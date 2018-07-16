@@ -47,10 +47,10 @@ static_assert( VLC_RENDERER_CAN_AUDIO == LIBVLC_RENDERER_CAN_AUDIO &&
                VLC_RENDERER_CAN_VIDEO == LIBVLC_RENDERER_CAN_VIDEO,
               "core/libvlc renderer flags mismatch" );
 
-const vlc_renderer_item_t *
-libvlc_renderer_item_to_vlc( const libvlc_renderer_item_t *p_item )
+vlc_renderer_item_t *
+libvlc_renderer_item_to_vlc( libvlc_renderer_item_t *p_item )
 {
-    return (const vlc_renderer_item_t*) p_item;
+    return (vlc_renderer_item_t*) p_item;
 }
 
 static void renderer_discovery_item_added( vlc_renderer_discovery_t *rd,
@@ -174,7 +174,10 @@ void
 libvlc_renderer_discoverer_stop( libvlc_renderer_discoverer_t *p_lrd )
 {
     if( p_lrd->p_rd != NULL )
+    {
         vlc_rd_release( p_lrd->p_rd );
+        p_lrd->p_rd = NULL;
+    }
 
     for( int i = 0; i < p_lrd->i_items; ++i )
         vlc_renderer_item_release( p_lrd->pp_items[i] );

@@ -51,6 +51,7 @@ typedef UINT D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS;
 
 struct filter_sys_t
 {
+    d3d11_handle_t                 hd3d;
     d3d11_device_t                 d3d_dev;
     ID3D11VideoDevice              *d3dviddev;
     ID3D11VideoContext             *d3dvidctx;
@@ -146,17 +147,17 @@ static int RenderPic( filter_t *p_filter, picture_t *p_outpic, picture_t *p_pic,
     if( p_cur && p_next )
     {
         picture_sys_t *picsys_next = ActivePictureSys(p_next);
-        if ( assert_ProcessorInput(p_filter, picsys_next) )
+        if ( unlikely(!picsys_next) || assert_ProcessorInput(p_filter, picsys_next) )
             return VLC_EGENERIC;
 
         picture_sys_t *picsys_cur = ActivePictureSys(p_cur);
-        if ( assert_ProcessorInput(p_filter, picsys_cur) )
+        if ( unlikely(!picsys_cur) || assert_ProcessorInput(p_filter, picsys_cur) )
             return VLC_EGENERIC;
 
         if ( p_prev )
         {
             picture_sys_t *picsys_prev = ActivePictureSys(p_prev);
-            if ( assert_ProcessorInput(p_filter, picsys_prev) )
+            if ( unlikely(!picsys_prev) || assert_ProcessorInput(p_filter, picsys_prev) )
                 return VLC_EGENERIC;
 
             stream.pInputSurface    = picsys_cur->processorInput;
@@ -177,7 +178,7 @@ static int RenderPic( filter_t *p_filter, picture_t *p_outpic, picture_t *p_pic,
     else
     {
         picture_sys_t *p_sys_src = ActivePictureSys(p_pic);
-        if ( assert_ProcessorInput(p_filter, p_sys_src) )
+        if ( unlikely(!p_sys_src) || assert_ProcessorInput(p_filter, p_sys_src) )
             return VLC_EGENERIC;
 
         /* first single frame */
@@ -185,10 +186,10 @@ static int RenderPic( filter_t *p_filter, picture_t *p_outpic, picture_t *p_pic,
     }
 
     RECT srcRect;
-    srcRect.left = 0;
-    srcRect.top = 0;
-    srcRect.right  = p_pic->format.i_visible_width;
-    srcRect.bottom = p_pic->format.i_visible_height;
+    srcRect.left   = p_pic->format.i_x_offset;
+    srcRect.top    = p_pic->format.i_y_offset;
+    srcRect.right  = srcRect.left + p_pic->format.i_visible_width;
+    srcRect.bottom = srcRect.top  + p_pic->format.i_visible_height;
     ID3D11VideoContext_VideoProcessorSetStreamSourceRect(p_sys->d3dvidctx, p_sys->videoProcessor,
                                                          0, TRUE, &srcRect);
     ID3D11VideoContext_VideoProcessorSetStreamDestRect(p_sys->d3dvidctx, p_sys->videoProcessor,
@@ -202,9 +203,9 @@ static int RenderPic( filter_t *p_filter, picture_t *p_outpic, picture_t *p_pic,
 
     D3D11_BOX box = {
         .top = 0,
-        .bottom = p_outpic->format.i_visible_height,
+        .bottom = p_outpic->format.i_height,
         .left = 0,
-        .right = p_outpic->format.i_visible_width,
+        .right = p_outpic->format.i_width,
         .back = 1,
     };
 
@@ -363,6 +364,9 @@ int D3D11OpenDeinterlace(vlc_object_t *obj)
         free(sys);
         return VLC_ENOOBJ;
     }
+
+    if (D3D11_Create(filter, &sys->hd3d) != VLC_SUCCESS)
+        goto error;
 
     hr = ID3D11Device_QueryInterface(sys->d3d_dev.d3ddevice, &IID_ID3D11VideoDevice, (void **)&sys->d3dviddev);
     if (FAILED(hr)) {
@@ -546,6 +550,8 @@ int D3D11OpenDeinterlace(vlc_object_t *obj)
 
     return VLC_SUCCESS;
 error:
+    if (sys->processorOutput)
+        ID3D11VideoProcessorOutputView_Release(sys->processorOutput);
     if (sys->outTexture)
         ID3D11Texture2D_Release(sys->outTexture);
     if (sys->videoProcessor)
@@ -558,6 +564,7 @@ error:
         ID3D11VideoDevice_Release(sys->d3dviddev);
     if (sys->d3d_dev.d3dcontext)
         D3D11_FilterReleaseInstance(&sys->d3d_dev);
+    D3D11_Destroy(&sys->hd3d);
     free(sys);
 
     return VLC_EGENERIC;
@@ -568,13 +575,15 @@ void D3D11CloseDeinterlace(vlc_object_t *obj)
     filter_t *filter = (filter_t *)obj;
     filter_sys_t *sys = filter->p_sys;
 
-    ID3D11VideoProcessorOutputView_Release(sys->processorOutput);
+    if (likely(sys->processorOutput))
+        ID3D11VideoProcessorOutputView_Release(sys->processorOutput);
     ID3D11Texture2D_Release(sys->outTexture);
     ID3D11VideoProcessor_Release(sys->videoProcessor);
     ID3D11VideoProcessorEnumerator_Release(sys->procEnumerator);
     ID3D11VideoContext_Release(sys->d3dvidctx);
     ID3D11VideoDevice_Release(sys->d3dviddev);
     D3D11_FilterReleaseInstance(&sys->d3d_dev);
+    D3D11_Destroy(&sys->hd3d);
 
     free(sys);
 }

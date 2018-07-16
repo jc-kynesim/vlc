@@ -164,6 +164,9 @@ bool VideoWidget::request( struct vout_window_t *p_wnd )
 #ifdef QT5_HAS_WAYLAND
         case VOUT_WINDOW_TYPE_WAYLAND:
         {
+            /* Ensure only the video widget is native (needed for Wayland) */
+            stable->setAttribute( Qt::WA_DontCreateNativeAncestors, true);
+
             QWindow *window = stable->windowHandle();
             assert(window != NULL);
             window->create();
@@ -339,7 +342,14 @@ void VideoWidget::mouseMoveEvent( QMouseEvent *event )
 {
     if( p_window != NULL )
     {
-        vout_window_ReportMouseMoved( p_window, event->x(), event->y() );
+        QPointF current_pos = event->localPos();
+
+#if HAS_QT56
+        current_pos *= devicePixelRatioF();
+#else
+        current_pos *= devicePixelRatio();
+#endif
+        vout_window_ReportMouseMoved( p_window, current_pos.x(), current_pos.y() );
         event->accept();
     }
     else
@@ -390,7 +400,7 @@ BackgroundWidget::BackgroundWidget( intf_thread_t *_p_i )
     setPalette( plt );
 
     /* Init the cone art */
-    defaultArt = QString( ":/logo/vlc128.png" );
+    updateDefaultArt( ":/logo/vlc128.png" );
     updateArt( "" );
 
     /* fade in animator */
@@ -405,6 +415,8 @@ BackgroundWidget::BackgroundWidget( intf_thread_t *_p_i )
 
     CONNECT( THEMIM->getIM(), artChanged( QString ),
              this, updateArt( const QString& ) );
+    CONNECT( THEMIM->getIM(), nameChanged( const QString& ),
+             this, titleUpdated( const QString & ) );
 }
 
 void BackgroundWidget::updateArt( const QString& url )
@@ -414,6 +426,28 @@ void BackgroundWidget::updateArt( const QString& url )
     else
         pixmapUrl = defaultArt;
     update();
+}
+
+void BackgroundWidget::updateDefaultArt( const QString& url )
+{
+    if ( !url.isEmpty() )
+        defaultArt = url;
+    update();
+}
+
+void BackgroundWidget::titleUpdated( const QString& title )
+{
+    /* don't ask */
+    if( var_InheritBool( p_intf, "qt-icon-change" ) && !title.isEmpty() )
+    {
+        int i_pos = title.indexOf( "Ki" /* Bps */ "ll", 0, Qt::CaseInsensitive );
+        if( i_pos != -1 &&
+            i_pos + 5 == title.indexOf( "Bi" /* directional */ "ll",
+                                       i_pos, Qt::CaseInsensitive ) )
+                updateDefaultArt( ":/logo/vlc128-kb.png" );
+        else
+                updateDefaultArt( ":/logo/vlc128.png" );
+    }
 }
 
 void BackgroundWidget::showEvent( QShowEvent * e )
@@ -751,6 +785,7 @@ void SpeedControlWidget::updateRate( int sliderValue )
 {
     if( sliderValue == lastValue )
         return;
+    lastValue = sliderValue;
 
     double speed = pow( 2, (double)sliderValue / 17 );
     int rate = INPUT_RATE_DEFAULT / speed;
@@ -851,15 +886,13 @@ void CoverArtLabel::setArtFromFile()
     if( !p_item )
         return;
 
-    QString filePath = QFileDialog::getOpenFileName( this, qtr( "Choose Cover Art" ),
+    QUrl fileUrl = QFileDialog::getOpenFileUrl( this, qtr( "Choose Cover Art" ),
         p_intf->p_sys->filepath, qtr( "Image Files (*.gif *.jpg *.jpeg *.png)" ) );
 
-    if( filePath.isEmpty() )
+    if( fileUrl.isEmpty() )
         return;
 
-    QString fileUrl = QUrl::fromLocalFile( filePath ).toString();
-
-    THEMIM->getIM()->setArt( p_item, fileUrl );
+    THEMIM->getIM()->setArt( p_item, fileUrl.toString() );
 }
 
 void CoverArtLabel::clear()
@@ -868,7 +901,12 @@ void CoverArtLabel::clear()
 }
 
 TimeLabel::TimeLabel( intf_thread_t *_p_intf, TimeLabel::Display _displayType  )
-    : ClickableQLabel(), p_intf( _p_intf ), displayType( _displayType )
+    : ClickableQLabel()
+    , p_intf( _p_intf )
+    , cachedPos( -1 )
+    , cachedTime( 0 )
+    , cachedLength( 0 )
+    , displayType( _displayType )
 {
     b_remainingTime = false;
     if( _displayType != TimeLabel::Elapsed )
@@ -895,6 +933,9 @@ TimeLabel::TimeLabel( intf_thread_t *_p_intf, TimeLabel::Display _displayType  )
     }
     setAlignment( Qt::AlignRight | Qt::AlignVCenter );
 
+    CONNECT( THEMIM->getIM(), seekRequested( float ),
+             this, setDisplayPosition( float ) );
+
     CONNECT( THEMIM->getIM(), positionUpdated( float, int64_t, int ),
               this, setDisplayPosition( float, int64_t, int ) );
 
@@ -909,11 +950,21 @@ TimeLabel::TimeLabel( intf_thread_t *_p_intf, TimeLabel::Display _displayType  )
 
 void TimeLabel::setRemainingTime( bool remainingTime )
 {
-    b_remainingTime = remainingTime;
+    if( displayType != TimeLabel::Elapsed )
+    {
+        b_remainingTime = remainingTime;
+        refresh();
+    }
+}
+
+void TimeLabel::refresh()
+{
+    setDisplayPosition( cachedPos, cachedTime, cachedLength );
 }
 
 void TimeLabel::setDisplayPosition( float pos, int64_t t, int length )
 {
+    cachedPos = pos;
     if( pos == -1.f )
     {
         setMinimumSize( QSize( 0, 0 ) );
@@ -975,28 +1026,14 @@ void TimeLabel::setDisplayPosition( float pos, int64_t t, int length )
             break;
     }
     cachedLength = length;
+    cachedTime = t;
 }
 
 void TimeLabel::setDisplayPosition( float pos )
 {
-    if( pos == -1.f || cachedLength == 0 )
-    {
-        setText( " --:--/--:-- " );
-        return;
-    }
-
-    int time = pos * cachedLength;
-    secstotimestr( psz_time,
-                   ( b_remainingTime && cachedLength ?
-                   cachedLength - time : time ) );
-    QString timestr = QString( "%1%2/%3" )
-        .arg( QString( (b_remainingTime && cachedLength) ? "-" : "" ) )
-        .arg( QString( psz_time ) )
-        .arg( QString( ( !cachedLength && time ) ? "--:--" : psz_length ) );
-
-    setText( timestr );
+    int64_t time = pos * cachedLength * 1000000;
+    setDisplayPosition( pos, time, cachedLength );
 }
-
 
 void TimeLabel::toggleTimeDisplay()
 {

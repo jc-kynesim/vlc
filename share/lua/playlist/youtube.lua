@@ -1,7 +1,7 @@
 --[[
  $Id$
 
- Copyright © 2007-2017 the VideoLAN team
+ Copyright © 2007-2018 the VideoLAN team
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -107,8 +107,8 @@ function js_descramble( sig, js_url )
     end
 
     -- Look for the descrambler function's name
-    -- c&&a.set("signature",br(c));
-    local descrambler = js_extract( js, "%.set%(\"signature\",([^)]-)%(" )
+    -- k.s&&f.set(k.sp||"signature",DK(k.s));
+    local descrambler = js_extract( js, "%.set%([^,]-\"signature\",([^)]-)%(" )
     if not descrambler then
         vlc.msg.dbg( "Couldn't extract youtube video URL signature descrambling function name" )
         return sig
@@ -227,8 +227,10 @@ end
 -- Probe function.
 function probe()
     return ( ( vlc.access == "http" or vlc.access == "https" )
-             and string.match( vlc.path, "^www%.youtube%.com/" )
              and (
+               string.match( vlc.path, "^www%.youtube%.com/" )
+            or string.match( vlc.path, "^gaming%.youtube%.com/" )
+             ) and (
                string.match( vlc.path, "/watch%?" ) -- the html page
             or string.match( vlc.path, "/live$" ) -- user live stream html page
             or string.match( vlc.path, "/live%?" ) -- user live stream html page
@@ -240,6 +242,10 @@ end
 
 -- Parse function.
 function parse()
+    if string.match( vlc.path, "^gaming%.youtube%.com/" ) then
+        url = string.gsub( vlc.path, "^gaming%.youtube%.com", "www.youtube.com" )
+        return { { path = vlc.access.."://"..url } }
+    end
     if string.match( vlc.path, "/watch%?" )
         or string.match( vlc.path, "/live$" )
         or string.match( vlc.path, "/live%?" )

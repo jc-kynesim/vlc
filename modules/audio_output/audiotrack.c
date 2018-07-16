@@ -179,12 +179,17 @@ struct aout_sys_t {
  * will be done by VLC */
 #define AUDIOTRACK_NATIVE_SAMPLERATE
 
+#define AUDIOTRACK_SESSION_ID_TEXT " Id of audio session the AudioTrack must be attached to"
+
 vlc_module_begin ()
     set_shortname( "AudioTrack" )
     set_description( "Android AudioTrack audio output" )
     set_capability( "audio output", 180 )
     set_category( CAT_AUDIO )
     set_subcategory( SUBCAT_AUDIO_AOUT )
+    add_integer( "audiotrack-session-id", 0,
+            AUDIOTRACK_SESSION_ID_TEXT, NULL, true )
+        change_private()
     add_sw_gain()
     add_shortcut( "audiotrack" )
     set_callbacks( Open, Close )
@@ -320,7 +325,7 @@ InitJNIFields( audio_output_t *p_aout, JNIEnv* env )
     jfields.AudioTrack.clazz = (jclass) (*env)->NewGlobalRef( env, clazz );
     CHECK_EXCEPTION( "NewGlobalRef", true );
 
-    GET_ID( GetMethodID, AudioTrack.ctor, "<init>", "(IIIIII)V", true );
+    GET_ID( GetMethodID, AudioTrack.ctor, "<init>", "(IIIIIII)V", true );
     GET_ID( GetMethodID, AudioTrack.release, "release", "()V", true );
     GET_ID( GetMethodID, AudioTrack.getState, "getState", "()I", true );
     GET_ID( GetMethodID, AudioTrack.play, "play", "()V", true );
@@ -815,9 +820,11 @@ AudioTrack_New( JNIEnv *env, audio_output_t *p_aout, unsigned int i_rate,
                 int i_channel_config, int i_format, int i_size )
 {
     aout_sys_t *p_sys = p_aout->sys;
+    jint session_id = var_InheritInteger( p_aout, "audiotrack-session-id" );
     jobject p_audiotrack = JNI_AT_NEW( jfields.AudioManager.STREAM_MUSIC,
                                        i_rate, i_channel_config, i_format,
-                                       i_size, jfields.AudioTrack.MODE_STREAM );
+                                       i_size, jfields.AudioTrack.MODE_STREAM,
+                                       session_id );
     if( CHECK_AT_EXCEPTION( "AudioTrack<init>" ) || !p_audiotrack )
     {
         msg_Warn( p_aout, "AudioTrack Init failed" ) ;
@@ -928,7 +935,8 @@ AudioTrack_HasEncoding( audio_output_t *p_aout, vlc_fourcc_t i_format,
     switch( i_format )
     {
         case VLC_CODEC_DTS:
-            if( MATCH_ENCODING_FLAG( ENCODING_DTS_HD ) )
+            if( MATCH_ENCODING_FLAG( ENCODING_DTS_HD )
+             && var_GetBool( p_aout, "dtshd" ) )
             {
                 *p_dtshd = true;
                 return true;
@@ -971,14 +979,13 @@ StartPassthrough( JNIEnv *env, audio_output_t *p_aout )
                 p_sys->fmt.i_physical_channels = AOUT_CHANS_7_1;
                 break;
             case VLC_CODEC_DTS:
-                if( b_dtshd && p_sys->fmt.i_rate >= 48000 )
+                p_sys->fmt.i_bytes_per_frame = 4;
+                p_sys->fmt.i_physical_channels = AOUT_CHANS_STEREO;
+                if( b_dtshd )
                 {
                     p_sys->fmt.i_rate = 192000;
                     p_sys->fmt.i_bytes_per_frame = 16;
                 }
-                else
-                    p_sys->fmt.i_bytes_per_frame = 4;
-                p_sys->fmt.i_physical_channels = AOUT_CHANS_STEREO;
                 break;
             case VLC_CODEC_EAC3:
                 p_sys->fmt.i_rate = 192000;

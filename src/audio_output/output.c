@@ -224,6 +224,8 @@ audio_output_t *aout_New (vlc_object_t *parent)
     var_AddCallback (aout, "mute", var_Copy, parent);
     var_Create (aout, "device", VLC_VAR_STRING);
     var_AddCallback (aout, "device", var_CopyDevice, parent);
+    /* TODO: 3.0 HACK: only way to signal DTS_HD to aout modules. */
+    var_Create (aout, "dtshd", VLC_VAR_BOOL);
 
     aout->event.volume_report = aout_VolumeNotify;
     aout->event.mute_report = aout_MuteNotify;
@@ -410,8 +412,12 @@ static void aout_PrepareStereoMode (audio_output_t *aout,
     vlc_value_t val, txt, default_val = { .i_int = AOUT_VAR_CHAN_UNSET };
     val.i_int = 0;
 
-    if (!AOUT_FMT_LINEAR(fmt))
+    if (!AOUT_FMT_LINEAR(fmt) || i_nb_input_channels == 1)
         return;
+
+    val.i_int = AOUT_VAR_CHAN_MONO;
+    txt.psz_string = _("Mono");
+    var_Change (aout, "stereo-mode", VLC_VAR_ADDCHOICE, &val, &txt);
 
     if (i_nb_input_channels != 2)
     {
@@ -484,6 +490,11 @@ static void aout_PrepareStereoMode (audio_output_t *aout,
             break;
         case AOUT_VAR_CHAN_HEADPHONES:
             filters_cfg->headphones = true;
+            break;
+        case AOUT_VAR_CHAN_MONO:
+            /* Remix all channels into one */
+            for (size_t i = 0; i < AOUT_CHANIDX_MAX; ++ i)
+                filters_cfg->remap[i] = AOUT_CHANIDX_LEFT;
             break;
         default:
             if (i_nb_input_channels == 2

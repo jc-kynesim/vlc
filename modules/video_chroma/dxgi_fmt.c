@@ -26,10 +26,6 @@
 
 #include <vlc_es.h>
 
-#define COBJMACROS
-#include <initguid.h>
-#include <d3d11.h>
-
 #include "dxgi_fmt.h"
 
 typedef struct
@@ -83,10 +79,11 @@ static const d3d_format_t d3d_formats[] = {
     { "NV11",     DXGI_FORMAT_NV11,           VLC_CODEC_I411,          8, 4, 1, { DXGI_FORMAT_R8_UNORM,           DXGI_FORMAT_R8G8_UNORM} },
 #endif
     { "I420",     DXGI_FORMAT_UNKNOWN,        VLC_CODEC_I420,          8, 2, 2, { DXGI_FORMAT_R8_UNORM,      DXGI_FORMAT_R8_UNORM, DXGI_FORMAT_R8_UNORM } },
-    { "R8G8B8A8", DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_RGBA,          8, 1, 1, { DXGI_FORMAT_R8G8B8A8_UNORM } },
-    { "VA_RGBA",  DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_D3D11_OPAQUE,  8, 1, 1, { DXGI_FORMAT_R8G8B8A8_UNORM } },
+    { "I420_10",  DXGI_FORMAT_UNKNOWN,        VLC_CODEC_I420_10L,     10, 2, 2, { DXGI_FORMAT_R16_UNORM,     DXGI_FORMAT_R16_UNORM, DXGI_FORMAT_R16_UNORM } },
     { "B8G8R8A8", DXGI_FORMAT_B8G8R8A8_UNORM, VLC_CODEC_BGRA,          8, 1, 1, { DXGI_FORMAT_B8G8R8A8_UNORM } },
     { "VA_BGRA",  DXGI_FORMAT_B8G8R8A8_UNORM, VLC_CODEC_D3D11_OPAQUE,  8, 1, 1, { DXGI_FORMAT_B8G8R8A8_UNORM } },
+    { "R8G8B8A8", DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_RGBA,          8, 1, 1, { DXGI_FORMAT_R8G8B8A8_UNORM } },
+    { "VA_RGBA",  DXGI_FORMAT_R8G8B8A8_UNORM, VLC_CODEC_D3D11_OPAQUE,  8, 1, 1, { DXGI_FORMAT_R8G8B8A8_UNORM } },
     { "R8G8B8X8", DXGI_FORMAT_B8G8R8X8_UNORM, VLC_CODEC_RGB32,         8, 1, 1, { DXGI_FORMAT_B8G8R8X8_UNORM } },
     { "B5G6R5",   DXGI_FORMAT_B5G6R5_UNORM,   VLC_CODEC_RGB16,         5, 1, 1, { DXGI_FORMAT_B5G6R5_UNORM } },
     { "I420_OPAQUE", DXGI_FORMAT_420_OPAQUE,  VLC_CODEC_D3D11_OPAQUE,  8, 2, 2, { DXGI_FORMAT_UNKNOWN } },
@@ -127,4 +124,37 @@ void DxgiFormatMask(DXGI_FORMAT format, video_format_t *fmt)
         fmt->i_gmask = 0x00ff0000;
         fmt->i_bmask = 0xff000000;
     }
+}
+
+const char *DxgiVendorStr(int gpu_vendor)
+{
+    static const struct {
+        unsigned   id;
+        const char name[32];
+    } vendors [] = {
+        { GPU_MANUFACTURER_AMD,      "ATI"         },
+        { GPU_MANUFACTURER_NVIDIA,   "NVIDIA"      },
+        { GPU_MANUFACTURER_VIA,      "VIA"         },
+        { GPU_MANUFACTURER_INTEL,    "Intel"       },
+        { GPU_MANUFACTURER_S3,       "S3 Graphics" },
+        { GPU_MANUFACTURER_QUALCOMM, "Qualcomm"    },
+        { 0,                         "Unknown" }
+    };
+
+    int i = 0;
+    for (i = 0; vendors[i].id != 0; i++) {
+        if (vendors[i].id == gpu_vendor)
+            break;
+    }
+    return vendors[i].name;
+}
+
+UINT DxgiResourceCount(const d3d_format_t *d3d_fmt)
+{
+    for (UINT count=0; count<D3D11_MAX_SHADER_VIEW; count++)
+    {
+        if (d3d_fmt->resourceFormat[count] == DXGI_FORMAT_UNKNOWN)
+            return count;
+    }
+    return D3D11_MAX_SHADER_VIEW;
 }

@@ -112,11 +112,13 @@ private:
 protected:
     void paintEvent( QPaintEvent *e ) Q_DECL_OVERRIDE;
     void showEvent( QShowEvent * e ) Q_DECL_OVERRIDE;
+    void updateDefaultArt( const QString& );
     static const int MARGIN = 5;
     QString defaultArt;
 public slots:
     void toggle(){ isVisible() ? hide() : show(); }
     void updateArt( const QString& );
+    void titleUpdated( const QString& );
 };
 
 class EasterEggBackgroundWidget : public BackgroundWidget
@@ -196,12 +198,15 @@ protected:
 private:
     intf_thread_t *p_intf;
     bool b_remainingTime;
+    float cachedPos;
+    int64_t cachedTime;
     int cachedLength;
     TimeLabel::Display displayType;
 
     char psz_length[MSTRTIME_MAX_SIZE];
     char psz_time[MSTRTIME_MAX_SIZE];
     void toggleTimeDisplay();
+    void refresh();
 private slots:
     void setRemainingTime( bool );
     void setDisplayPosition( float pos, int64_t time, int length );

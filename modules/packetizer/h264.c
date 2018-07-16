@@ -114,6 +114,7 @@ struct decoder_sys_t
     int i_next_block_flags;
     bool b_recovered;
     unsigned i_recoveryfnum;
+    unsigned i_recoverystartfnum;
 
     /* POC */
     h264_poc_context_t pocctx;
@@ -230,6 +231,33 @@ static void ActivateSets( decoder_t *p_dec, const h264_sequence_parameter_set_t 
                                       &p_dec->fmt_out.video.transfer,
                                       &p_dec->fmt_out.video.space,
                                       &p_dec->fmt_out.video.b_color_range_full );
+        }
+
+        if( p_dec->fmt_out.i_extra == 0 && p_pps )
+        {
+            const block_t *p_spsblock = NULL;
+            const block_t *p_ppsblock = NULL;
+            for( size_t i=0; i<=H264_SPS_ID_MAX && !p_spsblock; i++ )
+                if( p_sps == p_sys->sps[i].p_sps )
+                    p_spsblock = p_sys->sps[i].p_block;
+
+            for( size_t i=0; i<=H264_PPS_ID_MAX && !p_ppsblock; i++ )
+                if( p_pps == p_sys->pps[i].p_pps )
+                    p_ppsblock = p_sys->pps[i].p_block;
+
+            if( p_spsblock && p_ppsblock )
+            {
+                size_t i_alloc = p_ppsblock->i_buffer + p_spsblock->i_buffer;
+                p_dec->fmt_out.p_extra = malloc( i_alloc );
+                if( p_dec->fmt_out.p_extra )
+                {
+                    uint8_t*p_buf = p_dec->fmt_out.p_extra;
+                    p_dec->fmt_out.i_extra = i_alloc;
+                    memcpy( &p_buf[0], p_spsblock->p_buffer, p_spsblock->i_buffer );
+                    memcpy( &p_buf[p_spsblock->i_buffer], p_ppsblock->p_buffer,
+                            p_ppsblock->i_buffer );
+                }
+            }
         }
     }
 }
@@ -762,6 +790,7 @@ static block_t *OutputPicture( decoder_t *p_dec )
          p_sys->i_recoveryfnum == UINT_MAX )
     {
         p_sys->i_recoveryfnum = p_sys->slice.i_frame_num + p_sys->i_recovery_frame_cnt;
+        p_sys->i_recoverystartfnum = p_sys->slice.i_frame_num;
         b_need_sps_pps = true; /* SPS/PPS must be inserted for SEI recovery */
         msg_Dbg( p_dec, "Recovering using SEI, prerolling %u reference pics", p_sys->i_recovery_frame_cnt );
     }
@@ -770,10 +799,12 @@ static block_t *OutputPicture( decoder_t *p_dec )
     {
         assert(p_sys->b_recovered == false);
         const unsigned maxFrameNum = 1 << (p_sps->i_log2_max_frame_num + 4);
-        if( (p_sys->i_recoveryfnum > maxFrameNum &&
-            (unsigned)p_sys->slice.i_frame_num <= maxFrameNum / 2 &&
-            (unsigned)p_sys->slice.i_frame_num >= p_sys->i_recoveryfnum % maxFrameNum ) ||
-            (unsigned)p_sys->slice.i_frame_num >= p_sys->i_recoveryfnum )
+
+        if( ( p_sys->i_recoveryfnum > maxFrameNum &&
+              p_sys->slice.i_frame_num < p_sys->i_recoverystartfnum &&
+              p_sys->slice.i_frame_num >= p_sys->i_recoveryfnum % maxFrameNum ) ||
+            ( p_sys->i_recoveryfnum <= maxFrameNum &&
+              p_sys->slice.i_frame_num >= p_sys->i_recoveryfnum ) )
         {
             p_sys->i_recoveryfnum = UINT_MAX;
             p_sys->b_recovered = true;

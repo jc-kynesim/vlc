@@ -263,10 +263,13 @@ static void SDTCallBack( demux_t *p_demux, dvbpsi_sdt_t *p_sdt )
                 msg_Dbg( p_demux, "    - type=%"PRIu8" provider=%s name=%s",
                          pD->i_service_type, str1, str2 );
 
-                vlc_meta_SetTitle( p_meta, str2 );
-                vlc_meta_SetPublisher( p_meta, str1 );
-                if( pD->i_service_type >= 0x01 && pD->i_service_type <= 0x10 )
-                    psz_type = ppsz_type[pD->i_service_type];
+                if( !str2 || strcmp( "Service01", str2 ) ) /* Skip bogus libav/ffmpeg SDT */
+                {
+                    vlc_meta_SetTitle( p_meta, str2 );
+                    vlc_meta_SetPublisher( p_meta, str1 );
+                    if( pD->i_service_type >= 0x01 && pD->i_service_type <= 0x10 )
+                        psz_type = ppsz_type[pD->i_service_type];
+                }
                 free( str1 );
                 free( str2 );
             }
@@ -779,13 +782,9 @@ static void SINewTableCallBack( dvbpsi_t *h, uint8_t i_table_id,
              ( i_table_id == 0x4e || /* Current/Following */
                (i_table_id >= 0x50 && i_table_id <= 0x5f) ) ) /* Schedule */
     {
-        /* Do not attach decoders if we can't decode timestamps */
-        if( p_demux->p_sys->i_network_time > 0 )
-        {
-            if( !dvbpsi_eit_attach( h, i_table_id, i_extension,
-                                    (dvbpsi_eit_callback)EITCallBack, p_demux ) )
-                msg_Err( p_demux, "SINewTableCallback: failed attaching EITCallback" );
-        }
+        if( !dvbpsi_eit_attach( h, i_table_id, i_extension,
+                                (dvbpsi_eit_callback)EITCallBack, p_demux ) )
+            msg_Err( p_demux, "SINewTableCallback: failed attaching EITCallback" );
     }
     else if( p_pid->i_pid == TS_SI_TDT_PID &&
             (i_table_id == TS_SI_TDT_TABLE_ID || i_table_id == TS_SI_TOT_TABLE_ID) )

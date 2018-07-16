@@ -1,6 +1,5 @@
 #!/bin/sh
 set -e
-set -x
 
 info()
 {
@@ -16,8 +15,12 @@ OSX_KERNELVERSION=`uname -r | cut -d. -f1`
 SDKROOT=`xcode-select -print-path`/Platforms/MacOSX.platform/Developer/SDKs/MacOSX$OSX_VERSION.sdk
 VLCBUILDDIR=""
 
-CORE_COUNT=`sysctl -n machdep.cpu.core_count`
+CORE_COUNT=`getconf NPROCESSORS_ONLN 2>&1`
 let JOBS=$CORE_COUNT+1
+
+if [ ! -z "$VLC_FORCE_KERNELVERSION" ]; then
+    OSX_KERNELVERSION="$VLC_FORCE_KERNELVERSION"
+fi
 
 usage()
 {
@@ -33,9 +36,11 @@ OPTIONS:
    -r            Rebuild everything (tools, contribs, vlc)
    -c            Recompile contribs from sources
    -p            Build packages for all artifacts
+   -i <n|u>      Create an installable package (n: nightly, u: unsigned stripped release archive)
    -k <sdk>      Use the specified sdk (default: $SDKROOT)
    -a <arch>     Use the specified arch (default: $ARCH)
    -C            Use the specified VLC build dir
+   -b <url>      Enable breakpad support and send crash reports to this URL
 EOF
 
 }
@@ -50,7 +55,7 @@ spopd()
     popd > /dev/null
 }
 
-while getopts "hvrcpk:a:j:C:" OPTION
+while getopts "hvrcpi:k:a:j:C:b:" OPTION
 do
      case $OPTION in
          h)
@@ -70,6 +75,9 @@ do
          p)
              PACKAGE="yes"
          ;;
+         i)
+             PACKAGETYPE=$OPTARG
+         ;;
          a)
              ARCH=$OPTARG
          ;;
@@ -81,6 +89,13 @@ do
          ;;
          C)
              VLCBUILDDIR=$OPTARG
+         ;;
+         b)
+             BREAKPAD=$OPTARG
+         ;;
+         *)
+             usage
+             exit 1
          ;;
      esac
 done
@@ -117,7 +132,7 @@ export CXX="`xcrun --find clang++`"
 export OBJC="`xcrun --find clang`"
 export OSX_VERSION
 export SDKROOT
-export PATH="${vlcroot}/extras/tools/build/bin:${vlcroot}/contrib/${TRIPLET}/bin:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:${PATH}"
+export PATH="${vlcroot}/extras/tools/build/bin:${vlcroot}/contrib/${TRIPLET}/bin:${VLC_PATH}:/bin:/sbin:/usr/bin:/usr/sbin"
 
 # Select avcodec flavor to compile contribs with
 export USE_FFMPEG=1
@@ -161,6 +176,7 @@ spushd "${vlcroot}/extras/tools"
 ./bootstrap > $out
 if [ "$REBUILD" = "yes" ]; then
     make clean
+    ./bootstrap > $out
 fi
 make > $out
 spopd
@@ -180,10 +196,14 @@ export CFLAGS="-Werror=partial-availability"
 export CXXFLAGS="-Werror=partial-availability"
 export OBJCFLAGS="-Werror=partial-availability"
 
+export EXTRA_CFLAGS="-isysroot $SDKROOT -mmacosx-version-min=$MINIMAL_OSX_VERSION -DMACOSX_DEPLOYMENT_TARGET=$MINIMAL_OSX_VERSION"
+export EXTRA_LDFLAGS="-Wl,-syslibroot,$SDKROOT -mmacosx-version-min=$MINIMAL_OSX_VERSION -isysroot $SDKROOT -DMACOSX_DEPLOYMENT_TARGET=$MINIMAL_OSX_VERSION"
+export XCODE_FLAGS="MACOSX_DEPLOYMENT_TARGET=$MINIMAL_OSX_VERSION -sdk macosx$OSX_VERSION WARNING_CFLAGS=-Werror=partial-availability"
+
 info "Building contribs"
 spushd "${vlcroot}/contrib"
 mkdir -p contrib-$TRIPLET && cd contrib-$TRIPLET
-../bootstrap --build=$TRIPLET --host=$TRIPLET --enable-libplacebo > $out
+../bootstrap --build=$TRIPLET --host=$TRIPLET > $out
 if [ "$REBUILD" = "yes" ]; then
     make clean
 fi
@@ -206,6 +226,10 @@ spopd
 unset CFLAGS
 unset CXXFLAGS
 unset OBJCFLAGS
+
+unset EXTRA_CFLAGS
+unset EXTRA_LDFLAGS
+unset XCODE_FLAGS
 
 # Enable debug symbols by default
 export CFLAGS="-g"
@@ -232,6 +256,11 @@ fi
 # vlc/configure
 #
 
+CONFIGFLAGS=""
+if [ ! -z "$BREAKPAD" ]; then
+     CONFIGFLAGS="$CONFIGFLAGS --with-breakpad=$BREAKPAD"
+fi
+
 if [ "${vlcroot}/configure" -nt Makefile ]; then
 
   ${vlcroot}/extras/package/macosx/configure.sh \
@@ -239,6 +268,7 @@ if [ "${vlcroot}/configure" -nt Makefile ]; then
       --host=$TRIPLET \
       --with-macosx-version-min=$MINIMAL_OSX_VERSION \
       --with-macosx-sdk=$SDKROOT \
+      $CONFIGFLAGS \
       $VLC_CONFIGURE_ARGS > $out
 fi
 
@@ -259,7 +289,29 @@ info "Preparing VLC.app"
 make VLC.app
 
 
-if [ "$PACKAGE" = "yes" ]; then
+if [ "$PACKAGETYPE" = "u" ]; then
+    info "Copying app with debug symbols into VLC-debug.app and stripping"
+    rm -rf VLC-debug.app
+    cp -Rp VLC.app VLC-debug.app
+
+    # Workaround for breakpad symbol parsing:
+    # Symbols must be uploaded for libvlc(core).dylib, not libvlc(core).x.dylib
+    (cd VLC-debug.app/Contents/MacOS/lib/ && rm libvlccore.dylib && mv libvlccore.*.dylib libvlccore.dylib)
+    (cd VLC-debug.app/Contents/MacOS/lib/ && rm libvlc.dylib && mv libvlc.*.dylib libvlc.dylib)
+
+
+    find VLC.app/ -name "*.dylib" -exec strip -x {} \;
+    find VLC.app/ -type f -name "VLC" -exec strip -x {} \;
+    find VLC.app/ -type f -name "Sparkle" -exec strip -x {} \;
+    find VLC.app/ -type f -name "Growl" -exec strip -x {} \;
+    find VLC.app/ -type f -name "Breakpad" -exec strip -x {} \;
+
+    bin/vlc-cache-gen VLC.app/Contents/MacOS/plugins
+
+    info "Building VLC release archive"
+    make package-macosx-release
+    shasum -a 512 vlc-*-release.zip
+elif [ "$PACKAGETYPE" = "n" -o "$PACKAGE" = "yes" ]; then
     info "Building VLC dmg package"
     make package-macosx
 fi

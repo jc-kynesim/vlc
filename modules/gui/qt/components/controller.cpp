@@ -350,7 +350,7 @@ QWidget *AbstractController::createWidget( buttonType_e button, int options )
         }
         break;
     case INPUT_SLIDER: {
-        SeekSlider *slider = new SeekSlider( Qt::Horizontal, NULL, !b_shiny );
+        SeekSlider *slider = new SeekSlider( p_intf, Qt::Horizontal, NULL, !b_shiny );
         SeekPoints *chapters = new SeekPoints( this, p_intf );
         CONNECT( THEMIM->getIM(), chapterChanged( bool ), chapters, update() );
         slider->setChapters( chapters );
@@ -800,6 +800,10 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
     b_fullscreen        = false;
     i_hide_timeout      = 1;
     i_screennumber      = -1;
+#ifdef QT5_HAS_WAYLAND
+    b_hasWayland = QGuiApplication::platformName()
+           .startsWith(QLatin1String("wayland"), Qt::CaseInsensitive);
+#endif
 
     vout.clear();
 
@@ -846,7 +850,6 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
     previousPosition = getSettings()->value( "FullScreen/pos" ).toPoint();
     screenRes = getSettings()->value( "FullScreen/screen" ).toRect();
     isWideFSC = getSettings()->value( "FullScreen/wide" ).toBool();
-    i_screennumber = var_InheritInteger( p_intf, "qt-fullscreen-screennumber" );
 
     CONNECT( this, fullscreenChanged( bool ), THEMIM, changeFullscreen( bool ) );
 }
@@ -869,11 +872,23 @@ void FullscreenControllerWidget::restoreFSC()
         setMinimumWidth( FSC_WIDTH );
         adjustSize();
 
+        if ( targetScreen() < 0 )
+            return;
+
         QRect currentRes = QApplication::desktop()->screenGeometry( targetScreen() );
-        windowHandle()->setScreen(QGuiApplication::screens()[targetScreen()]);
+        QWindow *wh = windowHandle();
+        if ( wh != Q_NULLPTR )
+        {
+#ifdef QT5_HAS_WAYLAND
+            if ( !b_hasWayland )
+                wh->setScreen(QGuiApplication::screens()[targetScreen()]);
+#else
+            wh->setScreen(QGuiApplication::screens()[targetScreen()]);
+#endif
+        }
 
         if( currentRes == screenRes &&
-            QApplication::desktop()->screen()->geometry().contains( previousPosition, true ) )
+            currentRes.contains( previousPosition, true ) )
         {
             /* Restore to the last known position */
             move( previousPosition );
@@ -984,6 +999,13 @@ void FullscreenControllerWidget::toggleFullwidth()
     restoreFSC();
 }
 
+
+void FullscreenControllerWidget::setTargetScreen(int screennumber)
+{
+    i_screennumber = screennumber;
+}
+
+
 int FullscreenControllerWidget::targetScreen()
 {
     if( i_screennumber < 0 || i_screennumber >= QApplication::desktop()->screenCount() )
@@ -1024,7 +1046,11 @@ void FullscreenControllerWidget::customEvent( QEvent *event )
             b_fs = b_fullscreen;
             vlc_mutex_unlock( &lock );
 
-            if( b_fs )
+            if( b_fs && ( isHidden()
+#if HAVE_TRANSPARENCY
+                 || p_slowHideTimer->isActive()
+#endif
+                    ) )
                 showFSC();
 
             break;

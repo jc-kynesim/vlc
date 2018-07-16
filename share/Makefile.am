@@ -39,7 +39,8 @@ dist_icons16_DATA = icons/16x16/vlc.png icons/16x16/vlc.xpm
 dist_icons32_DATA = icons/32x32/vlc.png icons/32x32/vlc.xpm \
 			icons/32x32/vlc-xmas.xpm
 dist_icons48_DATA = icons/48x48/vlc.png icons/48x48/vlc-xmas.png
-dist_icons128_DATA = icons/128x128/vlc.png icons/128x128/vlc-xmas.png
+dist_icons128_DATA = icons/128x128/vlc.png icons/128x128/vlc-xmas.png \
+                     icons/128x128/vlc-kb.png
 dist_icons256_DATA = icons/256x256/vlc.png
 
 nobase_dist_vlcdata_SCRIPTS = \
@@ -56,6 +57,7 @@ EXTRA_DIST += \
 	$(DIST_solid)
 
 nobase_vlcdata_DATA =
+nobase_vlclib_DATA =
 nobase_dist_vlcdata_DATA =
 if BUILD_SKINS
 nobase_vlcdata_DATA += skins2/default.vlt
@@ -116,7 +118,7 @@ luac_verbose_0 = @echo "  LUAC   $@";
 	$(luac_verbose)$(LUAC) -o $@ $<
 
 if BUILD_LUA
-nobase_vlcdata_DATA += \
+nobase_vlclib_DATA += \
 	lua/extensions/VLSub.luac \
 	lua/intf/cli.luac \
 	lua/intf/dummy.luac \
@@ -151,9 +153,7 @@ nobase_vlcdata_DATA += \
 	lua/playlist/vocaroo.luac \
 	lua/playlist/youtube.luac \
 	lua/playlist/twitch.luac \
-	lua/sd/fmc.luac \
 	lua/sd/icecast.luac \
-	lua/sd/icast.luac \
 	lua/sd/jamendo.luac \
 	$(NULL)
 
@@ -272,7 +272,6 @@ EXTRA_DIST += \
 	lua/playlist/appletrailers.lua \
 	lua/playlist/bbc_co_uk.lua \
 	lua/playlist/break.lua \
-	lua/playlist/canalplus.lua \
 	lua/playlist/cue.lua \
 	lua/playlist/dailymotion.lua \
 	lua/playlist/extreme.lua \
@@ -286,7 +285,6 @@ EXTRA_DIST += \
 	lua/playlist/mpora.lua \
 	lua/playlist/newgrounds.lua \
 	lua/playlist/pinkbike.lua \
-	lua/playlist/pluzz.lua \
 	lua/playlist/rockbox_fm_presets.lua \
 	lua/playlist/soundcloud.lua \
 	lua/playlist/vimeo.lua \

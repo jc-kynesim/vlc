@@ -46,6 +46,7 @@
 
 #include "../../codec/jpeg2000.h"
 #include "../../codec/opus_header.h"
+#include "../../packetizer/dts_header.h"
 
 #include "sections.h"
 #include "ts_sl.h"
@@ -1250,9 +1251,12 @@ static bool PMTSetupEsHDMV( demux_t *p_demux, ts_es_t *p_es,
     case 0x81:
         es_format_Change( p_fmt, AUDIO_ES, VLC_CODEC_A52 );
         break;
-    case 0x82:
     case 0x85: /* DTS-HD High resolution audio */
     case 0x86: /* DTS-HD Master audio */
+        es_format_Change( p_fmt, AUDIO_ES, VLC_CODEC_DTS );
+        p_fmt->i_profile = PROFILE_DTS_HD;
+        break;
+    case 0x82:
     case 0xA2: /* Secondary DTS audio */
         es_format_Change( p_fmt, AUDIO_ES, VLC_CODEC_DTS );
         break;
@@ -1573,6 +1577,12 @@ static void FillPESFromDvbpsiES( demux_t *p_demux,
     {
         SetupAudioExtendedDescriptors( p_demux, p_pes->p_es, p_dvbpsies );
     }
+
+    /* Disable dolbyvision */
+    if ( registration_type == TS_PMT_REGISTRATION_BLURAY &&
+         p_dvbpsies->i_pid == 0x1015 &&
+         PMTEsHasRegistration( p_demux, p_dvbpsies, "HDMV" ) )
+        p_pes->p_es->fmt.i_priority = ES_PRIORITY_NOT_DEFAULTABLE;
 
     /* PES packets usually contain truncated frames */
     p_pes->p_es->fmt.b_packetized = false;

@@ -303,6 +303,23 @@ static QString ChangeFiltersString( struct intf_thread_t *p_intf, const char *ps
     else if (!b_add)
         list.removeAll( psz_name );
 
+#ifdef _WIN32
+    /* VLC 3.x HACK: "adjust" d3d* filters can't work with other SW filters.
+     * There is not way to fix it until VLC 4.0. As a workaround, force the
+     * adjust filter to be added at the end of the list. Therefore the SW
+     * "adjust" filter will be used since the previous filter will be SW. */
+    if( b_add && strcmp( psz_filter_type, "video-filter" ) == 0
+     && strcmp( psz_name, "adjust" ) != 0 )
+    {
+        QList<QString>::iterator it = std::find(list.begin(), list.end(), "adjust");
+        if( it != list.end() )
+        {
+            list.erase(it);
+            list << "adjust";
+        }
+    }
+#endif
+
     free( psz_chain );
 
     return list.join( ":" );
@@ -358,22 +375,26 @@ void ExtVideo::updateFilters()
 
 void ExtVideo::browseLogo()
 {
+    const QStringList schemes = QStringList(QStringLiteral("file"));
     QString filter = QString( "%1 (*.png *.jpg);;%2 (*)" )
                         .arg( qtr("Image Files") )
                         .arg( TITLE_EXTENSIONS_ALL );
-    QString file = QFileDialog::getOpenFileName( NULL, qtr( "Logo filenames" ),
-                   p_intf->p_sys->filepath, filter );
+    QString file = QFileDialog::getOpenFileUrl( NULL, qtr( "Logo filenames" ),
+                   p_intf->p_sys->filepath, filter,
+                   NULL, QFileDialog::Options(), schemes ).toLocalFile();
 
     UPDATE_AND_APPLY_TEXT( logoFileText, file );
 }
 
 void ExtVideo::browseEraseFile()
 {
+    const QStringList schemes = QStringList(QStringLiteral("file"));
     QString filter = QString( "%1 (*.png *.jpg);;%2 (*)" )
                         .arg( qtr("Image Files") )
                         .arg( TITLE_EXTENSIONS_ALL );
-    QString file = QFileDialog::getOpenFileName( NULL, qtr( "Image mask" ),
-                   p_intf->p_sys->filepath, filter );
+    QString file = QFileDialog::getOpenFileUrl( NULL, qtr( "Image mask" ),
+                   p_intf->p_sys->filepath, filter,
+                   NULL, QFileDialog::Options(), schemes ).toLocalFile();
 
     UPDATE_AND_APPLY_TEXT( eraseMaskText, file );
 }
@@ -1313,10 +1334,10 @@ StereoWidener::StereoWidener( intf_thread_t *p_intf, QWidget *parent )
     i_smallfont = -1;
     const FilterSliderData::slider_data_t a[4] =
     {
-        { "stereowiden-delay",     N_("Delay time"),    "ms", 1.0, 100,  20, 1.0, 1.0 },
-        { "stereowiden-feedback",  N_("Feedback gain"), "%",  0.0, 0.9, 0.3, 0.1, 1.0 },
-        { "stereowiden-crossfeed", N_("Crossfeed"),     "%",  0.0, 0.8, 0.3, 0.1, 1.0 },
-        { "stereowiden-dry-mix",   N_("Dry mix"),       "%",  0.0, 1.0, 0.8, 0.1, 1.0 },
+        { "stereowiden-delay",     qtr("Delay time"),    "ms", 1.0, 100,  20, 1.0, 1.0 },
+        { "stereowiden-feedback",  qtr("Feedback gain"), "%",  0.0, 0.9, 0.3, 0.1, 1.0 },
+        { "stereowiden-crossfeed", qtr("Crossfeed"),     "%",  0.0, 0.8, 0.3, 0.1, 1.0 },
+        { "stereowiden-dry-mix",   qtr("Dry mix"),       "%",  0.0, 1.0, 0.8, 0.1, 1.0 },
     };
     for( int i=0; i<4 ;i++ ) controls.append( a[i] );
     build();
@@ -1330,7 +1351,7 @@ PitchShifter::PitchShifter( intf_thread_t *p_intf, QWidget *parent )
     : AudioFilterControlWidget( p_intf, parent, "scaletempo_pitch" )
 {
     i_smallfont = -1;
-    controls.append( { "pitch-shift", N_("Adjust pitch"), "semitones",
+    controls.append( { "pitch-shift", qtr("Adjust pitch"), "semitones",
                         -12.0, 12.0, 0.0, 0.25, 1.0 } );
     build();
 }

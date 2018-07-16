@@ -1,10 +1,11 @@
 /*****************************************************************************
  * VLCRendererMenuController.m: Controller class for the renderer menu
  *****************************************************************************
- * Copyright (C) 2016 VLC authors and VideoLAN
+ * Copyright (C) 2016-2018 VLC authors and VideoLAN
  * $Id$
  *
  * Authors: Marvin Scholz <epirat07 at gmail dot com>
+ *          Felix Paul Kühne <fkuehne -at- videolan -dot- org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -59,23 +60,11 @@
 - (void)awakeFromNib
 {
     _selectedItem = _rendererNoneItem;
-    [self setupMenu];
 }
 
 - (void)dealloc
 {
     [self stopRendererDiscoveries];
-}
-
-- (void)setupMenu
-{
-    [_rendererDiscoveryState setTitle:_NS("Renderer discovery off")];
-    [_rendererDiscoveryState setEnabled:NO];
-
-    [_rendererDiscoveryToggle setTitle:_NS("Enable renderer discovery")];
-
-    [_rendererNoneItem setTitle:_NS("No renderer")];
-    [_rendererNoneItem setState:NSOnState];
 }
 
 - (void)loadRendererDiscoveries
@@ -107,10 +96,25 @@
 
 - (void)addRendererItem:(VLCRendererItem *)item
 {
+    // Check if the item is already selected
+    if (_selectedItem.representedObject != nil)
+    {
+        VLCRendererItem *selected_rd_item = _selectedItem.representedObject;
+        if ([selected_rd_item.identifier isEqualToString:item.identifier])
+        {
+            [_selectedItem setRepresentedObject:item];
+            return;
+        }
+    }
+
     // Create a menu item
     NSMenuItem *menuItem = [[NSMenuItem alloc] initWithTitle:item.name
                                                       action:@selector(selectRenderer:)
                                                keyEquivalent:@""];
+    if (item.capabilityFlags & VLC_RENDERER_CAN_VIDEO)
+        [menuItem setImage:[NSImage imageNamed:@"sidebar-movie"]];
+    else
+        [menuItem setImage:[NSImage imageNamed:@"sidebar-music"]];
     [menuItem setTarget:self];
     [menuItem setRepresentedObject:item];
     [_rendererMenu insertItem:menuItem atIndex:[_rendererMenu indexOfItem:_rendererNoneItem] + 1];
@@ -121,18 +125,15 @@
     NSInteger index = [_rendererMenu indexOfItemWithRepresentedObject:item];
     if (index != NSNotFound) {
         NSMenuItem *menuItem = [_rendererMenu itemAtIndex:index];
-        if (menuItem == _selectedItem) {
-            [self selectRenderer:_rendererNoneItem];
-        }
-        [_rendererMenu removeItemAtIndex:index];
+        // Don't remove selected item
+        if (menuItem != _selectedItem)
+            [_rendererMenu removeItemAtIndex:index];
     }
 }
 
 - (void)startRendererDiscoveries
 {
     _isDiscoveryEnabled = YES;
-    [_rendererDiscoveryState setTitle:_NS("Renderer discovery on")];
-    [_rendererDiscoveryToggle setTitle:_NS("Disable renderer discovery")];
     for (VLCRendererDiscovery *dc in _rendererDiscoveries) {
         [dc startDiscovery];
     }
@@ -141,8 +142,6 @@
 - (void)stopRendererDiscoveries
 {
     _isDiscoveryEnabled = NO;
-    [_rendererDiscoveryState setTitle:_NS("Renderer discovery off")];
-    [_rendererDiscoveryToggle setTitle:_NS("Enable renderer discovery")];
     for (VLCRendererDiscovery *dc in _rendererDiscoveries) {
         [dc stopDiscovery];
     }
@@ -156,8 +155,10 @@
     return [menuItem isEnabled];
 }
 
-- (IBAction)selectRenderer:(NSMenuItem *)sender
+- (void)selectRenderer:(NSMenuItem *)sender
 {
+    [_rendererNoneItem setState:NSOffState];
+
     [_selectedItem setState:NSOffState];
     [sender setState:NSOnState];
     _selectedItem = sender;
@@ -169,22 +170,15 @@
         return;
 
     if (item) {
-        [item setSoutForPlaylist:playlist];
-        [item setDemuxFilterForPlaylist:playlist];
+        [item setRendererForPlaylist:playlist];
     } else {
-        [self unsetSoutForPlaylist:playlist];
-        [self unsetDemuxFilterForPlaylist:playlist];
+        [self unsetRendererForPlaylist:playlist];
     }
 }
 
-- (void)unsetSoutForPlaylist:(playlist_t*)playlist
+- (void)unsetRendererForPlaylist:(playlist_t*)playlist
 {
-    var_SetString(playlist, "sout", "");
-}
-
-- (void)unsetDemuxFilterForPlaylist:(playlist_t*)playlist
-{
-    var_SetString(playlist, "demux-filter", "");
+    playlist_SetRenderer(playlist, NULL);
 }
 
 #pragma mark VLCRendererDiscovery delegate methods

@@ -1,4 +1,4 @@
-List of vlc plugins (490):
+List of vlc plugins (491):
 $Id$
 
  * a52: A/52 audio decoder plugin, using liba52
@@ -53,6 +53,7 @@ $Id$
  * audiobargraph_a: audiobargraph audio plugin
  * audiobargraph_v: audiobargraph video plugin
  * audioscrobbler: AudioScrobbler/Last.fm submission plugin
+ * audiotoolboxmidi: AudioToolbox MIDI decoder plugin for macOS
  * audiounit_ios: AudioUnit output plugin for iOS
  * auhal: Audio output for Mac OS X based on the AUHAL API
  * avahi: Zeroconf services discovery
@@ -465,8 +466,8 @@ $Id$
  * win_msg: Windows Messages module
  * windrive: Windows logical disc drives
  * wingdi: WIN 32 / WIN CE GDI video output
+ * winhibit: Win32 screensaver inhibition
  * winstore: Windows Store App audio output
- * wl_screenshooter: Wayland screen capture input
  * wl_shell: Wayland shell surface window provider
  * wl_shm: Wayland shared memory video output
  * wma_fixed: wma decoder using integer decoder from Rockbox

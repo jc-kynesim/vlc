@@ -68,6 +68,13 @@ static bool GetLock(filter_t *p_filter, LPDIRECT3DSURFACE9 d3d,
     return true;
 }
 
+static inline void plane_SwapUV(plane_t p[PICTURE_PLANE_MAX])
+{
+    uint8_t *buf = p[V_PLANE].p_pixels;
+    p[V_PLANE].p_pixels = p[U_PLANE].p_pixels;
+    p[U_PLANE].p_pixels = buf;
+}
+
 static void DXA9_YV12(filter_t *p_filter, picture_t *src, picture_t *dst)
 {
     copy_cache_t *p_copy_cache = (copy_cache_t*) p_filter->p_sys;
@@ -115,7 +122,8 @@ static void DXA9_YV12(filter_t *p_filter, picture_t *src, picture_t *dst)
             dst->p[1].p_pixels = dst->p[2].p_pixels;
             dst->p[2].p_pixels = tmp;
         }
-    } else if (desc.Format == MAKEFOURCC('N','V','1','2')) {
+    } else if (desc.Format == MAKEFOURCC('N','V','1','2')
+            || desc.Format == MAKEFOURCC('P','0','1','0')) {
         const uint8_t *plane[2] = {
             lock.pBits,
             (uint8_t*)lock.pBits + lock.Pitch * desc.Height
@@ -124,9 +132,17 @@ static void DXA9_YV12(filter_t *p_filter, picture_t *src, picture_t *dst)
             lock.Pitch,
             lock.Pitch,
         };
-        Copy420_SP_to_P(dst, plane, pitch,
-                        src->format.i_visible_height + src->format.i_y_offset, p_copy_cache);
-        picture_SwapUV(dst);
+        if (desc.Format == MAKEFOURCC('N','V','1','2'))
+            Copy420_SP_to_P(dst, plane, pitch,
+                            __MIN(desc.Height, src->format.i_y_offset + src->format.i_visible_height),
+                            p_copy_cache);
+        else
+            Copy420_16_SP_to_P(dst, plane, pitch,
+                              __MIN(desc.Height, src->format.i_y_offset + src->format.i_visible_height),
+                              6, p_copy_cache);
+
+        if (dst->format.i_chroma != VLC_CODEC_I420 && dst->format.i_chroma != VLC_CODEC_I420_10L)
+            picture_SwapUV(dst);
     } else {
         msg_Err(p_filter, "Unsupported DXA9 conversion from 0x%08X to YV12", desc.Format);
     }
@@ -145,7 +161,8 @@ static void DXA9_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
     if (!GetLock(p_filter, p_sys->surface, &lock, &desc))
         return;
 
-    if (desc.Format == MAKEFOURCC('N','V','1','2')) {
+    if (desc.Format == MAKEFOURCC('N','V','1','2')
+     || desc.Format == MAKEFOURCC('P','0','1','0')) {
         const uint8_t *plane[2] = {
             lock.pBits,
             (uint8_t*)lock.pBits + lock.Pitch * desc.Height
@@ -155,7 +172,8 @@ static void DXA9_NV12(filter_t *p_filter, picture_t *src, picture_t *dst)
             lock.Pitch,
         };
         Copy420_SP_to_SP(dst, plane, pitch,
-                         src->format.i_visible_height + src->format.i_y_offset, p_copy_cache);
+                         __MIN(desc.Height, src->format.i_y_offset + src->format.i_visible_height),
+                         p_copy_cache);
     } else {
         msg_Err(p_filter, "Unsupported DXA9 conversion from 0x%08X to NV12", desc.Format);
     }
@@ -258,6 +276,7 @@ static void YV12_D3D9(filter_t *p_filter, picture_t *src, picture_t *dst)
     picture_UpdatePlanes(sys->staging, d3drect.pBits, d3drect.Pitch);
 
     picture_Hold( src );
+
     sys->filter->pf_video_filter(sys->filter, src);
 
     IDirect3DSurface9_UnlockRect(sys->staging->p_sys->surface);
@@ -292,20 +311,38 @@ int D3D9OpenConverter( vlc_object_t *obj )
 {
     filter_t *p_filter = (filter_t *)obj;
 
-    if ( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D9_OPAQUE )
+    if ( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D9_OPAQUE &&
+         p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D9_OPAQUE_10B )
         return VLC_EGENERIC;
 
     if ( p_filter->fmt_in.video.i_height != p_filter->fmt_out.video.i_height
          || p_filter->fmt_in.video.i_width != p_filter->fmt_out.video.i_width )
         return VLC_EGENERIC;
 
+    uint8_t pixel_bytes = 1;
     switch( p_filter->fmt_out.video.i_chroma ) {
     case VLC_CODEC_I420:
     case VLC_CODEC_YV12:
+        if( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D9_OPAQUE )
+            return VLC_EGENERIC;
         p_filter->pf_video_filter = DXA9_YV12_Filter;
         break;
+    case VLC_CODEC_I420_10L:
+        if( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D9_OPAQUE_10B )
+            return VLC_EGENERIC;
+        p_filter->pf_video_filter = DXA9_YV12_Filter;
+        pixel_bytes = 2;
+        break;
     case VLC_CODEC_NV12:
+        if( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D9_OPAQUE )
+            return VLC_EGENERIC;
         p_filter->pf_video_filter = DXA9_NV12_Filter;
+        break;
+    case VLC_CODEC_P010:
+        if( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D9_OPAQUE_10B )
+            return VLC_EGENERIC;
+        p_filter->pf_video_filter = DXA9_NV12_Filter;
+        pixel_bytes = 2;
         break;
     default:
         return VLC_EGENERIC;
@@ -315,13 +352,19 @@ int D3D9OpenConverter( vlc_object_t *obj )
     if (!p_sys)
          return VLC_ENOMEM;
 
+    if (CopyInitCache(&p_sys->cache, p_filter->fmt_in.video.i_width * pixel_bytes))
+    {
+        free(p_sys);
+        return VLC_ENOMEM;
+    }
+
     if (unlikely(D3D9_Create( p_filter, &p_sys->hd3d ) != VLC_SUCCESS)) {
         msg_Warn(p_filter, "cannot load d3d9.dll, aborting");
+        CopyCleanCache(&p_sys->cache);
         free(p_sys);
         return VLC_EGENERIC;
     }
 
-    CopyInitCache(&p_sys->cache, p_filter->fmt_in.video.i_width );
     p_filter->p_sys = p_sys;
     return VLC_SUCCESS;
 }
@@ -335,7 +378,8 @@ int D3D9OpenCPUConverter( vlc_object_t *obj )
     picture_t *p_dst = NULL;
     video_format_t fmt_staging;
 
-    if ( p_filter->fmt_out.video.i_chroma != VLC_CODEC_D3D9_OPAQUE )
+    if ( p_filter->fmt_out.video.i_chroma != VLC_CODEC_D3D9_OPAQUE
+      && p_filter->fmt_out.video.i_chroma != VLC_CODEC_D3D9_OPAQUE_10B )
         return VLC_EGENERIC;
 
     if ( p_filter->fmt_in.video.i_height != p_filter->fmt_out.video.i_height
@@ -345,6 +389,8 @@ int D3D9OpenCPUConverter( vlc_object_t *obj )
     switch( p_filter->fmt_in.video.i_chroma ) {
     case VLC_CODEC_I420:
     case VLC_CODEC_YV12:
+    case VLC_CODEC_I420_10L:
+    case VLC_CODEC_P010:
         p_filter->pf_video_filter = YV12_D3D9_Filter;
         break;
     default:

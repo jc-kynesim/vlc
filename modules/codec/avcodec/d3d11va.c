@@ -357,6 +357,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
 
             sys->d3d_dev.d3dcontext = p_sys->context;
             sys->d3d_dev.owner = false;
+            D3D11_GetDriverVersion(va, &sys->d3d_dev);
             sys->d3dvidctx = d3dvidctx;
 
             assert(p_sys->texture[KNOWN_DXGI_INDEX] != NULL);
@@ -368,11 +369,6 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
             va->sys->totalTextureSlices = dstDesc.ArraySize;
         }
     }
-    if (!va->sys->textureWidth || !va->sys->textureHeight)
-    {
-        va->sys->textureWidth  = fmt->video.i_width;
-        va->sys->textureHeight = fmt->video.i_height;
-    }
 
     err = D3D11_Create( va, &sys->hd3d );
     if (err != VLC_SUCCESS)
@@ -382,7 +378,7 @@ static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat pix_fmt,
     if (err!=VLC_SUCCESS)
         goto error;
 
-    err = directx_va_Setup(va, &sys->dx_sys, ctx, fmt);
+    err = directx_va_Setup(va, &sys->dx_sys, ctx, fmt, isXboxHardware(sys->d3d_dev.d3ddevice));
     if (err != VLC_SUCCESS)
         goto error;
 
@@ -413,17 +409,33 @@ static int D3dCreateDevice(vlc_va_t *va)
         return VLC_SUCCESS;
     }
 
-    /* */
-    hr = D3D11_CreateDevice(va, &sys->hd3d, true, &sys->d3d_dev);
-    if (FAILED(hr)) {
-        msg_Err(va, "D3D11CreateDevice failed. (hr=0x%lX)", hr);
-        return VLC_EGENERIC;
+#if VLC_WINSTORE_APP
+    sys->d3d_dev.d3dcontext = var_InheritInteger(va, "winrt-d3dcontext");
+    if (likely(sys->d3d_dev.d3dcontext))
+    {
+        ID3D11Device* d3ddevice = NULL;
+        ID3D11DeviceContext_GetDevice(sys->d3d_dev.d3dcontext, &sys->d3d_dev.d3ddevice);
+        ID3D11DeviceContext_AddRef(sys->d3d_dev.d3dcontext);
+        ID3D11Device_Release(sys->d3d_dev.d3ddevice);
     }
+#endif
+
+    /* */
+    if (!sys->d3d_dev.d3ddevice)
+    {
+        hr = D3D11_CreateDevice(va, &sys->hd3d, true, &sys->d3d_dev);
+        if (FAILED(hr)) {
+            msg_Err(va, "D3D11CreateDevice failed. (hr=0x%lX)", hr);
+            return VLC_EGENERIC;
+        }
+	}
 
     void *d3dvidctx = NULL;
     hr = ID3D11DeviceContext_QueryInterface(sys->d3d_dev.d3dcontext, &IID_ID3D11VideoContext, &d3dvidctx);
     if (FAILED(hr)) {
        msg_Err(va, "Could not Query ID3D11VideoContext Interface. (hr=0x%lX)", hr);
+       ID3D11DeviceContext_Release(sys->d3d_dev.d3dcontext);
+       ID3D11Device_Release(sys->d3d_dev.d3ddevice);
        return VLC_EGENERIC;
     }
     sys->d3dvidctx = d3dvidctx;
@@ -441,23 +453,12 @@ static void D3dDestroyDevice(vlc_va_t *va)
         ID3D11VideoContext_Release(sys->d3dvidctx);
     D3D11_ReleaseDevice( &sys->d3d_dev );
 }
+
 /**
  * It describes our Direct3D object
  */
 static char *DxDescribe(vlc_va_sys_t *sys)
 {
-    static const struct {
-        unsigned id;
-        char     name[32];
-    } vendors [] = {
-        { 0x1002, "ATI" },
-        { 0x10DE, "NVIDIA" },
-        { 0x1106, "VIA" },
-        { 0x8086, "Intel" },
-        { 0x5333, "S3 Graphics" },
-        { 0x4D4F4351, "Qualcomm" },
-        { 0, "" }
-    };
 
     IDXGIAdapter *p_adapter = D3D11DeviceAdapter(sys->d3d_dev.d3ddevice);
     if (!p_adapter) {
@@ -467,20 +468,12 @@ static char *DxDescribe(vlc_va_sys_t *sys)
     char *description = NULL;
     DXGI_ADAPTER_DESC adapterDesc;
     if (SUCCEEDED(IDXGIAdapter_GetDesc(p_adapter, &adapterDesc))) {
-        const char *vendor = "Unknown";
-        for (int i = 0; vendors[i].id != 0; i++) {
-            if (vendors[i].id == adapterDesc.VendorId) {
-                vendor = vendors[i].name;
-                break;
-            }
-        }
-
         char *utfdesc = FromWide(adapterDesc.Description);
         if (likely(utfdesc!=NULL))
         {
             if (asprintf(&description, "D3D11VA (%s, vendor %u(%s), device %u, revision %u)",
                          utfdesc,
-                         adapterDesc.VendorId, vendor, adapterDesc.DeviceId, adapterDesc.Revision) < 0)
+                         adapterDesc.VendorId, DxgiVendorStr(adapterDesc.VendorId), adapterDesc.DeviceId, adapterDesc.Revision) < 0)
                 description = NULL;
             free(utfdesc);
         }
@@ -550,6 +543,28 @@ static int DxGetInputList(vlc_va_t *va, input_list_t *p_list)
     return VLC_SUCCESS;
 }
 
+extern const GUID DXVA_ModeHEVC_VLD_Main;
+extern const GUID DXVA_ModeHEVC_VLD_Main10;
+extern const GUID DXVA_ModeVP9_VLD_10bit_Profile2;
+static bool CanUseIntelHEVC(vlc_va_t *va)
+{
+    vlc_va_sys_t *sys = va->sys;
+    IDXGIAdapter *pAdapter = D3D11DeviceAdapter(sys->d3d_dev.d3ddevice);
+    if (!pAdapter)
+        return false;
+
+    DXGI_ADAPTER_DESC adapterDesc;
+    HRESULT hr = IDXGIAdapter_GetDesc(pAdapter, &adapterDesc);
+    IDXGIAdapter_Release(pAdapter);
+    if (FAILED(hr))
+        return false;
+
+    if (adapterDesc.VendorId != GPU_MANUFACTURER_INTEL)
+        return true;
+
+    return directx_va_canUseHevc( va, adapterDesc.DeviceId );
+}
+
 static int DxSetupOutput(vlc_va_t *va, const GUID *input, const video_format_t *fmt)
 {
     vlc_va_sys_t *sys = va->sys;
@@ -565,10 +580,16 @@ static int DxSetupOutput(vlc_va_t *va, const GUID *input, const video_format_t *
     }
 #endif
 
-    DXGI_FORMAT processorInput[4];
+    if ((IsEqualGUID(input,&DXVA_ModeHEVC_VLD_Main) ||
+         IsEqualGUID(input,&DXVA_ModeHEVC_VLD_Main10)) && !CanUseIntelHEVC(va))
+        return VLC_EGENERIC;
+
+    DXGI_FORMAT processorInput[5];
     int idx = 0;
     if ( sys->render != DXGI_FORMAT_UNKNOWN )
         processorInput[idx++] = sys->render;
+    if (IsEqualGUID(input, &DXVA_ModeHEVC_VLD_Main10) || IsEqualGUID(input, &DXVA_ModeVP9_VLD_10bit_Profile2))
+        processorInput[idx++] = DXGI_FORMAT_P010;
     processorInput[idx++] = DXGI_FORMAT_NV12;
     processorInput[idx++] = DXGI_FORMAT_420_OPAQUE;
     processorInput[idx++] = DXGI_FORMAT_UNKNOWN;
@@ -631,13 +652,10 @@ static int DxSetupOutput(vlc_va_t *va, const GUID *input, const video_format_t *
         msg_Dbg(va, "Using output format %s for decoder %s", DxgiFormatToStr(processorInput[idx]), psz_decoder_name);
         if ( sys->render == processorInput[idx] )
         {
-            /* NVIDIA cards crash when calling CreateVideoDecoderOutputView
-             * on more than 30 slices */
-            if (sys->totalTextureSlices <= 30 || !isNvidiaHardware(sys->d3d_dev.d3ddevice))
+            if (CanUseVoutPool(&sys->d3d_dev, sys->totalTextureSlices))
                 dx_sys->can_extern_pool = true;
             else
-                msg_Warn( va, "NVIDIA GPU with too many slices (%d) detected, use internal pool",
-                          sys->totalTextureSlices );
+                msg_Warn( va, "use internal pool" );
         }
         sys->render = processorInput[idx];
         free(psz_decoder_name);
@@ -663,7 +681,7 @@ static bool CanUseDecoderPadding(vlc_va_sys_t *sys)
 
     /* Qualcomm hardware has issues with textures and pixels that should not be
     * part of the decoded area */
-    return adapterDesc.VendorId != 0x4D4F4351;
+    return adapterDesc.VendorId != GPU_MANUFACTURER_QUALCOMM;
 }
 
 /**
@@ -683,24 +701,38 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id,
         ID3D10Multithread_Release(pMultithread);
     }
 
-#if VLC_WINSTORE_APP
-    /* On the Xbox 1/S, any decoding of H264 with one dimension over 2304
-     * crashes totally the device */
-    if (codec_id == AV_CODEC_ID_H264 &&
-        (fmt->i_width > 2304 || fmt->i_height > 2304) &&
-        isXboxHardware(sys->d3d_dev.d3ddevice))
+    if (!sys->textureWidth || !sys->textureHeight)
     {
-        msg_Warn(va, "%dx%d resolution not supported by your hardware", fmt->i_width, fmt->i_height);
-        return VLC_EGENERIC;
+        sys->textureWidth  = fmt->i_width;
+        sys->textureHeight = fmt->i_height;
     }
-#endif
+
     if ((sys->textureWidth != fmt->i_width || sys->textureHeight != fmt->i_height) &&
         !CanUseDecoderPadding(sys))
     {
         msg_Dbg(va, "mismatching external pool sizes use the internal one %dx%d vs %dx%d",
                 sys->textureWidth, sys->textureHeight, fmt->i_width, fmt->i_height);
         dx_sys->can_extern_pool = false;
+        sys->textureWidth  = fmt->i_width;
+        sys->textureHeight = fmt->i_height;
     }
+    if (sys->totalTextureSlices && sys->totalTextureSlices < surface_count)
+    {
+        msg_Warn(va, "not enough decoding slices in the texture (%d/%d)",
+                 sys->totalTextureSlices, surface_count);
+        dx_sys->can_extern_pool = false;
+    }
+#if VLC_WINSTORE_APP
+    /* On the Xbox 1/S, any decoding of H264 with one dimension over 2304
+     * crashes totally the device */
+    if (codec_id == AV_CODEC_ID_H264 &&
+        (sys->textureWidth > 2304 || sys->textureHeight > 2304) &&
+        isXboxHardware(sys->d3d_dev.d3ddevice))
+    {
+        msg_Warn(va, "%dx%d resolution not supported by your hardware", fmt->i_width, fmt->i_height);
+        return VLC_EGENERIC;
+    }
+#endif
 
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
     ZeroMemory(&viewDesc, sizeof(viewDesc));
@@ -741,13 +773,6 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id,
 
             D3D11_TEXTURE2D_DESC texDesc;
             ID3D11Texture2D_GetDesc(pic->p_sys->texture[KNOWN_DXGI_INDEX], &texDesc);
-            if (texDesc.ArraySize < surface_count)
-            {
-                msg_Warn(va, "not enough decoding slices in the texture (%d/%d)",
-                         texDesc.ArraySize, surface_count);
-                dx_sys->can_extern_pool = false;
-                break;
-            }
             assert(texDesc.Format == sys->render);
             assert(texDesc.BindFlags & D3D11_BIND_DECODER);
 
@@ -841,7 +866,7 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id,
 
             if (texDesc.BindFlags & D3D11_BIND_SHADER_RESOURCE)
             {
-                ID3D11Texture2D *textures[D3D11_MAX_SHADER_VIEW] = {p_texture, p_texture};
+                ID3D11Texture2D *textures[D3D11_MAX_SHADER_VIEW] = {p_texture, p_texture, p_texture};
                 AllocateShaderView(VLC_OBJECT(va), sys->d3d_dev.d3ddevice, textureFmt, textures, surface_idx,
                                    &sys->resourceView[surface_idx * D3D11_MAX_SHADER_VIEW]);
             }

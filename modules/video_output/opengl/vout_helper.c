@@ -41,6 +41,7 @@
 #include <vlc_vout.h>
 #include <vlc_viewpoint.h>
 
+#include "vout_helper.h"
 #include "internal.h"
 
 #ifndef GL_CLAMP_TO_EDGE
@@ -60,7 +61,7 @@
 
 #ifdef HAVE_GL_ASSERT_NOERROR
 # define GL_ASSERT_NOERROR() do { \
-    GLenum glError = glGetError(); \
+    GLenum glError = vgl->vt.GetError(); \
     switch (glError) \
     { \
         case GL_NO_ERROR: break; \
@@ -411,7 +412,7 @@ GenTextures(const opengl_tex_converter_t *tc,
             const GLsizei *tex_width, const GLsizei *tex_height,
             GLuint *textures)
 {
-    glGenTextures(tc->tex_count, textures);
+    tc->vt->GenTextures(tc->tex_count, textures);
 
     for (unsigned i = 0; i < tc->tex_count; i++)
     {
@@ -419,14 +420,14 @@ GenTextures(const opengl_tex_converter_t *tc,
 
 #if !defined(USE_OPENGL_ES2)
         /* Set the texture parameters */
-        glTexParameterf(tc->tex_target, GL_TEXTURE_PRIORITY, 1.0);
-        glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+        tc->vt->TexParameterf(tc->tex_target, GL_TEXTURE_PRIORITY, 1.0);
+        tc->vt->TexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 #endif
 
-        glTexParameteri(tc->tex_target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(tc->tex_target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(tc->tex_target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(tc->tex_target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        tc->vt->TexParameteri(tc->tex_target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        tc->vt->TexParameteri(tc->tex_target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        tc->vt->TexParameteri(tc->tex_target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        tc->vt->TexParameteri(tc->tex_target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
 
     if (tc->pf_allocate_textures != NULL)
@@ -434,7 +435,7 @@ GenTextures(const opengl_tex_converter_t *tc,
         int ret = tc->pf_allocate_textures(tc, textures, tex_width, tex_height);
         if (ret != VLC_SUCCESS)
         {
-            glDeleteTextures(tc->tex_count, textures);
+            tc->vt->DeleteTextures(tc->tex_count, textures);
             memset(textures, 0, tc->tex_count * sizeof(GLuint));
             return ret;
         }
@@ -445,7 +446,7 @@ GenTextures(const opengl_tex_converter_t *tc,
 static void
 DelTextures(const opengl_tex_converter_t *tc, GLuint *textures)
 {
-    glDeleteTextures(tc->tex_count, textures);
+    tc->vt->DeleteTextures(tc->tex_count, textures);
     memset(textures, 0, tc->tex_count * sizeof(GLuint));
 }
 
@@ -627,7 +628,7 @@ opengl_init_program(vout_display_opengl_t *vgl, struct prgm *prgm,
             .log_level = PL_LOG_INFO,
         });
         if (tc->pl_ctx)
-            tc->pl_sh = pl_shader_alloc(tc->pl_ctx, NULL, 0);
+            tc->pl_sh = pl_shader_alloc(tc->pl_ctx, NULL, 0, 0);
     }
 #endif
 
@@ -650,7 +651,10 @@ opengl_init_program(vout_display_opengl_t *vgl, struct prgm *prgm,
             vlc_fourcc_GetChromaDescription(fmt->i_chroma);
 
         if (desc == NULL)
+        {
+            vlc_object_release(tc);
             return VLC_EGENERIC;
+        }
         if (desc->plane_count == 0)
         {
             /* Opaque chroma: load a module to handle it */
@@ -727,32 +731,22 @@ vout_display_opengl_t *vout_display_opengl_New(video_format_t *fmt,
                                                vlc_gl_t *gl,
                                                const vlc_viewpoint_t *viewpoint)
 {
+    if (gl->getProcAddress == NULL) {
+        msg_Err(gl, "getProcAddress not implemented, bailing out\n");
+        return NULL;
+    }
+
     vout_display_opengl_t *vgl = calloc(1, sizeof(*vgl));
     if (!vgl)
         return NULL;
 
-    GL_ASSERT_NOERROR();
     vgl->gl = gl;
 
-    if (gl->getProcAddress == NULL) {
-        msg_Err(gl, "getProcAddress not implemented, bailing out\n");
-        free(vgl);
-        return NULL;
-    }
-
-    const char *extensions = (const char *)glGetString(GL_EXTENSIONS);
-#if !defined(USE_OPENGL_ES2)
-    const unsigned char *ogl_version = glGetString(GL_VERSION);
-    bool supports_shaders = strverscmp((const char *)ogl_version, "2.0") >= 0;
-    if (!supports_shaders)
-    {
-        msg_Err(gl, "shaders not supported, bailing out\n");
-        free(vgl);
-        return NULL;
-    }
-#endif
-
+#if defined(USE_OPENGL_ES2) || defined(HAVE_GL_CORE_SYMBOLS)
 #define GET_PROC_ADDR_CORE(name) vgl->vt.name = gl##name
+#else
+#define GET_PROC_ADDR_CORE(name) GET_PROC_ADDR_EXT(name, true)
+#endif
 #define GET_PROC_ADDR_EXT(name, critical) do { \
     vgl->vt.name = vlc_gl_GetProcAddress(gl, "gl"#name); \
     if (vgl->vt.name == NULL && critical) { \
@@ -770,19 +764,31 @@ vout_display_opengl_t *vout_display_opengl_New(video_format_t *fmt,
 #endif
 #define GET_PROC_ADDR_OPTIONAL(name) GET_PROC_ADDR_EXT(name, false) /* GL 3 or more */
 
-    GET_PROC_ADDR_CORE(GetError);
-    GET_PROC_ADDR_CORE(GetString);
-    GET_PROC_ADDR_CORE(GetIntegerv);
     GET_PROC_ADDR_CORE(BindTexture);
-    GET_PROC_ADDR_CORE(TexParameteri);
-    GET_PROC_ADDR_CORE(TexParameterf);
-    GET_PROC_ADDR_CORE(PixelStorei);
-    GET_PROC_ADDR_CORE(GenTextures);
+    GET_PROC_ADDR_CORE(BlendFunc);
+    GET_PROC_ADDR_CORE(Clear);
+    GET_PROC_ADDR_CORE(ClearColor);
     GET_PROC_ADDR_CORE(DeleteTextures);
+    GET_PROC_ADDR_CORE(DepthMask);
+    GET_PROC_ADDR_CORE(Disable);
+    GET_PROC_ADDR_CORE(DrawArrays);
+    GET_PROC_ADDR_CORE(DrawElements);
+    GET_PROC_ADDR_CORE(Enable);
+    GET_PROC_ADDR_CORE(Finish);
+    GET_PROC_ADDR_CORE(Flush);
+    GET_PROC_ADDR_CORE(GenTextures);
+    GET_PROC_ADDR_CORE(GetError);
+    GET_PROC_ADDR_CORE(GetIntegerv);
+    GET_PROC_ADDR_CORE(GetString);
+    GET_PROC_ADDR_CORE(PixelStorei);
     GET_PROC_ADDR_CORE(TexImage2D);
+    GET_PROC_ADDR_CORE(TexParameterf);
+    GET_PROC_ADDR_CORE(TexParameteri);
     GET_PROC_ADDR_CORE(TexSubImage2D);
+    GET_PROC_ADDR_CORE(Viewport);
 
     GET_PROC_ADDR_CORE_GL(GetTexLevelParameteriv);
+    GET_PROC_ADDR_CORE_GL(TexEnvf);
 
     GET_PROC_ADDR(CreateShader);
     GET_PROC_ADDR(ShaderSource);
@@ -821,6 +827,8 @@ vout_display_opengl_t *vout_display_opengl_New(video_format_t *fmt,
     GET_PROC_ADDR(BufferData);
     GET_PROC_ADDR(DeleteBuffers);
 
+    GET_PROC_ADDR_OPTIONAL(GetFramebufferAttachmentParameteriv);
+
     GET_PROC_ADDR_OPTIONAL(BufferSubData);
     GET_PROC_ADDR_OPTIONAL(BufferStorage);
     GET_PROC_ADDR_OPTIONAL(MapBufferRange);
@@ -831,10 +839,31 @@ vout_display_opengl_t *vout_display_opengl_New(video_format_t *fmt,
     GET_PROC_ADDR_OPTIONAL(ClientWaitSync);
 #undef GET_PROC_ADDR
 
+    GL_ASSERT_NOERROR();
+
+    const char *extensions = (const char *)vgl->vt.GetString(GL_EXTENSIONS);
+    assert(extensions);
+    if (!extensions)
+    {
+        msg_Err(gl, "glGetString returned NULL\n");
+        free(vgl);
+        return NULL;
+    }
+#if !defined(USE_OPENGL_ES2)
+    const unsigned char *ogl_version = vgl->vt.GetString(GL_VERSION);
+    bool supports_shaders = strverscmp((const char *)ogl_version, "2.0") >= 0;
+    if (!supports_shaders)
+    {
+        msg_Err(gl, "shaders not supported, bailing out\n");
+        free(vgl);
+        return NULL;
+    }
+#endif
+
     /* Resize the format if it is greater than the maximum texture size
      * supported by the hardware */
     GLint       max_tex_size;
-    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_tex_size);
+    vgl->vt.GetIntegerv(GL_MAX_TEXTURE_SIZE, &max_tex_size);
 
     if ((GLint)fmt->i_width > max_tex_size ||
         (GLint)fmt->i_height > max_tex_size)
@@ -914,12 +943,12 @@ vout_display_opengl_t *vout_display_opengl_New(video_format_t *fmt,
     }
 
     /* */
-    glDisable(GL_BLEND);
-    glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-    glEnable(GL_CULL_FACE);
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    vgl->vt.Disable(GL_BLEND);
+    vgl->vt.Disable(GL_DEPTH_TEST);
+    vgl->vt.DepthMask(GL_FALSE);
+    vgl->vt.Enable(GL_CULL_FACE);
+    vgl->vt.ClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    vgl->vt.Clear(GL_COLOR_BUFFER_BIT);
 
     vgl->vt.GenBuffers(1, &vgl->vertex_buffer_object);
     vgl->vt.GenBuffers(1, &vgl->index_buffer_object);
@@ -961,38 +990,38 @@ void vout_display_opengl_Delete(vout_display_opengl_t *vgl)
     GL_ASSERT_NOERROR();
 
     /* */
-    glFinish();
-    glFlush();
+    vgl->vt.Finish();
+    vgl->vt.Flush();
 
-    opengl_tex_converter_t *tc = vgl->prgm->tc;
-    if (!tc->handle_texs_gen)
-        DelTextures(tc, vgl->texture);
-
-    tc = vgl->sub_prgm->tc;
-    for (int i = 0; i < vgl->region_count; i++)
-    {
-        if (vgl->region[i].texture)
-            DelTextures(tc, &vgl->region[i].texture);
-    }
-    free(vgl->region);
-
-    vgl->vt.DeleteBuffers(1, &vgl->vertex_buffer_object);
-    vgl->vt.DeleteBuffers(1, &vgl->index_buffer_object);
-    vgl->vt.DeleteBuffers(vgl->prgm->tc->tex_count, vgl->texture_buffer_object);
-
-    if (vgl->subpicture_buffer_object_count > 0)
-        vgl->vt.DeleteBuffers(vgl->subpicture_buffer_object_count,
-                              vgl->subpicture_buffer_object);
-    free(vgl->subpicture_buffer_object);
+    const size_t main_tex_count = vgl->prgm->tc->tex_count;
+    const bool main_del_texs = !vgl->prgm->tc->handle_texs_gen;
 
     if (vgl->pool)
         picture_pool_Release(vgl->pool);
     opengl_deinit_program(vgl, vgl->prgm);
     opengl_deinit_program(vgl, vgl->sub_prgm);
 
-    free(vgl);
+    vgl->vt.DeleteBuffers(1, &vgl->vertex_buffer_object);
+    vgl->vt.DeleteBuffers(1, &vgl->index_buffer_object);
+    vgl->vt.DeleteBuffers(main_tex_count, vgl->texture_buffer_object);
 
+    if (vgl->subpicture_buffer_object_count > 0)
+        vgl->vt.DeleteBuffers(vgl->subpicture_buffer_object_count,
+                              vgl->subpicture_buffer_object);
+    free(vgl->subpicture_buffer_object);
+
+    if (main_del_texs)
+        vgl->vt.DeleteTextures(main_tex_count, vgl->texture);
+
+    for (int i = 0; i < vgl->region_count; i++)
+    {
+        if (vgl->region[i].texture)
+            vgl->vt.DeleteTextures(1, &vgl->region[i].texture);
+    }
+    free(vgl->region);
     GL_ASSERT_NOERROR();
+
+    free(vgl);
 }
 
 static void UpdateZ(vout_display_opengl_t *vgl)
@@ -1062,6 +1091,12 @@ void vout_display_opengl_SetWindowAspectRatio(vout_display_opengl_t *vgl,
     UpdateFOVy(vgl);
     UpdateZ(vgl);
     getViewpointMatrixes(vgl, vgl->fmt.projection_mode, vgl->prgm);
+}
+
+void vout_display_opengl_Viewport(vout_display_opengl_t *vgl, int x, int y,
+                                  unsigned width, unsigned height)
+{
+    vgl->vt.Viewport(x, y, width, height);
 }
 
 picture_pool_t *vout_display_opengl_GetPool(vout_display_opengl_t *vgl, unsigned requested_count)
@@ -1568,7 +1603,7 @@ static void DrawWithShaders(vout_display_opengl_t *vgl, struct prgm *prgm)
     vgl->vt.UniformMatrix4fv(prgm->uloc.ZoomMatrix, 1, GL_FALSE,
                              prgm->var.ZoomMatrix);
 
-    glDrawElements(GL_TRIANGLES, vgl->nb_indices, GL_UNSIGNED_SHORT, 0);
+    vgl->vt.DrawElements(GL_TRIANGLES, vgl->nb_indices, GL_UNSIGNED_SHORT, 0);
 }
 
 
@@ -1628,7 +1663,7 @@ int vout_display_opengl_Display(vout_display_opengl_t *vgl,
     /* Why drawing here and not in Render()? Because this way, the
        OpenGL providers can call vout_display_opengl_Display to force redraw.
        Currently, the OS X provider uses it to get a smooth window resizing */
-    glClear(GL_COLOR_BUFFER_BIT);
+    vgl->vt.Clear(GL_COLOR_BUFFER_BIT);
 
     vgl->vt.UseProgram(vgl->prgm->id);
 
@@ -1685,8 +1720,8 @@ int vout_display_opengl_Display(vout_display_opengl_t *vgl,
     opengl_tex_converter_t *tc = prgm->tc;
     vgl->vt.UseProgram(program);
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    vgl->vt.Enable(GL_BLEND);
+    vgl->vt.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     /* We need two buffer objects for each region: for vertex and texture coordinates. */
     if (2 * vgl->region_count > vgl->subpicture_buffer_object_count) {
@@ -1751,9 +1786,9 @@ int vout_display_opengl_Display(vout_display_opengl_t *vgl,
         vgl->vt.UniformMatrix4fv(prgm->uloc.ZoomMatrix, 1, GL_FALSE,
                                  prgm->var.ZoomMatrix);
 
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        vgl->vt.DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
-    glDisable(GL_BLEND);
+    vgl->vt.Disable(GL_BLEND);
 
     /* Display */
     vlc_gl_Swap(vgl->gl);

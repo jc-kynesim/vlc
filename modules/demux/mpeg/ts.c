@@ -111,6 +111,10 @@ static void Close ( vlc_object_t * );
     "Seek and position based on a percent byte position, not a PCR generated " \
     "time position. If seeking doesn't work property, turn on this option." )
 
+#define CC_CHECK_TEXT       "Check packets continuity counter"
+#define CC_CHECK_LONGTEXT   "Detect discontinuities and drop packet duplicates. " \
+                            "(bluRay sources are known broken and have false positives). "
+
 #define PCR_TEXT N_("Trust in-stream PCR")
 #define PCR_LONGTEXT N_("Use the stream PCR as a reference.")
 
@@ -148,6 +152,7 @@ vlc_module_begin ()
 
     add_bool( "ts-split-es", true, SPLIT_ES_TEXT, SPLIT_ES_LONGTEXT, false )
     add_bool( "ts-seek-percent", false, SEEK_PERCENT_TEXT, SEEK_PERCENT_LONGTEXT, true )
+    add_bool( "ts-cc-check", true, CC_CHECK_TEXT, CC_CHECK_LONGTEXT, true )
 
     add_obsolete_bool( "ts-silent" );
 
@@ -191,6 +196,9 @@ static void PCRFixHandle( demux_t *, ts_pmt_t *, block_t * );
 #define TS_PACKET_SIZE_204 204
 #define TS_PACKET_SIZE_MAX 204
 #define TS_HEADER_SIZE 4
+
+#define PROBE_CHUNK_COUNT 500
+#define PROBE_MAX         (PROBE_CHUNK_COUNT * 10)
 
 static int DetectPacketSize( demux_t *p_demux, unsigned *pi_header_size, int i_offset )
 {
@@ -483,6 +491,7 @@ static int Open( vlc_object_t *p_this )
     p_sys->b_canseek = false;
     p_sys->b_canfastseek = false;
     p_sys->b_ignore_time_for_positions = var_InheritBool( p_demux, "ts-seek-percent" );
+    p_sys->b_cc_check = var_InheritBool( p_demux, "ts-cc-check" );
 
     p_sys->standard = TS_STANDARD_AUTO;
     char *psz_standard = var_InheritString( p_demux, "ts-standard" );
@@ -1079,7 +1088,7 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
 
             p_sys->b_default_selection = false;
         }
-        else
+        else if( !p_sys->b_default_selection )
         {
             ARRAY_RESET( p_sys->programs );
             p_sys->seltype = PROGRAM_AUTO_DEFAULT;
@@ -1972,8 +1981,6 @@ static int SeekToTime( demux_t *p_demux, const ts_pmt_t *p_pmt, int64_t i_scaled
     return VLC_SUCCESS;
 }
 
-#define PROBE_CHUNK_COUNT 250
-
 static int ProbeChunk( demux_t *p_demux, int i_program, bool b_end, int64_t *pi_pcr, bool *pb_found )
 {
     demux_sys_t *p_sys = p_demux->p_sys;
@@ -2097,7 +2104,8 @@ int ProbeStart( demux_t *p_demux, int i_program )
 
         /* Go ahead one more chunk if end of file contained only stuffing packets */
         i_probe_count += PROBE_CHUNK_COUNT;
-    } while( i_pos > 0 && (i_pcr == -1 || !b_found) && i_probe_count < (2 * PROBE_CHUNK_COUNT) );
+    } while( i_pos > 0 && (i_pcr == -1 || !b_found) &&
+             i_probe_count < PROBE_MAX );
 
     if( vlc_stream_Seek( p_sys->stream, i_initial_pos ) )
         return VLC_EGENERIC;
@@ -2128,7 +2136,8 @@ int ProbeEnd( demux_t *p_demux, int i_program )
 
         /* Go ahead one more chunk if end of file contained only stuffing packets */
         i_probe_count += PROBE_CHUNK_COUNT;
-    } while( i_pos > 0 && (i_pcr == -1 || !b_found) && i_probe_count < (6 * PROBE_CHUNK_COUNT) );
+    } while( i_pos > 0 && (i_pcr == -1 || !b_found) &&
+             i_probe_count < PROBE_MAX );
 
     if( vlc_stream_Seek( p_sys->stream, i_initial_pos ) )
         return VLC_EGENERIC;
@@ -2183,8 +2192,13 @@ static void ProgramSetPCR( demux_t *p_demux, ts_pmt_t *p_pmt, mtime_t i_pcr )
         if( p_sys->b_access_control == false &&
             vlc_stream_Tell( p_sys->stream ) > p_pmt->i_last_dts_byte )
         {
-            p_pmt->i_last_dts = i_pcr;
-            p_pmt->i_last_dts_byte = vlc_stream_Tell( p_sys->stream );
+            if( p_pmt->i_last_dts_byte == 0 ) /* first run */
+                p_pmt->i_last_dts_byte = stream_Size( p_sys->stream );
+            else
+            {
+                p_pmt->i_last_dts = i_pcr;
+                p_pmt->i_last_dts_byte = vlc_stream_Tell( p_sys->stream );
+            }
         }
     }
 }
@@ -2445,7 +2459,12 @@ static block_t * ProcessTSPacket( demux_t *p_demux, ts_pid_t *pid, block_t *p_pk
             {
                 msg_Warn( p_demux, "discontinuity indicator (pid=%d) ",
                             pid->i_pid );
-                p_pkt->i_flags |= BLOCK_FLAG_DISCONTINUITY;
+                /* ignore, that's not that simple 2.4.3.5 */
+                //p_pkt->i_flags |= BLOCK_FLAG_DISCONTINUITY;
+
+                /* ... or don't ignore for our Bluray still frames and seek hacks */
+                if(p[5] == 0x82 && !strncmp((const char *)&p[7], "VLC_DISCONTINU", 14))
+                    p_pkt->i_flags |= BLOCK_FLAG_DISCONTINUITY;
             }
 #if 0
             if( p[5]&0x40 )
@@ -2461,7 +2480,7 @@ static block_t * ProcessTSPacket( demux_t *p_demux, ts_pid_t *pid, block_t *p_pk
         * diff == 0 and duplicate packet (playload != 0) <- should we
         *   test the content ?
      */
-    if( b_payload )
+    if( b_payload && p_demux->p_sys->b_cc_check )
     {
         const int i_diff = ( i_cc - pid->i_cc )&0x0f;
         if( i_diff == 1 )

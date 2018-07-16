@@ -27,6 +27,7 @@
 #include <vlc_stream.h>
 #include <vlc_demux.h>
 #include "SourceStream.hpp"
+#include "../StreamFormat.hpp"
 #include "CommandsQueue.hpp"
 #include "../ChunksSource.hpp"
 
@@ -75,6 +76,68 @@ bool AbstractDemuxer::needsRestartOnSeek() const
     return b_reinitsonseek;
 }
 
+MimeDemuxer::MimeDemuxer(demux_t *p_realdemux_,
+                         const DemuxerFactoryInterface *factory_,
+                         es_out_t *out, AbstractSourceStream *source)
+    : AbstractDemuxer()
+{
+    p_es_out = out;
+    factory = factory_;
+    p_realdemux = p_realdemux_;
+    demuxer = NULL;
+    sourcestream = source;
+}
+
+MimeDemuxer::~MimeDemuxer()
+{
+    if( demuxer )
+        delete demuxer;
+}
+
+bool MimeDemuxer::create()
+{
+    stream_t *p_newstream = sourcestream->makeStream();
+    if(!p_newstream)
+        return false;
+
+    char *type = stream_ContentType(p_newstream);
+    if(type)
+    {
+        demuxer = factory->newDemux( p_realdemux, StreamFormat(std::string(type)),
+                                     p_es_out, sourcestream );
+        free(type);
+    }
+    vlc_stream_Delete(p_newstream);
+
+    if(!demuxer || !demuxer->create())
+        return false;
+
+    return true;
+}
+
+void MimeDemuxer::destroy()
+{
+    if(demuxer)
+    {
+        delete demuxer;
+        demuxer = NULL;
+    }
+    sourcestream->Reset();
+}
+
+void MimeDemuxer::drain()
+{
+    if(demuxer)
+        demuxer->drain();
+}
+
+int MimeDemuxer::demux(mtime_t t)
+{
+    if(!demuxer)
+        return VLC_DEMUXER_EOF;
+    return demuxer->demux(t);
+}
+
 Demuxer::Demuxer(demux_t *p_realdemux_, const std::string &name_, es_out_t *out, AbstractSourceStream *source)
     : AbstractDemuxer()
 {
@@ -89,6 +152,10 @@ Demuxer::Demuxer(demux_t *p_realdemux_, const std::string &name_, es_out_t *out,
     {
         b_candetectswitches = false;
         b_startsfromzero = true;
+    }
+    else if(name == "aac")
+    {
+        b_candetectswitches = false;
     }
 }
 

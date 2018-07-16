@@ -457,8 +457,8 @@ static subpicture_t *ParseText( decoder_t *p_dec, block_t *p_block )
     subpicture_updater_sys_t *p_spu_sys = p_spu->updater.p_sys;
 
     p_spu_sys->region.align = SUBPICTURE_ALIGN_BOTTOM | p_sys->i_align;
-    p_spu_sys->region.inner_align = p_sys->i_align;
-    p_spu_sys->region.p_segments = ParseSubtitles( &p_spu_sys->region.inner_align, psz_subtitle );
+    p_spu_sys->region.inner_align = SUBPICTURE_ALIGN_BOTTOM;
+    p_spu_sys->region.p_segments = ParseSubtitles( &p_spu_sys->region.align, psz_subtitle );
 
     free( psz_subtitle );
 
@@ -678,7 +678,7 @@ static text_style_t* DuplicateAndPushStyle(style_stack_t** pp_stack)
     style_stack_t* p_entry = malloc( sizeof( *p_entry ) );
     if ( unlikely( !p_entry ) )
     {
-        free( p_dup );
+        text_style_Delete( p_dup );
         return NULL;
     }
     // Give the style ownership to the segment.
@@ -792,12 +792,14 @@ static text_segment_t* ParseSubtitles( int *pi_align, const char *psz_subtitle )
                         }
                         if ( !strcasecmp( psz_attribute_name, "face" ) )
                         {
+                            free(p_segment->style->psz_fontname);
                             p_segment->style->psz_fontname = psz_attribute_value;
                             // We don't want to free the attribute value since it has become our fontname
                             psz_attribute_value = NULL;
                         }
                         else if ( !strcasecmp( psz_attribute_name, "family" ) )
                         {
+                            free(p_segment->style->psz_monofontname);
                             p_segment->style->psz_monofontname = psz_attribute_value;
                             psz_attribute_value = NULL;
                         }
@@ -1000,6 +1002,7 @@ static text_segment_t* ParseSubtitles( int *pi_align, const char *psz_subtitle )
             else if( psz_subtitle[1] == 'F' || psz_subtitle[1] == 'f' )
             {
                 p_segment = NewTextSegmentPushStyle( p_segment, &p_stack );
+                free(p_segment->style->psz_fontname);
                 p_segment->style->psz_fontname = strndup( &psz_subtitle[3], i_len );
             }
             else if( psz_subtitle[1] == 'S' || psz_subtitle[1] == 's' )

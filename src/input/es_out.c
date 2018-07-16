@@ -1255,8 +1255,9 @@ static void EsOutProgramMeta( es_out_t *out, int i_group, const vlc_meta_t *p_me
     {
         const char *psz_current_title = vlc_meta_Get( p_pgrm->p_meta, vlc_meta_Title );
         const char *psz_new_title = vlc_meta_Get( p_meta, vlc_meta_Title );
-        if( !psz_current_title != !psz_new_title ||
-            ( psz_new_title && psz_new_title && strcmp(psz_new_title, psz_current_title)) )
+        if( (psz_current_title != NULL && psz_new_title != NULL)
+            ? strcmp(psz_new_title, psz_current_title)
+            : (psz_current_title != psz_new_title) )
         {
             /* Remove old entries */
             char *psz_oldinfokey = EsOutProgramGetMetaName( p_pgrm );
@@ -1864,10 +1865,19 @@ static void EsOutSelect( es_out_t *out, es_out_id_t *es, bool b_force )
         return;
     }
 
+    bool b_auto_unselect = p_esprops && p_sys->i_mode == ES_OUT_MODE_AUTO &&
+                           p_esprops->e_policy == ES_OUT_ES_POLICY_EXCLUSIVE &&
+                           p_esprops->p_main_es && p_esprops->p_main_es != es;
+
     if( p_sys->i_mode == ES_OUT_MODE_ALL || b_force )
     {
         if( !EsIsSelected( es ) )
+        {
+            if( b_auto_unselect )
+                EsUnselect( out, p_esprops->p_main_es, false );
+
             EsSelect( out, es );
+        }
     }
     else if( p_sys->i_mode == ES_OUT_MODE_PARTIAL )
     {
@@ -1968,23 +1978,17 @@ static void EsOutSelect( es_out_t *out, es_out_id_t *es, bool b_force )
         }
 
         if( wanted_es == es && !EsIsSelected( es ) )
+        {
+            if( b_auto_unselect )
+                EsUnselect( out, p_esprops->p_main_es, false );
+
             EsSelect( out, es );
+        }
     }
 
     /* FIXME TODO handle priority here */
-    if( p_esprops && EsIsSelected( es ) )
-    {
-        if( p_sys->i_mode == ES_OUT_MODE_AUTO )
-        {
-            if( p_esprops->e_policy == ES_OUT_ES_POLICY_EXCLUSIVE &&
-                p_esprops->p_main_es &&
-                p_esprops->p_main_es != es )
-            {
-                EsUnselect( out, p_esprops->p_main_es, false );
-            }
-            p_esprops->p_main_es = es;
-        }
-    }
+    if( p_esprops && p_sys->i_mode == ES_OUT_MODE_AUTO && EsIsSelected( es ) )
+        p_esprops->p_main_es = es;
 }
 
 static void EsOutCreateCCChannels( es_out_t *out, vlc_fourcc_t codec, uint64_t i_bitmap,
@@ -2382,13 +2386,39 @@ static int EsOutControlLocked( es_out_t *out, int i_query, va_list args )
         }
         return VLC_SUCCESS;
     }
-    case ES_OUT_RESTART_ALL_ES:
+    case ES_OUT_STOP_ALL_ES:
     {
+        int *selected_es = vlc_alloc(p_sys->i_es + 1, sizeof(int));
+        if (!selected_es)
+            return VLC_ENOMEM;
+        selected_es[0] = p_sys->i_es;
         for( int i = 0; i < p_sys->i_es; i++ )
         {
-            EsDestroyDecoder( out, p_sys->es[i] );
-            EsCreateDecoder( out, p_sys->es[i] );
+            if( EsIsSelected( p_sys->es[i] ) )
+            {
+                EsDestroyDecoder( out, p_sys->es[i] );
+                selected_es[i + 1] = p_sys->es[i]->i_id;
+            }
+            else
+                selected_es[i + 1] = -1;
         }
+        *va_arg( args, void **) = selected_es;
+        return VLC_SUCCESS;
+    }
+    case ES_OUT_START_ALL_ES:
+    {
+        int *selected_es = va_arg( args, void * );
+        int count = selected_es[0];
+        for( int i = 0; i < count; ++i )
+        {
+            int i_id = selected_es[i + 1];
+            if( i_id != -1 )
+            {
+                es_out_id_t *p_es = EsOutGetFromID( out, i_id );
+                EsCreateDecoder( out, p_es );
+            }
+        }
+        free(selected_es);
         return VLC_SUCCESS;
     }
 
@@ -3255,14 +3285,15 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const es_format_t *
            }
            info_category_AddInfo( p_cat, _("Projection"), "%s", _(psz_loc_name) );
 
-           info_category_AddInfo( p_cat, _("Yaw"), "%.2f",
-                                  fmt->video.pose.yaw );
-           info_category_AddInfo( p_cat, _("Pitch"), "%.2f",
-                                  fmt->video.pose.pitch );
-           info_category_AddInfo( p_cat, _("Roll"), "%.2f",
-                                  fmt->video.pose.roll );
-           info_category_AddInfo( p_cat, _("Field of view"), "%.2f",
-                                  fmt->video.pose.fov );
+           info_category_AddInfo( p_cat, vlc_pgettext("ViewPoint", "Yaw"),
+                                  "%.2f", fmt->video.pose.yaw );
+           info_category_AddInfo( p_cat, vlc_pgettext("ViewPoint", "Pitch"),
+                                  "%.2f", fmt->video.pose.pitch );
+           info_category_AddInfo( p_cat, vlc_pgettext("ViewPoint", "Roll"),
+                                  "%.2f", fmt->video.pose.roll );
+           info_category_AddInfo( p_cat,
+                                  vlc_pgettext("ViewPoint", "Field of view"),
+                                  "%.2f", fmt->video.pose.fov );
        }
        if ( fmt->video.mastering.max_luminance )
        {

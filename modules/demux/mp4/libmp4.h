@@ -99,7 +99,6 @@ typedef int64_t stime_t;
 #define ATOM_stss VLC_FOURCC( 's', 't', 's', 's' )
 #define ATOM_stsh VLC_FOURCC( 's', 't', 's', 'h' )
 #define ATOM_stdp VLC_FOURCC( 's', 't', 'd', 'p' )
-#define ATOM_padb VLC_FOURCC( 'p', 'a', 'd', 'b' )
 #define ATOM_edts VLC_FOURCC( 'e', 'd', 't', 's' )
 #define ATOM_elst VLC_FOURCC( 'e', 'l', 's', 't' )
 #define ATOM_mvex VLC_FOURCC( 'm', 'v', 'e', 'x' )
@@ -181,6 +180,13 @@ typedef int64_t stime_t;
 #define ATOM_eac3 VLC_FOURCC( 'e', 'c', '-', '3' )
 #define ATOM_dac3 VLC_FOURCC( 'd', 'a', 'c', '3' )
 #define ATOM_dec3 VLC_FOURCC( 'd', 'e', 'c', '3' )
+#define ATOM_ddts VLC_FOURCC( 'd', 'd', 't', 's' ) /* DTS formats */
+#define ATOM_dtsc VLC_FOURCC( 'd', 't', 's', 'c' )
+#define ATOM_dtsh VLC_FOURCC( 'd', 't', 's', 'h' )
+#define ATOM_dtsl VLC_FOURCC( 'd', 't', 's', 'l' )
+#define ATOM_dtse VLC_FOURCC( 'd', 't', 's', 'e' )
+#define ATOM_dtsm VLC_FOURCC( 'd', 't', 's', '-' )
+#define ATOM_dtsp VLC_FOURCC( 'd', 't', 's', '+' )
 #define ATOM_vc1  VLC_FOURCC( 'v', 'c', '-', '1' )
 #define ATOM_dvc1 VLC_FOURCC( 'd', 'v', 'c', '1' )
 #define ATOM_WMA2 VLC_FOURCC( 'W', 'M', 'A', '2' )
@@ -228,11 +234,13 @@ typedef int64_t stime_t;
 #define ATOM_VP31 VLC_FOURCC( 'V', 'P', '3', '1' )
 #define ATOM_vp31 VLC_FOURCC( 'v', 'p', '3', '1' )
 #define ATOM_h264 VLC_FOURCC( 'h', '2', '6', '4' )
+#define ATOM_H264 VLC_FOURCC( 'H', '2', '6', '4' )
 #define ATOM_qdrw VLC_FOURCC( 'q', 'd', 'r', 'w' )
 #define ATOM_vp08 VLC_FOURCC( 'v', 'p', '0', '8' )
 #define ATOM_vp09 VLC_FOURCC( 'v', 'p', '0', '9' )
 #define ATOM_vp10 VLC_FOURCC( 'v', 'p', '1', '0' )
 #define ATOM_WMV3 VLC_FOURCC( 'W', 'M', 'V', '3' )
+#define ATOM_WVC1 VLC_FOURCC( 'W', 'V', 'C', '1' )
 
 #define ATOM_avc1 VLC_FOURCC( 'a', 'v', 'c', '1' )
 #define ATOM_avc3 VLC_FOURCC( 'a', 'v', 'c', '3' )
@@ -376,6 +384,8 @@ typedef int64_t stime_t;
 #define ATOM_gsst VLC_FOURCC( 'g', 's', 's', 't' )
 #define ATOM_gstd VLC_FOURCC( 'g', 's', 't', 'd' )
 #define ATOM_colr VLC_FOURCC( 'c', 'o', 'l', 'r' )
+#define ATOM_SmDm VLC_FOURCC( 'S', 'm', 'D', 'm' )
+#define ATOM_CoLL VLC_FOURCC( 'C', 'o', 'L', 'L' )
 
 #define ATOM_0x40PRM VLC_FOURCC( '@', 'P', 'R', 'M' )
 #define ATOM_0x40PRQ VLC_FOURCC( '@', 'P', 'R', 'Q' )
@@ -928,19 +938,6 @@ typedef struct MP4_Box_data_stdp_s
 
 } MP4_Box_data_stdp_t;
 
-typedef struct MP4_Box_data_padb_s
-{
-    uint8_t  i_version;
-    uint32_t i_flags;
-
-    uint32_t i_sample_count;
-
-    unsigned char *i_reserved;   /* 1bit  */
-    unsigned char *i_pad;        /* 3bits */
-
-} MP4_Box_data_padb_t;
-
-
 typedef struct MP4_Box_data_elst_s
 {
     uint8_t  i_version;
@@ -948,8 +945,8 @@ typedef struct MP4_Box_data_elst_s
 
     uint32_t i_entry_count;
 
-    uint64_t *i_segment_duration;
-    int64_t  *i_media_time;
+    uint64_t *i_segment_duration; /* movie timescale */
+    int64_t  *i_media_time; /* media(track) timescale */
     uint16_t *i_media_rate_integer;
     uint16_t *i_media_rate_fraction;
 
@@ -1275,16 +1272,32 @@ typedef struct
 
 typedef struct
 {
+    uint8_t i_version;
     uint8_t i_profile;
     uint8_t i_level;
     uint8_t i_bit_depth;
-    uint8_t i_color_space;
     uint8_t i_chroma_subsampling;
+    uint8_t i_color_primaries;
     uint8_t i_xfer_function;
+    uint8_t i_matrix_coeffs;
     uint8_t i_fullrange;
     uint16_t i_codec_init_datasize;
     uint8_t *p_codec_init_data;
 } MP4_Box_data_vpcC_t;
+
+typedef struct
+{
+    uint16_t primaries[3*2]; /* G,B,R / x,y */
+    uint16_t white_point[2]; /* x,y */
+    uint32_t i_luminanceMax;
+    uint32_t i_luminanceMin;
+} MP4_Box_data_SmDm_t;
+
+typedef struct
+{
+    uint16_t i_maxCLL;
+    uint16_t i_maxFALL;
+} MP4_Box_data_CoLL_t;
 
 typedef struct
 {
@@ -1685,6 +1698,8 @@ typedef union MP4_Box_data_s
     MP4_Box_data_tsel_t *p_tsel;
     MP4_Box_data_load_t *p_load;
     MP4_Box_data_vpcC_t *p_vpcC;
+    MP4_Box_data_SmDm_t *p_SmDm;
+    MP4_Box_data_CoLL_t *p_CoLL;
 
     MP4_Box_data_tfra_t *p_tfra;
     MP4_Box_data_mfro_t *p_mfro;
@@ -1702,7 +1717,6 @@ typedef union MP4_Box_data_s
     MP4_Box_data_stss_t *p_stss;
     MP4_Box_data_stsh_t *p_stsh;
     MP4_Box_data_stdp_t *p_stdp;
-    MP4_Box_data_padb_t *p_padb;
     MP4_Box_data_elst_t *p_elst;
     MP4_Box_data_cprt_t *p_cprt;
 

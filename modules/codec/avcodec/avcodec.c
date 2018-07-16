@@ -97,7 +97,7 @@ vlc_module_begin ()
 
     add_obsolete_bool( "ffmpeg-dr" ) /* removed since 2.1.0 */
     add_bool( "avcodec-dr", true, DR_TEXT, DR_TEXT, true )
-    add_bool( "avcodec-corrupted", false, CORRUPTED_TEXT, CORRUPTED_LONGTEXT, false )
+    add_bool( "avcodec-corrupted", true, CORRUPTED_TEXT, CORRUPTED_LONGTEXT, false )
     add_obsolete_integer ( "ffmpeg-error-resilience" ) /* removed since 2.1.0 */
     add_integer ( "avcodec-error-resilience", 1, ERROR_TEXT,
         ERROR_LONGTEXT, true )
@@ -147,7 +147,7 @@ vlc_module_begin ()
     set_section( N_("Encoding") , NULL )
     set_description( N_("FFmpeg audio/video encoder") )
     set_capability( "encoder", 100 )
-    set_callbacks( OpenEncoder, CloseEncoder )
+    set_callbacks( InitVideoEnc, EndVideoEnc )
 
     /* removed in 2.1.0 */
     add_obsolete_string( "sout-ffmpeg-codec" )

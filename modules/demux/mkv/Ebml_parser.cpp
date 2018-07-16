@@ -29,15 +29,14 @@
 /*****************************************************************************
  * Ebml Stream parser
  *****************************************************************************/
-EbmlParser::EbmlParser( EbmlStream *es, EbmlElement *el_start, demux_t *p_demux,
-                        bool b_with_dummy ) :
+EbmlParser::EbmlParser( EbmlStream *es, EbmlElement *el_start, demux_t *p_demux ) :
     p_demux( p_demux ),
     m_es( es ),
     mi_level( 1 ),
     m_got( NULL ),
     mi_user_level( 1 ),
     mb_keep( false ),
-    mb_dummy( b_with_dummy )
+    mb_dummy( var_InheritBool( p_demux, "mkv-use-dummy" ) )
 {
     memset( m_el, 0, sizeof( *m_el ) * M_EL_MAXSIZE);
     m_el[0] = el_start;
@@ -64,17 +63,9 @@ EbmlParser::~EbmlParser( void )
 
 void EbmlParser::reconstruct( EbmlStream* es, EbmlElement* el_start, demux_t* p_demux )
 {
-    this->reconstruct( es, el_start, p_demux, var_InheritBool( p_demux, "mkv-use-dummy" ) );
-}
-
-void EbmlParser::reconstruct( EbmlStream* es, EbmlElement* el_start, demux_t* p_demux,
-  bool b_with_dummy)
-{
     this->~EbmlParser();
 
-    new( static_cast<void*>( this ) ) EbmlParser(
-      es, el_start, p_demux, b_with_dummy
-    );
+    new( static_cast<void*>( this ) ) EbmlParser( es, el_start, p_demux );
 }
 
 void EbmlParser::Up( void )
@@ -119,7 +110,7 @@ void EbmlParser::Reset( demux_t *p_demux )
     this->p_demux = p_demux;
     mi_user_level = mi_level = 1;
     // a little faster and cleaner
-    m_es->I_O().setFilePointer( static_cast<KaxSegment*>(m_el[0])->GetGlobalPosition(0) );
+    m_es->I_O().setFilePointer( static_cast<EbmlMaster*>(m_el[0])->GetDataStart() );
 }
 
 
@@ -137,10 +128,12 @@ const EbmlSemanticContext Context_KaxSegmentVLC = EbmlSemanticContext(KaxSegment
                                                                       GetEbmlNoGlobal_Context,
                                                                       KaxSegment_Context.GetMaster());
 
-EbmlElement *EbmlParser::Get( int n_call )
+EbmlElement *EbmlParser::Get( bool allow_overshoot )
 {
     int i_ulev = 0;
+    int n_call = 0;
     EbmlElement *p_prev = NULL;
+    bool do_read = true;
 
     if( mi_user_level != mi_level )
     {
@@ -154,6 +147,7 @@ EbmlElement *EbmlParser::Get( int n_call )
         return ret;
     }
 
+next:
     p_prev = m_el[mi_level];
     if( p_prev )
         p_prev->SkipData( *m_es, EBML_CONTEXT(p_prev) );
@@ -180,10 +174,16 @@ EbmlElement *EbmlParser::Get( int n_call )
     }
     else {
         size_t size_lvl = mi_level;
-        while ( size_lvl && m_el[size_lvl-1]->IsFiniteSize() &&
+        while ( size_lvl && m_el[size_lvl-1]->IsFiniteSize() && m_el[size_lvl]->IsFiniteSize() &&
                 m_el[size_lvl-1]->GetEndPosition() == m_el[size_lvl]->GetEndPosition() )
             size_lvl--;
-        if (size_lvl == 0 || !m_el[size_lvl-1]->IsFiniteSize() )
+        if (size_lvl == 0 && !allow_overshoot)
+        {
+            i_ulev = mi_level; // trick to go all the way up
+            m_el[mi_level] = NULL;
+            do_read = false;
+        }
+        else if (size_lvl == 0 || !m_el[size_lvl-1]->IsFiniteSize() || !m_el[size_lvl]->IsFiniteSize() )
             i_max_read = UINT64_MAX;
         else {
             uint64 top = m_el[size_lvl-1]->GetEndPosition();
@@ -192,18 +192,31 @@ EbmlElement *EbmlParser::Get( int n_call )
         }
     }
 
-    // If the parent is a segment, use the segment context when creating children
-    // (to prolong their lifetime), otherwise just continue as normal
-    EbmlSemanticContext e_context =
-            EBML_CTX_MASTER( EBML_CONTEXT(m_el[mi_level - 1]) ) == EBML_CTX_MASTER( Context_KaxSegmentVLC )
-            ? Context_KaxSegmentVLC
-            : EBML_CONTEXT(m_el[mi_level - 1]);
+    if (do_read)
+    {
+        // If the parent is a segment, use the segment context when creating children
+        // (to prolong their lifetime), otherwise just continue as normal
+        EbmlSemanticContext e_context =
+                EBML_CTX_MASTER( EBML_CONTEXT(m_el[mi_level - 1]) ) == EBML_CTX_MASTER( Context_KaxSegmentVLC )
+                ? Context_KaxSegmentVLC
+                : EBML_CONTEXT(m_el[mi_level - 1]);
 
-    /* Ignore unknown level 0 or 1 elements */
-    m_el[mi_level] = unlikely(!i_max_read) ? NULL :
-                     m_es->FindNextElement( e_context,
-                                            i_ulev, i_max_read,
-                                            (  mb_dummy | (mi_level > 1) ), 1 );
+        /* Ignore unknown level 0 or 1 elements */
+        m_el[mi_level] = unlikely(!i_max_read) ? NULL :
+                         m_es->FindNextElement( e_context,
+                                                i_ulev, i_max_read,
+                                                (  mb_dummy | (mi_level > 1) ), 1 );
+
+        if( m_el[mi_level] == NULL )
+        {
+            if ( i_max_read != UINT64_MAX && !static_cast<vlc_stream_io_callback *>(&m_es->I_O())->IsEOF() )
+            {
+                msg_Dbg(p_demux, "found nothing, go up");
+                i_ulev = 1;
+            }
+        }
+    }
+
     if( i_ulev > 0 )
     {
         if( p_prev )
@@ -267,7 +280,19 @@ EbmlElement *EbmlParser::Get( int n_call )
             /* The element fits inside its upper element */
             msg_Warn( p_demux, "Dummy element found %" PRIu64 "... skipping it",
                       m_el[mi_level]->GetElementPosition() );
-            return Get( ++n_call );
+            if( p_prev )
+            {
+                if( !mb_keep )
+                {
+                    if( MKV_IS_ID( p_prev, KaxBlockVirtual ) )
+                        static_cast<KaxBlockVirtualWorkaround*>(p_prev)->Fix(); // !! WARNING : TODO !! this is undefined-behavior
+                    delete p_prev;
+                    p_prev = NULL;
+                }
+                mb_keep = false;
+            }
+            n_call++;
+            goto next;
         }
         else
         {
@@ -288,10 +313,18 @@ EbmlElement *EbmlParser::Get( int n_call )
                 return NULL;
             }
 
-            EbmlElement *unwanted_dummy = m_el[mi_level];
-            EbmlElement *upper_dummy = Get();
-            delete unwanted_dummy;
-            return upper_dummy;
+            if( p_prev )
+            {
+                if( !mb_keep )
+                {
+                    if( MKV_IS_ID( p_prev, KaxBlockVirtual ) )
+                        static_cast<KaxBlockVirtualWorkaround*>(p_prev)->Fix(); // !! WARNING : TODO !! this is undefined-behavior
+                    delete p_prev;
+                    p_prev = NULL;
+                }
+                mb_keep = false;
+            }
+            goto next;
         }
     }
 

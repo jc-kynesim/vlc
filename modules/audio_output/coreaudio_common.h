@@ -55,7 +55,9 @@ struct aout_sys_common
     atomic_uint         i_underrun_size;
     atomic_bool         b_paused;
     atomic_bool         b_do_flush;
+    atomic_bool         b_highlatency;
     vlc_sem_t           flush_sem;
+    vlc_mutex_t         lock;
     int                 i_rate;
     unsigned int        i_bytes_per_frame;
     unsigned int        i_frame_length;
@@ -69,7 +71,8 @@ void ca_Open(audio_output_t *p_aout);
 
 void ca_Close(audio_output_t *p_aout);
 
-void ca_Render(audio_output_t *p_aout, uint8_t *p_output, size_t i_requested);
+void ca_Render(audio_output_t *p_aout, uint32_t i_nb_samples, uint8_t *p_output,
+               size_t i_requested);
 
 int  ca_TimeGet(audio_output_t *p_aout, mtime_t *delay);
 
@@ -84,10 +87,13 @@ int  ca_Initialize(audio_output_t *p_aout, const audio_sample_format_t *fmt,
 
 void ca_Uninitialize(audio_output_t *p_aout);
 
+void ca_SetAliveState(audio_output_t *p_aout, bool alive);
+
 AudioUnit au_NewOutputInstance(audio_output_t *p_aout, OSType comp_sub_type);
 
 int  au_Initialize(audio_output_t *p_aout, AudioUnit au,
                    audio_sample_format_t *fmt,
-                   const AudioChannelLayout *outlayout, mtime_t i_dev_latency_us);
+                   const AudioChannelLayout *outlayout, mtime_t i_dev_latency_us,
+                   bool *warn_configuration);
 
 void au_Uninitialize(audio_output_t *p_aout, AudioUnit au);

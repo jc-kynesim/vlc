@@ -128,9 +128,6 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
     setWindowIcon( QApplication::windowIcon() );
     setWindowOpacity( var_InheritFloat( p_intf, "qt-opacity" ) );
 
-    /* Is video in embedded in the UI or not */
-    b_videoEmbedded = var_InheritBool( p_intf, "embedded-video" );
-
     /* Does the interface resize to video size or the opposite */
     b_autoresize = var_InheritBool( p_intf, "qt-video-autoresize" );
 
@@ -151,6 +148,11 @@ MainInterface::MainInterface( intf_thread_t *_p_intf ) : QVLCMW( _p_intf )
 
     /* Should the UI stays on top of other windows */
     b_interfaceOnTop = var_InheritBool( p_intf, "video-on-top" );
+
+#ifdef QT5_HAS_WAYLAND
+    b_hasWayland = QGuiApplication::platformName()
+        .startsWith(QLatin1String("wayland"), Qt::CaseInsensitive);
+#endif
 
     /**************************
      *  UI and Widgets design
@@ -480,7 +482,7 @@ void MainInterface::createMainWidget( QSettings *creationSettings )
             bgWidget->setExpandstoHeight( true );
 
     /* And video Outputs */
-    if( b_videoEmbedded )
+    if( var_InheritBool( p_intf, "embedded-video" ) )
     {
         videoWidget = new VideoWidget( p_intf, stackCentralW );
         stackCentralW->addWidget( videoWidget );
@@ -588,9 +590,6 @@ inline void MainInterface::createStatusBar()
     CONNECT( THEMIM->getIM(), encryptionChanged( bool ),
              this, showCryptedLabel( bool ) );
 
-    CONNECT( THEMIM->getIM(), seekRequested( float ),
-             timeLabel, setDisplayPosition( float ) );
-
     /* This shouldn't be necessary, but for somehow reason, the statusBarr
        starts at height of 20px and when a text is shown it needs more space.
        But, as the QMainWindow policy doesn't allow statusBar to change QMW's
@@ -624,10 +623,10 @@ void MainInterface::debug()
 }
 
 inline void MainInterface::showVideo() { showTab( videoWidget ); }
-inline void MainInterface::restoreStackOldWidget()
-            { showTab( stackCentralOldWidget ); }
+inline void MainInterface::restoreStackOldWidget( bool video_closing )
+            { showTab( stackCentralOldWidget, video_closing ); }
 
-inline void MainInterface::showTab( QWidget *widget )
+inline void MainInterface::showTab( QWidget *widget, bool video_closing )
 {
     if ( !widget ) widget = bgWidget; /* trying to restore a null oldwidget */
 #ifdef DEBUG_INTF
@@ -647,10 +646,11 @@ inline void MainInterface::showTab( QWidget *widget )
         widget = bgWidget;
 
     stackCentralOldWidget = stackCentralW->currentWidget();
-    stackWidgetsSizes[stackCentralOldWidget] = stackCentralW->size();
+    if( !isFullScreen() )
+        stackWidgetsSizes[stackCentralOldWidget] = stackCentralW->size();
 
     /* If we are playing video, embedded */
-    if( videoWidget && THEMIM->getIM()->hasVideo() )
+    if( !video_closing && videoWidget && THEMIM->getIM()->hasVideo() )
     {
         /* Video -> Playlist */
         if( videoWidget == stackCentralOldWidget && widget == playlistWidget )
@@ -693,7 +693,7 @@ inline void MainInterface::showTab( QWidget *widget )
 #endif
 
     /* This part is done later, to account for the new pl size */
-    if( videoWidget && THEMIM->getIM()->hasVideo() &&
+    if( !video_closing && videoWidget && THEMIM->getIM()->hasVideo() &&
         videoWidget == stackCentralOldWidget && widget == playlistWidget )
     {
         playlistWidget->artContainer->addWidget( videoWidget );
@@ -741,6 +741,11 @@ void MainInterface::getVideoSlot( struct vout_window_t *p_wnd,
         toggleUpdateSystrayMenu();
 
     /* Request the videoWidget */
+    if ( !videoWidget )
+    {
+        videoWidget = new VideoWidget( p_intf, stackCentralW );
+        stackCentralW->addWidget( videoWidget );
+    }
     *res = videoWidget->request( p_wnd );
     if( *res ) /* The videoWidget is available */
     {
@@ -782,7 +787,7 @@ void MainInterface::releaseVideoSlot( void )
     hideResumePanel();
 
     if( stackCentralW->currentWidget() == videoWidget )
-        restoreStackOldWidget();
+        restoreStackOldWidget( true );
     else if( playlistWidget &&
              playlistWidget->artContainer->currentWidget() == videoWidget )
     {
@@ -858,31 +863,39 @@ void MainInterface::setVideoFullScreen( bool fs )
     if( fs )
     {
         int numscreen = var_InheritInteger( p_intf, "qt-fullscreen-screennumber" );
-        /* if user hasn't defined screennumber, or screennumber that is bigger
-         * than current number of screens, take screennumber where current interface
-         * is
-         */
-        if( numscreen < 0 || numscreen >= QApplication::desktop()->screenCount() )
-            numscreen = QApplication::desktop()->screenNumber( p_intf->p_sys->p_mi );
 
-        QRect screenres = QApplication::desktop()->screenGeometry( numscreen );
-        lastWinScreen = windowHandle()->screen();
-        windowHandle()->setScreen(QGuiApplication::screens()[numscreen]);
-
-        /* To be sure window is on proper-screen in xinerama */
-        if( !screenres.contains( pos() ) )
+        if ( numscreen >= 0 && numscreen < QApplication::desktop()->screenCount() )
         {
-            lastWinPosition = pos();
-            lastWinSize = size();
-            msg_Dbg( p_intf, "Moving video to correct position");
-            move( QPoint( screenres.x(), screenres.y() ) );
+            if( fullscreenControls )
+                fullscreenControls->setTargetScreen( numscreen );
+
+            QRect screenres = QApplication::desktop()->screenGeometry( numscreen );
+            lastWinScreen = windowHandle()->screen();
+#ifdef QT5_HAS_WAYLAND
+            if( !b_hasWayland )
+                windowHandle()->setScreen(QGuiApplication::screens()[numscreen]);
+#else
+            windowHandle()->setScreen(QGuiApplication::screens()[numscreen]);
+#endif
+
+            /* To be sure window is on proper-screen in xinerama */
+            if( !screenres.contains( pos() ) )
+            {
+                lastWinPosition = pos();
+                lastWinSize = size();
+                msg_Dbg( p_intf, "Moving video to correct position");
+                move( QPoint( screenres.x(), screenres.y() ) );
+            }
+
+            /* */
+            if( playlistWidget != NULL && playlistWidget->artContainer->currentWidget() == videoWidget )
+            {
+                showTab( videoWidget );
+            }
         }
 
-        /* */
-        if( playlistWidget != NULL && playlistWidget->artContainer->currentWidget() == videoWidget )
-        {
-            showTab( videoWidget );
-        }
+        /* we won't be able to get its windowed sized once in fullscreen, so update it now */
+        stackWidgetsSizes[stackCentralW->currentWidget()] = stackCentralW->size();
 
         /* */
         displayNormalView();
@@ -892,8 +905,13 @@ void MainInterface::setVideoFullScreen( bool fs )
     {
         setMinimalView( b_minimalView );
         setInterfaceFullScreen( b_interfaceFullScreen );
-        if (lastWinScreen != NULL)
+#ifdef QT5_HAS_WAYLAND
+        if( lastWinScreen != NULL && !b_hasWayland )
             windowHandle()->setScreen(lastWinScreen);
+#else
+        if( lastWinScreen != NULL )
+            windowHandle()->setScreen(lastWinScreen);
+#endif
         if( lastWinPosition.isNull() == false )
         {
             move( lastWinPosition );
@@ -1063,12 +1081,21 @@ void MainInterface::dockPlaylist( bool p_docked )
     if( !p_docked ) /* Previously docked */
     {
         playlistVisible = playlistWidget->isVisible();
-        stackCentralW->removeWidget( playlistWidget );
-        dialog->importPlaylistWidget( playlistWidget );
+
+        /* repositioning the videowidget __before__ exporting the
+           playlistwidget into the playlist dialog avoids two unneeded
+           calls to the server in the qt library to reparent the underlying
+           native window back and forth.
+           For Wayland, this is mandatory since reparenting is not implemented.
+           For X11 or Windows, this is just an optimization. */
         if ( videoWidget && THEMIM->getIM()->hasVideo() )
             showTab(videoWidget);
         else
             showTab(bgWidget);
+
+        /* playlistwidget exported into the playlist dialog */
+        stackCentralW->removeWidget( playlistWidget );
+        dialog->importPlaylistWidget( playlistWidget );
         if ( playlistVisible ) dialog->show();
     }
     else /* Previously undocked */

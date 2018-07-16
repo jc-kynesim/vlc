@@ -370,9 +370,11 @@ QMenu *VLCMenuBar::FileMenu( intf_thread_t *p_intf, QWidget *parent, MainInterfa
     addDPStaticEntry( menu, qtr( "Open &Location from clipboard" ),
                       NULL, SLOT( openUrlDialog() ), "Ctrl+V" );
 
-    if( var_InheritBool( p_intf, "qt-recentplay" ) )
+    if( !recentsMenu && var_InheritBool( p_intf, "qt-recentplay" ) )
+        recentsMenu = new QMenu( qtr( "Open &Recent Media" ) );
+
+    if( recentsMenu )
     {
-        recentsMenu = new QMenu( qtr( "Open &Recent Media" ), menu );
         updateRecents( p_intf );
         menu->addMenu( recentsMenu );
     }
@@ -539,11 +541,6 @@ QMenu *VLCMenuBar::ViewMenu( intf_thread_t *p_intf, QMenu *current, MainInterfac
     if( visual_selector_enabled ) adv->setChecked( true );
 #endif
 
-    action = menu->addAction( qtr( "Always on &top" ) );
-    action->setCheckable( true );
-    action->setChecked( mi->isInterfaceAlwaysOnTop() );
-    CONNECT( action, triggered( bool ), mi, setInterfaceAlwaysOnTop( bool ) );
-
     menu->addSeparator();
 
     InterfacesMenu( p_intf, menu );
@@ -675,15 +672,9 @@ QMenu *VLCMenuBar::VideoMenu( intf_thread_t *p_intf, QMenu *current )
     QVector<vlc_object_t *> objects;
     QVector<const char *> varnames;
 
-    if ( !rendererMenu )
-        rendererMenu = RendererMenu( p_intf );
-
     if( current->isEmpty() )
     {
         addActionWithSubmenu( current, "video-es", qtr( "Video &Track" ) );
-
-        current->addSeparator();
-        current->addMenu( rendererMenu );
 
         current->addSeparator();
         /* Surface modifiers */
@@ -737,6 +728,13 @@ QMenu *VLCMenuBar::NavigMenu( intf_thread_t *p_intf, QMenu *menu )
     action->setData( "bookmark" );
 
     menu->addSeparator();
+
+    if ( !rendererMenu )
+        rendererMenu = RendererMenu( p_intf );
+
+    menu->addMenu( rendererMenu );
+    menu->addSeparator();
+
 
     PopupMenuControlEntries( menu, p_intf );
 
@@ -1347,6 +1345,8 @@ void VLCMenuBar::UpdateItem( intf_thread_t *p_intf, QMenu *menu,
         FREENULL( text.psz_string );
         return;
     }
+    else
+        action->setEnabled( false );
 
     switch( i_type & VLC_VAR_TYPE )
     {
@@ -1655,11 +1655,12 @@ QMenu *VLCMenuBar::RendererMenu(intf_thread_t *p_intf, QMenu *menu )
 
     submenu->addSeparator();
 
-    action = new QAction( qtr("Scan"), submenu );
-    action->setCheckable(true);
+    action = new QAction( qtr("Scanning..."), submenu );
+    action->setEnabled( false );
     submenu->addAction( action );
 
-    CONNECT( action, triggered(bool), ActionsManager::getInstance( p_intf ), ScanRendererAction( bool ) );
+    CONNECT( submenu, aboutToShow(), ActionsManager::getInstance( p_intf ), StartRendererScan() );
+    CONNECT( submenu, aboutToHide(), ActionsManager::getInstance( p_intf ), RendererMenuCountdown() );
     CONNECT( rendererGroup, triggered(QAction*), ActionsManager::getInstance( p_intf ), RendererSelected( QAction* ) );
 
     return submenu;

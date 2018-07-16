@@ -75,8 +75,8 @@ static inline void SubpictureUpdaterSysRegionClean(subpicture_updater_sys_region
 static inline void SubpictureUpdaterSysRegionInit(subpicture_updater_sys_region_t *p_updtregion)
 {
     memset(p_updtregion, 0, sizeof(*p_updtregion));
-    p_updtregion->align = SUBPICTURE_ALIGN_TOP;
-    p_updtregion->inner_align = SUBPICTURE_ALIGN_LEFT;
+    p_updtregion->align = SUBPICTURE_ALIGN_BOTTOM;
+    p_updtregion->inner_align = 0;
 }
 
 static inline subpicture_updater_sys_region_t *SubpictureUpdaterSysRegionNew( )
@@ -233,12 +233,12 @@ static void SubpictureTextUpdate(subpicture_t *subpic,
 
             if( p_segment->style )
             {
-                /* Update all segments font sizes in pixels, *** metric used by renderers *** */
-                /* We only do this when a fixed font size isn't set */
-                if( p_segment->style && p_segment->style->f_font_relsize && !p_segment->style->i_font_size )
+                /* Update all segments font sizes in video source %,
+                 * so we can handle HiDPI properly and have consistent rendering limits */
+                 if( p_segment->style->i_font_size > 0 && fmt_src->i_visible_height > 0 )
                 {
-                    p_segment->style->i_font_size = p_segment->style->f_font_relsize *
-                                                    subpic->i_original_picture_height / 100;
+                    p_segment->style->f_font_relsize = 100.0 * p_segment->style->i_font_size / fmt_src->i_visible_height;
+                    p_segment->style->i_font_size = 0;
                 }
 
                 if( p_segment->style->i_style_flags & (STYLE_BLINK_BACKGROUND|STYLE_BLINK_FOREGROUND) )

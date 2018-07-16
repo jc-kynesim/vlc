@@ -63,9 +63,6 @@
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-int  OpenEncoder ( vlc_object_t * );
-void CloseEncoder( vlc_object_t * );
-
 static block_t *EncodeVideo( encoder_t *, picture_t * );
 static block_t *EncodeAudio( encoder_t *, block_t * );
 
@@ -235,7 +232,7 @@ static const int DEFAULT_ALIGN = 0;
 
 
 /*****************************************************************************
- * OpenEncoder: probe the encoder
+ * InitVideoEnc: probe the encoder
  *****************************************************************************/
 static void probe_video_frame_rate( encoder_t *p_enc, AVCodecContext *p_context, AVCodec *p_codec )
 {
@@ -294,7 +291,7 @@ static void add_av_option_float( encoder_t *p_enc, AVDictionary** pp_dict, const
         msg_Warn( p_enc, "Failed to set encoder option %s", psz_name );
 }
 
-int OpenEncoder( vlc_object_t *p_this )
+int InitVideoEnc( vlc_object_t *p_this )
 {
     encoder_t *p_enc = (encoder_t *)p_this;
     encoder_sys_t *p_sys;
@@ -347,12 +344,15 @@ int OpenEncoder( vlc_object_t *p_this )
     {
         p_codec = avcodec_find_encoder_by_name( psz_encoder );
         if( !p_codec )
+        {
             msg_Err( p_this, "Encoder `%s' not found", psz_encoder );
+            return VLC_EGENERIC;
+        }
         else if( p_codec->id != i_codec_id )
         {
             msg_Err( p_this, "Encoder `%s' can't handle %4.4s",
                     psz_encoder, (char*)&p_enc->fmt_out.i_codec );
-            p_codec = NULL;
+            return VLC_EGENERIC;
         }
     }
     free( psz_encoder );
@@ -543,12 +543,26 @@ int OpenEncoder( vlc_object_t *p_this )
 
         if( p_codec->pix_fmts )
         {
+            static const enum AVPixelFormat vlc_pix_fmts[] = {
+                AV_PIX_FMT_YUV420P,
+                AV_PIX_FMT_NV12,
+                AV_PIX_FMT_RGB24,
+            };
+            bool found = false;
             const enum PixelFormat *p = p_codec->pix_fmts;
-            for( ; *p != -1; p++ )
+            for( ; !found && *p != -1; p++ )
             {
-                if( *p == p_context->pix_fmt ) break;
+                for( size_t i = 0; i < ARRAY_SIZE(vlc_pix_fmts); ++i )
+                {
+                    if( *p == vlc_pix_fmts[i] )
+                    {
+                        found = true;
+                        p_context->pix_fmt = *p;
+                        break;
+                    }
+                }
             }
-            if( *p == -1 ) p_context->pix_fmt = p_codec->pix_fmts[0];
+            if (!found) p_context->pix_fmt = p_codec->pix_fmts[0];
             GetVlcChroma( &p_enc->fmt_in.video, p_context->pix_fmt );
             p_enc->fmt_in.i_codec = p_enc->fmt_in.video.i_chroma;
         }
@@ -667,9 +681,6 @@ int OpenEncoder( vlc_object_t *p_this )
     }
     else if( p_enc->fmt_in.i_cat == AUDIO_ES )
     {
-        /* work around bug in libmp3lame encoding */
-        if( i_codec_id == AV_CODEC_ID_MP3 && p_enc->fmt_out.audio.i_channels  > 2 )
-            p_enc->fmt_out.audio.i_channels = 2;
         p_context->codec_type  = AVMEDIA_TYPE_AUDIO;
         p_context->sample_fmt  = p_codec->sample_fmts ?
                                     p_codec->sample_fmts[0] :
@@ -892,7 +903,14 @@ errmsg:
         if( p_context->channels > 2 )
         {
             p_context->channels = 2;
-            p_enc->fmt_in.audio.i_channels = 2; // FIXME
+            p_context->channel_layout = channel_mask[p_context->channels][1];
+
+            /* Change fmt_in in order to ask for a channels conversion */
+            p_enc->fmt_in.audio.i_channels =
+            p_enc->fmt_out.audio.i_channels = 2;
+            p_enc->fmt_in.audio.i_physical_channels =
+            p_enc->fmt_out.audio.i_physical_channels = AOUT_CHANS_STEREO;
+            p_sys->i_channels_to_reorder = 0;
             msg_Warn( p_enc, "stereo mode selected (codec limitation)" );
         }
 
@@ -907,10 +925,11 @@ errmsg:
 
             if ( i_frequency == 6 )
             {
-                msg_Err( p_enc, "MPEG audio doesn't support frequency=%d",
+                msg_Warn( p_enc, "MPEG audio doesn't support frequency=%d",
                         fmt->audio.i_rate );
-                av_dict_free(&options);
-                goto error;
+                /* Fallback to 44100 hz */
+                p_context->sample_rate = p_enc->fmt_in.audio.i_rate =
+                p_enc->fmt_out.audio.i_rate = 44100;
             }
 
             for ( i = 1; i < 14; i++ )
@@ -1119,7 +1138,7 @@ static block_t *encode_avframe( encoder_t *p_enc, encoder_sys_t *p_sys, AVFrame 
     int ret = avcodec_send_frame( p_sys->p_context, frame );
     if( frame && ret != 0 && ret != AVERROR(EAGAIN) )
     {
-        msg_Warn( p_enc, "cannot send one frame to encoder");
+        msg_Warn( p_enc, "cannot send one frame to encoder %d", ret );
         return NULL;
     }
     ret = avcodec_receive_packet( p_sys->p_context, &av_pkt );
@@ -1416,9 +1435,9 @@ static block_t *EncodeAudio( encoder_t *p_enc, block_t *p_aout_buf )
 }
 
 /*****************************************************************************
- * CloseEncoder: libavcodec encoder destruction
+ * EndVideoEnc: libavcodec encoder destruction
  *****************************************************************************/
-void CloseEncoder( vlc_object_t *p_this )
+void EndVideoEnc( vlc_object_t *p_this )
 {
     encoder_t *p_enc = (encoder_t *)p_this;
     encoder_sys_t *p_sys = p_enc->p_sys;

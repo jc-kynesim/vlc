@@ -326,9 +326,8 @@ static input_thread_t *Create( vlc_object_t *p_parent, input_item_t *p_item,
     priv->attachment_demux = NULL;
     priv->p_sout   = NULL;
     priv->b_out_pace_control = false;
-    /* The renderer is passed after its refcount was incremented.
-     * The input thread is now responsible for releasing it */
-    priv->p_renderer = p_renderer;
+    priv->p_renderer = p_renderer && b_preparsing == false ?
+                vlc_renderer_item_hold( p_renderer ) : NULL;
 
     priv->viewpoint_changed = false;
     /* Fetch the viewpoint from the mediaplayer or the playlist if any */
@@ -846,15 +845,20 @@ static int InitSout( input_thread_t * p_input )
         return VLC_SUCCESS;
 
     /* Find a usable sout and attach it to p_input */
-    char *psz = NULL;
+    char *psz = var_GetNonEmptyString( p_input, "sout" );
     if( priv->p_renderer )
     {
+        /* Keep sout if it comes from a renderer and if the user didn't touch
+         * the sout config */
+        bool keep_sout = psz == NULL;
+        free(psz);
+
         const char *psz_renderer_sout = vlc_renderer_item_sout( priv->p_renderer );
         if( asprintf( &psz, "#%s", psz_renderer_sout ) < 0 )
             return VLC_ENOMEM;
+        if( keep_sout )
+            var_SetBool( p_input, "sout-keep", true );
     }
-    if( !psz )
-        psz = var_GetNonEmptyString( p_input, "sout" );
     if( psz && strncasecmp( priv->p_item->psz_uri, "vlc:", 4 ) )
     {
         priv->p_sout  = input_resource_RequestSout( priv->p_resource, NULL, psz );
@@ -1256,7 +1260,7 @@ static void InitPrograms( input_thread_t * p_input )
 
     /* Set up es_out */
     i_es_out_mode = ES_OUT_MODE_AUTO;
-    if( input_priv(p_input)->p_sout )
+    if( input_priv(p_input)->p_sout && !input_priv(p_input)->p_renderer )
     {
         char *prgms;
 
@@ -1711,6 +1715,10 @@ static void ControlRelease( int i_type, vlc_value_t val )
     case INPUT_CONTROL_UPDATE_VIEWPOINT:
         free( val.p_address );
         break;
+    case INPUT_CONTROL_SET_RENDERER:
+        if( val.p_address )
+            vlc_renderer_item_release( val.p_address );
+        break;
 
     default:
         break;
@@ -1796,6 +1804,41 @@ static void ViewpointApply( input_thread_t *p_input )
     }
 }
 
+/* XXX: The two following functions are copied from the hotkeys module. The OSD
+ * handling need to be handled by the core, in the future input manager for
+ * example. */
+static void ControlNavDisplayVolume( vout_thread_t *p_vout, float vol )
+{
+    vout_FlushSubpictureChannel( p_vout, VOUT_SPU_CHANNEL_OSD );
+    vout_OSDMessage( p_vout, VOUT_SPU_CHANNEL_OSD, _( "Volume %ld%%" ),
+                     lroundf( vol * 100.f ) );
+}
+
+static void ControlNavDisplayPosition( vout_thread_t *p_vout,
+                                       input_thread_t *p_input )
+{
+    vout_FlushSubpictureChannel( p_vout, VOUT_SPU_CHANNEL_OSD );
+
+    int64_t t = var_GetInteger( p_input, "time" ) / CLOCK_FREQ;
+    int64_t l = var_GetInteger( p_input, "length" ) / CLOCK_FREQ;
+
+    char psz_time[MSTRTIME_MAX_SIZE];
+    secstotimestr( psz_time, t );
+
+    if( l > 0 )
+    {
+        char psz_duration[MSTRTIME_MAX_SIZE];
+
+        secstotimestr( psz_duration, l );
+        vout_OSDMessage( p_vout, VOUT_SPU_CHANNEL_OSD,
+                         "%s / %s", psz_time, psz_duration );
+    }
+    else if( t > 0 )
+    {
+        vout_OSDMessage( p_vout, VOUT_SPU_CHANNEL_OSD, "%s", psz_time );
+    }
+}
+
 static void ControlNav( input_thread_t *p_input, int i_type )
 {
     input_thread_private_t *priv = input_priv(p_input);
@@ -1844,9 +1887,7 @@ static void ControlNav( input_thread_t *p_input, int i_type )
         if( !b_viewpoint_ch
          && var_GetBool( pp_vout[i], "viewpoint-changeable" ) )
             b_viewpoint_ch = true;
-        vlc_object_release( pp_vout[i] );
     }
-    free( pp_vout );
 
     if( b_viewpoint_ch )
     {
@@ -1856,7 +1897,7 @@ static void ControlNav( input_thread_t *p_input, int i_type )
         priv->viewpoint.roll  += vp.roll;
         priv->viewpoint.fov   += vp.fov;
         ViewpointApply( p_input );
-        return;
+        goto clean;
     }
 
     /* Seek or change volume if the input doesn't have navigation or viewpoint */
@@ -1864,6 +1905,8 @@ static void ControlNav( input_thread_t *p_input, int i_type )
     {
         mtime_t it = var_InheritInteger( p_input, "short-jump-size" );
         var_SetInteger( p_input, "time-offset", it * seek_direction * CLOCK_FREQ );
+        if( i_vout > 0 )
+            ControlNavDisplayPosition( pp_vout[0], p_input );
     }
     else
     {
@@ -1871,17 +1914,24 @@ static void ControlNav( input_thread_t *p_input, int i_type )
         audio_output_t *p_aout = input_resource_HoldAout( priv->p_resource );
         if( p_aout )
         {
-            aout_VolumeUpdate( p_aout, vol_direction, NULL );
+            float new_vol;
+            aout_VolumeUpdate( p_aout, vol_direction, &new_vol );
             vlc_object_release( p_aout );
+            if( i_vout > 0 )
+                ControlNavDisplayVolume( pp_vout[0], new_vol );
         }
     }
+
+clean:
+    for( size_t i = 0; i < i_vout; ++i )
+        vlc_object_release( pp_vout[i] );
+    free( pp_vout );
 }
 
 #ifdef ENABLE_SOUT
-static void ControlUpdateSout( input_thread_t *p_input, const char* psz_chain )
+static void ControlUpdateRenderer( input_thread_t *p_input, bool b_enable )
 {
-    var_SetString( p_input, "sout", psz_chain );
-    if( psz_chain && *psz_chain )
+    if( b_enable )
     {
         if( InitSout( p_input ) != VLC_SUCCESS )
         {
@@ -1895,7 +1945,6 @@ static void ControlUpdateSout( input_thread_t *p_input, const char* psz_chain )
                                     input_priv(p_input)->p_sout, NULL );
         input_priv(p_input)->p_sout = NULL;
     }
-    es_out_Control( input_priv(p_input)->p_es_out, ES_OUT_RESTART_ALL_ES );
 }
 #endif
 
@@ -2324,9 +2373,14 @@ static bool Control( input_thread_t *p_input,
             if ( p_item == NULL && p_priv->p_renderer == NULL )
                 break;
 
+            void *context;
+            if( es_out_Control( input_priv(p_input)->p_es_out_display,
+                                ES_OUT_STOP_ALL_ES, &context ) != VLC_SUCCESS )
+                break;
+
             if ( p_priv->p_renderer )
             {
-                ControlUpdateSout( p_input, NULL );
+                ControlUpdateRenderer( p_input, false );
                 demux_FilterDisable( p_priv->master->p_demux,
                         vlc_renderer_item_demux_filter( p_priv->p_renderer ) );
                 vlc_renderer_item_release( p_priv->p_renderer );
@@ -2335,7 +2389,7 @@ static bool Control( input_thread_t *p_input,
             if( p_item != NULL )
             {
                 p_priv->p_renderer = vlc_renderer_item_hold( p_item );
-                ControlUpdateSout( p_input, vlc_renderer_item_sout( p_item ) );
+                ControlUpdateRenderer( p_input, true );
                 if( !demux_FilterEnable( p_priv->master->p_demux,
                                 vlc_renderer_item_demux_filter( p_priv->p_renderer ) ) )
                 {
@@ -2344,6 +2398,8 @@ static bool Control( input_thread_t *p_input,
                 }
                 input_resource_TerminateVout( p_priv->p_resource );
             }
+            es_out_Control( input_priv(p_input)->p_es_out_display, ES_OUT_START_ALL_ES,
+                            context );
 #endif
             break;
         }

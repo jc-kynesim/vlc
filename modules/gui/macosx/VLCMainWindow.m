@@ -277,9 +277,7 @@ static const float f_min_window_height = 307.;
 
     /* restore split view */
     f_lastLeftSplitViewWidth = 200;
-    /* trick NSSplitView implementation, which pretends to know better than us */
-    if (!var_InheritBool(getIntf(), "macosx-show-sidebar"))
-        [self performSelector:@selector(toggleLeftSubSplitView) withObject:nil afterDelay:0.05];
+    [[[VLCMain sharedInstance] mainMenu] updateSidebarMenuItem: ![_splitView isSubviewCollapsed:_splitViewLeft]];
 }
 
 #pragma mark -
@@ -322,19 +320,16 @@ static const float f_min_window_height = 307.;
                 [internetItems addObject: [SideBarItem itemWithTitle: _NS(*ppsz_longname) identifier: o_identifier]];
                 [[internetItems lastObject] setIcon: imageFromRes(@"sidebar-podcast")];
                 [[internetItems lastObject] setSdtype: SD_CAT_INTERNET];
-                [[internetItems lastObject] setUntranslatedTitle: toNSStr(*ppsz_longname)];
                 break;
             case SD_CAT_DEVICES:
                 [devicesItems addObject: [SideBarItem itemWithTitle: _NS(*ppsz_longname) identifier: o_identifier]];
                 [[devicesItems lastObject] setIcon: imageFromRes(@"sidebar-local")];
                 [[devicesItems lastObject] setSdtype: SD_CAT_DEVICES];
-                [[devicesItems lastObject] setUntranslatedTitle: toNSStr(*ppsz_longname)];
                 break;
             case SD_CAT_LAN:
                 [lanItems addObject: [SideBarItem itemWithTitle: _NS(*ppsz_longname) identifier: o_identifier]];
                 [[lanItems lastObject] setIcon: imageFromRes(@"sidebar-local")];
                 [[lanItems lastObject] setSdtype: SD_CAT_LAN];
-                [[lanItems lastObject] setUntranslatedTitle: toNSStr(*ppsz_longname)];
                 break;
             case SD_CAT_MYCOMPUTER:
                 [mycompItems addObject: [SideBarItem itemWithTitle: _NS(*ppsz_longname) identifier: o_identifier]];
@@ -346,7 +341,6 @@ static const float f_min_window_height = 307.;
                     [[mycompItems lastObject] setIcon: imageFromRes(@"sidebar-pictures")];
                 else
                     [[mycompItems lastObject] setIcon: [NSImage imageNamed:@"NSApplicationIcon"]];
-                [[mycompItems lastObject] setUntranslatedTitle: toNSStr(*ppsz_longname)];
                 [[mycompItems lastObject] setSdtype: SD_CAT_MYCOMPUTER];
                 break;
             default:
@@ -520,7 +514,6 @@ static const float f_min_window_height = 307.;
 
 - (void)applicationWillTerminate:(NSNotification *)notification
 {
-    config_PutInt(getIntf(), "macosx-show-sidebar", ![_splitView isSubviewCollapsed:_splitViewLeft]);
     [self saveFrameUsingName:[self frameAutosaveName]];
 }
 
@@ -837,8 +830,7 @@ static const float f_min_window_height = 307.;
 - (void)mainSplitViewDidResizeSubviews:(id)object
 {
     f_lastLeftSplitViewWidth = [_splitViewLeft frame].size.width;
-    config_PutInt(getIntf(), "macosx-show-sidebar", ![_splitView isSubviewCollapsed:_splitViewLeft]);
-    [[[VLCMain sharedInstance] mainMenu] updateSidebarMenuItem];
+    [[[VLCMain sharedInstance] mainMenu] updateSidebarMenuItem: ![_splitView isSubviewCollapsed:_splitViewLeft]];
 }
 
 - (void)toggleLeftSubSplitView
@@ -848,7 +840,8 @@ static const float f_min_window_height = 307.;
         [_splitView setPosition:f_lastLeftSplitViewWidth ofDividerAtIndex:0];
     else
         [_splitView setPosition:[_splitView minPossiblePositionOfDividerAtIndex:0] ofDividerAtIndex:0];
-    [[[VLCMain sharedInstance] mainMenu] updateSidebarMenuItem];
+
+    [[[VLCMain sharedInstance] mainMenu] updateSidebarMenuItem: ![_splitView isSubviewCollapsed:_splitViewLeft]];
 }
 
 #pragma mark -
@@ -882,16 +875,19 @@ static const float f_min_window_height = 307.;
 
     mt_duration = mt_duration / 1000000;
 
-    NSDate *date = [NSDate dateWithTimeIntervalSince1970:mt_duration];
-    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
-    if (mt_duration >= 86400) {
-        [formatter setDateFormat:@"dd:HH:mm:ss"];
-    } else {
-        [formatter setDateFormat:@"HH:mm:ss"];
-    }
-    [formatter setTimeZone:[NSTimeZone timeZoneForSecondsFromGMT:0]];
+    int sec = (mt_duration % 60);
+    int min = (mt_duration % 3600) / 60;
+    int hours = (mt_duration % 86400) / 3600;
+    int days = (int)(mt_duration / 86400);
 
-    return [NSString stringWithFormat:@" — %@",[formatter stringFromDate:date]];
+    NSString *result;
+    if (days > 0) {
+        result = [NSString stringWithFormat:@"%i:%i:%02i:%02i", days, hours, min, sec];
+    } else {
+        result = [NSString stringWithFormat:@"%i:%02i:%02i", hours, min, sec];
+    }
+
+    return [NSString stringWithFormat:@" — %@", result];
 }
 
 - (IBAction)searchItem:(id)sender
@@ -1070,9 +1066,12 @@ static const float f_min_window_height = 307.;
         }
     } else {
         PL_LOCK;
-        playlist_item_t *pl_item = playlist_ChildSearchName(&p_playlist->root, [[item untranslatedTitle] UTF8String]);
-        if (pl_item != NULL)
+        const char *title = [[item title] UTF8String];
+        playlist_item_t *pl_item = playlist_ChildSearchName(&p_playlist->root, title);
+        if (pl_item)
             [[[[VLCMain sharedInstance] playlist] model] changeRootItem:pl_item];
+        else
+            msg_Err(getIntf(), "Could not find playlist entry with name %s", title);
 
         PL_UNLOCK;
     }

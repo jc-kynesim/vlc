@@ -1,20 +1,20 @@
 dnl Autoconf settings for vlc
 
-AC_COPYRIGHT([Copyright 1999-2017 VLC authors and VideoLAN])
+AC_COPYRIGHT([Copyright 1999-2018 VLC authors and VideoLAN])
 
-AC_INIT(vlc, 3.0.0-git)
+AC_INIT(vlc, 3.0.2)
 VERSION_MAJOR=3
 VERSION_MINOR=0
-VERSION_REVISION=0
+VERSION_REVISION=2
 VERSION_EXTRA=0
-VERSION_DEV=git
+VERSION_DEV=
 
 PKGDIR="vlc"
 AC_SUBST(PKGDIR)
 
 CONFIGURE_LINE="`echo "$0 $ac_configure_args" | sed -e 's/\\\/\\\\\\\/g'`"
 CODENAME="Vetinari"
-COPYRIGHT_YEARS="1996-2017"
+COPYRIGHT_YEARS="1996-2018"
 
 AC_CONFIG_SRCDIR(src/libvlc.c)
 AC_CONFIG_AUX_DIR(autotools)
@@ -187,17 +187,6 @@ case "${host_os}" in
              HAVE_OSX="0"
              ],)
 
-    dnl Allow binaries created on Lion to run on earlier releases
-    AC_EGREP_CPP(yes,
-           [#import <Cocoa/Cocoa.h>
-            #ifdef MAC_OS_X_VERSION_10_7
-            yes
-            #endif],
-            [AC_MSG_RESULT([yes])
-            AC_LIBOBJ([getdelim])
-            AC_LIBOBJ([strndup])
-            AC_LIBOBJ([strnlen])],)
-
     dnl
     dnl  Handle Mac OS X SDK flags
     dnl
@@ -301,6 +290,7 @@ case "${host_os}" in
     LDFLAGS="${LDFLAGS} -Zomf -Zbin-files -Zargs-wild -Zhigh-mem"
     AC_LIBOBJ([freeaddrinfo])
     AC_LIBOBJ([gai_strerror])
+    AC_CHECK_FUNCS([if_nametoindex])
     ;;
   *nacl*)
     SYS=nacl
@@ -341,6 +331,7 @@ AM_CONDITIONAL(HAVE_OSX,     test "${HAVE_OSX}" = "1")
 AM_CONDITIONAL(HAVE_TVOS,    test "${HAVE_TVOS}" = "1")
 
 AM_CONDITIONAL(HAVE_NACL,    test "${SYS}" = "nacl")
+AM_CONDITIONAL(HAVE_LIBANL,  test "${HAVE_LIBANL}" = "1")
 
 AM_CONDITIONAL(HAVE_WIN32,   test "${SYS}" = "mingw32")
 AM_CONDITIONAL(HAVE_WIN64,   test "${HAVE_WIN64}" = "1") dnl Only used for the packaging
@@ -599,8 +590,8 @@ dnl Check for system libs needed
 need_libc=false
 
 dnl Check for usual libc functions
-AC_CHECK_FUNCS([daemon fcntl flock fstatvfs fork getenv getpwuid_r isatty lstat memalign mkostemp mmap open_memstream openat pread posix_fadvise posix_madvise posix_memalign setlocale stricmp strnicmp strptime tdestroy uselocale])
-AC_REPLACE_FUNCS([aligned_alloc atof atoll dirfd fdopendir ffsll flockfile fsync getdelim getpid lldiv memrchr nrand48 poll recvmsg rewind sendmsg setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tfind timegm timespec_get strverscmp pathconf])
+AC_CHECK_FUNCS([accept4 daemon fcntl flock fstatvfs fork getenv getpwuid_r isatty lstat memalign mkostemp mmap newlocale open_memstream openat pipe2 pread posix_fadvise posix_madvise posix_memalign setlocale stricmp strnicmp strptime uselocale])
+AC_REPLACE_FUNCS([aligned_alloc atof atoll dirfd fdopendir ffsll flockfile fsync getdelim getpid lldiv memrchr nrand48 poll recvmsg rewind sendmsg setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy tfind timegm timespec_get strverscmp pathconf])
 AC_REPLACE_FUNCS([gettimeofday])
 AC_CHECK_FUNC(fdatasync,,
   [AC_DEFINE(fdatasync, fsync, [Alias fdatasync() to fsync() if missing.])
@@ -631,7 +622,7 @@ AC_FUNC_STRCOLL
 dnl Check for non-standard system calls
 case "$SYS" in
   "linux")
-    AC_CHECK_FUNCS([accept4 pipe2 eventfd vmsplice sched_getaffinity recvmmsg])
+    AC_CHECK_FUNCS([eventfd vmsplice sched_getaffinity recvmmsg])
     ;;
   "mingw32")
     AC_CHECK_FUNCS([_lock_file])
@@ -769,6 +760,10 @@ AC_COMPILE_IFELSE([AC_LANG_SOURCE([_Thread_local int foo = 0;
 dnl __STDC_NO_THREADS__ can't be trusted on some platforms.
 dnl check for its availability explicitely
 AC_CHECK_HEADERS([threads.h])
+
+AC_CHECK_LIB([anl],[getaddrinfo_a],[
+  AC_DEFINE(HAVE_LIBANL, 1, [Define to 1 if you have the anl library])
+])
 
 dnl Check for dynamic plugins
 LIBDL=""
@@ -3845,24 +3840,29 @@ AS_IF([test "$with_breakpad" != "no"], [
     AC_MSG_ERROR([You need to supply the CrashDragon Server URL as value for --with-breakpad])
   ])
 
-  AS_IF([test "$HAVE_OSX" != "1"], [
-    AC_MSG_ERROR([Breakpad currently only works on macOS])
+  AS_IF([test "$HAVE_OSX" = "1"], [
+    AC_MSG_CHECKING([for Breakpad framework])
+    AS_IF([test ! -d ${CONTRIB_DIR}/Breakpad.framework -a \
+                ! -d ${CONTRIB_DIR}/Frameworks/Breakpad.framework], [
+      AC_MSG_RESULT([no])
+      with_breakpad="no"
+      AC_MSG_ERROR([Breakpad framework is required and was not found in ${CONTRIB_DIR}])
+    ], [
+      AC_MSG_RESULT([yes])
+    ])
+  ],[
+    PKG_CHECK_MODULES([BREAKPAD], [breakpad-client], [
+      LDFLAGS="${LDFLAGS} -Wl,--build-id"
+    ], [
+      AC_MSG_ERROR(["breakpad not found"])
+    ])
   ])
-
-  AC_MSG_CHECKING([for Breakpad framework])
-  AS_IF([test ! -d ${CONTRIB_DIR}/Breakpad.framework -a \
-              ! -d ${CONTRIB_DIR}/Frameworks/Breakpad.framework], [
-    AC_MSG_RESULT([no])
-    AC_MSG_ERROR([Breakpad framework is required and was not found in ${CONTRIB_DIR}])
-  ], [
-    AC_MSG_RESULT([yes])
-    AC_DEFINE([HAVE_BREAKPAD], [1], [Define to 1 if breakpad is enabled.])
-    AC_SUBST(BREAKPAD_URL, ["${with_breakpad}"])
-  ])
-
 ])
 
 AM_CONDITIONAL(HAVE_BREAKPAD, [test "$with_breakpad" != "no"])
+AS_IF([test "$with_breakpad" != "no"], [
+  AC_SUBST(BREAKPAD_URL, ["${with_breakpad}"])
+])
 
 dnl
 dnl  Minimal Mac OS X module
@@ -3892,6 +3892,12 @@ AC_CHECK_HEADERS(VideoToolbox/VideoToolbox.h, [
     VLC_ADD_PLUGIN([videotoolbox])
     VLC_ADD_PLUGIN([cvpx])
   ])
+
+dnl
+dnl  AudioToolbox MIDI plugin
+AC_CHECK_HEADERS([AudioToolbox/AudioToolbox.h], [
+  VLC_ADD_PLUGIN([audiotoolboxmidi])
+])
 
 dnl
 dnl  ncurses module
@@ -4119,7 +4125,7 @@ AS_IF([test "${enable_osx_notifications}" != "no"], [
 dnl
 dnl Libnotify notification plugin
 dnl
-PKG_ENABLE_MODULES_VLC([NOTIFY], [], [libnotify gtk+-2.0], [libnotify notification], [auto])
+PKG_ENABLE_MODULES_VLC([NOTIFY], [], [libnotify gtk+-3.0], [libnotify notification], [auto])
 
 dnl
 dnl  libplacebo support
@@ -4129,7 +4135,7 @@ AC_ARG_ENABLE(libplacebo,
       [disable libplacebo support (default auto)])])
 
 AS_IF([test "$enable_libplacebo" != "no"], [
-  PKG_CHECK_MODULES([LIBPLACEBO], [libplacebo >= 0.1], [
+  PKG_CHECK_MODULES([LIBPLACEBO], [libplacebo >= 0.2.1], [
     AC_DEFINE([HAVE_LIBPLACEBO], [1], [Define to 1 if libplacebo is enabled.])
   ], [
     AS_IF([test -n "${enable_libplacebo}"], [

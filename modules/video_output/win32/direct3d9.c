@@ -125,7 +125,7 @@ typedef struct
     uint32_t     rmask;
     uint32_t     gmask;
     uint32_t     bmask;
-} d3d_format_t;
+} d3d9_format_t;
 
 struct vout_display_sys_t
 {
@@ -151,7 +151,7 @@ struct vout_display_sys_t
     D3DFORMAT               d3dregion_format;    /* Backbuffer output format */
     int                     d3dregion_count;
     struct d3d_region_t     *d3dregion;
-    const d3d_format_t      *d3dtexture_format;  /* Rendering texture(s) format */
+    const d3d9_format_t      *d3dtexture_format;  /* Rendering texture(s) format */
 
     /* */
     bool                    reset_device;
@@ -165,12 +165,12 @@ struct vout_display_sys_t
     bool           desktop_requested;
 };
 
-static const d3d_format_t *Direct3DFindFormat(vout_display_t *vd, vlc_fourcc_t chroma, D3DFORMAT target);
+static const d3d9_format_t *Direct3DFindFormat(vout_display_t *vd, vlc_fourcc_t chroma, D3DFORMAT target);
 
 static int  Open(vlc_object_t *);
 
 static picture_pool_t *Direct3D9CreatePicturePool  (vlc_object_t *, d3d9_device_t *,
-     const d3d_format_t *, const video_format_t *, unsigned);
+     const d3d9_format_t *, const video_format_t *, unsigned);
 
 static void           Prepare(vout_display_t *, picture_t *, subpicture_t *subpicture);
 static void           Display(vout_display_t *, picture_t *, subpicture_t *subpicture);
@@ -246,6 +246,9 @@ static int Open(vlc_object_t *object)
     vout_display_sys_t *sys;
 
     if ( !vd->obj.force && vd->source.projection_mode != PROJECTION_MODE_RECTANGULAR)
+        return VLC_EGENERIC; /* let a module who can handle it do it */
+
+    if ( !vd->obj.force && vd->source.mastering.max_luminance != 0)
         return VLC_EGENERIC; /* let a module who can handle it do it */
 
     OSVERSIONINFO winVer;
@@ -398,7 +401,7 @@ static void Direct3D9UnlockSurface(picture_t *picture)
 
 /* */
 static picture_pool_t *Direct3D9CreatePicturePool(vlc_object_t *o,
-    d3d9_device_t *p_d3d9_dev, const d3d_format_t *default_d3dfmt, const video_format_t *fmt, unsigned count)
+    d3d9_device_t *p_d3d9_dev, const d3d9_format_t *default_d3dfmt, const video_format_t *fmt, unsigned count)
 {
     picture_pool_t*   pool = NULL;
     picture_t**       pictures = NULL;
@@ -429,6 +432,7 @@ static picture_pool_t *Direct3D9CreatePicturePool(vlc_object_t *o,
         picture_sys_t *picsys = malloc(sizeof(*picsys));
         if (unlikely(picsys == NULL))
             goto error;
+        memset(picsys, 0, sizeof(*picsys));
 
         HRESULT hr = IDirect3DDevice9_CreateOffscreenPlainSurface(p_d3d9_dev->dev,
                                                           fmt->i_width,
@@ -503,17 +507,26 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     else if (picture->context)
     {
         const struct va_pic_context *pic_ctx = (struct va_pic_context*)picture->context;
-        if (pic_ctx->picsys.surface != picture->p_sys->surface)
+        if (pic_ctx->picsys.surface != surface)
         {
-            HRESULT hr;
-            RECT visibleSource;
-            visibleSource.left = 0;
-            visibleSource.top = 0;
-            visibleSource.right = picture->format.i_visible_width;
-            visibleSource.bottom = picture->format.i_visible_height;
-            hr = IDirect3DDevice9_StretchRect( p_d3d9_dev->dev, pic_ctx->picsys.surface, &visibleSource, surface, &visibleSource, D3DTEXF_NONE);
-            if (FAILED(hr)) {
-                msg_Err(vd, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx)", hr );
+            D3DSURFACE_DESC srcDesc, dstDesc;
+            IDirect3DSurface9_GetDesc(pic_ctx->picsys.surface, &srcDesc);
+            IDirect3DSurface9_GetDesc(surface, &dstDesc);
+            if ( srcDesc.Width == dstDesc.Width && srcDesc.Height == dstDesc.Height )
+                surface = pic_ctx->picsys.surface;
+            else
+            {
+                HRESULT hr;
+                RECT visibleSource;
+                visibleSource.left = 0;
+                visibleSource.top = 0;
+                visibleSource.right = picture->format.i_visible_width;
+                visibleSource.bottom = picture->format.i_visible_height;
+
+                hr = IDirect3DDevice9_StretchRect( p_d3d9_dev->dev, pic_ctx->picsys.surface, &visibleSource, surface, &visibleSource, D3DTEXF_NONE);
+                if (FAILED(hr)) {
+                    msg_Err(vd, "Failed to copy the hw surface to the decoder surface (hr=0x%0lx)", hr );
+                }
             }
         }
     }
@@ -769,7 +782,7 @@ static int Direct3D9Open(vout_display_t *vd, video_format_t *fmt)
     /* Find the appropriate D3DFORMAT for the render chroma, the format will be the closest to
      * the requested chroma which is usable by the hardware in an offscreen surface, as they
      * typically support more formats than textures */
-    const d3d_format_t *d3dfmt = Direct3DFindFormat(vd, fmt->i_chroma, p_d3d9_dev->pp.BackBufferFormat);
+    const d3d9_format_t *d3dfmt = Direct3DFindFormat(vd, fmt->i_chroma, p_d3d9_dev->pp.BackBufferFormat);
     if (!d3dfmt) {
         msg_Err(vd, "surface pixel format is not supported.");
         goto error;
@@ -932,7 +945,7 @@ static int Direct3D9CheckConversion(vout_display_t *vd,
     return VLC_SUCCESS;
 }
 
-static const d3d_format_t d3d_formats[] = {
+static const d3d9_format_t d3d_formats[] = {
     /* YV12 is always used for planar 420, the planes are then swapped in Lock() */
     { "YV12",       MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_YV12,  0,0,0 },
     { "YV12",       MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_I420,  0,0,0 },
@@ -953,7 +966,7 @@ static const d3d_format_t d3d_formats[] = {
 
 /**
  * It returns the format (closest to chroma) that can be converted to target */
-static const d3d_format_t *Direct3DFindFormat(vout_display_t *vd, vlc_fourcc_t chroma, D3DFORMAT target)
+static const d3d9_format_t *Direct3DFindFormat(vout_display_t *vd, vlc_fourcc_t chroma, D3DFORMAT target)
 {
     vout_display_sys_t *sys = vd->sys;
     bool hardware_scale_ok = !(vd->fmt.i_visible_width & 1) && !(vd->fmt.i_visible_height & 1);
@@ -975,7 +988,7 @@ static const d3d_format_t *Direct3DFindFormat(vout_display_t *vd, vlc_fourcc_t c
 
         for (unsigned i = 0; list[i] != 0; i++) {
             for (unsigned j = 0; d3d_formats[j].name; j++) {
-                const d3d_format_t *format = &d3d_formats[j];
+                const d3d9_format_t *format = &d3d_formats[j];
 
                 if (format->fourcc != list[i])
                     continue;
@@ -1812,7 +1825,7 @@ GLConvUpdate(const opengl_tex_converter_t *tc, GLuint *textures,
     HRESULT hr;
 
     picture_sys_t *picsys = ActivePictureSys(pic);
-    if (!picsys)
+    if (unlikely(!picsys || !priv->gl_render))
         return VLC_EGENERIC;
 
     if (!priv->vt.DXUnlockObjectsNV(priv->gl_handle_d3d, 1, &priv->gl_render))
@@ -1838,6 +1851,8 @@ GLConvUpdate(const opengl_tex_converter_t *tc, GLuint *textures,
     if (!priv->vt.DXLockObjectsNV(priv->gl_handle_d3d, 1, &priv->gl_render))
     {
         msg_Warn(tc->gl, "DXLockObjectsNV failed");
+        priv->vt.DXUnregisterObjectNV(priv->gl_handle_d3d, priv->gl_render);
+        priv->gl_render = NULL;
         return VLC_EGENERIC;
     }
 
@@ -1858,14 +1873,6 @@ GLConvAllocateTextures(const opengl_tex_converter_t *tc, GLuint *textures,
 {
     VLC_UNUSED(tex_width); VLC_UNUSED(tex_height);
     struct glpriv *priv = tc->priv;
-    tc->vt->GenTextures(1, textures);
-
-    tc->vt->ActiveTexture(GL_TEXTURE0);
-    tc->vt->BindTexture(tc->tex_target, textures[0]);
-    tc->vt->TexParameteri(tc->tex_target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    tc->vt->TexParameteri(tc->tex_target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    tc->vt->TexParameterf(tc->tex_target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    tc->vt->TexParameterf(tc->tex_target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     priv->gl_render =
         priv->vt.DXRegisterObjectNV(priv->gl_handle_d3d, priv->dx_render,

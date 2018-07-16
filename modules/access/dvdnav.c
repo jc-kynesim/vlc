@@ -115,6 +115,8 @@ vlc_module_end ()
 #define DVD_READ_CACHE 1
 #endif
 
+#define BLOCK_FLAG_CELL_DISCONTINUITY (BLOCK_FLAG_PRIVATE_SHIFT << 1)
+
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
@@ -155,6 +157,8 @@ struct demux_sys_t
     /* */
     int           i_title;
     input_title_t **title;
+    int           cur_title;
+    int           cur_seekpoint;
 
     /* length of program group chain */
     mtime_t     i_pgc_length;
@@ -644,13 +648,13 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
 
             p_demux->info.i_update |=
                 INPUT_UPDATE_TITLE | INPUT_UPDATE_SEEKPOINT;
-            p_demux->info.i_title = i;
-            p_demux->info.i_seekpoint = 0;
+            p_sys->cur_title = i;
+            p_sys->cur_seekpoint = 0;
             return VLC_SUCCESS;
 
         case DEMUX_SET_SEEKPOINT:
             i = va_arg( args, int );
-            if( p_demux->info.i_title == 0 )
+            if( p_sys->cur_title == 0 )
             {
                 static const int argtab[] = {
                     DVD_MENU_Escape,
@@ -666,15 +670,23 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
                            dvdnav_menu_call(p_sys->dvdnav,argtab[i]) )
                     return VLC_EGENERIC;
             }
-            else if( dvdnav_part_play( p_sys->dvdnav, p_demux->info.i_title,
+            else if( dvdnav_part_play( p_sys->dvdnav, p_sys->cur_title,
                                        i + 1 ) != DVDNAV_STATUS_OK )
             {
                 msg_Warn( p_demux, "cannot set title/chapter" );
                 return VLC_EGENERIC;
             }
             p_demux->info.i_update |= INPUT_UPDATE_SEEKPOINT;
-            p_demux->info.i_seekpoint = i;
+            p_sys->cur_seekpoint = i;
             return VLC_SUCCESS;
+
+        case DEMUX_GET_TITLE:
+            *va_arg( args, int * ) = p_sys->cur_title;
+            break;
+
+        case DEMUX_GET_SEEKPOINT:
+            *va_arg( args, int * ) = p_sys->cur_seekpoint;
+            break;
 
         case DEMUX_GET_PTS_DELAY:
             *va_arg( args, int64_t * ) =
@@ -756,8 +768,8 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
             }
             p_demux->info.i_update |=
                 INPUT_UPDATE_TITLE | INPUT_UPDATE_SEEKPOINT;
-            p_demux->info.i_title = 0;
-            p_demux->info.i_seekpoint = 2;
+            p_sys->cur_title = 0;
+            p_sys->cur_seekpoint = 2;
             break;
         }
 
@@ -803,7 +815,7 @@ static int Demux( demux_t *p_demux )
     {
         msg_Warn( p_demux, "cannot get next block (%s)",
                   dvdnav_err_to_string( p_sys->dvdnav ) );
-        if( p_demux->info.i_title == 0 )
+        if( p_sys->cur_title == 0 )
         {
             msg_Dbg( p_demux, "jumping to first title" );
             return ControlInternal( p_demux, DEMUX_SET_TITLE, 1 ) == VLC_SUCCESS ? 1 : -1;
@@ -970,10 +982,10 @@ static int Demux( demux_t *p_demux )
                                        &i_part ) == DVDNAV_STATUS_OK )
         {
             if( i_title >= 0 && i_title < p_sys->i_title &&
-                p_demux->info.i_title != i_title )
+                p_sys->cur_title != i_title )
             {
                 p_demux->info.i_update |= INPUT_UPDATE_TITLE;
-                p_demux->info.i_title = i_title;
+                p_sys->cur_title = i_title;
             }
         }
         break;
@@ -1000,6 +1012,9 @@ static int Demux( demux_t *p_demux )
         p_sys->i_vobu_index = 0;
         p_sys->i_vobu_flush = 0;
 
+        for( int i=0; i<PS_TK_COUNT; i++ )
+            p_sys->tk[i].i_next_block_flags |= BLOCK_FLAG_CELL_DISCONTINUITY;
+
         /* FIXME is it correct or there is better way to know chapter change */
         if( dvdnav_current_title_info( p_sys->dvdnav, &i_title,
                                        &i_part ) == DVDNAV_STATUS_OK )
@@ -1007,12 +1022,12 @@ static int Demux( demux_t *p_demux )
             if( i_title >= 0 && i_title < p_sys->i_title )
             {
                 p_demux->info.i_update |= INPUT_UPDATE_TITLE;
-                p_demux->info.i_title = i_title;
+                p_sys->cur_title = i_title;
 
                 if( i_part >= 1 && i_part <= p_sys->title[i_title]->i_seekpoint )
                 {
                     p_demux->info.i_update |= INPUT_UPDATE_SEEKPOINT;
-                    p_demux->info.i_seekpoint = i_part - 1;
+                    p_sys->cur_seekpoint = i_part - 1;
                 }
             }
         }
@@ -1209,7 +1224,12 @@ static void DemuxTitles( demux_t *p_demux )
         {
             s = vlc_seekpoint_New();
             if( p_chapters_time )
-                s->i_time_offset = p_chapters_time[j] * 1000 / 90;
+            {
+                if ( j > 0 )
+                    s->i_time_offset = p_chapters_time[j - 1] * 1000 / 90;
+                else
+                    s->i_time_offset = 0;
+            }
             TAB_APPEND( t->i_seekpoint, t->seekpoint, s );
         }
         free( p_chapters_time );
@@ -1386,13 +1406,27 @@ static int DemuxBlock( demux_t *p_demux, const uint8_t *p, int len )
                 {
                     ESNew( p_demux, i_id );
                 }
+
                 if( tk->es &&
                     !ps_pkt_parse_pes( VLC_OBJECT(p_demux), p_pkt, tk->i_skip ) )
                 {
+                    int i_next_block_flags = tk->i_next_block_flags;
+                    tk->i_next_block_flags = 0;
+                    if( i_next_block_flags & BLOCK_FLAG_CELL_DISCONTINUITY )
+                    {
+                        if( p_pkt->i_dts >= VLC_TS_INVALID )
+                        {
+                            i_next_block_flags &= ~BLOCK_FLAG_CELL_DISCONTINUITY;
+                            i_next_block_flags |= BLOCK_FLAG_DISCONTINUITY;
+                        }
+                        else tk->i_next_block_flags = BLOCK_FLAG_CELL_DISCONTINUITY;
+                    }
+                    p_pkt->i_flags |= i_next_block_flags;
                     es_out_Send( p_demux->out, tk->es, p_pkt );
                 }
                 else
                 {
+                    tk->i_next_block_flags = 0;
                     block_Release( p_pkt );
                 }
             }

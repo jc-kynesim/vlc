@@ -78,7 +78,7 @@ vlc_module_begin ()
     set_capability ("vout display", 300)
     set_callbacks (Open, Close)
     add_shortcut ("macosx", "vout_macosx")
-    add_glconv ()
+    add_glopts ()
 vlc_module_end ()
 
 /**
@@ -366,14 +366,6 @@ static int Control (vout_display_t *vd, int query, va_list ap)
             case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
             case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
             {
-
-                id o_window = [sys->glView window];
-                if (!o_window) {
-                    return VLC_SUCCESS; // this is okay, since the event will occur again when we have a window
-                }
-
-                NSSize windowMinSize = [o_window minSize];
-
                 const vout_display_cfg_t *cfg;
 
                 if (query == VOUT_DISPLAY_CHANGE_SOURCE_ASPECT || query == VOUT_DISPLAY_CHANGE_SOURCE_CROP) {
@@ -410,7 +402,9 @@ static int Control (vout_display_t *vd, int query, va_list ap)
                  This has the positive side effect that we avoid erratic sizing as we animate every resize. */
                 if (query != VOUT_DISPLAY_CHANGE_DISPLAY_SIZE)
                     // x / y are top left corner, but we need the lower left one
-                    glViewport (place.x, cfg_tmp.display.height - (place.y + place.height), place.width, place.height);
+                    vout_display_opengl_Viewport(sys->vgl, place.x,
+                                                 cfg_tmp.display.height - (place.y + place.height),
+                                                 place.width, place.height);
                 vlc_gl_ReleaseCurrent (sys->gl);
 
                 return VLC_SUCCESS;
@@ -720,11 +714,18 @@ static void OpenglSwap (vlc_gl_t *gl)
 
 - (void)renewGState
 {
-    NSWindow *window = [self window];
+    // Comment take from Apple GLEssentials sample code:
+    // https://developer.apple.com/library/content/samplecode/GLEssentials
+    //
+    // OpenGL rendering is not synchronous with other rendering on the OSX.
+    // Therefore, call disableScreenUpdatesUntilFlush so the window server
+    // doesn't render non-OpenGL content in the window asynchronously from
+    // OpenGL content, which could cause flickering.  (non-OpenGL content
+    // includes the title bar and drawing done by the app with other APIs)
 
-    // Remove flashes with splitter view.
-    if ([window respondsToSelector:@selector(disableScreenUpdatesUntilFlush)])
-        [window disableScreenUpdatesUntilFlush];
+    // In macOS 10.13 and later, window updates are automatically batched
+    // together and this no longer needs to be called (effectively a no-op)
+    [[self window] disableScreenUpdatesUntilFlush];
 
     [super renewGState];
 }

@@ -42,6 +42,7 @@
 
 #include <QStyleFactory>
 #include <QSettings>
+#include <QScreen>
 #include <QtAlgorithms>
 #include <QDir>
 #include <assert.h>
@@ -127,7 +128,15 @@ static struct {
 static int getDefaultAudioVolume(vlc_object_t *obj, const char *aout)
 {
     if (!strcmp(aout, "") || !strcmp(aout, "any"))
+#ifdef _WIN32
+        /* All Windows aouts, that can be selected automatically, handle volume
+         * saving. In case of automatic mode, we'll save the last volume for
+         * every modules. Therefore, all volumes variable we be the same and we
+         * can use the first one (mmdevice). */
+        return config_GetFloat(obj, "mmdevice-volume") * 100.f + .5f;
+#else
         return -1;
+#endif
     else
     /* Note: For hysterical raisins, this is sorted by decreasing priority
      * order (then alphabetical order). */
@@ -141,7 +150,7 @@ static int getDefaultAudioVolume(vlc_object_t *obj, const char *aout)
 #endif
 #ifdef _WIN32
     if (!strcmp(aout, "mmdevice"))
-        return -1;
+        return config_GetFloat(obj, "mmdevice-volume") * 100.f + .5f;
     else
 #endif
     if (!strcmp(aout, "sndio"))
@@ -361,16 +370,35 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             CONFIG_BOOL( "video-deco", windowDecorations );
             CONFIG_GENERIC( "vout", StringList, ui.voutLabel, outputModule );
 
+            CONNECT( ui.outputModule, currentIndexChanged( int ),
+                     this, updateVideoOptions( int ) );
+            optionWidgets["videoOutCoB"] = ui.outputModule;
+
+            optionWidgets["fullscreenScreenB"] = ui.fullscreenScreenBox;
+            ui.fullscreenScreenBox->addItem( qtr("Automatic"), -1 );
+            int i_screenCount = 0;
+            foreach( QScreen* screen, QGuiApplication::screens() )
+            {
+                ui.fullscreenScreenBox->addItem( screen->name(), i_screenCount );
+                i_screenCount++;
+            }
+            p_config =  config_FindConfig( "qt-fullscreen-screennumber" );
+            if( p_config )
+            {
+                int i_defaultScreen = p_config->value.i + 1;
+                if ( i_defaultScreen < 0 || i_defaultScreen > ( ui.fullscreenScreenBox->count() - 1 ) )
+                    ui.fullscreenScreenBox->setCurrentIndex( 0 );
+                else
+                    ui.fullscreenScreenBox->setCurrentIndex(p_config->value.i + 1);
+            }
+
 #ifdef _WIN32
-            CONFIG_GENERIC( "directx-device", StringList, ui.dxDeviceLabel,
-                            dXdisplayDevice );
             CONFIG_BOOL( "directx-overlay", overlay );
             CONFIG_BOOL( "directx-hw-yuv", hwYUVBox );
             CONNECT( ui.overlay, toggled( bool ), ui.hwYUVBox, setEnabled( bool ) );
+            optionWidgets["directxVideoB"] = ui.directXBox;
 #else
             ui.directXBox->setVisible( false );
-            ui.overlay->setVisible( false );
-            ui.hwYUVBox->setVisible( false );
 #endif
 
 #ifdef __OS2__
@@ -392,6 +420,8 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                             snapshotsSequentialNumbering );
             CONFIG_GENERIC( "snapshot-format", StringList, ui.arLabel,
                             snapshotsFormat );
+
+            updateVideoOptions( ui.outputModule->currentIndex() );
          END_SPREFS_CAT;
 
         /******************************
@@ -467,6 +497,23 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             }
 #endif
 
+#ifdef _WIN32
+            audioControl( MMDevice );
+            optionWidgets["mmdeviceL" ] = MMDeviceLabel;
+            optionWidgets["mmdeviceW" ] = MMDeviceDevice;
+            CONFIG_GENERIC_NO_UI( "mmdevice-audio-device", StringList,
+                                  MMDeviceLabel, MMDeviceDevice );
+
+            CONFIG_GENERIC( "mmdevice-passthrough", IntegerList,
+                            ui.mmdevicePassthroughLabel, mmdevicePassthroughBox );
+            optionWidgets["mmdevicePassthroughL"] = ui.mmdevicePassthroughLabel;
+            optionWidgets["mmdevicePassthroughB"] = ui.mmdevicePassthroughBox;
+#else
+            ui.mmdevicePassthroughLabel->setVisible( false );
+            ui.mmdevicePassthroughBox->setVisible( false );
+#endif
+
+
 #undef audioControl2
 #undef audioControl
 #undef audioCommon
@@ -488,8 +535,6 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                             preferredAudioLanguage );
 
             CONFIG_BOOL( "spdif", spdifBox );
-            CONFIG_GENERIC( "force-dolby-surround", IntegerList, ui.dolbyLabel,
-                            detectionDolby );
 
             CONFIG_GENERIC_NO_BOOL( "norm-max-level" , Float, NULL,
                                     volNormSpin );
@@ -515,7 +560,6 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             /*Little mofification of ui.volumeValue to compile with Qt < 4.3 */
             ui.volumeValue->setButtonSymbols(QAbstractSpinBox::NoButtons);
             optionWidgets["volLW"] = ui.volumeValue;
-            optionWidgets["headphoneB"] = ui.headphoneEffect;
             optionWidgets["spdifChB"] = ui.spdifBox;
             optionWidgets["defaultVolume"] = ui.defaultVolume;
             optionWidgets["resetVolumeCheckbox"] = ui.resetVolumeCheckbox;
@@ -558,9 +602,6 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             bool b_enabled = ( qs_filter.contains( "normvol" ) );
             ui.volNormBox->setChecked( b_enabled );
             ui.volNormSpin->setEnabled( b_enabled );
-
-            b_enabled = ( qs_filter.contains( "headphone" ) );
-            ui.headphoneEffect->setChecked( b_enabled );
 
             /* Volume Label */
             updateAudioVolume( ui.defaultVolume->value() ); // First time init
@@ -626,6 +667,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             else
                 FreeLibrary( hdxva2_dll );
 #endif
+            CONFIG_BOOL( "input-fast-seek", fastSeekBox );
             optionWidgets["inputLE"] = ui.DVDDeviceComboBox;
             optionWidgets["cachingCoB"] = ui.cachingCombo;
             CONFIG_GENERIC( "avcodec-skiploopfilter", IntegerList, ui.filterLabel, loopFilterBox );
@@ -911,12 +953,31 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
 #undef CONFIG_BOOL
 }
 
+void SPrefsPanel::updateVideoOptions( int number )
+{
+    QString value = qobject_cast<QComboBox *>(optionWidgets["videoOutCoB"])
+                                            ->itemData( number ).toString();
+#ifdef _WIN32
+    if( optionWidgets["directxVideoB"] ) {
+        optionWidgets["directxVideoB"]->setVisible( ( value == "directdraw" ) );
+    }
+#endif
+}
+
 
 void SPrefsPanel::updateAudioOptions( int number)
 {
     QString value = qobject_cast<QComboBox *>(optionWidgets["audioOutCoB"])
                                             ->itemData( number ).toString();
 #ifdef _WIN32
+    /* Since MMDevice is most likely to be used by default, we show MMDevice
+     * options by default */
+    const bool mmDeviceEnabled = value == "mmdevice" || value == "any";
+    optionWidgets["mmdevicePassthroughL"]->setVisible( mmDeviceEnabled );
+    optionWidgets["mmdevicePassthroughB"]->setVisible( mmDeviceEnabled );
+    optionWidgets["mmdeviceW"]->setVisible( mmDeviceEnabled );
+    optionWidgets["mmdeviceL"]->setVisible( mmDeviceEnabled );
+
     optionWidgets["directxW"]->setVisible( ( value == "directsound" ) );
     optionWidgets["directxL"]->setVisible( ( value == "directsound" ) );
     optionWidgets["waveoutW"]->setVisible( ( value == "waveout" ) );
@@ -1029,6 +1090,13 @@ void SPrefsPanel::apply()
         break;
     }
 
+    case SPrefsVideo:
+    {
+        int i_fullscreenScreen =  qobject_cast<QComboBox *>(optionWidgets["fullscreenScreenB"])->currentData().toInt();
+        config_PutInt( p_intf, "qt-fullscreen-screennumber", i_fullscreenScreen );
+        break;
+    }
+
     case SPrefsAudio:
     {
         bool b_checked =
@@ -1037,14 +1105,6 @@ void SPrefsPanel::apply()
             qs_filter.append( "normvol" );
         if( !b_checked && qs_filter.contains( "normvol" ) )
             qs_filter.removeAll( "normvol" );
-
-        b_checked =
-            qobject_cast<QCheckBox *>(optionWidgets["headphoneB"])->isChecked();
-
-        if( b_checked && !qs_filter.contains( "headphone" ) )
-            qs_filter.append( "headphone" );
-        if( !b_checked && qs_filter.contains( "headphone" ) )
-            qs_filter.removeAll( "headphone" );
 
         config_PutPsz( p_intf, "audio-filter", qtu( qs_filter.join( ":" ) ) );
 
@@ -1063,6 +1123,8 @@ void SPrefsPanel::apply()
         //FIXME this is moot
 #if defined( _WIN32 )
         VLC_UNUSED( f_gain );
+        if( save_vol_aout( "mmdevice" ) )
+            config_PutFloat( p_intf, "mmdevice-volume", i_volume / 100.f );
         if( save_vol_aout( "directsound" ) )
             config_PutFloat( p_intf, "directx-volume", i_volume / 100.f );
         if( save_vol_aout( "waveout" ) )

@@ -90,7 +90,14 @@ struct aout_sys_t
     bool      b_paused;
     bool      b_preferred_channels_set;
     enum au_dev au_dev;
+
+    /* sw gain */
+    float               soft_gain;
+    bool                soft_mute;
 };
+
+/* Soft volume helper */
+#include "audio_output/volume.h"
 
 enum port_type
 {
@@ -127,6 +134,23 @@ enum port_type
         aout_RestartRequest(p_aout, AOUT_RESTART_OUTPUT);
 }
 
+- (void)handleInterruption:(NSNotification *)notification
+{
+    audio_output_t *p_aout = [self aout];
+    NSDictionary *userInfo = notification.userInfo;
+    if (!userInfo || !userInfo[AVAudioSessionInterruptionTypeKey]) {
+        return;
+    }
+
+    NSUInteger interruptionType = [userInfo[AVAudioSessionInterruptionTypeKey] unsignedIntegerValue];
+
+    if (interruptionType == AVAudioSessionInterruptionTypeBegan) {
+        ca_SetAliveState(p_aout, false);
+    } else if (interruptionType == AVAudioSessionInterruptionTypeEnded
+               && [userInfo[AVAudioSessionInterruptionOptionKey] unsignedIntegerValue] == AVAudioSessionInterruptionOptionShouldResume) {
+        ca_SetAliveState(p_aout, true);
+    }
+}
 @end
 
 static void
@@ -333,15 +357,7 @@ Flush(audio_output_t *p_aout, bool wait)
 {
     struct aout_sys_t * p_sys = p_aout->sys;
 
-    if (!p_sys->b_paused)
-        ca_Flush(p_aout, wait);
-    else
-    {
-        /* ca_Flush() can't work while paused since the AudioUnit is Stopped
-         * and the render callback won't be called. But it's safe to clear the
-         * circular buffer from this thread since AU is stopped. */
-        TPCircularBufferClear(&p_sys->c.circular_buffer);
-    }
+    ca_Flush(p_aout, wait);
 }
 
 static int
@@ -411,13 +427,29 @@ Start(audio_output_t *p_aout, audio_sample_format_t *restrict fmt)
     if (aout_FormatNbChannels(fmt) == 0 || AOUT_FMT_HDMI(fmt))
         return VLC_EGENERIC;
 
+    /* XXX: No more passthrough since iOS 11 */
+    if (AOUT_FMT_SPDIF(fmt))
+        return VLC_EGENERIC;
+
     aout_FormatPrint(p_aout, "VLC is looking for:", fmt);
 
     p_sys->au_unit = NULL;
 
+    [[NSNotificationCenter defaultCenter] addObserver:p_sys->aoutWrapper
+                                             selector:@selector(audioSessionRouteChange:)
+                                                 name:AVAudioSessionRouteChangeNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:p_sys->aoutWrapper
+                                             selector:@selector(handleInterruption:)
+                                                 name:AVAudioSessionInterruptionNotification
+                                               object:nil];
+
     /* Activate the AVAudioSession */
     if (avas_SetActive(p_aout, true, 0) != VLC_SUCCESS)
+    {
+        [[NSNotificationCenter defaultCenter] removeObserver:p_sys->aoutWrapper];
         return VLC_EGENERIC;
+    }
 
     /* Set the preferred number of channels, then fetch the channel layout that
      * should correspond to this number */
@@ -449,7 +481,7 @@ Start(audio_output_t *p_aout, audio_sample_format_t *restrict fmt)
         ca_LogWarn("failed to set IO mode");
 
     ret = au_Initialize(p_aout, p_sys->au_unit, fmt, layout,
-                        [p_sys->avInstance outputLatency] * CLOCK_FREQ);
+                        [p_sys->avInstance outputLatency] * CLOCK_FREQ, NULL);
     if (ret != VLC_SUCCESS)
         goto error;
 
@@ -466,15 +498,14 @@ Start(audio_output_t *p_aout, audio_sample_format_t *restrict fmt)
     if (p_sys->b_muted)
         Pause(p_aout, true, 0);
 
-    [[NSNotificationCenter defaultCenter] addObserver:p_sys->aoutWrapper
-           selector:@selector(audioSessionRouteChange:)
-           name:AVAudioSessionRouteChangeNotification object:nil];
-
     free(layout);
     fmt->channel_type = AUDIO_CHANNEL_TYPE_BITMAP;
     p_aout->mute_set  = MuteSet;
     p_aout->pause = Pause;
     p_aout->flush = Flush;
+
+    aout_SoftVolumeStart( p_aout );
+
     msg_Dbg(p_aout, "analog AudioUnit output successfully opened for %4.4s %s",
             (const char *)&fmt->i_format, aout_FormatPrintChannels(fmt));
     return VLC_SUCCESS;
@@ -486,6 +517,7 @@ error:
     avas_resetPreferredNumberOfChannels(p_aout);
     avas_SetActive(p_aout, false,
                    AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation);
+    [[NSNotificationCenter defaultCenter] removeObserver:p_sys->aoutWrapper];
     msg_Err(p_aout, "opening AudioUnit output failed");
     return VLC_EGENERIC;
 }
@@ -555,6 +587,8 @@ Open(vlc_object_t *obj)
     aout->start = Start;
     aout->stop = Stop;
     aout->device_select = DeviceSelect;
+
+    aout_SoftVolumeInit( aout );
 
     for (unsigned int i = 0; i< sizeof(au_devs) / sizeof(au_devs[0]); ++i)
         aout_HotplugReport(aout, au_devs[i].psz_id, au_devs[i].psz_name);

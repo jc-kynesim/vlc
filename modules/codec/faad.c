@@ -512,24 +512,29 @@ static int DecodeBlock( decoder_t *p_dec, block_t *p_block )
 
         /* Convert frame.channel_position to our own channel values */
         p_dec->fmt_out.audio.i_physical_channels = 0;
-        uint32_t pi_faad_channels_positions[FAAD_CHANNEL_ID_COUNT] = {0};
+
         uint8_t  pi_neworder_table[AOUT_CHAN_MAX];
-        for( size_t i = 0; i < frame.channels; i++ )
+        uint32_t pi_faad_channels_positions[FAAD_CHANNEL_ID_COUNT + 1] = {0};
+
+        bool b_reorder = false;
+        if (p_dec->fmt_out.audio.channel_type == AUDIO_CHANNEL_TYPE_BITMAP)
         {
-            unsigned pos = frame.channel_position[i];
-            if( likely(pos < FAAD_CHANNEL_ID_COUNT) )
+            for( size_t i = 0; i < frame.channels && i < FAAD_CHANNEL_ID_COUNT; i++ )
             {
-                pi_faad_channels_positions[i] = pi_tovlcmapping[pos];
-                p_dec->fmt_out.audio.i_physical_channels |= pi_faad_channels_positions[i];
+                unsigned pos = frame.channel_position[i];
+                if( likely(pos < FAAD_CHANNEL_ID_COUNT) )
+                {
+                    pi_faad_channels_positions[i] = pi_tovlcmapping[pos];
+                    p_dec->fmt_out.audio.i_physical_channels |= pi_faad_channels_positions[i];
+                }
+                else pi_faad_channels_positions[i] = 0;
             }
-            else pi_faad_channels_positions[i] = 0;
+
+            b_reorder = aout_CheckChannelReorder( pi_faad_channels_positions, NULL,
+                p_dec->fmt_out.audio.i_physical_channels, pi_neworder_table );
+
+            p_dec->fmt_out.audio.i_channels = popcount(p_dec->fmt_out.audio.i_physical_channels);
         }
-
-        aout_CheckChannelReorder( pi_faad_channels_positions, NULL,
-                                  p_dec->fmt_out.audio.i_physical_channels, pi_neworder_table );
-
-
-        p_dec->fmt_out.audio.i_channels = popcount(p_dec->fmt_out.audio.i_physical_channels);
 
         if( !decoder_UpdateAudioFormat( p_dec ) && p_dec->fmt_out.audio.i_channels > 0 )
             p_out = decoder_NewAudioBuffer( p_dec, frame.samples / p_dec->fmt_out.audio.i_channels );
@@ -541,14 +546,20 @@ static int DecodeBlock( decoder_t *p_dec, block_t *p_block )
                                               frame.samples / frame.channels )
                               - p_out->i_pts;
 
-            /* Don't kill speakers if some weird mapping does not gets 1:1 */
-            if( popcount(p_dec->fmt_out.audio.i_physical_channels) != frame.channels )
-                memset( p_out->p_buffer, 0, p_out->i_buffer );
+            if ( p_dec->fmt_out.audio.channel_type == AUDIO_CHANNEL_TYPE_BITMAP )
+            {
+                /* Don't kill speakers if some weird mapping does not gets 1:1 */
+                if( popcount(p_dec->fmt_out.audio.i_physical_channels) != frame.channels )
+                    memset( p_out->p_buffer, 0, p_out->i_buffer );
+            }
 
             /* FIXME: replace when aout_channel_reorder can take samples from a different buffer */
-            DoReordering( (uint32_t *)p_out->p_buffer, samples,
-                          frame.samples / frame.channels, frame.channels,
-                          pi_neworder_table );
+            if( b_reorder )
+                DoReordering( (uint32_t *)p_out->p_buffer, samples,
+                              frame.samples / frame.channels, frame.channels,
+                              pi_neworder_table );
+            else
+                 memcpy( p_out->p_buffer, samples, p_out->i_buffer );
 
             if( p_sys->b_discontinuity )
             {

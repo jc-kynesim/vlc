@@ -159,8 +159,10 @@ get_next_path(libvlc_media_list_player_t * p_mlp, bool b_loop)
     /* If item just gained a sublist just play it */
     if (p_sublist_of_playing_item)
     {
+        int i_count = libvlc_media_list_count(p_sublist_of_playing_item);
         libvlc_media_list_release(p_sublist_of_playing_item);
-        return libvlc_media_list_path_copy_by_appending(p_mlp->current_playing_item_path, 0);
+        if (i_count > 0)
+            return libvlc_media_list_path_copy_by_appending(p_mlp->current_playing_item_path, 0);
     }
 
     /* Try to catch parent element */
@@ -651,6 +653,14 @@ void libvlc_media_list_player_pause(libvlc_media_list_player_t * p_mlp)
 {
     lock(p_mlp);
     libvlc_media_player_pause(p_mlp->p_mi);
+    unlock(p_mlp);
+}
+
+void libvlc_media_list_player_set_pause(libvlc_media_list_player_t * p_mlp,
+                                        int do_pause)
+{
+    lock(p_mlp);
+    libvlc_media_player_set_pause(p_mlp->p_mi, do_pause);
     unlock(p_mlp);
 }
 

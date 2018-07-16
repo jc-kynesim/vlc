@@ -68,7 +68,6 @@ src/config/help.c
 src/config/intf.c
 src/darwin/error.c
 src/extras/libc.c
-src/extras/tdestroy.c
 src/input/access.c
 src/input/clock.c
 src/input/clock.h
@@ -209,7 +208,6 @@ modules/access/rtp/rtp.c
 modules/access/rtsp/access.c
 modules/access/satip.c
 modules/access/screen/screen.c
-modules/access/screen/wayland.c
 modules/access/screen/xcb.c
 modules/access/sdp.c
 modules/access/sftp.c
@@ -292,6 +290,7 @@ modules/codec/adpcm.c
 modules/codec/aes3.c
 modules/codec/aom.c
 modules/codec/araw.c
+modules/codec/audiotoolbox_midi.c
 modules/codec/arib/aribsub.c
 modules/codec/avcodec/avcodec.c
 modules/codec/avcodec/avcodec.h
@@ -1223,23 +1222,23 @@ share/lua/http/mobile_view.html
 # qt .ui files
 # uncomment (and prepend $builddir} if you want to generate a proper vlc.pot 
 
-#modules/gui/qt/ui/about.h
-#modules/gui/qt/ui/equalizer.h
-#modules/gui/qt/ui/messages_panel.h
-#modules/gui/qt/ui/open.h
-#modules/gui/qt/ui/open_capture.h
-#modules/gui/qt/ui/open_disk.h
-#modules/gui/qt/ui/open_file.h
-#modules/gui/qt/ui/open_net.h
-#modules/gui/qt/ui/podcast_configuration.h
-#modules/gui/qt/ui/profiles.h
-#modules/gui/qt/ui/sout.h
-#modules/gui/qt/ui/sprefs_audio.h
-#modules/gui/qt/ui/sprefs_input.h
-#modules/gui/qt/ui/sprefs_interface.h
-#modules/gui/qt/ui/sprefs_subtitles.h
-#modules/gui/qt/ui/sprefs_video.h
-#modules/gui/qt/ui/streampanel.h
-#modules/gui/qt/ui/update.h
-#modules/gui/qt/ui/video_effects.h
-#modules/gui/qt/ui/vlm.h
+modules/gui/qt/ui/about.h
+modules/gui/qt/ui/equalizer.h
+modules/gui/qt/ui/messages_panel.h
+modules/gui/qt/ui/open.h
+modules/gui/qt/ui/open_capture.h
+modules/gui/qt/ui/open_disk.h
+modules/gui/qt/ui/open_file.h
+modules/gui/qt/ui/open_net.h
+modules/gui/qt/ui/podcast_configuration.h
+modules/gui/qt/ui/profiles.h
+modules/gui/qt/ui/sout.h
+modules/gui/qt/ui/sprefs_audio.h
+modules/gui/qt/ui/sprefs_input.h
+modules/gui/qt/ui/sprefs_interface.h
+modules/gui/qt/ui/sprefs_subtitles.h
+modules/gui/qt/ui/sprefs_video.h
+modules/gui/qt/ui/streampanel.h
+modules/gui/qt/ui/update.h
+modules/gui/qt/ui/video_effects.h
+modules/gui/qt/ui/vlm.h

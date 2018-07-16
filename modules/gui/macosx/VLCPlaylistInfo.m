@@ -64,10 +64,9 @@
     [_authorLabel setStringValue: _NS("Artist")];
     [_saveMetaDataButton setStringValue: _NS("Save Metadata")];
 
-    [[_tabView tabViewItemAtIndex: 0] setLabel: _NS("General")];
-    [[_tabView tabViewItemAtIndex: 1] setLabel: _NS("Codec Details")];
-    [[_tabView tabViewItemAtIndex: 2] setLabel: _NS("Statistics")];
-    [_tabView selectTabViewItemAtIndex: 0];
+    [_segmentedView setLabel:_NS("General") forSegment:0];
+    [_segmentedView setLabel:_NS("Codec Details") forSegment:1];
+    [_segmentedView setLabel:_NS("Statistics") forSegment:2];
 
     /* constants defined in vlc_meta.h */
     [_genreLabel setStringValue: _NS(VLC_META_GENRE)];
@@ -93,11 +92,6 @@
     [_displayedLabel setStringValue: _NS("Displayed frames")];
     [_lostFramesLabel setStringValue: _NS("Lost frames")];
 
-    [_soutLabel setStringValue: _NS("Streaming")];
-    [_sentPacketsLabel setStringValue: _NS("Sent packets")];
-    [_sentBytesLabel setStringValue: _NS("Sent bytes")];
-    [_sentBitrateLabel setStringValue: _NS("Send rate")];
-
     [_audioLabel setStringValue: _NS("Audio")];
     [_audioDecodedLabel setStringValue: _NS("Decoded blocks")];
     [_playedAudioBuffersLabel setStringValue: _NS("Played buffers")];
@@ -107,8 +101,8 @@
 
     b_stats = var_InheritBool(getIntf(), "stats");
     if (!b_stats) {
-        if ([_tabView numberOfTabViewItems] > 2)
-            [_tabView removeTabViewItem: [_tabView tabViewItemAtIndex: 2]];
+        if ([_segmentedView segmentCount] >= 3)
+            [_segmentedView setSegmentCount: 2];
     }
     else
         [self initMediaPanelStats];
@@ -154,11 +148,6 @@
     [_videoDecodedTextField setIntValue:0];
     [_displayedTextField setIntValue:0];
     [_lostFramesTextField setIntValue:0];
-
-    //Initializing Output Variables
-    [_sentPacketsTextField setIntValue: 0];
-    [_sentBytesTextField setStringValue: [NSString stringWithFormat:_NS("%.1f KiB"), (float)0]];
-    [_sentBitrateTextField setStringValue: [NSString stringWithFormat:@"%6.0f kb/s", (float)0]];
 
     //Initializing Audio Variables
     [_audioDecodedTextField setIntValue:0];
@@ -292,13 +281,6 @@ FREENULL( psz_##foo );
     [_videoDecodedTextField setIntValue: p_item->p_stats->i_decoded_video];
     [_displayedTextField setIntValue: p_item->p_stats->i_displayed_pictures];
     [_lostFramesTextField setIntValue: p_item->p_stats->i_lost_pictures];
-
-    /* Sout */
-    [_sentPacketsTextField setIntValue: p_item->p_stats->i_sent_packets];
-    [_sentBytesTextField setStringValue: [NSString stringWithFormat: @"%8.0f KiB",
-                                          (float)(p_item->p_stats->i_sent_bytes)/1024]];
-    [_sentBitrateTextField setStringValue: [NSString stringWithFormat:
-                                            @"%6.0f kb/s", (float)(p_item->p_stats->f_send_bitrate*8)*1000]];
 
     /* Audio */
     [_audioDecodedTextField setIntValue: p_item->p_stats->i_decoded_audio];

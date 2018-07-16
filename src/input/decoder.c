@@ -313,7 +313,8 @@ static int aout_update_format( decoder_t *p_dec )
 
     if( p_owner->p_aout &&
        ( !AOUT_FMTS_IDENTICAL(&p_dec->fmt_out.audio, &p_owner->fmt.audio) ||
-         p_dec->fmt_out.i_codec != p_dec->fmt_out.audio.i_format ) )
+         p_dec->fmt_out.i_codec != p_dec->fmt_out.audio.i_format ||
+         p_dec->fmt_out.i_profile != p_owner->fmt.i_profile ) )
     {
         audio_output_t *p_aout = p_owner->p_aout;
 
@@ -364,6 +365,11 @@ static int aout_update_format( decoder_t *p_dec )
         p_aout = input_resource_GetAout( p_owner->p_resource );
         if( p_aout )
         {
+            /* TODO: 3.0 HACK: we need to put i_profile inside audio_format_t
+             * for 4.0 */
+            if( p_dec->fmt_out.i_codec == VLC_CODEC_DTS )
+                var_SetBool( p_aout, "dtshd", p_dec->fmt_out.i_profile > 0 );
+
             if( aout_DecNew( p_aout, &format,
                              &p_dec->fmt_out.audio_replay_gain,
                              &request_vout ) )
@@ -851,7 +857,6 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block )
         {
             vlc_mutex_lock( &p_owner->lock );
             DecoderUpdateFormatLocked( p_dec );
-            vlc_mutex_unlock( &p_owner->lock );
 
             p_owner->fmt.i_group = p_dec->fmt_in.i_group;
             p_owner->fmt.i_id = p_dec->fmt_in.i_id;
@@ -861,6 +866,7 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block )
                 p_owner->fmt.psz_language =
                     strdup( p_dec->fmt_in.psz_language );
             }
+            vlc_mutex_unlock( &p_owner->lock );
 
             p_owner->p_sout_input =
                 sout_InputNew( p_owner->p_sout, &p_owner->fmt );
@@ -887,7 +893,8 @@ static void DecoderProcessSout( decoder_t *p_dec, block_t *p_block )
 
             if( DecoderPlaySout( p_dec, p_sout_block ) == VLC_EGENERIC )
             {
-                msg_Err( p_dec, "cannot continue streaming due to errors" );
+                msg_Err( p_dec, "cannot continue streaming due to errors with codec %4.4s",
+                                (char *)&p_owner->fmt.i_codec );
 
                 p_owner->error = true;
 
@@ -2027,6 +2034,7 @@ void input_DecoderDecode( decoder_t *p_dec, block_t *p_block, bool b_do_pace )
             msg_Warn( p_dec, "decoder/packetizer fifo full (data not "
                       "consumed quickly enough), resetting fifo!" );
             block_ChainRelease( vlc_fifo_DequeueAllUnlocked( p_owner->p_fifo ) );
+            p_block->i_flags |= BLOCK_FLAG_DISCONTINUITY;
         }
     }
     else

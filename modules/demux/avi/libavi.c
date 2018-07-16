@@ -89,7 +89,12 @@ static int AVI_ChunkReadCommon( stream_t *s, avi_chunk_t *p_chk,
     {
         msg_Warn( s, "chunk %4.4s does not fit into parent %ld",
                      (char*)&p_chk->common.i_chunk_fourcc, AVI_ChunkEnd( p_father ) );
-        return VLC_EGENERIC;
+
+        /* How hard is to produce files with the correct declared size ? */
+        if( p_father->common.i_chunk_fourcc != AVIFOURCC_RIFF ||
+            p_father->common.p_father == NULL ||
+            p_father->common.p_father->common.p_father != NULL ) /* Root > RIFF only */
+            return VLC_EGENERIC;
     }
 
 #ifdef AVI_DEBUG
@@ -1131,16 +1136,17 @@ int AVI_ChunkReadRoot( stream_t *s, avi_chunk_t *p_root )
             free( p_chk );
             break;
         }
-        else if( vlc_stream_Tell( s ) >=
+
+        *pp_append = p_chk;
+        while( *pp_append )
+            pp_append = &((*pp_append)->common.p_next);
+
+        if( vlc_stream_Tell( s ) >=
                  p_chk->common.p_father->common.i_chunk_pos +
                  __EVEN( p_chk->common.p_father->common.i_chunk_size ) )
         {
             break;
         }
-
-        *pp_append = p_chk;
-        while( *pp_append )
-            pp_append = &((*pp_append)->common.p_next);
 
         /* If we can't seek then stop when we 've found first RIFF-AVI */
         if( p_chk->common.i_chunk_fourcc == AVIFOURCC_RIFF &&

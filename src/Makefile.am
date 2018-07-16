@@ -200,7 +200,6 @@ libvlccore_la_SOURCES = \
 	config/getopt.c \
 	config/vlc_getopt.h \
 	extras/libc.c \
-	extras/tdestroy.c \
 	modules/modules.h \
 	modules/modules.c \
 	modules/bank.c \
@@ -430,8 +429,11 @@ if HAVE_LINUX
 libvlccore_la_SOURCES += \
 	linux/cpu.c \
 	linux/dirs.c \
-	linux/getaddrinfo.c \
 	linux/thread.c
+endif
+if HAVE_LIBANL
+libvlccore_la_SOURCES += \
+	linux/getaddrinfo.c
 libvlccore_la_LIBADD += -lanl
 else
 libvlccore_la_SOURCES += \

@@ -151,6 +151,23 @@ SegmentSeeker::find_greatest_seekpoints_in_range( fptr_t start_fpos, mtime_t end
         tpoints.insert( tracks_seekpoint_t::value_type( it->first, sp ) );
     }
 
+    if (tpoints.empty())
+    {
+        // try a further pts
+        for( tracks_seekpoints_t::const_iterator it = _tracks_seekpoints.begin(); it != _tracks_seekpoints.end(); ++it )
+        {
+            if ( std::find( filter_tracks.begin(), filter_tracks.end(), it->first ) == filter_tracks.end() )
+                continue;
+
+            Seekpoint sp = get_first_seekpoint_around( end_pts, it->second );
+
+            if( sp.fpos < start_fpos )
+                continue;
+
+            tpoints.insert( tracks_seekpoint_t::value_type( it->first, sp ) );
+        }
+    }
+
     return tpoints;
 }
 
@@ -197,6 +214,10 @@ SegmentSeeker::get_seekpoints_around( mtime_t pts, seekpoints_t const& seekpoint
     iterator const it_begin  = seekpoints.begin();
     iterator const it_end    = seekpoints.end();
     iterator const it_middle = greatest_lower_bound( it_begin, it_end, needle );
+
+    if ( it_middle != it_end && (*it_middle).pts > pts)
+        // found nothing low enough, use the first one
+        return seekpoint_pair_t( *it_begin, Seekpoint() );
 
     iterator it_before = it_middle;
     iterator it_after = it_middle == it_end ? it_middle : next_( it_middle ) ;
@@ -290,14 +311,17 @@ SegmentSeeker::get_seekpoints( matroska_segment_c& ms, mtime_t target_pts,
         Seekpoint const& start = seekpoints.first;
         Seekpoint const& end   = seekpoints.second;
 
-        index_range( ms, Range( start.fpos, end.fpos ), needle_pts );
+        if ( start.fpos == std::numeric_limits<fptr_t>::max() )
+            return tracks_seekpoint_t();
 
-        {
-            tracks_seekpoint_t tpoints = find_greatest_seekpoints_in_range( start.fpos, target_pts, filter_tracks );
+        if ( end.fpos != std::numeric_limits<fptr_t>::max() || !ms.b_cues )
+            // do not read the whole (infinite?) file to get seek indexes
+            index_range( ms, Range( start.fpos, end.fpos ), needle_pts );
 
-            if( contains_all_of_t() ( tpoints, priority_tracks ) )
-                return tpoints;
-        }
+        tracks_seekpoint_t tpoints = find_greatest_seekpoints_in_range( start.fpos, target_pts, filter_tracks );
+
+        if( contains_all_of_t() ( tpoints, priority_tracks ) )
+            return tpoints;
 
         needle_pts = start.pts - 1;
     }
@@ -438,19 +462,20 @@ SegmentSeeker::mkv_jump_to( matroska_segment_c& ms, fptr_t fpos )
     fptr_t i_cluster_pos = -1;
     ms.cluster = NULL;
 
+    if (!_cluster_positions.empty())
     {
         cluster_positions_t::iterator cluster_it = greatest_lower_bound(
           _cluster_positions.begin(), _cluster_positions.end(), fpos
         );
 
         ms.es.I_O().setFilePointer( *cluster_it );
-        ms.ep->reconstruct( &ms.es, ms.segment, &ms.sys.demuxer );
+        ms.ep.reconstruct( &ms.es, ms.segment, &ms.sys.demuxer );
     }
 
     while( ms.cluster == NULL || (
           ms.cluster->IsFiniteSize() && ms.cluster->GetEndPosition() < fpos ) )
     {
-        if( !( ms.cluster = static_cast<KaxCluster*>( ms.ep->Get() ) ) )
+        if( !( ms.cluster = static_cast<KaxCluster*>( ms.ep.Get() ) ) )
         {
             msg_Err( &ms.sys.demuxer, "unable to read KaxCluster during seek, giving up" );
             return;
@@ -463,17 +488,22 @@ SegmentSeeker::mkv_jump_to( matroska_segment_c& ms, fptr_t fpos )
         mark_range_as_searched( Range( i_cluster_pos, ms.es.I_O().getFilePointer() ) );
     }
 
-    ms.ep->Down();
+    ms.ep.Down();
 
     /* read until cluster/timecode to initialize cluster */
 
-    while( EbmlElement * el = ms.ep->Get() )
+    while( EbmlElement * el = ms.ep.Get() )
     {
         if( MKV_CHECKED_PTR_DECL( p_tc, KaxClusterTimecode, el ) )
         {
             p_tc->ReadData( ms.es.I_O(), SCOPE_ALL_DATA );
             ms.cluster->InitTimecode( static_cast<uint64>( *p_tc ), ms.i_timescale );
+            add_cluster(ms.cluster);
             break;
+        }
+        else if( MKV_CHECKED_PTR_DECL( p_tc, EbmlCrc32, el ) )
+        {
+            p_tc->ReadData( ms.es.I_O(), SCOPE_ALL_DATA ); /* avoid a skip that may fail */
         }
     }
 

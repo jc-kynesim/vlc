@@ -29,11 +29,19 @@
 
 DEFINE_GUID(GUID_CONTEXT_MUTEX, 0x472e8835, 0x3f8e, 0x4f93, 0xa0, 0xcb, 0x25, 0x79, 0x77, 0x6c, 0xed, 0x86);
 
+/* see https://msdn.microsoft.com/windows/hardware/commercialize/design/compatibility/device-graphics */
+struct wddm_version
+{
+    int wddm, d3d_features, revision, build;
+};
+
 typedef struct
 {
     ID3D11Device             *d3ddevice;       /* D3D device */
     ID3D11DeviceContext      *d3dcontext;      /* D3D context */
     bool                     owner;
+    struct wddm_version      WDDM;
+    D3D_FEATURE_LEVEL        feature_level;
 } d3d11_device_t;
 
 typedef struct
@@ -98,8 +106,12 @@ int D3D11_Create(vlc_object_t *, d3d11_handle_t *);
 void D3D11_Destroy(d3d11_handle_t *);
 
 bool isXboxHardware(ID3D11Device *d3ddev);
-bool isNvidiaHardware(ID3D11Device *d3ddev);
+bool CanUseVoutPool(d3d11_device_t *, UINT slices);
 IDXGIAdapter *D3D11DeviceAdapter(ID3D11Device *d3ddev);
+int D3D11CheckDriverVersion(d3d11_device_t *, UINT vendorId,
+                            const struct wddm_version *min_ver);
+void D3D11_GetDriverVersion(vlc_object_t *, d3d11_device_t *);
+#define D3D11_GetDriverVersion(a,b) D3D11_GetDriverVersion(VLC_OBJECT(a),b)
 
 static inline bool DeviceSupportsFormat(ID3D11Device *d3ddevice,
                                         DXGI_FORMAT format, UINT supportFlags)
@@ -111,10 +123,11 @@ static inline bool DeviceSupportsFormat(ID3D11Device *d3ddevice,
 }
 
 const d3d_format_t *FindD3D11Format(ID3D11Device *d3ddevice,
-                                                  vlc_fourcc_t i_src_chroma,
-                                                  uint8_t bits_per_channel,
-                                                  bool allow_opaque,
-                                                  UINT supportFlags);
+                                    vlc_fourcc_t i_src_chroma,
+                                    bool rgb_only,
+                                    uint8_t bits_per_channel,
+                                    bool allow_opaque,
+                                    UINT supportFlags);
 
 int AllocateTextures(vlc_object_t *obj, d3d11_device_t *d3d_dev,
                      const d3d_format_t *cfg, const video_format_t *fmt,

@@ -126,9 +126,9 @@ protected:
     void handleSystray();
 
     /* Central StackWidget Management */
-    void showTab( QWidget *);
+    void showTab( QWidget *, bool video_closing = false );
     void showVideo();
-    void restoreStackOldWidget();
+    void restoreStackOldWidget( bool video_closing = false );
 
     /* */
     void displayNormalView();
@@ -175,7 +175,6 @@ protected:
     /* Flags */
     unsigned             i_notificationSetting; /// Systray Notifications
     bool                 b_autoresize;          ///< persistent resizable window
-    bool                 b_videoEmbedded;       ///< Want an external Video Window
     bool                 b_videoFullScreen;     ///< --fullscreen
     bool                 b_hideAfterCreation;
     bool                 b_minimalView;         ///< Minimal video
@@ -184,7 +183,9 @@ protected:
     bool                 b_pauseOnMinimize;
     bool                 b_maximizedView;
     bool                 b_isWindowTiled;
-
+#ifdef QT5_HAS_WAYLAND
+    bool                 b_hasWayland;
+#endif
     /* States */
     bool                 playlistVisible;       ///< Is the playlist visible ?
 //    bool                 videoIsActive;       ///< Having a video now / THEMIM->hasV

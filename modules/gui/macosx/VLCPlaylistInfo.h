@@ -32,7 +32,7 @@
 @property (readonly) input_item_t *item;
 
 @property (readwrite, weak) IBOutlet NSOutlineView *outlineView;
-@property (readwrite, weak) IBOutlet NSTabView *tabView;
+@property (readwrite, weak) IBOutlet NSSegmentedControl *segmentedView;
 
 @property (readwrite, weak) IBOutlet NSTextField *uriLabel;
 @property (readwrite, weak) IBOutlet NSTextField *titleLabel;
@@ -83,13 +83,6 @@
 @property (readwrite, weak) IBOutlet NSTextField *playedAudioBuffersTextField;
 @property (readwrite, weak) IBOutlet NSTextField *readBytesLabel;
 @property (readwrite, weak) IBOutlet NSTextField *readBytesTextField;
-@property (readwrite, weak) IBOutlet NSTextField *sentBitrateLabel;
-@property (readwrite, weak) IBOutlet NSTextField *sentBitrateTextField;
-@property (readwrite, weak) IBOutlet NSTextField *sentBytesLabel;
-@property (readwrite, weak) IBOutlet NSTextField *sentBytesTextField;
-@property (readwrite, weak) IBOutlet NSTextField *sentPacketsLabel;
-@property (readwrite, weak) IBOutlet NSTextField *sentPacketsTextField;
-@property (readwrite, weak) IBOutlet NSTextField *soutLabel;
 @property (readwrite, weak) IBOutlet NSTextField *videoLabel;
 @property (readwrite, weak) IBOutlet NSTextField *videoDecodedLabel;
 @property (readwrite, weak) IBOutlet NSTextField *videoDecodedTextField;

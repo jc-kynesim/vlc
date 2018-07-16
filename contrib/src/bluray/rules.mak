@@ -1,6 +1,6 @@
 # LIBBLURAY
 
-BLURAY_VERSION := 1.0.1
+BLURAY_VERSION := 1.0.2
 BLURAY_URL := $(VIDEOLAN)/libbluray/$(BLURAY_VERSION)/libbluray-$(BLURAY_VERSION).tar.bz2
 
 ifdef BUILD_DISCS
@@ -48,6 +48,7 @@ $(TARBALLS)/libbluray-$(BLURAY_VERSION).tar.bz2:
 
 bluray: libbluray-$(BLURAY_VERSION).tar.bz2 .sum-bluray
 	$(UNPACK)
+	$(APPLY) $(SRC)/bluray/0001-Implement-dl_get_path-for-darwin-macOS.patch
 	$(call pkg_static,"src/libbluray.pc.in")
 	$(MOVE)
 

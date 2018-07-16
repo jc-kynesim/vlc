@@ -69,7 +69,7 @@ SoutInputBox::SoutInputBox( QWidget *_parent, const QString& mrl ) : QGroupBox( 
 
 void SoutInputBox::setMRL( const QString& mrl )
 {
-    QUrl uri = QUrl::fromEncoded( mrl.toLatin1() );
+    QUrl uri( mrl );
     QString type = uri.scheme();
 
     if( !uri.isValid() &&
@@ -91,7 +91,10 @@ void SoutInputBox::setMRL( const QString& mrl )
     }
     else
     {
-        sourceLine->setText( uri.toString() );
+        sourceLine->setText(
+            toNativeSeparators(uri.toDisplayString(
+                QUrl::RemovePassword | QUrl::PreferLocalFile | QUrl::NormalizePathSegments
+            )));
         if ( type.isEmpty() ) type = qtr( I_FILE_SLASH_DIR );
         sourceValueLabel->setText( type );
     }
@@ -166,8 +169,10 @@ QString FileDestBox::getMRL( const QString& mux )
 
 void FileDestBox::fileBrowse()
 {
-    QString fileName = QFileDialog::getSaveFileName( this, qtr( "Save file..." ),
-            p_intf->p_sys->filepath, qtr( "Containers (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv *.webm)" ) );
+    const QStringList schemes = QStringList(QStringLiteral("file"));
+    QString fileName = QFileDialog::getSaveFileUrl( this, qtr( "Save file..." ),
+            p_intf->p_sys->filepath, qtr( "Containers (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv *.webm)" ),
+            nullptr, QFileDialog::Options(), schemes).toLocalFile();
     fileEdit->setText( toNativeSeparators( fileName ) );
     emit mrlUpdated();
 }
@@ -461,7 +466,7 @@ QString ICEDestBox::getMRL( const QString& )
     m.option( "access", "shout" );
     m.option( "mux", "ogg" );
 
-    QString url = ICEPassEdit->text() + "@"
+    QString url = "//" + ICEPassEdit->text() + "@"
         + ICEEdit->text()
         + ":" + QString::number( ICEPort->value(), 10 )
         + "/" + ICEMountEdit->text();

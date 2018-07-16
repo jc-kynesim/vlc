@@ -134,7 +134,8 @@ static void UpdateCursorMoved( event_thread_t *p_event )
 {
     UpdateCursor( p_event, true );
     p_event->last_moved = mdate();
-    SetTimer( p_event->hwnd, (UINT_PTR)p_event, p_event->hide_timeout, HideMouse );
+    if( p_event->hwnd )
+        SetTimer( p_event->hwnd, (UINT_PTR)p_event, p_event->hide_timeout, HideMouse );
 }
 
 /* Local helpers */
@@ -186,10 +187,6 @@ static void *EventThread( void *p_this )
         vlc_restorecancel( canc );
         return NULL;
     }
-
-    /* Prevent monitor from powering off */
-    if (var_GetBool(vd, "disable-screensaver"))
-        SetThreadExecutionState( ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED | ES_CONTINUOUS );
 
     /* Main loop */
     /* GetMessage will sleep if there's no message in the queue */
@@ -481,6 +478,7 @@ event_thread_t *EventThreadCreate( vout_display_t *vd)
     p_event->button_pressed = 0;
     p_event->psz_title = NULL;
     p_event->source = vd->source;
+    p_event->hwnd = NULL;
     atomic_init(&p_event->has_moved, false);
     vout_display_PlacePicture(&p_event->place, &vd->source, vd->cfg, false);
 

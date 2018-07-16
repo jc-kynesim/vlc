@@ -336,7 +336,9 @@ static bool h264_parse_sequence_parameter_set_rbsp( bs_t *p_bs,
     }
     else
     {
-        p_sps->i_chroma_idc = 1; /* Not present == inferred to 4:2:2 */
+        p_sps->i_chroma_idc = 1; /* Not present == inferred to 4:2:0 */
+        p_sps->i_bit_depth_luma = 8;
+        p_sps->i_bit_depth_chroma = 8;
     }
 
     /* Skip i_log2_max_frame_num */
@@ -550,6 +552,8 @@ static bool h264_parse_picture_parameter_set_rbsp( bs_t *p_bs,
     p_pps->i_pic_order_present_flag = bs_read( p_bs, 1 );
 
     unsigned num_slice_groups = bs_read_ue( p_bs ) + 1;
+    if( num_slice_groups > 8 ) /* never has value > 7. Annex A, G & J */
+        return false;
     if( num_slice_groups > 1 )
     {
         unsigned slice_group_map_type = bs_read_ue( p_bs );
@@ -582,7 +586,7 @@ static bool h264_parse_picture_parameter_set_rbsp( bs_t *p_bs,
             }
             for( unsigned i = 0; i < pic_size_in_maps_units; i++ )
             {
-                bs_read( p_bs, sliceGroupSize );
+                bs_skip( p_bs, sliceGroupSize );
             }
         }
     }
@@ -788,8 +792,6 @@ bool h264_get_picture_size( const h264_sequence_parameter_set_t *p_sps, unsigned
 bool h264_get_chroma_luma( const h264_sequence_parameter_set_t *p_sps, uint8_t *pi_chroma_format,
                            uint8_t *pi_depth_luma, uint8_t *pi_depth_chroma )
 {
-    if( p_sps->i_bit_depth_luma == 0 )
-        return false;
     *pi_chroma_format = p_sps->i_chroma_idc;
     *pi_depth_luma = p_sps->i_bit_depth_luma;
     *pi_depth_chroma = p_sps->i_bit_depth_chroma;

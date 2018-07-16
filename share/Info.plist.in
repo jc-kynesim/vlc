@@ -1042,16 +1042,16 @@
 			</array>
 		</dict>
 		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>mkv</string>
+			</array>
 			<key>CFBundleTypeIconFile</key>
 			<string>mkv.icns</string>
 			<key>CFBundleTypeName</key>
 			<string>Matroska Video File</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
-			<key>LSItemContentTypes</key>
-			<array>
-				<string>org.matroska.mkv</string>
-			</array>
 		</dict>
 		<dict>
 			<key>CFBundleTypeExtensions</key>
@@ -1395,7 +1395,7 @@
 	<key>BreakpadRequestComments</key>
 	<string>1</string>
 	<key>BreakpadURL</key>
-	<string>@BREAKPAD_URL@/crashreports</string>
+	<string>@BREAKPAD_URL@/reports</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

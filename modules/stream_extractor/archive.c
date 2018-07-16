@@ -167,7 +167,7 @@ static la_int64_t libarchive_seek_cb( libarchive_t* p_arc, void* p_obj,
     {
         case SEEK_SET: whence_pos = 0;                           break;
         case SEEK_CUR: whence_pos = vlc_stream_Tell( p_source ); break;
-        case SEEK_END: whence_pos = stream_Size( p_source ) - 1; break;
+        case SEEK_END: whence_pos = stream_Size( p_source ); break;
               default: vlc_assert_unreachable();
 
     }
@@ -194,7 +194,7 @@ static la_ssize_t libarchive_read_cb( libarchive_t* p_arc, void* p_obj,
     if( i_ret < 0 )
     {
         archive_set_error( p_sys->p_archive, ARCHIVE_FATAL,
-          "libarchive_read_cb failed = %" PRId64, i_ret );
+          "libarchive_read_cb failed = %zd", i_ret );
 
         return ARCHIVE_FATAL;
     }
@@ -516,6 +516,10 @@ static int ReadDir( stream_directory_t* p_directory, input_item_node_t* p_node )
             continue;
 
         char const* path = archive_entry_pathname( entry );
+
+        if( unlikely( !path ) )
+            break;
+
         char*       mrl  = vlc_stream_extractor_CreateMRL( p_directory, path );
 
         if( unlikely( !mrl ) )

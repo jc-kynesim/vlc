@@ -69,7 +69,7 @@
 
 #define NBBANDS_TEXT N_( "Show 80 bands instead of 20" )
 #define SPNBBANDS_LONGTEXT N_( \
-      "More bands for the spectrometer : 80 if enabled else 20." )
+      "More bands for the spectrometer: 80 if enabled, else 20." )
 
 #define SEPAR_TEXT N_( "Number of blank pixels between bands.")
 
@@ -340,6 +340,7 @@ static block_t *DoRealWork( filter_t *p_filter, block_t *p_in_buf )
 
     /* First, get a new picture */
     picture_t *p_outpic = vout_GetPicture( p_sys->p_vout );
+    p_outpic->b_progressive = true;
     if( unlikely(p_outpic == NULL) )
         return p_in_buf;
 
