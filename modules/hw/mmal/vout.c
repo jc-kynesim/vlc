@@ -27,9 +27,9 @@
 #endif
 
 #include <math.h>
+#include <stdatomic.h>
 
 #include <vlc_common.h>
-#include <vlc_atomic.h>
 #include <vlc_plugin.h>
 #include <vlc_threads.h>
 #include <vlc_vout_display.h>
@@ -68,24 +68,6 @@
 #define PHASE_OFFSET_TARGET ((double)0.25)
 #define PHASE_CHECK_INTERVAL 100
 
-static int Open(vlc_object_t *);
-static void Close(vlc_object_t *);
-
-vlc_module_begin()
-    set_shortname(N_("MMAL vout"))
-    set_description(N_("MMAL-based vout plugin for Raspberry Pi"))
-    set_capability("vout display", 90)
-    add_shortcut("mmal_vout")
-    add_integer(MMAL_LAYER_NAME, 1, MMAL_LAYER_TEXT, MMAL_LAYER_LONGTEXT, false)
-    add_bool(MMAL_BLANK_BACKGROUND_NAME, true, MMAL_BLANK_BACKGROUND_TEXT,
-                    MMAL_BLANK_BACKGROUND_LONGTEXT, true);
-    add_bool(MMAL_ADJUST_REFRESHRATE_NAME, false, MMAL_ADJUST_REFRESHRATE_TEXT,
-                    MMAL_ADJUST_REFRESHRATE_LONGTEXT, false)
-    add_bool(MMAL_NATIVE_INTERLACED, false, MMAL_NATIVE_INTERLACE_TEXT,
-                    MMAL_NATIVE_INTERLACE_LONGTEXT, false)
-    set_callbacks(Open, Close)
-vlc_module_end()
-
 struct dmx_region_t {
     struct dmx_region_t *next;
     picture_t *picture;
@@ -100,11 +82,8 @@ struct dmx_region_t {
 };
 
 struct vout_display_sys_t {
-    vlc_cond_t buffer_cond;
-    vlc_mutex_t buffer_mutex;
     vlc_mutex_t manage_mutex;
 
-    plane_t planes[3]; /* Depending on video format up to 3 planes are used */
     picture_t **pictures; /* Actual list of alloced pictures passed into picture_pool */
     picture_pool_t *picture_pool;
 
@@ -124,8 +103,8 @@ struct vout_display_sys_t {
     unsigned display_width;
     unsigned display_height;
 
-    int i_frame_rate_base; /* cached framerate to detect changes for rate adjustment */
-    int i_frame_rate;
+    unsigned int i_frame_rate_base; /* cached framerate to detect changes for rate adjustment */
+    unsigned int i_frame_rate;
 
     int next_phase_check; /* lowpass for phase check frequency */
     int phase_offset; /* currently applied offset to presentation time in ns */
@@ -137,6 +116,8 @@ struct vout_display_sys_t {
     bool b_top_field_first; /* cached interlaced settings to detect changes for native mode */
     bool b_progressive;
     bool opaque; /* indicated use of opaque picture format (zerocopy) */
+
+    int in_cb_cnt;
 };
 
 static const vlc_fourcc_t subpicture_chromas[] = {
@@ -148,19 +129,6 @@ static const vlc_fourcc_t subpicture_chromas[] = {
 static inline uint32_t align(uint32_t x, uint32_t y);
 static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
                 const video_format_t *fmt);
-
-/* VLC vout display callbacks */
-static picture_pool_t *vd_pool(vout_display_t *vd, unsigned count);
-static void vd_prepare(vout_display_t *vd, picture_t *picture,
-                subpicture_t *subpicture);
-static void vd_display(vout_display_t *vd, picture_t *picture,
-                subpicture_t *subpicture);
-static int vd_control(vout_display_t *vd, int query, va_list args);
-static void vd_manage(vout_display_t *vd);
-
-/* MMAL callbacks */
-static void control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
-static void input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
 
 /* TV service */
 static int query_resolution(vout_display_t *vd, unsigned *width, unsigned *height);
@@ -181,199 +149,44 @@ static void dmx_region_delete(struct dmx_region_t *dmx_region,
 static void show_background(vout_display_t *vd, bool enable);
 static void maintain_phase_sync(vout_display_t *vd);
 
-static int Open(vlc_object_t *object)
+
+static void vd_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 {
-    vout_display_t *vd = (vout_display_t *)object;
-    vout_display_sys_t *sys;
-    uint32_t buffer_pitch, buffer_height;
-    vout_display_place_t place;
-    MMAL_DISPLAYREGION_T display_region;
-    MMAL_STATUS_T status;
-    int ret = VLC_SUCCESS;
-    unsigned i;
+    pic_ctx_mmal_t * ctx = buf->user_data;
+    vout_display_t * const vd = (vout_display_t *)port->userdata;
+    vout_display_sys_t *const sys = vd->sys;
 
-    if (vout_display_IsWindowed(vd))
-        return VLC_EGENERIC;
+    ++sys->in_cb_cnt;
+    msg_Dbg(vd, "<<< %s[%d] cmd=%d, ctx=%p, buf=%p, flags=%#x, pts=%lld", __func__, sys->in_cb_cnt, buf->cmd, ctx, buf,
+            buf->flags, (long long)buf->pts);
 
-    sys = calloc(1, sizeof(struct vout_display_sys_t));
-    if (!sys)
-        return VLC_ENOMEM;
-    vd->sys = sys;
+    mmal_buffer_header_release(buf);
 
-    sys->layer = var_InheritInteger(vd, MMAL_LAYER_NAME);
-    bcm_host_init();
-
-    sys->opaque = vd->fmt.i_chroma == VLC_CODEC_MMAL_OPAQUE;
-
-    status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &sys->component);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(vd, "Failed to create MMAL component %s (status=%"PRIx32" %s)",
-                        MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, status, mmal_status_to_string(status));
-        ret = VLC_EGENERIC;
-        goto out;
-    }
-
-    sys->component->control->userdata = (struct MMAL_PORT_USERDATA_T *)vd;
-    status = mmal_port_enable(sys->component->control, control_port_cb);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(vd, "Failed to enable control port %s (status=%"PRIx32" %s)",
-                        sys->component->control->name, status, mmal_status_to_string(status));
-        ret = VLC_EGENERIC;
-        goto out;
-    }
-
-    sys->input = sys->component->input[0];
-    sys->input->userdata = (struct MMAL_PORT_USERDATA_T *)vd;
-
-    if (sys->opaque) {
-        sys->input->format->encoding = MMAL_ENCODING_OPAQUE;
-        sys->i_planes = 1;
-        sys->buffer_size = sys->input->buffer_size_recommended;
-    } else {
-        sys->input->format->encoding = MMAL_ENCODING_I420;
-        vd->fmt.i_chroma = VLC_CODEC_I420;
-        buffer_pitch = align(vd->fmt.i_width, 32);
-        buffer_height = align(vd->fmt.i_height, 16);
-        sys->i_planes = 3;
-        sys->buffer_size = 3 * buffer_pitch * buffer_height / 2;
-    }
-
-    sys->input->format->es->video.width = vd->fmt.i_width;
-    sys->input->format->es->video.height = vd->fmt.i_height;
-    sys->input->format->es->video.crop.x = 0;
-    sys->input->format->es->video.crop.y = 0;
-    sys->input->format->es->video.crop.width = vd->fmt.i_width;
-    sys->input->format->es->video.crop.height = vd->fmt.i_height;
-    sys->input->format->es->video.par.num = vd->source.i_sar_num;
-    sys->input->format->es->video.par.den = vd->source.i_sar_den;
-
-    status = mmal_port_format_commit(sys->input);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(vd, "Failed to commit format for input port %s (status=%"PRIx32" %s)",
-                        sys->input->name, status, mmal_status_to_string(status));
-        ret = VLC_EGENERIC;
-        goto out;
-    }
-    sys->input->buffer_size = sys->input->buffer_size_recommended;
-
-    vout_display_PlacePicture(&place, &vd->source, vd->cfg, false);
-    display_region.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
-    display_region.hdr.size = sizeof(MMAL_DISPLAYREGION_T);
-    display_region.fullscreen = MMAL_FALSE;
-    display_region.src_rect.x = vd->fmt.i_x_offset;
-    display_region.src_rect.y = vd->fmt.i_y_offset;
-    display_region.src_rect.width = vd->fmt.i_visible_width;
-    display_region.src_rect.height = vd->fmt.i_visible_height;
-    display_region.dest_rect.x = place.x;
-    display_region.dest_rect.y = place.y;
-    display_region.dest_rect.width = place.width;
-    display_region.dest_rect.height = place.height;
-    display_region.layer = sys->layer;
-    display_region.set = MMAL_DISPLAY_SET_FULLSCREEN | MMAL_DISPLAY_SET_SRC_RECT |
-            MMAL_DISPLAY_SET_DEST_RECT | MMAL_DISPLAY_SET_LAYER;
-    status = mmal_port_parameter_set(sys->input, &display_region.hdr);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(vd, "Failed to set display region (status=%"PRIx32" %s)",
-                        status, mmal_status_to_string(status));
-        ret = VLC_EGENERIC;
-        goto out;
-    }
-
-    for (i = 0; i < sys->i_planes; ++i) {
-        sys->planes[i].i_lines = buffer_height;
-        sys->planes[i].i_pitch = buffer_pitch;
-        sys->planes[i].i_visible_lines = vd->fmt.i_visible_height;
-        sys->planes[i].i_visible_pitch = vd->fmt.i_visible_width;
-
-        if (i > 0) {
-            sys->planes[i].i_lines /= 2;
-            sys->planes[i].i_pitch /= 2;
-            sys->planes[i].i_visible_lines /= 2;
-            sys->planes[i].i_visible_pitch /= 2;
-        }
-    }
-
-    vlc_mutex_init(&sys->buffer_mutex);
-    vlc_cond_init(&sys->buffer_cond);
-    vlc_mutex_init(&sys->manage_mutex);
-
-    vd->pool = vd_pool;
-    vd->prepare = vd_prepare;
-    vd->display = vd_display;
-    vd->control = vd_control;
-    vd->manage = vd_manage;
-
-    vc_tv_register_callback(tvservice_cb, vd);
-
-    if (query_resolution(vd, &sys->display_width, &sys->display_height) >= 0) {
-        vout_display_SendEventDisplaySize(vd, sys->display_width, sys->display_height);
-    } else {
-        sys->display_width = vd->cfg->display.width;
-        sys->display_height = vd->cfg->display.height;
-    }
-
-    sys->dmx_handle = vc_dispmanx_display_open(0);
-    vd->info.subpicture_chromas = subpicture_chromas;
-
-    vout_display_DeleteWindow(vd, NULL);
-
-out:
-    if (ret != VLC_SUCCESS)
-        Close(object);
-
-    return ret;
+    msg_Dbg(vd, ">>> %s", __func__);
 }
 
-static void Close(vlc_object_t *object)
+static int query_resolution(vout_display_t *vd, unsigned *width, unsigned *height)
 {
-    vout_display_t *vd = (vout_display_t *)object;
-    vout_display_sys_t *sys = vd->sys;
-    char response[20]; /* answer is hvs_update_fields=%1d */
-    unsigned i;
+    TV_DISPLAY_STATE_T display_state;
+    int ret = 0;
 
-    vc_tv_unregister_callback_full(tvservice_cb, vd);
-
-    if (sys->dmx_handle)
-        close_dmx(vd);
-
-    if (sys->component && sys->component->control->is_enabled)
-        mmal_port_disable(sys->component->control);
-
-    if (sys->input && sys->input->is_enabled)
-        mmal_port_disable(sys->input);
-
-    if (sys->component && sys->component->is_enabled)
-        mmal_component_disable(sys->component);
-
-    if (sys->pool)
-        mmal_port_pool_destroy(sys->input, sys->pool);
-
-    if (sys->component)
-        mmal_component_release(sys->component);
-
-    if (sys->picture_pool)
-        picture_pool_Release(sys->picture_pool);
-    else
-        for (i = 0; i < sys->num_buffers; ++i)
-            if (sys->pictures[i]) {
-                mmal_buffer_header_release(sys->pictures[i]->p_sys->buffer);
-                picture_Release(sys->pictures[i]);
-            }
-
-    vlc_mutex_destroy(&sys->buffer_mutex);
-    vlc_cond_destroy(&sys->buffer_cond);
-    vlc_mutex_destroy(&sys->manage_mutex);
-
-    if (sys->native_interlaced) {
-        if (vc_gencmd(response, sizeof(response), "hvs_update_fields 0") < 0 ||
-                response[18] != '0')
-            msg_Warn(vd, "Could not reset hvs field mode");
+    if (vc_tv_get_display_state(&display_state) == 0) {
+        if (display_state.state & 0xFF) {
+            *width = display_state.display.hdmi.width;
+            *height = display_state.display.hdmi.height;
+        } else if (display_state.state & 0xFF00) {
+            *width = display_state.display.sdtv.width;
+            *height = display_state.display.sdtv.height;
+        } else {
+            msg_Warn(vd, "Invalid display state %"PRIx32, display_state.state);
+            ret = -1;
+        }
+    } else {
+        msg_Warn(vd, "Failed to query display resolution");
+        ret = -1;
     }
 
-    free(sys->pictures);
-    free(sys);
-
-    bcm_host_deinit();
+    return ret;
 }
 
 static inline uint32_t align(uint32_t x, uint32_t y) {
@@ -446,154 +259,61 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
     return 0;
 }
 
+// Actual picture pool for MMAL opaques is just a set of trivial containers
 static picture_pool_t *vd_pool(vout_display_t *vd, unsigned count)
 {
-    vout_display_sys_t *sys = vd->sys;
-    picture_resource_t picture_res;
-    picture_pool_configuration_t picture_pool_cfg;
-    video_format_t fmt = vd->fmt;
-    MMAL_STATUS_T status;
-    unsigned i;
-
-    if (sys->picture_pool) {
-        if (sys->num_buffers < count)
-            msg_Warn(vd, "Picture pool with %u pictures requested, but we already have one with %u pictures",
-                            count, sys->num_buffers);
-
-        goto out;
-    }
-
-    if (sys->opaque) {
-        if (count <= NUM_ACTUAL_OPAQUE_BUFFERS)
-            count = NUM_ACTUAL_OPAQUE_BUFFERS;
-
-        MMAL_PARAMETER_BOOLEAN_T zero_copy = {
-            { MMAL_PARAMETER_ZERO_COPY, sizeof(MMAL_PARAMETER_BOOLEAN_T) },
-            1
-        };
-
-        status = mmal_port_parameter_set(sys->input, &zero_copy.hdr);
-        if (status != MMAL_SUCCESS) {
-           msg_Err(vd, "Failed to set zero copy on port %s (status=%"PRIx32" %s)",
-                    sys->input->name, status, mmal_status_to_string(status));
-           goto out;
-        }
-    }
-
-    if (count < sys->input->buffer_num_recommended)
-        count = sys->input->buffer_num_recommended;
-
-#ifndef NDEBUG
-    msg_Dbg(vd, "Creating picture pool with %u pictures", count);
-#endif
-
-    sys->input->buffer_num = count;
-    status = mmal_port_enable(sys->input, input_port_cb);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(vd, "Failed to enable input port %s (status=%"PRIx32" %s)",
-                        sys->input->name, status, mmal_status_to_string(status));
-        goto out;
-    }
-
-    status = mmal_component_enable(sys->component);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(vd, "Failed to enable component %s (status=%"PRIx32" %s)",
-                        sys->component->name, status, mmal_status_to_string(status));
-        goto out;
-    }
-
-    sys->num_buffers = count;
-    sys->pool = mmal_port_pool_create(sys->input, sys->num_buffers,
-            sys->input->buffer_size);
-    if (!sys->pool) {
-        msg_Err(vd, "Failed to create MMAL pool for %u buffers of size %"PRIu32,
-                        count, sys->input->buffer_size);
-        goto out;
-    }
-
-    memset(&picture_res, 0, sizeof(picture_resource_t));
-    sys->pictures = calloc(sys->num_buffers, sizeof(picture_t *));
-    for (i = 0; i < sys->num_buffers; ++i) {
-        picture_res.p_sys = calloc(1, sizeof(picture_sys_t));
-        picture_res.p_sys->owner = (vlc_object_t *)vd;
-        picture_res.p_sys->buffer = mmal_queue_get(sys->pool->queue);
-
-        sys->pictures[i] = picture_NewFromResource(&fmt, &picture_res);
-        if (!sys->pictures[i]) {
-            msg_Err(vd, "Failed to create picture");
-            free(picture_res.p_sys);
-            goto out;
-        }
-
-        sys->pictures[i]->i_planes = sys->i_planes;
-        memcpy(sys->pictures[i]->p, sys->planes, sys->i_planes * sizeof(plane_t));
-    }
-
-    memset(&picture_pool_cfg, 0, sizeof(picture_pool_configuration_t));
-    picture_pool_cfg.picture_count = sys->num_buffers;
-    picture_pool_cfg.picture = sys->pictures;
-    picture_pool_cfg.lock = mmal_picture_lock;
-
-    sys->picture_pool = picture_pool_NewExtended(&picture_pool_cfg);
-    if (!sys->picture_pool) {
-        msg_Err(vd, "Failed to create picture pool");
-        goto out;
-    }
-
-out:
-    return sys->picture_pool;
+    return picture_pool_NewFromFormat(&vd->fmt, count);
 }
 
-static void vd_prepare(vout_display_t *vd, picture_t *picture,
+static void vd_display(vout_display_t *vd, picture_t *p_pic,
                 subpicture_t *subpicture)
 {
-    vout_display_sys_t *sys = vd->sys;
-    picture_sys_t *pic_sys = picture->p_sys;
+    vout_display_sys_t * const sys = vd->sys;
+    MMAL_STATUS_T err;
 
-    if (!sys->adjust_refresh_rate || pic_sys->displayed)
-        return;
+    msg_Dbg(vd, "<<< %s", __func__);
 
-    /* Apply the required phase_offset to the picture, so that vd_display()
-     * will be called at the corrected time from the core */
-    picture->date += sys->phase_offset;
-}
-
-static void vd_display(vout_display_t *vd, picture_t *picture,
-                subpicture_t *subpicture)
-{
-    vout_display_sys_t *sys = vd->sys;
-    picture_sys_t *pic_sys = picture->p_sys;
-    MMAL_BUFFER_HEADER_T *buffer = pic_sys->buffer;
-    MMAL_STATUS_T status;
-
-    if (picture->format.i_frame_rate != sys->i_frame_rate ||
-        picture->format.i_frame_rate_base != sys->i_frame_rate_base ||
-        picture->b_progressive != sys->b_progressive ||
-        picture->b_top_field_first != sys->b_top_field_first) {
-        sys->b_top_field_first = picture->b_top_field_first;
-        sys->b_progressive = picture->b_progressive;
-        sys->i_frame_rate = picture->format.i_frame_rate;
-        sys->i_frame_rate_base = picture->format.i_frame_rate_base;
-        configure_display(vd, NULL, &picture->format);
+    if (p_pic->format.i_frame_rate != sys->i_frame_rate ||
+        p_pic->format.i_frame_rate_base != sys->i_frame_rate_base ||
+        p_pic->b_progressive != sys->b_progressive ||
+        p_pic->b_top_field_first != sys->b_top_field_first) {
+        sys->b_top_field_first = p_pic->b_top_field_first;
+        sys->b_progressive = p_pic->b_progressive;
+        sys->i_frame_rate = p_pic->format.i_frame_rate;
+        sys->i_frame_rate_base = p_pic->format.i_frame_rate_base;
+        configure_display(vd, NULL, &p_pic->format);
     }
 
-    if (!pic_sys->displayed || !sys->opaque) {
-        buffer->cmd = 0;
-        buffer->length = sys->input->buffer_size;
-        buffer->user_data = picture;
 
-        status = mmal_port_send_buffer(sys->input, buffer);
-        if (status == MMAL_SUCCESS)
-            atomic_fetch_add(&sys->buffers_in_transit, 1);
+    if (!sys->input->is_enabled &&
+        (err = mmal_port_enable(sys->input, vd_input_port_cb)) != MMAL_SUCCESS)
+    {
+        msg_Err(vd, "Input port enable failed");
+        goto fail;
+    }
 
-        if (status != MMAL_SUCCESS) {
-            msg_Err(vd, "Failed to send buffer to input port. Frame dropped");
-            picture_Release(picture);
+    // Stuff into input
+    // We assume the BH is already set up with values reflecting pic date etc.
+    {
+        MMAL_BUFFER_HEADER_T * const pic_buf = pic_mmal_buffer(p_pic);
+        MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->pool->queue);
+
+        if ((err = mmal_buffer_header_replicate(buf, pic_buf)) != MMAL_SUCCESS)
+        {
+            msg_Err(vd, "Failed to replicate input buffer: %d", err);
+            goto fail;
         }
 
-        pic_sys->displayed = true;
-    } else {
-        picture_Release(picture);
+        msg_Dbg(vd, "Vd buf send: pic=%p, buf=%p/%p, ctx=%p, flags=%#x, len=%d/%d, pts=%lld",
+                p_pic, pic_buf, buf, pic_buf->user_data, buf->flags, buf->length, buf->alloc_size, (long long)buf->pts);
+
+        picture_Release(p_pic);
+
+        if ((err = mmal_port_send_buffer(sys->input, buf)) != MMAL_SUCCESS)
+        {
+            msg_Err(vd, "Send buffer to input failed");
+            goto fail;
+        }
     }
 
     display_subpicture(vd, subpicture);
@@ -605,12 +325,8 @@ static void vd_display(vout_display_t *vd, picture_t *picture,
         maintain_phase_sync(vd);
     sys->next_phase_check = (sys->next_phase_check + 1) % PHASE_CHECK_INTERVAL;
 
-    if (sys->opaque) {
-        vlc_mutex_lock(&sys->buffer_mutex);
-        while (atomic_load(&sys->buffers_in_transit) >= MAX_BUFFERS_IN_TRANSIT)
-            vlc_cond_wait(&sys->buffer_cond, &sys->buffer_mutex);
-        vlc_mutex_unlock(&sys->buffer_mutex);
-    }
+fail:
+    /* NOP */;
 }
 
 static int vd_control(vout_display_t *vd, int query, va_list args)
@@ -667,7 +383,8 @@ static void vd_manage(vout_display_t *vd)
         if (query_resolution(vd, &width, &height) >= 0) {
             sys->display_width = width;
             sys->display_height = height;
-            vout_display_SendEventDisplaySize(vd, width, height);
+//            msg_Dbg(vd, "%s: %dx%d", __func__, width, height);
+//            vout_window_ReportSize(vd->cfg->window, width, height);
         }
 
         sys->need_configure_display = false;
@@ -676,7 +393,35 @@ static void vd_manage(vout_display_t *vd)
     vlc_mutex_unlock(&sys->manage_mutex);
 }
 
-static void control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
+static void vd_prepare(vout_display_t *vd, picture_t *picture,
+#if VLC_VER_3
+                       subpicture_t *subpicture
+#else
+                       subpicture_t *subpicture, vlc_tick_t date
+#endif
+                       )
+{
+    VLC_UNUSED(picture);
+    VLC_UNUSED(subpicture);
+//    VLC_UNUSED(date);
+
+    vd_manage(vd);
+#if 0
+    VLC_UNUSED(date);
+    vout_display_sys_t *sys = vd->sys;
+    picture_sys_t *pic_sys = picture->p_sys;
+
+    if (!sys->adjust_refresh_rate || pic_sys->displayed)
+        return;
+
+    /* Apply the required phase_offset to the picture, so that vd_display()
+     * will be called at the corrected time from the core */
+    picture->date += sys->phase_offset;
+#endif
+}
+
+
+static void vd_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
     vout_display_t *vd = (vout_display_t *)port->userdata;
     MMAL_STATUS_T status;
@@ -687,45 +432,6 @@ static void control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
     }
 
     mmal_buffer_header_release(buffer);
-}
-
-static void input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
-{
-    vout_display_t *vd = (vout_display_t *)port->userdata;
-    vout_display_sys_t *sys = vd->sys;
-    picture_t *picture = (picture_t *)buffer->user_data;
-
-    if (picture)
-        picture_Release(picture);
-
-    vlc_mutex_lock(&sys->buffer_mutex);
-    atomic_fetch_sub(&sys->buffers_in_transit, 1);
-    vlc_cond_signal(&sys->buffer_cond);
-    vlc_mutex_unlock(&sys->buffer_mutex);
-}
-
-static int query_resolution(vout_display_t *vd, unsigned *width, unsigned *height)
-{
-    TV_DISPLAY_STATE_T display_state;
-    int ret = 0;
-
-    if (vc_tv_get_display_state(&display_state) == 0) {
-        if (display_state.state & 0xFF) {
-            *width = display_state.display.hdmi.width;
-            *height = display_state.display.hdmi.height;
-        } else if (display_state.state & 0xFF00) {
-            *width = display_state.display.sdtv.width;
-            *height = display_state.display.sdtv.height;
-        } else {
-            msg_Warn(vd, "Invalid display state %"PRIx32, display_state.state);
-            ret = -1;
-        }
-    } else {
-        msg_Warn(vd, "Failed to query display resolution");
-        ret = -1;
-    }
-
-    return ret;
 }
 
 static void tvservice_cb(void *callback_data, uint32_t reason, uint32_t param1, uint32_t param2)
@@ -969,7 +675,7 @@ static void maintain_phase_sync(vout_display_t *vd)
     MMAL_PARAMETER_VIDEO_RENDER_STATS_T render_stats = {
         .hdr = { MMAL_PARAMETER_VIDEO_RENDER_STATS, sizeof(render_stats) },
     };
-    int32_t frame_duration = 1000000 /
+    int32_t frame_duration = CLOCK_FREQ /
         ((double)vd->sys->i_frame_rate /
         vd->sys->i_frame_rate_base);
     vout_display_sys_t *sys = vd->sys;
@@ -1041,3 +747,235 @@ static void show_background(vout_display_t *vd, bool enable)
         sys->bkg_resource = DISPMANX_NO_HANDLE;
     }
 }
+
+static void CloseMmalVout(vlc_object_t *object)
+{
+    vout_display_t * const vd = (vout_display_t *)object;
+    vout_display_sys_t * const sys = vd->sys;
+    char response[20]; /* answer is hvs_update_fields=%1d */
+
+    msg_Dbg(vd, "<<< %s", __func__);
+
+    vc_tv_unregister_callback_full(tvservice_cb, vd);
+
+    if (sys->dmx_handle)
+        close_dmx(vd);
+
+    if (sys->component && sys->component->control->is_enabled)
+        mmal_port_disable(sys->component->control);
+
+    if (sys->input && sys->input->is_enabled)
+        mmal_port_disable(sys->input);
+
+    if (sys->component && sys->component->is_enabled)
+        mmal_component_disable(sys->component);
+
+    if (sys->pool)
+        mmal_pool_destroy(sys->pool);
+
+    if (sys->component)
+        mmal_component_release(sys->component);
+
+    if (sys->picture_pool)
+        picture_pool_Release(sys->picture_pool);
+
+    vlc_mutex_destroy(&sys->manage_mutex);
+
+    if (sys->native_interlaced) {
+        if (vc_gencmd(response, sizeof(response), "hvs_update_fields 0") < 0 ||
+                response[18] != '0')
+            msg_Warn(vd, "Could not reset hvs field mode");
+    }
+
+    free(sys->pictures);
+    free(sys);
+
+    bcm_host_deinit();
+
+    msg_Dbg(vd, ">>> %s", __func__);
+}
+
+static int OpenMmalVout(vlc_object_t *object)
+{
+    vout_display_t *vd = (vout_display_t *)object;
+    vout_display_sys_t *sys;
+    uint32_t buffer_pitch, buffer_height;
+    vout_display_place_t place;
+    MMAL_DISPLAYREGION_T display_region;
+    MMAL_STATUS_T status;
+    int ret = VLC_EGENERIC;
+
+    msg_Dbg(vd, "<<< %s", __func__);
+
+    if (vd->fmt.i_chroma != VLC_CODEC_MMAL_OPAQUE)
+    {
+        msg_Dbg(vd, ">>> %s: Format not MMAL", __func__);
+        return VLC_EGENERIC;
+    }
+
+    if (vout_display_IsWindowed(vd))
+    {
+        msg_Dbg(vd, ">>> %s: Is a window", __func__);
+        return VLC_EGENERIC;
+    }
+
+    sys = calloc(1, sizeof(struct vout_display_sys_t));
+    if (!sys)
+        return VLC_ENOMEM;
+    vd->sys = sys;
+
+    sys->layer = var_InheritInteger(vd, MMAL_LAYER_NAME);
+    bcm_host_init();
+
+    sys->opaque = vd->fmt.i_chroma == VLC_CODEC_MMAL_OPAQUE;
+
+    status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &sys->component);
+    if (status != MMAL_SUCCESS) {
+        msg_Err(vd, "Failed to create MMAL component %s (status=%"PRIx32" %s)",
+                        MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, status, mmal_status_to_string(status));
+        goto fail;
+    }
+
+    sys->component->control->userdata = (struct MMAL_PORT_USERDATA_T *)vd;
+    status = mmal_port_enable(sys->component->control, vd_control_port_cb);
+    if (status != MMAL_SUCCESS) {
+        msg_Err(vd, "Failed to enable control port %s (status=%"PRIx32" %s)",
+                        sys->component->control->name, status, mmal_status_to_string(status));
+        goto fail;
+    }
+
+    sys->input = sys->component->input[0];
+    sys->input->userdata = (struct MMAL_PORT_USERDATA_T *)vd;
+
+    if (sys->opaque) {
+        sys->input->format->encoding = MMAL_ENCODING_OPAQUE;
+        sys->i_planes = 1;
+        sys->buffer_size = sys->input->buffer_size_recommended;
+    } else {
+        sys->input->format->encoding = MMAL_ENCODING_I420;
+        vd->fmt.i_chroma = VLC_CODEC_I420;
+        buffer_pitch = align(vd->fmt.i_width, 32);
+        buffer_height = align(vd->fmt.i_height, 16);
+        sys->i_planes = 3;
+        sys->buffer_size = 3 * buffer_pitch * buffer_height / 2;
+    }
+
+    sys->input->format->es->video.width = vd->fmt.i_width;
+    sys->input->format->es->video.height = vd->fmt.i_height;
+    sys->input->format->es->video.crop.x = 0;
+    sys->input->format->es->video.crop.y = 0;
+    sys->input->format->es->video.crop.width = vd->fmt.i_width;
+    sys->input->format->es->video.crop.height = vd->fmt.i_height;
+    sys->input->format->es->video.par.num = vd->source.i_sar_num;
+    sys->input->format->es->video.par.den = vd->source.i_sar_den;
+
+    status = port_parameter_set_bool(sys->input, MMAL_PARAMETER_ZERO_COPY, true);
+    if (status != MMAL_SUCCESS) {
+       msg_Err(vd, "Failed to set zero copy on port %s (status=%"PRIx32" %s)",
+                sys->input->name, status, mmal_status_to_string(status));
+       goto fail;
+    }
+
+    status = mmal_port_format_commit(sys->input);
+    if (status != MMAL_SUCCESS) {
+        msg_Err(vd, "Failed to commit format for input port %s (status=%"PRIx32" %s)",
+                        sys->input->name, status, mmal_status_to_string(status));
+        goto fail;
+    }
+    sys->input->buffer_size = sys->input->buffer_size_recommended;
+    sys->input->buffer_num = 30;
+
+    vout_display_PlacePicture(&place, &vd->source, vd->cfg, false);
+    display_region.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
+    display_region.hdr.size = sizeof(MMAL_DISPLAYREGION_T);
+    display_region.fullscreen = MMAL_FALSE;
+    display_region.src_rect.x = vd->fmt.i_x_offset;
+    display_region.src_rect.y = vd->fmt.i_y_offset;
+    display_region.src_rect.width = vd->fmt.i_visible_width;
+    display_region.src_rect.height = vd->fmt.i_visible_height;
+    display_region.dest_rect.x = place.x;
+    display_region.dest_rect.y = place.y;
+    display_region.dest_rect.width = place.width;
+    display_region.dest_rect.height = place.height;
+    display_region.layer = sys->layer;
+    display_region.set = MMAL_DISPLAY_SET_FULLSCREEN | MMAL_DISPLAY_SET_SRC_RECT |
+            MMAL_DISPLAY_SET_DEST_RECT | MMAL_DISPLAY_SET_LAYER;
+    status = mmal_port_parameter_set(sys->input, &display_region.hdr);
+    if (status != MMAL_SUCCESS) {
+        msg_Err(vd, "Failed to set display region (status=%"PRIx32" %s)",
+                        status, mmal_status_to_string(status));
+        goto fail;
+    }
+
+    status = mmal_port_enable(sys->input, vd_input_port_cb);
+    if (status != MMAL_SUCCESS) {
+        msg_Err(vd, "Failed to enable input port %s (status=%"PRIx32" %s)",
+                sys->input->name, status, mmal_status_to_string(status));
+        goto fail;
+    }
+
+    status = mmal_component_enable(sys->component);
+    if (status != MMAL_SUCCESS) {
+        msg_Err(vd, "Failed to enable component %s (status=%"PRIx32" %s)",
+                sys->component->name, status, mmal_status_to_string(status));
+        goto fail;
+    }
+
+    if ((sys->pool = mmal_pool_create(sys->input->buffer_num, 0)) == NULL)
+    {
+        msg_Err(vd, "Failed to create input pool");
+        goto fail;
+    }
+
+
+    vlc_mutex_init(&sys->manage_mutex);
+
+    vd->pool = vd_pool;
+    vd->prepare = vd_prepare;
+    vd->display = vd_display;
+    vd->control = vd_control;
+
+    vc_tv_register_callback(tvservice_cb, vd);
+
+    if (query_resolution(vd, &sys->display_width, &sys->display_height) >= 0) {
+//        vout_window_ReportSize(vd->cfg->window,
+//                               sys->display_width, sys->display_height);
+    } else {
+        sys->display_width = vd->cfg->display.width;
+        sys->display_height = vd->cfg->display.height;
+    }
+
+    sys->dmx_handle = vc_dispmanx_display_open(0);
+    vd->info.subpicture_chromas = subpicture_chromas;
+
+    msg_Dbg(vd, ">>> %s: ok", __func__);
+    return VLC_SUCCESS;
+
+fail:
+    CloseMmalVout(object);
+
+    msg_Dbg(vd, ">>> %s: rv=%d", __func__, ret);
+
+    return ret;
+}
+
+
+vlc_module_begin()
+    set_shortname(N_("MMAL vout"))
+    set_description(N_("MMAL-based vout plugin for Raspberry Pi"))
+    set_capability("vout display", 900)
+    add_shortcut("mmal_vout")
+    set_category( CAT_VIDEO )
+    set_subcategory( SUBCAT_VIDEO_VOUT )
+
+    add_integer(MMAL_LAYER_NAME, 1, MMAL_LAYER_TEXT, MMAL_LAYER_LONGTEXT, false)
+    add_bool(MMAL_BLANK_BACKGROUND_NAME, true, MMAL_BLANK_BACKGROUND_TEXT,
+                    MMAL_BLANK_BACKGROUND_LONGTEXT, true);
+    add_bool(MMAL_ADJUST_REFRESHRATE_NAME, false, MMAL_ADJUST_REFRESHRATE_TEXT,
+                    MMAL_ADJUST_REFRESHRATE_LONGTEXT, false)
+    add_bool(MMAL_NATIVE_INTERLACED, false, MMAL_NATIVE_INTERLACE_TEXT,
+                    MMAL_NATIVE_INTERLACE_LONGTEXT, false)
+    set_callbacks(OpenMmalVout, CloseMmalVout)
+vlc_module_end()
+
+

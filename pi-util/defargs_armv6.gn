@@ -1,0 +1,28 @@
+# See "gn args <out_dir> --list" for available build arguments.
+is_debug = false
+target_cpu = "arm"
+target_os = "linux"
+
+arm_float_abi = "hard"
+arm_use_neon = false
+arm_optionally_use_neon = true
+arm_version = 6
+arm_use_thumb = false
+arm_arch = "armv6z"
+
+# Separate out so we can have both arm v6 & v7 versions
+is_component_ffmpeg = true
+
+# tcmalloc doesn't like armv6 by default
+use_allocator = "none"
+
+# Pulse deprecated on Pi
+use_pulseaudio = false
+
+# Could use system libjpeg but go with chromiums version
+# use_system_libjpeg = true
+use_libjpeg_turbo = true
+
+# We want H.264 in ffmpeg
+ffmpeg_branding = "Chrome"
+proprietary_codecs = true

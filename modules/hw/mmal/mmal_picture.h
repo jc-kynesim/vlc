@@ -24,19 +24,121 @@
 #ifndef VLC_MMAL_MMAL_PICTURE_H_
 #define VLC_MMAL_MMAL_PICTURE_H_
 
+#include <stdatomic.h>
+
 #include <vlc_common.h>
 #include <interface/mmal/mmal.h>
 
 /* Think twice before changing this. Incorrect values cause havoc. */
 #define NUM_ACTUAL_OPAQUE_BUFFERS 30
 
-struct picture_sys_t {
-    vlc_object_t *owner;
+#ifndef VLC_TICK_INVALID
+#define VLC_TICK_INVALID VLC_TS_INVALID
+#define VLC_VER_3 1
+#else
+#define VLC_VER_3 0
+#endif
 
-    MMAL_BUFFER_HEADER_T *buffer;
-    bool displayed;
-};
+typedef struct mmal_port_pool_ref_s
+{
+    atomic_uint refs;
+    MMAL_POOL_T * pool;
+    MMAL_PORT_T * port;
+} hw_mmal_port_pool_ref_t;
 
-int mmal_picture_lock(picture_t *picture);
+typedef struct pic_ctx_mmal_s {
+    picture_context_t cmn;  // PARENT: Common els at start
+
+    MMAL_BUFFER_HEADER_T * buf;
+    hw_mmal_port_pool_ref_t * ppr;
+
+    vlc_object_t * obj;
+} pic_ctx_mmal_t;
+
+hw_mmal_port_pool_ref_t * hw_mmal_port_pool_ref_create(MMAL_PORT_T * const port,
+   const unsigned int headers, const uint32_t payload_size);
+void hw_mmal_port_pool_ref_release(hw_mmal_port_pool_ref_t * const ppr, const bool in_cb);
+bool hw_mmal_port_pool_ref_recycle(hw_mmal_port_pool_ref_t * const ppr, MMAL_BUFFER_HEADER_T * const buf);
+MMAL_STATUS_T hw_mmal_port_pool_ref_fill(hw_mmal_port_pool_ref_t * const ppr);
+static inline void hw_mmal_port_pool_ref_acquire(hw_mmal_port_pool_ref_t * const ppr)
+{
+    atomic_fetch_add(&ppr->refs, 1);
+}
+
+
+picture_context_t * hw_mmal_pic_ctx_copy(picture_context_t * pic_ctx_cmn);
+void hw_mmal_pic_ctx_destroy(picture_context_t * pic_ctx_cmn);
+picture_context_t * hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf,
+    hw_mmal_port_pool_ref_t * const ppr, vlc_object_t * obj);
+
+
+
+static inline MMAL_STATUS_T port_parameter_set_uint32(MMAL_PORT_T * port, uint32_t id, uint32_t val)
+{
+    const MMAL_PARAMETER_UINT32_T param = {
+        .hdr = {.id = id, .size = sizeof(MMAL_PARAMETER_UINT32_T)},
+        .value = val
+    };
+    return mmal_port_parameter_set(port, &param.hdr);
+}
+
+static inline MMAL_STATUS_T port_parameter_set_bool(MMAL_PORT_T * port, uint32_t id, int val)
+{
+    const MMAL_PARAMETER_BOOLEAN_T param = {
+        .hdr = {.id = id, .size = sizeof(MMAL_PARAMETER_BOOLEAN_T)},
+        .enable = val
+    };
+    return mmal_port_parameter_set(port, &param.hdr);
+}
+
+static inline void pic_to_buf_copy_props(MMAL_BUFFER_HEADER_T * const buf, const picture_t * const pic)
+{
+    if (!pic->b_progressive)
+    {
+        buf->flags |= MMAL_BUFFER_HEADER_VIDEO_FLAG_INTERLACED;
+        buf->type->video.flags |= MMAL_BUFFER_HEADER_VIDEO_FLAG_INTERLACED;
+    }
+    else
+    {
+        buf->flags &= ~MMAL_BUFFER_HEADER_VIDEO_FLAG_INTERLACED;
+        buf->type->video.flags &= ~MMAL_BUFFER_HEADER_VIDEO_FLAG_INTERLACED;
+    }
+    if (pic->b_top_field_first)
+    {
+        buf->flags |= MMAL_BUFFER_HEADER_VIDEO_FLAG_TOP_FIELD_FIRST;
+        buf->type->video.flags |= MMAL_BUFFER_HEADER_VIDEO_FLAG_TOP_FIELD_FIRST;
+    }
+    else
+    {
+        buf->flags &= ~MMAL_BUFFER_HEADER_VIDEO_FLAG_TOP_FIELD_FIRST;
+        buf->type->video.flags &= ~MMAL_BUFFER_HEADER_VIDEO_FLAG_TOP_FIELD_FIRST;
+    }
+    buf->pts = pic->date != VLC_TICK_INVALID ? pic->date : MMAL_TIME_UNKNOWN;
+    buf->dts = buf->pts;
+}
+
+static inline void buf_to_pic_copy_props(picture_t * const pic, const MMAL_BUFFER_HEADER_T * const buf)
+{
+    // Contrary to docn the interlace & tff flags turn up in the header flags rather than the
+    // video specific flags (which appear to be currently unused).
+    pic->b_progressive = (buf->flags & MMAL_BUFFER_HEADER_VIDEO_FLAG_INTERLACED) == 0;
+    pic->b_top_field_first = (buf->flags & MMAL_BUFFER_HEADER_VIDEO_FLAG_TOP_FIELD_FIRST) != 0;
+
+    pic->date = buf->pts != MMAL_TIME_UNKNOWN ? buf->pts :
+        buf->dts != MMAL_TIME_UNKNOWN ? buf->dts :
+            VLC_TICK_INVALID;
+}
+
+// Retrieve buf from pic & update with pic props
+static inline MMAL_BUFFER_HEADER_T * pic_mmal_buffer(const picture_t *const pic)
+{
+    MMAL_BUFFER_HEADER_T * const buf = ((pic_ctx_mmal_t *)pic->context)->buf;
+    if (buf != NULL)
+        pic_to_buf_copy_props(buf, pic);
+
+    return buf;
+}
+
+
 
 #endif
