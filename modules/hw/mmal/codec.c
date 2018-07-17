@@ -65,6 +65,7 @@ typedef struct decoder_sys_t
     hw_mmal_port_pool_ref_t *ppr;
     MMAL_ES_FORMAT_T *output_format;
 
+    MMAL_STATUS_T err_stream;
     bool b_top_field_first;
     bool b_progressive;
 
@@ -223,6 +224,7 @@ static void control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 
     if (buffer->cmd == MMAL_EVENT_ERROR) {
         status = *(uint32_t *)buffer->data;
+        dec->p_sys->err_stream = status;
         msg_Err(dec, "MMAL error %"PRIx32" \"%s\"", status,
                 mmal_status_to_string(status));
     }
@@ -435,6 +437,12 @@ static int decode(decoder_t *dec, block_t *block)
 
     msg_Dbg(dec, "<<< %s: %lld/%lld", __func__, block == NULL ? -1LL : block->i_dts, block == NULL ? -1LL : block->i_pts);
 
+    if (sys->err_stream != MMAL_SUCCESS) {
+        msg_Err(dec, "MMAL error reported by ctrl");
+        flush_decoder(dec);
+        return VLCDEC_ECRITICAL;  /// I think they are all fatal
+    }
+
     /*
      * Configure output port if necessary
      */
@@ -603,6 +611,8 @@ static int OpenDecoder(decoder_t *dec)
 
     bcm_host_init();
 
+    sys->err_stream = MMAL_SUCCESS;
+
     status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_DECODER, &sys->component);
     if (status != MMAL_SUCCESS) {
         msg_Err(dec, "Failed to create MMAL component %s (status=%"PRIx32" %s)",
@@ -747,9 +757,8 @@ typedef struct filter_sys_t {
     bool b_top_field_first;
     bool b_progressive;
 
+    MMAL_STATUS_T err_stream;
     int in_count;
-
-    atomic_int out_port_count;
 } filter_sys_t;
 
 static void vlc_to_mmal_pic_fmt(MMAL_PORT_T * const port, const es_format_t * const es_vlc)
@@ -776,11 +785,14 @@ static void vlc_to_mmal_pic_fmt(MMAL_PORT_T * const port, const es_format_t * co
 
 static void conv_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
-    msg_Dbg((filter_t *)port->userdata, "%s: <<< cmd=%d, data=%p, pic=%p", __func__, buffer->cmd, buffer->data, buffer->user_data);
+    filter_t * const p_filter = (filter_t *)port->userdata;
+
+    msg_Dbg(p_filter, "%s: <<< cmd=%d, data=%p, pic=%p", __func__, buffer->cmd, buffer->data, buffer->user_data);
 
     if (buffer->cmd == MMAL_EVENT_ERROR) {
-        filter_t * const p_filter = (filter_t *)port->userdata;
         MMAL_STATUS_T status = *(uint32_t *)buffer->data;
+
+        p_filter->p_sys->err_stream = status;
 
         msg_Err(p_filter, "MMAL error %"PRIx32" \"%s\"", status,
                 mmal_status_to_string(status));
@@ -788,8 +800,6 @@ static void conv_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer
 
     mmal_buffer_header_release(buffer);
 }
-
-#include "../../../src/misc/picture.h"
 
 static void conv_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 {
@@ -808,9 +818,8 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 {
     filter_t * const p_filter = (filter_t *)port->userdata;
     filter_sys_t * const sys = p_filter->p_sys;
-    int n = atomic_fetch_sub(&sys->out_port_count, 1);
 
-    msg_Dbg(p_filter, "<<< %s[%d]: <<< cmd=%d, flags=%#x, pic=%p, data=%p, len=%d/%d, pts=%lld", __func__, n,
+    msg_Dbg(p_filter, "<<< %s: <<< cmd=%d, flags=%#x, pic=%p, data=%p, len=%d/%d, pts=%lld", __func__,
             buf->cmd, buf->flags, buf->user_data, buf->data, buf->length, buf->alloc_size, (long long)buf->pts);
 
     if (buf->cmd == 0) {
@@ -846,7 +855,38 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     mmal_buffer_header_release(buf);
 }
 
+static void conv_flush(filter_t * p_filter)
+{
+    filter_sys_t * const sys = p_filter->p_sys;
 
+    msg_Dbg(p_filter, "<<< %s", __func__);
+
+    if (sys->input != NULL && sys->input->is_enabled)
+        mmal_port_disable(sys->input);
+
+    if (sys->output != NULL && sys->output->is_enabled)
+        mmal_port_disable(sys->output);
+
+    // Free up anything we may have already lying around
+    // Don't need lock as the above disables should have prevented anything
+    // happening in the background
+    {
+        picture_t * ret_pics = sys->ret_pics;
+        sys->ret_pics = NULL;
+        sys->ret_pics_tail = NULL;
+
+        while (ret_pics != NULL) {
+            picture_t * const pic = ret_pics;
+            ret_pics = pic->p_next;
+            picture_Release(pic);
+            vlc_sem_wait(&sys->sem);  // Drain sem
+        }
+    }
+    // No buffers in either port now
+    sys->in_count = 0;
+
+    msg_Dbg(p_filter, ">>> %s", __func__);
+}
 
 static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 {
@@ -855,6 +895,12 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     MMAL_STATUS_T err;
 
     msg_Dbg(p_filter, "<<< %s", __func__);
+
+    if (sys->err_stream != MMAL_SUCCESS) {
+        msg_Err(p_filter, "MMAL error reported by ctrl");
+        conv_flush(p_filter);
+        goto fail;
+    }
 
     // Reenable stuff if the last thing we did was flush
     if (!sys->output->is_enabled &&
@@ -934,7 +980,10 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     }
 
     if (sys->in_count < 0)
+    {
+        msg_Err(p_filter, "Buffer count somehow negative");
         goto fail;
+    }
 
     // Avoid being more than 1 pic behind
     vlc_sem_wait(&sys->sem);
@@ -966,39 +1015,6 @@ fail:
     return NULL;
 }
 
-
-static void conv_flush(filter_t * p_filter)
-{
-    filter_sys_t * const sys = p_filter->p_sys;
-
-    msg_Dbg(p_filter, "<<< %s", __func__);
-
-    if (sys->input != NULL && sys->input->is_enabled)
-        mmal_port_disable(sys->input);
-
-    if (sys->output != NULL && sys->output->is_enabled)
-        mmal_port_disable(sys->output);
-
-    // Free up anything we may have already lying around
-    // Don't need lock as the above disables should have prevented anything
-    // happening in the background
-    {
-        picture_t * ret_pics = sys->ret_pics;
-        sys->ret_pics = NULL;
-        sys->ret_pics_tail = NULL;
-
-        while (ret_pics != NULL) {
-            picture_t * const pic = ret_pics;
-            ret_pics = pic->p_next;
-            picture_Release(pic);
-            vlc_sem_wait(&sys->sem);  // Drain sem
-        }
-    }
-    // No buffers in either port now
-    sys->in_count = 0;
-
-    msg_Dbg(p_filter, ">>> %s", __func__);
-}
 
 static void CloseConverter(vlc_object_t * obj)
 {
@@ -1049,6 +1065,7 @@ static int conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, 
     if (pic != NULL) {
         unsigned int bpp = (pic->format.i_bits_per_pixel + 7) >> 3;
         sys->output->format->es->video.width = pic->p[0].i_pitch / bpp;
+        sys->output->format->es->video.height = pic->p[0].i_lines;
     }
 
     mmal_log_dump_format(sys->output->format);
@@ -1098,6 +1115,7 @@ static int OpenConverter(vlc_object_t * obj)
     p_filter->p_sys = sys;
 
     vlc_mutex_init(&sys->lock);
+    sys->err_stream = MMAL_SUCCESS;
 
     status = mmal_component_create(MMAL_COMPONENT_ISP_RESIZER, &sys->component);
     if (status != MMAL_SUCCESS) {

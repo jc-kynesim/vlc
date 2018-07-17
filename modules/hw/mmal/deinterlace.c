@@ -58,11 +58,8 @@ typedef struct filter_sys_t
 
     MMAL_QUEUE_T * out_q;
 
-    int in_flight;
-
-    // Debug counts
-    unsigned int in_cb_cnt;
-    unsigned int out_cb_cnt;
+    unsigned int seq_in;
+    unsigned int seq_out;
 } filter_sys_t;
 
 
@@ -103,10 +100,9 @@ fail1:
 static void di_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
     pic_ctx_mmal_t * ctx = buffer->user_data;
-    filter_sys_t *const sys = ((filter_t *)port->userdata)->p_sys;
+//    filter_sys_t *const sys = ((filter_t *)port->userdata)->p_sys;
 
-    ++sys->in_cb_cnt;
-    msg_Dbg((filter_t *)port->userdata, "<<< %s[%d] cmd=%d, ctx=%p, buf=%p, flags=%#x, pts=%lld", __func__, sys->in_cb_cnt, buffer->cmd, ctx, buffer,
+    msg_Dbg((filter_t *)port->userdata, "<<< %s: cmd=%d, ctx=%p, buf=%p, flags=%#x, pts=%lld", __func__, buffer->cmd, ctx, buffer,
             buffer->flags, (long long)buffer->pts);
 
     mmal_buffer_header_release(buffer);
@@ -122,9 +118,8 @@ static void di_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
         // but might not on later flushes as we shut down
         filter_t * const p_filter = (filter_t *)port->userdata;
         filter_sys_t * const sys = p_filter->p_sys;
-        ++sys->out_cb_cnt;
 
-        msg_Dbg(p_filter, "<<< %s[%d]: cmd=%d; flags=%#x, pts=%lld", __func__, sys->out_cb_cnt, buf->cmd, buf->flags, (long long) buf->pts);
+        msg_Dbg(p_filter, "<<< %s: cmd=%d; flags=%#x, pts=%lld", __func__, buf->cmd, buf->flags, (long long) buf->pts);
         mmal_queue_put(sys->out_q, buf);
         msg_Dbg(p_filter, ">>> %s: out Q len=%d", __func__, mmal_queue_length(sys->out_q));
     }
@@ -150,6 +145,16 @@ static MMAL_STATUS_T fill_output_from_q(filter_t * const p_filter, filter_sys_t 
         }
     }
     return MMAL_SUCCESS;
+}
+
+static inline unsigned int seq_inc(unsigned int x)
+{
+    return x + 1 >= 16 ? 1 : x + 1;
+}
+
+static inline unsigned int seq_delta(unsigned int sseq, unsigned int fseq)
+{
+    return fseq == 0 ? 0 : fseq <= sseq ? sseq - fseq : 15 - (fseq - sseq);
 }
 
 static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
@@ -193,17 +198,16 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
 
         picture_Release(p_pic);
 
-        buf->flags &= ~MMAL_BUFFER_HEADER_FLAG_USER0;
-        if ((buf->flags & MMAL_BUFFER_HEADER_VIDEO_FLAG_INTERLACED) != 0)
-            buf->flags |= MMAL_BUFFER_HEADER_FLAG_USER0;
+        // Add a sequence to the flags so we can track what we have actually
+        // deinterlaced
+        buf->flags = (buf->flags & ~(0xfU * MMAL_BUFFER_HEADER_FLAG_USER0)) | (sys->seq_in * (MMAL_BUFFER_HEADER_FLAG_USER0));
+        sys->seq_in = seq_inc(sys->seq_in);
 
         if ((err = mmal_port_send_buffer(sys->input, buf)) != MMAL_SUCCESS)
         {
             msg_Err(p_filter, "Send buffer to input failed");
             goto fail;
         }
-
-        sys->in_flight += 2;  // We expect 2 frames out for interlaced - 1 otherwise
     }
 
     // Return anything that is in the out Q
@@ -211,10 +215,13 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
         MMAL_BUFFER_HEADER_T * out_buf;
         picture_t ** pp_pic = &ret_pics;
 
-        while ((out_buf = (sys->in_flight > 6 ? mmal_queue_wait(sys->out_q) : mmal_queue_get(sys->out_q))) != NULL)
+        // Advanced di has a 3 frame latency, so if the seq delta is greater
+        // than that then we are expecting at least two frames of output. Wait
+        // for one of those.
+        while ((out_buf = (seq_delta(sys->seq_in, sys->seq_out) > 3 ? mmal_queue_wait(sys->out_q) : mmal_queue_get(sys->out_q))) != NULL)
         {
             picture_t * const out_pic = di_alloc_opaque(p_filter, out_buf);
-            const bool was_interlaced = (out_buf->flags & MMAL_BUFFER_HEADER_FLAG_USER0) != 0;
+            const unsigned int seq_out = (out_buf->flags / MMAL_BUFFER_HEADER_FLAG_USER0) & 0xf;
 
             if (out_pic == NULL) {
                 msg_Warn(p_filter, "Failed to alloc new filter output pic");
@@ -222,11 +229,15 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
                 break;
             }
 
-            msg_Dbg(p_filter, "-- %s: Q pic=%p: IL=%d", __func__, out_pic, was_interlaced);
+            msg_Dbg(p_filter, "-- %s: Q pic=%p: seq_in=%d, seq_out=%d, delta=%d", __func__, out_pic, sys->seq_in, seq_out, seq_delta(sys->seq_in, seq_out));
 
             *pp_pic = out_pic;
             pp_pic = &out_pic->p_next;
-            sys->in_flight -= was_interlaced ? 1 : 2;
+
+            // Ignore 0 seqs
+            // Don't think these should actually happen
+            if (seq_out != 0)
+                sys->seq_out = seq_out;
         }
     }
 
@@ -268,11 +279,9 @@ static void di_flush(filter_t *p_filter)
         // Leaving the input disabled is fine - but we want to leave the output enabled
         // so we can retrieve buffers that are still bound to pictures
     }
-    // No buffers in either port now
-    sys->in_flight = 0;
 
-    sys->in_cb_cnt = 0;
-    sys->out_cb_cnt = 0;
+    sys->seq_in = 1;
+    sys->seq_out = 1;
 
     msg_Dbg(p_filter, ">>> %s", __func__);
 }
@@ -360,6 +369,9 @@ static int OpenMmalDeinterlace(filter_t *filter)
     if (!sys)
         return VLC_ENOMEM;
     filter->p_sys = sys;
+
+    sys->seq_in = 1;
+    sys->seq_out = 1;
 
     bcm_host_init();
 
