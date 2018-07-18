@@ -41,6 +41,8 @@
 
 #include "mmal_picture.h"
 
+#define TRACE_ALL 0
+
 /*
  * This seems to be a bit high, but reducing it causes instabilities
  */
@@ -90,6 +92,7 @@ static supported_mmal_enc_t supported_mmal_enc =
     -1
 };
 
+#if TRACE_ALL
 static const char * str_fourcc(char * buf, unsigned int fcc)
 {
     if (fcc == 0)
@@ -101,7 +104,7 @@ static const char * str_fourcc(char * buf, unsigned int fcc)
     buf[4] = 0;
     return buf;
 }
-
+#endif
 
 static bool is_enc_supported(const MMAL_FOURCC_T fcc)
 {
@@ -203,7 +206,9 @@ static picture_t * alloc_opaque_pic(decoder_t * const dec, MMAL_BUFFER_HEADER_T 
     buf_to_pic_copy_props(pic, buf);
     pic->b_force = true;
 
+#if TRACE_ALL
     msg_Dbg(dec, "pic: prog=%d, tff=%d, date=%lld", pic->b_progressive, pic->b_top_field_first, (long long)pic->date);
+#endif
 
     return pic;
 
@@ -220,7 +225,9 @@ static void control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
     decoder_t *dec = (decoder_t *)port->userdata;
     MMAL_STATUS_T status;
 
+#if TRACE_ALL
     msg_Dbg(dec, "<<< %s: cmd=%d, data=%p", __func__, buffer->cmd, buffer->data);
+#endif
 
     if (buffer->cmd == MMAL_EVENT_ERROR) {
         status = *(uint32_t *)buffer->data;
@@ -238,8 +245,10 @@ static void input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 
     (void)port;  // Unused
 
+#if TRACE_ALL
     msg_Dbg((decoder_t *)port->userdata, "<<< %s: cmd=%d, data=%p, len=%d/%d, pts=%lld", __func__,
             buffer->cmd, buffer->data, buffer->length, buffer->alloc_size, (long long)buffer->pts);
+#endif
 
     mmal_buffer_header_reset(buffer);
     mmal_buffer_header_release(buffer);
@@ -256,11 +265,15 @@ static void output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
     {
         decoder_t * const dec = (decoder_t *)port->userdata;
 
+#if TRACE_ALL
         msg_Dbg((decoder_t *)port->userdata, "<<< %s: cmd=%d, data=%p, len=%d/%d, pts=%lld", __func__,
                 buffer->cmd, buffer->data, buffer->length, buffer->alloc_size, (long long)buffer->pts);
+#endif
 
         picture_t *pic = alloc_opaque_pic(dec, buffer);
+#if TRACE_ALL
         msg_Dbg(dec, "flags=%#x, video flags=%#x", buffer->flags, buffer->type->video.flags);
+#endif
         if (pic == NULL)
             msg_Err(dec, "Failed to allocate new picture");
         else
@@ -304,7 +317,9 @@ static void fill_output_port(decoder_t *dec)
     {
         // If we have a new format don't bother stuffing the buffer
         // We should get a reset RSN
+#if TRACE_ALL
         msg_Dbg(dec, "%s: Updated", __func__);
+#endif
 
         return;
     }
@@ -320,7 +335,9 @@ static int change_output_format(decoder_t *dec)
     MMAL_STATUS_T status;
     int ret = 0;
 
+#if TRACE_ALL
     msg_Dbg(dec, "%s: <<<", __func__);
+#endif
 
     if (atomic_load(&sys->started)) {
         mmal_format_full_copy(sys->output->format, sys->output_format);
@@ -335,7 +352,9 @@ static int change_output_format(decoder_t *dec)
     }
 
 port_reset:
+#if TRACE_ALL
     msg_Dbg(dec, "%s: Do full port reset", __func__);
+#endif
     status = mmal_port_disable(sys->output);
     if (status != MMAL_SUCCESS) {
         msg_Err(dec, "Failed to disable output port (status=%"PRIx32" %s)",
@@ -370,7 +389,9 @@ port_reset:
         /* we need one picture from vout for each buffer header on the output
          * port */
         dec->i_extra_picture_buffers = 10;
+#if TRACE_ALL
         msg_Dbg(dec, "Request %d extra pictures", dec->i_extra_picture_buffers);
+#endif
     }
 
 apply_fmt:
@@ -396,10 +417,12 @@ apply_fmt:
         sys->b_progressive = (interlace_type.eMode == MMAL_InterlaceProgressive);
         sys->b_top_field_first = sys->b_progressive ? true :
             (interlace_type.eMode == MMAL_InterlaceFieldsInterleavedUpperFirst);
+#if TRACE_ALL
         msg_Dbg(dec, "Detected %s%s video (%d)",
                 sys->b_progressive ? "progressive" : "interlaced",
                 sys->b_progressive ? "" : (sys->b_top_field_first ? " tff" : " bff"),
                 interlace_type.eMode);
+#endif
     }
 
 out:
@@ -414,7 +437,9 @@ static void flush_decoder(decoder_t *dec)
 {
     decoder_sys_t *const sys = dec->p_sys;
 
+#if TRACE_ALL
     msg_Dbg(dec, "%s: <<<", __func__);
+#endif
 
     if (!sys->b_flushed) {
         mmal_port_disable(sys->input);
@@ -424,7 +449,9 @@ static void flush_decoder(decoder_t *dec)
         mmal_port_enable(sys->output, output_port_cb);
         sys->b_flushed = true;
     }
+#if TRACE_ALL
     msg_Dbg(dec, "%s: >>>", __func__);
+#endif
 }
 
 static int decode(decoder_t *dec, block_t *block)
@@ -435,7 +462,9 @@ static int decode(decoder_t *dec, block_t *block)
     uint32_t flags = 0;
     MMAL_STATUS_T status;
 
+#if TRACE_ALL
     msg_Dbg(dec, "<<< %s: %lld/%lld", __func__, block == NULL ? -1LL : block->i_dts, block == NULL ? -1LL : block->i_pts);
+#endif
 
     if (sys->err_stream != MMAL_SUCCESS) {
         msg_Err(dec, "MMAL error reported by ctrl");
@@ -458,7 +487,9 @@ static int decode(decoder_t *dec, block_t *block)
      * Check whether full flush is required
      */
     if (block->i_flags & BLOCK_FLAG_DISCONTINUITY) {
+#if TRACE_ALL
         msg_Dbg(dec, "%s: >>> Discontinuity", __func__);
+#endif
         flush_decoder(dec);
     }
 
@@ -525,7 +556,9 @@ static int decode(decoder_t *dec, block_t *block)
         }
         buffer->flags = flags;
 
+#if TRACE_ALL
         msg_Dbg(dec, "%s: -- Send buffer: len=%d", __func__, len);
+#endif
         status = mmal_port_send_buffer(sys->input, buffer);
         if (status != MMAL_SUCCESS) {
             msg_Err(dec, "Failed to send buffer to input port (status=%"PRIx32" %s)",
@@ -549,7 +582,9 @@ static void CloseDecoder(decoder_t *dec)
 {
     decoder_sys_t *sys = dec->p_sys;
 
+#if TRACE_ALL
     msg_Dbg(dec, "%s: <<<", __func__);
+#endif
 
     if (!sys)
         return;
@@ -586,6 +621,7 @@ static int OpenDecoder(decoder_t *dec)
     MMAL_STATUS_T status;
     const MMAL_FOURCC_T in_fcc = vlc_to_mmal_es_fourcc(dec->fmt_in.i_codec);
 
+#if TRACE_ALL
     {
         char buf1[5], buf2[5], buf2a[5];
         char buf3[5], buf4[5];
@@ -598,6 +634,7 @@ static int OpenDecoder(decoder_t *dec)
                 str_fourcc(buf4, dec->fmt_out.video.i_chroma),
                 dec->fmt_out.video.i_width, dec->fmt_out.video.i_height);
     }
+#endif
 
     if (!is_enc_supported(in_fcc))
         return VLC_EGENERIC;
@@ -625,8 +662,10 @@ static int OpenDecoder(decoder_t *dec)
     sys->input->format->encoding = in_fcc;
 
     if (!set_and_test_enc_supported(sys->input, in_fcc)) {
+#if TRACE_ALL
         char cbuf[5];
         msg_Dbg(dec, "Format not supported: %s", str_fourcc(cbuf, in_fcc));
+#endif
         goto fail;
     }
 
@@ -730,12 +769,16 @@ static int OpenDecoder(decoder_t *dec)
     dec->pf_decode = decode;
     dec->pf_flush  = flush_decoder;
 
+#if TRACE_ALL
     msg_Dbg(dec, ">>> %s: ok", __func__);
+#endif
     return 0;
 
 fail:
     CloseDecoder(dec);
-    msg_Dbg(dec, ">>> %s: FAIL: ret=%d", __func__, ret);
+#if TRACE_ALL
+msg_Dbg(dec, ">>> %s: FAIL: ret=%d", __func__, ret);
+#endif
     return ret;
 }
 
@@ -787,7 +830,9 @@ static void conv_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer
 {
     filter_t * const p_filter = (filter_t *)port->userdata;
 
+#if TRACE_ALL
     msg_Dbg(p_filter, "%s: <<< cmd=%d, data=%p, pic=%p", __func__, buffer->cmd, buffer->data, buffer->user_data);
+#endif
 
     if (buffer->cmd == MMAL_EVENT_ERROR) {
         MMAL_STATUS_T status = *(uint32_t *)buffer->data;
@@ -803,15 +848,21 @@ static void conv_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer
 
 static void conv_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 {
+#if TRACE_ALL
     picture_context_t * ctx = buf->user_data;
 //    filter_sys_t *const sys = ((filter_t *)port->userdata)->p_sys;
 
     msg_Dbg((filter_t *)port->userdata, "<<< %s cmd=%d, ctx=%p, buf=%p, flags=%#x, len=%d/%d, pts=%lld",
             __func__, buf->cmd, ctx, buf, buf->flags, buf->length, buf->alloc_size, (long long)buf->pts);
+#else
+    VLC_UNUSED(port);
+#endif
 
     mmal_buffer_header_release(buf);
 
+#if TRACE_ALL
     msg_Dbg((filter_t *)port->userdata, ">>> %s", __func__);
+#endif
 }
 
 static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
@@ -819,8 +870,10 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     filter_t * const p_filter = (filter_t *)port->userdata;
     filter_sys_t * const sys = p_filter->p_sys;
 
+#if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s: <<< cmd=%d, flags=%#x, pic=%p, data=%p, len=%d/%d, pts=%lld", __func__,
             buf->cmd, buf->flags, buf->user_data, buf->data, buf->length, buf->alloc_size, (long long)buf->pts);
+#endif
 
     if (buf->cmd == 0) {
         picture_t * const pic = (picture_t *)buf->user_data;
@@ -830,7 +883,9 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
         }
         else if (buf->data == NULL || buf->length == 0)
         {
+#if TRACE_ALL
             msg_Dbg(p_filter, "%s: Buffer has no data", __func__);
+#endif
             picture_Release(pic);
         }
         else
@@ -859,7 +914,9 @@ static void conv_flush(filter_t * p_filter)
 {
     filter_sys_t * const sys = p_filter->p_sys;
 
+#if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s", __func__);
+#endif
 
     if (sys->input != NULL && sys->input->is_enabled)
         mmal_port_disable(sys->input);
@@ -885,7 +942,9 @@ static void conv_flush(filter_t * p_filter)
     // No buffers in either port now
     sys->in_count = 0;
 
+#if TRACE_ALL
     msg_Dbg(p_filter, ">>> %s", __func__);
+#endif
 }
 
 static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
@@ -894,7 +953,9 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     picture_t * ret_pics;
     MMAL_STATUS_T err;
 
+#if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s", __func__);
+#endif
 
     if (sys->err_stream != MMAL_SUCCESS) {
         msg_Err(p_filter, "MMAL error reported by ctrl");
@@ -929,8 +990,10 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             goto fail;
         }
 
+#if TRACE_ALL
         msg_Dbg(p_filter, "In buf send: pic=%p, buf=%p/%p, ctx=%p, flags=%#x, len=%d/%d, pts=%lld",
                 p_pic, pic_buf, buf, pic_buf->user_data, buf->flags, buf->length, buf->alloc_size, (long long)buf->pts);
+#endif
 
         picture_Release(p_pic);
 
@@ -964,9 +1027,11 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             out_buf->alloc_size = out_pic->p[0].i_pitch * out_pic->p[0].i_lines;
             //**** stride ????
 
+#if TRACE_ALL
             msg_Dbg(p_filter, "Out buf send: pic=%p, buf=%p, flags=%#x, len=%d/%d, pts=%lld",
                     p_pic, out_buf->user_data, out_buf->flags,
                     out_buf->length, out_buf->alloc_size, (long long)out_buf->pts);
+#endif
 
             if ((err = mmal_port_send_buffer(sys->output, out_buf)) != MMAL_SUCCESS)
             {
@@ -1006,7 +1071,9 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         }
     }
 
+#if TRACE_ALL
     msg_Dbg(p_filter, ">>> %s: pic=%p", __func__, ret_pics);
+#endif
 
     return ret_pics;
 
@@ -1021,7 +1088,9 @@ static void CloseConverter(vlc_object_t * obj)
     filter_t * const p_filter = (filter_t *)obj;
     filter_sys_t * const sys = p_filter->p_sys;
 
+#if TRACE_ALL
     msg_Dbg(obj, "<<< %s", __func__);
+#endif
 
     if (sys == NULL)
         return;
@@ -1098,10 +1167,12 @@ static int OpenConverter(vlc_object_t * obj)
     MMAL_FOURCC_T enc_out;
     const MMAL_FOURCC_T enc_in = MMAL_ENCODING_OPAQUE;
 
+#if TRACE_ALL
     char dbuf0[5], dbuf1[5];
     msg_Dbg(p_filter, "%s: %s,%dx%d->%s,%dx%d", __func__,
             str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_height, p_filter->fmt_in.video.i_width,
             str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_height, p_filter->fmt_out.video.i_width);
+#endif
 
     if (enc_in != vlc_to_mmal_pic_fourcc(p_filter->fmt_in.i_codec) ||
         (enc_out = vlc_to_mmal_pic_fourcc(p_filter->fmt_out.i_codec)) == 0)
@@ -1183,13 +1254,17 @@ static int OpenConverter(vlc_object_t * obj)
     p_filter->pf_flush = conv_flush;
     // video_drain NIF in filter structure
 
+#if TRACE_ALL
     msg_Dbg(p_filter, ">>> %s: ok", __func__);
+#endif
 
     return VLC_SUCCESS;
 
 fail:
     CloseConverter(obj);
-    msg_Dbg(p_filter, ">>> %s: FAIL: %d", __func__, ret);
+#if TRACE_ALL
+msg_Dbg(p_filter, ">>> %s: FAIL: %d", __func__, ret);
+#endif
     return ret;
 }
 

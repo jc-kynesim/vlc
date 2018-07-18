@@ -65,6 +65,8 @@ typedef struct filter_sys_t
 
 #define MMAL_COMPONENT_DEFAULT_DEINTERLACE "vc.ril.image_fx"
 
+#define TRACE_ALL 0
+
 
 
 // Buffer either attached to pic or released
@@ -86,7 +88,9 @@ static picture_t * di_alloc_opaque(filter_t * const p_filter, MMAL_BUFFER_HEADER
 
     buf_to_pic_copy_props(pic, buf);
 
+#if TRACE_ALL
     msg_Dbg(p_filter, "pic: prog=%d, tff=%d, date=%lld", pic->b_progressive, pic->b_top_field_first, (long long)pic->date);
+#endif
 
     return pic;
 
@@ -99,15 +103,21 @@ fail1:
 
 static void di_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
+#if TRACE_ALL
     pic_ctx_mmal_t * ctx = buffer->user_data;
 //    filter_sys_t *const sys = ((filter_t *)port->userdata)->p_sys;
 
     msg_Dbg((filter_t *)port->userdata, "<<< %s: cmd=%d, ctx=%p, buf=%p, flags=%#x, pts=%lld", __func__, buffer->cmd, ctx, buffer,
             buffer->flags, (long long)buffer->pts);
+#else
+    VLC_UNUSED(port);
+#endif
 
     mmal_buffer_header_release(buffer);
 
+#if TRACE_ALL
     msg_Dbg((filter_t *)port->userdata, ">>> %s", __func__);
+#endif
 }
 
 static void di_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
@@ -119,9 +129,13 @@ static void di_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
         filter_t * const p_filter = (filter_t *)port->userdata;
         filter_sys_t * const sys = p_filter->p_sys;
 
+#if TRACE_ALL
         msg_Dbg(p_filter, "<<< %s: cmd=%d; flags=%#x, pts=%lld", __func__, buf->cmd, buf->flags, (long long) buf->pts);
+#endif
         mmal_queue_put(sys->out_q, buf);
+#if TRACE_ALL
         msg_Dbg(p_filter, ">>> %s: out Q len=%d", __func__, mmal_queue_length(sys->out_q));
+#endif
     }
     else
     {
@@ -163,7 +177,9 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
     picture_t *ret_pics = NULL;
     MMAL_STATUS_T err;
 
+#if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s", __func__);
+#endif
 
     // Reenable stuff if the last thing we did was flush
     // Output should always be enabled
@@ -193,8 +209,10 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
             goto fail;
         }
 
+#if TRACE_ALL
         msg_Dbg(p_filter, "In buf send: pic=%p, buf=%p/%p, ctx=%p, flags=%#x, len=%d/%d, pts=%lld",
                 p_pic, pic_buf, buf, pic_buf->user_data, buf->flags, buf->length, buf->alloc_size, (long long)buf->pts);
+#endif
 
         picture_Release(p_pic);
 
@@ -229,7 +247,9 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
                 break;
             }
 
+#if TRACE_ALL
             msg_Dbg(p_filter, "-- %s: Q pic=%p: seq_in=%d, seq_out=%d, delta=%d", __func__, out_pic, sys->seq_in, seq_out, seq_delta(sys->seq_in, seq_out));
+#endif
 
             *pp_pic = out_pic;
             pp_pic = &out_pic->p_next;
@@ -241,7 +261,9 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
         }
     }
 
+#if TRACE_ALL
     msg_Dbg(p_filter, ">>> %s: pic=%p", __func__, ret_pics);
+#endif
 
     return ret_pics;
 
@@ -254,7 +276,9 @@ static void di_flush(filter_t *p_filter)
 {
     filter_sys_t * const sys = p_filter->p_sys;
 
+#if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s", __func__);
+#endif
 
     if (sys->input != NULL && sys->input->is_enabled)
         mmal_port_disable(sys->input);
@@ -283,7 +307,9 @@ static void di_flush(filter_t *p_filter)
     sys->seq_in = 1;
     sys->seq_out = 1;
 
+#if TRACE_ALL
     msg_Dbg(p_filter, ">>> %s", __func__);
+#endif
 }
 
 static void control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
@@ -305,7 +331,9 @@ static void CloseMmalDeinterlace(filter_t *filter)
 {
     filter_sys_t * const sys = filter->p_sys;
 
+#if TRACE_ALL
     msg_Dbg(filter, "<<< %s", __func__);
+#endif
 
     if (!sys)
         return;
@@ -356,8 +384,10 @@ static int OpenMmalDeinterlace(filter_t *filter)
     MMAL_STATUS_T status;
     filter_sys_t *sys;
 
+#if TRACE_ALL
     msg_Dbg(filter, "Try to open mmal_deinterlace filter. frame_duration: %d, QPU %s!",
             frame_duration, use_qpu ? "used" : "unused");
+#endif
 
     if (filter->fmt_in.video.i_chroma != VLC_CODEC_MMAL_OPAQUE)
         return VLC_EGENERIC;

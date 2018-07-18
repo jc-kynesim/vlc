@@ -56,10 +56,12 @@ static void do_detached(void *(*fn)(void *), void * v)
     pthread_detach(dothread);
 }
 
-// Destroy a ppr - arranged s.t. it has the correct prototype for a pthread
+// Destroy a ppr - aranged s.t. it has the correct prototype for a pthread
 static void * kill_ppr(void * v)
 {
     hw_mmal_port_pool_ref_t * const ppr = v;
+    if (ppr->port->is_enabled)
+        mmal_port_disable(ppr->port);  // Avoid annoyed messages from MMAL when we kill the pool
     mmal_port_pool_destroy(ppr->port, ppr->pool);
     free(ppr);
     return NULL;
