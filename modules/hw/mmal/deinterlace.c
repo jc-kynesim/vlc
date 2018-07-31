@@ -54,7 +54,6 @@ typedef struct filter_sys_t
     MMAL_PORT_T *output;
     MMAL_POOL_T *in_pool;
     hw_mmal_port_pool_ref_t *out_ppr;
-    vlc_sem_t sem;
 
     MMAL_QUEUE_T * out_q;
 
@@ -359,7 +358,6 @@ static void CloseMmalDeinterlace(filter_t *filter)
     if (sys->component)
         mmal_component_release(sys->component);
 
-    vlc_sem_destroy(&sys->sem);
     free(sys);
 
     bcm_host_deinit();
@@ -530,8 +528,6 @@ static int OpenMmalDeinterlace(filter_t *filter)
 
     filter->pf_video_filter = deinterlace;
     filter->pf_flush = di_flush;
-
-    vlc_sem_init(&sys->sem, 5);
     return 0;
 
 fail:

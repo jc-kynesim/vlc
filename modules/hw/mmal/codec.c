@@ -54,9 +54,17 @@
 #define MMAL_COMPONENT_DEFAULT_RESIZER "vc.ril.resize"
 #define MMAL_COMPONENT_ISP_RESIZER "vc.ril.isp"
 
+#define MMAL_SLICE_HEIGHT 16
+#define MMAL_ALIGN_W      32
+#define MMAL_ALIGN_H      16
+
 #define MMAL_OPAQUE_NAME "mmal-opaque"
 #define MMAL_OPAQUE_TEXT N_("Decode frames directly into RPI VideoCore instead of host memory.")
 #define MMAL_OPAQUE_LONGTEXT N_("Decode frames directly into RPI VideoCore instead of host memory. This option must only be used with the MMAL video output plugin.")
+
+#define MMAL_RESIZE_NAME "mmal-resize"
+#define MMAL_RESIZE_TEXT N_("Use mmal resizer rather than isp.")
+#define MMAL_RESIZE_LONGTEXT N_("Use mmal resizer rather than isp. This uses less gpu memory than the ISP but is slower.")
 
 typedef struct decoder_sys_t
 {
@@ -92,7 +100,7 @@ static supported_mmal_enc_t supported_mmal_enc =
     -1
 };
 
-#if TRACE_ALL
+#if TRACE_ALL || 1
 static const char * str_fourcc(char * buf, unsigned int fcc)
 {
     if (fcc == 0)
@@ -184,6 +192,40 @@ static MMAL_FOURCC_T vlc_to_mmal_pic_fourcc(const unsigned int fcc)
     }
     return 0;
 }
+
+static MMAL_FOURCC_T pic_to_slice_mmal_fourcc(const MMAL_FOURCC_T fcc)
+{
+    switch (fcc){
+    case MMAL_ENCODING_I420:
+        return MMAL_ENCODING_I420_SLICE;
+    case MMAL_ENCODING_I422:
+        return MMAL_ENCODING_I422_SLICE;
+    case MMAL_ENCODING_ARGB:
+        return MMAL_ENCODING_ARGB_SLICE;
+    case MMAL_ENCODING_RGBA:
+        return MMAL_ENCODING_RGBA_SLICE;
+    case MMAL_ENCODING_ABGR:
+        return MMAL_ENCODING_ABGR_SLICE;
+    case MMAL_ENCODING_BGRA:
+        return MMAL_ENCODING_BGRA_SLICE;
+    case MMAL_ENCODING_RGB16:
+        return MMAL_ENCODING_RGB16_SLICE;
+    case MMAL_ENCODING_RGB24:
+        return MMAL_ENCODING_RGB24_SLICE;
+    case MMAL_ENCODING_RGB32:
+        return MMAL_ENCODING_RGB32_SLICE;
+    case MMAL_ENCODING_BGR16:
+        return MMAL_ENCODING_BGR16_SLICE;
+    case MMAL_ENCODING_BGR24:
+        return MMAL_ENCODING_BGR24_SLICE;
+    case MMAL_ENCODING_BGR32:
+        return MMAL_ENCODING_BGR32_SLICE;
+    default:
+        break;
+    }
+    return 0;
+}
+
 
 
 // Buffer either attached to pic or released
@@ -802,15 +844,53 @@ typedef struct filter_sys_t {
 
     MMAL_STATUS_T err_stream;
     int in_count;
+
+    bool zero_copy;
+    const char * component_name;
+    MMAL_PORT_BH_CB_T in_port_cb_fn;
+    MMAL_PORT_BH_CB_T out_port_cb_fn;
+
+    // Slice specific tracking stuff
+    struct {
+        picture_t * pic;
+        unsigned int line;  // Lines filled
+    } slice;
+
 } filter_sys_t;
+
+static MMAL_STATUS_T conv_enable_in(filter_t * const p_filter, filter_sys_t * const sys)
+{
+    MMAL_STATUS_T err = MMAL_SUCCESS;
+
+    if (!sys->input->is_enabled &&
+        (err = mmal_port_enable(sys->input, sys->in_port_cb_fn)) != MMAL_SUCCESS)
+    {
+        msg_Err(p_filter, "Failed to enable input port %s (status=%"PRIx32" %s)",
+                sys->input->name, err, mmal_status_to_string(err));
+    }
+    return err;
+}
+
+static MMAL_STATUS_T conv_enable_out(filter_t * const p_filter, filter_sys_t * const sys)
+{
+    MMAL_STATUS_T err = MMAL_SUCCESS;
+
+    if (!sys->output->is_enabled &&
+        (err = mmal_port_enable(sys->output, sys->out_port_cb_fn)) != MMAL_SUCCESS)
+    {
+        msg_Err(p_filter, "Failed to enable output port %s (status=%"PRIx32" %s)",
+                sys->output->name, err, mmal_status_to_string(err));
+    }
+    return err;
+}
 
 static void vlc_to_mmal_pic_fmt(MMAL_PORT_T * const port, const es_format_t * const es_vlc)
 {
     const video_format_t *const vf_vlc = &es_vlc->video;
     MMAL_VIDEO_FORMAT_T * vf_mmal = &port->format->es->video;
 
-    vf_mmal->width          = vf_vlc->i_width;
-    vf_mmal->height         = vf_vlc->i_height;
+    vf_mmal->width          = (vf_vlc->i_width + 31) & ~31;
+    vf_mmal->height         = (vf_vlc->i_height + 15) & ~15;;
     vf_mmal->crop.x         = vf_vlc->i_x_offset;
     vf_mmal->crop.y         = vf_vlc->i_y_offset;
     vf_mmal->crop.width     = vf_vlc->i_visible_width;
@@ -865,6 +945,21 @@ static void conv_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 #endif
 }
 
+static void conv_out_q_pic(filter_sys_t * const sys, picture_t * const pic)
+{
+    pic->p_next = NULL;
+
+    vlc_mutex_lock(&sys->lock);
+    if (sys->ret_pics_tail == NULL)
+        sys->ret_pics = pic;
+    else
+        sys->ret_pics_tail->p_next = pic;
+    sys->ret_pics_tail = pic;
+    vlc_mutex_unlock(&sys->lock);
+
+    vlc_sem_post(&sys->sem);
+}
+
 static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 {
     filter_t * const p_filter = (filter_t *)port->userdata;
@@ -891,24 +986,88 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
         else
         {
             buf_to_pic_copy_props(pic, buf);
-
-            pic->p_next = NULL;
-
-            vlc_mutex_lock(&sys->lock);
-            if (sys->ret_pics_tail == NULL)
-                sys->ret_pics = pic;
-            else
-                sys->ret_pics_tail->p_next = pic;
-            sys->ret_pics_tail = pic;
-            vlc_mutex_unlock(&sys->lock);
-
-            vlc_sem_post(&sys->sem);
+            conv_out_q_pic(sys, pic);
         }
     }
 
     buf->user_data = NULL; // Zap here to make sure we can't reuse later
     mmal_buffer_header_release(buf);
 }
+
+
+static void slice_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
+{
+    filter_t * const p_filter = (filter_t *)port->userdata;
+    filter_sys_t * const sys = p_filter->p_sys;
+
+#if TRACE_ALL
+    msg_Dbg(p_filter, "<<< %s: <<< cmd=%d, flags=%#x, pic=%p, data=%p, len=%d/%d, pts=%lld", __func__,
+            buf->cmd, buf->flags, buf->user_data, buf->data, buf->length, buf->alloc_size, (long long)buf->pts);
+#endif
+
+    if (buf->cmd != 0)
+    {
+        mmal_buffer_header_release(buf);
+        return;
+    }
+
+    if (buf->data == NULL || buf->length == 0)
+    {
+#if TRACE_ALL
+        msg_Dbg(p_filter, "%s: Buffer has no data", __func__);
+#endif
+    }
+    else
+    {
+        // Got slice
+        picture_t * pic = sys->slice.pic;
+
+        if (pic == NULL) {
+            pic = sys->slice.pic = filter_NewPicture(p_filter);
+            sys->slice.line = 0;
+        }
+
+        // Copy lines
+        // * single plane only - fix for I420
+        {
+            const unsigned int n = __MIN(pic->p[0].i_lines - sys->slice.line, MMAL_SLICE_HEIGHT);
+            const unsigned int src_stride = buf->type->video.pitch[0];
+            const unsigned int dst_stride = pic->p[0].i_pitch;
+            uint8_t *dst = pic->p[0].p_pixels + sys->slice.line * pic->p[0].i_pitch;
+            const uint8_t *src = buf->data + buf->type->video.offset[0] + sys->slice.line * buf->type->video.pitch[0];
+
+            if (src_stride == dst_stride) {
+                memcpy(dst, src, src_stride * n);
+            }
+            else {
+                unsigned int i;
+                for (i = 0; i != n; ++i) {
+                    memcpy(dst, src, __MIN(dst_stride, src_stride));
+                    dst += dst_stride;
+                    src += src_stride;
+                }
+            }
+            sys->slice.line += n;
+        }
+
+        if ((buf->flags & MMAL_BUFFER_HEADER_FLAG_FRAME_END) != 0 || sys->slice.line >= (unsigned int)pic->p[0].i_lines) {
+
+            buf_to_pic_copy_props(pic, buf);
+            conv_out_q_pic(sys, pic);
+            sys->slice.pic = NULL;
+        }
+    }
+
+    // Put back
+    buf->user_data = NULL; // Zap here to make sure we can't reuse later
+    mmal_buffer_header_reset(buf);
+
+    if (mmal_port_send_buffer(sys->output, buf) != MMAL_SUCCESS) {
+        mmal_buffer_header_release(buf);
+    }
+
+}
+
 
 static void conv_flush(filter_t * p_filter)
 {
@@ -927,6 +1086,11 @@ static void conv_flush(filter_t * p_filter)
     // Free up anything we may have already lying around
     // Don't need lock as the above disables should have prevented anything
     // happening in the background
+    if (sys->slice.pic != NULL) {
+        picture_Release(sys->slice.pic);
+        sys->slice.pic = NULL;
+    }
+
     {
         picture_t * ret_pics = sys->ret_pics;
         sys->ret_pics = NULL;
@@ -964,19 +1128,9 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     }
 
     // Reenable stuff if the last thing we did was flush
-    if (!sys->output->is_enabled &&
-        (err = mmal_port_enable(sys->output, conv_output_port_cb)) != MMAL_SUCCESS)
-    {
-        msg_Err(p_filter, "Output port enable failed");
+    if ((err = conv_enable_out(p_filter, sys)) != MMAL_SUCCESS ||
+        (err = conv_enable_in(p_filter, sys)) != MMAL_SUCCESS)
         goto fail;
-    }
-
-    if (!sys->input->is_enabled &&
-        (err = mmal_port_enable(sys->input, conv_input_port_cb)) != MMAL_SUCCESS)
-    {
-        msg_Err(p_filter, "Input port enable failed");
-        goto fail;
-    }
 
     // Stuff into input
     // We assume the BH is already set up with values reflecting pic date etc.
@@ -1105,7 +1259,12 @@ static void CloseConverter(vlc_object_t * obj)
         mmal_component_disable(sys->component);
 
     if (sys->out_pool)
-        mmal_pool_destroy(sys->out_pool);
+    {
+        if (sys->zero_copy)
+            mmal_port_pool_destroy(sys->output, sys->out_pool);
+        else
+            mmal_pool_destroy(sys->out_pool);
+    }
 
     if (sys->in_pool != NULL)
         mmal_pool_destroy(sys->in_pool);
@@ -1120,18 +1279,20 @@ static void CloseConverter(vlc_object_t * obj)
 }
 
 
-static int conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, picture_t * const pic)
+static int conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, picture_t * const pic, const MMAL_FOURCC_T pic_enc)
 {
     MMAL_STATUS_T status;
 
     sys->output = sys->component->output[0];
     sys->output->userdata = (struct MMAL_PORT_USERDATA_T *)p_filter;
     sys->output->format->type = MMAL_ES_TYPE_VIDEO;
-    sys->output->format->encoding = vlc_to_mmal_pic_fourcc(p_filter->fmt_out.i_codec);
+    sys->output->format->encoding = pic_enc;
     sys->output->format->encoding_variant = sys->output->format->encoding;
     vlc_to_mmal_pic_fmt(sys->output, &p_filter->fmt_out);
 
-    if (pic != NULL) {
+    // Override default format width/height if we have a pic we need to match
+    if (pic != NULL)
+    {
         unsigned int bpp = (pic->format.i_bits_per_pixel + 7) >> 3;
         sys->output->format->es->video.width = pic->p[0].i_pitch / bpp;
         sys->output->format->es->video.height = pic->p[0].i_lines;
@@ -1146,15 +1307,12 @@ static int conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, 
         return -1;
     }
 
-    sys->output->buffer_num = __MAX(2, sys->output->buffer_num_recommended);
+    sys->output->buffer_num = __MIN(2, sys->output->buffer_num_recommended);
     sys->output->buffer_size = sys->output->buffer_size_recommended;
 
-    status = mmal_port_enable(sys->output, conv_output_port_cb);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(p_filter, "Failed to enable output port %s (status=%"PRIx32" %s)",
-                sys->output->name, status, mmal_status_to_string(status));
+    if (conv_enable_out(p_filter, sys) != MMAL_SUCCESS)
         return -1;
-    }
+
     return 0;
 }
 
@@ -1166,17 +1324,26 @@ static int OpenConverter(vlc_object_t * obj)
     MMAL_STATUS_T status;
     MMAL_FOURCC_T enc_out;
     const MMAL_FOURCC_T enc_in = MMAL_ENCODING_OPAQUE;
-
-#if TRACE_ALL
-    char dbuf0[5], dbuf1[5];
-    msg_Dbg(p_filter, "%s: %s,%dx%d->%s,%dx%d", __func__,
-            str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_height, p_filter->fmt_in.video.i_width,
-            str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_height, p_filter->fmt_out.video.i_width);
-#endif
+    bool use_resizer;
 
     if (enc_in != vlc_to_mmal_pic_fourcc(p_filter->fmt_in.i_codec) ||
         (enc_out = vlc_to_mmal_pic_fourcc(p_filter->fmt_out.i_codec)) == 0)
         return VLC_EGENERIC;
+
+    use_resizer = var_InheritBool(p_filter, MMAL_RESIZE_NAME);
+
+    // Check we have a sliced version of the fourcc if we want the resizer
+    if (use_resizer &&
+        (enc_out = pic_to_slice_mmal_fourcc(enc_out)) == 0)
+        return VLC_EGENERIC;
+
+    {
+        char dbuf0[5], dbuf1[5];
+        msg_Dbg(p_filter, "%s: (%s) %s,%dx%d->%s,%dx%d", __func__,
+                use_resizer ? "resize" : "isp",
+                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_height, p_filter->fmt_in.video.i_width,
+                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_height, p_filter->fmt_out.video.i_width);
+    }
 
     sys = calloc(1, sizeof(filter_sys_t));
     if (!sys) {
@@ -1185,10 +1352,24 @@ static int OpenConverter(vlc_object_t * obj)
     }
     p_filter->p_sys = sys;
 
+    // Init stuff the we destroy unconditionaly in Close first
     vlc_mutex_init(&sys->lock);
+    vlc_sem_init(&sys->sem, 1);
     sys->err_stream = MMAL_SUCCESS;
 
-    status = mmal_component_create(MMAL_COMPONENT_ISP_RESIZER, &sys->component);
+    sys->in_port_cb_fn = conv_input_port_cb;
+    if (use_resizer) {
+        sys->zero_copy = true;
+        sys->component_name = MMAL_COMPONENT_DEFAULT_RESIZER;
+        sys->out_port_cb_fn = slice_output_port_cb;
+    }
+    else {
+        sys->zero_copy = false;  // Copy directly into filter picyure
+        sys->component_name = MMAL_COMPONENT_ISP_RESIZER;
+        sys->out_port_cb_fn = conv_output_port_cb;
+    }
+
+    status = mmal_component_create(sys->component_name, &sys->component);
     if (status != MMAL_SUCCESS) {
         msg_Err(p_filter, "Failed to create MMAL component %s (status=%"PRIx32" %s)",
                 MMAL_COMPONENT_DEFAULT_VIDEO_DECODER, status, mmal_status_to_string(status));
@@ -1222,16 +1403,20 @@ static int OpenConverter(vlc_object_t * obj)
     sys->input->buffer_size = sys->input->buffer_size_recommended;
     sys->input->buffer_num = NUM_DECODER_BUFFER_HEADERS;
 
-    status = mmal_port_enable(sys->input, conv_input_port_cb);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(p_filter, "Failed to enable input port %s (status=%"PRIx32" %s)",
-                sys->input->name, status, mmal_status_to_string(status));
+    if (conv_enable_in(p_filter, sys) != MMAL_SUCCESS)
         goto fail;
-    }
 
-    {
+    port_parameter_set_bool(sys->output, MMAL_PARAMETER_ZERO_COPY, sys->zero_copy);
+
+    if (sys->zero_copy) {
+        // If zc then we will do stride conversion when we copy to arm side
+        // so no need to worry about actual pic dimensions here
+        if (conv_set_output(p_filter, sys, NULL, enc_out) != 0)
+            goto fail;
+    }
+    else {
         picture_t *pic = filter_NewPicture(p_filter);
-        int err = conv_set_output(p_filter, sys, pic);
+        int err = conv_set_output(p_filter, sys, pic, enc_out);
         picture_Release(pic);
         if (err != 0) {
             goto fail;
@@ -1245,10 +1430,10 @@ static int OpenConverter(vlc_object_t * obj)
         goto fail;
     }
 
-    sys->out_pool = mmal_pool_create(sys->output->buffer_num, 0);
+    sys->out_pool = sys->zero_copy ?
+        mmal_port_pool_create(sys->output, sys->output->buffer_num, sys->output->buffer_size) :
+        mmal_pool_create(sys->output->buffer_num, 0);
     sys->in_pool = mmal_pool_create(sys->input->buffer_num, 0);
-
-    vlc_sem_init(&sys->sem, 1);
 
     p_filter->pf_video_filter = conv_filter;
     p_filter->pf_flush = conv_flush;
@@ -1285,6 +1470,7 @@ vlc_module_begin()
     set_description(N_("MMAL conversion filter"))
     add_shortcut("mmal_converter")
     set_capability( "video converter", 900 )
+    add_bool(MMAL_RESIZE_NAME, /* default */ false, MMAL_RESIZE_TEXT, MMAL_RESIZE_LONGTEXT, /* advanced option */ false)
     set_callbacks(OpenConverter, CloseConverter)
 
 vlc_module_end()

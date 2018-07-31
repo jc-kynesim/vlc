@@ -1,8 +1,8 @@
 include $(top_srcdir)/modules/common.am
 mmaldir = $(pluginsdir)/mmal
 
-AM_CFLAGS += $(CFLAGS_mmal)
-AM_LDFLAGS += -rpath '$(mmaldir)' $(LDFLAGS_mmal)
+AM_CFLAGS += -pthread $(CFLAGS_mmal)
+AM_LDFLAGS += -pthread -rpath '$(mmaldir)' $(LDFLAGS_mmal)
 
 libmmal_vout_plugin_la_SOURCES = vout.c mmal_picture.c mmal_picture.h
 libmmal_vout_plugin_la_CFLAGS = $(AM_CFLAGS)

@@ -28,7 +28,7 @@ PATH="$TOOLS/bin:$PATH" \
   CPPFLAGS="$ARCH $INCLUDES $DEFINES" \
   CXX=${PREFIX}g++ \
   CXXFLAGS="$ARCH $INCLUDES" \
-  LDFLAGS="-ggdb -L$TOOLS/lib -L$LIB1 -L$LIB2 -L$LIB3 -L$LIB4 -Wl,-rpath=$HLIB1,-rpath-link=$LIB1,-rpath=$HLIB2,-rpath-link=$LIB2,-rpath=$HLIB3,-rpath-link=$LIB3,-rpath=$HLIB4,-rpath-link=$LIB4,-rpath-link=`pwd`/src/.libs -pthread" \
+  LDFLAGS="-ggdb -L$TOOLS/lib -L$LIB1 -L$LIB2 -L$LIB3 -L$LIB4 -Wl,-rpath=$HLIB1,-rpath-link=$LIB1,-rpath=$HLIB2,-rpath-link=$LIB2,-rpath=$HLIB3,-rpath-link=$LIB3,-rpath=$HLIB4,-rpath-link=$LIB4,-rpath-link=`pwd`/src/.libs" \
   MOC=`which moc` \
   UIC=`which uic` \
   RCC=`which rcc` \

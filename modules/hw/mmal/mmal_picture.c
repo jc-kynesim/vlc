@@ -21,6 +21,10 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
+// We would really like to use vlc_thread.h but the detach thread stuff can't be
+// used here :-(
+#include <pthread.h>
+
 #include <vlc_common.h>
 #include <vlc_picture.h>
 #include <interface/mmal/mmal.h>
