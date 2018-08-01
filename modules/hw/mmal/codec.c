@@ -826,6 +826,54 @@ msg_Dbg(dec, ">>> %s: FAIL: ret=%d", __func__, ret);
 
 // ----------------------------
 
+#define CONV_MAX_LATENCY 1  // In frames
+
+typedef struct pic_fifo_s {
+    picture_t * head;
+    picture_t * tail;
+} pic_fifo_t;
+
+static inline picture_t * pic_fifo_get(pic_fifo_t * const pf)
+{
+    picture_t * const pic = pf->head;;
+    if (pic != NULL) {
+        pf->head = pic->p_next;
+        pic->p_next = NULL;
+    }
+    return pic;
+}
+
+static inline picture_t * pic_fifo_get_all(pic_fifo_t * const pf)
+{
+    picture_t * const pic = pf->head;;
+    pf->head = NULL;
+    return pic;
+}
+
+static inline void pic_fifo_release_all(pic_fifo_t * const pf)
+{
+    picture_t * pic;
+    while ((pic = pic_fifo_get(pf)) != NULL) {
+        picture_Release(pic);
+    }
+}
+
+static inline void pic_fifo_init(pic_fifo_t * const pf)
+{
+    pf->head = NULL;
+    pf->tail = NULL;  // Not strictly needed
+}
+
+static inline void pic_fifo_put(pic_fifo_t * const pf, picture_t * pic)
+{
+    pic->p_next = NULL;
+    if (pf->head == NULL)
+        pf->head = pic;
+    else
+        pf->tail->p_next = pic;
+    pf->tail = pic;
+}
+
 typedef struct filter_sys_t {
     MMAL_COMPONENT_T *component;
     MMAL_PORT_T *input;
@@ -833,8 +881,7 @@ typedef struct filter_sys_t {
     MMAL_POOL_T *out_pool;  // Free output buffers
     MMAL_POOL_T *in_pool;   // Input pool to get BH for replication
 
-    picture_t * ret_pics;
-    picture_t * ret_pics_tail;
+    pic_fifo_t ret_pics;
 
     vlc_sem_t sem;
     vlc_mutex_t lock;
@@ -852,7 +899,7 @@ typedef struct filter_sys_t {
 
     // Slice specific tracking stuff
     struct {
-        picture_t * pic;
+        pic_fifo_t pics;
         unsigned int line;  // Lines filled
     } slice;
 
@@ -950,11 +997,7 @@ static void conv_out_q_pic(filter_sys_t * const sys, picture_t * const pic)
     pic->p_next = NULL;
 
     vlc_mutex_lock(&sys->lock);
-    if (sys->ret_pics_tail == NULL)
-        sys->ret_pics = pic;
-    else
-        sys->ret_pics_tail->p_next = pic;
-    sys->ret_pics_tail = pic;
+    pic_fifo_put(&sys->ret_pics, pic);
     vlc_mutex_unlock(&sys->lock);
 
     vlc_sem_post(&sys->sem);
@@ -966,7 +1009,7 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     filter_sys_t * const sys = p_filter->p_sys;
 
 #if TRACE_ALL
-    msg_Dbg(p_filter, "<<< %s: <<< cmd=%d, flags=%#x, pic=%p, data=%p, len=%d/%d, pts=%lld", __func__,
+    msg_Dbg(p_filter, "<<< %s: cmd=%d, flags=%#x, pic=%p, data=%p, len=%d/%d, pts=%lld", __func__,
             buf->cmd, buf->flags, buf->user_data, buf->data, buf->length, buf->alloc_size, (long long)buf->pts);
 #endif
 
@@ -1020,41 +1063,60 @@ static void slice_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     else
     {
         // Got slice
-        picture_t * pic = sys->slice.pic;
+        picture_t *pic = sys->slice.pics.head;
+        const unsigned int scale_lines = sys->output->format->es->video.height;  // Expected lines of callback
 
         if (pic == NULL) {
-            pic = sys->slice.pic = filter_NewPicture(p_filter);
-            sys->slice.line = 0;
+            msg_Err(p_filter, "No output picture");
+            goto fail;
         }
 
         // Copy lines
         // * single plane only - fix for I420
         {
-            const unsigned int n = __MIN(pic->p[0].i_lines - sys->slice.line, MMAL_SLICE_HEIGHT);
+            const unsigned int scale_n = __MIN(scale_lines - sys->slice.line, MMAL_SLICE_HEIGHT);
+            const unsigned int pic_lines = pic->p[0].i_lines;
+            const unsigned int copy_n = sys->slice.line + scale_n <= pic_lines ? scale_n :
+                sys->slice.line >= pic_lines ? 0 :
+                    pic_lines - sys->slice.line;
+
             const unsigned int src_stride = buf->type->video.pitch[0];
             const unsigned int dst_stride = pic->p[0].i_pitch;
             uint8_t *dst = pic->p[0].p_pixels + sys->slice.line * dst_stride;
             const uint8_t *src = buf->data + buf->type->video.offset[0];
 
             if (src_stride == dst_stride) {
-                memcpy(dst, src, src_stride * n);
+                if (copy_n != 0)
+                    memcpy(dst, src, src_stride * copy_n);
             }
             else {
                 unsigned int i;
-                for (i = 0; i != n; ++i) {
+                for (i = 0; i != copy_n; ++i) {
                     memcpy(dst, src, __MIN(dst_stride, src_stride));
                     dst += dst_stride;
                     src += src_stride;
                 }
             }
-            sys->slice.line += n;
+            sys->slice.line += scale_n;
         }
 
-        if ((buf->flags & MMAL_BUFFER_HEADER_FLAG_FRAME_END) != 0 || sys->slice.line >= (unsigned int)pic->p[0].i_lines) {
+        if ((buf->flags & MMAL_BUFFER_HEADER_FLAG_FRAME_END) != 0 || sys->slice.line >= scale_lines) {
 
-            buf_to_pic_copy_props(pic, buf);
-            conv_out_q_pic(sys, pic);
-            sys->slice.pic = NULL;
+            if ((buf->flags & MMAL_BUFFER_HEADER_FLAG_FRAME_END) == 0 || sys->slice.line != scale_lines) {
+                // Stuff doesn't add up...
+                msg_Err(p_filter, "Line count (%d/%d) & EOF disagree (flags=%#x)", sys->slice.line, scale_lines, buf->flags);
+                goto fail;
+            }
+            else {
+                sys->slice.line = 0;
+
+                vlc_mutex_lock(&sys->lock);
+                pic_fifo_get(&sys->slice.pics);  // Remove head from Q
+                vlc_mutex_unlock(&sys->lock);
+
+                buf_to_pic_copy_props(pic, buf);
+                conv_out_q_pic(sys, pic);
+            }
         }
     }
 
@@ -1065,7 +1127,11 @@ static void slice_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     if (mmal_port_send_buffer(sys->output, buf) != MMAL_SUCCESS) {
         mmal_buffer_header_release(buf);
     }
+    return;
 
+fail:
+    sys->err_stream = MMAL_EIO;
+    vlc_sem_post(&sys->sem);  // If we were waiting then break us out - the flush should fix sem values
 }
 
 
@@ -1086,25 +1152,20 @@ static void conv_flush(filter_t * p_filter)
     // Free up anything we may have already lying around
     // Don't need lock as the above disables should have prevented anything
     // happening in the background
-    if (sys->slice.pic != NULL) {
-        picture_Release(sys->slice.pic);
-        sys->slice.pic = NULL;
-    }
 
-    {
-        picture_t * ret_pics = sys->ret_pics;
-        sys->ret_pics = NULL;
-        sys->ret_pics_tail = NULL;
+    pic_fifo_release_all(&sys->slice.pics);
+    pic_fifo_release_all(&sys->ret_pics);
 
-        while (ret_pics != NULL) {
-            picture_t * const pic = ret_pics;
-            ret_pics = pic->p_next;
-            picture_Release(pic);
-            vlc_sem_wait(&sys->sem);  // Drain sem
-        }
-    }
+    // Reset sem values - easiest & most reliable to just kill & re-init
+    // This will also dig us out of situations where we have got out of sync somehow
+    vlc_sem_destroy(&sys->sem);
+    vlc_sem_init(&sys->sem, CONV_MAX_LATENCY);
+
     // No buffers in either port now
     sys->in_count = 0;
+
+    // Reset error status
+    sys->err_stream = MMAL_SUCCESS;
 
 #if TRACE_ALL
     msg_Dbg(p_filter, ">>> %s", __func__);
@@ -1122,15 +1183,36 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 #endif
 
     if (sys->err_stream != MMAL_SUCCESS) {
-        msg_Err(p_filter, "MMAL error reported by ctrl");
-        conv_flush(p_filter);
-        goto fail;
+        goto stream_fail;
     }
 
     // Reenable stuff if the last thing we did was flush
     if ((err = conv_enable_out(p_filter, sys)) != MMAL_SUCCESS ||
         (err = conv_enable_in(p_filter, sys)) != MMAL_SUCCESS)
         goto fail;
+
+    // If ZC then we need to allocate the out pic before we stuff the input
+    if (sys->zero_copy) {
+        MMAL_BUFFER_HEADER_T * out_buf;
+        picture_t * const out_pic = filter_NewPicture(p_filter);
+
+        if (out_pic == NULL)
+        {
+            msg_Err(p_filter, "Failed to alloc required filter output pic");
+            goto fail;
+        }
+
+        vlc_mutex_lock(&sys->lock);
+        pic_fifo_put(&sys->slice.pics, out_pic);
+        vlc_mutex_unlock(&sys->lock);
+
+        // Poke any returned pic buffers into output
+        // In general this should only happen immediately after enable
+        while ((out_buf = mmal_queue_get(sys->out_pool->queue)) != NULL)
+            mmal_port_send_buffer(sys->output, out_buf);
+
+        ++sys->in_count;
+    }
 
     // Stuff into input
     // We assume the BH is already set up with values reflecting pic date etc.
@@ -1150,6 +1232,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 #endif
 
         picture_Release(p_pic);
+        p_pic = NULL;
 
         if ((err = mmal_port_send_buffer(sys->input, buf)) != MMAL_SUCCESS)
         {
@@ -1160,23 +1243,13 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         --sys->in_count;
     }
 
-    if (sys->zero_copy) {
-        ++sys->in_count;
-        MMAL_BUFFER_HEADER_T * out_buf;
-
-        // Poke any returned pic buffers into output
-        // In general this should only happen immediately after enable
-        while ((out_buf = mmal_queue_get(sys->out_pool->queue)) != NULL)
-            mmal_port_send_buffer(sys->output, out_buf);
-    }
-    else
-    {
+    if (!sys->zero_copy) {
         MMAL_BUFFER_HEADER_T * out_buf;
 
         while ((out_buf = sys->in_count < 0 ?
                 mmal_queue_wait(sys->out_pool->queue) : mmal_queue_get(sys->out_pool->queue)) != NULL)
         {
-            picture_t * const out_pic = filter_NewPicture( p_filter );
+            picture_t * const out_pic = filter_NewPicture(p_filter);
 
             if (out_pic == NULL) {
                 msg_Warn(p_filter, "Failed to alloc new filter output pic");
@@ -1218,10 +1291,11 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 
     // Return all pending buffers
     vlc_mutex_lock(&sys->lock);
-    ret_pics = sys->ret_pics;
-    sys->ret_pics = NULL;
-    sys->ret_pics_tail = NULL;
+    ret_pics = pic_fifo_get_all(&sys->ret_pics);
     vlc_mutex_unlock(&sys->lock);
+
+    if (sys->err_stream != MMAL_SUCCESS)
+        goto stream_fail;
 
     // Sink as many sem posts as we have pics
     // (shouldn't normally wait, but there is a small race)
@@ -1240,8 +1314,12 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 
     return ret_pics;
 
+stream_fail:
+    msg_Err(p_filter, "MMAL error reported by callback");
 fail:
-    picture_Release(p_pic);
+    if (p_pic != NULL)
+        picture_Release(p_pic);
+    conv_flush(p_filter);
     return NULL;
 }
 
@@ -1292,7 +1370,6 @@ static int conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, 
 {
     MMAL_STATUS_T status;
 
-    sys->output = sys->component->output[0];
     sys->output->userdata = (struct MMAL_PORT_USERDATA_T *)p_filter;
     sys->output->format->type = MMAL_ES_TYPE_VIDEO;
     sys->output->format->encoding = pic_enc;
@@ -1363,8 +1440,10 @@ static int OpenConverter(vlc_object_t * obj)
 
     // Init stuff the we destroy unconditionaly in Close first
     vlc_mutex_init(&sys->lock);
-    vlc_sem_init(&sys->sem, 1);
+    vlc_sem_init(&sys->sem, CONV_MAX_LATENCY);
     sys->err_stream = MMAL_SUCCESS;
+    pic_fifo_init(&sys->ret_pics);
+    pic_fifo_init(&sys->slice.pics);
 
     sys->in_port_cb_fn = conv_input_port_cb;
     if (use_resizer) {
@@ -1384,6 +1463,8 @@ static int OpenConverter(vlc_object_t * obj)
                 MMAL_COMPONENT_DEFAULT_VIDEO_DECODER, status, mmal_status_to_string(status));
         goto fail;
     }
+    sys->output = sys->component->output[0];
+    sys->input = sys->component->input[0];
 
     sys->component->control->userdata = (struct MMAL_PORT_USERDATA_T *)p_filter;
     status = mmal_port_enable(sys->component->control, conv_control_port_cb);
@@ -1393,7 +1474,6 @@ static int OpenConverter(vlc_object_t * obj)
         goto fail;
     }
 
-    sys->input = sys->component->input[0];
     sys->input->userdata = (struct MMAL_PORT_USERDATA_T *)p_filter;
     sys->input->format->type = MMAL_ES_TYPE_VIDEO;
     sys->input->format->encoding = enc_in;
