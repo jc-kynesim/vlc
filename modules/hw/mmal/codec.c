@@ -1001,7 +1001,7 @@ static void slice_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     filter_sys_t * const sys = p_filter->p_sys;
 
 #if TRACE_ALL
-    msg_Dbg(p_filter, "<<< %s: <<< cmd=%d, flags=%#x, pic=%p, data=%p, len=%d/%d, pts=%lld", __func__,
+    msg_Dbg(p_filter, "<<< %s: cmd=%d, flags=%#x, pic=%p, data=%p, len=%d/%d, pts=%lld", __func__,
             buf->cmd, buf->flags, buf->user_data, buf->data, buf->length, buf->alloc_size, (long long)buf->pts);
 #endif
 
@@ -1033,8 +1033,8 @@ static void slice_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
             const unsigned int n = __MIN(pic->p[0].i_lines - sys->slice.line, MMAL_SLICE_HEIGHT);
             const unsigned int src_stride = buf->type->video.pitch[0];
             const unsigned int dst_stride = pic->p[0].i_pitch;
-            uint8_t *dst = pic->p[0].p_pixels + sys->slice.line * pic->p[0].i_pitch;
-            const uint8_t *src = buf->data + buf->type->video.offset[0] + sys->slice.line * buf->type->video.pitch[0];
+            uint8_t *dst = pic->p[0].p_pixels + sys->slice.line * dst_stride;
+            const uint8_t *src = buf->data + buf->type->video.offset[0];
 
             if (src_stride == dst_stride) {
                 memcpy(dst, src, src_stride * n);
@@ -1160,7 +1160,16 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         --sys->in_count;
     }
 
-    // Poke return pic buffer into output
+    if (sys->zero_copy) {
+        ++sys->in_count;
+        MMAL_BUFFER_HEADER_T * out_buf;
+
+        // Poke any returned pic buffers into output
+        // In general this should only happen immediately after enable
+        while ((out_buf = mmal_queue_get(sys->out_pool->queue)) != NULL)
+            mmal_port_send_buffer(sys->output, out_buf);
+    }
+    else
     {
         MMAL_BUFFER_HEADER_T * out_buf;
 
