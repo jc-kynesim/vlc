@@ -71,6 +71,7 @@ void hw_mmal_pic_ctx_destroy(picture_context_t * pic_ctx_cmn);
 picture_context_t * hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf,
     hw_mmal_port_pool_ref_t * const ppr, vlc_object_t * obj);
 
+int hw_mmal_get_gpu_mem(void);
 
 
 static inline MMAL_STATUS_T port_parameter_set_uint32(MMAL_PORT_T * port, uint32_t id, uint32_t val)

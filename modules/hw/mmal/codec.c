@@ -46,7 +46,8 @@
 /*
  * This seems to be a bit high, but reducing it causes instabilities
  */
-#define NUM_EXTRA_BUFFERS 10
+#define NUM_EXTRA_BUFFERS 6
+//#define NUM_EXTRA_BUFFERS 10
 #define NUM_DECODER_BUFFER_HEADERS 30
 
 #define MIN_NUM_BUFFERS_IN_TRANSIT 2
@@ -1156,7 +1157,7 @@ static void conv_flush(filter_t * p_filter)
     pic_fifo_release_all(&sys->slice.pics);
     pic_fifo_release_all(&sys->ret_pics);
 
-    // Reset sem values - easiest & most reliable to just kill & re-init
+    // Reset sem values - easiest & most reliable way is to just kill & re-init
     // This will also dig us out of situations where we have got out of sync somehow
     vlc_sem_destroy(&sys->sem);
     vlc_sem_init(&sys->sem, CONV_MAX_LATENCY);
@@ -1411,6 +1412,7 @@ static int OpenConverter(vlc_object_t * obj)
     MMAL_FOURCC_T enc_out;
     const MMAL_FOURCC_T enc_in = MMAL_ENCODING_OPAQUE;
     bool use_resizer;
+    int gpu_mem;
 
     if (enc_in != vlc_to_mmal_pic_fourcc(p_filter->fmt_in.i_codec) ||
         (enc_out = vlc_to_mmal_pic_fourcc(p_filter->fmt_out.i_codec)) == 0)
@@ -1423,12 +1425,15 @@ static int OpenConverter(vlc_object_t * obj)
         (enc_out = pic_to_slice_mmal_fourcc(enc_out)) == 0)
         return VLC_EGENERIC;
 
+    gpu_mem = hw_mmal_get_gpu_mem();
+
     {
         char dbuf0[5], dbuf1[5];
-        msg_Dbg(p_filter, "%s: (%s) %s,%dx%d->%s,%dx%d", __func__,
+        msg_Dbg(p_filter, "%s: (%s) %s,%dx%d->%s,%dx%d (gpu=%d)", __func__,
                 use_resizer ? "resize" : "isp",
                 str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_height, p_filter->fmt_in.video.i_width,
-                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_height, p_filter->fmt_out.video.i_width);
+                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_height, p_filter->fmt_out.video.i_width,
+                gpu_mem);
     }
 
     sys = calloc(1, sizeof(filter_sys_t));
