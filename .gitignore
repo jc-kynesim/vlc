@@ -5,6 +5,7 @@
 *.lo
 *.lo?
 *.la
+*.luac
 *.moc.cpp
 *.o
 *.so
@@ -45,6 +46,7 @@ wxvlc
 vlc_install_dir/*
 plugins.dat
 patches/*
+sysroot/*
 
 include/vlc/libvlc_version.h
 
