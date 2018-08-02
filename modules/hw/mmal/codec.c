@@ -1394,7 +1394,7 @@ static int conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, 
         return -1;
     }
 
-    sys->output->buffer_num = __MIN(2, sys->output->buffer_num_recommended);
+    sys->output->buffer_num = __MAX(sys->zero_copy ? 16 : 2, sys->output->buffer_num_recommended);
     sys->output->buffer_size = sys->output->buffer_size_recommended;
 
     if (conv_enable_out(p_filter, sys) != MMAL_SUCCESS)
@@ -1524,10 +1524,20 @@ static int OpenConverter(vlc_object_t * obj)
         goto fail;
     }
 
+    msg_Dbg(p_filter, "Outpool: zc=%d, num=%d, size=%d", sys->zero_copy, sys->output->buffer_num, sys->output->buffer_size);
     sys->out_pool = sys->zero_copy ?
         mmal_port_pool_create(sys->output, sys->output->buffer_num, sys->output->buffer_size) :
         mmal_pool_create(sys->output->buffer_num, 0);
-    sys->in_pool = mmal_pool_create(sys->input->buffer_num, 0);
+
+    if (sys->out_pool == NULL) {
+        msg_Err(p_filter, "Failed to create output pool");
+        goto fail;
+    }
+    if ((sys->in_pool = mmal_pool_create(sys->input->buffer_num, 0)) == NULL)
+    {
+        msg_Err(p_filter, "Failed to create input pool");
+        goto fail;
+    }
 
     p_filter->pf_video_filter = conv_filter;
     p_filter->pf_flush = conv_flush;
