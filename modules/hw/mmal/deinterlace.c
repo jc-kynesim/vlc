@@ -42,9 +42,25 @@
 
 #define MIN_NUM_BUFFERS_IN_TRANSIT 2
 
-#define MMAL_DEINTERLACE_QPU "mmal-deinterlace-adv-qpu"
-#define MMAL_DEINTERLACE_QPU_TEXT N_("Use QPUs for advanced HD deinterlacing.")
-#define MMAL_DEINTERLACE_QPU_LONGTEXT N_("Make use of the QPUs to allow higher quality deinterlacing of HD content.")
+#define MMAL_DEINTERLACE_NO_QPU "mmal-deinterlace-no-qpu"
+#define MMAL_DEINTERLACE_NO_QPU_TEXT N_("Do not use QPUs for advanced HD deinterlacing.")
+#define MMAL_DEINTERLACE_NO_QPU_LONGTEXT N_("Do not make use of the QPUs to allow higher quality deinterlacing of HD content.")
+
+#define MMAL_DEINTERLACE_ADV "mmal-deinterlace-adv"
+#define MMAL_DEINTERLACE_ADV_TEXT N_("Force advanced interlace")
+#define MMAL_DEINTERLACE_ADV_LONGTEXT N_("Force advanced interlace")
+
+#define MMAL_DEINTERLACE_FAST "mmal-deinterlace-fast"
+#define MMAL_DEINTERLACE_FAST_TEXT N_("Force fast interlace")
+#define MMAL_DEINTERLACE_FAST_LONGTEXT N_("Force fast interlace")
+
+#define MMAL_DEINTERLACE_HALF_RATE "mmal-deinterlace-half-rate"
+#define MMAL_DEINTERLACE_HALF_RATE_TEXT N_("Halve output framerate")
+#define MMAL_DEINTERLACE_HALF_RATE_LONGTEXT N_("Halve output framerate. 1 output frame for each pair of interlaced fields input")
+
+#define MMAL_DEINTERLACE_FULL_RATE "mmal-deinterlace-full-rate"
+#define MMAL_DEINTERLACE_FULL_RATE_TEXT N_("Full output framerate")
+#define MMAL_DEINTERLACE_FULL_RATE_LONGTEXT N_("Full output framerate. 1 output frame for each interlaced field input")
 
 
 typedef struct filter_sys_t
@@ -57,6 +73,9 @@ typedef struct filter_sys_t
 
     MMAL_QUEUE_T * out_q;
 
+    bool half_rate;
+    bool use_qpu;
+    bool use_fast;
     unsigned int seq_in;
     unsigned int seq_out;
 } filter_sys_t;
@@ -369,29 +388,19 @@ static int OpenMmalDeinterlace(filter_t *filter)
     int32_t frame_duration = filter->fmt_in.video.i_frame_rate != 0 ?
             CLOCK_FREQ * filter->fmt_in.video.i_frame_rate_base /
             filter->fmt_in.video.i_frame_rate : 0;
-    bool use_qpu = var_InheritBool(filter, MMAL_DEINTERLACE_QPU);
-
-    MMAL_PARAMETER_IMAGEFX_PARAMETERS_T imfx_param = {
-            { MMAL_PARAMETER_IMAGE_EFFECT_PARAMETERS, sizeof(imfx_param) },
-            MMAL_PARAM_IMAGEFX_DEINTERLACE_ADV,
-            4,
-            { 3, frame_duration, 0, use_qpu }
-    };
 
     int ret = VLC_EGENERIC;
     MMAL_STATUS_T status;
     filter_sys_t *sys;
 
+    if (filter->fmt_in.video.i_chroma != VLC_CODEC_MMAL_OPAQUE ||
+        filter->fmt_out.video.i_chroma != VLC_CODEC_MMAL_OPAQUE)
+        return VLC_EGENERIC;
+
 #if TRACE_ALL
     msg_Dbg(filter, "Try to open mmal_deinterlace filter. frame_duration: %d, QPU %s!",
             frame_duration, use_qpu ? "used" : "unused");
 #endif
-
-    if (filter->fmt_in.video.i_chroma != VLC_CODEC_MMAL_OPAQUE)
-        return VLC_EGENERIC;
-
-    if (filter->fmt_out.video.i_chroma != VLC_CODEC_MMAL_OPAQUE)
-        return VLC_EGENERIC;
 
     sys = calloc(1, sizeof(filter_sys_t));
     if (!sys)
@@ -400,6 +409,26 @@ static int OpenMmalDeinterlace(filter_t *filter)
 
     sys->seq_in = 1;
     sys->seq_out = 1;
+    sys->half_rate = false;
+    sys->use_qpu = true;
+    sys->use_fast = false;
+
+    if (filter->fmt_in.video.i_width * filter->fmt_in.video.i_height > 768 * 576)
+    {
+        // We get stressed if we have to try too hard - so make life easier
+        sys->half_rate = true;
+    }
+
+    if (var_InheritBool(filter, MMAL_DEINTERLACE_NO_QPU))
+        sys->use_qpu = false;
+    if (var_InheritBool(filter, MMAL_DEINTERLACE_ADV))
+        sys->use_fast = false;
+    if (var_InheritBool(filter, MMAL_DEINTERLACE_FAST))
+        sys->use_fast = true;
+    if (var_InheritBool(filter, MMAL_DEINTERLACE_FULL_RATE))
+        sys->half_rate = false;
+    if (var_InheritBool(filter, MMAL_DEINTERLACE_HALF_RATE))
+        sys->half_rate = true;
 
     bcm_host_init();
 
@@ -410,11 +439,22 @@ static int OpenMmalDeinterlace(filter_t *filter)
         goto fail;
     }
 
-    status = mmal_port_parameter_set(sys->component->output[0], &imfx_param.hdr);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(filter, "Failed to configure MMAL component %s (status=%"PRIx32" %s)",
-                MMAL_COMPONENT_DEFAULT_DEINTERLACE, status, mmal_status_to_string(status));
-        goto fail;
+    {
+        const MMAL_PARAMETER_IMAGEFX_PARAMETERS_T imfx_param = {
+            { MMAL_PARAMETER_IMAGE_EFFECT_PARAMETERS, sizeof(imfx_param) },
+            sys->use_fast ?
+                MMAL_PARAM_IMAGEFX_DEINTERLACE_FAST :
+                MMAL_PARAM_IMAGEFX_DEINTERLACE_ADV,
+            4,
+            { 5 /* Frame type: mixed */, frame_duration, sys->half_rate, sys->use_qpu }
+        };
+
+        status = mmal_port_parameter_set(sys->component->output[0], &imfx_param.hdr);
+        if (status != MMAL_SUCCESS) {
+            msg_Err(filter, "Failed to configure MMAL component %s (status=%"PRIx32" %s)",
+                    MMAL_COMPONENT_DEFAULT_DEINTERLACE, status, mmal_status_to_string(status));
+            goto fail;
+        }
     }
 
     sys->component->control->userdata = (struct MMAL_PORT_USERDATA_T *)filter;
@@ -439,7 +479,8 @@ static int OpenMmalDeinterlace(filter_t *filter)
     sys->input->format->es->video.par.den = filter->fmt_in.video.i_sar_den;
 
     es_format_Copy(&filter->fmt_out, &filter->fmt_in);
-    filter->fmt_out.video.i_frame_rate *= 2;
+    if (!sys->half_rate)
+        filter->fmt_out.video.i_frame_rate *= 2;
 
     status = mmal_port_format_commit(sys->input);
     if (status != MMAL_SUCCESS) {
@@ -543,8 +584,17 @@ vlc_module_begin()
     set_subcategory(SUBCAT_VIDEO_VFILTER)
     set_callbacks(OpenMmalDeinterlace, CloseMmalDeinterlace)
     add_shortcut("deinterlace")
-    add_bool(MMAL_DEINTERLACE_QPU, false, MMAL_DEINTERLACE_QPU_TEXT,
-                    MMAL_DEINTERLACE_QPU_LONGTEXT, true);
+    add_bool(MMAL_DEINTERLACE_NO_QPU, false, MMAL_DEINTERLACE_NO_QPU_TEXT,
+                    MMAL_DEINTERLACE_NO_QPU_LONGTEXT, true);
+    add_bool(MMAL_DEINTERLACE_ADV, false, MMAL_DEINTERLACE_ADV_TEXT,
+                    MMAL_DEINTERLACE_ADV_LONGTEXT, true);
+    add_bool(MMAL_DEINTERLACE_FAST, false, MMAL_DEINTERLACE_FAST_TEXT,
+                    MMAL_DEINTERLACE_FAST_LONGTEXT, true);
+    add_bool(MMAL_DEINTERLACE_HALF_RATE, false, MMAL_DEINTERLACE_HALF_RATE_TEXT,
+                    MMAL_DEINTERLACE_HALF_RATE_LONGTEXT, true);
+    add_bool(MMAL_DEINTERLACE_FULL_RATE, false, MMAL_DEINTERLACE_FULL_RATE_TEXT,
+                    MMAL_DEINTERLACE_FULL_RATE_LONGTEXT, true);
+
 vlc_module_end()
 
 
