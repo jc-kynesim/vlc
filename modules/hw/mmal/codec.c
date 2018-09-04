@@ -475,6 +475,35 @@ out:
     return ret;
 }
 
+static MMAL_STATUS_T
+set_extradata_and_commit(decoder_t * const dec, decoder_sys_t * const sys)
+{
+    MMAL_STATUS_T status;
+
+    if (dec->fmt_in.i_codec == VLC_CODEC_H264) {
+        if (dec->fmt_in.i_extra > 0) {
+            status = mmal_format_extradata_alloc(sys->input->format,
+                    dec->fmt_in.i_extra);
+            if (status == MMAL_SUCCESS) {
+                memcpy(sys->input->format->extradata, dec->fmt_in.p_extra,
+                        dec->fmt_in.i_extra);
+                sys->input->format->extradata_size = dec->fmt_in.i_extra;
+            } else {
+                msg_Err(dec, "Failed to allocate extra format data on input port %s (status=%"PRIx32" %s)",
+                        sys->input->name, status, mmal_status_to_string(status));
+            }
+        }
+    }
+
+    status = mmal_port_format_commit(sys->input);
+    if (status != MMAL_SUCCESS) {
+        msg_Err(dec, "Failed to commit format for input port %s (status=%"PRIx32" %s)",
+                sys->input->name, status, mmal_status_to_string(status));
+    }
+    return status;
+}
+
+
 
 static void flush_decoder(decoder_t *dec)
 {
@@ -550,11 +579,16 @@ static int decode(decoder_t *dec, block_t *block)
         goto fail;
     }
 
-    if (!sys->input->is_enabled &&
-        (status = mmal_port_enable(sys->input, input_port_cb)) != MMAL_SUCCESS)
+    if (!sys->input->is_enabled)
     {
-        msg_Err(dec, "Input port enable failed");
-        goto fail;
+        if ((status = set_extradata_and_commit(dec, sys)) != MMAL_SUCCESS)
+            goto fail;
+
+        if ((status = mmal_port_enable(sys->input, input_port_cb)) != MMAL_SUCCESS)
+        {
+            msg_Err(dec, "Input port enable failed");
+            goto fail;
+        }
     }
 
     // *** We cannot get a picture to put the result in 'till we have
@@ -720,27 +754,9 @@ static int OpenDecoder(decoder_t *dec)
         goto fail;
     }
 
-    if (dec->fmt_in.i_codec == VLC_CODEC_H264) {
-        if (dec->fmt_in.i_extra > 0) {
-            status = mmal_format_extradata_alloc(sys->input->format,
-                    dec->fmt_in.i_extra);
-            if (status == MMAL_SUCCESS) {
-                memcpy(sys->input->format->extradata, dec->fmt_in.p_extra,
-                        dec->fmt_in.i_extra);
-                sys->input->format->extradata_size = dec->fmt_in.i_extra;
-            } else {
-                msg_Err(dec, "Failed to allocate extra format data on input port %s (status=%"PRIx32" %s)",
-                        sys->input->name, status, mmal_status_to_string(status));
-            }
-        }
-    }
-
-    status = mmal_port_format_commit(sys->input);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(dec, "Failed to commit format for input port %s (status=%"PRIx32" %s)",
-                sys->input->name, status, mmal_status_to_string(status));
+    if ((status = set_extradata_and_commit(dec, sys)) != MMAL_SUCCESS)
         goto fail;
-    }
+
     sys->input->buffer_size = sys->input->buffer_size_recommended;
     sys->input->buffer_num = sys->input->buffer_num_recommended;
 
