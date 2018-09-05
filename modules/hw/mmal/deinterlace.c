@@ -444,8 +444,9 @@ static int OpenMmalDeinterlace(filter_t *filter)
         // We get stressed if we have to try too hard - so make life easier
         sys->half_rate = true;
         // Also check we actually have enough memory to do this
-        if (hw_mmal_get_gpu_mem() < 96)
+        if (hw_mmal_get_gpu_mem() < (96 << 20))
             sys->use_passthrough = true;
+
     }
 
     if (var_InheritBool(filter, MMAL_DEINTERLACE_NO_QPU))
