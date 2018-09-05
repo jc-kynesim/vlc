@@ -34,6 +34,27 @@
 
 #include "mmal_picture.h"
 
+void vlc_to_mmal_pic_fmt(MMAL_PORT_T * const port, const es_format_t * const es_vlc)
+{
+    const video_format_t *const vf_vlc = &es_vlc->video;
+    MMAL_VIDEO_FORMAT_T * vf_mmal = &port->format->es->video;
+
+    vf_mmal->width          = (vf_vlc->i_width + 31) & ~31;
+    vf_mmal->height         = (vf_vlc->i_height + 15) & ~15;;
+    vf_mmal->crop.x         = vf_vlc->i_x_offset;
+    vf_mmal->crop.y         = vf_vlc->i_y_offset;
+    vf_mmal->crop.width     = vf_vlc->i_visible_width;
+    vf_mmal->crop.height    = vf_vlc->i_visible_height;
+    if (vf_vlc->i_sar_num == 0 || vf_vlc->i_sar_den == 0) {
+        vf_mmal->par.num        = 1;
+        vf_mmal->par.den        = 1;
+    } else {
+        vf_mmal->par.num        = vf_vlc->i_sar_num;
+        vf_mmal->par.den        = vf_vlc->i_sar_den;
+    }
+    vf_mmal->frame_rate.num = vf_vlc->i_frame_rate;
+    vf_mmal->frame_rate.den = vf_vlc->i_frame_rate_base;
+}
 
 hw_mmal_port_pool_ref_t * hw_mmal_port_pool_ref_create(MMAL_PORT_T * const port,
    const unsigned int headers, const uint32_t payload_size)

@@ -46,7 +46,8 @@
 /*
  * This seems to be a bit high, but reducing it causes instabilities
  */
-#define NUM_EXTRA_BUFFERS 6
+#define NUM_EXTRA_BUFFERS 3
+//#define NUM_EXTRA_BUFFERS 6
 //#define NUM_EXTRA_BUFFERS 10
 #define NUM_DECODER_BUFFER_HEADERS 30
 
@@ -227,7 +228,30 @@ static MMAL_FOURCC_T pic_to_slice_mmal_fourcc(const MMAL_FOURCC_T fcc)
     return 0;
 }
 
+#if 0
+static inline void draw_line(void * pic_buf, size_t pic_stride, unsigned int x, unsigned int y, unsigned int len, int inc)
+{
+    uint32_t * p = (uint32_t *)pic_buf + y * pic_stride + x;
+    while (len-- != 0) {
+        *p = ~0U;
+        p += inc;
+    }
+}
 
+
+static void draw_corners(void * pic_buf, size_t pic_stride, unsigned int x, unsigned int y, unsigned int w, unsigned int h)
+{
+    const unsigned int len = 20;
+    draw_line(pic_buf, pic_stride, x, y, len, 1);
+    draw_line(pic_buf, pic_stride, x, y, len, pic_stride);
+    draw_line(pic_buf, pic_stride, x + w - 1, y, len, -1);
+    draw_line(pic_buf, pic_stride, x + w - 1, y, len, pic_stride);
+    draw_line(pic_buf, pic_stride, x + w - 1, y + h - 1, len, -1);
+    draw_line(pic_buf, pic_stride, x + w - 1, y + h - 1, len, -(int)pic_stride);
+    draw_line(pic_buf, pic_stride, x, y + h - 1, len, 1);
+    draw_line(pic_buf, pic_stride, x, y + h - 1, len, -(int)pic_stride);
+}
+#endif
 
 // Buffer either attached to pic or released
 static picture_t * alloc_opaque_pic(decoder_t * const dec, MMAL_BUFFER_HEADER_T * const buf)
@@ -948,28 +972,6 @@ static MMAL_STATUS_T conv_enable_out(filter_t * const p_filter, filter_sys_t * c
     return err;
 }
 
-static void vlc_to_mmal_pic_fmt(MMAL_PORT_T * const port, const es_format_t * const es_vlc)
-{
-    const video_format_t *const vf_vlc = &es_vlc->video;
-    MMAL_VIDEO_FORMAT_T * vf_mmal = &port->format->es->video;
-
-    vf_mmal->width          = (vf_vlc->i_width + 31) & ~31;
-    vf_mmal->height         = (vf_vlc->i_height + 15) & ~15;;
-    vf_mmal->crop.x         = vf_vlc->i_x_offset;
-    vf_mmal->crop.y         = vf_vlc->i_y_offset;
-    vf_mmal->crop.width     = vf_vlc->i_visible_width;
-    vf_mmal->crop.height    = vf_vlc->i_visible_height;
-    if (vf_vlc->i_sar_num == 0 || vf_vlc->i_sar_den == 0) {
-        vf_mmal->par.num        = 1;
-        vf_mmal->par.den        = 1;
-    } else {
-        vf_mmal->par.num        = vf_vlc->i_sar_num;
-        vf_mmal->par.den        = vf_vlc->i_sar_den;
-    }
-    vf_mmal->frame_rate.num = vf_vlc->i_frame_rate;
-    vf_mmal->frame_rate.den = vf_vlc->i_frame_rate_base;
-}
-
 static void conv_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
     filter_t * const p_filter = (filter_t *)port->userdata;
@@ -1046,6 +1048,9 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
         else
         {
             buf_to_pic_copy_props(pic, buf);
+
+//            draw_corners(pic->p[0].p_pixels, pic->p[0].i_pitch / 4, 0, 0, pic->p[0].i_visible_pitch / 4, pic->p[0].i_visible_lines);
+
             conv_out_q_pic(sys, pic);
         }
     }
@@ -1397,8 +1402,15 @@ static int conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, 
     if (pic != NULL)
     {
         unsigned int bpp = (pic->format.i_bits_per_pixel + 7) >> 3;
-        sys->output->format->es->video.width = pic->p[0].i_pitch / bpp;
-        sys->output->format->es->video.height = pic->p[0].i_lines;
+        MMAL_VIDEO_FORMAT_T * const fmt = &sys->output->format->es->video;
+        fmt->width = pic->p[0].i_pitch / bpp;
+        fmt->height = pic->p[0].i_lines;
+        fmt->crop.x = 0;
+        fmt->crop.y = 0;
+        fmt->crop.width = pic->p[0].i_visible_pitch / bpp;
+        fmt->crop.height = pic->p[0].i_visible_lines;
+
+        msg_Dbg(p_filter, "%s: %dx%d [(0,0) %dx%d]", __func__, fmt->width, fmt->height, fmt->crop.width, fmt->crop.height);
     }
 
     mmal_log_dump_format(sys->output->format);
@@ -1445,10 +1457,14 @@ static int OpenConverter(vlc_object_t * obj)
 
     {
         char dbuf0[5], dbuf1[5];
-        msg_Dbg(p_filter, "%s: (%s) %s,%dx%d->%s,%dx%d (gpu=%d)", __func__,
+        msg_Dbg(p_filter, "%s: (%s) %s,%dx%d [(%d,%d) %dx%d]->%s,%dx%d [(%d,%d) %dx%d] (gpu=%d)", __func__,
                 use_resizer ? "resize" : "isp",
                 str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_height, p_filter->fmt_in.video.i_width,
+                p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
+                p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
                 str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_height, p_filter->fmt_out.video.i_width,
+                p_filter->fmt_out.video.i_x_offset, p_filter->fmt_out.video.i_y_offset,
+                p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height,
                 gpu_mem);
     }
 

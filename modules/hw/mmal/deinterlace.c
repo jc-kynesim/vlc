@@ -429,14 +429,7 @@ static int OpenMmalDeinterlace(filter_t *filter)
     sys->input->userdata = (struct MMAL_PORT_USERDATA_T *)filter;
     if (filter->fmt_in.i_codec == VLC_CODEC_MMAL_OPAQUE)
         sys->input->format->encoding = MMAL_ENCODING_OPAQUE;
-    sys->input->format->es->video.width = filter->fmt_in.video.i_width;
-    sys->input->format->es->video.height = filter->fmt_in.video.i_height;
-    sys->input->format->es->video.crop.x = 0;
-    sys->input->format->es->video.crop.y = 0;
-    sys->input->format->es->video.crop.width = filter->fmt_in.video.i_width;
-    sys->input->format->es->video.crop.height = filter->fmt_in.video.i_height;
-    sys->input->format->es->video.par.num = filter->fmt_in.video.i_sar_num;
-    sys->input->format->es->video.par.den = filter->fmt_in.video.i_sar_den;
+    vlc_to_mmal_pic_fmt(sys->input, &filter->fmt_in);
 
     es_format_Copy(&filter->fmt_out, &filter->fmt_in);
     filter->fmt_out.video.i_frame_rate *= 2;
