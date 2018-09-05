@@ -47,12 +47,17 @@
 #define MMAL_DEINTERLACE_NO_QPU_LONGTEXT N_("Do not make use of the QPUs to allow higher quality deinterlacing of HD content.")
 
 #define MMAL_DEINTERLACE_ADV "mmal-deinterlace-adv"
-#define MMAL_DEINTERLACE_ADV_TEXT N_("Force advanced interlace")
-#define MMAL_DEINTERLACE_ADV_LONGTEXT N_("Force advanced interlace")
+#define MMAL_DEINTERLACE_ADV_TEXT N_("Force advanced deinterlace")
+#define MMAL_DEINTERLACE_ADV_LONGTEXT N_("Force advanced deinterlace")
 
 #define MMAL_DEINTERLACE_FAST "mmal-deinterlace-fast"
-#define MMAL_DEINTERLACE_FAST_TEXT N_("Force fast interlace")
-#define MMAL_DEINTERLACE_FAST_LONGTEXT N_("Force fast interlace")
+#define MMAL_DEINTERLACE_FAST_TEXT N_("Force fast deinterlace")
+#define MMAL_DEINTERLACE_FAST_LONGTEXT N_("Force fast deinterlace")
+
+#define MMAL_DEINTERLACE_NONE "mmal-deinterlace-none"
+#define MMAL_DEINTERLACE_NONE_TEXT N_("Force no deinterlace")
+#define MMAL_DEINTERLACE_NONE_LONGTEXT N_("Force no interlace. Simply strips off the interlace markers and passes the frame straight through. "\
+    "This is the default for > SD if < 96M gpu-mem")
 
 #define MMAL_DEINTERLACE_HALF_RATE "mmal-deinterlace-half-rate"
 #define MMAL_DEINTERLACE_HALF_RATE_TEXT N_("Halve output framerate")
@@ -76,6 +81,7 @@ typedef struct filter_sys_t
     bool half_rate;
     bool use_qpu;
     bool use_fast;
+    bool use_passthrough;
     unsigned int seq_in;
     unsigned int seq_out;
 } filter_sys_t;
@@ -330,6 +336,19 @@ static void di_flush(filter_t *p_filter)
 #endif
 }
 
+
+static void pass_flush(filter_t *p_filter)
+{
+    // Nothing to do
+}
+
+static picture_t * pass_deinterlace(filter_t * p_filter, picture_t * p_pic)
+{
+    p_pic->b_progressive = true;
+    return p_pic;
+}
+
+
 static void control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
     filter_t *filter = (filter_t *)port->userdata;
@@ -353,8 +372,14 @@ static void CloseMmalDeinterlace(filter_t *filter)
     msg_Dbg(filter, "<<< %s", __func__);
 #endif
 
-    if (!sys)
+    if (sys == NULL)
         return;
+
+    if (sys->use_passthrough)
+    {
+        free(sys);
+        return;
+    }
 
     di_flush(filter);
 
@@ -412,23 +437,42 @@ static int OpenMmalDeinterlace(filter_t *filter)
     sys->half_rate = false;
     sys->use_qpu = true;
     sys->use_fast = false;
+    sys->use_passthrough = false;
 
     if (filter->fmt_in.video.i_width * filter->fmt_in.video.i_height > 768 * 576)
     {
         // We get stressed if we have to try too hard - so make life easier
         sys->half_rate = true;
+        // Also check we actually have enough memory to do this
+        if (hw_mmal_get_gpu_mem() < 96)
+            sys->use_passthrough = true;
     }
 
     if (var_InheritBool(filter, MMAL_DEINTERLACE_NO_QPU))
         sys->use_qpu = false;
     if (var_InheritBool(filter, MMAL_DEINTERLACE_ADV))
+    {
         sys->use_fast = false;
+        sys->use_passthrough = false;
+    }
     if (var_InheritBool(filter, MMAL_DEINTERLACE_FAST))
+    {
         sys->use_fast = true;
+        sys->use_passthrough = false;
+    }
+    if (var_InheritBool(filter, MMAL_DEINTERLACE_NONE))
+        sys->use_passthrough = true;
     if (var_InheritBool(filter, MMAL_DEINTERLACE_FULL_RATE))
         sys->half_rate = false;
     if (var_InheritBool(filter, MMAL_DEINTERLACE_HALF_RATE))
         sys->half_rate = true;
+
+    if (sys->use_passthrough)
+    {
+        filter->pf_video_filter = pass_deinterlace;
+        filter->pf_flush = pass_flush;
+        return 0;
+    }
 
     bcm_host_init();
 
@@ -583,6 +627,8 @@ vlc_module_begin()
                     MMAL_DEINTERLACE_ADV_LONGTEXT, true);
     add_bool(MMAL_DEINTERLACE_FAST, false, MMAL_DEINTERLACE_FAST_TEXT,
                     MMAL_DEINTERLACE_FAST_LONGTEXT, true);
+    add_bool(MMAL_DEINTERLACE_NONE, false, MMAL_DEINTERLACE_NONE_TEXT,
+                    MMAL_DEINTERLACE_NONE_LONGTEXT, true);
     add_bool(MMAL_DEINTERLACE_HALF_RATE, false, MMAL_DEINTERLACE_HALF_RATE_TEXT,
                     MMAL_DEINTERLACE_HALF_RATE_LONGTEXT, true);
     add_bool(MMAL_DEINTERLACE_FULL_RATE, false, MMAL_DEINTERLACE_FULL_RATE_TEXT,
