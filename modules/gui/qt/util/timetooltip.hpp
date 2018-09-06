@@ -25,13 +25,6 @@
 #include "qt.hpp"
 
 #include <QWidget>
-#include <QBitmap>
-
-class QPaintEvent;
-class QString;
-class QFont;
-class QRect;
-class QPainterPath;
 
 class TimeTooltip : public QWidget
 {
@@ -54,7 +47,6 @@ private:
     QFont mFont;
     QRect mBox;
     QPainterPath mPainterPath;
-    QBitmap mMask;
     int mTipX;
 };
 

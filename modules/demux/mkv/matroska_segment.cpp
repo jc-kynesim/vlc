@@ -545,6 +545,8 @@ bool matroska_segment_c::CompareSegmentUIDs( const matroska_segment_c * p_item_a
         return false;
 
     p_tmp = static_cast<EbmlBinary *>( p_item_a->p_segment_uid );
+    if ( !p_tmp )
+        return false;
     if ( p_item_b->p_prev_segment_uid != NULL
           && *p_tmp == *p_item_b->p_prev_segment_uid )
         return true;
@@ -1116,6 +1118,7 @@ bool matroska_segment_c::ESCreate()
     es_out_Control( sys.demuxer.out, ES_OUT_SET_ES_CAT_POLICY, VIDEO_ES,
                     ES_OUT_ES_POLICY_EXCLUSIVE );
 
+    mkv_track_t *default_tracks[ES_CATEGORY_COUNT] = {};
     for( tracks_map_t::iterator it = tracks.begin(); it != tracks.end(); ++it )
     {
         tracks_map_t::key_type   track_id = it->first;
@@ -1138,8 +1141,17 @@ bool matroska_segment_c::ESCreate()
          */
         if( track.b_default || track.b_forced )
         {
-            es_out_Control( sys.demuxer.out, ES_OUT_SET_ES_DEFAULT, track.p_es );
+            mkv_track_t *&default_track = default_tracks[track.fmt.i_cat];
+            if( !default_track || track.b_default )
+                default_track = &track;
         }
+
+    }
+
+    for( mkv_track_t *track : default_tracks )
+    {
+        if( track )
+            es_out_Control( sys.demuxer.out, ES_OUT_SET_ES_DEFAULT, track->p_es );
     }
 
     return true;

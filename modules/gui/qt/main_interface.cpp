@@ -886,13 +886,10 @@ void MainInterface::setVideoFullScreen( bool fs )
                 msg_Dbg( p_intf, "Moving video to correct position");
                 move( QPoint( screenres.x(), screenres.y() ) );
             }
-
-            /* */
-            if( playlistWidget != NULL && playlistWidget->artContainer->currentWidget() == videoWidget )
-            {
-                showTab( videoWidget );
-            }
         }
+
+        if( playlistWidget != NULL && playlistWidget->artContainer->currentWidget() == videoWidget )
+            showTab( videoWidget );
 
         /* we won't be able to get its windowed sized once in fullscreen, so update it now */
         stackWidgetsSizes[stackCentralW->currentWidget()] = stackCentralW->size();
@@ -1343,9 +1340,8 @@ void MainInterface::resizeWindow(int w, int h)
          * By calling XMoveResizeWindow directly, Qt will not see our change
          * request until the ConfigureNotify event on success
          * and not at all if it is rejected. */
-        XMoveResizeWindow( QX11Info::display(), winId(),
-                          geometry().x() * dpr, geometry().y() * dpr,
-                          (unsigned int)size.width() * dpr, (unsigned int)size.height() * dpr);
+        XResizeWindow( QX11Info::display(), winId(),
+                       (unsigned int)size.width() * dpr, (unsigned int)size.height() * dpr);
         return;
     }
 #endif
