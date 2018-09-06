@@ -46,11 +46,18 @@ typedef struct mmal_port_pool_ref_s
     MMAL_PORT_T * port;
 } hw_mmal_port_pool_ref_t;
 
+typedef struct pic_ctx_subpic_s {
+    picture_t * subpic;
+    int x, y;
+    int alpha;
+} pic_ctx_subpic_t;
+
 typedef struct pic_ctx_mmal_s {
     picture_context_t cmn;  // PARENT: Common els at start
 
     MMAL_BUFFER_HEADER_T * buf;
     hw_mmal_port_pool_ref_t * ppr;
+    pic_ctx_subpic_t sub;
 
     vlc_object_t * obj;
 } pic_ctx_mmal_t;
@@ -68,6 +75,24 @@ static inline void hw_mmal_port_pool_ref_acquire(hw_mmal_port_pool_ref_t * const
     atomic_fetch_add(&ppr->refs, 1);
 }
 
+static inline void hw_mmal_pic_set_subpic(picture_t * pic, const picture_t * subpic, int x, int y, int alpha)
+{
+    pic_ctx_subpic_t * const sub = &((pic_ctx_mmal_t *)pic->context)->sub;
+    sub->subpic = picture_Hold((picture_t *)subpic);
+    sub->x = x;
+    sub->y = y;
+    sub->alpha = alpha;
+}
+
+static inline void hw_mmal_pic_unset_subpic(picture_t * pic)
+{
+    pic_ctx_subpic_t * const sub = &((pic_ctx_mmal_t *)pic->context)->sub;
+    if (sub->subpic != NULL)
+    {
+        picture_Release(sub->subpic);
+        sub->subpic = NULL;
+    }
+}
 
 picture_context_t * hw_mmal_pic_ctx_copy(picture_context_t * pic_ctx_cmn);
 void hw_mmal_pic_ctx_destroy(picture_context_t * pic_ctx_cmn);

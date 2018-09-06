@@ -153,8 +153,14 @@ buf_pre_release_cb(MMAL_BUFFER_HEADER_T * buf, void *userdata)
 
     // Kill the callback - otherwise we will go in circles!
     mmal_buffer_header_pre_release_cb_set(buf, (MMAL_BH_PRE_RELEASE_CB_T)0, NULL);
-
     mmal_buffer_header_acquire(buf);  // Ref it again
+
+    // Kill any sub-pic
+    if (ctx->sub.subpic != NULL) {
+        picture_Release(ctx->sub.subpic);
+        ctx->sub.subpic = NULL;  // Not needed but be tidy to make sure we can't reuse accidentaly
+    }
+
     // As we have re-acquired the buffer we need a full release
     // (not continue) to zap the ref count back to zero
     // This is "safe" 'cos we have already reset the cb

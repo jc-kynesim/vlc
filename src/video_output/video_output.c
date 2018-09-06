@@ -983,6 +983,8 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
     if (filtered->date != vout->p->displayed.current->date)
         msg_Warn(vout, "Unsupported timestamp modifications done by chain_interactive");
 
+    msg_Dbg(vout, "%s", __func__);
+
     /*
      * Get the subpicture to be displayed
      */

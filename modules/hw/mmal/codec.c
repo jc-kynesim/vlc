@@ -1031,7 +1031,6 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     msg_Dbg(p_filter, "<<< %s: cmd=%d, flags=%#x, pic=%p, data=%p, len=%d/%d, pts=%lld", __func__,
             buf->cmd, buf->flags, buf->user_data, buf->data, buf->length, buf->alloc_size, (long long)buf->pts);
 #endif
-
     if (buf->cmd == 0) {
         picture_t * const pic = (picture_t *)buf->user_data;
 
@@ -1206,6 +1205,15 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 
     if (sys->err_stream != MMAL_SUCCESS) {
         goto stream_fail;
+    }
+
+    if (p_pic->context == NULL) {
+        msg_Dbg(p_filter, "%s: No context", __func__);
+    }
+    else {
+        pic_ctx_subpic_t * const sub = &((pic_ctx_mmal_t *)p_pic->context)->sub;
+
+        msg_Dbg(p_filter, "%s: Subpic: %p @ %d,%d:%d", __func__, sub->subpic, sub->x, sub->y, sub->alpha);
     }
 
     // Reenable stuff if the last thing we did was flush
@@ -1459,10 +1467,10 @@ static int OpenConverter(vlc_object_t * obj)
         char dbuf0[5], dbuf1[5];
         msg_Dbg(p_filter, "%s: (%s) %s,%dx%d [(%d,%d) %dx%d]->%s,%dx%d [(%d,%d) %dx%d] (gpu=%d)", __func__,
                 use_resizer ? "resize" : "isp",
-                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_height, p_filter->fmt_in.video.i_width,
+                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
                 p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
                 p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
-                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_height, p_filter->fmt_out.video.i_width,
+                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
                 p_filter->fmt_out.video.i_x_offset, p_filter->fmt_out.video.i_y_offset,
                 p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height,
                 gpu_mem);
@@ -1589,6 +1597,51 @@ msg_Dbg(p_filter, ">>> %s: FAIL: %d", __func__, ret);
     return ret;
 }
 
+static void FilterBlendMmal(filter_t *p_filter,
+                  picture_t *dst, const picture_t *src,
+                  int x_offset, int y_offset, int alpha)
+{
+    msg_Dbg(p_filter, "%s (%d,%d:%d)", __func__, x_offset, y_offset, alpha);
+
+    if (dst->context == NULL)
+        msg_Err(p_filter, "MMAL pic missing context");
+    else
+        hw_mmal_pic_set_subpic(dst, src, x_offset, y_offset, alpha);
+}
+
+
+static int OpenBlendMmal(vlc_object_t *object)
+{
+    filter_t * const p_filter = (filter_t *)object;
+//    const vlc_fourcc_t vfcc_src = filter->fmt_in.video.i_chroma;
+    const vlc_fourcc_t vfcc_dst = p_filter->fmt_out.video.i_chroma;
+
+    {
+        char dbuf0[5], dbuf1[5];
+        msg_Dbg(p_filter, "%s: (%s) %s,%dx%d [(%d,%d) %dx%d]->%s,%dx%d [(%d,%d) %dx%d]", __func__,
+                "blend",
+                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
+                p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
+                p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
+                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
+                p_filter->fmt_out.video.i_x_offset, p_filter->fmt_out.video.i_y_offset,
+                p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height);
+    }
+
+    if (vfcc_dst != VLC_CODEC_MMAL_OPAQUE) {
+        return VLC_EGENERIC;
+    }
+
+    p_filter->pf_video_blend = FilterBlendMmal;
+    return VLC_SUCCESS;
+}
+
+static void CloseBlendMmal(vlc_object_t *object)
+{
+    VLC_UNUSED(object);
+}
+
+
 vlc_module_begin()
     set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_VCODEC )
@@ -1608,6 +1661,14 @@ vlc_module_begin()
     set_capability( "video converter", 900 )
     add_bool(MMAL_RESIZE_NAME, /* default */ false, MMAL_RESIZE_TEXT, MMAL_RESIZE_LONGTEXT, /* advanced option */ false)
     set_callbacks(OpenConverter, CloseConverter)
+
+    add_submodule()
+    set_category( CAT_VIDEO )
+    set_subcategory( SUBCAT_VIDEO_VFILTER )
+    set_description(N_("Video pictures blending for MMAL"))
+    add_shortcut("mmal_blend")
+    set_capability("video blending", 110)
+    set_callbacks(OpenBlendMmal, CloseBlendMmal)
 
 vlc_module_end()
 
