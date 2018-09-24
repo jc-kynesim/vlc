@@ -41,7 +41,7 @@
 
 #include "mmal_picture.h"
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 /*
  * This seems to be a bit high, but reducing it causes instabilities
@@ -510,21 +510,6 @@ set_extradata_and_commit(decoder_t * const dec, decoder_sys_t * const sys)
 {
     MMAL_STATUS_T status;
 
-    if (dec->fmt_in.i_codec == VLC_CODEC_H264) {
-        if (dec->fmt_in.i_extra > 0) {
-            status = mmal_format_extradata_alloc(sys->input->format,
-                    dec->fmt_in.i_extra);
-            if (status == MMAL_SUCCESS) {
-                memcpy(sys->input->format->extradata, dec->fmt_in.p_extra,
-                        dec->fmt_in.i_extra);
-                sys->input->format->extradata_size = dec->fmt_in.i_extra;
-            } else {
-                msg_Err(dec, "Failed to allocate extra format data on input port %s (status=%"PRIx32" %s)",
-                        sys->input->name, status, mmal_status_to_string(status));
-            }
-        }
-    }
-
     status = mmal_port_format_commit(sys->input);
     if (status != MMAL_SUCCESS) {
         msg_Err(dec, "Failed to commit format for input port %s (status=%"PRIx32" %s)",
@@ -533,7 +518,32 @@ set_extradata_and_commit(decoder_t * const dec, decoder_sys_t * const sys)
     return status;
 }
 
+static MMAL_STATUS_T decoder_send_extradata(decoder_t * const dec, decoder_sys_t *const sys)
+{
+    if (dec->fmt_in.i_codec == VLC_CODEC_H264 &&
+        dec->fmt_in.i_extra > 0)
+    {
+        MMAL_BUFFER_HEADER_T * const buf = mmal_queue_wait(sys->input_pool->queue);
+        MMAL_STATUS_T status;
 
+        mmal_buffer_header_reset(buf);
+        buf->cmd = 0;
+        buf->user_data = NULL;
+        buf->alloc_size = sys->input->buffer_size;
+        buf->length = dec->fmt_in.i_extra;
+        buf->data = dec->fmt_in.p_extra;
+        buf->flags = MMAL_BUFFER_HEADER_FLAG_CONFIG;
+
+        status = mmal_port_send_buffer(sys->input, buf);
+        if (status != MMAL_SUCCESS) {
+            msg_Err(dec, "Failed to send extradata buffer to input port (status=%"PRIx32" %s)",
+                    status, mmal_status_to_string(status));
+            return status;
+        }
+    }
+
+    return MMAL_SUCCESS;
+}
 
 static void flush_decoder(decoder_t *dec)
 {
@@ -619,6 +629,9 @@ static int decode(decoder_t *dec, block_t *block)
             msg_Err(dec, "Input port enable failed");
             goto fail;
         }
+
+        if ((status = decoder_send_extradata(dec, sys)) != MMAL_SUCCESS)
+            goto fail;
     }
 
     // *** We cannot get a picture to put the result in 'till we have
@@ -854,6 +867,9 @@ static int OpenDecoder(decoder_t *dec)
     sys->b_flushed = true;
     dec->fmt_out.i_codec = VLC_CODEC_MMAL_OPAQUE;
     dec->fmt_out.video.i_chroma = VLC_CODEC_MMAL_OPAQUE;
+
+    if ((status = decoder_send_extradata(dec, sys)) != MMAL_SUCCESS)
+        goto fail;
 
     dec->pf_decode = decode;
     dec->pf_flush  = flush_decoder;
