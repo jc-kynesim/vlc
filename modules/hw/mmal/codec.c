@@ -54,7 +54,8 @@
 #define MIN_NUM_BUFFERS_IN_TRANSIT 2
 
 #define MMAL_COMPONENT_DEFAULT_RESIZER "vc.ril.resize"
-#define MMAL_COMPONENT_ISP_RESIZER "vc.ril.isp"
+#define MMAL_COMPONENT_ISP_RESIZER     "vc.ril.isp"
+#define MMAL_COMPONENT_HVS             "vc.ril.hvs"
 
 #define MMAL_SLICE_HEIGHT 16
 #define MMAL_ALIGN_W      32
@@ -65,8 +66,13 @@
 #define MMAL_OPAQUE_LONGTEXT N_("Decode frames directly into RPI VideoCore instead of host memory. This option must only be used with the MMAL video output plugin.")
 
 #define MMAL_RESIZE_NAME "mmal-resize"
-#define MMAL_RESIZE_TEXT N_("Use mmal resizer rather than isp.")
+#define MMAL_RESIZE_TEXT N_("Use mmal resizer rather than hvs.")
 #define MMAL_RESIZE_LONGTEXT N_("Use mmal resizer rather than isp. This uses less gpu memory than the ISP but is slower.")
+
+#define MMAL_ISP_NAME "mmal-isp"
+#define MMAL_ISP_TEXT N_("Use mmal isp rather than hvs.")
+#define MMAL_ISP_LONGTEXT N_("Use mmal isp rather than hvs. This may be faster but has no blend.")
+
 
 typedef struct decoder_sys_t
 {
@@ -1448,6 +1454,7 @@ static int OpenConverter(vlc_object_t * obj)
     MMAL_FOURCC_T enc_out;
     const MMAL_FOURCC_T enc_in = MMAL_ENCODING_OPAQUE;
     bool use_resizer;
+    bool use_isp;
     int gpu_mem;
 
     if (enc_in != vlc_to_mmal_pic_fourcc(p_filter->fmt_in.i_codec) ||
@@ -1455,6 +1462,12 @@ static int OpenConverter(vlc_object_t * obj)
         return VLC_EGENERIC;
 
     use_resizer = var_InheritBool(p_filter, MMAL_RESIZE_NAME);
+    use_isp = var_InheritBool(p_filter, MMAL_ISP_NAME);
+
+    if (use_resizer) {
+        // use resizer overrides use_isp
+        use_isp = false;
+    }
 
     // Check we have a sliced version of the fourcc if we want the resizer
     if (use_resizer &&
@@ -1496,9 +1509,13 @@ static int OpenConverter(vlc_object_t * obj)
         sys->component_name = MMAL_COMPONENT_DEFAULT_RESIZER;
         sys->out_port_cb_fn = slice_output_port_cb;
     }
-    else {
-        sys->zero_copy = false;  // Copy directly into filter picyure
+    else if (use_isp) {
+        sys->zero_copy = false;  // Copy directly into filter picture
         sys->component_name = MMAL_COMPONENT_ISP_RESIZER;
+        sys->out_port_cb_fn = conv_output_port_cb;
+    } else {
+        sys->zero_copy = false;  // Copy directly into filter picture
+        sys->component_name = MMAL_COMPONENT_HVS;
         sys->out_port_cb_fn = conv_output_port_cb;
     }
 
@@ -1597,6 +1614,239 @@ msg_Dbg(p_filter, ">>> %s: FAIL: %d", __func__, ret);
     return ret;
 }
 
+#if 0
+diff --git a/host_applications/linux/apps/raspicam/RaspiPreview.c b/host_applications/linux/apps/raspicam/RaspiPreview.c
+index 7656c87..cf4439c 100644
+--- a/host_applications/linux/apps/raspicam/RaspiPreview.c
++++ b/host_applications/linux/apps/raspicam/RaspiPreview.c
+@@ -69,7 +69,7 @@ static int cmdline_commands_size = sizeof(cmdline_commands) / sizeof(cmdline_com
+  */
+ MMAL_STATUS_T raspipreview_create(RASPIPREVIEW_PARAMETERS *state)
+ {
+-   MMAL_COMPONENT_T *preview = 0;
++   MMAL_COMPONENT_T *preview = NULL, *hvs = NULL;
+    MMAL_PORT_T *preview_port = NULL;
+    MMAL_STATUS_T status;
+
+@@ -102,6 +102,15 @@ MMAL_STATUS_T raspipreview_create(RASPIPREVIEW_PARAMETERS *state)
+          goto error;
+       }
+
++      status = mmal_component_create("vc.ril.hvs",
++            &hvs);
++
++      if (status != MMAL_SUCCESS)
++      {
++         vcos_log_error("Unable to create HVS component");
++         goto error;
++      }
++
+       preview_port = preview->input[0];
+
+       MMAL_DISPLAYREGION_T param;
+@@ -143,8 +152,16 @@ MMAL_STATUS_T raspipreview_create(RASPIPREVIEW_PARAMETERS *state)
+       vcos_log_error("Unable to enable preview/null sink component (%u)", status);
+       goto error;
+    }
++   status = mmal_component_enable(hvs);
++
++   if (status != MMAL_SUCCESS)
++   {
++      vcos_log_error("Unable to enable hvs component (%u)", status);
++      goto error;
++   }
+
+    state->preview_component = preview;
++   state->preview_hvs_component = hvs;
+
+    return status;
+
+@@ -170,6 +187,11 @@ void raspipreview_destroy(RASPIPREVIEW_PARAMETERS *state)
+       mmal_component_destroy(state->preview_component);
+       state->preview_component = NULL;
+    }
++   if (state->preview_hvs_component)
++   {
++      mmal_component_destroy(state->preview_hvs_component);
++      state->preview_hvs_component = NULL;
++   }
+ }
+
+ /**
+diff --git a/host_applications/linux/apps/raspicam/RaspiPreview.h b/host_applications/linux/apps/raspicam/RaspiPreview.h
+index 409dbff..59c1c17 100644
+--- a/host_applications/linux/apps/raspicam/RaspiPreview.h
++++ b/host_applications/linux/apps/raspicam/RaspiPreview.h
+@@ -55,6 +55,7 @@ typedef struct
+    int opacity;                           /// Opacity of window - 0 = transparent, 255 = opaque
+    MMAL_RECT_T previewWindow;             /// Destination rectangle for the preview window.
+    MMAL_COMPONENT_T *preview_component;   /// Pointer to the created preview display component
++   MMAL_COMPONENT_T *preview_hvs_component;   /// Pointer to the created preview display component
+ } RASPIPREVIEW_PARAMETERS;
+
+ MMAL_STATUS_T raspipreview_create(RASPIPREVIEW_PARAMETERS *state);
+diff --git a/host_applications/linux/apps/raspicam/RaspiStill.c b/host_applications/linux/apps/raspicam/RaspiStill.c
+index 9bd26fb..caafa9c 100644
+--- a/host_applications/linux/apps/raspicam/RaspiStill.c
++++ b/host_applications/linux/apps/raspicam/RaspiStill.c
+@@ -164,8 +164,11 @@ typedef struct
+    MMAL_COMPONENT_T *encoder_component;   /// Pointer to the encoder component
+    MMAL_COMPONENT_T *null_sink_component; /// Pointer to the null sink component
+    MMAL_CONNECTION_T *preview_connection; /// Pointer to the connection from camera to preview
++   MMAL_CONNECTION_T *preview_hvs_connection; /// Pointer to the connection from camera to preview
+    MMAL_CONNECTION_T *encoder_connection; /// Pointer to the connection from camera to encoder
+
++   MMAL_POOL_T *hvs_overlay_pool; /// Pointer to the pool of buffers used by encoder output port
++
+    MMAL_POOL_T *encoder_pool; /// Pointer to the pool of buffers used by encoder output port
+
+    RASPITEX_STATE raspitex_state; /// GL renderer state and parameters
+@@ -2015,6 +2018,10 @@ void *gps_reader_process(void *gps_reader_data_ptr)
+    return NULL;
+ }
+
++static void overlay_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
++{
++   mmal_buffer_header_release(buffer);
++}
+ /**
+  * main
+  */
+@@ -2155,6 +2162,7 @@ int main(int argc, const char **argv)
+
+       if (! state.useGL)
+       {
++         MMAL_ES_FORMAT_T *format;
+          if (state.verbose)
+             fprintf(stderr, "Connecting camera preview port to video render.\n");
+
+@@ -2163,7 +2171,124 @@ int main(int argc, const char **argv)
+          preview_input_port  = state.preview_parameters.preview_component->input[0];
+
+          // Connect camera to preview (which might be a null_sink if no preview required)
+-         status = connect_ports(camera_preview_port, preview_input_port, &state.preview_connection);
++         status = connect_ports(camera_preview_port, state.preview_parameters.preview_hvs_component->input[0], &state.preview_connection);
++         mmal_format_full_copy(state.preview_parameters.preview_hvs_component->output[0]->format, state.preview_parameters.preview_hvs_component->input[0]->format);
++         format = state.preview_parameters.preview_hvs_component->output[0]->format;
++         format->encoding = MMAL_ENCODING_BGRA;
++         format->es->video.crop.width = camera_preview_port->format->es->video.crop.width/2;
++         format->es->video.crop.height = camera_preview_port->format->es->video.crop.height/2;
++         format->es->video.width = VCOS_ALIGN_UP(format->es->video.crop.width, 32);
++         format->es->video.height = VCOS_ALIGN_UP(format->es->video.crop.height, 16);
++         format->es->video.crop.x = 0;
++         format->es->video.crop.y = 0;
++         status = mmal_port_format_commit(state.preview_parameters.preview_hvs_component->output[0]);
++         if (status != MMAL_SUCCESS)
++         {
++            vcos_log_error("%s: Failed to set HVS output", __func__);
++            goto error;
++         }
++         status = connect_ports(state.preview_parameters.preview_hvs_component->output[0], preview_input_port, &state.preview_hvs_connection);
++         if (status != MMAL_SUCCESS)
++         {
++            vcos_log_error("%s: Failed to connect hvs to render", __func__);
++            goto error;
++         }
++      }
++      {
++         MMAL_PORT_T *port = state.preview_parameters.preview_hvs_component->input[1];
++         MMAL_BUFFER_HEADER_T *buf;
++         MMAL_ES_FORMAT_T *format = port->format;
++         format->encoding = MMAL_ENCODING_BGRA;
++         format->es->video.crop.width = 2;
++         format->es->video.crop.height = 2;
++         format->es->video.width = VCOS_ALIGN_UP(format->es->video.crop.width, 32);
++         format->es->video.height = VCOS_ALIGN_UP(format->es->video.crop.height, 16);
++         format->es->video.crop.x = 0;
++         format->es->video.crop.y = 0;
++         status = mmal_port_format_commit(port);
++         if (status != MMAL_SUCCESS)
++         {
++            vcos_log_error("%s: Failed to set hvs overlay input", __func__);
++            goto error;
++         }
++
++         port->buffer_num = port->buffer_num_recommended;
++         port->buffer_size = port->buffer_size_recommended;
++         state.hvs_overlay_pool = mmal_port_pool_create(port, port->buffer_num, port->buffer_size);
++         if (!state.hvs_overlay_pool)
++         {
++            vcos_log_error("%s: Failed to create hvs overlay pool", __func__);
++            goto error;
++         }
++
++         MMAL_DISPLAYREGION_T param;
++         param.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
++         param.hdr.size = sizeof(MMAL_DISPLAYREGION_T);
++
++         param.set |= MMAL_DISPLAY_SET_ALPHA;
++         param.alpha = 255;
++
++         param.set |= MMAL_DISPLAY_SET_FULLSCREEN;
++         param.fullscreen = 1;
++
++         param.set |= MMAL_DISPLAY_SET_DEST_RECT;
++         param.dest_rect.x = 100;
++         param.dest_rect.y = 100;
++         param.dest_rect.width = 100;
++         param.dest_rect.height = 100;
++
++         param.set |= MMAL_DISPLAY_SET_LAYER;
++         param.layer = 2;
++
++         status = mmal_port_parameter_set(port, &param.hdr);
++
++         if (status != MMAL_SUCCESS && status != MMAL_ENOSYS)
++         {
++            vcos_log_error("unable to set port display_region (%u)", status);
++            goto error;
++         }
++
++         param.dest_rect.x = 0;
++         param.dest_rect.y = 0;
++         param.dest_rect.width = 1024;
++         param.dest_rect.height = 768;
++
++         param.set |= MMAL_DISPLAY_SET_LAYER;
++         param.layer = 1;
++
++         param.set |= MMAL_DISPLAY_SET_ALPHA;
++         param.alpha = 255;
++         status = mmal_port_parameter_set(state.preview_parameters.preview_hvs_component->input[0], &param.hdr);
++
++         if (status != MMAL_SUCCESS && status != MMAL_ENOSYS)
++         {
++            vcos_log_error("unable to set port display_region (%u)", status);
++            goto error;
++         }
++
++         if (mmal_port_enable(port, overlay_cb) != MMAL_SUCCESS)
++         {
++            vcos_log_error("%s: Failed to enable hvs overlay port", __func__);
++            goto error;
++         }
++         buf = mmal_queue_get(state.hvs_overlay_pool->queue);
++         if (buf)
++         {
++            #define RGBA(r,g,b,a) ((r) | (g<<8) | (b<<16) | (a<<24))
++            uint32_t *pixels = (uint32_t*)buf->data;
++            memset(buf->data, 0xFF, 16*16*4);
++            pixels[0] = RGBA(255, 255, 0, 128);
++            pixels[1] = RGBA(0, 255, 0, 128);
++            pixels[format->es->video.width] = RGBA(0, 0,   255, 128);
++            pixels[(format->es->video.width) + 1] = RGBA(0, 255, 255, 128);
++            buf->length = port->buffer_size;
++
++            status = mmal_port_send_buffer(port, buf);
++            if (status != MMAL_SUCCESS)
++            {
++               vcos_log_error("%s: Failed to send overlay buffer", __func__);
++            }
++         }
+       }
+
+#endif
+
 static void FilterBlendMmal(filter_t *p_filter,
                   picture_t *dst, const picture_t *src,
                   int x_offset, int y_offset, int alpha)
@@ -1660,6 +1910,7 @@ vlc_module_begin()
     add_shortcut("mmal_converter")
     set_capability( "video converter", 900 )
     add_bool(MMAL_RESIZE_NAME, /* default */ false, MMAL_RESIZE_TEXT, MMAL_RESIZE_LONGTEXT, /* advanced option */ false)
+    add_bool(MMAL_ISP_NAME, /* default */ false, MMAL_ISP_TEXT, MMAL_ISP_LONGTEXT, /* advanced option */ false)
     set_callbacks(OpenConverter, CloseConverter)
 
     add_submodule()
