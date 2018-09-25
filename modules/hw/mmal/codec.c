@@ -191,8 +191,9 @@ static MMAL_FOURCC_T vlc_to_mmal_pic_fourcc(const unsigned int fcc)
     switch (fcc){
     case VLC_CODEC_I420:
         return MMAL_ENCODING_I420;
-    case VLC_CODEC_RGB32:
-        return MMAL_ENCODING_BGRA;  // _RGB32 doesn't exist in mmal magic mapping table
+    case VLC_CODEC_RGB32:           // _RGB32 doesn't exist in mmal magic mapping table
+    case VLC_CODEC_RGBA:
+        return MMAL_ENCODING_BGRA;
     case VLC_CODEC_MMAL_OPAQUE:
         return MMAL_ENCODING_OPAQUE;
     default:
@@ -941,8 +942,10 @@ typedef struct filter_sys_t {
     MMAL_COMPONENT_T *component;
     MMAL_PORT_T *input;
     MMAL_PORT_T *output;
+    MMAL_PORT_T *subput;
     MMAL_POOL_T *out_pool;  // Free output buffers
     MMAL_POOL_T *in_pool;   // Input pool to get BH for replication
+    MMAL_POOL_T *sub_pool;  // Input pool for subpics
 
     pic_fifo_t ret_pics;
 
@@ -967,6 +970,47 @@ typedef struct filter_sys_t {
     } slice;
 
 } filter_sys_t;
+
+
+static MMAL_FOURCC_T vlc_to_mmal_colour_space(const video_color_space_t vlc_cs)
+{
+    switch (vlc_cs) {
+    case COLOR_SPACE_BT601:
+        return MMAL_COLOR_SPACE_ITUR_BT601;
+    case COLOR_SPACE_BT709:
+        return MMAL_COLOR_SPACE_ITUR_BT709;
+    case COLOR_SPACE_BT2020:
+    case COLOR_SPACE_UNDEF:
+        break;
+    }
+    return MMAL_COLOR_SPACE_UNKNOWN;
+}
+
+static void pic_to_format(MMAL_ES_FORMAT_T * const es_fmt, const picture_t * const pic)
+{
+    unsigned int bpp = (pic->format.i_bits_per_pixel + 7) >> 3;
+    MMAL_VIDEO_FORMAT_T * const v_fmt = &es_fmt->es->video;
+    char tb0[5], tb1[5];
+
+    es_fmt->type = MMAL_ES_TYPE_VIDEO;
+    es_fmt->encoding_variant = es_fmt->encoding =
+        vlc_to_mmal_pic_fourcc(pic->format.i_chroma);
+
+    printf("%s: enc=%s/%s\n", __func__, str_fourcc(tb0, pic->format.i_chroma), str_fourcc(tb1, es_fmt->encoding));
+
+    v_fmt->width = pic->p[0].i_pitch / bpp;
+    v_fmt->height = pic->p[0].i_lines;
+    v_fmt->crop.x = 0;
+    v_fmt->crop.y = 0;
+    v_fmt->crop.width = pic->p[0].i_visible_pitch / bpp;
+    v_fmt->crop.height = pic->p[0].i_visible_lines;
+    v_fmt->frame_rate.den = pic->format.i_frame_rate_base;
+    v_fmt->frame_rate.num = pic->format.i_frame_rate;
+    v_fmt->par.den = pic->format.i_sar_den;
+    v_fmt->par.num = pic->format.i_sar_num;
+    v_fmt->color_space = vlc_to_mmal_colour_space(pic->format.space);
+}
+
 
 static MMAL_STATUS_T conv_enable_in(filter_t * const p_filter, filter_sys_t * const sys)
 {
@@ -1032,6 +1076,23 @@ static void conv_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     msg_Dbg((filter_t *)port->userdata, ">>> %s", __func__);
 #endif
 }
+
+static void conv_subpic_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
+{
+    picture_t * pic = buf->user_data;
+//    filter_sys_t *const sys = ((filter_t *)port->userdata)->p_sys;
+
+    msg_Dbg((filter_t *)port->userdata, "<<< %s cmd=%d, ctx=%p, buf=%p, flags=%#x, len=%d/%d, pts=%lld",
+            __func__, buf->cmd, pic, buf, buf->flags, buf->length, buf->alloc_size, (long long)buf->pts);
+
+    if (pic != NULL) {
+        picture_Release(pic);
+    }
+
+    buf->user_data = NULL;
+    mmal_buffer_header_release(buf);
+}
+
 
 static void conv_out_q_pic(filter_sys_t * const sys, picture_t * const pic)
 {
@@ -1186,6 +1247,9 @@ static void conv_flush(filter_t * p_filter)
     msg_Dbg(p_filter, "<<< %s", __func__);
 #endif
 
+    if (sys->subput != NULL && sys->subput->is_enabled)
+        mmal_port_disable(sys->subput);
+
     if (sys->input != NULL && sys->input->is_enabled)
         mmal_port_disable(sys->input);
 
@@ -1234,8 +1298,48 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     }
     else {
         pic_ctx_subpic_t * const sub = &((pic_ctx_mmal_t *)p_pic->context)->sub;
+        MMAL_PORT_T * const port = sys->subput;
 
         msg_Dbg(p_filter, "%s: Subpic: %p @ %d,%d:%d", __func__, sub->subpic, sub->x, sub->y, sub->alpha);
+
+        if (!port->is_enabled) {
+
+            port->userdata = (struct MMAL_PORT_USERDATA_T *)p_filter;
+            pic_to_format(port->format, sub->subpic);
+
+            mmal_log_dump_format(port->format);
+
+            if ((err = mmal_port_format_commit(port)) != MMAL_SUCCESS)
+            {
+                msg_Dbg(p_filter, "%s: Subpic commit fail: %d", __func__, err);
+            }
+
+            port->buffer_num = sys->input->buffer_num;  // Want as many aux buffers as input buffers
+            port->buffer_size = port->buffer_size_recommended;
+
+            if ((err = mmal_port_enable(port, conv_subpic_cb)) != MMAL_SUCCESS)
+            {
+                msg_Dbg(p_filter, "%s: Subpic enable fail: %d", __func__, err);
+            }
+        }
+
+        {
+            MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->sub_pool->queue);
+
+            buf->data = sub->subpic->p[0].p_pixels;
+            buf->alloc_size = buf->length = sub->subpic->p[0].i_lines * sub->subpic->p[0].i_pitch;
+            buf->offset = 0;
+            buf->user_data = sub->subpic;
+            buf->pts = buf->dts = pic_mmal_buffer(p_pic)->pts;
+
+            pic_to_buf_copy_props(buf, sub->subpic);
+
+            if ((err = mmal_port_send_buffer(port, buf)) != MMAL_SUCCESS)
+            {
+                msg_Err(p_filter, "Send buffer to subput failed");
+                goto fail;
+            }
+        }
     }
 
     // Reenable stuff if the last thing we did was flush
@@ -1408,6 +1512,9 @@ static void CloseConverter(vlc_object_t * obj)
     if (sys->in_pool != NULL)
         mmal_pool_destroy(sys->in_pool);
 
+    if (sys->sub_pool != NULL)
+        mmal_pool_destroy(sys->sub_pool);
+
     if (sys->component)
         mmal_component_release(sys->component);
 
@@ -1431,16 +1538,8 @@ static int conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, 
     // Override default format width/height if we have a pic we need to match
     if (pic != NULL)
     {
-        unsigned int bpp = (pic->format.i_bits_per_pixel + 7) >> 3;
-        MMAL_VIDEO_FORMAT_T * const fmt = &sys->output->format->es->video;
-        fmt->width = pic->p[0].i_pitch / bpp;
-        fmt->height = pic->p[0].i_lines;
-        fmt->crop.x = 0;
-        fmt->crop.y = 0;
-        fmt->crop.width = pic->p[0].i_visible_pitch / bpp;
-        fmt->crop.height = pic->p[0].i_visible_lines;
-
-        msg_Dbg(p_filter, "%s: %dx%d [(0,0) %dx%d]", __func__, fmt->width, fmt->height, fmt->crop.width, fmt->crop.height);
+        pic_to_format(sys->output->format, pic);
+//        msg_Dbg(p_filter, "%s: %dx%d [(0,0) %dx%d]", __func__, fmt->width, fmt->height, fmt->crop.width, fmt->crop.height);
     }
 
     mmal_log_dump_format(sys->output->format);
@@ -1542,7 +1641,8 @@ static int OpenConverter(vlc_object_t * obj)
         goto fail;
     }
     sys->output = sys->component->output[0];
-    sys->input = sys->component->input[0];
+    sys->input  = sys->component->input[0];
+    sys->subput = sys->component->input[1];
 
     sys->component->control->userdata = (struct MMAL_PORT_USERDATA_T *)p_filter;
     status = mmal_port_enable(sys->component->control, conv_control_port_cb);
@@ -1607,6 +1707,11 @@ static int OpenConverter(vlc_object_t * obj)
         goto fail;
     }
     if ((sys->in_pool = mmal_pool_create(sys->input->buffer_num, 0)) == NULL)
+    {
+        msg_Err(p_filter, "Failed to create input pool");
+        goto fail;
+    }
+    if ((sys->sub_pool = mmal_pool_create(20, 0)) == NULL)
     {
         msg_Err(p_filter, "Failed to create input pool");
         goto fail;
