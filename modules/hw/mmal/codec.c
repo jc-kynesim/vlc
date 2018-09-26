@@ -1352,11 +1352,15 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                     goto fail;
                 }
 
+                buf->cmd = 0;
                 buf->data = subpic->p[0].p_pixels;
                 buf->alloc_size = buf->length = subpic->p[0].i_lines * subpic->p[0].i_pitch;
                 buf->offset = 0;
+                buf->flags = MMAL_BUFFER_HEADER_FLAG_FRAME_END;
+                buf->pts = buf->dts = p_pic->date != VLC_TICK_INVALID ? p_pic->date : MMAL_TIME_UNKNOWN;
                 buf->user_data = subpic;
-                buf->pts = buf->dts = pic_mmal_buffer(p_pic)->pts;
+
+                printf("Subpic: pts=%lld\n", buf->pts);
 
                 pic_to_buf_copy_props(buf, subpic);
                 hw_mmal_pic_unset_subpic(p_pic);
