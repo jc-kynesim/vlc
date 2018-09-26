@@ -1305,7 +1305,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         {
             MMAL_PORT_T *const port = sys->subput;
 
-            msg_Dbg(p_filter, "%s: Subpic: %p @ %d,%d:%d", __func__, subpic, sub->x, sub->y, sub->alpha);
+            msg_Dbg(p_filter, "%s: Subpic: %p @ %d,%d:%d %dx%d", __func__, subpic, sub->x, sub->y, sub->alpha, subpic->format.i_width, subpic->format.i_height);
 
             if (!port->is_enabled) {
 
@@ -1330,6 +1330,27 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 
             {
                 MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->sub_pool->queue);
+                MMAL_DISPLAYREGION_T dreg = {
+                    .hdr = {
+                        .id = MMAL_PARAMETER_DISPLAYREGION,
+                        .size = sizeof(MMAL_DISPLAYREGION_T)
+                    },
+                    .set = MMAL_DISPLAY_SET_ALPHA | MMAL_DISPLAY_SET_FULLSCREEN | MMAL_DISPLAY_SET_DEST_RECT,
+                    .alpha = sub->alpha,
+                    .fullscreen = 0,
+                    .dest_rect = {
+                        .x = sub->x,
+                        .y = sub->y,
+                        .width = subpic->format.i_width,
+                        .height = subpic->format.i_height
+                    },
+                };
+
+                if ((err = mmal_port_parameter_set(port, &dreg.hdr)) != MMAL_SUCCESS)
+                {
+                    msg_Err(p_filter, "Set display region on subput failed");
+                    goto fail;
+                }
 
                 buf->data = subpic->p[0].p_pixels;
                 buf->alloc_size = buf->length = subpic->p[0].i_lines * subpic->p[0].i_pitch;
@@ -1338,6 +1359,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 buf->pts = buf->dts = pic_mmal_buffer(p_pic)->pts;
 
                 pic_to_buf_copy_props(buf, subpic);
+                hw_mmal_pic_unset_subpic(p_pic);
 
                 if ((err = mmal_port_send_buffer(port, buf)) != MMAL_SUCCESS)
                 {
