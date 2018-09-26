@@ -1296,48 +1296,54 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     if (p_pic->context == NULL) {
         msg_Dbg(p_filter, "%s: No context", __func__);
     }
-    else {
+    else
+    {
         pic_ctx_subpic_t * const sub = &((pic_ctx_mmal_t *)p_pic->context)->sub;
-        MMAL_PORT_T * const port = sys->subput;
+        picture_t *const subpic = sub->subpic;
 
-        msg_Dbg(p_filter, "%s: Subpic: %p @ %d,%d:%d", __func__, sub->subpic, sub->x, sub->y, sub->alpha);
-
-        if (!port->is_enabled) {
-
-            port->userdata = (struct MMAL_PORT_USERDATA_T *)p_filter;
-            pic_to_format(port->format, sub->subpic);
-
-            mmal_log_dump_format(port->format);
-
-            if ((err = mmal_port_format_commit(port)) != MMAL_SUCCESS)
-            {
-                msg_Dbg(p_filter, "%s: Subpic commit fail: %d", __func__, err);
-            }
-
-            port->buffer_num = sys->input->buffer_num;  // Want as many aux buffers as input buffers
-            port->buffer_size = port->buffer_size_recommended;
-
-            if ((err = mmal_port_enable(port, conv_subpic_cb)) != MMAL_SUCCESS)
-            {
-                msg_Dbg(p_filter, "%s: Subpic enable fail: %d", __func__, err);
-            }
-        }
-
+        if (subpic != NULL)
         {
-            MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->sub_pool->queue);
+            MMAL_PORT_T *const port = sys->subput;
 
-            buf->data = sub->subpic->p[0].p_pixels;
-            buf->alloc_size = buf->length = sub->subpic->p[0].i_lines * sub->subpic->p[0].i_pitch;
-            buf->offset = 0;
-            buf->user_data = sub->subpic;
-            buf->pts = buf->dts = pic_mmal_buffer(p_pic)->pts;
+            msg_Dbg(p_filter, "%s: Subpic: %p @ %d,%d:%d", __func__, subpic, sub->x, sub->y, sub->alpha);
 
-            pic_to_buf_copy_props(buf, sub->subpic);
+            if (!port->is_enabled) {
 
-            if ((err = mmal_port_send_buffer(port, buf)) != MMAL_SUCCESS)
+                port->userdata = (struct MMAL_PORT_USERDATA_T *)p_filter;
+                pic_to_format(port->format, subpic);
+
+                mmal_log_dump_format(port->format);
+
+                if ((err = mmal_port_format_commit(port)) != MMAL_SUCCESS)
+                {
+                    msg_Dbg(p_filter, "%s: Subpic commit fail: %d", __func__, err);
+                }
+
+                port->buffer_num = sys->input->buffer_num;  // Want as many aux buffers as input buffers
+                port->buffer_size = port->buffer_size_recommended;
+
+                if ((err = mmal_port_enable(port, conv_subpic_cb)) != MMAL_SUCCESS)
+                {
+                    msg_Dbg(p_filter, "%s: Subpic enable fail: %d", __func__, err);
+                }
+            }
+
             {
-                msg_Err(p_filter, "Send buffer to subput failed");
-                goto fail;
+                MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->sub_pool->queue);
+
+                buf->data = subpic->p[0].p_pixels;
+                buf->alloc_size = buf->length = subpic->p[0].i_lines * subpic->p[0].i_pitch;
+                buf->offset = 0;
+                buf->user_data = subpic;
+                buf->pts = buf->dts = pic_mmal_buffer(p_pic)->pts;
+
+                pic_to_buf_copy_props(buf, subpic);
+
+                if ((err = mmal_port_send_buffer(port, buf)) != MMAL_SUCCESS)
+                {
+                    msg_Err(p_filter, "Send buffer to subput failed");
+                    goto fail;
+                }
             }
         }
     }
