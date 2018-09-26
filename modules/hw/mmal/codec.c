@@ -1085,12 +1085,7 @@ static void conv_subpic_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     msg_Dbg((filter_t *)port->userdata, "<<< %s cmd=%d, ctx=%p, buf=%p, flags=%#x, len=%d/%d, pts=%lld",
             __func__, buf->cmd, pic, buf, buf->flags, buf->length, buf->alloc_size, (long long)buf->pts);
 
-    if (pic != NULL) {
-        picture_Release(pic);
-    }
-
-    buf->user_data = NULL;
-    mmal_buffer_header_release(buf);
+    mmal_buffer_header_release(buf);  // Will extract & release pic in pool callback
 }
 
 
@@ -1300,11 +1295,10 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     {
         pic_ctx_subpic_t * const sub = &((pic_ctx_mmal_t *)p_pic->context)->sub;
         picture_t *const subpic = sub->subpic;
+        MMAL_PORT_T *const port = sys->subput;
 
         if (subpic != NULL)
         {
-            MMAL_PORT_T *const port = sys->subput;
-
             msg_Dbg(p_filter, "%s: Subpic: %p @ %d,%d:%d %dx%d", __func__, subpic, sub->x, sub->y, sub->alpha, subpic->format.i_width, subpic->format.i_height);
 
             if (!port->is_enabled) {
@@ -1330,7 +1324,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 
             {
                 MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->sub_pool->queue);
-                MMAL_DISPLAYREGION_T dreg = {
+                const MMAL_DISPLAYREGION_T dreg = {
                     .hdr = {
                         .id = MMAL_PARAMETER_DISPLAYREGION,
                         .size = sizeof(MMAL_DISPLAYREGION_T)
@@ -1346,9 +1340,8 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                     },
                 };
 
-                if ((err = mmal_port_parameter_set(port, &dreg.hdr)) != MMAL_SUCCESS)
-                {
-                    msg_Err(p_filter, "Set display region on subput failed");
+                if (buf == NULL) {
+                    msg_Err(p_filter, "Buffer get for subpic failed");
                     goto fail;
                 }
 
@@ -1358,18 +1351,53 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 buf->offset = 0;
                 buf->flags = MMAL_BUFFER_HEADER_FLAG_FRAME_END;
                 buf->pts = buf->dts = p_pic->date != VLC_TICK_INVALID ? p_pic->date : MMAL_TIME_UNKNOWN;
-                buf->user_data = subpic;
+                buf->user_data = picture_Hold(subpic);
+                buf->type->video = (MMAL_BUFFER_HEADER_VIDEO_SPECIFIC_T){
+                    .planes = 1,
+                    .pitch = { subpic->p[0].i_pitch }
+                };
 
                 printf("Subpic: pts=%lld\n", buf->pts);
 
-                pic_to_buf_copy_props(buf, subpic);
                 hw_mmal_pic_unset_subpic(p_pic);
+
+                if ((err = mmal_port_parameter_set(port, &dreg.hdr)) != MMAL_SUCCESS)
+                {
+                    msg_Err(p_filter, "Set display region on subput failed");
+                    mmal_buffer_header_release(buf);
+                    goto fail;
+                }
 
                 if ((err = mmal_port_send_buffer(port, buf)) != MMAL_SUCCESS)
                 {
                     msg_Err(p_filter, "Send buffer to subput failed");
+                    mmal_buffer_header_release(buf);
                     goto fail;
                 }
+            }
+        }
+        else if (sys->subput->is_enabled)
+        {
+            MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->sub_pool->queue);
+
+            if (buf == NULL) {
+                msg_Err(p_filter, "Buffer get for subpic failed");
+                goto fail;
+            }
+
+            buf->cmd = 0;
+            buf->data = NULL;
+            buf->alloc_size = 0;
+            buf->offset = 0;
+            buf->flags = 0;
+            buf->pts = buf->dts = p_pic->date != VLC_TICK_INVALID ? p_pic->date : MMAL_TIME_UNKNOWN;
+            buf->user_data = NULL;
+
+            if ((err = mmal_port_send_buffer(port, buf)) != MMAL_SUCCESS)
+            {
+                msg_Err(p_filter, "Send buffer to subput failed");
+                mmal_buffer_header_release(buf);
+                goto fail;
             }
         }
     }
@@ -1592,6 +1620,19 @@ static int conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, 
     return 0;
 }
 
+static MMAL_BOOL_T conv_subpic_release_cb(MMAL_POOL_T *pool, MMAL_BUFFER_HEADER_T *buffer, void *userdata)
+{
+    picture_t *const pic = (picture_t *)buffer->user_data;
+    VLC_UNUSED(pool);
+    VLC_UNUSED(userdata);
+
+    if (pic != NULL) {
+        buffer->user_data = NULL;
+        picture_Release(pic);
+    }
+    return MMAL_TRUE;
+}
+
 static int OpenConverter(vlc_object_t * obj)
 {
     filter_t * const p_filter = (filter_t *)obj;
@@ -1745,9 +1786,10 @@ static int OpenConverter(vlc_object_t * obj)
     }
     if ((sys->sub_pool = mmal_pool_create(20, 0)) == NULL)
     {
-        msg_Err(p_filter, "Failed to create input pool");
+        msg_Err(p_filter, "Failed to create subpic pool");
         goto fail;
     }
+    mmal_pool_callback_set(sys->sub_pool, conv_subpic_release_cb, NULL);
 
     p_filter->pf_video_filter = conv_filter;
     p_filter->pf_flush = conv_flush;
