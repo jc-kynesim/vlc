@@ -958,6 +958,8 @@ typedef struct filter_sys_t {
     MMAL_STATUS_T err_stream;
     int in_count;
 
+    bool subpic_set;
+
     bool zero_copy;
     const char * component_name;
     MMAL_PORT_BH_CB_T in_port_cb_fn;
@@ -1082,7 +1084,7 @@ static void conv_subpic_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     picture_t * pic = buf->user_data;
 //    filter_sys_t *const sys = ((filter_t *)port->userdata)->p_sys;
 
-    msg_Dbg((filter_t *)port->userdata, "<<< %s cmd=%d, ctx=%p, buf=%p, flags=%#x, len=%d/%d, pts=%lld",
+    msg_Warn((filter_t *)port->userdata, "<<< %s cmd=%d, ctx=%p, buf=%p, flags=%#x, len=%d/%d, pts=%lld",
             __func__, buf->cmd, pic, buf, buf->flags, buf->length, buf->alloc_size, (long long)buf->pts);
 
     mmal_buffer_header_release(buf);  // Will extract & release pic in pool callback
@@ -1297,9 +1299,9 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         picture_t *const subpic = sub->subpic;
         MMAL_PORT_T *const port = sys->subput;
 
-        if (subpic != NULL)
+        if (subpic != NULL && subpic->format.i_width > 0 && subpic->format.i_height > 0)
         {
-            msg_Dbg(p_filter, "%s: Subpic: %p @ %d,%d:%d %dx%d", __func__, subpic, sub->x, sub->y, sub->alpha, subpic->format.i_width, subpic->format.i_height);
+            msg_Warn(p_filter, "%s: Subpic: %p @ %d,%d:%d %dx%d", __func__, subpic, sub->x, sub->y, sub->alpha, subpic->format.i_width, subpic->format.i_height);
 
             if (!port->is_enabled) {
 
@@ -1313,8 +1315,10 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                     msg_Dbg(p_filter, "%s: Subpic commit fail: %d", __func__, err);
                 }
 
-                port->buffer_num = sys->input->buffer_num;  // Want as many aux buffers as input buffers
-                port->buffer_size = port->buffer_size_recommended;
+//                port->buffer_num = sys->input->buffer_num;  // Want as many aux buffers as input buffers
+//                port->buffer_size = port->buffer_size_recommended;
+                port->buffer_num = 10;
+                port->buffer_size = 1920*1088*4;
 
                 if ((err = mmal_port_enable(port, conv_subpic_cb)) != MMAL_SUCCESS)
                 {
@@ -1322,6 +1326,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 }
             }
 
+//            if (subpic != sys->last_subpic)
             {
                 MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->sub_pool->queue);
                 const MMAL_DISPLAYREGION_T dreg = {
@@ -1374,11 +1379,16 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                     mmal_buffer_header_release(buf);
                     goto fail;
                 }
+
+                sys->subpic_set = true;
             }
         }
-        else if (sys->subput->is_enabled)
+        else if (port->is_enabled && sys->subpic_set)
         {
             MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->sub_pool->queue);
+
+            // Kill any (empty) subpic
+            hw_mmal_pic_unset_subpic(p_pic);
 
             if (buf == NULL) {
                 msg_Err(p_filter, "Buffer get for subpic failed");
@@ -1399,6 +1409,8 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 mmal_buffer_header_release(buf);
                 goto fail;
             }
+
+            sys->subpic_set = false;
         }
     }
 
@@ -1784,7 +1796,7 @@ static int OpenConverter(vlc_object_t * obj)
         msg_Err(p_filter, "Failed to create input pool");
         goto fail;
     }
-    if ((sys->sub_pool = mmal_pool_create(20, 0)) == NULL)
+    if ((sys->sub_pool = mmal_pool_create(10, 0)) == NULL)
     {
         msg_Err(p_filter, "Failed to create subpic pool");
         goto fail;

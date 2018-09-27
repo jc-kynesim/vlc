@@ -31,8 +31,10 @@
 #include <interface/mmal/util/mmal_util.h>
 #include <interface/mmal/util/mmal_default_components.h>
 #include <interface/vmcs_host/vcgencmd.h>
+#include <interface/vcsm/user-vcsm.h>
 
 #include "mmal_picture.h"
+
 
 void vlc_to_mmal_pic_fmt(MMAL_PORT_T * const port, const es_format_t * const es_vlc)
 {
@@ -244,4 +246,124 @@ fail0:
     return -1;
 };
 
+// ===========================================================================
 
+typedef struct pool_ent_s
+{
+    struct pool_ent_s * next;
+    struct pool_ent_s * prev;
+    size_t size;
+
+    int vcsm_hdl;
+    int vc_hdl;
+    void * buf;
+} pool_ent_t;
+
+typedef struct pool_ctl_s
+{
+    pool_ent_t * ents;
+    pool_ent_t * tail;
+    unsigned int n;
+    unsigned int max_n;
+} pool_ctl_t;
+
+
+pool_ent_t * pool_extract_ent(pool_ctl_t * const pc, pool_ent_t * const ent)
+{
+    if (ent->next == NULL)
+        pc->tail = ent->prev;
+    else
+        ent->next->prev = ent->prev;
+
+    if (ent->prev == NULL)
+        pc->ents = ent->next;
+    else
+        ent->prev->next = ent->next;
+
+    ent->prev = ent->next = NULL;
+
+    --pc->n;
+
+    return ent;  // For convienience
+}
+
+void pool_free_last(pool_ctl_t * const pc)
+{
+    pool_ent_t * const ent = pool_extract_ent(pc, pc->tail);
+
+    // Free contents
+    vcsm_unlock_hdl(ent->vcsm_hdl);
+
+    vcsm_free(ent->vcsm_hdl);
+
+    free(ent);
+}
+
+pool_ent_t * pool_alloc_new(pool_ctl_t * const pc, size_t req_size)
+{
+    pool_ent_t * ent = malloc(sizeof(*ent));
+
+    if (ent == NULL)
+        return NULL;
+
+    ent->next = ent->prev = NULL;
+
+    // Alloc from vcsm
+    if ((ent->vcsm_hdl = vcsm_malloc_cache(req_size, VCSM_CACHE_TYPE_HOST, (char *)"vlc-subpic")) == -1)
+        goto fail1;
+    if ((ent->vc_hdl = vcsm_vc_hdl_from_hdl(ent->vcsm_hdl)) == 0)
+        goto fail2;
+    if ((ent->buf = vcsm_lock(ent->vcsm_hdl)) == NULL)
+        goto fail2;
+
+    ent->size = req_size;
+
+    return ent;
+
+fail2:
+    vcsm_free(ent->vcsm_hdl);
+fail1:
+    free(ent);
+    return NULL;
+}
+
+
+void pool_recycle(pool_ctl_t * const pc, pool_ent_t * const ent)
+{
+    if (pc->n >= pc->max_n)
+        pool_free_last(pc);
+
+    if ((ent->next = pc->ents) == NULL)
+        pc->tail = ent;
+    else
+        ent->next->prev = ent;
+
+    ent->prev = NULL;
+    pc->ents = ent;
+}
+
+
+pool_ent_t * pool_best_fit(pool_ctl_t * const pc, size_t req_size)
+{
+    pool_ent_t * ent = pc->ents;
+    pool_ent_t * best = NULL;
+
+    // Simple scan
+    while (ent != NULL) {
+        if (ent->size >= req_size && ent->size <= req_size * 2 && (best == NULL || best->size > ent->size))
+            best = ent;
+        ent = ent->next;
+    }
+
+    // extract best from chain if we've found it
+    if (best != NULL)
+        return pool_extract_ent(pc, best);
+
+    return pool_alloc_new(pc, req_size);
+}
+
+int pool_init()
+{
+    vcsm_init();
+    return 0;
+}
