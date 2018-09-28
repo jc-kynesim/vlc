@@ -57,7 +57,9 @@ typedef struct pic_ctx_mmal_s {
 
     MMAL_BUFFER_HEADER_T * buf;
     hw_mmal_port_pool_ref_t * ppr;
-    pic_ctx_subpic_t sub;
+
+    MMAL_BUFFER_HEADER_T * sub_bufs;
+    MMAL_BUFFER_HEADER_T * sub_tail;
 
     vlc_object_t * obj;
 } pic_ctx_mmal_t;
@@ -75,23 +77,30 @@ static inline void hw_mmal_port_pool_ref_acquire(hw_mmal_port_pool_ref_t * const
     atomic_fetch_add(&ppr->refs, 1);
 }
 
-static inline void hw_mmal_pic_set_subpic(picture_t * pic, const picture_t * subpic, int x, int y, int alpha)
+static inline void hw_mmal_pic_sub_buf_add(picture_t * const pic, MMAL_BUFFER_HEADER_T * const sub)
 {
-    pic_ctx_subpic_t * const sub = &((pic_ctx_mmal_t *)pic->context)->sub;
-    sub->subpic = picture_Hold((picture_t *)subpic);
-    sub->x = x;
-    sub->y = y;
-    sub->alpha = alpha;
+    pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic->context;
+    sub->next = NULL;
+    if (ctx->sub_tail == NULL)
+        ctx->sub_bufs = sub;
+    else
+        ctx->sub_tail->next = sub;
+    ctx->sub_tail = sub;
 }
 
-static inline void hw_mmal_pic_unset_subpic(picture_t * pic)
+static inline MMAL_BUFFER_HEADER_T * hw_mmal_pic_sub_buf_get(picture_t * const pic)
 {
-    pic_ctx_subpic_t * const sub = &((pic_ctx_mmal_t *)pic->context)->sub;
-    if (sub->subpic != NULL)
-    {
-        picture_Release(sub->subpic);
-        sub->subpic = NULL;
-    }
+    pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic->context;
+    MMAL_BUFFER_HEADER_T * const sub = ctx->sub_bufs;
+
+    if (sub == NULL)
+        return NULL;
+
+    if ((ctx->sub_bufs = sub->next) == NULL)
+        ctx->sub_tail = NULL;
+
+    sub->next = NULL;
+    return sub;
 }
 
 picture_context_t * hw_mmal_pic_ctx_copy(picture_context_t * pic_ctx_cmn);
@@ -167,6 +176,15 @@ static inline MMAL_BUFFER_HEADER_T * pic_mmal_buffer(const picture_t *const pic)
 
     return buf;
 }
+
+struct vzc_pool_ctl_s;
+typedef struct vzc_pool_ctl_s vzc_pool_ctl_t;
+
+bool hw_mmal_vzc_buf_set_format(MMAL_BUFFER_HEADER_T * const buf, MMAL_ES_FORMAT_T * const es_fmt);
+MMAL_DISPLAYREGION_T * hw_mmal_vzc_buf_region(MMAL_BUFFER_HEADER_T * const buf);
+MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, const picture_t * const pic);
+void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc);
+vzc_pool_ctl_t * hw_mmal_vzc_pool_new(void);
 
 
 

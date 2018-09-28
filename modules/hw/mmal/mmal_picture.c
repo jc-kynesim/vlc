@@ -157,10 +157,15 @@ buf_pre_release_cb(MMAL_BUFFER_HEADER_T * buf, void *userdata)
     mmal_buffer_header_pre_release_cb_set(buf, (MMAL_BH_PRE_RELEASE_CB_T)0, NULL);
     mmal_buffer_header_acquire(buf);  // Ref it again
 
-    // Kill any sub-pic
-    if (ctx->sub.subpic != NULL) {
-        picture_Release(ctx->sub.subpic);
-        ctx->sub.subpic = NULL;  // Not needed but be tidy to make sure we can't reuse accidentaly
+    // Kill any sub-pics still attached
+    {
+        MMAL_BUFFER_HEADER_T * sub;
+        while ((sub = ctx->sub_bufs) != NULL) {
+            ctx->sub_bufs = sub->next;
+            sub->next = NULL;
+            mmal_buffer_header_release(sub);
+        }
+        ctx->sub_tail = NULL; // Just tidy
     }
 
     // As we have re-acquired the buffer we need a full release
@@ -257,18 +262,25 @@ typedef struct pool_ent_s
     int vcsm_hdl;
     int vc_hdl;
     void * buf;
+
+    MMAL_DISPLAYREGION_T dreg;
+    unsigned int width;
+    unsigned int height;
 } pool_ent_t;
 
-typedef struct pool_ctl_s
+
+struct vzc_pool_ctl_s
 {
     pool_ent_t * ents;
     pool_ent_t * tail;
     unsigned int n;
     unsigned int max_n;
-} pool_ctl_t;
+
+    MMAL_POOL_T * pool;
+};
 
 
-pool_ent_t * pool_extract_ent(pool_ctl_t * const pc, pool_ent_t * const ent)
+static pool_ent_t * pool_extract_ent(vzc_pool_ctl_t * const pc, pool_ent_t * const ent)
 {
     if (ent->next == NULL)
         pc->tail = ent->prev;
@@ -287,7 +299,7 @@ pool_ent_t * pool_extract_ent(pool_ctl_t * const pc, pool_ent_t * const ent)
     return ent;  // For convienience
 }
 
-void pool_free_last(pool_ctl_t * const pc)
+static void pool_free_last(vzc_pool_ctl_t * const pc)
 {
     pool_ent_t * const ent = pool_extract_ent(pc, pc->tail);
 
@@ -299,9 +311,9 @@ void pool_free_last(pool_ctl_t * const pc)
     free(ent);
 }
 
-pool_ent_t * pool_alloc_new(pool_ctl_t * const pc, size_t req_size)
+static pool_ent_t * pool_ent_alloc_new(size_t req_size)
 {
-    pool_ent_t * ent = malloc(sizeof(*ent));
+    pool_ent_t * ent = calloc(1, sizeof(*ent));
 
     if (ent == NULL)
         return NULL;
@@ -318,6 +330,11 @@ pool_ent_t * pool_alloc_new(pool_ctl_t * const pc, size_t req_size)
 
     ent->size = req_size;
 
+    // Init the region header
+    // Doesn't really belong here but it simplifies the structures
+    ent->dreg.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
+    ent->dreg.hdr.size = sizeof(ent->dreg);
+
     return ent;
 
 fail2:
@@ -328,7 +345,7 @@ fail1:
 }
 
 
-void pool_recycle(pool_ctl_t * const pc, pool_ent_t * const ent)
+static void pool_recycle(vzc_pool_ctl_t * const pc, pool_ent_t * const ent)
 {
     if (pc->n >= pc->max_n)
         pool_free_last(pc);
@@ -343,7 +360,7 @@ void pool_recycle(pool_ctl_t * const pc, pool_ent_t * const ent)
 }
 
 
-pool_ent_t * pool_best_fit(pool_ctl_t * const pc, size_t req_size)
+static pool_ent_t * pool_best_fit(vzc_pool_ctl_t * const pc, size_t req_size)
 {
     pool_ent_t * ent = pc->ents;
     pool_ent_t * best = NULL;
@@ -359,11 +376,148 @@ pool_ent_t * pool_best_fit(pool_ctl_t * const pc, size_t req_size)
     if (best != NULL)
         return pool_extract_ent(pc, best);
 
-    return pool_alloc_new(pc, req_size);
+    return pool_ent_alloc_new(req_size);
 }
 
-int pool_init()
+bool hw_mmal_vzc_buf_set_format(MMAL_BUFFER_HEADER_T * const buf, MMAL_ES_FORMAT_T * const es_fmt)
 {
-    vcsm_init();
-    return 0;
+    const pool_ent_t * const ent = buf->user_data;
+    MMAL_VIDEO_FORMAT_T * const v_fmt = &es_fmt->es->video;
+
+    es_fmt->type = MMAL_ES_TYPE_VIDEO;
+    es_fmt->encoding = MMAL_ENCODING_BGRA;
+    es_fmt->encoding_variant = MMAL_ENCODING_BGRA;
+
+    v_fmt->width = ent->width;
+    v_fmt->height = ent->height;
+    v_fmt->crop.x = 0;
+    v_fmt->crop.y = 0;
+    v_fmt->crop.width = ent->width;
+    v_fmt->crop.height = ent->height;
+    return true;
 }
+
+MMAL_DISPLAYREGION_T * hw_mmal_vzc_buf_region(MMAL_BUFFER_HEADER_T * const buf)
+{
+    pool_ent_t *ent = buf->user_data;
+    return &ent->dreg;
+}
+
+MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, const picture_t * const pic)
+{
+    MMAL_BUFFER_HEADER_T *buf = mmal_queue_get(pc->pool->queue);
+    if (buf == NULL)
+        return NULL;
+
+    {
+        // ?? Round start offset as well as length
+        const video_format_t *const fmt = &pic->format;
+
+        unsigned int bpp = (fmt->i_bits_per_pixel + 7) >> 3;
+        unsigned int xl = (fmt->i_x_offset & ~15);
+        unsigned int xr = (fmt->i_x_offset + fmt->i_visible_width + 15) & ~15;
+        size_t dst_stride = (xr - xl) * bpp;
+        size_t dst_size = dst_stride * ((fmt->i_visible_height + 15) & ~15);
+
+        pool_ent_t * ent = pool_best_fit(pc, dst_size);
+
+        if (ent == NULL)
+            goto fail1;
+        buf->user_data = ent;
+
+        // Copy data
+        buf->next = NULL;
+        buf->cmd = 0;
+        buf->data = (uint8_t *)(ent->vc_hdl);
+        buf->alloc_size = buf->length = dst_size;
+        buf->offset = 0;
+        buf->flags = MMAL_BUFFER_HEADER_FLAG_FRAME_END;
+        buf->pts = buf->dts = pic->date != VLC_TICK_INVALID ? pic->date : MMAL_TIME_UNKNOWN;
+        buf->type->video = (MMAL_BUFFER_HEADER_VIDEO_SPECIFIC_T){
+            .planes = 1,
+            .pitch = { dst_stride }
+        };
+
+        // Remember offsets
+        ent->dreg.set = MMAL_DISPLAY_SET_SRC_RECT;
+
+        ent->dreg.src_rect = (MMAL_RECT_T){
+            .x = fmt->i_x_offset - xl,
+            .y = 0,
+            .width = fmt->i_visible_width,
+            .height = fmt->i_visible_height
+        };
+
+        // 2D copy
+        {
+            unsigned int i;
+            uint8_t *d = ent->buf;
+            const uint8_t *s = pic->p[0].p_pixels + xl * bpp + fmt->i_y_offset * pic->p[0].i_pitch;
+            for (i = 0; i != fmt->i_visible_height; ++i) {
+                memcpy(d, s, dst_stride);
+                d += dst_stride;
+                s += pic->p[0].i_pitch;
+            }
+        }
+
+    }
+
+    return buf;
+
+fail1:
+    mmal_buffer_header_release(buf);
+    return NULL;
+}
+
+void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc)
+{
+    if (pc == NULL)
+        return;
+
+    while (pc->ents != NULL)
+        pool_free_last(pc);
+
+    if (pc->pool != NULL)
+        mmal_pool_destroy(pc->pool);
+
+    free (pc);
+
+    vcsm_exit();
+}
+
+static MMAL_BOOL_T vcz_pool_release_cb(MMAL_POOL_T *pool, MMAL_BUFFER_HEADER_T *buf, void *userdata)
+{
+    vzc_pool_ctl_t * const pc = userdata;
+    pool_ent_t * const ent = buf->user_data;
+    VLC_UNUSED(pool);
+
+    if (ent != NULL) {
+        buf->user_data = NULL;
+        pool_recycle(pc, ent);
+    }
+
+    return MMAL_TRUE;
+}
+
+vzc_pool_ctl_t * hw_mmal_vzc_pool_new()
+{
+    vzc_pool_ctl_t * const pc = calloc(1, sizeof(*pc));
+
+    if (pc == NULL)
+        return NULL;
+
+    vcsm_init();
+
+    if ((pc->pool = mmal_pool_create(64, 0)) == NULL)
+    {
+        hw_mmal_vzc_pool_delete(pc);
+        return NULL;
+    }
+
+    mmal_pool_callback_set(pc->pool, vcz_pool_release_cb, pc);
+
+    return pc;
+}
+
+
+

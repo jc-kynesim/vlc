@@ -1295,30 +1295,42 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     }
     else
     {
-        pic_ctx_subpic_t * const sub = &((pic_ctx_mmal_t *)p_pic->context)->sub;
-        picture_t *const subpic = sub->subpic;
         MMAL_PORT_T *const port = sys->subput;
+        MMAL_BUFFER_HEADER_T *const sub_buf = hw_mmal_pic_sub_buf_get(p_pic);
 
-        if (subpic != NULL && subpic->format.i_width > 0 && subpic->format.i_height > 0)
+        if (sub_buf != NULL)
         {
-            msg_Warn(p_filter, "%s: Subpic: %p @ %d,%d:%d %dx%d", __func__, subpic, sub->x, sub->y, sub->alpha, subpic->format.i_width, subpic->format.i_height);
+            MMAL_DISPLAYREGION_T * dreg = hw_mmal_vzc_buf_region(sub_buf);
 
-            if (!port->is_enabled) {
-
-                port->userdata = (struct MMAL_PORT_USERDATA_T *)p_filter;
-                pic_to_format(port->format, subpic);
-
-                mmal_log_dump_format(port->format);
+            if (hw_mmal_vzc_buf_set_format(sub_buf, port->format))
+            {
+                MMAL_VIDEO_FORMAT_T *const v_fmt = &port->format->es->video;
+                v_fmt->frame_rate.den = p_pic->format.i_frame_rate_base;
+                v_fmt->frame_rate.num = p_pic->format.i_frame_rate;
+                v_fmt->par.den = p_pic->format.i_sar_den;
+                v_fmt->par.num = p_pic->format.i_sar_num;
+                v_fmt->color_space = MMAL_COLOR_SPACE_UNKNOWN;
 
                 if ((err = mmal_port_format_commit(port)) != MMAL_SUCCESS)
                 {
                     msg_Dbg(p_filter, "%s: Subpic commit fail: %d", __func__, err);
                 }
+            }
 
-//                port->buffer_num = sys->input->buffer_num;  // Want as many aux buffers as input buffers
-//                port->buffer_size = port->buffer_size_recommended;
-                port->buffer_num = 10;
-                port->buffer_size = 1920*1088*4;
+            if (!port->is_enabled) {
+
+                port->userdata = (struct MMAL_PORT_USERDATA_T *)p_filter;
+
+                mmal_log_dump_format(port->format);
+
+                if ((err = port_parameter_set_bool(port, MMAL_PARAMETER_ZERO_COPY, 1)) != MMAL_SUCCESS)
+                {
+                    msg_Err(p_filter, "Failed to set zero copy on port %s (status=%"PRIx32" %s)",
+                             port->name, err, mmal_status_to_string(err));
+                }
+
+                port->buffer_num = 30;
+                port->buffer_size = 0;
 
                 if ((err = mmal_port_enable(port, conv_subpic_cb)) != MMAL_SUCCESS)
                 {
@@ -1326,57 +1338,20 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 }
             }
 
-//            if (subpic != sys->last_subpic)
             {
-                MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->sub_pool->queue);
-                const MMAL_DISPLAYREGION_T dreg = {
-                    .hdr = {
-                        .id = MMAL_PARAMETER_DISPLAYREGION,
-                        .size = sizeof(MMAL_DISPLAYREGION_T)
-                    },
-                    .set = MMAL_DISPLAY_SET_ALPHA | MMAL_DISPLAY_SET_FULLSCREEN | MMAL_DISPLAY_SET_DEST_RECT,
-                    .alpha = sub->alpha,
-                    .fullscreen = 0,
-                    .dest_rect = {
-                        .x = sub->x,
-                        .y = sub->y,
-                        .width = subpic->format.i_width,
-                        .height = subpic->format.i_height
-                    },
-                };
-
-                if (buf == NULL) {
-                    msg_Err(p_filter, "Buffer get for subpic failed");
-                    goto fail;
-                }
-
-                buf->cmd = 0;
-                buf->data = subpic->p[0].p_pixels;
-                buf->alloc_size = buf->length = subpic->p[0].i_lines * subpic->p[0].i_pitch;
-                buf->offset = 0;
-                buf->flags = MMAL_BUFFER_HEADER_FLAG_FRAME_END;
-                buf->pts = buf->dts = p_pic->date != VLC_TICK_INVALID ? p_pic->date : MMAL_TIME_UNKNOWN;
-                buf->user_data = picture_Hold(subpic);
-                buf->type->video = (MMAL_BUFFER_HEADER_VIDEO_SPECIFIC_T){
-                    .planes = 1,
-                    .pitch = { subpic->p[0].i_pitch }
-                };
-
-                printf("Subpic: pts=%lld\n", buf->pts);
-
-                hw_mmal_pic_unset_subpic(p_pic);
-
-                if ((err = mmal_port_parameter_set(port, &dreg.hdr)) != MMAL_SUCCESS)
+                if ((err = mmal_port_parameter_set(port, &dreg->hdr)) != MMAL_SUCCESS)
                 {
                     msg_Err(p_filter, "Set display region on subput failed");
-                    mmal_buffer_header_release(buf);
+                    mmal_buffer_header_release(sub_buf);
                     goto fail;
                 }
 
-                if ((err = mmal_port_send_buffer(port, buf)) != MMAL_SUCCESS)
+                sub_buf->pts = sub_buf->dts = p_pic->date != VLC_TICK_INVALID ? p_pic->date : MMAL_TIME_UNKNOWN;
+
+                if ((err = mmal_port_send_buffer(port, sub_buf)) != MMAL_SUCCESS)
                 {
                     msg_Err(p_filter, "Send buffer to subput failed");
-                    mmal_buffer_header_release(buf);
+                    mmal_buffer_header_release(sub_buf);
                     goto fail;
                 }
 
@@ -1386,9 +1361,6 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         else if (port->is_enabled && sys->subpic_set)
         {
             MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->sub_pool->queue);
-
-            // Kill any (empty) subpic
-            hw_mmal_pic_unset_subpic(p_pic);
 
             if (buf == NULL) {
                 msg_Err(p_filter, "Buffer get for subpic failed");
@@ -2054,23 +2026,60 @@ index 9bd26fb..caafa9c 100644
 
 #endif
 
+typedef struct blend_sys_s {
+    vzc_pool_ctl_t * vzc;
+} blend_sys_t;
+
 static void FilterBlendMmal(filter_t *p_filter,
                   picture_t *dst, const picture_t *src,
                   int x_offset, int y_offset, int alpha)
 {
+    blend_sys_t * const sys = (blend_sys_t *)p_filter->p_sys;
+
     msg_Dbg(p_filter, "%s (%d,%d:%d)", __func__, x_offset, y_offset, alpha);
+
+    // If nothing to do then do nothing
+    if (alpha == 0 ||
+        src->format.i_visible_height == 0 ||
+        src->format.i_visible_width == 0)
+    {
+        return;
+    }
 
     if (dst->context == NULL)
         msg_Err(p_filter, "MMAL pic missing context");
     else
-        hw_mmal_pic_set_subpic(dst, src, x_offset, y_offset, alpha);
+    {
+        MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc, src);
+        if (buf == NULL) {
+            msg_Err(p_filter, "Failed to allocate vzc buffer for subpic");
+            return;
+        }
+        MMAL_DISPLAYREGION_T * const reg = hw_mmal_vzc_buf_region(buf);
+
+        reg->set |=
+            MMAL_DISPLAY_SET_ALPHA | MMAL_DISPLAY_SET_FULLSCREEN | MMAL_DISPLAY_SET_DEST_RECT;
+
+        reg->fullscreen = 0;
+
+        reg->alpha = alpha;
+
+        reg->dest_rect = (MMAL_RECT_T){
+            .x = x_offset,
+            .y = y_offset,
+            .width = src->format.i_visible_width,
+            .height = src->format.i_visible_height
+        };
+
+        hw_mmal_pic_sub_buf_add(dst, buf);
+    }
 }
 
 
 static int OpenBlendMmal(vlc_object_t *object)
 {
     filter_t * const p_filter = (filter_t *)object;
-//    const vlc_fourcc_t vfcc_src = filter->fmt_in.video.i_chroma;
+    const vlc_fourcc_t vfcc_src = p_filter->fmt_in.video.i_chroma;
     const vlc_fourcc_t vfcc_dst = p_filter->fmt_out.video.i_chroma;
 
     {
@@ -2085,8 +2094,20 @@ static int OpenBlendMmal(vlc_object_t *object)
                 p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height);
     }
 
-    if (vfcc_dst != VLC_CODEC_MMAL_OPAQUE) {
+    if (vfcc_dst != VLC_CODEC_MMAL_OPAQUE || vfcc_src != VLC_CODEC_ARGB) {
         return VLC_EGENERIC;
+    }
+
+    {
+        blend_sys_t * const sys = calloc(1, sizeof (*sys));
+        if (sys == NULL)
+            return VLC_ENOMEM;
+        if ((sys->vzc = hw_mmal_vzc_pool_new()) == NULL)
+        {
+            free(sys);
+            return VLC_ENOMEM;
+        }
+        p_filter->p_sys = (filter_sys_t *)sys;
     }
 
     p_filter->pf_video_blend = FilterBlendMmal;
@@ -2095,7 +2116,11 @@ static int OpenBlendMmal(vlc_object_t *object)
 
 static void CloseBlendMmal(vlc_object_t *object)
 {
-    VLC_UNUSED(object);
+    filter_t * const p_filter = (filter_t *)object;
+    blend_sys_t * const sys = (blend_sys_t *)p_filter->p_sys;
+
+    hw_mmal_vzc_pool_delete(sys->vzc);
+    free(sys);
 }
 
 
