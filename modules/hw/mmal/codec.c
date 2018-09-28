@@ -2094,7 +2094,7 @@ static int OpenBlendMmal(vlc_object_t *object)
                 p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height);
     }
 
-    if (vfcc_dst != VLC_CODEC_MMAL_OPAQUE || vfcc_src != VLC_CODEC_ARGB) {
+    if (vfcc_dst != VLC_CODEC_MMAL_OPAQUE || vfcc_src != VLC_CODEC_RGBA) {
         return VLC_EGENERIC;
     }
 
