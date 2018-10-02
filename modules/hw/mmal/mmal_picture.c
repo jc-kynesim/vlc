@@ -357,6 +357,7 @@ static void pool_recycle(vzc_pool_ctl_t * const pc, pool_ent_t * const ent)
 
     ent->prev = NULL;
     pc->ents = ent;
+    ++pc->n;
 }
 
 
@@ -417,7 +418,8 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, const
         unsigned int xl = (fmt->i_x_offset & ~15);
         unsigned int xr = (fmt->i_x_offset + fmt->i_visible_width + 15) & ~15;
         size_t dst_stride = (xr - xl) * bpp;
-        size_t dst_size = dst_stride * ((fmt->i_visible_height + 15) & ~15);
+        size_t dst_lines = ((fmt->i_visible_height + 15) & ~15);
+        size_t dst_size = dst_stride * dst_lines;
 
         pool_ent_t * ent = pool_best_fit(pc, dst_size);
 
@@ -439,27 +441,45 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, const
         };
 
         // Remember offsets
+//        ent->dreg.set = 0;
         ent->dreg.set = MMAL_DISPLAY_SET_SRC_RECT;
 
+        printf("+++ bpp:%d, vis:%xx%d wxh:%dx%d, d:%dx%d\n", bpp, fmt->i_visible_width, fmt->i_visible_height, fmt->i_width, fmt->i_height, dst_stride, dst_lines);
+
         ent->dreg.src_rect = (MMAL_RECT_T){
-            .x = fmt->i_x_offset - xl,
+            .x = (fmt->i_x_offset - xl) << 16,
             .y = 0,
-            .width = fmt->i_visible_width,
-            .height = fmt->i_visible_height
+            .width = fmt->i_visible_width << 16,
+            .height = fmt->i_visible_height << 16
         };
 
+        ent->width = dst_stride / bpp;
+        ent->height = dst_lines;
+
+#if 0
+        memset(ent->buf, 255, dst_size);
+#else
         // 2D copy
         {
             unsigned int i;
             uint8_t *d = ent->buf;
             const uint8_t *s = pic->p[0].p_pixels + xl * bpp + fmt->i_y_offset * pic->p[0].i_pitch;
             for (i = 0; i != fmt->i_visible_height; ++i) {
+#if 0
+                {
+                    unsigned int j;
+                    for (j = 0; j < dst_stride; j += 4) {
+                        *(uint32_t *)(d + j) = 0xff000000 | ((j & 0xff) << 16) | ((~j & 0xff) << 8) | ((i << 3) & 0xff);
+                    }
+                }
+#endif
+//                memset(d, 0x80, dst_stride);
                 memcpy(d, s, dst_stride);
                 d += dst_stride;
                 s += pic->p[0].i_pitch;
             }
         }
-
+#endif
     }
 
     return buf;
@@ -515,6 +535,8 @@ vzc_pool_ctl_t * hw_mmal_vzc_pool_new()
     }
 
     mmal_pool_callback_set(pc->pool, vcz_pool_release_cb, pc);
+
+    pc->max_n = 8;
 
     return pc;
 }
