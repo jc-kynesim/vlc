@@ -444,13 +444,13 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, const
 //        ent->dreg.set = 0;
         ent->dreg.set = MMAL_DISPLAY_SET_SRC_RECT;
 
-        printf("+++ bpp:%d, vis:%xx%d wxh:%dx%d, d:%dx%d\n", bpp, fmt->i_visible_width, fmt->i_visible_height, fmt->i_width, fmt->i_height, dst_stride, dst_lines);
+        printf("+++ bpp:%d, vis:%dx%d wxh:%dx%d, d:%dx%d\n", bpp, fmt->i_visible_width, fmt->i_visible_height, fmt->i_width, fmt->i_height, dst_stride, dst_lines);
 
         ent->dreg.src_rect = (MMAL_RECT_T){
-            .x = (fmt->i_x_offset - xl) << 16,
+            .x = (fmt->i_x_offset - xl),
             .y = 0,
-            .width = fmt->i_visible_width << 16,
-            .height = fmt->i_visible_height << 16
+            .width = fmt->i_visible_width,
+            .height = fmt->i_visible_height
         };
 
         ent->width = dst_stride / bpp;
