@@ -25,6 +25,8 @@
 // used here :-(
 #include <pthread.h>
 
+#include <stdatomic.h>
+
 #include <vlc_common.h>
 #include <vlc_picture.h>
 #include <interface/mmal/mmal.h>
@@ -257,13 +259,15 @@ typedef struct pool_ent_s
 {
     struct pool_ent_s * next;
     struct pool_ent_s * prev;
+
+    atomic_int ref_count;
+
     size_t size;
 
     int vcsm_hdl;
     int vc_hdl;
     void * buf;
 
-    MMAL_DISPLAYREGION_T dreg;
     unsigned int width;
     unsigned int height;
 } pool_ent_t;
@@ -276,12 +280,25 @@ struct vzc_pool_ctl_s
     unsigned int n;
     unsigned int max_n;
 
+    vlc_mutex_t lock;
+
     MMAL_POOL_T * pool;
+
+    picture_t * cur_pic;
+    pool_ent_t * cur_ent;
 };
 
+typedef struct vzc_subbuf_ent_s
+{
+    pool_ent_t * ent;
+    MMAL_DISPLAYREGION_T dreg;
+} vzc_subbuf_ent_t;
 
 static pool_ent_t * pool_extract_ent(vzc_pool_ctl_t * const pc, pool_ent_t * const ent)
 {
+    if (ent == NULL)
+        return NULL;
+
     if (ent->next == NULL)
         pc->tail = ent->prev;
     else
@@ -299,16 +316,21 @@ static pool_ent_t * pool_extract_ent(vzc_pool_ctl_t * const pc, pool_ent_t * con
     return ent;  // For convienience
 }
 
+static void pool_free_ent(pool_ent_t * const ent)
+{
+    if (ent != NULL) {
+        // Free contents
+        vcsm_unlock_hdl(ent->vcsm_hdl);
+
+        vcsm_free(ent->vcsm_hdl);
+
+        free(ent);
+    }
+}
+
 static void pool_free_last(vzc_pool_ctl_t * const pc)
 {
-    pool_ent_t * const ent = pool_extract_ent(pc, pc->tail);
-
-    // Free contents
-    vcsm_unlock_hdl(ent->vcsm_hdl);
-
-    vcsm_free(ent->vcsm_hdl);
-
-    free(ent);
+    pool_free_ent(pool_extract_ent(pc, pc->tail));
 }
 
 static pool_ent_t * pool_ent_alloc_new(size_t req_size)
@@ -329,12 +351,6 @@ static pool_ent_t * pool_ent_alloc_new(size_t req_size)
         goto fail2;
 
     ent->size = req_size;
-
-    // Init the region header
-    // Doesn't really belong here but it simplifies the structures
-    ent->dreg.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
-    ent->dreg.hdr.size = sizeof(ent->dreg);
-
     return ent;
 
 fail2:
@@ -344,11 +360,34 @@ fail1:
     return NULL;
 }
 
+static inline pool_ent_t * pool_ent_ref(pool_ent_t * const ent)
+{
+    int n = atomic_fetch_add(&ent->ref_count, 1) + 1;
+    printf("Ref: %p: %d\n", ent, n);
+    return ent;
+}
 
 static void pool_recycle(vzc_pool_ctl_t * const pc, pool_ent_t * const ent)
 {
+    pool_ent_t * xs = NULL;
+    int n;
+
+    if (ent == NULL)
+        return;
+
+    n = atomic_fetch_sub(&ent->ref_count, 1) - 1;
+
+    printf("%s: %p: %d\n", __func__, ent, n);
+
+    if (n != 0)
+        return;
+
+    vlc_mutex_lock(&pc->lock);
+
+    // If we have a full pool then extract the LRU and free it
+    // Free done outside mutex
     if (pc->n >= pc->max_n)
-        pool_free_last(pc);
+        xs = pool_extract_ent(pc, pc->tail);
 
     if ((ent->next = pc->ents) == NULL)
         pc->tail = ent;
@@ -358,6 +397,10 @@ static void pool_recycle(vzc_pool_ctl_t * const pc, pool_ent_t * const ent)
     ent->prev = NULL;
     pc->ents = ent;
     ++pc->n;
+
+    vlc_mutex_unlock(&pc->lock);
+
+    pool_free_ent(xs);
 }
 
 
@@ -365,6 +408,8 @@ static pool_ent_t * pool_best_fit(vzc_pool_ctl_t * const pc, size_t req_size)
 {
     pool_ent_t * ent = pc->ents;
     pool_ent_t * best = NULL;
+
+    vlc_mutex_lock(&pc->lock);
 
     // Simple scan
     while (ent != NULL) {
@@ -374,15 +419,20 @@ static pool_ent_t * pool_best_fit(vzc_pool_ctl_t * const pc, size_t req_size)
     }
 
     // extract best from chain if we've found it
-    if (best != NULL)
-        return pool_extract_ent(pc, best);
+    pool_extract_ent(pc, best);
 
-    return pool_ent_alloc_new(req_size);
+    vlc_mutex_unlock(&pc->lock);
+
+    if (best == NULL)
+        best = pool_ent_alloc_new(req_size);
+
+    atomic_store(&best->ref_count, 1);
+    return best;
 }
 
 bool hw_mmal_vzc_buf_set_format(MMAL_BUFFER_HEADER_T * const buf, MMAL_ES_FORMAT_T * const es_fmt)
 {
-    const pool_ent_t * const ent = buf->user_data;
+    const pool_ent_t *const ent = ((vzc_subbuf_ent_t *)buf->user_data)->ent;
     MMAL_VIDEO_FORMAT_T * const v_fmt = &es_fmt->es->video;
 
     es_fmt->type = MMAL_ES_TYPE_VIDEO;
@@ -400,32 +450,57 @@ bool hw_mmal_vzc_buf_set_format(MMAL_BUFFER_HEADER_T * const buf, MMAL_ES_FORMAT
 
 MMAL_DISPLAYREGION_T * hw_mmal_vzc_buf_region(MMAL_BUFFER_HEADER_T * const buf)
 {
-    pool_ent_t *ent = buf->user_data;
-    return &ent->dreg;
+    vzc_subbuf_ent_t * sb = buf->user_data;
+    return &sb->dreg;
 }
 
-MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, const picture_t * const pic)
+MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic)
 {
     MMAL_BUFFER_HEADER_T *buf = mmal_queue_get(pc->pool->queue);
+    vzc_subbuf_ent_t * sb;
+
     if (buf == NULL)
         return NULL;
+
+    if ((sb = calloc(1, sizeof(*sb))) == NULL)
+        goto fail1;
+
+    sb->dreg.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
+    sb->dreg.hdr.size = sizeof(sb->dreg);
+    buf->user_data = sb;
 
     {
         // ?? Round start offset as well as length
         const video_format_t *const fmt = &pic->format;
 
-        unsigned int bpp = (fmt->i_bits_per_pixel + 7) >> 3;
-        unsigned int xl = (fmt->i_x_offset & ~15);
-        unsigned int xr = (fmt->i_x_offset + fmt->i_visible_width + 15) & ~15;
-        size_t dst_stride = (xr - xl) * bpp;
-        size_t dst_lines = ((fmt->i_visible_height + 15) & ~15);
-        size_t dst_size = dst_stride * dst_lines;
+        const unsigned int bpp = (fmt->i_bits_per_pixel + 7) >> 3;
+        const unsigned int xl = (fmt->i_x_offset & ~15);
+        const unsigned int xr = (fmt->i_x_offset + fmt->i_visible_width + 15) & ~15;
+        const size_t dst_stride = (xr - xl) * bpp;
+        const size_t dst_lines = ((fmt->i_visible_height + 15) & ~15);
+        const size_t dst_size = dst_stride * dst_lines;
 
-        pool_ent_t * ent = pool_best_fit(pc, dst_size);
+        pool_ent_t * ent;
 
-        if (ent == NULL)
-            goto fail1;
-        buf->user_data = ent;
+        if (pic == pc->cur_pic) {
+            ent = pool_ent_ref(pc->cur_ent);
+        }
+        else
+        {
+            pool_recycle(pc, pc->cur_ent);
+            pc->cur_ent = NULL;
+            if (pc->cur_pic != NULL)
+                picture_Release(pc->cur_pic);
+            pc->cur_pic = NULL;
+
+            if ((ent = pool_best_fit(pc, dst_size)) == NULL)
+                goto fail2;
+
+            pc->cur_ent = pool_ent_ref(ent);
+            pc->cur_pic = picture_Hold(pic);
+        }
+
+        sb->ent = ent;
 
         // Copy data
         buf->next = NULL;
@@ -441,12 +516,11 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, const
         };
 
         // Remember offsets
-//        ent->dreg.set = 0;
-        ent->dreg.set = MMAL_DISPLAY_SET_SRC_RECT;
+        sb->dreg.set = MMAL_DISPLAY_SET_SRC_RECT;
 
         printf("+++ bpp:%d, vis:%dx%d wxh:%dx%d, d:%dx%d\n", bpp, fmt->i_visible_width, fmt->i_visible_height, fmt->i_width, fmt->i_height, dst_stride, dst_lines);
 
-        ent->dreg.src_rect = (MMAL_RECT_T){
+        sb->dreg.src_rect = (MMAL_RECT_T){
             .x = (fmt->i_x_offset - xl),
             .y = 0,
             .width = fmt->i_visible_width,
@@ -484,6 +558,8 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, const
 
     return buf;
 
+fail2:
+    free(sb);
 fail1:
     mmal_buffer_header_release(buf);
     return NULL;
@@ -494,11 +570,18 @@ void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc)
     if (pc == NULL)
         return;
 
+    if (pc->cur_pic != NULL)
+        picture_Release(pc->cur_pic);
+
+    pool_recycle(pc, pc->cur_ent);
+
     while (pc->ents != NULL)
         pool_free_last(pc);
 
     if (pc->pool != NULL)
         mmal_pool_destroy(pc->pool);
+
+    vlc_mutex_destroy(&pc->lock);
 
     free (pc);
 
@@ -508,12 +591,14 @@ void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc)
 static MMAL_BOOL_T vcz_pool_release_cb(MMAL_POOL_T *pool, MMAL_BUFFER_HEADER_T *buf, void *userdata)
 {
     vzc_pool_ctl_t * const pc = userdata;
-    pool_ent_t * const ent = buf->user_data;
+    vzc_subbuf_ent_t * const sb = buf->user_data;
+
     VLC_UNUSED(pool);
 
-    if (ent != NULL) {
+    if (sb != NULL) {
         buf->user_data = NULL;
-        pool_recycle(pc, ent);
+        pool_recycle(pc, sb->ent);
+        free(sb);
     }
 
     return MMAL_TRUE;
@@ -534,9 +619,11 @@ vzc_pool_ctl_t * hw_mmal_vzc_pool_new()
         return NULL;
     }
 
+    pc->max_n = 8;
+    vlc_mutex_init(&pc->lock);
+
     mmal_pool_callback_set(pc->pool, vcz_pool_release_cb, pc);
 
-    pc->max_n = 8;
 
     return pc;
 }

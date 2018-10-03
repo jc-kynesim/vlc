@@ -96,10 +96,7 @@ static inline MMAL_BUFFER_HEADER_T * hw_mmal_pic_sub_buf_get(picture_t * const p
     if (sub == NULL)
         return NULL;
 
-    if ((ctx->sub_bufs = sub->next) == NULL)
-        ctx->sub_tail = NULL;
-
-    sub->next = NULL;
+    mmal_buffer_header_acquire(sub);
     return sub;
 }
 
@@ -182,7 +179,7 @@ typedef struct vzc_pool_ctl_s vzc_pool_ctl_t;
 
 bool hw_mmal_vzc_buf_set_format(MMAL_BUFFER_HEADER_T * const buf, MMAL_ES_FORMAT_T * const es_fmt);
 MMAL_DISPLAYREGION_T * hw_mmal_vzc_buf_region(MMAL_BUFFER_HEADER_T * const buf);
-MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, const picture_t * const pic);
+MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic);
 void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc);
 vzc_pool_ctl_t * hw_mmal_vzc_pool_new(void);
 
