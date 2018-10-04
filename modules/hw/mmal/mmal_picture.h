@@ -99,10 +99,6 @@ static inline MMAL_BUFFER_HEADER_T * hw_mmal_pic_sub_buf_get(picture_t * const p
     pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic->context;
     MMAL_BUFFER_HEADER_T * const sub = ctx->sub_bufs;
 
-    if (sub == NULL)
-        return NULL;
-
-    mmal_buffer_header_acquire(sub);
     return sub;
 }
 

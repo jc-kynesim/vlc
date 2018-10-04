@@ -568,7 +568,7 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
 
         ent_add_head(&pc->ents_cur, ent);
 
-        sb->ent = ent;
+        sb->ent = pool_ent_ref(ent);
 
         // Copy data
         buf->next = NULL;
