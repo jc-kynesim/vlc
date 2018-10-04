@@ -270,22 +270,35 @@ typedef struct pool_ent_s
 
     unsigned int width;
     unsigned int height;
+
+    picture_t * pic;
 } pool_ent_t;
 
 
-struct vzc_pool_ctl_s
+typedef struct ent_list_hdr_s
 {
     pool_ent_t * ents;
     pool_ent_t * tail;
     unsigned int n;
+} ent_list_hdr_t;
+
+#define ENT_LIST_HDR_INIT (ent_list_hdr_t){ \
+   .ents = NULL, \
+   .tail = NULL, \
+   .n = 0 \
+}
+
+struct vzc_pool_ctl_s
+{
+    ent_list_hdr_t ent_pool;
+    ent_list_hdr_t ents_cur;
+    ent_list_hdr_t ents_prev;
+
     unsigned int max_n;
 
     vlc_mutex_t lock;
 
-    MMAL_POOL_T * pool;
-
-    picture_t * cur_pic;
-    pool_ent_t * cur_ent;
+    MMAL_POOL_T * buf_pool;
 };
 
 typedef struct vzc_subbuf_ent_s
@@ -294,31 +307,53 @@ typedef struct vzc_subbuf_ent_s
     MMAL_DISPLAYREGION_T dreg;
 } vzc_subbuf_ent_t;
 
-static pool_ent_t * pool_extract_ent(vzc_pool_ctl_t * const pc, pool_ent_t * const ent)
+
+static pool_ent_t * ent_extract(ent_list_hdr_t * const elh, pool_ent_t * const ent)
 {
     if (ent == NULL)
         return NULL;
 
     if (ent->next == NULL)
-        pc->tail = ent->prev;
+        elh->tail = ent->prev;
     else
         ent->next->prev = ent->prev;
 
     if (ent->prev == NULL)
-        pc->ents = ent->next;
+        elh->ents = ent->next;
     else
         ent->prev->next = ent->next;
 
     ent->prev = ent->next = NULL;
 
-    --pc->n;
+    --elh->n;
 
     return ent;  // For convienience
 }
 
-static void pool_free_ent(pool_ent_t * const ent)
+static inline pool_ent_t * ent_extract_tail(ent_list_hdr_t * const elh)
+{
+    return ent_extract(elh, elh->tail);
+}
+
+static void ent_add_head(ent_list_hdr_t * const elh, pool_ent_t * const ent)
+{
+    if ((ent->next = elh->ents) == NULL)
+        elh->tail = ent;
+    else
+        ent->next->prev = ent;
+
+    ent->prev = NULL;
+    elh->ents = ent;
+    ++elh->n;
+}
+
+static void ent_free(pool_ent_t * const ent)
 {
     if (ent != NULL) {
+        // If we still have a ref to a pic - kill it now
+        if (ent->pic != NULL)
+            picture_Release(ent->pic);
+
         // Free contents
         vcsm_unlock_hdl(ent->vcsm_hdl);
 
@@ -328,9 +363,37 @@ static void pool_free_ent(pool_ent_t * const ent)
     }
 }
 
-static void pool_free_last(vzc_pool_ctl_t * const pc)
+static void ent_free_list(ent_list_hdr_t * const elh)
 {
-    pool_free_ent(pool_extract_ent(pc, pc->tail));
+    pool_ent_t * ent = elh->ents;
+
+    *elh = ENT_LIST_HDR_INIT;
+
+    while (ent != NULL) {
+        pool_ent_t * const t = ent;
+        ent = t->next;
+        ent_free(t);
+    }
+}
+
+static void ent_list_move(ent_list_hdr_t * const dst, ent_list_hdr_t * const src)
+{
+    *dst = *src;
+    *src = ENT_LIST_HDR_INIT;
+}
+
+// Scans "backwards" as that should give us the fastest match if we are
+// presented with pics in the same order each time
+static pool_ent_t * ent_list_extract_pic_ent(ent_list_hdr_t * const elh, picture_t * const pic)
+{
+    pool_ent_t *ent = elh->tail;
+
+    while (ent != NULL) {
+        if (ent->pic == pic)
+            return ent_extract(elh, ent);
+        ent = ent->prev;
+    }
+    return NULL;
 }
 
 static pool_ent_t * pool_ent_alloc_new(size_t req_size)
@@ -382,44 +445,53 @@ static void pool_recycle(vzc_pool_ctl_t * const pc, pool_ent_t * const ent)
     if (n != 0)
         return;
 
+    if (ent->pic != NULL) {
+        picture_Release(ent->pic);
+        ent->pic = NULL;
+    }
+
     vlc_mutex_lock(&pc->lock);
 
     // If we have a full pool then extract the LRU and free it
     // Free done outside mutex
-    if (pc->n >= pc->max_n)
-        xs = pool_extract_ent(pc, pc->tail);
+    if (pc->ent_pool.n >= pc->max_n)
+        xs = ent_extract_tail(&pc->ent_pool);
 
-    if ((ent->next = pc->ents) == NULL)
-        pc->tail = ent;
-    else
-        ent->next->prev = ent;
-
-    ent->prev = NULL;
-    pc->ents = ent;
-    ++pc->n;
+    ent_add_head(&pc->ent_pool, ent);
 
     vlc_mutex_unlock(&pc->lock);
 
-    pool_free_ent(xs);
+    ent_free(xs);
 }
 
+// * This could be made more efficient, but this is easy
+static void pool_recycle_list(vzc_pool_ctl_t * const pc, ent_list_hdr_t * const elh)
+{
+    pool_ent_t * ent;
+    while ((ent = ent_extract_tail(elh)) != NULL) {
+        pool_recycle(pc, ent);
+    }
+}
 
 static pool_ent_t * pool_best_fit(vzc_pool_ctl_t * const pc, size_t req_size)
 {
-    pool_ent_t * ent = pc->ents;
     pool_ent_t * best = NULL;
 
     vlc_mutex_lock(&pc->lock);
 
-    // Simple scan
-    while (ent != NULL) {
-        if (ent->size >= req_size && ent->size <= req_size * 2 && (best == NULL || best->size > ent->size))
-            best = ent;
-        ent = ent->next;
-    }
+    {
+        pool_ent_t * ent = pc->ent_pool.ents;
 
-    // extract best from chain if we've found it
-    pool_extract_ent(pc, best);
+        // Simple scan
+        while (ent != NULL) {
+            if (ent->size >= req_size && ent->size <= req_size * 2 && (best == NULL || best->size > ent->size))
+                best = ent;
+            ent = ent->next;
+        }
+
+        // extract best from chain if we've found it
+        ent_extract(&pc->ent_pool, best);
+    }
 
     vlc_mutex_unlock(&pc->lock);
 
@@ -454,9 +526,9 @@ MMAL_DISPLAYREGION_T * hw_mmal_vzc_buf_region(MMAL_BUFFER_HEADER_T * const buf)
     return &sb->dreg;
 }
 
-MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic)
+MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic, const bool is_first)
 {
-    MMAL_BUFFER_HEADER_T *buf = mmal_queue_get(pc->pool->queue);
+    MMAL_BUFFER_HEADER_T * const buf = mmal_queue_get(pc->buf_pool->queue);
     vzc_subbuf_ent_t * sb;
 
     if (buf == NULL)
@@ -464,6 +536,11 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
 
     if ((sb = calloc(1, sizeof(*sb))) == NULL)
         goto fail1;
+
+    if (is_first) {
+        pool_recycle_list(pc, &pc->ents_prev);
+        ent_list_move(&pc->ents_prev, &pc->ents_cur);
+    }
 
     sb->dreg.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
     sb->dreg.hdr.size = sizeof(sb->dreg);
@@ -480,25 +557,16 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
         const size_t dst_lines = ((fmt->i_visible_height + 15) & ~15);
         const size_t dst_size = dst_stride * dst_lines;
 
-        pool_ent_t * ent;
+        pool_ent_t * ent = ent_list_extract_pic_ent(&pc->ents_prev, pic);
 
-        if (pic == pc->cur_pic) {
-            ent = pool_ent_ref(pc->cur_ent);
-        }
-        else
+        if (ent == NULL)
         {
-            pool_recycle(pc, pc->cur_ent);
-            pc->cur_ent = NULL;
-            if (pc->cur_pic != NULL)
-                picture_Release(pc->cur_pic);
-            pc->cur_pic = NULL;
-
             if ((ent = pool_best_fit(pc, dst_size)) == NULL)
                 goto fail2;
-
-            pc->cur_ent = pool_ent_ref(ent);
-            pc->cur_pic = picture_Hold(pic);
+            ent->pic = picture_Hold(pic);
         }
+
+        ent_add_head(&pc->ents_cur, ent);
 
         sb->ent = ent;
 
@@ -570,16 +638,13 @@ void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc)
     if (pc == NULL)
         return;
 
-    if (pc->cur_pic != NULL)
-        picture_Release(pc->cur_pic);
+    pool_recycle_list(pc, &pc->ents_prev);
+    pool_recycle_list(pc, &pc->ents_cur);
 
-    pool_recycle(pc, pc->cur_ent);
+    ent_free_list(&pc->ent_pool);
 
-    while (pc->ents != NULL)
-        pool_free_last(pc);
-
-    if (pc->pool != NULL)
-        mmal_pool_destroy(pc->pool);
+    if (pc->buf_pool != NULL)
+        mmal_pool_destroy(pc->buf_pool);
 
     vlc_mutex_destroy(&pc->lock);
 
@@ -588,12 +653,12 @@ void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc)
     vcsm_exit();
 }
 
-static MMAL_BOOL_T vcz_pool_release_cb(MMAL_POOL_T *pool, MMAL_BUFFER_HEADER_T *buf, void *userdata)
+static MMAL_BOOL_T vcz_pool_release_cb(MMAL_POOL_T * buf_pool, MMAL_BUFFER_HEADER_T *buf, void *userdata)
 {
     vzc_pool_ctl_t * const pc = userdata;
     vzc_subbuf_ent_t * const sb = buf->user_data;
 
-    VLC_UNUSED(pool);
+    VLC_UNUSED(buf_pool);
 
     if (sb != NULL) {
         buf->user_data = NULL;
@@ -613,7 +678,7 @@ vzc_pool_ctl_t * hw_mmal_vzc_pool_new()
 
     vcsm_init();
 
-    if ((pc->pool = mmal_pool_create(64, 0)) == NULL)
+    if ((pc->buf_pool = mmal_pool_create(64, 0)) == NULL)
     {
         hw_mmal_vzc_pool_delete(pc);
         return NULL;
@@ -622,7 +687,7 @@ vzc_pool_ctl_t * hw_mmal_vzc_pool_new()
     pc->max_n = 8;
     vlc_mutex_init(&pc->lock);
 
-    mmal_pool_callback_set(pc->pool, vcz_pool_release_cb, pc);
+    mmal_pool_callback_set(pc->buf_pool, vcz_pool_release_cb, pc);
 
 
     return pc;

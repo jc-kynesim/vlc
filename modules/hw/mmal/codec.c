@@ -1836,7 +1836,7 @@ static void FilterBlendMmal(filter_t *p_filter,
         msg_Err(p_filter, "MMAL pic missing context");
     else
     {
-        MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc, src);
+        MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc, src, !hw_mmal_pic_has_sub_bufs(dst));
         if (buf == NULL) {
             msg_Err(p_filter, "Failed to allocate vzc buffer for subpic");
             return;

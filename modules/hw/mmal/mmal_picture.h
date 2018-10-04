@@ -77,6 +77,12 @@ static inline void hw_mmal_port_pool_ref_acquire(hw_mmal_port_pool_ref_t * const
     atomic_fetch_add(&ppr->refs, 1);
 }
 
+static inline int hw_mmal_pic_has_sub_bufs(picture_t * const pic)
+{
+    pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic->context;
+    return ctx->sub_bufs != NULL;
+}
+
 static inline void hw_mmal_pic_sub_buf_add(picture_t * const pic, MMAL_BUFFER_HEADER_T * const sub)
 {
     pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic->context;
@@ -179,7 +185,7 @@ typedef struct vzc_pool_ctl_s vzc_pool_ctl_t;
 
 bool hw_mmal_vzc_buf_set_format(MMAL_BUFFER_HEADER_T * const buf, MMAL_ES_FORMAT_T * const es_fmt);
 MMAL_DISPLAYREGION_T * hw_mmal_vzc_buf_region(MMAL_BUFFER_HEADER_T * const buf);
-MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic);
+MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic, const bool is_first);
 void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc);
 vzc_pool_ctl_t * hw_mmal_vzc_pool_new(void);
 

@@ -340,10 +340,13 @@ static void di_flush(filter_t *p_filter)
 static void pass_flush(filter_t *p_filter)
 {
     // Nothing to do
+    VLC_UNUSED(p_filter);
 }
 
 static picture_t * pass_deinterlace(filter_t * p_filter, picture_t * p_pic)
 {
+    VLC_UNUSED(p_filter);
+
     p_pic->b_progressive = true;
     return p_pic;
 }
