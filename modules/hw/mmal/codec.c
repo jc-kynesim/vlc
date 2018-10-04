@@ -941,7 +941,10 @@ static inline void pic_fifo_put(pic_fifo_t * const pf, picture_t * pic)
 typedef struct filter_sub_s {
     MMAL_PORT_T * port;
     MMAL_POOL_T * pool;
-    bool in_use;
+    // Shadow  vars so we can tell if stuff has changed
+    unsigned int seq;
+    MMAL_RECT_T dest_rect;
+    uint32_t alpha;
 } filter_sub_t;
 
 #define SUBS_MAX 3
@@ -1253,7 +1256,7 @@ static void conv_flush(filter_t * p_filter)
 
         if (sub->port != NULL && sub->port->is_enabled)
             mmal_port_disable(sub->port);
-        sub->in_use = false;
+        sub->seq = 0;
     }
 
     if (sys->input != NULL && sys->input->is_enabled)
@@ -1290,14 +1293,18 @@ static inline int rescale_x(int x, int mul, int div)
     return div == 0 ? x * mul : (x * mul + div/2) / div;
 }
 
-static void rescale_rect(MMAL_RECT_T * const x, const MMAL_RECT_T * mul_rect, const MMAL_RECT_T * div_rect)
+static void rescale_rect(MMAL_RECT_T * const d, const MMAL_RECT_T * const s, const MMAL_RECT_T * mul_rect, const MMAL_RECT_T * div_rect)
 {
-    x->x      = rescale_x(x->x,      mul_rect->width,  div_rect->width);
-    x->y      = rescale_x(x->y,      mul_rect->height, div_rect->height);
-    x->width  = rescale_x(x->width,  mul_rect->width,  div_rect->width);
-    x->height = rescale_x(x->height, mul_rect->height, div_rect->height);
+    d->x      = rescale_x(s->x,      mul_rect->width,  div_rect->width);
+    d->y      = rescale_x(s->y,      mul_rect->height, div_rect->height);
+    d->width  = rescale_x(s->width,  mul_rect->width,  div_rect->width);
+    d->height = rescale_x(s->height, mul_rect->height, div_rect->height);
 }
 
+static inline bool cmp_rect(const MMAL_RECT_T * const a, const MMAL_RECT_T * const b)
+{
+    return a->x == b->x && a->y == b->y && a->width == b->width && a->height == b->height;
+}
 
 static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 {
@@ -1325,6 +1332,8 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         {
             filter_sub_t * const sub = sys->subs + sub_no;
             MMAL_PORT_T *const port = sub->port;
+            const unsigned int seq = hw_mmal_vzc_buf_seq(sub_buf);
+            bool needs_update = (sub->seq != seq);
 
             MMAL_DISPLAYREGION_T * dreg = hw_mmal_vzc_buf_region(sub_buf);
 
@@ -1337,35 +1346,32 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 v_fmt->par.num = p_pic->format.i_sar_num;
                 v_fmt->color_space = MMAL_COLOR_SPACE_UNKNOWN;
 
-                // ***** NBG if main pic resized....
-                rescale_rect(&dreg->dest_rect, &sys->output->format->es->video.crop, &sys->input->format->es->video.crop);
+                rescale_rect(&dreg->dest_rect, hw_mmal_vzc_buf_get_dest_rect(sub_buf),
+                             &sys->output->format->es->video.crop, &sys->input->format->es->video.crop);
 
-                if ((err = mmal_port_parameter_set(port, &dreg->hdr)) != MMAL_SUCCESS)
-                {
-                    msg_Err(p_filter, "Set display region on subput failed");
-                    mmal_buffer_header_release(sub_buf);
-                    goto fail;
-                }
+                if (needs_update || dreg->alpha != sub->alpha || !cmp_rect(&dreg->dest_rect, &sub->dest_rect)) {
 
-                mmal_log_dump_format(port->format);
+                    sub->alpha = dreg->alpha;
+                    sub->dest_rect = dreg->dest_rect;
+                    needs_update = true;
 
-                if ((err = mmal_port_format_commit(port)) != MMAL_SUCCESS)
-                {
-                    msg_Dbg(p_filter, "%s: Subpic commit fail: %d", __func__, err);
+                    if ((err = mmal_port_parameter_set(port, &dreg->hdr)) != MMAL_SUCCESS)
+                    {
+                        msg_Err(p_filter, "Set display region on subput failed");
+                        goto fail;
+                    }
+
+                    if ((err = mmal_port_format_commit(port)) != MMAL_SUCCESS)
+                    {
+                        msg_Dbg(p_filter, "%s: Subpic commit fail: %d", __func__, err);
+                        goto fail;
+                    }
                 }
             }
 
             if (!port->is_enabled) {
 
                 port->userdata = (struct MMAL_PORT_USERDATA_T *)p_filter;
-
-                mmal_log_dump_format(port->format);
-
-                if ((err = port_parameter_set_bool(port, MMAL_PARAMETER_ZERO_COPY, 1)) != MMAL_SUCCESS)
-                {
-                    msg_Err(p_filter, "Failed to set zero copy on port %s (status=%"PRIx32" %s)",
-                             port->name, err, mmal_status_to_string(err));
-                }
 
                 port->buffer_num = 30;
                 port->buffer_size = port->buffer_size_recommended;  // Not used but shuts up the error checking
@@ -1376,6 +1382,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 }
             }
 
+            if (needs_update)
             {
                 MMAL_BUFFER_HEADER_T * const cpy_buf = mmal_queue_get(sub->pool->queue);
 
@@ -1399,7 +1406,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                     goto fail;
                 }
 
-                sub->in_use = true;
+                sub->seq = seq;
             }
         }
 
@@ -1408,7 +1415,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             filter_sub_t * const sub = sys->subs + sub_no;
             MMAL_PORT_T *const port = sub->port;
 
-            if (port->is_enabled && sub->in_use)
+            if (port->is_enabled && sub->seq != 0)
             {
                 MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sub->pool->queue);
 
@@ -1432,7 +1439,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                     goto fail;
                 }
 
-                sub->in_use = false;
+                sub->seq = 0;
             }
         }
     }
@@ -1891,12 +1898,9 @@ static void FilterBlendMmal(filter_t *p_filter,
 
         reg->alpha = alpha;
 
-        reg->dest_rect = (MMAL_RECT_T){
-            .x = x_offset,
-            .y = y_offset,
-            .width = src->format.i_visible_width,
-            .height = src->format.i_visible_height
-        };
+        hw_mmal_vzc_buf_set_dest_rect(buf, x_offset, y_offset, src->format.i_visible_width, src->format.i_visible_height);
+
+        reg->dest_rect = (MMAL_RECT_T){0, 0, 0, 0};
 
         hw_mmal_pic_sub_buf_add(dst, buf);
     }

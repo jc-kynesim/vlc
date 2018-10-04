@@ -261,6 +261,7 @@ typedef struct pool_ent_s
     struct pool_ent_s * prev;
 
     atomic_int ref_count;
+    unsigned int seq;
 
     size_t size;
 
@@ -295,6 +296,7 @@ struct vzc_pool_ctl_s
     ent_list_hdr_t ents_prev;
 
     unsigned int max_n;
+    unsigned int seq;
 
     vlc_mutex_t lock;
 
@@ -304,6 +306,7 @@ struct vzc_pool_ctl_s
 typedef struct vzc_subbuf_ent_s
 {
     pool_ent_t * ent;
+    MMAL_RECT_T orig_dest_rect;
     MMAL_DISPLAYREGION_T dreg;
 } vzc_subbuf_ent_t;
 
@@ -498,6 +501,9 @@ static pool_ent_t * pool_best_fit(vzc_pool_ctl_t * const pc, size_t req_size)
     if (best == NULL)
         best = pool_ent_alloc_new(req_size);
 
+    if ((best->seq = ++pc->seq) == 0)
+        best->seq = ++pc->seq;  // Never allow to be zero
+
     atomic_store(&best->ref_count, 1);
     return best;
 }
@@ -525,6 +531,28 @@ MMAL_DISPLAYREGION_T * hw_mmal_vzc_buf_region(MMAL_BUFFER_HEADER_T * const buf)
     vzc_subbuf_ent_t * sb = buf->user_data;
     return &sb->dreg;
 }
+
+void hw_mmal_vzc_buf_set_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const int x, const int y, const int w, const int h)
+{
+    vzc_subbuf_ent_t * sb = buf->user_data;
+    sb->orig_dest_rect.x = x;
+    sb->orig_dest_rect.y = y;
+    sb->orig_dest_rect.width = w;
+    sb->orig_dest_rect.height = h;
+}
+
+const MMAL_RECT_T * hw_mmal_vzc_buf_get_dest_rect(MMAL_BUFFER_HEADER_T * const buf)
+{
+    vzc_subbuf_ent_t * sb = buf->user_data;
+    return &sb->orig_dest_rect;
+}
+
+unsigned int hw_mmal_vzc_buf_seq(MMAL_BUFFER_HEADER_T * const buf)
+{
+    vzc_subbuf_ent_t * sb = buf->user_data;
+    return sb->ent->seq;
+}
+
 
 MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic, const bool is_first)
 {
