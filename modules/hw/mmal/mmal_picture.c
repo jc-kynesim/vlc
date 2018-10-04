@@ -429,7 +429,7 @@ fail1:
 static inline pool_ent_t * pool_ent_ref(pool_ent_t * const ent)
 {
     int n = atomic_fetch_add(&ent->ref_count, 1) + 1;
-    printf("Ref: %p: %d\n", ent, n);
+//    printf("Ref: %p: %d\n", ent, n);
     return ent;
 }
 
@@ -443,7 +443,7 @@ static void pool_recycle(vzc_pool_ctl_t * const pc, pool_ent_t * const ent)
 
     n = atomic_fetch_sub(&ent->ref_count, 1) - 1;
 
-    printf("%s: %p: %d\n", __func__, ent, n);
+//    printf("%s: %p: %d\n", __func__, ent, n);
 
     if (n != 0)
         return;
@@ -614,7 +614,7 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
         // Remember offsets
         sb->dreg.set = MMAL_DISPLAY_SET_SRC_RECT;
 
-        printf("+++ bpp:%d, vis:%dx%d wxh:%dx%d, d:%dx%d\n", bpp, fmt->i_visible_width, fmt->i_visible_height, fmt->i_width, fmt->i_height, dst_stride, dst_lines);
+//        printf("+++ bpp:%d, vis:%dx%d wxh:%dx%d, d:%dx%d\n", bpp, fmt->i_visible_width, fmt->i_visible_height, fmt->i_width, fmt->i_height, dst_stride, dst_lines);
 
         sb->dreg.src_rect = (MMAL_RECT_T){
             .x = (fmt->i_x_offset - xl),
@@ -626,30 +626,17 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
         ent->width = dst_stride / bpp;
         ent->height = dst_lines;
 
-#if 0
-        memset(ent->buf, 255, dst_size);
-#else
         // 2D copy
         {
             unsigned int i;
             uint8_t *d = ent->buf;
             const uint8_t *s = pic->p[0].p_pixels + xl * bpp + fmt->i_y_offset * pic->p[0].i_pitch;
             for (i = 0; i != fmt->i_visible_height; ++i) {
-#if 0
-                {
-                    unsigned int j;
-                    for (j = 0; j < dst_stride; j += 4) {
-                        *(uint32_t *)(d + j) = 0xff000000 | ((j & 0xff) << 16) | ((~j & 0xff) << 8) | ((i << 3) & 0xff);
-                    }
-                }
-#endif
-//                memset(d, 0x80, dst_stride);
                 memcpy(d, s, dst_stride);
                 d += dst_stride;
                 s += pic->p[0].i_pitch;
             }
         }
-#endif
     }
 
     return buf;

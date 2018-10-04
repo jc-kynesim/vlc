@@ -41,7 +41,7 @@
 
 #include "mmal_picture.h"
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 /*
  * This seems to be a bit high, but reducing it causes instabilities
@@ -1007,8 +1007,6 @@ static void pic_to_format(MMAL_ES_FORMAT_T * const es_fmt, const picture_t * con
     es_fmt->encoding_variant = es_fmt->encoding =
         vlc_to_mmal_pic_fourcc(pic->format.i_chroma);
 
-    printf("%s: enc=%s/%s\n", __func__, str_fourcc(tb0, pic->format.i_chroma), str_fourcc(tb1, es_fmt->encoding));
-
     v_fmt->width = pic->p[0].i_pitch / bpp;
     v_fmt->height = pic->p[0].i_lines;
     v_fmt->crop.x = 0;
@@ -1090,8 +1088,10 @@ static void conv_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 
 static void conv_subpic_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 {
-    msg_Warn((filter_t *)port->userdata, "<<< %s cmd=%d, user=%p, buf=%p, flags=%#x, len=%d/%d, pts=%lld",
+#if TRACE_ALL
+    msg_Dbg((filter_t *)port->userdata, "<<< %s cmd=%d, user=%p, buf=%p, flags=%#x, len=%d/%d, pts=%lld",
             __func__, buf->cmd, buf->user_data, buf, buf->flags, buf->length, buf->alloc_size, (long long)buf->pts);
+#endif
 
     mmal_buffer_header_release(buf);  // Will extract & release pic in pool callback
 }
@@ -1354,7 +1354,9 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                     sub->alpha = dreg->alpha;
                     sub->dest_rect = dreg->dest_rect;
                     needs_update = true;
-
+#if TRACE_ALL
+                    msg_Dbg(p_filter, "Update region for sub %d", sub_no);
+#endif
                     if ((err = mmal_port_parameter_set(port, &dreg->hdr)) != MMAL_SUCCESS)
                     {
                         msg_Err(p_filter, "Set display region on subput failed");
@@ -1385,7 +1387,9 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             if (needs_update)
             {
                 MMAL_BUFFER_HEADER_T * const cpy_buf = mmal_queue_get(sub->pool->queue);
-
+#if TRACE_ALL
+                msg_Dbg(p_filter, "Update pic for sub %d", sub_no);
+#endif
                 if (cpy_buf == NULL) {
                     msg_Err(p_filter, "Fail to get subpic buffer");
                     goto fail;
@@ -1423,6 +1427,8 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                     msg_Err(p_filter, "Buffer get for subpic failed");
                     goto fail;
                 }
+
+                msg_Dbg(p_filter, "Remove pic for sub %d", sub_no);
 
                 buf->cmd = 0;
                 buf->data = NULL;
@@ -1868,9 +1874,9 @@ static void FilterBlendMmal(filter_t *p_filter,
                   int x_offset, int y_offset, int alpha)
 {
     blend_sys_t * const sys = (blend_sys_t *)p_filter->p_sys;
-
+#if TRACE_ALL
     msg_Dbg(p_filter, "%s (%d,%d:%d) pic=%p, pts=%lld, force=%d", __func__, x_offset, y_offset, alpha, src, src->date, src->b_force);
-
+#endif
     // If nothing to do then do nothing
     if (alpha == 0 ||
         src->format.i_visible_height == 0 ||
