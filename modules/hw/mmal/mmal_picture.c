@@ -428,8 +428,9 @@ fail1:
 
 static inline pool_ent_t * pool_ent_ref(pool_ent_t * const ent)
 {
-    int n = atomic_fetch_add(&ent->ref_count, 1) + 1;
+//    int n = atomic_fetch_add(&ent->ref_count, 1) + 1;
 //    printf("Ref: %p: %d\n", ent, n);
+    atomic_fetch_add(&ent->ref_count, 1);
     return ent;
 }
 
