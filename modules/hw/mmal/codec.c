@@ -1355,7 +1355,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         unsigned int sub_no = 0;
         MMAL_BUFFER_HEADER_T * sub_buf;
 
-        for (sub_buf = hw_mmal_pic_sub_buf_get(p_pic); sub_buf != NULL && sub_no < SUBS_MAX; sub_buf = sub_buf->next, ++sub_no)
+        for (; (sub_buf = hw_mmal_pic_sub_buf_get(p_pic, sub_no)) != NULL && sub_no < SUBS_MAX; ++sub_no)
         {
             filter_sub_t * const sub = sys->subs + sub_no;
             MMAL_PORT_T *const port = sub->port;

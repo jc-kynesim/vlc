@@ -52,9 +52,16 @@ typedef struct pic_ctx_subpic_s {
     int alpha;
 } pic_ctx_subpic_t;
 
+
+#define CTX_BUFS_MAX 4
+
 typedef struct pic_ctx_mmal_s {
     picture_context_t cmn;  // PARENT: Common els at start
 
+    unsigned int buf_count;
+    MMAL_BUFFER_HEADER_T * bufs[CTX_BUFS_MAX];
+
+#if 0
     MMAL_BUFFER_HEADER_T * buf;
     hw_mmal_port_pool_ref_t * ppr;
 
@@ -62,6 +69,7 @@ typedef struct pic_ctx_mmal_s {
     MMAL_BUFFER_HEADER_T * sub_tail;
 
     vlc_object_t * obj;
+#endif
 } pic_ctx_mmal_t;
 
 
@@ -70,7 +78,7 @@ void vlc_to_mmal_pic_fmt(MMAL_PORT_T * const port, const es_format_t * const es_
 hw_mmal_port_pool_ref_t * hw_mmal_port_pool_ref_create(MMAL_PORT_T * const port,
    const unsigned int headers, const uint32_t payload_size);
 void hw_mmal_port_pool_ref_release(hw_mmal_port_pool_ref_t * const ppr, const bool in_cb);
-bool hw_mmal_port_pool_ref_recycle(hw_mmal_port_pool_ref_t * const ppr, MMAL_BUFFER_HEADER_T * const buf);
+//bool hw_mmal_port_pool_ref_recycle(hw_mmal_port_pool_ref_t * const ppr, MMAL_BUFFER_HEADER_T * const buf);
 MMAL_STATUS_T hw_mmal_port_pool_ref_fill(hw_mmal_port_pool_ref_t * const ppr);
 static inline void hw_mmal_port_pool_ref_acquire(hw_mmal_port_pool_ref_t * const ppr)
 {
@@ -80,26 +88,26 @@ static inline void hw_mmal_port_pool_ref_acquire(hw_mmal_port_pool_ref_t * const
 static inline int hw_mmal_pic_has_sub_bufs(picture_t * const pic)
 {
     pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic->context;
-    return ctx->sub_bufs != NULL;
+    return ctx->buf_count > 1;
 }
 
 static inline void hw_mmal_pic_sub_buf_add(picture_t * const pic, MMAL_BUFFER_HEADER_T * const sub)
 {
     pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic->context;
-    sub->next = NULL;
-    if (ctx->sub_tail == NULL)
-        ctx->sub_bufs = sub;
-    else
-        ctx->sub_tail->next = sub;
-    ctx->sub_tail = sub;
+
+    if (ctx->buf_count >= CTX_BUFS_MAX) {
+        mmal_buffer_header_release(sub);
+        return;
+    }
+
+    ctx->bufs[ctx->buf_count++] = sub;
 }
 
-static inline MMAL_BUFFER_HEADER_T * hw_mmal_pic_sub_buf_get(picture_t * const pic)
+static inline MMAL_BUFFER_HEADER_T * hw_mmal_pic_sub_buf_get(picture_t * const pic, const unsigned int n)
 {
     pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic->context;
-    MMAL_BUFFER_HEADER_T * const sub = ctx->sub_bufs;
 
-    return sub;
+    return n + 1 > ctx->buf_count ? NULL : ctx->bufs[n + 1];
 }
 
 picture_context_t * hw_mmal_pic_ctx_copy(picture_context_t * pic_ctx_cmn);
@@ -169,7 +177,7 @@ static inline void buf_to_pic_copy_props(picture_t * const pic, const MMAL_BUFFE
 // Retrieve buf from pic & update with pic props
 static inline MMAL_BUFFER_HEADER_T * pic_mmal_buffer(const picture_t *const pic)
 {
-    MMAL_BUFFER_HEADER_T * const buf = ((pic_ctx_mmal_t *)pic->context)->buf;
+    MMAL_BUFFER_HEADER_T * const buf = ((pic_ctx_mmal_t *)pic->context)->bufs[0];
     if (buf != NULL)
         pic_to_buf_copy_props(buf, pic);
 

@@ -111,7 +111,7 @@ void hw_mmal_port_pool_ref_release(hw_mmal_port_pool_ref_t * const ppr, const bo
 
 // Put buffer in port if possible - if not then release to pool
 // Returns true if sent, false if recycled
-bool hw_mmal_port_pool_ref_recycle(hw_mmal_port_pool_ref_t * const ppr, MMAL_BUFFER_HEADER_T * const buf)
+static bool hw_mmal_port_pool_ref_recycle(hw_mmal_port_pool_ref_t * const ppr, MMAL_BUFFER_HEADER_T * const buf)
 {
     mmal_buffer_header_reset(buf);
     buf->user_data = NULL;
@@ -140,46 +140,55 @@ MMAL_STATUS_T hw_mmal_port_pool_ref_fill(hw_mmal_port_pool_ref_t * const ppr)
 void hw_mmal_pic_ctx_destroy(picture_context_t * pic_ctx_cmn)
 {
     pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic_ctx_cmn;
-    mmal_buffer_header_release(ctx->buf);
+    unsigned int i;
+
+    for (i = 0; i != ctx->buf_count; ++i) {
+        mmal_buffer_header_release(ctx->bufs[i]);
+    }
+    free(ctx);
 }
 
 picture_context_t * hw_mmal_pic_ctx_copy(picture_context_t * pic_ctx_cmn)
 {
-    pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic_ctx_cmn;
-    mmal_buffer_header_acquire(ctx->buf);
-    return pic_ctx_cmn;
+    const pic_ctx_mmal_t * const src_ctx = (pic_ctx_mmal_t *)pic_ctx_cmn;
+    pic_ctx_mmal_t * const dst_ctx = calloc(1, sizeof(*dst_ctx));
+    unsigned int i;
+
+    if (dst_ctx == NULL)
+        return NULL;
+
+    // Copy
+    dst_ctx->cmn = src_ctx->cmn;
+
+    dst_ctx->buf_count = src_ctx->buf_count;
+    for (i = 0; i != src_ctx->buf_count; ++i) {
+        dst_ctx->bufs[i] = src_ctx->bufs[i];
+        mmal_buffer_header_acquire(dst_ctx->bufs[i]);
+    }
+
+    return &dst_ctx->cmn;
 }
 
 static MMAL_BOOL_T
 buf_pre_release_cb(MMAL_BUFFER_HEADER_T * buf, void *userdata)
 {
-    pic_ctx_mmal_t * const ctx = userdata;
+    hw_mmal_port_pool_ref_t * const ppr = userdata;
 
     // Kill the callback - otherwise we will go in circles!
     mmal_buffer_header_pre_release_cb_set(buf, (MMAL_BH_PRE_RELEASE_CB_T)0, NULL);
     mmal_buffer_header_acquire(buf);  // Ref it again
 
-    // Kill any sub-pics still attached
-    {
-        MMAL_BUFFER_HEADER_T * sub;
-        while ((sub = ctx->sub_bufs) != NULL) {
-            ctx->sub_bufs = sub->next;
-            sub->next = NULL;
-            mmal_buffer_header_release(sub);
-        }
-        ctx->sub_tail = NULL; // Just tidy
-    }
-
     // As we have re-acquired the buffer we need a full release
     // (not continue) to zap the ref count back to zero
     // This is "safe" 'cos we have already reset the cb
-    hw_mmal_port_pool_ref_recycle(ctx->ppr, buf);
-    hw_mmal_port_pool_ref_release(ctx->ppr, true); // Assume in callback
+    hw_mmal_port_pool_ref_recycle(ppr, buf);
+    hw_mmal_port_pool_ref_release(ppr, true); // Assume in callback
 
-    free(ctx); // Free self
     return MMAL_TRUE;
 }
 
+// Buffer belongs to context on successful return from this fn
+// is still valid on failure
 picture_context_t *
 hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const ppr,
                     vlc_object_t * obj)
@@ -190,15 +199,15 @@ hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const 
         return NULL;
 
     hw_mmal_port_pool_ref_acquire(ppr);
-    mmal_buffer_header_pre_release_cb_set(buf, buf_pre_release_cb, ctx);
+    mmal_buffer_header_pre_release_cb_set(buf, buf_pre_release_cb, ppr);
 
     ctx->cmn.copy = hw_mmal_pic_ctx_copy;
     ctx->cmn.destroy = hw_mmal_pic_ctx_destroy;
-    ctx->buf = buf;
-    ctx->ppr = ppr;
-    ctx->obj = obj;
 
-    buf->user_data = ctx;
+    ctx->bufs[0] = buf;
+    ctx->buf_count = 1;
+
+    buf->user_data = NULL;
     return &ctx->cmn;
 }
 
@@ -313,6 +322,8 @@ typedef struct vzc_subbuf_ent_s
 
 static pool_ent_t * ent_extract(ent_list_hdr_t * const elh, pool_ent_t * const ent)
 {
+    printf("List %p [%d]: Ext %p\n", elh, elh->n, ent);
+
     if (ent == NULL)
         return NULL;
 
@@ -340,6 +351,8 @@ static inline pool_ent_t * ent_extract_tail(ent_list_hdr_t * const elh)
 
 static void ent_add_head(ent_list_hdr_t * const elh, pool_ent_t * const ent)
 {
+    printf("List %p [%d]: Add %p\n", elh, elh->n, ent);
+
     if ((ent->next = elh->ents) == NULL)
         elh->tail = ent;
     else
@@ -352,6 +365,7 @@ static void ent_add_head(ent_list_hdr_t * const elh, pool_ent_t * const ent)
 
 static void ent_free(pool_ent_t * const ent)
 {
+    printf("Free ent: %p\n", ent);
     if (ent != NULL) {
         // If we still have a ref to a pic - kill it now
         if (ent->pic != NULL)
@@ -370,6 +384,8 @@ static void ent_free_list(ent_list_hdr_t * const elh)
 {
     pool_ent_t * ent = elh->ents;
 
+    printf("Free list: %p [%d]\n", elh, elh->n);
+
     *elh = ENT_LIST_HDR_INIT;
 
     while (ent != NULL) {
@@ -381,6 +397,8 @@ static void ent_free_list(ent_list_hdr_t * const elh)
 
 static void ent_list_move(ent_list_hdr_t * const dst, ent_list_hdr_t * const src)
 {
+    printf("Move %p->%p\n", src, dst);
+
     *dst = *src;
     *src = ENT_LIST_HDR_INIT;
 }
@@ -391,7 +409,11 @@ static pool_ent_t * ent_list_extract_pic_ent(ent_list_hdr_t * const elh, picture
 {
     pool_ent_t *ent = elh->tail;
 
+    printf("Find list: %p [%d]; pic:%p\n", elh, elh->n, pic);
+
     while (ent != NULL) {
+        printf("Check ent: %p, pic:%p\n", ent, ent->pic);
+
         if (ent->pic == pic)
             return ent_extract(elh, ent);
         ent = ent->prev;
@@ -444,7 +466,7 @@ static void pool_recycle(vzc_pool_ctl_t * const pc, pool_ent_t * const ent)
 
     n = atomic_fetch_sub(&ent->ref_count, 1) - 1;
 
-//    printf("%s: %p: %d\n", __func__, ent, n);
+    printf("%s: Pool: %p: Ent: %p: %d\n", __func__, &pc->ent_pool, ent, n);
 
     if (n != 0)
         return;
@@ -587,6 +609,8 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
         const size_t dst_size = dst_stride * dst_lines;
 
         pool_ent_t * ent = ent_list_extract_pic_ent(&pc->ents_prev, pic);
+
+        printf("ent_found: %p\n", ent);
 
         if (ent == NULL)
         {

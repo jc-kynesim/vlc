@@ -93,7 +93,7 @@ typedef struct filter_sys_t
 
 
 
-// Buffer either attached to pic or released
+// Buffer attached to pic on success, is still valid on failure
 static picture_t * di_alloc_opaque(filter_t * const p_filter, MMAL_BUFFER_HEADER_T * const buf)
 {
     filter_sys_t *const filter_sys = p_filter->p_sys;
