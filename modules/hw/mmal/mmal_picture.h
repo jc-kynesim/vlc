@@ -113,7 +113,7 @@ static inline MMAL_BUFFER_HEADER_T * hw_mmal_pic_sub_buf_get(picture_t * const p
 picture_context_t * hw_mmal_pic_ctx_copy(picture_context_t * pic_ctx_cmn);
 void hw_mmal_pic_ctx_destroy(picture_context_t * pic_ctx_cmn);
 picture_context_t * hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf,
-    hw_mmal_port_pool_ref_t * const ppr, vlc_object_t * obj);
+    hw_mmal_port_pool_ref_t * const ppr);
 
 int hw_mmal_get_gpu_mem(void);
 
@@ -193,6 +193,7 @@ void hw_mmal_vzc_buf_set_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const int x
 const MMAL_RECT_T * hw_mmal_vzc_buf_get_dest_rect(MMAL_BUFFER_HEADER_T * const buf);
 unsigned int hw_mmal_vzc_buf_seq(MMAL_BUFFER_HEADER_T * const buf);
 MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic, const bool is_first);
+void hw_mmal_vzc_pool_flush(vzc_pool_ctl_t * const pc);
 void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc);
 vzc_pool_ctl_t * hw_mmal_vzc_pool_new(void);
 

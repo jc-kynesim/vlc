@@ -190,8 +190,7 @@ buf_pre_release_cb(MMAL_BUFFER_HEADER_T * buf, void *userdata)
 // Buffer belongs to context on successful return from this fn
 // is still valid on failure
 picture_context_t *
-hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const ppr,
-                    vlc_object_t * obj)
+hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const ppr)
 {
     pic_ctx_mmal_t * const ctx = calloc(1, sizeof(pic_ctx_mmal_t));
 
@@ -577,6 +576,12 @@ unsigned int hw_mmal_vzc_buf_seq(MMAL_BUFFER_HEADER_T * const buf)
 }
 
 
+// The intent with the ents_cur & ents_last stuff is to remember the buffers
+// we used on the last frame and reuse them on the current one if they are the
+// same.  Unfortunately detection of "is_first" is only a heuristic (there are
+// no rules governing the order in which things are blended) so we must deal
+// (fairly) gracefully with it never (or always) being set.
+
 MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic, const bool is_first)
 {
     MMAL_BUFFER_HEADER_T * const buf = mmal_queue_get(pc->buf_pool->queue);
@@ -588,7 +593,10 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
     if ((sb = calloc(1, sizeof(*sb))) == NULL)
         goto fail1;
 
-    if (is_first) {
+    // If first or we've had a lot of stuff move everything to the last list
+    // (we could deal more gracefully with the "too many" case but it shouldn't
+    // really happen)
+    if (is_first || pc->ents_cur.n >= CTX_BUFS_MAX) {
         pool_recycle_list(pc, &pc->ents_prev);
         ent_list_move(&pc->ents_prev, &pc->ents_cur);
     }
@@ -609,6 +617,11 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
         const size_t dst_size = dst_stride * dst_lines;
 
         pool_ent_t * ent = ent_list_extract_pic_ent(&pc->ents_prev, pic);
+
+        // If we didn't find ent in last then look in cur in case is_first
+        // isn't working
+        if (ent == NULL)
+            ent = ent_list_extract_pic_ent(&pc->ents_cur, pic);
 
         printf("ent_found: %p\n", ent);
 
@@ -673,13 +686,18 @@ fail1:
     return NULL;
 }
 
+void hw_mmal_vzc_pool_flush(vzc_pool_ctl_t * const pc)
+{
+    pool_recycle_list(pc, &pc->ents_prev);
+    pool_recycle_list(pc, &pc->ents_cur);
+}
+
 void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc)
 {
     if (pc == NULL)
         return;
 
-    pool_recycle_list(pc, &pc->ents_prev);
-    pool_recycle_list(pc, &pc->ents_cur);
+    hw_mmal_vzc_pool_flush(pc);
 
     ent_free_list(&pc->ent_pool);
 

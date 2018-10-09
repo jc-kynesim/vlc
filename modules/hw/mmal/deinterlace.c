@@ -107,7 +107,7 @@ static picture_t * di_alloc_opaque(filter_t * const p_filter, MMAL_BUFFER_HEADER
         goto fail2;
     }
 
-    if ((pic->context = hw_mmal_gen_context(buf, filter_sys->out_ppr, (vlc_object_t*)p_filter)) == NULL)
+    if ((pic->context = hw_mmal_gen_context(buf, filter_sys->out_ppr)) == NULL)
         goto fail2;
 
     buf_to_pic_copy_props(pic, buf);

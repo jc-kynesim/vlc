@@ -274,7 +274,7 @@ static picture_t * alloc_opaque_pic(decoder_t * const dec, MMAL_BUFFER_HEADER_T 
         goto fail2;
     }
 
-    if ((pic->context = hw_mmal_gen_context(buf, dec_sys->ppr, (vlc_object_t*)dec)) == NULL)
+    if ((pic->context = hw_mmal_gen_context(buf, dec_sys->ppr)) == NULL)
         goto fail2;
 
     buf_to_pic_copy_props(pic, buf);
@@ -1412,7 +1412,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 
             if (needs_update)
             {
-#if TRACE_ALL
+#if TRACE_ALL || 1
                 msg_Dbg(p_filter, "Update pic for sub %d", sub_no);
 #endif
                 if ((err = port_send_replicated(port, sub->pool, sub_buf, pts)) != MMAL_SUCCESS)
@@ -1438,7 +1438,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                     msg_Err(p_filter, "Buffer get for subpic failed");
                     goto fail;
                 }
-#if TRACE_ALL
+#if TRACE_ALL || 1
                 msg_Dbg(p_filter, "Remove pic for sub %d", sub_no);
 #endif
                 buf->cmd = 0;
@@ -1873,6 +1873,7 @@ msg_Dbg(p_filter, ">>> %s: FAIL: %d", __func__, ret);
 
 typedef struct blend_sys_s {
     vzc_pool_ctl_t * vzc;
+    const picture_t * last_dst;  // Not a ref, just a hint that we have a new pic
 } blend_sys_t;
 
 static void FilterBlendMmal(filter_t *p_filter,
@@ -1896,7 +1897,8 @@ static void FilterBlendMmal(filter_t *p_filter,
     else
     {
         // cast away src const so we can ref it
-        MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc, (picture_t *)src, !hw_mmal_pic_has_sub_bufs(dst));
+        MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc, (picture_t *)src,
+                                                             dst != sys->last_dst || !hw_mmal_pic_has_sub_bufs(dst));
         if (buf == NULL) {
             msg_Err(p_filter, "Failed to allocate vzc buffer for subpic");
             return;
@@ -1915,9 +1917,17 @@ static void FilterBlendMmal(filter_t *p_filter,
         reg->dest_rect = (MMAL_RECT_T){0, 0, 0, 0};
 
         hw_mmal_pic_sub_buf_add(dst, buf);
+
+        sys->last_dst = dst;
     }
 }
 
+static void FlushBlendMmal(filter_t * p_filter)
+{
+    blend_sys_t * const sys = (blend_sys_t *)p_filter->p_sys;
+    sys->last_dst = NULL;
+    hw_mmal_vzc_pool_flush(sys->vzc);
+}
 
 static int OpenBlendMmal(vlc_object_t *object)
 {
@@ -1954,6 +1964,8 @@ static int OpenBlendMmal(vlc_object_t *object)
     }
 
     p_filter->pf_video_blend = FilterBlendMmal;
+    p_filter->pf_flush = FlushBlendMmal;
+
     return VLC_SUCCESS;
 }
 
