@@ -2043,6 +2043,10 @@ static void FilterBlendNeon(filter_t *p_filter,
 
 
     do {
+#if 1
+        extern void blend_rgba_asm_neon(const void * src, void * dest, int alpha, unsigned int n);
+        blend_rgba_asm_neon(s_data, d_data, alpha, width / 4);
+#else
         int i;
         for (i = 0; i != width; ++i) {
             const uint32_t s_pel = ((const uint32_t *)s_data)[i];
@@ -2053,6 +2057,7 @@ static void FilterBlendNeon(filter_t *p_filter,
                 (a_merge((d_pel >> 8)  & 0xff, (s_pel >> 8)  & 0xff, a) << 8 ) |
                 (a_merge((d_pel >> 0)  & 0xff, (s_pel >> 0)  & 0xff, a) << 0 );
         }
+#endif
         s_data += src_pic->p[0].i_pitch;
         d_data += dst_pic->p[0].i_pitch;
     } while (--height > 0);
