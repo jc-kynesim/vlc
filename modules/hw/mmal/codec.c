@@ -974,6 +974,8 @@ typedef struct filter_sys_t {
     MMAL_PORT_BH_CB_T in_port_cb_fn;
     MMAL_PORT_BH_CB_T out_port_cb_fn;
 
+    int64_t frame_seq;
+
     // Slice specific tracking stuff
     struct {
         pic_fifo_t pics;
@@ -1114,9 +1116,9 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     filter_t * const p_filter = (filter_t *)port->userdata;
     filter_sys_t * const sys = p_filter->p_sys;
 
-#if TRACE_ALL
-    msg_Dbg(p_filter, "<<< %s: cmd=%d, flags=%#x, pic=%p, data=%p, len=%d/%d, pts=%lld", __func__,
-            buf->cmd, buf->flags, buf->user_data, buf->data, buf->length, buf->alloc_size, (long long)buf->pts);
+#if TRACE_ALL || 1
+    msg_Dbg(p_filter, "<<< %s: cmd=%d, flags=%#x, pic=%p, data=%p, len=%d/%d, pts=%lld/%lld", __func__,
+            buf->cmd, buf->flags, buf->user_data, buf->data, buf->length, buf->alloc_size, (long long)buf->pts, (long long)buf->dts);
 #endif
     if (buf->cmd == 0) {
         picture_t * const pic = (picture_t *)buf->user_data;
@@ -1133,6 +1135,7 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
         }
         else
         {
+            buf->pts = MMAL_TIME_UNKNOWN;
             buf_to_pic_copy_props(pic, buf);
 
 //            draw_corners(pic->p[0].p_pixels, pic->p[0].i_pitch / 4, 0, 0, pic->p[0].i_visible_pitch / 4, pic->p[0].i_visible_lines);
@@ -1309,7 +1312,7 @@ static inline bool cmp_rect(const MMAL_RECT_T * const a, const MMAL_RECT_T * con
 
 static MMAL_STATUS_T port_send_replicated(MMAL_PORT_T * const port, MMAL_POOL_T * const rep_pool,
                                           MMAL_BUFFER_HEADER_T * const src_buf,
-                                          const int64_t pts)
+                                          const int64_t pts, const int64_t dts)
 {
     MMAL_STATUS_T err;
     MMAL_BUFFER_HEADER_T *const rep_buf = mmal_queue_wait(rep_pool->queue);
@@ -1321,7 +1324,7 @@ static MMAL_STATUS_T port_send_replicated(MMAL_PORT_T * const port, MMAL_POOL_T 
         return err;
 
     rep_buf->pts = pts;
-    rep_buf->dts = pts;
+    rep_buf->dts = dts;
 
     if ((err = mmal_port_send_buffer(port, rep_buf)) != MMAL_SUCCESS)
     {
@@ -1338,6 +1341,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     picture_t * ret_pics;
     MMAL_STATUS_T err;
     const int64_t pts = p_pic->date != VLC_TICK_INVALID ? p_pic->date : MMAL_TIME_UNKNOWN;
+    const int64_t frame_seq = ++sys->frame_seq;
 
 #if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s", __func__);
@@ -1415,7 +1419,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 #if TRACE_ALL || 1
                 msg_Dbg(p_filter, "Update pic for sub %d", sub_no);
 #endif
-                if ((err = port_send_replicated(port, sub->pool, sub_buf, pts)) != MMAL_SUCCESS)
+                if ((err = port_send_replicated(port, sub->pool, sub_buf, frame_seq, pts)) != MMAL_SUCCESS)
                 {
                     msg_Err(p_filter, "Send buffer to subput failed");
                     goto fail;
@@ -1446,7 +1450,8 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 buf->alloc_size = 0;
                 buf->offset = 0;
                 buf->flags = 0;
-                buf->pts = buf->dts = pts;
+                buf->pts = frame_seq;
+                buf->dts = pts;
                 buf->user_data = NULL;
 
                 if ((err = mmal_port_send_buffer(port, buf)) != MMAL_SUCCESS)
@@ -1493,16 +1498,16 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     // We assume the BH is already set up with values reflecting pic date etc.
     {
         MMAL_BUFFER_HEADER_T * const pic_buf = pic_mmal_buffer(p_pic);
-#if TRACE_ALL
-        msg_Dbg(p_filter, "In buf send: pic=%p, buf=%p/%p, ctx=%p, flags=%#x, len=%d/%d, pts=%lld",
-                p_pic, pic_buf, buf, pic_buf->user_data, buf->flags, buf->length, buf->alloc_size, (long long)buf->pts);
+#if TRACE_ALL || 1
+        msg_Dbg(p_filter, "In buf send: pic=%p, buf=%p, user=%p, pts=%lld/%lld",
+                p_pic, pic_buf, pic_buf->user_data, frame_seq, pts);
 #endif
         if (pic_buf == NULL) {
             msg_Err(p_filter, "Pic has no attached buffer");
             goto fail;
         }
 
-        if ((err = port_send_replicated(sys->input, sys->in_pool, pic_buf, pts)) != MMAL_SUCCESS)
+        if ((err = port_send_replicated(sys->input, sys->in_pool, pic_buf, frame_seq, pts)) != MMAL_SUCCESS)
         {
             msg_Err(p_filter, "Send buffer to input failed");
             goto fail;
@@ -1978,6 +1983,111 @@ static void CloseBlendMmal(vlc_object_t *object)
     free(sys);
 }
 
+// ---------------------------------------------------------------------------
+
+static inline unsigned div255(unsigned v)
+{
+    /* It is exact for 8 bits, and has a max error of 1 for 9 and 10 bits
+     * while respecting full opacity/transparency */
+    return ((v >> 8) + v + 1) >> 8;
+    //return v / 255;
+}
+
+static inline unsigned int a_merge(unsigned int dst, unsigned src, unsigned f)
+{
+    return div255((255 - f) * (dst) + src * f);
+}
+
+
+static void FilterBlendNeon(filter_t *p_filter,
+                  picture_t *dst_pic, const picture_t * src_pic,
+                  int x_offset, int y_offset, int alpha)
+{
+    const uint8_t * s_data;
+    uint8_t * d_data;
+    int width = src_pic->format.i_visible_width;
+    int height = src_pic->format.i_visible_height;
+
+#if TRACE_ALL || 1
+    msg_Dbg(p_filter, "%s (%d,%d:%d) pic=%p, pts=%lld, force=%d", __func__, x_offset, y_offset, alpha, src_pic, src_pic->date, src_pic->b_force);
+#endif
+
+    if (alpha == 0 ||
+        src_pic->format.i_visible_height == 0 ||
+        src_pic->format.i_visible_width == 0)
+    {
+        return;
+    }
+
+    x_offset += dst_pic->format.i_x_offset;
+    y_offset += dst_pic->format.i_y_offset;
+
+    // Deal with R/B overrun
+    if (x_offset + width >= (int)(dst_pic->format.i_x_offset + dst_pic->format.i_visible_width))
+        width = dst_pic->format.i_x_offset + dst_pic->format.i_visible_width - x_offset;
+    if (y_offset + height >= (int)(dst_pic->format.i_y_offset + dst_pic->format.i_visible_height))
+        height = dst_pic->format.i_y_offset + dst_pic->format.i_visible_height - y_offset;
+
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    // *** L/U overrun
+
+    s_data = src_pic->p[0].p_pixels +
+        src_pic->p[0].i_pixel_pitch * src_pic->format.i_x_offset +
+        src_pic->p[0].i_pitch * src_pic->format.i_y_offset;
+    d_data = dst_pic->p[0].p_pixels +
+        dst_pic->p[0].i_pixel_pitch * x_offset +
+        dst_pic->p[0].i_pitch * y_offset;
+
+
+    do {
+        int i;
+        for (i = 0; i != width; ++i) {
+            const uint32_t s_pel = ((const uint32_t *)s_data)[i];
+            const uint32_t d_pel = ((const uint32_t *)d_data)[i];
+            const unsigned int a = div255(alpha * (s_pel >> 24));
+            ((uint32_t *)d_data)[i] = 0xff000000 |
+                (a_merge((d_pel >> 16) & 0xff, (s_pel >> 16) & 0xff, a) << 16) |
+                (a_merge((d_pel >> 8)  & 0xff, (s_pel >> 8)  & 0xff, a) << 8 ) |
+                (a_merge((d_pel >> 0)  & 0xff, (s_pel >> 0)  & 0xff, a) << 0 );
+        }
+        s_data += src_pic->p[0].i_pitch;
+        d_data += dst_pic->p[0].i_pitch;
+    } while (--height > 0);
+}
+
+static void CloseBlendNeon(vlc_object_t *object)
+{
+    VLC_UNUSED(object);
+}
+
+static int OpenBlendNeon(vlc_object_t *object)
+{
+    filter_t * const p_filter = (filter_t *)object;
+    const vlc_fourcc_t vfcc_src = p_filter->fmt_in.video.i_chroma;
+    const vlc_fourcc_t vfcc_dst = p_filter->fmt_out.video.i_chroma;
+
+    {
+        char dbuf0[5], dbuf1[5];
+        msg_Dbg(p_filter, "%s: (%s) %s,%dx%d [(%d,%d) %dx%d]->%s,%dx%d [(%d,%d) %dx%d]", __func__,
+                "blend",
+                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
+                p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
+                p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
+                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
+                p_filter->fmt_out.video.i_x_offset, p_filter->fmt_out.video.i_y_offset,
+                p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height);
+    }
+
+    if (vfcc_dst != VLC_CODEC_RGB32 || vfcc_src != VLC_CODEC_RGBA) {
+        return VLC_EGENERIC;
+    }
+
+    p_filter->pf_video_blend = FilterBlendNeon;
+    return VLC_SUCCESS;
+}
 
 vlc_module_begin()
     set_category( CAT_INPUT )
@@ -2005,8 +2115,16 @@ vlc_module_begin()
     set_subcategory( SUBCAT_VIDEO_VFILTER )
     set_description(N_("Video pictures blending for MMAL"))
     add_shortcut("mmal_blend")
-    set_capability("video blending", 110)
+    set_capability("video blending", 120)
     set_callbacks(OpenBlendMmal, CloseBlendMmal)
+
+    add_submodule()
+    set_category( CAT_VIDEO )
+    set_subcategory( SUBCAT_VIDEO_VFILTER )
+    set_description(N_("Video pictures blending for neon"))
+    add_shortcut("neon_blend")
+    set_capability("video blending", 110)
+    set_callbacks(OpenBlendNeon, CloseBlendNeon)
 
 vlc_module_end()
 

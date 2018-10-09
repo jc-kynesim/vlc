@@ -321,7 +321,7 @@ typedef struct vzc_subbuf_ent_s
 
 static pool_ent_t * ent_extract(ent_list_hdr_t * const elh, pool_ent_t * const ent)
 {
-    printf("List %p [%d]: Ext %p\n", elh, elh->n, ent);
+//    printf("List %p [%d]: Ext %p\n", elh, elh->n, ent);
 
     if (ent == NULL)
         return NULL;
@@ -350,7 +350,7 @@ static inline pool_ent_t * ent_extract_tail(ent_list_hdr_t * const elh)
 
 static void ent_add_head(ent_list_hdr_t * const elh, pool_ent_t * const ent)
 {
-    printf("List %p [%d]: Add %p\n", elh, elh->n, ent);
+//    printf("List %p [%d]: Add %p\n", elh, elh->n, ent);
 
     if ((ent->next = elh->ents) == NULL)
         elh->tail = ent;
@@ -364,7 +364,7 @@ static void ent_add_head(ent_list_hdr_t * const elh, pool_ent_t * const ent)
 
 static void ent_free(pool_ent_t * const ent)
 {
-    printf("Free ent: %p\n", ent);
+//    printf("Free ent: %p\n", ent);
     if (ent != NULL) {
         // If we still have a ref to a pic - kill it now
         if (ent->pic != NULL)
@@ -383,7 +383,7 @@ static void ent_free_list(ent_list_hdr_t * const elh)
 {
     pool_ent_t * ent = elh->ents;
 
-    printf("Free list: %p [%d]\n", elh, elh->n);
+//    printf("Free list: %p [%d]\n", elh, elh->n);
 
     *elh = ENT_LIST_HDR_INIT;
 
@@ -396,7 +396,7 @@ static void ent_free_list(ent_list_hdr_t * const elh)
 
 static void ent_list_move(ent_list_hdr_t * const dst, ent_list_hdr_t * const src)
 {
-    printf("Move %p->%p\n", src, dst);
+//    printf("Move %p->%p\n", src, dst);
 
     *dst = *src;
     *src = ENT_LIST_HDR_INIT;
@@ -408,10 +408,10 @@ static pool_ent_t * ent_list_extract_pic_ent(ent_list_hdr_t * const elh, picture
 {
     pool_ent_t *ent = elh->tail;
 
-    printf("Find list: %p [%d]; pic:%p\n", elh, elh->n, pic);
+//    printf("Find list: %p [%d]; pic:%p\n", elh, elh->n, pic);
 
     while (ent != NULL) {
-        printf("Check ent: %p, pic:%p\n", ent, ent->pic);
+//        printf("Check ent: %p, pic:%p\n", ent, ent->pic);
 
         if (ent->pic == pic)
             return ent_extract(elh, ent);
@@ -465,7 +465,7 @@ static void pool_recycle(vzc_pool_ctl_t * const pc, pool_ent_t * const ent)
 
     n = atomic_fetch_sub(&ent->ref_count, 1) - 1;
 
-    printf("%s: Pool: %p: Ent: %p: %d\n", __func__, &pc->ent_pool, ent, n);
+//    printf("%s: Pool: %p: Ent: %p: %d\n", __func__, &pc->ent_pool, ent, n);
 
     if (n != 0)
         return;
@@ -623,7 +623,7 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
         if (ent == NULL)
             ent = ent_list_extract_pic_ent(&pc->ents_cur, pic);
 
-        printf("ent_found: %p\n", ent);
+//        printf("ent_found: %p\n", ent);
 
         if (ent == NULL)
         {
