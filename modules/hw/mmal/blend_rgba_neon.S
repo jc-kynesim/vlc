@@ -9,22 +9,20 @@
 @ r3   pels
 
         .align  16
-        .global blend_rgba_asm_neon
+        .global blend_rgbx_rgba_neon
 #ifdef __ELF__
-        .type   blend_rgba_asm_neon, %function
+        .type   blend_rgbx_rgba_neon, %function
 #endif
 
-blend_rgba_asm_neon:
+blend_rgbx_rgba_neon:
 
-        subs       r3,  #8
-
-        vpush     { q4 }
+        vpush     { q4 }                @ With reworked reg alloc this could be avoided
         movw       r12, #257
-        mul        r2,  r12
-        vmov       s16, r2
-
         vmov.i8    q11, #0xff
+        mul        r2,  r12
         vmov.u8    q10, #1
+        subs       r3,  #8
+        vmov       s16, r2
         vmov.u32   q12, #0xff000000
         blt        2f
 
@@ -75,16 +73,20 @@ blend_rgba_asm_neon:
 
 2:
         cmp        r3, #-8
-        beq        3f
+        ble        3f
 
         @ Deal with tail
+        @ As the calculation on each pel is independant it doesn't matter
+        @ where the pels are in in the registers as long as we are consistant
+        @ with what we use for load & store. (Unused register fields will just
+        @ calculate garbage that we then ignore.)
 
         lsls       r2,  r3,  #30        @ b2 -> C, b1 -> N
         vldmcs     r1!, {d2,d3}
         vldmcs     r0!, {d30, d31}
         vldmmi     r1!, {d1}
         vldmmi     r0!, {d29}
-        tst        r3, #1
+        tst        r3,  #1
         vldrne     s1,  [r1]
         vldrne     s9,  [r0]
 

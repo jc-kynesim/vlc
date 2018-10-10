@@ -40,6 +40,7 @@
 #include <interface/mmal/util/mmal_default_components.h>
 
 #include "mmal_picture.h"
+#include "blend_rgba_neon.h"
 
 #define TRACE_ALL 0
 
@@ -2044,8 +2045,7 @@ static void FilterBlendNeon(filter_t *p_filter,
 
     do {
 #if 1
-        extern void blend_rgba_asm_neon(void * dest, const void * src, int alpha, unsigned int n);
-        blend_rgba_asm_neon(d_data, s_data, alpha, width);
+        blend_rgbx_rgba_neon(d_data, s_data, alpha, width);
 #else
         int i;
         for (i = 0; i != width; ++i) {

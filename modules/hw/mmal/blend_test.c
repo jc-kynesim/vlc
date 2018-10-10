@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <memory.h>
 
-extern void blend_rgba_asm_neon(void * dest, const void * src, int alpha, unsigned int n);
+#include "blend_rgba_neon.h"
 
 static inline unsigned div255(unsigned v)
 {
@@ -44,7 +44,7 @@ static void test_line(const uint32_t dx[256], const uint32_t s0[256], unsigned i
     memcpy(d1, dx, sizeof(d1));
 
     merge_line(d0, s0, alpha, len);
-    blend_rgba_asm_neon(d1, s0, alpha, len);
+    blend_rgbx_rgba_neon(d1, s0, alpha, len);
 
     for (i = 0; i != 256; ++i) {
         if (d0[i] != d1[i]) {
