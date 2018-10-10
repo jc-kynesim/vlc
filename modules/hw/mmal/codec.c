@@ -975,7 +975,8 @@ typedef struct filter_sys_t {
     MMAL_PORT_BH_CB_T in_port_cb_fn;
     MMAL_PORT_BH_CB_T out_port_cb_fn;
 
-    int64_t frame_seq;
+    uint64_t frame_seq;
+    mtime_t pts_stash[16];
 
     // Slice specific tracking stuff
     struct {
@@ -1117,9 +1118,10 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     filter_t * const p_filter = (filter_t *)port->userdata;
     filter_sys_t * const sys = p_filter->p_sys;
 
-#if TRACE_ALL || 1
+#if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s: cmd=%d, flags=%#x, pic=%p, data=%p, len=%d/%d, pts=%lld/%lld", __func__,
-            buf->cmd, buf->flags, buf->user_data, buf->data, buf->length, buf->alloc_size, (long long)buf->pts, (long long)buf->dts);
+            buf->cmd, buf->flags, buf->user_data, buf->data, buf->length, buf->alloc_size,
+            (long long)buf->pts, (long long)sys->pts_stash[(unsigned int)(buf->pts & 0xf)]);
 #endif
     if (buf->cmd == 0) {
         picture_t * const pic = (picture_t *)buf->user_data;
@@ -1136,8 +1138,8 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
         }
         else
         {
-            buf->pts = MMAL_TIME_UNKNOWN;
             buf_to_pic_copy_props(pic, buf);
+            pic->date = sys->pts_stash[(unsigned int)(buf->pts & 0xf)];
 
 //            draw_corners(pic->p[0].p_pixels, pic->p[0].i_pitch / 4, 0, 0, pic->p[0].i_visible_pitch / 4, pic->p[0].i_visible_lines);
 
@@ -1313,7 +1315,7 @@ static inline bool cmp_rect(const MMAL_RECT_T * const a, const MMAL_RECT_T * con
 
 static MMAL_STATUS_T port_send_replicated(MMAL_PORT_T * const port, MMAL_POOL_T * const rep_pool,
                                           MMAL_BUFFER_HEADER_T * const src_buf,
-                                          const int64_t pts, const int64_t dts)
+                                          const uint64_t seq)
 {
     MMAL_STATUS_T err;
     MMAL_BUFFER_HEADER_T *const rep_buf = mmal_queue_wait(rep_pool->queue);
@@ -1324,8 +1326,7 @@ static MMAL_STATUS_T port_send_replicated(MMAL_PORT_T * const port, MMAL_POOL_T 
     if ((err = mmal_buffer_header_replicate(rep_buf, src_buf)) != MMAL_SUCCESS)
         return err;
 
-    rep_buf->pts = pts;
-    rep_buf->dts = dts;
+    rep_buf->pts = seq;
 
     if ((err = mmal_port_send_buffer(port, rep_buf)) != MMAL_SUCCESS)
     {
@@ -1341,8 +1342,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     filter_sys_t * const sys = p_filter->p_sys;
     picture_t * ret_pics;
     MMAL_STATUS_T err;
-    const int64_t pts = p_pic->date != VLC_TICK_INVALID ? p_pic->date : MMAL_TIME_UNKNOWN;
-    const int64_t frame_seq = ++sys->frame_seq;
+    const uint64_t frame_seq = ++sys->frame_seq;
 
 #if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s", __func__);
@@ -1417,10 +1417,10 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 
             if (needs_update)
             {
-#if TRACE_ALL || 1
+#if TRACE_ALL
                 msg_Dbg(p_filter, "Update pic for sub %d", sub_no);
 #endif
-                if ((err = port_send_replicated(port, sub->pool, sub_buf, frame_seq, pts)) != MMAL_SUCCESS)
+                if ((err = port_send_replicated(port, sub->pool, sub_buf, frame_seq)) != MMAL_SUCCESS)
                 {
                     msg_Err(p_filter, "Send buffer to subput failed");
                     goto fail;
@@ -1443,7 +1443,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                     msg_Err(p_filter, "Buffer get for subpic failed");
                     goto fail;
                 }
-#if TRACE_ALL || 1
+#if TRACE_ALL
                 msg_Dbg(p_filter, "Remove pic for sub %d", sub_no);
 #endif
                 buf->cmd = 0;
@@ -1452,7 +1452,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 buf->offset = 0;
                 buf->flags = 0;
                 buf->pts = frame_seq;
-                buf->dts = pts;
+                buf->dts = MMAL_TIME_UNKNOWN;
                 buf->user_data = NULL;
 
                 if ((err = mmal_port_send_buffer(port, buf)) != MMAL_SUCCESS)
@@ -1499,16 +1499,17 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     // We assume the BH is already set up with values reflecting pic date etc.
     {
         MMAL_BUFFER_HEADER_T * const pic_buf = pic_mmal_buffer(p_pic);
-#if TRACE_ALL || 1
+#if TRACE_ALL
         msg_Dbg(p_filter, "In buf send: pic=%p, buf=%p, user=%p, pts=%lld/%lld",
-                p_pic, pic_buf, pic_buf->user_data, frame_seq, pts);
+                p_pic, pic_buf, pic_buf->user_data, (long long)frame_seq, (long long)p_pic->date);
 #endif
         if (pic_buf == NULL) {
             msg_Err(p_filter, "Pic has no attached buffer");
             goto fail;
         }
 
-        if ((err = port_send_replicated(sys->input, sys->in_pool, pic_buf, frame_seq, pts)) != MMAL_SUCCESS)
+        sys->pts_stash[(frame_seq & 0xf)] = p_pic->date;
+        if ((err = port_send_replicated(sys->input, sys->in_pool, pic_buf, frame_seq)) != MMAL_SUCCESS)
         {
             msg_Err(p_filter, "Send buffer to input failed");
             goto fail;
@@ -1887,7 +1888,7 @@ static void FilterBlendMmal(filter_t *p_filter,
                   int x_offset, int y_offset, int alpha)
 {
     blend_sys_t * const sys = (blend_sys_t *)p_filter->p_sys;
-#if TRACE_ALL || 1
+#if TRACE_ALL
     msg_Dbg(p_filter, "%s (%d,%d:%d) pic=%p, pts=%lld, force=%d", __func__, x_offset, y_offset, alpha, src, src->date, src->b_force);
 #endif
     // If nothing to do then do nothing
@@ -2009,8 +2010,10 @@ static void FilterBlendNeon(filter_t *p_filter,
     int width = src_pic->format.i_visible_width;
     int height = src_pic->format.i_visible_height;
 
-#if TRACE_ALL || 1
+#if TRACE_ALL
     msg_Dbg(p_filter, "%s (%d,%d:%d) pic=%p, pts=%lld, force=%d", __func__, x_offset, y_offset, alpha, src_pic, src_pic->date, src_pic->b_force);
+#else
+    VLC_UNUSED(p_filter);
 #endif
 
     if (alpha == 0 ||

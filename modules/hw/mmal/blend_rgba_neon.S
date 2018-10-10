@@ -3,6 +3,11 @@
 //      .thumb
         .text
 
+
+
+@ Implements /255 as ((x * 257) + 0x8000) >> 16
+@ This generates something in the range [(x+126)/255, (x+127)/255] which is good enough
+
 @ [r0] xBGR dest
 @ [r1] ABGR src merge
 @ r2   plane alpha
