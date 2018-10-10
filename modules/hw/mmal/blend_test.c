@@ -34,7 +34,7 @@ static void merge_line(void * dest, const void * src, int alpha, unsigned int n)
     }
 }
 
-static void test_line(const uint32_t dx[256], const uint32_t s0[256], unsigned int alpha)
+static void test_line(const uint32_t dx[256], const uint32_t s0[256], unsigned int alpha, unsigned int len)
 {
     uint32_t d0[256];
     uint32_t d1[256];
@@ -43,12 +43,12 @@ static void test_line(const uint32_t dx[256], const uint32_t s0[256], unsigned i
     memcpy(d0, dx, sizeof(d1));
     memcpy(d1, dx, sizeof(d1));
 
-    merge_line(d0, s0, alpha, 256);
-    blend_rgba_asm_neon(d1, s0, alpha, 256);
+    merge_line(d0, s0, alpha, len);
+    blend_rgba_asm_neon(d1, s0, alpha, len);
 
     for (i = 0; i != 256; ++i) {
         if (d0[i] != d1[i]) {
-            printf("%08x + %08x * %02x: %08x / %08x\n", dx[i], s0[i], alpha, d0[i], d1[i]);
+            printf("%3d: %08x + %08x * %02x: %08x / %08x: len=%d\n", i, dx[i], s0[i], alpha, d0[i], d1[i], len);
         }
     }
 }
@@ -72,7 +72,10 @@ int main(int argc, char *argv[])
         s0[i] = (i << 24) | 0xffffff;
     }
     for (i = 0; i != 256; ++i) {
-        test_line(d0, s0, i);
+        test_line(d0, s0, i, 256);
+    }
+    for (i = 0; i != 256; ++i) {
+        test_line(d0, s0, 128, i);
     }
 
     printf("Done\n");
