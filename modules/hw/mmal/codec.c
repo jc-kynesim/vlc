@@ -2044,8 +2044,8 @@ static void FilterBlendNeon(filter_t *p_filter,
 
     do {
 #if 1
-        extern void blend_rgba_asm_neon(const void * src, void * dest, int alpha, unsigned int n);
-        blend_rgba_asm_neon(s_data, d_data, alpha, width / 4);
+        extern void blend_rgba_asm_neon(void * dest, const void * src, int alpha, unsigned int n);
+        blend_rgba_asm_neon(d_data, s_data, alpha, width);
 #else
         int i;
         for (i = 0; i != width; ++i) {
