@@ -279,7 +279,6 @@ static picture_t * alloc_opaque_pic(decoder_t * const dec, MMAL_BUFFER_HEADER_T 
         goto fail2;
 
     buf_to_pic_copy_props(pic, buf);
-    pic->b_force = true;
 
 #if TRACE_ALL
     msg_Dbg(dec, "pic: prog=%d, tff=%d, date=%lld", pic->b_progressive, pic->b_top_field_first, (long long)pic->date);
