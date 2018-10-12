@@ -4,14 +4,26 @@
         .text
 
 
+@ blend_rgbx_rgba_neon
+
+@ [r0] RGBx dest      (Byte order: R, G, B, x)
+@ [r1] RGBA src merge (Byte order: R, G, B, A)
+@ r2   plane alpha
+@ r3   count (pixels)
+
+@ Whilst specified as RGBx+RGBA the only important part is the position of
+@ alpha, the other components are all treated the same
+@ Assumes little endian i.e. Alpha ends up in hi 8 bits of uint32_t
+
+#if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
+#error Only little endian written (should be easy fix)
+#endif
 
 @ Implements /255 as ((x * 257) + 0x8000) >> 16
 @ This generates something in the range [(x+126)/255, (x+127)/255] which is good enough
 
-@ [r0] xBGR dest
-@ [r1] ABGR src merge
-@ r2   plane alpha
-@ r3   pels
+@ ? There might be some advantage to doing a small merge before the main loop
+@   to put dest on a 32byte boundary
 
         .align  16
         .global blend_rgbx_rgba_neon
