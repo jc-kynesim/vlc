@@ -24,6 +24,9 @@
 
 @ ? There might be some advantage to doing a small merge before the main loop
 @   to put dest on a 32byte boundary
+@ Contrary to my expectations there seems to be no advantage to aligning dest.
+@ However there is is some to aligning src on at least an 8-byte boundary
+@ (1480 cycles vs 1680 cycles for 256 pels on cached data)
 
         .align  16
         .global blend_rgbx_rgba_neon
@@ -43,6 +46,7 @@ blend_rgbx_rgba_neon:
         vmov.u32   q12, #0xff000000
         blt        2f
 
+
 1:
         vld1.32   { q0,q1 }, [r1]!
         @ Alpha in hi byte of each word
@@ -50,6 +54,9 @@ blend_rgbx_rgba_neon:
         vshr.u32   q8,  q0,  #24
         vmul.u32   q9,  q9,  d8[0]
         vmul.u32   q8,  q8,  d8[0]
+
+        subs       r3,  #8
+
         vrshr.u32  q9,  q9,  #16
         vrshr.u32  q8,  q8,  #16        @ 4 mix alpha values
         vmul.u32   q9,  q10
@@ -74,8 +81,6 @@ blend_rgbx_rgba_neon:
         vsra.u16   q2,  q2,  #8
         vsra.u16   q1,  q1,  #8
         vsra.u16   q0,  q0,  #8
-
-        subs       r3,  #8
 
         vrshrn.u16 d7,  q3,  #8
         vrshrn.u16 d6,  q2,  #8
