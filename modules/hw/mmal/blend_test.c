@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
         test_line0(d0, s0, i, 256);
     }
     for (i = 0; i != 256; ++i) {
-        test_line1(d0, s0, i, 256);
+        test_line1(d0, s0+2, i, 256);
     }
 
     for (i = 0; i != 256; ++i) {

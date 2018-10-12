@@ -116,9 +116,14 @@ blend_rgbx_rgba_neon:
 	ble        1f
 
 	@ Align r1 on a 32 byte boundary
+.if 1
+	mov        r4,  r3
+	mov        r3,  #7
+.else
 	mov        r4,  r3
 	neg        r3,  r1
 	ubfx       r3,  r3,  #2,  #3
+.endif
 	cmp        r3,  #0
 
 	blne       tail_rgbx_rgba
