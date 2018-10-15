@@ -38,65 +38,35 @@ static void merge_line(void * dest, const void * src, int alpha, unsigned int n)
     }
 }
 
-static void test_line(const uint32_t dx[256], const uint32_t s0[256], unsigned int alpha, unsigned int len)
+#define BUF_SIZE   256
+#define BUF_SLACK  16
+#define BUF_ALIGN  64
+#define BUF_ALLOC  (BUF_SIZE + 2*BUF_SLACK + BUF_ALIGN)
+
+static void test_line(const uint32_t * const dx, const unsigned int d_off,
+                      const uint32_t * const sx, const unsigned int s_off,
+                      const unsigned int alpha, const unsigned int len, const int prof_no)
 {
-    uint32_t d0[256];
-    uint32_t d1[256];
+    uint32_t d0_buf[BUF_ALLOC];
+    uint32_t d1_buf[BUF_ALLOC];
+    const uint32_t * const s0 = sx + s_off;
+
+    uint32_t * const d0 =  (uint32_t *)(((uintptr_t)d0_buf + (BUF_ALIGN - 1)) & ~(BUF_ALIGN - 1)) + d_off;
+    uint32_t * const d1 = (uint32_t *)(((uintptr_t)d1_buf + (BUF_ALIGN - 1)) & ~(BUF_ALIGN - 1)) + d_off;
     unsigned int i;
 
-    memcpy(d0, dx, sizeof(d1));
-    memcpy(d1, dx, sizeof(d1));
+    memcpy(d0, dx, (BUF_SIZE + BUF_SLACK*2)*4);
+    memcpy(d1, dx, (BUF_SIZE + BUF_SLACK*2)*4);
 
-    merge_line(d0, s0, alpha, len);
-
-    blend_rgbx_rgba_neon(d1, s0, alpha, len);
-
-    for (i = 0; i != 256; ++i) {
-        if (d0[i] != d1[i]) {
-            printf("%3d: %08x + %08x * %02x: %08x / %08x: len=%d\n", i, dx[i], s0[i], alpha, d0[i], d1[i], len);
-        }
-    }
-}
-
-static void test_line0(const uint32_t dx[256], const uint32_t s0[256], unsigned int alpha, unsigned int len)
-{
-    uint32_t d0[256];
-    uint32_t d1[256];
-    unsigned int i;
-
-    memcpy(d0, dx, sizeof(d1));
-    memcpy(d1, dx, sizeof(d1));
-
-    merge_line(d0, s0, alpha, len);
+    merge_line(d0 + BUF_SLACK, s0 + BUF_SLACK, alpha, len);
 
     PROFILE_START();
-    blend_rgbx_rgba_neon(d1, s0, alpha, len);
-    PROFILE_ACC(prof0);
+    blend_rgbx_rgba_neon(d1 + BUF_SLACK, s0 + BUF_SLACK, alpha, len);
+    PROFILE_ACC_N(prof_no);
 
-    for (i = 0; i != 256; ++i) {
+    for (i = 0; i != BUF_SIZE + BUF_SLACK*2; ++i) {
         if (d0[i] != d1[i]) {
-            printf("%3d: %08x + %08x * %02x: %08x / %08x: len=%d\n", i, dx[i], s0[i], alpha, d0[i], d1[i], len);
-        }
-    }
-}
-
-static void test_line1(const uint32_t dx[256], const uint32_t s0[256], unsigned int alpha, unsigned int len)
-{
-    uint32_t d0[256];
-    uint32_t d1[256];
-    unsigned int i;
-
-    memcpy(d0, dx, sizeof(d1));
-    memcpy(d1, dx, sizeof(d1));
-
-    merge_line(d0, s0, alpha, len);
-    PROFILE_START();
-    blend_rgbx_rgba_neon(d1, s0, alpha, len);
-    PROFILE_ACC(prof1);
-
-    for (i = 0; i != 256; ++i) {
-        if (d0[i] != d1[i]) {
-            printf("%3d: %08x + %08x * %02x: %08x / %08x: len=%d\n", i, dx[i], s0[i], alpha, d0[i], d1[i], len);
+            printf("%3d: %08x + %08x * %02x: %08x / %08x: len=%d\n", (int)(i - BUF_SLACK), dx[i], s0[i], alpha, d0[i], d1[i], len);
         }
     }
 }
@@ -104,9 +74,9 @@ static void test_line1(const uint32_t dx[256], const uint32_t s0[256], unsigned 
 
 int main(int argc, char *argv[])
 {
-    unsigned int i;
-    uint32_t d0_buf[512];
-    uint32_t s0_buf[512];
+    unsigned int i, j;
+    uint32_t d0_buf[BUF_ALLOC];
+    uint32_t s0_buf[BUF_ALLOC];
 
     uint32_t * const d0 = (uint32_t *)(((uintptr_t)d0_buf + 63) & ~63) + 0;
     uint32_t * const s0 = (uint32_t *)(((uintptr_t)s0_buf + 63) & ~63) + 0;
@@ -121,23 +91,23 @@ int main(int argc, char *argv[])
             printf("%d/255: %d != %d/%d\n", i, a, b, c);
     }
 
-    for (i = 0; i != 384; ++i) {
-        d0[i] = 0xff00 | i;
-        s0[i] = (i << 24) | 0xffffff;
+    for (i = 0; i != BUF_ALLOC; ++i) {
+        d0_buf[i] = 0xff00 | i;
+        s0_buf[i] = (i << 24) | 0xffffff;
     }
     for (i = 0; i != 256; ++i) {
-        test_line0(d0, s0, i, 256);
+        test_line(d0, 0, s0, 0, i, 256, -1);
     }
     for (i = 0; i != 256; ++i) {
-        test_line1(d0, s0+2, i, 256);
+        test_line(d0, 0, s0, 0, 128, i, -1);
     }
 
-    for (i = 0; i != 256; ++i) {
-        test_line(d0, s0, 128, i);
+    for (j = 0; j != 16; ++j) {
+        for (i = 0; i != 256; ++i) {
+            test_line(d0, j & 3, s0, j >> 2, i, 256, j);
+        }
+        PROFILE_PRINTF_N(j);
     }
-
-    PROFILE_PRINTF(prof0);
-    PROFILE_PRINTF(prof1);
 
     printf("Done\n");
 

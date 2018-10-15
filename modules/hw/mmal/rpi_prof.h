@@ -32,6 +32,10 @@ X uint64_t av_rpi_prof2_cycles Z;
 X unsigned int av_rpi_prof2_cnt Z;
 #define RPI_prof2_MAX_DURATION 10000
 
+X uint64_t av_rpi_prof_n_cycles[128];
+X unsigned int av_rpi_prof_n_cnt[128];
+#define RPI_prof_n_MAX_DURATION 10000
+
 
 #undef X
 #undef Z
@@ -60,9 +64,28 @@ do {\
     }\
 } while(0)
 
+
+#define PROFILE_ACC_N(n)\
+    if ((n) >= 0) {\
+        perf_2 = read_ccnt();\
+        {\
+            const uint32_t duration = perf_2 - perf_1;\
+            if (duration < RPI_prof_n_MAX_DURATION)\
+            {\
+                av_rpi_prof_n_cycles[n] += duration;\
+                av_rpi_prof_n_cnt[n] += 1;\
+            }\
+        }\
+    }\
+} while(0)
+
 #define PROFILE_PRINTF(x)\
     printf("%-20s cycles=%14" PRIu64 ";  cnt=%8u;  avg=%5" PRIu64 "\n", #x, av_rpi_##x##_cycles, av_rpi_##x##_cnt,\
         av_rpi_##x##_cnt == 0 ? (uint64_t)0 : av_rpi_##x##_cycles / (uint64_t)av_rpi_##x##_cnt)
+
+#define PROFILE_PRINTF_N(n)\
+    printf("prof[%d] cycles=%14" PRIu64 ";  cnt=%8u;  avg=%5" PRIu64 "\n", (n), av_rpi_prof_n_cycles[n], av_rpi_prof_n_cnt[n],\
+        av_rpi_prof_n_cnt[n] == 0 ? (uint64_t)0 : av_rpi_prof_n_cycles[n] / (uint64_t)av_rpi_prof_n_cnt[n])
 
 #else
 

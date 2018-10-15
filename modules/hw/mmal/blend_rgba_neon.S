@@ -2,7 +2,7 @@
         .arm
 //      .thumb
         .text
-
+        .align 16
 
 @ Deal with tail
 @ As the calculation on each pel is independant it doesn't matter
@@ -12,7 +12,7 @@
 
 tail_rgbx_rgba:
         lsls       r2,  r3,  #30        @ b2 -> C, b1 -> N
-	mov        r12, r0
+        mov        r12, r0
         vldmcs     r1!, {d2,d3}
         vldmcs     r0!, {d30, d31}
         vldmmi     r1!, {d1}
@@ -20,8 +20,8 @@ tail_rgbx_rgba:
         tst        r3,  #1
         vldrne     s1,  [r1]
         vldrne     s9,  [r0]
-	addne      r1,  #4
-	addne      r0,  #4
+        addne      r1,  #4
+        addne      r0,  #4
 
         @ Alpha in hi byte of each word
         vshr.u32   q9,  q1,  #24
@@ -65,7 +65,7 @@ tail_rgbx_rgba:
         vstmmi     r12!, {d5}
         tst        r3,  #1
         vstrne     s9,  [r12]
-	bx	   lr
+        bx         lr
 
 
 @ blend_rgbx_rgba_neon
@@ -86,9 +86,7 @@ tail_rgbx_rgba:
 @ Implements /255 as ((x * 257) + 0x8000) >> 16
 @ This generates something in the range [(x+126)/255, (x+127)/255] which is good enough
 
-@ Contrary to my expectations there seems to be no advantage to aligning dest.
-@ However there is is some to aligning src on at least an 8-byte boundary
-@ (1480 cycles vs 1680 cycles for 256 pels on cached data)
+@ There is advatage to aligning src and/or dest - dest gives a bit more due to being used twice
 
         .align  16
         .global blend_rgbx_rgba_neon
@@ -98,7 +96,7 @@ tail_rgbx_rgba:
 
 blend_rgbx_rgba_neon:
 
-	push      { r4, lr }
+        push      { r4, lr }
         vpush     { q4 }                @ With reworked reg alloc this could be avoided
         movw       r12, #257
         vmov.i8    q11, #0xff
@@ -109,26 +107,21 @@ blend_rgbx_rgba_neon:
         vmov.u32   q12, #0xff000000
         blt        2f
 
-	@ If < 16 bytes to move then don't bother trying to align
-	@ (a) This means the the align doesn't need to worry about r3 underflow
-	@ (b) The overhead would be greater than any gain
-	cmp        r3,  #8
-	ble        1f
+        @ If < 16 bytes to move then don't bother trying to align
+        @ (a) This means the the align doesn't need to worry about r3 underflow
+        @ (b) The overhead would be greater than any gain
+        cmp        r3,  #8
+        ble        1f
 
-	@ Align r1 on a 32 byte boundary
-.if 1
-	mov        r4,  r3
-	mov        r3,  #7
-.else
-	mov        r4,  r3
-	neg        r3,  r1
-	ubfx       r3,  r3,  #2,  #3
-.endif
-	cmp        r3,  #0
+        @ Align r1 on a 32 byte boundary
+        mov        r4,  r3
+        neg        r3,  r0
+        ubfx       r3,  r3,  #2,  #3
 
-	blne       tail_rgbx_rgba
+        cmp        r3,  #0
+        blne       tail_rgbx_rgba
 
-	sub        r3,  r4,  r3
+        sub        r3,  r4,  r3
 
 1:
         vld1.32   { q0,q1 }, [r1]
@@ -155,7 +148,7 @@ blend_rgbx_rgba_neon:
         vmull.u8   q1,  d1,  d17
         vmull.u8   q0,  d0,  d16
         vsub.u8    q8,  q11, q8
-	addge      r1,  #32
+        addge      r1,  #32
 
         vmlal.u8   q3,  d31, d19
         vmlal.u8   q2,  d30, d18
@@ -179,14 +172,14 @@ blend_rgbx_rgba_neon:
 
         vst1.32   { q2,q3 }, [r0]!
         bge        1b
-	add        r1,  #32
+        add        r1,  #32
 
 2:
         cmp        r3, #-8
         blgt       tail_rgbx_rgba
 
         vpop      { q4 }
-	pop       { r4, pc }
+        pop       { r4, pc }
 
 
 
