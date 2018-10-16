@@ -86,7 +86,7 @@ tail_rgbx_rgba:
 @ Implements /255 as ((x * 257) + 0x8000) >> 16
 @ This generates something in the range [(x+126)/255, (x+127)/255] which is good enough
 
-@ There is advatage to aligning src and/or dest - dest gives a bit more due to being used twice
+@ There is advantage to aligning src and/or dest - dest gives a bit more due to being used twice
 
         .align  16
         .global blend_rgbx_rgba_neon

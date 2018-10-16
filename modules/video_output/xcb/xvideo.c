@@ -353,6 +353,8 @@ static int Open (vlc_object_t *obj)
     vout_display_t *vd = (vout_display_t *)obj;
     vout_display_sys_t *p_sys;
 
+    msg_Dbg (vd, "<<< %s", __func__);
+
     {   /* NOTE: Reject hardware surface formats. Blending would break. */
         const vlc_chroma_description_t *chroma =
             vlc_fourcc_GetChromaDescription(vd->source.i_chroma);
@@ -363,6 +365,8 @@ static int Open (vlc_object_t *obj)
     p_sys = malloc (sizeof (*p_sys));
     if (p_sys == NULL)
         return VLC_ENOMEM;
+
+    msg_Dbg (vd, "--- (1) %s", __func__);
 
     vd->sys = p_sys;
 
@@ -689,6 +693,8 @@ static void Display (vout_display_t *vd, picture_t *pic, subpicture_t *subpictur
                 /* Memory: */ pic->p->i_pitch / pic->p->i_pixel_pitch,
                               pic->p->i_lines, false);
     else
+    {
+        printf("%s\n", __func__);
         ck = xcb_xv_put_image_checked (p_sys->conn, p_sys->port, p_sys->window,
                           p_sys->gc, p_sys->id,
                           fmt.i_x_offset, fmt.i_y_offset,
@@ -697,6 +703,7 @@ static void Display (vout_display_t *vd, picture_t *pic, subpicture_t *subpictur
                           pic->p->i_pitch / pic->p->i_pixel_pitch,
                           pic->p->i_lines,
                           p_sys->data_size, pic->p->p_pixels);
+    }
 
     /* Wait for reply. See x11.c for rationale. */
     xcb_generic_error_t *e = xcb_request_check (p_sys->conn, ck);
