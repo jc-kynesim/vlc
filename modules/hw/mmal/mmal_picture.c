@@ -420,9 +420,12 @@ static pool_ent_t * ent_list_extract_pic_ent(ent_list_hdr_t * const elh, picture
     return NULL;
 }
 
+#define POOL_ENT_ALLOC_BLOCK  0x10000
+
 static pool_ent_t * pool_ent_alloc_new(size_t req_size)
 {
     pool_ent_t * ent = calloc(1, sizeof(*ent));
+    const size_t alloc_size = (req_size + POOL_ENT_ALLOC_BLOCK - 1) & ~(POOL_ENT_ALLOC_BLOCK - 1);
 
     if (ent == NULL)
         return NULL;
@@ -430,14 +433,14 @@ static pool_ent_t * pool_ent_alloc_new(size_t req_size)
     ent->next = ent->prev = NULL;
 
     // Alloc from vcsm
-    if ((ent->vcsm_hdl = vcsm_malloc_cache(req_size, VCSM_CACHE_TYPE_HOST, (char *)"vlc-subpic")) == -1)
+    if ((ent->vcsm_hdl = vcsm_malloc_cache(alloc_size, VCSM_CACHE_TYPE_HOST, (char *)"vlc-subpic")) == -1)
         goto fail1;
     if ((ent->vc_hdl = vcsm_vc_hdl_from_hdl(ent->vcsm_hdl)) == 0)
         goto fail2;
     if ((ent->buf = vcsm_lock(ent->vcsm_hdl)) == NULL)
         goto fail2;
 
-    ent->size = req_size;
+    ent->size = alloc_size;
     return ent;
 
 fail2:
@@ -509,7 +512,8 @@ static pool_ent_t * pool_best_fit(vzc_pool_ctl_t * const pc, size_t req_size)
 
         // Simple scan
         while (ent != NULL) {
-            if (ent->size >= req_size && ent->size <= req_size * 2 && (best == NULL || best->size > ent->size))
+            if (ent->size >= req_size && ent->size <= req_size * 2 + POOL_ENT_ALLOC_BLOCK &&
+                    (best == NULL || best->size > ent->size))
                 best = ent;
             ent = ent->next;
         }
