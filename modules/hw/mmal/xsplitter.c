@@ -177,7 +177,8 @@ static void mmal_x11_display(vout_display_t * vd, picture_t * pic, subpicture_t 
     if (sys->use_mmal != is_mmal_pic)  {
         msg_Dbg(vd, "%s: Picture dropped", __func__);
         picture_Release(pic);
-        // ?? Subpics
+        if (sub != NULL)
+            subpicture_Delete(sub);
         return;
     }
 

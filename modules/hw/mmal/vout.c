@@ -44,6 +44,8 @@
 #include <interface/vmcs_host/vc_tvservice.h>
 #include <interface/vmcs_host/vc_dispmanx.h>
 
+#define TRACE_ALL 0
+
 #define MAX_BUFFERS_IN_TRANSIT 1
 #define VC_TV_MAX_MODE_IDS 127
 
@@ -159,12 +161,16 @@ static void vd_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     vout_display_sys_t *const sys = vd->sys;
 
     ++sys->in_cb_cnt;
+#if TRACE_ALL
     msg_Dbg(vd, "<<< %s[%d] cmd=%d, ctx=%p, buf=%p, flags=%#x, pts=%lld", __func__, sys->in_cb_cnt, buf->cmd, ctx, buf,
             buf->flags, (long long)buf->pts);
+#endif
 
     mmal_buffer_header_release(buf);
 
+#if TRACE_ALL
     msg_Dbg(vd, ">>> %s", __func__);
+#endif
 }
 
 static int query_resolution(vout_display_t *vd, unsigned *width, unsigned *height)
@@ -273,8 +279,9 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
     vout_display_sys_t * const sys = vd->sys;
     MMAL_STATUS_T err;
 
+#if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
-
+#endif
     if (sys->force_config ||
         p_pic->format.i_frame_rate != sys->i_frame_rate ||
         p_pic->format.i_frame_rate_base != sys->i_frame_rate_base ||
@@ -769,8 +776,9 @@ static void CloseMmalVout(vlc_object_t *object)
     vout_display_sys_t * const sys = vd->sys;
     char response[20]; /* answer is hvs_update_fields=%1d */
 
+#if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
-
+#endif
     vc_tv_unregister_callback_full(tvservice_cb, vd);
 
     if (sys->dmx_handle)
@@ -807,7 +815,9 @@ static void CloseMmalVout(vlc_object_t *object)
 
     bcm_host_deinit();
 
+#if TRACE_ALL
     msg_Dbg(vd, ">>> %s", __func__);
+#endif
 }
 
 static int OpenMmalVout(vlc_object_t *object)
@@ -820,11 +830,14 @@ static int OpenMmalVout(vlc_object_t *object)
     MMAL_STATUS_T status;
     int ret = VLC_EGENERIC;
 
+#if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
-
+#endif
     if (vd->fmt.i_chroma != VLC_CODEC_MMAL_OPAQUE)
     {
+#if TRACE_ALL
         msg_Dbg(vd, ">>> %s: Format not MMAL", __func__);
+#endif
         return VLC_EGENERIC;
     }
 

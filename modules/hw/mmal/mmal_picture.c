@@ -552,6 +552,15 @@ bool hw_mmal_vzc_buf_set_format(MMAL_BUFFER_HEADER_T * const buf, MMAL_ES_FORMAT
     return true;
 }
 
+void hw_mmal_vzc_buf_frame_size(MMAL_BUFFER_HEADER_T * const buf,
+                                uint32_t * const pWidth, uint32_t * const pHeight)
+{
+    const pool_ent_t *const ent = ((vzc_subbuf_ent_t *)buf->user_data)->ent;
+    *pWidth = ent->width;
+    *pHeight = ent->height;
+}
+
+
 MMAL_DISPLAYREGION_T * hw_mmal_vzc_buf_region(MMAL_BUFFER_HEADER_T * const buf)
 {
     vzc_subbuf_ent_t * sb = buf->user_data;

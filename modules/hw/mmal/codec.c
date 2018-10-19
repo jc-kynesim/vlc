@@ -1863,7 +1863,7 @@ static void FilterBlendMmal(filter_t *p_filter,
                   int x_offset, int y_offset, int alpha)
 {
     blend_sys_t * const sys = (blend_sys_t *)p_filter->p_sys;
-#if TRACE_ALL
+#if TRACE_ALL || 1
     msg_Dbg(p_filter, "%s (%d,%d:%d) pic=%p, pts=%lld, force=%d", __func__, x_offset, y_offset, alpha, src, src->date, src->b_force);
 #endif
     // If nothing to do then do nothing
