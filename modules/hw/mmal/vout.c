@@ -74,6 +74,7 @@
 struct dmx_region_t {
     struct dmx_region_t *next;
     picture_t *picture;
+    MMAL_BUFFER_HEADER_T * buf;
     VC_RECT_T bmp_rect;
     VC_RECT_T src_rect;
     VC_RECT_T dst_rect;
@@ -640,7 +641,7 @@ static struct dmx_region_t *dmx_region_new(vout_display_t *vd,
 {
     vout_display_sys_t *sys = vd->sys;
     video_format_t *fmt = &region->fmt;
-    struct dmx_region_t *dmx_region = malloc(sizeof(struct dmx_region_t));
+    struct dmx_region_t *dmx_region = calloc(1, sizeof(struct dmx_region_t));
     uint32_t image_handle;
 
     dmx_region->pos_x = region->i_x;
@@ -674,6 +675,52 @@ static struct dmx_region_t *dmx_region_new(vout_display_t *vd,
 
     return dmx_region;
 }
+
+static struct dmx_region_t *dmx_region_new_from_buf(vout_display_t *vd,
+                DISPMANX_UPDATE_HANDLE_T update, MMAL_BUFFER_HEADER_T * const buf)
+{
+    vout_display_sys_t *sys = vd->sys;
+    struct dmx_region_t *dmx_region = calloc(1, sizeof(struct dmx_region_t));
+    uint32_t image_handle;
+    const MMAL_DISPLAYREGION_T * mmreg = hw_mmal_vzc_buf_region(buf);
+    const MMAL_RECT_T * mmrect = hw_mmal_vzc_buf_get_dest_rect(buf);
+    uint32_t frame_width, frame_height, frame_stride;
+
+    hw_mmal_vzc_buf_frame_size(buf, &frame_width, &frame_height);
+    frame_stride = frame_width  * 4;
+
+    dmx_region->pos_x = mmrect->x;
+    dmx_region->pos_y = mmrect->y;
+
+    vc_dispmanx_rect_set(&dmx_region->bmp_rect, 0, 0, mmreg->src_rect.width,
+                         mmreg->src_rect.height);
+    vc_dispmanx_rect_set(&dmx_region->src_rect, 0, 0, mmreg->src_rect.width << 16,
+                         mmreg->src_rect.height << 16);
+    vc_dispmanx_rect_set(&dmx_region->dst_rect, mmrect->x, mmrect->y,
+                    mmrect->width, mmrect->height);
+
+    dmx_region->resource = vc_dispmanx_resource_create(VC_IMAGE_RGBA32,
+                    dmx_region->bmp_rect.width | (frame_stride << 16),
+                    dmx_region->bmp_rect.height | (frame_height << 16),
+                    &image_handle);
+    vc_dispmanx_resource_write_data_handle(dmx_region->resource, VC_IMAGE_RGBA32,
+                    frame_stride,
+                    /** handle **/, 0, &dmx_region->bmp_rect);
+
+    dmx_region->alpha.flags = DISPMANX_FLAGS_ALPHA_FROM_SOURCE | DISPMANX_FLAGS_ALPHA_MIX;
+    dmx_region->alpha.opacity = mmreg->alpha;
+    dmx_region->alpha.mask = DISPMANX_NO_HANDLE;
+    dmx_region->element = vc_dispmanx_element_add(update, sys->dmx_handle,
+                    sys->layer + 1, &dmx_region->dst_rect, dmx_region->resource,
+                    &dmx_region->src_rect, DISPMANX_PROTECTION_NONE,
+                    &dmx_region->alpha, NULL, VC_IMAGE_ROT0);
+
+    dmx_region->next = NULL;
+    dmx_region->buf = buf;
+
+    return dmx_region;
+}
+
 
 static void dmx_region_update(struct dmx_region_t *dmx_region,
                 DISPMANX_UPDATE_HANDLE_T update, picture_t *picture)

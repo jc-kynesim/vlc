@@ -217,6 +217,9 @@ void hw_mmal_vzc_buf_set_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const int x
 const MMAL_RECT_T * hw_mmal_vzc_buf_get_dest_rect(MMAL_BUFFER_HEADER_T * const buf);
 unsigned int hw_mmal_vzc_buf_seq(MMAL_BUFFER_HEADER_T * const buf);
 MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic, const bool is_first);
+void hw_mmal_vzc_buf_frame_size(MMAL_BUFFER_HEADER_T * const buf,
+                                uint32_t * const pWidth, uint32_t * const pHeight);
+
 void hw_mmal_vzc_pool_flush(vzc_pool_ctl_t * const pc);
 void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc);
 vzc_pool_ctl_t * hw_mmal_vzc_pool_new(void);
