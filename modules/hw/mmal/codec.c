@@ -1312,30 +1312,6 @@ static inline bool cmp_rect(const MMAL_RECT_T * const a, const MMAL_RECT_T * con
     return a->x == b->x && a->y == b->y && a->width == b->width && a->height == b->height;
 }
 
-static MMAL_STATUS_T port_send_replicated(MMAL_PORT_T * const port, MMAL_POOL_T * const rep_pool,
-                                          MMAL_BUFFER_HEADER_T * const src_buf,
-                                          const uint64_t seq)
-{
-    MMAL_STATUS_T err;
-    MMAL_BUFFER_HEADER_T *const rep_buf = mmal_queue_wait(rep_pool->queue);
-
-    if (rep_buf == NULL)
-        return MMAL_ENOSPC;
-
-    if ((err = mmal_buffer_header_replicate(rep_buf, src_buf)) != MMAL_SUCCESS)
-        return err;
-
-    rep_buf->pts = seq;
-
-    if ((err = mmal_port_send_buffer(port, rep_buf)) != MMAL_SUCCESS)
-    {
-        mmal_buffer_header_release(rep_buf);
-        return err;
-    }
-
-    return MMAL_SUCCESS;
-}
-
 static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 {
     filter_sys_t * const sys = p_filter->p_sys;

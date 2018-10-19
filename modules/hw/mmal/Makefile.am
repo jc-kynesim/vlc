@@ -21,3 +21,10 @@ libmmal_deinterlace_plugin_la_CFLAGS = $(AM_CFLAGS)
 libmmal_deinterlace_plugin_la_LDFLAGS = $(AM_LDFLAGS)
 libmmal_deinterlace_plugin_la_LIBADD = $(LIBS_mmal)
 mmal_LTLIBRARIES += libmmal_deinterlace_plugin.la
+
+libmmal_xsplitter_plugin_la_SOURCES = xsplitter.c mmal_picture.c mmal_picture.h
+libmmal_xsplitter_plugin_la_CFLAGS = $(AM_CFLAGS)
+libmmal_xsplitter_plugin_la_LDFLAGS = $(AM_LDFLAGS)
+libmmal_xsplitter_plugin_la_LIBADD = $(LIBS_mmal)
+mmal_LTLIBRARIES += libmmal_xsplitter_plugin.la
+

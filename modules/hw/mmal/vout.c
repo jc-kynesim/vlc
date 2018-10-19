@@ -117,6 +117,7 @@ struct vout_display_sys_t {
     bool b_top_field_first; /* cached interlaced settings to detect changes for native mode */
     bool b_progressive;
     bool opaque; /* indicated use of opaque picture format (zerocopy) */
+    bool force_config;
 
     int in_cb_cnt;
 };
@@ -274,10 +275,13 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
 
     msg_Dbg(vd, "<<< %s", __func__);
 
-    if (p_pic->format.i_frame_rate != sys->i_frame_rate ||
+    if (sys->force_config ||
+        p_pic->format.i_frame_rate != sys->i_frame_rate ||
         p_pic->format.i_frame_rate_base != sys->i_frame_rate_base ||
         p_pic->b_progressive != sys->b_progressive ||
-        p_pic->b_top_field_first != sys->b_top_field_first) {
+        p_pic->b_top_field_first != sys->b_top_field_first)
+    {
+        sys->force_config = false;
         sys->b_top_field_first = p_pic->b_top_field_first;
         sys->b_progressive = p_pic->b_progressive;
         sys->i_frame_rate = p_pic->format.i_frame_rate;
@@ -297,24 +301,12 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
     // We assume the BH is already set up with values reflecting pic date etc.
     {
         MMAL_BUFFER_HEADER_T * const pic_buf = pic_mmal_buffer(p_pic);
-        MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->pool->queue);
-
-        if ((err = mmal_buffer_header_replicate(buf, pic_buf)) != MMAL_SUCCESS)
-        {
-            msg_Err(vd, "Failed to replicate input buffer: %d", err);
-            goto fail;
-        }
-
-        msg_Dbg(vd, "Vd buf send: pic=%p, buf=%p/%p, ctx=%p, flags=%#x, len=%d/%d, pts=%lld",
-                p_pic, pic_buf, buf, pic_buf->user_data, buf->flags, buf->length, buf->alloc_size, (long long)buf->pts);
-
-        picture_Release(p_pic);
-
-        if ((err = mmal_port_send_buffer(sys->input, buf)) != MMAL_SUCCESS)
+        if ((err = port_send_replicated(sys->input, sys->pool, pic_buf, pic_buf->pts)) != MMAL_SUCCESS)
         {
             msg_Err(vd, "Send buffer to input failed");
             goto fail;
         }
+        picture_Release(p_pic);
     }
 
     display_subpicture(vd, subpicture);
@@ -357,10 +349,32 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
             break;
 
         case VOUT_DISPLAY_RESET_PICTURES:
-            vlc_assert_unreachable();
+            msg_Warn(vd, "Reset Pictures");
+            ret = VLC_SUCCESS;
+            break;
+
         case VOUT_DISPLAY_CHANGE_ZOOM:
             msg_Warn(vd, "Unsupported control query %d", query);
             break;
+
+        case VOUT_DISPLAY_CHANGE_MMAL_HIDE:
+        {
+            MMAL_STATUS_T err;
+            msg_Dbg(vd, "Hide display");
+
+            if (sys->input->is_enabled &&
+                (err = mmal_port_disable(sys->input)) != MMAL_SUCCESS)
+            {
+                msg_Err(vd, "Unable to disable port: err=%d", err);
+                ret = VLC_EGENERIC;
+                break;
+            }
+            show_background(vd, false);
+            sys->force_config = true;
+
+            ret = VLC_SUCCESS;
+            break;
+        }
 
         default:
             msg_Warn(vd, "Unknown control query %d", query);
@@ -962,270 +976,13 @@ fail:
     return ret == VLC_SUCCESS ? VLC_EGENERIC : ret;
 }
 
-typedef struct mmal_x11_sys_s
-{
-    bool use_mmal;
-    vout_display_t * mmal_vout;
-    vout_display_t * x_vout;
-} mmal_x11_sys_t;
-
-static void unload_display_module(vout_display_t * const x_vout)
-{
-    if (x_vout != NULL) {
-       if (x_vout->module != NULL) {
-            module_unneed(x_vout, x_vout->module);
-        }
-        vlc_object_release(x_vout);
-    }
-}
-
-static void CloseMmalX11(vlc_object_t *object)
-{
-    vout_display_t * const vd = (vout_display_t *)object;
-    mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
-
-    if (sys == NULL)
-        return;
-
-    unload_display_module(sys->x_vout);
-
-    unload_display_module(sys->mmal_vout);
-
-    if (sys->x_vout != NULL)
-        vlc_object_release(sys->x_vout);
-
-    free(sys);
-}
-
-static void mmal_x11_event(vout_display_t * x_vd, int cmd, va_list args)
-{
-    vout_display_t * const vd = x_vd->owner.sys;
-    msg_Dbg(vd, "<<< %s (cmd=%d)", __func__, cmd);
-    vd->owner.event(vd, cmd, args);
-}
-
-static vout_window_t * mmal_x11_window_new(vout_display_t * x_vd, unsigned type)
-{
-    vout_display_t * const vd = x_vd->owner.sys;
-    static int z = 0;
-    msg_Dbg(vd, "<<< %s (type=%d)", __func__, type);
-    if (++z > 10) {
-        *(volatile char *)0 = 0;
-    }
-    return vd->owner.window_new(vd, type);
-}
-
-static void mmal_x11_window_del(vout_display_t * x_vd, vout_window_t * win)
-{
-    vout_display_t * const vd = x_vd->owner.sys;
-    static int z = 0;
-    msg_Dbg(vd, "<<< %s", __func__);
-    if (++z > 10) {
-        *(volatile char *)0 = 0;
-    }
-    vd->owner.window_del(vd, win);
-}
-
-
-static vout_display_t * load_display_module(vout_display_t * const vd, mmal_x11_sys_t * const sys,
-                                            const char * const cap, const char * const module_name)
-{
-    vout_display_t * const x_vout = vlc_object_create(vd, sizeof(*x_vout));
-
-    if (!x_vout)
-        return NULL;
-
-    x_vout->owner.sys = vd;
-    x_vout->owner.event = mmal_x11_event;
-    x_vout->owner.window_new = mmal_x11_window_new;
-    x_vout->owner.window_del = mmal_x11_window_del;
-
-    x_vout->cfg    = vd->cfg;
-    x_vout->source = vd->source;
-    x_vout->info   = vd->info;
-
-    x_vout->fmt = vd->fmt;
-
-    if ((x_vout->module = module_need(x_vout, cap, module_name, true)) == NULL)
-    {
-        msg_Err(vd, "Failed to find X11 module");
-        goto fail;
-    }
-
-    msg_Dbg(vd, "Found X11 module");
-
-    return x_vout;
-
-fail:
-    vlc_object_release(x_vout);
-    return NULL;
-}
-
-
-/* Return a pointer over the current picture_pool_t* (mandatory).
- *
- * For performance reasons, it is best to provide at least count
- * pictures but it is not mandatory.
- * You can return NULL when you cannot/do not want to allocate
- * pictures.
- * The vout display module keeps the ownership of the pool and can
- * destroy it only when closing or on invalid pictures control.
- */
-static picture_pool_t * mmal_x11_pool(vout_display_t * vd, unsigned count)
-{
-    mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
-    vout_display_t * const x_vd = sys->x_vout;
-    msg_Dbg(vd, "<<< %s (count=%d)", __func__, count);
-    return x_vd->pool(x_vd, count);
-}
-
-/* Prepare a picture and an optional subpicture for display (optional).
- *
- * It is called before the next pf_display call to provide as much
- * time as possible to prepare the given picture and the subpicture
- * for display.
- * You are guaranted that pf_display will always be called and using
- * the exact same picture_t and subpicture_t.
- * You cannot change the pixel content of the picture_t or of the
- * subpicture_t.
- */
-static void mmal_x11_prepare(vout_display_t * vd, picture_t * pic, subpicture_t * sub)
-{
-    mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
-    vout_display_t * const x_vd = sys->x_vout;
-    msg_Dbg(vd, "<<< %s", __func__);
-    if (x_vd->prepare)
-        x_vd->prepare(x_vd, pic, sub);
-}
-
-/* Display a picture and an optional subpicture (mandatory).
- *
- * The picture and the optional subpicture must be displayed as soon as
- * possible.
- * You cannot change the pixel content of the picture_t or of the
- * subpicture_t.
- *
- * This function gives away the ownership of the picture and of the
- * subpicture, so you must release them as soon as possible.
- */
-static void mmal_x11_display(vout_display_t * vd, picture_t * pic, subpicture_t * sub)
-{
-    mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
-    vout_display_t * const x_vd = sys->x_vout;
-    msg_Dbg(vd, "<<< %s", __func__);
-    x_vd->display(x_vd, pic, sub);
-}
-
-
-static int vout_display_Control(vout_display_t *vd, int query, ...)
-{
-    va_list args;
-    int result;
-
-    va_start(args, query);
-    result = vd->control(vd, query, args);
-    va_end(args);
-
-    return result;
-}
-
-/* Control on the module (mandatory) */
-static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
-{
-    mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
-    vout_display_t * const x_vd = sys->x_vout;
-    int rv;
-    msg_Dbg(vd, "<<< %s (ctl=%d)", __func__, ctl);
-    switch (ctl) {
-        case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
-        {
-            const vout_display_cfg_t * cfg = va_arg(va, const vout_display_cfg_t *);
-            msg_Dbg(vd, "Change size: %d, %d", cfg->display.width, cfg->display.height);
-            if (cfg->display.width == 1920) {
-                msg_Dbg(vd, "Change to full width - try mmal");
-                vd->fmt.i_chroma = VLC_CODEC_MMAL_OPAQUE;
-            }
-            rv = vout_display_Control(x_vd, ctl, cfg);
-            vd->fmt  = x_vd->fmt;
-            vd->fmt.i_chroma = VLC_CODEC_MMAL_OPAQUE;
-            break;
-        }
-        case VOUT_DISPLAY_RESET_PICTURES:
-            msg_Dbg(vd, "Reset pictures");
-            rv = x_vd->control(x_vd, ctl, va);
-            break;
-        default:
-            rv = x_vd->control(x_vd, ctl, va);
-            vd->fmt  = x_vd->fmt;
-            break;
-    }
-    msg_Dbg(vd, ">>> %s (rv=%d)", __func__, rv);
-    return rv;
-}
-
-#define DO_MANAGE 0
-
-#if DO_MANAGE
-/* Manage pending event (optional) */
-static void mmal_x11_manage(vout_display_t * vd)
-{
-    mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
-    vout_display_t * const x_vd = sys->x_vout;
-    msg_Dbg(vd, "<<< %s", __func__);
-    x_vd->manage(x_vd);
-}
-#endif
-
-
-
-static int OpenMmalX11(vlc_object_t *object)
-{
-    vout_display_t * const vd = (vout_display_t *)object;
-    mmal_x11_sys_t * const sys = calloc(1, sizeof(*sys));
-    int ret = VLC_SUCCESS;
-
-    if (sys == NULL) {
-        return VLC_EGENERIC;
-    }
-    vd->sys = (vout_display_sys_t *)sys;
-
-    if ((sys->mmal_vout = load_display_module(vd, sys, "wombat", "mmal_vout")) == NULL)
-        goto fail;
-    if ((sys->x_vout = load_display_module(vd, sys, "vout display", "xcb_x11")) == NULL)
-        goto fail;
-
-    vd->info = sys->x_vout->info;
-    vd->fmt  = sys->x_vout->fmt;
-
-    vd->pool = mmal_x11_pool;
-    vd->prepare = mmal_x11_prepare;
-    vd->display = mmal_x11_display;
-    vd->control = mmal_x11_control;
-#if DO_MANAGE
-    vd->manage = mmal_x11_manage;
-#endif
-
-    return VLC_SUCCESS;
-
-fail:
-    CloseMmalX11(VLC_OBJECT(vd));
-    return ret == VLC_SUCCESS ? VLC_EGENERIC : ret;
-}
-
 vlc_module_begin()
-    set_shortname(N_("MMAL x11 splitter"))
-    set_description(N_("MMAL x11 splitter for Raspberry Pi"))
-    set_capability("vout display", 900)
-    add_shortcut("mmal_x11")
-    set_category( CAT_VIDEO )
-    set_subcategory( SUBCAT_VIDEO_VOUT )
-    set_callbacks(OpenMmalX11, CloseMmalX11)
 
     add_submodule()
 
     set_shortname(N_("MMAL vout"))
     set_description(N_("MMAL-based vout plugin for Raspberry Pi"))
-    set_capability("wombat", 0)
+    set_capability("vout display", 0)
     add_shortcut("mmal_vout")
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VOUT )
