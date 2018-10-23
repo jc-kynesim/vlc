@@ -40,6 +40,7 @@
 #include <interface/mmal/util/mmal_default_components.h>
 
 #include "mmal_picture.h"
+#include "subpic.h"
 #include "blend_rgba_neon.h"
 
 #define TRACE_ALL 0
@@ -942,9 +943,7 @@ typedef struct filter_sub_s {
     MMAL_PORT_T * port;
     MMAL_POOL_T * pool;
     // Shadow  vars so we can tell if stuff has changed
-    unsigned int seq;
-    MMAL_RECT_T dest_rect;
-    uint32_t alpha;
+    subpic_reg_stash_t stash;
 } filter_sub_t;
 
 #define SUBS_MAX 3
@@ -1087,19 +1086,6 @@ static void conv_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     msg_Dbg((filter_t *)port->userdata, ">>> %s", __func__);
 #endif
 }
-
-static void conv_subpic_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
-{
-#if TRACE_ALL
-    msg_Dbg((filter_t *)port->userdata, "<<< %s cmd=%d, user=%p, buf=%p, flags=%#x, len=%d/%d, pts=%lld",
-            __func__, buf->cmd, buf->user_data, buf, buf->flags, buf->length, buf->alloc_size, (long long)buf->pts);
-#else
-    VLC_UNUSED(port);
-#endif
-
-    mmal_buffer_header_release(buf);  // Will extract & release pic in pool callback
-}
-
 
 static void conv_out_q_pic(filter_sys_t * const sys, picture_t * const pic)
 {
@@ -1262,7 +1248,7 @@ static void conv_flush(filter_t * p_filter)
 
         if (sub->port != NULL && sub->port->is_enabled)
             mmal_port_disable(sub->port);
-        sub->seq = 0;
+        sub->stash.seq = 0;
     }
 
     if (sys->input != NULL && sys->input->is_enabled)
@@ -1294,24 +1280,6 @@ static void conv_flush(filter_t * p_filter)
 #endif
 }
 
-static inline int rescale_x(int x, int mul, int div)
-{
-    return div == 0 ? x * mul : (x * mul + div/2) / div;
-}
-
-static void rescale_rect(MMAL_RECT_T * const d, const MMAL_RECT_T * const s, const MMAL_RECT_T * mul_rect, const MMAL_RECT_T * div_rect)
-{
-    d->x      = rescale_x(s->x,      mul_rect->width,  div_rect->width);
-    d->y      = rescale_x(s->y,      mul_rect->height, div_rect->height);
-    d->width  = rescale_x(s->width,  mul_rect->width,  div_rect->width);
-    d->height = rescale_x(s->height, mul_rect->height, div_rect->height);
-}
-
-static inline bool cmp_rect(const MMAL_RECT_T * const a, const MMAL_RECT_T * const b)
-{
-    return a->x == b->x && a->y == b->y && a->width == b->width && a->height == b->height;
-}
-
 static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 {
     filter_sys_t * const sys = p_filter->p_sys;
@@ -1333,8 +1301,19 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     else
     {
         unsigned int sub_no = 0;
-        MMAL_BUFFER_HEADER_T * sub_buf;
 
+#if 1
+        for (sub_no = 0; sub_no != SUBS_MAX; ++sub_no) {
+            int rv;
+            if ((rv = hw_mmal_subpic_update(VLC_OBJECT(p_filter), p_pic, sub_no, sys->subs[sub_no].port, &sys->subs[sub_no].stash,
+                                     sys->output, sys->input,
+                                     sys->subs[sub_no].pool, frame_seq)) == 0)
+                break;
+            else if (rv < 0)
+                goto fail;
+        }
+#else
+        MMAL_BUFFER_HEADER_T * sub_buf;
         for (; (sub_buf = hw_mmal_pic_sub_buf_get(p_pic, sub_no)) != NULL && sub_no < SUBS_MAX; ++sub_no)
         {
             filter_sub_t * const sub = sys->subs + sub_no;
@@ -1410,7 +1389,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             filter_sub_t * const sub = sys->subs + sub_no;
             MMAL_PORT_T *const port = sub->port;
 
-            if (port->is_enabled && sub->seq != 0)
+            if (port->is_enabled && sub->stash.seq != 0)
             {
                 MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sub->pool->queue);
 
@@ -1437,9 +1416,10 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                     goto fail;
                 }
 
-                sub->seq = 0;
+                sub->stash.seq = 0;
             }
         }
+#endif
     }
 
     // Reenable stuff if the last thing we did was flush

@@ -676,6 +676,7 @@ static struct dmx_region_t *dmx_region_new(vout_display_t *vd,
     return dmx_region;
 }
 
+#if 0
 static struct dmx_region_t *dmx_region_new_from_buf(vout_display_t *vd,
                 DISPMANX_UPDATE_HANDLE_T update, MMAL_BUFFER_HEADER_T * const buf)
 {
@@ -720,7 +721,7 @@ static struct dmx_region_t *dmx_region_new_from_buf(vout_display_t *vd,
 
     return dmx_region;
 }
-
+#endif
 
 static void dmx_region_update(struct dmx_region_t *dmx_region,
                 DISPMANX_UPDATE_HANDLE_T update, picture_t *picture)
@@ -736,6 +737,9 @@ static void dmx_region_delete(struct dmx_region_t *dmx_region,
 {
     vc_dispmanx_element_remove(update, dmx_region->element);
     vc_dispmanx_resource_delete(dmx_region->resource);
+    if (dmx_region->buf != NULL) {
+        mmal_buffer_header_release(dmx_region->buf);
+    }
     free(dmx_region);
 }
 
