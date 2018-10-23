@@ -38,7 +38,7 @@
 #include "mmal_picture.h"
 #include "subpic.h"
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 static inline int rescale_x(int x, int mul, int div)
 {
@@ -58,6 +58,49 @@ static inline bool cmp_rect(const MMAL_RECT_T * const a, const MMAL_RECT_T * con
     return a->x == b->x && a->y == b->y && a->width == b->width && a->height == b->height;
 }
 
+void hw_mmal_subpic_flush(vlc_object_t * const p_filter, subpic_reg_stash_t * const sub)
+{
+    VLC_UNUSED(p_filter);
+    if (sub->port != NULL && sub->port->is_enabled)
+        mmal_port_disable(sub->port);
+    sub->seq = 0;
+}
+
+void hw_mmal_subpic_close(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe)
+{
+    hw_mmal_subpic_flush(p_filter, spe);
+
+    if (spe->pool != NULL)
+        mmal_pool_destroy(spe->pool);
+
+    // Zap to avoid any accidental reuse
+    *spe = (subpic_reg_stash_t){NULL};
+}
+
+MMAL_STATUS_T hw_mmal_subpic_open(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe, MMAL_PORT_T * const port)
+{
+    MMAL_STATUS_T err;
+
+    // Start by zapping all to zero
+    *spe = (subpic_reg_stash_t){NULL};
+
+    if ((err = port_parameter_set_bool(port, MMAL_PARAMETER_ZERO_COPY, true)) != MMAL_SUCCESS)
+    {
+        msg_Err(p_filter, "Failed to set sub port zero copy");
+        return err;
+    }
+
+    if ((spe->pool = mmal_pool_create(30, 0)) == NULL)
+    {
+        msg_Err(p_filter, "Failed to create sub pool");
+        return MMAL_ENOMEM;
+    }
+
+    port->userdata = (void *)p_filter;
+    spe->port = port;
+
+    return MMAL_SUCCESS;
+}
 
 static void conv_subpic_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 {
@@ -74,19 +117,18 @@ static void conv_subpic_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 
 int hw_mmal_subpic_update(vlc_object_t * const p_filter,
     picture_t * const p_pic, const unsigned int sub_no,
-    MMAL_PORT_T * const port,
-    subpic_reg_stash_t * const stash,
+    subpic_reg_stash_t * const spe,
     MMAL_PORT_T * const scale_out_port, MMAL_PORT_T * const scale_in_port,
-    MMAL_POOL_T * const pool, const uint64_t pts)
+    const uint64_t pts)
 {
     MMAL_STATUS_T err;
     MMAL_BUFFER_HEADER_T * const sub_buf = hw_mmal_pic_sub_buf_get(p_pic, sub_no);
 
     if (sub_buf == NULL)
     {
-        if (port->is_enabled && stash->seq != 0)
+        if (spe->port->is_enabled && spe->seq != 0)
         {
-            MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(pool->queue);
+            MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(spe->pool->queue);
 
             if (buf == NULL) {
                 msg_Err(p_filter, "Buffer get for subpic failed");
@@ -104,25 +146,25 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
             buf->dts = MMAL_TIME_UNKNOWN;
             buf->user_data = NULL;
 
-            if ((err = mmal_port_send_buffer(port, buf)) != MMAL_SUCCESS)
+            if ((err = mmal_port_send_buffer(spe->port, buf)) != MMAL_SUCCESS)
             {
                 msg_Err(p_filter, "Send buffer to subput failed");
                 mmal_buffer_header_release(buf);
                 return -1;
             }
 
-            stash->seq = 0;
+            spe->seq = 0;
         }
     }
     else
     {
         const unsigned int seq = hw_mmal_vzc_buf_seq(sub_buf);
-        bool needs_update = (stash->seq != seq);
+        bool needs_update = (spe->seq != seq);
 
-        if (hw_mmal_vzc_buf_set_format(sub_buf, port->format))
+        if (hw_mmal_vzc_buf_set_format(sub_buf, spe->port->format))
         {
             MMAL_DISPLAYREGION_T * const dreg = hw_mmal_vzc_buf_region(sub_buf);
-            MMAL_VIDEO_FORMAT_T *const v_fmt = &port->format->es->video;
+            MMAL_VIDEO_FORMAT_T *const v_fmt = &spe->port->format->es->video;
 
             v_fmt->frame_rate.den = p_pic->format.i_frame_rate_base;
             v_fmt->frame_rate.num = p_pic->format.i_frame_rate;
@@ -133,21 +175,24 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
             rescale_rect(&dreg->dest_rect, hw_mmal_vzc_buf_get_dest_rect(sub_buf),
                          &scale_out_port->format->es->video.crop, &scale_in_port->format->es->video.crop);
 
-            if (needs_update || dreg->alpha != stash->alpha || !cmp_rect(&dreg->dest_rect, &stash->dest_rect)) {
+            if (needs_update || dreg->alpha != spe->alpha || !cmp_rect(&dreg->dest_rect, &spe->dest_rect)) {
 
-                stash->alpha = dreg->alpha;
-                stash->dest_rect = dreg->dest_rect;
+                spe->alpha = dreg->alpha;
+                spe->dest_rect = dreg->dest_rect;
                 needs_update = true;
 #if TRACE_ALL
                 msg_Dbg(p_filter, "Update region for sub %d", sub_no);
 #endif
-                if ((err = mmal_port_parameter_set(port, &dreg->hdr)) != MMAL_SUCCESS)
+                dreg->layer = 2;   // ***** do something better
+                dreg->set |= MMAL_DISPLAY_SET_LAYER;
+
+                if ((err = mmal_port_parameter_set(spe->port, &dreg->hdr)) != MMAL_SUCCESS)
                 {
                     msg_Err(p_filter, "Set display region on subput failed");
                     return -1;
                 }
 
-                if ((err = mmal_port_format_commit(port)) != MMAL_SUCCESS)
+                if ((err = mmal_port_format_commit(spe->port)) != MMAL_SUCCESS)
                 {
                     msg_Dbg(p_filter, "%s: Subpic commit fail: %d", __func__, err);
                     return -1;
@@ -155,12 +200,12 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
             }
         }
 
-        if (!port->is_enabled)
+        if (!spe->port->is_enabled)
         {
-            port->buffer_num = 30;
-            port->buffer_size = port->buffer_size_recommended;  // Not used but shuts up the error checking
+            spe->port->buffer_num = 30;
+            spe->port->buffer_size = spe->port->buffer_size_recommended;  // Not used but shuts up the error checking
 
-            if ((err = mmal_port_enable(port, conv_subpic_cb)) != MMAL_SUCCESS)
+            if ((err = mmal_port_enable(spe->port, conv_subpic_cb)) != MMAL_SUCCESS)
             {
                 msg_Dbg(p_filter, "%s: Subpic enable fail: %d", __func__, err);
                 return -1;
@@ -172,13 +217,13 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
 #if TRACE_ALL
             msg_Dbg(p_filter, "Update pic for sub %d", sub_no);
 #endif
-            if ((err = port_send_replicated(port, pool, sub_buf, pts)) != MMAL_SUCCESS)
+            if ((err = port_send_replicated(spe->port, spe->pool, sub_buf, pts)) != MMAL_SUCCESS)
             {
                 msg_Err(p_filter, "Send buffer to subput failed");
                 return -1;
             }
 
-            stash->seq = seq;
+            spe->seq = seq;
         }
     }
     return 1;

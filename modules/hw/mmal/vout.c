@@ -36,6 +36,7 @@
 #include <vlc_modules.h>
 
 #include "mmal_picture.h"
+#include "subpic.h"
 
 #include <bcm_host.h>
 #include <interface/mmal/mmal.h>
@@ -85,6 +86,13 @@ struct dmx_region_t {
     int32_t pos_y;
 };
 
+#define SUBS_MAX 4
+
+typedef struct vout_subpic_s {
+    MMAL_COMPONENT_T *component;
+    subpic_reg_stash_t sub;
+} vout_subpic_t;
+
 struct vout_display_sys_t {
     vlc_mutex_t manage_mutex;
 
@@ -123,6 +131,8 @@ struct vout_display_sys_t {
     bool force_config;
 
     int in_cb_cnt;
+
+    vout_subpic_t subs[SUBS_MAX];
 };
 
 static const vlc_fourcc_t subpicture_chromas[] = {
@@ -157,12 +167,12 @@ static void maintain_phase_sync(vout_display_t *vd);
 
 static void vd_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 {
-    pic_ctx_mmal_t * ctx = buf->user_data;
     vout_display_t * const vd = (vout_display_t *)port->userdata;
     vout_display_sys_t *const sys = vd->sys;
 
     ++sys->in_cb_cnt;
 #if TRACE_ALL
+    pic_ctx_mmal_t * ctx = buf->user_data;
     msg_Dbg(vd, "<<< %s[%d] cmd=%d, ctx=%p, buf=%p, flags=%#x, pts=%lld", __func__, sys->in_cb_cnt, buf->cmd, ctx, buf,
             buf->flags, (long long)buf->pts);
 #endif
@@ -314,13 +324,31 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
             msg_Err(vd, "Send buffer to input failed");
             goto fail;
         }
-        picture_Release(p_pic);
     }
 
     display_subpicture(vd, subpicture);
 
     if (subpicture)
         subpicture_Delete(subpicture);
+
+    if (p_pic->context == NULL) {
+        msg_Dbg(vd, "%s: No context", __func__);
+    }
+    else
+    {
+        unsigned int sub_no = 0;
+
+        for (sub_no = 0; sub_no != SUBS_MAX; ++sub_no) {
+            int rv;
+            if ((rv = hw_mmal_subpic_update(VLC_OBJECT(vd), p_pic, sub_no, &sys->subs[sub_no].sub,
+                                            sys->input, sys->input, p_pic->date)) == 0)
+                break;
+            else if (rv < 0)
+                goto fail;
+        }
+    }
+
+    picture_Release(p_pic);
 
     if (sys->next_phase_check == 0 && sys->adjust_refresh_rate)
         maintain_phase_sync(vd);
@@ -838,6 +866,20 @@ static void CloseMmalVout(vlc_object_t *object)
     if (sys->component && sys->component->control->is_enabled)
         mmal_port_disable(sys->component->control);
 
+    {
+        unsigned int i;
+        for (i = 0; i != SUBS_MAX; ++i) {
+            vout_subpic_t * const sub = sys->subs + i;
+            if (sub->component != NULL) {
+                hw_mmal_subpic_close(VLC_OBJECT(vd), &sub->sub);
+                if (sub->component->is_enabled)
+                    mmal_component_disable(sub->component);
+                mmal_component_release(sub->component);
+                sub->component = NULL;
+            }
+        }
+    }
+
     if (sys->input && sys->input->is_enabled)
         mmal_port_disable(sys->input);
 
@@ -905,7 +947,7 @@ static int OpenMmalVout(vlc_object_t *object)
         return VLC_ENOMEM;
     vd->sys = sys;
 
-//    sys->layer = var_InheritInteger(vd, MMAL_LAYER_NAME);
+    sys->layer = var_InheritInteger(vd, MMAL_LAYER_NAME);
 //    bcm_host_init();
 
     sys->opaque = vd->fmt.i_chroma == VLC_CODEC_MMAL_OPAQUE;
@@ -1006,6 +1048,27 @@ static int OpenMmalVout(vlc_object_t *object)
     {
         msg_Err(vd, "Failed to create input pool");
         goto fail;
+    }
+
+    {
+        unsigned int i;
+        for (i = 0; i != SUBS_MAX; ++i) {
+            vout_subpic_t * const sub = sys->subs + i;
+            if ((status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &sub->component)) != MMAL_SUCCESS)
+            {
+                msg_Dbg(vd, "Failed to create subpic component %d", i);
+                goto fail;
+            }
+            if ((status = hw_mmal_subpic_open(VLC_OBJECT(vd), &sub->sub, sub->component->input[0])) != MMAL_SUCCESS) {
+                msg_Dbg(vd, "Failed to open subpic %d", i);
+                goto fail;
+            }
+            if ((status = mmal_component_enable(sub->component)) != MMAL_SUCCESS)
+            {
+                msg_Dbg(vd, "Failed to enable subpic component %d", i);
+                goto fail;
+            }
+        }
     }
 
 
