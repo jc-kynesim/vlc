@@ -45,7 +45,7 @@
 #include <interface/vmcs_host/vc_tvservice.h>
 #include <interface/vmcs_host/vc_dispmanx.h>
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 #define MAX_BUFFERS_IN_TRANSIT 1
 #define VC_TV_MAX_MODE_IDS 127

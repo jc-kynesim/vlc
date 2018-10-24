@@ -299,6 +299,8 @@ typedef struct ent_list_hdr_s
 
 struct vzc_pool_ctl_s
 {
+    atomic_int ref_count;
+
     ent_list_hdr_t ent_pool;
     ent_list_hdr_t ents_cur;
     ent_list_hdr_t ents_prev;
@@ -669,6 +671,7 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
         ent_add_head(&pc->ents_cur, ent);
 
         sb->ent = pool_ent_ref(ent);
+        hw_mmal_vzc_pool_ref(pc);
 
         // Copy data
         buf->next = NULL;
@@ -733,10 +736,10 @@ void hw_mmal_vzc_pool_flush(vzc_pool_ctl_t * const pc)
     pool_recycle_list(pc, &pc->ents_cur);
 }
 
-void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc)
+static void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc)
 {
-    if (pc == NULL)
-        return;
+
+    printf("<<< %s\n", __func__);
 
     hw_mmal_vzc_pool_flush(pc);
 
@@ -747,9 +750,33 @@ void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc)
 
     vlc_mutex_destroy(&pc->lock);
 
+    memset(pc, 0xba, sizeof(*pc)); // Zap for (hopefully) faster crash
+
     free (pc);
 
     vcsm_exit();
+
+    printf(">>> %s\n", __func__);
+}
+
+void hw_mmal_vzc_pool_release(vzc_pool_ctl_t * const pc)
+{
+    int n;
+
+    if (pc == NULL)
+        return;
+
+    n = atomic_fetch_sub(&pc->ref_count, 1) - 1;
+
+    if (n != 0)
+        return;
+
+    hw_mmal_vzc_pool_delete(pc);
+}
+
+void hw_mmal_vzc_pool_ref(vzc_pool_ctl_t * const pc)
+{
+    atomic_fetch_add(&pc->ref_count, 1);
 }
 
 static MMAL_BOOL_T vcz_pool_release_cb(MMAL_POOL_T * buf_pool, MMAL_BUFFER_HEADER_T *buf, void *userdata)
@@ -759,11 +786,16 @@ static MMAL_BOOL_T vcz_pool_release_cb(MMAL_POOL_T * buf_pool, MMAL_BUFFER_HEADE
 
     VLC_UNUSED(buf_pool);
 
+    printf("<<< %s\n", __func__);
+
     if (sb != NULL) {
         buf->user_data = NULL;
         pool_recycle(pc, sb->ent);
+        hw_mmal_vzc_pool_release(pc);
         free(sb);
     }
+
+    printf(">>> %s\n", __func__);
 
     return MMAL_TRUE;
 }
@@ -777,17 +809,18 @@ vzc_pool_ctl_t * hw_mmal_vzc_pool_new()
 
     vcsm_init();
 
+    pc->max_n = 8;
+    vlc_mutex_init(&pc->lock);  // Must init before potential destruction
+
     if ((pc->buf_pool = mmal_pool_create(64, 0)) == NULL)
     {
         hw_mmal_vzc_pool_delete(pc);
         return NULL;
     }
 
-    pc->max_n = 8;
-    vlc_mutex_init(&pc->lock);
+    atomic_store(&pc->ref_count, 1);
 
     mmal_pool_callback_set(pc->buf_pool, vcz_pool_release_cb, pc);
-
 
     return pc;
 }

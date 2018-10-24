@@ -221,7 +221,8 @@ void hw_mmal_vzc_buf_frame_size(MMAL_BUFFER_HEADER_T * const buf,
                                 uint32_t * const pWidth, uint32_t * const pHeight);
 
 void hw_mmal_vzc_pool_flush(vzc_pool_ctl_t * const pc);
-void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc);
+void hw_mmal_vzc_pool_release(vzc_pool_ctl_t * const pc);
+void hw_mmal_vzc_pool_ref(vzc_pool_ctl_t * const pc);
 vzc_pool_ctl_t * hw_mmal_vzc_pool_new(void);
 
 #define VOUT_DISPLAY_CHANGE_MMAL_BASE 1024

@@ -1801,7 +1801,7 @@ static void CloseBlendMmal(vlc_object_t *object)
     filter_t * const p_filter = (filter_t *)object;
     blend_sys_t * const sys = (blend_sys_t *)p_filter->p_sys;
 
-    hw_mmal_vzc_pool_delete(sys->vzc);
+    hw_mmal_vzc_pool_release(sys->vzc);
     free(sys);
 }
 

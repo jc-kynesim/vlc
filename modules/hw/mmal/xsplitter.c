@@ -43,6 +43,8 @@ static void CloseMmalX11(vlc_object_t *object)
     vout_display_t * const vd = (vout_display_t *)object;
     mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
 
+    msg_Dbg(vd, "<<< %s", __func__);
+
     if (sys == NULL)
         return;
 
@@ -51,6 +53,8 @@ static void CloseMmalX11(vlc_object_t *object)
     unload_display_module(sys->mmal_vout);
 
     free(sys);
+
+    msg_Dbg(vd, ">>> %s", __func__);
 }
 
 static void mmal_x11_event(vout_display_t * x_vd, int cmd, va_list args)
