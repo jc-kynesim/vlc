@@ -1294,7 +1294,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         for (sub_no = 0; sub_no != SUBS_MAX; ++sub_no) {
             int rv;
             if ((rv = hw_mmal_subpic_update(VLC_OBJECT(p_filter), p_pic, sub_no, sys->subs + sub_no,
-                                     sys->output, sys->input, frame_seq)) == 0)
+                                     &sys->output->format->es->video.crop, frame_seq)) == 0)
                 break;
             else if (rv < 0)
                 goto fail;
@@ -1671,7 +1671,7 @@ static int OpenConverter(vlc_object_t * obj)
     {
         unsigned int i;
         for (i = 0; i != SUBS_MAX; ++i) {
-            if (hw_mmal_subpic_open(VLC_OBJECT(p_filter), sys->subs + i, sys->component->input[i + 1]) != MMAL_SUCCESS)
+            if (hw_mmal_subpic_open(VLC_OBJECT(p_filter), sys->subs + i, sys->component->input[i + 1], i + 1) != MMAL_SUCCESS)
             {
                 msg_Err(p_filter, "Failed to open subpic %d", i);
                 goto fail;
@@ -1724,7 +1724,7 @@ static void FilterBlendMmal(filter_t *p_filter,
     else
     {
         // cast away src const so we can ref it
-        MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc, (picture_t *)src,
+        MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc, (picture_t *)src, dst,
                                                              dst != sys->last_dst || !hw_mmal_pic_has_sub_bufs(dst));
         if (buf == NULL) {
             msg_Err(p_filter, "Failed to allocate vzc buffer for subpic");

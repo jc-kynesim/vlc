@@ -341,7 +341,8 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
         for (sub_no = 0; sub_no != SUBS_MAX; ++sub_no) {
             int rv;
             if ((rv = hw_mmal_subpic_update(VLC_OBJECT(vd), p_pic, sub_no, &sys->subs[sub_no].sub,
-                                            sys->input, sys->input, p_pic->date)) == 0)
+                                            &(MMAL_RECT_T){.width = sys->display_width, .height = sys->display_height},
+                                            p_pic->date)) == 0)
                 break;
             else if (rv < 0)
                 goto fail;
@@ -1059,7 +1060,7 @@ static int OpenMmalVout(vlc_object_t *object)
                 msg_Dbg(vd, "Failed to create subpic component %d", i);
                 goto fail;
             }
-            if ((status = hw_mmal_subpic_open(VLC_OBJECT(vd), &sub->sub, sub->component->input[0])) != MMAL_SUCCESS) {
+            if ((status = hw_mmal_subpic_open(VLC_OBJECT(vd), &sub->sub, sub->component->input[0], sys->layer + i + 1)) != MMAL_SUCCESS) {
                 msg_Dbg(vd, "Failed to open subpic %d", i);
                 goto fail;
             }

@@ -40,19 +40,6 @@
 
 #define TRACE_ALL 1
 
-static inline int rescale_x(int x, int mul, int div)
-{
-    return div == 0 ? x * mul : (x * mul + div/2) / div;
-}
-
-static void rescale_rect(MMAL_RECT_T * const d, const MMAL_RECT_T * const s, const MMAL_RECT_T * mul_rect, const MMAL_RECT_T * div_rect)
-{
-    d->x      = rescale_x(s->x,      mul_rect->width,  div_rect->width);
-    d->y      = rescale_x(s->y,      mul_rect->height, div_rect->height);
-    d->width  = rescale_x(s->width,  mul_rect->width,  div_rect->width);
-    d->height = rescale_x(s->height, mul_rect->height, div_rect->height);
-}
-
 static inline bool cmp_rect(const MMAL_RECT_T * const a, const MMAL_RECT_T * const b)
 {
     return a->x == b->x && a->y == b->y && a->width == b->width && a->height == b->height;
@@ -77,7 +64,7 @@ void hw_mmal_subpic_close(vlc_object_t * const p_filter, subpic_reg_stash_t * co
     *spe = (subpic_reg_stash_t){NULL};
 }
 
-MMAL_STATUS_T hw_mmal_subpic_open(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe, MMAL_PORT_T * const port)
+MMAL_STATUS_T hw_mmal_subpic_open(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe, MMAL_PORT_T * const port, const unsigned int layer)
 {
     MMAL_STATUS_T err;
 
@@ -98,6 +85,7 @@ MMAL_STATUS_T hw_mmal_subpic_open(vlc_object_t * const p_filter, subpic_reg_stas
 
     port->userdata = (void *)p_filter;
     spe->port = port;
+    spe->layer = layer;
 
     return MMAL_SUCCESS;
 }
@@ -118,7 +106,7 @@ static void conv_subpic_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 int hw_mmal_subpic_update(vlc_object_t * const p_filter,
     picture_t * const p_pic, const unsigned int sub_no,
     subpic_reg_stash_t * const spe,
-    MMAL_PORT_T * const scale_out_port, MMAL_PORT_T * const scale_in_port,
+    const MMAL_RECT_T * const scale_out,
     const uint64_t pts)
 {
     MMAL_STATUS_T err;
@@ -161,6 +149,8 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
         const unsigned int seq = hw_mmal_vzc_buf_seq(sub_buf);
         bool needs_update = (spe->seq != seq);
 
+        hw_mmal_vzc_buf_scale_dest_rect(sub_buf, scale_out);
+
         if (hw_mmal_vzc_buf_set_format(sub_buf, spe->port->format))
         {
             MMAL_DISPLAYREGION_T * const dreg = hw_mmal_vzc_buf_region(sub_buf);
@@ -172,8 +162,6 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
             v_fmt->par.num = p_pic->format.i_sar_num;
             v_fmt->color_space = MMAL_COLOR_SPACE_UNKNOWN;
 
-            rescale_rect(&dreg->dest_rect, hw_mmal_vzc_buf_get_dest_rect(sub_buf),
-                         &scale_out_port->format->es->video.crop, &scale_in_port->format->es->video.crop);
 
             if (needs_update || dreg->alpha != spe->alpha || !cmp_rect(&dreg->dest_rect, &spe->dest_rect)) {
 
@@ -183,7 +171,7 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
 #if TRACE_ALL
                 msg_Dbg(p_filter, "Update region for sub %d", sub_no);
 #endif
-                dreg->layer = 2;   // ***** do something better
+                dreg->layer = spe->layer;
                 dreg->set |= MMAL_DISPLAY_SET_LAYER;
 
                 if ((err = mmal_port_parameter_set(spe->port, &dreg->hdr)) != MMAL_SUCCESS)

@@ -314,6 +314,7 @@ struct vzc_pool_ctl_s
 typedef struct vzc_subbuf_ent_s
 {
     pool_ent_t * ent;
+    MMAL_RECT_T pic_rect;
     MMAL_RECT_T orig_dest_rect;
     MMAL_DISPLAYREGION_T dreg;
 } vzc_subbuf_ent_t;
@@ -576,10 +577,30 @@ void hw_mmal_vzc_buf_set_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const int x
     sb->orig_dest_rect.height = h;
 }
 
-const MMAL_RECT_T * hw_mmal_vzc_buf_get_dest_rect(MMAL_BUFFER_HEADER_T * const buf)
+static inline int rescale_x(int x, int mul, int div)
+{
+    return div == 0 ? x * mul : (x * mul + div/2) / div;
+}
+
+static void rescale_rect(MMAL_RECT_T * const d, const MMAL_RECT_T * const s, const MMAL_RECT_T * mul_rect, const MMAL_RECT_T * div_rect)
+{
+    d->x      = rescale_x(s->x,      mul_rect->width,  div_rect->width);
+    d->y      = rescale_x(s->y,      mul_rect->height, div_rect->height);
+    d->width  = rescale_x(s->width,  mul_rect->width,  div_rect->width);
+    d->height = rescale_x(s->height, mul_rect->height, div_rect->height);
+}
+
+void hw_mmal_vzc_buf_scale_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const MMAL_RECT_T * const scale_rect)
 {
     vzc_subbuf_ent_t * sb = buf->user_data;
-    return &sb->orig_dest_rect;
+    if (scale_rect == NULL) {
+        sb->dreg.dest_rect = sb->orig_dest_rect;
+    }
+    else
+    {
+        rescale_rect(&sb->dreg.dest_rect, &sb->orig_dest_rect,
+                     scale_rect, &sb->pic_rect);
+    }
 }
 
 unsigned int hw_mmal_vzc_buf_seq(MMAL_BUFFER_HEADER_T * const buf)
@@ -595,7 +616,7 @@ unsigned int hw_mmal_vzc_buf_seq(MMAL_BUFFER_HEADER_T * const buf)
 // no rules governing the order in which things are blended) so we must deal
 // (fairly) gracefully with it never (or always) being set.
 
-MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic, const bool is_first)
+MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic, const picture_t * const dst_pic, const bool is_first)
 {
     MMAL_BUFFER_HEADER_T * const buf = mmal_queue_get(pc->buf_pool->queue);
     vzc_subbuf_ent_t * sb;
@@ -672,6 +693,13 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
             .y = 0,
             .width = fmt->i_visible_width,
             .height = fmt->i_visible_height
+        };
+
+        sb->pic_rect = (MMAL_RECT_T){
+            .x      = dst_pic->format.i_x_offset,
+            .y      = dst_pic->format.i_y_offset,
+            .width  = dst_pic->format.i_visible_width,
+            .height = dst_pic->format.i_visible_height
         };
 
         ent->width = dst_stride / bpp;

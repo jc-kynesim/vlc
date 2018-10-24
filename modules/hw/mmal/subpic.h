@@ -5,6 +5,7 @@ typedef struct subpic_reg_stash_s
 {
     MMAL_PORT_T * port;
     MMAL_POOL_T * pool;
+    unsigned int layer;
     // Shadow  vars so we can tell if stuff has changed
     MMAL_RECT_T dest_rect;
     unsigned int alpha;
@@ -14,14 +15,14 @@ typedef struct subpic_reg_stash_s
 int hw_mmal_subpic_update(vlc_object_t * const p_filter,
     picture_t * const p_pic, const unsigned int sub_no,
     subpic_reg_stash_t * const stash,
-    MMAL_PORT_T * const scale_out_port, MMAL_PORT_T * const scale_in_port,
+    const MMAL_RECT_T * const scale_out,
     const uint64_t pts);
 
 void hw_mmal_subpic_flush(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe);
 
 void hw_mmal_subpic_close(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe);
 
-MMAL_STATUS_T hw_mmal_subpic_open(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe, MMAL_PORT_T * const port);
+MMAL_STATUS_T hw_mmal_subpic_open(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe, MMAL_PORT_T * const port, const unsigned int layer);
 
 #endif
 
