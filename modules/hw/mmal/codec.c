@@ -43,7 +43,7 @@
 #include "subpic.h"
 #include "blend_rgba_neon.h"
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 /*
  * This seems to be a bit high, but reducing it causes instabilities
@@ -978,20 +978,6 @@ typedef struct filter_sys_t {
 } filter_sys_t;
 
 
-static MMAL_FOURCC_T vlc_to_mmal_colour_space(const video_color_space_t vlc_cs)
-{
-    switch (vlc_cs) {
-    case COLOR_SPACE_BT601:
-        return MMAL_COLOR_SPACE_ITUR_BT601;
-    case COLOR_SPACE_BT709:
-        return MMAL_COLOR_SPACE_ITUR_BT709;
-    case COLOR_SPACE_BT2020:
-    case COLOR_SPACE_UNDEF:
-        break;
-    }
-    return MMAL_COLOR_SPACE_UNKNOWN;
-}
-
 static void pic_to_format(MMAL_ES_FORMAT_T * const es_fmt, const picture_t * const pic)
 {
     unsigned int bpp = (pic->format.i_bits_per_pixel + 7) >> 3;
@@ -1001,17 +987,11 @@ static void pic_to_format(MMAL_ES_FORMAT_T * const es_fmt, const picture_t * con
     es_fmt->encoding_variant = es_fmt->encoding =
         vlc_to_mmal_pic_fourcc(pic->format.i_chroma);
 
+    // Fill in crop etc.
+    vlc_to_mmal_video_fmt(es_fmt, &pic->format);
+    // Override width / height with strides
     v_fmt->width = pic->p[0].i_pitch / bpp;
     v_fmt->height = pic->p[0].i_lines;
-    v_fmt->crop.x = 0;
-    v_fmt->crop.y = 0;
-    v_fmt->crop.width = pic->p[0].i_visible_pitch / bpp;
-    v_fmt->crop.height = pic->p[0].i_visible_lines;
-    v_fmt->frame_rate.den = pic->format.i_frame_rate_base;
-    v_fmt->frame_rate.num = pic->format.i_frame_rate;
-    v_fmt->par.den = pic->format.i_sar_den;
-    v_fmt->par.num = pic->format.i_sar_num;
-    v_fmt->color_space = vlc_to_mmal_colour_space(pic->format.space);
 }
 
 
@@ -1280,6 +1260,19 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     msg_Dbg(p_filter, "<<< %s", __func__);
 #endif
 
+    {
+        char dbuf0[5], dbuf1[5];
+        msg_Dbg(p_filter, "%s: %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s,%dx%d [(%d,%d) %dx%d] sar:%d/%d", __func__,
+                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
+                p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
+                p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
+                p_filter->fmt_in.video.i_sar_num, p_filter->fmt_in.video.i_sar_den,
+                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
+                p_filter->fmt_out.video.i_x_offset, p_filter->fmt_out.video.i_y_offset,
+                p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height,
+                p_filter->fmt_out.video.i_sar_num, p_filter->fmt_out.video.i_sar_den);
+    }
+
     if (sys->err_stream != MMAL_SUCCESS) {
         goto stream_fail;
     }
@@ -1361,12 +1354,20 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 mmal_queue_wait(sys->out_pool->queue) : mmal_queue_get(sys->out_pool->queue)) != NULL)
         {
             picture_t * const out_pic = filter_NewPicture(p_filter);
+            char dbuf0[5];
 
             if (out_pic == NULL) {
                 msg_Warn(p_filter, "Failed to alloc new filter output pic");
                 mmal_buffer_header_release(out_buf);
                 break;
             }
+
+            msg_Dbg(p_filter, "out_pic %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d",
+                    str_fourcc(dbuf0, out_pic->format.i_chroma),
+                    out_pic->format.i_width, out_pic->format.i_height,
+                    out_pic->format.i_x_offset, out_pic->format.i_y_offset,
+                    out_pic->format.i_visible_width, out_pic->format.i_visible_height,
+                    out_pic->format.i_sar_num, out_pic->format.i_sar_den);
 
             mmal_buffer_header_reset(out_buf);
             out_buf->user_data = out_pic;
@@ -1413,6 +1414,16 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     if (ret_pics != NULL)
     {
         picture_t *next_pic = ret_pics->p_next;
+#if 0
+        char dbuf0[5];
+
+        msg_Dbg(p_filter, "pic_out %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d",
+                str_fourcc(dbuf0, ret_pics->format.i_chroma),
+                ret_pics->format.i_width, ret_pics->format.i_height,
+                ret_pics->format.i_x_offset, ret_pics->format.i_y_offset,
+                ret_pics->format.i_visible_width, ret_pics->format.i_visible_height,
+                ret_pics->format.i_sar_num, ret_pics->format.i_sar_den);
+#endif
         while (next_pic != NULL) {
             vlc_sem_wait(&sys->sem);
             next_pic = next_pic->p_next;
@@ -1490,13 +1501,14 @@ static int conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, 
     sys->output->format->type = MMAL_ES_TYPE_VIDEO;
     sys->output->format->encoding = pic_enc;
     sys->output->format->encoding_variant = sys->output->format->encoding;
-    vlc_to_mmal_pic_fmt(sys->output, &p_filter->fmt_out);
+    vlc_to_mmal_video_fmt(sys->output->format, &p_filter->fmt_out.video);
 
     // Override default format width/height if we have a pic we need to match
     if (pic != NULL)
     {
         pic_to_format(sys->output->format, pic);
-//        msg_Dbg(p_filter, "%s: %dx%d [(0,0) %dx%d]", __func__, fmt->width, fmt->height, fmt->crop.width, fmt->crop.height);
+        MMAL_VIDEO_FORMAT_T *fmt = &sys->output->format->es->video;
+        msg_Dbg(p_filter, "%s: %dx%d [(0,0) %dx%d]", __func__, fmt->width, fmt->height, fmt->crop.width, fmt->crop.height);
     }
 
     mmal_log_dump_format(sys->output->format);
@@ -1550,14 +1562,16 @@ static int OpenConverter(vlc_object_t * obj)
 
     {
         char dbuf0[5], dbuf1[5];
-        msg_Dbg(p_filter, "%s: (%s) %s,%dx%d [(%d,%d) %dx%d]->%s,%dx%d [(%d,%d) %dx%d] (gpu=%d)", __func__,
-                use_resizer ? "resize" : "isp",
+        msg_Dbg(p_filter, "%s: (%s) %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s,%dx%d [(%d,%d) %dx%d] sar:%d/%d (gpu=%d)", __func__,
+                use_resizer ? "resize" : use_isp ? "isp" : "hvs",
                 str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
                 p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
                 p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
+                p_filter->fmt_in.video.i_sar_num, p_filter->fmt_in.video.i_sar_den,
                 str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
                 p_filter->fmt_out.video.i_x_offset, p_filter->fmt_out.video.i_y_offset,
                 p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height,
+                p_filter->fmt_out.video.i_sar_num, p_filter->fmt_out.video.i_sar_den,
                 gpu_mem);
     }
 
@@ -1612,7 +1626,7 @@ static int OpenConverter(vlc_object_t * obj)
     sys->input->format->type = MMAL_ES_TYPE_VIDEO;
     sys->input->format->encoding = enc_in;
     sys->input->format->encoding_variant = MMAL_ENCODING_I420;
-    vlc_to_mmal_pic_fmt(sys->input, &p_filter->fmt_in);
+    vlc_to_mmal_video_fmt(sys->input->format, &p_filter->fmt_in.video);
     port_parameter_set_bool(sys->input, MMAL_PARAMETER_ZERO_COPY, 1);
 
     mmal_log_dump_format(sys->input->format);
@@ -1708,7 +1722,7 @@ static void FilterBlendMmal(filter_t *p_filter,
                   int x_offset, int y_offset, int alpha)
 {
     blend_sys_t * const sys = (blend_sys_t *)p_filter->p_sys;
-#if TRACE_ALL || 1
+#if TRACE_ALL
     msg_Dbg(p_filter, "%s (%d,%d:%d) pic=%p, pts=%lld, force=%d", __func__, x_offset, y_offset, alpha, src, src->date, src->b_force);
 #endif
     // If nothing to do then do nothing

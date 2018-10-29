@@ -517,7 +517,7 @@ static int OpenMmalDeinterlace(filter_t *filter)
     sys->input->userdata = (struct MMAL_PORT_USERDATA_T *)filter;
     if (filter->fmt_in.i_codec == VLC_CODEC_MMAL_OPAQUE)
         sys->input->format->encoding = MMAL_ENCODING_OPAQUE;
-    vlc_to_mmal_pic_fmt(sys->input, &filter->fmt_in);
+    vlc_to_mmal_video_fmt(sys->input->format, &filter->fmt_in.video);
 
     es_format_Copy(&filter->fmt_out, &filter->fmt_in);
     if (!sys->half_rate)

@@ -38,10 +38,23 @@
 #include "mmal_picture.h"
 
 
-void vlc_to_mmal_pic_fmt(MMAL_PORT_T * const port, const es_format_t * const es_vlc)
+MMAL_FOURCC_T vlc_to_mmal_color_space(const video_color_space_t vlc_cs)
 {
-    const video_format_t *const vf_vlc = &es_vlc->video;
-    MMAL_VIDEO_FORMAT_T * vf_mmal = &port->format->es->video;
+    switch (vlc_cs)
+    {
+        case COLOR_SPACE_BT601:
+            return MMAL_COLOR_SPACE_ITUR_BT601;
+        case COLOR_SPACE_BT709:
+            return MMAL_COLOR_SPACE_ITUR_BT709;
+        default:
+            break;
+    }
+    return MMAL_COLOR_SPACE_UNKNOWN;
+}
+
+void vlc_to_mmal_video_fmt(MMAL_ES_FORMAT_T *const es_fmt, const video_frame_format_t * const vf_vlc)
+{
+    MMAL_VIDEO_FORMAT_T * const vf_mmal = &es_fmt->es->video;
 
     vf_mmal->width          = (vf_vlc->i_width + 31) & ~31;
     vf_mmal->height         = (vf_vlc->i_height + 15) & ~15;;
@@ -58,6 +71,7 @@ void vlc_to_mmal_pic_fmt(MMAL_PORT_T * const port, const es_format_t * const es_
     }
     vf_mmal->frame_rate.num = vf_vlc->i_frame_rate;
     vf_mmal->frame_rate.den = vf_vlc->i_frame_rate_base;
+    vf_mmal->color_space    = vlc_to_mmal_color_space(vf_vlc->space);
 }
 
 hw_mmal_port_pool_ref_t * hw_mmal_port_pool_ref_create(MMAL_PORT_T * const port,
@@ -552,6 +566,7 @@ bool hw_mmal_vzc_buf_set_format(MMAL_BUFFER_HEADER_T * const buf, MMAL_ES_FORMAT
     v_fmt->crop.y = 0;
     v_fmt->crop.width = ent->width;
     v_fmt->crop.height = ent->height;
+
     return true;
 }
 
@@ -739,7 +754,7 @@ void hw_mmal_vzc_pool_flush(vzc_pool_ctl_t * const pc)
 static void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc)
 {
 
-    printf("<<< %s\n", __func__);
+//    printf("<<< %s\n", __func__);
 
     hw_mmal_vzc_pool_flush(pc);
 
@@ -750,13 +765,13 @@ static void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc)
 
     vlc_mutex_destroy(&pc->lock);
 
-    memset(pc, 0xba, sizeof(*pc)); // Zap for (hopefully) faster crash
+//    memset(pc, 0xba, sizeof(*pc)); // Zap for (hopefully) faster crash
 
     free (pc);
 
     vcsm_exit();
 
-    printf(">>> %s\n", __func__);
+//    printf(">>> %s\n", __func__);
 }
 
 void hw_mmal_vzc_pool_release(vzc_pool_ctl_t * const pc)
@@ -786,7 +801,7 @@ static MMAL_BOOL_T vcz_pool_release_cb(MMAL_POOL_T * buf_pool, MMAL_BUFFER_HEADE
 
     VLC_UNUSED(buf_pool);
 
-    printf("<<< %s\n", __func__);
+//    printf("<<< %s\n", __func__);
 
     if (sb != NULL) {
         buf->user_data = NULL;
@@ -795,7 +810,7 @@ static MMAL_BOOL_T vcz_pool_release_cb(MMAL_POOL_T * buf_pool, MMAL_BUFFER_HEADE
         free(sb);
     }
 
-    printf(">>> %s\n", __func__);
+//    printf(">>> %s\n", __func__);
 
     return MMAL_TRUE;
 }

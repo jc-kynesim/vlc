@@ -17,7 +17,7 @@
 
 #include "mmal_picture.h"
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 
 typedef struct mmal_x11_sys_s
@@ -132,7 +132,7 @@ static picture_pool_t * mmal_x11_pool(vout_display_t * vd, unsigned count)
     mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
     vout_display_t * const x_vd = sys->cur_vout;
 #if TRACE_ALL
-    msg_Dbg(vd, "<<< %s (count=%d)", __func__, count);
+    msg_Dbg(vd, "<<< %s (count=%d) %dx%d", __func__, count, x_vd->fmt.i_width, x_vd->fmt.i_height);
 #endif
     return x_vd->pool(x_vd, count);
 }
@@ -175,7 +175,7 @@ static void mmal_x11_display(vout_display_t * vd, picture_t * pic, subpicture_t 
     const bool is_mmal_pic = (pic->format.i_chroma == VLC_CODEC_MMAL_OPAQUE);
 
 #if TRACE_ALL
-    msg_Dbg(vd, "<<< %s", __func__);
+    msg_Dbg(vd, "<<< %s: fmt: %dx%d/%dx%d, pic:%dx%d", __func__, vd->fmt.i_width, vd->fmt.i_height, x_vd->fmt.i_width, x_vd->fmt.i_height, pic->format.i_width, pic->format.i_height);
 #endif
 
     if (sys->use_mmal != is_mmal_pic)  {
@@ -238,6 +238,10 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
         case VOUT_DISPLAY_RESET_PICTURES:
             msg_Dbg(vd, "Reset pictures");
             rv = x_vd->control(x_vd, ctl, va);
+            msg_Dbg(vd, "<<< %s: Pic reset: fmt: %dx%d<-%dx%d, source: %dx%d/%dx%d", __func__,
+                    vd->fmt.i_width, vd->fmt.i_height, x_vd->fmt.i_width, x_vd->fmt.i_height,
+                    vd->source.i_width, vd->source.i_height, x_vd->source.i_width, x_vd->source.i_height);
+            vd->fmt       = x_vd->fmt;
             break;
         default:
             rv = x_vd->control(x_vd, ctl, va);

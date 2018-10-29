@@ -73,7 +73,8 @@ typedef struct pic_ctx_mmal_s {
 } pic_ctx_mmal_t;
 
 
-void vlc_to_mmal_pic_fmt(MMAL_PORT_T * const port, const es_format_t * const es_vlc);
+MMAL_FOURCC_T vlc_to_mmal_color_space(const video_color_space_t vlc_cs);
+void vlc_to_mmal_video_fmt(MMAL_ES_FORMAT_T *const es_fmt, const video_frame_format_t * const vf_vlc);
 
 hw_mmal_port_pool_ref_t * hw_mmal_port_pool_ref_create(MMAL_PORT_T * const port,
    const unsigned int headers, const uint32_t payload_size);

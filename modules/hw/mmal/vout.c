@@ -45,7 +45,7 @@
 #include <interface/vmcs_host/vc_tvservice.h>
 #include <interface/vmcs_host/vc_dispmanx.h>
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 #define MAX_BUFFERS_IN_TRANSIT 1
 #define VC_TV_MAX_MODE_IDS 127
@@ -281,6 +281,7 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
 // Actual picture pool for MMAL opaques is just a set of trivial containers
 static picture_pool_t *vd_pool(vout_display_t *vd, unsigned count)
 {
+    msg_Dbg(vd, "%s: fmt:%dx%d, source:%dx%d", __func__, vd->fmt.i_width, vd->fmt.i_height, vd->source.i_width, vd->source.i_height);
     return picture_pool_NewFromFormat(&vd->fmt, count);
 }
 
@@ -293,6 +294,11 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
+
+    if (subpicture != NULL) {
+        msg_Dbg(vd, "<<< %s: subpic: %p", __func__, subpicture);
+    }
+
     if (sys->force_config ||
         p_pic->format.i_frame_rate != sys->i_frame_rate ||
         p_pic->format.i_frame_rate_base != sys->i_frame_rate_base ||
@@ -387,6 +393,7 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
 
         case VOUT_DISPLAY_RESET_PICTURES:
             msg_Warn(vd, "Reset Pictures");
+            vd->fmt = vd->source; // Take whatever source wants to give us
             ret = VLC_SUCCESS;
             break;
 
