@@ -215,7 +215,7 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
         {
             const vout_display_cfg_t * cfg = va_arg(va, const vout_display_cfg_t *);
-            const bool want_mmal = cfg->display.width == 1920;
+            const bool want_mmal = var_InheritBool(vd, "fullscreen");
             vout_display_t *new_vd = want_mmal ? sys->mmal_vout : sys->x_vout;
 
             msg_Dbg(vd, "Change size: %d, %d", cfg->display.width, cfg->display.height);
