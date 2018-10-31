@@ -102,7 +102,6 @@ struct vout_display_sys_t {
     MMAL_COMPONENT_T *component;
     MMAL_PORT_T *input;
     MMAL_POOL_T *pool; /* mmal buffer headers, used for pushing pictures to component*/
-    struct dmx_region_t *dmx_region;
     int i_planes; /* Number of actually used planes, 1 for opaque, 3 for i420 */
 
     uint32_t buffer_size; /* size of actual mmal buffers */
@@ -127,21 +126,13 @@ struct vout_display_sys_t {
     bool native_interlaced;
     bool b_top_field_first; /* cached interlaced settings to detect changes for native mode */
     bool b_progressive;
-    bool opaque; /* indicated use of opaque picture format (zerocopy) */
     bool force_config;
-
-    int in_cb_cnt;
 
     vout_subpic_t subs[SUBS_MAX];
 };
 
-static const vlc_fourcc_t subpicture_chromas[] = {
-    VLC_CODEC_RGBA,
-    0
-};
 
 /* Utility functions */
-static inline uint32_t align(uint32_t x, uint32_t y);
 static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
                 const video_format_t *fmt);
 
@@ -153,28 +144,20 @@ static void adjust_refresh_rate(vout_display_t *vd, const video_format_t *fmt);
 static int set_latency_target(vout_display_t *vd, bool enable);
 
 /* DispManX */
-static void display_subpicture(vout_display_t *vd, subpicture_t *subpicture);
 static void close_dmx(vout_display_t *vd);
-static struct dmx_region_t *dmx_region_new(vout_display_t *vd,
-                DISPMANX_UPDATE_HANDLE_T update, subpicture_region_t *region);
-static void dmx_region_update(struct dmx_region_t *dmx_region,
-                DISPMANX_UPDATE_HANDLE_T update, picture_t *picture);
-static void dmx_region_delete(struct dmx_region_t *dmx_region,
-                DISPMANX_UPDATE_HANDLE_T update);
 static void show_background(vout_display_t *vd, bool enable);
 static void maintain_phase_sync(vout_display_t *vd);
 
 
 static void vd_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 {
-    vout_display_t * const vd = (vout_display_t *)port->userdata;
-    vout_display_sys_t *const sys = vd->sys;
-
-    ++sys->in_cb_cnt;
 #if TRACE_ALL
+    vout_display_t * const vd = (vout_display_t *)port->userdata;
     pic_ctx_mmal_t * ctx = buf->user_data;
-    msg_Dbg(vd, "<<< %s[%d] cmd=%d, ctx=%p, buf=%p, flags=%#x, pts=%lld", __func__, sys->in_cb_cnt, buf->cmd, ctx, buf,
+    msg_Dbg(vd, "<<< %s[%d] cmd=%d, ctx=%p, buf=%p, flags=%#x, pts=%lld", __func__, buf->cmd, ctx, buf,
             buf->flags, (long long)buf->pts);
+#else
+    VLC_UNUSED(port);
 #endif
 
     mmal_buffer_header_release(buf);
@@ -206,14 +189,6 @@ static int query_resolution(vout_display_t *vd, unsigned *width, unsigned *heigh
     }
 
     return ret;
-}
-
-static inline uint32_t align(uint32_t x, uint32_t y) {
-    uint32_t mod = x % y;
-    if (mod == 0)
-        return x;
-    else
-        return x + y - mod;
 }
 
 static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
@@ -295,8 +270,10 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
 
+    // Not expecting subpictures in the current setup
+    // Subpics should be attached to the main pic
     if (subpicture != NULL) {
-        msg_Dbg(vd, "<<< %s: subpic: %p", __func__, subpicture);
+        subpicture_Delete(subpicture);
     }
 
     if (sys->force_config ||
@@ -331,11 +308,6 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
             goto fail;
         }
     }
-
-    display_subpicture(vd, subpicture);
-
-    if (subpicture)
-        subpicture_Delete(subpicture);
 
     if (p_pic->context == NULL) {
         msg_Dbg(vd, "%s: No context", __func__);
@@ -593,190 +565,14 @@ static void adjust_refresh_rate(vout_display_t *vd, const video_format_t *fmt)
     }
 }
 
-static void display_subpicture(vout_display_t *vd, subpicture_t *subpicture)
-{
-    vout_display_sys_t *sys = vd->sys;
-    struct dmx_region_t **dmx_region = &sys->dmx_region;
-    struct dmx_region_t *unused_dmx_region;
-    DISPMANX_UPDATE_HANDLE_T update = 0;
-    picture_t *picture;
-    video_format_t *fmt;
-    struct dmx_region_t *dmx_region_next;
-
-    if(subpicture) {
-        subpicture_region_t *region = subpicture->p_region;
-        while(region) {
-            picture = region->p_picture;
-            fmt = &region->fmt;
-
-            if(!*dmx_region) {
-                if(!update)
-                    update = vc_dispmanx_update_start(10);
-                *dmx_region = dmx_region_new(vd, update, region);
-            } else if(((*dmx_region)->bmp_rect.width != (int32_t)fmt->i_visible_width) ||
-                    ((*dmx_region)->bmp_rect.height != (int32_t)fmt->i_visible_height) ||
-                    ((*dmx_region)->pos_x != region->i_x) ||
-                    ((*dmx_region)->pos_y != region->i_y) ||
-                    ((*dmx_region)->alpha.opacity != (uint32_t)region->i_alpha)) {
-                dmx_region_next = (*dmx_region)->next;
-                if(!update)
-                    update = vc_dispmanx_update_start(10);
-                dmx_region_delete(*dmx_region, update);
-                *dmx_region = dmx_region_new(vd, update, region);
-                (*dmx_region)->next = dmx_region_next;
-            } else if((*dmx_region)->picture != picture) {
-                if(!update)
-                    update = vc_dispmanx_update_start(10);
-                dmx_region_update(*dmx_region, update, picture);
-            }
-
-            dmx_region = &(*dmx_region)->next;
-            region = region->p_next;
-        }
-    }
-
-    /* Remove remaining regions */
-    unused_dmx_region = *dmx_region;
-    while(unused_dmx_region) {
-        dmx_region_next = unused_dmx_region->next;
-        if(!update)
-            update = vc_dispmanx_update_start(10);
-        dmx_region_delete(unused_dmx_region, update);
-        unused_dmx_region = dmx_region_next;
-    }
-    *dmx_region = NULL;
-
-    if(update)
-        vc_dispmanx_update_submit_sync(update);
-}
-
 static void close_dmx(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
-    DISPMANX_UPDATE_HANDLE_T update = vc_dispmanx_update_start(10);
-    struct dmx_region_t *dmx_region = sys->dmx_region;
-    struct dmx_region_t *dmx_region_next;
-
-    while(dmx_region) {
-        dmx_region_next = dmx_region->next;
-        dmx_region_delete(dmx_region, update);
-        dmx_region = dmx_region_next;
-    }
-
-    vc_dispmanx_update_submit_sync(update);
-    sys->dmx_region = NULL;
 
     show_background(vd, false);
 
     vc_dispmanx_display_close(sys->dmx_handle);
     sys->dmx_handle = DISPMANX_NO_HANDLE;
-}
-
-static struct dmx_region_t *dmx_region_new(vout_display_t *vd,
-                DISPMANX_UPDATE_HANDLE_T update, subpicture_region_t *region)
-{
-    vout_display_sys_t *sys = vd->sys;
-    video_format_t *fmt = &region->fmt;
-    struct dmx_region_t *dmx_region = calloc(1, sizeof(struct dmx_region_t));
-    uint32_t image_handle;
-
-    dmx_region->pos_x = region->i_x;
-    dmx_region->pos_y = region->i_y;
-
-    vc_dispmanx_rect_set(&dmx_region->bmp_rect, 0, 0, fmt->i_visible_width,
-                    fmt->i_visible_height);
-    vc_dispmanx_rect_set(&dmx_region->src_rect, 0, 0, fmt->i_visible_width << 16,
-                    fmt->i_visible_height << 16);
-    vc_dispmanx_rect_set(&dmx_region->dst_rect, region->i_x, region->i_y,
-                    fmt->i_visible_width, fmt->i_visible_height);
-
-    dmx_region->resource = vc_dispmanx_resource_create(VC_IMAGE_RGBA32,
-                    dmx_region->bmp_rect.width | (region->p_picture->p[0].i_pitch << 16),
-                    dmx_region->bmp_rect.height | (dmx_region->bmp_rect.height << 16),
-                    &image_handle);
-    vc_dispmanx_resource_write_data(dmx_region->resource, VC_IMAGE_RGBA32,
-                    region->p_picture->p[0].i_pitch,
-                    region->p_picture->p[0].p_pixels, &dmx_region->bmp_rect);
-
-    dmx_region->alpha.flags = DISPMANX_FLAGS_ALPHA_FROM_SOURCE | DISPMANX_FLAGS_ALPHA_MIX;
-    dmx_region->alpha.opacity = region->i_alpha;
-    dmx_region->alpha.mask = DISPMANX_NO_HANDLE;
-    dmx_region->element = vc_dispmanx_element_add(update, sys->dmx_handle,
-                    sys->layer + 1, &dmx_region->dst_rect, dmx_region->resource,
-                    &dmx_region->src_rect, DISPMANX_PROTECTION_NONE,
-                    &dmx_region->alpha, NULL, VC_IMAGE_ROT0);
-
-    dmx_region->next = NULL;
-    dmx_region->picture = region->p_picture;
-
-    return dmx_region;
-}
-
-#if 0
-static struct dmx_region_t *dmx_region_new_from_buf(vout_display_t *vd,
-                DISPMANX_UPDATE_HANDLE_T update, MMAL_BUFFER_HEADER_T * const buf)
-{
-    vout_display_sys_t *sys = vd->sys;
-    struct dmx_region_t *dmx_region = calloc(1, sizeof(struct dmx_region_t));
-    uint32_t image_handle;
-    const MMAL_DISPLAYREGION_T * mmreg = hw_mmal_vzc_buf_region(buf);
-    const MMAL_RECT_T * mmrect = hw_mmal_vzc_buf_get_dest_rect(buf);
-    uint32_t frame_width, frame_height, frame_stride;
-
-    hw_mmal_vzc_buf_frame_size(buf, &frame_width, &frame_height);
-    frame_stride = frame_width  * 4;
-
-    dmx_region->pos_x = mmrect->x;
-    dmx_region->pos_y = mmrect->y;
-
-    vc_dispmanx_rect_set(&dmx_region->bmp_rect, 0, 0, mmreg->src_rect.width,
-                         mmreg->src_rect.height);
-    vc_dispmanx_rect_set(&dmx_region->src_rect, 0, 0, mmreg->src_rect.width << 16,
-                         mmreg->src_rect.height << 16);
-    vc_dispmanx_rect_set(&dmx_region->dst_rect, mmrect->x, mmrect->y,
-                    mmrect->width, mmrect->height);
-
-    dmx_region->resource = vc_dispmanx_resource_create(VC_IMAGE_RGBA32,
-                    dmx_region->bmp_rect.width | (frame_stride << 16),
-                    dmx_region->bmp_rect.height | (frame_height << 16),
-                    &image_handle);
-    vc_dispmanx_resource_write_data_handle(dmx_region->resource, VC_IMAGE_RGBA32,
-                    frame_stride,
-                    /** handle **/, 0, &dmx_region->bmp_rect);
-
-    dmx_region->alpha.flags = DISPMANX_FLAGS_ALPHA_FROM_SOURCE | DISPMANX_FLAGS_ALPHA_MIX;
-    dmx_region->alpha.opacity = mmreg->alpha;
-    dmx_region->alpha.mask = DISPMANX_NO_HANDLE;
-    dmx_region->element = vc_dispmanx_element_add(update, sys->dmx_handle,
-                    sys->layer + 1, &dmx_region->dst_rect, dmx_region->resource,
-                    &dmx_region->src_rect, DISPMANX_PROTECTION_NONE,
-                    &dmx_region->alpha, NULL, VC_IMAGE_ROT0);
-
-    dmx_region->next = NULL;
-    dmx_region->buf = buf;
-
-    return dmx_region;
-}
-#endif
-
-static void dmx_region_update(struct dmx_region_t *dmx_region,
-                DISPMANX_UPDATE_HANDLE_T update, picture_t *picture)
-{
-    vc_dispmanx_resource_write_data(dmx_region->resource, VC_IMAGE_RGBA32,
-                    picture->p[0].i_pitch, picture->p[0].p_pixels, &dmx_region->bmp_rect);
-    vc_dispmanx_element_change_source(update, dmx_region->element, dmx_region->resource);
-    dmx_region->picture = picture;
-}
-
-static void dmx_region_delete(struct dmx_region_t *dmx_region,
-                DISPMANX_UPDATE_HANDLE_T update)
-{
-    vc_dispmanx_element_remove(update, dmx_region->element);
-    vc_dispmanx_resource_delete(dmx_region->resource);
-    if (dmx_region->buf != NULL) {
-        mmal_buffer_header_release(dmx_region->buf);
-    }
-    free(dmx_region);
 }
 
 static void maintain_phase_sync(vout_display_t *vd)
@@ -925,7 +721,6 @@ static int OpenMmalVout(vlc_object_t *object)
 {
     vout_display_t *vd = (vout_display_t *)object;
     vout_display_sys_t *sys;
-    uint32_t buffer_pitch, buffer_height;
     vout_display_place_t place;
     MMAL_DISPLAYREGION_T display_region;
     MMAL_STATUS_T status;
@@ -942,23 +737,12 @@ static int OpenMmalVout(vlc_object_t *object)
         return VLC_EGENERIC;
     }
 
-#if 0
-    if (vout_display_IsWindowed(vd) && vd->fmt.i_visible_width != 1920)
-    {
-        msg_Dbg(vd, ">>> %s: Is a window, vis width=%d", __func__, vd->fmt.i_visible_width);
-        return VLC_EGENERIC;
-    }
-#endif
-
     sys = calloc(1, sizeof(struct vout_display_sys_t));
     if (!sys)
         return VLC_ENOMEM;
     vd->sys = sys;
 
     sys->layer = var_InheritInteger(vd, MMAL_LAYER_NAME);
-//    bcm_host_init();
-
-    sys->opaque = vd->fmt.i_chroma == VLC_CODEC_MMAL_OPAQUE;
 
     status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &sys->component);
     if (status != MMAL_SUCCESS) {
@@ -978,18 +762,9 @@ static int OpenMmalVout(vlc_object_t *object)
     sys->input = sys->component->input[0];
     sys->input->userdata = (struct MMAL_PORT_USERDATA_T *)vd;
 
-    if (sys->opaque) {
-        sys->input->format->encoding = MMAL_ENCODING_OPAQUE;
-        sys->i_planes = 1;
-        sys->buffer_size = sys->input->buffer_size_recommended;
-    } else {
-        sys->input->format->encoding = MMAL_ENCODING_I420;
-        vd->fmt.i_chroma = VLC_CODEC_I420;
-        buffer_pitch = align(vd->fmt.i_width, 32);
-        buffer_height = align(vd->fmt.i_height, 16);
-        sys->i_planes = 3;
-        sys->buffer_size = 3 * buffer_pitch * buffer_height / 2;
-    }
+    sys->input->format->encoding = MMAL_ENCODING_OPAQUE;
+    sys->i_planes = 1;
+    sys->buffer_size = sys->input->buffer_size_recommended;
 
     sys->input->format->es->video.width = vd->fmt.i_width;
     sys->input->format->es->video.height = vd->fmt.i_height;
@@ -1098,7 +873,6 @@ static int OpenMmalVout(vlc_object_t *object)
     }
 
     sys->dmx_handle = vc_dispmanx_display_open(0);
-    vd->info.subpicture_chromas = subpicture_chromas;
 
     msg_Dbg(vd, ">>> %s: ok", __func__);
     return VLC_SUCCESS;
