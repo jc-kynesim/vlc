@@ -19,13 +19,13 @@
 
 #define TRACE_ALL 1
 
-
 typedef struct mmal_x11_sys_s
 {
     bool use_mmal;
     vout_display_t * cur_vout;
     vout_display_t * mmal_vout;
     vout_display_t * x_vout;
+    uint32_t changed;
 } mmal_x11_sys_t;
 
 static void unload_display_module(vout_display_t * const x_vout)
@@ -85,7 +85,7 @@ static void mmal_x11_window_del(vout_display_t * x_vd, vout_window_t * win)
 }
 
 
-static vout_display_t * load_display_module(vout_display_t * const vd, mmal_x11_sys_t * const sys,
+static vout_display_t * load_display_module(vout_display_t * const vd,
                                             const char * const cap, const char * const module_name)
 {
     vout_display_t * const x_vout = vlc_object_create(vd, sizeof(*x_vout));
@@ -211,6 +211,10 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s[%d] (ctl=%d)", __func__, sys->use_mmal, ctl);
 #endif
+    // Remember what we've told this vd - unwanted ctls ignored on replay
+    if (ctl >= 0 && ctl <= 31)
+        sys->changed |= (1 << ctl);
+
     switch (ctl) {
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
         {
@@ -233,8 +237,28 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
                 sys->cur_vout = new_vd;
                 sys->use_mmal = want_mmal;
             }
+
+            // Repeat any control calls that we sent to the previous vd
+            if (sys->changed != 0) {
+                const uint32_t changed = sys->changed;
+                sys->changed = 0;
+                if ((changed & (1 << VOUT_DISPLAY_CHANGE_DISPLAY_FILLED)) != 0)
+                    vout_display_Control(new_vd, VOUT_DISPLAY_CHANGE_DISPLAY_FILLED, vd->cfg);
+                if ((changed & (1 << VOUT_DISPLAY_CHANGE_ZOOM)) != 0)
+                    vout_display_Control(new_vd, VOUT_DISPLAY_CHANGE_ZOOM, vd->cfg);
+                if ((changed & ((1 << VOUT_DISPLAY_CHANGE_SOURCE_CROP) | (1 << VOUT_DISPLAY_CHANGE_SOURCE_ASPECT))) != 0)
+                    new_vd->source = vd->source;
+                if ((changed & (1 << VOUT_DISPLAY_CHANGE_SOURCE_ASPECT)) != 0)
+                    vout_display_Control(new_vd, VOUT_DISPLAY_CHANGE_SOURCE_ASPECT);
+                if ((changed & (1 << VOUT_DISPLAY_CHANGE_SOURCE_CROP)) != 0)
+                    vout_display_Control(new_vd, VOUT_DISPLAY_CHANGE_SOURCE_CROP);
+                if ((changed & (1 << VOUT_DISPLAY_CHANGE_VIEWPOINT)) != 0)
+                    vout_display_Control(new_vd, VOUT_DISPLAY_CHANGE_ZOOM, vd->cfg);
+            }
+
             break;
         }
+
         case VOUT_DISPLAY_RESET_PICTURES:
             msg_Dbg(vd, "Reset pictures");
             rv = x_vd->control(x_vd, ctl, va);
@@ -243,9 +267,13 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
                     vd->source.i_width, vd->source.i_height, x_vd->source.i_width, x_vd->source.i_height);
             vd->fmt       = x_vd->fmt;
             break;
+
+        case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
+        case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
+            x_vd->source = vd->source;
         default:
             rv = x_vd->control(x_vd, ctl, va);
-            vd->fmt  = x_vd->fmt;
+//            vd->fmt  = x_vd->fmt;
             break;
     }
 #if TRACE_ALL
@@ -282,9 +310,9 @@ static int OpenMmalX11(vlc_object_t *object)
     }
     vd->sys = (vout_display_sys_t *)sys;
 
-    if ((sys->mmal_vout = load_display_module(vd, sys, "vout display", "mmal_vout")) == NULL)
+    if ((sys->mmal_vout = load_display_module(vd, "vout display", "mmal_vout")) == NULL)
         goto fail;
-    if ((sys->x_vout = load_display_module(vd, sys, "vout display", "xcb_x11")) == NULL)
+    if ((sys->x_vout = load_display_module(vd, "vout display", "xcb_x11")) == NULL)
         goto fail;
 
     sys->cur_vout = sys->x_vout;

@@ -38,7 +38,7 @@
 #include "mmal_picture.h"
 #include "subpic.h"
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 static inline bool cmp_rect(const MMAL_RECT_T * const a, const MMAL_RECT_T * const b)
 {
@@ -129,7 +129,7 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
             buf->data = NULL;
             buf->alloc_size = 0;
             buf->offset = 0;
-            buf->flags = 0;
+            buf->flags = MMAL_BUFFER_HEADER_FLAG_FRAME_END;
             buf->pts = pts;
             buf->dts = MMAL_TIME_UNKNOWN;
             buf->user_data = NULL;

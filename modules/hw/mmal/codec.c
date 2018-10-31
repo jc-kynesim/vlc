@@ -43,7 +43,7 @@
 #include "subpic.h"
 #include "blend_rgba_neon.h"
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 /*
  * This seems to be a bit high, but reducing it causes instabilities
@@ -499,6 +499,9 @@ apply_fmt:
                 interlace_type.eMode);
 #endif
     }
+
+    // Tell the reset of the world we have changed format
+    ret = decoder_UpdateVideoFormat(dec);
 
 out:
     mmal_format_free(sys->output_format);
