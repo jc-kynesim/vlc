@@ -38,6 +38,26 @@
 #include "mmal_picture.h"
 
 
+static void flush_range(void * start, size_t len)
+{
+    struct vcsm_user_clean_invalid2_s * b = calloc(1,
+        sizeof(struct vcsm_user_clean_invalid2_s) + sizeof(struct vcsm_user_clean_invalid2_block_s));
+
+    b->op_count = 1,
+
+    b->s[0] = (struct vcsm_user_clean_invalid2_block_s){
+        .invalidate_mode = 3,
+        .block_count = 1,
+        .start_address = start,
+        .block_size = len,
+        .inter_block_stride = 0
+    };
+
+    vcsm_clean_invalid2(b);
+
+    free(b);
+}
+
 MMAL_FOURCC_T vlc_to_mmal_color_space(const video_color_space_t vlc_cs)
 {
     switch (vlc_cs)
@@ -733,6 +753,9 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
                 d += dst_stride;
                 s += pic->p[0].i_pitch;
             }
+
+            // And make sure it is actually in memory
+            flush_range(ent->buf, d - (uint8_t *)ent->buf);
         }
     }
 
