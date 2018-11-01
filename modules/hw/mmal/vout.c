@@ -376,7 +376,12 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
         case VOUT_DISPLAY_CHANGE_MMAL_HIDE:
         {
             MMAL_STATUS_T err;
+            unsigned int i;
+
             msg_Dbg(vd, "Hide display");
+
+            for (i = 0; i != SUBS_MAX; ++i)
+                hw_mmal_subpic_flush(VLC_OBJECT(vd), &sys->subs[i].sub);
 
             if (sys->input->is_enabled &&
                 (err = mmal_port_disable(sys->input)) != MMAL_SUCCESS)

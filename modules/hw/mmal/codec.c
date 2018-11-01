@@ -1262,7 +1262,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 #if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s", __func__);
 #endif
-
+#if 0
     {
         char dbuf0[5], dbuf1[5];
         msg_Dbg(p_filter, "%s: %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s,%dx%d [(%d,%d) %dx%d] sar:%d/%d", __func__,
@@ -1275,6 +1275,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height,
                 p_filter->fmt_out.video.i_sar_num, p_filter->fmt_out.video.i_sar_den);
     }
+#endif
 
     if (sys->err_stream != MMAL_SUCCESS) {
         goto stream_fail;
@@ -1365,12 +1366,14 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 break;
             }
 
+#if 0
             msg_Dbg(p_filter, "out_pic %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d",
                     str_fourcc(dbuf0, out_pic->format.i_chroma),
                     out_pic->format.i_width, out_pic->format.i_height,
                     out_pic->format.i_x_offset, out_pic->format.i_y_offset,
                     out_pic->format.i_visible_width, out_pic->format.i_visible_height,
                     out_pic->format.i_sar_num, out_pic->format.i_sar_den);
+#endif
 
             mmal_buffer_header_reset(out_buf);
             out_buf->user_data = out_pic;
