@@ -219,7 +219,7 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
         {
             const vout_display_cfg_t * cfg = va_arg(va, const vout_display_cfg_t *);
-            const bool want_mmal = var_InheritBool(vd, "fullscreen");
+            const bool want_mmal = sys->mmal_vout != NULL && var_InheritBool(vd, "fullscreen");
             vout_display_t *new_vd = want_mmal ? sys->mmal_vout : sys->x_vout;
 
             msg_Dbg(vd, "Change size: %d, %d", cfg->display.width, cfg->display.height);
@@ -297,6 +297,17 @@ static void mmal_x11_manage(vout_display_t * vd)
 }
 #endif
 
+static const char * str_fourcc(char * buf, unsigned int fcc)
+{
+    if (fcc == 0)
+        return "----";
+    buf[0] = (fcc >> 0) & 0xff;
+    buf[1] = (fcc >> 8) & 0xff;
+    buf[2] = (fcc >> 16) & 0xff;
+    buf[3] = (fcc >> 24) & 0xff;
+    buf[4] = 0;
+    return buf;
+}
 
 
 static int OpenMmalX11(vlc_object_t *object)
@@ -310,10 +321,15 @@ static int OpenMmalX11(vlc_object_t *object)
     }
     vd->sys = (vout_display_sys_t *)sys;
 
-    if ((sys->mmal_vout = load_display_module(vd, "vout display", "mmal_vout")) == NULL)
-        goto fail;
     if ((sys->x_vout = load_display_module(vd, "vout display", "xcb_x11")) == NULL)
         goto fail;
+
+    if ((sys->mmal_vout = load_display_module(vd, "vout display", "mmal_vout")) == NULL)
+    {
+        // Winge but do no more than that - route everything to X
+        char dbuf0[5], dbuf1[5];
+        msg_Info(vd, "Not a valid format for mmal vout (%s/%s)", str_fourcc(dbuf0, vd->fmt.i_chroma), str_fourcc(dbuf1, vd->source.i_chroma));
+    }
 
     sys->cur_vout = sys->x_vout;
     vd->info = sys->cur_vout->info;
