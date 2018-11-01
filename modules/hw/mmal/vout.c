@@ -256,7 +256,8 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
 // Actual picture pool for MMAL opaques is just a set of trivial containers
 static picture_pool_t *vd_pool(vout_display_t *vd, unsigned count)
 {
-    msg_Dbg(vd, "%s: fmt:%dx%d, source:%dx%d", __func__, vd->fmt.i_width, vd->fmt.i_height, vd->source.i_width, vd->source.i_height);
+    msg_Dbg(vd, "%s: fmt:%dx%d,sar:%d/%d; source:%dx%d", __func__,
+            vd->fmt.i_width, vd->fmt.i_height, vd->fmt.i_sar_num, vd->fmt.i_sar_den, vd->source.i_width, vd->source.i_height);
     return picture_pool_NewFromFormat(&vd->fmt, count);
 }
 
@@ -681,6 +682,8 @@ static void CloseMmalVout(vlc_object_t *object)
             vout_subpic_t * const sub = sys->subs + i;
             if (sub->component != NULL) {
                 hw_mmal_subpic_close(VLC_OBJECT(vd), &sub->sub);
+                if (sub->component->control->is_enabled)
+                    mmal_port_disable(sub->component->control);
                 if (sub->component->is_enabled)
                     mmal_component_disable(sub->component);
                 mmal_component_release(sub->component);
@@ -845,6 +848,12 @@ static int OpenMmalVout(vlc_object_t *object)
             if ((status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &sub->component)) != MMAL_SUCCESS)
             {
                 msg_Dbg(vd, "Failed to create subpic component %d", i);
+                goto fail;
+            }
+            sub->component->control->userdata = (struct MMAL_PORT_USERDATA_T *)vd;
+            if ((status = mmal_port_enable(sub->component->control, vd_control_port_cb)) != MMAL_SUCCESS) {
+                msg_Err(vd, "Failed to enable control port %s on sub %d (status=%"PRIx32" %s)",
+                                sys->component->control->name, i, status, mmal_status_to_string(status));
                 goto fail;
             }
             if ((status = hw_mmal_subpic_open(VLC_OBJECT(vd), &sub->sub, sub->component->input[0], sys->layer + i + 1)) != MMAL_SUCCESS) {
