@@ -43,7 +43,6 @@
 #include <interface/mmal/util/mmal_util.h>
 #include <interface/mmal/util/mmal_default_components.h>
 #include <interface/vmcs_host/vc_tvservice.h>
-#include <interface/vmcs_host/vc_dispmanx.h>
 
 #define TRACE_ALL 0
 
@@ -103,9 +102,6 @@ struct vout_display_sys_t {
     int buffers_in_transit; /* number of buffers currently pushed to mmal component */
     unsigned num_buffers; /* number of buffers allocated at mmal port */
 
-    DISPMANX_DISPLAY_HANDLE_T dmx_handle;
-    DISPMANX_ELEMENT_HANDLE_T bkg_element;
-    DISPMANX_RESOURCE_HANDLE_T bkg_resource;
     unsigned display_width;
     unsigned display_height;
 
@@ -138,8 +134,7 @@ static void tvservice_cb(void *callback_data, uint32_t reason, uint32_t param1,
 static void adjust_refresh_rate(vout_display_t *vd, const video_format_t *fmt);
 static int set_latency_target(vout_display_t *vd, bool enable);
 
-/* DispManX */
-static void close_dmx(vout_display_t *vd);
+// Mmal
 static void maintain_phase_sync(vout_display_t *vd);
 
 
@@ -407,9 +402,6 @@ static void vd_manage(vout_display_t *vd)
     vlc_mutex_lock(&sys->manage_mutex);
 
     if (sys->need_configure_display) {
-        close_dmx(vd);
-        sys->dmx_handle = vc_dispmanx_display_open(0);
-
         if (query_resolution(vd, &width, &height) >= 0) {
             sys->display_width = width;
             sys->display_height = height;
@@ -564,14 +556,6 @@ static void adjust_refresh_rate(vout_display_t *vd, const video_format_t *fmt)
     }
 }
 
-static void close_dmx(vout_display_t *vd)
-{
-    vout_display_sys_t *sys = vd->sys;
-
-    vc_dispmanx_display_close(sys->dmx_handle);
-    sys->dmx_handle = DISPMANX_NO_HANDLE;
-}
-
 static void maintain_phase_sync(vout_display_t *vd)
 {
     MMAL_PARAMETER_VIDEO_RENDER_STATS_T render_stats = {
@@ -630,9 +614,6 @@ static void CloseMmalVout(vlc_object_t *object)
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
     vc_tv_unregister_callback_full(tvservice_cb, vd);
-
-    if (sys->dmx_handle)
-        close_dmx(vd);
 
     if (sys->component && sys->component->control->is_enabled)
         mmal_port_disable(sys->component->control);
@@ -846,8 +827,6 @@ static int OpenMmalVout(vlc_object_t *object)
         sys->display_width = vd->cfg->display.width;
         sys->display_height = vd->cfg->display.height;
     }
-
-    sys->dmx_handle = vc_dispmanx_display_open(0);
 
     msg_Dbg(vd, ">>> %s: ok", __func__);
     return VLC_SUCCESS;
