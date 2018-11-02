@@ -54,11 +54,6 @@
 #define MMAL_LAYER_TEXT N_("VideoCore layer where the video is displayed.")
 #define MMAL_LAYER_LONGTEXT N_("VideoCore layer where the video is displayed. Subpictures are displayed directly above and a black background directly below.")
 
-#define MMAL_BLANK_BACKGROUND_NAME "mmal-blank-background"
-#define MMAL_BLANK_BACKGROUND_TEXT N_("Blank screen below video.")
-#define MMAL_BLANK_BACKGROUND_LONGTEXT N_("Render blank screen below video. " \
-        "Increases VideoCore load.")
-
 #define MMAL_ADJUST_REFRESHRATE_NAME "mmal-adjust-refreshrate"
 #define MMAL_ADJUST_REFRESHRATE_TEXT N_("Adjust HDMI refresh rate to the video.")
 #define MMAL_ADJUST_REFRESHRATE_LONGTEXT N_("Adjust HDMI refresh rate to the video.")
@@ -145,7 +140,6 @@ static int set_latency_target(vout_display_t *vd, bool enable);
 
 /* DispManX */
 static void close_dmx(vout_display_t *vd);
-static void show_background(vout_display_t *vd, bool enable);
 static void maintain_phase_sync(vout_display_t *vd);
 
 
@@ -233,8 +227,9 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
     display_region.dest_rect.width = place.width;
     display_region.dest_rect.height = place.height;
     display_region.layer = sys->layer;
+    display_region.alpha = 0xff | (1 << 29);
     display_region.set = MMAL_DISPLAY_SET_FULLSCREEN | MMAL_DISPLAY_SET_SRC_RECT |
-            MMAL_DISPLAY_SET_DEST_RECT | MMAL_DISPLAY_SET_LAYER;
+            MMAL_DISPLAY_SET_DEST_RECT | MMAL_DISPLAY_SET_LAYER | MMAL_DISPLAY_SET_ALPHA;
     status = mmal_port_parameter_set(sys->input, &display_region.hdr);
     if (status != MMAL_SUCCESS) {
         msg_Err(vd, "Failed to set display region (status=%"PRIx32" %s)",
@@ -242,7 +237,6 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
         return -EINVAL;
     }
 
-    show_background(vd, var_InheritBool(vd, MMAL_BLANK_BACKGROUND_NAME));
     sys->adjust_refresh_rate = var_InheritBool(vd, MMAL_ADJUST_REFRESHRATE_NAME);
     sys->native_interlaced = var_InheritBool(vd, MMAL_NATIVE_INTERLACED);
     if (sys->adjust_refresh_rate) {
@@ -391,7 +385,6 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
                 ret = VLC_EGENERIC;
                 break;
             }
-            show_background(vd, false);
             sys->force_config = true;
 
             ret = VLC_SUCCESS;
@@ -575,8 +568,6 @@ static void close_dmx(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
 
-    show_background(vd, false);
-
     vc_dispmanx_display_close(sys->dmx_handle);
     sys->dmx_handle = DISPMANX_NO_HANDLE;
 }
@@ -626,36 +617,6 @@ static void maintain_phase_sync(vout_display_t *vd)
          * by the jump in the offset */
         set_latency_target(vd, false);
         set_latency_target(vd, true);
-    }
-}
-
-static void show_background(vout_display_t *vd, bool enable)
-{
-    vout_display_sys_t *sys = vd->sys;
-    uint32_t image_ptr, color = 0xFF000000;
-    VC_RECT_T dst_rect, src_rect;
-    DISPMANX_UPDATE_HANDLE_T update;
-
-    if (enable && !sys->bkg_element) {
-        sys->bkg_resource = vc_dispmanx_resource_create(VC_IMAGE_RGBA32, 1, 1,
-                        &image_ptr);
-        vc_dispmanx_rect_set(&dst_rect, 0, 0, 1, 1);
-        vc_dispmanx_resource_write_data(sys->bkg_resource, VC_IMAGE_RGBA32,
-                        sizeof(color), &color, &dst_rect);
-        vc_dispmanx_rect_set(&src_rect, 0, 0, 1 << 16, 1 << 16);
-        vc_dispmanx_rect_set(&dst_rect, 0, 0, 0, 0);
-        update = vc_dispmanx_update_start(0);
-        sys->bkg_element = vc_dispmanx_element_add(update, sys->dmx_handle,
-                        sys->layer - 1, &dst_rect, sys->bkg_resource, &src_rect,
-                        DISPMANX_PROTECTION_NONE, NULL, NULL, VC_IMAGE_ROT0);
-        vc_dispmanx_update_submit_sync(update);
-    } else if (!enable && sys->bkg_element) {
-        update = vc_dispmanx_update_start(0);
-        vc_dispmanx_element_remove(update, sys->bkg_element);
-        vc_dispmanx_resource_delete(sys->bkg_resource);
-        vc_dispmanx_update_submit_sync(update);
-        sys->bkg_element = DISPMANX_NO_HANDLE;
-        sys->bkg_resource = DISPMANX_NO_HANDLE;
     }
 }
 
@@ -911,8 +872,6 @@ vlc_module_begin()
     set_subcategory( SUBCAT_VIDEO_VOUT )
 
     add_integer(MMAL_LAYER_NAME, 1, MMAL_LAYER_TEXT, MMAL_LAYER_LONGTEXT, false)
-    add_bool(MMAL_BLANK_BACKGROUND_NAME, true, MMAL_BLANK_BACKGROUND_TEXT,
-                    MMAL_BLANK_BACKGROUND_LONGTEXT, true);
     add_bool(MMAL_ADJUST_REFRESHRATE_NAME, false, MMAL_ADJUST_REFRESHRATE_TEXT,
                     MMAL_ADJUST_REFRESHRATE_LONGTEXT, false)
     add_bool(MMAL_NATIVE_INTERLACED, false, MMAL_NATIVE_INTERLACE_TEXT,
