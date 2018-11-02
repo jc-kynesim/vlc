@@ -66,20 +66,6 @@
 #define PHASE_OFFSET_TARGET ((double)0.25)
 #define PHASE_CHECK_INTERVAL 100
 
-struct dmx_region_t {
-    struct dmx_region_t *next;
-    picture_t *picture;
-    MMAL_BUFFER_HEADER_T * buf;
-    VC_RECT_T bmp_rect;
-    VC_RECT_T src_rect;
-    VC_RECT_T dst_rect;
-    VC_DISPMANX_ALPHA_T alpha;
-    DISPMANX_ELEMENT_HANDLE_T element;
-    DISPMANX_RESOURCE_HANDLE_T resource;
-    int32_t pos_x;
-    int32_t pos_y;
-};
-
 #define SUBS_MAX 4
 
 typedef struct vout_subpic_s {
@@ -89,9 +75,6 @@ typedef struct vout_subpic_s {
 
 struct vout_display_sys_t {
     vlc_mutex_t manage_mutex;
-
-    picture_t **pictures; /* Actual list of alloced pictures passed into picture_pool */
-    picture_pool_t *picture_pool;
 
     MMAL_COMPONENT_T *component;
     MMAL_PORT_T *input;
@@ -120,6 +103,8 @@ struct vout_display_sys_t {
     bool force_config;
 
     vout_subpic_t subs[SUBS_MAX];
+
+    picture_pool_t * pic_pool;
 };
 
 
@@ -242,12 +227,26 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
     return 0;
 }
 
+static void kill_pool(vout_display_sys_t * const sys)
+{
+    if (sys->pic_pool != NULL) {
+        picture_pool_Release(sys->pic_pool);
+        sys->pic_pool = NULL;
+    }
+}
+
 // Actual picture pool for MMAL opaques is just a set of trivial containers
 static picture_pool_t *vd_pool(vout_display_t *vd, unsigned count)
 {
+    vout_display_sys_t * const sys = vd->sys;
+
     msg_Dbg(vd, "%s: fmt:%dx%d,sar:%d/%d; source:%dx%d", __func__,
             vd->fmt.i_width, vd->fmt.i_height, vd->fmt.i_sar_num, vd->fmt.i_sar_den, vd->source.i_width, vd->source.i_height);
-    return picture_pool_NewFromFormat(&vd->fmt, count);
+
+    if (sys->pic_pool == NULL) {
+        sys->pic_pool = picture_pool_NewFromFormat(&vd->fmt, count);
+    }
+    return sys->pic_pool;
 }
 
 static void vd_display(vout_display_t *vd, picture_t *p_pic,
@@ -355,6 +354,7 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
 
         case VOUT_DISPLAY_RESET_PICTURES:
             msg_Warn(vd, "Reset Pictures");
+            kill_pool(sys);
             vd->fmt = vd->source; // Take whatever source wants to give us
             ret = VLC_SUCCESS;
             break;
@@ -613,6 +613,9 @@ static void CloseMmalVout(vlc_object_t *object)
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
+
+    kill_pool(sys);
+
     vc_tv_unregister_callback_full(tvservice_cb, vd);
 
     if (sys->component && sys->component->control->is_enabled)
@@ -646,9 +649,6 @@ static void CloseMmalVout(vlc_object_t *object)
     if (sys->component)
         mmal_component_release(sys->component);
 
-    if (sys->picture_pool)
-        picture_pool_Release(sys->picture_pool);
-
     vlc_mutex_destroy(&sys->manage_mutex);
 
     if (sys->native_interlaced) {
@@ -657,7 +657,6 @@ static void CloseMmalVout(vlc_object_t *object)
             msg_Warn(vd, "Could not reset hvs field mode");
     }
 
-    free(sys->pictures);
     free(sys);
 
     bcm_host_deinit();
