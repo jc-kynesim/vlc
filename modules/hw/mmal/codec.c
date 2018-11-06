@@ -714,25 +714,29 @@ static void CloseDecoder(decoder_t *dec)
     if (!sys)
         return;
 
-    flush_decoder(dec);
+    if (sys->component != NULL) {
+        if (sys->input->is_enabled)
+            mmal_port_disable(sys->input);
 
-    if (sys->component && sys->component->control->is_enabled)
-        mmal_port_disable(sys->component->control);
+        if (sys->output->is_enabled)
+            mmal_port_disable(sys->output);
 
-    if (sys->component && sys->component->is_enabled)
-        mmal_component_disable(sys->component);
+        if (sys->component->control->is_enabled)
+            mmal_port_disable(sys->component->control);
 
-    if (sys->input_pool)
+        if (sys->component->is_enabled)
+            mmal_component_disable(sys->component);
+
+        mmal_component_release(sys->component);
+    }
+
+    if (sys->input_pool != NULL)
         mmal_pool_destroy(sys->input_pool);
 
-    if (sys->output_format)
+    if (sys->output_format != NULL)
         mmal_format_free(sys->output_format);
 
     hw_mmal_port_pool_ref_release(sys->ppr, false);
-    sys->output->userdata = NULL;
-
-    if (sys->component)
-        mmal_component_release(sys->component);
 
     free(sys);
 
@@ -783,6 +787,8 @@ static int OpenDecoder(decoder_t *dec)
     }
 
     sys->input = sys->component->input[0];
+    sys->output = sys->component->output[0];
+
     sys->input->userdata = (struct MMAL_PORT_USERDATA_T *)dec;
     sys->input->format->encoding = in_fcc;
 
@@ -815,7 +821,6 @@ static int OpenDecoder(decoder_t *dec)
         goto fail;
     }
 
-    sys->output = sys->component->output[0];
     sys->output->userdata = (struct MMAL_PORT_USERDATA_T *)dec;
 
     status = port_parameter_set_uint32(sys->output, MMAL_PARAMETER_EXTRA_BUFFERS, NUM_EXTRA_BUFFERS);
