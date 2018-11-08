@@ -17,7 +17,7 @@
 
 #include "mmal_picture.h"
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 typedef struct mmal_x11_sys_s
 {
@@ -106,7 +106,7 @@ static vout_display_t * load_display_module(vout_display_t * const vd,
 
     if ((x_vout->module = module_need(x_vout, cap, module_name, true)) == NULL)
     {
-        msg_Err(vd, "Failed to find X11 module");
+        msg_Err(vd, "Failed to open Xsplitter:%s module", module_name);
         goto fail;
     }
 
@@ -134,7 +134,11 @@ static picture_pool_t * mmal_x11_pool(vout_display_t * vd, unsigned count)
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s (count=%d) %dx%d", __func__, count, x_vd->fmt.i_width, x_vd->fmt.i_height);
 #endif
-    return x_vd->pool(x_vd, count);
+    picture_pool_t * pool = x_vd->pool(x_vd, count);
+#if TRACE_ALL
+    msg_Dbg(vd, ">>> %s: %p", __func__, pool);
+#endif
+    return pool;
 }
 
 /* Prepare a picture and an optional subpicture for display (optional).
@@ -175,7 +179,7 @@ static void mmal_x11_display(vout_display_t * vd, picture_t * pic, subpicture_t 
     const bool is_mmal_pic = (pic->format.i_chroma == VLC_CODEC_MMAL_OPAQUE);
 
 #if TRACE_ALL
-    msg_Dbg(vd, "<<< %s: fmt: %dx%d/%dx%d, pic:%dx%d", __func__, vd->fmt.i_width, vd->fmt.i_height, x_vd->fmt.i_width, x_vd->fmt.i_height, pic->format.i_width, pic->format.i_height);
+    msg_Dbg(vd, "<<< %s: fmt: %dx%d/%dx%d, pic:%dx%d, pts=%lld", __func__, vd->fmt.i_width, vd->fmt.i_height, x_vd->fmt.i_width, x_vd->fmt.i_height, pic->format.i_width, pic->format.i_height, (long long)pic->date);
 #endif
 
     if (sys->use_mmal != is_mmal_pic)  {

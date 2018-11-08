@@ -43,7 +43,7 @@
 #include "subpic.h"
 #include "blend_rgba_neon.h"
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 /*
  * This seems to be a bit high, but reducing it causes instabilities
@@ -198,6 +198,8 @@ static MMAL_FOURCC_T vlc_to_mmal_pic_fourcc(const unsigned int fcc)
         return MMAL_ENCODING_BGRA;
     case VLC_CODEC_MMAL_OPAQUE:
         return MMAL_ENCODING_OPAQUE;
+    case VLC_CODEC_MMAL_ZC_SAND8:
+        return MMAL_ENCODING_YUVUV128;
     default:
         break;
     }
@@ -949,7 +951,14 @@ static inline void pic_fifo_put(pic_fifo_t * const pf, picture_t * pic)
 
 #define SUBS_MAX 3
 
+typedef enum filter_resizer_e {
+    FILTER_RESIZER_RESIZER,
+    FILTER_RESIZER_ISP,
+    FILTER_RESIZER_HVS
+} filter_resizer_t;
+
 typedef struct filter_sys_t {
+    filter_resizer_t resizer_type;
     MMAL_COMPONENT_T *component;
     MMAL_PORT_T *input;
     MMAL_PORT_T *output;
@@ -1224,8 +1233,11 @@ static void conv_flush(filter_t * p_filter)
     msg_Dbg(p_filter, "<<< %s", __func__);
 #endif
 
-    for (i = 0; i != SUBS_MAX; ++i) {
-        hw_mmal_subpic_flush(VLC_OBJECT(p_filter), sys->subs + i);
+    if (sys->resizer_type == FILTER_RESIZER_HVS)
+    {
+        for (i = 0; i != SUBS_MAX; ++i) {
+            hw_mmal_subpic_flush(VLC_OBJECT(p_filter), sys->subs + i);
+        }
     }
 
     if (sys->input != NULL && sys->input->is_enabled)
@@ -1289,7 +1301,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     if (p_pic->context == NULL) {
         msg_Dbg(p_filter, "%s: No context", __func__);
     }
-    else
+    else if (sys->resizer_type == FILTER_RESIZER_HVS)
     {
         unsigned int sub_no = 0;
 
@@ -1425,6 +1437,17 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     if (ret_pics != NULL)
     {
         picture_t *next_pic = ret_pics->p_next;
+
+        {
+            unsigned int i, j;
+            for (i = 0; i != 32; ++i){
+                for (j = 0; j != 32; ++j){
+                    *(uint32_t *)(ret_pics->p[0].p_pixels + j * ret_pics->p[0].i_pixel_pitch + i * ret_pics->p[0].i_pitch) = 0xff0000ff;
+                }
+            }
+        }
+
+
 #if 0
         char dbuf0[5];
 
@@ -1479,8 +1502,11 @@ static void CloseConverter(vlc_object_t * obj)
     if (sys->component && sys->component->is_enabled)
         mmal_component_disable(sys->component);
 
-    for (i = 0; i != SUBS_MAX; ++i) {
-        hw_mmal_subpic_close(VLC_OBJECT(p_filter), sys->subs + i);
+    if (sys->resizer_type == FILTER_RESIZER_HVS)
+    {
+        for (i = 0; i != SUBS_MAX; ++i) {
+            hw_mmal_subpic_close(VLC_OBJECT(p_filter), sys->subs + i);
+        }
     }
 
     if (sys->out_pool)
@@ -1547,12 +1573,13 @@ static int OpenConverter(vlc_object_t * obj)
     filter_sys_t *sys;
     MMAL_STATUS_T status;
     MMAL_FOURCC_T enc_out;
-    const MMAL_FOURCC_T enc_in = MMAL_ENCODING_OPAQUE;
+    const MMAL_FOURCC_T enc_in = vlc_to_mmal_pic_fourcc(p_filter->fmt_in.i_codec);
     bool use_resizer;
     bool use_isp;
     int gpu_mem;
 
-    if (enc_in != vlc_to_mmal_pic_fourcc(p_filter->fmt_in.i_codec) ||
+    if ((enc_in != MMAL_ENCODING_OPAQUE &&
+         enc_in != MMAL_ENCODING_YUVUV128) ||
         (enc_out = vlc_to_mmal_pic_fourcc(p_filter->fmt_out.i_codec)) == 0)
         return VLC_EGENERIC;
 
@@ -1563,6 +1590,8 @@ static int OpenConverter(vlc_object_t * obj)
         // use resizer overrides use_isp
         use_isp = false;
     }
+
+    use_isp = true;
 
     // Check we have a sliced version of the fourcc if we want the resizer
     if (use_resizer &&
@@ -1602,15 +1631,18 @@ static int OpenConverter(vlc_object_t * obj)
 
     sys->in_port_cb_fn = conv_input_port_cb;
     if (use_resizer) {
+        sys->resizer_type = FILTER_RESIZER_RESIZER;
         sys->zero_copy = true;
         sys->component_name = MMAL_COMPONENT_DEFAULT_RESIZER;
         sys->out_port_cb_fn = slice_output_port_cb;
     }
     else if (use_isp) {
+        sys->resizer_type = FILTER_RESIZER_ISP;
         sys->zero_copy = false;  // Copy directly into filter picture
         sys->component_name = MMAL_COMPONENT_ISP_RESIZER;
         sys->out_port_cb_fn = conv_output_port_cb;
     } else {
+        sys->resizer_type = FILTER_RESIZER_HVS;
         sys->zero_copy = false;  // Copy directly into filter picture
         sys->component_name = MMAL_COMPONENT_HVS;
         sys->out_port_cb_fn = conv_output_port_cb;
@@ -1693,6 +1725,7 @@ static int OpenConverter(vlc_object_t * obj)
         goto fail;
     }
 
+    if (sys->resizer_type == FILTER_RESIZER_HVS)
     {
         unsigned int i;
         for (i = 0; i != SUBS_MAX; ++i) {

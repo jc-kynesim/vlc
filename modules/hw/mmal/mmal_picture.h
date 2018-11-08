@@ -229,4 +229,14 @@ vzc_pool_ctl_t * hw_mmal_vzc_pool_new(void);
 #define VOUT_DISPLAY_CHANGE_MMAL_BASE 1024
 #define VOUT_DISPLAY_CHANGE_MMAL_HIDE (VOUT_DISPLAY_CHANGE_MMAL_BASE + 0)
 
+#if 1
+// *** ABUSE
+#define VLC_CODEC_MMAL_ZC_SAND8   VLC_CODEC_D3D11_OPAQUE
+#define VLC_CODEC_MMAL_ZC_SAND10  VLC_CODEC_D3D11_OPAQUE_10B
+#else
+#define VLC_CODEC_MMAL_ZC_SAND8   VLC_FOURCC('Z','S','D','8')
+#define VLC_CODEC_MMAL_ZC_SAND10  VLC_FOURCC('Z','S','D','0')
+#define VLC_CODEC_MMAL_ZC_I420    VLC_FOURCC('Z','4','2','0')
+#endif
+
 #endif

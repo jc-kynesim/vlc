@@ -421,6 +421,8 @@ static int OpenMmalDeinterlace(filter_t *filter)
     MMAL_STATUS_T status;
     filter_sys_t *sys;
 
+    msg_Dbg(filter, "<<< %s", __func__);
+
     if (filter->fmt_in.video.i_chroma != VLC_CODEC_MMAL_OPAQUE ||
         filter->fmt_out.video.i_chroma != VLC_CODEC_MMAL_OPAQUE)
         return VLC_EGENERIC;

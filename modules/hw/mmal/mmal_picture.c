@@ -231,8 +231,12 @@ hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const 
     if (ctx == NULL)
         return NULL;
 
-    hw_mmal_port_pool_ref_acquire(ppr);
-    mmal_buffer_header_pre_release_cb_set(buf, buf_pre_release_cb, ppr);
+    // If we have an associated ppr then ref & set appropriate callbacks
+    if (ppr != NULL) {
+        hw_mmal_port_pool_ref_acquire(ppr);
+        mmal_buffer_header_pre_release_cb_set(buf, buf_pre_release_cb, ppr);
+        buf->user_data = NULL;
+    }
 
     ctx->cmn.copy = hw_mmal_pic_ctx_copy;
     ctx->cmn.destroy = hw_mmal_pic_ctx_destroy;
@@ -240,7 +244,6 @@ hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const 
     ctx->bufs[0] = buf;
     ctx->buf_count = 1;
 
-    buf->user_data = NULL;
     return &ctx->cmn;
 }
 
