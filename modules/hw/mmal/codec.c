@@ -200,6 +200,8 @@ static MMAL_FOURCC_T vlc_to_mmal_pic_fourcc(const unsigned int fcc)
         return MMAL_ENCODING_OPAQUE;
     case VLC_CODEC_MMAL_ZC_SAND8:
         return MMAL_ENCODING_YUVUV128;
+    case VLC_CODEC_MMAL_ZC_SAND10:
+        return MMAL_ENCODING_YUVUV64_10;
     default:
         break;
     }
@@ -1568,7 +1570,8 @@ static int OpenConverter(vlc_object_t * obj)
     int gpu_mem;
 
     if ((enc_in != MMAL_ENCODING_OPAQUE &&
-         enc_in != MMAL_ENCODING_YUVUV128) ||
+         enc_in != MMAL_ENCODING_YUVUV128 &&
+         enc_in != MMAL_ENCODING_YUVUV64_10) ||
         (enc_out = vlc_to_mmal_pic_fourcc(p_filter->fmt_out.i_codec)) == 0)
         return VLC_EGENERIC;
 
@@ -1580,7 +1583,10 @@ static int OpenConverter(vlc_object_t * obj)
         use_isp = false;
     }
 
-    use_isp = true;
+    // Must use ISP - HVS can't do this
+    if (enc_in == MMAL_ENCODING_YUVUV64_10) {
+        use_isp = true;
+    }
 
     // Check we have a sliced version of the fourcc if we want the resizer
     if (use_resizer &&
