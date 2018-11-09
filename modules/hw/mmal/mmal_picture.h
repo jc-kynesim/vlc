@@ -58,6 +58,8 @@ typedef struct pic_ctx_subpic_s {
 typedef struct pic_ctx_mmal_s {
     picture_context_t cmn;  // PARENT: Common els at start
 
+    MMAL_FOURCC_T fmt;
+
     unsigned int buf_count;
     MMAL_BUFFER_HEADER_T * bufs[CTX_BUFS_MAX];
 
@@ -111,10 +113,24 @@ static inline MMAL_BUFFER_HEADER_T * hw_mmal_pic_sub_buf_get(picture_t * const p
     return n + 1 > ctx->buf_count ? NULL : ctx->bufs[n + 1];
 }
 
+static inline bool hw_mmal_pic_is_mmal(const picture_t * const pic)
+{
+    return pic->format.i_chroma == VLC_CODEC_MMAL_OPAQUE ||
+        pic->format.i_chroma == VLC_CODEC_MMAL_ZC_SAND8 ||
+        pic->format.i_chroma == VLC_CODEC_MMAL_ZC_SAND10 ||
+        pic->format.i_chroma == VLC_CODEC_MMAL_ZC_I420;
+}
+
+static inline MMAL_FOURCC_T hw_mmal_pic_format(const picture_t *const pic)
+{
+    const pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic->context;
+    return ctx->fmt;
+}
+
 picture_context_t * hw_mmal_pic_ctx_copy(picture_context_t * pic_ctx_cmn);
 void hw_mmal_pic_ctx_destroy(picture_context_t * pic_ctx_cmn);
-picture_context_t * hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf,
-    hw_mmal_port_pool_ref_t * const ppr);
+picture_context_t * hw_mmal_gen_context(const MMAL_FOURCC_T fmt,
+    MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const ppr);
 
 int hw_mmal_get_gpu_mem(void);
 
@@ -228,15 +244,5 @@ vzc_pool_ctl_t * hw_mmal_vzc_pool_new(void);
 
 #define VOUT_DISPLAY_CHANGE_MMAL_BASE 1024
 #define VOUT_DISPLAY_CHANGE_MMAL_HIDE (VOUT_DISPLAY_CHANGE_MMAL_BASE + 0)
-
-#if 1
-// *** ABUSE
-#define VLC_CODEC_MMAL_ZC_SAND8   VLC_CODEC_D3D11_OPAQUE
-#define VLC_CODEC_MMAL_ZC_SAND10  VLC_CODEC_D3D11_OPAQUE_10B
-#else
-#define VLC_CODEC_MMAL_ZC_SAND8   VLC_FOURCC('Z','S','D','8')
-#define VLC_CODEC_MMAL_ZC_SAND10  VLC_FOURCC('Z','S','D','0')
-#define VLC_CODEC_MMAL_ZC_I420    VLC_FOURCC('Z','4','2','0')
-#endif
 
 #endif

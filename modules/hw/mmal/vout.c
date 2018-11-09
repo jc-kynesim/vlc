@@ -44,7 +44,7 @@
 #include <interface/mmal/util/mmal_default_components.h>
 #include <interface/vmcs_host/vc_tvservice.h>
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 #define MAX_BUFFERS_IN_TRANSIT 1
 #define VC_TV_MAX_MODE_IDS 127
@@ -123,12 +123,26 @@ static int set_latency_target(vout_display_t *vd, bool enable);
 static void maintain_phase_sync(vout_display_t *vd);
 
 
+static MMAL_FOURCC_T vout_vlc_to_mmal_pic_fourcc(const unsigned int fcc)
+{
+    switch (fcc){
+    case VLC_CODEC_MMAL_OPAQUE:
+        return MMAL_ENCODING_OPAQUE;
+    case VLC_CODEC_MMAL_ZC_SAND8:
+        return MMAL_ENCODING_YUVUV128;
+    default:
+        break;
+    }
+    return 0;
+}
+
+
 static void vd_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 {
 #if TRACE_ALL
     vout_display_t * const vd = (vout_display_t *)port->userdata;
     pic_ctx_mmal_t * ctx = buf->user_data;
-    msg_Dbg(vd, "<<< %s[%d] cmd=%d, ctx=%p, buf=%p, flags=%#x, pts=%lld", __func__, buf->cmd, ctx, buf,
+    msg_Dbg(vd, "<<< %s: cmd=%d, ctx=%p, buf=%p, flags=%#x, pts=%lld", __func__, buf->cmd, ctx, buf,
             buf->flags, (long long)buf->pts);
 #else
     VLC_UNUSED(port);
@@ -174,7 +188,10 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
     MMAL_STATUS_T status;
 
     if (!cfg && !fmt)
+    {
+        msg_Err(vd, "%s: Missing cfg & fmt", __func__);
         return -EINVAL;
+    }
 
     if (fmt) {
         sys->input->format->es->video.par.num = fmt->i_sar_num;
@@ -336,11 +353,12 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
     switch (query) {
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
             tmp_cfg = va_arg(args, const vout_display_cfg_t *);
-            if (tmp_cfg->display.width == sys->display_width &&
-                            tmp_cfg->display.height == sys->display_height) {
+//            if (tmp_cfg->display.width == sys->display_width &&
+//                            tmp_cfg->display.height == sys->display_height)
+            {
                 cfg = *vd->cfg;
-                cfg.display.width = sys->display_width;
-                cfg.display.height = sys->display_height;
+                cfg.display.width = tmp_cfg->display.width;
+                cfg.display.height = tmp_cfg->display.height;
                 if (configure_display(vd, &cfg, NULL) >= 0)
                     ret = VLC_SUCCESS;
             }
@@ -674,11 +692,12 @@ static int OpenMmalVout(vlc_object_t *object)
     MMAL_DISPLAYREGION_T display_region;
     MMAL_STATUS_T status;
     int ret = VLC_EGENERIC;
+    const MMAL_FOURCC_T enc_in = vout_vlc_to_mmal_pic_fourcc(vd->fmt.i_chroma);
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
-    if (vd->fmt.i_chroma != VLC_CODEC_MMAL_OPAQUE)
+    if (enc_in == 0)
     {
 #if TRACE_ALL
         msg_Dbg(vd, ">>> %s: Format not MMAL", __func__);
@@ -711,7 +730,8 @@ static int OpenMmalVout(vlc_object_t *object)
     sys->input = sys->component->input[0];
     sys->input->userdata = (struct MMAL_PORT_USERDATA_T *)vd;
 
-    sys->input->format->encoding = MMAL_ENCODING_OPAQUE;
+    sys->input->format->encoding = enc_in;
+    sys->input->format->encoding_variant = 0;
     sys->i_planes = 1;
     sys->buffer_size = sys->input->buffer_size_recommended;
 

@@ -176,10 +176,11 @@ static void mmal_x11_display(vout_display_t * vd, picture_t * pic, subpicture_t 
 {
     mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
     vout_display_t * const x_vd = sys->cur_vout;
-    const bool is_mmal_pic = (pic->format.i_chroma == VLC_CODEC_MMAL_OPAQUE);
+    const bool is_mmal_pic = hw_mmal_pic_is_mmal(pic);
 
 #if TRACE_ALL
-    msg_Dbg(vd, "<<< %s: fmt: %dx%d/%dx%d, pic:%dx%d, pts=%lld", __func__, vd->fmt.i_width, vd->fmt.i_height, x_vd->fmt.i_width, x_vd->fmt.i_height, pic->format.i_width, pic->format.i_height, (long long)pic->date);
+    msg_Dbg(vd, "<<< %s: fmt: %dx%d/%dx%d, pic:%dx%d, pts=%lld, mmal=%d/%d", __func__, vd->fmt.i_width, vd->fmt.i_height, x_vd->fmt.i_width, x_vd->fmt.i_height, pic->format.i_width, pic->format.i_height, (long long)pic->date,
+            is_mmal_pic, sys->use_mmal);
 #endif
 
     if (sys->use_mmal != is_mmal_pic)  {
@@ -226,7 +227,9 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
             const bool want_mmal = sys->mmal_vout != NULL && var_InheritBool(vd, "fullscreen");
             vout_display_t *new_vd = want_mmal ? sys->mmal_vout : sys->x_vout;
 
-            msg_Dbg(vd, "Change size: %d, %d", cfg->display.width, cfg->display.height);
+            msg_Dbg(vd, "Change size: %d, %d: mmal_vout=%p, want_mmal=%d, fs=%d",
+                    cfg->display.width, cfg->display.height, sys->mmal_vout, want_mmal,
+                    var_InheritBool(vd, "fullscreen"));
 
             if (sys->use_mmal != want_mmal) {
                 if (sys->use_mmal) {

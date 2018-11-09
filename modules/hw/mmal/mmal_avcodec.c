@@ -1563,9 +1563,23 @@ zc_buf_pre_release_cb(MMAL_BUFFER_HEADER_T * buf, void *userdata)
     VLC_UNUSED(buf);
     av_rpi_zc_unref(fr_ref);
 
-    return MMAL_TRUE;
+    return MMAL_FALSE;
 }
 
+static MMAL_FOURCC_T
+avfmt_to_mmal(const int avfmt)
+{
+    switch( avfmt )
+    {
+        case AV_PIX_FMT_SAND128:
+            return MMAL_ENCODING_YUVUV128;
+        case AV_PIX_FMT_SAND64_10:
+            return MMAL_ENCODING_YUVUV64_10;
+        default:
+            break;
+    }
+    return MMAL_ENCODING_UNKNOWN;
+}
 
 /*****************************************************************************
  * DecodeBlock: Called to decode one or more frames
@@ -1848,12 +1862,6 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
                     break;
                 }
 
-                {  // ********************
-                    memset(frame->data[0], -1, 128 * 64);
-                    memset(frame->data[1], -1, 128 * 64);
-                }
-
-
                 const intptr_t vc_handle = (intptr_t)av_rpi_zc_vc_handle(fr_buf);
 
                 buf->data = (uint8_t *)vc_handle;  // Cast our handle to a pointer for mmal - 2 steps to avoid gcc warnings
@@ -1864,7 +1872,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
 
                 mmal_buffer_header_pre_release_cb_set(buf, zc_buf_pre_release_cb, fr_buf);
             }
-            p_pic->context = hw_mmal_gen_context(buf, NULL);
+            p_pic->context = hw_mmal_gen_context(avfmt_to_mmal(frame->format), buf, NULL);
         }
 
 
@@ -1960,8 +1968,6 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         p_pic->i_nb_fields = 2 + frame->repeat_pict;
         p_pic->b_progressive = !frame->interlaced_frame;
         p_pic->b_top_field_first = frame->top_field_first;
-
-        p_pic->b_force = true; //**************************
 
         if (DecodeSidedata(p_dec, frame, p_pic))
             i_pts = VLC_TS_INVALID;
@@ -2513,6 +2519,9 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
 
     int i_thread_count = var_InheritInteger( p_dec, "avcodec-threads" );
     if( i_thread_count <= 0 )
+        i_thread_count = 6;
+#if 0
+    if( i_thread_count <= 0 )
     {
         i_thread_count = vlc_GetCPUCount();
         if( i_thread_count > 1 )
@@ -2526,29 +2535,12 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
 #endif
     }
     i_thread_count = __MIN( i_thread_count, p_codec->id == AV_CODEC_ID_HEVC ? 32 : 16 );
+#endif
     msg_Dbg( p_dec, "allowing %d thread(s) for decoding", i_thread_count );
     p_context->thread_count = i_thread_count;
     p_context->thread_safe_callbacks = true;
 
-    switch( p_codec->id )
-    {
-        case AV_CODEC_ID_MPEG4:
-        case AV_CODEC_ID_H263:
-            p_context->thread_type = 0;
-            break;
-        case AV_CODEC_ID_MPEG1VIDEO:
-        case AV_CODEC_ID_MPEG2VIDEO:
-            p_context->thread_type &= ~FF_THREAD_SLICE;
-            /* fall through */
-# if (LIBAVCODEC_VERSION_INT < AV_VERSION_INT(55, 1, 0))
-        case AV_CODEC_ID_H264:
-        case AV_CODEC_ID_VC1:
-        case AV_CODEC_ID_WMV3:
-            p_context->thread_type &= ~FF_THREAD_FRAME;
-# endif
-        default:
-            break;
-    }
+    p_context->thread_type = FF_THREAD_SLICE | FF_THREAD_FRAME;
 
     if( p_context->thread_type & FF_THREAD_FRAME )
         p_dec->i_extra_picture_buffers = 2 * p_context->thread_count;

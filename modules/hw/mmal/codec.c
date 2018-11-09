@@ -278,7 +278,7 @@ static picture_t * alloc_opaque_pic(decoder_t * const dec, MMAL_BUFFER_HEADER_T 
         goto fail2;
     }
 
-    if ((pic->context = hw_mmal_gen_context(buf, dec_sys->ppr)) == NULL)
+    if ((pic->context = hw_mmal_gen_context(MMAL_ENCODING_OPAQUE, buf, dec_sys->ppr)) == NULL)
         goto fail2;
 
     buf_to_pic_copy_props(pic, buf);
@@ -1437,17 +1437,6 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     if (ret_pics != NULL)
     {
         picture_t *next_pic = ret_pics->p_next;
-
-        {
-            unsigned int i, j;
-            for (i = 0; i != 32; ++i){
-                for (j = 0; j != 32; ++j){
-                    *(uint32_t *)(ret_pics->p[0].p_pixels + j * ret_pics->p[0].i_pixel_pitch + i * ret_pics->p[0].i_pitch) = 0xff0000ff;
-                }
-            }
-        }
-
-
 #if 0
         char dbuf0[5];
 
@@ -1832,7 +1821,10 @@ static int OpenBlendMmal(vlc_object_t *object)
                 p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height);
     }
 
-    if (vfcc_dst != VLC_CODEC_MMAL_OPAQUE || vfcc_src != VLC_CODEC_RGBA) {
+    if ((vfcc_dst != VLC_CODEC_MMAL_OPAQUE &&
+         vfcc_dst != VLC_CODEC_MMAL_ZC_SAND8 &&
+         vfcc_dst != VLC_CODEC_MMAL_ZC_SAND10) ||
+        vfcc_src != VLC_CODEC_RGBA) {
         return VLC_EGENERIC;
     }
 

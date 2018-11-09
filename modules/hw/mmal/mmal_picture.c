@@ -224,7 +224,7 @@ buf_pre_release_cb(MMAL_BUFFER_HEADER_T * buf, void *userdata)
 // Buffer belongs to context on successful return from this fn
 // is still valid on failure
 picture_context_t *
-hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const ppr)
+hw_mmal_gen_context(const MMAL_FOURCC_T fmt, MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const ppr)
 {
     pic_ctx_mmal_t * const ctx = calloc(1, sizeof(pic_ctx_mmal_t));
 
@@ -241,8 +241,9 @@ hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const 
     ctx->cmn.copy = hw_mmal_pic_ctx_copy;
     ctx->cmn.destroy = hw_mmal_pic_ctx_destroy;
 
-    ctx->bufs[0] = buf;
+    ctx->fmt = fmt;
     ctx->buf_count = 1;
+    ctx->bufs[0] = buf;
 
     return &ctx->cmn;
 }
