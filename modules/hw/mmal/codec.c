@@ -1596,10 +1596,11 @@ static int OpenConverter(vlc_object_t * obj)
     gpu_mem = hw_mmal_get_gpu_mem();
 
     {
-        char dbuf0[5], dbuf1[5];
-        msg_Dbg(p_filter, "%s: (%s) %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s,%dx%d [(%d,%d) %dx%d] sar:%d/%d (gpu=%d)", __func__,
+        char dbuf0[5], dbuf1[5], dbuf2[5];
+        msg_Dbg(p_filter, "%s: (%s) %s/%s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s,%dx%d [(%d,%d) %dx%d] sar:%d/%d (gpu=%d)", __func__,
                 use_resizer ? "resize" : use_isp ? "isp" : "hvs",
-                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
+                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), str_fourcc(dbuf2, enc_in),
+                p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
                 p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
                 p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
                 p_filter->fmt_in.video.i_sar_num, p_filter->fmt_in.video.i_sar_den,
@@ -1666,6 +1667,12 @@ static int OpenConverter(vlc_object_t * obj)
     sys->input->format->encoding_variant = MMAL_ENCODING_I420;
     vlc_to_mmal_video_fmt(sys->input->format, &p_filter->fmt_in.video);
     port_parameter_set_bool(sys->input, MMAL_PARAMETER_ZERO_COPY, 1);
+
+    if (sys->resizer_type == FILTER_RESIZER_ISP)
+    {
+        port_parameter_set_uint32(sys->input, MMAL_PARAMETER_CCM_SHIFT, enc_in != MMAL_ENCODING_YUVUV64_10 ? 0 : 5);
+        port_parameter_set_uint32(sys->output, MMAL_PARAMETER_OUTPUT_SHIFT, enc_in != MMAL_ENCODING_YUVUV64_10 ? 0 : 1);
+    }
 
     mmal_log_dump_format(sys->input->format);
 

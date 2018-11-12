@@ -1,1 +1,1 @@
-const char psz_vlc_changeset[] = "3.0.0-git-85-gd1cb71a";
+const char psz_vlc_changeset[] = "3.0.0-git-86-g28082742c2";
