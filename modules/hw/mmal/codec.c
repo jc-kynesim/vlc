@@ -949,7 +949,14 @@ static inline void pic_fifo_put(pic_fifo_t * const pf, picture_t * pic)
 
 #define SUBS_MAX 3
 
+typedef enum filter_resizer_e {
+    FILTER_RESIZER_RESIZER,
+    FILTER_RESIZER_ISP,
+    FILTER_RESIZER_HVS
+} filter_resizer_t;
+
 typedef struct filter_sys_t {
+    filter_resizer_t resizer_type;
     MMAL_COMPONENT_T *component;
     MMAL_PORT_T *input;
     MMAL_PORT_T *output;
@@ -1224,8 +1231,11 @@ static void conv_flush(filter_t * p_filter)
     msg_Dbg(p_filter, "<<< %s", __func__);
 #endif
 
-    for (i = 0; i != SUBS_MAX; ++i) {
-        hw_mmal_subpic_flush(VLC_OBJECT(p_filter), sys->subs + i);
+    if (sys->resizer_type == FILTER_RESIZER_HVS)
+    {
+        for (i = 0; i != SUBS_MAX; ++i) {
+            hw_mmal_subpic_flush(VLC_OBJECT(p_filter), sys->subs + i);
+        }
     }
 
     if (sys->input != NULL && sys->input->is_enabled)
@@ -1289,7 +1299,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     if (p_pic->context == NULL) {
         msg_Dbg(p_filter, "%s: No context", __func__);
     }
-    else
+    else if (sys->resizer_type == FILTER_RESIZER_HVS)
     {
         unsigned int sub_no = 0;
 
@@ -1479,8 +1489,11 @@ static void CloseConverter(vlc_object_t * obj)
     if (sys->component && sys->component->is_enabled)
         mmal_component_disable(sys->component);
 
-    for (i = 0; i != SUBS_MAX; ++i) {
-        hw_mmal_subpic_close(VLC_OBJECT(p_filter), sys->subs + i);
+    if (sys->resizer_type == FILTER_RESIZER_HVS)
+    {
+        for (i = 0; i != SUBS_MAX; ++i) {
+            hw_mmal_subpic_close(VLC_OBJECT(p_filter), sys->subs + i);
+        }
     }
 
     if (sys->out_pool)
@@ -1504,7 +1517,7 @@ static void CloseConverter(vlc_object_t * obj)
 }
 
 
-static int conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, picture_t * const pic, const MMAL_FOURCC_T pic_enc)
+static MMAL_STATUS_T conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, picture_t * const pic, const MMAL_FOURCC_T pic_enc)
 {
     MMAL_STATUS_T status;
 
@@ -1528,16 +1541,16 @@ static int conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, 
     if (status != MMAL_SUCCESS) {
         msg_Err(p_filter, "Failed to commit format for output port %s (status=%"PRIx32" %s)",
                 sys->output->name, status, mmal_status_to_string(status));
-        return -1;
+        return status;
     }
 
     sys->output->buffer_num = __MAX(sys->zero_copy ? 16 : 2, sys->output->buffer_num_recommended);
     sys->output->buffer_size = sys->output->buffer_size_recommended;
 
-    if (conv_enable_out(p_filter, sys) != MMAL_SUCCESS)
-        return -1;
+    if ((status = conv_enable_out(p_filter, sys)) != MMAL_SUCCESS)
+        return status;
 
-    return 0;
+    return MMAL_SUCCESS;
 }
 
 static int OpenConverter(vlc_object_t * obj)
@@ -1559,6 +1572,7 @@ static int OpenConverter(vlc_object_t * obj)
     use_resizer = var_InheritBool(p_filter, MMAL_RESIZE_NAME);
     use_isp = var_InheritBool(p_filter, MMAL_ISP_NAME);
 
+retry:
     if (use_resizer) {
         // use resizer overrides use_isp
         use_isp = false;
@@ -1602,15 +1616,18 @@ static int OpenConverter(vlc_object_t * obj)
 
     sys->in_port_cb_fn = conv_input_port_cb;
     if (use_resizer) {
+        sys->resizer_type = FILTER_RESIZER_RESIZER;
         sys->zero_copy = true;
         sys->component_name = MMAL_COMPONENT_DEFAULT_RESIZER;
         sys->out_port_cb_fn = slice_output_port_cb;
     }
     else if (use_isp) {
+        sys->resizer_type = FILTER_RESIZER_ISP;
         sys->zero_copy = false;  // Copy directly into filter picture
         sys->component_name = MMAL_COMPONENT_ISP_RESIZER;
         sys->out_port_cb_fn = conv_output_port_cb;
     } else {
+        sys->resizer_type = FILTER_RESIZER_HVS;
         sys->zero_copy = false;  // Copy directly into filter picture
         sys->component_name = MMAL_COMPONENT_HVS;
         sys->out_port_cb_fn = conv_output_port_cb;
@@ -1651,7 +1668,7 @@ static int OpenConverter(vlc_object_t * obj)
     sys->input->buffer_size = sys->input->buffer_size_recommended;
     sys->input->buffer_num = NUM_DECODER_BUFFER_HEADERS;
 
-    if (conv_enable_in(p_filter, sys) != MMAL_SUCCESS)
+    if ((status = conv_enable_in(p_filter, sys)) != MMAL_SUCCESS)
         goto fail;
 
     port_parameter_set_bool(sys->output, MMAL_PARAMETER_ZERO_COPY, sys->zero_copy);
@@ -1659,16 +1676,15 @@ static int OpenConverter(vlc_object_t * obj)
     if (sys->zero_copy) {
         // If zc then we will do stride conversion when we copy to arm side
         // so no need to worry about actual pic dimensions here
-        if (conv_set_output(p_filter, sys, NULL, enc_out) != 0)
+        if ((status = conv_set_output(p_filter, sys, NULL, enc_out)) != MMAL_SUCCESS)
             goto fail;
     }
     else {
         picture_t *pic = filter_NewPicture(p_filter);
-        int err = conv_set_output(p_filter, sys, pic, enc_out);
+        status = conv_set_output(p_filter, sys, pic, enc_out);
         picture_Release(pic);
-        if (err != 0) {
+        if (status != MMAL_SUCCESS)
             goto fail;
-        }
     }
 
     status = mmal_component_enable(sys->component);
@@ -1693,6 +1709,7 @@ static int OpenConverter(vlc_object_t * obj)
         goto fail;
     }
 
+    if (sys->resizer_type == FILTER_RESIZER_HVS)
     {
         unsigned int i;
         for (i = 0; i != SUBS_MAX; ++i) {
@@ -1716,8 +1733,15 @@ static int OpenConverter(vlc_object_t * obj)
 
 fail:
     CloseConverter(obj);
+
+    if (!use_resizer && status == MMAL_ENOMEM) {
+        use_resizer = true;
+        msg_Warn(p_filter, "Lack of memory to use HVS/ISP: trying resizer");
+        goto retry;
+    }
+
 #if TRACE_ALL
-msg_Dbg(p_filter, ">>> %s: FAIL: %d", __func__, ret);
+    msg_Dbg(p_filter, ">>> %s: FAIL: %d", __func__, ret);
 #endif
     return ret;
 }
