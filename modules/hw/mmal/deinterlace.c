@@ -535,6 +535,12 @@ static int OpenMmalDeinterlace(filter_t *filter)
     sys->input->buffer_num = 30;
 //    sys->input->buffer_num = sys->input->buffer_num_recommended;
 
+    if ((sys->in_pool = mmal_pool_create(sys->input->buffer_num, 0)) == NULL)
+    {
+        msg_Err(filter, "Failed to create input pool");
+        goto fail;
+    }
+
     status = port_parameter_set_bool(sys->input, MMAL_PARAMETER_ZERO_COPY, true);
     if (status != MMAL_SUCCESS) {
        msg_Err(filter, "Failed to set zero copy on port %s (status=%"PRIx32" %s)",
@@ -549,34 +555,6 @@ static int OpenMmalDeinterlace(filter_t *filter)
         goto fail;
     }
 
-    sys->output = sys->component->output[0];
-    sys->output->userdata = (struct MMAL_PORT_USERDATA_T *)filter;
-    mmal_format_full_copy(sys->output->format, sys->input->format);
-
-    status = port_parameter_set_uint32(sys->output, MMAL_PARAMETER_EXTRA_BUFFERS, 5);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(filter, "Failed to set MMAL_PARAMETER_EXTRA_BUFFERS on output port (status=%"PRIx32" %s)",
-                status, mmal_status_to_string(status));
-        goto fail;
-    }
-
-    status = port_parameter_set_bool(sys->output, MMAL_PARAMETER_ZERO_COPY, true);
-    if (status != MMAL_SUCCESS) {
-       msg_Err(filter, "Failed to set zero copy on port %s (status=%"PRIx32" %s)",
-                sys->output->name, status, mmal_status_to_string(status));
-       goto fail;
-    }
-
-    status = mmal_port_format_commit(sys->output);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(filter, "Failed to commit format for output port %s (status=%"PRIx32" %s)",
-                        sys->input->name, status, mmal_status_to_string(status));
-        goto fail;
-    }
-
-    sys->output->buffer_size = sys->output->buffer_size_recommended;
-    sys->output->buffer_num = 30;
-//    sys->output->buffer_num = sys->output->buffer_num_recommended;
 
     if ((sys->out_q = mmal_queue_create()) == NULL)
     {
@@ -584,24 +562,11 @@ static int OpenMmalDeinterlace(filter_t *filter)
         goto fail;
     }
 
-    if ((sys->in_pool = mmal_pool_create(sys->input->buffer_num, 0)) == NULL)
-    {
-        msg_Err(filter, "Failed to create input pool");
-        goto fail;
-    }
+    sys->output = sys->component->output[0];
+    mmal_format_full_copy(sys->output->format, sys->input->format);
 
-    sys->out_ppr = hw_mmal_port_pool_ref_create(sys->output, sys->output->buffer_num, sys->output->buffer_size);
-    if (sys->out_ppr == NULL) {
-        msg_Err(filter, "Failed to create output pool");
+    if ((status = hw_mmal_opaque_output(VLC_OBJECT(filter), &sys->out_ppr, sys->output, 5, di_output_port_cb)) != MMAL_SUCCESS)
         goto fail;
-    }
-
-    status = mmal_port_enable(sys->output, di_output_port_cb);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(filter, "Failed to enable output port %s (status=%"PRIx32" %s)",
-                sys->output->name, status, mmal_status_to_string(status));
-        goto fail;
-    }
 
     status = mmal_component_enable(sys->component);
     if (status != MMAL_SUCCESS) {

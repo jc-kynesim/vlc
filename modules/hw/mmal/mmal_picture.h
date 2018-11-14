@@ -87,6 +87,10 @@ static inline void hw_mmal_port_pool_ref_acquire(hw_mmal_port_pool_ref_t * const
 {
     atomic_fetch_add(&ppr->refs, 1);
 }
+MMAL_STATUS_T hw_mmal_opaque_output(vlc_object_t * const obj,
+                                    hw_mmal_port_pool_ref_t ** pppr,
+                                    MMAL_PORT_T * const port,
+                                    const unsigned int extra_buffers, MMAL_PORT_BH_CB_T callback);
 
 static inline int hw_mmal_pic_has_sub_bufs(picture_t * const pic)
 {

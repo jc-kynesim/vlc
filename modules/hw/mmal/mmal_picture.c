@@ -171,6 +171,58 @@ MMAL_STATUS_T hw_mmal_port_pool_ref_fill(hw_mmal_port_pool_ref_t * const ppr)
     return err;
 }
 
+
+MMAL_STATUS_T hw_mmal_opaque_output(vlc_object_t * const obj,
+                                    hw_mmal_port_pool_ref_t ** pppr,
+                                    MMAL_PORT_T * const port,
+                                    const unsigned int extra_buffers, MMAL_PORT_BH_CB_T callback)
+{
+    MMAL_STATUS_T status;
+
+    port->userdata = (struct MMAL_PORT_USERDATA_T *)obj;
+
+    status = port_parameter_set_uint32(port, MMAL_PARAMETER_EXTRA_BUFFERS, extra_buffers);
+    if (status != MMAL_SUCCESS) {
+        msg_Err(obj, "Failed to set MMAL_PARAMETER_EXTRA_BUFFERS on output port (status=%"PRIx32" %s)",
+                status, mmal_status_to_string(status));
+        return status;
+    }
+
+    status = port_parameter_set_bool(port, MMAL_PARAMETER_ZERO_COPY, 1);
+    if (status != MMAL_SUCCESS) {
+       msg_Err(obj, "Failed to set zero copy on port %s (status=%"PRIx32" %s)",
+                port->name, status, mmal_status_to_string(status));
+       return status;
+    }
+
+    port->format->encoding = MMAL_ENCODING_OPAQUE;
+    port->format->encoding_variant = 0;
+    if ((status = mmal_port_format_commit(port)) != MMAL_SUCCESS)
+    {
+        msg_Err(obj, "Failed to commit format on port %s (status=%"PRIx32" %s)",
+                 port->name, status, mmal_status_to_string(status));
+        return status;
+    }
+
+    port->buffer_num = 30;
+    port->buffer_size = port->buffer_size_recommended;
+
+    if ((*pppr = hw_mmal_port_pool_ref_create(port, port->buffer_num, port->buffer_size)) == NULL) {
+        msg_Err(obj, "Failed to create output pool");
+        return status;
+    }
+
+    status = mmal_port_enable(port, callback);
+    if (status != MMAL_SUCCESS) {
+        msg_Err(obj, "Failed to enable output port %s (status=%"PRIx32" %s)",
+                port->name, status, mmal_status_to_string(status));
+        return status;
+    }
+
+    return MMAL_SUCCESS;
+}
+
+
 void hw_mmal_pic_ctx_destroy(picture_context_t * pic_ctx_cmn)
 {
     pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic_ctx_cmn;

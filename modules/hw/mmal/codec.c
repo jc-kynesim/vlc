@@ -336,7 +336,7 @@ static void input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
         block_Release(block);
 }
 
-static void output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
+static void decoder_output_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
     // decoder structure only guaranteed valid if we have contents
 
@@ -454,7 +454,7 @@ port_reset:
     sys->output->buffer_num = NUM_DECODER_BUFFER_HEADERS;
     sys->output->buffer_size = sys->output->buffer_size_recommended;
 
-    status = mmal_port_enable(sys->output, output_port_cb);
+    status = mmal_port_enable(sys->output, decoder_output_cb);
     if (status != MMAL_SUCCESS) {
         msg_Err(dec, "Failed to enable output port (status=%"PRIx32" %s)",
                 status, mmal_status_to_string(status));
@@ -567,7 +567,7 @@ static void flush_decoder(decoder_t *dec)
         mmal_port_disable(sys->output);
         // We can leave the input disabled, but we want the output enabled
         // in order to sink any buffers returning from other modules
-        mmal_port_enable(sys->output, output_port_cb);
+        mmal_port_enable(sys->output, decoder_output_cb);
         sys->b_flushed = true;
     }
 #if TRACE_ALL
@@ -622,7 +622,7 @@ static int decode(decoder_t *dec, block_t *block)
 
     // Reenable stuff if the last thing we did was flush
     if (!sys->output->is_enabled &&
-        (status = mmal_port_enable(sys->output, output_port_cb)) != MMAL_SUCCESS)
+        (status = mmal_port_enable(sys->output, decoder_output_cb)) != MMAL_SUCCESS)
     {
         msg_Err(dec, "Output port enable failed");
         goto fail;
@@ -825,45 +825,9 @@ static int OpenDecoder(decoder_t *dec)
         goto fail;
     }
 
-    sys->output->userdata = (struct MMAL_PORT_USERDATA_T *)dec;
-
-    status = port_parameter_set_uint32(sys->output, MMAL_PARAMETER_EXTRA_BUFFERS, NUM_EXTRA_BUFFERS);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(dec, "Failed to set MMAL_PARAMETER_EXTRA_BUFFERS on output port (status=%"PRIx32" %s)",
-                status, mmal_status_to_string(status));
+    if ((status = hw_mmal_opaque_output(VLC_OBJECT(dec), &sys->ppr,
+                                        sys->output, NUM_EXTRA_BUFFERS, decoder_output_cb)) != MMAL_SUCCESS)
         goto fail;
-    }
-
-    status = port_parameter_set_bool(sys->output, MMAL_PARAMETER_ZERO_COPY, 1);
-    if (status != MMAL_SUCCESS) {
-       msg_Err(dec, "Failed to set zero copy on port %s (status=%"PRIx32" %s)",
-                sys->output->name, status, mmal_status_to_string(status));
-       goto fail;
-    }
-
-    sys->output->format->encoding = MMAL_ENCODING_OPAQUE;
-    if ((status = mmal_port_format_commit(sys->output)) != MMAL_SUCCESS)
-    {
-        msg_Err(dec, "Failed to commit format on port %s (status=%"PRIx32" %s)",
-                 sys->output->name, status, mmal_status_to_string(status));
-        goto fail;
-    }
-
-    sys->output->buffer_num = NUM_DECODER_BUFFER_HEADERS;
-    sys->output->buffer_size = sys->output->buffer_size_recommended;
-
-    sys->ppr = hw_mmal_port_pool_ref_create(sys->output, NUM_DECODER_BUFFER_HEADERS, sys->output->buffer_size);
-    if (sys->ppr == NULL) {
-        msg_Err(dec, "Failed to create output pool");
-        goto fail;
-    }
-
-    status = mmal_port_enable(sys->output, output_port_cb);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(dec, "Failed to enable output port %s (status=%"PRIx32" %s)",
-                sys->output->name, status, mmal_status_to_string(status));
-        goto fail;
-    }
 
     status = mmal_component_enable(sys->component);
     if (status != MMAL_SUCCESS) {
@@ -980,7 +944,7 @@ typedef struct filter_sys_t {
     MMAL_STATUS_T err_stream;
     int in_count;
 
-    bool zero_copy;
+    bool is_sliced;
     const char * component_name;
     MMAL_PORT_BH_CB_T in_port_cb_fn;
     MMAL_PORT_BH_CB_T out_port_cb_fn;
@@ -1323,7 +1287,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         goto fail;
 
     // If ZC then we need to allocate the out pic before we stuff the input
-    if (sys->zero_copy) {
+    if (sys->is_sliced) {
         MMAL_BUFFER_HEADER_T * out_buf;
         picture_t * const out_pic = filter_NewPicture(p_filter);
 
@@ -1370,7 +1334,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         --sys->in_count;
     }
 
-    if (!sys->zero_copy) {
+    if (!sys->is_sliced) {
         MMAL_BUFFER_HEADER_T * out_buf;
 
         while ((out_buf = sys->in_count < 0 ?
@@ -1502,7 +1466,7 @@ static void CloseConverter(vlc_object_t * obj)
 
     if (sys->out_pool)
     {
-        if (sys->zero_copy)
+        if (sys->is_sliced)
             mmal_port_pool_destroy(sys->output, sys->out_pool);
         else
             mmal_pool_destroy(sys->out_pool);
@@ -1548,7 +1512,7 @@ static MMAL_STATUS_T conv_set_output(filter_t * const p_filter, filter_sys_t * c
         return status;
     }
 
-    sys->output->buffer_num = __MAX(sys->zero_copy ? 16 : 2, sys->output->buffer_num_recommended);
+    sys->output->buffer_num = __MAX(sys->is_sliced ? 16 : 2, sys->output->buffer_num_recommended);
     sys->output->buffer_size = sys->output->buffer_size_recommended;
 
     if ((status = conv_enable_out(p_filter, sys)) != MMAL_SUCCESS)
@@ -1579,20 +1543,25 @@ static int OpenConverter(vlc_object_t * obj)
     use_isp = var_InheritBool(p_filter, MMAL_ISP_NAME);
 
 retry:
+    // Must use ISP - HVS can't do this, nor can resizer
+    if (enc_in == MMAL_ENCODING_YUVUV64_10) {
+        // If resizer selected then just give up
+        if (use_resizer)
+            return VLC_EGENERIC;
+        // otherwise downgrade HVS to ISP
+        use_isp = true;
+    }
+
     if (use_resizer) {
         // use resizer overrides use_isp
         use_isp = false;
     }
 
-    // Must use ISP - HVS can't do this
-    if (enc_in == MMAL_ENCODING_YUVUV64_10) {
-        use_isp = true;
-    }
-
     // Check we have a sliced version of the fourcc if we want the resizer
     if (use_resizer &&
-        (enc_out = pic_to_slice_mmal_fourcc(enc_out)) == 0)
+        (enc_out = pic_to_slice_mmal_fourcc(enc_out)) == 0) {
         return VLC_EGENERIC;
+    }
 
     gpu_mem = hw_mmal_get_gpu_mem();
 
@@ -1629,18 +1598,18 @@ retry:
     sys->in_port_cb_fn = conv_input_port_cb;
     if (use_resizer) {
         sys->resizer_type = FILTER_RESIZER_RESIZER;
-        sys->zero_copy = true;
+        sys->is_sliced = true;
         sys->component_name = MMAL_COMPONENT_DEFAULT_RESIZER;
         sys->out_port_cb_fn = slice_output_port_cb;
     }
     else if (use_isp) {
         sys->resizer_type = FILTER_RESIZER_ISP;
-        sys->zero_copy = false;  // Copy directly into filter picture
+        sys->is_sliced = false;  // Copy directly into filter picture
         sys->component_name = MMAL_COMPONENT_ISP_RESIZER;
         sys->out_port_cb_fn = conv_output_port_cb;
     } else {
         sys->resizer_type = FILTER_RESIZER_HVS;
-        sys->zero_copy = false;  // Copy directly into filter picture
+        sys->is_sliced = false;  // Copy directly into filter picture
         sys->component_name = MMAL_COMPONENT_HVS;
         sys->out_port_cb_fn = conv_output_port_cb;
     }
@@ -1689,9 +1658,9 @@ retry:
     if ((status = conv_enable_in(p_filter, sys)) != MMAL_SUCCESS)
         goto fail;
 
-    port_parameter_set_bool(sys->output, MMAL_PARAMETER_ZERO_COPY, sys->zero_copy);
+    port_parameter_set_bool(sys->output, MMAL_PARAMETER_ZERO_COPY, sys->is_sliced);
 
-    if (sys->zero_copy) {
+    if (sys->is_sliced) {
         // If zc then we will do stride conversion when we copy to arm side
         // so no need to worry about actual pic dimensions here
         if ((status = conv_set_output(p_filter, sys, NULL, enc_out)) != MMAL_SUCCESS)
@@ -1712,8 +1681,8 @@ retry:
         goto fail;
     }
 
-    msg_Dbg(p_filter, "Outpool: zc=%d, num=%d, size=%d", sys->zero_copy, sys->output->buffer_num, sys->output->buffer_size);
-    sys->out_pool = sys->zero_copy ?
+    msg_Dbg(p_filter, "Outpool: zc=%d, num=%d, size=%d", sys->is_sliced, sys->output->buffer_num, sys->output->buffer_size);
+    sys->out_pool = sys->is_sliced ?
         mmal_port_pool_create(sys->output, sys->output->buffer_num, sys->output->buffer_size) :
         mmal_pool_create(sys->output->buffer_num, 0);
 
