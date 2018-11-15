@@ -105,7 +105,166 @@ struct vout_display_sys_t {
     vout_subpic_t subs[SUBS_MAX];
 
     picture_pool_t * pic_pool;
+
+    struct vout_isp_conf_s {
+        MMAL_COMPONENT_T *component;
+        MMAL_PORT_T * input;
+        MMAL_PORT_T * output;
+        MMAL_QUEUE_T * out_q;
+    } isp;
 };
+
+
+// ISP setup
+
+static void isp_input_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
+{
+#if TRACE_ALL
+    vout_display_t * const vd = (vout_display_t *)port->userdata;
+    pic_ctx_mmal_t * ctx = buf->user_data;
+    msg_Dbg(vd, "<<< %s: cmd=%d, ctx=%p, buf=%p, flags=%#x, pts=%lld", __func__, buf->cmd, ctx, buf,
+            buf->flags, (long long)buf->pts);
+#else
+    VLC_UNUSED(port);
+#endif
+
+    mmal_buffer_header_release(buf);
+
+#if TRACE_ALL
+    msg_Dbg(vd, ">>> %s", __func__);
+#endif
+}
+
+static void isp_output_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
+{
+    if (buf->cmd == 0 && buf->length != 0)
+    {
+        // The filter structure etc. should always exist if we have contents
+        // but might not on later flushes as we shut down
+        vout_display_t * const vd = (vout_display_t *)port->userdata;
+        struct vout_isp_conf_s *const isp = &vd->sys->isp;
+
+#if TRACE_ALL
+        msg_Dbg(vd, "<<< %s: cmd=%d; flags=%#x, pts=%lld", __func__, buf->cmd, buf->flags, (long long) buf->pts);
+#endif
+        mmal_queue_put(isp->out_q, buf);
+#if TRACE_ALL
+        msg_Dbg(vd, ">>> %s: out Q len=%d", __func__, mmal_queue_length(isp->out_q));
+#endif
+    }
+    else
+    {
+        mmal_buffer_header_reset(buf);
+        mmal_buffer_header_release(buf);
+    }
+}
+
+
+static void isp_close(vout_display_t * const vd, vout_display_sys_t * const vd_sys)
+{
+    struct vout_isp_conf_s * const isp = &vd_sys->isp;
+    VLC_UNUSED(vd);
+
+    if (isp->component == NULL)
+        return;
+
+    if (isp->input->is_enabled)
+        mmal_port_disable(isp->input);
+
+    if (isp->output->is_enabled)
+        mmal_port_disable(isp->output);
+
+    if (isp->out_q != NULL) {
+        // 1st junk anything lying around
+        MMAL_BUFFER_HEADER_T * buf;
+        while ((buf = mmal_queue_get(isp->out_q)) != NULL)
+            mmal_buffer_header_release(buf);
+
+        mmal_queue_destroy(isp->out_q);
+        isp->out_q = NULL;
+    }
+
+    isp->input = NULL;
+    isp->output = NULL;
+
+    mmal_component_release(isp->component);
+    isp->component = NULL;
+
+    return;
+}
+
+static MMAL_STATUS_T isp_setup(vout_display_t * const vd, vout_display_sys_t * const vd_sys)
+{
+    struct vout_isp_conf_s * const isp = &vd_sys->isp;
+    MMAL_STATUS_T err;
+
+    if ((err = mmal_component_create(MMAL_COMPONENT_ISP_RESIZER, &isp->component)) != MMAL_SUCCESS) {
+        msg_Err(vd, "Cannot create ISP component");
+        return err;
+    }
+    isp->input = isp->component->input[0];
+    isp->output = isp->component->output[0];
+
+    isp->input->format->type = MMAL_ES_TYPE_VIDEO;
+    isp->input->format->encoding = MMAL_ENCODING_YUVUV64_10;
+    isp->input->format->encoding_variant = 0;
+
+    vlc_to_mmal_video_fmt(isp->input->format, &vd->fmt);
+
+    if ((err = port_parameter_set_bool(isp->input, MMAL_PARAMETER_ZERO_COPY, true)) != MMAL_SUCCESS)
+        goto fail;
+
+    if ((err = mmal_port_format_commit(isp->input)) != MMAL_SUCCESS) {
+        msg_Err(vd, "Failed to set ISP input format");
+        goto fail;
+    }
+
+    isp->input->buffer_size = isp->input->buffer_size_recommended;
+    isp->input->buffer_num = 30;
+
+    if ((err = mmal_port_enable(isp->input, isp_input_cb)) != MMAL_SUCCESS) {
+        msg_Err(vd, "Failed to enable ISP input port");
+        goto fail;
+    }
+
+
+    if ((isp->out_q = mmal_queue_create()) == NULL)
+    {
+        err = MMAL_ENOMEM;
+        goto fail;
+    }
+
+    isp->input->format->type = MMAL_ES_TYPE_VIDEO;
+    isp->input->format->encoding = MMAL_ENCODING_I420;
+    isp->input->format->encoding_variant = 0;
+
+    vlc_to_mmal_video_fmt(isp->output->format, &vd->fmt);
+
+    if ((err = port_parameter_set_bool(isp->output, MMAL_PARAMETER_ZERO_COPY, true)) != MMAL_SUCCESS)
+        goto fail;
+
+    if ((err = mmal_port_format_commit(isp->output)) != MMAL_SUCCESS) {
+        msg_Err(vd, "Failed to set ISP input format");
+        goto fail;
+    }
+
+    // **** port pool
+
+    isp->output->buffer_size = isp->output->buffer_size_recommended;
+    isp->output->buffer_num = 2;
+
+    if ((err = mmal_port_enable(isp->output, isp_output_cb)) != MMAL_SUCCESS) {
+        msg_Err(vd, "Failed to enable ISP input port");
+        goto fail;
+    }
+
+    return MMAL_SUCCESS;
+
+fail:
+    isp_close(vd, vd_sys);
+    return err;
+}
+
 
 
 /* Utility functions */

@@ -55,10 +55,6 @@
 
 #define MIN_NUM_BUFFERS_IN_TRANSIT 2
 
-#define MMAL_COMPONENT_DEFAULT_RESIZER "vc.ril.resize"
-#define MMAL_COMPONENT_ISP_RESIZER     "vc.ril.isp"
-#define MMAL_COMPONENT_HVS             "vc.ril.hvs"
-
 #define MMAL_SLICE_HEIGHT 16
 #define MMAL_ALIGN_W      32
 #define MMAL_ALIGN_H      16

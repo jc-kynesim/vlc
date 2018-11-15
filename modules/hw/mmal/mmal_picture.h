@@ -148,7 +148,7 @@ static inline MMAL_STATUS_T port_parameter_set_uint32(MMAL_PORT_T * port, uint32
     return mmal_port_parameter_set(port, &param.hdr);
 }
 
-static inline MMAL_STATUS_T port_parameter_set_bool(MMAL_PORT_T * port, uint32_t id, int val)
+static inline MMAL_STATUS_T port_parameter_set_bool(MMAL_PORT_T * const port, const uint32_t id, const bool val)
 {
     const MMAL_PARAMETER_BOOLEAN_T param = {
         .hdr = {.id = id, .size = sizeof(MMAL_PARAMETER_BOOLEAN_T)},
@@ -248,5 +248,9 @@ vzc_pool_ctl_t * hw_mmal_vzc_pool_new(void);
 
 #define VOUT_DISPLAY_CHANGE_MMAL_BASE 1024
 #define VOUT_DISPLAY_CHANGE_MMAL_HIDE (VOUT_DISPLAY_CHANGE_MMAL_BASE + 0)
+
+#define MMAL_COMPONENT_DEFAULT_RESIZER "vc.ril.resize"
+#define MMAL_COMPONENT_ISP_RESIZER     "vc.ril.isp"
+#define MMAL_COMPONENT_HVS             "vc.ril.hvs"
 
 #endif
