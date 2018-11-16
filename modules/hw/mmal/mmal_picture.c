@@ -77,7 +77,7 @@ void vlc_to_mmal_video_fmt(MMAL_ES_FORMAT_T *const es_fmt, const video_frame_for
     MMAL_VIDEO_FORMAT_T * const vf_mmal = &es_fmt->es->video;
 
     vf_mmal->width          = (vf_vlc->i_width + 31) & ~31;
-    vf_mmal->height         = (vf_vlc->i_height + 15) & ~15;;
+    vf_mmal->height         = (vf_vlc->i_height + 15) & ~15;
     vf_mmal->crop.x         = vf_vlc->i_x_offset;
     vf_mmal->crop.y         = vf_vlc->i_y_offset;
     vf_mmal->crop.width     = vf_vlc->i_visible_width;

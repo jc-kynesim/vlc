@@ -2000,7 +2000,10 @@ static int DecodeVideo( decoder_t *p_dec, block_t *p_block )
     msg_Dbg(p_dec, "<<< %s", __func__);
 
     while( ( p_pic = DecodeBlock( p_dec, pp_block, &error ) ) != NULL )
+    {
+        msg_Dbg(p_dec, "--- %s: Q pic", __func__);
         decoder_QueueVideo( p_dec, p_pic );
+    }
 
     msg_Dbg(p_dec, ">>> %s: err=%d", __func__, error);
 
@@ -2582,7 +2585,7 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
         return VLC_EGENERIC;
     }
 
-    if ((p_sys->out_pool = mmal_pool_create(30, 0)) == NULL)
+    if ((p_sys->out_pool = mmal_pool_create(5, 0)) == NULL)
     {
         msg_Err(p_dec, "Failed to create mmal buffer pool");
         goto fail;

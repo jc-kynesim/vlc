@@ -111,6 +111,9 @@ struct vout_display_sys_t {
         MMAL_PORT_T * input;
         MMAL_PORT_T * output;
         MMAL_QUEUE_T * out_q;
+        MMAL_POOL_T * in_pool;
+        MMAL_POOL_T * out_pool;
+        bool pending;
     } isp;
 };
 
@@ -133,6 +136,19 @@ static void isp_input_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 #if TRACE_ALL
     msg_Dbg(vd, ">>> %s", __func__);
 #endif
+}
+
+static void isp_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
+{
+    vout_display_t *vd = (vout_display_t *)port->userdata;
+    MMAL_STATUS_T status;
+
+    if (buffer->cmd == MMAL_EVENT_ERROR) {
+        status = *(uint32_t *)buffer->data;
+        msg_Err(vd, "MMAL error %"PRIx32" \"%s\"", status, mmal_status_to_string(status));
+    }
+
+    mmal_buffer_header_release(buffer);
 }
 
 static void isp_output_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
@@ -160,6 +176,13 @@ static void isp_output_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 }
 
 
+static void isp_empty_out_q(struct vout_isp_conf_s * const isp)
+{
+    MMAL_BUFFER_HEADER_T * buf;
+    while ((buf = mmal_queue_get(isp->out_q)) != NULL)
+        mmal_buffer_header_release(buf);
+}
+
 static void isp_close(vout_display_t * const vd, vout_display_sys_t * const vd_sys)
 {
     struct vout_isp_conf_s * const isp = &vd_sys->isp;
@@ -174,14 +197,20 @@ static void isp_close(vout_display_t * const vd, vout_display_sys_t * const vd_s
     if (isp->output->is_enabled)
         mmal_port_disable(isp->output);
 
+    if (isp->component->control->is_enabled)
+        mmal_port_disable(isp->component->control);
+
     if (isp->out_q != NULL) {
         // 1st junk anything lying around
-        MMAL_BUFFER_HEADER_T * buf;
-        while ((buf = mmal_queue_get(isp->out_q)) != NULL)
-            mmal_buffer_header_release(buf);
+        isp_empty_out_q(isp);
 
         mmal_queue_destroy(isp->out_q);
         isp->out_q = NULL;
+    }
+
+    if (isp->out_pool != NULL) {
+        mmal_port_pool_destroy(isp->output, isp->out_pool);
+        isp->out_pool = NULL;
     }
 
     isp->input = NULL;
@@ -205,13 +234,20 @@ static MMAL_STATUS_T isp_setup(vout_display_t * const vd, vout_display_sys_t * c
     isp->input = isp->component->input[0];
     isp->output = isp->component->output[0];
 
+    if ((err = mmal_port_enable(isp->component->control, isp_control_port_cb)) != MMAL_SUCCESS) {
+        msg_Err(vd, "Failed to enable ISP control port");
+        goto fail;
+    }
+
     isp->input->format->type = MMAL_ES_TYPE_VIDEO;
     isp->input->format->encoding = MMAL_ENCODING_YUVUV64_10;
     isp->input->format->encoding_variant = 0;
 
     vlc_to_mmal_video_fmt(isp->input->format, &vd->fmt);
 
-    if ((err = port_parameter_set_bool(isp->input, MMAL_PARAMETER_ZERO_COPY, true)) != MMAL_SUCCESS)
+    if ((err = port_parameter_set_bool(isp->input, MMAL_PARAMETER_ZERO_COPY, true)) != MMAL_SUCCESS ||
+        0)
+//        (err = port_parameter_set_uint32(isp->input, MMAL_PARAMETER_CCM_SHIFT, 5)) != MMAL_SUCCESS)
         goto fail;
 
     if ((err = mmal_port_format_commit(isp->input)) != MMAL_SUCCESS) {
@@ -221,6 +257,12 @@ static MMAL_STATUS_T isp_setup(vout_display_t * const vd, vout_display_sys_t * c
 
     isp->input->buffer_size = isp->input->buffer_size_recommended;
     isp->input->buffer_num = 30;
+
+    if ((isp->in_pool = mmal_pool_create(isp->input->buffer_num, 0)) == NULL)
+    {
+        msg_Err(vd, "Failed to create input pool");
+        goto fail;
+    }
 
     if ((err = mmal_port_enable(isp->input, isp_input_cb)) != MMAL_SUCCESS) {
         msg_Err(vd, "Failed to enable ISP input port");
@@ -234,13 +276,14 @@ static MMAL_STATUS_T isp_setup(vout_display_t * const vd, vout_display_sys_t * c
         goto fail;
     }
 
-    isp->input->format->type = MMAL_ES_TYPE_VIDEO;
-    isp->input->format->encoding = MMAL_ENCODING_I420;
-    isp->input->format->encoding_variant = 0;
+    isp->output->format->type = MMAL_ES_TYPE_VIDEO;
+    isp->output->format->encoding = MMAL_ENCODING_I420;
+    isp->output->format->encoding_variant = 0;
 
     vlc_to_mmal_video_fmt(isp->output->format, &vd->fmt);
 
-    if ((err = port_parameter_set_bool(isp->output, MMAL_PARAMETER_ZERO_COPY, true)) != MMAL_SUCCESS)
+    if ((err = port_parameter_set_bool(isp->output, MMAL_PARAMETER_ZERO_COPY, true)) != MMAL_SUCCESS ||
+        (err = port_parameter_set_uint32(isp->output, MMAL_PARAMETER_OUTPUT_SHIFT, 1)) != MMAL_SUCCESS)
         goto fail;
 
     if ((err = mmal_port_format_commit(isp->output)) != MMAL_SUCCESS) {
@@ -248,13 +291,18 @@ static MMAL_STATUS_T isp_setup(vout_display_t * const vd, vout_display_sys_t * c
         goto fail;
     }
 
-    // **** port pool
-
     isp->output->buffer_size = isp->output->buffer_size_recommended;
     isp->output->buffer_num = 2;
+    isp->output->userdata = (void *)vd;
 
     if ((err = mmal_port_enable(isp->output, isp_output_cb)) != MMAL_SUCCESS) {
         msg_Err(vd, "Failed to enable ISP input port");
+        goto fail;
+    }
+
+    if ((isp->out_pool = mmal_port_pool_create(isp->output, isp->output->buffer_num, isp->output->buffer_size)) == NULL)
+    {
+        msg_Err(vd, "Failed to make ISP port pool");
         goto fail;
     }
 
@@ -266,10 +314,6 @@ fail:
 }
 
 
-
-/* Utility functions */
-static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
-                const video_format_t *fmt);
 
 /* TV service */
 static int query_resolution(vout_display_t *vd, unsigned *width, unsigned *height);
@@ -289,6 +333,8 @@ static MMAL_FOURCC_T vout_vlc_to_mmal_pic_fourcc(const unsigned int fcc)
         return MMAL_ENCODING_OPAQUE;
     case VLC_CODEC_MMAL_ZC_SAND8:
         return MMAL_ENCODING_YUVUV128;
+    case VLC_CODEC_MMAL_ZC_SAND10:
+        return MMAL_ENCODING_I420;  // It will be after we've converted it...
     default:
         break;
     }
@@ -425,6 +471,36 @@ static picture_pool_t *vd_pool(vout_display_t *vd, unsigned count)
     return sys->pic_pool;
 }
 
+static inline bool want_isp(const vout_display_t * const vd)
+{
+    return (vd->fmt.i_chroma == VLC_CODEC_MMAL_ZC_SAND10);
+}
+
+static MMAL_STATUS_T isp_check(vout_display_t * const vd, vout_display_sys_t * const vd_sys)
+{
+    struct vout_isp_conf_s *const isp = &vd_sys->isp;
+    const bool has_isp = (isp->component != NULL);
+    const bool wants_isp = want_isp(vd);
+
+    if (has_isp == wants_isp)
+    {
+        // All OK - do nothing
+    }
+    else if (has_isp)
+    {
+        // ISP active but we don't want it
+        // *** Flush unless already done
+        // *** Check we have everything back and then kill it
+    }
+    else
+    {
+        // ISP closed but we want it
+        return isp_setup(vd, vd_sys);
+    }
+
+    return MMAL_SUCCESS;
+}
+
 static void vd_display(vout_display_t *vd, picture_t *p_pic,
                 subpicture_t *subpicture)
 {
@@ -455,16 +531,26 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
         configure_display(vd, NULL, &p_pic->format);
     }
 
-
     if (!sys->input->is_enabled &&
         (err = mmal_port_enable(sys->input, vd_input_port_cb)) != MMAL_SUCCESS)
     {
         msg_Err(vd, "Input port enable failed");
         goto fail;
     }
-
     // Stuff into input
     // We assume the BH is already set up with values reflecting pic date etc.
+    if (sys->isp.pending) {
+        MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->isp.out_q);
+        sys->isp.pending = false;
+
+        if (mmal_port_send_buffer(sys->input, buf) != MMAL_SUCCESS)
+        {
+            mmal_buffer_header_release(buf);
+            msg_Err(vd, "Send ISP buffer to render input failed");
+            goto fail;
+        }
+    }
+    else
     {
         MMAL_BUFFER_HEADER_T * const pic_buf = pic_mmal_buffer(p_pic);
         if ((err = port_send_replicated(sys->input, sys->pool, pic_buf, pic_buf->pts)) != MMAL_SUCCESS)
@@ -592,7 +678,7 @@ static void vd_manage(vout_display_t *vd)
     vlc_mutex_unlock(&sys->manage_mutex);
 }
 
-static void vd_prepare(vout_display_t *vd, picture_t *picture,
+static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
 #if VLC_VER_3
                        subpicture_t *subpicture
 #else
@@ -600,11 +686,43 @@ static void vd_prepare(vout_display_t *vd, picture_t *picture,
 #endif
                        )
 {
-    VLC_UNUSED(picture);
+    MMAL_STATUS_T err;
+    vout_display_sys_t * const sys = vd->sys;
+
     VLC_UNUSED(subpicture);
 //    VLC_UNUSED(date);
 
     vd_manage(vd);
+
+    if (isp_check(vd, sys) != MMAL_SUCCESS) {
+        return;
+    }
+
+    if (want_isp(vd))
+    {
+        struct vout_isp_conf_s * const isp = &sys->isp;
+        MMAL_BUFFER_HEADER_T * buf;
+
+        // This should be empty - make it so if it isn't
+        isp_empty_out_q(isp);
+        isp->pending = false;
+
+        // Stuff output
+        while ((buf = mmal_queue_get(isp->out_pool->queue)) != NULL) {
+            mmal_port_send_buffer(isp->output, buf);
+        }
+
+        buf = pic_mmal_buffer(p_pic);
+        if ((err = port_send_replicated(isp->input, isp->in_pool,
+                                        buf, buf->pts)) != MMAL_SUCCESS)
+        {
+            msg_Err(vd, "Send buffer to input failed");
+            return;
+        }
+
+        isp->pending = true;
+    }
+
 #if 0
     VLC_UNUSED(date);
     vout_display_sys_t *sys = vd->sys;
@@ -825,6 +943,8 @@ static void CloseMmalVout(vlc_object_t *object)
 
     if (sys->component)
         mmal_component_release(sys->component);
+
+    isp_close(vd, sys);
 
     vlc_mutex_destroy(&sys->manage_mutex);
 

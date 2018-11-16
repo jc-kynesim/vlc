@@ -220,6 +220,7 @@ static inline void buf_to_pic_copy_props(picture_t * const pic, const MMAL_BUFFE
 }
 
 // Retrieve buf from pic & update with pic props
+// Note that this is a weak pointer - replicate before putting in a Q
 static inline MMAL_BUFFER_HEADER_T * pic_mmal_buffer(const picture_t *const pic)
 {
     MMAL_BUFFER_HEADER_T * const buf = ((pic_ctx_mmal_t *)pic->context)->bufs[0];
