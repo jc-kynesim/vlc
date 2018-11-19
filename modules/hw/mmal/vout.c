@@ -120,6 +120,63 @@ struct vout_display_sys_t {
 
 // ISP setup
 
+static inline bool want_isp(const vout_display_t * const vd)
+{
+    return (vd->fmt.i_chroma == VLC_CODEC_MMAL_ZC_SAND10);
+}
+
+static MMAL_FOURCC_T vout_vlc_to_mmal_pic_fourcc(const unsigned int fcc)
+{
+    switch (fcc){
+    case VLC_CODEC_MMAL_OPAQUE:
+        return MMAL_ENCODING_OPAQUE;
+    case VLC_CODEC_MMAL_ZC_SAND8:
+        return MMAL_ENCODING_YUVUV128;
+    case VLC_CODEC_MMAL_ZC_SAND10:
+        return MMAL_ENCODING_YUVUV64_10;  // It will be after we've converted it...
+    default:
+        break;
+    }
+    return 0;
+}
+
+static void display_set_format(const vout_display_t * const vd, MMAL_ES_FORMAT_T *const es_fmt, const bool is_intermediate)
+{
+    const unsigned int w = is_intermediate ? vd->fmt.i_visible_width  : vd->fmt.i_width ;
+    const unsigned int h = is_intermediate ? vd->fmt.i_visible_height : vd->fmt.i_height;
+    MMAL_VIDEO_FORMAT_T * const v_fmt = &es_fmt->es->video;
+
+    es_fmt->type = MMAL_ES_TYPE_VIDEO;
+    es_fmt->encoding = is_intermediate ? MMAL_ENCODING_I420 : vout_vlc_to_mmal_pic_fourcc(vd->fmt.i_chroma);;
+    es_fmt->encoding_variant = 0;
+
+    v_fmt->width  = (w + 31) & ~31;
+    v_fmt->height = (h + 15) & ~15;
+    v_fmt->crop.x = 0;
+    v_fmt->crop.y = 0;
+    v_fmt->crop.width = w;
+    v_fmt->crop.height = h;
+    if (vd->fmt.i_sar_num == 0 || vd->fmt.i_sar_den == 0) {
+        v_fmt->par.num        = 1;
+        v_fmt->par.den        = 1;
+    } else {
+        v_fmt->par.num        = vd->fmt.i_sar_num;
+        v_fmt->par.den        = vd->fmt.i_sar_den;
+    }
+    v_fmt->frame_rate.num = vd->fmt.i_frame_rate;
+    v_fmt->frame_rate.den = vd->fmt.i_frame_rate_base;
+    v_fmt->color_space    = vlc_to_mmal_color_space(vd->fmt.space);
+}
+
+static void display_src_rect(const vout_display_t * const vd, MMAL_RECT_T *const rect)
+{
+    const bool wants_isp = want_isp(vd);
+    rect->x = wants_isp ? 0 : vd->fmt.i_x_offset;
+    rect->y = wants_isp ? 0 : vd->fmt.i_y_offset;
+    rect->width = vd->fmt.i_visible_width;
+    rect->height = vd->fmt.i_visible_height;
+}
+
 static void isp_input_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 {
 #if TRACE_ALL
@@ -283,15 +340,9 @@ static MMAL_STATUS_T isp_setup(vout_display_t * const vd, vout_display_sys_t * c
     }
 
     isp->input->userdata = (void *)vd;
-    isp->input->format->type = MMAL_ES_TYPE_VIDEO;
-    isp->input->format->encoding = MMAL_ENCODING_YUVUV64_10;
-    isp->input->format->encoding_variant = 0;
+    display_set_format(vd, isp->input->format, false);
 
-    vlc_to_mmal_video_fmt(isp->input->format, &vd->fmt);
-
-    if ((err = port_parameter_set_bool(isp->input, MMAL_PARAMETER_ZERO_COPY, true)) != MMAL_SUCCESS ||
-        0)
-//        (err = port_parameter_set_uint32(isp->input, MMAL_PARAMETER_CCM_SHIFT, 5)) != MMAL_SUCCESS)
+    if ((err = port_parameter_set_bool(isp->input, MMAL_PARAMETER_ZERO_COPY, true)) != MMAL_SUCCESS)
         goto fail;
 
     if ((err = mmal_port_format_commit(isp->input)) != MMAL_SUCCESS) {
@@ -314,14 +365,9 @@ static MMAL_STATUS_T isp_setup(vout_display_t * const vd, vout_display_sys_t * c
         goto fail;
     }
 
-    isp->output->format->type = MMAL_ES_TYPE_VIDEO;
-    isp->output->format->encoding = MMAL_ENCODING_I420;
-    isp->output->format->encoding_variant = 0;
+    display_set_format(vd, isp->output->format, true);
 
-    vlc_to_mmal_video_fmt(isp->output->format, &vd->fmt);
-
-    if ((err = port_parameter_set_bool(isp->output, MMAL_PARAMETER_ZERO_COPY, true)) != MMAL_SUCCESS ||
-        (err = port_parameter_set_uint32(isp->output, MMAL_PARAMETER_OUTPUT_SHIFT, 1)) != MMAL_SUCCESS)
+    if ((err = port_parameter_set_bool(isp->output, MMAL_PARAMETER_ZERO_COPY, true)) != MMAL_SUCCESS)
         goto fail;
 
     if ((err = mmal_port_format_commit(isp->output)) != MMAL_SUCCESS) {
@@ -349,7 +395,33 @@ fail:
     return err;
 }
 
+static MMAL_STATUS_T isp_check(vout_display_t * const vd, vout_display_sys_t * const vd_sys)
+{
+    struct vout_isp_conf_s *const isp = &vd_sys->isp;
+    const bool has_isp = (isp->component != NULL);
+    const bool wants_isp = want_isp(vd);
 
+    if (has_isp == wants_isp)
+    {
+        // All OK - do nothing
+    }
+    else if (has_isp)
+    {
+        // ISP active but we don't want it
+        isp_flush(isp);
+
+        // Check we have everything back and then kill it
+        if (mmal_queue_length(isp->out_pool->queue) == isp->output->buffer_num)
+            isp_close(vd, vd_sys);
+    }
+    else
+    {
+        // ISP closed but we want it
+        return isp_setup(vd, vd_sys);
+    }
+
+    return MMAL_SUCCESS;
+}
 
 /* TV service */
 static int query_resolution(vout_display_t *vd, unsigned *width, unsigned *height);
@@ -361,21 +433,6 @@ static int set_latency_target(vout_display_t *vd, bool enable);
 // Mmal
 static void maintain_phase_sync(vout_display_t *vd);
 
-
-static MMAL_FOURCC_T vout_vlc_to_mmal_pic_fourcc(const unsigned int fcc)
-{
-    switch (fcc){
-    case VLC_CODEC_MMAL_OPAQUE:
-        return MMAL_ENCODING_OPAQUE;
-    case VLC_CODEC_MMAL_ZC_SAND8:
-        return MMAL_ENCODING_YUVUV128;
-    case VLC_CODEC_MMAL_ZC_SAND10:
-        return MMAL_ENCODING_I420;  // It will be after we've converted it...
-    default:
-        break;
-    }
-    return 0;
-}
 
 
 static void vd_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
@@ -423,7 +480,7 @@ static int query_resolution(vout_display_t *vd, unsigned *width, unsigned *heigh
 static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
                 const video_format_t *fmt)
 {
-    vout_display_sys_t *sys = vd->sys;
+    vout_display_sys_t * const sys = vd->sys;
     vout_display_place_t place;
     MMAL_DISPLAYREGION_T display_region;
     MMAL_STATUS_T status;
@@ -433,6 +490,8 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
         msg_Err(vd, "%s: Missing cfg & fmt", __func__);
         return -EINVAL;
     }
+
+    isp_check(vd, sys);
 
     if (fmt) {
         sys->input->format->es->video.par.num = fmt->i_sar_num;
@@ -456,10 +515,7 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
     display_region.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
     display_region.hdr.size = sizeof(MMAL_DISPLAYREGION_T);
     display_region.fullscreen = MMAL_FALSE;
-    display_region.src_rect.x = fmt->i_x_offset;
-    display_region.src_rect.y = fmt->i_y_offset;
-    display_region.src_rect.width = fmt->i_visible_width;
-    display_region.src_rect.height = fmt->i_visible_height;
+    display_src_rect(vd, &display_region.src_rect);
     display_region.dest_rect.x = place.x;
     display_region.dest_rect.y = place.y;
     display_region.dest_rect.width = place.width;
@@ -505,39 +561,6 @@ static picture_pool_t *vd_pool(vout_display_t *vd, unsigned count)
         sys->pic_pool = picture_pool_NewFromFormat(&vd->fmt, count);
     }
     return sys->pic_pool;
-}
-
-static inline bool want_isp(const vout_display_t * const vd)
-{
-    return (vd->fmt.i_chroma == VLC_CODEC_MMAL_ZC_SAND10);
-}
-
-static MMAL_STATUS_T isp_check(vout_display_t * const vd, vout_display_sys_t * const vd_sys)
-{
-    struct vout_isp_conf_s *const isp = &vd_sys->isp;
-    const bool has_isp = (isp->component != NULL);
-    const bool wants_isp = want_isp(vd);
-
-    if (has_isp == wants_isp)
-    {
-        // All OK - do nothing
-    }
-    else if (has_isp)
-    {
-        // ISP active but we don't want it
-        isp_flush(isp);
-
-        // Check we have everything back and then kill it
-        if (mmal_queue_length(isp->out_pool->queue) == isp->output->buffer_num)
-            isp_close(vd, vd_sys);
-    }
-    else
-    {
-        // ISP closed but we want it
-        return isp_setup(vd, vd_sys);
-    }
-
-    return MMAL_SUCCESS;
 }
 
 static void vd_display(vout_display_t *vd, picture_t *p_pic,
@@ -1052,14 +1075,7 @@ static int OpenMmalVout(vlc_object_t *object)
     sys->i_planes = 1;
     sys->buffer_size = sys->input->buffer_size_recommended;
 
-    sys->input->format->es->video.width = vd->fmt.i_width;
-    sys->input->format->es->video.height = vd->fmt.i_height;
-    sys->input->format->es->video.crop.x = 0;
-    sys->input->format->es->video.crop.y = 0;
-    sys->input->format->es->video.crop.width = vd->fmt.i_width;
-    sys->input->format->es->video.crop.height = vd->fmt.i_height;
-    sys->input->format->es->video.par.num = vd->source.i_sar_num;
-    sys->input->format->es->video.par.den = vd->source.i_sar_den;
+    display_set_format(vd, sys->input->format, want_isp(vd));
 
     status = port_parameter_set_bool(sys->input, MMAL_PARAMETER_ZERO_COPY, true);
     if (status != MMAL_SUCCESS) {
@@ -1081,10 +1097,7 @@ static int OpenMmalVout(vlc_object_t *object)
     display_region.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
     display_region.hdr.size = sizeof(MMAL_DISPLAYREGION_T);
     display_region.fullscreen = MMAL_FALSE;
-    display_region.src_rect.x = vd->fmt.i_x_offset;
-    display_region.src_rect.y = vd->fmt.i_y_offset;
-    display_region.src_rect.width = vd->fmt.i_visible_width;
-    display_region.src_rect.height = vd->fmt.i_visible_height;
+    display_src_rect(vd, &display_region.src_rect);
     display_region.dest_rect.x = place.x;
     display_region.dest_rect.y = place.y;
     display_region.dest_rect.width = place.width;
