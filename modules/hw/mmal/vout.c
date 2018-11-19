@@ -175,12 +175,58 @@ static void isp_output_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     }
 }
 
-
 static void isp_empty_out_q(struct vout_isp_conf_s * const isp)
 {
     MMAL_BUFFER_HEADER_T * buf;
+    // We can be called as part of error recovery so allow for missing Q
+    if (isp->out_q == NULL)
+        return;
+
     while ((buf = mmal_queue_get(isp->out_q)) != NULL)
         mmal_buffer_header_release(buf);
+}
+
+static void isp_flush(struct vout_isp_conf_s * const isp)
+{
+    if (!isp->input->is_enabled)
+        mmal_port_disable(isp->input);
+
+    if (isp->output->is_enabled)
+        mmal_port_disable(isp->output);
+
+    isp_empty_out_q(isp);
+    isp->pending = false;
+}
+
+static MMAL_STATUS_T isp_prepare(vout_display_t * const vd, struct vout_isp_conf_s * const isp)
+{
+    MMAL_STATUS_T err;
+    MMAL_BUFFER_HEADER_T * buf;
+
+    if (!isp->output->is_enabled) {
+        if ((err = mmal_port_enable(isp->output, isp_output_cb)) != MMAL_SUCCESS)
+        {
+            msg_Err(vd, "ISP output port enable failed");
+            return err;
+        }
+    }
+
+    while ((buf = mmal_queue_get(isp->out_pool->queue)) != NULL) {
+        if ((err = mmal_port_send_buffer(isp->output, buf)) != MMAL_SUCCESS)
+        {
+            msg_Err(vd, "ISP output port stuff failed");
+            return err;
+        }
+    }
+
+    if (!isp->input->is_enabled) {
+        if ((err = mmal_port_enable(isp->input, isp_input_cb)) != MMAL_SUCCESS)
+        {
+            msg_Err(vd, "ISP input port enable failed");
+            return err;
+        }
+    }
+    return MMAL_SUCCESS;
 }
 
 static void isp_close(vout_display_t * const vd, vout_display_sys_t * const vd_sys)
@@ -191,11 +237,7 @@ static void isp_close(vout_display_t * const vd, vout_display_sys_t * const vd_s
     if (isp->component == NULL)
         return;
 
-    if (isp->input->is_enabled)
-        mmal_port_disable(isp->input);
-
-    if (isp->output->is_enabled)
-        mmal_port_disable(isp->output);
+    isp_flush(isp);
 
     if (isp->component->control->is_enabled)
         mmal_port_disable(isp->component->control);
@@ -234,11 +276,13 @@ static MMAL_STATUS_T isp_setup(vout_display_t * const vd, vout_display_sys_t * c
     isp->input = isp->component->input[0];
     isp->output = isp->component->output[0];
 
+    isp->component->control->userdata = (void *)vd;
     if ((err = mmal_port_enable(isp->component->control, isp_control_port_cb)) != MMAL_SUCCESS) {
         msg_Err(vd, "Failed to enable ISP control port");
         goto fail;
     }
 
+    isp->input->userdata = (void *)vd;
     isp->input->format->type = MMAL_ES_TYPE_VIDEO;
     isp->input->format->encoding = MMAL_ENCODING_YUVUV64_10;
     isp->input->format->encoding_variant = 0;
@@ -263,12 +307,6 @@ static MMAL_STATUS_T isp_setup(vout_display_t * const vd, vout_display_sys_t * c
         msg_Err(vd, "Failed to create input pool");
         goto fail;
     }
-
-    if ((err = mmal_port_enable(isp->input, isp_input_cb)) != MMAL_SUCCESS) {
-        msg_Err(vd, "Failed to enable ISP input port");
-        goto fail;
-    }
-
 
     if ((isp->out_q = mmal_queue_create()) == NULL)
     {
@@ -295,16 +333,14 @@ static MMAL_STATUS_T isp_setup(vout_display_t * const vd, vout_display_sys_t * c
     isp->output->buffer_num = 2;
     isp->output->userdata = (void *)vd;
 
-    if ((err = mmal_port_enable(isp->output, isp_output_cb)) != MMAL_SUCCESS) {
-        msg_Err(vd, "Failed to enable ISP input port");
-        goto fail;
-    }
-
     if ((isp->out_pool = mmal_port_pool_create(isp->output, isp->output->buffer_num, isp->output->buffer_size)) == NULL)
     {
         msg_Err(vd, "Failed to make ISP port pool");
         goto fail;
     }
+
+    if ((err = isp_prepare(vd, isp)) != MMAL_SUCCESS)
+        goto fail;
 
     return MMAL_SUCCESS;
 
@@ -489,8 +525,11 @@ static MMAL_STATUS_T isp_check(vout_display_t * const vd, vout_display_sys_t * c
     else if (has_isp)
     {
         // ISP active but we don't want it
-        // *** Flush unless already done
-        // *** Check we have everything back and then kill it
+        isp_flush(isp);
+
+        // Check we have everything back and then kill it
+        if (mmal_queue_length(isp->out_pool->queue) == isp->output->buffer_num)
+            isp_close(vd, vd_sys);
     }
     else
     {
@@ -708,9 +747,8 @@ static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
         isp->pending = false;
 
         // Stuff output
-        while ((buf = mmal_queue_get(isp->out_pool->queue)) != NULL) {
-            mmal_port_send_buffer(isp->output, buf);
-        }
+        if (isp_prepare(vd, isp) != MMAL_SUCCESS)
+            return;
 
         buf = pic_mmal_buffer(p_pic);
         if ((err = port_send_replicated(isp->input, isp->in_pool,

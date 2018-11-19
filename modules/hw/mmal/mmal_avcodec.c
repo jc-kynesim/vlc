@@ -1629,6 +1629,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
 
 
     /* A good idea could be to decode all I pictures and see for the other */
+    b_need_output_picture = true;
 
     /* Defaults that if we aren't in prerolling, we want output picture
        same for if we are flushing (p_block==NULL) */
