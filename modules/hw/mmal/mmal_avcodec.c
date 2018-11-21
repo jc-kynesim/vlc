@@ -1679,7 +1679,7 @@ static int rx_frame(decoder_t * const p_dec, decoder_sys_t * const p_sys, AVCode
 
 
 
-static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error )
+static int DecodeVideo( decoder_t *p_dec, block_t * p_block)
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
     AVCodecContext *p_context = p_sys->p_context;
@@ -1688,12 +1688,8 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
 
     /* Boolean for END_OF_SEQUENCE */
     bool eos_spotted = false;
-
-
-    block_t *p_block;
     mtime_t current_time;
-
-    msg_Dbg(p_dec, "%s: 0", __func__);
+    int rv = VLCDEC_SUCCESS;
 
     if( !p_context->extradata_size && p_dec->fmt_in.i_extra )
     {
@@ -1701,28 +1697,26 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         if( !avcodec_is_open( p_context ) )
             OpenVideoCodec( p_dec );
     }
-    msg_Dbg(p_dec, "%s: 1", __func__);
 
-    p_block = pp_block ? *pp_block : NULL;
     if(!p_block && !(p_sys->p_codec->capabilities & AV_CODEC_CAP_DELAY) )
-        return NULL;
+        return VLCDEC_SUCCESS;
 
     if( !avcodec_is_open( p_context ) )
     {
         if( p_block )
             block_Release( p_block );
-        return NULL;
+        return VLCDEC_ECRITICAL;
     }
 
     if( !check_block_validity( p_sys, p_block ) )
-        return NULL;
+        return VLCDEC_SUCCESS;
 
     current_time = mdate();
     if( p_dec->b_frame_drop_allowed &&  check_block_being_late( p_sys, p_block, current_time) )
     {
         msg_Err( p_dec, "more than 5 seconds of late video -> "
                  "dropping frame (computer too slow ?)" );
-        return NULL;
+        return VLCDEC_SUCCESS;
     }
 
 
@@ -1749,7 +1743,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
             if( p_block )
                 block_Release( p_block );
             msg_Warn( p_dec, "More than 11 late frames, dropping frame" );
-            return NULL;
+            return VLCDEC_SUCCESS;
         }
     }
     if( !b_need_output_picture )
@@ -1770,14 +1764,12 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         p_block = block_Realloc( p_block, 0,
                             p_block->i_buffer + FF_INPUT_BUFFER_PADDING_SIZE );
         if( !p_block )
-            return NULL;
+            return VLCDEC_ECRITICAL;
+
         p_block->i_buffer -= FF_INPUT_BUFFER_PADDING_SIZE;
-        *pp_block = p_block;
         memset( p_block->p_buffer + p_block->i_buffer, 0,
                 FF_INPUT_BUFFER_PADDING_SIZE );
     }
-
-    msg_Dbg(p_dec, "%s: 2", __func__);
 
     AVPacket pkt = {.data = NULL, .size = 0};
 
@@ -1816,42 +1808,30 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         ret = avcodec_send_packet(p_context, &pkt);
     }
 
-    // Now done with pkt
+    // Now done with pkt & block
     av_packet_unref(&pkt);
-    if( p_block )
+    if (p_block != NULL)
+    {
         block_Release( p_block );
+        p_block = NULL;
+    }
 
     if (ret != 0)
     {
         if (ret == AVERROR(ENOMEM) || ret == AVERROR(EINVAL))
         {
             msg_Err(p_dec, "avcodec_send_packet critical error");
-            *error = true;
+            rv = VLCDEC_ECRITICAL;
         }
     }
 
     while (rx_frame(p_dec, p_sys, p_context) == 1)
         /* Loop */;
 
-
     if (eos_spotted)
         p_sys->b_first_frame = true;
 
-    return NULL;
-}
-
-static int DecodeVideo( decoder_t *p_dec, block_t *p_block )
-{
-    block_t **pp_block = p_block ? &p_block : NULL;
-    bool error = false;
-
-    msg_Dbg(p_dec, "<<< %s", __func__);
-
-    DecodeBlock( p_dec, pp_block, &error );
-
-    msg_Dbg(p_dec, ">>> %s: err=%d", __func__, error);
-
-    return error ? VLCDEC_ECRITICAL : VLCDEC_SUCCESS;
+    return rv;
 }
 
 /*****************************************************************************
