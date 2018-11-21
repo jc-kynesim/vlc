@@ -439,7 +439,6 @@ static MMAL_STATUS_T isp_check(vout_display_t * const vd, vout_display_sys_t * c
 }
 
 /* TV service */
-static int query_resolution(vout_display_t *vd, unsigned *width, unsigned *height);
 static void tvservice_cb(void *callback_data, uint32_t reason, uint32_t param1,
                 uint32_t param2);
 static void adjust_refresh_rate(vout_display_t *vd, const video_format_t *fmt);
@@ -474,10 +473,13 @@ static int query_resolution(vout_display_t *vd, unsigned *width, unsigned *heigh
     int ret = 0;
 
     if (vc_tv_get_display_state(&display_state) == 0) {
+        msg_Dbg(vd, "State=%#x", display_state.state);
         if (display_state.state & 0xFF) {
+            msg_Dbg(vd, "HDMI: %dx%d", display_state.display.hdmi.width, display_state.display.hdmi.height);
             *width = display_state.display.hdmi.width;
             *height = display_state.display.hdmi.height;
         } else if (display_state.state & 0xFF00) {
+            msg_Dbg(vd, "SDTV: %dx%d", display_state.display.sdtv.width, display_state.display.sdtv.height);
             *width = display_state.display.sdtv.width;
             *height = display_state.display.sdtv.height;
         } else {
@@ -525,7 +527,16 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
     if (!cfg)
         cfg = vd->cfg;
 
-    vout_display_PlacePicture(&place, fmt, cfg, false);
+    {
+        // Ignore what VLC thinks might be going on with display size
+        vout_display_cfg_t tcfg = *cfg;
+        tcfg.display.width = sys->display_width;
+        tcfg.display.height = sys->display_height;
+        tcfg.is_display_filled = true;
+        vout_display_PlacePicture(&place, fmt, &tcfg, false);
+
+        msg_Dbg(vd, "%dx%d -> %dx%d @ %d,%d", tcfg.display.width, tcfg.display.height, place.width, place.height, place.x, place.y);
+    }
 
     display_region.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
     display_region.hdr.size = sizeof(MMAL_DISPLAYREGION_T);
@@ -672,23 +683,14 @@ fail:
 
 static int vd_control(vout_display_t *vd, int query, va_list args)
 {
-    vout_display_sys_t *sys = vd->sys;
-    vout_display_cfg_t cfg;
-    const vout_display_cfg_t *tmp_cfg;
+    vout_display_sys_t * const sys = vd->sys;
     int ret = VLC_EGENERIC;
+    VLC_UNUSED(args);
 
     switch (query) {
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
-            tmp_cfg = va_arg(args, const vout_display_cfg_t *);
-//            if (tmp_cfg->display.width == sys->display_width &&
-//                            tmp_cfg->display.height == sys->display_height)
-            {
-                cfg = *vd->cfg;
-                cfg.display.width = tmp_cfg->display.width;
-                cfg.display.height = tmp_cfg->display.height;
-                if (configure_display(vd, &cfg, NULL) >= 0)
-                    ret = VLC_SUCCESS;
-            }
+            // Ignore this - we just use full screen anyway
+            ret = VLC_SUCCESS;
             break;
 
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
@@ -706,6 +708,7 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
 
         case VOUT_DISPLAY_CHANGE_ZOOM:
             msg_Warn(vd, "Unsupported control query %d", query);
+            ret = VLC_SUCCESS;
             break;
 
         case VOUT_DISPLAY_CHANGE_MMAL_HIDE:
@@ -722,11 +725,9 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
                 (err = mmal_port_disable(sys->input)) != MMAL_SUCCESS)
             {
                 msg_Err(vd, "Unable to disable port: err=%d", err);
-                ret = VLC_EGENERIC;
                 break;
             }
             sys->force_config = true;
-
             ret = VLC_SUCCESS;
             break;
         }
@@ -1070,6 +1071,8 @@ static int OpenMmalVout(vlc_object_t *object)
         return VLC_ENOMEM;
     vd->sys = sys;
 
+    bcm_host_init();
+
     sys->layer = var_InheritInteger(vd, MMAL_LAYER_NAME);
 
     status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &sys->component);
@@ -1189,10 +1192,8 @@ static int OpenMmalVout(vlc_object_t *object)
 
     vc_tv_register_callback(tvservice_cb, vd);
 
-    if (query_resolution(vd, &sys->display_width, &sys->display_height) >= 0) {
-//        vout_window_ReportSize(vd->cfg->window,
-//                               sys->display_width, sys->display_height);
-    } else {
+    if (query_resolution(vd, &sys->display_width, &sys->display_height) < 0)
+    {
         sys->display_width = vd->cfg->display.width;
         sys->display_height = vd->cfg->display.height;
     }
