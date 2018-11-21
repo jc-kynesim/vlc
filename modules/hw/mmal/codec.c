@@ -919,6 +919,12 @@ typedef enum filter_resizer_e {
     FILTER_RESIZER_HVS
 } filter_resizer_t;
 
+typedef struct conv_frame_stash_s
+{
+    mtime_t pts;
+    MMAL_BUFFER_HEADER_T * sub_bufs[SUBS_MAX];
+} conv_frame_stash_t;
+
 typedef struct filter_sys_t {
     filter_resizer_t resizer_type;
     MMAL_COMPONENT_T *component;
@@ -946,7 +952,7 @@ typedef struct filter_sys_t {
     MMAL_PORT_BH_CB_T out_port_cb_fn;
 
     uint64_t frame_seq;
-    mtime_t pts_stash[16];
+    conv_frame_stash_t stash[16];
 
     // Slice specific tracking stuff
     struct {
@@ -1058,7 +1064,7 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 #if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s: cmd=%d, flags=%#x, pic=%p, data=%p, len=%d/%d, pts=%lld/%lld", __func__,
             buf->cmd, buf->flags, buf->user_data, buf->data, buf->length, buf->alloc_size,
-            (long long)buf->pts, (long long)sys->pts_stash[(unsigned int)(buf->pts & 0xf)]);
+            (long long)buf->pts, (long long)sys->stash[(unsigned int)(buf->pts & 0xf)].pts);
 #endif
     if (buf->cmd == 0) {
         picture_t * const pic = (picture_t *)buf->user_data;
@@ -1076,7 +1082,6 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
         else
         {
             buf_to_pic_copy_props(pic, buf);
-            pic->date = sys->pts_stash[(unsigned int)(buf->pts & 0xf)];
 
 //            draw_corners(pic->p[0].p_pixels, pic->p[0].i_pitch / 4, 0, 0, pic->p[0].i_visible_pitch / 4, pic->p[0].i_visible_lines);
 
@@ -1212,6 +1217,19 @@ static void conv_flush(filter_t * p_filter)
     // Don't need lock as the above disables should have prevented anything
     // happening in the background
 
+    for (i = 0; i != 16; ++i) {
+        conv_frame_stash_t *const stash = sys->stash + i;
+        unsigned int sub_no;
+
+        stash->pts = MMAL_TIME_UNKNOWN;
+        for (sub_no = 0; sub_no != SUBS_MAX; ++sub_no) {
+            if (stash->sub_bufs[sub_no] != NULL) {
+                mmal_buffer_header_release(stash->sub_bufs[sub_no]);
+                stash->sub_bufs[sub_no] = NULL;
+            }
+        }
+    }
+
     pic_fifo_release_all(&sys->slice.pics);
     pic_fifo_release_all(&sys->ret_pics);
 
@@ -1231,12 +1249,31 @@ static void conv_flush(filter_t * p_filter)
 #endif
 }
 
+static void conv_stash_fixup(filter_t * const p_filter, filter_sys_t * const sys, picture_t * const p_pic)
+{
+    conv_frame_stash_t * const stash = sys->stash + (p_pic->date & 0xf);
+    unsigned int sub_no;
+    VLC_UNUSED(p_filter);
+
+    p_pic->date = stash->pts;
+    for (sub_no = 0; sub_no != SUBS_MAX; ++sub_no) {
+        if (stash->sub_bufs[sub_no] != NULL) {
+            // **** Do stashed blend
+            // **** Aaargh, bother... need to rescale subs too
+
+            mmal_buffer_header_release(stash->sub_bufs[sub_no]);
+            stash->sub_bufs[sub_no] = NULL;
+        }
+    }
+}
+
 static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 {
     filter_sys_t * const sys = p_filter->p_sys;
     picture_t * ret_pics;
     MMAL_STATUS_T err;
     const uint64_t frame_seq = ++sys->frame_seq;
+    conv_frame_stash_t * const stash = sys->stash + (frame_seq & 0xf);
 
 #if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s", __func__);
@@ -1274,6 +1311,15 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 break;
             else if (rv < 0)
                 goto fail;
+        }
+    }
+    else
+    {
+        unsigned int sub_no = 0;
+        for (sub_no = 0; sub_no != SUBS_MAX; ++sub_no) {
+            if ((stash->sub_bufs[sub_no] = hw_mmal_pic_sub_buf_get(p_pic, sub_no)) != NULL) {
+                mmal_buffer_header_acquire(stash->sub_bufs[sub_no]);
+            }
         }
     }
 
@@ -1318,7 +1364,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             goto fail;
         }
 
-        sys->pts_stash[(frame_seq & 0xf)] = p_pic->date;
+        stash->pts = p_pic->date;
         if ((err = port_send_replicated(sys->input, sys->in_pool, pic_buf, frame_seq)) != MMAL_SUCCESS)
         {
             msg_Err(p_filter, "Send buffer to input failed");
@@ -1337,7 +1383,6 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 mmal_queue_wait(sys->out_pool->queue) : mmal_queue_get(sys->out_pool->queue)) != NULL)
         {
             picture_t * const out_pic = filter_NewPicture(p_filter);
-            char dbuf0[5];
 
             if (out_pic == NULL) {
                 msg_Warn(p_filter, "Failed to alloc new filter output pic");
@@ -1346,6 +1391,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             }
 
 #if 0
+            char dbuf0[5];
             msg_Dbg(p_filter, "out_pic %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d",
                     str_fourcc(dbuf0, out_pic->format.i_chroma),
                     out_pic->format.i_width, out_pic->format.i_height,
@@ -1399,6 +1445,8 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     if (ret_pics != NULL)
     {
         picture_t *next_pic = ret_pics->p_next;
+
+        conv_stash_fixup(p_filter, sys, ret_pics);
 #if 0
         char dbuf0[5];
 
@@ -1411,6 +1459,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 #endif
         while (next_pic != NULL) {
             vlc_sem_wait(&sys->sem);
+            conv_stash_fixup(p_filter, sys, next_pic);
             next_pic = next_pic->p_next;
         }
     }
@@ -1612,6 +1661,12 @@ retry:
 
     status = mmal_component_create(sys->component_name, &sys->component);
     if (status != MMAL_SUCCESS) {
+        if (!use_isp && !use_resizer) {
+            msg_Warn(p_filter, "Failed to rcreate HVS resizer - retrying with ISP");
+            CloseConverter(obj);
+            use_isp = true;
+            goto retry;
+        }
         msg_Err(p_filter, "Failed to create MMAL component %s (status=%"PRIx32" %s)",
                 MMAL_COMPONENT_DEFAULT_VIDEO_DECODER, status, mmal_status_to_string(status));
         goto fail;

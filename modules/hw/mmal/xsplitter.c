@@ -207,6 +207,11 @@ static int vout_display_Control(vout_display_t *vd, int query, ...)
     return result;
 }
 
+static bool want_mmal_vout(vout_display_t * vd, const mmal_x11_sys_t * const sys)
+{
+    return sys->mmal_vout != NULL && var_InheritBool(vd, "fullscreen");
+}
+
 /* Control on the module (mandatory) */
 static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
 {
@@ -224,7 +229,7 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
         {
             const vout_display_cfg_t * cfg = va_arg(va, const vout_display_cfg_t *);
-            const bool want_mmal = sys->mmal_vout != NULL && var_InheritBool(vd, "fullscreen");
+            const bool want_mmal = want_mmal_vout(vd, sys);
             vout_display_t *new_vd = want_mmal ? sys->mmal_vout : sys->x_vout;
 
             msg_Dbg(vd, "Change size: %d, %d: mmal_vout=%p, want_mmal=%d, fs=%d",
@@ -338,10 +343,6 @@ static int OpenMmalX11(vlc_object_t *object)
         msg_Info(vd, "Not a valid format for mmal vout (%s/%s)", str_fourcc(dbuf0, vd->fmt.i_chroma), str_fourcc(dbuf1, vd->source.i_chroma));
     }
 
-    sys->cur_vout = sys->x_vout;
-    vd->info = sys->cur_vout->info;
-    vd->fmt  = sys->cur_vout->fmt;
-
     vd->pool = mmal_x11_pool;
     vd->prepare = mmal_x11_prepare;
     vd->display = mmal_x11_display;
@@ -349,6 +350,18 @@ static int OpenMmalX11(vlc_object_t *object)
 #if DO_MANAGE
     vd->manage = mmal_x11_manage;
 #endif
+
+    if (want_mmal_vout(vd, sys)) {
+        sys->cur_vout = sys->mmal_vout;
+        sys->use_mmal = true;
+    }
+    else {
+        sys->cur_vout = sys->x_vout;
+        sys->use_mmal = false;
+    }
+
+    vd->info = sys->cur_vout->info;
+    vd->fmt  = sys->cur_vout->fmt;
 
     return VLC_SUCCESS;
 

@@ -321,6 +321,19 @@ static void isp_close(vout_display_t * const vd, vout_display_sys_t * const vd_s
     return;
 }
 
+// Restuff into output rather than return to pool is we can
+static MMAL_BOOL_T isp_out_pool_cb(MMAL_POOL_T *pool, MMAL_BUFFER_HEADER_T *buffer, void *userdata)
+{
+    struct vout_isp_conf_s * const isp = userdata;
+    VLC_UNUSED(pool);
+    if (isp->output->is_enabled) {
+        mmal_buffer_header_reset(buffer);
+        if (mmal_port_send_buffer(isp->output, buffer) == MMAL_SUCCESS)
+            return MMAL_FALSE;
+    }
+    return MMAL_TRUE;
+}
+
 static MMAL_STATUS_T isp_setup(vout_display_t * const vd, vout_display_sys_t * const vd_sys)
 {
     struct vout_isp_conf_s * const isp = &vd_sys->isp;
@@ -384,6 +397,8 @@ static MMAL_STATUS_T isp_setup(vout_display_t * const vd, vout_display_sys_t * c
         msg_Err(vd, "Failed to make ISP port pool");
         goto fail;
     }
+
+    mmal_pool_callback_set(isp->out_pool, isp_out_pool_cb, isp);
 
     if ((err = isp_prepare(vd, isp)) != MMAL_SUCCESS)
         goto fail;
@@ -605,6 +620,8 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
         MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->isp.out_q);
         sys->isp.pending = false;
 
+        msg_Dbg(vd, "--- %s: ISP stuff", __func__);
+
         if (mmal_port_send_buffer(sys->input, buf) != MMAL_SUCCESS)
         {
             mmal_buffer_header_release(buf);
@@ -615,6 +632,9 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
     else
     {
         MMAL_BUFFER_HEADER_T * const pic_buf = pic_mmal_buffer(p_pic);
+
+        msg_Dbg(vd, "--- %s: Buf stuff", __func__);
+
         if ((err = port_send_replicated(sys->input, sys->pool, pic_buf, pic_buf->pts)) != MMAL_SUCCESS)
         {
             msg_Err(vd, "Send buffer to input failed");

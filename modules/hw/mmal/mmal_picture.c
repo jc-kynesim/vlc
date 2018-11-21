@@ -627,6 +627,14 @@ static pool_ent_t * pool_best_fit(vzc_pool_ctl_t * const pc, size_t req_size)
     return best;
 }
 
+
+void hw_mmal_vzc_buf_get_wh(MMAL_BUFFER_HEADER_T * const buf, int * const pW, int * const pH)
+{
+    const pool_ent_t *const ent = ((vzc_subbuf_ent_t *)buf->user_data)->ent;
+    *pW = ent->width;
+    *pH = ent->height;
+}
+
 bool hw_mmal_vzc_buf_set_format(MMAL_BUFFER_HEADER_T * const buf, MMAL_ES_FORMAT_T * const es_fmt)
 {
     const pool_ent_t *const ent = ((vzc_subbuf_ent_t *)buf->user_data)->ent;
