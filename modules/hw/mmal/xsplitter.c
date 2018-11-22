@@ -17,7 +17,7 @@
 
 #include "mmal_picture.h"
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 typedef struct mmal_x11_sys_s
 {

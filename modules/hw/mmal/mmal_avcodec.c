@@ -51,7 +51,7 @@
 
 #include "mmal_picture.h"
 
-//#include "avcodec.h"
+#define TRACE_ALL 0
 
 #define AVPROVIDER(lib) ((lib##_VERSION_MICRO < 100) ? "libav" : "ffmpeg")
 
@@ -1433,7 +1433,9 @@ static int OpenVideoCodec( decoder_t *p_dec )
     const AVCodec *codec = p_sys->p_codec;
     int ret;
 
+#if TRACE_ALL
     msg_Dbg(p_dec, "<<< %s", __func__);
+#endif
 
     if( ctx->extradata_size <= 0 )
     {
@@ -1490,12 +1492,9 @@ static MMAL_BOOL_T
 zc_buf_pre_release_cb(MMAL_BUFFER_HEADER_T * buf, void *userdata)
 {
     const AVRpiZcRefPtr fr_ref = userdata;
-
-    printf("%s\n", __func__);
-
     VLC_UNUSED(buf);
+
     av_rpi_zc_unref(fr_ref);
-    printf("%s:2\n", __func__);
 
     return MMAL_FALSE;
 }
@@ -1666,8 +1665,6 @@ static int rx_frame(decoder_t * const p_dec, decoder_sys_t * const p_sys, AVCode
         i_pts = VLC_TS_INVALID;
 
     av_frame_free(&frame);
-
-    msg_Dbg(p_dec, "%s: PTS=%lld", __func__, (long long)i_pts);
 
     p_sys->b_first_frame = false;
     decoder_QueueVideo(p_dec, p_pic);

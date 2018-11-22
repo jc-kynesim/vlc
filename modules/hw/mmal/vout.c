@@ -44,7 +44,7 @@
 #include <interface/mmal/util/mmal_default_components.h>
 #include <interface/vmcs_host/vc_tvservice.h>
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 #define MAX_BUFFERS_IN_TRANSIT 1
 #define VC_TV_MAX_MODE_IDS 127
@@ -630,9 +630,9 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
     if (sys->isp.pending) {
         MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->isp.out_q);
         sys->isp.pending = false;
-
+#if TRACE_ALL
         msg_Dbg(vd, "--- %s: ISP stuff", __func__);
-
+#endif
         if (mmal_port_send_buffer(sys->input, buf) != MMAL_SUCCESS)
         {
             mmal_buffer_header_release(buf);
@@ -643,9 +643,9 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
     else
     {
         MMAL_BUFFER_HEADER_T * const pic_buf = pic_mmal_buffer(p_pic);
-
+#if TRACE_ALL
         msg_Dbg(vd, "--- %s: Buf stuff", __func__);
-
+#endif
         if ((err = port_send_replicated(sys->input, sys->pool, pic_buf, pic_buf->pts)) != MMAL_SUCCESS)
         {
             msg_Err(vd, "Send buffer to input failed");
