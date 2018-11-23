@@ -1689,12 +1689,6 @@ retry:
     vlc_to_mmal_video_fmt(sys->input->format, &p_filter->fmt_in.video);
     port_parameter_set_bool(sys->input, MMAL_PARAMETER_ZERO_COPY, 1);
 
-    if (sys->resizer_type == FILTER_RESIZER_ISP)
-    {
-        port_parameter_set_uint32(sys->input, MMAL_PARAMETER_CCM_SHIFT, enc_in != MMAL_ENCODING_YUVUV64_10 ? 0 : 5);
-        port_parameter_set_uint32(sys->output, MMAL_PARAMETER_OUTPUT_SHIFT, enc_in != MMAL_ENCODING_YUVUV64_10 ? 0 : 1);
-    }
-
     mmal_log_dump_format(sys->input->format);
 
     status = mmal_port_format_commit(sys->input);
