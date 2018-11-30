@@ -95,6 +95,7 @@ do {\
 #define PROFILE_ACC(x)
 #define PROFILE_ACC_N(x)
 #define PROFILE_PRINTF(x)
+#define PROFILE_PRINTF_N(x)
 
 #endif
 

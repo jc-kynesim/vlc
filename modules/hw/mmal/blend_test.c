@@ -124,24 +124,20 @@ int main(int argc, char *argv[])
         d0_buf[i] = 0xff00 | i;
         s0_buf[i] = (i << 24) | 0xffffff;
     }
+
     for (i = 0; i != 256; ++i) {
         test_line2(d0, 0, s0, 0, i, 256, -1);
     }
-#if 0
     for (i = 0; i != 256; ++i) {
-        test_line(d0, 0, s0, 0, i, 256, -1);
-    }
-    for (i = 0; i != 256; ++i) {
-        test_line(d0, 0, s0, 0, 128, i, -1);
+        test_line2(d0, 0, s0, 0, 128, i, -1);
     }
 
     for (j = 0; j != 16; ++j) {
         for (i = 0; i != 256; ++i) {
-            test_line(d0, j & 3, s0, j >> 2, i, 256, j);
+            test_line2(d0, j & 3, s0, j >> 2, i, 256, j);
         }
         PROFILE_PRINTF_N(j);
     }
-#endif
     printf("Done\n");
 
     return 0;

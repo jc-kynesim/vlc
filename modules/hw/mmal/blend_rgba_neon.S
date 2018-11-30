@@ -67,7 +67,6 @@ tail_rgbx_rgba:
         vstrne     s9,  [r12]
         bx         lr
 
-
 @ blend_rgbx_rgba_neon
 
 @ [r0] RGBx dest      (Byte order: R, G, B, x)
@@ -181,6 +180,81 @@ blend_rgbx_rgba_neon:
         vpop      { q4 }
         pop       { r4, pc }
 
+@ -----------------------------------------------------------------------------
+
+tail_bgrx_rgba:
+        lsls       r2,  r3,  #30        @ b2 -> C, b1 -> N
+        mov        r2,  r0
+        bcc        1f
+        vld4.8    {d16[0], d17[0], d18[0], d19[0]}, [r1]!
+        vld4.8    {d20[0], d21[0], d22[0], d23[0]}, [r0]!
+        vld4.8    {d16[1], d17[1], d18[1], d19[1]}, [r1]!
+        vld4.8    {d20[1], d21[1], d22[1], d23[1]}, [r0]!
+        vld4.8    {d16[2], d17[2], d18[2], d19[2]}, [r1]!
+        vld4.8    {d20[2], d21[2], d22[2], d23[2]}, [r0]!
+        vld4.8    {d16[3], d17[3], d18[3], d19[3]}, [r1]!
+        vld4.8    {d20[3], d21[3], d22[3], d23[3]}, [r0]!
+1:
+        bpl        1f
+        vld4.8    {d16[4], d17[4], d18[4], d19[4]}, [r1]!
+        vld4.8    {d20[4], d21[4], d22[4], d23[4]}, [r0]!
+        vld4.8    {d16[5], d17[5], d18[5], d19[5]}, [r1]!
+        vld4.8    {d20[5], d21[5], d22[5], d23[5]}, [r0]!
+1:
+        tst        r3,  #1
+        beq        1f
+        vld4.8    {d16[6], d17[6], d18[6], d19[6]}, [r1]!
+        vld4.8    {d20[6], d21[6], d22[6], d23[6]}, [r0]!
+1:
+        @ Alpha ends up in d19
+
+        vmovl.u8   q14, d19
+        vmull.u16  q15, d29, d7[0]
+        vmull.u16  q14, d28, d7[0]
+        vrshrn.u32 d31, q15, #16
+        vrshrn.u32 d30, q14, #16
+        vmovn.u16  d31, q15
+        vsub.u8    d30, d6,  d31
+
+        vmull.u8   q12, d16, d31
+        vmull.u8   q13, d17, d31
+        vmull.u8   q14, d18, d31
+
+        vmlal.u8   q12, d20, d30
+        vmlal.u8   q13, d21, d30
+        vmlal.u8   q14, d22, d30
+
+        vsra.u16   q12, q12, #8
+        vsra.u16   q13, q13, #8
+        vsra.u16   q14, q14, #8
+
+        vrshrn.u16 d16, q12, #8
+        vrshrn.u16 d17, q13, #8
+        vrshrn.u16 d18, q14, #8
+        vmov.u8    d19, #0xff
+
+        mov        r0,  r2
+        lsls       r2,  r3,  #30        @ b2 -> C, b1 -> N
+        mov        r2,  r0
+        bcc        1f
+        vst4.8    {d16[0], d17[0], d18[0], d19[0]}, [r0]!
+        vst4.8    {d16[1], d17[1], d18[1], d19[1]}, [r0]!
+        vst4.8    {d16[2], d17[2], d18[2], d19[2]}, [r0]!
+        vst4.8    {d16[3], d17[3], d18[3], d19[3]}, [r0]!
+1:
+        bpl        1f
+        vst4.8    {d16[4], d17[4], d18[4], d19[4]}, [r0]!
+        vst4.8    {d16[5], d17[5], d18[5], d19[5]}, [r0]!
+1:
+        tst        r3,  #1
+        beq        1f
+        vst4.8    {d16[6], d17[6], d18[6], d19[6]}, [r0]!
+1:
+        bx         lr
+
+
+
+
 @ [r0] RGBx dest      (Byte order: R, G, B, x)
 @ [r1] RGBA src merge (Byte order: R, G, B, A)
 @ r2   plane alpha
@@ -192,11 +266,32 @@ blend_rgbx_rgba_neon:
         .type   blend_bgrx_rgba_neon, %function
 #endif
 blend_bgrx_rgba_neon:
+        push      { r4, lr }
+
         movw       r12, #257
         mul        r2,  r12
         vmov       s14, r2      @ s14 = d7[0]
 
         vmov.u8    d6,  #0xff
+
+        subs       r3,  #8
+        blt        2f
+
+        @ If < 16 bytes to move then don't bother trying to align
+        @ (a) This means the the align doesn't need to worry about r3 underflow
+        @ (b) The overhead would be greater than any gain
+        cmp        r3,  #8
+        ble        1f
+
+        @ Align r1 on a 32 byte boundary
+        mov        r4,  r3
+        neg        r3,  r0
+        ubfx       r3,  r3,  #2,  #3
+
+        cmp        r3,  #0
+        blne       tail_bgrx_rgba
+
+        sub        r3,  r4,  r3
 
 1:
         @ Alpha ends up in d19
@@ -231,6 +326,11 @@ blend_bgrx_rgba_neon:
         subs       r3,  #8
 
         vst4.8    {d16, d17, d18, d19}, [r0]!
-        bgt        1b
+        bge        1b
 
-        bx         lr
+2:
+        cmp        r3, #-8
+        blgt       tail_bgrx_rgba
+
+        pop       { r4, pc }
+
