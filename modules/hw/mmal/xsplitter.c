@@ -110,6 +110,8 @@ static vout_display_t * load_display_module(vout_display_t * const vd,
         goto fail;
     }
 
+    msg_Dbg(vd, "R/G/B: %08x/%08x/%08x", x_vout->fmt.i_rmask, x_vout->fmt.i_gmask, x_vout->fmt.i_bmask);
+
     return x_vout;
 
 fail:

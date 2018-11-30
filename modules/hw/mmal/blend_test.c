@@ -4,7 +4,7 @@
 
 #include "blend_rgba_neon.h"
 
-#define RPI_PROFILE 1
+#define RPI_PROFILE 0
 #define RPI_PROC_ALLOC 1
 #include "rpi_prof.h"
 
@@ -71,6 +71,35 @@ static void test_line(const uint32_t * const dx, const unsigned int d_off,
     }
 }
 
+static void test_line2(const uint32_t * const dx, const unsigned int d_off,
+                      const uint32_t * const sx, const unsigned int s_off,
+                      const unsigned int alpha, const unsigned int len, const int prof_no)
+{
+    uint32_t d0_buf[BUF_ALLOC];
+    uint32_t d1_buf[BUF_ALLOC];
+    const uint32_t * const s0 = sx + s_off;
+
+    uint32_t * const d0 =  (uint32_t *)(((uintptr_t)d0_buf + (BUF_ALIGN - 1)) & ~(BUF_ALIGN - 1)) + d_off;
+    uint32_t * const d1 = (uint32_t *)(((uintptr_t)d1_buf + (BUF_ALIGN - 1)) & ~(BUF_ALIGN - 1)) + d_off;
+    unsigned int i;
+
+    memcpy(d0, dx, (BUF_SIZE + BUF_SLACK*2)*4);
+    memcpy(d1, dx, (BUF_SIZE + BUF_SLACK*2)*4);
+
+    merge_line(d0 + BUF_SLACK, s0 + BUF_SLACK, alpha, len);
+
+    PROFILE_START();
+    blend_bgrx_rgba_neon(d1 + BUF_SLACK, s0 + BUF_SLACK, alpha, len);
+    PROFILE_ACC_N(prof_no);
+
+    for (i = 0; i != BUF_SIZE + BUF_SLACK*2; ++i) {
+        if (d0[i] != d1[i]) {
+            printf("%3d: %08x + %08x * %02x: %08x / %08x: len=%d\n", (int)(i - BUF_SLACK), dx[i], s0[i], alpha, d0[i], d1[i], len);
+        }
+    }
+}
+
+
 
 int main(int argc, char *argv[])
 {
@@ -96,6 +125,10 @@ int main(int argc, char *argv[])
         s0_buf[i] = (i << 24) | 0xffffff;
     }
     for (i = 0; i != 256; ++i) {
+        test_line2(d0, 0, s0, 0, i, 256, -1);
+    }
+#if 0
+    for (i = 0; i != 256; ++i) {
         test_line(d0, 0, s0, 0, i, 256, -1);
     }
     for (i = 0; i != 256; ++i) {
@@ -108,7 +141,7 @@ int main(int argc, char *argv[])
         }
         PROFILE_PRINTF_N(j);
     }
-
+#endif
     printf("Done\n");
 
     return 0;

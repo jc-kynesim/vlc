@@ -72,6 +72,47 @@ MMAL_FOURCC_T vlc_to_mmal_color_space(const video_color_space_t vlc_cs)
     return MMAL_COLOR_SPACE_UNKNOWN;
 }
 
+MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc)
+{
+    switch (vf_vlc->i_chroma) {
+        case VLC_CODEC_I420:
+            return MMAL_ENCODING_I420;
+        case VLC_CODEC_RGB32:
+        {
+            // VLC RGB32 aka RV32 means we have to look at the mask values
+            const uint32_t r = vf_vlc->i_rmask;
+            const uint32_t g = vf_vlc->i_gmask;
+            const uint32_t b = vf_vlc->i_bmask;
+            if (r == 0xff0000 && g == 0xff00 && b == 0xff)
+                return MMAL_ENCODING_BGRA;
+            if (r == 0xff && g == 0xff00 && b == 0xff0000)
+                return MMAL_ENCODING_RGBA;
+            if (r == 0xff000000 && g == 0xff0000 && b == 0xff00)
+                return MMAL_ENCODING_ABGR;
+            if (r == 0xff00 && g == 0xff0000 && b == 0xff000000)
+                return MMAL_ENCODING_ARGB;
+            break;
+        }
+        case VLC_CODEC_RGBA:
+            return MMAL_ENCODING_RGBA;
+        case VLC_CODEC_BGRA:
+            return MMAL_ENCODING_BGRA;
+        case VLC_CODEC_ARGB:
+            return MMAL_ENCODING_ARGB;
+        // VLC_CODEC_ABGR does not exist in VLC
+        case VLC_CODEC_MMAL_OPAQUE:
+            return MMAL_ENCODING_OPAQUE;
+        case VLC_CODEC_MMAL_ZC_SAND8:
+            return MMAL_ENCODING_YUVUV128;
+        case VLC_CODEC_MMAL_ZC_SAND10:
+            return MMAL_ENCODING_YUVUV64_10;
+        default:
+            break;
+    }
+    return 0;
+}
+
+
 void vlc_to_mmal_video_fmt(MMAL_ES_FORMAT_T *const es_fmt, const video_frame_format_t * const vf_vlc)
 {
     MMAL_VIDEO_FORMAT_T * const vf_mmal = &es_fmt->es->video;
@@ -369,6 +410,7 @@ typedef struct pool_ent_s
 
     unsigned int width;
     unsigned int height;
+    MMAL_FOURCC_T enc_type;
 
     picture_t * pic;
 } pool_ent_t;
@@ -641,8 +683,8 @@ bool hw_mmal_vzc_buf_set_format(MMAL_BUFFER_HEADER_T * const buf, MMAL_ES_FORMAT
     MMAL_VIDEO_FORMAT_T * const v_fmt = &es_fmt->es->video;
 
     es_fmt->type = MMAL_ES_TYPE_VIDEO;
-    es_fmt->encoding = MMAL_ENCODING_BGRA;
-    es_fmt->encoding_variant = MMAL_ENCODING_BGRA;
+    es_fmt->encoding = ent->enc_type;
+    es_fmt->encoding_variant = 0;
 
     v_fmt->width = ent->width;
     v_fmt->height = ent->height;
@@ -752,6 +794,7 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
         const size_t dst_size = dst_stride * dst_lines;
 
         pool_ent_t * ent = ent_list_extract_pic_ent(&pc->ents_prev, pic);
+        bool needs_copy = false;
 
         // If we didn't find ent in last then look in cur in case is_first
         // isn't working
@@ -762,8 +805,14 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
 
         if (ent == NULL)
         {
+            // Need a new ent
+            needs_copy = true;
+
             if ((ent = pool_best_fit(pc, dst_size)) == NULL)
                 goto fail2;
+            if ((ent->enc_type = vlc_to_mmal_video_fourcc(&pic->format)) == 0)
+                goto fail2;
+
             ent->pic = picture_Hold(pic);
         }
 
@@ -804,22 +853,25 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
             .height = dst_pic->format.i_visible_height
         };
 
-        ent->width = dst_stride / bpp;
-        ent->height = dst_lines;
-
-        // 2D copy
+        if (needs_copy)
         {
-            unsigned int i;
-            uint8_t *d = ent->buf;
-            const uint8_t *s = pic->p[0].p_pixels + xl * bpp + fmt->i_y_offset * pic->p[0].i_pitch;
-            for (i = 0; i != fmt->i_visible_height; ++i) {
-                memcpy(d, s, dst_stride);
-                d += dst_stride;
-                s += pic->p[0].i_pitch;
-            }
+            ent->width = dst_stride / bpp;
+            ent->height = dst_lines;
 
-            // And make sure it is actually in memory
-            flush_range(ent->buf, d - (uint8_t *)ent->buf);
+            // 2D copy
+            {
+                unsigned int i;
+                uint8_t *d = ent->buf;
+                const uint8_t *s = pic->p[0].p_pixels + xl * bpp + fmt->i_y_offset * pic->p[0].i_pitch;
+                for (i = 0; i != fmt->i_visible_height; ++i) {
+                    memcpy(d, s, dst_stride);
+                    d += dst_stride;
+                    s += pic->p[0].i_pitch;
+                }
+
+                // And make sure it is actually in memory
+                flush_range(ent->buf, d - (uint8_t *)ent->buf);
+            }
         }
     }
 

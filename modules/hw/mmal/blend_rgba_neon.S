@@ -181,5 +181,56 @@ blend_rgbx_rgba_neon:
         vpop      { q4 }
         pop       { r4, pc }
 
+@ [r0] RGBx dest      (Byte order: R, G, B, x)
+@ [r1] RGBA src merge (Byte order: R, G, B, A)
+@ r2   plane alpha
+@ r3   count (pixels)
 
+        .align  16
+        .global blend_bgrx_rgba_neon
+#ifdef __ELF__
+        .type   blend_bgrx_rgba_neon, %function
+#endif
+blend_bgrx_rgba_neon:
+        movw       r12, #257
+        mul        r2,  r12
+        vmov       s14, r2      @ s14 = d7[0]
 
+        vmov.u8    d6,  #0xff
+
+1:
+        @ Alpha ends up in d19
+        vld4.8    {d16, d17, d18, d19}, [r1]!
+
+        vmovl.u8   q14, d19
+        vmull.u16  q15, d29, d7[0]
+        vmull.u16  q14, d28, d7[0]
+        vrshrn.u32 d31, q15, #16
+        vrshrn.u32 d30, q14, #16
+        vmovn.u16  d31, q15
+        vsub.u8    d30, d6,  d31
+
+        vld4.8    {d20, d21, d22, d23}, [r0]
+
+        vmull.u8   q12, d16, d31
+        vmull.u8   q13, d17, d31
+        vmull.u8   q14, d18, d31
+
+        vmlal.u8   q12, d20, d30
+        vmlal.u8   q13, d21, d30
+        vmlal.u8   q14, d22, d30
+
+        vsra.u16   q12, q12, #8
+        vsra.u16   q13, q13, #8
+        vsra.u16   q14, q14, #8
+
+        vrshrn.u16 d16, q12, #8
+        vrshrn.u16 d17, q13, #8
+        vrshrn.u16 d18, q14, #8
+        vmov.u8    d19, #0xff
+        subs       r3,  #8
+
+        vst4.8    {d16, d17, d18, d19}, [r0]!
+        bgt        1b
+
+        bx         lr

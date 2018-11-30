@@ -184,26 +184,6 @@ static MMAL_FOURCC_T vlc_to_mmal_es_fourcc(const unsigned int fcc)
     return 0;
 }
 
-static MMAL_FOURCC_T vlc_to_mmal_pic_fourcc(const unsigned int fcc)
-{
-    switch (fcc){
-    case VLC_CODEC_I420:
-        return MMAL_ENCODING_I420;
-    case VLC_CODEC_RGB32:           // _RGB32 doesn't exist in mmal magic mapping table
-    case VLC_CODEC_RGBA:
-        return MMAL_ENCODING_BGRA;
-    case VLC_CODEC_MMAL_OPAQUE:
-        return MMAL_ENCODING_OPAQUE;
-    case VLC_CODEC_MMAL_ZC_SAND8:
-        return MMAL_ENCODING_YUVUV128;
-    case VLC_CODEC_MMAL_ZC_SAND10:
-        return MMAL_ENCODING_YUVUV64_10;
-    default:
-        break;
-    }
-    return 0;
-}
-
 static MMAL_FOURCC_T pic_to_slice_mmal_fourcc(const MMAL_FOURCC_T fcc)
 {
     switch (fcc){
@@ -236,6 +216,22 @@ static MMAL_FOURCC_T pic_to_slice_mmal_fourcc(const MMAL_FOURCC_T fcc)
     }
     return 0;
 }
+
+#define DEBUG_SQUARES 0
+#if DEBUG_SQUARES
+static void draw_square(void * pic_buf, size_t pic_stride, unsigned int x, unsigned int y, unsigned int w, unsigned int h, uint32_t val)
+{
+    uint32_t * p = (uint32_t *)pic_buf + y * pic_stride + x;
+    unsigned int i;
+    for (i = 0; i != h; ++i) {
+        unsigned int j;
+        for (j = 0; j != w; ++j) {
+            p[j] = val;
+        }
+        p += pic_stride;
+    }
+}
+#endif
 
 #if 0
 static inline void draw_line(void * pic_buf, size_t pic_stride, unsigned int x, unsigned int y, unsigned int len, int inc)
@@ -969,8 +965,8 @@ static void pic_to_format(MMAL_ES_FORMAT_T * const es_fmt, const picture_t * con
     MMAL_VIDEO_FORMAT_T * const v_fmt = &es_fmt->es->video;
 
     es_fmt->type = MMAL_ES_TYPE_VIDEO;
-    es_fmt->encoding_variant = es_fmt->encoding =
-        vlc_to_mmal_pic_fourcc(pic->format.i_chroma);
+    es_fmt->encoding = vlc_to_mmal_video_fourcc(&pic->format);
+    es_fmt->encoding_variant = 0;
 
     // Fill in crop etc.
     vlc_to_mmal_video_fmt(es_fmt, &pic->format);
@@ -1084,7 +1080,11 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
             buf_to_pic_copy_props(pic, buf);
 
 //            draw_corners(pic->p[0].p_pixels, pic->p[0].i_pitch / 4, 0, 0, pic->p[0].i_visible_pitch / 4, pic->p[0].i_visible_lines);
-
+#if DEBUG_SQUARES
+            draw_square(pic->p[0].p_pixels, pic->p[0].i_pitch / 4,  0, 0, 32, 32, 0xffff0000);
+            draw_square(pic->p[0].p_pixels, pic->p[0].i_pitch / 4, 32, 0, 32, 32, 0xff00ff00);
+            draw_square(pic->p[0].p_pixels, pic->p[0].i_pitch / 4, 64, 0, 32, 32, 0xff0000ff);
+#endif
             conv_out_q_pic(sys, pic);
         }
     }
@@ -1573,7 +1573,7 @@ static int OpenConverter(vlc_object_t * obj)
     filter_sys_t *sys;
     MMAL_STATUS_T status;
     MMAL_FOURCC_T enc_out;
-    const MMAL_FOURCC_T enc_in = vlc_to_mmal_pic_fourcc(p_filter->fmt_in.i_codec);
+    const MMAL_FOURCC_T enc_in = vlc_to_mmal_video_fourcc(&p_filter->fmt_in.video);
     bool use_resizer;
     bool use_isp;
     int gpu_mem;
@@ -1581,7 +1581,7 @@ static int OpenConverter(vlc_object_t * obj)
     if ((enc_in != MMAL_ENCODING_OPAQUE &&
          enc_in != MMAL_ENCODING_YUVUV128 &&
          enc_in != MMAL_ENCODING_YUVUV64_10) ||
-        (enc_out = vlc_to_mmal_pic_fourcc(p_filter->fmt_out.i_codec)) == 0)
+        (enc_out = vlc_to_mmal_video_fourcc(&p_filter->fmt_out.video)) == 0)
         return VLC_EGENERIC;
 
     use_resizer = var_InheritBool(p_filter, MMAL_RESIZE_NAME);
@@ -1611,15 +1611,16 @@ retry:
     gpu_mem = hw_mmal_get_gpu_mem();
 
     {
-        char dbuf0[5], dbuf1[5], dbuf2[5];
-        msg_Dbg(p_filter, "%s: (%s) %s/%s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s,%dx%d [(%d,%d) %dx%d] sar:%d/%d (gpu=%d)", __func__,
+        char dbuf0[5], dbuf1[5], dbuf2[5], dbuf3[5];
+        msg_Dbg(p_filter, "%s: (%s) %s/%s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s/%s,%dx%d [(%d,%d) %dx%d] sar:%d/%d (gpu=%d)", __func__,
                 use_resizer ? "resize" : use_isp ? "isp" : "hvs",
                 str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), str_fourcc(dbuf2, enc_in),
                 p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
                 p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
                 p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
                 p_filter->fmt_in.video.i_sar_num, p_filter->fmt_in.video.i_sar_den,
-                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
+                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), str_fourcc(dbuf3, enc_out),
+                p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
                 p_filter->fmt_out.video.i_x_offset, p_filter->fmt_out.video.i_y_offset,
                 p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height,
                 p_filter->fmt_out.video.i_sar_num, p_filter->fmt_out.video.i_sar_den,
@@ -1980,20 +1981,27 @@ static int OpenBlendNeon(vlc_object_t *object)
     filter_t * const p_filter = (filter_t *)object;
     const vlc_fourcc_t vfcc_src = p_filter->fmt_in.video.i_chroma;
     const vlc_fourcc_t vfcc_dst = p_filter->fmt_out.video.i_chroma;
+    MMAL_FOURCC_T mfcc_src = vlc_to_mmal_video_fourcc(&p_filter->fmt_in.video);
+    MMAL_FOURCC_T mfcc_dst = vlc_to_mmal_video_fourcc(&p_filter->fmt_out.video);
 
     {
         char dbuf0[5], dbuf1[5];
-        msg_Dbg(p_filter, "%s: (%s) %s,%dx%d [(%d,%d) %dx%d]->%s,%dx%d [(%d,%d) %dx%d]", __func__,
+        char dbuf0a[5], dbuf1a[5];
+        msg_Dbg(p_filter, "%s: (%s) %s/%s,%dx%d [(%d,%d) %dx%d]->%s/%s,%dx%d [(%d,%d) %dx%d]", __func__,
                 "blend",
-                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
+                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma),
+                str_fourcc(dbuf0a, mfcc_src),
+                p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
                 p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
                 p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
-                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma), p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
+                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma),
+                str_fourcc(dbuf1a, mfcc_dst),
+                p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
                 p_filter->fmt_out.video.i_x_offset, p_filter->fmt_out.video.i_y_offset,
                 p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height);
     }
 
-    if (vfcc_dst != VLC_CODEC_RGB32 || vfcc_src != VLC_CODEC_RGBA) {
+    if (vfcc_dst != VLC_CODEC_RGB32) {
         return VLC_EGENERIC;
     }
 

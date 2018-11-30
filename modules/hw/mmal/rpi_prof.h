@@ -93,6 +93,7 @@ do {\
 #define PROFILE_INIT()
 #define PROFILE_START()
 #define PROFILE_ACC(x)
+#define PROFILE_ACC_N(x)
 #define PROFILE_PRINTF(x)
 
 #endif

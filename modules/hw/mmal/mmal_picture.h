@@ -74,7 +74,7 @@ typedef struct pic_ctx_mmal_s {
 #endif
 } pic_ctx_mmal_t;
 
-
+MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc);
 MMAL_FOURCC_T vlc_to_mmal_color_space(const video_color_space_t vlc_cs);
 void vlc_to_mmal_video_fmt(MMAL_ES_FORMAT_T *const es_fmt, const video_frame_format_t * const vf_vlc);
 
