@@ -38,6 +38,25 @@ static void merge_line(void * dest, const void * src, int alpha, unsigned int n)
     }
 }
 
+
+// Merge RGBA with BGRA
+static void merge_line2(void * dest, const void * src, int alpha, unsigned int n)
+{
+    unsigned int i;
+    const uint8_t * s_data = src;
+    uint8_t * d_data = dest;
+
+    for (i = 0; i != n; ++i) {
+        const uint32_t s_pel = ((const uint32_t *)s_data)[i];
+        const uint32_t d_pel = ((const uint32_t *)d_data)[i];
+        const unsigned int a = div255(alpha * (s_pel >> 24));
+        ((uint32_t *)d_data)[i] = 0xff000000 |
+            (a_merge((d_pel >> 0)  & 0xff, (s_pel >> 16) & 0xff, a) << 0 ) |
+            (a_merge((d_pel >> 8)  & 0xff, (s_pel >> 8)  & 0xff, a) << 8 ) |
+            (a_merge((d_pel >> 16) & 0xff, (s_pel >> 0)  & 0xff, a) << 16);
+    }
+}
+
 #define BUF_SIZE   256
 #define BUF_SLACK  16
 #define BUF_ALIGN  64
@@ -86,7 +105,7 @@ static void test_line2(const uint32_t * const dx, const unsigned int d_off,
     memcpy(d0, dx, (BUF_SIZE + BUF_SLACK*2)*4);
     memcpy(d1, dx, (BUF_SIZE + BUF_SLACK*2)*4);
 
-    merge_line(d0 + BUF_SLACK, s0 + BUF_SLACK, alpha, len);
+    merge_line2(d0 + BUF_SLACK, s0 + BUF_SLACK, alpha, len);
 
     PROFILE_START();
     blend_bgrx_rgba_neon(d1 + BUF_SLACK, s0 + BUF_SLACK, alpha, len);
@@ -122,8 +141,23 @@ int main(int argc, char *argv[])
 
     for (i = 0; i != BUF_ALLOC; ++i) {
         d0_buf[i] = 0xff00 | i;
-        s0_buf[i] = (i << 24) | 0xffffff;
+        s0_buf[i] = (i << 24) | 0x40ffc0;
     }
+
+    for (i = 0; i != 256; ++i) {
+        test_line(d0, 0, s0, 0, i, 256, -1);
+    }
+    for (i = 0; i != 256; ++i) {
+        test_line(d0, 0, s0, 0, 128, i, -1);
+    }
+
+    for (j = 0; j != 16; ++j) {
+        for (i = 0; i != 256; ++i) {
+            test_line(d0, j & 3, s0, j >> 2, i, 256, j);
+        }
+        PROFILE_PRINTF_N(j);
+    }
+    printf("Done 1\n");
 
     for (i = 0; i != 256; ++i) {
         test_line2(d0, 0, s0, 0, i, 256, -1);
@@ -138,7 +172,7 @@ int main(int argc, char *argv[])
         }
         PROFILE_PRINTF_N(j);
     }
-    printf("Done\n");
+    printf("Done 2\n");
 
     return 0;
 }

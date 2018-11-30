@@ -1971,6 +1971,71 @@ static void FilterBlendNeon(filter_t *p_filter,
     } while (--height > 0);
 }
 
+static void FilterBlendNeon_bgrx_rgba(filter_t *p_filter,
+                  picture_t *dst_pic, const picture_t * src_pic,
+                  int x_offset, int y_offset, int alpha)
+{
+    const uint8_t * s_data;
+    uint8_t * d_data;
+    int width = src_pic->format.i_visible_width;
+    int height = src_pic->format.i_visible_height;
+
+#if TRACE_ALL
+    msg_Dbg(p_filter, "%s (%d,%d:%d) pic=%p, pts=%lld, force=%d", __func__, x_offset, y_offset, alpha, src_pic, src_pic->date, src_pic->b_force);
+#else
+    VLC_UNUSED(p_filter);
+#endif
+
+    if (alpha == 0 ||
+        src_pic->format.i_visible_height == 0 ||
+        src_pic->format.i_visible_width == 0)
+    {
+        return;
+    }
+
+    x_offset += dst_pic->format.i_x_offset;
+    y_offset += dst_pic->format.i_y_offset;
+
+    // Deal with R/B overrun
+    if (x_offset + width >= (int)(dst_pic->format.i_x_offset + dst_pic->format.i_visible_width))
+        width = dst_pic->format.i_x_offset + dst_pic->format.i_visible_width - x_offset;
+    if (y_offset + height >= (int)(dst_pic->format.i_y_offset + dst_pic->format.i_visible_height))
+        height = dst_pic->format.i_y_offset + dst_pic->format.i_visible_height - y_offset;
+
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    // *** L/U overrun
+
+    s_data = src_pic->p[0].p_pixels +
+        src_pic->p[0].i_pixel_pitch * src_pic->format.i_x_offset +
+        src_pic->p[0].i_pitch * src_pic->format.i_y_offset;
+    d_data = dst_pic->p[0].p_pixels +
+        dst_pic->p[0].i_pixel_pitch * x_offset +
+        dst_pic->p[0].i_pitch * y_offset;
+
+
+    do {
+#if 1
+        blend_bgrx_rgba_neon(d_data, s_data, alpha, width);
+#else
+        int i;
+        for (i = 0; i != width; ++i) {
+            const uint32_t s_pel = ((const uint32_t *)s_data)[i];
+            const uint32_t d_pel = ((const uint32_t *)d_data)[i];
+            const unsigned int a = div255(alpha * (s_pel >> 24));
+            ((uint32_t *)d_data)[i] = 0xff000000 |
+                (a_merge((d_pel >> 16) & 0xff, (s_pel >> 16) & 0xff, a) << 16) |
+                (a_merge((d_pel >> 8)  & 0xff, (s_pel >> 8)  & 0xff, a) << 8 ) |
+                (a_merge((d_pel >> 0)  & 0xff, (s_pel >> 0)  & 0xff, a) << 0 );
+        }
+#endif
+        s_data += src_pic->p[0].i_pitch;
+        d_data += dst_pic->p[0].i_pitch;
+    } while (--height > 0);
+}
+
 static void CloseBlendNeon(vlc_object_t *object)
 {
     VLC_UNUSED(object);
@@ -2005,7 +2070,14 @@ static int OpenBlendNeon(vlc_object_t *object)
         return VLC_EGENERIC;
     }
 
-    p_filter->pf_video_blend = FilterBlendNeon;
+    switch (mfcc_src) {
+    case MMAL_ENCODING_RGBA:
+    case MMAL_ENCODING_BGRA:
+        p_filter->pf_video_blend = mfcc_src == mfcc_dst ? FilterBlendNeon : FilterBlendNeon_bgrx_rgba;
+        break;
+    default:
+        return VLC_EGENERIC;
+    }
     return VLC_SUCCESS;
 }
 

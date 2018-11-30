@@ -182,7 +182,8 @@ blend_rgbx_rgba_neon:
 
 @ -----------------------------------------------------------------------------
 
-tail_bgrx_rgba:
+
+.macro blend_tail sR, sG, sB, sA, dR, dG, dB, dA
         lsls       r2,  r3,  #30        @ b2 -> C, b1 -> N
         mov        r2,  r0
         bcc        1f
@@ -208,7 +209,7 @@ tail_bgrx_rgba:
 1:
         @ Alpha ends up in d19
 
-        vmovl.u8   q14, d19
+        vmovl.u8   q14, \sA
         vmull.u16  q15, d29, d7[0]
         vmull.u16  q14, d28, d7[0]
         vrshrn.u32 d31, q15, #16
@@ -216,42 +217,42 @@ tail_bgrx_rgba:
         vmovn.u16  d31, q15
         vsub.u8    d30, d6,  d31
 
-        vmull.u8   q12, d16, d31
-        vmull.u8   q13, d17, d31
-        vmull.u8   q14, d18, d31
+        vmull.u8   q12, \sR, d31
+        vmull.u8   q13, \sG, d31
+        vmull.u8   q14, \sB, d31
 
-        vmlal.u8   q12, d20, d30
-        vmlal.u8   q13, d21, d30
-        vmlal.u8   q14, d22, d30
+        vmlal.u8   q12, \dR, d30
+        vmlal.u8   q13, \dG, d30
+        vmlal.u8   q14, \dB, d30
 
         vsra.u16   q12, q12, #8
         vsra.u16   q13, q13, #8
         vsra.u16   q14, q14, #8
 
-        vrshrn.u16 d16, q12, #8
-        vrshrn.u16 d17, q13, #8
-        vrshrn.u16 d18, q14, #8
-        vmov.u8    d19, #0xff
+        vrshrn.u16 \dR, q12, #8
+        vrshrn.u16 \dG, q13, #8
+        vrshrn.u16 \dB, q14, #8
+        vmov.u8    \dA, #0xff
 
         mov        r0,  r2
         lsls       r2,  r3,  #30        @ b2 -> C, b1 -> N
         mov        r2,  r0
         bcc        1f
-        vst4.8    {d16[0], d17[0], d18[0], d19[0]}, [r0]!
-        vst4.8    {d16[1], d17[1], d18[1], d19[1]}, [r0]!
-        vst4.8    {d16[2], d17[2], d18[2], d19[2]}, [r0]!
-        vst4.8    {d16[3], d17[3], d18[3], d19[3]}, [r0]!
+        vst4.8    {d20[0], d21[0], d22[0], d23[0]}, [r0]!
+        vst4.8    {d20[1], d21[1], d22[1], d23[1]}, [r0]!
+        vst4.8    {d20[2], d21[2], d22[2], d23[2]}, [r0]!
+        vst4.8    {d20[3], d21[3], d22[3], d23[3]}, [r0]!
 1:
         bpl        1f
-        vst4.8    {d16[4], d17[4], d18[4], d19[4]}, [r0]!
-        vst4.8    {d16[5], d17[5], d18[5], d19[5]}, [r0]!
+        vst4.8    {d20[4], d21[4], d22[4], d23[4]}, [r0]!
+        vst4.8    {d20[5], d21[5], d22[5], d23[5]}, [r0]!
 1:
         tst        r3,  #1
         beq        1f
-        vst4.8    {d16[6], d17[6], d18[6], d19[6]}, [r0]!
+        vst4.8    {d20[6], d21[6], d22[6], d23[6]}, [r0]!
 1:
         bx         lr
-
+.endm
 
 
 
@@ -265,7 +266,10 @@ tail_bgrx_rgba:
 #ifdef __ELF__
         .type   blend_bgrx_rgba_neon, %function
 #endif
-blend_bgrx_rgba_neon:
+
+
+.macro blend_main sR, sG, sB, sA, dR, dG, dB, dA, tail_fn
+
         push      { r4, lr }
 
         movw       r12, #257
@@ -289,7 +293,7 @@ blend_bgrx_rgba_neon:
         ubfx       r3,  r3,  #2,  #3
 
         cmp        r3,  #0
-        blne       tail_bgrx_rgba
+        blne       \tail_fn
 
         sub        r3,  r4,  r3
 
@@ -297,7 +301,7 @@ blend_bgrx_rgba_neon:
         @ Alpha ends up in d19
         vld4.8    {d16, d17, d18, d19}, [r1]!
 
-        vmovl.u8   q14, d19
+        vmovl.u8   q14, \sA
         vmull.u16  q15, d29, d7[0]
         vmull.u16  q14, d28, d7[0]
         vrshrn.u32 d31, q15, #16
@@ -307,30 +311,37 @@ blend_bgrx_rgba_neon:
 
         vld4.8    {d20, d21, d22, d23}, [r0]
 
-        vmull.u8   q12, d16, d31
-        vmull.u8   q13, d17, d31
-        vmull.u8   q14, d18, d31
+        vmull.u8   q12, \sR, d31
+        vmull.u8   q13, \sG, d31
+        vmull.u8   q14, \sB, d31
 
-        vmlal.u8   q12, d20, d30
-        vmlal.u8   q13, d21, d30
-        vmlal.u8   q14, d22, d30
+        vmlal.u8   q12, \dR, d30
+        vmlal.u8   q13, \dG, d30
+        vmlal.u8   q14, \dB, d30
 
         vsra.u16   q12, q12, #8
         vsra.u16   q13, q13, #8
         vsra.u16   q14, q14, #8
 
-        vrshrn.u16 d16, q12, #8
-        vrshrn.u16 d17, q13, #8
-        vrshrn.u16 d18, q14, #8
-        vmov.u8    d19, #0xff
+        vrshrn.u16 \dR, q12, #8
+        vrshrn.u16 \dG, q13, #8
+        vrshrn.u16 \dB, q14, #8
+        vmov.u8    \dA, #0xff
         subs       r3,  #8
 
-        vst4.8    {d16, d17, d18, d19}, [r0]!
+        vst4.8    {d20, d21, d22, d23}, [r0]!
         bge        1b
 
 2:
         cmp        r3, #-8
-        blgt       tail_bgrx_rgba
+        blgt       \tail_fn
 
         pop       { r4, pc }
+.endm
+
+tail_bgrx_rgba:
+        blend_tail d18, d17, d16, d19, d20, d21, d22, d23
+
+blend_bgrx_rgba_neon:
+        blend_main d18, d17, d16, d19, d20, d21, d22, d23, tail_bgrx_rgba
 
