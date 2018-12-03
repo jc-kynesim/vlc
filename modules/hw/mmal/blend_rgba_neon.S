@@ -271,19 +271,19 @@ blend_rgbx_rgba_neon:
 
         vdup.u8    d7,  r2
 
+        subs       r3,  #8
         vmov.u8    d6,  #0xff
 
-        subs       r3,  #8
         blt        2f
 
         @ If < 16 bytes to move then don't bother trying to align
         @ (a) This means the the align doesn't need to worry about r3 underflow
         @ (b) The overhead would be greater than any gain
         cmp        r3,  #8
+        mov        r4,  r3
         ble        1f
 
         @ Align r1 on a 32 byte boundary
-        mov        r4,  r3
         neg        r3,  r0
         ubfx       r3,  r3,  #2,  #3
 
@@ -293,23 +293,28 @@ blend_rgbx_rgba_neon:
         sub        r3,  r4,  r3
 
 1:
-        @ Alpha ends up in d19
-        vld4.8    {d16, d17, d18, d19}, [r1]!
+        vld4.8    {d16, d17, d18, d19}, [r1]
 
+1:
+        @ Alpha ends up in d19
         vmull.u8   q15, \sA, d7
-        vsra.u16   q15, q15, #8
-        vrshrn.u16 d31, q15, #8
-        vsub.u8    d30, d6,  d31
 
         vld4.8    {d20, d21, d22, d23}, [r0]
+
+        vsra.u16   q15, q15, #8
+        subs       r3,  #8
+        vrshrn.u16 d31, q15, #8
+        vsub.u8    d30, d6,  d31
 
         vmull.u8   q12, \sR, d31
         vmull.u8   q13, \sG, d31
         vmull.u8   q14, \sB, d31
+        addge      r1,  #32
 
         vmlal.u8   q12, \dR, d30
         vmlal.u8   q13, \dG, d30
         vmlal.u8   q14, \dB, d30
+        vld4.8    {d16, d17, d18, d19}, [r1]
 
         vsra.u16   q12, q12, #8         @ * 257/256
         vsra.u16   q13, q13, #8
@@ -319,10 +324,10 @@ blend_rgbx_rgba_neon:
         vrshrn.u16 \dG, q13, #8
         vrshrn.u16 \dB, q14, #8
         vmov.u8    \dA, #0xff
-        subs       r3,  #8
 
         vst4.8    {d20, d21, d22, d23}, [r0]!
         bge        1b
+        add        r1,  #32
 
 2:
         cmp        r3, #-8
