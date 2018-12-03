@@ -5,8 +5,9 @@
 extern "C" {
 #endif
 
-extern void blend_rgbx_rgba_neon(void * dest, const void * src, int alpha, unsigned int n);
-extern void blend_bgrx_rgba_neon(void * dest, const void * src, int alpha, unsigned int n);
+typedef void blend_neon_fn(void * dest, const void * src, int alpha, unsigned int n);
+extern blend_neon_fn blend_rgbx_rgba_neon;
+extern blend_neon_fn blend_bgrx_rgba_neon;
 
 #ifdef __cplusplus
 }

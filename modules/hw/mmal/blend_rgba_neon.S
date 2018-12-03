@@ -6,12 +6,17 @@
 
 @ blend_rgbx_rgba_neon
 
+@ Implements /255 as ((x * 257) + 0x8000) >> 16
+@ This generates something in the range [(x+126)/255, (x+127)/255] which is good enough
 
-@ [r0] RGBx dest      (Byte order: R, G, B, x)
-@ [r1] RGBA src merge (Byte order: R, G, B, A)
+@ There is advantage to aligning src and/or dest - dest gives a bit more due to being used twice
+
+
+
+@ [r0] RGBx dest      loaded into d20-d23
+@ [r1] RGBA src merge loaded into d16-d19
 @ r2   plane alpha
 @ r3   count (pixels)
-
 
 .macro blend_main sR, sG, sB, sA, dR, dG, dB, dA
 
@@ -163,12 +168,6 @@
 
 @ Whilst specified as RGBx+RGBA the only important part is the position of
 @ alpha, the other components are all treated the same
-@ Assumes little endian i.e. Alpha ends up in hi 8 bits of uint32_t
-
-@ Implements /255 as ((x * 257) + 0x8000) >> 16
-@ This generates something in the range [(x+126)/255, (x+127)/255] which is good enough
-
-@ There is advantage to aligning src and/or dest - dest gives a bit more due to being used twice
 
 @ [r0] RGBx dest      (Byte order: R, G, B, x)
 @ [r1] RGBA src merge (Byte order: R, G, B, A) - same as above
