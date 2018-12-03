@@ -4,7 +4,7 @@
 
 #include "blend_rgba_neon.h"
 
-#define RPI_PROFILE 0
+#define RPI_PROFILE 1
 #define RPI_PROC_ALLOC 1
 #include "rpi_prof.h"
 
@@ -156,6 +156,7 @@ int main(int argc, char *argv[])
             test_line(d0, j & 3, s0, j >> 2, i, 256, j);
         }
         PROFILE_PRINTF_N(j);
+        PROFILE_CLEAR_N(j);
     }
     printf("Done 1\n");
 

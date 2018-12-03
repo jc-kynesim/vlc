@@ -87,6 +87,12 @@ do {\
     printf("prof[%d] cycles=%14" PRIu64 ";  cnt=%8u;  avg=%5" PRIu64 "\n", (n), av_rpi_prof_n_cycles[n], av_rpi_prof_n_cnt[n],\
         av_rpi_prof_n_cnt[n] == 0 ? (uint64_t)0 : av_rpi_prof_n_cycles[n] / (uint64_t)av_rpi_prof_n_cnt[n])
 
+#define PROFILE_CLEAR_N(n) \
+do {\
+    av_rpi_prof_n_cycles[n] = 0;\
+    av_rpi_prof_n_cnt[n] = 0;\
+} while(0)
+
 #else
 
 // No profile
@@ -96,6 +102,7 @@ do {\
 #define PROFILE_ACC_N(x)
 #define PROFILE_PRINTF(x)
 #define PROFILE_PRINTF_N(x)
+#define PROFILE_CLEAR_N(n)
 
 #endif
 

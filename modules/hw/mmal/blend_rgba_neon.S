@@ -209,12 +209,9 @@ blend_rgbx_rgba_neon:
 1:
         @ Alpha ends up in d19
 
-        vmovl.u8   q14, \sA
-        vmull.u16  q15, d29, d7[0]
-        vmull.u16  q14, d28, d7[0]
-        vrshrn.u32 d31, q15, #16
-        vrshrn.u32 d30, q14, #16
-        vmovn.u16  d31, q15
+        vmull.u8   q15, \sA, d7
+        vsra.u16   q15, q15, #8
+        vrshrn.u16 d31, q15, #8
         vsub.u8    d30, d6,  d31
 
         vmull.u8   q12, \sR, d31
@@ -272,9 +269,7 @@ blend_rgbx_rgba_neon:
 
         push      { r4, lr }
 
-        movw       r12, #257
-        mul        r2,  r12
-        vmov       s14, r2      @ s14 = d7[0]
+        vdup.u8    d7,  r2
 
         vmov.u8    d6,  #0xff
 
@@ -301,12 +296,9 @@ blend_rgbx_rgba_neon:
         @ Alpha ends up in d19
         vld4.8    {d16, d17, d18, d19}, [r1]!
 
-        vmovl.u8   q14, \sA
-        vmull.u16  q15, d29, d7[0]
-        vmull.u16  q14, d28, d7[0]
-        vrshrn.u32 d31, q15, #16
-        vrshrn.u32 d30, q14, #16
-        vmovn.u16  d31, q15
+        vmull.u8   q15, \sA, d7
+        vsra.u16   q15, q15, #8
+        vrshrn.u16 d31, q15, #8
         vsub.u8    d30, d6,  d31
 
         vld4.8    {d20, d21, d22, d23}, [r0]
@@ -319,7 +311,7 @@ blend_rgbx_rgba_neon:
         vmlal.u8   q13, \dG, d30
         vmlal.u8   q14, \dB, d30
 
-        vsra.u16   q12, q12, #8
+        vsra.u16   q12, q12, #8         @ * 257/256
         vsra.u16   q13, q13, #8
         vsra.u16   q14, q14, #8
 
