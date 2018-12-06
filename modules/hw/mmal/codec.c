@@ -943,6 +943,7 @@ typedef struct filter_sys_t {
     int in_count;
 
     bool is_sliced;
+    bool out_fmt_set;
     const char * component_name;
     MMAL_PORT_BH_CB_T in_port_cb_fn;
     MMAL_PORT_BH_CB_T out_port_cb_fn;
@@ -1267,6 +1268,42 @@ static void conv_stash_fixup(filter_t * const p_filter, filter_sys_t * const sys
     }
 }
 
+static MMAL_STATUS_T conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, picture_t * const pic)
+{
+    MMAL_STATUS_T status;
+
+    sys->output->userdata = (struct MMAL_PORT_USERDATA_T *)p_filter;
+    sys->output->format->type = MMAL_ES_TYPE_VIDEO;
+    sys->output->format->encoding = vlc_to_mmal_video_fourcc(&p_filter->fmt_out.video);
+    sys->output->format->encoding_variant = 0;
+    vlc_to_mmal_video_fmt(sys->output->format, &p_filter->fmt_out.video);
+
+    // Override default format width/height if we have a pic we need to match
+    if (pic != NULL)
+    {
+        pic_to_format(sys->output->format, pic);
+        MMAL_VIDEO_FORMAT_T *fmt = &sys->output->format->es->video;
+        msg_Dbg(p_filter, "%s: %dx%d [(0,0) %dx%d]", __func__, fmt->width, fmt->height, fmt->crop.width, fmt->crop.height);
+    }
+
+    mmal_log_dump_format(sys->output->format);
+
+    status = mmal_port_format_commit(sys->output);
+    if (status != MMAL_SUCCESS) {
+        msg_Err(p_filter, "Failed to commit format for output port %s (status=%"PRIx32" %s)",
+                sys->output->name, status, mmal_status_to_string(status));
+        return status;
+    }
+
+    sys->output->buffer_num = __MAX(sys->is_sliced ? 16 : 2, sys->output->buffer_num_recommended);
+    sys->output->buffer_size = sys->output->buffer_size_recommended;
+
+    if ((status = conv_enable_out(p_filter, sys)) != MMAL_SUCCESS)
+        return status;
+
+    return MMAL_SUCCESS;
+}
+
 static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 {
     filter_sys_t * const sys = p_filter->p_sys;
@@ -1320,6 +1357,34 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             if ((stash->sub_bufs[sub_no] = hw_mmal_pic_sub_buf_get(p_pic, sub_no)) != NULL) {
                 mmal_buffer_header_acquire(stash->sub_bufs[sub_no]);
             }
+        }
+    }
+
+    if (!sys->out_fmt_set) {
+        sys->out_fmt_set = true;
+
+        if (sys->is_sliced) {
+            // If zc then we will do stride conversion when we copy to arm side
+            // so no need to worry about actual pic dimensions here
+            if ((err = conv_set_output(p_filter, sys, NULL)) != MMAL_SUCCESS)
+                goto fail;
+        }
+        else {
+            picture_t *pic = filter_NewPicture(p_filter);
+            err = conv_set_output(p_filter, sys, pic);
+            picture_Release(pic);
+            if (err != MMAL_SUCCESS)
+                goto fail;
+        }
+
+        msg_Dbg(p_filter, "Outpool: zc=%d, num=%d, size=%d", sys->is_sliced, sys->output->buffer_num, sys->output->buffer_size);
+        sys->out_pool = sys->is_sliced ?
+            mmal_port_pool_create(sys->output, sys->output->buffer_num, sys->output->buffer_size) :
+            mmal_pool_create(sys->output->buffer_num, 0);
+
+        if (sys->out_pool == NULL) {
+            msg_Err(p_filter, "Failed to create output pool");
+            goto fail;
         }
     }
 
@@ -1530,42 +1595,6 @@ static void CloseConverter(vlc_object_t * obj)
 }
 
 
-static MMAL_STATUS_T conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, picture_t * const pic, const MMAL_FOURCC_T pic_enc)
-{
-    MMAL_STATUS_T status;
-
-    sys->output->userdata = (struct MMAL_PORT_USERDATA_T *)p_filter;
-    sys->output->format->type = MMAL_ES_TYPE_VIDEO;
-    sys->output->format->encoding = pic_enc;
-    sys->output->format->encoding_variant = sys->output->format->encoding;
-    vlc_to_mmal_video_fmt(sys->output->format, &p_filter->fmt_out.video);
-
-    // Override default format width/height if we have a pic we need to match
-    if (pic != NULL)
-    {
-        pic_to_format(sys->output->format, pic);
-        MMAL_VIDEO_FORMAT_T *fmt = &sys->output->format->es->video;
-        msg_Dbg(p_filter, "%s: %dx%d [(0,0) %dx%d]", __func__, fmt->width, fmt->height, fmt->crop.width, fmt->crop.height);
-    }
-
-    mmal_log_dump_format(sys->output->format);
-
-    status = mmal_port_format_commit(sys->output);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(p_filter, "Failed to commit format for output port %s (status=%"PRIx32" %s)",
-                sys->output->name, status, mmal_status_to_string(status));
-        return status;
-    }
-
-    sys->output->buffer_num = __MAX(sys->is_sliced ? 16 : 2, sys->output->buffer_num_recommended);
-    sys->output->buffer_size = sys->output->buffer_size_recommended;
-
-    if ((status = conv_enable_out(p_filter, sys)) != MMAL_SUCCESS)
-        return status;
-
-    return MMAL_SUCCESS;
-}
-
 static int OpenConverter(vlc_object_t * obj)
 {
     filter_t * const p_filter = (filter_t *)obj;
@@ -1706,20 +1735,6 @@ retry:
 
     port_parameter_set_bool(sys->output, MMAL_PARAMETER_ZERO_COPY, sys->is_sliced);
 
-    if (sys->is_sliced) {
-        // If zc then we will do stride conversion when we copy to arm side
-        // so no need to worry about actual pic dimensions here
-        if ((status = conv_set_output(p_filter, sys, NULL, enc_out)) != MMAL_SUCCESS)
-            goto fail;
-    }
-    else {
-        picture_t *pic = filter_NewPicture(p_filter);
-        status = conv_set_output(p_filter, sys, pic, enc_out);
-        picture_Release(pic);
-        if (status != MMAL_SUCCESS)
-            goto fail;
-    }
-
     status = mmal_component_enable(sys->component);
     if (status != MMAL_SUCCESS) {
         msg_Err(p_filter, "Failed to enable component %s (status=%"PRIx32" %s)",
@@ -1727,15 +1742,6 @@ retry:
         goto fail;
     }
 
-    msg_Dbg(p_filter, "Outpool: zc=%d, num=%d, size=%d", sys->is_sliced, sys->output->buffer_num, sys->output->buffer_size);
-    sys->out_pool = sys->is_sliced ?
-        mmal_port_pool_create(sys->output, sys->output->buffer_num, sys->output->buffer_size) :
-        mmal_pool_create(sys->output->buffer_num, 0);
-
-    if (sys->out_pool == NULL) {
-        msg_Err(p_filter, "Failed to create output pool");
-        goto fail;
-    }
     if ((sys->in_pool = mmal_pool_create(sys->input->buffer_num, 0)) == NULL)
     {
         msg_Err(p_filter, "Failed to create input pool");
@@ -1904,8 +1910,6 @@ static void FilterBlendNeon(filter_t *p_filter,
 
 #if TRACE_ALL
     msg_Dbg(p_filter, "%s (%d,%d:%d) pic=%p, pts=%lld, force=%d", __func__, x_offset, y_offset, alpha, src_pic, src_pic->date, src_pic->b_force);
-#else
-    VLC_UNUSED(p_filter);
 #endif
 
     if (alpha == 0 ||
