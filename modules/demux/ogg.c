@@ -1671,6 +1671,7 @@ static int Ogg_FindLogicalStreams( demux_t *p_demux )
                     p_stream->b_force_backup = true;
                     p_stream->i_extra_headers_packets = 1;
                     p_stream->special.flac.b_old = true;
+                    p_stream->f_rate = 48000; /* better be safe since that's delayed */
                     es_format_Change( &p_stream->fmt, AUDIO_ES, VLC_CODEC_FLAC );
                 }
                 /* Check for Flac header (>= version 1.0.0) */
@@ -2163,7 +2164,7 @@ static void Ogg_CreateES( demux_t *p_demux )
             if( p_old_stream &&
                 p_old_stream->fmt.i_cat == p_stream->fmt.i_cat &&
                 p_old_stream->fmt.i_codec == p_stream->fmt.i_codec &&
-                p_old_stream->p_es != NULL )
+                p_old_stream->p_es != NULL && p_stream->p_es != NULL )
             {
                 msg_Dbg( p_demux, "will reuse old stream to avoid glitch" );
 

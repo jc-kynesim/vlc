@@ -231,14 +231,19 @@
 - (id)initWithContentRect:(NSRect)contentRect styleMask:(NSWindowStyleMask)styleMask
                   backing:(NSBackingStoreType)backingType defer:(BOOL)flag
 {
-    _darkInterface = config_GetInt(getIntf(), "macosx-interfacestyle");
+    if (@available(macOS 10.14, *)) {
+        self = [super initWithContentRect:contentRect styleMask:styleMask
+                                  backing:backingType defer:flag];
+    } else {
+        _darkInterface = config_GetInt(getIntf(), "macosx-interfacestyle");
 
-    if (_darkInterface) {
-        styleMask = NSBorderlessWindowMask | NSResizableWindowMask | NSMiniaturizableWindowMask;
+        if (_darkInterface) {
+            styleMask = NSBorderlessWindowMask | NSResizableWindowMask | NSMiniaturizableWindowMask;
+        }
+
+        self = [super initWithContentRect:contentRect styleMask:styleMask
+                                  backing:backingType defer:flag];
     }
-
-    self = [super initWithContentRect:contentRect styleMask:styleMask
-                              backing:backingType defer:flag];
 
     /* we want to be moveable regardless of our style */
     [self setMovableByWindowBackground: YES];
@@ -356,7 +361,7 @@
      bottom edge is on the screen or can be on the screen when the user moves
      the window */
     difference = NSMaxY (screenRect) - NSMaxY (frameRect);
-    if (_styleMask & NSResizableWindowMask) {
+    if (self.styleMask & NSResizableWindowMask) {
         CGFloat difference2;
 
         difference2 = screenRect.origin.y - frameRect.origin.y;
