@@ -35,6 +35,10 @@
 
 #include <new>
 
+extern "C" {
+    #include "../av1_unpack.h"
+}
+
 #include <vlc_fs.h>
 #include <vlc_url.h>
 
@@ -609,11 +613,19 @@ void BlockDecode( demux_t *p_demux, KaxBlock *block, KaxSimpleBlock *simpleblock
             break;
 
          case VLC_CODEC_OPUS:
-            mtime_t i_length = i_duration * track. f_timecodescale *
-                    (double) p_segment->i_timescale / 1000.0;
-            if ( i_length < 0 ) i_length = 0;
-            p_block->i_nb_samples = i_length * track.fmt.audio.i_rate
-                    / CLOCK_FREQ;
+            {
+                mtime_t i_length = i_duration * track. f_timecodescale *
+                        (double) p_segment->i_timescale / 1000.0;
+                if ( i_length < 0 ) i_length = 0;
+                p_block->i_nb_samples = i_length * track.fmt.audio.i_rate
+                        / CLOCK_FREQ;
+                break;
+            }
+
+          case VLC_CODEC_AV1:
+            p_block = AV1_Unpack_Sample( p_block );
+            if( unlikely( !p_block ) )
+                continue;
             break;
         }
 

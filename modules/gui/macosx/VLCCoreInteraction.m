@@ -102,11 +102,11 @@ static int BossCallback(vlc_object_t *p_this, const char *psz_var,
         b_mediaKeySupport = var_InheritBool(p_intf, "macosx-mediakeys");
         if (b_mediaKeySupport) {
             _mediaKeyController = [[SPMediaKeyTap alloc] initWithDelegate:self];
-            [[NSUserDefaults standardUserDefaults] registerDefaults:[NSDictionary dictionaryWithObjectsAndKeys:
-                                                                     [SPMediaKeyTap defaultMediaKeyUserBundleIdentifiers], kMediaKeyUsingBundleIdentifiersDefaultsKey,
-                                                                     nil]];
         }
-        [[NSNotificationCenter defaultCenter] addObserver: self selector: @selector(coreChangedMediaKeySupportSetting:) name:VLCMediaKeySupportSettingChangedNotification object: nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(coreChangedMediaKeySupportSetting:)
+                                                     name:VLCMediaKeySupportSettingChangedNotification
+                                                   object:nil];
 
         /* init Apple Remote support */
         _remote = [[AppleRemote alloc] init];
@@ -879,14 +879,18 @@ static int BossCallback(vlc_object_t *p_this, const char *psz_var,
     if (b_mediaKeySupport && ([[[main playlist] model] hasChildren] ||
                               [[main inputManager] hasInput])) {
         if (!b_mediaKeyTrapEnabled) {
-            b_mediaKeyTrapEnabled = YES;
-            msg_Dbg(p_intf, "Enable media key support");
-            [_mediaKeyController startWatchingMediaKeys];
+            msg_Dbg(p_intf, "Enabling media key support");
+            if ([_mediaKeyController startWatchingMediaKeys]) {
+                b_mediaKeyTrapEnabled = YES;
+            } else {
+                msg_Warn(p_intf, "Failed to enable media key support, likely "
+                    "app needs to be whitelisted in Security Settings.");
+            }
         }
     } else {
         if (b_mediaKeyTrapEnabled) {
             b_mediaKeyTrapEnabled = NO;
-            msg_Dbg(p_intf, "Disable media key support");
+            msg_Dbg(p_intf, "Disabling media key support");
             [_mediaKeyController stopWatchingMediaKeys];
         }
     }

@@ -825,7 +825,10 @@ bool matroska_segment_c::Seek( demux_t &demuxer, mtime_t i_absolute_mk_date, mti
         track.i_last_dts        = VLC_TS_INVALID;
 
         bool selected;
-        es_out_Control( demuxer.out, ES_OUT_GET_ES_STATE, track.p_es, &selected );
+        if (track.p_es == NULL)
+            selected = false;
+        else
+            es_out_Control( demuxer.out, ES_OUT_GET_ES_STATE, track.p_es, &selected );
         if ( selected )
             selected_tracks.push_back( track.i_number );
     }
@@ -1213,7 +1216,6 @@ int matroska_segment_c::BlockGet( KaxBlock * & pp_block, KaxSimpleBlock * & pp_s
         {
             VLC_UNUSED( kcue );
             msg_Warn( vars.p_demuxer, "find KaxCues FIXME" );
-            throw VLC_EGENERIC;
         }
         E_CASE_DEFAULT(element)
         {
