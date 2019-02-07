@@ -3419,6 +3419,9 @@ dnl
 AC_ARG_ENABLE(mmal,
   AS_HELP_STRING([--enable-mmal],
     [Multi-Media Abstraction Layer (MMAL) hardware plugin (default enable)]))
+AC_ARG_ENABLE(mmal_avcodec,
+  AS_HELP_STRING([--enable-mmal-avcodec],
+    [Use MMAL enabled avcodec libs (default disable)]))
 if test "${enable_mmal}" != "no"; then
   VLC_SAVE_FLAGS
   LDFLAGS="${LDFLAGS} -L/opt/vc/lib -lvchostif"
@@ -3441,6 +3444,7 @@ if test "${enable_mmal}" != "no"; then
   VLC_RESTORE_FLAGS
 fi
 AM_CONDITIONAL([HAVE_MMAL], [test "${have_mmal}" = "yes"])
+AM_CONDITIONAL([HAVE_MMAL_AVCODEC], [test "${enable_mmal_avcodec}" = "yes"])
 
 dnl
 dnl evas plugin

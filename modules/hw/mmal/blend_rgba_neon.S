@@ -3,6 +3,8 @@
 //      .thumb
         .text
         .align 16
+        .arch armv7-a
+        .fpu neon-vfpv4
 
 @ blend_rgbx_rgba_neon
 
@@ -83,7 +85,7 @@
         add        r1,  #32
 
 2:
-        cmp        r3, #-8
+        cmp        r3,  #-8
         blgt       10f
 
         pop       { r4, pc }

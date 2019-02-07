@@ -32,7 +32,7 @@ PATH="$TOOLS/bin:$PATH" \
   MOC=`which moc` \
   UIC=`which uic` \
   RCC=`which rcc` \
-  ./configure --host=$A --enable-debug --disable-lua --disable-qt --disable-vdpau --disable-chromecast --disable-wayland
+  ./configure --host=$A --enable-debug --disable-lua --disable-qt --disable-vdpau --disable-chromecast --disable-wayland --disable-bluray
 
 #  ./configure --host=$A --enable-debug --disable-wayland
 

@@ -28,10 +28,12 @@ libmmal_xsplitter_plugin_la_LDFLAGS = $(AM_LDFLAGS)
 libmmal_xsplitter_plugin_la_LIBADD = $(LIBS_mmal)
 mmal_LTLIBRARIES += libmmal_xsplitter_plugin.la
 
+if HAVE_MMAL_AVCODEC
 libmmal_avcodec_plugin_la_SOURCES = mmal_avcodec.c mmal_picture.c mmal_picture.h
 libmmal_avcodec_plugin_la_CFLAGS = $(AM_CFLAGS)
 libmmal_avcodec_plugin_la_LDFLAGS = $(AM_LDFLAGS)
 libmmal_avcodec_plugin_la_LIBADD = $(AVFORMAT_LIBS) $(AVUTIL_LIBS) $(LIBS_mmal)
 mmal_LTLIBRARIES += libmmal_avcodec_plugin.la
+endif
 
 
