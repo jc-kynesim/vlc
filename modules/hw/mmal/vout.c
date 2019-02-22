@@ -1185,6 +1185,14 @@ static int OpenMmalVout(vlc_object_t *object)
 
     vlc_mutex_init(&sys->manage_mutex);
 
+    vd->info = (vout_display_info_t){
+        .is_slow = false,
+        .has_double_click = false,
+        .needs_hide_mouse = false,
+        .has_pictures_invalid = true,
+        .subpicture_chromas = NULL
+    };
+
     vd->pool = vd_pool;
     vd->prepare = vd_prepare;
     vd->display = vd_display;

@@ -28,6 +28,19 @@ typedef struct mmal_x11_sys_s
     uint32_t changed;
 } mmal_x11_sys_t;
 
+static const char * str_fourcc(char * buf, unsigned int fcc)
+{
+    if (fcc == 0)
+        return "----";
+    buf[0] = (fcc >> 0) & 0xff;
+    buf[1] = (fcc >> 8) & 0xff;
+    buf[2] = (fcc >> 16) & 0xff;
+    buf[3] = (fcc >> 24) & 0xff;
+    buf[4] = 0;
+    return buf;
+}
+
+
 static void unload_display_module(vout_display_t * const x_vout)
 {
     if (x_vout != NULL) {
@@ -134,7 +147,12 @@ static picture_pool_t * mmal_x11_pool(vout_display_t * vd, unsigned count)
     mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
     vout_display_t * const x_vd = sys->cur_vout;
 #if TRACE_ALL
-    msg_Dbg(vd, "<<< %s (count=%d) %dx%d", __func__, count, x_vd->fmt.i_width, x_vd->fmt.i_height);
+    char buf0[5];
+    msg_Dbg(vd, "<<< %s (count=%d) %s:%dx%d->%s:%dx%d", __func__, count,
+            str_fourcc(buf0, vd->fmt.i_chroma),
+            vd->fmt.i_width, vd->fmt.i_height,
+            str_fourcc(buf0, x_vd->fmt.i_chroma),
+            x_vd->fmt.i_width, x_vd->fmt.i_height);
 #endif
     picture_pool_t * pool = x_vd->pool(x_vd, count);
 #if TRACE_ALL
@@ -275,7 +293,10 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
 
         case VOUT_DISPLAY_RESET_PICTURES:
             msg_Dbg(vd, "Reset pictures");
-            rv = x_vd->control(x_vd, ctl, va);
+//            rv = x_vd->control(x_vd, ctl, va);
+            rv = sys->x_vout->control(sys->x_vout, ctl, va);
+            if (sys->mmal_vout)
+                rv = sys->mmal_vout->control(sys->mmal_vout, ctl, va);
             msg_Dbg(vd, "<<< %s: Pic reset: fmt: %dx%d<-%dx%d, source: %dx%d/%dx%d", __func__,
                     vd->fmt.i_width, vd->fmt.i_height, x_vd->fmt.i_width, x_vd->fmt.i_height,
                     vd->source.i_width, vd->source.i_height, x_vd->source.i_width, x_vd->source.i_height);
@@ -311,19 +332,6 @@ static void mmal_x11_manage(vout_display_t * vd)
 }
 #endif
 
-static const char * str_fourcc(char * buf, unsigned int fcc)
-{
-    if (fcc == 0)
-        return "----";
-    buf[0] = (fcc >> 0) & 0xff;
-    buf[1] = (fcc >> 8) & 0xff;
-    buf[2] = (fcc >> 16) & 0xff;
-    buf[3] = (fcc >> 24) & 0xff;
-    buf[4] = 0;
-    return buf;
-}
-
-
 static int OpenMmalX11(vlc_object_t *object)
 {
     vout_display_t * const vd = (vout_display_t *)object;
@@ -334,6 +342,14 @@ static int OpenMmalX11(vlc_object_t *object)
         return VLC_EGENERIC;
     }
     vd->sys = (vout_display_sys_t *)sys;
+
+    vd->info = (vout_display_info_t){
+        .is_slow = false,
+        .has_double_click = false,
+        .needs_hide_mouse = false,
+        .has_pictures_invalid = true,
+        .subpicture_chromas = NULL
+    };
 
     if ((sys->x_vout = load_display_module(vd, "vout display", "xcb_x11")) == NULL)
         goto fail;
