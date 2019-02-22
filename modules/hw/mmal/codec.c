@@ -87,6 +87,11 @@ typedef struct decoder_sys_t
 
     bool b_flushed;
 
+    // Lock to avoid pic update & allocate happenening simultainiously
+    // * We should be able to arrange life s.t. this isn't needed
+    //   but while we are confused apply belt & braces
+    vlc_mutex_t pic_lock;
+
     /* statistics */
     atomic_bool started;
 } decoder_sys_t;
@@ -106,19 +111,23 @@ static supported_mmal_enc_t supported_mmal_enc =
     -1
 };
 
-#if TRACE_ALL || 1
+static inline char safe_char(const unsigned int c0)
+{
+    const unsigned int c = c0 & 0xff;
+    return c > ' ' && c < 0x7f ? c : '.';
+}
+
 static const char * str_fourcc(char * buf, unsigned int fcc)
 {
     if (fcc == 0)
         return "----";
-    buf[0] = (fcc >> 0) & 0xff;
-    buf[1] = (fcc >> 8) & 0xff;
-    buf[2] = (fcc >> 16) & 0xff;
-    buf[3] = (fcc >> 24) & 0xff;
+    buf[0] = safe_char(fcc >> 0);
+    buf[1] = safe_char(fcc >> 8);
+    buf[2] = safe_char(fcc >> 16);
+    buf[3] = safe_char(fcc >> 24);
     buf[4] = 0;
     return buf;
 }
-#endif
 
 static bool is_enc_supported(const MMAL_FOURCC_T fcc)
 {
@@ -262,7 +271,10 @@ static void draw_corners(void * pic_buf, size_t pic_stride, unsigned int x, unsi
 static picture_t * alloc_opaque_pic(decoder_t * const dec, MMAL_BUFFER_HEADER_T * const buf)
 {
     decoder_sys_t *const dec_sys = dec->p_sys;
+
+    vlc_mutex_lock(&dec_sys->pic_lock);
     picture_t * const pic = decoder_NewPicture(dec);
+    vlc_mutex_unlock(&dec_sys->pic_lock);
 
     if (pic == NULL)
         goto fail1;
@@ -286,8 +298,8 @@ static picture_t * alloc_opaque_pic(decoder_t * const dec, MMAL_BUFFER_HEADER_T 
 fail2:
     picture_Release(pic);
 fail1:
-    // * maybe should recycle rather than release?
-    mmal_buffer_header_release(buf);
+    // Recycle rather than release to avoid buffer starvation if NewPic fails
+    hw_mmal_port_pool_ref_recycle(dec_sys->ppr, buf);
     return NULL;
 }
 
@@ -330,14 +342,12 @@ static void input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 
 static void decoder_output_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
-    // decoder structure only guaranteed valid if we have contents
+    decoder_t * const dec = (decoder_t *)port->userdata;
 
     if (buffer->cmd == 0 && buffer->length != 0)
     {
-        decoder_t * const dec = (decoder_t *)port->userdata;
-
 #if TRACE_ALL
-        msg_Dbg((decoder_t *)port->userdata, "<<< %s: cmd=%d, data=%p, len=%d/%d, pts=%lld", __func__,
+        msg_Dbg(dec, "<<< %s: cmd=%d, data=%p, len=%d/%d, pts=%lld", __func__,
                 buffer->cmd, buffer->data, buffer->length, buffer->alloc_size, (long long)buffer->pts);
 #endif
 
@@ -352,9 +362,9 @@ static void decoder_output_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
         // Buffer released or attached to pic - do not release again
         return;
     }
-    else if (buffer->cmd == MMAL_EVENT_FORMAT_CHANGED)
+
+    if (buffer->cmd == MMAL_EVENT_FORMAT_CHANGED)
     {
-        decoder_t * const dec = (decoder_t *)port->userdata;
         decoder_sys_t * const sys = dec->p_sys;
         MMAL_EVENT_FORMAT_CHANGED_T * const fmt = mmal_event_format_changed_get(buffer);
         MMAL_ES_FORMAT_T * const format = mmal_format_alloc();
@@ -372,7 +382,14 @@ static void decoder_output_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
             sys->output_format = format;
         }
     }
+    else if (buffer->cmd != 0) {
+        char buf0[5];
+        msg_Warn(dec, "Unexpected output cb event: %s", str_fourcc(buf0, buffer->cmd));
+    }
 
+    // If we get here then we were flushing (cmd == 0 && len == 0) or
+    // that was an EVENT - in either case we want to release the buffer
+    // back to its pool rather than recycle it.
     mmal_buffer_header_reset(buffer);
     buffer->user_data = NULL;
     mmal_buffer_header_release(buffer);
@@ -496,8 +513,10 @@ apply_fmt:
 #endif
     }
 
-    // Tell the reset of the world we have changed format
+    // Tell the rest of the world we have changed format
+    vlc_mutex_lock(&sys->pic_lock);
     ret = decoder_UpdateVideoFormat(dec);
+    vlc_mutex_unlock(&sys->pic_lock);
 
 out:
     mmal_format_free(sys->output_format);
@@ -734,6 +753,7 @@ static void CloseDecoder(decoder_t *dec)
 
     hw_mmal_port_pool_ref_release(sys->ppr, false);
 
+    vlc_mutex_destroy(&sys->pic_lock);
     free(sys);
 
     bcm_host_deinit();
@@ -770,6 +790,7 @@ static int OpenDecoder(decoder_t *dec)
         goto fail;
     }
     dec->p_sys = sys;
+    vlc_mutex_init(&sys->pic_lock);
 
     bcm_host_init();
 
@@ -1641,7 +1662,7 @@ retry:
 
     {
         char dbuf0[5], dbuf1[5], dbuf2[5], dbuf3[5];
-        msg_Dbg(p_filter, "%s: (%s) %s/%s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s/%s,%dx%d [(%d,%d) %dx%d] sar:%d/%d (gpu=%d)", __func__,
+        msg_Dbg(p_filter, "%s: (%s) %s/%s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s/%s,%dx%d [(%d,%d) %dx%d] rgb:%#x:%#x:%#x sar:%d/%d (gpu=%d)", __func__,
                 use_resizer ? "resize" : use_isp ? "isp" : "hvs",
                 str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), str_fourcc(dbuf2, enc_in),
                 p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
@@ -1652,6 +1673,7 @@ retry:
                 p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
                 p_filter->fmt_out.video.i_x_offset, p_filter->fmt_out.video.i_y_offset,
                 p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height,
+                p_filter->fmt_out.video.i_rmask, p_filter->fmt_out.video.i_gmask, p_filter->fmt_out.video.i_bmask,
                 p_filter->fmt_out.video.i_sar_num, p_filter->fmt_out.video.i_sar_den,
                 gpu_mem);
     }

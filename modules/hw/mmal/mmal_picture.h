@@ -81,7 +81,7 @@ void vlc_to_mmal_video_fmt(MMAL_ES_FORMAT_T *const es_fmt, const video_frame_for
 hw_mmal_port_pool_ref_t * hw_mmal_port_pool_ref_create(MMAL_PORT_T * const port,
    const unsigned int headers, const uint32_t payload_size);
 void hw_mmal_port_pool_ref_release(hw_mmal_port_pool_ref_t * const ppr, const bool in_cb);
-//bool hw_mmal_port_pool_ref_recycle(hw_mmal_port_pool_ref_t * const ppr, MMAL_BUFFER_HEADER_T * const buf);
+bool hw_mmal_port_pool_ref_recycle(hw_mmal_port_pool_ref_t * const ppr, MMAL_BUFFER_HEADER_T * const buf);
 MMAL_STATUS_T hw_mmal_port_pool_ref_fill(hw_mmal_port_pool_ref_t * const ppr);
 static inline void hw_mmal_port_pool_ref_acquire(hw_mmal_port_pool_ref_t * const ppr)
 {

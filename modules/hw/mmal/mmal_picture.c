@@ -184,7 +184,7 @@ void hw_mmal_port_pool_ref_release(hw_mmal_port_pool_ref_t * const ppr, const bo
 
 // Put buffer in port if possible - if not then release to pool
 // Returns true if sent, false if recycled
-static bool hw_mmal_port_pool_ref_recycle(hw_mmal_port_pool_ref_t * const ppr, MMAL_BUFFER_HEADER_T * const buf)
+bool hw_mmal_port_pool_ref_recycle(hw_mmal_port_pool_ref_t * const ppr, MMAL_BUFFER_HEADER_T * const buf)
 {
     mmal_buffer_header_reset(buf);
     buf->user_data = NULL;
