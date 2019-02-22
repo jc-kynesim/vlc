@@ -1,4 +1,4 @@
-sudo mkdir -p /usr/lib/arm-linux-gnueabihf/vlc/plugins/hw/mmal
-#sudo cp --preserve=links src/.libs/libvlccor*.so /usr/lib/arm-linux-gnueabihf/
-sudo cp modules/hw/mmal/.libs/*.so /usr/lib/arm-linux-gnueabihf/vlc/plugins/hw/mmal/
+DSTDIR=/usr/lib/arm-linux-gnueabihf/vlc/plugins/mmal
+sudo mkdir -p $DSTDIR
+sudo cp modules/hw/mmal/.libs/*.so $DSTDIR/
 vlc --no-plugins-cache $*
