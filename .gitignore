@@ -7,6 +7,7 @@
 *.la
 *.luac
 *.moc.cpp
+*.gmo
 *.o
 *.so
 *.trs
@@ -92,4 +93,5 @@ share/vlc.appdata.xml.in
 share/vlc.desktop
 src/fourcc_gen
 src/fourcc_tables.h
+src/revision.*
 
