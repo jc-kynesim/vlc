@@ -965,6 +965,7 @@ typedef struct filter_sys_t {
 
     bool is_sliced;
     bool out_fmt_set;
+    bool latency_set;
     const char * component_name;
     MMAL_PORT_BH_CB_T in_port_cb_fn;
     MMAL_PORT_BH_CB_T out_port_cb_fn;
@@ -981,10 +982,13 @@ typedef struct filter_sys_t {
 } filter_sys_t;
 
 
-static void pic_to_format(MMAL_ES_FORMAT_T * const es_fmt, const picture_t * const pic)
+static MMAL_STATUS_T pic_to_format(MMAL_ES_FORMAT_T * const es_fmt, const picture_t * const pic)
 {
     unsigned int bpp = (pic->format.i_bits_per_pixel + 7) >> 3;
     MMAL_VIDEO_FORMAT_T * const v_fmt = &es_fmt->es->video;
+
+    if (bpp < 1 || bpp > 4)
+        return MMAL_EINVAL;
 
     es_fmt->type = MMAL_ES_TYPE_VIDEO;
     es_fmt->encoding = vlc_to_mmal_video_fourcc(&pic->format);
@@ -995,6 +999,7 @@ static void pic_to_format(MMAL_ES_FORMAT_T * const es_fmt, const picture_t * con
     // Override width / height with strides
     v_fmt->width = pic->p[0].i_pitch / bpp;
     v_fmt->height = pic->p[0].i_lines;
+    return MMAL_SUCCESS;
 }
 
 
@@ -1271,6 +1276,11 @@ static void conv_flush(filter_t * p_filter)
 #endif
 }
 
+static void conv_flush_passthrough(filter_t * p_filter)
+{
+    VLC_UNUSED(p_filter);
+}
+
 static void conv_stash_fixup(filter_t * const p_filter, filter_sys_t * const sys, picture_t * const p_pic)
 {
     conv_frame_stash_t * const stash = sys->stash + (p_pic->date & 0xf);
@@ -1302,7 +1312,13 @@ static MMAL_STATUS_T conv_set_output(filter_t * const p_filter, filter_sys_t * c
     // Override default format width/height if we have a pic we need to match
     if (pic != NULL)
     {
-        pic_to_format(sys->output->format, pic);
+        if ((status = pic_to_format(sys->output->format, pic)) != MMAL_SUCCESS)
+        {
+            char cbuf[5];
+            msg_Err(p_filter, "Bad format desc: %s, bits=%d", str_fourcc(cbuf, pic->format.i_chroma), pic->format.i_bits_per_pixel);
+            return status;
+        }
+
         MMAL_VIDEO_FORMAT_T *fmt = &sys->output->format->es->video;
         msg_Dbg(p_filter, "%s: %dx%d [(0,0) %dx%d]", __func__, fmt->width, fmt->height, fmt->crop.width, fmt->crop.height);
     }
@@ -1518,6 +1534,15 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     // Avoid being more than 1 pic behind
     vlc_sem_wait(&sys->sem);
 
+    // Set sem for delayed scale if not already set
+    if (!sys->latency_set) {
+        unsigned int i;
+        sys->latency_set = true;
+        for (i = 0; i != CONV_MAX_LATENCY; ++i) {
+            vlc_sem_post(&sys->sem);
+        }
+    }
+
     // Return all pending buffers
     vlc_mutex_lock(&sys->lock);
     ret_pics = pic_fifo_get_all(&sys->ret_pics);
@@ -1565,6 +1590,14 @@ fail:
     return NULL;
 }
 
+static picture_t *conv_filter_passthrough(filter_t *p_filter, picture_t *p_pic)
+{
+    VLC_UNUSED(p_filter);
+#if TRACE_ALL
+    msg_Dbg(p_filter, "<<< %s", __func__);
+#endif
+    return p_pic;
+}
 
 static void CloseConverter(vlc_object_t * obj)
 {
@@ -1616,6 +1649,31 @@ static void CloseConverter(vlc_object_t * obj)
 }
 
 
+static int open_converter_passthrough(filter_t * const p_filter)
+{
+    {
+        char dbuf0[5], dbuf1[5];
+        msg_Dbg(p_filter, "%s: (%s) %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s,%dx%d [(%d,%d) %dx%d] rgb:%#x:%#x:%#x sar:%d/%d", __func__,
+                "passthrough",
+                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma),
+                p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
+                p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
+                p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
+                p_filter->fmt_in.video.i_sar_num, p_filter->fmt_in.video.i_sar_den,
+                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma),
+                p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
+                p_filter->fmt_out.video.i_x_offset, p_filter->fmt_out.video.i_y_offset,
+                p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height,
+                p_filter->fmt_out.video.i_rmask, p_filter->fmt_out.video.i_gmask, p_filter->fmt_out.video.i_bmask,
+                p_filter->fmt_out.video.i_sar_num, p_filter->fmt_out.video.i_sar_den);
+    }
+
+
+    p_filter->pf_video_filter = conv_filter_passthrough;
+    p_filter->pf_flush = conv_flush_passthrough;
+    return VLC_SUCCESS;
+}
+
 static int OpenConverter(vlc_object_t * obj)
 {
     filter_t * const p_filter = (filter_t *)obj;
@@ -1633,6 +1691,10 @@ static int OpenConverter(vlc_object_t * obj)
          enc_in != MMAL_ENCODING_YUVUV64_10) ||
         (enc_out = vlc_to_mmal_video_fourcc(&p_filter->fmt_out.video)) == 0)
         return VLC_EGENERIC;
+
+    if (enc_in == enc_out) {
+        return open_converter_passthrough(p_filter);
+    }
 
     use_resizer = var_InheritBool(p_filter, MMAL_RESIZE_NAME);
     use_isp = var_InheritBool(p_filter, MMAL_ISP_NAME);
@@ -1687,7 +1749,7 @@ retry:
 
     // Init stuff the we destroy unconditionaly in Close first
     vlc_mutex_init(&sys->lock);
-    vlc_sem_init(&sys->sem, CONV_MAX_LATENCY);
+    vlc_sem_init(&sys->sem, 0);
     sys->err_stream = MMAL_SUCCESS;
     pic_fifo_init(&sys->ret_pics);
     pic_fifo_init(&sys->slice.pics);
