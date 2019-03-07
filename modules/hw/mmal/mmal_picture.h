@@ -39,6 +39,10 @@
 #define VLC_VER_3 0
 #endif
 
+struct hw_mmal_cma_env_s;
+typedef struct hw_mmal_cma_env_s hw_mmal_cma_env_t;
+
+
 typedef struct mmal_port_pool_ref_s
 {
     atomic_uint refs;

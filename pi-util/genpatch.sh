@@ -14,10 +14,12 @@ fi
 
 git diff --name-status --exit-code
 
-PATCHTAG=${VERSION}-$1
-PATCHFILE=../vlc-$PATCHTAG.patch
+PATCHTAG=pi/$VERSION/$1
+PATCHFILE=../vlc-$(VERSION)-$1.patch
 
-git tag pi/$PATCHTAG
+echo Tagging: $PATCHTAG
+git tag $PATCHTAG
+echo Generating patch: $PATCHFILE
 git diff $VERSION -- modules/hw/mmal src/misc include configure.ac > $PATCHFILE
-
+echo Copying patch to arm-build
 scp $PATCHFILE john@arm-build:patches/0002-vlc-3.0.6-mmal_test_4.patch
