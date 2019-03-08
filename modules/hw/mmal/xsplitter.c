@@ -306,6 +306,7 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
             x_vd->source = vd->source;
+            /* FALLTHRU */
         default:
             rv = x_vd->control(x_vd, ctl, va);
 //            vd->fmt  = x_vd->fmt;
