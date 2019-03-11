@@ -1,7 +1,9 @@
 BASE=`pwd`/..
 A=arm-linux-gnueabihf
-TOOLS=$BASE/tools/arm-bcm2708/gcc-linaro-6.3.1-2017.05-x86_64_arm-linux-gnueabihf
-SYSROOT2=$BASE/tools/arm-bcm2708/sysroot-glibc-linaro-2.23-2017.05-arm-linux-gnueabihf
+TOOLS=$BASE/tools/arm-bcm2708/gcc-arm-8.2-2019.01-x86_64-arm-linux-gnueabihf
+SYSROOT2=$BASE/tools/arm-bcm2708/sysroot-glibc-8.2-2019.01-x86_64-arm-linux-gnueabihf
+#TOOLS=$BASE/tools/arm-bcm2708/gcc-linaro-6.3.1-2017.05-x86_64_arm-linux-gnueabihf
+#SYSROOT2=$BASE/tools/arm-bcm2708/sysroot-glibc-linaro-2.23-2017.05-arm-linux-gnueabihf
 SYSROOT=`pwd`/sysroot/raspian_stretch_pi1-sysroot
 HLIB3=/lib/$A
 HLIB1=/usr/lib/$A
@@ -13,7 +15,7 @@ LIB1=$SYSROOT$HLIB1
 LIB3=$SYSROOT$HLIB3
 LIB4=$SYSROOT$HLIB4
 
-INCLUDES="-I$SYSROOT/usr/include -I$SYSROOT/usr/include/$A -I$SYSROOT/opt/vc/include -I$SYSROOT/usr/lib/arm-linux-gnueabihf/dbus-1.0/include"
+INCLUDES="-I$SYSROOT/usr/include -I$SYSROOT/usr/include/$A -I$SYSROOT/opt/vc/include -I$SYSROOT/usr/lib/arm-linux-gnueabihf/dbus-1.0/include -I$SYSROOT/usr/include/libdrm"
 DEFINES="-ggdb -D__VCCOREVER__=0x04000000 -DQT_WARNING_DISABLE_DEPRECATED=\"\""
 ARCH="-march=armv7-a -mfpu=neon-vfpv4"
 PREFIX=$TOOLS/bin/$A-
@@ -32,7 +34,7 @@ PATH="$TOOLS/bin:$PATH" \
   MOC=`which moc` \
   UIC=`which uic` \
   RCC=`which rcc` \
-  ./configure --host=$A --enable-debug --disable-lua --disable-qt --disable-vdpau --disable-chromecast --disable-wayland --disable-bluray
+  ./configure --host=$A --enable-debug --disable-lua --disable-qt --disable-vdpau --disable-chromecast --disable-wayland --disable-bluray --disable-opencv
 
 #  ./configure --host=$A --enable-debug --disable-wayland
 

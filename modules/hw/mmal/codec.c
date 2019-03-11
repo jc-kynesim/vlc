@@ -92,6 +92,9 @@ typedef struct decoder_sys_t
     //   but while we are confused apply belt & braces
     vlc_mutex_t pic_lock;
 
+    // CMA test stuff
+    hw_mmal_cma_env_t * cma;
+
     /* statistics */
     atomic_bool started;
 } decoder_sys_t;
@@ -753,6 +756,8 @@ static void CloseDecoder(decoder_t *dec)
 
     hw_mmal_port_pool_ref_release(sys->ppr, false);
 
+    hw_mmal_cma_delete(sys->cma);
+
     vlc_mutex_destroy(&sys->pic_lock);
     free(sys);
 
@@ -795,6 +800,8 @@ static int OpenDecoder(decoder_t *dec)
     bcm_host_init();
 
     sys->err_stream = MMAL_SUCCESS;
+
+    sys->cma = hw_mmal_cma_init(VLC_OBJECT(dec));
 
     status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_DECODER, &sys->component);
     if (status != MMAL_SUCCESS) {

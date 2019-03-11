@@ -26,6 +26,8 @@
 #include <pthread.h>
 
 #include <stdatomic.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include <vlc_common.h>
 #include <vlc_picture.h>
@@ -75,21 +77,104 @@ static inline void flush_range(void * const start, const size_t len)
 
 struct hw_mmal_cma_env_s
 {
+    vlc_object_t * obj;
+    Display * dpy;
+    EGLDisplay * egl_dpy;
     int drm_fd;
 };
 
-hw_mmal_cma_t * hw_mmal_cma_init()
+void hw_mmal_cma_delete(hw_mmal_cma_env_t * const mcma)
 {
-    hw_mmal_cma_t * const mcma = calloc(1, sizeof(hw_mmal_cma_t));
+    if (mcma == NULL)
+        return;
+
+    if (mcma->drm_fd != -1)
+        close(mcma->drm_fd);
+
+    if (mcma->egl_dpy != EGL_NO_DISPLAY)
+        eglTerminate(mcma->egl_dpy);
+
+    if (mcma->dpy)
+        XCloseDisplay(mcma->dpy);
+
+    free(mcma);
+}
+
+static int
+get_drm_fd(Display * const dpy)
+{
+   xcb_connection_t * const c = XGetXCBConnection(dpy);
+   const xcb_window_t root = RootWindow(dpy, DefaultScreen(dpy));
+   int fd;
+
+   const xcb_query_extension_reply_t *extension =
+      xcb_get_extension_data(c, &xcb_dri3_id);
+   if (!(extension && extension->present))
+      return -1;
+
+   xcb_dri3_open_cookie_t cookie =
+      xcb_dri3_open(c, root, None);
+
+   xcb_dri3_open_reply_t *reply = xcb_dri3_open_reply(c, cookie, NULL);
+   if (!reply)
+      return -1;
+
+   if (reply->nfd != 1) {
+      free(reply);
+      return -1;
+   }
+
+   fd = xcb_dri3_open_reply_fds(c, reply)[0];
+   free(reply);
+   fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) | FD_CLOEXEC);
+
+   return fd;
+}
+
+hw_mmal_cma_env_t * hw_mmal_cma_init(vlc_object_t * const obj)
+{
+    hw_mmal_cma_env_t * const mcma = calloc(1, sizeof(hw_mmal_cma_env_t));
     if (mcma == NULL)
         return NULL;
 
+    mcma->obj = obj;
+    mcma->egl_dpy = EGL_NO_DISPLAY;
+    mcma->drm_fd = -1;
+
+    if ((mcma->dpy = XOpenDisplay(NULL)) == NULL)
+    {
+        msg_Err(mcma->obj, "Failed to open X");
+        goto fail;
+    }
+
+    if ((mcma->egl_dpy = eglGetDisplay(mcma->dpy)) == EGL_NO_DISPLAY)
+    {
+        msg_Err(mcma->obj, "Failed to get EGL Display");
+        goto fail;
+    }
+
+    {
+        EGLint egl_major, egl_minor;
+        if (!eglInitialize(mcma->egl_dpy, &egl_major, &egl_minor))
+        {
+            msg_Err(mcma->obj, "eglInitialize() failed");
+            goto fail;
+        }
+    }
+
+    if ((mcma->drm_fd = get_drm_fd(mcma->dpy)) == -1)
+    {
+        msg_Err(mcma->obj, "Failed to get drm fd");
+        goto fail;
+    }
+
     return mcma;
+
+fail:
+    hw_mmal_cma_delete(mcma);
+    return NULL;
 }
 
-void hw_mmal_cma_delete(hw_mmal_cma_t * const mcma)
-{
-}
 
 
 #if 0

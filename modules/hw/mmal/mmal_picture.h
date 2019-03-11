@@ -42,6 +42,8 @@
 struct hw_mmal_cma_env_s;
 typedef struct hw_mmal_cma_env_s hw_mmal_cma_env_t;
 
+hw_mmal_cma_env_t * hw_mmal_cma_init(vlc_object_t * const obj);
+void hw_mmal_cma_delete(hw_mmal_cma_env_t * const mcma);
 
 typedef struct mmal_port_pool_ref_s
 {
