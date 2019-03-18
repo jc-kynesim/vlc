@@ -1,7 +1,13 @@
 set -e
 
+NOPATCH=0
+if [ "$1" == "--notag" ]; then
+  shift
+  NOPATCH=1
+fi
+
 if [ "$1" == "" ]; then
-  echo Usage: $0 \<patch_tag\>
+  echo Usage: $0 [--notag] \<patch_tag\>
   echo e.g.: $0 mmal_4
   exit 1
 fi
@@ -12,13 +18,19 @@ if [ "$VERSION" == "" ]; then
   exit 1
 fi
 
-git diff --name-status --exit-code
+PATCHFILE=../vlc-$VERSION-$1.patch
 
-PATCHTAG=pi/$VERSION/$1
-PATCHFILE=../vlc-$(VERSION)-$1.patch
+if [ $NOPATCH ]; then
+  echo Not tagged
+else
+  # Only continue if we are all comitted
+  git diff --name-status --exit-code
 
-echo Tagging: $PATCHTAG
-git tag $PATCHTAG
+  PATCHTAG=pi/$VERSION/$1
+  echo Tagging: $PATCHTAG
+
+  git tag $PATCHTAG
+fi
 echo Generating patch: $PATCHFILE
 git diff $VERSION -- modules/hw/mmal src/misc include configure.ac > $PATCHFILE
 echo Copying patch to arm-build

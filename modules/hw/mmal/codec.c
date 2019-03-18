@@ -39,11 +39,12 @@
 #include <interface/mmal/util/mmal_util.h>
 #include <interface/mmal/util/mmal_default_components.h>
 
+#include "mmal_gl.h"
 #include "mmal_picture.h"
 #include "subpic.h"
 #include "blend_rgba_neon.h"
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 /*
  * This seems to be a bit high, but reducing it causes instabilities
@@ -92,9 +93,6 @@ typedef struct decoder_sys_t
     //   but while we are confused apply belt & braces
     vlc_mutex_t pic_lock;
 
-    // CMA test stuff
-    hw_mmal_cma_env_t * cma;
-
     /* statistics */
     atomic_bool started;
 } decoder_sys_t;
@@ -113,24 +111,6 @@ static supported_mmal_enc_t supported_mmal_enc =
     {{MMAL_PARAMETER_SUPPORTED_ENCODINGS, sizeof(((supported_mmal_enc_t *)0)->supported)}, {0}},
     -1
 };
-
-static inline char safe_char(const unsigned int c0)
-{
-    const unsigned int c = c0 & 0xff;
-    return c > ' ' && c < 0x7f ? c : '.';
-}
-
-static const char * str_fourcc(char * buf, unsigned int fcc)
-{
-    if (fcc == 0)
-        return "----";
-    buf[0] = safe_char(fcc >> 0);
-    buf[1] = safe_char(fcc >> 8);
-    buf[2] = safe_char(fcc >> 16);
-    buf[3] = safe_char(fcc >> 24);
-    buf[4] = 0;
-    return buf;
-}
 
 static bool is_enc_supported(const MMAL_FOURCC_T fcc)
 {
@@ -756,8 +736,6 @@ static void CloseDecoder(decoder_t *dec)
 
     hw_mmal_port_pool_ref_release(sys->ppr, false);
 
-    hw_mmal_cma_delete(sys->cma);
-
     vlc_mutex_destroy(&sys->pic_lock);
     free(sys);
 
@@ -800,8 +778,6 @@ static int OpenDecoder(decoder_t *dec)
     bcm_host_init();
 
     sys->err_stream = MMAL_SUCCESS;
-
-    sys->cma = hw_mmal_cma_init(VLC_OBJECT(dec));
 
     status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_DECODER, &sys->component);
     if (status != MMAL_SUCCESS) {
@@ -1499,7 +1475,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 break;
             }
 
-#if 0
+#if 1
             char dbuf0[5];
             msg_Dbg(p_filter, "out_pic %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d",
                     str_fourcc(dbuf0, out_pic->format.i_chroma),
@@ -1516,8 +1492,8 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             //**** stride ????
 
 #if TRACE_ALL
-            msg_Dbg(p_filter, "Out buf send: pic=%p, buf=%p, flags=%#x, len=%d/%d, pts=%lld",
-                    p_pic, out_buf->user_data, out_buf->flags,
+            msg_Dbg(p_filter, "Out buf send: pic=%p, data=%p, user=%p, flags=%#x, len=%d/%d, pts=%lld",
+                    p_pic, out_buf->data, out_buf->user_data, out_buf->flags,
                     out_buf->length, out_buf->alloc_size, (long long)out_buf->pts);
 #endif
 

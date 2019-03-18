@@ -31,6 +31,7 @@ sudo apt-get install \
   libmodplug-dev \
   libshine-dev \
   libvorbis-dev \
+  libxml2-dev \
 comerr-dev \
 libasound2-dev \
 libatk1.0-dev \

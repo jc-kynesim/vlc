@@ -39,12 +39,6 @@
 #define VLC_VER_3 0
 #endif
 
-struct hw_mmal_cma_env_s;
-typedef struct hw_mmal_cma_env_s hw_mmal_cma_env_t;
-
-hw_mmal_cma_env_t * hw_mmal_cma_init(vlc_object_t * const obj);
-void hw_mmal_cma_delete(hw_mmal_cma_env_t * const mcma);
-
 typedef struct mmal_port_pool_ref_s
 {
     atomic_uint refs;
@@ -79,6 +73,8 @@ typedef struct pic_ctx_mmal_s {
     vlc_object_t * obj;
 #endif
 } pic_ctx_mmal_t;
+
+const char * str_fourcc(char * const buf, const unsigned int fcc);
 
 MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc);
 MMAL_FOURCC_T vlc_to_mmal_color_space(const video_color_space_t vlc_cs);

@@ -28,19 +28,6 @@ typedef struct mmal_x11_sys_s
     uint32_t changed;
 } mmal_x11_sys_t;
 
-static const char * str_fourcc(char * buf, unsigned int fcc)
-{
-    if (fcc == 0)
-        return "----";
-    buf[0] = (fcc >> 0) & 0xff;
-    buf[1] = (fcc >> 8) & 0xff;
-    buf[2] = (fcc >> 16) & 0xff;
-    buf[3] = (fcc >> 24) & 0xff;
-    buf[4] = 0;
-    return buf;
-}
-
-
 static void unload_display_module(vout_display_t * const x_vout)
 {
     if (x_vout != NULL) {

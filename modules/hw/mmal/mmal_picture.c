@@ -41,6 +41,24 @@
 
 #define UINT64_SIZE(s) (((s) + sizeof(uint64_t) - 1)/sizeof(uint64_t))
 
+static inline char safe_char(const unsigned int c0)
+{
+    const unsigned int c = c0 & 0xff;
+    return c > ' ' && c < 0x7f ? c : '.';
+}
+
+const char * str_fourcc(char * const buf, const unsigned int fcc)
+{
+    if (fcc == 0)
+        return "----";
+    buf[0] = safe_char(fcc >> 0);
+    buf[1] = safe_char(fcc >> 8);
+    buf[2] = safe_char(fcc >> 16);
+    buf[3] = safe_char(fcc >> 24);
+    buf[4] = 0;
+    return buf;
+}
+
 // WB + Inv
 static inline void flush_range(void * const start, const size_t len)
 {
@@ -61,254 +79,6 @@ static inline void flush_range(void * const start, const size_t len)
 
     vcsm_clean_invalid2(b);
 }
-
-#include <drm.h>
-#include <drm_mode.h>
-#include <drm_fourcc.h>
-#include <xf86drm.h>
-#include <xf86drmMode.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xlib-xcb.h>
-#include <epoxy/gl.h>
-#include <epoxy/egl.h>
-#include <xcb/xcb.h>
-#include <xcb/dri3.h>
-
-struct hw_mmal_cma_env_s
-{
-    vlc_object_t * obj;
-    Display * dpy;
-    EGLDisplay * egl_dpy;
-    int drm_fd;
-};
-
-void hw_mmal_cma_delete(hw_mmal_cma_env_t * const mcma)
-{
-    if (mcma == NULL)
-        return;
-
-    if (mcma->drm_fd != -1)
-        close(mcma->drm_fd);
-
-    if (mcma->egl_dpy != EGL_NO_DISPLAY)
-        eglTerminate(mcma->egl_dpy);
-
-    if (mcma->dpy)
-        XCloseDisplay(mcma->dpy);
-
-    free(mcma);
-}
-
-static int
-get_drm_fd(Display * const dpy)
-{
-   xcb_connection_t * const c = XGetXCBConnection(dpy);
-   const xcb_window_t root = RootWindow(dpy, DefaultScreen(dpy));
-   int fd;
-
-   const xcb_query_extension_reply_t *extension =
-      xcb_get_extension_data(c, &xcb_dri3_id);
-   if (!(extension && extension->present))
-      return -1;
-
-   xcb_dri3_open_cookie_t cookie =
-      xcb_dri3_open(c, root, None);
-
-   xcb_dri3_open_reply_t *reply = xcb_dri3_open_reply(c, cookie, NULL);
-   if (!reply)
-      return -1;
-
-   if (reply->nfd != 1) {
-      free(reply);
-      return -1;
-   }
-
-   fd = xcb_dri3_open_reply_fds(c, reply)[0];
-   free(reply);
-   fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) | FD_CLOEXEC);
-
-   return fd;
-}
-
-hw_mmal_cma_env_t * hw_mmal_cma_init(vlc_object_t * const obj)
-{
-    hw_mmal_cma_env_t * const mcma = calloc(1, sizeof(hw_mmal_cma_env_t));
-    if (mcma == NULL)
-        return NULL;
-
-    mcma->obj = obj;
-    mcma->egl_dpy = EGL_NO_DISPLAY;
-    mcma->drm_fd = -1;
-
-    if ((mcma->dpy = XOpenDisplay(NULL)) == NULL)
-    {
-        msg_Err(mcma->obj, "Failed to open X");
-        goto fail;
-    }
-
-    if ((mcma->egl_dpy = eglGetDisplay(mcma->dpy)) == EGL_NO_DISPLAY)
-    {
-        msg_Err(mcma->obj, "Failed to get EGL Display");
-        goto fail;
-    }
-
-    {
-        EGLint egl_major, egl_minor;
-        if (!eglInitialize(mcma->egl_dpy, &egl_major, &egl_minor))
-        {
-            msg_Err(mcma->obj, "eglInitialize() failed");
-            goto fail;
-        }
-    }
-
-    if ((mcma->drm_fd = get_drm_fd(mcma->dpy)) == -1)
-    {
-        msg_Err(mcma->obj, "Failed to get drm fd");
-        goto fail;
-    }
-
-    return mcma;
-
-fail:
-    hw_mmal_cma_delete(mcma);
-    return NULL;
-}
-
-
-
-#if 0
-static int buffer_create(struct buffer *b, int drmfd, MMAL_PORT_T *port,
-                         EGLDisplay dpy, EGLContext ctx)
-{
-   struct drm_mode_create_dumb gem;
-   struct drm_mode_destroy_dumb gem_destroy;
-   int ret;
-
-   memset(&gem, 0, sizeof gem);
-   gem.width = port->format->es->video.width;
-   gem.height = port->format->es->video.height;
-   gem.bpp = 32;
-   gem.size = port->buffer_size;
-   ret = ioctl(drmfd, DRM_IOCTL_MODE_CREATE_DUMB, &gem);
-   if (ret)
-   {
-      printf("CREATE_DUMB failed: %s\n", ERRSTR);
-      return -1;
-   }
-   printf("bo %u %ux%u bpp %u size %lu (%u)\n", gem.handle, gem.width, gem.height, gem.bpp, (long)gem.size, port->buffer_size);
-   b->bo_handle = gem.handle;
-
-   struct drm_prime_handle prime;
-   memset(&prime, 0, sizeof prime);
-   prime.handle = b->bo_handle;
-
-   ret = ioctl(drmfd, DRM_IOCTL_PRIME_HANDLE_TO_FD, &prime);
-   if (ret)
-   {
-      printf("PRIME_HANDLE_TO_FD failed: %s\n", ERRSTR);
-      goto fail_gem;
-   }
-   printf("dbuf_fd = %d\n", prime.fd);
-   b->dbuf_fd = prime.fd;
-
-   uint32_t pitches[4] = { 0 };
-   uint32_t offsets[4] = { 0 };
-   uint32_t bo_handles[4] = { b->bo_handle };
-   unsigned int fourcc = mmal_encoding_to_drm_fourcc(port->format->encoding);
-
-   mmal_format_to_drm_pitches_offsets(pitches, offsets, bo_handles, port->format);
-
-
-   fprintf(stderr, "FB fourcc %c%c%c%c\n",
-      fourcc,
-      fourcc >> 8,
-      fourcc >> 16,
-      fourcc >> 24);
-
-   b->vcsm_handle = vcsm_import_dmabuf(b->dbuf_fd, "DRM Buf");
-   if (!b->vcsm_handle)
-      goto fail_prime;
-
-   EGLint attribs[50];
-   int i = 0;
-
-   attribs[i++] = EGL_WIDTH;
-   attribs[i++] = port->format->es->video.crop.width;
-   attribs[i++] = EGL_HEIGHT;
-   attribs[i++] = port->format->es->video.crop.height;
-
-   attribs[i++] = EGL_LINUX_DRM_FOURCC_EXT;
-   attribs[i++] = fourcc;
-
-   attribs[i++] = EGL_DMA_BUF_PLANE0_FD_EXT;
-   attribs[i++] = b->dbuf_fd;
-
-   attribs[i++] = EGL_DMA_BUF_PLANE0_OFFSET_EXT;
-   attribs[i++] = offsets[0];
-
-   attribs[i++] = EGL_DMA_BUF_PLANE0_PITCH_EXT;
-   attribs[i++] = pitches[0];
-
-   if (pitches[1]) {
-      attribs[i++] = EGL_DMA_BUF_PLANE1_FD_EXT;
-      attribs[i++] = b->dbuf_fd;
-
-      attribs[i++] = EGL_DMA_BUF_PLANE1_OFFSET_EXT;
-      attribs[i++] = offsets[1];
-
-      attribs[i++] = EGL_DMA_BUF_PLANE1_PITCH_EXT;
-      attribs[i++] = pitches[1];
-   }
-
-   if (pitches[2]) {
-      attribs[i++] = EGL_DMA_BUF_PLANE2_FD_EXT;
-      attribs[i++] = b->dbuf_fd;
-
-      attribs[i++] = EGL_DMA_BUF_PLANE2_OFFSET_EXT;
-      attribs[i++] = offsets[2];
-
-      attribs[i++] = EGL_DMA_BUF_PLANE2_PITCH_EXT;
-      attribs[i++] = pitches[2];
-   }
-
-   attribs[i++] = EGL_NONE;
-
-   EGLImage image = eglCreateImageKHR(dpy,
-                                      EGL_NO_CONTEXT,
-                                      EGL_LINUX_DMA_BUF_EXT,
-                                      NULL, attribs);
-   if (!image) {
-      fprintf(stderr, "Failed to import fd %d: Err=%#x\n", b->dbuf_fd, eglGetError());
-      exit(1);
-   }
-
-   glGenTextures(1, &b->texture);
-   glBindTexture(GL_TEXTURE_EXTERNAL_OES, b->texture);
-   glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-   glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-   glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
-
-   eglDestroyImageKHR(dpy, image);
-
-   return 0;
-
-fail_prime:
-   close(b->dbuf_fd);
-
-fail_gem:
-   memset(&gem_destroy, 0, sizeof gem_destroy);
-   gem_destroy.handle = b->bo_handle,
-   ret = ioctl(drmfd, DRM_IOCTL_MODE_DESTROY_DUMB, &gem_destroy);
-   if (ret)
-   {
-      printf("DESTROY_DUMB failed: %s\n", ERRSTR);
-   }
-
-   return -1;
-}
-#endif
-
 
 MMAL_FOURCC_T vlc_to_mmal_color_space(const video_color_space_t vlc_cs)
 {
