@@ -97,6 +97,7 @@ MMAL_FOURCC_T vlc_to_mmal_color_space(const video_color_space_t vlc_cs)
 MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc)
 {
     switch (vf_vlc->i_chroma) {
+        case VLC_CODEC_MMAL_GL_RGB32:
         case VLC_CODEC_RGB32:
         {
             // VLC RGB32 aka RV32 means we have to look at the mask values
@@ -113,6 +114,8 @@ MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc
                 return MMAL_ENCODING_ARGB;
             break;
         }
+        case VLC_CODEC_MMAL_GL_I420:
+            return MMAL_ENCODING_I420;
         case VLC_CODEC_RGBA:
             return MMAL_ENCODING_RGBA;
         case VLC_CODEC_BGRA:

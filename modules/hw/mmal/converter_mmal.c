@@ -605,7 +605,7 @@ OpenGLConverter(vlc_object_t *obj)
 
     if (eglfmt == 0)
     {
-        tc->fmt.i_chroma = VLC_CODEC_RGB32;
+        tc->fmt.i_chroma = VLC_CODEC_MMAL_GL_RGB32;
         tc->fmt.i_rmask = 0xff0000;
         tc->fmt.i_gmask = 0xff00;
         tc->fmt.i_bmask = 0xff;

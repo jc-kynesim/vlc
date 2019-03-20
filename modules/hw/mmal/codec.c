@@ -946,6 +946,7 @@ typedef struct filter_sys_t {
     MMAL_STATUS_T err_stream;
     int in_count;
 
+    bool is_gl;
     bool is_sliced;
     bool out_fmt_set;
     bool latency_set;
@@ -1487,9 +1488,21 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 
             mmal_buffer_header_reset(out_buf);
             out_buf->user_data = out_pic;
-            out_buf->data = out_pic->p[0].p_pixels;
-            out_buf->alloc_size = out_pic->p[0].i_pitch * out_pic->p[0].i_lines;
-            //**** stride ????
+
+            if (sys->is_gl) {
+                if ((out_buf->data = (void *)hw_mmal_h_vcsm(out_pic)) == 0)
+                {
+                    msg_Err(p_filter, "Pic has no vcsm handle");
+                    goto fail;
+                }
+                out_buf->alloc_size = sys->output->buffer_size;
+            }
+            else {
+                out_buf->data = out_pic->p[0].p_pixels;
+                out_buf->alloc_size = out_pic->p[0].i_pitch * out_pic->p[0].i_lines;
+                //**** stride ????
+            }
+
 
 #if TRACE_ALL
             msg_Dbg(p_filter, "Out buf send: pic=%p, data=%p, user=%p, flags=%#x, len=%d/%d, pts=%lld",
@@ -1738,6 +1751,9 @@ retry:
     pic_fifo_init(&sys->slice.pics);
 
     sys->in_port_cb_fn = conv_input_port_cb;
+
+    sys->is_gl = hw_mmal_chroma_is_gl(p_filter->fmt_out.video.i_chroma);
+
     if (use_resizer) {
         sys->resizer_type = FILTER_RESIZER_RESIZER;
         sys->is_sliced = true;
@@ -1800,7 +1816,7 @@ retry:
     if ((status = conv_enable_in(p_filter, sys)) != MMAL_SUCCESS)
         goto fail;
 
-    port_parameter_set_bool(sys->output, MMAL_PARAMETER_ZERO_COPY, sys->is_sliced);
+    port_parameter_set_bool(sys->output, MMAL_PARAMETER_ZERO_COPY, sys->is_sliced || sys->is_gl);
 
     status = mmal_component_enable(sys->component);
     if (status != MMAL_SUCCESS) {

@@ -127,6 +127,16 @@ static inline bool hw_mmal_pic_is_mmal(const picture_t * const pic)
         pic->format.i_chroma == VLC_CODEC_MMAL_ZC_I420;
 }
 
+static inline bool hw_mmal_chroma_is_gl(const uint32_t i_chroma)
+{
+    return
+        i_chroma == VLC_CODEC_MMAL_GL_RGB32 ||
+        i_chroma == VLC_CODEC_MMAL_GL_SAND10 ||
+        i_chroma == VLC_CODEC_MMAL_GL_SAND8 ||
+        i_chroma == VLC_CODEC_MMAL_GL_I420;
+}
+
+
 static inline MMAL_FOURCC_T hw_mmal_pic_format(const picture_t *const pic)
 {
     const pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic->context;
