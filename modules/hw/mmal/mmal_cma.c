@@ -41,6 +41,24 @@ typedef struct cma_pool_fixed_s
 
 } cma_pool_fixed_t;
 
+static void free_pool(const cma_pool_fixed_t * const p, void ** pool, unsigned int n, size_t el_size)
+{
+    while (pool[n] != NULL)
+    {
+        p->el_alloc_free(p->alloc_v, pool[n], el_size);
+        pool[n] = NULL;
+        n = n + 1 < p->pool_size ? n + 1 : 0;
+    }
+    free(pool);
+}
+
+void cma_pool_fixed_unref(cma_pool_fixed_t * const p)
+{
+}
+
+void cma_pool_fixed_ref(cma_pool_fixed_t * const p)
+{
+}
 
 void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size)
 {
@@ -77,15 +95,7 @@ void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size)
 
     // Do the free old op outside the mutex in case the free is slow
     if (deadpool != NULL)
-    {
-        while (deadpool[dead_n] != NULL)
-        {
-            p->el_alloc_free(p->alloc_v, deadpool[dead_n], dead_size);
-            deadpool[dead_n] = NULL;
-            dead_n = dead_size + 1 < p->pool_size ? dead_n + 1 : 0;
-        }
-        free(deadpool);
-    }
+        free_pool(p, deadpool, dead_n, dead_size);
 
     if (v == NULL && req_el_size != 0)
         v = p->el_alloc_fn(p->alloc_v, req_el_size);
