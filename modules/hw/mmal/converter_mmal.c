@@ -418,13 +418,15 @@ tc_mmal_get_pic(const opengl_tex_converter_t *tc, mmal_gl_converter_t * const sy
         msg_Err(tc, "%s: picture_New failed", __func__);
         goto fail;
     }
+    pic->format.i_bits_per_pixel = tc->fmt.i_bits_per_pixel;  // Doesn't seem to be copied by default
 
-    msg_Dbg(tc, "%s: pic_fmt:%dx%d, total_size=%zd, res:%dx%d pic:%s:%dx%d", __func__,
+    msg_Dbg(tc, "%s: %p: pic_fmt:%dx%d, total_size=%zd, res:%dx%d pic:%s:%dx%d, bpp=%d, tc bpp=%d", __func__, pic,
             pic->format.i_width, pic->format.i_height,
             size_total,
             pic_res.p[0].i_pitch, pic_res.p[0].i_lines,
             str_fourcc(cbuf0, pic->format.i_chroma),
-            pic->p[0].i_pitch, pic->p[0].i_lines);
+            pic->p[0].i_pitch, pic->p[0].i_lines,
+            pic->format.i_bits_per_pixel, tc->fmt.i_bits_per_pixel);
 
     return pic;
 
@@ -606,11 +608,11 @@ OpenGLConverter(vlc_object_t *obj)
     if (eglfmt == 0)
     {
         tc->fmt.i_chroma = VLC_CODEC_MMAL_GL_RGB32;
+        tc->fmt.i_bits_per_pixel = 32;
         tc->fmt.i_rmask = 0xff0000;
         tc->fmt.i_gmask = 0xff00;
         tc->fmt.i_bmask = 0xff;
         tc->fmt.space = COLOR_SPACE_SRGB;
-//        tc->fmt.i_bits_per_pixel = 8;  // ???
         sys->drm_fourcc = vlc_to_gl_fourcc(&tc->fmt);
     }
 

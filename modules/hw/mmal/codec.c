@@ -1299,7 +1299,7 @@ static MMAL_STATUS_T conv_set_output(filter_t * const p_filter, filter_sys_t * c
         if ((status = pic_to_format(sys->output->format, pic)) != MMAL_SUCCESS)
         {
             char cbuf[5];
-            msg_Err(p_filter, "Bad format desc: %s, bits=%d", str_fourcc(cbuf, pic->format.i_chroma), pic->format.i_bits_per_pixel);
+            msg_Err(p_filter, "Bad format desc: %s, pic=%p, bits=%d", str_fourcc(cbuf, pic->format.i_chroma), pic, pic->format.i_bits_per_pixel);
             return status;
         }
 

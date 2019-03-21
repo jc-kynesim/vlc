@@ -15,7 +15,8 @@ LIB1=$SYSROOT$HLIB1
 LIB3=$SYSROOT$HLIB3
 LIB4=$SYSROOT$HLIB4
 
-INCLUDES="-I$SYSROOT/usr/include -I$SYSROOT/usr/include/$A -I$SYSROOT/opt/vc/include -I$SYSROOT/usr/lib/arm-linux-gnueabihf/dbus-1.0/include -I$SYSROOT/usr/include/libdrm"
+#INCLUDES="-I$SYSROOT/usr/include -I$SYSROOT/usr/include/$A -I$SYSROOT/opt/vc/include -I$SYSROOT/usr/lib/arm-linux-gnueabihf/dbus-1.0/include -I$SYSROOT/usr/include/libdrm"
+INCLUDES="-I$SYSROOT/usr/include -I$SYSROOT/usr/include/$A -I$SYSROOT/opt/vc/include -I$SYSROOT/usr/lib/arm-linux-gnueabihf/dbus-1.0/include"
 DEFINES="-ggdb -D__VCCOREVER__=0x04000000 -DQT_WARNING_DISABLE_DEPRECATED=\"\""
 ARCH="-march=armv7-a -mfpu=neon-vfpv4"
 PREFIX=$TOOLS/bin/$A-

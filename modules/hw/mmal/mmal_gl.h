@@ -1,10 +1,10 @@
 // Trim this include list!
 
-#include <drm.h>
-#include <drm_mode.h>
-#include <drm_fourcc.h>
-#include <xf86drm.h>
-#include <xf86drmMode.h>
+#include <libdrm/drm.h>
+#include <libdrm/drm_mode.h>
+#include <libdrm/drm_fourcc.h>
+//#include <xf86drm.h>
+//#include <xf86drmMode.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xlib-xcb.h>
