@@ -29,6 +29,8 @@ typedef void cma_pool_free_fn(void * v, void * el, size_t size);
 
 typedef struct cma_pool_fixed_s
 {
+    atomic_int ref_count;
+
     vlc_mutex_t lock;
     unsigned int n_in;
     unsigned int n_out;
@@ -41,23 +43,38 @@ typedef struct cma_pool_fixed_s
 
 } cma_pool_fixed_t;
 
-static void free_pool(const cma_pool_fixed_t * const p, void ** pool, unsigned int n, size_t el_size)
+static int free_pool(const cma_pool_fixed_t * const p, void ** pool, unsigned int n, size_t el_size)
 {
+    int i = 0;
+
     while (pool[n] != NULL)
     {
         p->el_alloc_free(p->alloc_v, pool[n], el_size);
         pool[n] = NULL;
         n = n + 1 < p->pool_size ? n + 1 : 0;
+        ++i;
     }
     free(pool);
+    return i;
+}
+
+// Just kill this - no checks
+static void cma_pool_fixed_delete(cma_pool_fixed_t * const p)
+{
+    free_pool(p, p->pool, p->n_in, p->el_size);
+    vlc_mutex_destroy(&p->lock);
+    free(p);
 }
 
 void cma_pool_fixed_unref(cma_pool_fixed_t * const p)
 {
+    if (atomic_fetch_sub(&p->ref_count, 1) <= 1)
+        cma_pool_fixed_delete(p);
 }
 
 void cma_pool_fixed_ref(cma_pool_fixed_t * const p)
 {
+    atomic_fetch_add(&p->ref_count, 1);
 }
 
 void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size)
@@ -94,11 +111,16 @@ void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size)
     vlc_mutex_unlock(&p->lock);
 
     // Do the free old op outside the mutex in case the free is slow
+    // We cannot run out of refs here
     if (deadpool != NULL)
-        free_pool(p, deadpool, dead_n, dead_size);
+        atomic_fetch_sub(&p->ref_count, free_pool(p, deadpool, dead_n, dead_size));
 
     if (v == NULL && req_el_size != 0)
         v = p->el_alloc_fn(p->alloc_v, req_el_size);
+
+    // Tag ref
+    if (v != NULL)
+        cma_pool_fixed_ref(p);
 
     return v;
 }
@@ -121,28 +143,32 @@ void cma_pool_fixed_put(cma_pool_fixed_t * const p, void * v, const size_t el_si
 
     if (v != NULL)
         p->el_alloc_free(p->alloc_v, v, el_size);
+
+    cma_pool_unref(p);
 }
 
-
-
-
-
-typedef struct hw_mmal_cma_env_s
+// Purge pool & unref
+void cma_pool_fixed_kill(cma_pool_fixed_t * const p)
 {
-    Display * dpy;
-    int drm_fd;
-} hw_mmal_cma_env_t;
-
-
-cma_buf_t * hw_mmal_cma_buf_new(hw_mmal_cma_env_t * cenv, size_t size)
-{
+    cma_pool_fixed_get(p, 0);
+    cma_pool_fixed_unref(p);
 }
 
-hw_mmal_cma_env_delete(hw_mmal_cma_env_t * const cenv)
+cma_pool_fixed_t*
+cma_pool_fixed_new(void * const alloc_v,
+                   cma_pool_alloc_fn * const alloc_fn, cma_pool_free_fn * const free_fn)
 {
-}
+    cma_pool_fixed_t* const p = calloc(1, sizeof(cma_pool_fixed_t));
+    if (p == NULL)
+        return NULL;
 
-hw_mmal_cma_env_t * hw_mmal_cma_env_new()
-{
+    atomic_store(&p->ref_count, 1);
+    vlc_mutex_init(&p->lock);
+
+    p->alloc_v = alloc_v;
+    p->el_alloc_fn = alloc_fn;
+    p->el_free_fn = free_fn;
+
+    return p;
 }
 
