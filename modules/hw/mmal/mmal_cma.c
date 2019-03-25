@@ -2,6 +2,7 @@
 # include "config.h"
 #endif
 
+#include <stdatomic.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -9,17 +10,10 @@
 
 #include <interface/vcsm/user-vcsm.h>
 
-
 #include <vlc_common.h>
 #include <vlc_picture.h>
 
-#include "mmal_gl.h"
-
-#include <vlc_xlib.h>
-#include "../../video_output/opengl/converter.h"
-#include <vlc_vout_window.h>
-
-#include "mmal_picture.h"
+#include "mmal_cma.h"
 
 #include <assert.h>
 
@@ -27,7 +21,7 @@
 typedef void * cma_pool_alloc_fn(void * v, size_t size);
 typedef void cma_pool_free_fn(void * v, void * el, size_t size);
 
-typedef struct cma_pool_fixed_s
+struct cma_pool_fixed_s
 {
     atomic_int ref_count;
 
@@ -35,13 +29,13 @@ typedef struct cma_pool_fixed_s
     unsigned int n_in;
     unsigned int n_out;
     unsigned int pool_size;
+    size_t el_size;
     void ** pool;
 
     void * alloc_v;
     cma_pool_alloc_fn * el_alloc_fn;
     cma_pool_free_fn * el_free_fn;
-
-} cma_pool_fixed_t;
+};
 
 static int free_pool(const cma_pool_fixed_t * const p, void ** pool, unsigned int n, size_t el_size)
 {
@@ -49,7 +43,7 @@ static int free_pool(const cma_pool_fixed_t * const p, void ** pool, unsigned in
 
     while (pool[n] != NULL)
     {
-        p->el_alloc_free(p->alloc_v, pool[n], el_size);
+        p->el_free_fn(p->alloc_v, pool[n], el_size);
         pool[n] = NULL;
         n = n + 1 < p->pool_size ? n + 1 : 0;
         ++i;
@@ -142,9 +136,9 @@ void cma_pool_fixed_put(cma_pool_fixed_t * const p, void * v, const size_t el_si
     vlc_mutex_unlock(&p->lock);
 
     if (v != NULL)
-        p->el_alloc_free(p->alloc_v, v, el_size);
+        p->el_free_fn(p->alloc_v, v, el_size);
 
-    cma_pool_unref(p);
+    cma_pool_fixed_unref(p);
 }
 
 // Purge pool & unref
@@ -155,7 +149,7 @@ void cma_pool_fixed_kill(cma_pool_fixed_t * const p)
 }
 
 cma_pool_fixed_t*
-cma_pool_fixed_new(void * const alloc_v,
+cma_pool_fixed_new(const unsigned int pool_size, void * const alloc_v,
                    cma_pool_alloc_fn * const alloc_fn, cma_pool_free_fn * const free_fn)
 {
     cma_pool_fixed_t* const p = calloc(1, sizeof(cma_pool_fixed_t));
@@ -165,6 +159,8 @@ cma_pool_fixed_new(void * const alloc_v,
     atomic_store(&p->ref_count, 1);
     vlc_mutex_init(&p->lock);
 
+    p->pool_size = pool_size;
+
     p->alloc_v = alloc_v;
     p->el_alloc_fn = alloc_fn;
     p->el_free_fn = free_fn;
@@ -172,3 +168,59 @@ cma_pool_fixed_new(void * const alloc_v,
     return p;
 }
 
+
+static void cma_pool_free_cb(void * v, void * el, size_t size)
+{
+    VLC_UNUSED(v);
+    VLC_UNUSED(size);
+
+    cma_buf_t * const cb = el;
+    if (cb->fd != -1)
+        close(cb->fd);
+    if (cb->vcsm_h != 0)
+        vcsm_free(cb->vcsm_h);
+    free(cb);
+}
+
+static void * cma_pool_alloc_cb(void * v, size_t size)
+{
+    VLC_UNUSED(v);
+
+    cma_buf_t * const cb = malloc(sizeof(cma_buf_t));
+    if (cb == NULL)
+        return NULL;
+
+    *cb = (cma_buf_t){
+        .size = size,
+        .vcsm_h = 0,
+        .vc_h = 0,
+        .fd = -1
+    };
+
+    if ((cb->vcsm_h = vcsm_malloc_cache(size, VCSM_CACHE_TYPE_HOST, (char*)"VLC frame")) == 0)
+        goto fail;
+
+    if ((cb->vc_h = vcsm_vc_hdl_from_hdl(cb->vcsm_h)) == 0)
+        goto fail;
+
+    if ((cb->fd = vcsm_export_dmabuf(cb->vcsm_h)) == -1)
+        goto fail2;
+
+    return cb;
+
+fail2:
+    vcsm_free(cb->vcsm_h);
+fail:
+    free(cb);
+    return NULL;
+}
+
+void cma_buf_pool_delete(cma_pool_fixed_t * const p)
+{
+    cma_pool_fixed_kill(p);
+}
+
+cma_pool_fixed_t * cma_buf_pool_new(void)
+{
+    return cma_pool_fixed_new(5, NULL, cma_pool_alloc_cb, cma_pool_free_cb);
+}
