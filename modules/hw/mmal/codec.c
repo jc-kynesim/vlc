@@ -39,8 +39,9 @@
 #include <interface/mmal/util/mmal_util.h>
 #include <interface/mmal/util/mmal_default_components.h>
 
-#include "mmal_gl.h"
+#include "mmal_cma.h"
 #include "mmal_picture.h"
+
 #include "subpic.h"
 #include "blend_rgba_neon.h"
 
@@ -933,6 +934,8 @@ typedef struct filter_sys_t {
     MMAL_POOL_T *out_pool;  // Free output buffers
     MMAL_POOL_T *in_pool;   // Input pool to get BH for replication
 
+    cma_pool_fixed_t * cma_out_pool;
+
     subpic_reg_stash_t subs[SUBS_MAX];
 
     pic_fifo_t ret_pics;
@@ -946,7 +949,7 @@ typedef struct filter_sys_t {
     MMAL_STATUS_T err_stream;
     int in_count;
 
-    bool is_gl;
+    bool is_cma;
     bool is_sliced;
     bool out_fmt_set;
     bool latency_set;
@@ -971,18 +974,17 @@ static MMAL_STATUS_T pic_to_format(MMAL_ES_FORMAT_T * const es_fmt, const pictur
     unsigned int bpp = (pic->format.i_bits_per_pixel + 7) >> 3;
     MMAL_VIDEO_FORMAT_T * const v_fmt = &es_fmt->es->video;
 
-    if (bpp < 1 || bpp > 4)
-        return MMAL_EINVAL;
-
     es_fmt->type = MMAL_ES_TYPE_VIDEO;
     es_fmt->encoding = vlc_to_mmal_video_fourcc(&pic->format);
     es_fmt->encoding_variant = 0;
 
     // Fill in crop etc.
     vlc_to_mmal_video_fmt(es_fmt, &pic->format);
-    // Override width / height with strides
-    v_fmt->width = pic->p[0].i_pitch / bpp;
-    v_fmt->height = pic->p[0].i_lines;
+    // Override width / height with strides if appropriate
+    if (bpp != 0) {
+        v_fmt->width = pic->p[0].i_pitch / bpp;
+        v_fmt->height = pic->p[0].i_lines;
+    }
     return MMAL_SUCCESS;
 }
 
@@ -1063,6 +1065,42 @@ static void conv_out_q_pic(filter_sys_t * const sys, picture_t * const pic)
     vlc_sem_post(&sys->sem);
 }
 
+static int cma_pic_set_data(filter_t * const p_filter, picture_t * const pic, const MMAL_BUFFER_HEADER_T * const buf)
+{
+    filter_sys_t *const sys = p_filter->p_sys;
+    const MMAL_VIDEO_FORMAT_T * const mm_fmt = &sys->output->format->es->video;
+    const MMAL_BUFFER_HEADER_VIDEO_SPECIFIC_T *const buf_vid = &buf->type->video;
+
+    uint8_t * const data = cma_buf_pic_addr(pic);
+    if (data == NULL) {
+        return VLC_ENOMEM;
+    }
+
+    switch (p_filter->fmt_out.video.i_chroma)
+    {
+        case VLC_CODEC_MMAL_ZC_RGB32:
+            pic->i_planes = buf_vid->planes;
+            for (unsigned int i = 0; i != buf_vid->planes; ++i) {
+                // ****** This is wrong for non-RGB
+                pic->p[i] = (plane_t){
+                    .p_pixels = data + buf_vid->offset[i],
+                    .i_lines = mm_fmt->height,
+                    .i_pitch = buf_vid->pitch[i],
+                    .i_pixel_pitch = 4,
+                    .i_visible_lines = mm_fmt->crop.height,
+                    .i_visible_pitch = mm_fmt->crop.width
+                };
+            }
+            break;
+
+        default:
+            msg_Err(p_filter, "%s: Unexpected format", __func__);
+            return VLC_EGENERIC;
+    }
+
+    return VLC_SUCCESS;
+}
+
 static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 {
     filter_t * const p_filter = (filter_t *)port->userdata;
@@ -1089,6 +1127,11 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
         else
         {
             buf_to_pic_copy_props(pic, buf);
+
+            if (sys->is_cma) {
+                if (cma_pic_set_data(p_filter, pic, buf) != VLC_SUCCESS)
+                    msg_Err(p_filter, "Failed to set data");
+            }
 
 //            draw_corners(pic->p[0].p_pixels, pic->p[0].i_pitch / 4, 0, 0, pic->p[0].i_visible_pitch / 4, pic->p[0].i_visible_lines);
 #if DEBUG_SQUARES
@@ -1211,6 +1254,8 @@ static void conv_flush(filter_t * p_filter)
     msg_Dbg(p_filter, "<<< %s", __func__);
 #endif
 
+    cma_buf_pool_deletez(&sys->cma_out_pool);
+
     if (sys->resizer_type == FILTER_RESIZER_HVS)
     {
         for (i = 0; i != SUBS_MAX; ++i) {
@@ -1318,6 +1363,19 @@ static MMAL_STATUS_T conv_set_output(filter_t * const p_filter, filter_sys_t * c
 
     sys->output->buffer_num = __MAX(sys->is_sliced ? 16 : 2, sys->output->buffer_num_recommended);
     sys->output->buffer_size = sys->output->buffer_size_recommended;
+
+    if (sys->is_cma)
+    {
+        if ((sys->cma_out_pool = cma_buf_pool_new()) == NULL)
+        {
+            msg_Err(p_filter, "Failed to alloc cma buf pool");
+            return MMAL_ENOMEM;
+        }
+    }
+    else
+    {
+        cma_buf_pool_deletez(&sys->cma_out_pool);
+    }
 
     if ((status = conv_enable_out(p_filter, sys)) != MMAL_SUCCESS)
         return status;
@@ -1489,12 +1547,20 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             mmal_buffer_header_reset(out_buf);
             out_buf->user_data = out_pic;
 
-            if (sys->is_gl) {
-                if ((out_buf->data = (void *)hw_mmal_h_vcsm(out_pic)) == 0)
+            if (sys->is_cma) {
+                int rv;
+                if ((rv = cma_buf_pic_attach(sys->cma_out_pool, out_pic, sys->output->buffer_size)) != VLC_SUCCESS)
                 {
-                    msg_Err(p_filter, "Pic has no vcsm handle");
+                    msg_Err(p_filter, "Failed to attach CMA to pic: err=%d", rv);
                     goto fail;
                 }
+                const unsigned int vc_h = cma_buf_pic_vc_handle(out_pic);
+                if (vc_h == 0)
+                {
+                    msg_Err(p_filter, "Pic has no vc handle");
+                    goto fail;
+                }
+                out_buf->data = (uint8_t *)vc_h;
                 out_buf->alloc_size = sys->output->buffer_size;
             }
             else {
@@ -1502,7 +1568,6 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 out_buf->alloc_size = out_pic->p[0].i_pitch * out_pic->p[0].i_lines;
                 //**** stride ????
             }
-
 
 #if TRACE_ALL
             msg_Dbg(p_filter, "Out buf send: pic=%p, data=%p, user=%p, flags=%#x, len=%d/%d, pts=%lld",
@@ -1752,8 +1817,6 @@ retry:
 
     sys->in_port_cb_fn = conv_input_port_cb;
 
-    sys->is_gl = hw_mmal_chroma_is_gl(p_filter->fmt_out.video.i_chroma);
-
     if (use_resizer) {
         sys->resizer_type = FILTER_RESIZER_RESIZER;
         sys->is_sliced = true;
@@ -1771,6 +1834,7 @@ retry:
         sys->component_name = MMAL_COMPONENT_HVS;
         sys->out_port_cb_fn = conv_output_port_cb;
     }
+    sys->is_cma = is_cma_buf_pic_chroma(p_filter->fmt_out.video.i_chroma);
 
     status = mmal_component_create(sys->component_name, &sys->component);
     if (status != MMAL_SUCCESS) {
@@ -1816,7 +1880,7 @@ retry:
     if ((status = conv_enable_in(p_filter, sys)) != MMAL_SUCCESS)
         goto fail;
 
-    port_parameter_set_bool(sys->output, MMAL_PARAMETER_ZERO_COPY, sys->is_sliced || sys->is_gl);
+    port_parameter_set_bool(sys->output, MMAL_PARAMETER_ZERO_COPY, sys->is_sliced || sys->is_cma);
 
     status = mmal_component_enable(sys->component);
     if (status != MMAL_SUCCESS) {

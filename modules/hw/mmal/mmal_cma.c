@@ -73,7 +73,7 @@ void cma_pool_fixed_ref(cma_pool_fixed_t * const p)
 
 void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size)
 {
-    void * v;
+    void * v = NULL;
     void ** deadpool = NULL;
     size_t dead_size = 0;
     unsigned int dead_n = 0;
@@ -90,7 +90,6 @@ void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size)
         p->n_in = 0;
         p->n_out = 0;
         p->el_size = req_el_size;
-        v = NULL;
     }
     else if (p->pool != NULL)
     {
@@ -169,17 +168,23 @@ cma_pool_fixed_new(const unsigned int pool_size, void * const alloc_v,
 }
 
 
-static void cma_pool_free_cb(void * v, void * el, size_t size)
+static void cma_pool_delete(cma_buf_t * const cb)
 {
-    VLC_UNUSED(v);
-    VLC_UNUSED(size);
-
-    cma_buf_t * const cb = el;
+    if (cb->mmap != MAP_FAILED)
+        munmap(cb->mmap, cb->size);
     if (cb->fd != -1)
         close(cb->fd);
     if (cb->vcsm_h != 0)
         vcsm_free(cb->vcsm_h);
     free(cb);
+}
+
+static void cma_pool_free_cb(void * v, void * el, size_t size)
+{
+    VLC_UNUSED(v);
+    VLC_UNUSED(size);
+
+    cma_pool_delete(el);
 }
 
 static void * cma_pool_alloc_cb(void * v, size_t size)
@@ -194,7 +199,8 @@ static void * cma_pool_alloc_cb(void * v, size_t size)
         .size = size,
         .vcsm_h = 0,
         .vc_h = 0,
-        .fd = -1
+        .fd = -1,
+        .mmap = MAP_FAILED
     };
 
     if ((cb->vcsm_h = vcsm_malloc_cache(size, VCSM_CACHE_TYPE_HOST, (char*)"VLC frame")) == 0)
@@ -204,19 +210,21 @@ static void * cma_pool_alloc_cb(void * v, size_t size)
         goto fail;
 
     if ((cb->fd = vcsm_export_dmabuf(cb->vcsm_h)) == -1)
-        goto fail2;
+        goto fail;
+
+    if ((cb->mmap = mmap(NULL, cb->size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_LOCKED, cb->fd, 0)) == MAP_FAILED)
+        goto fail;
 
     return cb;
 
-fail2:
-    vcsm_free(cb->vcsm_h);
 fail:
-    free(cb);
+    cma_pool_delete(cb);
     return NULL;
 }
 
 void cma_buf_pool_delete(cma_pool_fixed_t * const p)
 {
+    assert(p != NULL);
     cma_pool_fixed_kill(p);
 }
 
@@ -224,3 +232,84 @@ cma_pool_fixed_t * cma_buf_pool_new(void)
 {
     return cma_pool_fixed_new(5, NULL, cma_pool_alloc_cb, cma_pool_free_cb);
 }
+
+
+typedef struct cma_pic_context_s {
+    picture_context_t cmn;
+
+    atomic_int ref_count;
+    cma_pool_fixed_t * p;
+    cma_buf_t * cb;
+} cma_pic_context_t;
+
+static picture_context_t * cma_buf_pic_ctx_copy(picture_context_t * pic_ctx)
+{
+    cma_pic_context_t * const ctx = (cma_pic_context_t *)pic_ctx;
+
+    atomic_fetch_add(&ctx->ref_count, 1);
+
+    return &ctx->cmn;
+}
+
+static void cma_buf_pic_ctx_destroy(picture_context_t * pic_ctx)
+{
+    cma_pic_context_t * const ctx = (cma_pic_context_t *)pic_ctx;
+
+    if (atomic_fetch_sub(&ctx->ref_count, 1) > 0)
+        return;
+
+    if (ctx->cb != NULL)
+        cma_pool_fixed_put(ctx->p, ctx->cb, ctx->cb->size);
+
+    free(ctx);
+}
+
+int cma_buf_pic_attach(cma_pool_fixed_t * const p, picture_t * const pic, const size_t size)
+{
+    if (pic->context != NULL)
+        return VLC_EBADVAR;
+
+    cma_buf_t * const cb = cma_pool_fixed_get(p, size);
+    if (cb == NULL)
+        return VLC_ENOMEM;
+
+    cma_pic_context_t * const ctx = malloc(sizeof(cma_pic_context_t));
+    if (ctx == NULL)
+        goto fail;
+
+    *ctx = (cma_pic_context_t){
+        .cmn = {
+            .destroy = cma_buf_pic_ctx_destroy,
+            .copy = cma_buf_pic_ctx_copy
+        },
+        .ref_count = 0,
+        .p = p,
+        .cb = cb
+    };
+
+    pic->context = &ctx->cmn;
+    return VLC_SUCCESS;
+
+fail:
+    cma_pool_fixed_put(p, cb, size);
+    return VLC_EGENERIC;
+}
+
+unsigned int cma_buf_pic_vc_handle(const picture_t * const pic)
+{
+    cma_pic_context_t *const ctx = (cma_pic_context_t *)pic->context;
+    return !is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx  == NULL ? 0 : ctx->cb == NULL ? 0 : ctx->cb->vc_h;
+}
+
+int cma_buf_pic_fd(const picture_t * const pic)
+{
+    cma_pic_context_t *const ctx = (cma_pic_context_t *)pic->context;
+    return !is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx == NULL ? -1 : ctx->cb == NULL ? -1 : ctx->cb->fd;
+}
+
+void * cma_buf_pic_addr(const picture_t * const pic)
+{
+    cma_pic_context_t *const ctx = (cma_pic_context_t *)pic->context;
+    return !is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx == NULL ? NULL : ctx->cb == NULL ? NULL : ctx->cb->mmap;
+}
+

@@ -37,6 +37,8 @@
 #include <interface/vmcs_host/vcgencmd.h>
 #include <interface/vcsm/user-vcsm.h>
 
+#include "mmal_cma.h"  // **************
+
 #include "mmal_picture.h"
 
 #define UINT64_SIZE(s) (((s) + sizeof(uint64_t) - 1)/sizeof(uint64_t))
@@ -97,6 +99,7 @@ MMAL_FOURCC_T vlc_to_mmal_color_space(const video_color_space_t vlc_cs)
 MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc)
 {
     switch (vf_vlc->i_chroma) {
+        case VLC_CODEC_MMAL_ZC_RGB32:
         case VLC_CODEC_MMAL_GL_RGB32:
         case VLC_CODEC_RGB32:
         {
@@ -127,8 +130,8 @@ MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc
             return MMAL_ENCODING_OPAQUE;
         case VLC_CODEC_MMAL_ZC_SAND8:
             return MMAL_ENCODING_YUVUV128;
-        case VLC_CODEC_MMAL_ZC_SAND10:
-            return MMAL_ENCODING_YUVUV64_10;
+//        case VLC_CODEC_MMAL_ZC_SAND10:
+//            return MMAL_ENCODING_YUVUV64_10;
         default:
             break;
     }

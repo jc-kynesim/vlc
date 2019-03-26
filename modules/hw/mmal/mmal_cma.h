@@ -23,5 +23,28 @@ typedef struct cma_buf_s {
 void cma_buf_pool_delete(cma_pool_fixed_t * const p);
 cma_pool_fixed_t * cma_buf_pool_new(void);
 
+int cma_buf_pic_attach(cma_pool_fixed_t * const p, picture_t * const pic, const size_t size);
+unsigned int cma_buf_pic_vc_handle(const picture_t * const pic);
+int cma_buf_pic_fd(const picture_t * const pic);
+void * cma_buf_pic_addr(const picture_t * const pic);
+
+#include <vlc_fourcc.h>
+
+// ******* Lie - until we build a proper 4cc
+#define VLC_CODEC_MMAL_ZC_RGB32 VLC_CODEC_MMAL_ZC_SAND10
+
+static inline bool is_cma_buf_pic_chroma(const uint32_t chroma)
+{
+    return chroma == VLC_CODEC_MMAL_ZC_RGB32;
+}
+
+static inline void cma_buf_pool_deletez(cma_pool_fixed_t ** const pp)
+{
+    cma_pool_fixed_t * const p = *pp;
+    if (p != NULL) {
+        *pp = NULL;
+        cma_buf_pool_delete(p);
+    }
+}
 
 

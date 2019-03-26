@@ -13,7 +13,20 @@
 #include <vlc_common.h>
 #include <vlc_picture.h>
 
-#include "mmal_gl.h"
+#include <libdrm/drm.h>
+#include <libdrm/drm_mode.h>
+#include <libdrm/drm_fourcc.h>
+//#include <xf86drm.h>
+//#include <xf86drmMode.h>
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/Xlib-xcb.h>
+#include <epoxy/gl.h>
+#include <epoxy/egl.h>
+#include <xcb/xcb.h>
+#include <xcb/dri3.h>
+
+#include "mmal_cma.h"
 
 #include <vlc_xlib.h>
 #include "../../video_output/opengl/converter.h"
@@ -33,6 +46,39 @@ typedef struct mmal_gl_converter_s
     int drm_fd;
 
 } mmal_gl_converter_t;
+
+
+static EGLint vlc_to_gl_fourcc(const video_format_t * const fmt)
+{
+    switch(vlc_to_mmal_video_fourcc(fmt))
+    {
+       case MMAL_ENCODING_I420:
+          return MMAL_FOURCC('Y','U','1','2');
+       case MMAL_ENCODING_YV12:
+          return MMAL_FOURCC('Y','V','1','2');
+       case MMAL_ENCODING_I422:
+          return MMAL_FOURCC('Y','U','1','6');
+       case MMAL_ENCODING_NV12:
+          return MMAL_FOURCC('N','V','1','2');
+       case MMAL_ENCODING_NV21:
+          return MMAL_FOURCC('N','V','2','1');
+       case MMAL_ENCODING_RGB16:
+          return MMAL_FOURCC('R','G','1','6');
+       case MMAL_ENCODING_RGB24:
+          return MMAL_FOURCC('B','G','2','4');
+       case MMAL_ENCODING_BGR24:
+          return MMAL_FOURCC('R','G','2','4');
+       case MMAL_ENCODING_BGR32:
+       case MMAL_ENCODING_BGRA:
+          return MMAL_FOURCC('X','R','2','4');
+       case MMAL_ENCODING_RGB32:
+       case MMAL_ENCODING_RGBA:
+          return MMAL_FOURCC('X','B','2','4');
+       default:
+          break;
+    }
+    return 0;
+}
 
 
 static int
@@ -180,7 +226,6 @@ fail_gem:
 
    return -1;
 }
-#endif
 
 static void
 tc_free_buf(cma_buf_t * const cmabuf)
@@ -276,38 +321,6 @@ tc_alloc_buf(const opengl_tex_converter_t * const tc, mmal_gl_converter_t * cons
 fail:
     tc_free_buf(cmabuf);
     return NULL;
-}
-
-static EGLint vlc_to_gl_fourcc(const video_format_t * const fmt)
-{
-    switch(vlc_to_mmal_video_fourcc(fmt))
-    {
-       case MMAL_ENCODING_I420:
-          return MMAL_FOURCC('Y','U','1','2');
-       case MMAL_ENCODING_YV12:
-          return MMAL_FOURCC('Y','V','1','2');
-       case MMAL_ENCODING_I422:
-          return MMAL_FOURCC('Y','U','1','6');
-       case MMAL_ENCODING_NV12:
-          return MMAL_FOURCC('N','V','1','2');
-       case MMAL_ENCODING_NV21:
-          return MMAL_FOURCC('N','V','2','1');
-       case MMAL_ENCODING_RGB16:
-          return MMAL_FOURCC('R','G','1','6');
-       case MMAL_ENCODING_RGB24:
-          return MMAL_FOURCC('B','G','2','4');
-       case MMAL_ENCODING_BGR24:
-          return MMAL_FOURCC('R','G','2','4');
-       case MMAL_ENCODING_BGR32:
-       case MMAL_ENCODING_BGRA:
-          return MMAL_FOURCC('X','R','2','4');
-       case MMAL_ENCODING_RGB32:
-       case MMAL_ENCODING_RGBA:
-          return MMAL_FOURCC('X','B','2','4');
-       default:
-          break;
-    }
-    return 0;
 }
 
 static inline unsigned int
@@ -467,7 +480,7 @@ fail:
 
     return NULL;
 }
-
+#endif
 
 static int
 get_drm_fd(opengl_tex_converter_t * const tc, Display * const dpy)
@@ -607,7 +620,7 @@ OpenGLConverter(vlc_object_t *obj)
 
     if (eglfmt == 0)
     {
-        tc->fmt.i_chroma = VLC_CODEC_MMAL_GL_RGB32;
+        tc->fmt.i_chroma = VLC_CODEC_MMAL_ZC_RGB32;
         tc->fmt.i_bits_per_pixel = 32;
         tc->fmt.i_rmask = 0xff0000;
         tc->fmt.i_gmask = 0xff00;
@@ -617,7 +630,6 @@ OpenGLConverter(vlc_object_t *obj)
     }
 
     tc->pf_update  = tc_mmal_update;
-    tc->pf_get_pool = tc_mmal_get_pool;
     return VLC_SUCCESS;
 
 fail:
