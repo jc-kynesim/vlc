@@ -80,6 +80,122 @@ static EGLint vlc_to_gl_fourcc(const video_format_t * const fmt)
     return 0;
 }
 
+typedef struct tex_context_s {
+    picture_context_t cmn;
+    GLuint texture;
+} tex_context_t;
+
+static void tex_context_delete(tex_context_t * const tex)
+{
+    free(tex);
+}
+
+static void tex_context_destroy(picture_context_t * pic_ctx)
+{
+    tex_context_delete((tex_context_t *)pic_ctx);
+}
+
+static picture_context_t * tex_context_copy(picture_context_t * pic_ctx)
+{
+    return pic_ctx;
+}
+
+static tex_context_t * get_tex_context(const opengl_tex_converter_t * const tc, picture_t * const pic)
+{
+    mmal_gl_converter_t * const sys = tc->priv;
+
+    tex_context_t * tex = (tex_context_t *)cma_buf_pic_context2(pic);
+    if (tex != NULL)
+        return tex;
+
+    if ((tex = malloc(sizeof(*tex))) == NULL)
+        return NULL;
+
+    *tex = (tex_context_t){
+        .cmn = {
+            .destroy = tex_context_destroy,
+            .copy = tex_context_copy
+        },
+        .texture = 0
+    };
+
+    {
+        EGLint attribs[30];
+        EGLint * a = attribs;
+        const int fd = cma_buf_pic_fd(pic);
+        uint8_t * base_addr = cma_buf_pic_addr(pic);
+
+        if (pic->i_planes >= 4 || pic->i_planes <= 0)
+        {
+            msg_Err(tc, "%s: Bad planes", __func__);
+            goto fail;
+        }
+
+        *a++ = EGL_WIDTH;
+        *a++ = pic->format.i_visible_width;
+        *a++ = EGL_HEIGHT;
+        *a++ = pic->format.i_visible_height;
+        *a++ = EGL_LINUX_DRM_FOURCC_EXT;
+        *a++ = sys->drm_fourcc;
+
+        static const EGLint attnames[] = {
+            EGL_DMA_BUF_PLANE0_FD_EXT,
+            EGL_DMA_BUF_PLANE0_OFFSET_EXT,
+            EGL_DMA_BUF_PLANE0_PITCH_EXT,
+            EGL_DMA_BUF_PLANE1_FD_EXT,
+            EGL_DMA_BUF_PLANE1_OFFSET_EXT,
+            EGL_DMA_BUF_PLANE1_PITCH_EXT,
+            EGL_DMA_BUF_PLANE2_FD_EXT,
+            EGL_DMA_BUF_PLANE2_OFFSET_EXT,
+            EGL_DMA_BUF_PLANE2_PITCH_EXT,
+            EGL_DMA_BUF_PLANE3_FD_EXT,
+            EGL_DMA_BUF_PLANE3_OFFSET_EXT,
+            EGL_DMA_BUF_PLANE3_PITCH_EXT
+        };
+        const EGLint * n = attnames;
+
+        for (int i = 0; i < pic->i_planes; ++i)
+        {
+            *a++ = *n++;
+            *a++ = fd;
+            *a++ = *n++;
+            *a++ = pic->p[i].p_pixels - base_addr;
+            *a++ = *n++;
+            *a++ = pic->p[i].i_pitch;
+        }
+
+        *a++ = EGL_NONE;
+
+        EGLImage image = eglCreateImageKHR(sys->dpy,
+                                           EGL_NO_CONTEXT,
+                                           EGL_LINUX_DMA_BUF_EXT,
+                                           NULL, attribs);
+        if (!image) {
+           msg_Err(tc, "Failed to import fd %d: Err=%#x", fd, eglGetError());
+           goto fail;
+        }
+
+        glGenTextures(1, &tex->texture);
+        glBindTexture(GL_TEXTURE_EXTERNAL_OES, tex->texture);
+        glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
+
+        eglDestroyImageKHR(sys->dpy, image);
+    }
+
+    if (cma_buf_pic_add_context2(pic, &tex->cmn) != VLC_SUCCESS)
+    {
+        msg_Err(tc, "%s: add_context2 failed", __func__);
+        goto fail;
+    }
+    return tex;
+
+fail:
+    tex_context_delete(tex);
+    return NULL;
+}
+
 
 static int
 tc_mmal_update(const opengl_tex_converter_t *tc, GLuint *textures,
@@ -90,8 +206,9 @@ tc_mmal_update(const opengl_tex_converter_t *tc, GLuint *textures,
     VLC_UNUSED(textures);
     VLC_UNUSED(tex_width);
     VLC_UNUSED(tex_height);
-    VLC_UNUSED(pic);
     VLC_UNUSED(plane_offset);
+
+    get_tex_context(tc, pic);
 
     return VLC_EGENERIC;
 }

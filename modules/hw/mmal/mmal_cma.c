@@ -225,6 +225,7 @@ fail:
 void cma_buf_pool_delete(cma_pool_fixed_t * const p)
 {
     assert(p != NULL);
+
     cma_pool_fixed_kill(p);
 }
 
@@ -240,6 +241,7 @@ typedef struct cma_pic_context_s {
     atomic_int ref_count;
     cma_pool_fixed_t * p;
     cma_buf_t * cb;
+    picture_context_t * ctx2;
 } cma_pic_context_t;
 
 static picture_context_t * cma_buf_pic_ctx_copy(picture_context_t * pic_ctx)
@@ -247,6 +249,7 @@ static picture_context_t * cma_buf_pic_ctx_copy(picture_context_t * pic_ctx)
     cma_pic_context_t * const ctx = (cma_pic_context_t *)pic_ctx;
 
     atomic_fetch_add(&ctx->ref_count, 1);
+    // As we don't actually copy this context - don't call the ctx2 copy code
 
     return &ctx->cmn;
 }
@@ -257,6 +260,9 @@ static void cma_buf_pic_ctx_destroy(picture_context_t * pic_ctx)
 
     if (atomic_fetch_sub(&ctx->ref_count, 1) > 0)
         return;
+
+    if (ctx->ctx2 != NULL)
+        ctx->ctx2->destroy(ctx->ctx2);
 
     if (ctx->cb != NULL)
         cma_pool_fixed_put(ctx->p, ctx->cb, ctx->cb->size);
@@ -295,6 +301,16 @@ fail:
     return VLC_EGENERIC;
 }
 
+int cma_buf_pic_add_context2(picture_t *const pic, picture_context_t * const ctx2)
+{
+    cma_pic_context_t *const ctx = (cma_pic_context_t *)pic->context;
+    if (!is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx == NULL || ctx->ctx2 != NULL)
+        return VLC_EGENERIC;
+
+    ctx->ctx2 = ctx2;
+    return VLC_SUCCESS;
+}
+
 unsigned int cma_buf_pic_vc_handle(const picture_t * const pic)
 {
     cma_pic_context_t *const ctx = (cma_pic_context_t *)pic->context;
@@ -312,4 +328,11 @@ void * cma_buf_pic_addr(const picture_t * const pic)
     cma_pic_context_t *const ctx = (cma_pic_context_t *)pic->context;
     return !is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx == NULL ? NULL : ctx->cb == NULL ? NULL : ctx->cb->mmap;
 }
+
+picture_context_t * cma_buf_pic_context2(const picture_t * const pic)
+{
+    cma_pic_context_t *const ctx = (cma_pic_context_t *)pic->context;
+    return !is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx == NULL ? NULL : ctx->ctx2;
+}
+
 

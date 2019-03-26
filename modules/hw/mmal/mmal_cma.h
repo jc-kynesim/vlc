@@ -24,9 +24,11 @@ void cma_buf_pool_delete(cma_pool_fixed_t * const p);
 cma_pool_fixed_t * cma_buf_pool_new(void);
 
 int cma_buf_pic_attach(cma_pool_fixed_t * const p, picture_t * const pic, const size_t size);
+int cma_buf_pic_add_context2(picture_t *const pic, picture_context_t * const ctx2);
 unsigned int cma_buf_pic_vc_handle(const picture_t * const pic);
 int cma_buf_pic_fd(const picture_t * const pic);
 void * cma_buf_pic_addr(const picture_t * const pic);
+picture_context_t * cma_buf_pic_context2(const picture_t * const pic);
 
 #include <vlc_fourcc.h>
 

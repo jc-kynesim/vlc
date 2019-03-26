@@ -29,7 +29,7 @@ libmmal_xsplitter_plugin_la_LDFLAGS = $(AM_LDFLAGS)
 libmmal_xsplitter_plugin_la_LIBADD = $(LIBS_mmal)
 mmal_LTLIBRARIES += libmmal_xsplitter_plugin.la
 
-libmmal_converter_plugin_la_SOURCES = converter_mmal.c mmal_picture.c mmal_picture.h
+libmmal_converter_plugin_la_SOURCES = converter_mmal.c mmal_cma.c mmal_picture.c mmal_cma.h mmal_picture.h
 libmmal_converter_plugin_la_CFLAGS = $(AM_CFLAGS)
 libmmal_converter_plugin_la_LDFLAGS = $(AM_LDFLAGS)
 libmmal_converter_plugin_la_LIBADD = $(LIBS_mmal)
