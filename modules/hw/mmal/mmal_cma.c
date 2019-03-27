@@ -21,6 +21,9 @@
 typedef void * cma_pool_alloc_fn(void * v, size_t size);
 typedef void cma_pool_free_fn(void * v, void * el, size_t size);
 
+// Pool structure
+// Ref count is held by pool owner and pool els that have been got
+// Els in the pool do not count towards its ref count
 struct cma_pool_fixed_s
 {
     atomic_int ref_count;
@@ -37,9 +40,19 @@ struct cma_pool_fixed_s
     cma_pool_free_fn * el_free_fn;
 };
 
+typedef struct cma_buf_s {
+    size_t size;
+    unsigned int vcsm_h;   // VCSM handle from initial alloc
+    unsigned int vc_h;     // VC handle for ZC mmal buffers
+    int fd;                // dmabuf handle for GL
+    void * mmap;           // ARM mapped address
+    picture_context_t *ctx2;
+} cma_buf_t;
+
 static int free_pool(const cma_pool_fixed_t * const p, void ** pool, unsigned int n, size_t el_size)
 {
     int i = 0;
+    assert(pool != NULL);
 
     while (pool[n] != NULL)
     {
@@ -55,7 +68,9 @@ static int free_pool(const cma_pool_fixed_t * const p, void ** pool, unsigned in
 // Just kill this - no checks
 static void cma_pool_fixed_delete(cma_pool_fixed_t * const p)
 {
-    free_pool(p, p->pool, p->n_in, p->el_size);
+    if (p->pool != NULL)
+        free_pool(p, p->pool, p->n_in, p->el_size);
+
     vlc_mutex_destroy(&p->lock);
     free(p);
 }
@@ -104,9 +119,8 @@ void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size)
     vlc_mutex_unlock(&p->lock);
 
     // Do the free old op outside the mutex in case the free is slow
-    // We cannot run out of refs here
     if (deadpool != NULL)
-        atomic_fetch_sub(&p->ref_count, free_pool(p, deadpool, dead_n, dead_size));
+        free_pool(p, deadpool, dead_n, dead_size);
 
     if (v == NULL && req_el_size != 0)
         v = p->el_alloc_fn(p->alloc_v, req_el_size);
@@ -143,6 +157,7 @@ void cma_pool_fixed_put(cma_pool_fixed_t * const p, void * v, const size_t el_si
 // Purge pool & unref
 void cma_pool_fixed_kill(cma_pool_fixed_t * const p)
 {
+    // This flush is not strictly needed but it reclaims what memory we can reclaim asap
     cma_pool_fixed_get(p, 0);
     cma_pool_fixed_unref(p);
 }
@@ -170,6 +185,11 @@ cma_pool_fixed_new(const unsigned int pool_size, void * const alloc_v,
 
 static void cma_pool_delete(cma_buf_t * const cb)
 {
+    printf("<<< %s\n", __func__);
+
+    if (cb->ctx2 != NULL)
+        cb->ctx2->destroy(cb->ctx2);
+
     if (cb->mmap != MAP_FAILED)
         munmap(cb->mmap, cb->size);
     if (cb->fd != -1)
@@ -177,6 +197,8 @@ static void cma_pool_delete(cma_buf_t * const cb)
     if (cb->vcsm_h != 0)
         vcsm_free(cb->vcsm_h);
     free(cb);
+
+    printf(">>> %s\n", __func__);
 }
 
 static void cma_pool_free_cb(void * v, void * el, size_t size)
@@ -200,7 +222,8 @@ static void * cma_pool_alloc_cb(void * v, size_t size)
         .vcsm_h = 0,
         .vc_h = 0,
         .fd = -1,
-        .mmap = MAP_FAILED
+        .mmap = MAP_FAILED,
+        .ctx2 = NULL
     };
 
     if ((cb->vcsm_h = vcsm_malloc_cache(size, VCSM_CACHE_TYPE_HOST, (char*)"VLC frame")) == 0)
@@ -241,7 +264,6 @@ typedef struct cma_pic_context_s {
     atomic_int ref_count;
     cma_pool_fixed_t * p;
     cma_buf_t * cb;
-    picture_context_t * ctx2;
 } cma_pic_context_t;
 
 static picture_context_t * cma_buf_pic_ctx_copy(picture_context_t * pic_ctx)
@@ -258,16 +280,19 @@ static void cma_buf_pic_ctx_destroy(picture_context_t * pic_ctx)
 {
     cma_pic_context_t * const ctx = (cma_pic_context_t *)pic_ctx;
 
+    printf("<<< %s: count=%d\n", __func__, atomic_load(&ctx->ref_count));
+
     if (atomic_fetch_sub(&ctx->ref_count, 1) > 0)
         return;
 
-    if (ctx->ctx2 != NULL)
-        ctx->ctx2->destroy(ctx->ctx2);
+    printf("--- %s\n", __func__);
 
     if (ctx->cb != NULL)
         cma_pool_fixed_put(ctx->p, ctx->cb, ctx->cb->size);
 
     free(ctx);
+
+    printf(">>> %s\n", __func__);
 }
 
 int cma_buf_pic_attach(cma_pool_fixed_t * const p, picture_t * const pic, const size_t size)
@@ -304,10 +329,10 @@ fail:
 int cma_buf_pic_add_context2(picture_t *const pic, picture_context_t * const ctx2)
 {
     cma_pic_context_t *const ctx = (cma_pic_context_t *)pic->context;
-    if (!is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx == NULL || ctx->ctx2 != NULL)
+    if (!is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx == NULL || ctx->cb == NULL || ctx->cb->ctx2 != NULL)
         return VLC_EGENERIC;
 
-    ctx->ctx2 = ctx2;
+    ctx->cb->ctx2 = ctx2;
     return VLC_SUCCESS;
 }
 
@@ -332,7 +357,7 @@ void * cma_buf_pic_addr(const picture_t * const pic)
 picture_context_t * cma_buf_pic_context2(const picture_t * const pic)
 {
     cma_pic_context_t *const ctx = (cma_pic_context_t *)pic->context;
-    return !is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx == NULL ? NULL : ctx->ctx2;
+    return !is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx == NULL ? NULL : ctx->cb == NULL ? NULL :  ctx->cb->ctx2;
 }
 
 

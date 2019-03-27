@@ -1006,6 +1006,20 @@ static MMAL_STATUS_T conv_enable_out(filter_t * const p_filter, filter_sys_t * c
 {
     MMAL_STATUS_T err = MMAL_SUCCESS;
 
+    if (sys->is_cma)
+    {
+        if (sys->cma_out_pool == NULL &&
+            (sys->cma_out_pool = cma_buf_pool_new()) == NULL)
+        {
+            msg_Err(p_filter, "Failed to alloc cma buf pool");
+            return MMAL_ENOMEM;
+        }
+    }
+    else
+    {
+        cma_buf_pool_deletez(&sys->cma_out_pool);
+    }
+
     if (!sys->output->is_enabled &&
         (err = mmal_port_enable(sys->output, sys->out_port_cb_fn)) != MMAL_SUCCESS)
     {
@@ -1254,8 +1268,6 @@ static void conv_flush(filter_t * p_filter)
     msg_Dbg(p_filter, "<<< %s", __func__);
 #endif
 
-    cma_buf_pool_deletez(&sys->cma_out_pool);
-
     if (sys->resizer_type == FILTER_RESIZER_HVS)
     {
         for (i = 0; i != SUBS_MAX; ++i) {
@@ -1268,6 +1280,8 @@ static void conv_flush(filter_t * p_filter)
 
     if (sys->output != NULL && sys->output->is_enabled)
         mmal_port_disable(sys->output);
+
+    cma_buf_pool_deletez(&sys->cma_out_pool);
 
     // Free up anything we may have already lying around
     // Don't need lock as the above disables should have prevented anything
@@ -1363,19 +1377,6 @@ static MMAL_STATUS_T conv_set_output(filter_t * const p_filter, filter_sys_t * c
 
     sys->output->buffer_num = __MAX(sys->is_sliced ? 16 : 2, sys->output->buffer_num_recommended);
     sys->output->buffer_size = sys->output->buffer_size_recommended;
-
-    if (sys->is_cma)
-    {
-        if ((sys->cma_out_pool = cma_buf_pool_new()) == NULL)
-        {
-            msg_Err(p_filter, "Failed to alloc cma buf pool");
-            return MMAL_ENOMEM;
-        }
-    }
-    else
-    {
-        cma_buf_pool_deletez(&sys->cma_out_pool);
-    }
 
     if ((status = conv_enable_out(p_filter, sys)) != MMAL_SUCCESS)
         return status;

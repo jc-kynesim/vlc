@@ -41,7 +41,7 @@ typedef struct mmal_gl_converter_s
 {
     EGLint drm_fourcc;
 
-    Display * dpy;
+    Display * x_dpy;
     EGLDisplay * egl_dpy;
     int drm_fd;
 
@@ -50,6 +50,7 @@ typedef struct mmal_gl_converter_s
 
 static EGLint vlc_to_gl_fourcc(const video_format_t * const fmt)
 {
+    // Converting to mmal selects the right RGB32 varient
     switch(vlc_to_mmal_video_fourcc(fmt))
     {
        case MMAL_ENCODING_I420:
@@ -87,6 +88,8 @@ typedef struct tex_context_s {
 
 static void tex_context_delete(tex_context_t * const tex)
 {
+    glDeleteTextures(1, &tex->texture);
+
     free(tex);
 }
 
@@ -164,9 +167,9 @@ static tex_context_t * get_tex_context(const opengl_tex_converter_t * const tc, 
             *a++ = pic->p[i].i_pitch;
         }
 
-        *a++ = EGL_NONE;
+        *a = EGL_NONE;
 
-        EGLImage image = eglCreateImageKHR(sys->dpy,
+        EGLImage image = eglCreateImageKHR(sys->egl_dpy,
                                            EGL_NO_CONTEXT,
                                            EGL_LINUX_DMA_BUF_EXT,
                                            NULL, attribs);
@@ -181,7 +184,7 @@ static tex_context_t * get_tex_context(const opengl_tex_converter_t * const tc, 
         glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
 
-        eglDestroyImageKHR(sys->dpy, image);
+        eglDestroyImageKHR(sys->egl_dpy, image);
     }
 
     if (cma_buf_pic_add_context2(pic, &tex->cmn) != VLC_SUCCESS)
@@ -202,15 +205,25 @@ tc_mmal_update(const opengl_tex_converter_t *tc, GLuint *textures,
                 const GLsizei *tex_width, const GLsizei *tex_height,
                 picture_t *pic, const size_t *plane_offset)
 {
-    msg_Err(tc, "%s", __func__);
-    VLC_UNUSED(textures);
+    msg_Err(tc, "%s: %d*%dx%d : %d*%dx%d", __func__, tc->tex_count, tex_width[0], tex_height[0], pic->i_planes, pic->p[0].i_pitch, pic->p[0].i_lines);
     VLC_UNUSED(tex_width);
     VLC_UNUSED(tex_height);
     VLC_UNUSED(plane_offset);
 
-    get_tex_context(tc, pic);
+    if (pic->i_planes != (int)tc->tex_count)
+    {
+        msg_Err(tc, "%s: Mismatched planes: %d/%u", __func__, pic->i_planes, tc->tex_count);
+        return VLC_EGENERIC;
+    }
 
-    return VLC_EGENERIC;
+    tex_context_t * const tex = get_tex_context(tc, pic);
+    if (tex == NULL)
+        return VLC_EGENERIC;
+
+    textures[0] = tex->texture;
+    msg_Dbg(tc, "tex[0]=%d", tex->texture);
+
+    return VLC_SUCCESS;
 }
 
 #if 0
@@ -655,8 +668,8 @@ CloseGLConverter(vlc_object_t *obj)
     if (sys->egl_dpy != EGL_NO_DISPLAY)
         eglTerminate(sys->egl_dpy);
 
-    if (sys->dpy)
-        XCloseDisplay(sys->dpy);
+    if (sys->x_dpy)
+        XCloseDisplay(sys->x_dpy);
 
     free(sys);
 }
@@ -698,13 +711,13 @@ OpenGLConverter(vlc_object_t *obj)
         goto fail;
     }
 
-    if ((sys->dpy = XOpenDisplay(tc->gl->surface->display.x11)) == NULL)
+    if ((sys->x_dpy = XOpenDisplay(tc->gl->surface->display.x11)) == NULL)
     {
         msg_Err(tc, "Failed to open X");
         goto fail;
     }
 
-    if ((sys->egl_dpy = eglGetDisplay(sys->dpy)) == EGL_NO_DISPLAY)
+    if ((sys->egl_dpy = eglGetDisplay(sys->x_dpy)) == EGL_NO_DISPLAY)
     {
         msg_Err(tc, "Failed to get EGL Display");
         goto fail;
@@ -719,7 +732,7 @@ OpenGLConverter(vlc_object_t *obj)
         }
     }
 
-    if ((sys->drm_fd = get_drm_fd(tc, sys->dpy)) == -1)
+    if ((sys->drm_fd = get_drm_fd(tc, sys->x_dpy)) == -1)
     {
         msg_Err(tc, "Failed to get drm fd");
         goto fail;
@@ -746,6 +759,7 @@ OpenGLConverter(vlc_object_t *obj)
         sys->drm_fourcc = vlc_to_gl_fourcc(&tc->fmt);
     }
 
+    tc->handle_texs_gen = true;  // We manage the texs
     tc->pf_update  = tc_mmal_update;
     return VLC_SUCCESS;
 
