@@ -21,6 +21,9 @@ unsigned int cma_buf_pic_vc_handle(const picture_t * const pic);
 int cma_buf_pic_fd(const picture_t * const pic);
 void * cma_buf_pic_addr(const picture_t * const pic);
 picture_context_t * cma_buf_pic_context2(const picture_t * const pic);
+struct cma_pic_context_s;
+struct cma_pic_context_s * cma_buf_pic_context_ref(const picture_t * const pic);
+void cma_buf_pic_context_unref(struct cma_pic_context_s * const ctx);
 
 #include <vlc_fourcc.h>
 
@@ -29,7 +32,7 @@ picture_context_t * cma_buf_pic_context2(const picture_t * const pic);
 
 static inline bool is_cma_buf_pic_chroma(const uint32_t chroma)
 {
-    return chroma == VLC_CODEC_MMAL_ZC_RGB32;
+    return chroma == VLC_CODEC_MMAL_ZC_RGB32 || chroma == VLC_CODEC_MMAL_ZC_SAND8 || chroma == VLC_CODEC_MMAL_ZC_I420;
 }
 
 static inline void cma_buf_pool_deletez(cma_pool_fixed_t ** const pp)

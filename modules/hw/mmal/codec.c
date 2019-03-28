@@ -1079,6 +1079,9 @@ static void conv_out_q_pic(filter_sys_t * const sys, picture_t * const pic)
     vlc_sem_post(&sys->sem);
 }
 
+static const uint8_t shift_00[] = {0,0,0,0};
+static const uint8_t shift_01[] = {0,1,1,1};
+
 static int cma_pic_set_data(filter_t * const p_filter, picture_t * const pic, const MMAL_BUFFER_HEADER_T * const buf)
 {
     filter_sys_t *const sys = p_filter->p_sys;
@@ -1090,21 +1093,19 @@ static int cma_pic_set_data(filter_t * const p_filter, picture_t * const pic, co
         return VLC_ENOMEM;
     }
 
+    const unsigned int * ws = shift_00;
+    const unsigned int * hs = shift_00;
+    int pb = 1;
+
     switch (p_filter->fmt_out.video.i_chroma)
     {
         case VLC_CODEC_MMAL_ZC_RGB32:
-            pic->i_planes = buf_vid->planes;
-            for (unsigned int i = 0; i != buf_vid->planes; ++i) {
-                // ****** This is wrong for non-RGB
-                pic->p[i] = (plane_t){
-                    .p_pixels = data + buf_vid->offset[i],
-                    .i_lines = mm_fmt->height,
-                    .i_pitch = buf_vid->pitch[i],
-                    .i_pixel_pitch = 4,
-                    .i_visible_lines = mm_fmt->crop.height,
-                    .i_visible_pitch = mm_fmt->crop.width
-                };
-            }
+            pb = 4;
+            break;
+
+        case VLC_CODEC_MMAL_ZC_I420:
+        case VLC_CODEC_MMAL_ZC_SAND8:
+            hs = shift_01;
             break;
 
         default:
@@ -1112,6 +1113,17 @@ static int cma_pic_set_data(filter_t * const p_filter, picture_t * const pic, co
             return VLC_EGENERIC;
     }
 
+    pic->i_planes = buf_vid->planes;
+    for (unsigned int i = 0; i != buf_vid->planes; ++i) {
+        pic->p[i] = (plane_t){
+            .p_pixels = data + buf_vid->offset[i],
+            .i_lines = mm_fmt->height >> hs[i],
+            .i_pitch = buf_vid->pitch[i],
+            .i_pixel_pitch = pb,
+            .i_visible_lines = mm_fmt->crop.height >> hs[i],
+            .i_visible_pitch = mm_fmt->crop.width >> ws[i]
+        };
+    }
     return VLC_SUCCESS;
 }
 
@@ -1143,6 +1155,13 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
             buf_to_pic_copy_props(pic, buf);
 
             if (sys->is_cma) {
+                const MMAL_BUFFER_HEADER_VIDEO_SPECIFIC_T *const buf_vid = &buf->type->video;
+
+                msg_Info(p_filter, "Planes=%d, Stride=[%d,%d,%d], Offset=[%d,%d,%d]",
+                         buf_vid->planes,
+                         buf_vid->pitch[0], buf_vid->pitch[1], buf_vid->pitch[2],
+                         buf_vid->offset[0], buf_vid->offset[1], buf_vid->offset[2]);
+
                 if (cma_pic_set_data(p_filter, pic, buf) != VLC_SUCCESS)
                     msg_Err(p_filter, "Failed to set data");
             }

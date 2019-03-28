@@ -117,6 +117,7 @@ MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc
                 return MMAL_ENCODING_ARGB;
             break;
         }
+        case VLC_CODEC_MMAL_ZC_I420:
         case VLC_CODEC_MMAL_GL_I420:
             return MMAL_ENCODING_I420;
         case VLC_CODEC_RGBA:

@@ -266,33 +266,32 @@ typedef struct cma_pic_context_s {
     cma_buf_t * cb;
 } cma_pic_context_t;
 
-static picture_context_t * cma_buf_pic_ctx_copy(picture_context_t * pic_ctx)
+
+static void cma_buf_pic_ctx_ref(cma_pic_context_t * const ctx)
 {
-    cma_pic_context_t * const ctx = (cma_pic_context_t *)pic_ctx;
-
     atomic_fetch_add(&ctx->ref_count, 1);
-    // As we don't actually copy this context - don't call the ctx2 copy code
-
-    return &ctx->cmn;
 }
 
-static void cma_buf_pic_ctx_destroy(picture_context_t * pic_ctx)
+static void cma_buf_pic_ctx_unref(cma_pic_context_t * const ctx)
 {
-    cma_pic_context_t * const ctx = (cma_pic_context_t *)pic_ctx;
-
-    printf("<<< %s: count=%d\n", __func__, atomic_load(&ctx->ref_count));
-
     if (atomic_fetch_sub(&ctx->ref_count, 1) > 0)
         return;
-
-    printf("--- %s\n", __func__);
 
     if (ctx->cb != NULL)
         cma_pool_fixed_put(ctx->p, ctx->cb, ctx->cb->size);
 
     free(ctx);
+}
 
-    printf(">>> %s\n", __func__);
+static picture_context_t * cma_buf_pic_ctx_copy(picture_context_t * pic_ctx)
+{
+    cma_buf_pic_ctx_ref((cma_pic_context_t *)pic_ctx);
+    return pic_ctx;
+}
+
+static void cma_buf_pic_ctx_destroy(picture_context_t * pic_ctx)
+{
+    cma_buf_pic_ctx_unref((cma_pic_context_t *)pic_ctx);
 }
 
 int cma_buf_pic_attach(cma_pool_fixed_t * const p, picture_t * const pic, const size_t size)
@@ -358,6 +357,23 @@ picture_context_t * cma_buf_pic_context2(const picture_t * const pic)
 {
     cma_pic_context_t *const ctx = (cma_pic_context_t *)pic->context;
     return !is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx == NULL ? NULL : ctx->cb == NULL ? NULL :  ctx->cb->ctx2;
+}
+
+cma_pic_context_t * cma_buf_pic_context_ref(const picture_t * const pic)
+{
+    cma_pic_context_t *const ctx = (cma_pic_context_t *)pic->context;
+
+    if (!is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx == NULL || ctx->cb == NULL)
+        return NULL;
+
+    cma_buf_pic_ctx_ref(ctx);
+    return ctx;
+}
+
+void cma_buf_pic_context_unref(cma_pic_context_t * const ctx)
+{
+    if (ctx != NULL)
+        cma_buf_pic_ctx_unref(ctx);
 }
 
 

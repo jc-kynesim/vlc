@@ -36,10 +36,13 @@
 
 #include <assert.h>
 
+#define OPT_SAND 0
+#define OPT_I420 1
 
 typedef struct mmal_gl_converter_s
 {
     EGLint drm_fourcc;
+    struct cma_pic_context_s * last_ctx_ref;
 
     PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
 } mmal_gl_converter_t;
@@ -56,6 +59,7 @@ static EGLint vlc_to_gl_fourcc(const video_format_t * const fmt)
           return MMAL_FOURCC('Y','V','1','2');
        case MMAL_ENCODING_I422:
           return MMAL_FOURCC('Y','U','1','6');
+       case MMAL_ENCODING_YUVUV128:
        case MMAL_ENCODING_NV12:
           return MMAL_FOURCC('N','V','1','2');
        case MMAL_ENCODING_NV21:
@@ -141,30 +145,68 @@ static tex_context_t * get_tex_context(const opengl_tex_converter_t * const tc, 
         *a++ = EGL_LINUX_DRM_FOURCC_EXT;
         *a++ = sys->drm_fourcc;
 
-        static const EGLint attnames[] = {
-            EGL_DMA_BUF_PLANE0_FD_EXT,
-            EGL_DMA_BUF_PLANE0_OFFSET_EXT,
-            EGL_DMA_BUF_PLANE0_PITCH_EXT,
-            EGL_DMA_BUF_PLANE1_FD_EXT,
-            EGL_DMA_BUF_PLANE1_OFFSET_EXT,
-            EGL_DMA_BUF_PLANE1_PITCH_EXT,
-            EGL_DMA_BUF_PLANE2_FD_EXT,
-            EGL_DMA_BUF_PLANE2_OFFSET_EXT,
-            EGL_DMA_BUF_PLANE2_PITCH_EXT,
-            EGL_DMA_BUF_PLANE3_FD_EXT,
-            EGL_DMA_BUF_PLANE3_OFFSET_EXT,
-            EGL_DMA_BUF_PLANE3_PITCH_EXT
-        };
-        const EGLint * n = attnames;
-
-        for (int i = 0; i < pic->i_planes; ++i)
+        if (pic->format.i_chroma == VLC_CODEC_MMAL_ZC_SAND8)
         {
-            *a++ = *n++;
-            *a++ = fd;
-            *a++ = *n++;
-            *a++ = pic->p[i].p_pixels - base_addr;
-            *a++ = *n++;
-            *a++ = pic->p[i].i_pitch;
+            // Sand is its own very special bunny :-(
+            static const EGLint attnames[] = {
+                EGL_DMA_BUF_PLANE0_FD_EXT,
+                EGL_DMA_BUF_PLANE0_OFFSET_EXT,
+                EGL_DMA_BUF_PLANE0_PITCH_EXT,
+                EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT,
+                EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT,
+                EGL_DMA_BUF_PLANE1_FD_EXT,
+                EGL_DMA_BUF_PLANE1_OFFSET_EXT,
+                EGL_DMA_BUF_PLANE1_PITCH_EXT,
+                EGL_DMA_BUF_PLANE1_MODIFIER_HI_EXT,
+                EGL_DMA_BUF_PLANE1_MODIFIER_LO_EXT
+            };
+
+            const EGLint * n = attnames;
+
+            for (int i = 0; i < pic->i_planes; ++i)
+            {
+                const uint64_t mod = DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(pic->p[i].i_pitch >> 7);
+
+                *a++ = *n++;
+                *a++ = fd;
+                *a++ = *n++;
+                *a++ = pic->p[i].p_pixels - base_addr;
+                *a++ = *n++;
+                *a++ = pic->format.i_width;
+                *a++ = *n++;
+                *a++ = (EGLint)(mod >> 32);
+                *a++ = *n++;
+                *a++ = (EGLint)(mod & 0xffffffff);
+            }
+        }
+        else
+        {
+            static const EGLint attnames[] = {
+                EGL_DMA_BUF_PLANE0_FD_EXT,
+                EGL_DMA_BUF_PLANE0_OFFSET_EXT,
+                EGL_DMA_BUF_PLANE0_PITCH_EXT,
+                EGL_DMA_BUF_PLANE1_FD_EXT,
+                EGL_DMA_BUF_PLANE1_OFFSET_EXT,
+                EGL_DMA_BUF_PLANE1_PITCH_EXT,
+                EGL_DMA_BUF_PLANE2_FD_EXT,
+                EGL_DMA_BUF_PLANE2_OFFSET_EXT,
+                EGL_DMA_BUF_PLANE2_PITCH_EXT,
+                EGL_DMA_BUF_PLANE3_FD_EXT,
+                EGL_DMA_BUF_PLANE3_OFFSET_EXT,
+                EGL_DMA_BUF_PLANE3_PITCH_EXT
+            };
+
+            const EGLint * n = attnames;
+
+            for (int i = 0; i < pic->i_planes; ++i)
+            {
+                *a++ = *n++;
+                *a++ = fd;
+                *a++ = *n++;
+                *a++ = pic->p[i].p_pixels - base_addr;
+                *a++ = *n++;
+                *a++ = pic->p[i].i_pitch;
+            }
         }
 
         *a = EGL_NONE;
@@ -203,6 +245,8 @@ tc_mmal_update(const opengl_tex_converter_t *tc, GLuint *textures,
                 const GLsizei *tex_width, const GLsizei *tex_height,
                 picture_t *pic, const size_t *plane_offset)
 {
+    mmal_gl_converter_t * const sys = tc->priv;
+
     msg_Err(tc, "%s: %d*%dx%d : %d*%dx%d", __func__, tc->tex_count, tex_width[0], tex_height[0], pic->i_planes, pic->p[0].i_pitch, pic->p[0].i_lines);
     VLC_UNUSED(tex_width);
     VLC_UNUSED(tex_height);
@@ -215,15 +259,14 @@ tc_mmal_update(const opengl_tex_converter_t *tc, GLuint *textures,
         return VLC_EGENERIC;
     }
 
-    if (pic->i_planes != (int)tc->tex_count)
-    {
-        msg_Err(tc, "%s: Mismatched planes: %d/%u", __func__, pic->i_planes, tc->tex_count);
-        return VLC_EGENERIC;
-    }
-
     tex_context_t * const tex = get_tex_context(tc, pic);
     if (tex == NULL)
         return VLC_EGENERIC;
+
+//    tc->vt->BindTexture(GL_TEXTURE_EXTERNAL_OES, tex->texture);
+
+    cma_buf_pic_context_unref(sys->last_ctx_ref);  // ?? Needed ??
+    sys->last_ctx_ref = cma_buf_pic_context_ref(pic);
 
     textures[0] = tex->texture;
     msg_Dbg(tc, "tex[0]=%d", tex->texture);
@@ -292,6 +335,7 @@ CloseGLConverter(vlc_object_t *obj)
     if (sys == NULL)
         return;
 
+    cma_buf_pic_context_unref(sys->last_ctx_ref);
     free(sys);
 }
 
@@ -341,12 +385,30 @@ OpenGLConverter(vlc_object_t *obj)
 
     if (eglfmt == 0)
     {
+#if OPT_SAND
+        tc->fmt.i_chroma = VLC_CODEC_MMAL_ZC_SAND8;
+        tc->fmt.i_bits_per_pixel = 8;
+        tc->fmt.i_rmask = 0;
+        tc->fmt.i_gmask = 0;
+        tc->fmt.i_bmask = 0;
+        tc->fmt.space = COLOR_SPACE_UNDEF;
+#elif OPT_I420
+        tc->fmt.i_chroma = VLC_CODEC_MMAL_ZC_I420;
+        tc->fmt.i_bits_per_pixel = 8;
+        tc->fmt.i_rmask = 0;
+        tc->fmt.i_gmask = 0;
+        tc->fmt.i_bmask = 0;
+        tc->fmt.space = COLOR_SPACE_UNDEF;
+#else
         tc->fmt.i_chroma = VLC_CODEC_MMAL_ZC_RGB32;
+        tc->fmt.i_chroma = VLC_CODEC_MMAL_ZC_SAND8;
         tc->fmt.i_bits_per_pixel = 32;
+        tc->fmt.i_bits_per_pixel = 8;
         tc->fmt.i_rmask = 0xff0000;
         tc->fmt.i_gmask = 0xff00;
         tc->fmt.i_bmask = 0xff;
         tc->fmt.space = COLOR_SPACE_SRGB;
+#endif
         sys->drm_fourcc = vlc_to_gl_fourcc(&tc->fmt);
     }
 
