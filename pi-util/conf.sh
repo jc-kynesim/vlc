@@ -17,7 +17,8 @@ LIB4=$SYSROOT$HLIB4
 
 #INCLUDES="-I$SYSROOT/usr/include -I$SYSROOT/usr/include/$A -I$SYSROOT/opt/vc/include -I$SYSROOT/usr/lib/arm-linux-gnueabihf/dbus-1.0/include -I$SYSROOT/usr/include/libdrm"
 INCLUDES="-I$SYSROOT/usr/include -I$SYSROOT/usr/include/$A -I$SYSROOT/opt/vc/include -I$SYSROOT/usr/lib/arm-linux-gnueabihf/dbus-1.0/include"
-DEFINES="-ggdb -D__VCCOREVER__=0x04000000 -DQT_WARNING_DISABLE_DEPRECATED=\"\""
+#DEFINES="-ggdb -D__VCCOREVER__=0x04000000 -DQT_WARNING_DISABLE_DEPRECATED=\"\""
+DEFINES="-ggdb -D__VCCOREVER__=0x04000000"
 ARCH="-march=armv7-a -mfpu=neon-vfpv4"
 PREFIX=$TOOLS/bin/$A-
 
@@ -35,8 +36,9 @@ PATH="$TOOLS/bin:$PATH" \
   MOC=`which moc` \
   UIC=`which uic` \
   RCC=`which rcc` \
-  ./configure --host=$A --enable-debug --disable-lua --disable-qt --disable-vdpau --disable-chromecast --disable-wayland --disable-bluray --disable-opencv
+  ./configure --host=$A --enable-debug --disable-lua --disable-chromecast --disable-wayland --enable-gles2
 
+#  ./configure --host=$A --enable-debug --disable-lua --disable-qt --disable-vdpau --disable-chromecast --disable-wayland --disable-bluray --disable-opencv
 #  ./configure --host=$A --enable-debug --disable-wayland
 
 

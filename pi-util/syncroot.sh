@@ -19,7 +19,7 @@ SRC=$1
 
 RPI_BASE=$DST_ROOT/..
 TOOL_BASE=$RPI_BASE/tools
-FIRMWARE_BASE=$RPI_BASE/firmware
+FIRMWARE_BASE=$RPI_BASE/firmware4
 
 echo Sync src:  $SRC
 echo Sync dest: $DST

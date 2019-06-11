@@ -1093,8 +1093,8 @@ static int cma_pic_set_data(filter_t * const p_filter, picture_t * const pic, co
         return VLC_ENOMEM;
     }
 
-    const unsigned int * ws = shift_00;
-    const unsigned int * hs = shift_00;
+    const uint8_t * ws = shift_00;
+    const uint8_t * hs = shift_00;
     int pb = 1;
 
     switch (p_filter->fmt_out.video.i_chroma)
@@ -2154,7 +2154,9 @@ static int OpenBlendNeon(vlc_object_t *object)
     }
 
     if (blend_fn == (blend_neon_fn *)0)
+    {
         return VLC_EGENERIC;
+    }
 
     p_filter->p_sys = (void *)blend_fn;
     p_filter->pf_video_blend = FilterBlendNeon;
