@@ -423,6 +423,7 @@ fail:
 
 vlc_module_begin ()
     set_description("MMAL OpenGL surface converter")
+    set_shortname (N_("MMALOpenGLConverer"))
     set_capability("glconv", 900)
     set_callbacks(OpenGLConverter, CloseGLConverter)
     set_category(CAT_VIDEO)
