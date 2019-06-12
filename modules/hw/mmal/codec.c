@@ -39,6 +39,8 @@
 #include <interface/mmal/util/mmal_util.h>
 #include <interface/mmal/util/mmal_default_components.h>
 
+#include <interface/vcsm/user-vcsm.h>
+
 #include "mmal_cma.h"
 #include "mmal_picture.h"
 
@@ -73,7 +75,6 @@
 #define MMAL_ISP_TEXT N_("Use mmal isp rather than hvs.")
 #define MMAL_ISP_LONGTEXT N_("Use mmal isp rather than hvs. This may be faster but has no blend.")
 
-
 typedef struct decoder_sys_t
 {
     MMAL_COMPONENT_T *component;
@@ -88,6 +89,8 @@ typedef struct decoder_sys_t
     bool b_progressive;
 
     bool b_flushed;
+
+    vcsm_init_type_t vcsm_init_type;
 
     // Lock to avoid pic update & allocate happenening simultainiously
     // * We should be able to arrange life s.t. this isn't needed
@@ -737,6 +740,8 @@ static void CloseDecoder(decoder_t *dec)
 
     hw_mmal_port_pool_ref_release(sys->ppr, false);
 
+    cma_vcsm_exit(sys->vcsm_init_type);
+
     vlc_mutex_destroy(&sys->pic_lock);
     free(sys);
 
@@ -777,6 +782,12 @@ static int OpenDecoder(decoder_t *dec)
     vlc_mutex_init(&sys->pic_lock);
 
     bcm_host_init();
+
+    if ((sys->vcsm_init_type = cma_vcsm_init()) == VCSM_INIT_NONE) {
+        msg_Err(dec, "VCSM init failed");
+        goto fail;
+    }
+    msg_Info(dec, "VCSM init succeeded: %s", cma_vcsm_init_str(sys->vcsm_init_type));
 
     sys->err_stream = MMAL_SUCCESS;
 

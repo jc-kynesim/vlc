@@ -38,10 +38,24 @@
 
 #define OPT_SAND 0
 #define OPT_I420 1
+#define OPT_RGB32 0
+
+
+#if OPT_SAND
+#define FMT_IN VLC_CODEC_MMAL_ZC_SAND8
+#elif OPT_I420
+#define FMT_IN VLC_CODEC_MMAL_ZC_I420
+#elif OPT_RGB32
+#define FMT_IN VLC_CODEC_MMAL_ZC_RGB32
+#elif
+#error Missing input format
+#endif
+
 
 typedef struct mmal_gl_converter_s
 {
     EGLint drm_fourcc;
+    vcsm_init_type_t vcsm_init_type;
     struct cma_pic_context_s * last_ctx_ref;
 
     PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
@@ -336,6 +350,7 @@ CloseGLConverter(vlc_object_t *obj)
         return;
 
     cma_buf_pic_context_unref(sys->last_ctx_ref);
+    cma_vcsm_exit(sys->vcsm_init_type);
     free(sys);
 }
 
@@ -344,7 +359,6 @@ OpenGLConverter(vlc_object_t *obj)
 {
     opengl_tex_converter_t * const tc = (opengl_tex_converter_t *)obj;
     int rv = VLC_EGENERIC;
-
     const EGLint eglfmt = vlc_to_gl_fourcc(&tc->fmt);
 
     {
@@ -358,6 +372,21 @@ OpenGLConverter(vlc_object_t *obj)
                 tc->fmt.i_sar_num, tc->fmt.i_sar_den);
     }
 
+    // Accept Opaque (as it can definitely be converted) or what we actually want
+    if (!(tc->fmt.i_chroma == FMT_IN ||
+          tc->fmt.i_chroma == VLC_CODEC_MMAL_OPAQUE))
+    {
+        return rv;
+    }
+
+    if (tc->gl->ext != VLC_GL_EXT_EGL ||
+        !tc->gl->egl.createImageKHR || !tc->gl->egl.destroyImageKHR)
+    {
+        // Missing an important callback
+        msg_Dbg(tc, "Missing EGL xxxImageKHR calls");
+        return rv;
+    }
+
     if ((tc->priv = calloc(1, sizeof(mmal_gl_converter_t))) == NULL)
     {
         msg_Err(tc, "priv alloc failure");
@@ -368,13 +397,17 @@ OpenGLConverter(vlc_object_t *obj)
 
     sys->drm_fourcc = eglfmt;
 
+    if ((sys->vcsm_init_type = cma_vcsm_init()) != VCSM_INIT_CMA) {
+        msg_Dbg(tc, "VCSM init failed");
+        goto fail;
+    }
+
     if ((sys->glEGLImageTargetTexture2DOES = vlc_gl_GetProcAddress(tc->gl, "glEGLImageTargetTexture2DOES")) == NULL)
     {
         msg_Err(tc, "Failed to bind GL fns");
         goto fail;
     }
 
-    // *** May want MMAL_I420 here, but we will need better descriptors
     if ((tc->fshader = tc_fragment_shader_init(tc, GL_TEXTURE_EXTERNAL_OES,
                                                    eglfmt == 0 ? VLC_CODEC_RGB32 : tc->fmt.i_chroma,
                                                    eglfmt == 0 ? COLOR_SPACE_SRGB : tc->fmt.space)) == 0)
@@ -385,30 +418,22 @@ OpenGLConverter(vlc_object_t *obj)
 
     if (eglfmt == 0)
     {
-#if OPT_SAND
-        tc->fmt.i_chroma = VLC_CODEC_MMAL_ZC_SAND8;
+        tc->fmt.i_chroma = FMT_IN;
         tc->fmt.i_bits_per_pixel = 8;
-        tc->fmt.i_rmask = 0;
-        tc->fmt.i_gmask = 0;
-        tc->fmt.i_bmask = 0;
-        tc->fmt.space = COLOR_SPACE_UNDEF;
-#elif OPT_I420
-        tc->fmt.i_chroma = VLC_CODEC_MMAL_ZC_I420;
-        tc->fmt.i_bits_per_pixel = 8;
-        tc->fmt.i_rmask = 0;
-        tc->fmt.i_gmask = 0;
-        tc->fmt.i_bmask = 0;
-        tc->fmt.space = COLOR_SPACE_UNDEF;
-#else
-        tc->fmt.i_chroma = VLC_CODEC_MMAL_ZC_RGB32;
-        tc->fmt.i_chroma = VLC_CODEC_MMAL_ZC_SAND8;
-        tc->fmt.i_bits_per_pixel = 32;
-        tc->fmt.i_bits_per_pixel = 8;
-        tc->fmt.i_rmask = 0xff0000;
-        tc->fmt.i_gmask = 0xff00;
-        tc->fmt.i_bmask = 0xff;
-        tc->fmt.space = COLOR_SPACE_SRGB;
-#endif
+        if (tc->fmt.i_chroma == VLC_CODEC_MMAL_ZC_RGB32)
+        {
+            tc->fmt.i_rmask = 0xff0000;
+            tc->fmt.i_gmask = 0xff00;
+            tc->fmt.i_bmask = 0xff;
+            tc->fmt.space = COLOR_SPACE_SRGB;
+        }
+        else
+        {
+            tc->fmt.i_rmask = 0;
+            tc->fmt.i_gmask = 0;
+            tc->fmt.i_bmask = 0;
+            tc->fmt.space = COLOR_SPACE_UNDEF;
+        }
         sys->drm_fourcc = vlc_to_gl_fourcc(&tc->fmt);
     }
 
