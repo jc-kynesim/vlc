@@ -110,38 +110,40 @@ typedef struct supported_mmal_enc_s {
     int n;
 } supported_mmal_enc_t;
 
-static supported_mmal_enc_t supported_mmal_enc =
-{
-    {{MMAL_PARAMETER_SUPPORTED_ENCODINGS, sizeof(((supported_mmal_enc_t *)0)->supported)}, {0}},
-    -1
-};
+#define SUPPORTED_MMAL_ENC_INIT \
+{ \
+    {{MMAL_PARAMETER_SUPPORTED_ENCODINGS, sizeof(((supported_mmal_enc_t *)0)->supported)}, {0}}, \
+    -1 \
+}
 
-static bool is_enc_supported(const MMAL_FOURCC_T fcc)
+static supported_mmal_enc_t supported_decode_in_enc = SUPPORTED_MMAL_ENC_INIT;
+
+static bool is_enc_supported(supported_mmal_enc_t * const support, const MMAL_FOURCC_T fcc)
 {
     int i;
 
     if (fcc == 0)
         return false;
-    if (supported_mmal_enc.n == -1)
+    if (support->n == -1)
         return true;  // Unknown - say OK
-    for (i = 0; i < supported_mmal_enc.n; ++i) {
-        if (supported_mmal_enc.supported.encodings[i] == fcc)
+    for (i = 0; i < support->n; ++i) {
+        if (support->supported.encodings[i] == fcc)
             return true;
     }
     return false;
 }
 
-static bool set_and_test_enc_supported(MMAL_PORT_T * port, const MMAL_FOURCC_T fcc)
+static bool set_and_test_enc_supported(supported_mmal_enc_t * const support, MMAL_PORT_T * port, const MMAL_FOURCC_T fcc)
 {
-    if (supported_mmal_enc.n >= 0)
+    if (support->n >= 0)
         /* already done */;
-    else if (mmal_port_parameter_get(port, (MMAL_PARAMETER_HEADER_T *)&supported_mmal_enc.supported) != MMAL_SUCCESS)
-        supported_mmal_enc.n = 0;
+    else if (mmal_port_parameter_get(port, (MMAL_PARAMETER_HEADER_T *)&support->supported) != MMAL_SUCCESS)
+        support->n = 0;
     else
-        supported_mmal_enc.n = (supported_mmal_enc.supported.header.size - sizeof(supported_mmal_enc.supported.header)) /
-          sizeof(supported_mmal_enc.supported.encodings[0]);
+        support->n = (support->supported.header.size - sizeof(support->supported.header)) /
+          sizeof(support->supported.encodings[0]);
 
-    return is_enc_supported(fcc);
+    return is_enc_supported(support, fcc);
 }
 
 static MMAL_FOURCC_T vlc_to_mmal_es_fourcc(const unsigned int fcc)
@@ -770,7 +772,7 @@ static int OpenDecoder(decoder_t *dec)
     }
 #endif
 
-    if (!is_enc_supported(in_fcc))
+    if (!is_enc_supported(&supported_decode_in_enc, in_fcc))
         return VLC_EGENERIC;
 
     sys = calloc(1, sizeof(decoder_sys_t));
@@ -804,7 +806,7 @@ static int OpenDecoder(decoder_t *dec)
     sys->input->userdata = (struct MMAL_PORT_USERDATA_T *)dec;
     sys->input->format->encoding = in_fcc;
 
-    if (!set_and_test_enc_supported(sys->input, in_fcc)) {
+    if (!set_and_test_enc_supported(&supported_decode_in_enc, sys->input, in_fcc)) {
 #if TRACE_ALL
         char cbuf[5];
         msg_Dbg(dec, "Format not supported: %s", str_fourcc(cbuf, in_fcc));
@@ -1792,6 +1794,8 @@ static int OpenConverter(vlc_object_t * obj)
     use_isp = var_InheritBool(p_filter, MMAL_ISP_NAME);
 
 retry:
+    // ** Make more generic by checking supported encs
+    //
     // Must use ISP - HVS can't do this, nor can resizer
     if (enc_in == MMAL_ENCODING_YUVUV64_10) {
         // If resizer selected then just give up
@@ -1800,6 +1804,11 @@ retry:
         // otherwise downgrade HVS to ISP
         use_isp = true;
     }
+    // HVS can't do I420
+    if (enc_out == MMAL_ENCODING_I420) {
+        use_isp = true;
+    }
+
 
     if (use_resizer) {
         // use resizer overrides use_isp
