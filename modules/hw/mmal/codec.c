@@ -47,7 +47,7 @@
 #include "subpic.h"
 #include "blend_rgba_neon.h"
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 /*
  * This seems to be a bit high, but reducing it causes instabilities
@@ -1168,13 +1168,6 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
             buf_to_pic_copy_props(pic, buf);
 
             if (sys->is_cma) {
-                const MMAL_BUFFER_HEADER_VIDEO_SPECIFIC_T *const buf_vid = &buf->type->video;
-
-                msg_Info(p_filter, "Planes=%d, Stride=[%d,%d,%d], Offset=[%d,%d,%d]",
-                         buf_vid->planes,
-                         buf_vid->pitch[0], buf_vid->pitch[1], buf_vid->pitch[2],
-                         buf_vid->offset[0], buf_vid->offset[1], buf_vid->offset[2]);
-
                 if (cma_pic_set_data(p_filter, pic, buf) != VLC_SUCCESS)
                     msg_Err(p_filter, "Failed to set data");
             }
@@ -1567,7 +1560,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 break;
             }
 
-#if 1
+#if 0
             char dbuf0[5];
             msg_Dbg(p_filter, "out_pic %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d",
                     str_fourcc(dbuf0, out_pic->format.i_chroma),

@@ -185,8 +185,6 @@ cma_pool_fixed_new(const unsigned int pool_size, void * const alloc_v,
 
 static void cma_pool_delete(cma_buf_t * const cb)
 {
-    printf("<<< %s\n", __func__);
-
     if (cb->ctx2 != NULL)
         cb->ctx2->destroy(cb->ctx2);
 
@@ -197,8 +195,6 @@ static void cma_pool_delete(cma_buf_t * const cb)
     if (cb->vcsm_h != 0)
         vcsm_free(cb->vcsm_h);
     free(cb);
-
-    printf(">>> %s\n", __func__);
 }
 
 static void cma_pool_free_cb(void * v, void * el, size_t size)

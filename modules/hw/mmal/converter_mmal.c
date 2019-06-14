@@ -51,6 +51,7 @@
 #error Missing input format
 #endif
 
+#define TRACE_ALL 0
 
 typedef struct mmal_gl_converter_s
 {
@@ -260,8 +261,9 @@ tc_mmal_update(const opengl_tex_converter_t *tc, GLuint *textures,
                 picture_t *pic, const size_t *plane_offset)
 {
     mmal_gl_converter_t * const sys = tc->priv;
-
+#if TRACE_ALL
     msg_Err(tc, "%s: %d*%dx%d : %d*%dx%d", __func__, tc->tex_count, tex_width[0], tex_height[0], pic->i_planes, pic->p[0].i_pitch, pic->p[0].i_lines);
+#endif
     VLC_UNUSED(tex_width);
     VLC_UNUSED(tex_height);
     VLC_UNUSED(plane_offset);
@@ -283,8 +285,6 @@ tc_mmal_update(const opengl_tex_converter_t *tc, GLuint *textures,
     sys->last_ctx_ref = cma_buf_pic_context_ref(pic);
 
     textures[0] = tex->texture;
-    msg_Dbg(tc, "tex[0]=%d", tex->texture);
-
     return VLC_SUCCESS;
 }
 
@@ -361,17 +361,6 @@ OpenGLConverter(vlc_object_t *obj)
     int rv = VLC_EGENERIC;
     const EGLint eglfmt = vlc_to_gl_fourcc(&tc->fmt);
 
-    {
-        char dbuf0[5], dbuf1[5];
-        msg_Dbg(tc, ">>> %s: V:%s/E:%s,%dx%d [(%d,%d) %d/%d] sar:%d/%d", __func__,
-                str_fourcc(dbuf0, tc->fmt.i_chroma),
-                str_fourcc(dbuf1, eglfmt),
-                tc->fmt.i_width, tc->fmt.i_height,
-                tc->fmt.i_x_offset, tc->fmt.i_y_offset,
-                tc->fmt.i_visible_width, tc->fmt.i_visible_height,
-                tc->fmt.i_sar_num, tc->fmt.i_sar_den);
-    }
-
     // Accept Opaque (as it can definitely be converted) or what we actually want
     if (!(tc->fmt.i_chroma == FMT_IN ||
           tc->fmt.i_chroma == VLC_CODEC_MMAL_OPAQUE))
@@ -385,6 +374,17 @@ OpenGLConverter(vlc_object_t *obj)
         // Missing an important callback
         msg_Dbg(tc, "Missing EGL xxxImageKHR calls");
         return rv;
+    }
+
+    {
+        char dbuf0[5], dbuf1[5];
+        msg_Dbg(tc, ">>> %s: V:%s/E:%s,%dx%d [(%d,%d) %d/%d] sar:%d/%d", __func__,
+                str_fourcc(dbuf0, tc->fmt.i_chroma),
+                str_fourcc(dbuf1, eglfmt),
+                tc->fmt.i_width, tc->fmt.i_height,
+                tc->fmt.i_x_offset, tc->fmt.i_y_offset,
+                tc->fmt.i_visible_width, tc->fmt.i_visible_height,
+                tc->fmt.i_sar_num, tc->fmt.i_sar_den);
     }
 
     if ((tc->priv = calloc(1, sizeof(mmal_gl_converter_t))) == NULL)
