@@ -19,7 +19,7 @@ SRC=$1
 
 RPI_BASE=$DST_ROOT/..
 TOOL_BASE=$RPI_BASE/tools
-FIRMWARE_BASE=$RPI_BASE/firmware4
+#FIRMWARE_BASE=$RPI_BASE/firmware4
 
 echo Sync src:  $SRC
 echo Sync dest: $DST
@@ -28,7 +28,8 @@ mkdir -p $DST/lib
 mkdir -p $DST/opt
 mkdir -p $DST/usr/share
 
-ln -sf $FIRMWARE_BASE/opt/vc $DST/opt
+#ln -sf $FIRMWARE_BASE/opt/vc $DST/opt
+rsync -rl $SRC/opt/vc $DST/opt
 rsync -rl $SRC/lib/arm-linux-gnueabihf $DST/lib
 rsync -rl --exclude "*/cups/backend/*" $SRC/usr/lib $DST/usr
 rsync -rl $SRC/usr/include $DST/usr

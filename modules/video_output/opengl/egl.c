@@ -43,6 +43,8 @@
 # include "../android/utils.h"
 #endif
 
+#define REQUIRE_DMA_BUF_IMPORT 1
+
 typedef struct vlc_gl_sys_t
 {
     EGLDisplay display;
@@ -354,6 +356,14 @@ static int Open (vlc_object_t *obj, const struct gl_api *api)
         goto error;
     }
 
+#if REQUIRE_DMA_BUF_IMPORT
+    if (!CheckToken(ext, "EGL_EXT_image_dma_buf_import"))
+    {
+        msg_Dbg(obj, "No dma_buf_import - fall back to X");
+        goto error;
+    }
+#endif
+
     const EGLint conf_attr[] = {
         EGL_RED_SIZE, 5,
         EGL_GREEN_SIZE, 5,
@@ -370,6 +380,14 @@ static int Open (vlc_object_t *obj, const struct gl_api *api)
         msg_Err (obj, "cannot choose EGL configuration");
         goto error;
     }
+
+    EGLint cav = 0;
+    if (eglGetConfigAttrib(sys->display, cfgv[0], EGL_CONFIG_CAVEAT, &cav) != EGL_TRUE)
+    {
+        msg_Err (obj, "cannot read attr");
+        goto error;
+    }
+    msg_Info(obj, "EGL caveats=%#x", cav);
 
     /* Create a drawing surface */
     sys->surface = createSurface(sys->display, cfgv[0], window, NULL);

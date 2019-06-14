@@ -382,7 +382,7 @@ fail:
 vlc_module_begin()
     set_shortname(N_("MMAL x11 splitter"))
     set_description(N_("MMAL x11 splitter for Raspberry Pi"))
-    set_capability("vout display", 900)
+    set_capability("vout display", 267)  // Between GLES & GL
     add_shortcut("mmal_x11")
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VOUT )
