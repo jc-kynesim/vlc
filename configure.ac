@@ -1,12 +1,12 @@
 dnl Autoconf settings for vlc
 
-AC_COPYRIGHT([Copyright 1999-2018 VLC authors and VideoLAN])
+AC_COPYRIGHT([Copyright 1999-2019 VLC authors and VideoLAN])
 
-AC_INIT(vlc, 3.0.6)
+AC_INIT(vlc, 3.0.7.1)
 VERSION_MAJOR=3
 VERSION_MINOR=0
-VERSION_REVISION=6
-VERSION_EXTRA=0
+VERSION_REVISION=7
+VERSION_EXTRA=1
 VERSION_DEV=
 
 PKGDIR="vlc"
@@ -14,7 +14,7 @@ AC_SUBST(PKGDIR)
 
 CONFIGURE_LINE="`echo "$0 $ac_configure_args" | sed -e 's/\\\/\\\\\\\/g'`"
 CODENAME="Vetinari"
-COPYRIGHT_YEARS="1996-2018"
+COPYRIGHT_YEARS="1996-2019"
 
 AC_CONFIG_SRCDIR(src/libvlc.c)
 AC_CONFIG_AUX_DIR(autotools)
@@ -4192,7 +4192,7 @@ AC_ARG_WITH(kde-solid,
   AS_HELP_STRING([--with-kde-solid=PATH],
                  [KDE Solid actions directory (auto)]),, [
 
-if test "${SYS}" != "mingw32" -a "${SYS}" != "darwin" ; then
+if test "${SYS}" != "mingw32" -a "${SYS}" != "darwin" -a "${HAVE_ANDROID}" != "1" ; then
   with_kde_solid="yes"
 fi
 ])

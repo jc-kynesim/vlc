@@ -76,8 +76,8 @@ vlc_module_begin ()
     add_bool("direct3d11-hw-blending", true, HW_BLENDING_TEXT, HW_BLENDING_LONGTEXT, true)
 
 #if VLC_WINSTORE_APP
-    add_integer("winrt-d3dcontext",    0x0, NULL, NULL, true); /* ID3D11DeviceContext* */
-    add_integer("winrt-swapchain",     0x0, NULL, NULL, true); /* IDXGISwapChain1*     */
+    add_integer("winrt-d3dcontext",    0x0, NULL, NULL, true) /* ID3D11DeviceContext* */
+    add_integer("winrt-swapchain",     0x0, NULL, NULL, true) /* IDXGISwapChain1*     */
 #endif
 
     set_capability("vout display", 300)
@@ -946,7 +946,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
 
     if (picture->format.mastering.max_luminance)
     {
-        D3D11_UpdateQuadLuminanceScale(vd, &sys->d3d_dev, &sys->picQuad, GetFormatLuminance(VLC_OBJECT(vd), &picture->format) / (float)sys->display.luminance_peak);
+        D3D11_UpdateQuadLuminanceScale(vd, &sys->d3d_dev, &sys->picQuad, (float)sys->display.luminance_peak / GetFormatLuminance(VLC_OBJECT(vd), &picture->format));
 
         if (sys->dxgiswapChain4)
         {
@@ -1469,10 +1469,10 @@ static bool CanUseTextureArray(vout_display_t *vd)
     return false;
 #else
     struct wddm_version WDDM = {
-        .wddm         = 22,
-        .d3d_features = 19,
-        .revision     = 162,
-        .build        = 0,
+        .wddm         = 20,  // starting with drivers designed for W10
+        // 15.200.1062.1004 is wrong - 2015/08/03
+        // 22.19.165.3 is good       - 2017/05/04
+        .revision     = 162, // 17.5.1
     };
     if (D3D11CheckDriverVersion(&vd->sys->d3d_dev, GPU_MANUFACTURER_AMD, &WDDM) == VLC_SUCCESS)
         return true;
@@ -1503,10 +1503,7 @@ static bool BogusZeroCopy(vout_display_t *vd)
     case 0x15DD: // RX Vega 8/11 (Ryzen iGPU)
     {
         struct wddm_version WDDM = {
-            .wddm         = 0,
-            .d3d_features = 0,
-            .revision     = 14011,
-            .build        = 0,
+            .revision     = 14011, // 18.10.2 - 2018/06/11
         };
         return D3D11CheckDriverVersion(&vd->sys->d3d_dev, GPU_MANUFACTURER_AMD, &WDDM) != VLC_SUCCESS;
     }

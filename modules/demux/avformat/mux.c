@@ -44,7 +44,7 @@
 //#define AVFORMAT_DEBUG 1
 
 static const char *const ppsz_mux_options[] = {
-    "mux", "options", NULL
+    "mux", "options", "reset-ts", NULL
 };
 
 /*****************************************************************************
@@ -150,6 +150,8 @@ int avformat_OpenMux( vlc_object_t *p_this )
     p_sys->io->write_data_type = IOWriteTyped;
     p_sys->b_header_done = false;
 #endif
+    if( var_GetBool( p_mux, "sout-avformat-reset-ts" ) )
+        p_sys->oc->avoid_negative_ts = AVFMT_AVOID_NEG_TS_MAKE_ZERO;
 
     /* Fill p_mux fields */
     p_mux->pf_control   = Control;
