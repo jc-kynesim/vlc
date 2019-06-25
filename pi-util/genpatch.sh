@@ -12,7 +12,7 @@ if [ "$1" == "" ]; then
   exit 1
 fi
 
-VERSION=`awk '/AC_INIT/{match($0,/[0-9]\.[0-9]\.[0-9]/);print substr($0,RSTART,RLENGTH)}' configure.ac`
+VERSION=`awk '/AC_INIT/{match($0,/[0-9](\.[0-9])+/);print substr($0,RSTART,RLENGTH)}' configure.ac`
 if [ "$VERSION" == "" ]; then
   echo Can\'t find version in configure.ac
   exit 1
@@ -32,6 +32,6 @@ else
   git tag $PATCHTAG
 fi
 echo Generating patch: $PATCHFILE
-git diff $VERSION -- modules/hw/mmal src/misc include configure.ac > $PATCHFILE
-echo Copying patch to arm-build
-scp $PATCHFILE john@arm-build:patches/0002-vlc-3.0.6-mmal_test_4.patch
+git diff $VERSION -- modules/hw/mmal modules/video_output/opengl src/misc include configure.ac > $PATCHFILE
+#echo Copying patch to arm-build
+#scp $PATCHFILE john@arm-build:patches/0002-vlc-3.0.6-mmal_test_4.patch
