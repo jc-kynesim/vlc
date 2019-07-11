@@ -245,15 +245,16 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
     switch (ctl) {
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
         {
-            const vout_display_cfg_t * cfg = va_arg(va, const vout_display_cfg_t *);
+            const vout_display_cfg_t * const cfg = va_arg(va, const vout_display_cfg_t *);
             const bool want_mmal = want_mmal_vout(vd, sys);
-            vout_display_t *new_vd = want_mmal ? sys->mmal_vout : sys->x_vout;
+            const bool swap_vout = (sys->use_mmal != want_mmal);
+            vout_display_t * const new_vd = want_mmal ? sys->mmal_vout : sys->x_vout;
 
             msg_Dbg(vd, "Change size: %d, %d: mmal_vout=%p, want_mmal=%d, fs=%d",
                     cfg->display.width, cfg->display.height, sys->mmal_vout, want_mmal,
                     var_InheritBool(vd, "fullscreen"));
 
-            if (sys->use_mmal != want_mmal) {
+            if (swap_vout) {
                 if (sys->use_mmal) {
                     vout_display_Control(x_vd, VOUT_DISPLAY_CHANGE_MMAL_HIDE);
                 }
@@ -268,7 +269,7 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
             }
 
             // Repeat any control calls that we sent to the previous vd
-            if (sys->changed != 0) {
+            if (swap_vout && sys->changed != 0) {
                 const uint32_t changed = sys->changed;
                 sys->changed = 0;
                 if ((changed & (1 << VOUT_DISPLAY_CHANGE_DISPLAY_FILLED)) != 0)
@@ -400,6 +401,7 @@ static int OpenMmalX11(vlc_object_t *object)
             .has_pictures_invalid = true,
         };
         // Construct intersection of subpicture chromas
+        // sys calloced so no need to add the terminating zero
         if (sys->mmal_vout->info.subpicture_chromas != NULL && sys->x_vout->info.subpicture_chromas != NULL) {
             unsigned int n = 0;
             // N^2 - fix if we ever care
