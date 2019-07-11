@@ -81,7 +81,6 @@ struct vout_display_sys_t {
     MMAL_POOL_T *pool; /* mmal buffer headers, used for pushing pictures to component*/
     int i_planes; /* Number of actually used planes, 1 for opaque, 3 for i420 */
 
-    uint32_t buffer_size; /* size of actual mmal buffers */
     int buffers_in_transit; /* number of buffers currently pushed to mmal component */
     unsigned num_buffers; /* number of buffers allocated at mmal port */
 
@@ -1158,7 +1157,6 @@ static int OpenMmalVout(vlc_object_t *object)
     sys->input->format->encoding = enc_in;
     sys->input->format->encoding_variant = 0;
     sys->i_planes = 1;
-    sys->buffer_size = sys->input->buffer_size_recommended;
 
     display_set_format(vd, sys->input->format, want_isp(vd));
 
