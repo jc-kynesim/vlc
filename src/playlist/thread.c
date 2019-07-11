@@ -435,6 +435,7 @@ static bool LoopInput( playlist_t *p_playlist )
         {
             PL_DEBUG( "incoming request - stopping current input" );
             input_Stop( p_input );
+            break;  // * We can kill our input and not have another signal
         }
         vlc_cond_wait( &p_sys->signal, &p_sys->lock );
     }
