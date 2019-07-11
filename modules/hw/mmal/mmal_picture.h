@@ -250,7 +250,8 @@ void hw_mmal_vzc_buf_set_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const int x
 void hw_mmal_vzc_buf_scale_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const MMAL_RECT_T * const scale_rect);
 void hw_mmal_vzc_buf_get_wh(MMAL_BUFFER_HEADER_T * const buf, int * const pW, int * const pH);
 unsigned int hw_mmal_vzc_buf_seq(MMAL_BUFFER_HEADER_T * const buf);
-MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic, const picture_t * const dst_pic, const bool is_first);
+MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic,
+                                                const MMAL_RECT_T dst_pic_rect, const unsigned int alpha, const bool is_first);
 void hw_mmal_vzc_buf_frame_size(MMAL_BUFFER_HEADER_T * const buf,
                                 uint32_t * const pWidth, uint32_t * const pHeight);
 
@@ -258,6 +259,17 @@ void hw_mmal_vzc_pool_flush(vzc_pool_ctl_t * const pc);
 void hw_mmal_vzc_pool_release(vzc_pool_ctl_t * const pc);
 void hw_mmal_vzc_pool_ref(vzc_pool_ctl_t * const pc);
 vzc_pool_ctl_t * hw_mmal_vzc_pool_new(void);
+
+
+static inline MMAL_RECT_T vis_mmal_rect(const video_format_t * const fmt)
+{
+    return (MMAL_RECT_T){
+        .x      = fmt->i_x_offset,
+        .y      = fmt->i_y_offset,
+        .width  = fmt->i_visible_width,
+        .height = fmt->i_visible_height
+    };
+}
 
 #define VOUT_DISPLAY_CHANGE_MMAL_BASE 1024
 #define VOUT_DISPLAY_CHANGE_MMAL_HIDE (VOUT_DISPLAY_CHANGE_MMAL_BASE + 0)

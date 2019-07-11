@@ -47,7 +47,7 @@
 #include "subpic.h"
 #include "blend_rgba_neon.h"
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 /*
  * This seems to be a bit high, but reducing it causes instabilities
@@ -1577,7 +1577,10 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 int rv;
                 if ((rv = cma_buf_pic_attach(sys->cma_out_pool, out_pic, sys->output->buffer_size)) != VLC_SUCCESS)
                 {
-                    msg_Err(p_filter, "Failed to attach CMA to pic: err=%d", rv);
+                    char dbuf0[5];
+                    msg_Err(p_filter, "Failed to attach CMA to pic: fmt=%s err=%d",
+                            str_fourcc(dbuf0, out_pic->format.i_chroma),
+                            rv);
                     goto fail;
                 }
                 const unsigned int vc_h = cma_buf_pic_vc_handle(out_pic);
@@ -1992,24 +1995,16 @@ static void FilterBlendMmal(filter_t *p_filter,
     else
     {
         // cast away src const so we can ref it
-        MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc, (picture_t *)src, dst,
+        MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc, (picture_t *)src,
+                                                             vis_mmal_rect(&dst->format),
+                                                             alpha,
                                                              dst != sys->last_dst || !hw_mmal_pic_has_sub_bufs(dst));
         if (buf == NULL) {
             msg_Err(p_filter, "Failed to allocate vzc buffer for subpic");
             return;
         }
-        MMAL_DISPLAYREGION_T * const reg = hw_mmal_vzc_buf_region(buf);
-
-        reg->set |=
-            MMAL_DISPLAY_SET_ALPHA | MMAL_DISPLAY_SET_FULLSCREEN | MMAL_DISPLAY_SET_DEST_RECT;
-
-        reg->fullscreen = 0;
-
-        reg->alpha = (uint32_t)(alpha & 0xff) | (1U << 31);
 
         hw_mmal_vzc_buf_set_dest_rect(buf, x_offset, y_offset, src->format.i_visible_width, src->format.i_visible_height);
-
-        reg->dest_rect = (MMAL_RECT_T){0, 0, 0, 0};
 
         hw_mmal_pic_sub_buf_add(dst, buf);
 

@@ -292,6 +292,8 @@ static void cma_buf_pic_ctx_destroy(picture_context_t * pic_ctx)
 
 int cma_buf_pic_attach(cma_pool_fixed_t * const p, picture_t * const pic, const size_t size)
 {
+    if (!is_cma_buf_pic_chroma(pic->format.i_chroma))
+        return VLC_EGENERIC;
     if (pic->context != NULL)
         return VLC_EBADVAR;
 

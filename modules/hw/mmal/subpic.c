@@ -39,7 +39,7 @@
 #include "subpic.h"
 
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 static inline bool cmp_rect(const MMAL_RECT_T * const a, const MMAL_RECT_T * const b)
 {
@@ -174,6 +174,12 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
 #endif
                 dreg->layer = spe->layer;
                 dreg->set |= MMAL_DISPLAY_SET_LAYER;
+
+                msg_Dbg(p_filter, "Set=%x, dest=%dx%d @ (%d,%d), src=%dx%d @ (%d,%d), layer=%d, alpha=%#x",
+                        dreg->set,
+                        dreg->dest_rect.width, dreg->dest_rect.height, dreg->dest_rect.x, dreg->dest_rect.y,
+                        dreg->src_rect.width, dreg->src_rect.height, dreg->src_rect.x, dreg->src_rect.y,
+                        dreg->layer, dreg->alpha);
 
                 if ((err = mmal_port_parameter_set(spe->port, &dreg->hdr)) != MMAL_SUCCESS)
                 {

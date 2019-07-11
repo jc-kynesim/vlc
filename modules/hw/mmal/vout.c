@@ -115,6 +115,9 @@ struct vout_display_sys_t {
         MMAL_POOL_T * out_pool;
         bool pending;
     } isp;
+
+    // Subpic blend if we have to do it here
+    vzc_pool_ctl_t * vzc;
 };
 
 
@@ -602,6 +605,54 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
     // Not expecting subpictures in the current setup
     // Subpics should be attached to the main pic
     if (subpicture != NULL) {
+        msg_Dbg(vd, "Unexpected subpics");
+        bool first = true;
+
+        if (sys->vzc == NULL) {
+            if ((sys->vzc = hw_mmal_vzc_pool_new()) == NULL)
+            {
+                msg_Err(vd, "Failed to allocate VZC");
+                goto fail;
+            }
+        }
+
+        // Attempt to import the subpics
+        for (subpicture_t * spic = subpicture; spic != NULL; spic = spic->p_next)
+        {
+            char dbuf0[5];
+            msg_Dbg(vd, "Order %" PRId64 ", Channel=%d, Start=%" PRId64, spic->i_order, spic->i_channel, spic->i_start);
+            for (subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
+                picture_t *const src = sreg->p_picture;
+
+                msg_Dbg(vd, "  [%p:%p] Pos=%d,%d src=%dx%d/%dx%d,  vd=%dx%d/%dx%d, Alpha=%d, Fmt=%s", src, src->p[0].p_pixels,
+                        sreg->i_x, sreg->i_y,
+                        src->format.i_visible_width, src->format.i_visible_height,
+                        src->format.i_width, src->format.i_height,
+                        vd->fmt.i_visible_width, vd->fmt.i_visible_height,
+                        vd->fmt.i_width, vd->fmt.i_height,
+                        sreg->i_alpha,
+                        str_fourcc(dbuf0, src->format.i_chroma));
+
+
+                // cast away src const so we can ref it
+                MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc,
+                    src,
+                    (MMAL_RECT_T){.width = vd->cfg->display.width, .height=vd->cfg->display.height},
+                    sreg->i_alpha,
+                    first);
+                if (buf == NULL) {
+                    msg_Err(vd, "Failed to allocate vzc buffer for subpic");
+                    goto fail;
+                }
+
+                hw_mmal_vzc_buf_set_dest_rect(buf, sreg->i_x, sreg->i_y, src->format.i_visible_width, src->format.i_visible_height);
+
+                hw_mmal_pic_sub_buf_add(p_pic, buf);
+
+                first = false;
+            }
+        }
+
         subpicture_Delete(subpicture);
     }
 
@@ -689,9 +740,11 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
 
     switch (query) {
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
+        {
             // Ignore this - we just use full screen anyway
             ret = VLC_SUCCESS;
             break;
+        }
 
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
@@ -1028,6 +1081,8 @@ static void CloseMmalVout(vlc_object_t *object)
 
     isp_close(vd, sys);
 
+    hw_mmal_vzc_pool_release(sys->vzc);
+
     vlc_mutex_destroy(&sys->manage_mutex);
 
     if (sys->native_interlaced) {
@@ -1223,7 +1278,7 @@ vlc_module_begin()
 
     set_shortname(N_("MMAL vout"))
     set_description(N_("MMAL-based vout plugin for Raspberry Pi"))
-    set_capability("vout display", 0)
+    set_capability("vout display", 16)  // 1 point better than ASCII art
     add_shortcut("mmal_vout")
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VOUT )

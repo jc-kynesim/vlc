@@ -784,7 +784,13 @@ unsigned int hw_mmal_vzc_buf_seq(MMAL_BUFFER_HEADER_T * const buf)
 // no rules governing the order in which things are blended) so we must deal
 // (fairly) gracefully with it never (or always) being set.
 
-MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic, const picture_t * const dst_pic, const bool is_first)
+// dst_fmt gives the number space in which the destination pixels are specified
+
+MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc,
+                                                picture_t * const pic,
+                                                const MMAL_RECT_T dst_pic_rect,
+                                                const unsigned int alpha,
+                                                const bool is_first)
 {
     MMAL_BUFFER_HEADER_T * const buf = mmal_queue_get(pc->buf_pool->queue);
     vzc_subbuf_ent_t * sb;
@@ -860,7 +866,16 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
         };
 
         // Remember offsets
-        sb->dreg.set = MMAL_DISPLAY_SET_SRC_RECT;
+        sb->dreg.set = MMAL_DISPLAY_SET_SRC_RECT |
+            MMAL_DISPLAY_SET_DEST_RECT |
+            MMAL_DISPLAY_SET_FULLSCREEN |
+            MMAL_DISPLAY_SET_ALPHA;
+
+        sb->dreg.fullscreen = 0;
+        // Will be set later - zero now to avoid any confusion
+        sb->dreg.dest_rect = (MMAL_RECT_T){0, 0, 0, 0};
+
+        sb->dreg.alpha = (uint32_t)(alpha & 0xff) | MMAL_DISPLAY_ALPHA_FLAGS_MIX;
 
 //        printf("+++ bpp:%d, vis:%dx%d wxh:%dx%d, d:%dx%d\n", bpp, fmt->i_visible_width, fmt->i_visible_height, fmt->i_width, fmt->i_height, dst_stride, dst_lines);
 
@@ -871,12 +886,7 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, pictu
             .height = fmt->i_visible_height
         };
 
-        sb->pic_rect = (MMAL_RECT_T){
-            .x      = dst_pic->format.i_x_offset,
-            .y      = dst_pic->format.i_y_offset,
-            .width  = dst_pic->format.i_visible_width,
-            .height = dst_pic->format.i_visible_height
-        };
+        sb->pic_rect = dst_pic_rect;
 
         if (needs_copy)
         {

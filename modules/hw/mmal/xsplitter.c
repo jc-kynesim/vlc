@@ -17,7 +17,7 @@
 
 #include "mmal_picture.h"
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 typedef struct mmal_x11_sys_s
 {
@@ -63,6 +63,12 @@ static void mmal_x11_event(vout_display_t * x_vd, int cmd, va_list args)
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s (cmd=%d)", __func__, cmd);
 #endif
+
+    // Do not fall into the display assert if Invalid not supported
+    if (cmd == VOUT_DISPLAY_EVENT_PICTURES_INVALID &&
+            !vd->info.has_pictures_invalid)
+        return;
+
     vd->owner.event(vd, cmd, args);
 }
 
@@ -185,12 +191,15 @@ static void mmal_x11_display(vout_display_t * vd, picture_t * pic, subpicture_t 
     vout_display_t * const x_vd = sys->cur_vout;
     const bool is_mmal_pic = hw_mmal_pic_is_mmal(pic);
 
-#if TRACE_ALL
+#if TRACE_ALL || 1
     msg_Dbg(vd, "<<< %s: fmt: %dx%d/%dx%d, pic:%dx%d, pts=%lld, mmal=%d/%d", __func__, vd->fmt.i_width, vd->fmt.i_height, x_vd->fmt.i_width, x_vd->fmt.i_height, pic->format.i_width, pic->format.i_height, (long long)pic->date,
             is_mmal_pic, sys->use_mmal);
 #endif
 
-    if (sys->use_mmal != is_mmal_pic)  {
+    if (x_vd->fmt.i_chroma != pic->format.i_chroma ||
+        x_vd->fmt.i_width  != pic->format.i_width ||
+        x_vd->fmt.i_height != pic->format.i_height)
+    {
         msg_Dbg(vd, "%s: Picture dropped", __func__);
         picture_Release(pic);
         if (sub != NULL)
@@ -247,7 +256,7 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
                 if (sys->use_mmal) {
                     vout_display_Control(x_vd, VOUT_DISPLAY_CHANGE_MMAL_HIDE);
                 }
-                vout_display_SendEventPicturesInvalid(x_vd);
+                vout_display_SendEventPicturesInvalid(vd);
             }
 
             rv = vout_display_Control(new_vd, ctl, cfg);
@@ -279,15 +288,18 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
         }
 
         case VOUT_DISPLAY_RESET_PICTURES:
-            msg_Dbg(vd, "Reset pictures");
-//            rv = x_vd->control(x_vd, ctl, va);
-            rv = sys->x_vout->control(sys->x_vout, ctl, va);
-            if (sys->mmal_vout)
-                rv = sys->mmal_vout->control(sys->mmal_vout, ctl, va);
             msg_Dbg(vd, "<<< %s: Pic reset: fmt: %dx%d<-%dx%d, source: %dx%d/%dx%d", __func__,
                     vd->fmt.i_width, vd->fmt.i_height, x_vd->fmt.i_width, x_vd->fmt.i_height,
                     vd->source.i_width, vd->source.i_height, x_vd->source.i_width, x_vd->source.i_height);
-            vd->fmt       = x_vd->fmt;
+            // If the display doesn't have has_pictures_invalid then it doesn't
+            // expect RESET_PICTURES
+            if (sys->x_vout->info.has_pictures_invalid) {
+                rv = sys->x_vout->control(sys->x_vout, ctl, va);
+            }
+            if (sys->mmal_vout && sys->mmal_vout->info.has_pictures_invalid) {
+                rv = sys->mmal_vout->control(sys->mmal_vout, ctl, va);
+            }
+            vd->fmt = x_vd->fmt;
             break;
 
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
@@ -339,8 +351,16 @@ static int OpenMmalX11(vlc_object_t *object)
         .subpicture_chromas = NULL
     };
 
-    if ((sys->x_vout = load_display_module(vd, "vout display", "xcb_x11")) == NULL)
+    if ((sys->x_vout = load_display_module(vd, "vout display", "opengles2")) != NULL)
+        msg_Dbg(vd, "Opengles2 output found");
+    else
+    if ((sys->x_vout = load_display_module(vd, "vout display", "xcb_x11")) != NULL)
+        msg_Dbg(vd, "X11 XCB output found");
+    else
+    {
+        msg_Dbg(vd, "No main X output found");
         goto fail;
+    }
 
     if ((sys->mmal_vout = load_display_module(vd, "vout display", "mmal_vout")) == NULL)
     {
@@ -367,6 +387,8 @@ static int OpenMmalX11(vlc_object_t *object)
     }
 
     vd->info = sys->cur_vout->info;
+    vd->info.has_pictures_invalid = true;
+//    vd->info.subpicture_chromas = NULL;
     vd->fmt  = sys->cur_vout->fmt;
 
     return VLC_SUCCESS;
@@ -382,7 +404,7 @@ fail:
 vlc_module_begin()
     set_shortname(N_("MMAL x11 splitter"))
     set_description(N_("MMAL x11 splitter for Raspberry Pi"))
-    set_capability("vout display", 267)  // Between GLES & GL
+    set_capability("vout display", 300)  // Between GLES & GL
     add_shortcut("mmal_x11")
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VOUT )
