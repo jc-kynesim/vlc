@@ -44,7 +44,7 @@
 #include <interface/mmal/util/mmal_default_components.h>
 #include <interface/vmcs_host/vc_tvservice.h>
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 #define MAX_BUFFERS_IN_TRANSIT 1
 #define VC_TV_MAX_MODE_IDS 127
@@ -76,6 +76,7 @@ typedef struct vout_subpic_s {
 struct vout_display_sys_t {
     vlc_mutex_t manage_mutex;
 
+    vcsm_init_type_t init_type;
     MMAL_COMPONENT_T *component;
     MMAL_PORT_T *input;
     MMAL_POOL_T *pool; /* mmal buffer headers, used for pushing pictures to component*/
@@ -115,6 +116,9 @@ struct vout_display_sys_t {
         bool pending;
     } isp;
 
+    MMAL_POOL_T * copy_pool;
+    MMAL_BUFFER_HEADER_T * copy_buf;
+
     // Subpic blend if we have to do it here
     vzc_pool_ctl_t * vzc;
 };
@@ -127,6 +131,31 @@ static inline bool want_isp(const vout_display_t * const vd)
     return (vd->fmt.i_chroma == VLC_CODEC_MMAL_ZC_SAND10);
 }
 
+static inline bool want_copy(const vout_display_t * const vd)
+{
+    return (vd->fmt.i_chroma == VLC_CODEC_I420);
+}
+
+// Do a stride converting copy - if the strides are the same and line_len is
+// close then do a single block copy - we don't expect to have to preserve
+// pixels in the output frame
+static inline void mem_copy_2d(uint8_t * d_ptr, const size_t d_stride, const uint8_t * s_ptr, const size_t s_stride, size_t lines, const size_t line_len)
+{
+  if (s_stride == d_stride && s_stride < line_len + 32)
+  {
+    memcpy(d_ptr, s_ptr, s_stride * lines);
+  }
+  else
+  {
+    while (lines-- != 0) {
+      memcpy(d_ptr, s_ptr, line_len);
+      d_ptr += d_stride;
+      s_ptr += s_stride;
+    }
+  }
+}
+
+
 static MMAL_FOURCC_T vout_vlc_to_mmal_pic_fourcc(const unsigned int fcc)
 {
     switch (fcc){
@@ -136,6 +165,8 @@ static MMAL_FOURCC_T vout_vlc_to_mmal_pic_fourcc(const unsigned int fcc)
         return MMAL_ENCODING_YUVUV128;
     case VLC_CODEC_MMAL_ZC_SAND10:
         return MMAL_ENCODING_YUVUV64_10;  // It will be after we've converted it...
+    case VLC_CODEC_I420:
+        return MMAL_ENCODING_I420;
     default:
         break;
     }
@@ -629,7 +660,20 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
     }
     // Stuff into input
     // We assume the BH is already set up with values reflecting pic date etc.
-    if (sys->isp.pending) {
+    if (sys->copy_buf != NULL) {
+        MMAL_BUFFER_HEADER_T *const buf = sys->copy_buf;
+        sys->copy_buf = NULL;
+#if TRACE_ALL
+        msg_Dbg(vd, "--- %s: Copy stuff", __func__);
+#endif
+        if (mmal_port_send_buffer(sys->input, buf) != MMAL_SUCCESS)
+        {
+            mmal_buffer_header_release(buf);
+            msg_Err(vd, "Send copy buffer to render input failed");
+            goto fail;
+        }
+    }
+    else if (sys->isp.pending) {
         MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(sys->isp.out_q);
         sys->isp.pending = false;
 #if TRACE_ALL
@@ -832,8 +876,41 @@ static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
 
     // Subpics can either turn up attached to the main pic or in the
     // subpic list here  - if they turn up here then attach to pic
-    if (subpicture != NULL) {
+    if (subpicture != NULL && !want_copy(vd)) {  //**** Copy has bust subs
         attach_subpics(vd, sys, p_pic, subpicture);
+    }
+
+    // *****
+    if (want_copy(vd)) {
+        if (sys->copy_buf != NULL) {
+            msg_Err(vd, "Copy buf not NULL");
+            mmal_buffer_header_release(sys->copy_buf);
+            sys->copy_buf = NULL;
+        }
+
+        MMAL_BUFFER_HEADER_T * const buf = mmal_queue_wait(sys->copy_pool->queue);
+        // Copy 2d
+        unsigned int y_size = sys->input->format->es->video.width * sys->input->format->es->video.height;
+
+        buf->flags = MMAL_BUFFER_HEADER_FLAG_FRAME_END;
+        buf->length = sys->input->buffer_size;
+
+        mem_copy_2d(buf->data, sys->input->format->es->video.width,
+                    p_pic->p[0].p_pixels, p_pic->p[0].i_pitch,
+                    sys->input->format->es->video.crop.height,
+                    sys->input->format->es->video.crop.width);
+
+        mem_copy_2d(buf->data + y_size, sys->input->format->es->video.width / 2,
+                    p_pic->p[1].p_pixels, p_pic->p[1].i_pitch,
+                    sys->input->format->es->video.crop.height / 2,
+                    sys->input->format->es->video.crop.width / 2);
+
+        mem_copy_2d(buf->data + y_size + y_size / 4, sys->input->format->es->video.width / 2,
+                    p_pic->p[2].p_pixels, p_pic->p[2].i_pitch,
+                    sys->input->format->es->video.crop.height / 2,
+                    sys->input->format->es->video.crop.width / 2);
+
+        sys->copy_buf = buf;
     }
 
     if (isp_check(vd, sys) != MMAL_SUCCESS) {
@@ -1076,6 +1153,12 @@ static void CloseMmalVout(vlc_object_t *object)
     if (sys->input && sys->input->is_enabled)
         mmal_port_disable(sys->input);
 
+    if (sys->copy_buf != NULL)
+        mmal_buffer_header_release(sys->copy_buf);
+
+    if (sys->input != NULL && sys->copy_pool != NULL)
+        mmal_port_pool_destroy(sys->input, sys->copy_pool);
+
     if (sys->component && sys->component->is_enabled)
         mmal_component_disable(sys->component);
 
@@ -1097,9 +1180,9 @@ static void CloseMmalVout(vlc_object_t *object)
             msg_Warn(vd, "Could not reset hvs field mode");
     }
 
-    free(sys);
+    cma_vcsm_exit(sys->init_type);;
 
-    bcm_host_deinit();
+    free(sys);
 
 #if TRACE_ALL
     msg_Dbg(vd, ">>> %s", __func__);
@@ -1122,7 +1205,8 @@ static int OpenMmalVout(vlc_object_t *object)
     if (enc_in == 0)
     {
 #if TRACE_ALL
-        msg_Dbg(vd, ">>> %s: Format not MMAL", __func__);
+        char dbuf0[5];
+        msg_Dbg(vd, ">>> %s: Format %s not MMAL", __func__, str_fourcc(dbuf0, vd->fmt.i_chroma));
 #endif
         return VLC_EGENERIC;
     }
@@ -1132,7 +1216,11 @@ static int OpenMmalVout(vlc_object_t *object)
         return VLC_ENOMEM;
     vd->sys = sys;
 
-    bcm_host_init();
+    if ((sys->init_type = cma_vcsm_init()) == VCSM_INIT_NONE)
+    {
+        msg_Err(vd, "VCSM init fail");
+        goto fail;
+    }
 
     sys->layer = var_InheritInteger(vd, MMAL_LAYER_NAME);
 
@@ -1173,8 +1261,20 @@ static int OpenMmalVout(vlc_object_t *object)
                         sys->input->name, status, mmal_status_to_string(status));
         goto fail;
     }
+
     sys->input->buffer_size = sys->input->buffer_size_recommended;
-    sys->input->buffer_num = 30;
+
+    if (!want_copy(vd)) {
+        sys->input->buffer_num = 30;
+    }
+    else {
+        sys->input->buffer_num = 2;
+        if ((sys->copy_pool = mmal_port_pool_create(sys->input, 2, sys->input->buffer_size)) == NULL)
+        {
+            msg_Err(vd, "Cannot create copy pool");
+            goto fail;
+        }
+    }
 
     vout_display_PlacePicture(&place, &vd->source, vd->cfg, false);
     display_region.hdr.id = MMAL_PARAMETER_DISPLAYREGION;

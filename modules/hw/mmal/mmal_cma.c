@@ -375,38 +375,3 @@ void cma_buf_pic_context_unref(cma_pic_context_t * const ctx)
 }
 
 
-//----------------------------------------------------------------------------
-
-vcsm_init_type_t cma_vcsm_init(void)
-{
-    if (vcsm_init_ex(1, -1) == 0) {
-        return VCSM_INIT_CMA;
-    }
-    else if (vcsm_init_ex(0, -1) == 0) {
-        return VCSM_INIT_LEGACY;
-    }
-    return VCSM_INIT_NONE;
-}
-
-void cma_vcsm_exit(const vcsm_init_type_t init_mode)
-{
-    if (init_mode != VCSM_INIT_NONE)
-        vcsm_exit();
-}
-
-const char * cma_vcsm_init_str(const vcsm_init_type_t init_mode)
-{
-    switch (init_mode)
-    {
-        case VCSM_INIT_CMA:
-            return "CMA";
-        case VCSM_INIT_LEGACY:
-            return "Legacy";
-        case VCSM_INIT_NONE:
-            return "none";
-        default:
-            break;
-    }
-    return "???";
-}
-

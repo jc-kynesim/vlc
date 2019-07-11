@@ -1,12 +1,3 @@
-typedef enum vcsm_init_type_e {
-    VCSM_INIT_NONE = 0,
-    VCSM_INIT_LEGACY,
-    VCSM_INIT_CMA
-} vcsm_init_type_t;
-
-vcsm_init_type_t cma_vcsm_init(void);
-void cma_vcsm_exit(const vcsm_init_type_t init_mode);
-const char * cma_vcsm_init_str(const vcsm_init_type_t init_mode);
 
 struct cma_pool_fixed_s;
 typedef struct cma_pool_fixed_s cma_pool_fixed_t;
