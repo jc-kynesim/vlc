@@ -26,6 +26,7 @@ typedef struct mmal_x11_sys_s
     vout_display_t * mmal_vout;
     vout_display_t * x_vout;
     uint32_t changed;
+    vlc_fourcc_t subpicture_chromas[16];
 } mmal_x11_sys_t;
 
 static void unload_display_module(vout_display_t * const x_vout)
@@ -386,9 +387,34 @@ static int OpenMmalX11(vlc_object_t *object)
         sys->use_mmal = false;
     }
 
-    vd->info = sys->cur_vout->info;
-    vd->info.has_pictures_invalid = true;
-//    vd->info.subpicture_chromas = NULL;
+    if (sys->mmal_vout == NULL) {
+        vd->info = sys->cur_vout->info;
+        vd->info.has_pictures_invalid = true;  // Should make this unwanted
+    }
+    else {
+        // We have both - construct a combination
+        vd->info = (vout_display_info_t){
+            .is_slow              = false,
+            .has_double_click     = sys->mmal_vout->info.has_double_click || sys->x_vout->info.has_double_click,
+            .needs_hide_mouse     = sys->mmal_vout->info.needs_hide_mouse || sys->x_vout->info.needs_hide_mouse,
+            .has_pictures_invalid = true,
+        };
+        // Construct intersection of subpicture chromas
+        if (sys->mmal_vout->info.subpicture_chromas != NULL && sys->x_vout->info.subpicture_chromas != NULL) {
+            unsigned int n = 0;
+            // N^2 - fix if we ever care
+            for (const vlc_fourcc_t * p1 = sys->mmal_vout->info.subpicture_chromas; *p1 != 0 && n != 15; ++p1) {
+                for (const vlc_fourcc_t * p2 = sys->x_vout->info.subpicture_chromas; *p2 != 0; ++p2) {
+                    if (*p1 == *p2) {
+                        sys->subpicture_chromas[n++] = *p1;
+                        break;
+                    }
+                }
+            }
+            if (n != 0)
+                vd->info.subpicture_chromas = sys->subpicture_chromas;
+        }
+    }
     vd->fmt  = sys->cur_vout->fmt;
 
     return VLC_SUCCESS;

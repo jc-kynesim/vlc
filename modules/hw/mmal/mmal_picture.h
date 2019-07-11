@@ -236,12 +236,17 @@ static inline MMAL_BUFFER_HEADER_T * pic_mmal_buffer(const picture_t *const pic)
 struct vzc_pool_ctl_s;
 typedef struct vzc_pool_ctl_s vzc_pool_ctl_t;
 
+// At the moment we cope with any mono-planar RGBA thing
+// We could cope with many other things but they currently don't occur
+extern const vlc_fourcc_t hw_mmal_vzc_subpicture_chromas[];
 static inline bool hw_mmal_vzc_subpic_fmt_valid(const video_frame_format_t * const vf_vlc)
 {
     const vlc_fourcc_t vfcc_src = vf_vlc->i_chroma;
-    // At the moment we cope with any mono-planar RGBA thing
-    // We could cope with many other things but they currently don't occur
-    return vfcc_src == VLC_CODEC_RGBA || vfcc_src == VLC_CODEC_BGRA || vfcc_src == VLC_CODEC_ARGB;
+    for (const vlc_fourcc_t * p = hw_mmal_vzc_subpicture_chromas; *p != 0; ++p)
+        if (*p == vfcc_src)
+            return true;
+
+    return false;
 }
 
 bool hw_mmal_vzc_buf_set_format(MMAL_BUFFER_HEADER_T * const buf, MMAL_ES_FORMAT_T * const es_fmt);

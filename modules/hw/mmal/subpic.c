@@ -39,7 +39,7 @@
 #include "subpic.h"
 
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 static inline bool cmp_rect(const MMAL_RECT_T * const a, const MMAL_RECT_T * const b)
 {

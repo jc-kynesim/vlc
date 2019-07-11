@@ -695,6 +695,8 @@ static pool_ent_t * pool_best_fit(vzc_pool_ctl_t * const pc, size_t req_size)
 }
 
 
+const vlc_fourcc_t hw_mmal_vzc_subpicture_chromas[] = { VLC_CODEC_RGBA, VLC_CODEC_BGRA, VLC_CODEC_ARGB, 0 };
+
 void hw_mmal_vzc_buf_get_wh(MMAL_BUFFER_HEADER_T * const buf, int * const pW, int * const pH)
 {
     const pool_ent_t *const ent = ((vzc_subbuf_ent_t *)buf->user_data)->ent;

@@ -766,6 +766,58 @@ static void vd_manage(vout_display_t *vd)
     vlc_mutex_unlock(&sys->manage_mutex);
 }
 
+
+static int attach_subpics(vout_display_t * const vd, vout_display_sys_t * const sys,
+                          picture_t * const p_pic, subpicture_t * const subpicture)
+{
+    bool first = true;
+
+    if (sys->vzc == NULL) {
+        if ((sys->vzc = hw_mmal_vzc_pool_new()) == NULL)
+        {
+            msg_Err(vd, "Failed to allocate VZC");
+            return VLC_ENOMEM;
+        }
+    }
+
+    // Attempt to import the subpics
+    for (subpicture_t * spic = subpicture; spic != NULL; spic = spic->p_next)
+    {
+        for (subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
+            picture_t *const src = sreg->p_picture;
+
+#if 0
+            char dbuf0[5];
+            msg_Dbg(vd, "  [%p:%p] Pos=%d,%d src=%dx%d/%dx%d,  vd=%dx%d/%dx%d, Alpha=%d, Fmt=%s", src, src->p[0].p_pixels,
+                    sreg->i_x, sreg->i_y,
+                    src->format.i_visible_width, src->format.i_visible_height,
+                    src->format.i_width, src->format.i_height,
+                    vd->fmt.i_visible_width, vd->fmt.i_visible_height,
+                    vd->fmt.i_width, vd->fmt.i_height,
+                    sreg->i_alpha,
+                    str_fourcc(dbuf0, src->format.i_chroma));
+#endif
+
+            MMAL_BUFFER_HEADER_T * const buf = hw_mmal_vzc_buf_from_pic(sys->vzc,
+                src,
+                (MMAL_RECT_T){.width = vd->cfg->display.width, .height=vd->cfg->display.height},
+                sreg->i_x, sreg->i_y,
+                sreg->i_alpha,
+                first);
+            if (buf == NULL) {
+                msg_Err(vd, "Failed to allocate vzc buffer for subpic");
+                return VLC_ENOMEM;
+            }
+
+            hw_mmal_pic_sub_buf_add(p_pic, buf);
+
+            first = false;
+        }
+    }
+    return VLC_SUCCESS;
+}
+
+
 static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
 #if VLC_VER_3
                        subpicture_t *subpicture
@@ -777,61 +829,13 @@ static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
     MMAL_STATUS_T err;
     vout_display_sys_t * const sys = vd->sys;
 
-    VLC_UNUSED(subpicture);
-//    VLC_UNUSED(date);
-
     vd_manage(vd);
 
     // Subpics can either turn up attached to the main pic or in the
     // subpic list here  - if they turn up here then attach to pic
     if (subpicture != NULL) {
-        bool first = true;
-
-        if (sys->vzc == NULL) {
-            if ((sys->vzc = hw_mmal_vzc_pool_new()) == NULL)
-            {
-                msg_Err(vd, "Failed to allocate VZC");
-                goto fail;
-            }
-        }
-
-        // Attempt to import the subpics
-        for (subpicture_t * spic = subpicture; spic != NULL; spic = spic->p_next)
-        {
-            for (subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
-                picture_t *const src = sreg->p_picture;
-
-#if 0
-                char dbuf0[5];
-                msg_Dbg(vd, "  [%p:%p] Pos=%d,%d src=%dx%d/%dx%d,  vd=%dx%d/%dx%d, Alpha=%d, Fmt=%s", src, src->p[0].p_pixels,
-                        sreg->i_x, sreg->i_y,
-                        src->format.i_visible_width, src->format.i_visible_height,
-                        src->format.i_width, src->format.i_height,
-                        vd->fmt.i_visible_width, vd->fmt.i_visible_height,
-                        vd->fmt.i_width, vd->fmt.i_height,
-                        sreg->i_alpha,
-                        str_fourcc(dbuf0, src->format.i_chroma));
-#endif
-
-                // cast away src const so we can ref it
-                MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc,
-                    src,
-                    (MMAL_RECT_T){.width = vd->cfg->display.width, .height=vd->cfg->display.height},
-                    sreg->i_x, sreg->i_y,
-                    sreg->i_alpha,
-                    first);
-                if (buf == NULL) {
-                    msg_Err(vd, "Failed to allocate vzc buffer for subpic");
-                    goto fail;
-                }
-
-                hw_mmal_pic_sub_buf_add(p_pic, buf);
-
-                first = false;
-            }
-        }
+        attach_subpics(vd, sys, p_pic, subpicture);
     }
-
 
     if (isp_check(vd, sys) != MMAL_SUCCESS) {
         return;
@@ -1248,7 +1252,7 @@ static int OpenMmalVout(vlc_object_t *object)
         .has_double_click = false,
         .needs_hide_mouse = false,
         .has_pictures_invalid = true,
-        .subpicture_chromas = NULL
+        .subpicture_chromas = hw_mmal_vzc_subpicture_chromas
     };
 
     vd->pool = vd_pool;
