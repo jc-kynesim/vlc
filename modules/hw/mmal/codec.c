@@ -1997,14 +1997,13 @@ static void FilterBlendMmal(filter_t *p_filter,
         // cast away src const so we can ref it
         MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc, (picture_t *)src,
                                                              vis_mmal_rect(&dst->format),
+                                                             x_offset, y_offset,
                                                              alpha,
                                                              dst != sys->last_dst || !hw_mmal_pic_has_sub_bufs(dst));
         if (buf == NULL) {
             msg_Err(p_filter, "Failed to allocate vzc buffer for subpic");
             return;
         }
-
-        hw_mmal_vzc_buf_set_dest_rect(buf, x_offset, y_offset, src->format.i_visible_width, src->format.i_visible_height);
 
         hw_mmal_pic_sub_buf_add(dst, buf);
 

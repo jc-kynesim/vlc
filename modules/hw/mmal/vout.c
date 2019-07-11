@@ -638,14 +638,13 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
                 MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc,
                     src,
                     (MMAL_RECT_T){.width = vd->cfg->display.width, .height=vd->cfg->display.height},
+                    sreg->i_x, sreg->i_y,
                     sreg->i_alpha,
                     first);
                 if (buf == NULL) {
                     msg_Err(vd, "Failed to allocate vzc buffer for subpic");
                     goto fail;
                 }
-
-                hw_mmal_vzc_buf_set_dest_rect(buf, sreg->i_x, sreg->i_y, src->format.i_visible_width, src->format.i_visible_height);
 
                 hw_mmal_pic_sub_buf_add(p_pic, buf);
 

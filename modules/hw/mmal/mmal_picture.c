@@ -736,15 +736,6 @@ MMAL_DISPLAYREGION_T * hw_mmal_vzc_buf_region(MMAL_BUFFER_HEADER_T * const buf)
     return &sb->dreg;
 }
 
-void hw_mmal_vzc_buf_set_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const int x, const int y, const int w, const int h)
-{
-    vzc_subbuf_ent_t * sb = buf->user_data;
-    sb->orig_dest_rect.x = x;
-    sb->orig_dest_rect.y = y;
-    sb->orig_dest_rect.width = w;
-    sb->orig_dest_rect.height = h;
-}
-
 static inline int rescale_x(int x, int mul, int div)
 {
     return div == 0 ? x * mul : (x * mul + div/2) / div;
@@ -789,6 +780,7 @@ unsigned int hw_mmal_vzc_buf_seq(MMAL_BUFFER_HEADER_T * const buf)
 MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc,
                                                 picture_t * const pic,
                                                 const MMAL_RECT_T dst_pic_rect,
+                                                const int x_offset, const int y_offset,
                                                 const unsigned int alpha,
                                                 const bool is_first)
 {
@@ -880,13 +872,20 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc,
 //        printf("+++ bpp:%d, vis:%dx%d wxh:%dx%d, d:%dx%d\n", bpp, fmt->i_visible_width, fmt->i_visible_height, fmt->i_width, fmt->i_height, dst_stride, dst_lines);
 
         sb->dreg.src_rect = (MMAL_RECT_T){
-            .x = (fmt->i_x_offset - xl),
-            .y = 0,
-            .width = fmt->i_visible_width,
+            .x      = (fmt->i_x_offset - xl),
+            .y      = 0,
+            .width  = fmt->i_visible_width,
             .height = fmt->i_visible_height
         };
 
         sb->pic_rect = dst_pic_rect;
+
+        sb->orig_dest_rect = (MMAL_RECT_T){
+            .x      = x_offset,
+            .y      = y_offset,
+            .width  = fmt->i_visible_width,
+            .height = fmt->i_visible_height
+        };
 
         if (needs_copy)
         {
