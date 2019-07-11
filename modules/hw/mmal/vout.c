@@ -602,56 +602,9 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
 
-    // Not expecting subpictures in the current setup
-    // Subpics should be attached to the main pic
+    // If we had subpics then we have attached them to the main pic in prepare
+    // so all we have to do here is delete the refs
     if (subpicture != NULL) {
-        msg_Dbg(vd, "Unexpected subpics");
-        bool first = true;
-
-        if (sys->vzc == NULL) {
-            if ((sys->vzc = hw_mmal_vzc_pool_new()) == NULL)
-            {
-                msg_Err(vd, "Failed to allocate VZC");
-                goto fail;
-            }
-        }
-
-        // Attempt to import the subpics
-        for (subpicture_t * spic = subpicture; spic != NULL; spic = spic->p_next)
-        {
-            char dbuf0[5];
-            msg_Dbg(vd, "Order %" PRId64 ", Channel=%d, Start=%" PRId64, spic->i_order, spic->i_channel, spic->i_start);
-            for (subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
-                picture_t *const src = sreg->p_picture;
-
-                msg_Dbg(vd, "  [%p:%p] Pos=%d,%d src=%dx%d/%dx%d,  vd=%dx%d/%dx%d, Alpha=%d, Fmt=%s", src, src->p[0].p_pixels,
-                        sreg->i_x, sreg->i_y,
-                        src->format.i_visible_width, src->format.i_visible_height,
-                        src->format.i_width, src->format.i_height,
-                        vd->fmt.i_visible_width, vd->fmt.i_visible_height,
-                        vd->fmt.i_width, vd->fmt.i_height,
-                        sreg->i_alpha,
-                        str_fourcc(dbuf0, src->format.i_chroma));
-
-
-                // cast away src const so we can ref it
-                MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc,
-                    src,
-                    (MMAL_RECT_T){.width = vd->cfg->display.width, .height=vd->cfg->display.height},
-                    sreg->i_x, sreg->i_y,
-                    sreg->i_alpha,
-                    first);
-                if (buf == NULL) {
-                    msg_Err(vd, "Failed to allocate vzc buffer for subpic");
-                    goto fail;
-                }
-
-                hw_mmal_pic_sub_buf_add(p_pic, buf);
-
-                first = false;
-            }
-        }
-
         subpicture_Delete(subpicture);
     }
 
@@ -828,6 +781,57 @@ static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
 //    VLC_UNUSED(date);
 
     vd_manage(vd);
+
+    // Subpics can either turn up attached to the main pic or in the
+    // subpic list here  - if they turn up here then attach to pic
+    if (subpicture != NULL) {
+        bool first = true;
+
+        if (sys->vzc == NULL) {
+            if ((sys->vzc = hw_mmal_vzc_pool_new()) == NULL)
+            {
+                msg_Err(vd, "Failed to allocate VZC");
+                goto fail;
+            }
+        }
+
+        // Attempt to import the subpics
+        for (subpicture_t * spic = subpicture; spic != NULL; spic = spic->p_next)
+        {
+            for (subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
+                picture_t *const src = sreg->p_picture;
+
+#if 0
+                char dbuf0[5];
+                msg_Dbg(vd, "  [%p:%p] Pos=%d,%d src=%dx%d/%dx%d,  vd=%dx%d/%dx%d, Alpha=%d, Fmt=%s", src, src->p[0].p_pixels,
+                        sreg->i_x, sreg->i_y,
+                        src->format.i_visible_width, src->format.i_visible_height,
+                        src->format.i_width, src->format.i_height,
+                        vd->fmt.i_visible_width, vd->fmt.i_visible_height,
+                        vd->fmt.i_width, vd->fmt.i_height,
+                        sreg->i_alpha,
+                        str_fourcc(dbuf0, src->format.i_chroma));
+#endif
+
+                // cast away src const so we can ref it
+                MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc,
+                    src,
+                    (MMAL_RECT_T){.width = vd->cfg->display.width, .height=vd->cfg->display.height},
+                    sreg->i_x, sreg->i_y,
+                    sreg->i_alpha,
+                    first);
+                if (buf == NULL) {
+                    msg_Err(vd, "Failed to allocate vzc buffer for subpic");
+                    goto fail;
+                }
+
+                hw_mmal_pic_sub_buf_add(p_pic, buf);
+
+                first = false;
+            }
+        }
+    }
+
 
     if (isp_check(vd, sys) != MMAL_SUCCESS) {
         return;
