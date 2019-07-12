@@ -226,7 +226,7 @@ static int vout_display_Control(vout_display_t *vd, int query, ...)
 
 static bool want_mmal_vout(vout_display_t * vd, const mmal_x11_sys_t * const sys)
 {
-    return sys->mmal_vout != NULL && var_InheritBool(vd, "fullscreen");
+    return sys->mmal_vout != NULL && (sys->x_vout == NULL || var_InheritBool(vd, "fullscreen"));
 }
 
 /* Control on the module (mandatory) */
@@ -355,20 +355,16 @@ static int OpenMmalX11(vlc_object_t *object)
 
     if ((sys->x_vout = load_display_module(vd, "vout display", "opengles2")) != NULL)
         msg_Dbg(vd, "Opengles2 output found");
-    else
-    if ((sys->x_vout = load_display_module(vd, "vout display", "xcb_x11")) != NULL)
+    else if ((sys->x_vout = load_display_module(vd, "vout display", "xcb_x11")) != NULL)
         msg_Dbg(vd, "X11 XCB output found");
-    else
-    {
-        msg_Dbg(vd, "No main X output found");
-        goto fail;
-    }
 
-    if ((sys->mmal_vout = load_display_module(vd, "vout display", "mmal_vout")) == NULL)
-    {
-        // Winge but do no more than that - route everything to X
+    if ((sys->mmal_vout = load_display_module(vd, "vout display", "mmal_vout")) != NULL)
+        msg_Dbg(vd, "MMAL output found");
+
+    if (sys->mmal_vout == NULL && sys->x_vout == NULL) {
         char dbuf0[5], dbuf1[5];
-        msg_Info(vd, "Not a valid format for mmal vout (%s/%s)", str_fourcc(dbuf0, vd->fmt.i_chroma), str_fourcc(dbuf1, vd->source.i_chroma));
+        msg_Info(vd, "No valid output found for vout (%s/%s)", str_fourcc(dbuf0, vd->fmt.i_chroma), str_fourcc(dbuf1, vd->source.i_chroma));
+        goto fail;
     }
 
     vd->pool = mmal_x11_pool;
@@ -388,7 +384,7 @@ static int OpenMmalX11(vlc_object_t *object)
         sys->use_mmal = false;
     }
 
-    if (sys->mmal_vout == NULL) {
+    if (sys->mmal_vout == NULL || sys->x_vout == NULL) {
         vd->info = sys->cur_vout->info;
         vd->info.has_pictures_invalid = true;  // Should make this unwanted
     }
