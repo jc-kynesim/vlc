@@ -381,14 +381,6 @@ static int Open (vlc_object_t *obj, const struct gl_api *api)
         goto error;
     }
 
-    EGLint cav = 0;
-    if (eglGetConfigAttrib(sys->display, cfgv[0], EGL_CONFIG_CAVEAT, &cav) != EGL_TRUE)
-    {
-        msg_Err (obj, "cannot read attr");
-        goto error;
-    }
-    msg_Info(obj, "EGL caveats=%#x", cav);
-
     /* Create a drawing surface */
     sys->surface = createSurface(sys->display, cfgv[0], window, NULL);
     if (sys->surface == EGL_NO_SURFACE)
