@@ -9,28 +9,18 @@
 
 #include <interface/vcsm/user-vcsm.h>
 
-
 #include <vlc_common.h>
 #include <vlc_picture.h>
 
-#include <libdrm/drm.h>
-#include <libdrm/drm_mode.h>
 #include <libdrm/drm_fourcc.h>
-//#include <xf86drm.h>
-//#include <xf86drmMode.h>
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xlib-xcb.h>
-#include <epoxy/gl.h>
-#include <epoxy/egl.h>
-#include <xcb/xcb.h>
-#include <xcb/dri3.h>
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
 
 #include "mmal_cma.h"
 
-#include <vlc_xlib.h>
 #include "../../video_output/opengl/converter.h"
-#include <vlc_vout_window.h>
 
 #include "mmal_picture.h"
 
@@ -228,7 +218,7 @@ static tex_context_t * get_tex_context(const opengl_tex_converter_t * const tc, 
 
         const EGLImage image = tc->gl->egl.createImageKHR(tc->gl, EGL_LINUX_DMA_BUF_EXT, NULL, attribs);
         if (!image) {
-           msg_Err(tc, "Failed to import fd %d: Err=%#x", fd, eglGetError());
+           msg_Err(tc, "Failed to import fd %d: Err=%#x", fd, tc->vt->GetError());
            goto fail;
         }
 
