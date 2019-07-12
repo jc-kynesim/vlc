@@ -17,7 +17,7 @@
 
 #include "mmal_picture.h"
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 typedef struct mmal_x11_sys_s
 {
@@ -192,7 +192,7 @@ static void mmal_x11_display(vout_display_t * vd, picture_t * pic, subpicture_t 
     vout_display_t * const x_vd = sys->cur_vout;
     const bool is_mmal_pic = hw_mmal_pic_is_mmal(pic);
 
-#if TRACE_ALL || 1
+#if TRACE_ALL
     msg_Dbg(vd, "<<< %s: fmt: %dx%d/%dx%d, pic:%dx%d, pts=%lld, mmal=%d/%d", __func__, vd->fmt.i_width, vd->fmt.i_height, x_vd->fmt.i_width, x_vd->fmt.i_height, pic->format.i_width, pic->format.i_height, (long long)pic->date,
             is_mmal_pic, sys->use_mmal);
 #endif

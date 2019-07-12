@@ -44,7 +44,7 @@
 #include <interface/mmal/util/mmal_default_components.h>
 #include <interface/vmcs_host/vc_tvservice.h>
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 #define MAX_BUFFERS_IN_TRANSIT 1
 #define VC_TV_MAX_MODE_IDS 127

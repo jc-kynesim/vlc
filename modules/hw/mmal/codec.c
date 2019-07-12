@@ -47,7 +47,7 @@
 #include "subpic.h"
 #include "blend_rgba_neon.h"
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 /*
  * This seems to be a bit high, but reducing it causes instabilities
@@ -1486,7 +1486,6 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                 goto fail;
         }
 
-        msg_Dbg(p_filter, "Outpool: zc=%d, num=%d, size=%d", sys->is_sliced, sys->output->buffer_num, sys->output->buffer_size);
         sys->out_pool = sys->is_sliced ?
             mmal_port_pool_create(sys->output, sys->output->buffer_num, sys->output->buffer_size) :
             mmal_pool_create(sys->output->buffer_num, 0);

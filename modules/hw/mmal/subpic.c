@@ -168,17 +168,17 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
                 spe->alpha = dreg->alpha;
                 spe->dest_rect = dreg->dest_rect;
                 needs_update = true;
-#if TRACE_ALL
-                msg_Dbg(p_filter, "Update region for sub %d", sub_no);
-#endif
+
                 dreg->layer = spe->layer;
                 dreg->set |= MMAL_DISPLAY_SET_LAYER;
 
-                msg_Dbg(p_filter, "Set=%x, dest=%dx%d @ (%d,%d), src=%dx%d @ (%d,%d), layer=%d, alpha=%#x",
-                        dreg->set,
+#if TRACE_ALL
+                msg_Dbg(p_filter, "%s: Update region: Set=%x, dest=%dx%d @ (%d,%d), src=%dx%d @ (%d,%d), layer=%d, alpha=%#x",
+                        __func__, dreg->set,
                         dreg->dest_rect.width, dreg->dest_rect.height, dreg->dest_rect.x, dreg->dest_rect.y,
                         dreg->src_rect.width, dreg->src_rect.height, dreg->src_rect.x, dreg->src_rect.y,
                         dreg->layer, dreg->alpha);
+#endif
 
                 if ((err = mmal_port_parameter_set(spe->port, &dreg->hdr)) != MMAL_SUCCESS)
                 {
