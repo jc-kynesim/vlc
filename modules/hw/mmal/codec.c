@@ -1448,8 +1448,12 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 
         for (sub_no = 0; sub_no != SUBS_MAX; ++sub_no) {
             int rv;
-            if ((rv = hw_mmal_subpic_update(VLC_OBJECT(p_filter), p_pic, sub_no, sys->subs + sub_no,
-                                     &sys->output->format->es->video.crop, frame_seq)) == 0)
+            if ((rv = hw_mmal_subpic_update(VLC_OBJECT(p_filter),
+                                            hw_mmal_pic_sub_buf_get(p_pic, sub_no),
+                                            sys->subs + sub_no,
+                                            &p_pic->format,
+                                            &sys->output->format->es->video.crop,
+                                            frame_seq)) == 0)
                 break;
             else if (rv < 0)
                 goto fail;

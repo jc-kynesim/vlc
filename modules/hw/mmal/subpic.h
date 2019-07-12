@@ -13,10 +13,11 @@ typedef struct subpic_reg_stash_s
 } subpic_reg_stash_t;
 
 int hw_mmal_subpic_update(vlc_object_t * const p_filter,
-    picture_t * const p_pic, const unsigned int sub_no,
-    subpic_reg_stash_t * const stash,
-    const MMAL_RECT_T * const scale_out,
-    const uint64_t pts);
+                          MMAL_BUFFER_HEADER_T * const sub_buf,
+                          subpic_reg_stash_t * const spe,
+                          const video_format_t * const fmt,
+                          const MMAL_RECT_T * const scale_out,
+                          const uint64_t pts);
 
 void hw_mmal_subpic_flush(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe);
 

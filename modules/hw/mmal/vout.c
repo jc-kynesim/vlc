@@ -103,6 +103,9 @@ struct vout_display_sys_t {
     bool force_config;
 
     vout_subpic_t subs[SUBS_MAX];
+    // Stash for subpics derived from the passed subpicture rather than
+    // included with the main pic
+    MMAL_BUFFER_HEADER_T * subpic_bufs[SUBS_MAX];
 
     picture_pool_t * pic_pool;
 
@@ -699,16 +702,20 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
         }
     }
 
-    if (p_pic->context == NULL) {
-        msg_Dbg(vd, "%s: No context", __func__);
-    }
-    else
     {
         unsigned int sub_no = 0;
+        MMAL_BUFFER_HEADER_T **psub_bufs2 = sys->subpic_bufs;
+        const bool is_mmal_pic = hw_mmal_pic_is_mmal(p_pic);
 
         for (sub_no = 0; sub_no != SUBS_MAX; ++sub_no) {
             int rv;
-            if ((rv = hw_mmal_subpic_update(VLC_OBJECT(vd), p_pic, sub_no, &sys->subs[sub_no].sub,
+            MMAL_BUFFER_HEADER_T * const sub_buf = !is_mmal_pic ? NULL :
+                hw_mmal_pic_sub_buf_get(p_pic, sub_no);
+
+            if ((rv = hw_mmal_subpic_update(VLC_OBJECT(vd),
+                                            sub_buf != NULL ? sub_buf : *psub_bufs2++,
+                                            &sys->subs[sub_no].sub,
+                                            &p_pic->format,
                                             &(MMAL_RECT_T){.width = sys->display_width, .height = sys->display_height},
                                             p_pic->date)) == 0)
                 break;
@@ -717,14 +724,17 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
         }
     }
 
+fail:
+    for (unsigned int i = 0; i != SUBS_MAX && sys->subpic_bufs[i] != NULL; ++i) {
+        mmal_buffer_header_release(sys->subpic_bufs[i]);
+        sys->subpic_bufs[i] = NULL;
+    }
+
     picture_Release(p_pic);
 
     if (sys->next_phase_check == 0 && sys->adjust_refresh_rate)
         maintain_phase_sync(vd);
     sys->next_phase_check = (sys->next_phase_check + 1) % PHASE_CHECK_INTERVAL;
-
-fail:
-    /* NOP */;
 }
 
 static int vd_control(vout_display_t *vd, int query, va_list args)
@@ -811,9 +821,9 @@ static void vd_manage(vout_display_t *vd)
 
 
 static int attach_subpics(vout_display_t * const vd, vout_display_sys_t * const sys,
-                          picture_t * const p_pic, subpicture_t * const subpicture)
+                          subpicture_t * const subpicture)
 {
-    bool first = true;
+    unsigned int n = 0;
 
     if (sys->vzc == NULL) {
         if ((sys->vzc = hw_mmal_vzc_pool_new()) == NULL)
@@ -841,20 +851,19 @@ static int attach_subpics(vout_display_t * const vd, vout_display_sys_t * const 
                     str_fourcc(dbuf0, src->format.i_chroma));
 #endif
 
-            MMAL_BUFFER_HEADER_T * const buf = hw_mmal_vzc_buf_from_pic(sys->vzc,
+            if ((sys->subpic_bufs[n] = hw_mmal_vzc_buf_from_pic(sys->vzc,
                 src,
                 (MMAL_RECT_T){.width = vd->cfg->display.width, .height=vd->cfg->display.height},
                 sreg->i_x, sreg->i_y,
                 sreg->i_alpha,
-                first);
-            if (buf == NULL) {
+                n == 0)) == NULL)
+            {
                 msg_Err(vd, "Failed to allocate vzc buffer for subpic");
                 return VLC_ENOMEM;
             }
 
-            hw_mmal_pic_sub_buf_add(p_pic, buf);
-
-            first = false;
+            if (++n == SUBS_MAX)
+                return VLC_SUCCESS;
         }
     }
     return VLC_SUCCESS;
@@ -875,9 +884,10 @@ static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
     vd_manage(vd);
 
     // Subpics can either turn up attached to the main pic or in the
-    // subpic list here  - if they turn up here then attach to pic
-    if (subpicture != NULL && !want_copy(vd)) {  //**** Copy has bust subs
-        attach_subpics(vd, sys, p_pic, subpicture);
+    // subpic list here  - if they turn up here then process inrto temp
+    // buffers
+    if (subpicture != NULL) {
+        attach_subpics(vd, sys, subpicture);
     }
 
     // *****
@@ -1131,27 +1141,29 @@ static void CloseMmalVout(vlc_object_t *object)
 
     vc_tv_unregister_callback_full(tvservice_cb, vd);
 
-    if (sys->component && sys->component->control->is_enabled)
-        mmal_port_disable(sys->component->control);
+    // Shouldn't be anything here - but just in case
+    for (unsigned int i = 0; i != SUBS_MAX; ++i)
+        if (sys->subpic_bufs[i] != NULL)
+            mmal_buffer_header_release(sys->subpic_bufs[i]);
 
-    {
-        unsigned int i;
-        for (i = 0; i != SUBS_MAX; ++i) {
-            vout_subpic_t * const sub = sys->subs + i;
-            if (sub->component != NULL) {
-                hw_mmal_subpic_close(VLC_OBJECT(vd), &sub->sub);
-                if (sub->component->control->is_enabled)
-                    mmal_port_disable(sub->component->control);
-                if (sub->component->is_enabled)
-                    mmal_component_disable(sub->component);
-                mmal_component_release(sub->component);
-                sub->component = NULL;
-            }
+    for (unsigned int i = 0; i != SUBS_MAX; ++i) {
+        vout_subpic_t * const sub = sys->subs + i;
+        if (sub->component != NULL) {
+            hw_mmal_subpic_close(VLC_OBJECT(vd), &sub->sub);
+            if (sub->component->control->is_enabled)
+                mmal_port_disable(sub->component->control);
+            if (sub->component->is_enabled)
+                mmal_component_disable(sub->component);
+            mmal_component_release(sub->component);
+            sub->component = NULL;
         }
     }
 
     if (sys->input && sys->input->is_enabled)
         mmal_port_disable(sys->input);
+
+    if (sys->component && sys->component->control->is_enabled)
+        mmal_port_disable(sys->component->control);
 
     if (sys->copy_buf != NULL)
         mmal_buffer_header_release(sys->copy_buf);

@@ -105,13 +105,13 @@ static void conv_subpic_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 
 
 int hw_mmal_subpic_update(vlc_object_t * const p_filter,
-    picture_t * const p_pic, const unsigned int sub_no,
+    MMAL_BUFFER_HEADER_T * const sub_buf,
     subpic_reg_stash_t * const spe,
+    const video_format_t * const fmt,
     const MMAL_RECT_T * const scale_out,
     const uint64_t pts)
 {
     MMAL_STATUS_T err;
-    MMAL_BUFFER_HEADER_T * const sub_buf = hw_mmal_pic_sub_buf_get(p_pic, sub_no);
 
     if (sub_buf == NULL)
     {
@@ -157,12 +157,11 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
             MMAL_DISPLAYREGION_T * const dreg = hw_mmal_vzc_buf_region(sub_buf);
             MMAL_VIDEO_FORMAT_T *const v_fmt = &spe->port->format->es->video;
 
-            v_fmt->frame_rate.den = p_pic->format.i_frame_rate_base;
-            v_fmt->frame_rate.num = p_pic->format.i_frame_rate;
-            v_fmt->par.den = p_pic->format.i_sar_den;
-            v_fmt->par.num = p_pic->format.i_sar_num;
+            v_fmt->frame_rate.den = fmt->i_frame_rate_base;
+            v_fmt->frame_rate.num = fmt->i_frame_rate;
+            v_fmt->par.den        = fmt->i_sar_den;
+            v_fmt->par.num        = fmt->i_sar_num;
             v_fmt->color_space = MMAL_COLOR_SPACE_UNKNOWN;
-
 
             if (needs_update || dreg->alpha != spe->alpha || !cmp_rect(&dreg->dest_rect, &spe->dest_rect)) {
 
