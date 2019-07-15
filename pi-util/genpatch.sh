@@ -1,6 +1,6 @@
 set -e
 
-NOPATCH=0
+NOPATCH=
 if [ "$1" == "--notag" ]; then
   shift
   NOPATCH=1
