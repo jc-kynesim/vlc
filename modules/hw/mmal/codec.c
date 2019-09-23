@@ -34,7 +34,6 @@
 #include <vlc_filter.h>
 #include <vlc_threads.h>
 
-#include <bcm_host.h>
 #include <interface/mmal/mmal.h>
 #include <interface/mmal/util/mmal_util.h>
 #include <interface/mmal/util/mmal_default_components.h>
@@ -273,7 +272,7 @@ static picture_t * alloc_opaque_pic(decoder_t * const dec, MMAL_BUFFER_HEADER_T 
         goto fail2;
     }
 
-    if ((pic->context = hw_mmal_gen_context(MMAL_ENCODING_OPAQUE, buf, dec_sys->ppr)) == NULL)
+    if ((pic->context = hw_mmal_gen_context(buf, dec_sys->ppr)) == NULL)
         goto fail2;
 
     buf_to_pic_copy_props(pic, buf);
@@ -746,8 +745,6 @@ static void CloseDecoder(decoder_t *dec)
 
     vlc_mutex_destroy(&sys->pic_lock);
     free(sys);
-
-    bcm_host_deinit();
 }
 
 static int OpenDecoder(decoder_t *dec)
@@ -757,7 +754,7 @@ static int OpenDecoder(decoder_t *dec)
     MMAL_STATUS_T status;
     const MMAL_FOURCC_T in_fcc = vlc_to_mmal_es_fourcc(dec->fmt_in.i_codec);
 
-#if TRACE_ALL
+#if TRACE_ALL || 1
     {
         char buf1[5], buf2[5], buf2a[5];
         char buf3[5], buf4[5];
@@ -782,8 +779,6 @@ static int OpenDecoder(decoder_t *dec)
     }
     dec->p_sys = sys;
     vlc_mutex_init(&sys->pic_lock);
-
-    bcm_host_init();
 
     if ((sys->vcsm_init_type = cma_vcsm_init()) == VCSM_INIT_NONE) {
         msg_Err(dec, "VCSM init failed");
@@ -947,7 +942,7 @@ typedef struct filter_sys_t {
     MMAL_POOL_T *out_pool;  // Free output buffers
     MMAL_POOL_T *in_pool;   // Input pool to get BH for replication
 
-    cma_pool_fixed_t * cma_out_pool;
+    cma_buf_pool_t * cma_out_pool;
 
     subpic_reg_stash_t subs[SUBS_MAX];
 
@@ -979,6 +974,7 @@ typedef struct filter_sys_t {
         unsigned int line;  // Lines filled
     } slice;
 
+    vcsm_init_type_t vcsm_init_type;
 } filter_sys_t;
 
 
@@ -992,7 +988,7 @@ static MMAL_STATUS_T pic_to_format(MMAL_ES_FORMAT_T * const es_fmt, const pictur
     es_fmt->encoding_variant = 0;
 
     // Fill in crop etc.
-    vlc_to_mmal_video_fmt(es_fmt, &pic->format);
+    hw_mmal_vlc_fmt_to_mmal_fmt(es_fmt, &pic->format);
     // Override width / height with strides if appropriate
     if (bpp != 0) {
         v_fmt->width = pic->p[0].i_pitch / bpp;
@@ -1022,7 +1018,7 @@ static MMAL_STATUS_T conv_enable_out(filter_t * const p_filter, filter_sys_t * c
     if (sys->is_cma)
     {
         if (sys->cma_out_pool == NULL &&
-            (sys->cma_out_pool = cma_buf_pool_new()) == NULL)
+            (sys->cma_out_pool = cma_buf_pool_new(5, 5, true)) == NULL)
         {
             msg_Err(p_filter, "Failed to alloc cma buf pool");
             return MMAL_ENOMEM;
@@ -1092,54 +1088,6 @@ static void conv_out_q_pic(filter_sys_t * const sys, picture_t * const pic)
     vlc_sem_post(&sys->sem);
 }
 
-static const uint8_t shift_00[] = {0,0,0,0};
-static const uint8_t shift_01[] = {0,1,1,1};
-
-static int cma_pic_set_data(filter_t * const p_filter, picture_t * const pic, const MMAL_BUFFER_HEADER_T * const buf)
-{
-    filter_sys_t *const sys = p_filter->p_sys;
-    const MMAL_VIDEO_FORMAT_T * const mm_fmt = &sys->output->format->es->video;
-    const MMAL_BUFFER_HEADER_VIDEO_SPECIFIC_T *const buf_vid = &buf->type->video;
-
-    uint8_t * const data = cma_buf_pic_addr(pic);
-    if (data == NULL) {
-        return VLC_ENOMEM;
-    }
-
-    const uint8_t * ws = shift_00;
-    const uint8_t * hs = shift_00;
-    int pb = 1;
-
-    switch (p_filter->fmt_out.video.i_chroma)
-    {
-        case VLC_CODEC_MMAL_ZC_RGB32:
-            pb = 4;
-            break;
-
-        case VLC_CODEC_MMAL_ZC_I420:
-        case VLC_CODEC_MMAL_ZC_SAND8:
-            hs = shift_01;
-            break;
-
-        default:
-            msg_Err(p_filter, "%s: Unexpected format", __func__);
-            return VLC_EGENERIC;
-    }
-
-    pic->i_planes = buf_vid->planes;
-    for (unsigned int i = 0; i != buf_vid->planes; ++i) {
-        pic->p[i] = (plane_t){
-            .p_pixels = data + buf_vid->offset[i],
-            .i_lines = mm_fmt->height >> hs[i],
-            .i_pitch = buf_vid->pitch[i],
-            .i_pixel_pitch = pb,
-            .i_visible_lines = mm_fmt->crop.height >> hs[i],
-            .i_visible_pitch = mm_fmt->crop.width >> ws[i]
-        };
-    }
-    return VLC_SUCCESS;
-}
-
 static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 {
     filter_t * const p_filter = (filter_t *)port->userdata;
@@ -1161,14 +1109,14 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 #if TRACE_ALL
             msg_Dbg(p_filter, "%s: Buffer has no data", __func__);
 #endif
-            picture_Release(pic);
         }
         else
         {
             buf_to_pic_copy_props(pic, buf);
 
+            // Set pic data pointers from buf aux info now it has it
             if (sys->is_cma) {
-                if (cma_pic_set_data(p_filter, pic, buf) != VLC_SUCCESS)
+                if (cma_pic_set_data(pic, sys->output->format, buf) != VLC_SUCCESS)
                     msg_Err(p_filter, "Failed to set data");
             }
 
@@ -1178,11 +1126,12 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
             draw_square(pic->p[0].p_pixels, pic->p[0].i_pitch / 4, 32, 0, 32, 32, 0xff00ff00);
             draw_square(pic->p[0].p_pixels, pic->p[0].i_pitch / 4, 64, 0, 32, 32, 0xff0000ff);
 #endif
+
+            buf->user_data = NULL;  // Responsability for this pic no longer with buffer
             conv_out_q_pic(sys, pic);
         }
     }
 
-    buf->user_data = NULL; // Zap here to make sure we can't reuse later
     mmal_buffer_header_release(buf);
 }
 
@@ -1367,6 +1316,21 @@ static void conv_stash_fixup(filter_t * const p_filter, filter_sys_t * const sys
     }
 }
 
+// Output buffers may contain a pic ref on error or flush
+// Free it
+static MMAL_BOOL_T out_buffer_pre_release_cb(MMAL_BUFFER_HEADER_T *header, void *userdata)
+{
+    VLC_UNUSED(userdata);
+
+    picture_t * const pic = header->user_data;
+    header->user_data = NULL;
+
+    if (pic != NULL)
+        picture_Release(pic);
+
+    return MMAL_FALSE;
+}
+
 static MMAL_STATUS_T conv_set_output(filter_t * const p_filter, filter_sys_t * const sys, picture_t * const pic)
 {
     MMAL_STATUS_T status;
@@ -1375,11 +1339,11 @@ static MMAL_STATUS_T conv_set_output(filter_t * const p_filter, filter_sys_t * c
     sys->output->format->type = MMAL_ES_TYPE_VIDEO;
     sys->output->format->encoding = vlc_to_mmal_video_fourcc(&p_filter->fmt_out.video);
     sys->output->format->encoding_variant = 0;
-    vlc_to_mmal_video_fmt(sys->output->format, &p_filter->fmt_out.video);
+    hw_mmal_vlc_fmt_to_mmal_fmt(sys->output->format, &p_filter->fmt_out.video);
 
-    // Override default format width/height if we have a pic we need to match
     if (pic != NULL)
     {
+        // Override default format width/height if we have a pic we need to match
         if ((status = pic_to_format(sys->output->format, pic)) != MMAL_SUCCESS)
         {
             char cbuf[5];
@@ -1389,6 +1353,11 @@ static MMAL_STATUS_T conv_set_output(filter_t * const p_filter, filter_sys_t * c
 
         MMAL_VIDEO_FORMAT_T *fmt = &sys->output->format->es->video;
         msg_Dbg(p_filter, "%s: %dx%d [(0,0) %dx%d]", __func__, fmt->width, fmt->height, fmt->crop.width, fmt->crop.height);
+    }
+
+    if (sys->is_sliced) {
+        // Override height for slice
+        sys->output->format->es->video.height = MMAL_SLICE_HEIGHT;
     }
 
     mmal_log_dump_format(sys->output->format);
@@ -1416,6 +1385,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     MMAL_STATUS_T err;
     const uint64_t frame_seq = ++sys->frame_seq;
     conv_frame_stash_t * const stash = sys->stash + (frame_seq & 0xf);
+    MMAL_BUFFER_HEADER_T * out_buf = NULL;
 
 #if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s", __func__);
@@ -1437,6 +1407,15 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 
     if (sys->err_stream != MMAL_SUCCESS) {
         goto stream_fail;
+    }
+
+    // Check pic fmt corresponds to what we have set up
+    // ??? ISP may require flush (disable) but actually seems quite happy
+    //     without
+    if (hw_mmal_vlc_pic_to_mmal_fmt_update(sys->input->format, p_pic))
+    {
+        msg_Dbg(p_filter, "Reset input port format");
+        mmal_port_format_commit(sys->input);
     }
 
     if (p_pic->context == NULL) {
@@ -1477,6 +1456,8 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             // so no need to worry about actual pic dimensions here
             if ((err = conv_set_output(p_filter, sys, NULL)) != MMAL_SUCCESS)
                 goto fail;
+
+            sys->out_pool = mmal_port_pool_create(sys->output, sys->output->buffer_num, sys->output->buffer_size);
         }
         else {
             picture_t *pic = filter_NewPicture(p_filter);
@@ -1484,11 +1465,9 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             picture_Release(pic);
             if (err != MMAL_SUCCESS)
                 goto fail;
-        }
 
-        sys->out_pool = sys->is_sliced ?
-            mmal_port_pool_create(sys->output, sys->output->buffer_num, sys->output->buffer_size) :
-            mmal_pool_create(sys->output->buffer_num, 0);
+            sys->out_pool = mmal_pool_create(sys->output->buffer_num, 0);
+        }
 
         if (sys->out_pool == NULL) {
             msg_Err(p_filter, "Failed to create output pool");
@@ -1503,7 +1482,6 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 
     // If ZC then we need to allocate the out pic before we stuff the input
     if (sys->is_sliced) {
-        MMAL_BUFFER_HEADER_T * out_buf;
         picture_t * const out_pic = filter_NewPicture(p_filter);
 
         if (out_pic == NULL)
@@ -1526,42 +1504,51 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 
     // Stuff into input
     // We assume the BH is already set up with values reflecting pic date etc.
+    stash->pts = p_pic->date;
     {
-        MMAL_BUFFER_HEADER_T * const pic_buf = pic_mmal_buffer(p_pic);
-#if TRACE_ALL
-        msg_Dbg(p_filter, "In buf send: pic=%p, buf=%p, user=%p, pts=%lld/%lld",
-                p_pic, pic_buf, pic_buf->user_data, (long long)frame_seq, (long long)p_pic->date);
-#endif
+        MMAL_BUFFER_HEADER_T * const pic_buf = hw_mmal_pic_buf_replicated(p_pic, sys->in_pool);
+
+        // Whether or not we extracted the pic_buf we are done with the picture
+        picture_Release(p_pic);
+        p_pic = NULL;
+
         if (pic_buf == NULL) {
             msg_Err(p_filter, "Pic has no attached buffer");
             goto fail;
         }
 
-        stash->pts = p_pic->date;
-        if ((err = port_send_replicated(sys->input, sys->in_pool, pic_buf, frame_seq)) != MMAL_SUCCESS)
+        pic_buf->pts = frame_seq;
+
+        if ((err = mmal_port_send_buffer(sys->input, pic_buf)) != MMAL_SUCCESS)
         {
             msg_Err(p_filter, "Send buffer to input failed");
+            mmal_buffer_header_release(pic_buf);
             goto fail;
         }
 
-        picture_Release(p_pic);
-        p_pic = NULL;
         --sys->in_count;
     }
 
     if (!sys->is_sliced) {
-        MMAL_BUFFER_HEADER_T * out_buf;
 
         while ((out_buf = sys->in_count < 0 ?
                 mmal_queue_wait(sys->out_pool->queue) : mmal_queue_get(sys->out_pool->queue)) != NULL)
         {
             picture_t * const out_pic = filter_NewPicture(p_filter);
 
+            mmal_buffer_header_reset(out_buf);
+
             if (out_pic == NULL) {
                 msg_Warn(p_filter, "Failed to alloc new filter output pic");
                 mmal_buffer_header_release(out_buf);
+                out_buf = NULL;
                 break;
             }
+
+            // Attach out_pic to the buffer & ensure it is freed when the buffer is released
+            // On a good send callback the pic will be extracted to avoid this
+            out_buf->user_data = out_pic;
+            mmal_buffer_header_pre_release_cb_set(out_buf, out_buffer_pre_release_cb, NULL);
 
 #if 0
             char dbuf0[5];
@@ -1573,20 +1560,30 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                     out_pic->format.i_sar_num, out_pic->format.i_sar_den);
 #endif
 
-            mmal_buffer_header_reset(out_buf);
-            out_buf->user_data = out_pic;
 
             if (sys->is_cma) {
                 int rv;
-                if ((rv = cma_buf_pic_attach(sys->cma_out_pool, out_pic, sys->output->buffer_size)) != VLC_SUCCESS)
+
+                cma_buf_t * const cb = cma_buf_pool_alloc_buf(sys->cma_out_pool, sys->output->buffer_size);
+                if (cb == NULL) {
+                    char dbuf0[5];
+                    msg_Err(p_filter, "Failed to alloc CMA buf: fmt=%s, size=%d, err=%d",
+                            str_fourcc(dbuf0, out_pic->format.i_chroma),
+                            sys->output->buffer_size,
+                            rv);
+                    goto fail;
+                }
+
+                if ((rv = cma_buf_pic_attach(cb, out_pic)) != VLC_SUCCESS)
                 {
                     char dbuf0[5];
                     msg_Err(p_filter, "Failed to attach CMA to pic: fmt=%s err=%d",
                             str_fourcc(dbuf0, out_pic->format.i_chroma),
                             rv);
+                    cma_buf_unref(cb);
                     goto fail;
                 }
-                const unsigned int vc_h = cma_buf_pic_vc_handle(out_pic);
+                const unsigned int vc_h = cma_buf_vc_handle(cb);
                 if (vc_h == 0)
                 {
                     msg_Err(p_filter, "Pic has no vc handle");
@@ -1610,9 +1607,9 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             if ((err = mmal_port_send_buffer(sys->output, out_buf)) != MMAL_SUCCESS)
             {
                 msg_Err(p_filter, "Send buffer to output failed");
-                mmal_buffer_header_release(out_buf);
-                break;
+                goto fail;
             }
+            out_buf = NULL;
 
             ++sys->in_count;
         }
@@ -1677,6 +1674,11 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 stream_fail:
     msg_Err(p_filter, "MMAL error reported by callback");
 fail:
+#if TRACE_ALL
+    msg_Err(p_filter, ">>> %s: FAIL", __func__);
+#endif
+    if (out_buf != NULL)
+        mmal_buffer_header_release(out_buf);
     if (p_pic != NULL)
         picture_Release(p_pic);
     conv_flush(p_filter);
@@ -1735,6 +1737,8 @@ static void CloseConverter(vlc_object_t * obj)
     if (sys->component)
         mmal_component_release(sys->component);
 
+    cma_vcsm_exit(sys->vcsm_init_type);
+
     vlc_sem_destroy(&sys->sem);
     vlc_mutex_destroy(&sys->lock);
 
@@ -1779,9 +1783,8 @@ static int OpenConverter(vlc_object_t * obj)
     bool use_isp;
     int gpu_mem;
 
-    if ((enc_in != MMAL_ENCODING_OPAQUE &&
-         enc_in != MMAL_ENCODING_YUVUV128 &&
-         enc_in != MMAL_ENCODING_YUVUV64_10) ||
+    // At least in principle we should deal with any mmal format as input
+    if (!hw_mmal_chroma_is_mmal(p_filter->fmt_in.video.i_chroma) ||
         (enc_out = vlc_to_mmal_video_fourcc(&p_filter->fmt_out.video)) == 0)
         return VLC_EGENERIC;
 
@@ -1806,6 +1809,11 @@ retry:
     // HVS can't do I420
     if (enc_out == MMAL_ENCODING_I420) {
         use_isp = true;
+    }
+    // Only HVS can deal with SAND30
+    if (enc_in == MMAL_ENCODING_YUV10_COL) {
+        if (use_isp || use_resizer)
+            return VLC_EGENERIC;
     }
 
 
@@ -1856,6 +1864,11 @@ retry:
 
     sys->in_port_cb_fn = conv_input_port_cb;
 
+    if ((sys->vcsm_init_type = cma_vcsm_init()) == VCSM_INIT_NONE) {
+        msg_Err(p_filter, "VCSM init failed");
+        goto fail;
+    }
+
     if (use_resizer) {
         sys->resizer_type = FILTER_RESIZER_RESIZER;
         sys->is_sliced = true;
@@ -1902,7 +1915,7 @@ retry:
     sys->input->format->type = MMAL_ES_TYPE_VIDEO;
     sys->input->format->encoding = enc_in;
     sys->input->format->encoding_variant = MMAL_ENCODING_I420;
-    vlc_to_mmal_video_fmt(sys->input->format, &p_filter->fmt_in.video);
+    hw_mmal_vlc_fmt_to_mmal_fmt(sys->input->format, &p_filter->fmt_in.video);
     port_parameter_set_bool(sys->input, MMAL_PARAMETER_ZERO_COPY, 1);
 
     mmal_log_dump_format(sys->input->format);
@@ -1975,6 +1988,7 @@ fail:
 typedef struct blend_sys_s {
     vzc_pool_ctl_t * vzc;
     const picture_t * last_dst;  // Not a ref, just a hint that we have a new pic
+    vcsm_init_type_t vcsm_init_type;
 } blend_sys_t;
 
 static void FilterBlendMmal(filter_t *p_filter,
@@ -2021,14 +2035,26 @@ static void FlushBlendMmal(filter_t * p_filter)
     hw_mmal_vzc_pool_flush(sys->vzc);
 }
 
+static void CloseBlendMmal(vlc_object_t *object)
+{
+    filter_t * const p_filter = (filter_t *)object;
+    blend_sys_t * const sys = (blend_sys_t *)p_filter->p_sys;
+
+    if (sys != NULL) {
+        p_filter->p_sys = NULL;
+
+        hw_mmal_vzc_pool_release(sys->vzc);
+        cma_vcsm_exit(sys->vcsm_init_type);
+        free(sys);
+    }
+}
+
 static int OpenBlendMmal(vlc_object_t *object)
 {
     filter_t * const p_filter = (filter_t *)object;
     const vlc_fourcc_t vfcc_dst = p_filter->fmt_out.video.i_chroma;
 
-    if ((vfcc_dst != VLC_CODEC_MMAL_OPAQUE &&
-         vfcc_dst != VLC_CODEC_MMAL_ZC_SAND8 &&
-         vfcc_dst != VLC_CODEC_MMAL_ZC_SAND10) ||
+    if (!hw_mmal_chroma_is_mmal(vfcc_dst) ||
         !hw_mmal_vzc_subpic_fmt_valid(&p_filter->fmt_in.video))
     {
         return VLC_EGENERIC;
@@ -2050,27 +2076,26 @@ static int OpenBlendMmal(vlc_object_t *object)
         blend_sys_t * const sys = calloc(1, sizeof (*sys));
         if (sys == NULL)
             return VLC_ENOMEM;
-        if ((sys->vzc = hw_mmal_vzc_pool_new()) == NULL)
-        {
-            free(sys);
-            return VLC_ENOMEM;
-        }
+
         p_filter->p_sys = (filter_sys_t *)sys;
+
+        if ((sys->vcsm_init_type = cma_vcsm_init()) == VCSM_INIT_NONE) {
+            msg_Err(p_filter, "VCSM init failed");
+            goto fail;
+        }
+
+        if ((sys->vzc = hw_mmal_vzc_pool_new()) == NULL)
+            goto fail;
     }
 
     p_filter->pf_video_blend = FilterBlendMmal;
     p_filter->pf_flush = FlushBlendMmal;
 
     return VLC_SUCCESS;
-}
 
-static void CloseBlendMmal(vlc_object_t *object)
-{
-    filter_t * const p_filter = (filter_t *)object;
-    blend_sys_t * const sys = (blend_sys_t *)p_filter->p_sys;
-
-    hw_mmal_vzc_pool_release(sys->vzc);
-    free(sys);
+fail:
+    CloseBlendMmal(VLC_OBJECT(p_filter));
+    return VLC_ENOMEM;
 }
 
 // ---------------------------------------------------------------------------

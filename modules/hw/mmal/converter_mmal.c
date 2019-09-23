@@ -26,28 +26,13 @@
 
 #include <assert.h>
 
-#define OPT_SAND 0
-#define OPT_I420 1
-#define OPT_RGB32 0
-
-
-#if OPT_SAND
-#define FMT_IN VLC_CODEC_MMAL_ZC_SAND8
-#elif OPT_I420
-#define FMT_IN VLC_CODEC_MMAL_ZC_I420
-#elif OPT_RGB32
-#define FMT_IN VLC_CODEC_MMAL_ZC_RGB32
-#elif
-#error Missing input format
-#endif
-
 #define TRACE_ALL 0
 
 typedef struct mmal_gl_converter_s
 {
     EGLint drm_fourcc;
     vcsm_init_type_t vcsm_init_type;
-    struct cma_pic_context_s * last_ctx_ref;
+    cma_buf_t * last_cb;
 
     PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
 } mmal_gl_converter_t;
@@ -64,7 +49,7 @@ static EGLint vlc_to_gl_fourcc(const video_format_t * const fmt)
           return MMAL_FOURCC('Y','V','1','2');
        case MMAL_ENCODING_I422:
           return MMAL_FOURCC('Y','U','1','6');
-       case MMAL_ENCODING_YUVUV128:
+//       case MMAL_ENCODING_YUVUV128:  // Doesn't actually work yet
        case MMAL_ENCODING_NV12:
           return MMAL_FOURCC('N','V','1','2');
        case MMAL_ENCODING_NV21:
@@ -111,11 +96,10 @@ static picture_context_t * tex_context_copy(picture_context_t * pic_ctx)
     return pic_ctx;
 }
 
-static tex_context_t * get_tex_context(const opengl_tex_converter_t * const tc, picture_t * const pic)
+static tex_context_t * get_tex_context(const opengl_tex_converter_t * const tc, picture_t * const pic, cma_buf_t * const cb)
 {
     mmal_gl_converter_t * const sys = tc->priv;
-
-    tex_context_t * tex = (tex_context_t *)cma_buf_pic_context2(pic);
+    tex_context_t * tex = (tex_context_t *)cma_buf_context2(cb);
     if (tex != NULL)
         return tex;
 
@@ -134,12 +118,12 @@ static tex_context_t * get_tex_context(const opengl_tex_converter_t * const tc, 
     {
         EGLint attribs[30];
         EGLint * a = attribs;
-        const int fd = cma_buf_pic_fd(pic);
-        uint8_t * base_addr = cma_buf_pic_addr(pic);
+        const int fd = cma_buf_fd(cb);
+        uint8_t * base_addr = cma_buf_addr(cb);
 
         if (pic->i_planes >= 4 || pic->i_planes <= 0)
         {
-            msg_Err(tc, "%s: Bad planes", __func__);
+            msg_Err(tc, "%s: Bad planes: %d", __func__, pic->i_planes);
             goto fail;
         }
 
@@ -232,7 +216,7 @@ static tex_context_t * get_tex_context(const opengl_tex_converter_t * const tc, 
         tc->gl->egl.destroyImageKHR(tc->gl, image);
     }
 
-    if (cma_buf_pic_add_context2(pic, &tex->cmn) != VLC_SUCCESS)
+    if (cma_buf_add_context2(cb, &tex->cmn) != VLC_SUCCESS)
     {
         msg_Err(tc, "%s: add_context2 failed", __func__);
         goto fail;
@@ -252,7 +236,12 @@ tc_mmal_update(const opengl_tex_converter_t *tc, GLuint *textures,
 {
     mmal_gl_converter_t * const sys = tc->priv;
 #if TRACE_ALL
-    msg_Err(tc, "%s: %d*%dx%d : %d*%dx%d", __func__, tc->tex_count, tex_width[0], tex_height[0], pic->i_planes, pic->p[0].i_pitch, pic->p[0].i_lines);
+    {
+        char cbuf[5];
+        msg_Dbg(tc, "%s: %s %d*%dx%d : %d*%dx%d", __func__,
+                str_fourcc(cbuf, pic->format.i_chroma),
+                tc->tex_count, tex_width[0], tex_height[0], pic->i_planes, pic->p[0].i_pitch, pic->p[0].i_lines);
+    }
 #endif
     VLC_UNUSED(tex_width);
     VLC_UNUSED(tex_height);
@@ -265,14 +254,21 @@ tc_mmal_update(const opengl_tex_converter_t *tc, GLuint *textures,
         return VLC_EGENERIC;
     }
 
-    tex_context_t * const tex = get_tex_context(tc, pic);
+    cma_buf_t * const cb = cma_buf_pic_get(pic);
+    if (cb == NULL)
+    {
+        msg_Err(tc, "Pic missing cma buf");
+        return VLC_EGENERIC;
+    }
+
+    tex_context_t * const tex = get_tex_context(tc, pic, cb);
     if (tex == NULL)
         return VLC_EGENERIC;
 
 //    tc->vt->BindTexture(GL_TEXTURE_EXTERNAL_OES, tex->texture);
 
-    cma_buf_pic_context_unref(sys->last_ctx_ref);  // ?? Needed ??
-    sys->last_ctx_ref = cma_buf_pic_context_ref(pic);
+    cma_buf_unref(sys->last_cb);
+    sys->last_cb = cma_buf_ref(cb);
 
     textures[0] = tex->texture;
     return VLC_SUCCESS;
@@ -339,10 +335,32 @@ CloseGLConverter(vlc_object_t *obj)
     if (sys == NULL)
         return;
 
-    cma_buf_pic_context_unref(sys->last_ctx_ref);
+    cma_buf_unref(sys->last_cb);
     cma_vcsm_exit(sys->vcsm_init_type);
     free(sys);
 }
+
+
+// Pick a chroma that we can convert to
+// Prefer I420 as smallest
+static vlc_fourcc_t chroma_in_out(const vlc_fourcc_t chroma_in)
+{
+    switch (chroma_in)
+    {
+        case VLC_CODEC_MMAL_OPAQUE:
+        case VLC_CODEC_MMAL_ZC_I420:
+        case VLC_CODEC_MMAL_ZC_SAND8:
+        case VLC_CODEC_MMAL_ZC_SAND10:   // ISP only
+            return VLC_CODEC_MMAL_ZC_I420;
+        case VLC_CODEC_MMAL_ZC_SAND30:   // HVS only
+        case VLC_CODEC_MMAL_ZC_RGB32:
+            return VLC_CODEC_MMAL_ZC_RGB32;
+        default:
+            break;
+    }
+    return 0;
+}
+
 
 static int
 OpenGLConverter(vlc_object_t *obj)
@@ -350,12 +368,22 @@ OpenGLConverter(vlc_object_t *obj)
     opengl_tex_converter_t * const tc = (opengl_tex_converter_t *)obj;
     int rv = VLC_EGENERIC;
     const EGLint eglfmt = vlc_to_gl_fourcc(&tc->fmt);
+    const vlc_fourcc_t chroma_out = chroma_in_out(tc->fmt.i_chroma);
 
-    // Accept Opaque (as it can definitely be converted) or what we actually want
-    if (!(tc->fmt.i_chroma == FMT_IN ||
-          tc->fmt.i_chroma == VLC_CODEC_MMAL_OPAQUE))
-    {
+    // Do we know what to do with this?
+    if (chroma_out == 0)
         return rv;
+
+    {
+        char dbuf0[5], dbuf1[5], dbuf2[5];
+        msg_Dbg(tc, "<<< %s: V:%s/E:%s,%dx%d [(%d,%d) %d/%d] sar:%d/%d -> %s", __func__,
+                str_fourcc(dbuf0, tc->fmt.i_chroma),
+                str_fourcc(dbuf1, eglfmt),
+                tc->fmt.i_width, tc->fmt.i_height,
+                tc->fmt.i_x_offset, tc->fmt.i_y_offset,
+                tc->fmt.i_visible_width, tc->fmt.i_visible_height,
+                tc->fmt.i_sar_num, tc->fmt.i_sar_den,
+                str_fourcc(dbuf2, chroma_out));
     }
 
     if (tc->gl->ext != VLC_GL_EXT_EGL ||
@@ -364,17 +392,6 @@ OpenGLConverter(vlc_object_t *obj)
         // Missing an important callback
         msg_Dbg(tc, "Missing EGL xxxImageKHR calls");
         return rv;
-    }
-
-    {
-        char dbuf0[5], dbuf1[5];
-        msg_Dbg(tc, ">>> %s: V:%s/E:%s,%dx%d [(%d,%d) %d/%d] sar:%d/%d", __func__,
-                str_fourcc(dbuf0, tc->fmt.i_chroma),
-                str_fourcc(dbuf1, eglfmt),
-                tc->fmt.i_width, tc->fmt.i_height,
-                tc->fmt.i_x_offset, tc->fmt.i_y_offset,
-                tc->fmt.i_visible_width, tc->fmt.i_visible_height,
-                tc->fmt.i_sar_num, tc->fmt.i_sar_den);
     }
 
     if ((tc->priv = calloc(1, sizeof(mmal_gl_converter_t))) == NULL)
@@ -408,7 +425,7 @@ OpenGLConverter(vlc_object_t *obj)
 
     if (eglfmt == 0)
     {
-        tc->fmt.i_chroma = FMT_IN;
+        tc->fmt.i_chroma = chroma_out;
         tc->fmt.i_bits_per_pixel = 8;
         if (tc->fmt.i_chroma == VLC_CODEC_MMAL_ZC_RGB32)
         {
@@ -429,6 +446,21 @@ OpenGLConverter(vlc_object_t *obj)
 
     tc->handle_texs_gen = true;  // We manage the texs
     tc->pf_update  = tc_mmal_update;
+
+#if TRACE_ALL
+    {
+        char dbuf0[5], dbuf1[5], dbuf2[5];
+        msg_Dbg(tc, ">>> %s: V:%s/E:%s,%dx%d [(%d,%d) %d/%d] sar:%d/%d -> %s", __func__,
+                str_fourcc(dbuf0, tc->fmt.i_chroma),
+                str_fourcc(dbuf1, sys->drm_fourcc),
+                tc->fmt.i_width, tc->fmt.i_height,
+                tc->fmt.i_x_offset, tc->fmt.i_y_offset,
+                tc->fmt.i_visible_width, tc->fmt.i_visible_height,
+                tc->fmt.i_sar_num, tc->fmt.i_sar_den,
+                str_fourcc(dbuf2, chroma_out));
+    }
+#endif
+
     return VLC_SUCCESS;
 
 fail:

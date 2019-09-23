@@ -29,6 +29,8 @@
 #include <vlc_common.h>
 #include <interface/mmal/mmal.h>
 
+#include "mmal_cma.h"
+
 /* Think twice before changing this. Incorrect values cause havoc. */
 #define NUM_ACTUAL_OPAQUE_BUFFERS 30
 
@@ -54,31 +56,24 @@ typedef struct pic_ctx_subpic_s {
 
 
 #define CTX_BUFS_MAX 4
-
 typedef struct pic_ctx_mmal_s {
     picture_context_t cmn;  // PARENT: Common els at start
 
-    MMAL_FOURCC_T fmt;
+    cma_buf_t * cb;
 
     unsigned int buf_count;
     MMAL_BUFFER_HEADER_T * bufs[CTX_BUFS_MAX];
 
-#if 0
-    MMAL_BUFFER_HEADER_T * buf;
-    hw_mmal_port_pool_ref_t * ppr;
-
-    MMAL_BUFFER_HEADER_T * sub_bufs;
-    MMAL_BUFFER_HEADER_T * sub_tail;
-
-    vlc_object_t * obj;
-#endif
 } pic_ctx_mmal_t;
 
 const char * str_fourcc(char * const buf, const unsigned int fcc);
 
 MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc);
 MMAL_FOURCC_T vlc_to_mmal_color_space(const video_color_space_t vlc_cs);
-void vlc_to_mmal_video_fmt(MMAL_ES_FORMAT_T *const es_fmt, const video_frame_format_t * const vf_vlc);
+void hw_mmal_vlc_fmt_to_mmal_fmt(MMAL_ES_FORMAT_T *const es_fmt, const video_frame_format_t * const vf_vlc);
+// Returns true if fmt_changed
+// frame_rate ignored for compare, but is set if something else is updated
+bool hw_mmal_vlc_pic_to_mmal_fmt_update(MMAL_ES_FORMAT_T *const es_fmt, const picture_t * const pic);
 
 hw_mmal_port_pool_ref_t * hw_mmal_port_pool_ref_create(MMAL_PORT_T * const port,
    const unsigned int headers, const uint32_t payload_size);
@@ -119,24 +114,25 @@ static inline MMAL_BUFFER_HEADER_T * hw_mmal_pic_sub_buf_get(picture_t * const p
     return n + 1 > ctx->buf_count ? NULL : ctx->bufs[n + 1];
 }
 
-static inline bool hw_mmal_pic_is_mmal(const picture_t * const pic)
+static inline bool hw_mmal_chroma_is_mmal(const vlc_fourcc_t chroma)
 {
-    return pic->format.i_chroma == VLC_CODEC_MMAL_OPAQUE ||
-        pic->format.i_chroma == VLC_CODEC_MMAL_ZC_SAND8 ||
-        pic->format.i_chroma == VLC_CODEC_MMAL_ZC_SAND10 ||
-        pic->format.i_chroma == VLC_CODEC_MMAL_ZC_I420 ||
-        pic->format.i_chroma == VLC_CODEC_MMAL_ZC_RGB32;
+    return
+        chroma == VLC_CODEC_MMAL_OPAQUE ||
+        chroma == VLC_CODEC_MMAL_ZC_SAND8 ||
+        chroma == VLC_CODEC_MMAL_ZC_SAND10 ||
+        chroma == VLC_CODEC_MMAL_ZC_SAND30 ||
+        chroma == VLC_CODEC_MMAL_ZC_I420 ||
+        chroma == VLC_CODEC_MMAL_ZC_RGB32;
 }
 
-static inline MMAL_FOURCC_T hw_mmal_pic_format(const picture_t *const pic)
+static inline bool hw_mmal_pic_is_mmal(const picture_t * const pic)
 {
-    const pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic->context;
-    return ctx->fmt;
+    return hw_mmal_chroma_is_mmal(pic->format.i_chroma);
 }
 
 picture_context_t * hw_mmal_pic_ctx_copy(picture_context_t * pic_ctx_cmn);
 void hw_mmal_pic_ctx_destroy(picture_context_t * pic_ctx_cmn);
-picture_context_t * hw_mmal_gen_context(const MMAL_FOURCC_T fmt,
+picture_context_t * hw_mmal_gen_context(
     MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const ppr);
 
 int hw_mmal_get_gpu_mem(void);
@@ -184,6 +180,7 @@ static inline MMAL_STATUS_T port_send_replicated(MMAL_PORT_T * const port, MMAL_
     return MMAL_SUCCESS;
 }
 
+
 static inline void pic_to_buf_copy_props(MMAL_BUFFER_HEADER_T * const buf, const picture_t * const pic)
 {
     if (!pic->b_progressive)
@@ -222,16 +219,7 @@ static inline void buf_to_pic_copy_props(picture_t * const pic, const MMAL_BUFFE
             VLC_TICK_INVALID;
 }
 
-// Retrieve buf from pic & update with pic props
-// Note that this is a weak pointer - replicate before putting in a Q
-static inline MMAL_BUFFER_HEADER_T * pic_mmal_buffer(const picture_t *const pic)
-{
-    MMAL_BUFFER_HEADER_T * const buf = ((pic_ctx_mmal_t *)pic->context)->bufs[0];
-    if (buf != NULL)
-        pic_to_buf_copy_props(buf, pic);
-
-    return buf;
-}
+MMAL_BUFFER_HEADER_T * hw_mmal_pic_buf_replicated(const picture_t *const pic, MMAL_POOL_T * const rep_pool);
 
 struct vzc_pool_ctl_s;
 typedef struct vzc_pool_ctl_s vzc_pool_ctl_t;
@@ -276,6 +264,29 @@ static inline MMAL_RECT_T vis_mmal_rect(const video_format_t * const fmt)
         .height = fmt->i_visible_height
     };
 }
+
+int cma_pic_set_data(picture_t * const pic,
+                    const MMAL_ES_FORMAT_T * const mm_esfmt,
+                    const MMAL_BUFFER_HEADER_T * const buf);
+
+int cma_buf_pic_attach(cma_buf_t * const cb, picture_t * const pic);
+// Returns a pointer to the cma_buf attached to the pic
+// Just a pointer - doesn't add a ref
+cma_buf_t * cma_buf_pic_get(picture_t * const pic);
+
+static inline bool is_cma_buf_pic_chroma(const uint32_t chroma)
+{
+    return chroma == VLC_CODEC_MMAL_ZC_RGB32 ||
+        chroma == VLC_CODEC_MMAL_ZC_SAND8 ||
+        chroma == VLC_CODEC_MMAL_ZC_SAND10 ||
+        chroma == VLC_CODEC_MMAL_ZC_SAND30 ||
+        chroma == VLC_CODEC_MMAL_ZC_I420;
+}
+
+
+int rpi_get_model_type(void);
+bool rpi_is_model_pi4(void);
+bool rpi_is_fkms_active(void);
 
 typedef enum vcsm_init_type_e {
     VCSM_INIT_NONE = 0,

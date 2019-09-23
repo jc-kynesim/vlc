@@ -190,9 +190,9 @@ static void mmal_x11_display(vout_display_t * vd, picture_t * pic, subpicture_t 
 {
     mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
     vout_display_t * const x_vd = sys->cur_vout;
-    const bool is_mmal_pic = hw_mmal_pic_is_mmal(pic);
 
 #if TRACE_ALL
+    const bool is_mmal_pic = hw_mmal_pic_is_mmal(pic);
     msg_Dbg(vd, "<<< %s: fmt: %dx%d/%dx%d, pic:%dx%d, pts=%lld, mmal=%d/%d", __func__, vd->fmt.i_width, vd->fmt.i_height, x_vd->fmt.i_width, x_vd->fmt.i_height, pic->format.i_width, pic->format.i_height, (long long)pic->date,
             is_mmal_pic, sys->use_mmal);
 #endif
@@ -353,6 +353,16 @@ static int OpenMmalX11(vlc_object_t *object)
         .subpicture_chromas = NULL
     };
 
+    {
+        char dbuf0[5];
+        msg_Dbg(vd, ">>> %s: %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d", __func__,
+                str_fourcc(dbuf0, vd->fmt.i_chroma),
+                vd->fmt.i_width,         vd->fmt.i_height,
+                vd->fmt.i_x_offset,      vd->fmt.i_y_offset,
+                vd->fmt.i_visible_width, vd->fmt.i_visible_height,
+                vd->fmt.i_sar_num,       vd->fmt.i_sar_den);
+    }
+
     if ((sys->x_vout = load_display_module(vd, "vout display", "opengles2")) != NULL)
         msg_Dbg(vd, "Opengles2 output found");
     else if ((sys->x_vout = load_display_module(vd, "vout display", "xcb_x11")) != NULL)
@@ -415,6 +425,18 @@ static int OpenMmalX11(vlc_object_t *object)
     }
     vd->fmt  = sys->cur_vout->fmt;
 
+#if TRACE_ALL
+    {
+        char dbuf0[5];
+        msg_Dbg(vd, ">>> %s: (%s) %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d", __func__,
+                module_get_name(sys->cur_vout->module, false),
+                str_fourcc(dbuf0, vd->fmt.i_chroma),
+                vd->fmt.i_width,         vd->fmt.i_height,
+                vd->fmt.i_x_offset,      vd->fmt.i_y_offset,
+                vd->fmt.i_visible_width, vd->fmt.i_visible_height,
+                vd->fmt.i_sar_num,       vd->fmt.i_sar_den);
+    }
+#endif
     return VLC_SUCCESS;
 
 fail:

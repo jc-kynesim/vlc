@@ -31,14 +31,18 @@
 
 #include <vlc_common.h>
 #include <vlc_picture.h>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wbad-function-cast"
+#include <bcm_host.h>
+#pragma GCC diagnostic pop
 #include <interface/mmal/mmal.h>
 #include <interface/mmal/util/mmal_util.h>
 #include <interface/mmal/util/mmal_default_components.h>
 #include <interface/vmcs_host/vcgencmd.h>
 #include <interface/vcsm/user-vcsm.h>
 
-#include "mmal_cma.h"  // **************
-
+#include "mmal_cma.h"
 #include "mmal_picture.h"
 
 #define UINT64_SIZE(s) (((s) + sizeof(uint64_t) - 1)/sizeof(uint64_t))
@@ -131,18 +135,19 @@ MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc
             return MMAL_ENCODING_YUVUV128;
         case VLC_CODEC_MMAL_ZC_SAND10:
             return MMAL_ENCODING_YUVUV64_10;
+        case VLC_CODEC_MMAL_ZC_SAND30:
+            return MMAL_ENCODING_YUV10_COL;
         default:
             break;
     }
     return 0;
 }
 
-
-void vlc_to_mmal_video_fmt(MMAL_ES_FORMAT_T *const es_fmt, const video_frame_format_t * const vf_vlc)
+static void vlc_fmt_to_video_format(MMAL_VIDEO_FORMAT_T *const vf_mmal, const video_frame_format_t * const vf_vlc)
 {
-    MMAL_VIDEO_FORMAT_T * const vf_mmal = &es_fmt->es->video;
+    const unsigned int wmask = (vf_vlc->i_chroma == VLC_CODEC_MMAL_ZC_I420) ? 31 : 15;
 
-    vf_mmal->width          = (vf_vlc->i_width + 31) & ~31;
+    vf_mmal->width          = (vf_vlc->i_width + wmask) & ~wmask;
     vf_mmal->height         = (vf_vlc->i_height + 15) & ~15;
     vf_mmal->crop.x         = vf_vlc->i_x_offset;
     vf_mmal->crop.y         = vf_vlc->i_y_offset;
@@ -159,6 +164,72 @@ void vlc_to_mmal_video_fmt(MMAL_ES_FORMAT_T *const es_fmt, const video_frame_for
     vf_mmal->frame_rate.den = vf_vlc->i_frame_rate_base;
     vf_mmal->color_space    = vlc_to_mmal_color_space(vf_vlc->space);
 }
+
+
+void hw_mmal_vlc_fmt_to_mmal_fmt(MMAL_ES_FORMAT_T *const es_fmt, const video_frame_format_t * const vf_vlc)
+{
+    vlc_fmt_to_video_format(&es_fmt->es->video, vf_vlc);
+}
+
+bool hw_mmal_vlc_pic_to_mmal_fmt_update(MMAL_ES_FORMAT_T *const es_fmt, const picture_t * const pic)
+{
+    MMAL_VIDEO_FORMAT_T vf_new_ss;
+    MMAL_VIDEO_FORMAT_T *const vf_old = &es_fmt->es->video;
+    MMAL_VIDEO_FORMAT_T *const vf_new = &vf_new_ss;
+
+    vlc_fmt_to_video_format(vf_new, &pic->format);
+
+    // If we have a format that might have come from ffmpeg then rework for
+    // a better guess as to layout. All sand stuff is "special" with regards to
+    // width/height vs real layout so leave as is if that
+    if (pic->format.i_chroma == VLC_CODEC_MMAL_ZC_I420 ||
+        pic->format.i_chroma == VLC_CODEC_MMAL_ZC_RGB32)
+    {
+        // Now overwrite width/height with a better guess as to actual layout info
+        vf_new->height = pic->p[0].i_lines;
+        vf_new->width = pic->p[0].i_pitch / pic->p[0].i_pixel_pitch;
+    }
+
+    if (
+        vf_new->width          != vf_old->width          ||
+        vf_new->height         != vf_old->height         ||
+        vf_new->crop.x         != vf_old->crop.x         ||
+        vf_new->crop.y         != vf_old->crop.y         ||
+        vf_new->crop.width     != vf_old->crop.width     ||
+        vf_new->crop.height    != vf_old->crop.height    ||
+        vf_new->par.num        != vf_old->par.num        ||
+        vf_new->par.den        != vf_old->par.den        ||
+        // Frame rate ignored
+        vf_new->color_space    != vf_old->color_space)
+    {
+#if 0
+        char dbuf0[5], dbuf1[5];
+        printf("%dx%d (%d,%d %dx%d) par:%d/%d %s -> %dx%d (%d,%d %dx%d) par:%d/%d %s\n",
+               vf_old->width          ,
+               vf_old->height         ,
+               vf_old->crop.x         ,
+               vf_old->crop.y         ,
+               vf_old->crop.width     ,
+               vf_old->crop.height    ,
+               vf_old->par.num        ,
+               vf_old->par.den        ,
+               str_fourcc(dbuf0, vf_old->color_space)    ,
+               vf_new->width          ,
+               vf_new->height         ,
+               vf_new->crop.x         ,
+               vf_new->crop.y         ,
+               vf_new->crop.width     ,
+               vf_new->crop.height    ,
+               vf_new->par.num        ,
+               vf_new->par.den        ,
+               str_fourcc(dbuf1, vf_new->color_space)    );
+#endif
+        *vf_old = *vf_new;
+        return true;
+    }
+    return false;
+}
+
 
 hw_mmal_port_pool_ref_t * hw_mmal_port_pool_ref_create(MMAL_PORT_T * const port,
    const unsigned int headers, const uint32_t payload_size)
@@ -280,6 +351,8 @@ MMAL_STATUS_T hw_mmal_opaque_output(vlc_object_t * const obj,
 
     status = mmal_port_enable(port, callback);
     if (status != MMAL_SUCCESS) {
+        hw_mmal_port_pool_ref_release(*pppr, false);
+        *pppr = NULL;
         msg_Err(obj, "Failed to enable output port %s (status=%"PRIx32" %s)",
                 port->name, status, mmal_status_to_string(status));
         return status;
@@ -295,8 +368,12 @@ void hw_mmal_pic_ctx_destroy(picture_context_t * pic_ctx_cmn)
     unsigned int i;
 
     for (i = 0; i != ctx->buf_count; ++i) {
-        mmal_buffer_header_release(ctx->bufs[i]);
+        if (ctx->bufs[i] != NULL)
+            mmal_buffer_header_release(ctx->bufs[i]);
     }
+
+    cma_buf_unref(ctx->cb);
+
     free(ctx);
 }
 
@@ -312,10 +389,13 @@ picture_context_t * hw_mmal_pic_ctx_copy(picture_context_t * pic_ctx_cmn)
     // Copy
     dst_ctx->cmn = src_ctx->cmn;
 
+    dst_ctx->cb = cma_buf_ref(src_ctx->cb);
+
     dst_ctx->buf_count = src_ctx->buf_count;
     for (i = 0; i != src_ctx->buf_count; ++i) {
         dst_ctx->bufs[i] = src_ctx->bufs[i];
-        mmal_buffer_header_acquire(dst_ctx->bufs[i]);
+        if (dst_ctx->bufs[i] != NULL)
+            mmal_buffer_header_acquire(dst_ctx->bufs[i]);
     }
 
     return &dst_ctx->cmn;
@@ -342,7 +422,7 @@ buf_pre_release_cb(MMAL_BUFFER_HEADER_T * buf, void *userdata)
 // Buffer belongs to context on successful return from this fn
 // is still valid on failure
 picture_context_t *
-hw_mmal_gen_context(const MMAL_FOURCC_T fmt, MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const ppr)
+hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const ppr)
 {
     pic_ctx_mmal_t * const ctx = calloc(1, sizeof(pic_ctx_mmal_t));
 
@@ -359,12 +439,64 @@ hw_mmal_gen_context(const MMAL_FOURCC_T fmt, MMAL_BUFFER_HEADER_T * buf, hw_mmal
     ctx->cmn.copy = hw_mmal_pic_ctx_copy;
     ctx->cmn.destroy = hw_mmal_pic_ctx_destroy;
 
-    ctx->fmt = fmt;
     ctx->buf_count = 1;
     ctx->bufs[0] = buf;
 
     return &ctx->cmn;
 }
+
+
+static MMAL_BOOL_T rep_buf_free_cb(MMAL_BUFFER_HEADER_T *header, void *userdata)
+{
+    cma_buf_t * const cb = userdata;
+    VLC_UNUSED(header);
+
+    cma_buf_unref(cb);
+    return MMAL_FALSE;
+}
+
+MMAL_BUFFER_HEADER_T * hw_mmal_pic_buf_replicated(const picture_t *const pic, MMAL_POOL_T * const rep_pool)
+{
+    MMAL_STATUS_T err;
+    pic_ctx_mmal_t *const ctx = (pic_ctx_mmal_t *)pic->context;
+    MMAL_BUFFER_HEADER_T *const rep_buf = mmal_queue_wait(rep_pool->queue);
+
+    if (rep_buf == NULL)
+        return NULL;
+
+    if (ctx->bufs[0] != NULL)
+    {
+        // Existing buffer - replicate it
+        if ((err = mmal_buffer_header_replicate(rep_buf, ctx->bufs[0])) != MMAL_SUCCESS)
+            goto fail;
+    }
+    else if (ctx->cb != NULL)
+    {
+        // Just a CMA buffer - fill in new buffer
+        const uintptr_t vc_h = cma_buf_vc_handle(ctx->cb);
+        if (vc_h == 0)
+            goto fail;
+
+        mmal_buffer_header_reset(rep_buf);
+        rep_buf->data = (uint8_t *)vc_h;
+        rep_buf->alloc_size = cma_buf_size(ctx->cb);
+        rep_buf->length = rep_buf->alloc_size;
+        // Ensure cb remains valid for the duration of this buffer
+        mmal_buffer_header_pre_release_cb_set(rep_buf, rep_buf_free_cb, cma_buf_ref(ctx->cb));
+    }
+    else
+        goto fail;
+
+    pic_to_buf_copy_props(rep_buf, pic);
+    return rep_buf;
+
+fail:
+    mmal_buffer_header_release(rep_buf);
+    return NULL;
+}
+
+
+
 
 int hw_mmal_get_gpu_mem(void) {
     static int stashed_val = -2;
@@ -1015,24 +1147,147 @@ vzc_pool_ctl_t * hw_mmal_vzc_pool_new()
     return pc;
 }
 
+//----------------------------------------------------------------------------
+
+
+static const uint8_t shift_00[] = {0,0,0,0};
+static const uint8_t shift_01[] = {0,1,1,1};
+
+int cma_pic_set_data(picture_t * const pic,
+                            const MMAL_ES_FORMAT_T * const mm_esfmt,
+                            const MMAL_BUFFER_HEADER_T * const buf)
+{
+    const MMAL_VIDEO_FORMAT_T * const mm_fmt = &mm_esfmt->es->video;
+    const MMAL_BUFFER_HEADER_VIDEO_SPECIFIC_T *const buf_vid = &buf->type->video;
+    cma_buf_t *const cb = cma_buf_pic_get(pic);
+
+    uint8_t * const data = cma_buf_addr(cb);
+    if (data == NULL) {
+        return VLC_ENOMEM;
+    }
+
+    const uint8_t * ws = shift_00;
+    const uint8_t * hs = shift_00;
+    int pb = 1;
+
+    switch (mm_esfmt->encoding)
+    {
+        case MMAL_ENCODING_ARGB:
+        case MMAL_ENCODING_ABGR:
+        case MMAL_ENCODING_RGBA:
+        case MMAL_ENCODING_BGRA:
+        case MMAL_ENCODING_RGB32:
+        case MMAL_ENCODING_BGR32:
+            pb = 4;
+            break;
+
+        case MMAL_ENCODING_I420:
+            ws = shift_01;
+            /* FALL THRU */
+        case MMAL_ENCODING_YUVUV128:
+            hs = shift_01;
+            break;
+
+        default:
+//            msg_Err(p_filter, "%s: Unexpected format", __func__);
+            return VLC_EGENERIC;
+    }
+
+    pic->i_planes = buf_vid->planes;
+    for (unsigned int i = 0; i != buf_vid->planes; ++i) {
+        pic->p[i] = (plane_t){
+            .p_pixels = data + buf_vid->offset[i],
+            .i_lines = mm_fmt->height >> hs[i],
+            .i_pitch = buf_vid->pitch[i],
+            .i_pixel_pitch = pb,
+            .i_visible_lines = mm_fmt->crop.height >> hs[i],
+            .i_visible_pitch = mm_fmt->crop.width >> ws[i]
+        };
+    }
+    return VLC_SUCCESS;
+}
+
+int cma_buf_pic_attach(cma_buf_t * const cb, picture_t * const pic)
+{
+    if (!is_cma_buf_pic_chroma(pic->format.i_chroma))
+        return VLC_EGENERIC;
+    if (pic->context != NULL)
+        return VLC_EBADVAR;
+
+    pic_ctx_mmal_t * const ctx = calloc(1, sizeof(pic_ctx_mmal_t));
+
+    if (ctx == NULL)
+        return VLC_ENOMEM;
+
+    ctx->cmn.copy = hw_mmal_pic_ctx_copy;
+    ctx->cmn.destroy = hw_mmal_pic_ctx_destroy;
+    ctx->buf_count = 1; // cb takes the place of the 1st buf
+    ctx->cb = cb;
+
+    pic->context = &ctx->cmn;
+    return VLC_SUCCESS;
+}
+
+cma_buf_t * cma_buf_pic_get(picture_t * const pic)
+{
+    pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic->context;
+    return !is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx  == NULL ? 0 : ctx->cb;
+}
+
 
 //----------------------------------------------------------------------------
 
+/* Returns the type of the Pi being used
+*/
+bool rpi_is_model_pi4(void) {
+    return bcm_host_is_model_pi4();
+}
+
+// Preferred mode - none->cma on Pi4 otherwise legacy
+static volatile vcsm_init_type_t last_vcsm_type = VCSM_INIT_NONE;
+
 vcsm_init_type_t cma_vcsm_init(void)
 {
-    if (vcsm_init_ex(1, -1) == 0) {
-        return VCSM_INIT_CMA;
+    vcsm_init_type_t rv = VCSM_INIT_NONE;
+    // We don't both locking - taking a copy here should be good enough
+    vcsm_init_type_t try_type = last_vcsm_type;
+
+    if (try_type == VCSM_INIT_NONE) {
+        if (bcm_host_is_fkms_active())
+            try_type = VCSM_INIT_CMA;
+        else
+            try_type = VCSM_INIT_LEGACY;
     }
-    else if (vcsm_init_ex(0, -1) == 0) {
-        return VCSM_INIT_LEGACY;
+
+    if (try_type == VCSM_INIT_CMA) {
+        if (vcsm_init_ex(1, -1) == 0)
+            rv = VCSM_INIT_CMA;
+        else if (vcsm_init_ex(0, -1) == 0)
+            rv = VCSM_INIT_LEGACY;
     }
-    return VCSM_INIT_NONE;
+    else
+    {
+        if (vcsm_init_ex(0, -1) == 0)
+            rv = VCSM_INIT_LEGACY;
+        else if (vcsm_init_ex(1, -1) == 0)
+            rv = VCSM_INIT_CMA;
+    }
+
+    // Just in case this affects vcsm init do after that
+    if (rv != VCSM_INIT_NONE)
+        bcm_host_init();
+
+    last_vcsm_type = rv;
+    return rv;
 }
 
 void cma_vcsm_exit(const vcsm_init_type_t init_mode)
 {
     if (init_mode != VCSM_INIT_NONE)
+    {
         vcsm_exit();
+        bcm_host_deinit();  // Does nothing but add in case it ever does
+    }
 }
 
 const char * cma_vcsm_init_str(const vcsm_init_type_t init_mode)

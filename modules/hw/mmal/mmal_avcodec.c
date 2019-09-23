@@ -44,11 +44,13 @@
 #include <libavcodec/avcodec.h>
 #include <libavutil/mem.h>
 #include <libavutil/pixdesc.h>
+#include <libavutil/rpi_sand_fns.h>
 #include <libavcodec/rpi_zc.h>
 #if (LIBAVUTIL_VERSION_MICRO >= 100 && LIBAVUTIL_VERSION_INT >= AV_VERSION_INT( 55, 16, 101 ) )
 #include <libavutil/mastering_display_metadata.h>
 #endif
 
+#include "mmal_cma.h"
 #include "mmal_picture.h"
 
 #define TRACE_ALL 0
@@ -142,6 +144,9 @@
       (LIBAVFORMAT_VERSION_MICRO >= 100 && LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT( a, d, e ) ) )
 
 #endif
+
+//static int cma_get_buffer2(struct AVCodecContext *s, AVFrame *frame, int flags);
+
 
 /*****************************************************************************
  * Codec fourcc -> libavcodec Codec_id mapping
@@ -690,7 +695,7 @@ static const struct
     {VLC_CODEC_I422, AV_PIX_FMT_YUV422P, 0, 0, 0 },
     {VLC_CODEC_J422, AV_PIX_FMT_YUVJ422P, 0, 0, 0 },
 
-    {VLC_CODEC_I420, AV_PIX_FMT_YUV420P, 0, 0, 0 },
+    {VLC_CODEC_MMAL_ZC_I420, AV_PIX_FMT_YUV420P, 0, 0, 0 },
     {VLC_CODEC_YV12, AV_PIX_FMT_YUV420P, 0, 0, 0 },
     {VLC_FOURCC('I','Y','U','V'), AV_PIX_FMT_YUV420P, 0, 0, 0 },
     {VLC_CODEC_J420, AV_PIX_FMT_YUVJ420P, 0, 0, 0 },
@@ -785,6 +790,31 @@ static const struct
     { 0, 0, 0, 0, 0 }
 };
 
+static inline void wait_mt(decoder_sys_t *sys)
+{
+//    vlc_sem_wait(&sys->sem_mt);
+}
+
+static inline void post_mt(decoder_sys_t *sys)
+{
+//    vlc_sem_post(&sys->sem_mt);
+}
+
+static vlc_fourcc_t get_hw_chroma(const enum AVPixelFormat ffmpeg_hw_chroma, const enum AVPixelFormat ffmpeg_ww_chroma)
+{
+    VLC_UNUSED(ffmpeg_ww_chroma);
+    switch (ffmpeg_hw_chroma)
+    {
+        case AV_PIX_FMT_RPI4_8:
+            return VLC_CODEC_MMAL_ZC_SAND8;
+        case AV_PIX_FMT_RPI4_10:
+            return VLC_CODEC_MMAL_ZC_SAND30;
+        default:
+            break;
+    }
+    return 0;
+}
+
 static int GetVlcChroma( video_format_t *fmt, int i_ffmpeg_chroma )
 {
     /* TODO FIXME for rgb format we HAVE to set rgb mask/shift */
@@ -837,7 +867,17 @@ static AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
         free( psz_decoder );
     }
     if( !p_codec )
-        p_codec = avcodec_find_decoder( i_codec_id );
+    {
+        if( p_dec->fmt_in.i_codec != VLC_CODEC_HEVC )
+            p_codec = avcodec_find_decoder(i_codec_id);
+        else
+        {
+            psz_namecodec = rpi_is_model_pi4() ? "hevc" : "hevc_rpi";
+            msg_Info(p_dec, "Looking for HEVC decoder '%s'", psz_namecodec);
+            p_codec = avcodec_find_decoder_by_name(psz_namecodec);
+        }
+    }
+
     if( !p_codec )
     {
         msg_Dbg( p_dec, "codec not found (%s)", psz_namecodec );
@@ -854,44 +894,6 @@ static AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
     avctx->debug = var_InheritInteger( p_dec, "avcodec-debug" );
     avctx->opaque = p_dec;
     return avctx;
-}
-
-static int ffmpeg_OpenCodec( decoder_t *p_dec, AVCodecContext *ctx,
-                      const AVCodec *codec )
-{
-    char *psz_opts = var_InheritString( p_dec, "avcodec-options" );
-    AVDictionary *options = NULL;
-    int ret;
-
-    if (psz_opts) {
-        vlc_av_get_options(psz_opts, &options);
-        free(psz_opts);
-    }
-
-    if (av_rpi_zc_init(ctx) != 0)
-    {
-        msg_Err(p_dec, "Failed to init AV ZC");
-        return VLC_EGENERIC;
-    }
-
-    vlc_avcodec_lock();
-    ret = avcodec_open2( ctx, codec, options ? &options : NULL );
-    vlc_avcodec_unlock();
-
-    AVDictionaryEntry *t = NULL;
-    while ((t = av_dict_get(options, "", t, AV_DICT_IGNORE_SUFFIX))) {
-        msg_Err( p_dec, "Unknown option \"%s\"", t->key );
-    }
-    av_dict_free(&options);
-
-    if( ret < 0 )
-    {
-        msg_Err( p_dec, "cannot start codec (%s)", codec->name );
-        return VLC_EGENERIC;
-    }
-
-    msg_Dbg( p_dec, "codec (%s) started", codec->name );
-    return VLC_SUCCESS;
 }
 
 
@@ -937,7 +939,8 @@ struct decoder_sys_t
     int profile;
     int level;
 
-    MMAL_POOL_T * out_pool;
+    cma_buf_pool_t * cma_pool;
+    vcsm_init_type_t vcsm_init_type;
 };
 
 /*****************************************************************************
@@ -987,8 +990,8 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
 
         avcodec_align_dimensions2(ctx, &width, &height, aligns);
     }
-//    else /* hardware decoding */
-//        fmt->i_chroma = vlc_va_GetChroma(pix_fmt, sw_pix_fmt);
+    else /* hardware decoding */
+        fmt->i_chroma = get_hw_chroma(pix_fmt, sw_pix_fmt);
 
     if( width == 0 || height == 0 || width > 8192 || height > 8192 ||
         width < ctx->width || height < ctx->height )
@@ -1424,7 +1427,118 @@ static int DecodeSidedata( decoder_t *p_dec, const AVFrame *frame, picture_t *p_
     return 0;
 }
 
+static void cma_avbuf_pool_free(void * v)
+{
+    cma_buf_unref(v);
+}
 
+static unsigned int zc_buf_vcsm_handle(void * v)
+{
+    return cma_buf_vcsm_handle(v);
+}
+
+static unsigned int zc_buf_vc_handle(void * v)
+{
+    return cma_buf_vc_handle(v);
+}
+
+static void * zc_buf_map_arm(void * v)
+{
+    return cma_buf_addr(v);
+}
+
+static unsigned int zc_buf_map_vc(void * v)
+{
+    return cma_buf_vc_addr(v);
+}
+
+
+
+static const av_rpi_zc_buf_fn_tab_t zc_buf_fn_tab = {
+    .free = cma_avbuf_pool_free,
+
+    .vcsm_handle = zc_buf_vcsm_handle,
+    .vc_handle = zc_buf_vc_handle,
+    .map_arm = zc_buf_map_arm,
+    .map_vc = zc_buf_map_vc
+};
+
+
+static AVBufferRef *
+zc_alloc_buf(void * v, size_t size, const AVRpiZcFrameGeometry * geo)
+{
+    decoder_t * const dec = v;
+    decoder_sys_t * const sys = dec->p_sys;
+
+    VLC_UNUSED(geo);
+
+    assert(sys != NULL);
+
+    void * const cmabuf = cma_buf_pool_alloc_buf(sys->cma_pool, size);
+
+    if (cmabuf == NULL)
+    {
+        msg_Err(dec, "CMA buf pool alloc buf failed");
+        return NULL;
+    }
+
+    AVBufferRef *const avbuf = av_rpi_zc_buf(cma_buf_size(cmabuf), 0, cmabuf, &zc_buf_fn_tab);
+
+    if (avbuf == NULL)
+    {
+        msg_Err(dec, "av_rpi_zc_buf failed");
+        cma_buf_unref(cmabuf);
+        return NULL;
+    }
+
+    return avbuf;
+}
+
+static void
+zc_free_pool(void * v)
+{
+    decoder_t * const dec = v;
+    cma_buf_pool_delete(dec->p_sys->cma_pool);
+}
+
+
+static int ffmpeg_OpenCodec( decoder_t *p_dec, AVCodecContext *ctx,
+                      const AVCodec *codec )
+{
+    char *psz_opts = var_InheritString( p_dec, "avcodec-options" );
+    AVDictionary *options = NULL;
+    int ret;
+
+    if (psz_opts) {
+        vlc_av_get_options(psz_opts, &options);
+        free(psz_opts);
+    }
+
+    if (av_rpi_zc_init2(ctx, p_dec, zc_alloc_buf, zc_free_pool) != 0)
+    {
+        msg_Err(p_dec, "Failed to init AV ZC");
+        return VLC_EGENERIC;
+    }
+
+    vlc_avcodec_lock();
+    ret = avcodec_open2( ctx, codec, options ? &options : NULL );
+    vlc_avcodec_unlock();
+
+    AVDictionaryEntry *t = NULL;
+    while ((t = av_dict_get(options, "", t, AV_DICT_IGNORE_SUFFIX))) {
+        msg_Err( p_dec, "Unknown option \"%s\"", t->key );
+    }
+    av_dict_free(&options);
+
+    if( ret < 0 )
+    {
+        msg_Err( p_dec, "cannot start codec (%s)", codec->name );
+        return VLC_EGENERIC;
+    }
+
+    msg_Dbg( p_dec, "codec (%s) started", codec->name );
+    return VLC_SUCCESS;
+}
 
 static int OpenVideoCodec( decoder_t *p_dec )
 {
@@ -1488,30 +1602,63 @@ static int OpenVideoCodec( decoder_t *p_dec )
     return 0;
 }
 
-static MMAL_BOOL_T
-zc_buf_pre_release_cb(MMAL_BUFFER_HEADER_T * buf, void *userdata)
+
+static const uint8_t shift_01[] = {0,1,1,1};
+static const uint8_t pb_1[] = {1,1,1,1};
+static const uint8_t pb_12[] = {1,2,2,2};
+static const uint8_t pb_24[] = {2,4,4,4};
+static const uint8_t pb_4[] = {4,4,4,4};
+
+static int set_pic_from_frame(picture_t * const pic, const AVFrame * const frame)
 {
-    const AVRpiZcRefPtr fr_ref = userdata;
-    VLC_UNUSED(buf);
+    const uint8_t * hs = shift_01;
+    const uint8_t * ws = shift_01;
+    const uint8_t * pb = pb_1;
 
-    av_rpi_zc_unref(fr_ref);
-
-    return MMAL_FALSE;
-}
-
-static MMAL_FOURCC_T
-avfmt_to_mmal(const int avfmt)
-{
-    switch( avfmt )
+    switch (pic->format.i_chroma)
     {
-        case AV_PIX_FMT_SAND128:
-            return MMAL_ENCODING_YUVUV128;
-        case AV_PIX_FMT_SAND64_10:
-            return MMAL_ENCODING_YUVUV64_10;
-        default:
+        case VLC_CODEC_MMAL_ZC_RGB32:
+            pic->i_planes = 1;
+            pb = pb_4;
             break;
+        case VLC_CODEC_MMAL_ZC_I420:
+            pic->i_planes = 3;
+            break;
+        case VLC_CODEC_MMAL_ZC_SAND8:
+            pic->i_planes = 2;
+            pb = pb_12;
+            break;
+        case VLC_CODEC_MMAL_ZC_SAND10:
+        case VLC_CODEC_MMAL_ZC_SAND30:  // Lies: SAND30 is "special"
+            pic->i_planes = 2;
+            pb = pb_24;
+            break;
+        default:
+            return VLC_EGENERIC;
     }
-    return MMAL_ENCODING_UNKNOWN;
+
+    const cma_buf_t * const cb = cma_buf_pic_get(pic);
+    uint8_t * const data = cma_buf_addr(cb);
+    if (data == NULL) {
+        return VLC_ENOMEM;
+    }
+
+    uint8_t * frame_end = frame->data[0] + cma_buf_size(cb);
+    for (int i = 0; i != pic->i_planes; ++i) {
+        // Calculate lines from gap between planes
+        // This will give us an accurate "height" for later use by MMAL
+        const int lines = ((i + 1 == pic->i_planes ? frame_end : frame->data[i + 1]) -
+                           frame->data[i]) / frame->linesize[i];
+        pic->p[i] = (plane_t){
+            .p_pixels = data + (frame->data[i] - frame->data[0]),
+            .i_lines = lines,
+            .i_pitch = frame->linesize[i],
+            .i_pixel_pitch = pb[i],
+            .i_visible_lines = av_frame_cropped_height(frame) >> hs[i],
+            .i_visible_pitch = av_frame_cropped_width(frame) >> ws[i]
+        };
+    }
+    return 0;
 }
 
 /*****************************************************************************
@@ -1579,7 +1726,7 @@ static int rx_frame(decoder_t * const p_dec, decoder_sys_t * const p_sys, AVCode
 
     interpolate_next_pts( p_dec, frame );
 
-//    update_late_frame_count( p_dec, p_block, current_time, i_pts);  //*********************
+    // update_late_frame_count( p_dec, p_block, current_time, i_pts); // ** ?? **
 
     if( ( /* !p_sys->p_va && */ !frame->linesize[0] ) ||
        ( p_dec->b_frame_drop_allowed && (frame->flags & AV_FRAME_FLAG_CORRUPT) &&
@@ -1593,49 +1740,38 @@ static int rx_frame(decoder_t * const p_dec, decoder_sys_t * const p_sys, AVCode
     lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
                               p_context->pix_fmt);
 
+
     {
-        MMAL_BUFFER_HEADER_T * const buf = mmal_queue_wait(p_sys->out_pool->queue);
-//        MMAL_BUFFER_HEADER_T * const buf = mmal_queue_get(p_sys->out_pool->queue);
-        if (buf == NULL) {
-            msg_Err(p_dec, "MMAL buffer alloc failure");
+        cma_buf_t * const cb = av_rpi_zc_buf_v(frame->buf[0]);
+
+        if (cb == NULL)
+        {
+            msg_Err(p_dec, "Frame has no attached CMA buffer");
             av_frame_free(&frame);
             return 1;
         }
 
-        mmal_buffer_header_reset(buf); // length, offset, flags, pts, dts
-        buf->cmd = 0;
-        buf->user_data = NULL;
-
+        if ((p_pic = decoder_NewPicture(p_dec)) == NULL)
         {
-            const AVRpiZcRefPtr fr_buf = av_rpi_zc_ref(p_context, frame, frame->format, 0);
-
-            if (fr_buf == NULL) {
-                mmal_buffer_header_release(buf);
-                av_frame_free(&frame);
-                return VLC_ENOMEM;
-            }
-
-            const intptr_t vc_handle = (intptr_t)av_rpi_zc_vc_handle(fr_buf);
-
-            buf->data = (uint8_t *)vc_handle;  // Cast our handle to a pointer for mmal - 2 steps to avoid gcc warnings
-            buf->offset = av_rpi_zc_offset(fr_buf);
-            buf->length = av_rpi_zc_length(fr_buf);
-            buf->alloc_size = av_rpi_zc_numbytes(fr_buf);
-            buf->flags |= MMAL_BUFFER_HEADER_FLAG_FRAME_END;
-
-            mmal_buffer_header_pre_release_cb_set(buf, zc_buf_pre_release_cb, fr_buf);
-        }
-
-        p_pic = decoder_NewPicture(p_dec);  // *** Really want an empy pic
-        if (p_pic == NULL)
-        {
-            msg_Err(p_dec, "Picture alloc failure");
-            mmal_buffer_header_release(buf);
+            msg_Err(p_dec, "Failed to allocate pic");
             av_frame_free(&frame);
-            return VLC_ENOMEM;
+            return 1;
         }
 
-        p_pic->context = hw_mmal_gen_context(avfmt_to_mmal(frame->format), buf, NULL);
+        cma_buf_in_flight(cb);
+
+        if (cma_buf_pic_attach(cma_buf_ref(cb), p_pic) != 0)
+        {
+            char dbuf0[5];
+            msg_Err(p_dec, "Failed to attach bufs to pic: fmt=%s", str_fourcc(dbuf0, p_pic->format.i_chroma));
+            cma_buf_unref(cb);
+            av_frame_free(&frame);
+            picture_Release(p_pic);
+            return 1;
+        }
+
+        // ****** Set planes etc.
+        set_pic_from_frame(p_pic, frame);
     }
 
 
@@ -1665,7 +1801,9 @@ static int rx_frame(decoder_t * const p_dec, decoder_sys_t * const p_sys, AVCode
         i_pts = VLC_TS_INVALID;
 
     av_frame_free(&frame);
-
+#if TRACE_ALL
+    msg_Dbg(p_dec, "--- QueueVideo");
+#endif
     p_sys->b_first_frame = false;
     decoder_QueueVideo(p_dec, p_pic);
 
@@ -1687,6 +1825,10 @@ static int DecodeVideo( decoder_t *p_dec, block_t * p_block)
     bool eos_spotted = false;
     mtime_t current_time;
     int rv = VLCDEC_SUCCESS;
+
+#if TRACE_ALL
+    msg_Dbg(p_dec, "<<< %s: (buf_size=%d)", __func__, p_block == NULL ? 0 : p_block->i_buffer);
+#endif
 
     if( !p_context->extradata_size && p_dec->fmt_in.i_extra )
     {
@@ -1828,6 +1970,10 @@ static int DecodeVideo( decoder_t *p_dec, block_t * p_block)
     if (eos_spotted)
         p_sys->b_first_frame = true;
 
+#if TRACE_ALL
+    msg_Dbg(p_dec, ">>> %s", __func__);
+#endif
+
     return rv;
 }
 
@@ -1844,20 +1990,20 @@ static void MmalAvcodecCloseDecoder(vlc_object_t *obj)
     AVCodecContext *ctx = p_sys->p_context;
 //    void *hwaccel_context;
 
+    msg_Dbg(obj, "<<< %s", __func__);
+
     /* do not flush buffers if codec hasn't been opened (theora/vorbis/VC1) */
     if( avcodec_is_open( ctx ) )
         avcodec_flush_buffers( ctx );
 
 //    cc_Flush( &p_sys->cc );
 
-    avcodec_close(ctx);
-    av_rpi_zc_uninit(ctx);
+    av_rpi_zc_uninit2(ctx);
 
 //    hwaccel_context = ctx->hwaccel_context;
     avcodec_free_context( &ctx );
 
-    if( p_sys->out_pool != NULL )
-        mmal_pool_destroy(p_sys->out_pool);
+    cma_vcsm_exit(p_sys->vcsm_init_type);
 
 //    if( p_sys->p_va )
 //        vlc_va_Delete( p_sys->p_va, &hwaccel_context );
@@ -1940,7 +2086,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
 
     /* Enumerate available formats */
     enum PixelFormat swfmt = avcodec_default_get_format(p_context, pi_fmt);
-//    bool can_hwaccel = false;
+    bool can_hwaccel = false;
 
     for (size_t i = 0; pi_fmt[i] != AV_PIX_FMT_NONE; i++)
     {
@@ -1951,8 +2097,8 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
 
         msg_Dbg( p_dec, "available %sware decoder output format %d (%s)",
                  hwaccel ? "hard" : "soft", pi_fmt[i], dsc->name );
-//        if (hwaccel)
-//            can_hwaccel = true;
+        if (hwaccel)
+            can_hwaccel = true;
     }
 
     /* If the format did not actually change (e.g. seeking), try to reuse the
@@ -1984,9 +2130,6 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
     p_sys->profile = p_context->profile;
     p_sys->level = p_context->level;
 
-#if 1
-    return swfmt;
-#else
     if (!can_hwaccel)
         return swfmt;
 
@@ -2014,6 +2157,8 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
 #if (LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(52, 4, 0))
         AV_PIX_FMT_VDPAU,
 #endif
+        AV_PIX_FMT_RPI4_10,
+        AV_PIX_FMT_RPI4_8,
         AV_PIX_FMT_NONE,
     };
 
@@ -2027,7 +2172,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         if( hwfmt == AV_PIX_FMT_NONE )
             continue;
 
-        p_dec->fmt_out.video.i_chroma = vlc_va_GetChroma(hwfmt, swfmt);
+        p_dec->fmt_out.video.i_chroma = get_hw_chroma(hwfmt, swfmt);
         if (p_dec->fmt_out.video.i_chroma == 0)
             continue; /* Unknown brand of hardware acceleration */
         if (p_context->width == 0 || p_context->height == 0)
@@ -2039,6 +2184,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         msg_Dbg(p_dec, "trying format %s", dsc ? dsc->name : "unknown");
         if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt))
             continue; /* Unsupported brand of hardware acceleration */
+#if 0
         post_mt(p_sys);
 
         picture_t *test_pic = decoder_NewPicture(p_dec);
@@ -2056,8 +2202,9 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
 
         if (va->description != NULL)
             msg_Info(p_dec, "Using %s for hardware decoding", va->description);
-
         p_sys->p_va = va;
+#endif
+
         p_sys->pix_fmt = hwfmt;
         p_context->draw_horiz_band = NULL;
         return hwfmt;
@@ -2067,7 +2214,6 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
     /* Fallback to default behaviour */
     p_sys->pix_fmt = swfmt;
     return swfmt;
-#endif
 }
 
 /*****************************************************************************
@@ -2085,13 +2231,45 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
 {
     decoder_t *p_dec = (decoder_t *)obj;
     const AVCodec *p_codec;
+    const vcsm_init_type_t vcsm_type = cma_vcsm_init();
+    const int vcsm_size =
+        vcsm_type == VCSM_INIT_LEGACY ? hw_mmal_get_gpu_mem() : 512 << 20;
 
-    if (p_dec->fmt_in.i_codec != VLC_CODEC_HEVC)
+#if 1
+    {
+        char buf1[5], buf2[5], buf2a[5];
+        char buf3[5], buf4[5];
+        uint32_t in_fcc = 0;
+        msg_Dbg(p_dec, "%s: <<< (%s/%s)[%s] %dx%d -> (%s/%s) %dx%d [%s/%d]", __func__,
+                str_fourcc(buf1, p_dec->fmt_in.i_codec),
+                str_fourcc(buf2, p_dec->fmt_in.video.i_chroma),
+                str_fourcc(buf2a, in_fcc),
+                p_dec->fmt_in.video.i_width, p_dec->fmt_in.video.i_height,
+                str_fourcc(buf3, p_dec->fmt_out.i_codec),
+                str_fourcc(buf4, p_dec->fmt_out.video.i_chroma),
+                p_dec->fmt_out.video.i_width, p_dec->fmt_out.video.i_height,
+                cma_vcsm_init_str(vcsm_type), vcsm_size);
+    }
+#endif
+
+    if( vcsm_type == VCSM_INIT_NONE )
         return VLC_EGENERIC;
+
+    if( (p_dec->fmt_in.i_codec != VLC_CODEC_HEVC &&
+         (vcsm_type == VCSM_INIT_CMA || vcsm_size < (96 << 20))) ||
+        (p_dec->fmt_in.i_codec == VLC_CODEC_HEVC &&
+         vcsm_size < (128 << 20)))
+    {
+        cma_vcsm_exit(vcsm_type);
+        return VLC_EGENERIC;
+    }
 
     AVCodecContext *p_context = ffmpeg_AllocContext( p_dec, &p_codec );
     if( p_context == NULL )
+    {
+        cma_vcsm_exit(vcsm_type);
         return VLC_EGENERIC;
+    }
 
     int i_val;
 
@@ -2100,12 +2278,14 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     if( unlikely(p_sys == NULL) )
     {
         avcodec_free_context( &p_context );
+        cma_vcsm_exit(vcsm_type);
         return VLC_ENOMEM;
     }
 
     p_dec->p_sys = p_sys;
     p_sys->p_context = p_context;
     p_sys->p_codec = p_codec;
+    p_sys->vcsm_init_type = vcsm_type;
 //    p_sys->p_va = NULL;
 
     /* ***** Fill p_context with init values ***** */
@@ -2177,24 +2357,9 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
 //    p_context->opaque = p_dec;
 
     int i_thread_count = var_InheritInteger( p_dec, "avcodec-threads" );
+    // 6 Threads for everything except Pi4 HEVC where 3 should do
     if( i_thread_count <= 0 )
-        i_thread_count = 6;
-#if 0
-    if( i_thread_count <= 0 )
-    {
-        i_thread_count = vlc_GetCPUCount();
-        if( i_thread_count > 1 )
-            i_thread_count++;
-
-        //FIXME: take in count the decoding time
-#if VLC_WINSTORE_APP
-        i_thread_count = __MIN( i_thread_count, 6 );
-#else
-        i_thread_count = __MIN( i_thread_count, p_codec->id == AV_CODEC_ID_HEVC ? 10 : 6 );
-#endif
-    }
-    i_thread_count = __MIN( i_thread_count, p_codec->id == AV_CODEC_ID_HEVC ? 32 : 16 );
-#endif
+        i_thread_count = (p_dec->fmt_in.i_codec == VLC_CODEC_HEVC && rpi_is_model_pi4()) ? 3 : 6;
     msg_Dbg( p_dec, "allowing %d thread(s) for decoding", i_thread_count );
     p_context->thread_count = i_thread_count;
     p_context->thread_safe_callbacks = true;
@@ -2215,7 +2380,7 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     if( GetVlcChroma( &p_dec->fmt_out.video, p_context->pix_fmt ) != VLC_SUCCESS )
     {
         /* we are doomed. but not really, because most codecs set their pix_fmt later on */
-        p_dec->fmt_out.i_codec = VLC_CODEC_I420;
+        p_dec->fmt_out.i_codec = VLC_CODEC_MMAL_ZC_I420;
     }
     p_dec->fmt_out.i_codec = p_dec->fmt_out.video.i_chroma;
 
@@ -2229,6 +2394,12 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     } else
         p_sys->palette_sent = true;
 
+    if ((p_sys->cma_pool = cma_buf_pool_new(5, 5, false)) == NULL)
+    {
+        msg_Err(p_dec, "CMA pool alloc failure");
+        goto fail;
+    }
+
     /* ***** init this codec with special data ***** */
     ffmpeg_InitCodec( p_dec );
 
@@ -2240,12 +2411,6 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
         return VLC_EGENERIC;
     }
 
-    if ((p_sys->out_pool = mmal_pool_create(5, 0)) == NULL)
-    {
-        msg_Err(p_dec, "Failed to create mmal buffer pool");
-        goto fail;
-    }
-
     p_dec->pf_decode = DecodeVideo;
     p_dec->pf_flush  = Flush;
 
@@ -2254,10 +2419,20 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
         p_dec->fmt_in.i_profile = p_context->profile;
     if( p_context->level != FF_LEVEL_UNKNOWN )
         p_dec->fmt_in.i_level = p_context->level;
+
+#if TRACE_ALL
+    msg_Dbg(p_dec, "<<< %s: OK", __func__);
+#endif
+
     return VLC_SUCCESS;
 
 fail:
     MmalAvcodecCloseDecoder(VLC_OBJECT(p_dec));
+
+#if TRACE_ALL
+    msg_Dbg(p_dec, "<<< %s: FAIL", __func__);
+#endif
+
     return VLC_EGENERIC;
 }
 
@@ -2268,7 +2443,7 @@ vlc_module_begin()
     set_subcategory( SUBCAT_INPUT_VCODEC )
     set_shortname(N_("MMAL avcodec"))
     set_description(N_("MMAL buffered avcodec "))
-    set_capability("video decoder", 800)
+    set_capability("video decoder", 80)
     add_shortcut("mmal_avcodec")
     set_callbacks(MmalAvcodecOpenDecoder, MmalAvcodecCloseDecoder)
 vlc_module_end()

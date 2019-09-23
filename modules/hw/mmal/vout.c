@@ -35,14 +35,17 @@
 #include <vlc_vout_display.h>
 #include <vlc_modules.h>
 
-#include "mmal_picture.h"
-#include "subpic.h"
-
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wbad-function-cast"
 #include <bcm_host.h>
+#pragma GCC diagnostic pop
 #include <interface/mmal/mmal.h>
 #include <interface/mmal/util/mmal_util.h>
 #include <interface/mmal/util/mmal_default_components.h>
 #include <interface/vmcs_host/vc_tvservice.h>
+
+#include "mmal_picture.h"
+#include "subpic.h"
 
 #define TRACE_ALL 0
 
@@ -167,7 +170,10 @@ static MMAL_FOURCC_T vout_vlc_to_mmal_pic_fourcc(const unsigned int fcc)
     case VLC_CODEC_MMAL_ZC_SAND8:
         return MMAL_ENCODING_YUVUV128;
     case VLC_CODEC_MMAL_ZC_SAND10:
-        return MMAL_ENCODING_YUVUV64_10;  // It will be after we've converted it...
+        return MMAL_ENCODING_YUVUV64_10;
+    case VLC_CODEC_MMAL_ZC_SAND30:
+        return MMAL_ENCODING_YUV10_COL;
+    case VLC_CODEC_MMAL_ZC_I420:
     case VLC_CODEC_I420:
         return MMAL_ENCODING_I420;
     default:
@@ -183,7 +189,7 @@ static void display_set_format(const vout_display_t * const vd, MMAL_ES_FORMAT_T
     MMAL_VIDEO_FORMAT_T * const v_fmt = &es_fmt->es->video;
 
     es_fmt->type = MMAL_ES_TYPE_VIDEO;
-    es_fmt->encoding = is_intermediate ? MMAL_ENCODING_I420 : vout_vlc_to_mmal_pic_fourcc(vd->fmt.i_chroma);;
+    es_fmt->encoding = is_intermediate ? MMAL_ENCODING_I420 : vout_vlc_to_mmal_pic_fourcc(vd->fmt.i_chroma);
     es_fmt->encoding_variant = 0;
 
     v_fmt->width  = (w + 31) & ~31;
@@ -202,6 +208,8 @@ static void display_set_format(const vout_display_t * const vd, MMAL_ES_FORMAT_T
     v_fmt->frame_rate.num = vd->fmt.i_frame_rate;
     v_fmt->frame_rate.den = vd->fmt.i_frame_rate_base;
     v_fmt->color_space    = vlc_to_mmal_color_space(vd->fmt.space);
+
+    msg_Dbg(vd, "WxH: %dx%d, Crop: %dx%d", v_fmt->width, v_fmt->height, v_fmt->crop.width, v_fmt->crop.height);
 }
 
 static void display_src_rect(const vout_display_t * const vd, MMAL_RECT_T *const rect)
@@ -505,7 +513,7 @@ static void vd_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 
 static int query_resolution(vout_display_t *vd, unsigned *width, unsigned *height)
 {
-    TV_DISPLAY_STATE_T display_state;
+    TV_DISPLAY_STATE_T display_state = {0};
     int ret = 0;
 
     if (vc_tv_get_display_state(&display_state) == 0) {
@@ -691,12 +699,25 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
     }
     else
     {
-        MMAL_BUFFER_HEADER_T * const pic_buf = pic_mmal_buffer(p_pic);
-#if TRACE_ALL
-        msg_Dbg(vd, "--- %s: Buf stuff", __func__);
-#endif
-        if ((err = port_send_replicated(sys->input, sys->pool, pic_buf, pic_buf->pts)) != MMAL_SUCCESS)
+        MMAL_BUFFER_HEADER_T *const pic_buf = hw_mmal_pic_buf_replicated(p_pic, sys->pool);
+        if (pic_buf == NULL)
         {
+            msg_Err(vd, "Replicated buffer get fail");
+            goto fail;
+        }
+
+        // If dimensions have chnaged then fix that
+        if (hw_mmal_vlc_pic_to_mmal_fmt_update(sys->input->format, p_pic))
+        {
+            msg_Dbg(vd, "Reset port format");
+
+            // HVS can deal with on-line dimension changes
+            mmal_port_format_commit(sys->input);
+        }
+
+        if ((err = mmal_port_send_buffer(sys->input, pic_buf)) != MMAL_SUCCESS)
+        {
+            mmal_buffer_header_release(pic_buf);
             msg_Err(vd, "Send buffer to input failed");
             goto fail;
         }
@@ -884,7 +905,7 @@ static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
     vd_manage(vd);
 
     // Subpics can either turn up attached to the main pic or in the
-    // subpic list here  - if they turn up here then process inrto temp
+    // subpic list here  - if they turn up here then process into temp
     // buffers
     if (subpicture != NULL) {
         attach_subpics(vd, sys, subpicture);
@@ -940,11 +961,16 @@ static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
         if (isp_prepare(vd, isp) != MMAL_SUCCESS)
             return;
 
-        buf = pic_mmal_buffer(p_pic);
-        if ((err = port_send_replicated(isp->input, isp->in_pool,
-                                        buf, buf->pts)) != MMAL_SUCCESS)
+        if ((buf = hw_mmal_pic_buf_replicated(p_pic, isp->in_pool)) == NULL)
+        {
+            msg_Err(vd, "Pic has no attached buffer");
+            return;
+        }
+
+        if ((err = mmal_port_send_buffer(isp->input, buf)) != MMAL_SUCCESS)
         {
             msg_Err(vd, "Send buffer to input failed");
+            mmal_buffer_header_release(buf);
             return;
         }
 
