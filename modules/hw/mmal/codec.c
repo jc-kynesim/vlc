@@ -1388,12 +1388,9 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     MMAL_BUFFER_HEADER_T * out_buf = NULL;
 
 #if TRACE_ALL
-    msg_Dbg(p_filter, "<<< %s", __func__);
-#endif
-#if 0
     {
         char dbuf0[5], dbuf1[5];
-        msg_Dbg(p_filter, "%s: %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s,%dx%d [(%d,%d) %dx%d] sar:%d/%d", __func__,
+        msg_Dbg(p_filter, "<<< %s: %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s,%dx%d [(%d,%d) %dx%d] sar:%d/%d", __func__,
                 str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma), p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
                 p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
                 p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
