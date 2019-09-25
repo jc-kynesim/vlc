@@ -877,10 +877,10 @@ static inline int rescale_x(int x, int mul, int div)
 
 static void rescale_rect(MMAL_RECT_T * const d, const MMAL_RECT_T * const s, const MMAL_RECT_T * mul_rect, const MMAL_RECT_T * div_rect)
 {
-    d->x      = rescale_x(s->x,      mul_rect->width,  div_rect->width);
-    d->y      = rescale_x(s->y,      mul_rect->height, div_rect->height);
-    d->width  = rescale_x(s->width,  mul_rect->width,  div_rect->width);
-    d->height = rescale_x(s->height, mul_rect->height, div_rect->height);
+    d->x      = rescale_x(s->x - div_rect->x, mul_rect->width,  div_rect->width)  + mul_rect->x;
+    d->y      = rescale_x(s->y - div_rect->y, mul_rect->height, div_rect->height) + mul_rect->y;
+    d->width  = rescale_x(s->width,           mul_rect->width,  div_rect->width);
+    d->height = rescale_x(s->height,          mul_rect->height, div_rect->height);
 }
 
 void hw_mmal_vzc_buf_scale_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const MMAL_RECT_T * const scale_rect)

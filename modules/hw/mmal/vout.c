@@ -91,6 +91,8 @@ struct vout_display_sys_t {
     unsigned display_width;
     unsigned display_height;
 
+    MMAL_RECT_T dest_rect;      // Output rectangle in display coords
+
     unsigned int i_frame_rate_base; /* cached framerate to detect changes for rate adjustment */
     unsigned int i_frame_rate;
 
@@ -542,7 +544,6 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
                 const video_format_t *fmt)
 {
     vout_display_sys_t * const sys = vd->sys;
-    vout_display_place_t place;
     MMAL_DISPLAYREGION_T display_region;
     MMAL_STATUS_T status;
 
@@ -574,22 +575,28 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
     {
         // Ignore what VLC thinks might be going on with display size
         vout_display_cfg_t tcfg = *cfg;
+        vout_display_place_t place;
         tcfg.display.width = sys->display_width;
         tcfg.display.height = sys->display_height;
         tcfg.is_display_filled = true;
         vout_display_PlacePicture(&place, fmt, &tcfg, false);
 
-        msg_Dbg(vd, "%dx%d -> %dx%d @ %d,%d", tcfg.display.width, tcfg.display.height, place.width, place.height, place.x, place.y);
+        sys->dest_rect = (MMAL_RECT_T){
+            .x      = place.x,
+            .y      = place.y,
+            .width  = place.width,
+            .height = place.height
+        };
+
+        msg_Dbg(vd, "%dx%d -> %dx%d @ %d,%d", tcfg.display.width, tcfg.display.height,
+                place.width, place.height, place.x, place.y);
     }
 
     display_region.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
     display_region.hdr.size = sizeof(MMAL_DISPLAYREGION_T);
     display_region.fullscreen = MMAL_FALSE;
     display_src_rect(vd, &display_region.src_rect);
-    display_region.dest_rect.x = place.x;
-    display_region.dest_rect.y = place.y;
-    display_region.dest_rect.width = place.width;
-    display_region.dest_rect.height = place.height;
+    display_region.dest_rect = sys->dest_rect;
     display_region.layer = sys->layer;
     display_region.alpha = 0xff | (1 << 29);
     display_region.set = MMAL_DISPLAY_SET_FULLSCREEN | MMAL_DISPLAY_SET_SRC_RECT |
@@ -737,7 +744,7 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
                                             sub_buf != NULL ? sub_buf : *psub_bufs2++,
                                             &sys->subs[sub_no].sub,
                                             &p_pic->format,
-                                            &(MMAL_RECT_T){.width = sys->display_width, .height = sys->display_height},
+                                            &sys->dest_rect,
                                             p_pic->date)) == 0)
                 break;
             else if (rv < 0)
