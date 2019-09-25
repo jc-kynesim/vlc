@@ -51,8 +51,7 @@
 /*
  * This seems to be a bit high, but reducing it causes instabilities
  */
-#define NUM_EXTRA_BUFFERS 3
-//#define NUM_EXTRA_BUFFERS 6
+#define NUM_EXTRA_BUFFERS 5
 //#define NUM_EXTRA_BUFFERS 10
 #define NUM_DECODER_BUFFER_HEADERS 30
 
