@@ -40,8 +40,6 @@
 #include <interface/mmal/util/mmal_util.h>
 #include <interface/mmal/util/mmal_default_components.h>
 
-#define MIN_NUM_BUFFERS_IN_TRANSIT 2
-
 #define MMAL_DEINTERLACE_NO_QPU "mmal-deinterlace-no-qpu"
 #define MMAL_DEINTERLACE_NO_QPU_TEXT N_("Do not use QPUs for advanced HD deinterlacing.")
 #define MMAL_DEINTERLACE_NO_QPU_LONGTEXT N_("Do not make use of the QPUs to allow higher quality deinterlacing of HD content.")
@@ -88,8 +86,8 @@ typedef struct filter_sys_t
     bool use_qpu;
     bool use_fast;
     bool use_passthrough;
-    unsigned int seq_in;
-    unsigned int seq_out;
+    unsigned int seq_in;    // Seq of next frame to submit (1-15) [Init=1]
+    unsigned int seq_out;   // Seq of last frame received  (1-15) [Init=15]
 
     vcsm_init_type_t vcsm_init_type;
 
@@ -373,8 +371,11 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
         // Advanced di has a 3 frame latency, so if the seq delta is greater
         // than that then we are expecting at least two frames of output. Wait
         // for one of those.
-        while ((out_buf = (seq_delta(sys->seq_in, sys->seq_out) > 3 ? mmal_queue_wait(sys->out_q) : mmal_queue_get(sys->out_q))) != NULL)
-//        while ((out_buf = (seq_delta(sys->seq_in, sys->seq_out) > 3 ? mmal_queue_wait(sys->out_q) : NULL)) != NULL)
+        // seq_in is seq of the next frame we are going to submit (1-15, no 0)
+        // seq_out is last frame we removed from Q
+        // So after 4 frames sent (1st time we want to wait), 0 rx seq_in=5, seq_out=15, delta=5
+
+        while ((out_buf = (seq_delta(sys->seq_in, sys->seq_out) >= 5 ? mmal_queue_timedwait(sys->out_q, 1000) : mmal_queue_get(sys->out_q))) != NULL)
         {
             const unsigned int seq_out = (out_buf->flags / MMAL_BUFFER_HEADER_FLAG_USER0) & 0xf;
             int rv;
@@ -423,6 +424,9 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
             if (seq_out != 0)
                 sys->seq_out = seq_out;
         }
+
+        // Crash on lockup
+        assert(ret_pics != NULL || seq_delta(sys->seq_in, sys->seq_out) < 5);
     }
 
 #if TRACE_ALL
@@ -479,7 +483,7 @@ static void di_flush(filter_t *p_filter)
     }
 
     sys->seq_in = 1;
-    sys->seq_out = 1;
+    sys->seq_out = 15;
 
 #if TRACE_ALL
     msg_Dbg(p_filter, ">>> %s", __func__);
@@ -601,7 +605,7 @@ static int OpenMmalDeinterlace(filter_t *filter)
     filter->p_sys = sys;
 
     sys->seq_in = 1;
-    sys->seq_out = 1;
+    sys->seq_out = 15;
     sys->is_cma = is_cma_buf_pic_chroma(filter->fmt_out.video.i_chroma);
 
     if ((sys->vcsm_init_type = cma_vcsm_init()) == VCSM_INIT_NONE) {
