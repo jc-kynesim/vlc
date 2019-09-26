@@ -5,6 +5,7 @@ typedef struct subpic_reg_stash_s
 {
     MMAL_PORT_T * port;
     MMAL_POOL_T * pool;
+    int display_id;  // -1 => do not set
     unsigned int layer;
     // Shadow  vars so we can tell if stuff has changed
     MMAL_RECT_T dest_rect;
@@ -23,7 +24,9 @@ void hw_mmal_subpic_flush(vlc_object_t * const p_filter, subpic_reg_stash_t * co
 
 void hw_mmal_subpic_close(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe);
 
-MMAL_STATUS_T hw_mmal_subpic_open(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe, MMAL_PORT_T * const port, const unsigned int layer);
+// If display id is -1 it will be unset
+MMAL_STATUS_T hw_mmal_subpic_open(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe, MMAL_PORT_T * const port,
+                                  const int display_id, const unsigned int layer);
 
 #endif
 

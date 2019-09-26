@@ -65,7 +65,8 @@ void hw_mmal_subpic_close(vlc_object_t * const p_filter, subpic_reg_stash_t * co
     *spe = (subpic_reg_stash_t){NULL};
 }
 
-MMAL_STATUS_T hw_mmal_subpic_open(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe, MMAL_PORT_T * const port, const unsigned int layer)
+MMAL_STATUS_T hw_mmal_subpic_open(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe, MMAL_PORT_T * const port,
+                                  const int display_id, const unsigned int layer)
 {
     MMAL_STATUS_T err;
 
@@ -86,6 +87,7 @@ MMAL_STATUS_T hw_mmal_subpic_open(vlc_object_t * const p_filter, subpic_reg_stas
 
     port->userdata = (void *)p_filter;
     spe->port = port;
+    spe->display_id = display_id;
     spe->layer = layer;
 
     return MMAL_SUCCESS;
@@ -169,6 +171,11 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
                 spe->dest_rect = dreg->dest_rect;
                 needs_update = true;
 
+                if (spe->display_id >= 0)
+                {
+                    dreg->display_num = spe->display_id;
+                    dreg->set |= MMAL_DISPLAY_SET_NUM;
+                }
                 dreg->layer = spe->layer;
                 dreg->set |= MMAL_DISPLAY_SET_LAYER;
 

@@ -1947,7 +1947,7 @@ retry:
     {
         unsigned int i;
         for (i = 0; i != SUBS_MAX; ++i) {
-            if (hw_mmal_subpic_open(VLC_OBJECT(p_filter), sys->subs + i, sys->component->input[i + 1], i + 1) != MMAL_SUCCESS)
+            if (hw_mmal_subpic_open(VLC_OBJECT(p_filter), sys->subs + i, sys->component->input[i + 1], -1, i + 1) != MMAL_SUCCESS)
             {
                 msg_Err(p_filter, "Failed to open subpic %d", i);
                 goto fail;
