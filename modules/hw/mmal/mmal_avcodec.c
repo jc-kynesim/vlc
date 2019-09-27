@@ -54,6 +54,15 @@
 
 #define TRACE_ALL 0
 
+#define BUFFERS_IN_FLIGHT       5       // Default max value for in flight buffers
+
+#define MMAL_AVCODEC_BUFFERS "mmal-avcodec-buffers"
+#define MMAL_AVCODEC_BUFFERS_TEXT N_("In flight buffer count before blocking.")
+#define MMAL_AVCODEC_BUFFERS_LONGTEXT N_("In flight buffer count before blocking. " \
+"Beware that incautious changing of this can lead to lockup. " \
+"Zero will disable the module.")
+
+
 // Fwd declarations required due to wanting to avoid reworking the original
 // code too much
 static void MmalAvcodecCloseDecoder( vlc_object_t *obj );
@@ -106,6 +115,7 @@ struct decoder_sys_t
     // Rpi vars
     cma_buf_pool_t * cma_pool;
     vcsm_init_type_t vcsm_init_type;
+    int cma_in_flight_max;
     // Debug
     decoder_t * p_dec;
 };
@@ -1056,6 +1066,13 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     decoder_t *p_dec = (decoder_t *)obj;
     const AVCodec *p_codec;
 
+    const int extra_buffers = var_InheritInteger(p_dec, MMAL_AVCODEC_BUFFERS);
+    if (extra_buffers <= 0)
+    {
+        msg_Dbg(p_dec, "%s: extra_buffers=%d - cannot use module", __func__, extra_buffers);
+        return VLC_EGENERIC;
+    }
+
     const vcsm_init_type_t vcsm_type = cma_vcsm_init();
     const int vcsm_size =
         vcsm_type == VCSM_INIT_LEGACY ? hw_mmal_get_gpu_mem() : 512 << 20;
@@ -1113,6 +1130,7 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     p_sys->p_codec = p_codec;
     p_sys->p_dec = p_dec;
 //    p_sys->p_va = NULL;
+    p_sys->cma_in_flight_max = extra_buffers;
     p_sys->vcsm_init_type = vcsm_type;
     vlc_sem_init( &p_sys->sem_mt, 0 );
 
@@ -1263,7 +1281,7 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     } else
         p_sys->palette_sent = true;
 
-    if ((p_sys->cma_pool = cma_buf_pool_new(5, 5, false)) == NULL)
+    if ((p_sys->cma_pool = cma_buf_pool_new(p_sys->cma_in_flight_max, p_sys->cma_in_flight_max, false)) == NULL)
     {
         msg_Err(p_dec, "CMA pool alloc failure");
         goto fail;
@@ -2085,6 +2103,8 @@ vlc_module_begin()
     set_description(N_("MMAL buffered avcodec "))
     set_capability("video decoder", 80)
     add_shortcut("mmal_avcodec")
+    add_integer(MMAL_AVCODEC_BUFFERS, BUFFERS_IN_FLIGHT, MMAL_AVCODEC_BUFFERS_TEXT,
+                    MMAL_AVCODEC_BUFFERS_LONGTEXT, true)
     set_callbacks(MmalAvcodecOpenDecoder, MmalAvcodecCloseDecoder)
 vlc_module_end()
 
