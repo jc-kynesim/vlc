@@ -58,7 +58,10 @@
 
 #define MMAL_DISPLAY_NAME "mmal-display"
 #define MMAL_DISPLAY_TEXT N_("Output device for Rpi fullscreen.")
-#define MMAL_DISPLAY_LONGTEXT N_("Output device for Rpi fullscreen. Valid values are HDMI-1,HDMI-2")
+#define MMAL_DISPLAY_LONGTEXT N_("Output device for Rpi fullscreen. " \
+"Valid values are HDMI-1,HDMI-2.  By default if qt-fullscreen-screennumber " \
+"is specified (or set by Fullscreen Output Device in Preferences) " \
+"HDMI-<qt-fullscreen-screennumber+1> will be used, otherwise HDMI-1.")
 
 #define MMAL_ADJUST_REFRESHRATE_NAME "mmal-adjust-refreshrate"
 #define MMAL_ADJUST_REFRESHRATE_TEXT N_("Adjust HDMI refresh rate to the video.")
@@ -1311,13 +1314,16 @@ static int OpenMmalVout(vlc_object_t *object)
 
     {
         const char *display_name = var_InheritString(vd, MMAL_DISPLAY_NAME);
+        int qt_num = var_InheritInteger(vd, "qt-fullscreen-screennumber" );
         int display_id = find_display_num(display_name);
 //        sys->display_id = display_id < 0 ? vc_tv_get_default_display_id() : display_id;
-        sys->display_id = display_id < 0 ? DISPMANX_ID_HDMI : display_id;
+        sys->display_id = display_id >= 0 ? display_id :
+            qt_num == 1 ? DISPMANX_ID_HDMI1 : DISPMANX_ID_HDMI;
         if (display_id < -1)
             msg_Warn(vd, "Unknown display device: '%s'", display_name);
         else
-            msg_Dbg(vd, "Display device: %s, id=%d/%d", display_name, display_id, sys->display_id);
+            msg_Dbg(vd, "Display device: %s, qt=%d id=%d display=%d", display_name,
+                    qt_num, display_id, sys->display_id);
     }
 
     status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &sys->component);
