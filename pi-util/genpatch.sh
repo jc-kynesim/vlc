@@ -32,6 +32,6 @@ else
   git tag $PATCHTAG
 fi
 echo Generating patch: $PATCHFILE
-git diff $VERSION -- modules/hw/mmal modules/video_output/opengl src/misc include configure.ac > $PATCHFILE
+git diff $VERSION -- modules/hw/mmal modules/video_output/opengl src/misc include src/video_output configure.ac > $PATCHFILE
 #echo Copying patch to arm-build
 #scp $PATCHFILE john@arm-build:patches/0002-vlc-3.0.6-mmal_test_4.patch
