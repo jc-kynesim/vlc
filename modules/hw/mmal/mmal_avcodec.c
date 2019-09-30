@@ -1096,7 +1096,7 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
 
     if( vcsm_type == VCSM_INIT_NONE )
         return VLC_EGENERIC;
-#if 0
+#if 1
     if( (p_dec->fmt_in.i_codec != VLC_CODEC_HEVC &&
          (vcsm_type == VCSM_INIT_CMA || vcsm_size < (96 << 20))) ||
         (p_dec->fmt_in.i_codec == VLC_CODEC_HEVC &&
