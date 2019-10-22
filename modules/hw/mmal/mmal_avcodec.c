@@ -954,7 +954,9 @@ static int lavc_UpdateVideoFormat(decoder_t *dec, AVCodecContext *ctx,
 {
     video_format_t fmt_out;
     int val;
-
+#if TRACE_ALL
+    msg_Dbg(dec, "<<< %s", __func__);
+#endif
     val = lavc_GetVideoFormat(dec, &fmt_out, ctx, fmt, swfmt);
     if (val)
     {
@@ -985,7 +987,11 @@ static int lavc_UpdateVideoFormat(decoder_t *dec, AVCodecContext *ctx,
         dec->fmt_out.video.mastering = dec->fmt_in.video.mastering;
     dec->fmt_out.video.lighting = dec->fmt_in.video.lighting;
 
-    return decoder_UpdateVideoFormat(dec);
+    val = decoder_UpdateVideoFormat(dec);
+#if TRACE_ALL
+    msg_Dbg(dec, ">>> %s: rv=%d", __func__, val);
+#endif
+    return val;
 }
 
 static int OpenVideoCodec( decoder_t *p_dec )
@@ -1308,10 +1314,22 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     if( p_context->level != FF_LEVEL_UNKNOWN )
         p_dec->fmt_in.i_level = p_context->level;
 
+#if 1
+    // Most of the time we have nothing useful by way of a format here
+    // wait till we've decoded something
+#else
     // Update output format
-    lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
-                               p_context->pix_fmt);
+    if (lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
+                               p_context->pix_fmt) != 0)
+    {
+        msg_Err(p_dec, "Unable to update format: pix_fmt=%d", p_context->pix_fmt);
+//        goto fail;
+    }
+#endif
 
+#if TRACE_ALL
+    msg_Dbg(p_dec, "<<< %s: OK", __func__);
+#endif
     return VLC_SUCCESS;
 
 fail:
@@ -1595,6 +1613,7 @@ static int DecodeSidedata( decoder_t *p_dec, const AVFrame *frame, picture_t *p_
 /*****************************************************************************
  * DecodeBlock: Called to decode one or more frames
  *****************************************************************************/
+
 static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error )
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
@@ -1611,6 +1630,11 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
 
     block_t *p_block;
     mtime_t current_time;
+    picture_t *p_pic = NULL;
+    AVFrame *frame = NULL;
+
+    // By default we are OK
+    *error = false;
 
     if( !p_context->extradata_size && p_dec->fmt_in.i_extra )
     {
@@ -1744,7 +1768,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         i_used = ret != AVERROR(EAGAIN) ? pkt.size : 0;
         av_packet_unref( &pkt );
 
-        AVFrame *frame = av_frame_alloc();
+        frame = av_frame_alloc();
         if (unlikely(frame == NULL))
         {
             *error = true;
@@ -1854,38 +1878,36 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         }
 
 #if 1
-        picture_t *p_pic = NULL;
-
         {
             cma_buf_t * const cb = av_rpi_zc_buf_v(frame->buf[0]);
 
             if (cb == NULL)
             {
                 msg_Err(p_dec, "Frame has no attached CMA buffer");
-                av_frame_free(&frame);
-                return NULL;
+                goto fail;
             }
 
-            lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
-                                       p_context->pix_fmt);
+            if (lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
+                                       p_context->pix_fmt) != 0)
+            {
+                msg_Err(p_dec, "Failed to update format");
+                goto fail;
+            }
 
             if ((p_pic = decoder_NewPicture(p_dec)) == NULL)
             {
                 msg_Err(p_dec, "Failed to allocate pic");
-                av_frame_free(&frame);
-                return NULL;
+                goto fail;
             }
 
             cma_buf_in_flight(cb);
 
             if (cma_buf_pic_attach(cma_buf_ref(cb), p_pic) != 0)
             {
+                cma_buf_unref(cb);  // Undo the in_flight
                 char dbuf0[5];
                 msg_Err(p_dec, "Failed to attach bufs to pic: fmt=%s", str_fourcc(dbuf0, p_pic->format.i_chroma));
-                cma_buf_unref(cb);
-                av_frame_free(&frame);
-                picture_Release(p_pic);
-                return NULL;
+                goto fail;
             }
 
             // ****** Set planes etc.
@@ -1978,6 +2000,18 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
 #if TRACE_ALL
      msg_Dbg(p_dec, ">>> %s: NULL", __func__);
 #endif
+    return NULL;
+
+fail:
+#if TRACE_ALL
+     msg_Dbg(p_dec, ">>> %s: FAIL", __func__);
+#endif
+    av_frame_free(&frame);
+    if (p_pic != NULL)
+        picture_Release(p_pic);
+    if (p_block != NULL)
+        block_Release(p_block);
+    *error = true;
     return NULL;
 }
 
