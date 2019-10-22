@@ -497,6 +497,10 @@ cma_buf_t * cma_buf_ref(cma_buf_t * const cb)
 cma_buf_t * cma_buf_pool_alloc_buf(cma_buf_pool_t * const cbp, const size_t size)
 {
     cma_buf_t *const cb = cma_pool_fixed_get(cbp->pool, size, cbp->all_in_flight);
+
+    if (cb == NULL)
+        return NULL;
+
     cb->in_flight = cbp->all_in_flight;
     // When 1st allocated or retrieved from the pool the block will have a
     // ref count of 0 so ref here
