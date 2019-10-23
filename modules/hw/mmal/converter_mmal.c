@@ -350,11 +350,11 @@ static vlc_fourcc_t chroma_in_out(const vlc_fourcc_t chroma_in)
         case VLC_CODEC_MMAL_OPAQUE:
         case VLC_CODEC_MMAL_ZC_I420:
         case VLC_CODEC_MMAL_ZC_SAND8:
-        case VLC_CODEC_MMAL_ZC_SAND10:   // ISP only
+        case VLC_CODEC_MMAL_ZC_SAND10:          // ISP only
             return VLC_CODEC_MMAL_ZC_I420;
-        case VLC_CODEC_MMAL_ZC_SAND30:   // HVS only
+        case VLC_CODEC_MMAL_ZC_SAND30:          // HVS only
         case VLC_CODEC_MMAL_ZC_RGB32:
-            return VLC_CODEC_MMAL_ZC_RGB32;
+            return VLC_CODEC_MMAL_ZC_RGB32;     // HVS can't generate YUV of any sort
         default:
             break;
     }
