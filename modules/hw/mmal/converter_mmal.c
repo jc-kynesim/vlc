@@ -26,7 +26,7 @@
 
 #include <assert.h>
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 typedef struct mmal_gl_converter_s
 {
@@ -446,6 +446,14 @@ OpenGLConverter(vlc_object_t *obj)
 
     tc->handle_texs_gen = true;  // We manage the texs
     tc->pf_update  = tc_mmal_update;
+
+
+    tc->fmt.i_width = 1280;
+    tc->fmt.i_height = 720;
+    tc->fmt.i_x_offset = 0;
+    tc->fmt.i_y_offset = 0;
+    tc->fmt.i_visible_width = 1280;
+    tc->fmt.i_visible_height = 720;
 
 #if TRACE_ALL
     {
