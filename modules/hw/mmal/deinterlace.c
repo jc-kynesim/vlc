@@ -96,7 +96,7 @@ typedef struct filter_sys_t
 
 #define MMAL_COMPONENT_DEFAULT_DEINTERLACE "vc.ril.image_fx"
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 
 
@@ -223,6 +223,9 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
     filter_sys_t * const sys = p_filter->p_sys;
     picture_t *ret_pics = NULL;
     MMAL_STATUS_T err;
+    MMAL_BUFFER_HEADER_T * out_buf = NULL;
+
+#error If we jump around on Kylie then we eventually fail unable to alloc pic
 
 #if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s", __func__);
@@ -274,7 +277,6 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
         // We are expecting one in - one out so simply wedge a new bufer
         // into the output port.  Flow control will happen on cma alloc.
         int rv;
-        MMAL_BUFFER_HEADER_T * out_buf;
 
         if ((out_buf = mmal_queue_get(sys->out_pool->queue)) == NULL)
         {
@@ -365,7 +367,6 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
 
     // Return anything that is in the out Q
     {
-        MMAL_BUFFER_HEADER_T * out_buf;  // *** Worry about error leaks
         picture_t ** pp_pic = &ret_pics;
 
         // Advanced di has a 3 frame latency, so if the seq delta is greater
@@ -408,9 +409,11 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
                 if (out_pic == NULL) {
                     msg_Warn(p_filter, "Failed to alloc new filter output pic");
                     mmal_queue_put_back(sys->out_q, out_buf);  // Wedge buf back into Q in the hope we can alloc a pic later
+                    out_buf = NULL;
                     break;
                 }
             }
+            out_buf = NULL;  // Now attached to pic or recycled
 
 #if TRACE_ALL
             msg_Dbg(p_filter, "-- %s: Q pic=%p: seq_in=%d, seq_out=%d, delta=%d", __func__, out_pic, sys->seq_in, seq_out, seq_delta(sys->seq_in, seq_out));
@@ -436,6 +439,8 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
     return ret_pics;
 
 fail:
+    if (out_buf != NULL)
+        mmal_buffer_header_release(out_buf);
     picture_Release(p_pic);
     return NULL;
 }

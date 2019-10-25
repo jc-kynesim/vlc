@@ -26,7 +26,7 @@
 
 #include <assert.h>
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 typedef struct mmal_gl_converter_s
 {
@@ -82,6 +82,7 @@ typedef struct tex_context_s {
 static void tex_context_delete(tex_context_t * const tex)
 {
     tex->DeleteTextures(1, &tex->texture);
+    printf("--- Free texture %d\n", tex->texture);
 
     free(tex);
 }
@@ -208,6 +209,7 @@ static tex_context_t * get_tex_context(const opengl_tex_converter_t * const tc, 
 
         // ** ?? tc->tex_target
         tc->vt->GenTextures(1, &tex->texture);
+        msg_Dbg(tc, "Gen tex %d", tex->texture);
         tc->vt->BindTexture(GL_TEXTURE_EXTERNAL_OES, tex->texture);
         tc->vt->TexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         tc->vt->TexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -446,14 +448,6 @@ OpenGLConverter(vlc_object_t *obj)
 
     tc->handle_texs_gen = true;  // We manage the texs
     tc->pf_update  = tc_mmal_update;
-
-
-    tc->fmt.i_width = 1280;
-    tc->fmt.i_height = 720;
-    tc->fmt.i_x_offset = 0;
-    tc->fmt.i_y_offset = 0;
-    tc->fmt.i_visible_width = 1280;
-    tc->fmt.i_visible_height = 720;
 
 #if TRACE_ALL
     {

@@ -46,7 +46,7 @@
 #include "subpic.h"
 #include "blend_rgba_neon.h"
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 /*
  * This seems to be a bit high, but reducing it causes instabilities
