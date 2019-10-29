@@ -199,11 +199,9 @@ static MMAL_BOOL_T out_buffer_pre_release_cb(MMAL_BUFFER_HEADER_T *header, void 
 {
     VLC_UNUSED(userdata);
 
-    picture_t * const pic = header->user_data;
+    cma_buf_t * const cb = header->user_data;
     header->user_data = NULL;
-
-    if (pic != NULL)
-        picture_Release(pic);
+    cma_buf_unref(cb);  // Copes fine with NULL
 
     return MMAL_FALSE;
 }
@@ -224,8 +222,6 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
     picture_t *ret_pics = NULL;
     MMAL_STATUS_T err;
     MMAL_BUFFER_HEADER_T * out_buf = NULL;
-
-#error If we jump around on Kylie then we eventually fail unable to alloc pic
 
 #if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s", __func__);
@@ -276,7 +272,6 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
     {
         // We are expecting one in - one out so simply wedge a new bufer
         // into the output port.  Flow control will happen on cma alloc.
-        int rv;
 
         if ((out_buf = mmal_queue_get(sys->out_pool->queue)) == NULL)
         {
@@ -286,36 +281,20 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
         }
         mmal_buffer_header_reset(out_buf);
 
-        picture_t * const out_pic = filter_NewPicture(p_filter);
-
-        if (out_pic == NULL) {
-            msg_Warn(p_filter, "Failed to alloc new filter output pic");
-            goto fail;
-        }
-
-        // Attach out_pic to the buffer & ensure it is freed when the buffer is released
+        // Attach cma_buf to the buffer & ensure it is freed when the buffer is released
         // On a good send callback the pic will be extracted to avoid this
-        out_buf->user_data = out_pic;
-        mmal_buffer_header_pre_release_cb_set(out_buf, out_buffer_pre_release_cb, NULL);
+        mmal_buffer_header_pre_release_cb_set(out_buf, out_buffer_pre_release_cb, p_filter);
 
         cma_buf_t * const cb = cma_buf_pool_alloc_buf(sys->cma_out_pool, sys->output->buffer_size);
-        if (cb == NULL) {
+        if ((out_buf->user_data = cb) == NULL)
+        {
             char dbuf0[5];
             msg_Err(p_filter, "Failed to alloc CMA buf: fmt=%s, size=%d",
-                    str_fourcc(dbuf0, out_pic->format.i_chroma),
+                    str_fourcc(dbuf0, p_pic->format.i_chroma),
                     sys->output->buffer_size);
             goto fail;
         }
 
-        if ((rv = cma_buf_pic_attach(cb, out_pic)) != VLC_SUCCESS)
-        {
-            char dbuf0[5];
-            msg_Err(p_filter, "Failed to attach CMA to pic: fmt=%s err=%d",
-                    str_fourcc(dbuf0, out_pic->format.i_chroma),
-                    rv);
-            cma_buf_unref(cb);
-            goto fail;
-        }
         const unsigned int vc_h = cma_buf_vc_handle(cb);
         if (vc_h == 0)
         {
@@ -385,8 +364,28 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
 
             if (sys->is_cma)
             {
-                // Extract pic from buf
-                out_pic = (picture_t *)out_buf->user_data;
+                // Alloc pic
+                if ((out_pic = filter_NewPicture(p_filter)) == NULL)
+                {
+                    // Can't alloc pic - just stop extraction
+                    mmal_queue_put_back(sys->out_q, out_buf);
+                    out_buf = NULL;
+                    msg_Warn(p_filter, "Failed to alloc new filter output pic");
+                    break;
+                }
+
+                // Extract cma_buf from buf & attach to pic
+                cma_buf_t * const cb = (cma_buf_t *)out_buf->user_data;
+                if ((rv = cma_buf_pic_attach(cb, out_pic)) != VLC_SUCCESS)
+                {
+                    char dbuf0[5];
+                    msg_Err(p_filter, "Failed to attach CMA to pic: fmt=%s err=%d",
+                            str_fourcc(dbuf0, out_pic->format.i_chroma),
+                            rv);
+                    // cb still attached to buffer and will be freed with it
+                    goto fail;
+                }
+                out_buf->user_data = NULL;
 
                 buf_to_pic_copy_props(out_pic, out_buf);
 
@@ -784,7 +783,7 @@ static int OpenMmalDeinterlace(filter_t *filter)
         // CMA stuff
         sys->output->userdata = (struct MMAL_PORT_USERDATA_T *)filter;
 
-        if ((sys->cma_out_pool = cma_buf_pool_new(8, 8, true)) == NULL)
+        if ((sys->cma_out_pool = cma_buf_pool_new(8, 8, true, "deinterlace")) == NULL)
         {
             msg_Err(filter, "Failed to alloc cma buf pool");
             goto fail;

@@ -1017,7 +1017,7 @@ static MMAL_STATUS_T conv_enable_out(filter_t * const p_filter, filter_sys_t * c
     if (sys->is_cma)
     {
         if (sys->cma_out_pool == NULL &&
-            (sys->cma_out_pool = cma_buf_pool_new(5, 5, true)) == NULL)
+            (sys->cma_out_pool = cma_buf_pool_new(5, 5, true, "mmal_converter")) == NULL)
         {
             msg_Err(p_filter, "Failed to alloc cma buf pool");
             return MMAL_ENOMEM;
