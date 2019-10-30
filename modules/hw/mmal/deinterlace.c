@@ -96,7 +96,7 @@ typedef struct filter_sys_t
 
 #define MMAL_COMPONENT_DEFAULT_DEINTERLACE "vc.ril.image_fx"
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 
 
@@ -286,7 +286,7 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
         mmal_buffer_header_pre_release_cb_set(out_buf, out_buffer_pre_release_cb, p_filter);
 
         cma_buf_t * const cb = cma_buf_pool_alloc_buf(sys->cma_out_pool, sys->output->buffer_size);
-        if ((out_buf->user_data = cb) == NULL)
+        if ((out_buf->user_data = cb) == NULL)  // Check & attach cb to buf
         {
             char dbuf0[5];
             msg_Err(p_filter, "Failed to alloc CMA buf: fmt=%s, size=%d",
@@ -294,13 +294,7 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
                     sys->output->buffer_size);
             goto fail;
         }
-
-        const unsigned int vc_h = cma_buf_vc_handle(cb);
-        if (vc_h == 0)
-        {
-            msg_Err(p_filter, "Pic has no vc handle");
-            goto fail;
-        }
+        const unsigned int vc_h = cma_buf_vc_handle(cb);  // Cannot coerce without going via variable
         out_buf->data = (uint8_t *)vc_h;
         out_buf->alloc_size = sys->output->buffer_size;
 

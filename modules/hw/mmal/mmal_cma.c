@@ -28,6 +28,10 @@
 typedef void * cma_pool_alloc_fn(void * v, size_t size);
 typedef void cma_pool_free_fn(void * v, void * el, size_t size);
 
+#if TRACE_ALL
+static atomic_int pool_seq;
+#endif
+
 // Pool structure
 // Ref count is held by pool owner and pool els that have been got
 // Els in the pool do not count towards its ref count
@@ -51,6 +55,9 @@ struct cma_pool_fixed_s
     cma_pool_on_delete_fn * on_delete_fn;
 
     const char * name;
+#if TRACE_ALL
+    int seq;
+#endif
 };
 
 static void free_pool(const cma_pool_fixed_t * const p, void ** pool, unsigned int n, size_t el_size)
@@ -231,6 +238,9 @@ cma_pool_fixed_new(const unsigned int pool_size,
     p->el_free_fn = free_fn;
     p->on_delete_fn = on_delete_fn;
     p->name = name == NULL ? NULL : strdup(name);
+#if TRACE_ALL
+    p->seq = atomic_fetch_add(&pool_seq, 1);
+#endif
 
     return p;
 }
@@ -269,7 +279,7 @@ static void cma_pool_delete(cma_buf_t * const cb)
 #if TRACE_ALL
     cb->cbp->alloc_size -= cb->size;
     --cb->cbp->alloc_n;
-    fprintf(stderr, "%s[%s]: N=%d, Total=%d\n", __func__, cb->cbp->pool->name, cb->cbp->alloc_n, cb->cbp->alloc_size);
+    fprintf(stderr, "%s[%d:%s]: N=%d, Total=%d\n", __func__, cb->cbp->pool->seq, cb->cbp->pool->name, cb->cbp->alloc_n, cb->cbp->alloc_size);
 #endif
 
     if (cb->ctx2 != NULL)
@@ -319,7 +329,7 @@ static void * cma_pool_alloc_cb(void * v, size_t size)
 #if TRACE_ALL
     cb->cbp->alloc_size += cb->size;
     ++cb->cbp->alloc_n;
-    fprintf(stderr, "%s[%s]: N=%d, Total=%d\n", __func__, cbp->pool->name, cbp->alloc_n, cbp->alloc_size);
+    fprintf(stderr, "%s[%d:%s]: N=%d, Total=%d\n", __func__, cbp->pool->seq, cbp->pool->name, cbp->alloc_n, cbp->alloc_size);
 #endif
 
     // 0x80 is magic value to force full ARM-side mapping - otherwise

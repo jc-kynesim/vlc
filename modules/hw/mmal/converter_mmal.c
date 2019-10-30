@@ -82,8 +82,6 @@ typedef struct tex_context_s {
 static void tex_context_delete(tex_context_t * const tex)
 {
     tex->DeleteTextures(1, &tex->texture);
-    printf("--- Free texture %d\n", tex->texture);
-
     free(tex);
 }
 
@@ -209,7 +207,6 @@ static tex_context_t * get_tex_context(const opengl_tex_converter_t * const tc, 
 
         // ** ?? tc->tex_target
         tc->vt->GenTextures(1, &tex->texture);
-        msg_Dbg(tc, "Gen tex %d", tex->texture);
         tc->vt->BindTexture(GL_TEXTURE_EXTERNAL_OES, tex->texture);
         tc->vt->TexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         tc->vt->TexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

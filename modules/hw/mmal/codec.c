@@ -947,19 +947,15 @@ typedef struct filter_sys_t {
 
     pic_fifo_t ret_pics;
 
+    unsigned int pic_n;
     vlc_sem_t sem;
     vlc_mutex_t lock;
 
-    bool b_top_field_first;
-    bool b_progressive;
-
     MMAL_STATUS_T err_stream;
-    int in_count;
 
     bool is_cma;
     bool is_sliced;
     bool out_fmt_set;
-    bool latency_set;
     const char * component_name;
     MMAL_PORT_BH_CB_T in_port_cb_fn;
     MMAL_PORT_BH_CB_T out_port_cb_fn;
@@ -1017,7 +1013,7 @@ static MMAL_STATUS_T conv_enable_out(filter_t * const p_filter, filter_sys_t * c
     if (sys->is_cma)
     {
         if (sys->cma_out_pool == NULL &&
-            (sys->cma_out_pool = cma_buf_pool_new(5, 5, true, "mmal_converter")) == NULL)
+            (sys->cma_out_pool = cma_buf_pool_new(5, 5, true, "mmal_resizer")) == NULL)
         {
             msg_Err(p_filter, "Failed to alloc cma buf pool");
             return MMAL_ENOMEM;
@@ -1254,7 +1250,7 @@ static void conv_flush(filter_t * p_filter)
     if (sys->output != NULL && sys->output->is_enabled)
         mmal_port_disable(sys->output);
 
-    cma_buf_pool_deletez(&sys->cma_out_pool);
+//    cma_buf_pool_deletez(&sys->cma_out_pool);
 
     // Free up anything we may have already lying around
     // Don't need lock as the above disables should have prevented anything
@@ -1277,12 +1273,9 @@ static void conv_flush(filter_t * p_filter)
     pic_fifo_release_all(&sys->ret_pics);
 
     // Reset sem values - easiest & most reliable way is to just kill & re-init
-    // This will also dig us out of situations where we have got out of sync somehow
     vlc_sem_destroy(&sys->sem);
-    vlc_sem_init(&sys->sem, CONV_MAX_LATENCY);
-
-    // No buffers in either port now
-    sys->in_count = 0;
+    vlc_sem_init(&sys->sem, 0);
+    sys->pic_n = 0;
 
     // Reset error status
     sys->err_stream = MMAL_SUCCESS;
@@ -1476,8 +1469,10 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         (err = conv_enable_in(p_filter, sys)) != MMAL_SUCCESS)
         goto fail;
 
-    // If ZC then we need to allocate the out pic before we stuff the input
-    if (sys->is_sliced) {
+    // We attach pic to buf before stuffing the output port
+    // We could attach the pic on output for cma, but it is a lot easier to keep
+    // the code common.
+    {
         picture_t * const out_pic = filter_NewPicture(p_filter);
 
         if (out_pic == NULL)
@@ -1486,17 +1481,89 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             goto fail;
         }
 
-        vlc_mutex_lock(&sys->lock);
-        pic_fifo_put(&sys->slice.pics, out_pic);
-        vlc_mutex_unlock(&sys->lock);
+        if (sys->is_sliced) {
+            vlc_mutex_lock(&sys->lock);
+            pic_fifo_put(&sys->slice.pics, out_pic);
+            vlc_mutex_unlock(&sys->lock);
 
-        // Poke any returned pic buffers into output
-        // In general this should only happen immediately after enable
-        while ((out_buf = mmal_queue_get(sys->out_pool->queue)) != NULL)
-            mmal_port_send_buffer(sys->output, out_buf);
+            // Poke any returned pic buffers into output
+            // In general this should only happen immediately after enable
+            while ((out_buf = mmal_queue_get(sys->out_pool->queue)) != NULL)
+                mmal_port_send_buffer(sys->output, out_buf);
+        }
+        else
+        {
+            // 1 in - 1 out
+            if ((out_buf = mmal_queue_wait(sys->out_pool->queue)) == NULL)
+            {
+                msg_Err(p_filter, "Failed to get output buffer");
+                picture_Release(out_pic);
+                goto fail;
+            }
+            mmal_buffer_header_reset(out_buf);
 
-        ++sys->in_count;
+            // Attach out_pic to the buffer & ensure it is freed when the buffer is released
+            // On a good send callback the pic will be extracted to avoid this
+            out_buf->user_data = out_pic;
+            mmal_buffer_header_pre_release_cb_set(out_buf, out_buffer_pre_release_cb, NULL);
+
+#if 0
+            char dbuf0[5];
+            msg_Dbg(p_filter, "out_pic %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d",
+                    str_fourcc(dbuf0, out_pic->format.i_chroma),
+                    out_pic->format.i_width, out_pic->format.i_height,
+                    out_pic->format.i_x_offset, out_pic->format.i_y_offset,
+                    out_pic->format.i_visible_width, out_pic->format.i_visible_height,
+                    out_pic->format.i_sar_num, out_pic->format.i_sar_den);
+#endif
+
+
+            if (sys->is_cma) {
+                int rv;
+
+                cma_buf_t * const cb = cma_buf_pool_alloc_buf(sys->cma_out_pool, sys->output->buffer_size);
+                if (cb == NULL) {
+                    char dbuf0[5];
+                    msg_Err(p_filter, "Failed to alloc CMA buf: fmt=%s, size=%d",
+                            str_fourcc(dbuf0, out_pic->format.i_chroma),
+                            sys->output->buffer_size);
+                    goto fail;
+                }
+                const unsigned int vc_h = cma_buf_vc_handle(cb);  // Cannot coerce without going via variable
+                out_buf->data = (uint8_t *)vc_h;
+                out_buf->alloc_size = sys->output->buffer_size;
+
+                if ((rv = cma_buf_pic_attach(cb, out_pic)) != VLC_SUCCESS)
+                {
+                    char dbuf0[5];
+                    msg_Err(p_filter, "Failed to attach CMA to pic: fmt=%s err=%d",
+                            str_fourcc(dbuf0, out_pic->format.i_chroma),
+                            rv);
+                    cma_buf_unref(cb);
+                    goto fail;
+                }
+            }
+            else {
+                out_buf->data = out_pic->p[0].p_pixels;
+                out_buf->alloc_size = out_pic->p[0].i_pitch * out_pic->p[0].i_lines;
+                //**** stride ????
+            }
+
+#if TRACE_ALL
+            msg_Dbg(p_filter, "Out buf send: pic=%p, data=%p, user=%p, flags=%#x, len=%d/%d, pts=%lld",
+                    p_pic, out_buf->data, out_buf->user_data, out_buf->flags,
+                    out_buf->length, out_buf->alloc_size, (long long)out_buf->pts);
+#endif
+
+            if ((err = mmal_port_send_buffer(sys->output, out_buf)) != MMAL_SUCCESS)
+            {
+                msg_Err(p_filter, "Send buffer to output failed");
+                goto fail;
+            }
+            out_buf = NULL;
+        }
     }
+
 
     // Stuff into input
     // We assume the BH is already set up with values reflecting pic date etc.
@@ -1521,145 +1588,28 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             mmal_buffer_header_release(pic_buf);
             goto fail;
         }
-
-        --sys->in_count;
     }
 
-    if (!sys->is_sliced) {
-
-        while ((out_buf = sys->in_count < 0 ?
-                mmal_queue_wait(sys->out_pool->queue) : mmal_queue_get(sys->out_pool->queue)) != NULL)
-        {
-            picture_t * const out_pic = filter_NewPicture(p_filter);
-
-            mmal_buffer_header_reset(out_buf);
-
-            if (out_pic == NULL) {
-                msg_Warn(p_filter, "Failed to alloc new filter output pic");
-                mmal_buffer_header_release(out_buf);
-                out_buf = NULL;
-                break;
-            }
-
-            // Attach out_pic to the buffer & ensure it is freed when the buffer is released
-            // On a good send callback the pic will be extracted to avoid this
-            out_buf->user_data = out_pic;
-            mmal_buffer_header_pre_release_cb_set(out_buf, out_buffer_pre_release_cb, NULL);
-
-#if 0
-            char dbuf0[5];
-            msg_Dbg(p_filter, "out_pic %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d",
-                    str_fourcc(dbuf0, out_pic->format.i_chroma),
-                    out_pic->format.i_width, out_pic->format.i_height,
-                    out_pic->format.i_x_offset, out_pic->format.i_y_offset,
-                    out_pic->format.i_visible_width, out_pic->format.i_visible_height,
-                    out_pic->format.i_sar_num, out_pic->format.i_sar_den);
-#endif
-
-
-            if (sys->is_cma) {
-                int rv;
-
-                cma_buf_t * const cb = cma_buf_pool_alloc_buf(sys->cma_out_pool, sys->output->buffer_size);
-                if (cb == NULL) {
-                    char dbuf0[5];
-                    msg_Err(p_filter, "Failed to alloc CMA buf: fmt=%s, size=%d, err=%d",
-                            str_fourcc(dbuf0, out_pic->format.i_chroma),
-                            sys->output->buffer_size,
-                            rv);
-                    goto fail;
-                }
-
-                if ((rv = cma_buf_pic_attach(cb, out_pic)) != VLC_SUCCESS)
-                {
-                    char dbuf0[5];
-                    msg_Err(p_filter, "Failed to attach CMA to pic: fmt=%s err=%d",
-                            str_fourcc(dbuf0, out_pic->format.i_chroma),
-                            rv);
-                    cma_buf_unref(cb);
-                    goto fail;
-                }
-                const unsigned int vc_h = cma_buf_vc_handle(cb);
-                if (vc_h == 0)
-                {
-                    msg_Err(p_filter, "Pic has no vc handle");
-                    goto fail;
-                }
-                out_buf->data = (uint8_t *)vc_h;
-                out_buf->alloc_size = sys->output->buffer_size;
-            }
-            else {
-                out_buf->data = out_pic->p[0].p_pixels;
-                out_buf->alloc_size = out_pic->p[0].i_pitch * out_pic->p[0].i_lines;
-                //**** stride ????
-            }
-
+    // We have a 1 pic latency for everything except the 1st pic which we
+    // wait for.
+    // This means we get a single static pic out
+    if (sys->pic_n++ == 1) {
 #if TRACE_ALL
-            msg_Dbg(p_filter, "Out buf send: pic=%p, data=%p, user=%p, flags=%#x, len=%d/%d, pts=%lld",
-                    p_pic, out_buf->data, out_buf->user_data, out_buf->flags,
-                    out_buf->length, out_buf->alloc_size, (long long)out_buf->pts);
+        msg_Dbg(p_filter, ">>> %s: Pic1=NULL", __func__);
 #endif
-
-            if ((err = mmal_port_send_buffer(sys->output, out_buf)) != MMAL_SUCCESS)
-            {
-                msg_Err(p_filter, "Send buffer to output failed");
-                goto fail;
-            }
-            out_buf = NULL;
-
-            ++sys->in_count;
-        }
+        return NULL;
     }
-
-    if (sys->in_count < 0)
-    {
-        msg_Err(p_filter, "Buffer count somehow negative");
-        goto fail;
-    }
-
-    // Avoid being more than 1 pic behind
     vlc_sem_wait(&sys->sem);
 
-    // Set sem for delayed scale if not already set
-    if (!sys->latency_set) {
-        unsigned int i;
-        sys->latency_set = true;
-        for (i = 0; i != CONV_MAX_LATENCY; ++i) {
-            vlc_sem_post(&sys->sem);
-        }
-    }
-
-    // Return all pending buffers
+    // Return a single pending buffer
     vlc_mutex_lock(&sys->lock);
-    ret_pics = pic_fifo_get_all(&sys->ret_pics);
+    ret_pics = pic_fifo_get(&sys->ret_pics);
     vlc_mutex_unlock(&sys->lock);
 
     if (sys->err_stream != MMAL_SUCCESS)
         goto stream_fail;
 
-    // Sink as many sem posts as we have pics
-    // (shouldn't normally wait, but there is a small race)
-    if (ret_pics != NULL)
-    {
-        picture_t *next_pic = ret_pics->p_next;
-
-        conv_stash_fixup(p_filter, sys, ret_pics);
-#if 0
-        char dbuf0[5];
-
-        msg_Dbg(p_filter, "pic_out %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d",
-                str_fourcc(dbuf0, ret_pics->format.i_chroma),
-                ret_pics->format.i_width, ret_pics->format.i_height,
-                ret_pics->format.i_x_offset, ret_pics->format.i_y_offset,
-                ret_pics->format.i_visible_width, ret_pics->format.i_visible_height,
-                ret_pics->format.i_sar_num, ret_pics->format.i_sar_den);
-#endif
-        while (next_pic != NULL) {
-            vlc_sem_wait(&sys->sem);
-            conv_stash_fixup(p_filter, sys, next_pic);
-            next_pic = next_pic->p_next;
-        }
-    }
+    conv_stash_fixup(p_filter, sys, ret_pics);
 
 #if TRACE_ALL
     msg_Dbg(p_filter, ">>> %s: pic=%p", __func__, ret_pics);
@@ -1672,6 +1622,7 @@ stream_fail:
 fail:
 #if TRACE_ALL
     msg_Err(p_filter, ">>> %s: FAIL", __func__);
+    picture_Release(ret_pics);
 #endif
     if (out_buf != NULL)
         mmal_buffer_header_release(out_buf);
@@ -1705,6 +1656,8 @@ static void CloseConverter(vlc_object_t * obj)
 
     // Disables input & output ports
     conv_flush(p_filter);
+
+    cma_buf_pool_deletez(&sys->cma_out_pool);
 
     if (sys->component && sys->component->control->is_enabled)
         mmal_port_disable(sys->component->control);
