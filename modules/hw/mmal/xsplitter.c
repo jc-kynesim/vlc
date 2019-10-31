@@ -22,8 +22,7 @@
 typedef struct display_desc_s
 {
     vout_display_t * vout;
-    unsigned int max_width;
-    unsigned int max_height;
+    unsigned int max_pels;
 } display_desc_t;
 
 typedef struct mmal_x11_sys_s
@@ -36,25 +35,78 @@ typedef struct mmal_x11_sys_s
     vlc_fourcc_t subpicture_chromas[16];
 } mmal_x11_sys_t;
 
-#define MAX_GL_WIDTH 1280
-#define MAX_GL_HEIGHT 720
-//#define MAX_GL_WIDTH 4000
-//#define MAX_GL_HEIGHT 4000
+#define MAX_GL_PELS (1920*1080)
+#define MAX_MMAL_PELS (4096*4096)  // Should never be hit
+
+#if 0
+// Gen prog for the following table
+// Not done inline in case we end up pulling in FP libs we don't want
+#include <math.h>
+#include <stdio.h>
+
+int main(int argc, char *argv[])
+{
+    unsigned int i;
+    for (i = 0; i != 64; ++i)
+    {
+        printf(" [%2u]=%5u,", i, (unsigned int)(0.5 + (1/sqrt((i + 5)/4.0) * 65536.0)));
+        if (i % 4 == 3)
+            printf("\n");
+    }
+}
+#endif
+
+static const uint16_t sqrt_tab[64] = {
+    [ 0]=58617, [ 1]=53510, [ 2]=49541, [ 3]=46341,
+    [ 4]=43691, [ 5]=41449, [ 6]=39520, [ 7]=37837,
+    [ 8]=36353, [ 9]=35030, [10]=33843, [11]=32768,
+    [12]=31790, [13]=30894, [14]=30070, [15]=29309,
+    [16]=28602, [17]=27945, [18]=27330, [19]=26755,
+    [20]=26214, [21]=25705, [22]=25225, [23]=24770,
+    [24]=24339, [25]=23930, [26]=23541, [27]=23170,
+    [28]=22817, [29]=22479, [30]=22155, [31]=21845,
+    [32]=21548, [33]=21263, [34]=20988, [35]=20724,
+    [36]=20470, [37]=20225, [38]=19988, [39]=19760,
+    [40]=19539, [41]=19326, [42]=19119, [43]=18919,
+    [44]=18725, [45]=18536, [46]=18354, [47]=18176,
+    [48]=18004, [49]=17837, [50]=17674, [51]=17515,
+    [52]=17361, [53]=17211, [54]=17064, [55]=16921,
+    [56]=16782, [57]=16646, [58]=16514, [59]=16384,
+    [60]=16257, [61]=16134, [62]=16013, [63]=15895
+};
+#define SQRT_MAX (sizeof(sqrt_tab)/sizeof(sqrt_tab[0]) - 1)
 
 static bool cpy_fmt_limit_size(const display_desc_t * const dd,
                            video_format_t * const dst,
                            const video_format_t * const src)
 {
+    const unsigned int src_pel = src->i_visible_width * src->i_visible_height;
+
     *dst = *src;
 
-    // ***** Better tests required!
-    if (dst->i_visible_width <= dd->max_width)
+    if (src_pel <= dd->max_pels)
         return false;
 
-    dst->i_width = dd->max_width;
-    dst->i_visible_width = dd->max_width;
-    dst->i_height = dd->max_height;
-    dst->i_visible_height = dd->max_height;
+    // scaling factor sqrt(max_pel/cur_pel)
+    // sqrt done by lookup & 16 bit fixed-point maths - not exactly accurate but
+    // easily good enough & avoids floating point (which may be slow)
+    // src_pel > max_pel so n >= 0
+    // Rounding should be such that exact sqrts work and everything else rounds
+    // down
+    unsigned int n = ((src_pel * 4 - 1) / dd->max_pels) - 4;
+    unsigned int scale = sqrt_tab[n >= SQRT_MAX ? SQRT_MAX : n];
+
+    // Rescale width - rounding up to 16
+    unsigned int width = ((src->i_visible_width * scale + (16 << 16) - 1) >> 16) & ~15;
+    // Rescale height based on new width
+    unsigned int height = (src->i_visible_height * width + src->i_visible_width/2) / src->i_visible_width;
+
+//    fprintf(stderr, "%dx%d -> %dx%d\n", src->i_visible_width, src->i_visible_height, width, height);
+
+    dst->i_width          = width;
+    dst->i_visible_width  = width;
+    dst->i_height         = height;
+    dst->i_visible_height = height;
     return true;
 }
 
@@ -398,10 +450,8 @@ static int OpenMmalX11(vlc_object_t *object)
                 vd->fmt.i_sar_num,       vd->fmt.i_sar_den);
     }
 
-    sys->x_desc.max_height = MAX_GL_HEIGHT;
-    sys->x_desc.max_width  = MAX_GL_WIDTH;
-    sys->mmal_desc.max_height = 4096;
-    sys->mmal_desc.max_width  = 4096;
+    sys->x_desc.max_pels = MAX_GL_PELS;
+    sys->mmal_desc.max_pels = MAX_MMAL_PELS;
 
     if (load_display_module(vd, &sys->x_desc, "vout display", "opengles2") == 0)
     {
@@ -409,8 +459,7 @@ static int OpenMmalX11(vlc_object_t *object)
     }
     else
     {
-        sys->x_desc.max_height = 4096;
-        sys->x_desc.max_width  = 4096;
+        sys->x_desc.max_pels = MAX_MMAL_PELS;
         if (load_display_module(vd, &sys->x_desc, "vout display", "xcb_x11") == 0)
             msg_Dbg(vd, "X11 XCB output found");
     }
