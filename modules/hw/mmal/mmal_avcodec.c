@@ -226,6 +226,8 @@ zc_alloc_buf(void * v, size_t size, const AVRpiZcFrameGeometry * geo)
         return NULL;
     }
 
+    msg_Info(dec, "Pool size=%d", av_rpi_zc_get_decoder_pool_size(sys->p_context->get_buffer_context));
+
     AVBufferRef *const avbuf = av_rpi_zc_buf(cma_buf_size(cmabuf), 0, cmabuf, &zc_buf_fn_tab);
 
     if (avbuf == NULL)
@@ -1215,9 +1217,9 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     if( i_thread_count <= 0 )
 #if 1
     {
-        // Pick 5 threads for everything on Pi
-        // * Reduce to 3 for Pi4 HEVC?
-        i_thread_count = 5;
+        // Pick 5 threads for everything on Pi except for HEVC where the h/w
+        // really limits the useful size to 3
+        i_thread_count = p_codec->id == AV_CODEC_ID_HEVC ? 3 : 5;
     }
 #else
     {
