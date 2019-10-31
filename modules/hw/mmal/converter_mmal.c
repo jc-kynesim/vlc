@@ -82,7 +82,6 @@ typedef struct tex_context_s {
 static void tex_context_delete(tex_context_t * const tex)
 {
     tex->DeleteTextures(1, &tex->texture);
-
     free(tex);
 }
 

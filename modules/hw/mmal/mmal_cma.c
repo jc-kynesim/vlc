@@ -28,6 +28,10 @@
 typedef void * cma_pool_alloc_fn(void * v, size_t size);
 typedef void cma_pool_free_fn(void * v, void * el, size_t size);
 
+#if TRACE_ALL
+static atomic_int pool_seq;
+#endif
+
 // Pool structure
 // Ref count is held by pool owner and pool els that have been got
 // Els in the pool do not count towards its ref count
@@ -49,6 +53,11 @@ struct cma_pool_fixed_s
     cma_pool_alloc_fn * el_alloc_fn;
     cma_pool_free_fn * el_free_fn;
     cma_pool_on_delete_fn * on_delete_fn;
+
+    const char * name;
+#if TRACE_ALL
+    int seq;
+#endif
 };
 
 static void free_pool(const cma_pool_fixed_t * const p, void ** pool, unsigned int n, size_t el_size)
@@ -72,6 +81,9 @@ static void cma_pool_fixed_delete(cma_pool_fixed_t * const p)
 
     if (p->pool != NULL)
         free_pool(p, p->pool, p->n_in, p->el_size);
+
+    if (p->name != NULL)
+        free((void *)p->name);  // Discard const
 
     vlc_mutex_destroy(&p->lock);
     free(p);
@@ -208,7 +220,8 @@ cma_pool_fixed_new(const unsigned int pool_size,
                    const int flight_size,
                    void * const alloc_v,
                    cma_pool_alloc_fn * const alloc_fn, cma_pool_free_fn * const free_fn,
-                   cma_pool_on_delete_fn * const on_delete_fn)
+                   cma_pool_on_delete_fn * const on_delete_fn,
+                   const char * const name)
 {
     cma_pool_fixed_t* const p = calloc(1, sizeof(cma_pool_fixed_t));
     if (p == NULL)
@@ -224,6 +237,10 @@ cma_pool_fixed_new(const unsigned int pool_size,
     p->el_alloc_fn = alloc_fn;
     p->el_free_fn = free_fn;
     p->on_delete_fn = on_delete_fn;
+    p->name = name == NULL ? NULL : strdup(name);
+#if TRACE_ALL
+    p->seq = atomic_fetch_add(&pool_seq, 1);
+#endif
 
     return p;
 }
@@ -262,7 +279,7 @@ static void cma_pool_delete(cma_buf_t * const cb)
 #if TRACE_ALL
     cb->cbp->alloc_size -= cb->size;
     --cb->cbp->alloc_n;
-    printf("%s: N=%d, Total=%d\n", __func__, cb->cbp->alloc_n, cb->cbp->alloc_size);
+    fprintf(stderr, "%s[%d:%s]: N=%d, Total=%d\n", __func__, cb->cbp->pool->seq, cb->cbp->pool->name, cb->cbp->alloc_n, cb->cbp->alloc_size);
 #endif
 
     if (cb->ctx2 != NULL)
@@ -312,7 +329,7 @@ static void * cma_pool_alloc_cb(void * v, size_t size)
 #if TRACE_ALL
     cb->cbp->alloc_size += cb->size;
     ++cb->cbp->alloc_n;
-    printf("%s: N=%d, Total=%d\n", __func__, cbp->alloc_n, cbp->alloc_size);
+    fprintf(stderr, "%s[%d:%s]: N=%d, Total=%d\n", __func__, cbp->pool->seq, cbp->pool->name, cbp->alloc_n, cbp->alloc_size);
 #endif
 
     // 0x80 is magic value to force full ARM-side mapping - otherwise
@@ -320,7 +337,7 @@ static void * cma_pool_alloc_cb(void * v, size_t size)
     if ((cb->vcsm_h = vcsm_malloc_cache(size, VCSM_CACHE_TYPE_HOST | 0x80, "VLC frame")) == 0)
     {
 #if TRACE_ALL
-        printf("vcsm_malloc_cache fail\n");
+        fprintf(stderr, "vcsm_malloc_cache fail\n");
 #endif
         goto fail;
     }
@@ -328,7 +345,7 @@ static void * cma_pool_alloc_cb(void * v, size_t size)
     if ((cb->vc_h = vcsm_vc_hdl_from_hdl(cb->vcsm_h)) == 0)
     {
 #if TRACE_ALL
-        printf("vcsm_vc_hdl_from_hdl fail\n");
+        fprintf(stderr, "vcsm_vc_hdl_from_hdl fail\n");
 #endif
         goto fail;
     }
@@ -338,7 +355,7 @@ static void * cma_pool_alloc_cb(void * v, size_t size)
         if ((cb->fd = vcsm_export_dmabuf(cb->vcsm_h)) == -1)
         {
 #if TRACE_ALL
-            printf("vcsm_export_dmabuf fail\n");
+            fprintf(stderr, "vcsm_export_dmabuf fail\n");
 #endif
             goto fail;
         }
@@ -352,7 +369,7 @@ static void * cma_pool_alloc_cb(void * v, size_t size)
         if ((arm_addr = vcsm_lock(cb->vcsm_h)) == NULL)
         {
 #if TRACE_ALL
-            printf("vcsm_lock fail\n");
+            fprintf(stderr, "vcsm_lock fail\n");
 #endif
             goto fail;
         }
@@ -396,7 +413,7 @@ void cma_buf_pool_delete(cma_buf_pool_t * const cbp)
     }
 }
 
-cma_buf_pool_t * cma_buf_pool_new(const unsigned int pool_size, const unsigned int flight_size, const bool all_in_flight)
+cma_buf_pool_t * cma_buf_pool_new(const unsigned int pool_size, const unsigned int flight_size, const bool all_in_flight, const char * const name)
 {
     vcsm_init_type_t const init_type = cma_vcsm_init();
     if (init_type == VCSM_INIT_NONE)
@@ -409,7 +426,7 @@ cma_buf_pool_t * cma_buf_pool_new(const unsigned int pool_size, const unsigned i
     cbp->init_type = init_type;
     cbp->all_in_flight = all_in_flight;
 
-    if ((cbp->pool = cma_pool_fixed_new(pool_size, flight_size, cbp, cma_pool_alloc_cb, cma_pool_free_cb, cma_buf_pool_on_delete_cb)) == NULL)
+    if ((cbp->pool = cma_pool_fixed_new(pool_size, flight_size, cbp, cma_pool_alloc_cb, cma_pool_free_cb, cma_buf_pool_on_delete_cb, name)) == NULL)
         goto fail;
     return cbp;
 

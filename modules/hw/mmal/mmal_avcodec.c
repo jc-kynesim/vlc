@@ -1287,7 +1287,7 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     } else
         p_sys->palette_sent = true;
 
-    if ((p_sys->cma_pool = cma_buf_pool_new(p_sys->cma_in_flight_max, p_sys->cma_in_flight_max, false)) == NULL)
+    if ((p_sys->cma_pool = cma_buf_pool_new(p_sys->cma_in_flight_max, p_sys->cma_in_flight_max, false, "mmal_avcodec")) == NULL)
     {
         msg_Err(p_dec, "CMA pool alloc failure");
         goto fail;

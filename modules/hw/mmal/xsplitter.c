@@ -19,15 +19,96 @@
 
 #define TRACE_ALL 0
 
+typedef struct display_desc_s
+{
+    vout_display_t * vout;
+    unsigned int max_pels;
+} display_desc_t;
+
 typedef struct mmal_x11_sys_s
 {
     bool use_mmal;
-    vout_display_t * cur_vout;
-    vout_display_t * mmal_vout;
-    vout_display_t * x_vout;
+    display_desc_t * cur_desc;
+    display_desc_t mmal_desc;
+    display_desc_t x_desc;
     uint32_t changed;
     vlc_fourcc_t subpicture_chromas[16];
 } mmal_x11_sys_t;
+
+#define MAX_GL_PELS (1920*1080)
+#define MAX_MMAL_PELS (4096*4096)  // Should never be hit
+
+#if 0
+// Gen prog for the following table
+// Not done inline in case we end up pulling in FP libs we don't want
+#include <math.h>
+#include <stdio.h>
+
+int main(int argc, char *argv[])
+{
+    unsigned int i;
+    for (i = 0; i != 64; ++i)
+    {
+        printf(" [%2u]=%5u,", i, (unsigned int)(0.5 + (1/sqrt((i + 5)/4.0) * 65536.0)));
+        if (i % 4 == 3)
+            printf("\n");
+    }
+}
+#endif
+
+static const uint16_t sqrt_tab[64] = {
+    [ 0]=58617, [ 1]=53510, [ 2]=49541, [ 3]=46341,
+    [ 4]=43691, [ 5]=41449, [ 6]=39520, [ 7]=37837,
+    [ 8]=36353, [ 9]=35030, [10]=33843, [11]=32768,
+    [12]=31790, [13]=30894, [14]=30070, [15]=29309,
+    [16]=28602, [17]=27945, [18]=27330, [19]=26755,
+    [20]=26214, [21]=25705, [22]=25225, [23]=24770,
+    [24]=24339, [25]=23930, [26]=23541, [27]=23170,
+    [28]=22817, [29]=22479, [30]=22155, [31]=21845,
+    [32]=21548, [33]=21263, [34]=20988, [35]=20724,
+    [36]=20470, [37]=20225, [38]=19988, [39]=19760,
+    [40]=19539, [41]=19326, [42]=19119, [43]=18919,
+    [44]=18725, [45]=18536, [46]=18354, [47]=18176,
+    [48]=18004, [49]=17837, [50]=17674, [51]=17515,
+    [52]=17361, [53]=17211, [54]=17064, [55]=16921,
+    [56]=16782, [57]=16646, [58]=16514, [59]=16384,
+    [60]=16257, [61]=16134, [62]=16013, [63]=15895
+};
+#define SQRT_MAX (sizeof(sqrt_tab)/sizeof(sqrt_tab[0]) - 1)
+
+static bool cpy_fmt_limit_size(const display_desc_t * const dd,
+                           video_format_t * const dst,
+                           const video_format_t * const src)
+{
+    const unsigned int src_pel = src->i_visible_width * src->i_visible_height;
+
+    *dst = *src;
+
+    if (src_pel <= dd->max_pels)
+        return false;
+
+    // scaling factor sqrt(max_pel/cur_pel)
+    // sqrt done by lookup & 16 bit fixed-point maths - not exactly accurate but
+    // easily good enough & avoids floating point (which may be slow)
+    // src_pel > max_pel so n >= 0
+    // Rounding should be such that exact sqrts work and everything else rounds
+    // down
+    unsigned int n = ((src_pel * 4 - 1) / dd->max_pels) - 4;
+    unsigned int scale = sqrt_tab[n >= SQRT_MAX ? SQRT_MAX : n];
+
+    // Rescale width - rounding up to 16
+    unsigned int width = ((src->i_visible_width * scale + (16 << 16) - 1) >> 16) & ~15;
+    // Rescale height based on new width
+    unsigned int height = (src->i_visible_height * width + src->i_visible_width/2) / src->i_visible_width;
+
+//    fprintf(stderr, "%dx%d -> %dx%d\n", src->i_visible_width, src->i_visible_height, width, height);
+
+    dst->i_width          = width;
+    dst->i_visible_width  = width;
+    dst->i_height         = height;
+    dst->i_visible_height = height;
+    return true;
+}
 
 static void unload_display_module(vout_display_t * const x_vout)
 {
@@ -49,9 +130,9 @@ static void CloseMmalX11(vlc_object_t *object)
     if (sys == NULL)
         return;
 
-    unload_display_module(sys->x_vout);
+    unload_display_module(sys->x_desc.vout);
 
-    unload_display_module(sys->mmal_vout);
+    unload_display_module(sys->mmal_desc.vout);
 
     free(sys);
 
@@ -92,13 +173,16 @@ static void mmal_x11_window_del(vout_display_t * x_vd, vout_window_t * win)
 }
 
 
-static vout_display_t * load_display_module(vout_display_t * const vd,
-                                            const char * const cap, const char * const module_name)
+static int load_display_module(vout_display_t * const vd,
+                                display_desc_t * const dd,
+                                const char * const cap,
+                                const char * const module_name)
 {
     vout_display_t * const x_vout = vlc_object_create(vd, sizeof(*x_vout));
 
+    dd->vout = NULL;
     if (!x_vout)
-        return NULL;
+        return -1;
 
     x_vout->owner.sys = vd;
     x_vout->owner.event = mmal_x11_event;
@@ -106,10 +190,9 @@ static vout_display_t * load_display_module(vout_display_t * const vd,
     x_vout->owner.window_del = mmal_x11_window_del;
 
     x_vout->cfg    = vd->cfg;
-    x_vout->source = vd->source;
     x_vout->info   = vd->info;
-
-    x_vout->fmt = vd->fmt;
+    cpy_fmt_limit_size(dd, &x_vout->source, &vd->source);
+    cpy_fmt_limit_size(dd, &x_vout->fmt,    &vd->fmt);
 
     if ((x_vout->module = module_need(x_vout, cap, module_name, true)) == NULL)
     {
@@ -119,11 +202,12 @@ static vout_display_t * load_display_module(vout_display_t * const vd,
 
     msg_Dbg(vd, "R/G/B: %08x/%08x/%08x", x_vout->fmt.i_rmask, x_vout->fmt.i_gmask, x_vout->fmt.i_bmask);
 
-    return x_vout;
+    dd->vout = x_vout;
+    return 0;
 
 fail:
     vlc_object_release(x_vout);
-    return NULL;
+    return -1;
 }
 
 
@@ -139,7 +223,7 @@ fail:
 static picture_pool_t * mmal_x11_pool(vout_display_t * vd, unsigned count)
 {
     mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
-    vout_display_t * const x_vd = sys->cur_vout;
+    vout_display_t * const x_vd = sys->cur_desc->vout;
 #if TRACE_ALL
     char buf0[5];
     msg_Dbg(vd, "<<< %s (count=%d) %s:%dx%d->%s:%dx%d", __func__, count,
@@ -168,7 +252,7 @@ static picture_pool_t * mmal_x11_pool(vout_display_t * vd, unsigned count)
 static void mmal_x11_prepare(vout_display_t * vd, picture_t * pic, subpicture_t * sub)
 {
     mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
-    vout_display_t * const x_vd = sys->cur_vout;
+    vout_display_t * const x_vd = sys->cur_desc->vout;
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
@@ -189,7 +273,7 @@ static void mmal_x11_prepare(vout_display_t * vd, picture_t * pic, subpicture_t 
 static void mmal_x11_display(vout_display_t * vd, picture_t * pic, subpicture_t * sub)
 {
     mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
-    vout_display_t * const x_vd = sys->cur_vout;
+    vout_display_t * const x_vd = sys->cur_desc->vout;
 
 #if TRACE_ALL
     const bool is_mmal_pic = hw_mmal_pic_is_mmal(pic);
@@ -212,28 +296,29 @@ static void mmal_x11_display(vout_display_t * vd, picture_t * pic, subpicture_t 
 }
 
 
-static int vout_display_Control(vout_display_t *vd, int query, ...)
+static int vout_display_Control(display_desc_t * const dd, int query, ...)
 {
     va_list args;
     int result;
 
     va_start(args, query);
-    result = vd->control(vd, query, args);
+    result = dd->vout->control(dd->vout, query, args);
     va_end(args);
 
     return result;
 }
 
-static bool want_mmal_vout(vout_display_t * vd, const mmal_x11_sys_t * const sys)
+static bool want_mmal_vout(vout_display_t * const vd, const mmal_x11_sys_t * const sys)
 {
-    return sys->mmal_vout != NULL && (sys->x_vout == NULL || var_InheritBool(vd, "fullscreen"));
+    return sys->mmal_desc.vout != NULL &&
+        (sys->x_desc.vout == NULL || var_InheritBool(vd, "fullscreen"));
 }
 
 /* Control on the module (mandatory) */
 static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
 {
     mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
-    vout_display_t *x_vd = sys->cur_vout;
+    display_desc_t *x_desc = sys->cur_desc;
     int rv;
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s[%d] (ctl=%d)", __func__, sys->use_mmal, ctl);
@@ -248,23 +333,23 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
             const vout_display_cfg_t * const cfg = va_arg(va, const vout_display_cfg_t *);
             const bool want_mmal = want_mmal_vout(vd, sys);
             const bool swap_vout = (sys->use_mmal != want_mmal);
-            vout_display_t * const new_vd = want_mmal ? sys->mmal_vout : sys->x_vout;
+            display_desc_t * const new_desc = want_mmal ? &sys->mmal_desc : &sys->x_desc;
 
             msg_Dbg(vd, "Change size: %d, %d: mmal_vout=%p, want_mmal=%d, fs=%d",
-                    cfg->display.width, cfg->display.height, sys->mmal_vout, want_mmal,
+                    cfg->display.width, cfg->display.height, sys->mmal_desc.vout, want_mmal,
                     var_InheritBool(vd, "fullscreen"));
 
             if (swap_vout) {
                 if (sys->use_mmal) {
-                    vout_display_Control(x_vd, VOUT_DISPLAY_CHANGE_MMAL_HIDE);
+                    vout_display_Control(x_desc, VOUT_DISPLAY_CHANGE_MMAL_HIDE);
                 }
                 vout_display_SendEventPicturesInvalid(vd);
             }
 
-            rv = vout_display_Control(new_vd, ctl, cfg);
+            rv = vout_display_Control(new_desc, ctl, cfg);
             if (rv == VLC_SUCCESS) {
-                vd->fmt       = new_vd->fmt;
-                sys->cur_vout = new_vd;
+                vd->fmt       = new_desc->vout->fmt;
+                sys->cur_desc = new_desc;
                 sys->use_mmal = want_mmal;
             }
 
@@ -273,17 +358,18 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
                 const uint32_t changed = sys->changed;
                 sys->changed = 0;
                 if ((changed & (1 << VOUT_DISPLAY_CHANGE_DISPLAY_FILLED)) != 0)
-                    vout_display_Control(new_vd, VOUT_DISPLAY_CHANGE_DISPLAY_FILLED, vd->cfg);
+                    vout_display_Control(new_desc, VOUT_DISPLAY_CHANGE_DISPLAY_FILLED, vd->cfg);
                 if ((changed & (1 << VOUT_DISPLAY_CHANGE_ZOOM)) != 0)
-                    vout_display_Control(new_vd, VOUT_DISPLAY_CHANGE_ZOOM, vd->cfg);
-                if ((changed & ((1 << VOUT_DISPLAY_CHANGE_SOURCE_CROP) | (1 << VOUT_DISPLAY_CHANGE_SOURCE_ASPECT))) != 0)
-                    new_vd->source = vd->source;
+                    vout_display_Control(new_desc, VOUT_DISPLAY_CHANGE_ZOOM, vd->cfg);
+                if ((changed & ((1 << VOUT_DISPLAY_CHANGE_SOURCE_CROP) |
+                                (1 << VOUT_DISPLAY_CHANGE_SOURCE_ASPECT))) != 0)
+                    cpy_fmt_limit_size(new_desc, &new_desc->vout->source, &vd->source);
                 if ((changed & (1 << VOUT_DISPLAY_CHANGE_SOURCE_ASPECT)) != 0)
-                    vout_display_Control(new_vd, VOUT_DISPLAY_CHANGE_SOURCE_ASPECT);
+                    vout_display_Control(new_desc, VOUT_DISPLAY_CHANGE_SOURCE_ASPECT);
                 if ((changed & (1 << VOUT_DISPLAY_CHANGE_SOURCE_CROP)) != 0)
-                    vout_display_Control(new_vd, VOUT_DISPLAY_CHANGE_SOURCE_CROP);
+                    vout_display_Control(new_desc, VOUT_DISPLAY_CHANGE_SOURCE_CROP);
                 if ((changed & (1 << VOUT_DISPLAY_CHANGE_VIEWPOINT)) != 0)
-                    vout_display_Control(new_vd, VOUT_DISPLAY_CHANGE_ZOOM, vd->cfg);
+                    vout_display_Control(new_desc, VOUT_DISPLAY_CHANGE_VIEWPOINT, vd->cfg);
             }
 
             break;
@@ -291,25 +377,26 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
 
         case VOUT_DISPLAY_RESET_PICTURES:
             msg_Dbg(vd, "<<< %s: Pic reset: fmt: %dx%d<-%dx%d, source: %dx%d/%dx%d", __func__,
-                    vd->fmt.i_width, vd->fmt.i_height, x_vd->fmt.i_width, x_vd->fmt.i_height,
-                    vd->source.i_width, vd->source.i_height, x_vd->source.i_width, x_vd->source.i_height);
+                    vd->fmt.i_width, vd->fmt.i_height, x_desc->vout->fmt.i_width, x_desc->vout->fmt.i_height,
+                    vd->source.i_width, vd->source.i_height, x_desc->vout->source.i_width, x_desc->vout->source.i_height);
             // If the display doesn't have has_pictures_invalid then it doesn't
             // expect RESET_PICTURES
-            if (sys->x_vout->info.has_pictures_invalid) {
-                rv = sys->x_vout->control(sys->x_vout, ctl, va);
+            if (sys->x_desc.vout->info.has_pictures_invalid) {
+                rv = sys->x_desc.vout->control(sys->x_desc.vout, ctl, va);
             }
-            if (sys->mmal_vout && sys->mmal_vout->info.has_pictures_invalid) {
-                rv = sys->mmal_vout->control(sys->mmal_vout, ctl, va);
+            if (sys->mmal_desc.vout && sys->mmal_desc.vout->info.has_pictures_invalid) {
+                rv = sys->mmal_desc.vout->control(sys->mmal_desc.vout, ctl, va);
             }
-            vd->fmt = x_vd->fmt;
+            vd->fmt = x_desc->vout->fmt;
             break;
 
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
-            x_vd->source = vd->source;
+            cpy_fmt_limit_size(x_desc, &x_desc->vout->source, &vd->source);
+
             /* FALLTHRU */
         default:
-            rv = x_vd->control(x_vd, ctl, va);
+            rv = x_desc->vout->control(x_desc->vout, ctl, va);
 //            vd->fmt  = x_vd->fmt;
             break;
     }
@@ -326,7 +413,7 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
 static void mmal_x11_manage(vout_display_t * vd)
 {
     mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
-    vout_display_t * const x_vd = sys->cur_vout;
+    vout_display_t * const x_vd = sys->cur_desc->vout;
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
@@ -363,15 +450,24 @@ static int OpenMmalX11(vlc_object_t *object)
                 vd->fmt.i_sar_num,       vd->fmt.i_sar_den);
     }
 
-    if ((sys->x_vout = load_display_module(vd, "vout display", "opengles2")) != NULL)
-        msg_Dbg(vd, "Opengles2 output found");
-    else if ((sys->x_vout = load_display_module(vd, "vout display", "xcb_x11")) != NULL)
-        msg_Dbg(vd, "X11 XCB output found");
+    sys->x_desc.max_pels = MAX_GL_PELS;
+    sys->mmal_desc.max_pels = MAX_MMAL_PELS;
 
-    if ((sys->mmal_vout = load_display_module(vd, "vout display", "mmal_vout")) != NULL)
+    if (load_display_module(vd, &sys->x_desc, "vout display", "opengles2") == 0)
+    {
+        msg_Dbg(vd, "Opengles2 output found");
+    }
+    else
+    {
+        sys->x_desc.max_pels = MAX_MMAL_PELS;
+        if (load_display_module(vd, &sys->x_desc, "vout display", "xcb_x11") == 0)
+            msg_Dbg(vd, "X11 XCB output found");
+    }
+
+    if ((load_display_module(vd, &sys->mmal_desc, "vout display", "mmal_vout")) == 0)
         msg_Dbg(vd, "MMAL output found");
 
-    if (sys->mmal_vout == NULL && sys->x_vout == NULL) {
+    if (sys->mmal_desc.vout == NULL && sys->x_desc.vout == NULL) {
         char dbuf0[5], dbuf1[5];
         msg_Info(vd, "No valid output found for vout (%s/%s)", str_fourcc(dbuf0, vd->fmt.i_chroma), str_fourcc(dbuf1, vd->source.i_chroma));
         goto fail;
@@ -386,33 +482,33 @@ static int OpenMmalX11(vlc_object_t *object)
 #endif
 
     if (want_mmal_vout(vd, sys)) {
-        sys->cur_vout = sys->mmal_vout;
+        sys->cur_desc = &sys->mmal_desc;
         sys->use_mmal = true;
     }
     else {
-        sys->cur_vout = sys->x_vout;
+        sys->cur_desc = &sys->x_desc;
         sys->use_mmal = false;
     }
 
-    if (sys->mmal_vout == NULL || sys->x_vout == NULL) {
-        vd->info = sys->cur_vout->info;
+    if (sys->mmal_desc.vout == NULL || sys->x_desc.vout == NULL) {
+        vd->info = sys->cur_desc->vout->info;
         vd->info.has_pictures_invalid = true;  // Should make this unwanted
     }
     else {
         // We have both - construct a combination
         vd->info = (vout_display_info_t){
             .is_slow              = false,
-            .has_double_click     = sys->mmal_vout->info.has_double_click || sys->x_vout->info.has_double_click,
-            .needs_hide_mouse     = sys->mmal_vout->info.needs_hide_mouse || sys->x_vout->info.needs_hide_mouse,
+            .has_double_click     = sys->mmal_desc.vout->info.has_double_click || sys->x_desc.vout->info.has_double_click,
+            .needs_hide_mouse     = sys->mmal_desc.vout->info.needs_hide_mouse || sys->x_desc.vout->info.needs_hide_mouse,
             .has_pictures_invalid = true,
         };
         // Construct intersection of subpicture chromas
         // sys calloced so no need to add the terminating zero
-        if (sys->mmal_vout->info.subpicture_chromas != NULL && sys->x_vout->info.subpicture_chromas != NULL) {
+        if (sys->mmal_desc.vout->info.subpicture_chromas != NULL && sys->x_desc.vout->info.subpicture_chromas != NULL) {
             unsigned int n = 0;
             // N^2 - fix if we ever care
-            for (const vlc_fourcc_t * p1 = sys->mmal_vout->info.subpicture_chromas; *p1 != 0 && n != 15; ++p1) {
-                for (const vlc_fourcc_t * p2 = sys->x_vout->info.subpicture_chromas; *p2 != 0; ++p2) {
+            for (const vlc_fourcc_t * p1 = sys->mmal_desc.vout->info.subpicture_chromas; *p1 != 0 && n != 15; ++p1) {
+                for (const vlc_fourcc_t * p2 = sys->x_desc.vout->info.subpicture_chromas; *p2 != 0; ++p2) {
                     if (*p1 == *p2) {
                         sys->subpicture_chromas[n++] = *p1;
                         break;
@@ -423,13 +519,13 @@ static int OpenMmalX11(vlc_object_t *object)
                 vd->info.subpicture_chromas = sys->subpicture_chromas;
         }
     }
-    vd->fmt  = sys->cur_vout->fmt;
+    vd->fmt  = sys->cur_desc->vout->fmt;
 
 #if TRACE_ALL
     {
         char dbuf0[5];
         msg_Dbg(vd, ">>> %s: (%s) %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d", __func__,
-                module_get_name(sys->cur_vout->module, false),
+                module_get_name(sys->cur_desc->vout->module, false),
                 str_fourcc(dbuf0, vd->fmt.i_chroma),
                 vd->fmt.i_width,         vd->fmt.i_height,
                 vd->fmt.i_x_offset,      vd->fmt.i_y_offset,

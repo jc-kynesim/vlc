@@ -19,7 +19,8 @@ cma_pool_fixed_t * cma_pool_fixed_new(const unsigned int pool_size,
                    const int flight_size,
                    void * const alloc_v,
                    cma_pool_alloc_fn * const alloc_fn, cma_pool_free_fn * const free_fn,
-                   cma_pool_on_delete_fn * const on_delete_fn);
+                   cma_pool_on_delete_fn * const on_delete_fn,
+                   const char * const name);
 
 
 struct cma_buf_s;
@@ -43,7 +44,7 @@ typedef struct cma_buf_pool_s cma_buf_pool_t;
 
 cma_buf_t * cma_buf_pool_alloc_buf(cma_buf_pool_t * const p, const size_t size);
 void cma_buf_pool_delete(cma_buf_pool_t * const p);
-cma_buf_pool_t * cma_buf_pool_new(const unsigned int pool_size, const unsigned int flight_size, const bool all_in_flight);
+cma_buf_pool_t * cma_buf_pool_new(const unsigned int pool_size, const unsigned int flight_size, const bool all_in_flight, const char * const name);
 
 static inline void cma_buf_pool_deletez(cma_buf_pool_t ** const pp)
 {
