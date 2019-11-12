@@ -18,7 +18,7 @@
 
 #include <assert.h>
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 //-----------------------------------------------------------------------------
 //
@@ -456,7 +456,7 @@ void cma_buf_in_flight(cma_buf_t * const cb)
 
 void cma_buf_end_flight(cma_buf_t * const cb)
 {
-    if (!cb->cbp->all_in_flight)
+    if (cb != NULL && !cb->cbp->all_in_flight)
     {
         assert(cb->in_flight);
         cb->in_flight = false;
