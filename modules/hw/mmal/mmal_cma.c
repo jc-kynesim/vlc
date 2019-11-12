@@ -203,6 +203,14 @@ void cma_pool_fixed_inc_in_flight(cma_pool_fixed_t * const p)
     vlc_mutex_unlock(&p->lock);
 }
 
+void cma_pool_fixed_dec_in_flight(cma_pool_fixed_t * const p)
+{
+    vlc_mutex_lock(&p->lock);
+    if (--p->in_flight == 0)
+        vlc_cond_signal(&p->flight_cond);
+    vlc_mutex_unlock(&p->lock);
+}
+
 // Purge pool & unref
 void cma_pool_fixed_kill(cma_pool_fixed_t * const p)
 {
@@ -438,11 +446,24 @@ fail:
 
 void cma_buf_in_flight(cma_buf_t * const cb)
 {
-    assert(!cb->in_flight);
-
-    cb->in_flight = true;
-    cma_pool_fixed_inc_in_flight(cb->cbp->pool);
+    if (!cb->cbp->all_in_flight)
+    {
+        assert(!cb->in_flight);
+        cb->in_flight = true;
+        cma_pool_fixed_inc_in_flight(cb->cbp->pool);
+    }
 }
+
+void cma_buf_end_flight(cma_buf_t * const cb)
+{
+    if (!cb->cbp->all_in_flight)
+    {
+        assert(cb->in_flight);
+        cb->in_flight = false;
+        cma_pool_fixed_dec_in_flight(cb->cbp->pool);
+    }
+}
+
 
 // Return vcsm handle
 unsigned int cma_buf_vcsm_handle(const cma_buf_t * const cb)

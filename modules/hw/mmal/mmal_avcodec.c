@@ -226,7 +226,7 @@ zc_alloc_buf(void * v, size_t size, const AVRpiZcFrameGeometry * geo)
         return NULL;
     }
 
-    msg_Info(dec, "Pool size=%d", av_rpi_zc_get_decoder_pool_size(sys->p_context->get_buffer_context));
+//    msg_Info(dec, "Pool size=%d", av_rpi_zc_get_decoder_pool_size(sys->p_context->get_buffer_context));
 
     AVBufferRef *const avbuf = av_rpi_zc_buf(cma_buf_size(cmabuf), 0, cmabuf, &zc_buf_fn_tab);
 
@@ -1901,8 +1901,6 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
                 msg_Err(p_dec, "Failed to allocate pic");
                 goto fail;
             }
-
-            cma_buf_in_flight(cb);
 
             if (cma_buf_pic_attach(cma_buf_ref(cb), p_pic) != 0)
             {

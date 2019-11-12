@@ -269,6 +269,8 @@ int cma_pic_set_data(picture_t * const pic,
                     const MMAL_ES_FORMAT_T * const mm_esfmt,
                     const MMAL_BUFFER_HEADER_T * const buf);
 
+// Attaches cma buf to pic
+// Marks in_flight if not all_in_flight anyway
 int cma_buf_pic_attach(cma_buf_t * const cb, picture_t * const pic);
 // Returns a pointer to the cma_buf attached to the pic
 // Just a pointer - doesn't add a ref

@@ -372,6 +372,7 @@ void hw_mmal_pic_ctx_destroy(picture_context_t * pic_ctx_cmn)
             mmal_buffer_header_release(ctx->bufs[i]);
     }
 
+    cma_buf_end_flight(ctx->cb);
     cma_buf_unref(ctx->cb);
 
     free(ctx);
@@ -1223,6 +1224,8 @@ int cma_buf_pic_attach(cma_buf_t * const cb, picture_t * const pic)
     ctx->cmn.destroy = hw_mmal_pic_ctx_destroy;
     ctx->buf_count = 1; // cb takes the place of the 1st buf
     ctx->cb = cb;
+
+    cma_buf_in_flight(cb);
 
     pic->context = &ctx->cmn;
     return VLC_SUCCESS;

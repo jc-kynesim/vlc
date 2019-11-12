@@ -14,6 +14,7 @@ void cma_pool_fixed_ref(cma_pool_fixed_t * const p);
 void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size, const bool in_flight);
 void cma_pool_fixed_put(cma_pool_fixed_t * const p, void * v, const size_t el_size, const bool was_in_flight);
 void cma_pool_fixed_inc_in_flight(cma_pool_fixed_t * const p);
+void cma_pool_fixed_dec_in_flight(cma_pool_fixed_t * const p);
 void cma_pool_fixed_kill(cma_pool_fixed_t * const p);
 cma_pool_fixed_t * cma_pool_fixed_new(const unsigned int pool_size,
                    const int flight_size,
@@ -27,6 +28,7 @@ struct cma_buf_s;
 typedef struct cma_buf_s cma_buf_t;
 
 void cma_buf_in_flight(cma_buf_t * const cb);
+void cma_buf_end_flight(cma_buf_t * const cb);
 unsigned int cma_buf_vcsm_handle(const cma_buf_t * const cb);
 size_t cma_buf_size(const cma_buf_t * const cb);
 int cma_buf_add_context2(cma_buf_t *const cb, picture_context_t * const ctx2);
