@@ -611,6 +611,8 @@ struct vzc_pool_ctl_s
     vlc_mutex_t lock;
 
     MMAL_POOL_T * buf_pool;
+
+    vcsm_init_type_t vcsm_init_type;
 };
 
 typedef struct vzc_subbuf_ent_s
@@ -1049,7 +1051,9 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc,
                 }
 
                 // And make sure it is actually in memory
-                flush_range(ent->buf, d - (uint8_t *)ent->buf);
+                if (pc->vcsm_init_type != VCSM_INIT_CMA) {  // ** CMA is currently always uncached
+                    flush_range(ent->buf, d - (uint8_t *)ent->buf);
+                }
             }
         }
     }
@@ -1083,13 +1087,12 @@ static void hw_mmal_vzc_pool_delete(vzc_pool_ctl_t * const pc)
 
     vlc_mutex_destroy(&pc->lock);
 
-//    memset(pc, 0xba, sizeof(*pc)); // Zap for (hopefully) faster crash
+    cma_vcsm_exit(pc->vcsm_init_type);
 
+//    memset(pc, 0xba, sizeof(*pc)); // Zap for (hopefully) faster crash
     free (pc);
 
-    vcsm_exit();
-
-//    printf(">>> %s\n", __func__);
+    //    printf(">>> %s\n", __func__);
 }
 
 void hw_mmal_vzc_pool_release(vzc_pool_ctl_t * const pc)
@@ -1140,7 +1143,11 @@ vzc_pool_ctl_t * hw_mmal_vzc_pool_new()
     if (pc == NULL)
         return NULL;
 
-    vcsm_init();
+    if ((pc->vcsm_init_type = cma_vcsm_init()) == VCSM_INIT_NONE)
+    {
+        free(pc);
+        return NULL;
+    }
 
     pc->max_n = 8;
     vlc_mutex_init(&pc->lock);  // Must init before potential destruction
