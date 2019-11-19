@@ -107,6 +107,7 @@ void cma_pool_fixed_ref(cma_pool_fixed_t * const p)
 void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size, const bool is_in_flight)
 {
     void * v = NULL;
+    const bool inc_flight = is_in_flight && req_el_size != 0;
 
     vlc_mutex_lock(&p->lock);
 
@@ -154,7 +155,7 @@ void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size, 
 
     } while (1);
 
-    if (is_in_flight && req_el_size != 0)
+    if (inc_flight)
         ++p->in_flight;
 
     vlc_mutex_unlock(&p->lock);
@@ -165,6 +166,9 @@ void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size, 
     // Tag ref
     if (v != NULL)
         cma_pool_fixed_ref(p);
+    // Remove flight if we set it and error
+    else if (inc_flight)
+        cma_pool_fixed_dec_in_flight(p);
 
     return v;
 }
