@@ -46,6 +46,7 @@ struct cma_pool_fixed_s
     size_t el_size;
     void ** pool;
 
+    bool cancel;
     int in_flight;
     vlc_cond_t flight_cond;
 
@@ -104,14 +105,13 @@ void cma_pool_fixed_ref(cma_pool_fixed_t * const p)
     atomic_fetch_add(&p->ref_count, 1);
 }
 
-void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size, const bool is_in_flight)
+void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size, const bool inc_flight)
 {
     void * v = NULL;
-    const bool inc_flight = is_in_flight && req_el_size != 0;
 
     vlc_mutex_lock(&p->lock);
 
-    do
+    for (;;)
     {
         if (req_el_size != p->el_size)
         {
@@ -134,8 +134,12 @@ void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size, 
             }
         }
 
-        if (req_el_size == 0)
-            break;
+        // Late abort if flush or cancel so we can still kill the pool
+        if (req_el_size == 0 || p->cancel)
+        {
+            vlc_mutex_unlock(&p->lock);
+            return NULL;
+        }
 
         if (p->pool != NULL)
         {
@@ -152,8 +156,7 @@ void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size, 
             break;
 
         vlc_cond_wait(&p->flight_cond, &p->lock);
-
-    } while (1);
+    }
 
     if (inc_flight)
         ++p->in_flight;
@@ -214,6 +217,22 @@ void cma_pool_fixed_dec_in_flight(cma_pool_fixed_t * const p)
         vlc_cond_signal(&p->flight_cond);
     vlc_mutex_unlock(&p->lock);
 }
+
+void cma_pool_fixed_cancel(cma_pool_fixed_t * const p)
+{
+    vlc_mutex_lock(&p->lock);
+    p->cancel = true;
+    vlc_cond_broadcast(&p->flight_cond);
+    vlc_mutex_unlock(&p->lock);
+}
+
+void cma_pool_fixed_uncancel(cma_pool_fixed_t * const p)
+{
+    vlc_mutex_lock(&p->lock);
+    p->cancel = false;
+    vlc_mutex_unlock(&p->lock);
+}
+
 
 // Purge pool & unref
 void cma_pool_fixed_kill(cma_pool_fixed_t * const p)
@@ -404,6 +423,22 @@ static void cma_buf_pool_on_delete_cb(void * v)
 
     cma_vcsm_exit(cbp->init_type);
     free(cbp);
+}
+
+void cma_buf_pool_cancel(cma_buf_pool_t * const cbp)
+{
+    if (cbp == NULL || cbp->pool == NULL)
+        return;
+
+    cma_pool_fixed_cancel(cbp->pool);
+}
+
+void cma_buf_pool_uncancel(cma_buf_pool_t * const cbp)
+{
+    if (cbp == NULL || cbp->pool == NULL)
+        return;
+
+    cma_pool_fixed_uncancel(cbp->pool);
 }
 
 // User finished with pool

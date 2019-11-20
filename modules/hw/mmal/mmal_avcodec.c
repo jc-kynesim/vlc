@@ -1364,6 +1364,7 @@ static void Flush( decoder_t *p_dec )
      * for a picture. This will avoid a deadlock between avcodec_flush_buffers
      * and workers threads */
     decoder_AbortPictures( p_dec, true );
+    cma_buf_pool_cancel(p_sys->cma_pool);
 
     post_mt( p_sys );
     /* do not flush buffers if codec hasn't been opened (theora/vorbis/VC1) */
@@ -1372,6 +1373,7 @@ static void Flush( decoder_t *p_dec )
     wait_mt( p_sys );
 
     /* Reset cancel state to false */
+    cma_buf_pool_uncancel(p_sys->cma_pool);
     decoder_AbortPictures( p_dec, false );
 
 #if TRACE_ALL
@@ -2041,6 +2043,8 @@ static void MmalAvcodecCloseDecoder( vlc_object_t *obj )
     msg_Dbg(obj, "<<< %s", __func__);
 
     post_mt( p_sys );
+
+    cma_buf_pool_cancel(p_sys->cma_pool);  // Abort any pending frame allocs
 
     /* do not flush buffers if codec hasn't been opened (theora/vorbis/VC1) */
     if( avcodec_is_open( ctx ) )
