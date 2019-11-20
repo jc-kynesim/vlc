@@ -55,7 +55,7 @@
 //#define NUM_EXTRA_BUFFERS 10
 #define NUM_DECODER_BUFFER_HEADERS 30
 
-#define MIN_NUM_BUFFERS_IN_TRANSIT 2
+#define CONVERTER_BUFFERS 4  // Buffers on the output of the converter
 
 #define MMAL_SLICE_HEIGHT 16
 #define MMAL_ALIGN_W      32
@@ -1013,7 +1013,7 @@ static MMAL_STATUS_T conv_enable_out(filter_t * const p_filter, filter_sys_t * c
     if (sys->is_cma)
     {
         if (sys->cma_out_pool == NULL &&
-            (sys->cma_out_pool = cma_buf_pool_new(5, 5, true, "mmal_resizer")) == NULL)
+            (sys->cma_out_pool = cma_buf_pool_new(CONVERTER_BUFFERS, CONVERTER_BUFFERS, true, "mmal_resizer")) == NULL)
         {
             msg_Err(p_filter, "Failed to alloc cma buf pool");
             return MMAL_ENOMEM;

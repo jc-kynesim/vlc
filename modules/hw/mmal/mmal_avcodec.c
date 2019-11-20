@@ -55,6 +55,7 @@
 #define TRACE_ALL 0
 
 #define BUFFERS_IN_FLIGHT       5       // Default max value for in flight buffers
+#define BUFFERS_IN_FLIGHT_UHD   3       // Fewer if very big
 
 #define MMAL_AVCODEC_BUFFERS "mmal-avcodec-buffers"
 #define MMAL_AVCODEC_BUFFERS_TEXT N_("In flight buffer count before blocking.")
@@ -226,7 +227,12 @@ zc_alloc_buf(void * v, size_t size, const AVRpiZcFrameGeometry * geo)
         return NULL;
     }
 
-//    msg_Info(dec, "Pool size=%d", av_rpi_zc_get_decoder_pool_size(sys->p_context->get_buffer_context));
+    const unsigned int dec_pool_req = av_rpi_zc_get_decoder_pool_size(sys->p_context->opaque);
+    if (dec_pool_req != 0)
+    {
+//        msg_Info(dec, "Pool size=%d+%d", dec_pool_req, sys->cma_in_flight_max);
+        cma_buf_pool_resize(sys->cma_pool, dec_pool_req + sys->cma_in_flight_max, sys->cma_in_flight_max);
+    }
 
     AVBufferRef *const avbuf = av_rpi_zc_buf(cma_buf_size(cmabuf), 0, cmabuf, &zc_buf_fn_tab);
 
@@ -1074,7 +1080,14 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     decoder_t *p_dec = (decoder_t *)obj;
     const AVCodec *p_codec;
 
-    const int extra_buffers = var_InheritInteger(p_dec, MMAL_AVCODEC_BUFFERS);
+    int extra_buffers = var_InheritInteger(p_dec, MMAL_AVCODEC_BUFFERS);
+
+    if (extra_buffers < 0)
+    {
+        extra_buffers = p_dec->fmt_in.video.i_height * p_dec->fmt_in.video.i_width >= 1920 * 1088 ?
+            BUFFERS_IN_FLIGHT_UHD : BUFFERS_IN_FLIGHT;
+    }
+
     if (extra_buffers <= 0)
     {
         msg_Dbg(p_dec, "%s: extra_buffers=%d - cannot use module", __func__, extra_buffers);
@@ -1090,7 +1103,7 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
         char buf1[5], buf2[5], buf2a[5];
         char buf3[5], buf4[5];
         uint32_t in_fcc = 0;
-        msg_Dbg(p_dec, "%s: <<< (%s/%s)[%s] %dx%d -> (%s/%s) %dx%d [%s/%d]", __func__,
+        msg_Dbg(p_dec, "%s: <<< (%s/%s)[%s] %dx%d -> (%s/%s) %dx%d [%s/%d] xb:%d", __func__,
                 str_fourcc(buf1, p_dec->fmt_in.i_codec),
                 str_fourcc(buf2, p_dec->fmt_in.video.i_chroma),
                 str_fourcc(buf2a, in_fcc),
@@ -1098,7 +1111,7 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
                 str_fourcc(buf3, p_dec->fmt_out.i_codec),
                 str_fourcc(buf4, p_dec->fmt_out.video.i_chroma),
                 p_dec->fmt_out.video.i_width, p_dec->fmt_out.video.i_height,
-                cma_vcsm_init_str(vcsm_type), vcsm_size);
+                cma_vcsm_init_str(vcsm_type), vcsm_size, extra_buffers);
     }
 #endif
 
@@ -2141,7 +2154,7 @@ vlc_module_begin()
     set_description(N_("MMAL buffered avcodec "))
     set_capability("video decoder", 80)
     add_shortcut("mmal_avcodec")
-    add_integer(MMAL_AVCODEC_BUFFERS, BUFFERS_IN_FLIGHT, MMAL_AVCODEC_BUFFERS_TEXT,
+    add_integer(MMAL_AVCODEC_BUFFERS, -1, MMAL_AVCODEC_BUFFERS_TEXT,
                     MMAL_AVCODEC_BUFFERS_LONGTEXT, true)
     set_callbacks(MmalAvcodecOpenDecoder, MmalAvcodecCloseDecoder)
 vlc_module_end()

@@ -18,6 +18,8 @@ void cma_pool_fixed_dec_in_flight(cma_pool_fixed_t * const p);
 void cma_pool_fixed_cancel(cma_pool_fixed_t * const p);
 void cma_pool_fixed_uncancel(cma_pool_fixed_t * const p);
 void cma_pool_fixed_kill(cma_pool_fixed_t * const p);
+int cma_pool_fixed_resize(cma_pool_fixed_t * const p,
+                          const unsigned int new_pool_size, const int new_flight_size);
 cma_pool_fixed_t * cma_pool_fixed_new(const unsigned int pool_size,
                    const int flight_size,
                    void * const alloc_v,
@@ -50,7 +52,10 @@ cma_buf_t * cma_buf_pool_alloc_buf(cma_buf_pool_t * const p, const size_t size);
 void cma_buf_pool_cancel(cma_buf_pool_t * const cbp);
 void cma_buf_pool_uncancel(cma_buf_pool_t * const cbp);
 void cma_buf_pool_delete(cma_buf_pool_t * const p);
-cma_buf_pool_t * cma_buf_pool_new(const unsigned int pool_size, const unsigned int flight_size, const bool all_in_flight, const char * const name);
+int cma_buf_pool_resize(cma_buf_pool_t * const cbp,
+                          const unsigned int new_pool_size, const int new_flight_size);
+cma_buf_pool_t * cma_buf_pool_new(const unsigned int pool_size, const unsigned int flight_size,
+                                  const bool all_in_flight, const char * const name);
 
 static inline void cma_buf_pool_deletez(cma_buf_pool_t ** const pp)
 {
