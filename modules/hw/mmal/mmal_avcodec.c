@@ -1838,7 +1838,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         /* Nothing to display */
         if( not_received_frame )
         {
-            msg_Dbg(p_dec, "No rx: used=%d", i_used);
+//            msg_Dbg(p_dec, "No rx: used=%d", i_used);
             av_frame_free(&frame);
             if( i_used == 0 ) break;
             continue;
@@ -1871,7 +1871,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
              !p_sys->b_show_corrupted ) )
         {
             av_frame_free(&frame);
-            msg_Dbg(p_dec, "Bad frame");
+//            msg_Dbg(p_dec, "Bad frame");
             continue;
         }
 
