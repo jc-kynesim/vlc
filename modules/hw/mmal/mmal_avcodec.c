@@ -115,6 +115,7 @@ struct decoder_sys_t
 
     // Rpi vars
     cma_buf_pool_t * cma_pool;
+    bool pool_alloc_1;
     vcsm_init_type_t vcsm_init_type;
     int cma_in_flight_max;
     // Debug
@@ -219,19 +220,26 @@ zc_alloc_buf(void * v, size_t size, const AVRpiZcFrameGeometry * geo)
 
     assert(sys != NULL);
 
+    const unsigned int dec_pool_req = av_rpi_zc_get_decoder_pool_size(sys->p_context->opaque);
+    if (dec_pool_req != 0)
+    {
+        cma_buf_pool_resize(sys->cma_pool, dec_pool_req + sys->cma_in_flight_max, sys->cma_in_flight_max);
+
+        if (!sys->pool_alloc_1)
+        {
+            sys->pool_alloc_1 = true;
+            msg_Dbg(dec, "Pool size: (%d+%d) * %zd", dec_pool_req, sys->cma_in_flight_max, size);
+            if (cma_buf_pool_fill(sys->cma_pool, size) != 0)
+                msg_Warn(dec, "Failed to preallocate decoder pool (%d+%d) * %zd", dec_pool_req, sys->cma_in_flight_max, size);
+        }
+    }
+
     void * const cmabuf = cma_buf_pool_alloc_buf(sys->cma_pool, size);
 
     if (cmabuf == NULL)
     {
         msg_Err(dec, "CMA buf pool alloc buf failed");
         return NULL;
-    }
-
-    const unsigned int dec_pool_req = av_rpi_zc_get_decoder_pool_size(sys->p_context->opaque);
-    if (dec_pool_req != 0)
-    {
-//        msg_Info(dec, "Pool size=%d+%d", dec_pool_req, sys->cma_in_flight_max);
-        cma_buf_pool_resize(sys->cma_pool, dec_pool_req + sys->cma_in_flight_max, sys->cma_in_flight_max);
     }
 
     AVBufferRef *const avbuf = av_rpi_zc_buf(cma_buf_size(cmabuf), 0, cmabuf, &zc_buf_fn_tab);
@@ -1376,7 +1384,10 @@ static void Flush( decoder_t *p_dec )
     /* Abort pictures in order to unblock all avcodec workers threads waiting
      * for a picture. This will avoid a deadlock between avcodec_flush_buffers
      * and workers threads */
-    decoder_AbortPictures( p_dec, true );
+// It would probably be good to use AbortPicture but that often deadlocks on close
+// and given that we wait for pics in the main thread it should be unneeded (whereas
+// cma is alloced in the depths of ffmpeg on its own threads)
+//    decoder_AbortPictures( p_dec, true );
     cma_buf_pool_cancel(p_sys->cma_pool);
 
     post_mt( p_sys );
@@ -1387,7 +1398,7 @@ static void Flush( decoder_t *p_dec )
 
     /* Reset cancel state to false */
     cma_buf_pool_uncancel(p_sys->cma_pool);
-    decoder_AbortPictures( p_dec, false );
+//    decoder_AbortPictures( p_dec, false );
 
 #if TRACE_ALL
     msg_Dbg(p_dec, ">>> %s", __func__);

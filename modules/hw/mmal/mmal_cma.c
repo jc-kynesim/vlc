@@ -99,18 +99,33 @@ static void cma_pool_fixed_delete(cma_pool_fixed_t * const p)
         on_delete_fn(v);
 }
 
-void cma_pool_fixed_unref(cma_pool_fixed_t * const p)
+static void cma_pool_fixed_unref(cma_pool_fixed_t * const p)
 {
     if (atomic_fetch_sub(&p->ref_count, 1) <= 1)
         cma_pool_fixed_delete(p);
 }
 
-void cma_pool_fixed_ref(cma_pool_fixed_t * const p)
+static void cma_pool_fixed_ref(cma_pool_fixed_t * const p)
 {
     atomic_fetch_add(&p->ref_count, 1);
 }
 
-void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size, const bool inc_flight)
+static void cma_pool_fixed_inc_in_flight(cma_pool_fixed_t * const p)
+{
+    vlc_mutex_lock(&p->lock);
+    ++p->in_flight;
+    vlc_mutex_unlock(&p->lock);
+}
+
+static void cma_pool_fixed_dec_in_flight(cma_pool_fixed_t * const p)
+{
+    vlc_mutex_lock(&p->lock);
+    if (--p->in_flight == 0)
+        vlc_cond_signal(&p->flight_cond);
+    vlc_mutex_unlock(&p->lock);
+}
+
+static void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size, const bool inc_flight, const bool no_pool)
 {
     void * v = NULL;
 
@@ -146,7 +161,7 @@ void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size, 
             return NULL;
         }
 
-        if (p->pool != NULL)
+        if (p->pool != NULL && !no_pool)
         {
             v = p->pool[p->n_in];
             if (v != NULL)
@@ -181,7 +196,7 @@ void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size, 
     return v;
 }
 
-void cma_pool_fixed_put(cma_pool_fixed_t * const p, void * v, const size_t el_size, const bool was_in_flight)
+static void cma_pool_fixed_put(cma_pool_fixed_t * const p, void * v, const size_t el_size, const bool was_in_flight)
 {
     vlc_mutex_lock(&p->lock);
 
@@ -208,7 +223,7 @@ void cma_pool_fixed_put(cma_pool_fixed_t * const p, void * v, const size_t el_si
     cma_pool_fixed_unref(p);
 }
 
-int cma_pool_fixed_resize(cma_pool_fixed_t * const p,
+static int cma_pool_fixed_resize(cma_pool_fixed_t * const p,
                            const unsigned int new_pool_size, const int new_flight_size)
 {
     void ** dead_pool = NULL;
@@ -256,22 +271,24 @@ int cma_pool_fixed_resize(cma_pool_fixed_t * const p,
     return 0;
 }
 
-void cma_pool_fixed_inc_in_flight(cma_pool_fixed_t * const p)
+static int cma_pool_fixed_fill(cma_pool_fixed_t * const p, const size_t el_size)
 {
-    vlc_mutex_lock(&p->lock);
-    ++p->in_flight;
-    vlc_mutex_unlock(&p->lock);
+    for (;;)
+    {
+        vlc_mutex_lock(&p->lock);
+        bool done = el_size == p->el_size && p->pool != NULL && p->pool[p->n_out] != NULL;
+        vlc_mutex_unlock(&p->lock);
+        if (done)
+            break;
+        void * buf = cma_pool_fixed_get(p, el_size, false, true);
+        if (buf == NULL)
+            return -ENOMEM;
+        cma_pool_fixed_put(p, buf, el_size, false);
+    }
+    return 0;
 }
 
-void cma_pool_fixed_dec_in_flight(cma_pool_fixed_t * const p)
-{
-    vlc_mutex_lock(&p->lock);
-    if (--p->in_flight == 0)
-        vlc_cond_signal(&p->flight_cond);
-    vlc_mutex_unlock(&p->lock);
-}
-
-void cma_pool_fixed_cancel(cma_pool_fixed_t * const p)
+static void cma_pool_fixed_cancel(cma_pool_fixed_t * const p)
 {
     vlc_mutex_lock(&p->lock);
     p->cancel = true;
@@ -279,7 +296,7 @@ void cma_pool_fixed_cancel(cma_pool_fixed_t * const p)
     vlc_mutex_unlock(&p->lock);
 }
 
-void cma_pool_fixed_uncancel(cma_pool_fixed_t * const p)
+static void cma_pool_fixed_uncancel(cma_pool_fixed_t * const p)
 {
     vlc_mutex_lock(&p->lock);
     p->cancel = false;
@@ -288,18 +305,18 @@ void cma_pool_fixed_uncancel(cma_pool_fixed_t * const p)
 
 
 // Purge pool & unref
-void cma_pool_fixed_kill(cma_pool_fixed_t * const p)
+static void cma_pool_fixed_kill(cma_pool_fixed_t * const p)
 {
     if (p == NULL)
         return;
 
     // This flush is not strictly needed but it reclaims what memory we can reclaim asap
-    cma_pool_fixed_get(p, 0, false);
+    cma_pool_fixed_get(p, 0, false, false);
     cma_pool_fixed_unref(p);
 }
 
 // Create a new pool
-cma_pool_fixed_t*
+static cma_pool_fixed_t*
 cma_pool_fixed_new(const unsigned int pool_size,
                    const int flight_size,
                    void * const alloc_v,
@@ -515,6 +532,11 @@ void cma_buf_pool_delete(cma_buf_pool_t * const cbp)
     }
 }
 
+int cma_buf_pool_fill(cma_buf_pool_t * const cbp, const size_t el_size)
+{
+    return cma_pool_fixed_fill(cbp->pool, el_size);
+}
+
 int cma_buf_pool_resize(cma_buf_pool_t * const cbp,
                         const unsigned int new_pool_size, const int new_flight_size)
 {
@@ -633,7 +655,7 @@ cma_buf_t * cma_buf_ref(cma_buf_t * const cb)
 
 cma_buf_t * cma_buf_pool_alloc_buf(cma_buf_pool_t * const cbp, const size_t size)
 {
-    cma_buf_t *const cb = cma_pool_fixed_get(cbp->pool, size, cbp->all_in_flight);
+    cma_buf_t *const cb = cma_pool_fixed_get(cbp->pool, size, cbp->all_in_flight, false);
 
     if (cb == NULL)
         return NULL;

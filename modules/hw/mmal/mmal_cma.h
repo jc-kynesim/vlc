@@ -9,6 +9,7 @@ typedef void * cma_pool_alloc_fn(void * v, size_t size);
 typedef void cma_pool_free_fn(void * v, void * el, size_t size);
 typedef void cma_pool_on_delete_fn(void * v);
 
+#if 0
 void cma_pool_fixed_unref(cma_pool_fixed_t * const p);
 void cma_pool_fixed_ref(cma_pool_fixed_t * const p);
 void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el_size, const bool in_flight);
@@ -26,7 +27,7 @@ cma_pool_fixed_t * cma_pool_fixed_new(const unsigned int pool_size,
                    cma_pool_alloc_fn * const alloc_fn, cma_pool_free_fn * const free_fn,
                    cma_pool_on_delete_fn * const on_delete_fn,
                    const char * const name);
-
+#endif
 
 struct cma_buf_s;
 typedef struct cma_buf_s cma_buf_t;
@@ -52,6 +53,7 @@ cma_buf_t * cma_buf_pool_alloc_buf(cma_buf_pool_t * const p, const size_t size);
 void cma_buf_pool_cancel(cma_buf_pool_t * const cbp);
 void cma_buf_pool_uncancel(cma_buf_pool_t * const cbp);
 void cma_buf_pool_delete(cma_buf_pool_t * const p);
+int cma_buf_pool_fill(cma_buf_pool_t * const cbp, const size_t el_size);
 int cma_buf_pool_resize(cma_buf_pool_t * const cbp,
                           const unsigned int new_pool_size, const int new_flight_size);
 cma_buf_pool_t * cma_buf_pool_new(const unsigned int pool_size, const unsigned int flight_size,
