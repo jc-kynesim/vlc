@@ -1995,6 +1995,7 @@ void input_DecoderDelete( decoder_t *p_dec )
     vlc_mutex_lock( &p_owner->lock );
     p_owner->b_waiting = false;
     vlc_cond_signal( &p_owner->wait_request );
+    vlc_mutex_unlock( &p_owner->lock );
 
     /* If the video output is paused or slow, or if the picture pool size was
      * under-estimated (e.g. greedy video filter, buggy decoder...), the
@@ -2005,7 +2006,6 @@ void input_DecoderDelete( decoder_t *p_dec )
      * worker threads (if any) and the decoder thread to terminate. */
     if( p_owner->p_vout != NULL )
         vout_Cancel( p_owner->p_vout, true );
-    vlc_mutex_unlock( &p_owner->lock );
 
     vlc_join( p_owner->thread, NULL );
 
