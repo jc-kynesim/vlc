@@ -90,6 +90,7 @@ static void cma_pool_fixed_delete(cma_pool_fixed_t * const p)
     if (p->name != NULL)
         free((void *)p->name);  // Discard const
 
+    vlc_cond_destroy(&p->flight_cond);
     vlc_mutex_destroy(&p->lock);
     free(p);
 
@@ -312,6 +313,7 @@ cma_pool_fixed_new(const unsigned int pool_size,
 
     atomic_store(&p->ref_count, 1);
     vlc_mutex_init(&p->lock);
+    vlc_cond_init(&p->flight_cond);
 
     p->pool_size = pool_size;
     p->flight_size = flight_size;
