@@ -456,6 +456,75 @@ hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const 
     return &ctx->cmn;
 }
 
+// Do a stride converting copy - if the strides are the same and line_len is
+// close then do a single block copy - we don't expect to have to preserve
+// pixels in the output frame
+static void mem_copy_2d(uint8_t * d_ptr, const size_t d_stride,
+                        const uint8_t * s_ptr, const size_t s_stride,
+                        size_t lines, const size_t line_len)
+{
+  if (s_stride == d_stride && s_stride < line_len + 32)
+  {
+    memcpy(d_ptr, s_ptr, s_stride * lines);
+  }
+  else
+  {
+    while (lines-- != 0) {
+      memcpy(d_ptr, s_ptr, line_len);
+      d_ptr += d_stride;
+      s_ptr += s_stride;
+    }
+  }
+}
+
+int hw_mmal_copy_pic_to_buf(MMAL_BUFFER_HEADER_T * const buf,
+                            void * const buf_data,
+                            const MMAL_ES_FORMAT_T * const fmt,
+                            const picture_t * const pic)
+{
+    const MMAL_VIDEO_FORMAT_T *const video = &fmt->es->video;
+    const uint8_t *dest = (buf_data == NULL) ? buf->data : buf_data;
+
+    //**** Worry about x/y_offsets
+
+    switch (pic->format.i_chroma) {
+        case VLC_CODEC_I420:
+        {
+            const unsigned int y_size = video->width * video->height;
+
+            buf->length = y_size + y_size / 2;
+
+            mem_copy_2d(dest, video->width,
+                        pic->p[0].p_pixels, pic->p[0].i_pitch,
+                        video->crop.height,
+                        video->crop.width);
+
+            mem_copy_2d(dest + y_size, video->width / 2,
+                        pic->p[1].p_pixels, pic->p[1].i_pitch,
+                        video->crop.height / 2,
+                        video->crop.width / 2);
+
+            mem_copy_2d(dest + y_size + y_size / 4, video->width / 2,
+                        pic->p[2].p_pixels, pic->p[2].i_pitch,
+                        video->crop.height / 2,
+                        video->crop.width / 2);
+
+            // And make sure it is actually in memory
+            if (cma_vcsm_type() == VCSM_INIT_LEGACY) {  // ** CMA is currently always uncached
+                flush_range(dest, buf->length);
+            }
+
+            break;
+        }
+
+        default:
+            return VLC_EBADVAR;
+    }
+
+    buf->flags = MMAL_BUFFER_HEADER_FLAG_FRAME_END;
+    return VLC_SUCCESS;
+}
+
 
 static MMAL_BOOL_T rep_buf_free_cb(MMAL_BUFFER_HEADER_T *header, void *userdata)
 {
@@ -466,9 +535,56 @@ static MMAL_BOOL_T rep_buf_free_cb(MMAL_BUFFER_HEADER_T *header, void *userdata)
     return MMAL_FALSE;
 }
 
+static int cma_buf_buf_attach(MMAL_BUFFER_HEADER_T * const buf, cma_buf_t * const cb)
+{
+    // Just a CMA buffer - fill in new buffer
+    const uintptr_t vc_h = cma_buf_vc_handle(cb);
+    if (vc_h == 0)
+        return VLC_EGENERIC;
+
+    mmal_buffer_header_reset(buf);
+    buf->data       = (uint8_t *)vc_h;
+    buf->alloc_size = cma_buf_size(cb);
+    buf->length     = buf->alloc_size;
+    // Ensure cb remains valid for the duration of this buffer
+    mmal_buffer_header_pre_release_cb_set(buf, rep_buf_free_cb, cma_buf_ref(cb));
+    return VLC_SUCCESS;
+}
+
+MMAL_BUFFER_HEADER_T * hw_mmal_pic_buf_copied(const picture_t *const pic,
+                                              MMAL_POOL_T * const rep_pool,
+                                              MMAL_PORT_T * const port,
+                                              cma_buf_pool_t * const cbp)
+{
+    MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(rep_pool->queue);
+    if (buf == NULL)
+        goto fail0;
+
+    cma_buf_t * const cb = cma_buf_pool_alloc_buf(cbp, port->buffer_size);
+    if (cb == NULL)
+        goto fail1;
+
+    if (cma_buf_buf_attach(buf, cb) != VLC_SUCCESS)
+        goto fail2;
+
+    pic_to_buf_copy_props(buf, pic);
+
+    if (hw_mmal_copy_pic_to_buf(buf, cma_buf_addr(cb), port->format, pic) != VLC_SUCCESS)
+        goto fail2;
+
+    cma_buf_unref(cb);
+    return buf;
+
+fail2:
+    cma_buf_unref(cb);
+fail1:
+    mmal_buffer_header_release(buf);
+fail0:
+    return NULL;
+}
+
 MMAL_BUFFER_HEADER_T * hw_mmal_pic_buf_replicated(const picture_t *const pic, MMAL_POOL_T * const rep_pool)
 {
-    MMAL_STATUS_T err;
     pic_ctx_mmal_t *const ctx = (pic_ctx_mmal_t *)pic->context;
     MMAL_BUFFER_HEADER_T *const rep_buf = mmal_queue_wait(rep_pool->queue);
 
@@ -478,22 +594,14 @@ MMAL_BUFFER_HEADER_T * hw_mmal_pic_buf_replicated(const picture_t *const pic, MM
     if (ctx->bufs[0] != NULL)
     {
         // Existing buffer - replicate it
-        if ((err = mmal_buffer_header_replicate(rep_buf, ctx->bufs[0])) != MMAL_SUCCESS)
+        if (mmal_buffer_header_replicate(rep_buf, ctx->bufs[0]) != MMAL_SUCCESS)
             goto fail;
     }
     else if (ctx->cb != NULL)
     {
         // Just a CMA buffer - fill in new buffer
-        const uintptr_t vc_h = cma_buf_vc_handle(ctx->cb);
-        if (vc_h == 0)
+        if (cma_buf_buf_attach(rep_buf, ctx->cb) != 0)
             goto fail;
-
-        mmal_buffer_header_reset(rep_buf);
-        rep_buf->data = (uint8_t *)vc_h;
-        rep_buf->alloc_size = cma_buf_size(ctx->cb);
-        rep_buf->length = rep_buf->alloc_size;
-        // Ensure cb remains valid for the duration of this buffer
-        mmal_buffer_header_pre_release_cb_set(rep_buf, rep_buf_free_cb, cma_buf_ref(ctx->cb));
     }
     else
         goto fail;
@@ -1041,18 +1149,14 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc,
 
             // 2D copy
             {
-                unsigned int i;
                 uint8_t *d = ent->buf;
                 const uint8_t *s = pic->p[0].p_pixels + xl * bpp + fmt->i_y_offset * pic->p[0].i_pitch;
-                for (i = 0; i != fmt->i_visible_height; ++i) {
-                    memcpy(d, s, dst_stride);
-                    d += dst_stride;
-                    s += pic->p[0].i_pitch;
-                }
+
+                mem_copy_2d(d, dst_stride, s, pic->p[0].i_pitch, fmt->i_visible_height, dst_stride);
 
                 // And make sure it is actually in memory
                 if (pc->vcsm_init_type != VCSM_INIT_CMA) {  // ** CMA is currently always uncached
-                    flush_range(ent->buf, d - (uint8_t *)ent->buf);
+                    flush_range(ent->buf, dst_stride * fmt->i_visible_height);
                 }
             }
         }
@@ -1269,10 +1373,15 @@ bool rpi_is_model_pi4(void) {
 // Preferred mode - none->cma on Pi4 otherwise legacy
 static volatile vcsm_init_type_t last_vcsm_type = VCSM_INIT_NONE;
 
+vcsm_init_type_t cma_vcsm_type(void)
+{
+    return last_vcsm_type;
+}
+
 vcsm_init_type_t cma_vcsm_init(void)
 {
     vcsm_init_type_t rv = VCSM_INIT_NONE;
-    // We don't both locking - taking a copy here should be good enough
+    // We don't bother locking - taking a copy here should be good enough
     vcsm_init_type_t try_type = last_vcsm_type;
 
     if (try_type == VCSM_INIT_NONE) {

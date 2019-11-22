@@ -152,26 +152,6 @@ static inline bool want_copy(const vout_display_t * const vd)
     return (vd->fmt.i_chroma == VLC_CODEC_I420);
 }
 
-// Do a stride converting copy - if the strides are the same and line_len is
-// close then do a single block copy - we don't expect to have to preserve
-// pixels in the output frame
-static inline void mem_copy_2d(uint8_t * d_ptr, const size_t d_stride, const uint8_t * s_ptr, const size_t s_stride, size_t lines, const size_t line_len)
-{
-  if (s_stride == d_stride && s_stride < line_len + 32)
-  {
-    memcpy(d_ptr, s_ptr, s_stride * lines);
-  }
-  else
-  {
-    while (lines-- != 0) {
-      memcpy(d_ptr, s_ptr, line_len);
-      d_ptr += d_stride;
-      s_ptr += s_stride;
-    }
-  }
-}
-
-
 static MMAL_FOURCC_T vout_vlc_to_mmal_pic_fourcc(const unsigned int fcc)
 {
     switch (fcc){
@@ -949,25 +929,7 @@ static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
 
         MMAL_BUFFER_HEADER_T * const buf = mmal_queue_wait(sys->copy_pool->queue);
         // Copy 2d
-        unsigned int y_size = sys->input->format->es->video.width * sys->input->format->es->video.height;
-
-        buf->flags = MMAL_BUFFER_HEADER_FLAG_FRAME_END;
-        buf->length = sys->input->buffer_size;
-
-        mem_copy_2d(buf->data, sys->input->format->es->video.width,
-                    p_pic->p[0].p_pixels, p_pic->p[0].i_pitch,
-                    sys->input->format->es->video.crop.height,
-                    sys->input->format->es->video.crop.width);
-
-        mem_copy_2d(buf->data + y_size, sys->input->format->es->video.width / 2,
-                    p_pic->p[1].p_pixels, p_pic->p[1].i_pitch,
-                    sys->input->format->es->video.crop.height / 2,
-                    sys->input->format->es->video.crop.width / 2);
-
-        mem_copy_2d(buf->data + y_size + y_size / 4, sys->input->format->es->video.width / 2,
-                    p_pic->p[2].p_pixels, p_pic->p[2].i_pitch,
-                    sys->input->format->es->video.crop.height / 2,
-                    sys->input->format->es->video.crop.width / 2);
+        hw_mmal_copy_pic_to_buf(buf, NULL, sys->input->format, p_pic);
 
         sys->copy_buf = buf;
     }

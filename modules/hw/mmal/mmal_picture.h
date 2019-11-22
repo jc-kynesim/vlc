@@ -75,6 +75,12 @@ void hw_mmal_vlc_fmt_to_mmal_fmt(MMAL_ES_FORMAT_T *const es_fmt, const video_fra
 // frame_rate ignored for compare, but is set if something else is updated
 bool hw_mmal_vlc_pic_to_mmal_fmt_update(MMAL_ES_FORMAT_T *const es_fmt, const picture_t * const pic);
 
+// Copy pic contents into an existing buffer
+int hw_mmal_copy_pic_to_buf(MMAL_BUFFER_HEADER_T * const buf,
+                            void * const buf_data,
+                            const MMAL_ES_FORMAT_T * const fmt,
+                            const picture_t * const pic);
+
 hw_mmal_port_pool_ref_t * hw_mmal_port_pool_ref_create(MMAL_PORT_T * const port,
    const unsigned int headers, const uint32_t payload_size);
 void hw_mmal_port_pool_ref_release(hw_mmal_port_pool_ref_t * const ppr, const bool in_cb);
@@ -219,6 +225,11 @@ static inline void buf_to_pic_copy_props(picture_t * const pic, const MMAL_BUFFE
             VLC_TICK_INVALID;
 }
 
+MMAL_BUFFER_HEADER_T * hw_mmal_pic_buf_copied(const picture_t *const pic,
+                                              MMAL_POOL_T * const rep_pool,
+                                              MMAL_PORT_T * const port,
+                                              cma_buf_pool_t * const cbp);
+
 MMAL_BUFFER_HEADER_T * hw_mmal_pic_buf_replicated(const picture_t *const pic, MMAL_POOL_T * const rep_pool);
 
 struct vzc_pool_ctl_s;
@@ -298,6 +309,7 @@ typedef enum vcsm_init_type_e {
 
 vcsm_init_type_t cma_vcsm_init(void);
 void cma_vcsm_exit(const vcsm_init_type_t init_mode);
+vcsm_init_type_t cma_vcsm_type(void);
 const char * cma_vcsm_init_str(const vcsm_init_type_t init_mode);
 
 
