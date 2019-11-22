@@ -549,7 +549,8 @@ static void CloseMmalDeinterlace(filter_t *filter)
 
     hw_mmal_port_pool_ref_release(sys->out_ppr, false);
     // Once we exit filter & sys are invalid so mark as such
-    sys->output->userdata = NULL;
+    if (sys->output != NULL)
+        sys->output->userdata = NULL;
 
     if (sys->is_cma)
     {
