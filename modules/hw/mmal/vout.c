@@ -149,7 +149,14 @@ static inline bool want_isp(const vout_display_t * const vd)
 
 static inline bool want_copy(const vout_display_t * const vd)
 {
-    return (vd->fmt.i_chroma == VLC_CODEC_I420);
+    return (vd->fmt.i_chroma == VLC_CODEC_I420 || vd->fmt.i_chroma == VLC_CODEC_I420_10L);
+}
+
+static inline vlc_fourcc_t req_chroma(const vout_display_t * const vd)
+{
+    return !hw_mmal_chroma_is_mmal(vd->fmt.i_chroma) && !want_copy(vd) ?
+        VLC_CODEC_I420 :
+        vd->fmt.i_chroma;
 }
 
 static MMAL_FOURCC_T vout_vlc_to_mmal_pic_fourcc(const unsigned int fcc)
@@ -169,7 +176,7 @@ static MMAL_FOURCC_T vout_vlc_to_mmal_pic_fourcc(const unsigned int fcc)
     default:
         break;
     }
-    return 0;
+    return MMAL_ENCODING_I420;
 }
 
 static void display_set_format(const vout_display_t * const vd, MMAL_ES_FORMAT_T *const es_fmt, const bool is_intermediate)
@@ -541,8 +548,18 @@ place_to_mmal_rect(const vout_display_place_t place)
 
 static void
 place_dest(vout_display_t *vd, vout_display_sys_t * const sys,
-           const vout_display_cfg_t * const cfg, const video_format_t * const fmt)
+           const vout_display_cfg_t * const cfg, const video_format_t * fmt)
 {
+    video_format_t tfmt;
+
+    // Fix SAR if unknown
+    if (fmt->i_sar_den == 0 || fmt->i_sar_num == 0) {
+        tfmt = *fmt;
+        tfmt.i_sar_den = 1;
+        tfmt.i_sar_num = 1;
+        fmt = &tfmt;
+    }
+
     // Ignore what VLC thinks might be going on with display size
     vout_display_cfg_t tcfg = *cfg;
     vout_display_place_t place;
@@ -552,9 +569,11 @@ place_dest(vout_display_t *vd, vout_display_sys_t * const sys,
     vout_display_PlacePicture(&place, fmt, &tcfg, false);
 
     sys->dest_rect = place_to_mmal_rect(place);
-
-    msg_Dbg(vd, "%dx%d -> %dx%d @ %d,%d", tcfg.display.width, tcfg.display.height,
+#if TRACE_ALL
+    msg_Dbg(vd, "%s: %dx%d -> %dx%d @ %d,%d", __func__,
+            tcfg.display.width, tcfg.display.height,
             place.width, place.height, place.x, place.y);
+#endif
 }
 
 
@@ -648,27 +667,20 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
     MMAL_STATUS_T err;
 
 #if TRACE_ALL
-    msg_Dbg(vd, "<<< %s", __func__);
+    {
+        char dbuf0[5];
+        msg_Dbg(vd, "<<< %s: %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d", __func__,
+                str_fourcc(dbuf0, p_pic->format.i_chroma), p_pic->format.i_width, p_pic->format.i_height,
+                p_pic->format.i_x_offset, p_pic->format.i_y_offset,
+                p_pic->format.i_visible_width, p_pic->format.i_visible_height,
+                p_pic->format.i_sar_num, p_pic->format.i_sar_den);
+    }
 #endif
 
     // If we had subpics then we have attached them to the main pic in prepare
     // so all we have to do here is delete the refs
     if (subpicture != NULL) {
         subpicture_Delete(subpicture);
-    }
-
-    if (sys->force_config ||
-        p_pic->format.i_frame_rate != sys->i_frame_rate ||
-        p_pic->format.i_frame_rate_base != sys->i_frame_rate_base ||
-        p_pic->b_progressive != sys->b_progressive ||
-        p_pic->b_top_field_first != sys->b_top_field_first)
-    {
-        sys->force_config = false;
-        sys->b_top_field_first = p_pic->b_top_field_first;
-        sys->b_progressive = p_pic->b_progressive;
-        sys->i_frame_rate = p_pic->format.i_frame_rate;
-        sys->i_frame_rate_base = p_pic->format.i_frame_rate_base;
-        configure_display(vd, NULL, &p_pic->format);
     }
 
     if (!sys->input->is_enabled &&
@@ -714,13 +726,15 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
             goto fail;
         }
 
+
         // If dimensions have chnaged then fix that
         if (hw_mmal_vlc_pic_to_mmal_fmt_update(sys->input->format, p_pic))
         {
             msg_Dbg(vd, "Reset port format");
 
             // HVS can deal with on-line dimension changes
-            mmal_port_format_commit(sys->input);
+            if (mmal_port_format_commit(sys->input) != MMAL_SUCCESS)
+                msg_Warn(vd, "Input format commit failed");
         }
 
         if ((err = mmal_port_send_buffer(sys->input, pic_buf)) != MMAL_SUCCESS)
@@ -789,7 +803,8 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
         case VOUT_DISPLAY_RESET_PICTURES:
             msg_Warn(vd, "Reset Pictures");
             kill_pool(sys);
-            vd->fmt = vd->source; // Take whatever source wants to give us
+            vd->fmt = vd->source; // Take (nearly) whatever source wants to give us
+            vd->fmt.i_chroma = req_chroma(vd);  // Adjust chroma to something we can actaully deal with
             ret = VLC_SUCCESS;
             break;
 
@@ -870,19 +885,22 @@ static int attach_subpics(vout_display_t * const vd, vout_display_sys_t * const 
 
 #if 0
             char dbuf0[5];
-            msg_Dbg(vd, "  [%p:%p] Pos=%d,%d src=%dx%d/%dx%d,  vd=%dx%d/%dx%d, Alpha=%d, Fmt=%s", src, src->p[0].p_pixels,
+            msg_Dbg(vd, "  [%p:%p] Pos=%d,%d src=%dx%d/%dx%d,  vd->fmt=%dx%d/%dx%d, vd->source=%dx%d/%dx%d, cfg=%dx%d, Alpha=%d, Fmt=%s", src, src->p[0].p_pixels,
                     sreg->i_x, sreg->i_y,
                     src->format.i_visible_width, src->format.i_visible_height,
                     src->format.i_width, src->format.i_height,
                     vd->fmt.i_visible_width, vd->fmt.i_visible_height,
                     vd->fmt.i_width, vd->fmt.i_height,
+                    vd->source.i_visible_width, vd->source.i_visible_height,
+                    vd->source.i_width, vd->source.i_height,
+                    vd->cfg->display.width, vd->cfg->display.height,
                     sreg->i_alpha,
                     str_fourcc(dbuf0, src->format.i_chroma));
 #endif
 
             if ((sys->subpic_bufs[n] = hw_mmal_vzc_buf_from_pic(sys->vzc,
                 src,
-                (MMAL_RECT_T){.width = vd->source.i_visible_width, .height=vd->source.i_visible_height},
+                (MMAL_RECT_T){.width = sys->dest_rect.width, .height=sys->dest_rect.height},  // Ignore dest offsets - just want size
                 sreg->i_x, sreg->i_y,
                 sreg->i_alpha,
                 n == 0)) == NULL)
@@ -912,6 +930,20 @@ static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
 
     vd_manage(vd);
 
+    if (sys->force_config ||
+        p_pic->format.i_frame_rate != sys->i_frame_rate ||
+        p_pic->format.i_frame_rate_base != sys->i_frame_rate_base ||
+        p_pic->b_progressive != sys->b_progressive ||
+        p_pic->b_top_field_first != sys->b_top_field_first)
+    {
+        sys->force_config = false;
+        sys->b_top_field_first = p_pic->b_top_field_first;
+        sys->b_progressive = p_pic->b_progressive;
+        sys->i_frame_rate = p_pic->format.i_frame_rate;
+        sys->i_frame_rate_base = p_pic->format.i_frame_rate_base;
+        configure_display(vd, NULL, &p_pic->format);
+    }
+
     // Subpics can either turn up attached to the main pic or in the
     // subpic list here  - if they turn up here then process into temp
     // buffers
@@ -929,7 +961,8 @@ static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
 
         MMAL_BUFFER_HEADER_T * const buf = mmal_queue_wait(sys->copy_pool->queue);
         // Copy 2d
-        hw_mmal_copy_pic_to_buf(buf, NULL, sys->input->format, p_pic);
+        hw_mmal_copy_pic_to_buf(buf->data, &buf->length, sys->input->format, p_pic);
+        buf->flags = MMAL_BUFFER_HEADER_FLAG_FRAME_END;
 
         sys->copy_buf = buf;
     }
@@ -1243,19 +1276,14 @@ static int OpenMmalVout(vlc_object_t *object)
     MMAL_DISPLAYREGION_T display_region;
     MMAL_STATUS_T status;
     int ret = VLC_EGENERIC;
-    const MMAL_FOURCC_T enc_in = vout_vlc_to_mmal_pic_fourcc(vd->fmt.i_chroma);
+    // At the moment all copy is via I420
+    const bool needs_copy = !hw_mmal_chroma_is_mmal(vd->fmt.i_chroma);
+    const MMAL_FOURCC_T enc_in = needs_copy ? MMAL_ENCODING_I420 :
+        vout_vlc_to_mmal_pic_fourcc(vd->fmt.i_chroma);
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
-    if (enc_in == 0)
-    {
-#if TRACE_ALL
-        char dbuf0[5];
-        msg_Dbg(vd, ">>> %s: Format %s not MMAL", __func__, str_fourcc(dbuf0, vd->fmt.i_chroma));
-#endif
-        return VLC_EGENERIC;
-    }
 
     sys = calloc(1, sizeof(struct vout_display_sys_t));
     if (!sys)
@@ -1328,7 +1356,7 @@ static int OpenMmalVout(vlc_object_t *object)
 
     sys->input->buffer_size = sys->input->buffer_size_recommended;
 
-    if (!want_copy(vd)) {
+    if (!needs_copy) {
         sys->input->buffer_num = 30;
     }
     else {
@@ -1410,6 +1438,9 @@ static int OpenMmalVout(vlc_object_t *object)
             goto fail;
         }
     }
+
+    // If we can't deal with it directly ask for I420
+    vd->fmt.i_chroma = req_chroma(vd);
 
     vd->info = (vout_display_info_t){
         .is_slow = false,

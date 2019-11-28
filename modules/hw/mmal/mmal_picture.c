@@ -30,6 +30,7 @@
 #include <fcntl.h>
 
 #include <vlc_common.h>
+#include <vlc_cpu.h>
 #include <vlc_picture.h>
 
 #pragma GCC diagnostic push
@@ -130,6 +131,7 @@ MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc
                 return MMAL_ENCODING_RGB16;
             break;
         }
+        case VLC_CODEC_I420:
         case VLC_CODEC_MMAL_ZC_I420:
             return MMAL_ENCODING_I420;
         case VLC_CODEC_RGBA:
@@ -155,7 +157,8 @@ MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc
 
 static void vlc_fmt_to_video_format(MMAL_VIDEO_FORMAT_T *const vf_mmal, const video_frame_format_t * const vf_vlc)
 {
-    const unsigned int wmask = (vf_vlc->i_chroma == VLC_CODEC_MMAL_ZC_I420) ? 31 : 15;
+    const unsigned int wmask = (vf_vlc->i_chroma == VLC_CODEC_MMAL_ZC_I420 ||
+                                vf_vlc->i_chroma == VLC_CODEC_I420) ? 31 : 15;
 
     vf_mmal->width          = (vf_vlc->i_width + wmask) & ~wmask;
     vf_mmal->height         = (vf_vlc->i_height + 15) & ~15;
@@ -192,8 +195,9 @@ bool hw_mmal_vlc_pic_to_mmal_fmt_update(MMAL_ES_FORMAT_T *const es_fmt, const pi
     // If we have a format that might have come from ffmpeg then rework for
     // a better guess as to layout. All sand stuff is "special" with regards to
     // width/height vs real layout so leave as is if that
-    if (pic->format.i_chroma == VLC_CODEC_MMAL_ZC_I420 ||
-        pic->format.i_chroma == VLC_CODEC_MMAL_ZC_RGB32)
+    if ((pic->format.i_chroma == VLC_CODEC_MMAL_ZC_I420 ||
+         pic->format.i_chroma == VLC_CODEC_MMAL_ZC_RGB32) &&
+        pic->p[0].i_pixel_pitch != 0)
     {
         // Now overwrite width/height with a better guess as to actual layout info
         vf_new->height = pic->p[0].i_lines;
@@ -456,6 +460,20 @@ hw_mmal_gen_context(MMAL_BUFFER_HEADER_T * buf, hw_mmal_port_pool_ref_t * const 
     return &ctx->cmn;
 }
 
+// n is els
+// * Make NEON!
+typedef void piccpy_fn(void * dest, const void * src, size_t n);
+
+extern piccpy_fn mmal_piccpy_10_to_8_neon;
+
+static void piccpy_10_to_8_c(void * dest, const void * src, size_t n)
+{
+    uint8_t * d = dest;
+    const uint16_t * s = src;
+    while (n-- != 0)
+        *d++ = *s++ >> 2;
+}
+
 // Do a stride converting copy - if the strides are the same and line_len is
 // close then do a single block copy - we don't expect to have to preserve
 // pixels in the output frame
@@ -463,65 +481,114 @@ static void mem_copy_2d(uint8_t * d_ptr, const size_t d_stride,
                         const uint8_t * s_ptr, const size_t s_stride,
                         size_t lines, const size_t line_len)
 {
-  if (s_stride == d_stride && s_stride < line_len + 32)
-  {
-    memcpy(d_ptr, s_ptr, s_stride * lines);
-  }
-  else
-  {
-    while (lines-- != 0) {
-      memcpy(d_ptr, s_ptr, line_len);
-      d_ptr += d_stride;
-      s_ptr += s_stride;
+    if (s_stride == d_stride && d_stride < line_len + 32)
+    {
+        memcpy(d_ptr, s_ptr, d_stride * lines);
     }
-  }
+    else
+    {
+        while (lines-- != 0) {
+            memcpy(d_ptr, s_ptr, line_len);
+            d_ptr += d_stride;
+            s_ptr += s_stride;
+        }
+    }
 }
 
-int hw_mmal_copy_pic_to_buf(MMAL_BUFFER_HEADER_T * const buf,
-                            void * const buf_data,
+// line_len in D units
+static void mem_copy_2d_10_to_8(uint8_t * d_ptr, const size_t d_stride,
+                        const uint8_t * s_ptr, const size_t s_stride,
+                        size_t lines, const size_t line_len)
+{
+    piccpy_fn * const docpy = vlc_CPU_ARM_NEON() ? mmal_piccpy_10_to_8_neon : piccpy_10_to_8_c;
+    if (s_stride == d_stride * 2 && d_stride < line_len + 32)
+    {
+        docpy(d_ptr, s_ptr, d_stride * lines);
+    }
+    else
+    {
+        while (lines-- != 0) {
+            docpy(d_ptr, s_ptr, line_len);
+            d_ptr += d_stride;
+            s_ptr += s_stride;
+        }
+    }
+}
+
+
+int hw_mmal_copy_pic_to_buf(void * const buf_data,
+                            uint32_t * const pLength,
                             const MMAL_ES_FORMAT_T * const fmt,
                             const picture_t * const pic)
 {
     const MMAL_VIDEO_FORMAT_T *const video = &fmt->es->video;
-    const uint8_t *dest = (buf_data == NULL) ? buf->data : buf_data;
+    uint8_t * const dest = buf_data;
+    size_t length = 0;
 
     //**** Worry about x/y_offsets
+
+    assert(fmt->encoding == MMAL_ENCODING_I420);
 
     switch (pic->format.i_chroma) {
         case VLC_CODEC_I420:
         {
-            const unsigned int y_size = video->width * video->height;
-
-            buf->length = y_size + y_size / 2;
-
+            const size_t y_size = video->width * video->height;
             mem_copy_2d(dest, video->width,
-                        pic->p[0].p_pixels, pic->p[0].i_pitch,
-                        video->crop.height,
-                        video->crop.width);
+                 pic->p[0].p_pixels, pic->p[0].i_pitch,
+                 video->crop.height,
+                 video->crop.width);
 
             mem_copy_2d(dest + y_size, video->width / 2,
-                        pic->p[1].p_pixels, pic->p[1].i_pitch,
-                        video->crop.height / 2,
-                        video->crop.width / 2);
+                 pic->p[1].p_pixels, pic->p[1].i_pitch,
+                 video->crop.height / 2,
+                 video->crop.width / 2);
 
             mem_copy_2d(dest + y_size + y_size / 4, video->width / 2,
-                        pic->p[2].p_pixels, pic->p[2].i_pitch,
-                        video->crop.height / 2,
-                        video->crop.width / 2);
+                 pic->p[2].p_pixels, pic->p[2].i_pitch,
+                 video->crop.height / 2,
+                 video->crop.width / 2);
 
             // And make sure it is actually in memory
-            if (cma_vcsm_type() == VCSM_INIT_LEGACY) {  // ** CMA is currently always uncached
-                flush_range(dest, buf->length);
-            }
+            length = y_size + y_size / 2;
+            break;
+        }
 
+        case VLC_CODEC_I420_10L:
+        {
+            const size_t y_size = video->width * video->height;
+            mem_copy_2d_10_to_8(dest, video->width,
+                 pic->p[0].p_pixels, pic->p[0].i_pitch,
+                 video->crop.height,
+                 video->crop.width);
+
+            mem_copy_2d_10_to_8(dest + y_size, video->width / 2,
+                 pic->p[1].p_pixels, pic->p[1].i_pitch,
+                 video->crop.height / 2,
+                 video->crop.width / 2);
+
+            mem_copy_2d_10_to_8(dest + y_size + y_size / 4, video->width / 2,
+                 pic->p[2].p_pixels, pic->p[2].i_pitch,
+                 video->crop.height / 2,
+                 video->crop.width / 2);
+
+            // And make sure it is actually in memory
+            length = y_size + y_size / 2;
             break;
         }
 
         default:
+            if (pLength != NULL)
+                *pLength = 0;
             return VLC_EBADVAR;
     }
 
-    buf->flags = MMAL_BUFFER_HEADER_FLAG_FRAME_END;
+    if (cma_vcsm_type() == VCSM_INIT_LEGACY) {  // ** CMA is currently always uncached
+        flush_range(dest, length);
+    }
+
+    if (pLength != NULL)
+        *pLength = (uint32_t)length;
+
     return VLC_SUCCESS;
 }
 
@@ -569,8 +636,9 @@ MMAL_BUFFER_HEADER_T * hw_mmal_pic_buf_copied(const picture_t *const pic,
 
     pic_to_buf_copy_props(buf, pic);
 
-    if (hw_mmal_copy_pic_to_buf(buf, cma_buf_addr(cb), port->format, pic) != VLC_SUCCESS)
+    if (hw_mmal_copy_pic_to_buf(cma_buf_addr(cb), &buf->length, port->format, pic) != VLC_SUCCESS)
         goto fail2;
+    buf->flags = MMAL_BUFFER_HEADER_FLAG_FRAME_END;
 
     cma_buf_unref(cb);
     return buf;
@@ -1002,6 +1070,13 @@ static void rescale_rect(MMAL_RECT_T * const d, const MMAL_RECT_T * const s, con
     d->y      = rescale_x(s->y - div_rect->y, mul_rect->height, div_rect->height) + mul_rect->y;
     d->width  = rescale_x(s->width,           mul_rect->width,  div_rect->width);
     d->height = rescale_x(s->height,          mul_rect->height, div_rect->height);
+#if 0
+    fprintf(stderr, "(%d,%d %dx%d) * (%d,%d %dx%d) / (%d,%d %dx%d) -> (%d,%d %dx%d)\n",
+            s->x, s->y, s->width, s->height,
+            mul_rect->x, mul_rect->y, mul_rect->width, mul_rect->height,
+            div_rect->x, div_rect->y, div_rect->width, div_rect->height,
+            d->x, d->y, d->width, d->height);
+#endif
 }
 
 void hw_mmal_vzc_buf_scale_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const MMAL_RECT_T * const scale_rect)
@@ -1280,8 +1355,9 @@ int cma_pic_set_data(picture_t * const pic,
                             const MMAL_BUFFER_HEADER_T * const buf)
 {
     const MMAL_VIDEO_FORMAT_T * const mm_fmt = &mm_esfmt->es->video;
-    const MMAL_BUFFER_HEADER_VIDEO_SPECIFIC_T *const buf_vid = &buf->type->video;
+    const MMAL_BUFFER_HEADER_VIDEO_SPECIFIC_T *const buf_vid = (buf == NULL) ? NULL : &buf->type->video;
     cma_buf_t *const cb = cma_buf_pic_get(pic);
+    unsigned int planes = 1;
 
     uint8_t * const data = cma_buf_addr(cb);
     if (data == NULL) {
@@ -1308,9 +1384,13 @@ int cma_pic_set_data(picture_t * const pic,
 
         case MMAL_ENCODING_I420:
             ws = shift_01;
-            /* FALL THRU */
+            hs = shift_01;
+            planes = 3;
+            break;
+
         case MMAL_ENCODING_YUVUV128:
             hs = shift_01;
+            planes = 2;
             break;
 
         default:
@@ -1318,16 +1398,24 @@ int cma_pic_set_data(picture_t * const pic,
             return VLC_EGENERIC;
     }
 
-    pic->i_planes = buf_vid->planes;
-    for (unsigned int i = 0; i != buf_vid->planes; ++i) {
+    // Fix up SAR if unset
+    if (pic->format.i_sar_den == 0 || pic->format.i_sar_num == 0) {
+        pic->format.i_sar_den = mm_fmt->par.den;
+        pic->format.i_sar_num = mm_fmt->par.num;
+    }
+
+    pic->i_planes = planes;
+    unsigned int offset = 0;
+    for (unsigned int i = 0; i != planes; ++i) {
         pic->p[i] = (plane_t){
-            .p_pixels = data + buf_vid->offset[i],
+            .p_pixels = data + (buf_vid != NULL ? buf_vid->offset[i] : offset),
             .i_lines = mm_fmt->height >> hs[i],
-            .i_pitch = buf_vid->pitch[i],
+            .i_pitch = buf_vid != NULL ? buf_vid->pitch[i] : mm_fmt->width * pb,
             .i_pixel_pitch = pb,
             .i_visible_lines = mm_fmt->crop.height >> hs[i],
             .i_visible_pitch = mm_fmt->crop.width >> ws[i]
         };
+        offset += pic->p[i].i_pitch * pic->p[i].i_lines;
     }
     return VLC_SUCCESS;
 }

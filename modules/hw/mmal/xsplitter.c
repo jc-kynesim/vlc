@@ -376,9 +376,14 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
         }
 
         case VOUT_DISPLAY_RESET_PICTURES:
-            msg_Dbg(vd, "<<< %s: Pic reset: fmt: %dx%d<-%dx%d, source: %dx%d/%dx%d", __func__,
-                    vd->fmt.i_width, vd->fmt.i_height, x_desc->vout->fmt.i_width, x_desc->vout->fmt.i_height,
-                    vd->source.i_width, vd->source.i_height, x_desc->vout->source.i_width, x_desc->vout->source.i_height);
+            {
+                char dbuf0[5], dbuf1[5], dbuf2[5];
+                msg_Dbg(vd, "<<< %s: Pic reset: fmt: %s,%dx%d<-%s,%dx%d, source: %s,%dx%d/%dx%d", __func__,
+                        str_fourcc(dbuf0, vd->fmt.i_chroma), vd->fmt.i_width, vd->fmt.i_height,
+                        str_fourcc(dbuf1, x_desc->vout->fmt.i_chroma), x_desc->vout->fmt.i_width, x_desc->vout->fmt.i_height,
+                        str_fourcc(dbuf2, vd->source.i_chroma), vd->source.i_width, vd->source.i_height, x_desc->vout->source.i_width,
+                        x_desc->vout->source.i_height);
+            }
             // If the display doesn't have has_pictures_invalid then it doesn't
             // expect RESET_PICTURES
             if (sys->x_desc.vout->info.has_pictures_invalid) {

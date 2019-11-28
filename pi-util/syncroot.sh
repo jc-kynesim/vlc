@@ -27,6 +27,8 @@ echo Sync dest: $DST
 mkdir -p $DST/lib
 mkdir -p $DST/opt
 mkdir -p $DST/usr/share
+mkdir -p $DST/usr/local/include
+mkdir -p $DST/usr/local/lib
 
 #ln -sf $FIRMWARE_BASE/opt/vc $DST/opt
 rsync -rl $SRC/opt/vc $DST/opt
@@ -34,6 +36,8 @@ rsync -rl $SRC/lib/arm-linux-gnueabihf $DST/lib
 rsync -rl --exclude "*/cups/backend/*" $SRC/usr/lib $DST/usr
 rsync -rl $SRC/usr/include $DST/usr
 rsync -rl $SRC/usr/share/pkgconfig $DST/usr/share
+rsync -rl $SRC/usr/local/include $DST/usr/local
+rsync -rl $SRC/usr/local/lib $DST/usr/local
 
 rm $DST/usr/lib/arm-linux-gnueabihf/libpthread*
 rm $DST/usr/lib/arm-linux-gnueabihf/libc.*

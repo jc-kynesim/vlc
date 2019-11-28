@@ -941,6 +941,7 @@ typedef struct filter_sys_t {
     MMAL_POOL_T *out_pool;  // Free output buffers
     MMAL_POOL_T *in_pool;   // Input pool to get BH for replication
 
+    cma_buf_pool_t * cma_in_pool;
     cma_buf_pool_t * cma_out_pool;
 
     subpic_reg_stash_t subs[SUBS_MAX];
@@ -953,6 +954,7 @@ typedef struct filter_sys_t {
 
     MMAL_STATUS_T err_stream;
 
+    bool needs_copy_in;
     bool is_cma;
     bool is_sliced;
     bool out_fmt_set;
@@ -1285,11 +1287,6 @@ static void conv_flush(filter_t * p_filter)
 #endif
 }
 
-static void conv_flush_passthrough(filter_t * p_filter)
-{
-    VLC_UNUSED(p_filter);
-}
-
 static void conv_stash_fixup(filter_t * const p_filter, filter_sys_t * const sys, picture_t * const p_pic)
 {
     conv_frame_stash_t * const stash = sys->stash + (p_pic->date & 0xf);
@@ -1408,7 +1405,9 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     }
 
     if (p_pic->context == NULL) {
-        msg_Dbg(p_filter, "%s: No context", __func__);
+        // Can't have stashed subpics if not one of our pics
+        if (!sys->needs_copy_in)
+            msg_Dbg(p_filter, "%s: No context", __func__);
     }
     else if (sys->resizer_type == FILTER_RESIZER_HVS)
     {
@@ -1481,6 +1480,9 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             goto fail;
         }
 
+        out_pic->format.i_sar_den = p_filter->fmt_out.video.i_sar_den;
+        out_pic->format.i_sar_num = p_filter->fmt_out.video.i_sar_num;
+
         if (sys->is_sliced) {
             vlc_mutex_lock(&sys->lock);
             pic_fifo_put(&sys->slice.pics, out_pic);
@@ -1508,15 +1510,16 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             mmal_buffer_header_pre_release_cb_set(out_buf, out_buffer_pre_release_cb, NULL);
 
 #if 0
-            char dbuf0[5];
-            msg_Dbg(p_filter, "out_pic %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d",
-                    str_fourcc(dbuf0, out_pic->format.i_chroma),
-                    out_pic->format.i_width, out_pic->format.i_height,
-                    out_pic->format.i_x_offset, out_pic->format.i_y_offset,
-                    out_pic->format.i_visible_width, out_pic->format.i_visible_height,
-                    out_pic->format.i_sar_num, out_pic->format.i_sar_den);
+            {
+                char dbuf0[5];
+                msg_Dbg(p_filter, "out_pic %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d",
+                        str_fourcc(dbuf0, out_pic->format.i_chroma),
+                        out_pic->format.i_width, out_pic->format.i_height,
+                        out_pic->format.i_x_offset, out_pic->format.i_y_offset,
+                        out_pic->format.i_visible_width, out_pic->format.i_visible_height,
+                        out_pic->format.i_sar_num, out_pic->format.i_sar_den);
+            }
 #endif
-
 
             if (sys->is_cma) {
                 int rv;
@@ -1569,7 +1572,9 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     // We assume the BH is already set up with values reflecting pic date etc.
     stash->pts = p_pic->date;
     {
-        MMAL_BUFFER_HEADER_T * const pic_buf = hw_mmal_pic_buf_replicated(p_pic, sys->in_pool);
+        MMAL_BUFFER_HEADER_T *const pic_buf = sys->needs_copy_in ?
+            hw_mmal_pic_buf_copied(p_pic, sys->in_pool, sys->input, sys->cma_in_pool) :
+            hw_mmal_pic_buf_replicated(p_pic, sys->in_pool);
 
         // Whether or not we extracted the pic_buf we are done with the picture
         picture_Release(p_pic);
@@ -1581,6 +1586,12 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         }
 
         pic_buf->pts = frame_seq;
+
+#if TRACE_ALL
+            msg_Dbg(p_filter, "In buf send: pic=%p, data=%p, user=%p, flags=%#x, len=%d/%d/%d, pts=%lld",
+                    p_pic, pic_buf->data, pic_buf->user_data, pic_buf->flags,
+                    pic_buf->length, pic_buf->alloc_size, sys->input->buffer_size, (long long)pic_buf->pts);
+#endif
 
         if ((err = mmal_port_send_buffer(sys->input, pic_buf)) != MMAL_SUCCESS)
         {
@@ -1632,15 +1643,6 @@ fail:
     return NULL;
 }
 
-static picture_t *conv_filter_passthrough(filter_t *p_filter, picture_t *p_pic)
-{
-    VLC_UNUSED(p_filter);
-#if TRACE_ALL
-    msg_Dbg(p_filter, "<<< %s", __func__);
-#endif
-    return p_pic;
-}
-
 static void CloseConverter(vlc_object_t * obj)
 {
     filter_t * const p_filter = (filter_t *)obj;
@@ -1657,6 +1659,7 @@ static void CloseConverter(vlc_object_t * obj)
     // Disables input & output ports
     conv_flush(p_filter);
 
+    cma_buf_pool_deletez(&sys->cma_in_pool);
     cma_buf_pool_deletez(&sys->cma_out_pool);
 
     if (sys->component && sys->component->control->is_enabled)
@@ -1691,34 +1694,30 @@ static void CloseConverter(vlc_object_t * obj)
     vlc_sem_destroy(&sys->sem);
     vlc_mutex_destroy(&sys->lock);
 
+    p_filter->p_sys = NULL;
     free(sys);
 }
 
 
-static int open_converter_passthrough(filter_t * const p_filter)
+static inline MMAL_FOURCC_T filter_enc_in(const video_format_t * const fmt)
 {
-    {
-        char dbuf0[5], dbuf1[5];
-        msg_Dbg(p_filter, "%s: (%s) %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s,%dx%d [(%d,%d) %dx%d] rgb:%#x:%#x:%#x sar:%d/%d", __func__,
-                "passthrough",
-                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma),
-                p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
-                p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
-                p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
-                p_filter->fmt_in.video.i_sar_num, p_filter->fmt_in.video.i_sar_den,
-                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma),
-                p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
-                p_filter->fmt_out.video.i_x_offset, p_filter->fmt_out.video.i_y_offset,
-                p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height,
-                p_filter->fmt_out.video.i_rmask, p_filter->fmt_out.video.i_gmask, p_filter->fmt_out.video.i_bmask,
-                p_filter->fmt_out.video.i_sar_num, p_filter->fmt_out.video.i_sar_den);
-    }
+    if (hw_mmal_chroma_is_mmal(fmt->i_chroma))
+        return vlc_to_mmal_video_fourcc(fmt);
 
+    if (fmt->i_chroma == VLC_CODEC_I420 ||
+        fmt->i_chroma == VLC_CODEC_I420_10L)
+        return MMAL_ENCODING_I420;
 
-    p_filter->pf_video_filter = conv_filter_passthrough;
-    p_filter->pf_flush = conv_flush_passthrough;
-    return VLC_SUCCESS;
+    return 0;
 }
+
+static inline MMAL_FOURCC_T filter_enc_out(const video_format_t * const fmt)
+{
+    const MMAL_FOURCC_T mmes = vlc_to_mmal_video_fourcc(fmt);
+    // Can only copy out single plane stuff currently - this could be fixed!
+    return hw_mmal_chroma_is_mmal(fmt->i_chroma) || mmes != MMAL_ENCODING_I420 ? mmes : 0;
+}
+
 
 static int OpenConverter(vlc_object_t * obj)
 {
@@ -1726,20 +1725,15 @@ static int OpenConverter(vlc_object_t * obj)
     int ret = VLC_EGENERIC;
     filter_sys_t *sys;
     MMAL_STATUS_T status;
-    MMAL_FOURCC_T enc_out;
-    const MMAL_FOURCC_T enc_in = vlc_to_mmal_video_fourcc(&p_filter->fmt_in.video);
+    MMAL_FOURCC_T enc_out = filter_enc_out(&p_filter->fmt_out.video);
+    const MMAL_FOURCC_T enc_in = filter_enc_in(&p_filter->fmt_in.video);
     bool use_resizer;
     bool use_isp;
     int gpu_mem;
 
     // At least in principle we should deal with any mmal format as input
-    if (!hw_mmal_chroma_is_mmal(p_filter->fmt_in.video.i_chroma) ||
-        (enc_out = vlc_to_mmal_video_fourcc(&p_filter->fmt_out.video)) == 0)
+    if (enc_in == 0 || enc_out == 0)
         return VLC_EGENERIC;
-
-    if (enc_in == enc_out) {
-        return open_converter_passthrough(p_filter);
-    }
 
     use_resizer = var_InheritBool(p_filter, MMAL_RESIZE_NAME);
     use_isp = var_InheritBool(p_filter, MMAL_ISP_NAME);
@@ -1811,6 +1805,7 @@ retry:
     pic_fifo_init(&sys->ret_pics);
     pic_fifo_init(&sys->slice.pics);
 
+    sys->needs_copy_in = !hw_mmal_chroma_is_mmal(p_filter->fmt_in.video.i_chroma);
     sys->in_port_cb_fn = conv_input_port_cb;
 
     if ((sys->vcsm_init_type = cma_vcsm_init()) == VCSM_INIT_NONE) {
@@ -1857,6 +1852,13 @@ retry:
     if (status != MMAL_SUCCESS) {
         msg_Err(p_filter, "Failed to enable control port %s (status=%"PRIx32" %s)",
                 sys->component->control->name, status, mmal_status_to_string(status));
+        goto fail;
+    }
+
+    if (sys->needs_copy_in &&
+        (sys->cma_in_pool = cma_buf_pool_new(2, 2, true, "conv-copy-in")) == NULL)
+    {
+        msg_Err(p_filter, "Failed to allocate input CMA pool");
         goto fail;
     }
 
@@ -1933,6 +1935,193 @@ fail:
     return ret;
 }
 
+#if 0
+//----------------------------------------------------------------------------
+//
+// Simple copy in to ZC
+
+typedef struct to_zc_sys_s {
+    vcsm_init_type_t vcsm_init_type;
+    cma_buf_pool_t * cma_out_pool;
+} to_zc_sys_t;
+
+
+#error MMAL doesnt like our sizing for e.g. 624x352
+static size_t buf_alloc_size(const vlc_fourcc_t i_chroma, const unsigned int width, const unsigned int height)
+{
+    const unsigned int pels = width * height;
+
+    switch (i_chroma)
+    {
+        case VLC_CODEC_MMAL_ZC_RGB32:
+            return pels * 4;
+        case VLC_CODEC_MMAL_ZC_I420:
+            return pels * 3 / 2;
+        default:
+            break;
+    }
+    return 0;
+}
+
+
+static picture_t *
+to_zc_filter(filter_t *p_filter, picture_t *in_pic)
+{
+    to_zc_sys_t * const sys = (to_zc_sys_t *)p_filter->p_sys;
+#if TRACE_ALL
+    msg_Dbg(p_filter, "<<< %s", __func__);
+#endif
+
+    assert(p_filter->fmt_out.video.i_chroma == VLC_CODEC_MMAL_ZC_I420);
+
+    picture_t * const out_pic = filter_NewPicture(p_filter);
+    if (out_pic == NULL)
+        goto fail0;
+
+    MMAL_ES_SPECIFIC_FORMAT_T mm_vfmt = {.video={0}};
+    MMAL_ES_FORMAT_T mm_esfmt = {
+        .encoding = vlc_to_mmal_video_fourcc(&p_filter->fmt_out.video),
+        .es = &mm_vfmt};
+
+    hw_mmal_vlc_fmt_to_mmal_fmt(&mm_esfmt, &p_filter->fmt_out.video);
+
+    const size_t buf_alloc = buf_alloc_size(p_filter->fmt_out.video.i_chroma,
+                                            p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height);
+    if (buf_alloc == 0)
+        goto fail1;
+    cma_buf_t *const cb = cma_buf_pool_alloc_buf(sys->cma_out_pool, buf_alloc);
+    if (cb == NULL)
+        goto fail1;
+
+    if (cma_buf_pic_attach(cb, out_pic) != VLC_SUCCESS)
+        goto fail2;
+    cma_pic_set_data(out_pic, &mm_esfmt, NULL);
+
+    hw_mmal_copy_pic_to_buf(cma_buf_addr(cb), NULL, &mm_esfmt, in_pic);
+
+    // Copy pic properties
+    out_pic->date              = in_pic->date;
+    out_pic->b_force           = in_pic->b_force;
+    out_pic->b_progressive     = in_pic->b_progressive;
+    out_pic->b_top_field_first = in_pic->b_top_field_first;
+    out_pic->i_nb_fields       = in_pic->i_nb_fields;
+
+    picture_Release(in_pic);
+
+    return out_pic;
+
+fail2:
+    cma_buf_unref(cb);
+fail1:
+    picture_Release(out_pic);
+fail0:
+    picture_Release(in_pic);
+    return NULL;
+}
+
+static void to_zc_flush(filter_t * p_filter)
+{
+    VLC_UNUSED(p_filter);
+}
+
+static void CloseConverterToZc(vlc_object_t * obj)
+{
+    filter_t * const p_filter = (filter_t *)obj;
+    to_zc_sys_t * const sys = (to_zc_sys_t *)p_filter->p_sys;
+
+    if (sys == NULL)
+        return;
+
+    p_filter->p_sys = NULL;
+
+    cma_buf_pool_deletez(&sys->cma_out_pool);
+    cma_vcsm_exit(sys->vcsm_init_type);
+
+    free(sys);
+}
+
+static bool to_zc_validate_fmt(const video_format_t * const f_in, const video_format_t * const f_out)
+{
+    if (!((f_in->i_chroma == VLC_CODEC_I420 || f_in->i_chroma == VLC_CODEC_I420_10L) &&
+          f_out->i_chroma == VLC_CODEC_MMAL_ZC_I420))
+    {
+        return false;
+    }
+    if (f_in->i_height != f_out->i_height ||
+        f_in->i_width  != f_out->i_width)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+static int OpenConverterToZc(vlc_object_t * obj)
+{
+    int ret = VLC_EGENERIC;
+    filter_t * const p_filter = (filter_t *)obj;
+
+    if (!to_zc_validate_fmt(&p_filter->fmt_in.video, &p_filter->fmt_out.video))
+        goto fail;
+
+    {
+        char dbuf0[5], dbuf1[5];
+        msg_Dbg(p_filter, "%s: %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s,%dx%d [(%d,%d) %dx%d] rgb:%#x:%#x:%#x sar:%d/%d", __func__,
+                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma),
+                p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
+                p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
+                p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
+                p_filter->fmt_in.video.i_sar_num, p_filter->fmt_in.video.i_sar_den,
+                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma),
+                p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
+                p_filter->fmt_out.video.i_x_offset, p_filter->fmt_out.video.i_y_offset,
+                p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height,
+                p_filter->fmt_out.video.i_rmask, p_filter->fmt_out.video.i_gmask, p_filter->fmt_out.video.i_bmask,
+                p_filter->fmt_out.video.i_sar_num, p_filter->fmt_out.video.i_sar_den);
+    }
+
+    to_zc_sys_t * const sys = calloc(1, sizeof(*sys));
+    if (!sys) {
+        ret = VLC_ENOMEM;
+        goto fail;
+    }
+    p_filter->p_sys = (filter_sys_t *)sys;
+
+    if ((sys->vcsm_init_type = cma_vcsm_init()) == VCSM_INIT_NONE) {
+        msg_Err(p_filter, "VCSM init failed");
+        goto fail;
+    }
+
+    if ((sys->cma_out_pool = cma_buf_pool_new(5, 5, true, "conv-to-zc")) == NULL)
+    {
+        msg_Err(p_filter, "Failed to allocate input CMA pool");
+        goto fail;
+    }
+
+    p_filter->pf_video_filter = to_zc_filter;
+    p_filter->pf_flush = to_zc_flush;
+    return VLC_SUCCESS;
+
+fail:
+    CloseConverterToZc(obj);
+    return ret;
+}
+
+//----------------------------------------------------------------------------
+//
+// Simple "copy" from ZC
+
+static void CloseConverterFromZc(vlc_object_t * obj)
+{
+    VLC_UNUSED(obj);
+}
+
+static int OpenConverterFromZc(vlc_object_t * obj)
+{
+    return VLC_EGENERIC;
+}
+#endif
+//----------------------------------------------------------------------------
 
 typedef struct blend_sys_s {
     vzc_pool_ctl_t * vzc;
@@ -2178,13 +2367,33 @@ vlc_module_begin()
     add_submodule()
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
-    set_shortname(N_("MMAL converterer"))
-    set_description(N_("MMAL conversion filter"))
+    set_shortname(N_("MMAL resizer"))
+    set_description(N_("MMAL resizing conversion filter"))
     add_shortcut("mmal_converter")
     set_capability( "video converter", 900 )
     add_bool(MMAL_RESIZE_NAME, /* default */ false, MMAL_RESIZE_TEXT, MMAL_RESIZE_LONGTEXT, /* advanced option */ false)
     add_bool(MMAL_ISP_NAME, /* default */ false, MMAL_ISP_TEXT, MMAL_ISP_LONGTEXT, /* advanced option */ false)
     set_callbacks(OpenConverter, CloseConverter)
+
+#if 0
+    add_submodule()
+    set_category( CAT_VIDEO )
+    set_subcategory( SUBCAT_VIDEO_VFILTER )
+    set_shortname(N_("MMAL to ZC"))
+    set_description(N_("MMAL conversion to ZC filter"))
+    add_shortcut("mmal_to_zc")
+    set_capability( "video converter", 901 )
+    set_callbacks(OpenConverterToZc, CloseConverterToZc)
+
+    add_submodule()
+    set_category( CAT_VIDEO )
+    set_subcategory( SUBCAT_VIDEO_VFILTER )
+    set_shortname(N_("MMAL from ZC"))
+    set_description(N_("MMAL conversion from ZC filter"))
+    add_shortcut("mmal_from_zc")
+    set_capability( "video converter", 902 )
+    set_callbacks(OpenConverterFromZc, CloseConverterFromZc)
+#endif
 
     add_submodule()
     set_category( CAT_VIDEO )

@@ -126,7 +126,7 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
                 return -1;
             }
 #if TRACE_ALL
-            msg_Dbg(p_filter, "Remove pic for sub %d", sub_no);
+            msg_Dbg(p_filter, "Remove pic for sub %d", spe->seq);
 #endif
             buf->cmd = 0;
             buf->data = NULL;
@@ -216,7 +216,7 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
         if (needs_update)
         {
 #if TRACE_ALL
-            msg_Dbg(p_filter, "Update pic for sub %d", sub_no);
+            msg_Dbg(p_filter, "Update pic for sub %d", spe->seq);
 #endif
             if ((err = port_send_replicated(spe->port, spe->pool, sub_buf, pts)) != MMAL_SUCCESS)
             {

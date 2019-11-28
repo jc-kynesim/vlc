@@ -76,10 +76,8 @@ void hw_mmal_vlc_fmt_to_mmal_fmt(MMAL_ES_FORMAT_T *const es_fmt, const video_fra
 bool hw_mmal_vlc_pic_to_mmal_fmt_update(MMAL_ES_FORMAT_T *const es_fmt, const picture_t * const pic);
 
 // Copy pic contents into an existing buffer
-int hw_mmal_copy_pic_to_buf(MMAL_BUFFER_HEADER_T * const buf,
-                            void * const buf_data,
-                            const MMAL_ES_FORMAT_T * const fmt,
-                            const picture_t * const pic);
+int hw_mmal_copy_pic_to_buf(void * const buf_data, uint32_t * const pLength,
+                            const MMAL_ES_FORMAT_T * const fmt, const picture_t * const pic);
 
 hw_mmal_port_pool_ref_t * hw_mmal_port_pool_ref_create(MMAL_PORT_T * const port,
    const unsigned int headers, const uint32_t payload_size);
