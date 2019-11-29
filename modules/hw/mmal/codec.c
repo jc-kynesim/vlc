@@ -48,6 +48,8 @@
 
 #define TRACE_ALL 0
 
+#define OPT_TO_FROM_ZC 0
+
 /*
  * This seems to be a bit high, but reducing it causes instabilities
  */
@@ -1935,7 +1937,7 @@ fail:
     return ret;
 }
 
-#if 0
+#if OPT_TO_FROM_ZC
 //----------------------------------------------------------------------------
 //
 // Simple copy in to ZC
@@ -1946,7 +1948,6 @@ typedef struct to_zc_sys_s {
 } to_zc_sys_t;
 
 
-#error MMAL doesnt like our sizing for e.g. 624x352
 static size_t buf_alloc_size(const vlc_fourcc_t i_chroma, const unsigned int width, const unsigned int height)
 {
     const unsigned int pels = width * height;
@@ -1986,7 +1987,7 @@ to_zc_filter(filter_t *p_filter, picture_t *in_pic)
     hw_mmal_vlc_fmt_to_mmal_fmt(&mm_esfmt, &p_filter->fmt_out.video);
 
     const size_t buf_alloc = buf_alloc_size(p_filter->fmt_out.video.i_chroma,
-                                            p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height);
+                                            mm_vfmt.video.width, mm_vfmt.video.height);
     if (buf_alloc == 0)
         goto fail1;
     cma_buf_t *const cb = cma_buf_pool_alloc_buf(sys->cma_out_pool, buf_alloc);
@@ -2375,7 +2376,7 @@ vlc_module_begin()
     add_bool(MMAL_ISP_NAME, /* default */ false, MMAL_ISP_TEXT, MMAL_ISP_LONGTEXT, /* advanced option */ false)
     set_callbacks(OpenConverter, CloseConverter)
 
-#if 0
+#if OPT_TO_FROM_ZC
     add_submodule()
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
