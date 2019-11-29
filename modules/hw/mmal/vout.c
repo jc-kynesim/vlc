@@ -898,9 +898,11 @@ static int attach_subpics(vout_display_t * const vd, vout_display_sys_t * const 
                     str_fourcc(dbuf0, src->format.i_chroma));
 #endif
 
+            // At this point I think the subtitles are being placed in the
+            // coord space of the cfg rectangle
             if ((sys->subpic_bufs[n] = hw_mmal_vzc_buf_from_pic(sys->vzc,
                 src,
-                (MMAL_RECT_T){.width = sys->dest_rect.width, .height=sys->dest_rect.height},  // Ignore dest offsets - just want size
+                (MMAL_RECT_T){.width = vd->cfg->display.width, .height=vd->cfg->display.height},
                 sreg->i_x, sreg->i_y,
                 sreg->i_alpha,
                 n == 0)) == NULL)
