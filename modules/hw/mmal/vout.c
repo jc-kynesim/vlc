@@ -99,6 +99,7 @@ struct vout_display_sys_t {
     unsigned display_width;
     unsigned display_height;
 
+    MMAL_RECT_T src_rect;       // Output rectangle in cfg coords (for subpic placement)
     MMAL_RECT_T dest_rect;      // Output rectangle in display coords
 
     unsigned int i_frame_rate_base; /* cached framerate to detect changes for rate adjustment */
@@ -546,9 +547,10 @@ place_to_mmal_rect(const vout_display_place_t place)
     };
 }
 
-static void
-place_dest(vout_display_t *vd, vout_display_sys_t * const sys,
-           const vout_display_cfg_t * const cfg, const video_format_t * fmt)
+static MMAL_RECT_T
+place_out(const vout_display_cfg_t * const cfg,
+          const video_format_t * fmt,
+          unsigned int w, unsigned int h)
 {
     video_format_t tfmt;
 
@@ -563,20 +565,40 @@ place_dest(vout_display_t *vd, vout_display_sys_t * const sys,
     // Ignore what VLC thinks might be going on with display size
     vout_display_cfg_t tcfg = *cfg;
     vout_display_place_t place;
-    tcfg.display.width = sys->display_width;
-    tcfg.display.height = sys->display_height;
+    tcfg.display.width = w;
+    tcfg.display.height = h;
     tcfg.is_display_filled = true;
-    vout_display_PlacePicture(&place, fmt, &tcfg, false);
 
-    sys->dest_rect = place_to_mmal_rect(place);
-#if TRACE_ALL
-    msg_Dbg(vd, "%s: %dx%d -> %dx%d @ %d,%d", __func__,
-            tcfg.display.width, tcfg.display.height,
-            place.width, place.height, place.x, place.y);
-#endif
+    vout_display_PlacePicture(&place, fmt, &tcfg, false);
+    return place_to_mmal_rect(place);
 }
 
+static void
+place_dest_rect(vout_display_t * const vd,
+          const vout_display_cfg_t * const cfg,
+          const video_format_t * fmt)
+{
+    vout_display_sys_t * const sys = vd->sys;
+    sys->dest_rect = place_out(cfg, fmt, sys->display_width, sys->display_height);
+}
 
+static void
+place_src_rect(vout_display_t * const vd,
+          const vout_display_cfg_t * const cfg,
+          const video_format_t * fmt)
+{
+    vout_display_sys_t * const sys = vd->sys;
+    sys->src_rect  = place_out(cfg, fmt, cfg->display.width, cfg->display.height);
+}
+
+static void
+place_rects(vout_display_t * const vd,
+          const vout_display_cfg_t * const cfg,
+          const video_format_t * fmt)
+{
+    place_dest_rect(vd, cfg, fmt);
+    place_src_rect(vd, cfg, fmt);
+}
 
 static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
                 const video_format_t *fmt)
@@ -610,7 +632,7 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
     if (!cfg)
         cfg = vd->cfg;
 
-    place_dest(vd, sys, cfg, fmt);
+    place_rects(vd, cfg, fmt);
 
     display_region.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
     display_region.hdr.size = sizeof(MMAL_DISPLAYREGION_T);
@@ -669,11 +691,12 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
 #if TRACE_ALL
     {
         char dbuf0[5];
-        msg_Dbg(vd, "<<< %s: %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d", __func__,
+        msg_Dbg(vd, "<<< %s: %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d -> %dx%d@%d,%d", __func__,
                 str_fourcc(dbuf0, p_pic->format.i_chroma), p_pic->format.i_width, p_pic->format.i_height,
                 p_pic->format.i_x_offset, p_pic->format.i_y_offset,
                 p_pic->format.i_visible_width, p_pic->format.i_visible_height,
-                p_pic->format.i_sar_num, p_pic->format.i_sar_den);
+                p_pic->format.i_sar_num, p_pic->format.i_sar_den,
+                sys->dest_rect.width, sys->dest_rect.height, sys->dest_rect.x, sys->dest_rect.y);
     }
 #endif
 
@@ -789,7 +812,9 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
     switch (query) {
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
         {
-            // Ignore this - we just use full screen anyway
+            // Whilst we don't actually resize the screen we do want to note
+            // what the source thinks is going on for subtitle placement
+            place_src_rect(vd, vd->cfg, &vd->source);
             ret = VLC_SUCCESS;
             break;
         }
@@ -809,7 +834,7 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
             break;
 
         case VOUT_DISPLAY_CHANGE_ZOOM:
-            msg_Warn(vd, "Unsupported control query %d", query);
+            msg_Dbg(vd, "Unsupported control query: 4 (Change zoom)");
             ret = VLC_SUCCESS;
             break;
 
@@ -883,7 +908,7 @@ static int attach_subpics(vout_display_t * const vd, vout_display_sys_t * const 
         for (subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
             picture_t *const src = sreg->p_picture;
 
-#if 0
+#if TRACE_ALL
             char dbuf0[5];
             msg_Dbg(vd, "  [%p:%p] Pos=%d,%d src=%dx%d/%dx%d,  vd->fmt=%dx%d/%dx%d, vd->source=%dx%d/%dx%d, cfg=%dx%d, Alpha=%d, Fmt=%s", src, src->p[0].p_pixels,
                     sreg->i_x, sreg->i_y,
@@ -899,10 +924,10 @@ static int attach_subpics(vout_display_t * const vd, vout_display_sys_t * const 
 #endif
 
             // At this point I think the subtitles are being placed in the
-            // coord space of the cfg rectangle
+            // coord space of the placed rectangle in the cfg display space
             if ((sys->subpic_bufs[n] = hw_mmal_vzc_buf_from_pic(sys->vzc,
                 src,
-                (MMAL_RECT_T){.width = vd->cfg->display.width, .height=vd->cfg->display.height},
+                (MMAL_RECT_T){.width = sys->src_rect.width, .height=sys->src_rect.height},
                 sreg->i_x, sreg->i_y,
                 sreg->i_alpha,
                 n == 0)) == NULL)
@@ -1376,7 +1401,7 @@ static int OpenMmalVout(vlc_object_t *object)
         sys->display_height = vd->cfg->display.height;
     }
 
-    place_dest(vd, sys, vd->cfg, &vd->source);  // Sets sys->dest_rect
+    place_rects(vd, vd->cfg, &vd->source);  // Sets sys->dest_rect
 
     display_region.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
     display_region.hdr.size = sizeof(MMAL_DISPLAYREGION_T);
