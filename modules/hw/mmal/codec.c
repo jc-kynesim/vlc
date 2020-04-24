@@ -256,6 +256,21 @@ static void draw_corners(void * pic_buf, size_t pic_stride, unsigned int x, unsi
 }
 #endif
 
+static MMAL_RATIONAL_T
+rationalize_sar(unsigned int num, unsigned int den)
+{
+    static const unsigned int primes[] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 0};
+    const unsigned int * p;
+
+    for (p = primes; *p != 0; ++p) {
+        while (num % *p == 0 && den % *p == 0) {
+            num /= *p;
+            den /= *p;
+        }
+    }
+    return (MMAL_RATIONAL_T){.num = num, .den = den};
+}
+
 // Buffer either attached to pic or released
 static picture_t * alloc_opaque_pic(decoder_t * const dec, MMAL_BUFFER_HEADER_T * const buf)
 {
@@ -365,6 +380,31 @@ static void decoder_output_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
             mmal_format_full_copy(format, fmt->format);
             format->encoding = MMAL_ENCODING_OPAQUE;
 
+            // If no PAR in the stream - see if we've got one from the demux
+            if (format->es->video.par.den <= 0 || format->es->video.par.num <= 0) {
+                unsigned int n = dec->fmt_in.video.i_sar_num;
+                unsigned int d = dec->fmt_in.video.i_sar_den;
+
+                if (n == 0 || d == 0) {
+                    // Guesswork required
+                    const unsigned int w = format->es->video.width;
+                    const unsigned int h = format->es->video.height;
+                    if ((w == 704 || w == 720) && (h == 480 || h == 576)) {
+                        // Very likely SD 4:3
+                        n = w * 3;
+                        d = h * 4;
+                    }
+                    else
+                    {
+                        // Otherwise guess SAR 1:1
+                        n = 1;
+                        d = 1;
+                    }
+                }
+
+                format->es->video.par = rationalize_sar(n, d);
+            }
+
             if (sys->output_format != NULL)
                 mmal_format_free(sys->output_format);
 
@@ -441,6 +481,7 @@ port_reset:
     }
 
     mmal_format_full_copy(sys->output->format, sys->output_format);
+
     status = mmal_port_format_commit(sys->output);
     if (status != MMAL_SUCCESS) {
         msg_Err(dec, "Failed to commit output format (status=%"PRIx32" %s)",
@@ -478,8 +519,8 @@ apply_fmt:
     dec->fmt_out.video.i_y_offset = sys->output->format->es->video.crop.y;
     dec->fmt_out.video.i_visible_width = sys->output->format->es->video.crop.width;
     dec->fmt_out.video.i_visible_height = sys->output->format->es->video.crop.height;
-    dec->fmt_out.video.i_sar_num = sys->output->format->es->video.par.num;
-    dec->fmt_out.video.i_sar_den = sys->output->format->es->video.par.den;
+    dec->fmt_out.video.i_sar_num = sys->output_format->es->video.par.num;  // SAR can be killed by commit
+    dec->fmt_out.video.i_sar_den = sys->output_format->es->video.par.den;
     dec->fmt_out.video.i_frame_rate = sys->output->format->es->video.frame_rate.num;
     dec->fmt_out.video.i_frame_rate_base = sys->output->format->es->video.frame_rate.den;
 
@@ -759,14 +800,19 @@ static int OpenDecoder(decoder_t *dec)
     {
         char buf1[5], buf2[5], buf2a[5];
         char buf3[5], buf4[5];
-        msg_Dbg(dec, "%s: <<< (%s/%s)[%s] %dx%d -> (%s/%s) %dx%d", __func__,
+        MMAL_RATIONAL_T r = rationalize_sar(dec->fmt_in.video.i_sar_num, dec->fmt_in.video.i_sar_den);
+
+        msg_Dbg(dec, "%s: <<< (%s/%s)[%s] %dx%d %d/%d=%d/%d -> (%s/%s) %dx%d %d/%d", __func__,
                 str_fourcc(buf1, dec->fmt_in.i_codec),
                 str_fourcc(buf2, dec->fmt_in.video.i_chroma),
                 str_fourcc(buf2a, in_fcc),
                 dec->fmt_in.video.i_width, dec->fmt_in.video.i_height,
+                dec->fmt_in.video.i_sar_num, dec->fmt_in.video.i_sar_den,
+                r.num, r.den,
                 str_fourcc(buf3, dec->fmt_out.i_codec),
                 str_fourcc(buf4, dec->fmt_out.video.i_chroma),
-                dec->fmt_out.video.i_width, dec->fmt_out.video.i_height);
+                dec->fmt_out.video.i_width, dec->fmt_out.video.i_height,
+                dec->fmt_out.video.i_sar_num, dec->fmt_out.video.i_sar_den);
     }
 #endif
 
