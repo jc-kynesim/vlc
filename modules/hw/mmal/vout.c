@@ -99,7 +99,7 @@ struct vout_display_sys_t {
     unsigned display_width;
     unsigned display_height;
 
-    MMAL_RECT_T src_rect;       // Output rectangle in cfg coords (for subpic placement)
+    MMAL_RECT_T spu_rect;       // Output rectangle in cfg coords (for subpic placement)
     MMAL_RECT_T dest_rect;      // Output rectangle in display coords
 
     unsigned int i_frame_rate_base; /* cached framerate to detect changes for rate adjustment */
@@ -548,11 +548,13 @@ place_to_mmal_rect(const vout_display_place_t place)
 }
 
 static MMAL_RECT_T
-place_out(const vout_display_cfg_t * const cfg,
+place_out(const vout_display_cfg_t * cfg,
           const video_format_t * fmt,
           unsigned int w, unsigned int h)
 {
     video_format_t tfmt;
+    vout_display_cfg_t tcfg;
+    vout_display_place_t place;
 
     // Fix SAR if unknown
     if (fmt->i_sar_den == 0 || fmt->i_sar_num == 0) {
@@ -562,14 +564,17 @@ place_out(const vout_display_cfg_t * const cfg,
         fmt = &tfmt;
     }
 
-    // Ignore what VLC thinks might be going on with display size
-    vout_display_cfg_t tcfg = *cfg;
-    vout_display_place_t place;
-    tcfg.display.width = w;
-    tcfg.display.height = h;
-    tcfg.is_display_filled = true;
+    // Override what VLC thinks might be going on with display size
+    // if we know better
+    if (w != 0 && h != 0)
+    {
+        tcfg = *cfg;
+        tcfg.display.width = w;
+        tcfg.display.height = h;
+        cfg = &tcfg;
+    }
 
-    vout_display_PlacePicture(&place, fmt, &tcfg, false);
+    vout_display_PlacePicture(&place, fmt, cfg, false);
     return place_to_mmal_rect(place);
 }
 
@@ -583,12 +588,20 @@ place_dest_rect(vout_display_t * const vd,
 }
 
 static void
-place_src_rect(vout_display_t * const vd,
+place_spu_rect(vout_display_t * const vd,
           const vout_display_cfg_t * const cfg,
           const video_format_t * fmt)
 {
     vout_display_sys_t * const sys = vd->sys;
-    sys->src_rect  = place_out(cfg, fmt, cfg->display.width, cfg->display.height);
+
+    sys->spu_rect = place_out(cfg, fmt, 0, 0);
+
+    // Copy place override logic for spu pos from video_output.c
+    // This info doesn't appear to reside anywhere natively
+    if (fmt->i_width * fmt->i_height >= (unsigned int)(sys->spu_rect.width * sys->spu_rect.height)) {
+        sys->spu_rect.width  = fmt->i_width;
+        sys->spu_rect.height = fmt->i_height;
+    }
 }
 
 static void
@@ -597,7 +610,7 @@ place_rects(vout_display_t * const vd,
           const video_format_t * fmt)
 {
     place_dest_rect(vd, cfg, fmt);
-    place_src_rect(vd, cfg, fmt);
+    place_spu_rect(vd, cfg, fmt);
 }
 
 static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
@@ -631,6 +644,8 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     if (!cfg)
         cfg = vd->cfg;
+
+    msg_Dbg(vd, "Zoom=%d/%d", cfg->zoom.num, cfg->zoom.den);
 
     place_rects(vd, cfg, fmt);
 
@@ -810,31 +825,28 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
     VLC_UNUSED(args);
 
     switch (query) {
-        case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
-        {
-            // Whilst we don't actually resize the screen we do want to note
-            // what the source thinks is going on for subtitle placement
-            place_src_rect(vd, vd->cfg, &vd->source);
-            ret = VLC_SUCCESS;
-            break;
-        }
-
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
-            if (configure_display(vd, NULL, &vd->source) >= 0)
+            if (configure_display(vd, vd->cfg, &vd->source) >= 0)
                 ret = VLC_SUCCESS;
             break;
+
+        case VOUT_DISPLAY_CHANGE_ZOOM:
+        case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
+        case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
+        {
+            const vout_display_cfg_t * const cfg = va_arg(args, const vout_display_cfg_t *);
+
+            if (configure_display(vd, cfg, &vd->source) >= 0)
+                ret = VLC_SUCCESS;
+            break;
+        }
 
         case VOUT_DISPLAY_RESET_PICTURES:
             msg_Warn(vd, "Reset Pictures");
             kill_pool(sys);
             vd->fmt = vd->source; // Take (nearly) whatever source wants to give us
             vd->fmt.i_chroma = req_chroma(vd);  // Adjust chroma to something we can actaully deal with
-            ret = VLC_SUCCESS;
-            break;
-
-        case VOUT_DISPLAY_CHANGE_ZOOM:
-            msg_Dbg(vd, "Unsupported control query: 4 (Change zoom)");
             ret = VLC_SUCCESS;
             break;
 
@@ -910,8 +922,9 @@ static int attach_subpics(vout_display_t * const vd, vout_display_sys_t * const 
 
 #if TRACE_ALL
             char dbuf0[5];
-            msg_Dbg(vd, "  [%p:%p] Pos=%d,%d src=%dx%d/%dx%d,  vd->fmt=%dx%d/%dx%d, vd->source=%dx%d/%dx%d, cfg=%dx%d, Alpha=%d, Fmt=%s", src, src->p[0].p_pixels,
+            msg_Dbg(vd, "  [%p:%p] Pos=%d,%d max=%dx%d, src=%dx%d/%dx%d, vd->fmt=%dx%d/%dx%d, vd->source=%dx%d/%dx%d, cfg=%dx%d, zoom=%d/%d, Alpha=%d, Fmt=%s", src, src->p[0].p_pixels,
                     sreg->i_x, sreg->i_y,
+                    sreg->i_max_width, sreg->i_max_height,
                     src->format.i_visible_width, src->format.i_visible_height,
                     src->format.i_width, src->format.i_height,
                     vd->fmt.i_visible_width, vd->fmt.i_visible_height,
@@ -919,6 +932,7 @@ static int attach_subpics(vout_display_t * const vd, vout_display_sys_t * const 
                     vd->source.i_visible_width, vd->source.i_visible_height,
                     vd->source.i_width, vd->source.i_height,
                     vd->cfg->display.width, vd->cfg->display.height,
+                    vd->cfg->zoom.num, vd->cfg->zoom.den,
                     sreg->i_alpha,
                     str_fourcc(dbuf0, src->format.i_chroma));
 #endif
@@ -927,7 +941,7 @@ static int attach_subpics(vout_display_t * const vd, vout_display_sys_t * const 
             // coord space of the placed rectangle in the cfg display space
             if ((sys->subpic_bufs[n] = hw_mmal_vzc_buf_from_pic(sys->vzc,
                 src,
-                (MMAL_RECT_T){.width = sys->src_rect.width, .height=sys->src_rect.height},
+                (MMAL_RECT_T){.width = sys->spu_rect.width, .height=sys->spu_rect.height},
                 sreg->i_x, sreg->i_y,
                 sreg->i_alpha,
                 n == 0)) == NULL)
