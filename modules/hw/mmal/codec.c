@@ -260,10 +260,17 @@ static MMAL_RATIONAL_T
 rationalize_sar(unsigned int num, unsigned int den)
 {
     static const unsigned int primes[] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 0};
-    const unsigned int * p;
+    const unsigned int * p = primes;
 
-    for (p = primes; *p != 0; ++p) {
-        while (num % *p == 0 && den % *p == 0) {
+    // If either num or den is 0 then return a well formed "unknown"
+    if (num == 0 || den == 0) {
+        return (MMAL_RATIONAL_T){.num = 0, .den = 0};
+    }
+
+    while (*p != 0 && num >= *p && den >= *p) {
+        if (num % *p != 0 || den % *p != 0)
+            ++p;
+        else {
             num /= *p;
             den /= *p;
         }
