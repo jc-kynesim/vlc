@@ -6,7 +6,7 @@ AM_LDFLAGS += -pthread -rpath '$(mmaldir)' $(LDFLAGS_mmal)
 
 libmmal_vout_plugin_la_SOURCES = vout.c subpic.c mmal_picture.c subpic.h  mmal_cma.c mmal_picture.h mmal_piccpy_neon.S
 libmmal_vout_plugin_la_CFLAGS = $(AM_CFLAGS)
-libmmal_vout_plugin_la_LDFLAGS = $(AM_LDFLAGS) -lm
+libmmal_vout_plugin_la_LDFLAGS = $(AM_LDFLAGS) -lm -lX11 -lXrandr
 libmmal_vout_plugin_la_LIBADD = $(LIBS_mmal)
 mmal_LTLIBRARIES = libmmal_vout_plugin.la
 

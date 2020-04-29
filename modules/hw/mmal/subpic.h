@@ -18,6 +18,7 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
                           subpic_reg_stash_t * const spe,
                           const video_format_t * const fmt,
                           const MMAL_RECT_T * const scale_out,
+                          const MMAL_DISPLAYTRANSFORM_T transform_out,
                           const uint64_t pts);
 
 void hw_mmal_subpic_flush(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe);

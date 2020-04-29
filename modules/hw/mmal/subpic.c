@@ -105,12 +105,12 @@ static void conv_subpic_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     mmal_buffer_header_release(buf);  // Will extract & release pic in pool callback
 }
 
-
 int hw_mmal_subpic_update(vlc_object_t * const p_filter,
     MMAL_BUFFER_HEADER_T * const sub_buf,
     subpic_reg_stash_t * const spe,
     const video_format_t * const fmt,
     const MMAL_RECT_T * const scale_out,
+    const MMAL_DISPLAYTRANSFORM_T transform_out,
     const uint64_t pts)
 {
     MMAL_STATUS_T err;
@@ -152,7 +152,7 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
         const unsigned int seq = hw_mmal_vzc_buf_seq(sub_buf);
         bool needs_update = (spe->seq != seq);
 
-        hw_mmal_vzc_buf_scale_dest_rect(sub_buf, scale_out);
+        hw_mmal_vzc_buf_scale_dest_rect(sub_buf, scale_out, transform_out);
 
         if (hw_mmal_vzc_buf_set_format(sub_buf, spe->port->format))
         {

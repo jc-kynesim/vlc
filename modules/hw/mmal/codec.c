@@ -1475,6 +1475,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
                                             sys->subs + sub_no,
                                             &p_pic->format,
                                             &sys->output->format->es->video.crop,
+                                            MMAL_DISPLAY_ROT0,
                                             frame_seq)) == 0)
                 break;
             else if (rv < 0)

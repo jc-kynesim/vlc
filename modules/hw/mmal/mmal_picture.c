@@ -46,6 +46,8 @@
 #include "mmal_cma.h"
 #include "mmal_picture.h"
 
+#define TRACE_TRANSFORMS 0
+
 #define UINT64_SIZE(s) (((s) + sizeof(uint64_t) - 1)/sizeof(uint64_t))
 
 static inline char safe_char(const unsigned int c0)
@@ -1070,7 +1072,7 @@ static void rescale_rect(MMAL_RECT_T * const d, const MMAL_RECT_T * const s, con
     d->y      = rescale_x(s->y - div_rect->y, mul_rect->height, div_rect->height) + mul_rect->y;
     d->width  = rescale_x(s->width,           mul_rect->width,  div_rect->width);
     d->height = rescale_x(s->height,          mul_rect->height, div_rect->height);
-#if 0
+#if TRACE_TRANSFORMS
     fprintf(stderr, "(%d,%d %dx%d) * (%d,%d %dx%d) / (%d,%d %dx%d) -> (%d,%d %dx%d)\n",
             s->x, s->y, s->width, s->height,
             mul_rect->x, mul_rect->y, mul_rect->width, mul_rect->height,
@@ -1079,16 +1081,74 @@ static void rescale_rect(MMAL_RECT_T * const d, const MMAL_RECT_T * const s, con
 #endif
 }
 
-void hw_mmal_vzc_buf_scale_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const MMAL_RECT_T * const scale_rect)
+// hflip s in c
+static inline MMAL_RECT_T rect_hflip(const MMAL_RECT_T s, const MMAL_RECT_T c)
+{
+    return (MMAL_RECT_T){
+        .x = c.x + (c.x + c.width) - (s.x + s.width),
+        .y = s.y,
+        .width = s.width,
+        .height = s.height
+    };
+}
+
+static inline MMAL_RECT_T rect_vflip(const MMAL_RECT_T s, const MMAL_RECT_T c)
+{
+    return (MMAL_RECT_T){
+        .x = s.x,
+        .y = (c.y + c.height) - (s.y - c.y) - s.height,
+        .width = s.width,
+        .height = s.height
+    };
+}
+
+static inline MMAL_RECT_T rect_transpose(const MMAL_RECT_T s)
+{
+    return (MMAL_RECT_T){
+        .x = s.y,
+        .y = s.x,
+        .width  = s.height,
+        .height = s.width
+    };
+}
+
+static MMAL_RECT_T
+rect_transform(MMAL_RECT_T s, const MMAL_RECT_T c, const MMAL_DISPLAYTRANSFORM_T t)
+{
+#if TRACE_TRANSFORMS
+    fprintf(stderr, "t=%d, s=%d,%d:%dx%d, c=%d,%d:%dx%d -> ", (int)t,
+           s.x,s.y,s.width,s.height,
+           c.x,c.y,c.width,c.height);
+#endif
+    if ((t & 1) != 0)
+        s = rect_hflip(s, c);
+    if ((t & 2) != 0)
+        s = rect_vflip(s, c);
+    if ((t & 4) != 0)
+        s = rect_transpose(s);
+#if TRACE_TRANSFORMS
+    printf("s=%d,%d:%dx%d\n",
+           s.x,s.y,s.width,s.height);
+#endif
+    return s;
+}
+
+void hw_mmal_vzc_buf_scale_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const MMAL_RECT_T * const scale_rect, const MMAL_DISPLAYTRANSFORM_T scale_transform)
 {
     vzc_subbuf_ent_t * sb = buf->user_data;
     if (scale_rect == NULL) {
         sb->dreg.dest_rect = sb->orig_dest_rect;
+        sb->dreg.transform = MMAL_DISPLAY_ROT0;
     }
     else
     {
+        // The scale rect has been transposed if we have a transposing
+        // transform - untranspose so we are the same way up as the source
+        const MMAL_RECT_T c = (scale_transform & 4) == 0 ? *scale_rect : rect_transpose(*scale_rect);
         rescale_rect(&sb->dreg.dest_rect, &sb->orig_dest_rect,
-                     scale_rect, &sb->pic_rect);
+                     &c, &sb->pic_rect);
+        sb->dreg.dest_rect = rect_transform(sb->dreg.dest_rect, c, scale_transform);
+        sb->dreg.transform = scale_transform;
     }
 }
 
@@ -1191,10 +1251,13 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc,
         sb->dreg.set = MMAL_DISPLAY_SET_SRC_RECT |
             MMAL_DISPLAY_SET_DEST_RECT |
             MMAL_DISPLAY_SET_FULLSCREEN |
+            MMAL_DISPLAY_SET_TRANSFORM |
             MMAL_DISPLAY_SET_ALPHA;
 
         sb->dreg.fullscreen = 0;
+
         // Will be set later - zero now to avoid any confusion
+        sb->dreg.transform = MMAL_DISPLAY_ROT0;
         sb->dreg.dest_rect = (MMAL_RECT_T){0, 0, 0, 0};
 
         sb->dreg.alpha = (uint32_t)(alpha & 0xff) | MMAL_DISPLAY_ALPHA_FLAGS_MIX;

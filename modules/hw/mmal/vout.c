@@ -63,6 +63,12 @@
 "is specified (or set by Fullscreen Output Device in Preferences) " \
 "HDMI-<qt-fullscreen-screennumber+1> will be used, otherwise HDMI-1.")
 
+#define MMAL_VOUT_TRANSFORM_NAME "mmal-vout-transform"
+#define MMAL_VOUT_TRANSFORM_TEXT N_("Video transform for Rpi fullscreen.")
+#define MMAL_VOUT_TRANSFORM_LONGTEXT N_("Video transform for Rpi fullscreen."\
+"Transforms availible: auto, 0, 90, 180, 270, hflip, vflip, transpose, antitranspose")
+
+
 #define MMAL_ADJUST_REFRESHRATE_NAME "mmal-adjust-refreshrate"
 #define MMAL_ADJUST_REFRESHRATE_TEXT N_("Adjust HDMI refresh rate to the video.")
 #define MMAL_ADJUST_REFRESHRATE_LONGTEXT N_("Adjust HDMI refresh rate to the video.")
@@ -101,6 +107,8 @@ struct vout_display_sys_t {
 
     MMAL_RECT_T spu_rect;       // Output rectangle in cfg coords (for subpic placement)
     MMAL_RECT_T dest_rect;      // Output rectangle in display coords
+    MMAL_DISPLAYTRANSFORM_T display_transform;  // "Native" display transform
+    MMAL_DISPLAYTRANSFORM_T dest_transform;    // Combined config+native transform
 
     unsigned int i_frame_rate_base; /* cached framerate to detect changes for rate adjustment */
     unsigned int i_frame_rate;
@@ -210,13 +218,15 @@ static void display_set_format(const vout_display_t * const vd, MMAL_ES_FORMAT_T
     msg_Dbg(vd, "WxH: %dx%d, Crop: %dx%d", v_fmt->width, v_fmt->height, v_fmt->crop.width, v_fmt->crop.height);
 }
 
-static void display_src_rect(const vout_display_t * const vd, MMAL_RECT_T *const rect)
+static MMAL_RECT_T display_src_rect(const vout_display_t * const vd)
 {
     const bool wants_isp = want_isp(vd);
-    rect->x = wants_isp ? 0 : vd->fmt.i_x_offset;
-    rect->y = wants_isp ? 0 : vd->fmt.i_y_offset;
-    rect->width = vd->fmt.i_visible_width;
-    rect->height = vd->fmt.i_visible_height;
+    return (MMAL_RECT_T){
+        .x = wants_isp ? 0 : vd->fmt.i_x_offset,
+        .y = wants_isp ? 0 : vd->fmt.i_y_offset,
+        .width = vd->fmt.i_visible_width,
+        .height = vd->fmt.i_visible_height
+    };
 }
 
 static void isp_input_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
@@ -578,13 +588,30 @@ place_out(const vout_display_cfg_t * cfg,
     return place_to_mmal_rect(place);
 }
 
+static inline bool is_swap_wh(const MMAL_DISPLAYTRANSFORM_T t)
+{
+    return ((unsigned int)t & 4) != 0;
+}
+
+static inline MMAL_RECT_T swap_rect(const MMAL_RECT_T s)
+{
+    return (MMAL_RECT_T){
+        .x      = s.y,
+        .y      = s.x,
+        .width  = s.height,
+        .height = s.width
+    };
+}
+
 static void
 place_dest_rect(vout_display_t * const vd,
           const vout_display_cfg_t * const cfg,
           const video_format_t * fmt)
 {
     vout_display_sys_t * const sys = vd->sys;
-    sys->dest_rect = place_out(cfg, fmt, sys->display_width, sys->display_height);
+    sys->dest_rect = is_swap_wh(sys->dest_transform) ?
+        swap_rect(place_out(cfg, fmt, sys->display_height, sys->display_width)) :
+        place_out(cfg, fmt, sys->display_width, sys->display_height);
 }
 
 static void
@@ -613,11 +640,44 @@ place_rects(vout_display_t * const vd,
     place_spu_rect(vd, cfg, fmt);
 }
 
+static int
+set_input_region(vout_display_t * const vd)
+{
+    const vout_display_sys_t * const sys = vd->sys;
+    MMAL_DISPLAYREGION_T display_region = {
+        .hdr = {
+            .id = MMAL_PARAMETER_DISPLAYREGION,
+            .size = sizeof(MMAL_DISPLAYREGION_T)
+        },
+        .display_num = sys->display_id,
+        .fullscreen = MMAL_FALSE,
+        .transform = sys->dest_transform,
+        .src_rect = display_src_rect(vd),
+        .dest_rect = sys->dest_rect,
+        .layer = sys->layer,
+        .alpha = 0xff | (1 << 29),
+        .set =
+            MMAL_DISPLAY_SET_NUM |
+            MMAL_DISPLAY_SET_FULLSCREEN |
+            MMAL_DISPLAY_SET_TRANSFORM |
+            MMAL_DISPLAY_SET_SRC_RECT |
+            MMAL_DISPLAY_SET_DEST_RECT |
+            MMAL_DISPLAY_SET_LAYER |
+            MMAL_DISPLAY_SET_ALPHA
+    };
+    MMAL_STATUS_T status = mmal_port_parameter_set(sys->input, &display_region.hdr);
+    if (status != MMAL_SUCCESS) {
+        msg_Err(vd, "Failed to set display region (status=%"PRIx32" %s)",
+                        status, mmal_status_to_string(status));
+        return -EINVAL;
+    }
+    return 0;
+}
+
 static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
                 const video_format_t *fmt)
 {
     vout_display_sys_t * const sys = vd->sys;
-    MMAL_DISPLAYREGION_T display_region;
     MMAL_STATUS_T status;
 
     if (!cfg && !fmt)
@@ -645,25 +705,10 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
     if (!cfg)
         cfg = vd->cfg;
 
-    msg_Dbg(vd, "Zoom=%d/%d", cfg->zoom.num, cfg->zoom.den);
-
     place_rects(vd, cfg, fmt);
 
-    display_region.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
-    display_region.hdr.size = sizeof(MMAL_DISPLAYREGION_T);
-    display_region.fullscreen = MMAL_FALSE;
-    display_src_rect(vd, &display_region.src_rect);
-    display_region.dest_rect = sys->dest_rect;
-    display_region.layer = sys->layer;
-    display_region.alpha = 0xff | (1 << 29);
-    display_region.set = MMAL_DISPLAY_SET_FULLSCREEN | MMAL_DISPLAY_SET_SRC_RECT |
-            MMAL_DISPLAY_SET_DEST_RECT | MMAL_DISPLAY_SET_LAYER | MMAL_DISPLAY_SET_ALPHA;
-    status = mmal_port_parameter_set(sys->input, &display_region.hdr);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(vd, "Failed to set display region (status=%"PRIx32" %s)",
-                        status, mmal_status_to_string(status));
+    if (set_input_region(vd) != 0)
         return -EINVAL;
-    }
 
     sys->adjust_refresh_rate = var_InheritBool(vd, MMAL_ADJUST_REFRESHRATE_NAME);
     sys->native_interlaced = var_InheritBool(vd, MMAL_NATIVE_INTERLACED);
@@ -798,6 +843,7 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
                                             &sys->subs[sub_no].sub,
                                             &p_pic->format,
                                             &sys->dest_rect,
+                                            sys->dest_transform,
                                             p_pic->date)) == 0)
                 break;
             else if (rv < 0)
@@ -1302,7 +1348,23 @@ static const struct {
     {NULL,      -2}
 };
 
-static int find_display_num(const char * name)
+static const struct {
+    const char * name;
+    int transform_num;
+} transform_name_to_num[] = {
+    {"auto",    -1},
+    {"0",       MMAL_DISPLAY_ROT0},
+    {"hflip",   MMAL_DISPLAY_MIRROR_ROT0},
+    {"vflip",   MMAL_DISPLAY_MIRROR_ROT180},
+    {"180",     MMAL_DISPLAY_ROT180},
+    {"transpose", MMAL_DISPLAY_MIRROR_ROT90},
+    {"270",     MMAL_DISPLAY_ROT270},
+    {"90",      MMAL_DISPLAY_ROT90},
+    {"antitranspose", MMAL_DISPLAY_MIRROR_ROT270},
+    {NULL,      -2}
+};
+
+static int find_display_num(const char * const name)
 {
     unsigned int i;
     for (i = 0; display_name_to_num[i].name != NULL && strcasecmp(display_name_to_num[i].name, name) != 0; ++i)
@@ -1310,11 +1372,59 @@ static int find_display_num(const char * name)
     return display_name_to_num[i].num;
 }
 
+static int find_transform_num(const char * const name)
+{
+    unsigned int i;
+    for (i = 0; transform_name_to_num[i].name != NULL && strcasecmp(transform_name_to_num[i].name, name) != 0; ++i)
+        /* Loop */;
+    return transform_name_to_num[i].transform_num;
+}
+
+#if HAVE_X11_XLIB_H
+#include <X11/Xlib.h>
+#include <X11/extensions/Xrandr.h>
+static MMAL_DISPLAYTRANSFORM_T get_xrandr_rotation(vout_display_t *vd)
+{
+    Display * x = XOpenDisplay(NULL);
+    Rotation cur_rot = 0;
+    unsigned int trans = MMAL_DISPLAY_ROT0;
+
+    if (x == NULL)
+        return MMAL_DISPLAY_ROT0;
+
+    XRRRotations(x, 0, &cur_rot);
+    XCloseDisplay(x);
+
+    // Convert to MMAL
+    // MMAL transforms can be xored to combine
+    // xranrdr seems to rotate the other way to mmal
+
+    if ((cur_rot & RR_Rotate_90) != 0)
+        trans ^= MMAL_DISPLAY_ROT270;
+    if ((cur_rot & RR_Rotate_180) != 0)
+        trans ^= MMAL_DISPLAY_ROT180;
+    if ((cur_rot & RR_Rotate_270) != 0)
+        trans ^= MMAL_DISPLAY_ROT90;
+    if ((cur_rot & RR_Reflect_X) != 0)
+        trans ^= MMAL_DISPLAY_MIRROR_ROT0;
+    if ((cur_rot & RR_Reflect_Y) != 0)
+        trans ^= MMAL_DISPLAY_MIRROR_ROT180;
+
+    msg_Dbg(vd, "%s: cur=%#x, mmal=%#x", __func__, cur_rot, trans);
+
+    return (MMAL_DISPLAYTRANSFORM_T)trans;
+}
+#else
+static MMAL_DISPLAYTRANSFORM_T get_xrandr_rotation(vout_display_t *vd)
+{
+    return MMAL_DISPLAY_ROT0;
+}
+#endif
+
 static int OpenMmalVout(vlc_object_t *object)
 {
     vout_display_t *vd = (vout_display_t *)object;
     vout_display_sys_t *sys;
-    MMAL_DISPLAYREGION_T display_region;
     MMAL_STATUS_T status;
     int ret = VLC_EGENERIC;
     // At the moment all copy is via I420
@@ -1325,6 +1435,8 @@ static int OpenMmalVout(vlc_object_t *object)
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
+
+    get_xrandr_rotation(vd);
 
     sys = calloc(1, sizeof(struct vout_display_sys_t));
     if (!sys)
@@ -1355,6 +1467,21 @@ static int OpenMmalVout(vlc_object_t *object)
         else
             msg_Dbg(vd, "Display device: %s, qt=%d id=%d display=%d", display_name,
                     qt_num, display_id, sys->display_id);
+    }
+
+    {
+        const char *transform_name = var_InheritString(vd, MMAL_VOUT_TRANSFORM_NAME);
+        int transform_num = find_transform_num(transform_name);
+        sys->display_transform = transform_num < 0 ?
+            get_xrandr_rotation(vd) :
+            (MMAL_DISPLAYTRANSFORM_T)transform_num;
+        sys->dest_transform = sys->display_transform;
+
+        if (transform_num < -1)
+            msg_Warn(vd, "Unknown vout transform: '%s'", transform_name);
+        else
+            msg_Dbg(vd, "Display transform: %s, mmal_display_transform=%d",
+                    transform_name, (int)sys->display_transform);
     }
 
     status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &sys->component);
@@ -1417,23 +1544,8 @@ static int OpenMmalVout(vlc_object_t *object)
 
     place_rects(vd, vd->cfg, &vd->source);  // Sets sys->dest_rect
 
-    display_region.hdr.id = MMAL_PARAMETER_DISPLAYREGION;
-    display_region.hdr.size = sizeof(MMAL_DISPLAYREGION_T);
-    display_region.display_num = sys->display_id;
-    display_region.fullscreen = MMAL_FALSE;
-    display_src_rect(vd, &display_region.src_rect);
-    display_region.dest_rect = sys->dest_rect;
-    display_region.layer = sys->layer;
-    display_region.set =
-        MMAL_DISPLAY_SET_NUM |
-        MMAL_DISPLAY_SET_FULLSCREEN | MMAL_DISPLAY_SET_SRC_RECT |
-        MMAL_DISPLAY_SET_DEST_RECT | MMAL_DISPLAY_SET_LAYER;
-    status = mmal_port_parameter_set(sys->input, &display_region.hdr);
-    if (status != MMAL_SUCCESS) {
-        msg_Err(vd, "Failed to set display region (status=%"PRIx32" %s)",
-                        status, mmal_status_to_string(status));
+    if (set_input_region(vd) != 0)
         goto fail;
-    }
 
     status = mmal_port_enable(sys->input, vd_input_port_cb);
     if (status != MMAL_SUCCESS) {
@@ -1526,6 +1638,10 @@ vlc_module_begin()
                     MMAL_NATIVE_INTERLACE_LONGTEXT, false)
     add_string(MMAL_DISPLAY_NAME, "auto", MMAL_DISPLAY_TEXT,
                     MMAL_DISPLAY_LONGTEXT, false)
+    add_string(MMAL_DISPLAY_NAME, "auto", MMAL_DISPLAY_TEXT,
+                    MMAL_DISPLAY_LONGTEXT, false)
+    add_string(MMAL_VOUT_TRANSFORM_NAME, "auto", MMAL_VOUT_TRANSFORM_TEXT,
+                    MMAL_VOUT_TRANSFORM_LONGTEXT, false)
     set_callbacks(OpenMmalVout, CloseMmalVout)
 
 vlc_module_end()
