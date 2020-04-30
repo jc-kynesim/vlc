@@ -809,17 +809,19 @@ static int OpenDecoder(decoder_t *dec)
         char buf3[5], buf4[5];
         MMAL_RATIONAL_T r = rationalize_sar(dec->fmt_in.video.i_sar_num, dec->fmt_in.video.i_sar_den);
 
-        msg_Dbg(dec, "%s: <<< (%s/%s)[%s] %dx%d %d/%d=%d/%d -> (%s/%s) %dx%d %d/%d", __func__,
+        msg_Dbg(dec, "%s: <<< (%s/%s)[%s] %dx%d %d/%d=%d/%d o:%#x -> (%s/%s) %dx%d %d/%d o:%#x", __func__,
                 str_fourcc(buf1, dec->fmt_in.i_codec),
                 str_fourcc(buf2, dec->fmt_in.video.i_chroma),
                 str_fourcc(buf2a, in_fcc),
                 dec->fmt_in.video.i_width, dec->fmt_in.video.i_height,
                 dec->fmt_in.video.i_sar_num, dec->fmt_in.video.i_sar_den,
                 r.num, r.den,
+                (int)dec->fmt_in.video.orientation,
                 str_fourcc(buf3, dec->fmt_out.i_codec),
                 str_fourcc(buf4, dec->fmt_out.video.i_chroma),
                 dec->fmt_out.video.i_width, dec->fmt_out.video.i_height,
-                dec->fmt_out.video.i_sar_num, dec->fmt_out.video.i_sar_den);
+                dec->fmt_out.video.i_sar_num, dec->fmt_out.video.i_sar_den,
+                (int)dec->fmt_out.video.orientation);
     }
 #endif
 
@@ -902,11 +904,17 @@ static int OpenDecoder(decoder_t *dec)
     }
 
     sys->b_flushed = true;
-    dec->fmt_out.i_codec = VLC_CODEC_MMAL_OPAQUE;
-    dec->fmt_out.video.i_chroma = VLC_CODEC_MMAL_OPAQUE;
 
     if ((status = decoder_send_extradata(dec, sys)) != MMAL_SUCCESS)
         goto fail;
+
+    // Given no better ideas at this point copy input format to output
+    // This also copies container stuff (such as orientation) that we do not
+    // decode from the ES but may be important to display
+    video_format_Copy(&dec->fmt_out.video, &dec->fmt_in.video);
+    dec->fmt_out.i_codec = VLC_CODEC_MMAL_OPAQUE;
+    dec->fmt_out.video.i_chroma = VLC_CODEC_MMAL_OPAQUE;
+
 
     dec->pf_decode = decode;
     dec->pf_flush  = flush_decoder;

@@ -103,6 +103,33 @@ MMAL_FOURCC_T vlc_to_mmal_color_space(const video_color_space_t vlc_cs)
     return MMAL_COLOR_SPACE_UNKNOWN;
 }
 
+MMAL_DISPLAYTRANSFORM_T vlc_to_mmal_transform(const video_orientation_t orientation)
+{
+    // *** Actually same values so maybe just cast
+    switch (orientation)
+    {
+        case ORIENT_NORMAL:
+            return MMAL_DISPLAY_ROT0;
+        case ORIENT_TRANSPOSED:
+            return MMAL_DISPLAY_MIRROR_ROT90;
+        case ORIENT_ANTI_TRANSPOSED:
+            return MMAL_DISPLAY_MIRROR_ROT270;
+        case ORIENT_HFLIPPED:
+            return MMAL_DISPLAY_MIRROR_ROT0;
+        case ORIENT_VFLIPPED:
+            return MMAL_DISPLAY_MIRROR_ROT180;
+        case ORIENT_ROTATED_180:
+            return MMAL_DISPLAY_ROT180;
+        case ORIENT_ROTATED_270:
+            return MMAL_DISPLAY_ROT270;
+        case ORIENT_ROTATED_90:
+            return MMAL_DISPLAY_ROT90;
+        default:
+            break;
+    }
+    return MMAL_DISPLAY_ROT0;
+}
+
 MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc)
 {
     switch (vf_vlc->i_chroma) {
@@ -1127,7 +1154,7 @@ rect_transform(MMAL_RECT_T s, const MMAL_RECT_T c, const MMAL_DISPLAYTRANSFORM_T
     if ((t & 4) != 0)
         s = rect_transpose(s);
 #if TRACE_TRANSFORMS
-    printf("s=%d,%d:%dx%d\n",
+    fprintf(stderr, "s=%d,%d:%dx%d\n",
            s.x,s.y,s.width,s.height);
 #endif
     return s;

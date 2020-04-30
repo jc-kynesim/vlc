@@ -609,7 +609,10 @@ place_dest_rect(vout_display_t * const vd,
           const video_format_t * fmt)
 {
     vout_display_sys_t * const sys = vd->sys;
-    sys->dest_rect = is_swap_wh(sys->dest_transform) ?
+    // If the display is transposed then we need to swap width/height
+    // when asking for placement.  Video orientation will we dealt with
+    // in place_out
+    sys->dest_rect = is_swap_wh(sys->display_transform) ?
         swap_rect(place_out(cfg, fmt, sys->display_height, sys->display_width)) :
         place_out(cfg, fmt, sys->display_width, sys->display_height);
 }
@@ -622,13 +625,19 @@ place_spu_rect(vout_display_t * const vd,
     vout_display_sys_t * const sys = vd->sys;
 
     sys->spu_rect = place_out(cfg, fmt, 0, 0);
+    sys->spu_rect.x = 0;
+    sys->spu_rect.y = 0;
 
     // Copy place override logic for spu pos from video_output.c
     // This info doesn't appear to reside anywhere natively
+
     if (fmt->i_width * fmt->i_height >= (unsigned int)(sys->spu_rect.width * sys->spu_rect.height)) {
         sys->spu_rect.width  = fmt->i_width;
         sys->spu_rect.height = fmt->i_height;
     }
+
+    if (ORIENT_IS_SWAP(fmt->orientation))
+        sys->spu_rect = swap_rect(sys->spu_rect);
 }
 
 static void
@@ -843,7 +852,7 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
                                             &sys->subs[sub_no].sub,
                                             &p_pic->format,
                                             &sys->dest_rect,
-                                            sys->dest_transform,
+                                            sys->display_transform,
                                             p_pic->date)) == 0)
                 break;
             else if (rv < 0)
@@ -968,11 +977,13 @@ static int attach_subpics(vout_display_t * const vd, vout_display_sys_t * const 
 
 #if TRACE_ALL
             char dbuf0[5];
-            msg_Dbg(vd, "  [%p:%p] Pos=%d,%d max=%dx%d, src=%dx%d/%dx%d, vd->fmt=%dx%d/%dx%d, vd->source=%dx%d/%dx%d, cfg=%dx%d, zoom=%d/%d, Alpha=%d, Fmt=%s", src, src->p[0].p_pixels,
+            msg_Dbg(vd, "  [%p:%p] Pos=%d,%d max=%dx%d, src=%dx%d/%dx%d o:%d, spu=%d,%d:%dx%d, vd->fmt=%dx%d/%dx%d, vd->source=%dx%d/%dx%d, cfg=%dx%d, zoom=%d/%d, Alpha=%d, Fmt=%s", src, src->p[0].p_pixels,
                     sreg->i_x, sreg->i_y,
                     sreg->i_max_width, sreg->i_max_height,
                     src->format.i_visible_width, src->format.i_visible_height,
                     src->format.i_width, src->format.i_height,
+                    src->format.orientation,
+                    sys->spu_rect.x, sys->spu_rect.y, sys->spu_rect.width, sys->spu_rect.height,
                     vd->fmt.i_visible_width, vd->fmt.i_visible_height,
                     vd->fmt.i_width, vd->fmt.i_height,
                     vd->source.i_visible_width, vd->source.i_visible_height,
@@ -1435,6 +1446,12 @@ static MMAL_DISPLAYTRANSFORM_T get_xrandr_rotation(vout_display_t * const vd)
 }
 #endif
 
+static inline MMAL_DISPLAYTRANSFORM_T
+swap_transform_hv(const MMAL_DISPLAYTRANSFORM_T x)
+{
+    return ((x & 1) << 1) | ((x & 2) >> 1) | (x & 4);
+}
+
 static int OpenMmalVout(vlc_object_t *object)
 {
     vout_display_t *vd = (vout_display_t *)object;
@@ -1447,7 +1464,7 @@ static int OpenMmalVout(vlc_object_t *object)
         vout_vlc_to_mmal_pic_fourcc(vd->fmt.i_chroma);
 
 #if TRACE_ALL
-    msg_Dbg(vd, "<<< %s", __func__);
+    msg_Dbg(vd, "<<< %s: o:%d", __func__, (int)vd->fmt.orientation);
 #endif
 
     get_xrandr_rotation(vd);
@@ -1496,6 +1513,14 @@ static int OpenMmalVout(vlc_object_t *object)
         else
             msg_Dbg(vd, "Display transform: %s, mmal_display_transform=%d",
                     transform_name, (int)sys->display_transform);
+
+
+        {
+            MMAL_DISPLAYTRANSFORM_T o = vlc_to_mmal_transform(vd->fmt.orientation);
+            MMAL_DISPLAYTRANSFORM_T d = sys->display_transform;
+
+            sys->dest_transform = o ^ (is_swap_wh(o) ? swap_transform_hv(d) : d);
+        }
     }
 
     status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &sys->component);

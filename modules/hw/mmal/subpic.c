@@ -105,6 +105,41 @@ static void conv_subpic_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     mmal_buffer_header_release(buf);  // Will extract & release pic in pool callback
 }
 
+static int
+subpic_send_empty(vlc_object_t * const p_filter, subpic_reg_stash_t * const spe, const uint64_t pts)
+{
+    MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(spe->pool->queue);
+    MMAL_STATUS_T err;
+
+    if (buf == NULL) {
+        msg_Err(p_filter, "Buffer get for subpic failed");
+        return -1;
+    }
+#if TRACE_ALL
+    msg_Dbg(p_filter, "Remove pic for sub %d", spe->seq);
+#endif
+    buf->cmd = 0;
+    buf->data = NULL;
+    buf->alloc_size = 0;
+    buf->offset = 0;
+    buf->flags = MMAL_BUFFER_HEADER_FLAG_FRAME_END;
+    buf->pts = pts;
+    buf->dts = MMAL_TIME_UNKNOWN;
+    buf->user_data = NULL;
+
+    if ((err = mmal_port_send_buffer(spe->port, buf)) != MMAL_SUCCESS)
+    {
+        msg_Err(p_filter, "Send buffer to subput failed");
+        mmal_buffer_header_release(buf);
+        return -1;
+    }
+    return 0;
+}
+
+// < 0 Error
+//   0 Done & stop
+//   1 Done & continue
+
 int hw_mmal_subpic_update(vlc_object_t * const p_filter,
     MMAL_BUFFER_HEADER_T * const sub_buf,
     subpic_reg_stash_t * const spe,
@@ -119,31 +154,7 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
     {
         if (spe->port->is_enabled && spe->seq != 0)
         {
-            MMAL_BUFFER_HEADER_T *const buf = mmal_queue_wait(spe->pool->queue);
-
-            if (buf == NULL) {
-                msg_Err(p_filter, "Buffer get for subpic failed");
-                return -1;
-            }
-#if TRACE_ALL
-            msg_Dbg(p_filter, "Remove pic for sub %d", spe->seq);
-#endif
-            buf->cmd = 0;
-            buf->data = NULL;
-            buf->alloc_size = 0;
-            buf->offset = 0;
-            buf->flags = MMAL_BUFFER_HEADER_FLAG_FRAME_END;
-            buf->pts = pts;
-            buf->dts = MMAL_TIME_UNKNOWN;
-            buf->user_data = NULL;
-
-            if ((err = mmal_port_send_buffer(spe->port, buf)) != MMAL_SUCCESS)
-            {
-                msg_Err(p_filter, "Send buffer to subput failed");
-                mmal_buffer_header_release(buf);
-                return -1;
-            }
-
+            subpic_send_empty(p_filter, spe, pts);
             spe->seq = 0;
         }
     }
@@ -186,6 +197,18 @@ int hw_mmal_subpic_update(vlc_object_t * const p_filter,
                         dreg->src_rect.width, dreg->src_rect.height, dreg->src_rect.x, dreg->src_rect.y,
                         dreg->layer, dreg->alpha);
 #endif
+
+                // If now completely offscreen just flush this & return
+                // We only do -ve as (a) that is easy and (b) it seems to be
+                // something that can confuse mmal
+                if (dreg->dest_rect.y + dreg->dest_rect.height <= 0 ||
+                    dreg->dest_rect.x + dreg->dest_rect.width <= 0)
+                {
+                    if (spe->port->is_enabled)
+                        subpic_send_empty(p_filter, spe, pts);
+                    spe->seq = seq;
+                    return 1;
+                }
 
                 if ((err = mmal_port_parameter_set(spe->port, &dreg->hdr)) != MMAL_SUCCESS)
                 {
