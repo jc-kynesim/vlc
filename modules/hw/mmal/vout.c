@@ -1383,11 +1383,11 @@ static int find_transform_num(const char * const name)
 #if HAVE_X11_XLIB_H
 #include <X11/Xlib.h>
 #include <X11/extensions/Xrandr.h>
-static MMAL_DISPLAYTRANSFORM_T get_xrandr_rotation(vout_display_t *vd)
+static MMAL_DISPLAYTRANSFORM_T get_xrandr_rotation(vout_display_t * const vd)
 {
-    Display * x = XOpenDisplay(NULL);
+    Display * const x = XOpenDisplay(NULL);
     Rotation cur_rot = 0;
-    unsigned int trans = MMAL_DISPLAY_ROT0;
+    MMAL_DISPLAYTRANSFORM_T trans;
 
     if (x == NULL)
         return MMAL_DISPLAY_ROT0;
@@ -1396,27 +1396,41 @@ static MMAL_DISPLAYTRANSFORM_T get_xrandr_rotation(vout_display_t *vd)
     XCloseDisplay(x);
 
     // Convert to MMAL
-    // MMAL transforms can be xored to combine
-    // xranrdr seems to rotate the other way to mmal
+    // xrandr seems to rotate the other way to mmal
 
-    if ((cur_rot & RR_Rotate_90) != 0)
-        trans ^= MMAL_DISPLAY_ROT270;
-    if ((cur_rot & RR_Rotate_180) != 0)
-        trans ^= MMAL_DISPLAY_ROT180;
-    if ((cur_rot & RR_Rotate_270) != 0)
-        trans ^= MMAL_DISPLAY_ROT90;
-    if ((cur_rot & RR_Reflect_X) != 0)
-        trans ^= MMAL_DISPLAY_MIRROR_ROT0;
-    if ((cur_rot & RR_Reflect_Y) != 0)
-        trans ^= MMAL_DISPLAY_MIRROR_ROT180;
+    switch (cur_rot)
+    {
+        case 0:
+        case RR_Rotate_0:
+            trans = MMAL_DISPLAY_ROT0;
+            break;
+        case RR_Rotate_90:
+            trans = MMAL_DISPLAY_ROT270;
+            break;
+        case RR_Rotate_180:
+            trans = MMAL_DISPLAY_ROT180;
+            break;
+        case RR_Rotate_270:
+            trans = MMAL_DISPLAY_ROT90;
+            break;
+        case RR_Reflect_X:
+            trans = MMAL_DISPLAY_MIRROR_ROT0;
+            break;
+        case RR_Reflect_Y:
+            trans = MMAL_DISPLAY_MIRROR_ROT180;
+            break;
+        default:
+            msg_Info(vd, "Unexpected X rotation value: %#x", cur_rot);
+            trans = MMAL_DISPLAY_ROT0;
+            break;
+    }
 
-    msg_Dbg(vd, "%s: cur=%#x, mmal=%#x", __func__, cur_rot, trans);
-
-    return (MMAL_DISPLAYTRANSFORM_T)trans;
+    return trans;
 }
 #else
-static MMAL_DISPLAYTRANSFORM_T get_xrandr_rotation(vout_display_t *vd)
+static MMAL_DISPLAYTRANSFORM_T get_xrandr_rotation(vout_display_t * const vd)
 {
+    VLC_UNUSED(vd);
     return MMAL_DISPLAY_ROT0;
 }
 #endif
