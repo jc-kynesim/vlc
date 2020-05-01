@@ -46,6 +46,7 @@
 
 #include "mmal_picture.h"
 #include "subpic.h"
+#include "transform_ops.h"
 
 #define TRACE_ALL 0
 
@@ -588,21 +589,6 @@ place_out(const vout_display_cfg_t * cfg,
     return place_to_mmal_rect(place);
 }
 
-static inline bool is_swap_wh(const MMAL_DISPLAYTRANSFORM_T t)
-{
-    return ((unsigned int)t & 4) != 0;
-}
-
-static inline MMAL_RECT_T swap_rect(const MMAL_RECT_T s)
-{
-    return (MMAL_RECT_T){
-        .x      = s.y,
-        .y      = s.x,
-        .width  = s.height,
-        .height = s.width
-    };
-}
-
 static void
 place_dest_rect(vout_display_t * const vd,
           const vout_display_cfg_t * const cfg,
@@ -612,8 +598,8 @@ place_dest_rect(vout_display_t * const vd,
     // If the display is transposed then we need to swap width/height
     // when asking for placement.  Video orientation will we dealt with
     // in place_out
-    sys->dest_rect = is_swap_wh(sys->display_transform) ?
-        swap_rect(place_out(cfg, fmt, sys->display_height, sys->display_width)) :
+    sys->dest_rect = is_transform_transpose(sys->display_transform) ?
+        rect_transpose(place_out(cfg, fmt, sys->display_height, sys->display_width)) :
         place_out(cfg, fmt, sys->display_width, sys->display_height);
 }
 
@@ -637,7 +623,7 @@ place_spu_rect(vout_display_t * const vd,
     }
 
     if (ORIENT_IS_SWAP(fmt->orientation))
-        sys->spu_rect = swap_rect(sys->spu_rect);
+        sys->spu_rect = rect_transpose(sys->spu_rect);
 }
 
 static void
@@ -713,6 +699,9 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     if (!cfg)
         cfg = vd->cfg;
+
+    sys->dest_transform = combine_transform(
+        vlc_to_mmal_transform(fmt->orientation), sys->display_transform);
 
     place_rects(vd, cfg, fmt);
 
@@ -1446,12 +1435,6 @@ static MMAL_DISPLAYTRANSFORM_T get_xrandr_rotation(vout_display_t * const vd)
 }
 #endif
 
-static inline MMAL_DISPLAYTRANSFORM_T
-swap_transform_hv(const MMAL_DISPLAYTRANSFORM_T x)
-{
-    return ((x & 1) << 1) | ((x & 2) >> 1) | (x & 4);
-}
-
 static int OpenMmalVout(vlc_object_t *object)
 {
     vout_display_t *vd = (vout_display_t *)object;
@@ -1506,7 +1489,6 @@ static int OpenMmalVout(vlc_object_t *object)
         sys->display_transform = transform_num < 0 ?
             get_xrandr_rotation(vd) :
             (MMAL_DISPLAYTRANSFORM_T)transform_num;
-        sys->dest_transform = sys->display_transform;
 
         if (transform_num < -1)
             msg_Warn(vd, "Unknown vout transform: '%s'", transform_name);
@@ -1514,13 +1496,8 @@ static int OpenMmalVout(vlc_object_t *object)
             msg_Dbg(vd, "Display transform: %s, mmal_display_transform=%d",
                     transform_name, (int)sys->display_transform);
 
-
-        {
-            MMAL_DISPLAYTRANSFORM_T o = vlc_to_mmal_transform(vd->fmt.orientation);
-            MMAL_DISPLAYTRANSFORM_T d = sys->display_transform;
-
-            sys->dest_transform = o ^ (is_swap_wh(o) ? swap_transform_hv(d) : d);
-        }
+        sys->dest_transform = combine_transform(
+            vlc_to_mmal_transform(vd->fmt.orientation), sys->display_transform);
     }
 
     status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &sys->component);

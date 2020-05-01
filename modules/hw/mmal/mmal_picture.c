@@ -45,6 +45,7 @@
 
 #include "mmal_cma.h"
 #include "mmal_picture.h"
+#include "transform_ops.h"
 
 #define TRACE_TRANSFORMS 0
 
@@ -101,33 +102,6 @@ MMAL_FOURCC_T vlc_to_mmal_color_space(const video_color_space_t vlc_cs)
             break;
     }
     return MMAL_COLOR_SPACE_UNKNOWN;
-}
-
-MMAL_DISPLAYTRANSFORM_T vlc_to_mmal_transform(const video_orientation_t orientation)
-{
-    // *** Actually same values so maybe just cast
-    switch (orientation)
-    {
-        case ORIENT_NORMAL:
-            return MMAL_DISPLAY_ROT0;
-        case ORIENT_TRANSPOSED:
-            return MMAL_DISPLAY_MIRROR_ROT90;
-        case ORIENT_ANTI_TRANSPOSED:
-            return MMAL_DISPLAY_MIRROR_ROT270;
-        case ORIENT_HFLIPPED:
-            return MMAL_DISPLAY_MIRROR_ROT0;
-        case ORIENT_VFLIPPED:
-            return MMAL_DISPLAY_MIRROR_ROT180;
-        case ORIENT_ROTATED_180:
-            return MMAL_DISPLAY_ROT180;
-        case ORIENT_ROTATED_270:
-            return MMAL_DISPLAY_ROT270;
-        case ORIENT_ROTATED_90:
-            return MMAL_DISPLAY_ROT90;
-        default:
-            break;
-    }
-    return MMAL_DISPLAY_ROT0;
 }
 
 MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc)
@@ -1108,37 +1082,6 @@ static void rescale_rect(MMAL_RECT_T * const d, const MMAL_RECT_T * const s, con
 #endif
 }
 
-// hflip s in c
-static inline MMAL_RECT_T rect_hflip(const MMAL_RECT_T s, const MMAL_RECT_T c)
-{
-    return (MMAL_RECT_T){
-        .x = c.x + (c.x + c.width) - (s.x + s.width),
-        .y = s.y,
-        .width = s.width,
-        .height = s.height
-    };
-}
-
-static inline MMAL_RECT_T rect_vflip(const MMAL_RECT_T s, const MMAL_RECT_T c)
-{
-    return (MMAL_RECT_T){
-        .x = s.x,
-        .y = (c.y + c.height) - (s.y - c.y) - s.height,
-        .width = s.width,
-        .height = s.height
-    };
-}
-
-static inline MMAL_RECT_T rect_transpose(const MMAL_RECT_T s)
-{
-    return (MMAL_RECT_T){
-        .x = s.y,
-        .y = s.x,
-        .width  = s.height,
-        .height = s.width
-    };
-}
-
 static MMAL_RECT_T
 rect_transform(MMAL_RECT_T s, const MMAL_RECT_T c, const MMAL_DISPLAYTRANSFORM_T t)
 {
@@ -1147,11 +1090,11 @@ rect_transform(MMAL_RECT_T s, const MMAL_RECT_T c, const MMAL_DISPLAYTRANSFORM_T
            s.x,s.y,s.width,s.height,
            c.x,c.y,c.width,c.height);
 #endif
-    if ((t & 1) != 0)
+    if (is_transform_hflip(t))
         s = rect_hflip(s, c);
-    if ((t & 2) != 0)
+    if (is_transform_vflip(t) != 0)
         s = rect_vflip(s, c);
-    if ((t & 4) != 0)
+    if (is_transform_transpose(t) != 0)
         s = rect_transpose(s);
 #if TRACE_TRANSFORMS
     fprintf(stderr, "s=%d,%d:%dx%d\n",
