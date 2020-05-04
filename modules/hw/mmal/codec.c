@@ -1799,6 +1799,10 @@ static int OpenConverter(vlc_object_t * obj)
     if (enc_in == 0 || enc_out == 0)
         return VLC_EGENERIC;
 
+    // Can't transform
+    if (p_filter->fmt_in.video.orientation != p_filter->fmt_out.video.orientation)
+        return VLC_EGENERIC;
+
     use_resizer = var_InheritBool(p_filter, MMAL_RESIZE_NAME);
     use_isp = var_InheritBool(p_filter, MMAL_ISP_NAME);
 
