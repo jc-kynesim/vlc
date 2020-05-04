@@ -12,7 +12,7 @@ if [ "$1" == "" ]; then
   exit 1
 fi
 
-VERSION=`awk '/AC_INIT/{match($0,/[0-9](\.[0-9])+/);print substr($0,RSTART,RLENGTH)}' configure.ac`
+VERSION=`awk '/AC_INIT/{match($0,/[0-9]+(\.[0-9]+)+/);print substr($0,RSTART,RLENGTH)}' configure.ac`
 if [ "$VERSION" == "" ]; then
   echo Can\'t find version in configure.ac
   exit 1
