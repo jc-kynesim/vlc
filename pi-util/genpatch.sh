@@ -33,5 +33,8 @@ else
 fi
 echo Generating patch: $PATCHFILE
 git diff $VERSION -- modules/hw/mmal modules/video_output/opengl src/misc include src/video_output src/input configure.ac > $PATCHFILE
+git diff $VERSION -- modules/video_chroma/chain.c > ../vlc-$VERSION-$1-chain.patch
+git diff $VERSION -- bin/vlc.c > ../vlc-$VERSION-$1-vlc.patch
+
 #echo Copying patch to arm-build
 #scp $PATCHFILE john@arm-build:patches/0002-vlc-3.0.6-mmal_test_4.patch
