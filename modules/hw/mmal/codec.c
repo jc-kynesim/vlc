@@ -628,7 +628,7 @@ static int decode(decoder_t *dec, block_t *block)
     decoder_sys_t *sys = dec->p_sys;
     MMAL_BUFFER_HEADER_T *buffer;
     uint32_t len;
-    uint32_t flags = 0;
+    uint32_t flags = MMAL_BUFFER_HEADER_FLAG_FRAME_START;
     MMAL_STATUS_T status;
 
 #if TRACE_ALL
@@ -728,13 +728,20 @@ static int decode(decoder_t *dec, block_t *block)
         block->i_buffer -= len;
         buffer->length = len;
         if (block->i_buffer == 0) {
+            flags |= MMAL_BUFFER_HEADER_FLAG_FRAME_END;
+            if (block->i_flags & BLOCK_FLAG_END_OF_SEQUENCE) {
+                msg_Dbg(dec, "EOS sent");
+                flags |= MMAL_BUFFER_HEADER_FLAG_EOS;
+            }
             buffer->user_data = block;
             block = NULL;
         }
         buffer->flags = flags;
 
 #if TRACE_ALL
-        msg_Dbg(dec, "%s: -- Send buffer: len=%d", __func__, len);
+        msg_Dbg(dec, "%s: -- Send buffer: cmd=%d, data=%p, size=%d, len=%d, offset=%d, flags=%#x, pts=%lld, dts=%lld", __func__,\
+                buffer->cmd, buffer->data, buffer->alloc_size, buffer->length, buffer->offset,
+                buffer->flags, (long long)buffer->pts, (long long)buffer->dts);
 #endif
         status = mmal_port_send_buffer(sys->input, buffer);
         if (status != MMAL_SUCCESS) {
@@ -745,6 +752,7 @@ static int decode(decoder_t *dec, block_t *block)
 
         // Reset flushed flag once we have sent a buf
         sys->b_flushed = false;
+        flags &= ~MMAL_BUFFER_HEADER_FLAG_FRAME_START;
     }
     return VLCDEC_SUCCESS;
 
