@@ -1438,10 +1438,25 @@ static MMAL_STATUS_T conv_set_output(filter_t * const p_filter, filter_sys_t * c
     return MMAL_SUCCESS;
 }
 
+
+static picture_t *conv_get_out_pics(filter_sys_t * const sys)
+{
+    picture_t * ret_pics;
+
+    vlc_sem_wait(&sys->sem);
+
+    // Return a single pending buffer
+    vlc_mutex_lock(&sys->lock);
+    ret_pics = pic_fifo_get(&sys->ret_pics);
+    vlc_mutex_unlock(&sys->lock);
+
+    return ret_pics;
+}
+
 static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
 {
     filter_sys_t * const sys = p_filter->p_sys;
-    picture_t * ret_pics;
+    picture_t * ret_pics = NULL;
     MMAL_STATUS_T err;
     const uint64_t frame_seq = ++sys->frame_seq;
     conv_frame_stash_t * const stash = sys->stash + (frame_seq & 0xf);
@@ -1467,12 +1482,29 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     }
 
     // Check pic fmt corresponds to what we have set up
-    // ??? ISP may require flush (disable) but actually seems quite happy
-    //     without
     if (hw_mmal_vlc_pic_to_mmal_fmt_update(sys->input->format, p_pic))
     {
         msg_Dbg(p_filter, "Reset input port format");
-        mmal_port_format_commit(sys->input);
+
+        // HVS can take new formats without disable, others need it
+        if (sys->resizer_type != FILTER_RESIZER_HVS) {
+            // Extract any pending pic
+            if (sys->pic_n >= 2) {
+                ret_pics = conv_get_out_pics(sys);
+                // If pic_n == 1 then we return without trying to get stuff
+                sys->pic_n = 1;
+            }
+            if (sys->input->is_enabled) {
+                if ((err = mmal_port_disable(sys->input)) != MMAL_SUCCESS)
+                    msg_Warn(p_filter, "Format update disable failed: %s", mmal_status_to_string(err));
+            }
+        }
+
+//        mmal_log_dump_port(sys->input);
+        if ((err = mmal_port_format_commit(sys->input)) != MMAL_SUCCESS)
+            msg_Warn(p_filter, "Format update commit failed: %s", mmal_status_to_string(err));
+
+        // (Re)enable if required will be done later
     }
 
     if (p_pic->context == NULL) {
@@ -1678,16 +1710,12 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
     // This means we get a single static pic out
     if (sys->pic_n++ == 1) {
 #if TRACE_ALL
-        msg_Dbg(p_filter, ">>> %s: Pic1=NULL", __func__);
+        msg_Dbg(p_filter, ">>> %s: Pic1=%p", __func__, ret_pics);
 #endif
-        return NULL;
+        return ret_pics;
     }
-    vlc_sem_wait(&sys->sem);
 
-    // Return a single pending buffer
-    vlc_mutex_lock(&sys->lock);
-    ret_pics = pic_fifo_get(&sys->ret_pics);
-    vlc_mutex_unlock(&sys->lock);
+    ret_pics = conv_get_out_pics(sys);
 
     if (sys->err_stream != MMAL_SUCCESS)
         goto stream_fail;
@@ -1705,8 +1733,9 @@ stream_fail:
 fail:
 #if TRACE_ALL
     msg_Err(p_filter, ">>> %s: FAIL", __func__);
-    picture_Release(ret_pics);
 #endif
+    if (ret_pics != NULL)
+        picture_Release(ret_pics);
     if (out_buf != NULL)
         mmal_buffer_header_release(out_buf);
     if (p_pic != NULL)
