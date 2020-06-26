@@ -1083,7 +1083,7 @@ static void rescale_rect(MMAL_RECT_T * const d, const MMAL_RECT_T * const s, con
 }
 
 static MMAL_RECT_T
-rect_transform(MMAL_RECT_T s, const MMAL_RECT_T c, const MMAL_DISPLAYTRANSFORM_T t)
+rect_untransform(MMAL_RECT_T s, const MMAL_RECT_T c, const MMAL_DISPLAYTRANSFORM_T t)
 {
 #if TRACE_TRANSFORMS
     fprintf(stderr, "t=%d, s=%d,%d:%dx%d, c=%d,%d:%dx%d -> ", (int)t,
@@ -1117,7 +1117,7 @@ void hw_mmal_vzc_buf_scale_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const MMA
         const MMAL_RECT_T c = (scale_transform & 4) == 0 ? *scale_rect : rect_transpose(*scale_rect);
         rescale_rect(&sb->dreg.dest_rect, &sb->orig_dest_rect,
                      &c, &sb->pic_rect);
-        sb->dreg.dest_rect = rect_transform(sb->dreg.dest_rect, c, scale_transform);
+        sb->dreg.dest_rect = rect_untransform(sb->dreg.dest_rect, c, scale_transform);
         sb->dreg.transform = scale_transform;
     }
 }

@@ -69,6 +69,10 @@
 #define MMAL_VOUT_TRANSFORM_LONGTEXT N_("Video transform for Rpi fullscreen."\
 "Transforms availible: auto, 0, 90, 180, 270, hflip, vflip, transpose, antitranspose")
 
+#define MMAL_VOUT_WINDOW_NAME "mmal-vout-window"
+#define MMAL_VOUT_WINDOW_TEXT N_("Display window for Rpi fullscreen")
+#define MMAL_VOUT_WINDOW_LONGTEXT N_("Display window for Rpi fullscreen."\
+"fullscreen|<width>,<height>,<x>,<y>")
 
 #define MMAL_ADJUST_REFRESHRATE_NAME "mmal-adjust-refreshrate"
 #define MMAL_ADJUST_REFRESHRATE_TEXT N_("Adjust HDMI refresh rate to the video.")
@@ -103,8 +107,9 @@ struct vout_display_sys_t {
     unsigned num_buffers; /* number of buffers allocated at mmal port */
 
     int display_id;
-    unsigned display_width;
-    unsigned display_height;
+    MMAL_RECT_T win_rect;       // Window rect after transform(s)
+    MMAL_RECT_T display_rect;   // Actual shape of display (x, y always 0)
+    MMAL_RECT_T req_win;        // User requested window (w=0 => fullscreen)
 
     MMAL_RECT_T spu_rect;       // Output rectangle in cfg coords (for subpic placement)
     MMAL_RECT_T dest_rect;      // Output rectangle in display coords
@@ -561,7 +566,7 @@ place_to_mmal_rect(const vout_display_place_t place)
 static MMAL_RECT_T
 place_out(const vout_display_cfg_t * cfg,
           const video_format_t * fmt,
-          unsigned int w, unsigned int h)
+          const MMAL_RECT_T r)
 {
     video_format_t tfmt;
     vout_display_cfg_t tcfg;
@@ -577,17 +582,37 @@ place_out(const vout_display_cfg_t * cfg,
 
     // Override what VLC thinks might be going on with display size
     // if we know better
-    if (w != 0 && h != 0)
+    if (r.width != 0 && r.height != 0)
     {
         tcfg = *cfg;
-        tcfg.display.width = w;
-        tcfg.display.height = h;
+        tcfg.display.width = r.width;
+        tcfg.display.height = r.height;
         cfg = &tcfg;
     }
 
     vout_display_PlacePicture(&place, fmt, cfg, false);
+
     return place_to_mmal_rect(place);
 }
+
+#define PRF "%dx%d (%d,%d)"
+#define PRV(r) (r).width, (r).height, (r).x, (r).y
+
+static MMAL_RECT_T
+rect_transform(MMAL_RECT_T s, const MMAL_RECT_T c, MMAL_DISPLAYTRANSFORM_T t)
+{
+    if (is_transform_transpose(t) != 0) {
+        s = rect_transpose(s);
+        t = swap_transform_hv(t);
+    }
+    if (is_transform_hflip(t))
+        s = rect_hflip(s, c);
+    if (is_transform_vflip(t) != 0)
+        s = rect_vflip(s, c);
+    return s;
+}
+
+
 
 static void
 place_dest_rect(vout_display_t * const vd,
@@ -595,12 +620,25 @@ place_dest_rect(vout_display_t * const vd,
           const video_format_t * fmt)
 {
     vout_display_sys_t * const sys = vd->sys;
+#if 0
     // If the display is transposed then we need to swap width/height
-    // when asking for placement.  Video orientation will we dealt with
+    // when asking for placement.  Video orientation will be dealt with
     // in place_out
     sys->dest_rect = is_transform_transpose(sys->display_transform) ?
-        rect_transpose(place_out(cfg, fmt, sys->display_height, sys->display_width)) :
-        place_out(cfg, fmt, sys->display_width, sys->display_height);
+        rect_transpose(place_out(cfg, fmt, sys->win_rect)) :
+        place_out(cfg, fmt, sys->win_rect);
+#else
+    // If the display is transposed then we need to swap width/height
+    // when asking for placement.  Video orientation will be dealt with
+    // in place_out
+    sys->dest_rect = place_out(cfg, fmt, sys->win_rect);
+    msg_Err(vd, "%s: Win R=" PRF ", D=" PRF, __func__, PRV(sys->win_rect), PRV(sys->dest_rect));
+    sys->dest_rect.x += sys->win_rect.x;
+    sys->dest_rect.y += sys->win_rect.y;
+    msg_Err(vd, "%s: Win R=" PRF ", D=" PRF, __func__, PRV(sys->win_rect), PRV(sys->dest_rect));
+    sys->dest_rect = rect_transform(sys->dest_rect, sys->display_rect, sys->display_transform);
+    msg_Err(vd, "%s: Display=" PRF ", D=" PRF, __func__, PRV(sys->display_rect), PRV(sys->dest_rect));
+#endif
 }
 
 static void
@@ -609,8 +647,9 @@ place_spu_rect(vout_display_t * const vd,
           const video_format_t * fmt)
 {
     vout_display_sys_t * const sys = vd->sys;
+    static const MMAL_RECT_T r0 = {0};
 
-    sys->spu_rect = place_out(cfg, fmt, 0, 0);
+    sys->spu_rect = place_out(cfg, fmt, r0);
     sys->spu_rect.x = 0;
     sys->spu_rect.y = 0;
 
@@ -923,22 +962,30 @@ static int vd_control(vout_display_t *vd, int query, va_list args)
     return ret;
 }
 
+static void set_display_windows(vout_display_t *const vd, vout_display_sys_t *const sys)
+{
+    unsigned int width, height;
+    if (query_resolution(vd, sys->display_id, &width, &height) < 0) {
+        width = vd->cfg->display.width;
+        height = vd->cfg->display.height;
+    }
+    sys->display_rect = (MMAL_RECT_T){0, 0, width, height};
+
+    sys->win_rect = (sys->req_win.width != 0) ?
+            sys->req_win :
+         is_transform_transpose(sys->display_transform) ?
+            rect_transpose(sys->display_rect) : sys->display_rect;
+}
+
 static void vd_manage(vout_display_t *vd)
 {
-    vout_display_sys_t *sys = vd->sys;
-    unsigned width, height;
+    vout_display_sys_t *const sys = vd->sys;
 
     vlc_mutex_lock(&sys->manage_mutex);
 
     if (sys->need_configure_display) {
-        if (query_resolution(vd, sys->display_id, &width, &height) >= 0) {
-            sys->display_width = width;
-            sys->display_height = height;
-//            msg_Dbg(vd, "%s: %dx%d", __func__, width, height);
-//            vout_window_ReportSize(vd->cfg->window, width, height);
-        }
-
         sys->need_configure_display = false;
+        set_display_windows(vd, sys);
     }
 
     vlc_mutex_unlock(&sys->manage_mutex);
@@ -1435,6 +1482,33 @@ static MMAL_DISPLAYTRANSFORM_T get_xrandr_rotation(vout_display_t * const vd)
 }
 #endif
 
+static MMAL_RECT_T str_to_rect(const char * s)
+{
+    MMAL_RECT_T rect = {0};
+    rect.width = strtoul(s, (char**)&s, 0);
+    if (*s == '\0')
+        return rect;
+    if (*s++ != ',')
+        goto fail;
+    rect.height = strtoul(s, (char**)&s, 0);
+    if (*s == '\0')
+        return rect;
+    if (*s++ != ',')
+        goto fail;
+    rect.x = strtoul(s, (char**)&s, 0);
+    if (*s == '\0')
+        return rect;
+    if (*s++ != ',')
+        goto fail;
+    rect.y = strtoul(s, (char**)&s, 0);
+    if (*s != '\0')
+        goto fail;
+    return rect;
+
+fail:
+    return (MMAL_RECT_T){0,0,0,0};
+}
+
 static int OpenMmalVout(vlc_object_t *object)
 {
     vout_display_t *vd = (vout_display_t *)object;
@@ -1481,6 +1555,15 @@ static int OpenMmalVout(vlc_object_t *object)
         else
             msg_Dbg(vd, "Display device: %s, qt=%d id=%d display=%d", display_name,
                     qt_num, display_id, sys->display_id);
+    }
+
+    {
+        const char *window_str = var_InheritString(vd, MMAL_VOUT_WINDOW_NAME);
+        sys->req_win = str_to_rect(window_str);
+        if (sys->req_win.width != 0)
+            msg_Dbg(vd, "Window: %dx%d @ %d,%d",
+                    sys->req_win.width, sys->req_win.height,
+                    sys->req_win.x, sys->req_win.y);
     }
 
     {
@@ -1552,11 +1635,7 @@ static int OpenMmalVout(vlc_object_t *object)
         }
     }
 
-    if (query_resolution(vd, sys->display_id, &sys->display_width, &sys->display_height) < 0)
-    {
-        sys->display_width = vd->cfg->display.width;
-        sys->display_height = vd->cfg->display.height;
-    }
+    set_display_windows(vd, sys);
 
     place_rects(vd, vd->cfg, &vd->source);  // Sets sys->dest_rect
 
@@ -1654,10 +1733,10 @@ vlc_module_begin()
                     MMAL_NATIVE_INTERLACE_LONGTEXT, false)
     add_string(MMAL_DISPLAY_NAME, "auto", MMAL_DISPLAY_TEXT,
                     MMAL_DISPLAY_LONGTEXT, false)
-    add_string(MMAL_DISPLAY_NAME, "auto", MMAL_DISPLAY_TEXT,
-                    MMAL_DISPLAY_LONGTEXT, false)
     add_string(MMAL_VOUT_TRANSFORM_NAME, "auto", MMAL_VOUT_TRANSFORM_TEXT,
                     MMAL_VOUT_TRANSFORM_LONGTEXT, false)
+    add_string(MMAL_VOUT_WINDOW_NAME, "fullscreen", MMAL_VOUT_WINDOW_TEXT,
+                    MMAL_VOUT_WINDOW_LONGTEXT, false)
     set_callbacks(OpenMmalVout, CloseMmalVout)
 
 vlc_module_end()
