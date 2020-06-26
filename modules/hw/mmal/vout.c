@@ -113,8 +113,9 @@ struct vout_display_sys_t {
 
     MMAL_RECT_T spu_rect;       // Output rectangle in cfg coords (for subpic placement)
     MMAL_RECT_T dest_rect;      // Output rectangle in display coords
+    MMAL_DISPLAYTRANSFORM_T dest_transform;      // Dest window coord transform
     MMAL_DISPLAYTRANSFORM_T display_transform;  // "Native" display transform
-    MMAL_DISPLAYTRANSFORM_T dest_transform;    // Combined config+native transform
+    MMAL_DISPLAYTRANSFORM_T video_transform;     // Combined config+native transform
 
     unsigned int i_frame_rate_base; /* cached framerate to detect changes for rate adjustment */
     unsigned int i_frame_rate;
@@ -592,19 +593,17 @@ place_out(const vout_display_cfg_t * cfg,
 
     vout_display_PlacePicture(&place, fmt, cfg, false);
 
+    place.x += r.x;
+    place.y += r.y;
+
     return place_to_mmal_rect(place);
 }
 
-#define PRF "%dx%d (%d,%d)"
-#define PRV(r) (r).width, (r).height, (r).x, (r).y
-
 static MMAL_RECT_T
-rect_transform(MMAL_RECT_T s, const MMAL_RECT_T c, MMAL_DISPLAYTRANSFORM_T t)
+rect_transform(MMAL_RECT_T s, const MMAL_RECT_T c, const MMAL_DISPLAYTRANSFORM_T t)
 {
-    if (is_transform_transpose(t) != 0) {
+    if (is_transform_transpose(t))
         s = rect_transpose(s);
-        t = swap_transform_hv(t);
-    }
     if (is_transform_hflip(t))
         s = rect_hflip(s, c);
     if (is_transform_vflip(t) != 0)
@@ -612,33 +611,14 @@ rect_transform(MMAL_RECT_T s, const MMAL_RECT_T c, MMAL_DISPLAYTRANSFORM_T t)
     return s;
 }
 
-
-
 static void
 place_dest_rect(vout_display_t * const vd,
           const vout_display_cfg_t * const cfg,
           const video_format_t * fmt)
 {
     vout_display_sys_t * const sys = vd->sys;
-#if 0
-    // If the display is transposed then we need to swap width/height
-    // when asking for placement.  Video orientation will be dealt with
-    // in place_out
-    sys->dest_rect = is_transform_transpose(sys->display_transform) ?
-        rect_transpose(place_out(cfg, fmt, sys->win_rect)) :
-        place_out(cfg, fmt, sys->win_rect);
-#else
-    // If the display is transposed then we need to swap width/height
-    // when asking for placement.  Video orientation will be dealt with
-    // in place_out
-    sys->dest_rect = place_out(cfg, fmt, sys->win_rect);
-    msg_Err(vd, "%s: Win R=" PRF ", D=" PRF, __func__, PRV(sys->win_rect), PRV(sys->dest_rect));
-    sys->dest_rect.x += sys->win_rect.x;
-    sys->dest_rect.y += sys->win_rect.y;
-    msg_Err(vd, "%s: Win R=" PRF ", D=" PRF, __func__, PRV(sys->win_rect), PRV(sys->dest_rect));
-    sys->dest_rect = rect_transform(sys->dest_rect, sys->display_rect, sys->display_transform);
-    msg_Err(vd, "%s: Display=" PRF ", D=" PRF, __func__, PRV(sys->display_rect), PRV(sys->dest_rect));
-#endif
+    sys->dest_rect = rect_transform(place_out(cfg, fmt, sys->win_rect),
+                                    sys->display_rect, sys->dest_transform);
 }
 
 static void
@@ -685,7 +665,7 @@ set_input_region(vout_display_t * const vd)
         },
         .display_num = sys->display_id,
         .fullscreen = MMAL_FALSE,
-        .transform = sys->dest_transform,
+        .transform = sys->video_transform,
         .src_rect = display_src_rect(vd),
         .dest_rect = sys->dest_rect,
         .layer = sys->layer,
@@ -739,7 +719,7 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
     if (!cfg)
         cfg = vd->cfg;
 
-    sys->dest_transform = combine_transform(
+    sys->video_transform = combine_transform(
         vlc_to_mmal_transform(fmt->orientation), sys->display_transform);
 
     place_rects(vd, cfg, fmt);
@@ -1579,8 +1559,9 @@ static int OpenMmalVout(vlc_object_t *object)
             msg_Dbg(vd, "Display transform: %s, mmal_display_transform=%d",
                     transform_name, (int)sys->display_transform);
 
-        sys->dest_transform = combine_transform(
+        sys->video_transform = combine_transform(
             vlc_to_mmal_transform(vd->fmt.orientation), sys->display_transform);
+        sys->dest_transform = transform_inverse(sys->display_transform);
     }
 
     status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &sys->component);
