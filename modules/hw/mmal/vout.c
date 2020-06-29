@@ -74,6 +74,12 @@
 #define MMAL_VOUT_WINDOW_LONGTEXT N_("Display window for Rpi fullscreen."\
 "fullscreen|<width>,<height>,<x>,<y>")
 
+#define MMAL_VOUT_TRANSPARENT_NAME "mmal-vout-transparent"
+#define MMAL_VOUT_TRANSPARENT_TEXT N_("Enable layers beneeth the vodeo layer.")
+#define MMAL_VOUT_TRANSPARENT_LONGTEXT N_("Enable layers beneath the video layer."\
+" By default these are disabled."\
+" Having the lower layers enabled can impact video performance")
+
 #define MMAL_ADJUST_REFRESHRATE_NAME "mmal-adjust-refreshrate"
 #define MMAL_ADJUST_REFRESHRATE_TEXT N_("Adjust HDMI refresh rate to the video.")
 #define MMAL_ADJUST_REFRESHRATE_LONGTEXT N_("Adjust HDMI refresh rate to the video.")
@@ -123,6 +129,7 @@ struct vout_display_sys_t {
     int next_phase_check; /* lowpass for phase check frequency */
     int phase_offset; /* currently applied offset to presentation time in ns */
     int layer; /* the dispman layer (z-index) used for video rendering */
+    bool transparent;           // Do not disable layers beneath ours
 
     bool need_configure_display; /* indicates a required display reconfigure to main thread */
     bool adjust_refresh_rate;
@@ -669,7 +676,7 @@ set_input_region(vout_display_t * const vd)
         .src_rect = display_src_rect(vd),
         .dest_rect = sys->dest_rect,
         .layer = sys->layer,
-        .alpha = 0xff | (1 << 29),
+        .alpha = 0xff | (sys->transparent ? 0 : (1 << 29)),
         .set =
             MMAL_DISPLAY_SET_NUM |
             MMAL_DISPLAY_SET_FULLSCREEN |
@@ -1522,6 +1529,7 @@ static int OpenMmalVout(vlc_object_t *object)
     vc_tv_register_callback(tvservice_cb, vd);
 
     sys->layer = var_InheritInteger(vd, MMAL_LAYER_NAME);
+    sys->transparent = var_InheritBool(vd, MMAL_VOUT_TRANSPARENT_NAME);
 
     {
         const char *display_name = var_InheritString(vd, MMAL_DISPLAY_NAME);
@@ -1718,6 +1726,8 @@ vlc_module_begin()
                     MMAL_VOUT_TRANSFORM_LONGTEXT, false)
     add_string(MMAL_VOUT_WINDOW_NAME, "fullscreen", MMAL_VOUT_WINDOW_TEXT,
                     MMAL_VOUT_WINDOW_LONGTEXT, false)
+    add_bool(MMAL_VOUT_TRANSPARENT_NAME, false, MMAL_VOUT_TRANSPARENT_TEXT,
+                    MMAL_VOUT_TRANSPARENT_LONGTEXT, false)
     set_callbacks(OpenMmalVout, CloseMmalVout)
 
 vlc_module_end()
