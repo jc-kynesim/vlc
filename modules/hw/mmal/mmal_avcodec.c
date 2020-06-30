@@ -2048,7 +2048,10 @@ static int DecodeVideo( decoder_t *p_dec, block_t *p_block )
     bool error = false;
     while( ( p_pic = DecodeBlock( p_dec, pp_block, &error ) ) != NULL )
         decoder_QueueVideo( p_dec, p_pic );
-    return error ? VLCDEC_ECRITICAL : VLCDEC_SUCCESS;
+    return VLCDEC_SUCCESS;
+// Easiest to just ignore all errors - returning a real error seems to
+// kill output forever
+//    return error ? VLCDEC_ECRITICAL : VLCDEC_SUCCESS;
 }
 
 /*****************************************************************************
