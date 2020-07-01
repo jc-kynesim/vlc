@@ -72,7 +72,7 @@
 #define MMAL_VOUT_WINDOW_NAME "mmal-vout-window"
 #define MMAL_VOUT_WINDOW_TEXT N_("Display window for Rpi fullscreen")
 #define MMAL_VOUT_WINDOW_LONGTEXT N_("Display window for Rpi fullscreen."\
-"fullscreen|<width>,<height>,<x>,<y>")
+"fullscreen|<width>x<height>+<x>+<y>")
 
 #define MMAL_VOUT_TRANSPARENT_NAME "mmal-vout-transparent"
 #define MMAL_VOUT_TRANSPARENT_TEXT N_("Enable layers beneeth the vodeo layer.")
@@ -1496,17 +1496,17 @@ static MMAL_RECT_T str_to_rect(const char * s)
     rect.width = strtoul(s, (char**)&s, 0);
     if (*s == '\0')
         return rect;
-    if (*s++ != ',')
+    if (*s++ != 'x')
         goto fail;
     rect.height = strtoul(s, (char**)&s, 0);
     if (*s == '\0')
         return rect;
-    if (*s++ != ',')
+    if (*s++ != '+')
         goto fail;
     rect.x = strtoul(s, (char**)&s, 0);
     if (*s == '\0')
         return rect;
-    if (*s++ != ',')
+    if (*s++ != '+')
         goto fail;
     rect.y = strtoul(s, (char**)&s, 0);
     if (*s != '\0')
