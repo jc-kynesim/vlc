@@ -296,7 +296,7 @@ static void mmal_x11_display(vout_display_t * vd, picture_t * pic, subpicture_t 
 }
 
 
-static int vout_display_Control(display_desc_t * const dd, int query, ...)
+static int vout_display_Control(const display_desc_t * const dd, int query, ...)
 {
     va_list args;
     int result;
@@ -312,6 +312,46 @@ static bool want_mmal_vout(vout_display_t * const vd, const mmal_x11_sys_t * con
 {
     return sys->mmal_desc.vout != NULL &&
         (sys->x_desc.vout == NULL || var_InheritBool(vd, "fullscreen"));
+}
+
+static inline int
+up_rv(const int a, const int b)
+{
+    return a != 0 ? a : b;
+}
+
+static int
+reset_pictures(vout_display_t * const vd, const display_desc_t * const desc)
+{
+    int rv = 0;
+    VLC_UNUSED(vd);
+    if (desc->vout)
+    {
+        // If the display doesn't have has_pictures_invalid then it doesn't
+        // expect RESET_PICTURES
+        if (desc->vout->info.has_pictures_invalid)
+            vout_display_Control(desc, VOUT_DISPLAY_RESET_PICTURES);
+    }
+    return rv;
+}
+
+static int
+replay_controls(vout_display_t * const vd, const display_desc_t * const desc, const int32_t changed)
+{
+    if ((changed & (1 << VOUT_DISPLAY_CHANGE_DISPLAY_FILLED)) != 0)
+        vout_display_Control(desc, VOUT_DISPLAY_CHANGE_DISPLAY_FILLED, vd->cfg);
+    if ((changed & (1 << VOUT_DISPLAY_CHANGE_ZOOM)) != 0)
+        vout_display_Control(desc, VOUT_DISPLAY_CHANGE_ZOOM, vd->cfg);
+    if ((changed & ((1 << VOUT_DISPLAY_CHANGE_SOURCE_CROP) |
+                    (1 << VOUT_DISPLAY_CHANGE_SOURCE_ASPECT))) != 0)
+        cpy_fmt_limit_size(desc, &desc->vout->source, &vd->source);
+    if ((changed & (1 << VOUT_DISPLAY_CHANGE_SOURCE_ASPECT)) != 0)
+        vout_display_Control(desc, VOUT_DISPLAY_CHANGE_SOURCE_ASPECT);
+    if ((changed & (1 << VOUT_DISPLAY_CHANGE_SOURCE_CROP)) != 0)
+        vout_display_Control(desc, VOUT_DISPLAY_CHANGE_SOURCE_CROP);
+    if ((changed & (1 << VOUT_DISPLAY_CHANGE_VIEWPOINT)) != 0)
+        vout_display_Control(desc, VOUT_DISPLAY_CHANGE_VIEWPOINT, vd->cfg);
+    return 0;
 }
 
 /* Control on the module (mandatory) */
@@ -339,6 +379,13 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
                     cfg->display.width, cfg->display.height, sys->mmal_desc.vout, want_mmal,
                     var_InheritBool(vd, "fullscreen"));
 
+            // Repeat any control calls that we sent to the previous vd
+            if (swap_vout && sys->changed != 0) {
+                const uint32_t changed = sys->changed;
+                sys->changed = 0;
+                replay_controls(vd, new_desc, changed);
+            }
+
             if (swap_vout) {
                 if (sys->use_mmal) {
                     vout_display_Control(x_desc, VOUT_DISPLAY_CHANGE_MMAL_HIDE);
@@ -353,24 +400,6 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
                 sys->use_mmal = want_mmal;
             }
 
-            // Repeat any control calls that we sent to the previous vd
-            if (swap_vout && sys->changed != 0) {
-                const uint32_t changed = sys->changed;
-                sys->changed = 0;
-                if ((changed & (1 << VOUT_DISPLAY_CHANGE_DISPLAY_FILLED)) != 0)
-                    vout_display_Control(new_desc, VOUT_DISPLAY_CHANGE_DISPLAY_FILLED, vd->cfg);
-                if ((changed & (1 << VOUT_DISPLAY_CHANGE_ZOOM)) != 0)
-                    vout_display_Control(new_desc, VOUT_DISPLAY_CHANGE_ZOOM, vd->cfg);
-                if ((changed & ((1 << VOUT_DISPLAY_CHANGE_SOURCE_CROP) |
-                                (1 << VOUT_DISPLAY_CHANGE_SOURCE_ASPECT))) != 0)
-                    cpy_fmt_limit_size(new_desc, &new_desc->vout->source, &vd->source);
-                if ((changed & (1 << VOUT_DISPLAY_CHANGE_SOURCE_ASPECT)) != 0)
-                    vout_display_Control(new_desc, VOUT_DISPLAY_CHANGE_SOURCE_ASPECT);
-                if ((changed & (1 << VOUT_DISPLAY_CHANGE_SOURCE_CROP)) != 0)
-                    vout_display_Control(new_desc, VOUT_DISPLAY_CHANGE_SOURCE_CROP);
-                if ((changed & (1 << VOUT_DISPLAY_CHANGE_VIEWPOINT)) != 0)
-                    vout_display_Control(new_desc, VOUT_DISPLAY_CHANGE_VIEWPOINT, vd->cfg);
-            }
 
             break;
         }
@@ -384,14 +413,9 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
                         str_fourcc(dbuf2, vd->source.i_chroma), vd->source.i_width, vd->source.i_height, x_desc->vout->source.i_width,
                         x_desc->vout->source.i_height);
             }
-            // If the display doesn't have has_pictures_invalid then it doesn't
-            // expect RESET_PICTURES
-            if (sys->x_desc.vout->info.has_pictures_invalid) {
-                rv = sys->x_desc.vout->control(sys->x_desc.vout, ctl, va);
-            }
-            if (sys->mmal_desc.vout && sys->mmal_desc.vout->info.has_pictures_invalid) {
-                rv = sys->mmal_desc.vout->control(sys->mmal_desc.vout, ctl, va);
-            }
+            rv = reset_pictures(vd, &sys->x_desc);
+            rv = up_rv(rv, reset_pictures(vd, &sys->mmal_desc));
+
             vd->fmt = x_desc->vout->fmt;
             break;
 

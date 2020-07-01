@@ -232,14 +232,17 @@ static void display_set_format(const vout_display_t * const vd, MMAL_ES_FORMAT_T
     msg_Dbg(vd, "WxH: %dx%d, Crop: %dx%d", v_fmt->width, v_fmt->height, v_fmt->crop.width, v_fmt->crop.height);
 }
 
-static MMAL_RECT_T display_src_rect(const vout_display_t * const vd)
+static MMAL_RECT_T
+display_src_rect(const vout_display_t * const vd, const video_format_t * const src)
 {
     const bool wants_isp = want_isp(vd);
+
+    // Scale source derived cropping to actual picture shape
     return (MMAL_RECT_T){
-        .x = wants_isp ? 0 : vd->fmt.i_x_offset,
-        .y = wants_isp ? 0 : vd->fmt.i_y_offset,
-        .width = vd->fmt.i_visible_width,
-        .height = vd->fmt.i_visible_height
+        .x = wants_isp ? 0 : src->i_x_offset * vd->fmt.i_width / src->i_width,
+        .y = wants_isp ? 0 : src->i_y_offset * vd->fmt.i_height / src->i_height,
+        .width  = src->i_visible_width  * vd->fmt.i_width / src->i_width,
+        .height = src->i_visible_height * vd->fmt.i_height / src->i_height
     };
 }
 
@@ -644,8 +647,8 @@ place_spu_rect(vout_display_t * const vd,
     // This info doesn't appear to reside anywhere natively
 
     if (fmt->i_width * fmt->i_height >= (unsigned int)(sys->spu_rect.width * sys->spu_rect.height)) {
-        sys->spu_rect.width  = fmt->i_width;
-        sys->spu_rect.height = fmt->i_height;
+        sys->spu_rect.width  = fmt->i_visible_width;
+        sys->spu_rect.height = fmt->i_visible_height;
     }
 
     if (ORIENT_IS_SWAP(fmt->orientation))
@@ -662,7 +665,7 @@ place_rects(vout_display_t * const vd,
 }
 
 static int
-set_input_region(vout_display_t * const vd)
+set_input_region(vout_display_t * const vd, const video_format_t * const fmt)
 {
     const vout_display_sys_t * const sys = vd->sys;
     MMAL_DISPLAYREGION_T display_region = {
@@ -673,7 +676,7 @@ set_input_region(vout_display_t * const vd)
         .display_num = sys->display_id,
         .fullscreen = MMAL_FALSE,
         .transform = sys->video_transform,
-        .src_rect = display_src_rect(vd),
+        .src_rect = display_src_rect(vd, fmt),
         .dest_rect = sys->dest_rect,
         .layer = sys->layer,
         .alpha = 0xff | (sys->transparent ? 0 : (1 << 29)),
@@ -731,7 +734,7 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     place_rects(vd, cfg, fmt);
 
-    if (set_input_region(vd) != 0)
+    if (set_input_region(vd, fmt) != 0)
         return -EINVAL;
 
     sys->adjust_refresh_rate = var_InheritBool(vd, MMAL_ADJUST_REFRESHRATE_NAME);
@@ -766,6 +769,15 @@ static picture_pool_t *vd_pool(vout_display_t *vd, unsigned count)
     return sys->pic_pool;
 }
 
+static inline bool
+check_shape(vout_display_t * const vd, const picture_t * const p_pic)
+{
+    if (vd->fmt.i_width == p_pic->format.i_width &&
+        vd->fmt.i_height == p_pic->format.i_height)
+        return true;
+    return false;
+}
+
 static void vd_display(vout_display_t *vd, picture_t *p_pic,
                 subpicture_t *subpicture)
 {
@@ -788,6 +800,12 @@ static void vd_display(vout_display_t *vd, picture_t *p_pic,
     // so all we have to do here is delete the refs
     if (subpicture != NULL) {
         subpicture_Delete(subpicture);
+    }
+
+    if (!check_shape(vd, p_pic))
+    {
+        msg_Err(vd, "Pic/fmt shape mismatch");
+        goto fail;
     }
 
     if (!sys->input->is_enabled &&
@@ -1051,6 +1069,9 @@ static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
 
     vd_manage(vd);
 
+    if (!check_shape(vd, p_pic))
+        return;
+
     if (sys->force_config ||
         p_pic->format.i_frame_rate != sys->i_frame_rate ||
         p_pic->format.i_frame_rate_base != sys->i_frame_rate_base ||
@@ -1062,7 +1083,7 @@ static void vd_prepare(vout_display_t *vd, picture_t *p_pic,
         sys->b_progressive = p_pic->b_progressive;
         sys->i_frame_rate = p_pic->format.i_frame_rate;
         sys->i_frame_rate_base = p_pic->format.i_frame_rate_base;
-        configure_display(vd, NULL, &p_pic->format);
+        configure_display(vd, NULL, &vd->source);
     }
 
     // Subpics can either turn up attached to the main pic or in the
@@ -1626,10 +1647,7 @@ static int OpenMmalVout(vlc_object_t *object)
 
     set_display_windows(vd, sys);
 
-    place_rects(vd, vd->cfg, &vd->source);  // Sets sys->dest_rect
-
-    if (set_input_region(vd) != 0)
-        goto fail;
+    configure_display(vd, vd->cfg, &vd->source);
 
     status = mmal_port_enable(sys->input, vd_input_port_cb);
     if (status != MMAL_SUCCESS) {
