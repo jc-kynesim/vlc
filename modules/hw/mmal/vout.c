@@ -676,16 +676,20 @@ set_input_region(vout_display_t * const vd, const video_format_t * const fmt)
         .display_num = sys->display_id,
         .fullscreen = MMAL_FALSE,
         .transform = sys->video_transform,
-        .src_rect = display_src_rect(vd, fmt),
         .dest_rect = sys->dest_rect,
+        .src_rect = display_src_rect(vd, fmt),
+        .noaspect = MMAL_TRUE,
+        .mode = MMAL_DISPLAY_MODE_FILL,
         .layer = sys->layer,
         .alpha = 0xff | (sys->transparent ? 0 : (1 << 29)),
         .set =
             MMAL_DISPLAY_SET_NUM |
             MMAL_DISPLAY_SET_FULLSCREEN |
             MMAL_DISPLAY_SET_TRANSFORM |
-            MMAL_DISPLAY_SET_SRC_RECT |
             MMAL_DISPLAY_SET_DEST_RECT |
+            MMAL_DISPLAY_SET_SRC_RECT |
+            MMAL_DISPLAY_SET_NOASPECT |
+            MMAL_DISPLAY_SET_MODE |
             MMAL_DISPLAY_SET_LAYER |
             MMAL_DISPLAY_SET_ALPHA
     };
