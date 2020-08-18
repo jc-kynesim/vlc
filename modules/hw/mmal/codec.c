@@ -894,6 +894,21 @@ static int OpenDecoder(decoder_t *dec)
         goto fail;
     }
 
+    // Set vanishingly unlikely shape (or at least crop)
+    // to ensure that we get a resolution changed event
+    // Small wxh are rejected (128x128 is rejected) so pick a
+    // plausible size.
+    // Crop doesn't seem to be checked for being constrained by wxh
+    // so we could place it outside the pic to be sure that it is
+    // never matched but stick with something legal in case it is ever
+    // actually checked
+    sys->output->format->es->video.height = 256;
+    sys->output->format->es->video.width = 256;
+    sys->output->format->es->video.crop.height = 4;
+    sys->output->format->es->video.crop.width = 2;
+    sys->output->format->es->video.crop.x = 66;
+    sys->output->format->es->video.crop.y = 88;
+
     if ((status = hw_mmal_opaque_output(VLC_OBJECT(dec), &sys->ppr,
                                         sys->output, NUM_EXTRA_BUFFERS, decoder_output_cb)) != MMAL_SUCCESS)
         goto fail;
