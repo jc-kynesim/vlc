@@ -24,6 +24,7 @@
 
 #import "VLCBottomBarView.h"
 #import "CompatibilityFixes.h"
+#import "NSGradient+VLCAdditions.h"
 
 @interface VLCBottomBarView () {
     NSBezierPath *_rectanglePath;
@@ -123,14 +124,17 @@
 
     NSRect barRect = self.bounds;
 
+    if (NSIsEmptyRect(barRect))
+        return;
+
     [[NSColor clearColor] setFill];
     NSRectFill(barRect);
 
     if (_isDark) {
-        [_darkGradient drawInBezierPath:_rectanglePath angle:270.0];
+        [_darkGradient vlc_safeDrawInBezierPath:_rectanglePath angle:270.0];
         [_darkStroke setStroke];
     } else {
-        [_lightGradient drawInBezierPath:_rectanglePath angle:270.0];
+        [_lightGradient vlc_safeDrawInBezierPath:_rectanglePath angle:270.0];
         [_lightStroke setStroke];
     }
 
