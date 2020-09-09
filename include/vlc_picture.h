@@ -100,6 +100,7 @@ enum vlc_video_context_type
     VLC_VIDEO_CONTEXT_NVDEC,
     VLC_VIDEO_CONTEXT_CVPX,
     VLC_VIDEO_CONTEXT_MMAL,
+    VLC_VIDEO_CONTEXT_DRM_PRIME,
 };
 
 VLC_API vlc_video_context * vlc_video_context_Create(vlc_decoder_device *,

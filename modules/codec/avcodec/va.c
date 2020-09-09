@@ -34,6 +34,20 @@ bool vlc_va_MightDecode(enum PixelFormat hwfmt, enum PixelFormat swfmt)
 {
     switch (hwfmt)
     {
+        case AV_PIX_FMT_DRM_PRIME:
+            switch (swfmt)
+            {
+                case AV_PIX_FMT_NV12:
+                case AV_PIX_FMT_P010:
+                case AV_PIX_FMT_YUVJ420P:
+                case AV_PIX_FMT_YUV420P:
+                case AV_PIX_FMT_YUV420P10LE:
+                    return true;
+                default:
+                    return false;
+            }
+            break;
+
         case AV_PIX_FMT_VAAPI_VLD:
             switch (swfmt)
             {
@@ -44,6 +58,8 @@ bool vlc_va_MightDecode(enum PixelFormat hwfmt, enum PixelFormat swfmt)
                 default:
                     return false;
             }
+            break;
+
         case AV_PIX_FMT_DXVA2_VLD:
             switch (swfmt)
             {

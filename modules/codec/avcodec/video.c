@@ -45,6 +45,7 @@
 
 #include "avcodec.h"
 #include "va.h"
+#include "drm_pic.h"
 
 #include <libavutil/stereo3d.h>
 
@@ -414,6 +415,11 @@ static int lavc_CopyPicture(decoder_t *dec, picture_t *pic, AVFrame *frame)
 {
     decoder_sys_t *sys = dec->p_sys;
 
+    if (frame->format == AV_PIX_FMT_DRM_PRIME)
+    {
+        return drm_prime_attach_buf_to_pic(dec, pic, frame);
+    }
+
     vlc_fourcc_t fourcc = FindVlcChroma(frame->format);
     if (!fourcc)
     {
@@ -497,6 +503,8 @@ static int OpenVideoCodec( decoder_t *p_dec )
     ret = ffmpeg_OpenCodec( p_dec, ctx, codec );
     if( ret < 0 )
         return ret;
+
+    msg_Info(p_dec, "%s: Pix format=%d/%d", __func__, ctx->pix_fmt, ctx->sw_pix_fmt);
 
     switch( ctx->active_thread_type )
     {
@@ -1167,6 +1175,8 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
             if( i_used == 0 ) break;
             continue;
         }
+        msg_Info(p_dec, "%s: Frame Rx: fmt=%d, ctx.fmt=%d PTS=%" PRId64 "/%" PRId64, __func__,
+                 frame->format, p_context->pix_fmt, frame->pts, frame->pkt_pts);
 
         struct frame_info_s *p_frame_info = &p_sys->frame_info[frame->reordered_opaque % FRAME_INFO_DEPTH];
         if( p_frame_info->b_eos )
@@ -1246,14 +1256,19 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
         {   /* When direct rendering is not used, get_format() and get_buffer()
              * might not be called. The output video format must be set here
              * then picture buffer can be allocated. */
-            if (p_sys->p_va == NULL
-             && lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
+
+            if (
+//                p_sys->p_va == NULL &&
+                lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
                                        p_context->pix_fmt, NULL) == 0
              && decoder_UpdateVideoOutput(p_dec, NULL) == 0)
                 p_pic = decoder_NewPicture(p_dec);
 
+            msg_Info(p_dec, "Pix fmt=%d, dec_fmt=%#x", p_context->pix_fmt, p_dec->fmt_out.video.i_chroma);
+
             if( !p_pic )
             {
+                msg_Info(p_dec, "No pic");
                 vlc_mutex_unlock(&p_sys->lock);
                 av_frame_free(&frame);
                 break;
@@ -1262,6 +1277,7 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
             /* Fill picture_t from AVFrame */
             if( lavc_CopyPicture( p_dec, p_pic, frame ) != VLC_SUCCESS )
             {
+                msg_Info(p_dec, "Copy fail");
                 vlc_mutex_unlock(&p_sys->lock);
                 av_frame_free(&frame);
                 picture_Release( p_pic );
@@ -1307,7 +1323,10 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
         p_pic->b_top_field_first = frame->top_field_first;
 
         if (DecodeSidedata(p_dec, frame, p_pic))
+        {
+            msg_Info(p_dec, "%s: Bad side", __func__);
             i_pts = VLC_TICK_INVALID;
+        }
 
         av_frame_free(&frame);
 
@@ -1318,10 +1337,12 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
                 p_pic->b_still = true;
             p_sys->b_first_frame = false;
             vlc_mutex_unlock(&p_sys->lock);
+            msg_Info(p_dec, "%s: Q Vid: %#x\n", __func__, p_pic->format.i_chroma);
             decoder_QueueVideo( p_dec, p_pic );
         }
         else
         {
+            msg_Info(p_dec, "%s: No PTS", __func__);
             vlc_mutex_unlock(&p_sys->lock);
             picture_Release( p_pic );
         }
@@ -1690,7 +1711,10 @@ no_reuse:
     p_sys->level = p_context->level;
 
     if (!can_hwaccel)
+    {
+        msg_Dbg(p_dec, "No hwaccle use sw: %d", swfmt);
         return swfmt;
+    }
 
 #if (LIBAVCODEC_VERSION_MICRO >= 100) \
   && (LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 83, 101))
@@ -1710,6 +1734,7 @@ no_reuse:
         AV_PIX_FMT_D3D11VA_VLD,
         AV_PIX_FMT_DXVA2_VLD,
 #endif
+        AV_PIX_FMT_DRM_PRIME,
         AV_PIX_FMT_VAAPI_VLD,
         AV_PIX_FMT_VDPAU,
         AV_PIX_FMT_NONE,
@@ -1726,6 +1751,8 @@ no_reuse:
 
         if( hwfmt == AV_PIX_FMT_NONE )
             continue;
+
+        msg_Dbg(p_dec, "Is hw %d, sw %d legit", hwfmt, swfmt);
 
         if (!vlc_va_MightDecode(hwfmt, swfmt))
             continue; /* Unknown brand of hardware acceleration */

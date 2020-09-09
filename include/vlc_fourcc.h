@@ -408,6 +408,10 @@
 /* Broadcom MMAL opaque buffer type */
 #define VLC_CODEC_MMAL_OPAQUE     VLC_FOURCC('M','M','A','L')
 
+/* DRM Prime opaque buffer with modifers */
+/* ?? Do I need to separate underlying fmts ?? */
+#define VLC_CODEC_DRM_PRIME_OPAQUE VLC_FOURCC('D','R','M','P')
+
 /* DXVA2 opaque video surface for use with D3D9 */
 #define VLC_CODEC_D3D9_OPAQUE     VLC_FOURCC('D','X','A','9') /* 4:2:0  8 bpc */
 #define VLC_CODEC_D3D9_OPAQUE_10B VLC_FOURCC('D','X','A','0') /* 4:2:0 10 bpc */

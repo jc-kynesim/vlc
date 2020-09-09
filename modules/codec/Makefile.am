@@ -362,6 +362,7 @@ libavcodec_plugin_la_SOURCES = \
 	codec/avcodec/subtitle.c \
 	codec/avcodec/audio.c \
 	codec/avcodec/va.c codec/avcodec/va.h \
+	codec/avcodec/drm_pic.c codec/avcodec/drm_pic.h\
 	codec/avcodec/avcodec.c codec/avcodec/avcodec.h
 if ENABLE_SOUT
 libavcodec_plugin_la_SOURCES += codec/avcodec/encoder.c
@@ -398,6 +399,16 @@ libvaapi_plugin_la_LIBADD = $(LIBVA_LIBS)
 if HAVE_AVCODEC_VAAPI
 codec_LTLIBRARIES += libvaapi_plugin.la
 endif
+
+libdrm_prime_plugin_la_SOURCES = \
+	codec/avcodec/drm_prime.c
+libdrm_prime_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)
+libdrm_prime_plugin_la_CFLAGS = $(AM_CFLAGS) $(AVCODEC_CFLAGS)
+libdrm_prime_plugin_la_LIBADD = $(LIBVA_LIBS) $(AVFORMAT_LIBS) $(AVUTIL_LIBS) $(LIBM)
+if HAVE_AVCODEC_DRM_PRIME
+codec_LTLIBRARIES += libdrm_prime_plugin.la
+endif
+
 
 libd3d9_common_la_SOURCES = video_chroma/d3d9_fmt.c video_chroma/d3d9_fmt.h \
 	video_chroma/dxgi_fmt.c video_chroma/dxgi_fmt.h

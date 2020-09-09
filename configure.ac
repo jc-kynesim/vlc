@@ -3774,6 +3774,18 @@ fi
 AM_CONDITIONAL([HAVE_MMAL], [test "${have_mmal}" = "yes"])
 
 dnl
+dnl DRM_PRIME plugin
+dnl
+AC_ARG_ENABLE([avcodec_drm_prime],
+  AS_HELP_STRING([--enable-avcodec-drm-prime],
+    [DRM-PRIME hardware plugin (default enable)]))
+if test "${enable_avcodec_drm_prime}" != "no"; then
+  have_avcodec_drm_prime="yes"
+  VLC_ADD_PLUGIN([avcodec_drm_prime])
+fi
+AM_CONDITIONAL([HAVE_AVCODEC_DRM_PRIME], [test "${have_avcodec_drm_prime}" = "yes"])
+
+dnl
 dnl  Audio plugins
 dnl
 
