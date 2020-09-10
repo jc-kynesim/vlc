@@ -54,7 +54,6 @@ vlc_module_begin ()
     add_module("gles2", "opengl es2", NULL, GLES2_TEXT, PROVIDER_LONGTEXT)
 
 #else
-
 # define API VLC_OPENGL
 # define MODULE_VARNAME "gl"
     set_shortname (N_("OpenGL"))

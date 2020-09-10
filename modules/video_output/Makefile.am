@@ -65,6 +65,11 @@ libglinterop_vaapi_plugin_la_SOURCES = video_output/opengl/interop_vaapi.c \
 libglinterop_vaapi_plugin_la_CFLAGS = $(AM_CFLAGS) $(GL_CFLAGS)
 libglinterop_vaapi_plugin_la_LIBADD = $(LIBVA_LIBS) $(LIBVA_EGL_LIBS)
 
+libglinterop_drm_prime_plugin_la_SOURCES = video_output/opengl/interop_drm_prime.c \
+	video_output/opengl/interop.h
+libglinterop_drm_prime_plugin_la_CFLAGS = $(AM_CFLAGS) $(GL_CFLAGS)
+libglinterop_drm_prime_plugin_la_LIBADD = $(LIBVA_LIBS) $(LIBVA_EGL_LIBS)
+
 libglinterop_vdpau_plugin_la_SOURCES = video_output/opengl/interop_vdpau.c \
 	video_output/opengl/interop.h hw/vdpau/picture.c hw/vdpau/vlc_vdpau.h
 libglinterop_vdpau_plugin_la_CFLAGS = $(AM_CFLAGS) $(VDPAU_CFLAGS)
@@ -72,6 +77,9 @@ libglinterop_vdpau_plugin_la_LIBADD = $(LIBDL) libvlc_vdpau.la $(X_LIBS) $(X_PRE
 
 if HAVE_GL
 if HAVE_EGL
+if HAVE_AVCODEC_DRM_PRIME
+vout_LTLIBRARIES += libglinterop_drm_prime_plugin.la
+endif
 if HAVE_VAAPI
 vout_LTLIBRARIES += libglinterop_vaapi_plugin.la
 endif

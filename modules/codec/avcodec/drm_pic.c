@@ -12,14 +12,11 @@
 #include <vlc_picture_pool.h>
 
 #include <libavcodec/avcodec.h>
+#include <libavutil/hwcontext_drm.h>
 
 #include "avcodec.h"
 #include "va.h"
 #include "drm_pic.h"
-
-typedef struct drm_prime_video_sys_s {
-    AVBufferRef * buf;
-} drm_prime_video_sys_t;
 
 static void drm_prime_video_sys_destroy(void * v)
 {
@@ -77,10 +74,12 @@ drm_prime_picture_context_new(AVBufferRef * buf)
 
 int drm_prime_attach_buf_to_pic(struct decoder_t *dec, picture_t *pic, AVFrame *frame)
 {
+    VLC_UNUSED(dec);
     if (pic->context)
         return VLC_EGENERIC;
     pic->context = drm_prime_picture_context_new(frame->buf[0]);
     return VLC_SUCCESS;
 }
+
 
 

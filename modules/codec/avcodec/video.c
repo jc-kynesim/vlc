@@ -1258,10 +1258,10 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
              * then picture buffer can be allocated. */
 
             if (
-//                p_sys->p_va == NULL &&
+                p_sys->p_va || (
                 lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
                                        p_context->pix_fmt, NULL) == 0
-             && decoder_UpdateVideoOutput(p_dec, NULL) == 0)
+             && decoder_UpdateVideoOutput(p_dec, NULL) == 0))
                 p_pic = decoder_NewPicture(p_dec);
 
             msg_Info(p_dec, "Pix fmt=%d, dec_fmt=%#x", p_context->pix_fmt, p_dec->fmt_out.video.i_chroma);
@@ -1283,8 +1283,7 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
                 picture_Release( p_pic );
                 break;
             }
-        }
-        else
+        } else
         {
             /* Some codecs can return the same frame multiple times. By the
              * time that the same frame is returned a second time, it will be

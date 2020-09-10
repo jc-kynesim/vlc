@@ -565,6 +565,7 @@ static int CreateVoutIfNeeded(vlc_input_decoder_t *p_owner)
     p_owner->reset_out_state = true;
     vlc_fifo_Unlock( p_owner->p_fifo );
 
+    msg_Info(p_dec, "<<< %s", __func__);
     return 1; // new vout was created
 }
 

@@ -105,6 +105,7 @@ vout_display_opengl_t *vout_display_opengl_New(video_format_t *fmt,
     if (!vgl)
         return NULL;
 
+    msg_Info(gl, "<<< %s: ctx=%p", __func__, context);
     vgl->gl = gl;
 
     int ret = vlc_gl_api_Init(&vgl->api, gl);

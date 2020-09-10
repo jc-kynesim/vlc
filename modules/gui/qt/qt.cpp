@@ -417,7 +417,7 @@ static int Open( vlc_object_t *p_this, bool isDialogProvider )
         return VLC_EGENERIC;
 #endif
 
-#if (_POSIX_SPAWN >= 0)
+#if (_POSIX_SPAWN >= 0) && 0
     /* Check if QApplication works */
     char *path = config_GetSysPath(VLC_PKG_LIBEXEC_DIR, "vlc-qt-check");
     if (unlikely(path == NULL))

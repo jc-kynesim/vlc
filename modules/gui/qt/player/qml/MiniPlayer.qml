@@ -135,7 +135,7 @@ Widgets.NavigableFocusScope {
                     Row {
                         id: playingItemInfoRow
                         anchors.top: parent.top
-                        anchors.bottom: parent.bottom
+//                        anchors.bottom: parent.bottom
                         anchors.verticalCenter: parent.verticalCenter
 
                         Item {
