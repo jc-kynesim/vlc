@@ -70,9 +70,10 @@ qtdeclarative5-dev \
 qml-module-qtqml-models2 \
 qml-module-qtquick2 \
 qml-module-qtquick-layouts \
-qml-module-qtgraphicaleffects \
 qml-module-qtquick-window2 \
-qml-module-qtquick-controls2
+qml-module-qtquick-controls2 \
+qml-module-qtgraphicaleffects \
+qml-module-qtsvg \
 
 # Pulse (hopefully) disabled
 # libpulse-dev \
