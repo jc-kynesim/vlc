@@ -25,7 +25,7 @@ import org.videolan.medialib 0.1
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-Item {
+FocusScope {
     id: root
 
     property alias image: picture.source
@@ -135,7 +135,7 @@ Item {
             anchors.fill: parent
             implicitWidth: layout.implicitWidth
             implicitHeight: layout.implicitHeight
-            focus: root.activeFocus
+            focus: true
 
             /* background visible when selected */
             Rectangle {
@@ -167,7 +167,7 @@ Item {
                 source: baseRect
                 horizontalOffset: 0
                 verticalOffset: VLCStyle.dp(6, VLCStyle.scale)
-                radius: VLCStyle.dp(14, scale)
+                radius: VLCStyle.dp(14, VLCStyle.scale)
                 spread: 0
                 samples: ( radius * 2 ) + 1
                 color: Qt.rgba(0, 0, 0, .22)

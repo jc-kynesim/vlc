@@ -51,6 +51,14 @@
 
 #define VLCGL_PICTURE_MAX 128
 
+#if !defined(GL_MAJOR_VERSION)
+# define GL_MAJOR_VERSION 0x821B
+#endif
+
+#if !defined(GL_MINOR_VERSION)
+# define GL_MINOR_VERSION 0x821C
+#endif
+
 #ifndef GL_TEXTURE_RECTANGLE
 # define GL_TEXTURE_RECTANGLE 0x84F5
 #endif
@@ -71,6 +79,9 @@
 #endif
 #ifndef GL_RG16
 # define GL_RG16 0x822C
+#endif
+#ifndef GL_RGBA8
+# define GL_RGBA8 0x8058
 #endif
 #ifndef GL_LUMINANCE16
 # define GL_LUMINANCE16 0x8042
@@ -208,6 +219,14 @@ typedef void (APIENTRY *PFNGLTEXPARAMETERFPROC) (GLenum target, GLenum pname, GL
 typedef void (APIENTRY *PFNGLTEXPARAMETERIPROC) (GLenum target, GLenum pname, GLint param);
 typedef void (APIENTRY *PFNGLTEXSUBIMAGE2DPROC) (GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void *pixels);
 typedef void (APIENTRY *PFNGLVIEWPORTPROC) (GLint x, GLint y, GLsizei width, GLsizei height);
+typedef void (APIENTRY *PFNGLGENRENDERBUFFERSPROC) (GLsizei count, GLuint *renderbuffers);
+typedef void (APIENTRY *PFNGLDELETERENDERBUFFERSPROC) (GLsizei n, const GLuint *renderbuffers);
+typedef void (APIENTRY *PFNGLBINDRENDERBUFFERPROC) (GLenum target, GLuint renderbuffer);
+typedef void (APIENTRY *PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC) (GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
+typedef void (APIENTRY *PFNGLFRAMEBUFFERRENDERBUFFERPROC) (GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer);
+typedef void (APIENTRY *PFNGLBLITFRAMEBUFFERPROC) (GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1,
+                                                   GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1,
+                                                   GLbitfield mask, GLenum filter);
 
 /* The following are defined in glext.h but not for GLES2 or on Apple systems */
 #if defined(USE_OPENGL_ES2) || defined(__APPLE__)
@@ -243,6 +262,11 @@ typedef void (APIENTRY *PFNGLVIEWPORTPROC) (GLint x, GLint y, GLsizei width, GLs
 #   define PFNGLBUFFERSUBDATAPROC            typeof(glBufferSubData)*
 #   define PFNGLDELETEBUFFERSPROC            typeof(glDeleteBuffers)*
 #   define PFNGLGETFRAMEBUFFERATTACHMENTPARAMETERIVPROC typeof(glGetFramebufferAttachmentParameteriv)*
+#   define PFNGLGENFRAMEBUFFERSPROC          typeof(glGenFramebuffers)*
+#   define PFNGLDELETEFRAMEBUFFERSPROC       typeof(glDeleteFramebuffers)*
+#   define PFNGLBINDFRAMEBUFFERPROC          typeof(glBindFramebuffer)*
+#   define PFNGLFRAMEBUFFERTEXTURE2DPROC     typeof(glFramebufferTexture2D)*
+#   define PFNGLCHECKFRAMEBUFFERSTATUSPROC   typeof(glCheckFramebufferStatus)*
 #if defined(__APPLE__)
 #   import <CoreFoundation/CoreFoundation.h>
 #endif
@@ -343,6 +367,17 @@ typedef struct {
 
     /* Framebuffers commands */
     PFNGLGETFRAMEBUFFERATTACHMENTPARAMETERIVPROC GetFramebufferAttachmentParameteriv;
+    PFNGLGENFRAMEBUFFERSPROC        GenFramebuffers;
+    PFNGLDELETEFRAMEBUFFERSPROC     DeleteFramebuffers;
+    PFNGLBINDFRAMEBUFFERPROC        BindFramebuffer;
+    PFNGLFRAMEBUFFERTEXTURE2DPROC   FramebufferTexture2D;
+    PFNGLCHECKFRAMEBUFFERSTATUSPROC CheckFramebufferStatus;
+    PFNGLGENRENDERBUFFERSPROC       GenRenderbuffers;
+    PFNGLDELETERENDERBUFFERSPROC    DeleteRenderbuffers;
+    PFNGLBINDRENDERBUFFERPROC       BindRenderbuffer;
+    PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC RenderbufferStorageMultisample;
+    PFNGLFRAMEBUFFERRENDERBUFFERPROC FramebufferRenderbuffer;
+    PFNGLBLITFRAMEBUFFERPROC        BlitFramebuffer;
 
     /* Commands used for PBO and/or Persistent mapping */
     PFNGLBUFFERSUBDATAPROC          BufferSubData; /* can be NULL */

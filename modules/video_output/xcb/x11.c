@@ -145,12 +145,11 @@ static int Control(vout_display_t *vd, int query, va_list ap)
     case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
     case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
     {
-        const vout_display_cfg_t *cfg = va_arg(ap, const vout_display_cfg_t *);
         video_format_t src, *fmt = &sys->fmt;
         vout_display_place_t place;
         int ret = VLC_SUCCESS;
 
-        vout_display_PlacePicture(&place, &vd->source, cfg);
+        vout_display_PlacePicture(&place, vd->source, vd->cfg);
 
         uint32_t mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y;
         const uint32_t values[] = {
@@ -167,7 +166,7 @@ static int Control(vout_display_t *vd, int query, va_list ap)
         /* Move the picture within the window */
         xcb_configure_window(sys->conn, sys->window, mask, values);
 
-        video_format_ApplyRotation(&src, &vd->source);
+        video_format_ApplyRotation(&src, vd->source);
         fmt->i_width  = src.i_width  * place.width / src.i_visible_width;
         fmt->i_height = src.i_height * place.height / src.i_visible_height;
 
@@ -181,7 +180,6 @@ static int Control(vout_display_t *vd, int query, va_list ap)
 
     case VOUT_DISPLAY_RESET_PICTURES:
     {
-        va_arg(ap, const vout_display_cfg_t *);
         *va_arg(ap, video_format_t *) = sys->fmt;
         return VLC_SUCCESS;
     }
@@ -313,7 +311,7 @@ static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
     };
     vout_display_place_t place;
 
-    vout_display_PlacePicture(&place, &vd->source, cfg);
+    vout_display_PlacePicture(&place, vd->source, cfg);
     sys->window = xcb_generate_id (conn);
     sys->gc = xcb_generate_id (conn);
 

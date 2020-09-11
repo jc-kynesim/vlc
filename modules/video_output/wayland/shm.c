@@ -115,11 +115,11 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic,
     }
 
     if (sys->viewport == NULL) /* Poor man's crop */
-        offset += 4 * vd->fmt.i_x_offset
-                  + pic->p->i_pitch * vd->fmt.i_y_offset;
+        offset += 4 * vd->fmt->i_x_offset
+                  + pic->p->i_pitch * vd->fmt->i_y_offset;
 
-    buf = wl_shm_pool_create_buffer(pool, offset, vd->fmt.i_visible_width,
-                                    vd->fmt.i_visible_height, stride,
+    buf = wl_shm_pool_create_buffer(pool, offset, vd->fmt->i_visible_width,
+                                    vd->fmt->i_visible_height, stride,
                                     WL_SHM_FORMAT_XRGB8888);
     wl_shm_pool_destroy(pool);
     if (buf == NULL)
@@ -160,14 +160,13 @@ static int Control(vout_display_t *vd, int query, va_list ap)
     {
         case VOUT_DISPLAY_RESET_PICTURES:
         {
-            const vout_display_cfg_t *cfg = va_arg(ap, const vout_display_cfg_t *);
             video_format_t *fmt = va_arg(ap, video_format_t *);
             vout_display_place_t place;
             video_format_t src;
             assert(sys->viewport == NULL);
 
-            vout_display_PlacePicture(&place, &vd->source, cfg);
-            video_format_ApplyRotation(&src, &vd->source);
+            vout_display_PlacePicture(&place, vd->source, vd->cfg);
+            video_format_ApplyRotation(&src, vd->source);
 
             fmt->i_width  = src.i_width * place.width
                                         / src.i_visible_width;
@@ -188,17 +187,16 @@ static int Control(vout_display_t *vd, int query, va_list ap)
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
         {
-            const vout_display_cfg_t *cfg = va_arg(ap, const vout_display_cfg_t *);
-            sys->display_width = cfg->display.width;
-            sys->display_height = cfg->display.height;
+            sys->display_width = vd->cfg->display.width;
+            sys->display_height = vd->cfg->display.height;
 
             if (sys->viewport != NULL)
             {
                 video_format_t fmt;
                 vout_display_place_t place;
 
-                video_format_ApplyRotation(&fmt, &vd->source);
-                vout_display_PlacePicture(&place, &vd->source, cfg);
+                video_format_ApplyRotation(&fmt, vd->source);
+                vout_display_PlacePicture(&place, vd->source, vd->cfg);
 
                 wp_viewport_set_source(sys->viewport,
                                 wl_fixed_from_int(fmt.i_x_offset),

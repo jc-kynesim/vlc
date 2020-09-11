@@ -33,6 +33,9 @@
 #include <vlc_opengl.h>
 #include "vout_helper.h"
 
+#include "filter_draw.h"
+#include "renderer.h"
+
 /* Plugin callbacks */
 static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
                 video_format_t *fmtp, vlc_video_context *context);
@@ -65,6 +68,9 @@ vlc_module_begin ()
     add_module("gl", "opengl", NULL, GL_TEXT, PROVIDER_LONGTEXT)
 #endif
     add_glopts ()
+
+    add_opengl_submodule_renderer()
+    add_opengl_submodule_draw()
 vlc_module_end ()
 
 struct vout_display_sys_t
@@ -101,7 +107,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
 #ifndef USE_OPENGL_ES2
     if (surface->type == VOUT_WINDOW_TYPE_XID)
     {
-        switch (fmt->i_chroma)
+        switch (vd->source->i_chroma)
         {
             case VLC_CODEC_VDPAU_VIDEO_444:
             case VLC_CODEC_VDPAU_VIDEO_422:
@@ -230,12 +236,11 @@ static int Control (vout_display_t *vd, int query, va_list ap)
       case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
       case VOUT_DISPLAY_CHANGE_ZOOM:
       {
-        vout_display_cfg_t cfg = *va_arg(ap, const vout_display_cfg_t *);
-        const video_format_t *src = &vd->source;
+        vout_display_cfg_t cfg = *vd->cfg;
 
         FlipVerticalAlign(&cfg);
 
-        vout_display_PlacePicture(&sys->place, src, &cfg);
+        vout_display_PlacePicture(&sys->place, vd->source, &cfg);
         sys->place_changed = true;
         vlc_gl_Resize (sys->gl, cfg.display.width, cfg.display.height);
         return VLC_SUCCESS;
@@ -244,11 +249,11 @@ static int Control (vout_display_t *vd, int query, va_list ap)
       case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
       case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
       {
-        vout_display_cfg_t cfg = *va_arg(ap, const vout_display_cfg_t *);
+        vout_display_cfg_t cfg = *vd->cfg;
 
         FlipVerticalAlign(&cfg);
 
-        vout_display_PlacePicture(&sys->place, &vd->source, &cfg);
+        vout_display_PlacePicture(&sys->place, vd->source, &cfg);
         sys->place_changed = true;
         return VLC_SUCCESS;
       }

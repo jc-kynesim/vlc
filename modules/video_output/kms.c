@@ -578,7 +578,7 @@ static int OpenDisplay(vout_display_t *vd)
 
     picture_resource_t rsc = { 0 };
 
-    sys->picture = picture_NewFromResource(&vd->fmt, &rsc);
+    sys->picture = picture_NewFromResource(vd->source, &rsc);
 
     if (!sys->picture)
         goto err_out;
@@ -692,14 +692,14 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
             sys->vlc_fourcc = local_vlc_chroma;
             msg_Dbg(vd, "Forcing VLC to use chroma '%4s'", chroma);
          } else {
-            sys->vlc_fourcc = fmtp->i_chroma;
+            sys->vlc_fourcc = vd->source->i_chroma;
             msg_Dbg(vd, "Chroma %4s invalid, using default", chroma);
          }
 
         free(chroma);
         chroma = NULL;
     } else {
-        sys->vlc_fourcc = fmtp->i_chroma;
+        sys->vlc_fourcc = vd->source->i_chroma;
         msg_Dbg(vd, "Chroma not defined, using default");
     }
 

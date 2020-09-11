@@ -40,6 +40,8 @@
 #import <OpenGL/OpenGL.h>
 #import <dlfcn.h>               /* dlsym */
 
+#include "opengl/filter_draw.h"
+#include "opengl/renderer.h"
 #include "opengl/vout_helper.h"
 
 #define OSX_SIERRA_AND_HIGHER (NSAppKitVersionNumber >= 1485)
@@ -56,6 +58,9 @@ vlc_module_begin()
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     set_callback_display(Open, 0)
+
+    add_opengl_submodule_renderer()
+    add_opengl_submodule_draw()
 vlc_module_end()
 
 static void PictureRender   (vout_display_t *vd, picture_t *pic, subpicture_t *subpicture,
@@ -308,11 +313,8 @@ static int Control (vout_display_t *vd, int query, va_list ap)
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
         {
-            const vout_display_cfg_t *cfg =
-                va_arg (ap, const vout_display_cfg_t *);
-
             /* we always use our current frame here */
-            vout_display_cfg_t cfg_tmp = *cfg;
+            vout_display_cfg_t cfg_tmp = *vd->cfg;
             [CATransaction lock];
             CGRect bounds = [sys->cgLayer visibleRect];
             [CATransaction unlock];
@@ -326,7 +328,7 @@ static int Control (vout_display_t *vd, int query, va_list ap)
                 cfg_tmp.align.vertical = VLC_VIDEO_ALIGN_TOP;
 
             vout_display_place_t place;
-            vout_display_PlacePicture(&place, &vd->source, &cfg_tmp);
+            vout_display_PlacePicture(&place, vd->source, &cfg_tmp);
             if (unlikely(OpenglLock(sys->gl)))
                 // don't return an error or we need to handle VOUT_DISPLAY_RESET_PICTURES
                 return VLC_SUCCESS;

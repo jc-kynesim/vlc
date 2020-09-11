@@ -33,12 +33,14 @@
 #include <math.h>
 
 #include <vlc_common.h>
+#include <vlc_list.h>
 #include <vlc_subpicture.h>
 #include <vlc_opengl.h>
 #include <vlc_modules.h>
 #include <vlc_vout.h>
 #include <vlc_viewpoint.h>
 
+#include "filters.h"
 #include "gl_api.h"
 #include "gl_util.h"
 #include "vout_helper.h"
@@ -54,8 +56,9 @@ struct vout_display_opengl_t {
     struct vlc_gl_api api;
 
     struct vlc_gl_interop *interop;
-    struct vlc_gl_sampler *sampler;
-    struct vlc_gl_renderer *renderer;
+    struct vlc_gl_renderer *renderer; /**< weak reference */
+
+    struct vlc_gl_filters *filters;
 
     struct vlc_gl_interop *sub_interop;
     struct vlc_gl_sub_renderer *sub_renderer;
@@ -141,28 +144,39 @@ vout_display_opengl_t *vout_display_opengl_New(video_format_t *fmt,
         goto free_vgl;
     }
 
-    vgl->sampler = vlc_gl_sampler_New(vgl->interop);
-    if (!vgl->sampler)
+    vgl->filters = vlc_gl_filters_New(gl, api, vgl->interop);
+    if (!vgl->filters)
     {
-        msg_Err(gl, "Could not create sampler");
+        msg_Err(gl, "Could not create filters");
         goto delete_interop;
     }
 
-    vgl->renderer = vlc_gl_renderer_New(gl, api, vgl->sampler);
-    if (!vgl->renderer)
+    /* The renderer is the only filter, for now */
+    struct vlc_gl_filter *renderer_filter =
+        vlc_gl_filters_Append(vgl->filters, "renderer", NULL);
+    if (!renderer_filter)
     {
         msg_Warn(gl, "Could not create renderer for %4.4s",
                  (const char *) &fmt->i_chroma);
-        goto delete_sampler;
+        goto delete_filters;
     }
 
-    GL_ASSERT_NOERROR(vt);
+    /* The renderer is a special filter: we need its concrete instance to
+     * forward SetViewpoint() */
+    vgl->renderer = renderer_filter->sys;
+
+    ret = vlc_gl_filters_InitFramebuffers(vgl->filters);
+    if (ret != VLC_SUCCESS)
+    {
+        msg_Err(gl, "Could not init filters framebuffers");
+        goto delete_filters;
+    }
 
     vgl->sub_interop = vlc_gl_interop_NewForSubpictures(gl, api);
     if (!vgl->sub_interop)
     {
         msg_Err(gl, "Could not create sub interop");
-        goto delete_renderer;
+        goto delete_filters;
     }
 
     vgl->sub_renderer =
@@ -194,10 +208,8 @@ delete_sub_renderer:
     vlc_gl_sub_renderer_Delete(vgl->sub_renderer);
 delete_sub_interop:
     vlc_gl_interop_Delete(vgl->sub_interop);
-delete_renderer:
-    vlc_gl_renderer_Delete(vgl->renderer);
-delete_sampler:
-    vlc_gl_sampler_Delete(vgl->sampler);
+delete_filters:
+    vlc_gl_filters_Delete(vgl->filters);
 delete_interop:
     vlc_gl_interop_Delete(vgl->interop);
 free_vgl:
@@ -219,8 +231,7 @@ void vout_display_opengl_Delete(vout_display_opengl_t *vgl)
     vlc_gl_sub_renderer_Delete(vgl->sub_renderer);
     vlc_gl_interop_Delete(vgl->sub_interop);
 
-    vlc_gl_renderer_Delete(vgl->renderer);
-    vlc_gl_sampler_Delete(vgl->sampler);
+    vlc_gl_filters_Delete(vgl->filters);
     vlc_gl_interop_Delete(vgl->interop);
 
     GL_ASSERT_NOERROR(vt);
@@ -243,8 +254,7 @@ void vout_display_opengl_SetWindowAspectRatio(vout_display_opengl_t *vgl,
 void vout_display_opengl_Viewport(vout_display_opengl_t *vgl, int x, int y,
                                   unsigned width, unsigned height)
 {
-    const opengl_vtable_t *vt = &vgl->api.vt;
-    vt->Viewport(x, y, width, height);
+    vlc_gl_filters_SetViewport(vgl->filters, x, y, width, height);
 }
 
 int vout_display_opengl_Prepare(vout_display_opengl_t *vgl,
@@ -252,7 +262,7 @@ int vout_display_opengl_Prepare(vout_display_opengl_t *vgl,
 {
     GL_ASSERT_NOERROR(&vgl->api.vt);
 
-    int ret = vlc_gl_sampler_Update(vgl->sampler, picture);
+    int ret = vlc_gl_filters_UpdatePicture(vgl->filters, picture);
     if (ret != VLC_SUCCESS)
         return ret;
 
@@ -268,7 +278,7 @@ int vout_display_opengl_Display(vout_display_opengl_t *vgl)
        OpenGL providers can call vout_display_opengl_Display to force redraw.
        Currently, the OS X provider uses it to get a smooth window resizing */
 
-    int ret = vlc_gl_renderer_Draw(vgl->renderer);
+    int ret = vlc_gl_filters_Draw(vgl->filters);
     if (ret != VLC_SUCCESS)
         return ret;
 
@@ -283,4 +293,3 @@ int vout_display_opengl_Display(vout_display_opengl_t *vgl)
 
     return VLC_SUCCESS;
 }
-

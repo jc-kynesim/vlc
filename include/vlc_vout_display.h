@@ -157,7 +157,7 @@ enum vout_display_query {
      * \ref VOUT_DISPLAY_CHANGE_SOURCE_CROP
      * control query returns an error.
      */
-    VOUT_DISPLAY_RESET_PICTURES, /* const vout_display_cfg_t *, video_format_t * */
+    VOUT_DISPLAY_RESET_PICTURES, /* video_format_t * */
 
 #if defined(__OS2__)
     /* Ask the module to acknowledge/refuse the fullscreen state change after
@@ -174,7 +174,7 @@ enum vout_display_query {
      * \retval VLC_EGENERIC if a \ref VOUT_DISPLAY_RESET_PICTURES request
      *                      is necessary
      */
-    VOUT_DISPLAY_CHANGE_DISPLAY_SIZE,   /* const vout_display_cfg_t *p_cfg */
+    VOUT_DISPLAY_CHANGE_DISPLAY_SIZE,
 
     /**
      * Notifies a change of the display fill display flag by the user.
@@ -183,7 +183,7 @@ enum vout_display_query {
      * \retval VLC_EGENERIC if a \ref VOUT_DISPLAY_RESET_PICTURES request
      *                      is necessary
      */
-    VOUT_DISPLAY_CHANGE_DISPLAY_FILLED, /* const vout_display_cfg_t *p_cfg */
+    VOUT_DISPLAY_CHANGE_DISPLAY_FILLED,
 
     /**
      * Notifies a change of the user zoom factor.
@@ -192,7 +192,7 @@ enum vout_display_query {
      * \retval VLC_EGENERIC if a \ref VOUT_DISPLAY_RESET_PICTURES request
      *                      is necessary
      */
-    VOUT_DISPLAY_CHANGE_ZOOM, /* const vout_display_cfg_t *p_cfg */
+    VOUT_DISPLAY_CHANGE_ZOOM,
 
     /**
      * Notifies a change of the sample aspect ratio.
@@ -201,7 +201,7 @@ enum vout_display_query {
      * \retval VLC_EGENERIC if a \ref VOUT_DISPLAY_RESET_PICTURES request
      *                      is necessary
      */
-    VOUT_DISPLAY_CHANGE_SOURCE_ASPECT, /* const vout_display_cfg_t *p_cfg */
+    VOUT_DISPLAY_CHANGE_SOURCE_ASPECT,
 
     /**
      * Notifies a change of the source cropping.
@@ -213,7 +213,7 @@ enum vout_display_query {
      * \retval VLC_EGENERIC if a \ref VOUT_DISPLAY_RESET_PICTURES request
      *                      is necessary
      */
-    VOUT_DISPLAY_CHANGE_SOURCE_CROP, /* const vout_display_cfg_t *p_cfg */
+    VOUT_DISPLAY_CHANGE_SOURCE_CROP,
 
     /**
      * Notifies a change of VR/360° viewpoint.
@@ -287,7 +287,7 @@ struct vout_display_t {
      * \note
      * Cropping is not requested while in the open function.
      */
-    video_format_t source;
+    const video_format_t *source;
 
     /**
      * Picture format.
@@ -302,7 +302,7 @@ struct vout_display_t {
      * By default, it is equal to ::source except for the aspect ratio
      * which is undefined(0) and is ignored.
      */
-    video_format_t fmt;
+    const video_format_t *fmt;
 
     /* Information
      *

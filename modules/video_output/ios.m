@@ -45,6 +45,8 @@
 #import <vlc_vout_display.h>
 #import <vlc_opengl.h>
 #import <vlc_dialog.h>
+#import "opengl/filter_draw.h"
+#import "opengl/renderer.h"
 #import "opengl/vout_helper.h"
 
 /**
@@ -76,6 +78,9 @@ vlc_module_begin ()
 
     add_shortcut("vout_ios2", "vout_ios")
     add_glopts()
+
+    add_opengl_submodule_renderer()
+    add_opengl_submodule_draw()
 vlc_module_end ()
 
 @interface VLCOpenGLES2VideoView : UIView {
@@ -261,12 +266,9 @@ static int Control(vout_display_t *vd, int query, va_list ap)
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
         {
-            const vout_display_cfg_t *cfg =
-                va_arg(ap, const vout_display_cfg_t *);
+            assert(vd->cfg);
 
-            assert(cfg);
-
-            [sys->glESView updateVoutCfg:cfg withVGL:glsys->vgl];
+            [sys->glESView updateVoutCfg:vd->cfg withVGL:glsys->vgl];
 
             return VLC_SUCCESS;
         }
@@ -645,7 +647,7 @@ static void GLESSwap(vlc_gl_t *gl)
     cfg.display.width  = _viewSize.width * _scaleFactor;
     cfg.display.height = _viewSize.height * _scaleFactor;
 
-    vout_display_PlacePicture(place, &_voutDisplay->source, &cfg);
+    vout_display_PlacePicture(place, _voutDisplay->source, &cfg);
 }
 
 - (void)reshape

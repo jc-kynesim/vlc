@@ -420,11 +420,9 @@ static int Control( vout_display_t *vd, int query, va_list args )
 
     case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
     {
-        const vout_display_cfg_t *cfg = va_arg(args, const vout_display_cfg_t *);
-
         WinPostMsg( sys->client, WM_VLC_SIZE_CHANGE,
-                    MPFROMLONG( cfg->display.width ),
-                    MPFROMLONG( cfg->display.height ));
+                    MPFROMLONG( vd->cfg->display.width ),
+                    MPFROMLONG( vd->cfg->display.height ));
         return VLC_SUCCESS;
     }
 
@@ -433,7 +431,7 @@ static int Control( vout_display_t *vd, int query, va_list args )
     case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
     {
         vout_display_place_t place;
-        vout_display_PlacePicture(&place, &vd->source, vd->cfg);
+        vout_display_PlacePicture(&place, vd->source, vd->cfg);
 
         sys->kvas.ulAspectWidth  = place.width;
         sys->kvas.ulAspectHeight = place.height;
@@ -444,7 +442,7 @@ static int Control( vout_display_t *vd, int query, va_list args )
     case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
     {
         video_format_t src_rot;
-        video_format_ApplyRotation(&src_rot, &vd->source);
+        video_format_ApplyRotation(&src_rot, vd->source);
 
         sys->kvas.rclSrcRect.xLeft   = src_rot.i_x_offset;
         sys->kvas.rclSrcRect.yTop    = src_rot.i_y_offset;
@@ -592,7 +590,7 @@ static int OpenDisplay( vout_display_t *vd, video_format_t *fmt )
     char *title = var_InheritString( vd, "video-title" );
     if (title != NULL
      || asprintf( &title, VOUT_TITLE " (%4.4s to %4.4s - %s mode KVA output)",
-                  (char *)&vd->fmt.i_chroma, (char *)&sys->kvas.fccSrcColor,
+                  (char *)&fmt->i_chroma, (char *)&sys->kvas.fccSrcColor,
                   psz_video_mode[sys->kvac.ulMode - 1] ) >= 0)
     {
         WinSetWindowText( sys->frame, title );
@@ -938,7 +936,7 @@ static MRESULT EXPENTRY WndProc( HWND hwnd, ULONG msg, MPARAM mp1, MPARAM mp2 )
             i_movie_height = movie_rect.yTop - movie_rect.yBottom;
 
             vout_display_place_t place;
-            vout_display_PlacePicture(&place, &vd->source, vd->cfg);
+            vout_display_PlacePicture(&place, vd->source, vd->cfg);
 
             int x = ( i_mouse_x - movie_rect.xLeft ) *
                     place.width / i_movie_width + place.x;

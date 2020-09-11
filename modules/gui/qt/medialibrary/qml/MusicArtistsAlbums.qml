@@ -52,8 +52,10 @@ Widgets.NavigableFocusScope {
             initialIndex = 0
         if (initialIndex !== artistList.currentIndex) {
             selectionModel.select(artistModel.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect)
-            artistList.currentIndex = initialIndex
-            artistList.positionViewAtIndex(initialIndex, ItemView.Contain)
+            if (artistList) {
+                artistList.currentIndex = initialIndex
+                artistList.positionViewAtIndex(initialIndex, ItemView.Contain)
+            }
         }
     }
 
@@ -159,7 +161,7 @@ Widgets.NavigableFocusScope {
                         width: VLCStyle.play_cover_small
                         radius: VLCStyle.play_cover_small
                         color: 'transparent'
-                        border.width: VLCStyle.dp(1, scale)
+                        border.width: VLCStyle.dp(1, VLCStyle.scale)
                         border.color: !_highlighted ? VLCStyle.colors.roundPlayCoverBorder : VLCStyle.colors.accent
                     }
                 }

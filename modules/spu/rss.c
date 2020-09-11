@@ -347,6 +347,11 @@ static void DestroyFilter( vlc_object_t *p_this )
     free( p_sys );
 }
 
+static void switchToNextFeed(filter_sys_t *p_sys)
+{
+    p_sys->i_cur_feed = (p_sys->i_cur_feed + 1)%p_sys->i_feeds;
+}
+
 /****************************************************************************
  * Filter: the whole thing
  ****************************************************************************
@@ -359,15 +364,23 @@ static subpicture_t *Filter( filter_t *p_filter, vlc_tick_t date )
     video_format_t fmt;
     subpicture_region_t *p_region;
 
-    int i_feed, i_item;
+    int i_item;
     rss_feed_t *p_feed;
 
     vlc_mutex_lock( &p_sys->lock );
 
     /* Check if the feeds have been fetched and that we have some feeds */
-    /* TODO: check that we have items for each feeds */
     if( !p_sys->b_fetched && p_sys->i_feeds > 0 )
     {
+        vlc_mutex_unlock( &p_sys->lock );
+        return NULL;
+    }
+
+    /* If the current feed has no item then switch to the next feed
+       and skip further processing */
+    if (p_sys->p_feeds[p_sys->i_cur_feed].i_items == 0)
+    {
+        switchToNextFeed(p_sys);
         vlc_mutex_unlock( &p_sys->lock );
         return NULL;
     }
@@ -397,7 +410,7 @@ static subpicture_t *Filter( filter_t *p_filter, vlc_tick_t date )
                 p_sys->i_cur_item = -1;
             else
                 p_sys->i_cur_item = 0;
-            p_sys->i_cur_feed = (p_sys->i_cur_feed + 1)%p_sys->i_feeds;
+            switchToNextFeed(p_sys);
         }
     }
 
@@ -421,45 +434,47 @@ static subpicture_t *Filter( filter_t *p_filter, vlc_tick_t date )
     /* Generate the string that will be displayed. This string is supposed to
        be p_sys->i_length characters long. */
     i_item = p_sys->i_cur_item;
-    i_feed = p_sys->i_cur_feed;
-    p_feed = &p_sys->p_feeds[i_feed];
+    p_feed = &p_sys->p_feeds[p_sys->i_cur_feed];
+    char *feed_title = p_feed->psz_title;
+    char *item_title = p_feed->p_items[i_item].psz_title;
 
     if( ( p_feed->p_pic && p_sys->i_title == default_title )
         || p_sys->i_title == hide_title )
     {
         /* Don't display the feed's title if we have an image */
         snprintf( p_sys->psz_marquee, p_sys->i_length, "%s",
-                  p_sys->p_feeds[i_feed].p_items[i_item].psz_title
-                  +p_sys->i_cur_char );
+                  item_title + p_sys->i_cur_char );
     }
     else if( ( !p_feed->p_pic && p_sys->i_title == default_title )
              || p_sys->i_title == prepend_title )
     {
         snprintf( p_sys->psz_marquee, p_sys->i_length, "%s : %s",
-                  p_sys->p_feeds[i_feed].psz_title,
-                  p_sys->p_feeds[i_feed].p_items[i_item].psz_title
-                  +p_sys->i_cur_char );
+                  feed_title,
+                  item_title + p_sys->i_cur_char );
     }
     else /* scrolling title */
     {
         if( i_item == -1 )
+        {
             snprintf( p_sys->psz_marquee, p_sys->i_length, "%s : %s",
-                      p_sys->p_feeds[i_feed].psz_title + p_sys->i_cur_char,
-                      p_sys->p_feeds[i_feed].p_items[i_item+1].psz_title );
+                      feed_title + p_sys->i_cur_char,
+                      p_feed->p_items[i_item+1].psz_title );
+            // Set i_item to 0 as the first item title was already printed.
+            i_item = 0;
+        }
         else
             snprintf( p_sys->psz_marquee, p_sys->i_length, "%s",
-                      p_sys->p_feeds[i_feed].p_items[i_item].psz_title
-                      +p_sys->i_cur_char );
+                      item_title + p_sys->i_cur_char );
     }
 
     while( strlen( p_sys->psz_marquee ) < (unsigned int)p_sys->i_length )
     {
         i_item++;
-        if( i_item == p_sys->p_feeds[i_feed].i_items ) break;
+        if( i_item == p_feed->i_items ) break;
         snprintf( strchr( p_sys->psz_marquee, 0 ),
                   p_sys->i_length - strlen( p_sys->psz_marquee ),
                   " - %s",
-                  p_sys->p_feeds[i_feed].p_items[i_item].psz_title );
+                  p_feed->p_items[i_item].psz_title );
     }
 
     /* Calls to snprintf might split multibyte UTF8 chars ...
@@ -623,7 +638,7 @@ static char *removeWhiteChars( const char *psz_src )
 
 
 /****************************************************************************
- * Parse url list, psz_urls must be non empty (TODO: check it !)
+ * Parse url list, psz_urls must be non empty (ensured by check in CreateFilter() )
  ***************************************************************************/
 static int ParseUrls( filter_t *p_filter, char *psz_urls )
 {

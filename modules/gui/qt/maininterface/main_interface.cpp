@@ -125,6 +125,8 @@ MainInterface::MainInterface(intf_thread_t *_p_intf , QWidget* parent, Qt::Windo
 
     /* */
     m_intfUserScaleFactor = var_InheritFloat(p_intf, "qt-interface-scale");
+    if (m_intfUserScaleFactor == -1)
+        m_intfUserScaleFactor = getSettings()->value( "MainWindow/interface-scale", 1.0).toFloat();
     winId(); //force window creation
     QWindow* window = windowHandle();
     if (window)
@@ -221,6 +223,7 @@ MainInterface::~MainInterface()
     settings->beginGroup("MainWindow");
     settings->setValue( "pl-dock-status", b_playlistDocked );
     settings->setValue( "ShowRemainingTime", m_showRemainingTime );
+    settings->setValue( "interface-scale", m_intfUserScaleFactor );
 
     /* Save playlist state */
     settings->setValue( "playlist-visible", playlistVisible );
@@ -302,6 +305,15 @@ void MainInterface::updateIntfScaleFactor()
         }
     }
     emit intfScaleFactorChanged();
+}
+
+void MainInterface::incrementIntfUserScaleFactor(bool increment)
+{
+    if (increment)
+        m_intfUserScaleFactor = std::min(m_intfUserScaleFactor + 0.1, 3.0);
+    else
+        m_intfUserScaleFactor = std::max(m_intfUserScaleFactor - 0.1, 0.3);
+    updateIntfScaleFactor();
 }
 
 inline void MainInterface::initSystray()

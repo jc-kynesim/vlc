@@ -51,9 +51,9 @@ static picture_t *VideoBufferNew(filter_t *filter)
     vout_display_t *vd = filter->owner.sys;
     const video_format_t *fmt = &filter->fmt_out.video;
 
-    assert(vd->fmt.i_chroma == fmt->i_chroma &&
-           vd->fmt.i_width  == fmt->i_width  &&
-           vd->fmt.i_height == fmt->i_height);
+    assert(vd->fmt->i_chroma == fmt->i_chroma &&
+           vd->fmt->i_width  == fmt->i_width  &&
+           vd->fmt->i_height == fmt->i_height);
 
     picture_pool_t *pool = vout_GetPool(vd, 3);
     if (!pool)
@@ -75,27 +75,6 @@ static int vout_display_Control(vout_display_t *vd, int query, ...)
 /*****************************************************************************
  *
  *****************************************************************************/
-
-static int vout_display_start(void *func, bool forced, va_list ap)
-{
-    vout_display_open_cb activate = func;
-    vout_display_t *vd = va_arg(ap, vout_display_t *);
-    const vout_display_cfg_t *cfg = va_arg(ap, const vout_display_cfg_t *);
-    vlc_video_context *context = va_arg(ap, vlc_video_context *);
-
-    /* Picture buffer does not have the concept of aspect ratio */
-    video_format_Copy(&vd->fmt, &vd->source);
-    vd->fmt.i_sar_num = 0;
-    vd->fmt.i_sar_den = 0;
-    vd->obj.force = forced; /* TODO: pass to activate() instead? */
-
-    int ret = activate(vd, cfg, &vd->fmt, context);
-    if (ret != VLC_SUCCESS) {
-        video_format_Clean(&vd->fmt);
-        vlc_objres_clear(VLC_OBJECT(vd));
-    }
-    return ret;
-}
 
 /* */
 void vout_display_GetDefaultDisplaySize(unsigned *width, unsigned *height,
@@ -229,7 +208,7 @@ void vout_display_TranslateMouseState(vout_display_t *vd, vlc_mouse_t *video,
     vout_display_place_t place;
 
     /* Translate window coordinates to video coordinates */
-    vout_display_PlacePicture(&place, &vd->source, vd->cfg);
+    vout_display_PlacePicture(&place, vd->source, vd->cfg);
 
     if (place.width <= 0 || place.height <= 0) {
         memset(video, 0, sizeof (*video));
@@ -239,7 +218,7 @@ void vout_display_TranslateMouseState(vout_display_t *vd, vlc_mouse_t *video,
     const int wx = window->i_x, wy = window->i_y;
     int x, y;
 
-    switch (vd->source.orientation) {
+    switch (vd->source->orientation) {
         case ORIENT_TOP_LEFT:
             x = wx;
             y = wy;
@@ -276,10 +255,10 @@ void vout_display_TranslateMouseState(vout_display_t *vd, vlc_mouse_t *video,
             vlc_assert_unreachable();
     }
 
-    video->i_x = vd->source.i_x_offset
-        + (int64_t)(x - place.x) * vd->source.i_visible_width / place.width;
-    video->i_y = vd->source.i_y_offset
-        + (int64_t)(y - place.y) * vd->source.i_visible_height / place.height;
+    video->i_x = vd->source->i_x_offset
+        + (int64_t)(x - place.x) * vd->source->i_visible_width / place.width;
+    video->i_y = vd->source->i_y_offset
+        + (int64_t)(y - place.y) * vd->source->i_visible_height / place.height;
     video->i_pressed = window->i_pressed;
     video->b_double_click = window->b_double_click;
 }
@@ -301,12 +280,35 @@ typedef struct {
 
     /* */
     video_format_t source;
+    video_format_t display_fmt;
     vlc_video_context *src_vctx;
      /* filters to convert the vout source to fmt, NULL means no conversion
       * can be done and nothing will be displayed */
     filter_chain_t *converters;
     picture_pool_t *pool;
 } vout_display_priv_t;
+
+static int vout_display_start(void *func, bool forced, va_list ap)
+{
+    vout_display_open_cb activate = func;
+    vout_display_priv_t *osys = va_arg(ap, vout_display_priv_t *);
+    const vout_display_cfg_t *cfg = &osys->cfg;
+    vout_display_t *vd = &osys->display;
+    vlc_video_context *context = osys->src_vctx;
+
+    /* Picture buffer does not have the concept of aspect ratio */
+    video_format_Copy(&osys->display_fmt, vd->source);
+    osys->display_fmt.i_sar_num = 0;
+    osys->display_fmt.i_sar_den = 0;
+    vd->obj.force = forced; /* TODO: pass to activate() instead? */
+
+    int ret = activate(vd, cfg, &osys->display_fmt, context);
+    if (ret != VLC_SUCCESS) {
+        video_format_Clean(&osys->display_fmt);
+        vlc_objres_clear(VLC_OBJECT(vd));
+    }
+    return ret;
+}
 
 static vlc_decoder_device * DisplayHoldDecoderDevice(vlc_object_t *o, void *sys)
 {
@@ -332,11 +334,11 @@ static int VoutDisplayCreateRender(vout_display_t *vd)
     if (unlikely(osys->converters == NULL))
         return -1;
 
-    video_format_t v_src = vd->source;
+    video_format_t v_src = osys->source;
     v_src.i_sar_num = 0;
     v_src.i_sar_den = 0;
 
-    video_format_t v_dst = vd->fmt;
+    video_format_t v_dst = *vd->fmt;
     v_dst.i_sar_num = 0;
     v_dst.i_sar_den = 0;
 
@@ -410,7 +412,7 @@ picture_pool_t *vout_GetPool(vout_display_t *vd, unsigned count)
     vout_display_priv_t *osys = container_of(vd, vout_display_priv_t, display);
 
     if (osys->pool == NULL)
-        osys->pool = picture_pool_NewFromFormat(&vd->fmt, count);
+        osys->pool = picture_pool_NewFromFormat(vd->fmt, count);
     return osys->pool;
 }
 
@@ -466,8 +468,8 @@ static void vout_display_Reset(vout_display_t *vd)
         osys->pool = NULL;
     }
 
-    if (vout_display_Control(vd, VOUT_DISPLAY_RESET_PICTURES, &osys->cfg,
-                             &vd->fmt)
+    if (vout_display_Control(vd, VOUT_DISPLAY_RESET_PICTURES,
+                             &osys->display_fmt)
      || VoutDisplayCreateRender(vd))
         msg_Err(vd, "Failed to adjust render format");
 }
@@ -475,16 +477,14 @@ static void vout_display_Reset(vout_display_t *vd)
 static int vout_UpdateSourceCrop(vout_display_t *vd)
 {
     vout_display_priv_t *osys = container_of(vd, vout_display_priv_t, display);
+    video_format_t fmt = osys->source;
     unsigned crop_num = osys->crop.num;
     unsigned crop_den = osys->crop.den;
 
     if (crop_num != 0 && crop_den != 0) {
-        video_format_t fmt = osys->source;
-        fmt.i_sar_num = vd->source.i_sar_num;
-        fmt.i_sar_den = vd->source.i_sar_den;
         VoutDisplayCropRatio(&osys->crop.left,  &osys->crop.top,
                              &osys->crop.right, &osys->crop.bottom,
-                             &fmt, crop_num, crop_den);
+                             &osys->source, crop_num, crop_den);
     }
 
     const int right_max  = osys->source.i_x_offset
@@ -509,15 +509,14 @@ static int vout_UpdateSourceCrop(vout_display_t *vd)
         bottom = (int)osys->source.i_y_offset + osys->crop.bottom;
     bottom = VLC_CLIP(bottom, top + 1, bottom_max);
 
-    vd->source.i_x_offset       = left;
-    vd->source.i_y_offset       = top;
-    vd->source.i_visible_width  = right - left;
-    vd->source.i_visible_height = bottom - top;
-    video_format_Print(VLC_OBJECT(vd), "SOURCE ", &osys->source);
-    video_format_Print(VLC_OBJECT(vd), "CROPPED", &vd->source);
+    osys->source.i_x_offset       = left;
+    osys->source.i_y_offset       = top;
+    osys->source.i_visible_width  = right - left;
+    osys->source.i_visible_height = bottom - top;
+    video_format_Print(VLC_OBJECT(vd), "SOURCE ", &fmt);
+    video_format_Print(VLC_OBJECT(vd), "CROPPED ", &osys->source);
 
-    int ret = vout_display_Control(vd, VOUT_DISPLAY_CHANGE_SOURCE_CROP,
-                                   &osys->cfg);
+    int ret = vout_display_Control(vd, VOUT_DISPLAY_CHANGE_SOURCE_CROP);
     osys->crop.left   = left - osys->source.i_x_offset;
     osys->crop.top    = top  - osys->source.i_y_offset;
     /* FIXME for right/bottom we should keep the 'type' border vs window */
@@ -537,15 +536,14 @@ static int vout_SetSourceAspect(vout_display_t *vd,
     int ret = 0;
 
     if (sar_num > 0 && sar_den > 0) {
-        vd->source.i_sar_num = sar_num;
-        vd->source.i_sar_den = sar_den;
+        osys->source.i_sar_num = sar_num;
+        osys->source.i_sar_den = sar_den;
     } else {
-        vd->source.i_sar_num = osys->source.i_sar_num;
-        vd->source.i_sar_den = osys->source.i_sar_den;
+        osys->source.i_sar_num = osys->source.i_sar_num;
+        osys->source.i_sar_den = osys->source.i_sar_den;
     }
 
-    if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_SOURCE_ASPECT,
-                             &osys->cfg))
+    if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_SOURCE_ASPECT))
         ret = -1;
 
     /* If a crop ratio is requested, recompute the parameters */
@@ -605,7 +603,7 @@ void vout_display_SetSize(vout_display_t *vd, unsigned width, unsigned height)
 
     osys->cfg.display.width  = width;
     osys->cfg.display.height = height;
-    if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_DISPLAY_SIZE, &osys->cfg))
+    if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_DISPLAY_SIZE))
         vout_display_Reset(vd);
 }
 
@@ -617,8 +615,7 @@ void vout_SetDisplayFilled(vout_display_t *vd, bool is_filled)
         return; /* nothing to do */
 
     osys->cfg.is_display_filled = is_filled;
-    if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_DISPLAY_FILLED,
-                             &osys->cfg))
+    if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_DISPLAY_FILLED))
         vout_display_Reset(vd);
 }
 
@@ -632,7 +629,7 @@ void vout_SetDisplayZoom(vout_display_t *vd, unsigned num, unsigned den)
 
     osys->cfg.zoom.num = num;
     osys->cfg.zoom.den = den;
-    if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_ZOOM, &osys->cfg))
+    if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_ZOOM))
         vout_display_Reset(vd);
 }
 
@@ -723,7 +720,7 @@ vout_display_t *vout_display_New(vlc_object_t *parent,
 
     osys->pool = NULL;
 
-    osys->source = *source;
+    video_format_Copy(&osys->source, source);
     osys->crop.left   = 0;
     osys->crop.top    = 0;
     osys->crop.right  = 0;
@@ -735,7 +732,8 @@ vout_display_t *vout_display_New(vlc_object_t *parent,
 
     /* */
     vout_display_t *vd = &osys->display;
-    video_format_Copy(&vd->source, source);
+    vd->source = &osys->source;
+    vd->fmt = &osys->display_fmt;
     vd->info = (vout_display_info_t){ };
     vd->cfg = &osys->cfg;
     vd->prepare = NULL;
@@ -747,8 +745,7 @@ vout_display_t *vout_display_New(vlc_object_t *parent,
         vd->owner = *owner;
 
     if (vlc_module_load(vd, "vout display", module, module && *module != '\0',
-                        vout_display_start, vd, &osys->cfg,
-                        osys->src_vctx) == NULL)
+                        vout_display_start, osys) == NULL)
         goto error;
 
 #if defined(__OS2__)
@@ -767,12 +764,12 @@ vout_display_t *vout_display_New(vlc_object_t *parent,
         if (vd->close != NULL)
             vd->close(vd);
         vlc_objres_clear(VLC_OBJECT(vd));
-        video_format_Clean(&vd->fmt);
+        video_format_Clean(&osys->display_fmt);
         goto error;
     }
     return vd;
 error:
-    video_format_Clean(&vd->source);
+    video_format_Clean(&osys->source);
     vlc_object_delete(vd);
     return NULL;
 }
@@ -797,7 +794,7 @@ void vout_display_Delete(vout_display_t *vd)
         vd->close(vd);
     vlc_objres_clear(VLC_OBJECT(vd));
 
-    video_format_Clean(&vd->source);
-    video_format_Clean(&vd->fmt);
+    video_format_Clean(&osys->source);
+    video_format_Clean(&osys->display_fmt);
     vlc_object_delete(vd);
 }

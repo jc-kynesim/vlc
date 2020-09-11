@@ -34,6 +34,8 @@
 #include <versionhelpers.h>
 
 #define GLEW_STATIC
+#include "../opengl/filter_draw.h"
+#include "../opengl/renderer.h"
 #include "../opengl/vout_helper.h"
 
 #include "common.h"
@@ -53,6 +55,9 @@ vlc_module_begin()
     add_shortcut("glwin32", "opengl")
     set_callback_display(Open, 275)
     add_glopts()
+
+    add_opengl_submodule_renderer()
+    add_opengl_submodule_draw()
 vlc_module_end()
 
 /*****************************************************************************
@@ -81,7 +86,7 @@ static int Control(vout_display_t *vd, int query, va_list args)
         return vout_display_opengl_SetViewpoint(sys->vgl,
                                                 va_arg(args, const vlc_viewpoint_t*));
 
-    return CommonControl(vd, &sys->area, &sys->sys, query, args);
+    return CommonControl(vd, &sys->area, &sys->sys, query);
 }
 
 static const struct vout_window_operations embedVideoWindow_Ops =
@@ -120,12 +125,12 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
         return VLC_ENOMEM;
 
     /* */
-    CommonInit(&sys->area, cfg);
+    CommonInit(&sys->area);
     if (CommonWindowInit(vd, &sys->area, &sys->sys,
-                   vd->source.projection_mode != PROJECTION_MODE_RECTANGULAR))
+                   vd->source->projection_mode != PROJECTION_MODE_RECTANGULAR))
         goto error;
 
-    if (vd->source.projection_mode != PROJECTION_MODE_RECTANGULAR)
+    if (vd->source->projection_mode != PROJECTION_MODE_RECTANGULAR)
         sys->p_sensors = HookWindowsSensors(vd, sys->sys.hvideownd);
 
     vout_window_SetTitle(cfg->window, VOUT_TITLE " (OpenGL output)");
@@ -208,7 +213,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         return;
     if (sys->area.place_changed)
     {
-        vout_display_cfg_t place_cfg = sys->area.vdcfg;
+        vout_display_cfg_t place_cfg = *vd->cfg;
         vout_display_place_t place;
 
         /* Reverse vertical alignment as the GL tex are Y inverted */
@@ -217,7 +222,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
         else if (place_cfg.align.vertical == VLC_VIDEO_ALIGN_BOTTOM)
             place_cfg.align.vertical = VLC_VIDEO_ALIGN_TOP;
 
-        vout_display_PlacePicture(&place, &vd->source, &place_cfg);
+        vout_display_PlacePicture(&place, vd->source, &place_cfg);
 
         const int width  = place.width;
         const int height = place.height;

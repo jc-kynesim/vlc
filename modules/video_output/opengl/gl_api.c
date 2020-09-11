@@ -119,6 +119,17 @@ vlc_gl_api_Init(struct vlc_gl_api *api, vlc_gl_t *gl)
     GET_PROC_ADDR(DeleteBuffers);
 
     GET_PROC_ADDR_OPTIONAL(GetFramebufferAttachmentParameteriv);
+    GET_PROC_ADDR_OPTIONAL(GenFramebuffers);
+    GET_PROC_ADDR_OPTIONAL(DeleteFramebuffers);
+    GET_PROC_ADDR_OPTIONAL(BindFramebuffer);
+    GET_PROC_ADDR_OPTIONAL(FramebufferTexture2D);
+    GET_PROC_ADDR_OPTIONAL(CheckFramebufferStatus);
+    GET_PROC_ADDR_OPTIONAL(GenRenderbuffers);
+    GET_PROC_ADDR_OPTIONAL(DeleteRenderbuffers);
+    GET_PROC_ADDR_OPTIONAL(BindRenderbuffer);
+    GET_PROC_ADDR_OPTIONAL(RenderbufferStorageMultisample);
+    GET_PROC_ADDR_OPTIONAL(FramebufferRenderbuffer);
+    GET_PROC_ADDR_OPTIONAL(BlitFramebuffer);
 
     GET_PROC_ADDR_OPTIONAL(BufferSubData);
     GET_PROC_ADDR_OPTIONAL(BufferStorage);
@@ -139,6 +150,18 @@ vlc_gl_api_Init(struct vlc_gl_api *api, vlc_gl_t *gl)
         msg_Err(gl, "glGetString returned NULL");
         return VLC_EGENERIC;
     }
+
+    GL_ASSERT_NOERROR(&api->vt);
+    GLint version;
+    api->vt.GetIntegerv(GL_MAJOR_VERSION, &version);
+    GLenum error = api->vt.GetError();
+
+    /* OpenGL >= 3.0:
+     *     https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glRenderbufferStorageMultisample.xhtml
+     * OpenGL ES >= 3.0:
+     *     https://www.khronos.org/registry/OpenGL-Refpages/es3.1/html/glRenderbufferStorageMultisample.xhtml
+     */
+    api->supports_multisample = version >= 3 && error == GL_NO_ERROR;
 
 #ifdef USE_OPENGL_ES2
     api->is_gles = true;

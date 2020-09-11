@@ -19,7 +19,7 @@ Widgets.NavigableFocusScope {
 
     Component.onCompleted: {
         if (player.playingState !== PlayerController.PLAYING_STATE_STOPPED)
-            root.implicitHeight = VLCStyle.miniPlayerHeight
+            root.implicitHeight = Qt.binding(function() { return VLCStyle.miniPlayerHeight; })
     }
 
     Connections {
@@ -39,6 +39,9 @@ Widgets.NavigableFocusScope {
         duration: 200
         easing.type: Easing.InSine
         to: VLCStyle.miniPlayerHeight
+        onStopped: {
+            root.implicitHeight = Qt.binding(function() { return VLCStyle.miniPlayerHeight; })
+        }
     }
 
     PropertyAnimation {
@@ -48,6 +51,9 @@ Widgets.NavigableFocusScope {
         duration: 200
         easing.type: Easing.OutSine
         to: 0
+        onStopped: {
+            root.implicitHeight = 0
+        }
     }
 
     // this MouseArea prevents mouse events to be sent below miniplayer
@@ -61,7 +67,7 @@ Widgets.NavigableFocusScope {
         anchors.left: parent.left
         anchors.right: parent.right
 
-        spacing: VLCStyle.dp(-progressBar.height / 2)
+        spacing: VLCStyle.dp(-progressBar.height / 2, VLCStyle.scale)
 
         SliderBar {
             id: progressBar
@@ -135,7 +141,6 @@ Widgets.NavigableFocusScope {
                     Row {
                         id: playingItemInfoRow
                         anchors.top: parent.top
-//                        anchors.bottom: parent.bottom
                         anchors.verticalCenter: parent.verticalCenter
 
                         Item {
@@ -166,8 +171,8 @@ Widgets.NavigableFocusScope {
                                         : VLCStyle.noArtAlbum
                                 fillMode: Image.PreserveAspectFit
 
-                                width: VLCStyle.dp(60)
-                                height: VLCStyle.dp(60)
+                                width: VLCStyle.dp(60, VLCStyle.scale)
+                                height: VLCStyle.dp(60, VLCStyle.scale)
                             }
                         }
 

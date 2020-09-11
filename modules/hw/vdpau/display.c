@@ -231,13 +231,12 @@ static int Control(vout_display_t *vd, int query, va_list ap)
     {
     case VOUT_DISPLAY_RESET_PICTURES:
     {
-        const vout_display_cfg_t *cfg = va_arg(ap, const vout_display_cfg_t *);
         video_format_t *fmt = va_arg(ap, video_format_t *);
-        const video_format_t *src= &vd->source;
+        const video_format_t *src= vd->source;
         vout_display_place_t place;
 
         msg_Dbg(vd, "resetting pictures");
-        vout_display_PlacePicture(&place, src, cfg);
+        vout_display_PlacePicture(&place, src, vd->cfg);
 
         fmt->i_width = src->i_width * place.width / src->i_visible_width;
         fmt->i_height = src->i_height * place.height / src->i_visible_height;
@@ -256,12 +255,11 @@ static int Control(vout_display_t *vd, int query, va_list ap)
     }
     case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
     {
-        const vout_display_cfg_t *cfg = va_arg(ap, const vout_display_cfg_t *);
         vout_display_place_t place;
 
-        vout_display_PlacePicture(&place, &vd->source, cfg);
-        if (place.width  != vd->fmt.i_visible_width
-         || place.height != vd->fmt.i_visible_height)
+        vout_display_PlacePicture(&place, vd->source, vd->cfg);
+        if (place.width  != vd->fmt->i_visible_width
+         || place.height != vd->fmt->i_visible_height)
             return VLC_EGENERIC;
 
         const uint32_t values[] = { place.x, place.y,
@@ -427,7 +425,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
         };
         vout_display_place_t place;
 
-        vout_display_PlacePicture(&place, &vd->source, cfg);
+        vout_display_PlacePicture(&place, vd->source, cfg);
         sys->window = xcb_generate_id(sys->conn);
 
         xcb_void_cookie_t c =

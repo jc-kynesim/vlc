@@ -46,6 +46,8 @@
 #include <vlc_vout_display.h>
 #include <vlc_opengl.h>
 #include <vlc_dialog.h>
+#include "opengl/filter_draw.h"
+#include "opengl/renderer.h"
 #include "opengl/vout_helper.h"
 
 /**
@@ -78,6 +80,9 @@ vlc_module_begin ()
     set_callback_display(Open, 300)
     add_shortcut ("macosx", "vout_macosx")
     add_glopts ()
+
+    add_opengl_submodule_renderer()
+    add_opengl_submodule_draw()
 vlc_module_end ()
 
 /**
@@ -321,7 +326,7 @@ static void PictureDisplay (vout_display_t *vd, picture_t *pic)
     {
         if (@available(macOS 10.14, *)) {
             vout_display_place_t place;
-            vout_display_PlacePicture(&place, &vd->source, &sys->cfg);
+            vout_display_PlacePicture(&place, vd->source, &sys->cfg);
             vout_display_opengl_Viewport(vd->sys->vgl, place.x,
                                          sys->cfg.display.height - (place.y + place.height),
                                          place.width, place.height);
@@ -350,12 +355,9 @@ static int Control (vout_display_t *vd, int query, va_list ap)
             case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
             case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
             {
-                const vout_display_cfg_t *cfg =
-                    va_arg (ap, const vout_display_cfg_t *);
-
                 /* we always use our current frame here, because we have some size constraints
                  in the ui vout provider */
-                vout_display_cfg_t cfg_tmp = *cfg;
+                vout_display_cfg_t cfg_tmp = *vd->cfg;
 
                 /* Reverse vertical alignment as the GL tex are Y inverted */
                 if (cfg_tmp.align.vertical == VLC_VIDEO_ALIGN_TOP)
@@ -364,9 +366,9 @@ static int Control (vout_display_t *vd, int query, va_list ap)
                     cfg_tmp.align.vertical = VLC_VIDEO_ALIGN_TOP;
 
                 vout_display_place_t place;
-                vout_display_PlacePicture(&place, &vd->source, &cfg_tmp);
+                vout_display_PlacePicture(&place, vd->source, &cfg_tmp);
                 @synchronized (sys->glView) {
-                    sys->cfg = *cfg;
+                    sys->cfg = *vd->cfg;
                 }
 
                 if (vlc_gl_MakeCurrent (sys->gl) != VLC_SUCCESS)
@@ -627,7 +629,7 @@ static void OpenglSwap (vlc_gl_t *gl)
             sys->cfg.display.width  = bounds.size.width;
             sys->cfg.display.height = bounds.size.height;
 
-            vout_display_PlacePicture(&place, &vd->source, &sys->cfg);
+            vout_display_PlacePicture(&place, vd->source, &sys->cfg);
             // FIXME: this call leads to a fatal mutex locking error in vout_ChangeDisplaySize()
             // vout_window_ReportSize(sys->embed, bounds.size.width, bounds.size.height);
         }
