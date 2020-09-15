@@ -1689,9 +1689,8 @@ static void Direct3D9Close(vout_display_t *vd)
     Direct3D9DestroyResources(vd);
 }
 
-static int Control(vout_display_t *vd, int query, va_list args)
+static int Control(vout_display_t *vd, int query)
 {
-    VLC_UNUSED(args);
     vout_display_sys_t *sys = vd->sys;
     return CommonControl(vd, &sys->area, &sys->sys, query);
 }
@@ -1760,6 +1759,10 @@ static void LocalSwapchainSwap( void *opaque )
     vout_display_t *vd = opaque;
     Swap( vd );
 }
+
+static const struct vlc_display_operations ops = {
+    Close, Prepare, Display, Control, NULL, NULL,
+};
 
 /**
  * It creates a Direct3D vout display.
@@ -1871,10 +1874,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     video_format_Clean(fmtp);
     video_format_Copy(fmtp, &fmt);
 
-    vd->prepare = Prepare;
-    vd->display = Display;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
 
     /* Change the window title bar text */
     vout_window_SetTitle(cfg->window, VOUT_TITLE " (Direct3D9 output)");

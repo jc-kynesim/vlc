@@ -598,9 +598,9 @@ err_out:
 }
 
 
-static int Control(vout_display_t *vd, int query, va_list args)
+static int Control(vout_display_t *vd, int query)
 {
-    (void) vd; (void) args;
+    (void) vd;
 
     switch (query) {
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
@@ -661,6 +661,10 @@ static void Close(vout_display_t *vd)
     if (sys->drm_fd)
         drmDropMaster(sys->drm_fd);
 }
+
+static const struct vlc_display_operations ops = {
+    Close, Prepare, Display, Control, NULL, NULL,
+};
 
 /**
  * This function allocates and initializes a KMS vout method.
@@ -725,17 +729,14 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
         return VLC_EGENERIC;
     }
 
-    video_format_ApplyRotation(&fmt, fmtp);
+    video_format_ApplyRotation(&fmt, vd->source);
 
     fmt.i_width = fmt.i_visible_width  = sys->width;
     fmt.i_height = fmt.i_visible_height = sys->height;
     fmt.i_chroma = sys->vlc_fourcc;
     *fmtp = fmt;
 
-    vd->prepare = Prepare;
-    vd->display = Display;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
 
     (void) context;
     return VLC_SUCCESS;

@@ -97,12 +97,15 @@ static void Prepare(vout_display_t *vd, picture_t *picture, subpicture_t *subpic
     picture_CopyPixels(&fake_pic, picture);
 }
 
-static int Control(vout_display_t *vd, int query, va_list args)
+static int Control(vout_display_t *vd, int query)
 {
-    VLC_UNUSED(args);
     vout_display_sys_t *sys = vd->sys;
     return CommonControl(vd, &sys->area, &sys->sys, query);
 }
+
+static const struct vlc_display_operations ops = {
+    Close, Prepare, Display, Control, NULL, NULL,
+};
 
 /* */
 static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
@@ -129,10 +132,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     vout_window_SetTitle(cfg->window, VOUT_TITLE " (WinGDI output)");
 
     /* */
-    vd->prepare = Prepare;
-    vd->display = Display;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
     return VLC_SUCCESS;
 
 error:

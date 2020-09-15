@@ -127,14 +127,21 @@ static void Display (vout_display_t *vd, picture_t *pic)
    }
 
     /* FIXME might be WAY better to wait in some case (be carefull with
-     * VOUT_DISPLAY_RESET_PICTURES if done) + does not work with
+     * reset_pictures if done) + does not work with
      * vout_display wrapper. */
 
     if (sys->attached)
         xcb_shm_detach(conn, segment);
 }
 
-static int Control(vout_display_t *vd, int query, va_list ap)
+static int ResetPictures(vout_display_t *vd, video_format_t *fmt)
+{
+    vout_display_sys_t *sys = vd->sys;
+    *fmt = sys->fmt;
+    return VLC_SUCCESS;
+}
+
+static int Control(vout_display_t *vd, int query)
 {
     vout_display_sys_t *sys = vd->sys;
 
@@ -178,12 +185,6 @@ static int Control(vout_display_t *vd, int query, va_list ap)
         return ret;
     }
 
-    case VOUT_DISPLAY_RESET_PICTURES:
-    {
-        *va_arg(ap, video_format_t *) = sys->fmt;
-        return VLC_SUCCESS;
-    }
-
     default:
         msg_Err (vd, "Unknown request in XCB vout display");
         return VLC_EGENERIC;
@@ -219,6 +220,7 @@ static xcb_visualid_t DepthToFormat(const xcb_setup_t *setup,
 static xcb_visualid_t ScreenToFormat(const xcb_setup_t *setup,
                                      const xcb_screen_t *screen,
                                      uint8_t *restrict bits,
+                                     const video_format_t *source,
                                      video_format_t *restrict fmtp)
 {
     xcb_visualid_t visual = 0;
@@ -236,7 +238,7 @@ static xcb_visualid_t ScreenToFormat(const xcb_setup_t *setup,
         if (depth->depth <= *bits)
             continue; /* no better than earlier depth */
 
-        video_format_ApplyRotation(&fmt, fmtp);
+        video_format_ApplyRotation(&fmt, source);
         vid = DepthToFormat(setup, depth, &fmt);
         if (vid != 0)
         {
@@ -247,6 +249,10 @@ static xcb_visualid_t ScreenToFormat(const xcb_setup_t *setup,
     }
     return visual;
 }
+
+static const struct vlc_display_operations ops = {
+    Close, Prepare, Display, Control, ResetPictures, NULL,
+};
 
 /**
  * Probe the X server.
@@ -273,7 +279,7 @@ static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
     const xcb_setup_t *setup = xcb_get_setup (conn);
 
     /* Determine our pixel format */
-    xcb_visualid_t vid = ScreenToFormat(setup, scr, &sys->depth, fmtp);
+    xcb_visualid_t vid = ScreenToFormat(setup, scr, &sys->depth, vd->source, fmtp);
     if (vid == 0) {
         msg_Err(vd, "no supported visual & pixel format");
         goto error;
@@ -332,10 +338,7 @@ static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     sys->fmt = *fmtp;
     /* Setup vout_display_t once everything is fine */
-    vd->prepare = Prepare;
-    vd->display = Display;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
 
     (void) context;
     return VLC_SUCCESS;

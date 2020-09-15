@@ -78,14 +78,15 @@ struct vout_display_sys_t
 static void           Prepare(vout_display_t *, picture_t *, subpicture_t *, vlc_tick_t);
 static void           Display(vout_display_t *, picture_t *);
 
-static int Control(vout_display_t *vd, int query, va_list args)
+static int SetViewpoint(vout_display_t *vd, const vlc_viewpoint_t *vp)
 {
     vout_display_sys_t *sys = vd->sys;
+    return vout_display_opengl_SetViewpoint(sys->vgl, vp);
+}
 
-    if (query == VOUT_DISPLAY_CHANGE_VIEWPOINT)
-        return vout_display_opengl_SetViewpoint(sys->vgl,
-                                                va_arg(args, const vlc_viewpoint_t*));
-
+static int Control(vout_display_t *vd, int query)
+{
+    vout_display_sys_t *sys = vd->sys;
     return CommonControl(vd, &sys->area, &sys->sys, query);
 }
 
@@ -106,6 +107,10 @@ static vout_window_t *EmbedVideoWindow_Create(vout_display_t *vd)
     wnd->ops = &embedVideoWindow_Ops;
     return wnd;
 }
+
+static const struct vlc_display_operations ops = {
+    Close, Prepare, Display, Control, NULL, SetViewpoint,
+};
 
 /**
  * It creates an OpenGL vout display.
@@ -163,10 +168,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     /* Setup vout_display now that everything is fine */
     vd->info.subpicture_chromas = subpicture_chromas;
 
-    vd->prepare = Prepare;
-    vd->display = Display;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
 
     return VLC_SUCCESS;
 

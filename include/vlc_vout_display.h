@@ -146,33 +146,19 @@ typedef struct {
  * Control query for vout_display_t
  */
 enum vout_display_query {
-    /**
-     * Asks to reset the internal buffers and picture format.
-     *
-     * This occurs after a
-     * \ref VOUT_DISPLAY_CHANGE_DISPLAY_SIZE,
-     * \ref VOUT_DISPLAY_CHANGE_DISPLAY_FILLED,
-     * \ref VOUT_DISPLAY_CHANGE_ZOOM,
-     * \ref VOUT_DISPLAY_CHANGE_SOURCE_ASPECT or
-     * \ref VOUT_DISPLAY_CHANGE_SOURCE_CROP
-     * control query returns an error.
-     */
-    VOUT_DISPLAY_RESET_PICTURES, /* video_format_t * */
-
 #if defined(__OS2__)
     /* Ask the module to acknowledge/refuse the fullscreen state change after
      * being requested (externally or by VOUT_DISPLAY_EVENT_FULLSCREEN */
-    VOUT_DISPLAY_CHANGE_FULLSCREEN VLC_DEPRECATED_ENUM,     /* bool fs */
+    VOUT_DISPLAY_CHANGE_FULLSCREEN VLC_DEPRECATED_ENUM,
     /* Ask the module to acknowledge/refuse the window management state change
      * after being requested externally or by VOUT_DISPLAY_WINDOW_STATE */
-    VOUT_DISPLAY_CHANGE_WINDOW_STATE VLC_DEPRECATED_ENUM,   /* unsigned state */
+    VOUT_DISPLAY_CHANGE_WINDOW_STATE VLC_DEPRECATED_ENUM,
 #endif
     /**
      * Notifies a change in display size.
      *
      * \retval VLC_SUCCESS if the display handled the change
-     * \retval VLC_EGENERIC if a \ref VOUT_DISPLAY_RESET_PICTURES request
-     *                      is necessary
+     * \retval VLC_EGENERIC if a \ref reset_pictures request is necessary
      */
     VOUT_DISPLAY_CHANGE_DISPLAY_SIZE,
 
@@ -180,8 +166,7 @@ enum vout_display_query {
      * Notifies a change of the display fill display flag by the user.
      *
      * \retval VLC_SUCCESS if the display handled the change
-     * \retval VLC_EGENERIC if a \ref VOUT_DISPLAY_RESET_PICTURES request
-     *                      is necessary
+     * \retval VLC_EGENERIC if a \ref reset_pictures request is necessary
      */
     VOUT_DISPLAY_CHANGE_DISPLAY_FILLED,
 
@@ -189,8 +174,7 @@ enum vout_display_query {
      * Notifies a change of the user zoom factor.
      *
      * \retval VLC_SUCCESS if the display handled the change
-     * \retval VLC_EGENERIC if a \ref VOUT_DISPLAY_RESET_PICTURES request
-     *                      is necessary
+     * \retval VLC_EGENERIC if a \ref reset_pictures request is necessary
      */
     VOUT_DISPLAY_CHANGE_ZOOM,
 
@@ -198,8 +182,7 @@ enum vout_display_query {
      * Notifies a change of the sample aspect ratio.
      *
      * \retval VLC_SUCCESS if the display handled the change
-     * \retval VLC_EGENERIC if a \ref VOUT_DISPLAY_RESET_PICTURES request
-     *                      is necessary
+     * \retval VLC_EGENERIC if a \ref reset_pictures request is necessary
      */
     VOUT_DISPLAY_CHANGE_SOURCE_ASPECT,
 
@@ -210,15 +193,9 @@ enum vout_display_query {
      * and video_format_t::i_visible_width/height
      *
      * \retval VLC_SUCCESS if the display handled the change
-     * \retval VLC_EGENERIC if a \ref VOUT_DISPLAY_RESET_PICTURES request
-     *                      is necessary
+     * \retval VLC_EGENERIC if a \ref reset_pictures request is necessary
      */
     VOUT_DISPLAY_CHANGE_SOURCE_CROP,
-
-    /**
-     * Notifies a change of VR/360° viewpoint.
-     */
-    VOUT_DISPLAY_CHANGE_VIEWPOINT,   /* const vlc_viewpoint_t * */
 };
 
 /**
@@ -248,9 +225,7 @@ struct vout_display_owner_t {
  *
  * @param vd vout display context
  * @param cfg Initial and current configuration.
- * @param fmtp By default, it is equal to vd->source except for the aspect
- * ratio which is undefined(0) and is ignored. It can be changed by the module
- * to request a different format.
+ * @param fmtp It can be changed by the module to request a different format.
  * @param context XXX: to be defined.
  * @return VLC_SUCCESS or a VLC error code
  */
@@ -267,48 +242,12 @@ typedef int (*vout_display_open_cb)(vout_display_t *vd,
     } \
     set_capability( "vout display", priority )
 
-
-struct vout_display_t {
-    struct vlc_object_t obj;
-
+struct vlc_display_operations
+{
     /**
-     * User configuration.
-     *
-     * This cannot be modified directly. It reflects the current values.
+     * Destroys the display.
      */
-    const vout_display_cfg_t *cfg;
-
-    /**
-     * Source video format.
-     *
-     * This is the format of the video that is being displayed (after decoding
-     * and filtering). It cannot be modified.
-     *
-     * \note
-     * Cropping is not requested while in the open function.
-     */
-    const video_format_t *source;
-
-    /**
-     * Picture format.
-     *
-     * This is the format of the pictures that are supplied to the
-     * \ref prepare and \ref display callbacks. Ideally, it should be identical
-     * or as close as possible as \ref source.
-     *
-     * This can only be changed from the display module activation callback,
-     * or within a VOUT_DISPLAY_RESET_PICTURES control request.
-     *
-     * By default, it is equal to ::source except for the aspect ratio
-     * which is undefined(0) and is ignored.
-     */
-    const video_format_t *fmt;
-
-    /* Information
-     *
-     * You can only set them in the open function.
-     */
-    vout_display_info_t info;
+    void       (*close)(vout_display_t *);
 
     /**
      * Prepares a picture and an optional subpicture for display (optional).
@@ -357,12 +296,79 @@ struct vout_display_t {
      *
      * See \ref vout_display_query for the list of request types.
      */
-    int        (*control)(vout_display_t *, int query, va_list);
+    int        (*control)(vout_display_t *, int query);
 
     /**
-     * Destroys the display.
+     * Reset the picture format handled by the module.
+     * This occurs after a
+     * \ref VOUT_DISPLAY_CHANGE_DISPLAY_SIZE,
+     * \ref VOUT_DISPLAY_CHANGE_DISPLAY_FILLED,
+     * \ref VOUT_DISPLAY_CHANGE_ZOOM,
+     * \ref VOUT_DISPLAY_CHANGE_SOURCE_ASPECT or
+     * \ref VOUT_DISPLAY_CHANGE_SOURCE_CROP
+     * control query returns an error.
+     *
+     * \param ftmp video format that the module expects as input
      */
-    void (*close)(vout_display_t *);
+    int       (*reset_pictures)(vout_display_t *, video_format_t *fmtp);
+
+    /**
+     * Notifies a change of VR/360° viewpoint.
+     *
+     * May be NULL.
+     *
+     * \param vp viewpoint to use on the next render
+     */
+    int        (*set_viewpoint)(vout_display_t *, const vlc_viewpoint_t *vp);
+};
+
+struct vout_display_t {
+    struct vlc_object_t obj;
+
+    /**
+     * User configuration.
+     *
+     * This cannot be modified directly. It reflects the current values.
+     */
+    const vout_display_cfg_t *cfg;
+
+    /**
+     * Source video format.
+     *
+     * This is the format of the video that is being displayed (after decoding
+     * and filtering). It cannot be modified.
+     *
+     * \note
+     * Cropping is not requested while in the open function.
+     */
+    const video_format_t *source;
+
+    /**
+     * Picture format.
+     *
+     * This is the format of the pictures that are supplied to the
+     * \ref prepare and \ref display callbacks. Ideally, it should be identical
+     * or as close as possible as \ref source.
+     *
+     * This can only be changed from the display module activation callback,
+     * or within a \ref reset_pictures request.
+     *
+     * By default, it is equal to ::source except for the aspect ratio
+     * which is undefined(0) and is ignored.
+     */
+    const video_format_t *fmt;
+
+    /* Information
+     *
+     * You can only set them in the open function.
+     */
+    vout_display_info_t info;
+
+    /* Reserved for the vout_display_t owner.
+     *
+     * It must not be overwritten nor used directly by a module.
+     */
+    vout_display_owner_t owner;
 
     /**
      * Private data for the display module.
@@ -371,11 +377,10 @@ struct vout_display_t {
      */
     vout_display_sys_t *sys;
 
-    /* Reserved for the vout_display_t owner.
-     *
-     * It must not be overwritten nor used directly by a module.
+    /**
+     * Callbacks the display module must set on Open.
      */
-    vout_display_owner_t owner;
+    const struct vlc_display_operations *ops;
 };
 
 /**
@@ -422,8 +427,8 @@ VLC_API picture_t *vout_display_Prepare(vout_display_t *vd, picture_t *picture,
  */
 static inline void vout_display_Display(vout_display_t *vd, picture_t *picture)
 {
-    if (vd->display != NULL)
-        vd->display(vd, picture);
+    if (vd->ops->display != NULL)
+        vd->ops->display(vd, picture);
     picture_Release(picture);
 }
 

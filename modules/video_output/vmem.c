@@ -103,7 +103,11 @@ typedef unsigned (*vlc_format_cb)(void **, char *, unsigned *, unsigned *,
 
 static void           Prepare(vout_display_t *, picture_t *, subpicture_t *, vlc_tick_t);
 static void           Display(vout_display_t *, picture_t *);
-static int            Control(vout_display_t *, int, va_list);
+static int            Control(vout_display_t *, int);
+
+static const struct vlc_display_operations ops = {
+    Close, Prepare, Display, Control, NULL, NULL,
+};
 
 /*****************************************************************************
  * Open: allocates video thread
@@ -133,7 +137,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     /* Define the video format */
     video_format_t fmt;
-    video_format_ApplyRotation(&fmt, fmtp);
+    video_format_ApplyRotation(&fmt, vd->source);
 
     if (setup != NULL) {
         char chroma[5];
@@ -216,10 +220,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     *fmtp = fmt;
 
     vd->sys     = sys;
-    vd->prepare = Prepare;
-    vd->display = Display;
-    vd->control = Control;
-    vd->close   = Close;
+    vd->ops     = &ops;
 
     (void) cfg; (void) context;
     return VLC_SUCCESS;
@@ -271,9 +272,9 @@ static void Display(vout_display_t *vd, picture_t *pic)
         sys->display(sys->opaque, sys->pic_opaque);
 }
 
-static int Control(vout_display_t *vd, int query, va_list args)
+static int Control(vout_display_t *vd, int query)
 {
-    (void) vd; (void) args;
+    (void) vd;
 
     switch (query) {
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:

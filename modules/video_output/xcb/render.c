@@ -350,7 +350,7 @@ static void DeleteBuffers(vout_display_t *vd)
     xcb_free_pixmap(conn, sys->drawable.crop);
 }
 
-static int Control(vout_display_t *vd, int query, va_list ap)
+static int Control(vout_display_t *vd, int query)
 {
     vout_display_sys_t *sys = vd->sys;
 
@@ -373,8 +373,6 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             return VLC_SUCCESS;
         }
 
-        case VOUT_DISPLAY_RESET_PICTURES:
-            vlc_assert_unreachable();
         default:
             msg_Err(vd, "Unknown request in XCB RENDER display");
             return VLC_EGENERIC;
@@ -542,6 +540,10 @@ FindVisual(const xcb_setup_t *setup, const xcb_screen_t *scr,
     return 0;
 }
 
+static const struct vlc_display_operations ops = {
+    Close, Prepare, Display, Control, NULL, NULL,
+};
+
 /**
  * Probe the X server.
  */
@@ -684,10 +686,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     sys->spu_chromas[1] = 0;
 
     vd->info.subpicture_chromas = sys->spu_chromas;
-    vd->prepare = Prepare;
-    vd->display = Display;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
 
     (void) ctx;
     return VLC_SUCCESS;

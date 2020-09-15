@@ -60,7 +60,7 @@ static void Close(vout_display_t *vd);
 static void PictureRender (vout_display_t *vd, picture_t *pic, subpicture_t *subpicture,
                            vlc_tick_t date);
 static void PictureDisplay (vout_display_t *vd, picture_t *pic);
-static int Control (vout_display_t *vd, int query, va_list ap);
+static int Control (vout_display_t *vd, int query);
 
 static void *OurGetProcAddress(vlc_gl_t *, const char *);
 
@@ -130,6 +130,16 @@ static void *OurGetProcAddress(vlc_gl_t *gl, const char *name)
 
     return dlsym(RTLD_DEFAULT, name);
 }
+
+static int SetViewpoint(vout_display_t *vd, const vlc_viewpoint_t *vp)
+{
+    vout_display_sys_t *sys = vd->sys;
+    return vout_display_opengl_SetViewpoint (sys->vgl, vp);
+}
+
+static const struct vlc_display_operations ops = {
+    Close, PictureRender, PictureDisplay, Control, NULL, SetViewpoint,
+};
 
 static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
                  video_format_t *fmt, vlc_video_context *context)
@@ -241,10 +251,7 @@ static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
         /* Setup vout_display_t once everything is fine */
         vd->info.subpicture_chromas = subpicture_chromas;
 
-        vd->prepare = PictureRender;
-        vd->display = PictureDisplay;
-        vd->control = Control;
-        vd->close   = Close;
+        vd->ops = &ops;
 
         /* */
         // FIXME: this call leads to a fatal mutex locking error in vout_ChangeDisplaySize()
@@ -339,7 +346,7 @@ static void PictureDisplay (vout_display_t *vd, picture_t *pic)
     sys->has_first_frame = true;
 }
 
-static int Control (vout_display_t *vd, int query, va_list ap)
+static int Control (vout_display_t *vd, int query)
 {
     vout_display_sys_t *sys = vd->sys;
 
@@ -387,12 +394,6 @@ static int Control (vout_display_t *vd, int query, va_list ap)
                 return VLC_SUCCESS;
             }
 
-            case VOUT_DISPLAY_CHANGE_VIEWPOINT:
-                return vout_display_opengl_SetViewpoint (sys->vgl,
-                                                         va_arg(ap, const vlc_viewpoint_t*));
-
-            case VOUT_DISPLAY_RESET_PICTURES:
-                vlc_assert_unreachable ();
             default:
                 msg_Err (vd, "Unknown request in Mac OS X vout display");
                 return VLC_EGENERIC;

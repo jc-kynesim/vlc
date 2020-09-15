@@ -94,7 +94,7 @@ vlc_module_end ()
  * Local prototypes
  *****************************************************************************/
 static void           Display(vout_display_t *, picture_t *);
-static int            Control(vout_display_t *, int, va_list);
+static int            Control(vout_display_t *, int);
 
 /* */
 static int  OpenDisplay  (vout_display_t *, bool force_resolution);
@@ -160,6 +160,10 @@ static void ClearScreen(vout_display_sys_t *sys)
         memset(sys->video_ptr, 0, sys->video_size);
     }
 }
+
+static const struct vlc_display_operations ops = {
+    Close, NULL, Display, Control, NULL, NULL,
+};
 
 /**
  * This function allocates and initializes a FB vout method.
@@ -248,7 +252,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     /* */
     video_format_t fmt;
-    video_format_ApplyRotation(&fmt, fmtp);
+    video_format_ApplyRotation(&fmt, vd->source);
 
     if (sys->chroma) {
         fmt.i_chroma = sys->chroma;
@@ -292,10 +296,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     /* */
     *fmtp = fmt;
-    vd->prepare = NULL;
-    vd->display = Display;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
 
     (void) context;
     return VLC_SUCCESS;
@@ -344,9 +345,9 @@ static void Display(vout_display_t *vd, picture_t *picture)
     picture_Copy(sys->picture, picture);
 }
 
-static int Control(vout_display_t *vd, int query, va_list args)
+static int Control(vout_display_t *vd, int query)
 {
-    (void) vd; (void) args;
+    (void) vd;
 
     switch (query) {
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:

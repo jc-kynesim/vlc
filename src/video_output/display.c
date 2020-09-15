@@ -61,15 +61,9 @@ static picture_t *VideoBufferNew(filter_t *filter)
     return picture_pool_Get(pool);
 }
 
-static int vout_display_Control(vout_display_t *vd, int query, ...)
+static int vout_display_Control(vout_display_t *vd, int query)
 {
-    va_list ap;
-    int ret;
-
-    va_start(ap, query);
-    ret = vd->control(vd, query, ap);
-    va_end(ap);
-    return ret;
+    return vd->ops->control(vd, query);
 }
 
 /*****************************************************************************
@@ -298,8 +292,6 @@ static int vout_display_start(void *func, bool forced, va_list ap)
 
     /* Picture buffer does not have the concept of aspect ratio */
     video_format_Copy(&osys->display_fmt, vd->source);
-    osys->display_fmt.i_sar_num = 0;
-    osys->display_fmt.i_sar_den = 0;
     vd->obj.force = forced; /* TODO: pass to activate() instead? */
 
     int ret = activate(vd, cfg, &osys->display_fmt, context);
@@ -441,8 +433,8 @@ picture_t *vout_display_Prepare(vout_display_t *vd, picture_t *picture,
     assert(subpic == NULL); /* TODO */
     picture = vout_ConvertForDisplay(vd, picture);
 
-    if (picture != NULL && vd->prepare != NULL)
-        vd->prepare(vd, picture, subpic, date);
+    if (picture != NULL && vd->ops->prepare != NULL)
+        vd->ops->prepare(vd, picture, subpic, date);
     return picture;
 }
 
@@ -468,8 +460,8 @@ static void vout_display_Reset(vout_display_t *vd)
         osys->pool = NULL;
     }
 
-    if (vout_display_Control(vd, VOUT_DISPLAY_RESET_PICTURES,
-                             &osys->display_fmt)
+    assert(vd->ops->reset_pictures);
+    if (vd->ops->reset_pictures(vd, &osys->display_fmt) != VLC_SUCCESS
      || VoutDisplayCreateRender(vd))
         msg_Err(vd, "Failed to adjust render format");
 }
@@ -687,10 +679,12 @@ void vout_SetDisplayViewpoint(vout_display_t *vd,
 
         osys->cfg.viewpoint = *p_viewpoint;
 
-        if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_VIEWPOINT,
-                                 &osys->cfg.viewpoint)) {
-            msg_Err(vd, "Failed to change Viewpoint");
-            osys->cfg.viewpoint = old_vp;
+        if (vd->ops->set_viewpoint)
+        {
+            if (vd->ops->set_viewpoint(vd, &osys->cfg.viewpoint)) {
+                msg_Err(vd, "Failed to change Viewpoint");
+                osys->cfg.viewpoint = old_vp;
+            }
         }
     }
 }
@@ -736,10 +730,7 @@ vout_display_t *vout_display_New(vlc_object_t *parent,
     vd->fmt = &osys->display_fmt;
     vd->info = (vout_display_info_t){ };
     vd->cfg = &osys->cfg;
-    vd->prepare = NULL;
-    vd->display = NULL;
-    vd->control = NULL;
-    vd->close = NULL;
+    vd->ops = NULL;
     vd->sys = NULL;
     if (owner)
         vd->owner = *owner;
@@ -751,18 +742,16 @@ vout_display_t *vout_display_New(vlc_object_t *parent,
 #if defined(__OS2__)
     if ((var_GetBool(parent, "fullscreen")
       || var_GetBool(parent, "video-wallpaper"))
-     && vout_display_Control(vd, VOUT_DISPLAY_CHANGE_FULLSCREEN,
-                             true) == VLC_SUCCESS)
+     && vout_display_Control(vd, VOUT_DISPLAY_CHANGE_FULLSCREEN) == VLC_SUCCESS)
         osys->cfg.is_fullscreen = true;
 
     if (var_InheritBool(parent, "video-on-top"))
-        vout_display_Control(vd, VOUT_DISPLAY_CHANGE_WINDOW_STATE,
-                             (unsigned)VOUT_WINDOW_STATE_ABOVE);
+        vout_display_Control(vd, VOUT_DISPLAY_CHANGE_WINDOW_STATE);
 #endif
 
     if (VoutDisplayCreateRender(vd)) {
-        if (vd->close != NULL)
-            vd->close(vd);
+        if (vd->ops->close != NULL)
+            vd->ops->close(vd);
         vlc_objres_clear(VLC_OBJECT(vd));
         video_format_Clean(&osys->display_fmt);
         goto error;
@@ -790,8 +779,8 @@ void vout_display_Delete(vout_display_t *vd)
     if (osys->pool != NULL)
         picture_pool_Release(osys->pool);
 
-    if (vd->close != NULL)
-        vd->close(vd);
+    if (vd->ops->close != NULL)
+        vd->ops->close(vd);
     vlc_objres_clear(VLC_OBJECT(vd));
 
     video_format_Clean(&osys->source);

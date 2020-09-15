@@ -73,9 +73,13 @@ struct vout_display_sys_t
 // Display callbacks
 static void PictureRender(vout_display_t *, picture_t *, subpicture_t *, mtime_t);
 static void PictureDisplay(vout_display_t *, picture_t *);
-static int Control(vout_display_t *, int, va_list);
+static int Control(vout_display_t *, int);
 static void Close(vout_display_t *);
 static void UpdateParams(vout_display_t *);
+
+static const struct vlc_display_operations ops = {
+    Close, PictureRender, PictureDisplay, Control, NULL, NULL,
+};
 
 // Allocates a Vulkan surface and instance for video output.
 static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
@@ -139,10 +143,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     vd->info.subpicture_chromas = subfmts;
 
-    vd->prepare = PictureRender;
-    vd->display = PictureDisplay;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
 
     UpdateParams(vd);
     (void) cfg; (void) context;
@@ -333,15 +334,12 @@ static void PictureDisplay(vout_display_t *vd, picture_t *pic)
     pl_swapchain_swap_buffers(sys->vk->swapchain);
 }
 
-static int Control(vout_display_t *vd, int query, va_list ap)
+static int Control(vout_display_t *vd, int query)
 {
     vout_display_sys_t *sys = vd->sys;
 
     switch (query)
     {
-    case VOUT_DISPLAY_RESET_PICTURES:
-        assert(!"VOUT_DISPLAY_RESET_PICTURES");
-
     case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
     case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
     case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:

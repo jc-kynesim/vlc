@@ -75,7 +75,7 @@ vlc_module_end()
 
 /* */
 static void           Display(vout_display_t *, picture_t *);
-static int            Control(vout_display_t *, int, va_list);
+static int            Control(vout_display_t *, int);
 
 /*****************************************************************************
  * vout_display_sys_t: video output descriptor
@@ -84,6 +84,10 @@ struct vout_display_sys_t {
     FILE *f;
     bool  is_first;
     bool  is_yuv4mpeg2;
+};
+
+static const struct vlc_display_operations ops = {
+    Close, NULL, Display, Control, NULL, NULL,
 };
 
 /* */
@@ -143,16 +147,13 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     /* */
     video_format_t fmt;
-    video_format_ApplyRotation(&fmt, fmtp);
+    video_format_ApplyRotation(&fmt, vd->source);
     fmt.i_chroma = chroma;
     video_format_FixRgb(&fmt);
 
     /* */
     *fmtp = fmt;
-    vd->prepare = NULL;
-    vd->display = Display;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
 
     (void) cfg; (void) context;
     return VLC_SUCCESS;
@@ -247,9 +248,9 @@ static void Display(vout_display_t *vd, picture_t *picture)
     fflush(sys->f);
 }
 
-static int Control(vout_display_t *vd, int query, va_list args)
+static int Control(vout_display_t *vd, int query)
 {
-    (void) vd; (void) args;
+    (void) vd;
 
     switch (query) {
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:

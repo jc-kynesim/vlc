@@ -66,7 +66,7 @@ vlc_module_end()
 static void PictureRender   (vout_display_t *vd, picture_t *pic, subpicture_t *subpicture,
                              vlc_tick_t date);
 static void PictureDisplay  (vout_display_t *vd, picture_t *pic);
-static int Control          (vout_display_t *vd, int query, va_list ap);
+static int Control          (vout_display_t *vd, int);
 
 static void *OurGetProcAddress (vlc_gl_t *gl, const char *name);
 static int OpenglLock         (vlc_gl_t *gl);
@@ -105,6 +105,21 @@ struct gl_sys
 {
     CGLContextObj locked_ctx;
     VLCCAOpenGLLayer *cgLayer;
+};
+
+static int SetViewpoint(vout_display_t *vd, const vlc_viewpoint_t *vp)
+{
+    vout_display_sys_t *sys = vd->sys;
+    if (OpenglLock(sys->gl))
+        return VLC_EGENERIC;
+
+    int ret = vout_display_opengl_SetViewpoint(sys->vgl, vp);
+    OpenglUnlock(sys->gl);
+    return ret;
+}
+
+static const struct vlc_display_operations ops = {
+    Close, PictureRender, PictureDisplay, Control, NULL, SetViewpoint,
 };
 
 /*****************************************************************************
@@ -198,10 +213,7 @@ static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
         /* setup vout display */
         vd->info.subpicture_chromas = subpicture_chromas;
 
-        vd->prepare = PictureRender;
-        vd->display = PictureDisplay;
-        vd->control = Control;
-        vd->close   = Close;
+        vd->ops = &ops;
 
         if (OSX_SIERRA_AND_HIGHER) {
             /* request our screen's HDR mode (introduced in OS X 10.11, but correctly supported in 10.12 only) */
@@ -298,7 +310,7 @@ static void PictureDisplay (vout_display_t *vd, picture_t *pic)
     }
 }
 
-static int Control (vout_display_t *vd, int query, va_list ap)
+static int Control (vout_display_t *vd, int query)
 {
     vout_display_sys_t *sys = vd->sys;
 
@@ -330,7 +342,7 @@ static int Control (vout_display_t *vd, int query, va_list ap)
             vout_display_place_t place;
             vout_display_PlacePicture(&place, vd->source, &cfg_tmp);
             if (unlikely(OpenglLock(sys->gl)))
-                // don't return an error or we need to handle VOUT_DISPLAY_RESET_PICTURES
+                // don't return an error or we need to handle reset_pictures
                 return VLC_SUCCESS;
 
             vout_display_opengl_SetWindowAspectRatio(sys->vgl, (float)place.width / place.height);
@@ -341,21 +353,6 @@ static int Control (vout_display_t *vd, int query, va_list ap)
             return VLC_SUCCESS;
         }
 
-        case VOUT_DISPLAY_CHANGE_VIEWPOINT:
-        {
-            int ret;
-
-            if (OpenglLock(sys->gl))
-                return VLC_EGENERIC;
-
-            ret = vout_display_opengl_SetViewpoint(sys->vgl,
-                                                   va_arg(ap, const vlc_viewpoint_t*));
-            OpenglUnlock(sys->gl);
-            return ret;
-        }
-
-        case VOUT_DISPLAY_RESET_PICTURES:
-            vlc_assert_unreachable ();
         default:
             msg_Err (vd, "Unhandled request %d", query);
             return VLC_EGENERIC;

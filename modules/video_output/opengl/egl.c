@@ -423,7 +423,7 @@ vlc_module_begin ()
     set_description (N_("EGL extension for OpenGL"))
     set_category (CAT_VIDEO)
     set_subcategory (SUBCAT_VIDEO_VOUT)
-    set_capability ("opengl", 50)
+    set_capability ("opengl", 0)
     set_callback(OpenGL)
     add_shortcut ("egl")
 

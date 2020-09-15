@@ -110,7 +110,7 @@ struct vout_display_sys_t
  * Local prototypes
  *****************************************************************************/
 static void            Display(vout_display_t *, picture_t *);
-static int             Control(vout_display_t *, int, va_list);
+static int             Control(vout_display_t *, int);
 
 static int  OpenDisplay ( vout_display_t *, video_format_t * );
 static void CloseDisplay( vout_display_t * );
@@ -155,6 +155,10 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic, vl
     }
 }
 
+static const struct vlc_display_operations ops = {
+    Close, Prepare, Display, Control, NULL, NULL,
+};
+
 static void PMThread( void *arg )
 {
     struct open_init *init = ( struct open_init * )arg;
@@ -169,7 +173,7 @@ static void PMThread( void *arg )
 
     /* */
     video_format_t fmt;
-    video_format_ApplyRotation(&fmt, fmtp);
+    video_format_ApplyRotation(&fmt, vd->source);
 
     /* */
     MorphToPM();
@@ -271,10 +275,7 @@ static void PMThread( void *arg )
     /* Setup vout_display now that everything is fine */
     *fmtp       = fmt;
 
-    vd->prepare = Prepare;
-    vd->display = Display;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
 
     /* Prevent SIG_FPE */
     _control87(MCW_EM, MCW_EM);
@@ -391,7 +392,7 @@ static void Display( vout_display_t *vd, picture_t *picture )
 /*****************************************************************************
  * Control: control facility for the vout
  *****************************************************************************/
-static int Control( vout_display_t *vd, int query, va_list args )
+static int Control( vout_display_t *vd, int query )
 {
     vout_display_sys_t *sys = vd->sys;
 
@@ -399,21 +400,15 @@ static int Control( vout_display_t *vd, int query, va_list args )
     {
     case VOUT_DISPLAY_CHANGE_FULLSCREEN:
     {
-        bool fs = va_arg(args, int);
-
-        WinPostMsg( sys->client, WM_VLC_FULLSCREEN_CHANGE, MPFROMLONG(fs), 0 );
+        WinPostMsg( sys->client, WM_VLC_FULLSCREEN_CHANGE, MPFROMLONG(true), 0 );
         return VLC_SUCCESS;
     }
 
     case VOUT_DISPLAY_CHANGE_WINDOW_STATE:
     {
-        const unsigned state = va_arg( args, unsigned );
-        const bool is_on_top = (state & VOUT_WINDOW_STATE_ABOVE) != 0;
+        WinSetWindowPos( sys->frame, HWND_TOP, 0, 0, 0, 0, SWP_ZORDER );
 
-        if( is_on_top )
-            WinSetWindowPos( sys->frame, HWND_TOP, 0, 0, 0, 0, SWP_ZORDER );
-
-        sys->is_on_top = is_on_top;
+        sys->is_on_top = true;
 
         return VLC_SUCCESS;
     }
@@ -453,9 +448,6 @@ static int Control( vout_display_t *vd, int query, va_list args )
         kvaSetup( &sys->kvas );
         return VLC_SUCCESS;
     }
-
-    case VOUT_DISPLAY_RESET_PICTURES:
-        vlc_assert_unreachable();
     }
 
     msg_Err(vd, "Unsupported query(=%d) in vout display KVA", query);

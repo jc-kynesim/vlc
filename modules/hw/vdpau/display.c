@@ -223,36 +223,38 @@ out:
         free(ev);
 }
 
-static int Control(vout_display_t *vd, int query, va_list ap)
+static int ResetPictures(vout_display_t *vd, video_format_t *fmt)
+{
+    vout_display_sys_t *sys = vd->sys;
+    const video_format_t *src= vd->source;
+    vout_display_place_t place;
+
+    msg_Dbg(vd, "resetting pictures");
+    vout_display_PlacePicture(&place, src, vd->cfg);
+
+    fmt->i_width = src->i_width * place.width / src->i_visible_width;
+    fmt->i_height = src->i_height * place.height / src->i_visible_height;
+    sys->width = fmt->i_visible_width = place.width;
+    sys->height = fmt->i_visible_height = place.height;
+    fmt->i_x_offset = src->i_x_offset * place.width / src->i_visible_width;
+    fmt->i_y_offset = src->i_y_offset * place.height / src->i_visible_height;
+
+    const uint32_t values[] = { place.x, place.y,
+                                place.width, place.height, };
+    xcb_configure_window(sys->conn, sys->window,
+                            XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y|
+                            XCB_CONFIG_WINDOW_WIDTH|XCB_CONFIG_WINDOW_HEIGHT,
+                            values);
+    xcb_flush (sys->conn);
+    return VLC_SUCCESS;
+}
+
+static int Control(vout_display_t *vd, int query)
 {
     vout_display_sys_t *sys = vd->sys;
 
     switch (query)
     {
-    case VOUT_DISPLAY_RESET_PICTURES:
-    {
-        video_format_t *fmt = va_arg(ap, video_format_t *);
-        const video_format_t *src= vd->source;
-        vout_display_place_t place;
-
-        msg_Dbg(vd, "resetting pictures");
-        vout_display_PlacePicture(&place, src, vd->cfg);
-
-        fmt->i_width = src->i_width * place.width / src->i_visible_width;
-        fmt->i_height = src->i_height * place.height / src->i_visible_height;
-        sys->width = fmt->i_visible_width = place.width;
-        sys->height = fmt->i_visible_height = place.height;
-        fmt->i_x_offset = src->i_x_offset * place.width / src->i_visible_width;
-        fmt->i_y_offset = src->i_y_offset * place.height / src->i_visible_height;
-
-        const uint32_t values[] = { place.x, place.y,
-                                    place.width, place.height, };
-        xcb_configure_window(sys->conn, sys->window,
-                             XCB_CONFIG_WINDOW_X|XCB_CONFIG_WINDOW_Y|
-                             XCB_CONFIG_WINDOW_WIDTH|XCB_CONFIG_WINDOW_HEIGHT,
-                             values);
-        break;
-    }
     case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
     {
         vout_display_place_t place;
@@ -282,6 +284,10 @@ static int Control(vout_display_t *vd, int query, va_list ap)
     xcb_flush (sys->conn);
     return VLC_SUCCESS;
 }
+
+static const struct vlc_display_operations ops = {
+    Close, Queue, Wait, Control, ResetPictures, NULL,
+};
 
 static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
                 video_format_t *fmtp, vlc_video_context *context)
@@ -488,12 +494,8 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     vd->info.subpicture_chromas = spu_chromas;
     *fmtp = fmt;
 
-    vd->prepare = Queue;
-    vd->display = Wait;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
 
-    (void) context;
     return VLC_SUCCESS;
 
 error:

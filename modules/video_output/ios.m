@@ -58,7 +58,7 @@ static void Close(vout_display_t *vd);
 
 static void PictureRender(vout_display_t *, picture_t *, subpicture_t *, vlc_tick_t);
 static void PictureDisplay(vout_display_t *, picture_t *);
-static int Control(vout_display_t*, int, va_list);
+static int Control(vout_display_t*, int);
 
 static void *OurGetProcAddress(vlc_gl_t *, const char *);
 
@@ -144,6 +144,17 @@ static void *OurGetProcAddress(vlc_gl_t *gl, const char *name)
     return dlsym(RTLD_DEFAULT, name);
 }
 
+static int SetViewpoint(vout_display_t *vd, const vlc_viewpoint_t *vp)
+{
+    vout_display_sys_t *sys = vd->sys;
+    struct gl_sys *glsys = sys->gl->sys;
+    return vout_display_opengl_SetViewpoint (glsys->vgl, vp);
+}
+
+static const struct vlc_display_operations ops = {
+    Close, PictureRender, PictureDisplay, Control, NULL, SetViewpoint,
+};
+
 static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
                 video_format_t *fmt, vlc_video_context *context)
 {
@@ -209,10 +220,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
         /* Setup vout_display_t once everything is fine */
         vd->info.subpicture_chromas = subpicture_chromas;
 
-        vd->prepare = PictureRender;
-        vd->display = PictureDisplay;
-        vd->control = Control;
-        vd->close   = Close;
+        vd->ops = &ops;
 
         return VLC_SUCCESS;
 
@@ -254,7 +262,7 @@ static void Close(vout_display_t *vd)
  * vout display callbacks
  *****************************************************************************/
 
-static int Control(vout_display_t *vd, int query, va_list ap)
+static int Control(vout_display_t *vd, int query)
 {
     vout_display_sys_t *sys = vd->sys;
     struct gl_sys *glsys = sys->gl->sys;
@@ -273,12 +281,6 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             return VLC_SUCCESS;
         }
 
-        case VOUT_DISPLAY_CHANGE_VIEWPOINT:
-            return vout_display_opengl_SetViewpoint(glsys->vgl,
-                                                    va_arg(ap, const vlc_viewpoint_t*));
-
-        case VOUT_DISPLAY_RESET_PICTURES:
-            vlc_assert_unreachable ();
         default:
             msg_Err(vd, "Unknown request %d", query);
             return VLC_EGENERIC;

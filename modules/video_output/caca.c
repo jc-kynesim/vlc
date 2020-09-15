@@ -171,11 +171,9 @@ static void PictureDisplay(vout_display_t *vd, picture_t *picture)
 /**
  * Control for vout display
  */
-static int Control(vout_display_t *vd, int query, va_list args)
+static int Control(vout_display_t *vd, int query)
 {
     vout_display_sys_t *sys = vd->sys;
-
-    (void) args;
 
     switch (query) {
     case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
@@ -372,6 +370,10 @@ static void Close(vout_display_t *vd)
     free(sys);
 }
 
+static const struct vlc_display_operations ops = {
+    Close, Prepare, PictureDisplay, Control, NULL, NULL,
+};
+
 /**
  * This function initializes libcaca vout method.
  */
@@ -488,10 +490,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     }
 
     /* Setup vout_display now that everything is fine */
-    vd->prepare = Prepare;
-    vd->display = PictureDisplay;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
 
     /* Fix initial state */
     caca_refresh_display(sys->dp);

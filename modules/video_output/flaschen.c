@@ -79,7 +79,11 @@ struct vout_display_sys_t {
     int             fd;
 };
 static void            Display(vout_display_t *, picture_t *);
-static int             Control(vout_display_t *, int, va_list);
+static int             Control(vout_display_t *, int);
+
+static const struct vlc_display_operations ops = {
+    Close, NULL, Display, Control, NULL, NULL,
+};
 
 /*****************************************************************************
  * Open: activates flaschen vout display method
@@ -138,10 +142,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     *fmtp = fmt;
 
-    vd->prepare = NULL;
-    vd->display = Display;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
 
     (void) cfg; (void) context;
     return VLC_SUCCESS;
@@ -209,10 +210,8 @@ static void Display(vout_display_t *vd, picture_t *picture)
 /**
  * Control for vout display
  */
-static int Control(vout_display_t *vd, int query, va_list args)
+static int Control(vout_display_t *vd, int query)
 {
-    VLC_UNUSED(args);
-
     switch (query) {
     case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
     case VOUT_DISPLAY_CHANGE_ZOOM:

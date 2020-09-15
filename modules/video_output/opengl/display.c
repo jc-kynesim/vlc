@@ -52,7 +52,7 @@ vlc_module_begin ()
 # define MODULE_VARNAME "gles2"
     set_shortname (N_("OpenGL ES2"))
     set_description (N_("OpenGL for Embedded Systems 2 video output"))
-    set_callback_display(Open, 265)
+    set_callback_display(Open, 275)
     add_shortcut ("opengles2", "gles2")
     add_module("gles2", "opengl es2", NULL, GLES2_TEXT, PROVIDER_LONGTEXT)
 
@@ -84,7 +84,17 @@ struct vout_display_sys_t
 /* Display callbacks */
 static void PictureRender (vout_display_t *, picture_t *, subpicture_t *, vlc_tick_t);
 static void PictureDisplay (vout_display_t *, picture_t *);
-static int Control (vout_display_t *, int, va_list);
+static int Control (vout_display_t *, int);
+
+static int SetViewpoint(vout_display_t *vd, const vlc_viewpoint_t *vp)
+{
+    vout_display_sys_t *sys = vd->sys;
+    return vout_display_opengl_SetViewpoint (sys->vgl, vp);
+}
+
+static const struct vlc_display_operations ops = {
+    Close, PictureRender, PictureDisplay, Control, NULL, SetViewpoint,
+};
 
 /**
  * Allocates a surface and an OpenGL context for video output.
@@ -148,10 +158,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     vd->sys = sys;
     vd->info.subpicture_chromas = spu_chromas;
-    vd->prepare = PictureRender;
-    vd->display = PictureDisplay;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
     return VLC_SUCCESS;
 
 error:
@@ -221,16 +228,12 @@ FlipVerticalAlign(vout_display_cfg_t *cfg)
         cfg->align.vertical = VLC_VIDEO_ALIGN_TOP;
 }
 
-static int Control (vout_display_t *vd, int query, va_list ap)
+static int Control (vout_display_t *vd, int query)
 {
     vout_display_sys_t *sys = vd->sys;
 
     switch (query)
     {
-#ifndef NDEBUG
-      case VOUT_DISPLAY_RESET_PICTURES: // not needed
-        vlc_assert_unreachable();
-#endif
 
       case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
       case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
@@ -257,9 +260,6 @@ static int Control (vout_display_t *vd, int query, va_list ap)
         sys->place_changed = true;
         return VLC_SUCCESS;
       }
-      case VOUT_DISPLAY_CHANGE_VIEWPOINT:
-        return vout_display_opengl_SetViewpoint (sys->vgl,
-                                                 va_arg(ap, const vlc_viewpoint_t*));
       default:
         msg_Err (vd, "Unknown request %d", query);
     }

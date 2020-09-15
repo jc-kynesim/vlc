@@ -76,7 +76,7 @@ static const vlc_fourcc_t subpicture_chromas[] =
 
 static void             Prepare(vout_display_t *, picture_t *, subpicture_t *, vlc_tick_t);
 static void             Display(vout_display_t *, picture_t *);
-static int              Control(vout_display_t *, int, va_list);
+static int              Control(vout_display_t *, int);
 
 typedef struct
 {
@@ -476,6 +476,10 @@ static void SetRGBMask(video_format_t *p_fmt)
     }
 }
 
+static const struct vlc_display_operations ops = {
+    Close, Prepare, Display, Control, NULL, NULL,
+};
+
 static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
                 video_format_t *fmtp, vlc_video_context *context)
 {
@@ -587,10 +591,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
         UpdateVideoSize(sys, &sys->p_window->fmt);
     }
 
-    vd->prepare = Prepare;
-    vd->display = Display;
-    vd->control = Control;
-    vd->close = Close;
+    vd->ops = &ops;
 
     *fmtp = fmt;
 
@@ -895,7 +896,7 @@ static void CopySourceAspect(video_format_t *p_dest,
     p_dest->i_sar_den = p_src->i_sar_den;
 }
 
-static int Control(vout_display_t *vd, int query, va_list args)
+static int Control(vout_display_t *vd, int query)
 {
     vout_display_sys_t *sys = vd->sys;
 
@@ -923,13 +924,11 @@ static int Control(vout_display_t *vd, int query, va_list args)
         FixSubtitleFormat(sys);
         return VLC_SUCCESS;
     }
-    case VOUT_DISPLAY_RESET_PICTURES:
-        vlc_assert_unreachable();
-    default:
-        msg_Warn(vd, "Unknown request in android-display: %d", query);
-        return VLC_EGENERIC;
     case VOUT_DISPLAY_CHANGE_ZOOM:
     case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
         return VLC_SUCCESS;
+    default:
+        msg_Warn(vd, "Unknown request in android-display: %d", query);
+        return VLC_EGENERIC;
     }
 }
