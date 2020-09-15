@@ -38,7 +38,7 @@ PATH="$TOOLS/bin:$PATH" \
   MOC="`which moc` -qt=5" \
   UIC="`which uic` -qt=5" \
   RCC="`which rcc` -qt=5" \
-  ../configure --host=$A --enable-mmal-avcodec --disable-vdpau --enable-vaapi --enable-debug --disable-lua --disable-chromecast --disable-wayland --enable-gles2 --disable-opencv --enable-dav1d --disable-aom
+  ../configure --host=$A --enable-mmal-avcodec --disable-vdpau --enable-vaapi --enable-debug --disable-lua --disable-chromecast --disable-wayland --enable-gles2 --disable-opencv --enable-dav1d --disable-aom --disable-qt
 
 #  ./configure --host=$A --enable-debug --disable-lua --disable-qt --disable-vdpau --disable-chromecast --disable-wayland --disable-bluray --disable-opencv
 #  ./configure --host=$A --enable-debug --disable-wayland

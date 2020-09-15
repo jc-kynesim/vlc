@@ -722,6 +722,8 @@ static void Flush( decoder_t *p_dec )
     decoder_sys_t *p_sys = p_dec->p_sys;
     AVCodecContext *p_context = p_sys->p_context;
 
+    msg_Info(p_dec, "<<< %s", __func__);
+
     p_sys->i_late_frames = 0;
     p_sys->framedrop = FRAMEDROP_NONE;
     cc_Flush( &p_sys->cc );
@@ -1175,8 +1177,8 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
             if( i_used == 0 ) break;
             continue;
         }
-        msg_Info(p_dec, "%s: Frame Rx: fmt=%d, ctx.fmt=%d PTS=%" PRId64 "/%" PRId64, __func__,
-                 frame->format, p_context->pix_fmt, frame->pts, frame->pkt_pts);
+//        msg_Info(p_dec, "%s: Frame Rx: fmt=%d, ctx.fmt=%d PTS=%" PRId64 "/%" PRId64, __func__,
+//                 frame->format, p_context->pix_fmt, frame->pts, frame->pkt_pts);
 
         struct frame_info_s *p_frame_info = &p_sys->frame_info[frame->reordered_opaque % FRAME_INFO_DEPTH];
         if( p_frame_info->b_eos )
@@ -1264,7 +1266,7 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
              && decoder_UpdateVideoOutput(p_dec, NULL) == 0))
                 p_pic = decoder_NewPicture(p_dec);
 
-            msg_Info(p_dec, "Pix fmt=%d, dec_fmt=%#x", p_context->pix_fmt, p_dec->fmt_out.video.i_chroma);
+//            msg_Info(p_dec, "Pix fmt=%d, dec_fmt=%#x", p_context->pix_fmt, p_dec->fmt_out.video.i_chroma);
 
             if( !p_pic )
             {
@@ -1336,12 +1338,12 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
                 p_pic->b_still = true;
             p_sys->b_first_frame = false;
             vlc_mutex_unlock(&p_sys->lock);
-            msg_Info(p_dec, "%s: Q Vid: %#x\n", __func__, p_pic->format.i_chroma);
+//            msg_Info(p_dec, "%s: Q Vid: %#x\n", __func__, p_pic->format.i_chroma);
             decoder_QueueVideo( p_dec, p_pic );
         }
         else
         {
-            msg_Info(p_dec, "%s: No PTS", __func__);
+            msg_Dbg(p_dec, "%s: No PTS", __func__);
             vlc_mutex_unlock(&p_sys->lock);
             picture_Release( p_pic );
         }
@@ -1396,6 +1398,8 @@ void EndVideoDec( vlc_object_t *obj )
     decoder_t *p_dec = (decoder_t *)obj;
     decoder_sys_t *p_sys = p_dec->p_sys;
     AVCodecContext *ctx = p_sys->p_context;
+
+    msg_Info(obj, "<<< %s", __func__);
 
     /* do not flush buffers if codec hasn't been opened (theora/vorbis/VC1) */
     if( avcodec_is_open( ctx ) )

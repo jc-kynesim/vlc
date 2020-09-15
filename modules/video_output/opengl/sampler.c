@@ -707,6 +707,55 @@ InitOrientationMatrix(GLfloat matrix[static 4*4],
     }
 }
 
+static void
+drm_prime_fetch_locations(struct vlc_gl_sampler *sampler, GLuint program)
+{
+    struct vlc_gl_sampler_priv *priv = PRIV(sampler);
+    const opengl_vtable_t *vt = priv->vt;
+
+    priv->uloc.Textures[0] =
+        vt->GetUniformLocation(program, "Texture0");
+    assert(priv->uloc.Textures[0] != -1);
+}
+
+static void
+drm_prime_load(const struct vlc_gl_sampler *sampler)
+{
+    struct vlc_gl_sampler_priv *priv = PRIV(sampler);
+    const opengl_vtable_t *vt = priv->vt;
+
+    GLuint texture = priv->textures[0];
+
+    vt->ActiveTexture(GL_TEXTURE0);
+    vt->BindTexture(GL_TEXTURE_2D, texture);
+    vt->Uniform1i(priv->uloc.Textures[0], 0);
+}
+
+static int
+drm_prime_shader_init(struct vlc_gl_sampler *sampler)
+{
+    static const struct vlc_gl_sampler_ops ops = {
+        .fetch_locations = drm_prime_fetch_locations,
+        .load = drm_prime_load,
+    };
+    sampler->ops = &ops;
+
+    sampler->shader.extensions =
+        strdup("#extension GL_OES_EGL_image_external : require\n");
+
+    static const char template[] =
+       "uniform samplerExternalOES Texture0;\n"
+        "vec4 vlc_texture(vec2 tex_coords) {\n"
+        "  return texture2D(Texture0, tex_coords);\n"
+        "}\n";
+
+    sampler->shader.body = strdup(template);
+    if (!sampler->shader.body)
+        return VLC_ENOMEM;
+
+    return VLC_SUCCESS;
+}
+
 static int
 opengl_fragment_shader_init(struct vlc_gl_sampler *sampler, GLenum tex_target,
                             vlc_fourcc_t chroma, video_color_space_t yuv_space,
@@ -728,6 +777,8 @@ opengl_fragment_shader_init(struct vlc_gl_sampler *sampler, GLenum tex_target,
 
     if (chroma == VLC_CODEC_XYZ12)
         return xyz12_shader_init(sampler);
+    if (chroma == VLC_CODEC_DRM_PRIME_OPAQUE)
+        return drm_prime_shader_init(sampler);
 
     if (is_yuv)
     {

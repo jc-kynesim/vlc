@@ -70,6 +70,8 @@ struct vlc_gl_t
                                     const int32_t *attrib_list);
             /* call eglDestroyImageKHR() with current display, can be NULL */
             bool (*destroyImageKHR)(vlc_gl_t *, void *image);
+            int (*getError)(void);
+            int (*debugMessageControlKHR)(void * fn, const int32_t * attrs);
         } egl;
         /* if ext == VLC_GL_EXT_WGL */
         struct

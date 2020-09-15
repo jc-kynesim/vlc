@@ -69,7 +69,9 @@ CreateShader(vlc_object_t *obj, const opengl_vtable_t *vt, GLenum type,
     if (!shader)
         return 0;
 
+
     vt->ShaderSource(shader, count, src, NULL);
+    msg_Dbg(obj, "Shader:\n%s", *src);
     vt->CompileShader(shader);
 
     LogShaderErrors(obj, vt, shader);

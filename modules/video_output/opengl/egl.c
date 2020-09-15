@@ -391,6 +391,8 @@ static int Open(vlc_gl_t *gl, const struct gl_api *api,
     {
         gl->egl.createImageKHR = CreateImageKHR;
         gl->egl.destroyImageKHR = DestroyImageKHR;
+        gl->egl.getError = (void *)eglGetProcAddress("eglGetError");
+        gl->egl.debugMessageControlKHR = (void *)eglGetProcAddress("eglDebugMessageControlKHR");
     }
 
     return VLC_SUCCESS;
@@ -406,6 +408,7 @@ static int OpenGLES2(vlc_gl_t *gl, unsigned width, unsigned height)
         "OpenGL_ES", EGL_OPENGL_ES_API, 3, EGL_OPENGL_ES2_BIT,
         { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE },
     };
+    msg_Info(gl, "<<< %s", __func__);
     return Open(gl, &api, width, height);
 }
 
@@ -415,6 +418,7 @@ static int OpenGL(vlc_gl_t *gl, unsigned width, unsigned height)
         "OpenGL", EGL_OPENGL_API, 4, EGL_OPENGL_BIT,
         { EGL_NONE },
     };
+    msg_Info(gl, "<<< %s", __func__);
     return Open(gl, &api, width, height);
 }
 

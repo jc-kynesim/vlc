@@ -28,6 +28,7 @@
 #include <EGL/eglext.h>
 #include <libavutil/buffer.h>
 #include <libavutil/hwcontext_drm.h>
+#include <drm/drm_fourcc.h>
 
 #include <vlc_common.h>
 #include <vlc_vout_window.h>
@@ -55,7 +56,7 @@ typedef void (*PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)(GLenum target, GLeglImageOES
 
 #define DRM_FORMAT_MOD_INVALID  fourcc_mod_code(NONE, DRM_FORMAT_RESERVED)
 
-
+#define IMAGES_MAX 4
 struct priv
 {
     PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
@@ -63,7 +64,7 @@ struct priv
 
     struct {
         picture_t *                 pic;
-        EGLImageKHR image;
+        EGLImageKHR images[IMAGES_MAX];
     } last;
 };
 
@@ -83,14 +84,24 @@ drm_prime_get_desc(picture_t *pic)
     return (const AVDRMFrameDescriptor *)vsys->buf->data;
 }
 
+static void destroy_images(const struct vlc_gl_interop *interop, EGLImageKHR imgs[IMAGES_MAX])
+{
+    unsigned int i;
+    for (i = 0; i != IMAGES_MAX; ++i)
+    {
+        const EGLImageKHR img = imgs[i];
+        imgs[i] = NULL;
+        if (img)
+            interop->gl->egl.destroyImageKHR(interop->gl, img);
+    }
+}
+
 static void release_last(const struct vlc_gl_interop *interop, struct priv *priv)
 {
     if (priv->last.pic != NULL)
         picture_Release(priv->last.pic);
-    if (priv->last.image)
-        interop->gl->egl.destroyImageKHR(interop->gl, priv->last.image);
     priv->last.pic = NULL;
-    priv->last.image = NULL;
+    destroy_images(interop, priv->last.images);
 }
 
 static int
@@ -102,25 +113,8 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
     struct priv *priv = interop->priv;
     vlc_object_t *o = VLC_OBJECT(interop->gl);
     const AVDRMFrameDescriptor * const desc = drm_prime_get_desc(pic);
+    EGLImageKHR images[IMAGES_MAX] = {NULL};
     EGLint attribs[64] = {0};
-    EGLint *a = attribs;
-
-    msg_Info(o, "<<< %s", __func__);
-
-    if (!desc)
-    {
-        msg_Err(o, "%s: No DRM Frame desriptor found", __func__);
-        return VLC_EGENERIC;
-    }
-
-    EGLImageKHR image = NULL;
-
-    *a++ = EGL_WIDTH;
-    *a++ = tex_width[0];
-    *a++ = EGL_HEIGHT;
-    *a++ = tex_height[0];
-    *a++ = EGL_LINUX_DRM_FOURCC_EXT;
-    *a++ = desc->layers[0].format;
 
     static const EGLint plane_exts[] = {
         EGL_DMA_BUF_PLANE0_FD_EXT,
@@ -139,8 +133,80 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
         EGL_DMA_BUF_PLANE2_MODIFIER_LO_EXT,
         EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT,
     };
-    const EGLint * ext = plane_exts;
 
+//    msg_Info(o, "<<< %s", __func__);
+
+    if (!desc)
+    {
+        msg_Err(o, "%s: No DRM Frame desriptor found", __func__);
+        return VLC_EGENERIC;
+    }
+
+#if 1
+    static const uint32_t fourcc_i420_8[4] = {
+        DRM_FORMAT_R8, DRM_FORMAT_R8, DRM_FORMAT_R8, 0
+    };
+    const uint32_t * fourccs = fourcc_i420_8;
+    unsigned int n = 0;
+
+    for (int i = 0; i < desc->nb_layers; ++i)
+    {
+        const AVDRMLayerDescriptor * const layer = desc->layers + i;
+        for (int j = 0; j != layer->nb_planes; ++j)
+        {
+            const AVDRMPlaneDescriptor * const plane = layer->planes + j;
+            const AVDRMObjectDescriptor * const obj = desc->objects + plane->object_index;
+            const EGLint * ext = plane_exts;
+            EGLint *a = attribs;
+
+            *a++ = EGL_WIDTH;
+            *a++ = tex_width[n];
+            *a++ = EGL_HEIGHT;
+            *a++ = tex_height[n];
+            *a++ = EGL_LINUX_DRM_FOURCC_EXT;
+            *a++ = fourccs[n];
+
+            *a++ = *ext++; // FD
+            *a++ = obj->fd;
+            *a++ = *ext++; // OFFSET
+            *a++ = plane->offset;
+            *a++ = *ext++; // PITCH
+            *a++ = plane->pitch;
+            if (obj->format_modifier && obj->format_modifier != DRM_FORMAT_MOD_INVALID)
+            {
+                *a++ = *ext++; // MODIFIER_LO
+                *a++ = (EGLint)(obj->format_modifier & 0xffffffff);
+                *a++ = *ext++; // MODIFIER_HI
+                *a++ = (EGLint)(obj->format_modifier >> 32);
+            }
+            *a++ = EGL_NONE;
+            *a++ = 0;
+
+            if ((images[n] = interop->gl->egl.createImageKHR(interop->gl, EGL_LINUX_DMA_BUF_EXT,
+                                                   NULL, attribs)) == NULL)
+            {
+                msg_Err(o, "Failed create %08x image %d KHR %dx%d fd=%d, offset=%d, pitch=%d, mod=%#" PRIx64 ": err=%#x",
+                        fourccs[n], n, tex_width[n], tex_height[n],
+                        obj->fd, plane->offset, plane->pitch, obj->format_modifier, interop->gl->egl.getError());
+                goto fail;
+            }
+
+            interop->vt->BindTexture(interop->tex_target, textures[n]);
+            priv->glEGLImageTargetTexture2DOES(interop->tex_target, images[n]);
+
+            ++n;
+        }
+    }
+#else
+    EGLint *a = attribs;
+    *a++ = EGL_WIDTH;
+    *a++ = tex_width[0];
+    *a++ = EGL_HEIGHT;
+    *a++ = tex_height[0];
+    *a++ = EGL_LINUX_DRM_FOURCC_EXT;
+    *a++ = desc->layers[0].format;
+
+    const EGLint * ext = plane_exts;
 
     for (int i = 0; i < desc->nb_layers; ++i)
     {
@@ -156,7 +222,7 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
             *a++ = plane->offset;
             *a++ = *ext++; // PITCH
             *a++ = plane->pitch;
-            if (obj->format_modifier != DRM_FORMAT_MOD_INVALID)
+            if (obj->format_modifier == DRM_FORMAT_MOD_INVALID)
             {
                 ext += 2;
             }
@@ -172,30 +238,29 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
     *a++ = EGL_NONE;
     *a++ = 0;
 
-    for (int i = 0; attribs[i] != EGL_NONE; i += 2)
-    {
-        msg_Dbg(o, "a[%2d]: %4x: %d", i, attribs[i], attribs[i+1]);
-    }
-
-    image = interop->gl->egl.createImageKHR(interop->gl, EGL_LINUX_DMA_BUF_EXT,
-                                           NULL, attribs);
-    if (!image)
+    if ((images[0] = interop->gl->egl.createImageKHR(interop->gl, EGL_LINUX_DMA_BUF_EXT,
+                                           NULL, attribs)) == NULL)
     {
         msg_Err(o, "Failed create image KHR");
-        return VLC_EGENERIC;
+        goto fail;
     }
 
     interop->vt->BindTexture(interop->tex_target, textures[0]);
-    priv->glEGLImageTargetTexture2DOES(interop->tex_target, image);
+    priv->glEGLImageTargetTexture2DOES(interop->tex_target, images[0]);
+#endif
 
     if (pic != priv->last.pic)
     {
         release_last(interop, priv);
         priv->last.pic = picture_Hold(pic);
-        priv->last.image = image;
+        memcpy(priv->last.images, images, sizeof(images));
     }
 
     return VLC_SUCCESS;
+
+fail:
+    destroy_images(interop, images);
+    return VLC_EGENERIC;
 }
 
 static void
@@ -209,12 +274,34 @@ Close(struct vlc_gl_interop *interop)
     free(priv);
 }
 
+static void egl_err_cb(EGLenum error,const char *command,EGLint messageType,EGLLabelKHR threadLabel,EGLLabelKHR objectLabel,const char* message)
+{
+    fprintf(stderr, "::: EGL: Err=%#x, Cmd='%s', Type=%#x, Msg='%s'\n", error, command, messageType, message);
+}
+
 static int
 Open(vlc_object_t *obj)
 {
     struct vlc_gl_interop *interop = (void *) obj;
 
     msg_Info(obj, "Try DRM_PRIME: Chroma=%#x", interop->fmt_in.i_chroma);
+
+    if (!interop->gl->egl.debugMessageControlKHR)
+    {
+        msg_Err(obj, "No EGL debug");
+    }
+    else
+    {
+        static const EGLAttrib atts[] = {
+         EGL_DEBUG_MSG_CRITICAL_KHR, 1,
+         EGL_DEBUG_MSG_ERROR_KHR, 1,
+         EGL_DEBUG_MSG_WARN_KHR, 1,
+         EGL_DEBUG_MSG_INFO_KHR, 0,
+         EGL_NONE, 0
+        };
+        if (interop->gl->egl.debugMessageControlKHR((void *)egl_err_cb, atts))
+            msg_Err(obj, "Failed to set debug callback");
+    }
 
     if (interop->vctx == NULL) {
         msg_Info(obj, "DRM PRIME no context");
@@ -281,8 +368,6 @@ Open(vlc_object_t *obj)
     if (tc_va_check_derive_image(interop))
         goto error;
 
-    /* The pictures are uploaded upside-down */
-    video_format_TransformBy(&interop->fmt_out, TRANSFORM_VFLIP);
 #endif
     priv->glEGLImageTargetTexture2DOES =
         vlc_gl_GetProcAddress(interop->gl, "glEGLImageTargetTexture2DOES");
@@ -291,8 +376,11 @@ Open(vlc_object_t *obj)
         goto error;
     }
 
-    int ret = opengl_interop_init(interop, GL_TEXTURE_2D, VLC_CODEC_I420,
-                                  interop->fmt_in.space);
+    /* The pictures are uploaded upside-down */
+    video_format_TransformBy(&interop->fmt_out, TRANSFORM_VFLIP);
+
+    int ret = opengl_interop_init(interop, GL_TEXTURE_2D, VLC_CODEC_I420, interop->fmt_in.space);
+//    int ret = opengl_interop_init(interop, GL_TEXTURE_EXTERNAL_OES, VLC_CODEC_DRM_PRIME_OPAQUE, COLOR_SPACE_UNDEF);
     if (ret != VLC_SUCCESS)
     {
         msg_Err(obj, "Interop Init failed");

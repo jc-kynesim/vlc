@@ -367,7 +367,7 @@ opengl_interop_init_impl(struct vlc_gl_interop *interop, GLenum tex_target,
     interop->fmt_out.space = yuv_space;
     interop->tex_target = tex_target;
 
-    if (chroma == VLC_CODEC_XYZ12)
+    if (chroma == VLC_CODEC_XYZ12 || chroma == VLC_CODEC_DRM_PRIME_OPAQUE)
     {
         interop_xyz12_init(interop);
         return VLC_SUCCESS;
