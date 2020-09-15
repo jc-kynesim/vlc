@@ -178,7 +178,8 @@ vlc_gl_t *vlc_gl_surface_Create(vlc_object_t *obj,
     }
     vlc_mutex_unlock(&sys->lock);
 
-    vlc_gl_t *gl = vlc_gl_Create(&dcfg, VLC_OPENGL, NULL);
+    vlc_gl_t *gl = vlc_gl_Create(&dcfg, VLC_OPENGL_ES2, NULL);
+//    vlc_gl_t *gl = vlc_gl_Create(&dcfg, VLC_OPENGL, NULL);
     if (gl == NULL) {
         vout_window_Delete(surface);
         goto error;

@@ -36,12 +36,21 @@ struct pl_context;
 struct pl_shader;
 struct pl_shader_res;
 
+#ifdef USE_OPENGL_ES2
 #define add_opengl_submodule_renderer() \
     add_submodule() \
     add_shortcut("renderer") \
-    set_shortname("renderer") \
+    set_shortname("renderer_gles2") \
+    set_capability("opengl filter", 1) \
+    set_callback(vlc_gl_renderer_Open)
+#else
+#define add_opengl_submodule_renderer() \
+    add_submodule() \
+    add_shortcut("renderer") \
+    set_shortname("renderer_gl") \
     set_capability("opengl filter", 0) \
     set_callback(vlc_gl_renderer_Open)
+#endif
 
 /**
  * OpenGL picture renderer
