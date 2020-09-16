@@ -39,6 +39,7 @@
 #include "interop.h"
 #include "../codec/avcodec/drm_pic.h"
 
+#define OPT_MULTIPLANE 0
 /* From https://www.khronos.org/registry/OpenGL/extensions/OES/OES_EGL_image.txt
  * The extension is an OpenGL ES extension but can (and usually is) available on
  * OpenGL implementations. */
@@ -47,14 +48,6 @@
 typedef void *GLeglImageOES;
 typedef void (*PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)(GLenum target, GLeglImageOES image);
 #endif
-
-#define DRM_FORMAT_MOD_VENDOR_NONE    0
-#define DRM_FORMAT_RESERVED           ((1ULL << 56) - 1)
-
-#define fourcc_mod_code(vendor, val) \
-        ((((EGLuint64KHR)DRM_FORMAT_MOD_VENDOR_## vendor) << 56) | ((val) & 0x00ffffffffffffffULL))
-
-#define DRM_FORMAT_MOD_INVALID  fourcc_mod_code(NONE, DRM_FORMAT_RESERVED)
 
 #define IMAGES_MAX 4
 struct priv
@@ -142,7 +135,7 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
         return VLC_EGENERIC;
     }
 
-#if 1
+#if OPT_MULTIPLANE
     static const uint32_t fourcc_i420_8[4] = {
         DRM_FORMAT_R8, DRM_FORMAT_R8, DRM_FORMAT_R8, 0
     };
@@ -222,7 +215,7 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
             *a++ = plane->offset;
             *a++ = *ext++; // PITCH
             *a++ = plane->pitch;
-            if (obj->format_modifier == DRM_FORMAT_MOD_INVALID)
+            if (!obj->format_modifier || obj->format_modifier == DRM_FORMAT_MOD_INVALID)
             {
                 ext += 2;
             }
@@ -276,6 +269,8 @@ Close(struct vlc_gl_interop *interop)
 
 static void egl_err_cb(EGLenum error,const char *command,EGLint messageType,EGLLabelKHR threadLabel,EGLLabelKHR objectLabel,const char* message)
 {
+    VLC_UNUSED(threadLabel);
+    VLC_UNUSED(objectLabel);
     fprintf(stderr, "::: EGL: Err=%#x, Cmd='%s', Type=%#x, Msg='%s'\n", error, command, messageType, message);
 }
 
@@ -296,11 +291,10 @@ Open(vlc_object_t *obj)
          EGL_DEBUG_MSG_CRITICAL_KHR, 1,
          EGL_DEBUG_MSG_ERROR_KHR, 1,
          EGL_DEBUG_MSG_WARN_KHR, 1,
-         EGL_DEBUG_MSG_INFO_KHR, 0,
+         EGL_DEBUG_MSG_INFO_KHR, 1,
          EGL_NONE, 0
         };
-        if (interop->gl->egl.debugMessageControlKHR((void *)egl_err_cb, atts))
-            msg_Err(obj, "Failed to set debug callback");
+        interop->gl->egl.debugMessageControlKHR((void *)egl_err_cb, atts);
     }
 
     if (interop->vctx == NULL) {
@@ -379,8 +373,11 @@ Open(vlc_object_t *obj)
     /* The pictures are uploaded upside-down */
     video_format_TransformBy(&interop->fmt_out, TRANSFORM_VFLIP);
 
+#if OPT_MULTIPLANE
     int ret = opengl_interop_init(interop, GL_TEXTURE_2D, VLC_CODEC_I420, interop->fmt_in.space);
-//    int ret = opengl_interop_init(interop, GL_TEXTURE_EXTERNAL_OES, VLC_CODEC_DRM_PRIME_OPAQUE, COLOR_SPACE_UNDEF);
+#else
+    int ret = opengl_interop_init(interop, GL_TEXTURE_EXTERNAL_OES, VLC_CODEC_DRM_PRIME_OPAQUE, interop->fmt_in.space);
+#endif
     if (ret != VLC_SUCCESS)
     {
         msg_Err(obj, "Interop Init failed");
