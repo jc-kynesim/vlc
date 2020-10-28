@@ -24,6 +24,8 @@
 
 char *ProcessMRL( const char *, const char * );
 
+int PlaylistControl( stream_t *p_access, int i_query, va_list args );
+
 int Import_M3U ( vlc_object_t * );
 
 int Import_RAM ( vlc_object_t * );
@@ -63,9 +65,3 @@ void Close_WPL ( vlc_object_t * );
 
 #define GetCurrentItem(obj) ((obj)->p_input_item)
 #define GetSource(obj) ((obj)->s)
-
-#define CHECK_FILE(obj) \
-do { \
-    if( GetSource(obj)->pf_readdir != NULL ) \
-        return VLC_EGENERIC; \
-} while(0)

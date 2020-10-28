@@ -31,8 +31,6 @@ using namespace adaptive::http;
 
 Downloader::Downloader()
 {
-    vlc_mutex_init(&lock);
-    vlc_cond_init(&waitcond);
     killed = false;
     thread_handle_valid = false;
 }
@@ -51,37 +49,38 @@ bool Downloader::start()
 
 Downloader::~Downloader()
 {
-    vlc_mutex_lock( &lock );
-    killed = true;
-    vlc_cond_signal(&waitcond);
-    vlc_mutex_unlock( &lock );
+    kill();
 
     if(thread_handle_valid)
         vlc_join(thread_handle, NULL);
 }
+
+void Downloader::kill()
+{
+    vlc::threads::mutex_locker locker {lock};
+    killed = true;
+    wait_cond.signal();
+}
+
 void Downloader::schedule(HTTPChunkBufferedSource *source)
 {
-    vlc_mutex_lock(&lock);
+    vlc::threads::mutex_locker locker {lock};
     source->hold();
     chunks.push_back(source);
-    vlc_cond_signal(&waitcond);
-    vlc_mutex_unlock(&lock);
+    wait_cond.signal();
 }
 
 void Downloader::cancel(HTTPChunkBufferedSource *source)
 {
-    vlc_mutex_lock(&lock);
+    vlc::threads::mutex_locker locker {lock};
     source->release();
     chunks.remove(source);
-    vlc_mutex_unlock(&lock);
 }
 
 void * Downloader::downloaderThread(void *opaque)
 {
     Downloader *instance = static_cast<Downloader *>(opaque);
-    int canc = vlc_savecancel();
     instance->Run();
-    vlc_restorecancel( canc );
     return NULL;
 }
 
@@ -93,11 +92,11 @@ void Downloader::DownloadSource(HTTPChunkBufferedSource *source)
 
 void Downloader::Run()
 {
-    vlc_mutex_lock(&lock);
+    vlc::threads::mutex_locker locker {lock};
     while(1)
     {
         while(chunks.empty() && !killed)
-            vlc_cond_wait(&waitcond, &lock);
+            wait_cond.wait(lock);
 
         if(killed)
             break;
@@ -113,5 +112,4 @@ void Downloader::Run()
             }
         }
     }
-    vlc_mutex_unlock(&lock);
 }

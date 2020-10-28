@@ -41,8 +41,7 @@
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
-static int  Open (vlc_object_t *);
-static void Close(vlc_object_t *);
+static int  Open (filter_t *);
 
 #define CFG_PREFIX "transform-"
 
@@ -58,7 +57,6 @@ vlc_module_begin()
     set_description(N_("Video transformation filter"))
     set_shortname(N_("Transformation"))
     set_help(N_("Rotate or flip the video"))
-    set_capability("video filter", 0)
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
 
@@ -67,7 +65,7 @@ vlc_module_begin()
         change_safe()
 
     add_shortcut("transform")
-    set_callbacks(Open, Close)
+    set_callback_video_filter(Open)
 vlc_module_end()
 
 /*****************************************************************************
@@ -302,9 +300,8 @@ static int Mouse(filter_t *filter, vlc_mouse_t *mouse,
     return VLC_SUCCESS;
 }
 
-static int Open(vlc_object_t *object)
+static int Open(filter_t *filter)
 {
-    filter_t *filter = (filter_t *)object;
     const video_format_t *src = &filter->fmt_in.video;
     video_format_t       *dst = &filter->fmt_out.video;
 
@@ -313,8 +310,8 @@ static int Open(vlc_object_t *object)
     if (chroma == NULL)
         return VLC_EGENERIC;
 
-    filter_sys_t *sys = malloc(sizeof(*sys));
-    if (!sys)
+    filter_sys_t *sys = vlc_obj_malloc(VLC_OBJECT(filter), sizeof(*sys));
+    if (unlikely(!sys))
         return VLC_ENOMEM;
 
     sys->chroma = chroma;
@@ -432,19 +429,15 @@ static int Open(vlc_object_t *object)
             goto error;
     }
 
+    static const struct vlc_filter_operations filter_ops =
+    {
+        .filter_video = Filter,
+        .video_mouse = Mouse,
+    };
+    filter->ops = &filter_ops;
     filter->p_sys           = sys;
-    filter->pf_video_filter = Filter;
-    filter->pf_video_mouse  = Mouse;
     return VLC_SUCCESS;
 error:
-    free(sys);
+    vlc_obj_free(VLC_OBJECT(filter), sys);
     return VLC_EGENERIC;
-}
-
-static void Close(vlc_object_t *object)
-{
-    filter_t     *filter = (filter_t *)object;
-    filter_sys_t *sys    = filter->p_sys;
-
-    free(sys);
 }

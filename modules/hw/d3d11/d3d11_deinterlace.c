@@ -45,6 +45,7 @@ typedef struct
     d3d11_processor_t              d3d_proc;
 
     struct deinterlace_ctx         context;
+    const d3d_format_t             *output_format;
 } filter_sys_t;
 
 struct filter_mode_t
@@ -190,23 +191,9 @@ static const struct filter_mode_t *GetFilterMode(const char *mode)
 picture_t *AllocPicture( filter_t *p_filter )
 {
     filter_sys_t *p_sys = p_filter->p_sys;
-    d3d11_video_context_t *vctx_sys = GetD3D11ContextPrivate( p_filter->vctx_out );
 
-    const d3d_format_t *cfg = NULL;
-    for (const d3d_format_t *output_format = GetRenderFormatList();
-            output_format->name != NULL; ++output_format)
-    {
-        if (output_format->formatTexture == vctx_sys->format &&
-            is_d3d11_opaque(output_format->fourcc))
-        {
-            cfg = output_format;
-            break;
-        }
-    }
-    if (unlikely(cfg == NULL))
-        return NULL;
-
-    picture_t *pic = D3D11_AllocPicture(VLC_OBJECT(p_filter), &p_filter->fmt_out.video, p_filter->vctx_out, cfg);
+    picture_t *pic = D3D11_AllocPicture(VLC_OBJECT(p_filter), &p_filter->fmt_out.video,
+                                        p_filter->vctx_out, p_sys->output_format);
     if (pic == NULL)
         return NULL;
 
@@ -232,9 +219,22 @@ picture_t *AllocPicture( filter_t *p_filter )
     return pic;
 }
 
-int D3D11OpenDeinterlace(vlc_object_t *obj)
+static void D3D11CloseDeinterlace(filter_t *filter)
 {
-    filter_t *filter = (filter_t *)obj;
+    filter_sys_t *sys = filter->p_sys;
+    Flush(filter);
+    D3D11_ReleaseProcessor( &sys->d3d_proc );
+    vlc_video_context_Release(filter->vctx_out);
+
+    free(sys);
+}
+
+static const struct vlc_filter_operations filter_ops = {
+    .filter_video = Deinterlace, .flush = Flush, .close = D3D11CloseDeinterlace,
+};
+
+int D3D11OpenDeinterlace(filter_t *filter)
+{
     HRESULT hr;
 
     if (!is_d3d11_opaque(filter->fmt_in.video.i_chroma))
@@ -244,7 +244,7 @@ int D3D11OpenDeinterlace(vlc_object_t *obj)
     if (!video_format_IsSimilar(&filter->fmt_in.video, &filter->fmt_out.video))
         return VLC_EGENERIC;
 
-    d3d11_video_context_t *vtcx_sys = GetD3D11ContextPrivate( filter->vctx_in );
+    d3d11_video_context_t *vctx_sys = GetD3D11ContextPrivate( filter->vctx_in );
 
     filter_sys_t *sys = malloc(sizeof (*sys));
     if (unlikely(sys == NULL))
@@ -254,6 +254,19 @@ int D3D11OpenDeinterlace(vlc_object_t *obj)
     d3d11_decoder_device_t *dev_sys = GetD3D11OpaqueContext( filter->vctx_in );
     sys->d3d_dev = &dev_sys->d3d_dev;
 
+    for (const d3d_format_t *output_format = GetRenderFormatList();
+            output_format->name != NULL; ++output_format)
+    {
+        if (output_format->formatTexture == vctx_sys->format &&
+            is_d3d11_opaque(output_format->fourcc))
+        {
+            sys->output_format = output_format;
+            break;
+        }
+    }
+    if (unlikely(sys->output_format == NULL))
+        goto error;
+
     d3d11_device_lock(sys->d3d_dev);
 
     if (D3D11_CreateProcessor(filter, sys->d3d_dev, D3D11_VIDEO_FRAME_FORMAT_INTERLACED_TOP_FIELD_FIRST,
@@ -261,16 +274,16 @@ int D3D11OpenDeinterlace(vlc_object_t *obj)
         goto error;
 
     UINT flags;
-    hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(sys->d3d_proc.procEnumerator, vtcx_sys->format, &flags);
+    hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(sys->d3d_proc.procEnumerator, vctx_sys->format, &flags);
     if (!SUCCEEDED(hr))
     {
-        msg_Dbg(filter, "can't read processor support for %s", DxgiFormatToStr(vtcx_sys->format));
+        msg_Dbg(filter, "can't read processor support for %s", DxgiFormatToStr(vctx_sys->format));
         goto error;
     }
     if ( !(flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT) ||
          !(flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT) )
     {
-        msg_Dbg(filter, "deinterlacing %s is not supported", DxgiFormatToStr(vtcx_sys->format));
+        msg_Dbg(filter, "deinterlacing %s is not supported", DxgiFormatToStr(vctx_sys->format));
         goto error;
     }
 
@@ -305,7 +318,7 @@ int D3D11OpenDeinterlace(vlc_object_t *obj)
     if ( sys->d3d_proc.videoProcessor==NULL &&
          p_mode->i_mode != D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS_DEINTERLACE_BOB )
     {
-        msg_Dbg(filter, "mode %s not available, trying bob", psz_mode);
+        msg_Dbg(filter, "mode %s not available, trying bob", p_mode->psz_mode);
         p_mode = GetFilterMode("bob");
         for (UINT type = 0; type < processorCaps.RateConversionCapsCount; ++type)
         {
@@ -350,8 +363,7 @@ int D3D11OpenDeinterlace(vlc_object_t *obj)
 
     filter->fmt_out.video   = out_fmt;
     filter->vctx_out        = vlc_video_context_Hold(filter->vctx_in);
-    filter->pf_video_filter = Deinterlace;
-    filter->pf_flush        = Flush;
+    filter->ops             = &filter_ops;
     filter->p_sys = sys;
 
     return VLC_SUCCESS;
@@ -361,15 +373,5 @@ error:
     free(sys);
 
     return VLC_EGENERIC;
-}
-
-void D3D11CloseDeinterlace(vlc_object_t *obj)
-{
-    filter_t *filter = (filter_t *)obj;
-    filter_sys_t *sys = filter->p_sys;
-    D3D11_ReleaseProcessor( &sys->d3d_proc );
-    vlc_video_context_Release(filter->vctx_out);
-
-    free(sys);
 }
 

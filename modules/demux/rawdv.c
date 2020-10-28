@@ -48,12 +48,17 @@ static void Close( vlc_object_t * );
 vlc_module_begin ()
     set_shortname( "DV" )
     set_description( N_("DV (Digital Video) demuxer") )
-    set_capability( "demux", 3 )
+    set_capability( "demux", 0 )
     set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_DEMUX )
     add_bool( "rawdv-hurry-up", false, HURRYUP_TEXT, HURRYUP_LONGTEXT, false )
     set_callbacks( Open, Close )
+    /* It isn't easy to recognize a raw DV stream. The chances that we'll
+     * mistake a stream from another type for a raw DV stream are too high, so
+     * we'll rely on the file extension to trigger this demux. Alternatively,
+     * it is possible to force this demux. */
     add_shortcut( "rawdv" )
+    add_file_extension("dv")
 vlc_module_end ()
 
 
@@ -130,15 +135,6 @@ static int Open( vlc_object_t * p_this )
     uint32_t    i_dword;
     dv_header_t dv_header;
     dv_id_t     dv_id;
-
-    /* It isn't easy to recognize a raw DV stream. The chances that we'll
-     * mistake a stream from another type for a raw DV stream are too high, so
-     * we'll rely on the file extension to trigger this demux. Alternatively,
-     * it is possible to force this demux. */
-
-    /* Check for DV file extension */
-    if( !demux_IsPathExtension( p_demux, ".dv" ) && !p_demux->obj.force )
-        return VLC_EGENERIC;
 
     if( vlc_stream_Peek( p_demux->s, &p_peek, DV_PAL_FRAME_SIZE ) <
         DV_NTSC_FRAME_SIZE )

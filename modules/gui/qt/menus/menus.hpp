@@ -40,6 +40,8 @@ class VLCMenuBar : public QObject
     friend class MenuFunc;
 
 public:
+    VLCMenuBar(QObject* parent = nullptr);
+
     /* Main bar creation */
     static void createMenuBar( MainInterface *mi, intf_thread_t * );
 
@@ -57,9 +59,12 @@ public:
     static void freeRendererMenu(){ delete rendererMenu; rendererMenu = NULL; }
     static void freeRecentsMenu(){ delete recentsMenu; recentsMenu = NULL; }
 
-private:
+protected:
     /* All main Menus */
-    static QMenu *FileMenu( intf_thread_t *, QWidget *, MainInterface * mi = NULL );
+    static QMenu *FileMenu( intf_thread_t *, QMenu *, MainInterface * mi = NULL );
+    static QMenu *FileMenu( intf_thread_t *p_intf, QWidget * parent, MainInterface * mi = NULL ){
+        return FileMenu(p_intf, new QMenu(parent), mi);
+    }
 
     static QMenu *ToolsMenu( intf_thread_t *, QMenu * );
     static QMenu *ToolsMenu( intf_thread_t * p_intf, QWidget *parent )
@@ -90,7 +95,10 @@ private:
         return AudioMenu( p_intf, new QMenu( parent ) );
     }
 
-    static QMenu *HelpMenu( QWidget * );
+    static QMenu *HelpMenu( QMenu *menu );
+    static QMenu *HelpMenu( QWidget *parent ) {
+        return HelpMenu( new QMenu( parent ) );
+    }
 
     /* Popups Menus */
     static void PopupMenuStaticEntries( QMenu *menu );

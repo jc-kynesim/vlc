@@ -353,6 +353,31 @@ struct sout_stream_id_sys_t
     vlc_tick_t        i_caching;
 };
 
+static int Control(sout_stream_t *stream, int query, va_list args)
+{
+    (void) stream;
+
+    switch (query)
+    {
+        case SOUT_STREAM_IS_SYNCHRONOUS:
+            *va_arg(args, bool *) = true;
+            break;
+
+        default:
+            return VLC_EGENERIC;
+    }
+
+    return VLC_SUCCESS;
+}
+
+static const struct sout_stream_operations stream_ops = {
+    Add, Del, Send, Control, NULL,
+};
+
+static const struct sout_stream_operations mux_ops = {
+    MuxAdd, MuxDel, MuxSend, Control, NULL,
+};
+
 /*****************************************************************************
  * Open:
  *****************************************************************************/
@@ -513,21 +538,14 @@ static int Open( vlc_object_t *p_this )
         }
 
         p_sys->packet = NULL;
-
-        p_stream->pf_add  = MuxAdd;
-        p_stream->pf_del  = MuxDel;
-        p_stream->pf_send = MuxSend;
+        p_stream->ops = &mux_ops;
     }
     else
     {
-        p_sys->p_mux    = NULL;
-        p_sys->p_grab   = NULL;
-
-        p_stream->pf_add    = Add;
-        p_stream->pf_del    = Del;
-        p_stream->pf_send   = Send;
+        p_sys->p_mux = NULL;
+        p_sys->p_grab = NULL;
+        p_stream->ops = &stream_ops;
     }
-    p_stream->pace_nocontrol = true;
 
     if( var_GetBool( p_stream, SOUT_CFG_PREFIX"sap" ) )
         SDPHandleUrl( p_stream, "sap://" );

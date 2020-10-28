@@ -43,8 +43,8 @@
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static int  CreateFilter ( vlc_object_t * );
-static void DestroyFilter( vlc_object_t * );
+static int  CreateFilter ( filter_t * );
+static void DestroyFilter( filter_t * );
 static subpicture_t *Filter( filter_t *, vlc_tick_t );
 
 static char *MarqueeReadFile( filter_t *, const char * );
@@ -136,11 +136,10 @@ static const char *const ppsz_pos_descriptions[] =
  * Module descriptor
  *****************************************************************************/
 vlc_module_begin ()
-    set_capability( "sub source", 0 )
     set_shortname( N_("Marquee" ))
     set_description( N_("Marquee display") )
     set_help(MARQUEE_HELP)
-    set_callbacks( CreateFilter, DestroyFilter )
+    set_callback_sub_source( CreateFilter, 0 )
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_SUBPIC )
     add_string( CFG_PREFIX "marquee", "VLC", MSG_TEXT, MSG_LONGTEXT,
@@ -178,12 +177,15 @@ static const char *const ppsz_filter_options[] = {
     NULL
 };
 
+static const struct vlc_filter_operations filter_ops = {
+    .source_sub = Filter, .close = DestroyFilter,
+};
+
 /*****************************************************************************
  * CreateFilter: allocates marquee video filter
  *****************************************************************************/
-static int CreateFilter( vlc_object_t *p_this )
+static int CreateFilter( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys;
 
     /* Allocate structure */
@@ -228,7 +230,7 @@ static int CreateFilter( vlc_object_t *p_this )
     CREATE_VAR( p_style->i_font_size, Integer, "marq-size" );
 
     /* Misc init */
-    p_filter->pf_sub_source = Filter;
+    p_filter->ops = &filter_ops;
     p_sys->last_time = 0;
 
     return VLC_SUCCESS;
@@ -236,9 +238,8 @@ static int CreateFilter( vlc_object_t *p_this )
 /*****************************************************************************
  * DestroyFilter: destroy marquee video filter
  *****************************************************************************/
-static void DestroyFilter( vlc_object_t *p_this )
+static void DestroyFilter( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
     /* Delete the marquee variables */

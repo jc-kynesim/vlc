@@ -29,7 +29,6 @@
 MediaLib::MediaLib(intf_thread_t *_intf, QObject *_parent)
     : QObject( _parent )
     , m_intf( _intf )
-    , m_gridView ( m_intf->p_sys->mainSettings->value("medialib-gridView",true).toBool() )
     , m_ml( vlcMl() )
     , m_event_cb( nullptr, [this](vlc_ml_event_callback_t* cb ) {
         vlc_ml_event_unregister_callback( m_ml, cb );
@@ -37,19 +36,6 @@ MediaLib::MediaLib(intf_thread_t *_intf, QObject *_parent)
 {
     m_event_cb.reset( vlc_ml_event_register_callback( m_ml, MediaLib::onMediaLibraryEvent,
                                                       this ) );
-}
-
-// Should the items be displayed as a grid or as list ?
-bool MediaLib::isGridView() const
-{
-    return m_gridView;
-}
-
-void MediaLib::setGridView(bool state)
-{
-    m_gridView = state;
-    m_intf->p_sys->mainSettings->setValue("medialib-gridView",state);
-    emit gridViewChanged();
 }
 
 void MediaLib::openMRLFromMedia(const vlc_ml_media_t& media, bool start )
@@ -64,20 +50,20 @@ void MediaLib::openMRLFromMedia(const vlc_ml_media_t& media, bool start )
     }
 }
 
-void MediaLib::addToPlaylist(const QString& mrl)
+void MediaLib::addToPlaylist(const QString& mrl, const QStringList* options)
 {
-    vlc::playlist::Media media{ mrl, mrl };
+    vlc::playlist::Media media{ mrl, mrl, options };
     m_intf->p_sys->p_mainPlaylistController->append( {media}, false );
 }
 
-void MediaLib::addToPlaylist(const QUrl& mrl)
+void MediaLib::addToPlaylist(const QUrl& mrl, const QStringList* options)
 {
-    vlc::playlist::Media media{ mrl.toString(QUrl::None), mrl.fileName() };
+    vlc::playlist::Media media{ mrl.toString(QUrl::None), mrl.fileName(), options };
     m_intf->p_sys->p_mainPlaylistController->append( {media} , false );
 }
 
 // A specific item has been asked to be added to the playlist
-void MediaLib::addToPlaylist(const MLParentId & itemId)
+void MediaLib::addToPlaylist(const MLParentId & itemId, const QStringList* options)
 {
     //invalid item
     if (itemId.id == 0)
@@ -87,7 +73,7 @@ void MediaLib::addToPlaylist(const MLParentId & itemId)
     {
         vlc::playlist::InputItemPtr item( vlc_ml_get_input_item( m_ml, itemId.id ), false );
         if (item) {
-            QVector<vlc::playlist::Media> medias = { vlc::playlist::Media(item.get()) };
+            QVector<vlc::playlist::Media> medias = { vlc::playlist::Media(item.get(), options) };
             m_intf->p_sys->p_mainPlaylistController->append(medias, false);
         }
     }
@@ -103,37 +89,37 @@ void MediaLib::addToPlaylist(const MLParentId & itemId)
         QVector<vlc::playlist::Media> medias;
         std::transform(mediaRange.begin(), mediaRange.end(), std::back_inserter(medias), [&](vlc_ml_media_t& m) {
             vlc::playlist::InputItemPtr item(vlc_ml_get_input_item( m_ml, m.i_id ), false);
-            return vlc::playlist::Media(item.get());
+            return vlc::playlist::Media(item.get(), options);
         });
         m_intf->p_sys->p_mainPlaylistController->append(medias, false);
     }
 }
 
-void MediaLib::addToPlaylist(const QVariantList& itemIdList)
+void MediaLib::addToPlaylist(const QVariantList& itemIdList, const QStringList* options)
 {
     for (const QVariant& varValue: itemIdList)
     {
         if (varValue.canConvert<QUrl>())
         {
             auto mrl = varValue.value<QUrl>();
-            addToPlaylist(mrl);
+            addToPlaylist(mrl, options);
         }
         else if (varValue.canConvert<QString>())
         {
             auto mrl = varValue.value<QString>();
-            addToPlaylist(mrl);
+            addToPlaylist(mrl, options);
         }
         else if (varValue.canConvert<MLParentId>())
         {
             MLParentId itemId = varValue.value<MLParentId>();
-            addToPlaylist(itemId);
+            addToPlaylist(itemId, options);
         }
     }
 }
 
 // A specific item has been asked to be played,
 // so it's added to the playlist and played
-void MediaLib::addAndPlay(const MLParentId & itemId )
+void MediaLib::addAndPlay(const MLParentId & itemId, const QStringList* options )
 {
     if (itemId.id == 0)
         return;
@@ -141,7 +127,7 @@ void MediaLib::addAndPlay(const MLParentId & itemId )
     {
         vlc::playlist::InputItemPtr item(vlc_ml_get_input_item( m_ml, itemId.id ), false);
         if (item) {
-            QVector<vlc::playlist::Media> medias = { vlc::playlist::Media(item.get()) };
+            QVector<vlc::playlist::Media> medias = { vlc::playlist::Media(item.get(), options) };
             m_intf->p_sys->p_mainPlaylistController->append(medias, true);
         }
     }
@@ -157,26 +143,26 @@ void MediaLib::addAndPlay(const MLParentId & itemId )
         QVector<vlc::playlist::Media> medias;
         std::transform(mediaRange.begin(), mediaRange.end(), std::back_inserter(medias), [&](vlc_ml_media_t& m) {
             vlc::playlist::InputItemPtr item(vlc_ml_get_input_item( m_ml, m.i_id ), false);
-            return vlc::playlist::Media(item.get());
+            return vlc::playlist::Media(item.get(), options);
         });
         m_intf->p_sys->p_mainPlaylistController->append(medias, true);
     }
 }
 
-void MediaLib::addAndPlay(const QString& mrl)
+void MediaLib::addAndPlay(const QString& mrl, const QStringList* options)
 {
-    vlc::playlist::Media media{ mrl, mrl };
+    vlc::playlist::Media media{ mrl, mrl, options };
     m_intf->p_sys->p_mainPlaylistController->append( {media}, true );
 }
 
-void MediaLib::addAndPlay(const QUrl& mrl)
+void MediaLib::addAndPlay(const QUrl& mrl, const QStringList* options)
 {
-    vlc::playlist::Media media{ mrl.toString(QUrl::None), mrl.fileName() };
+    vlc::playlist::Media media{ mrl.toString(QUrl::None), mrl.fileName(), options };
     m_intf->p_sys->p_mainPlaylistController->append( {media}, true );
 }
 
 
-void MediaLib::addAndPlay(const QVariantList& itemIdList)
+void MediaLib::addAndPlay(const QVariantList& itemIdList, const QStringList* options)
 {
     bool b_start = true;
     for (const QVariant& varValue: itemIdList)
@@ -185,25 +171,25 @@ void MediaLib::addAndPlay(const QVariantList& itemIdList)
         {
             auto mrl = varValue.value<QUrl>();
             if (b_start)
-                addAndPlay(mrl);
+                addAndPlay(mrl, options);
             else
-                addToPlaylist(mrl);
+                addToPlaylist(mrl, options);
         }
         if (varValue.canConvert<QString>())
         {
             auto mrl = varValue.value<QString>();
             if (b_start)
-                addAndPlay(mrl);
+                addAndPlay(mrl, options);
             else
-                addToPlaylist(mrl);
+                addToPlaylist(mrl, options);
         }
         else if (varValue.canConvert<MLParentId>())
         {
             MLParentId itemId = varValue.value<MLParentId>();
             if (b_start)
-                addAndPlay(itemId);
+                addAndPlay(itemId, options);
             else
-                addToPlaylist(itemId);
+                addToPlaylist(itemId, options);
         } else {
             continue;
         }

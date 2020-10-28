@@ -116,6 +116,11 @@ char *config_GetPsz(const char *psz_name)
 
     p_config = config_FindConfig( psz_name );
 
+#ifndef NDEBUG
+    if (p_config == NULL)
+        fprintf(stderr, "Unknown vlc configuration variable named %s\n", psz_name);
+#endif
+
     /* sanity checks */
     assert(p_config != NULL);
     assert(IsConfigStringType (p_config->i_type));
@@ -207,7 +212,7 @@ ssize_t config_GetIntChoices(const char *name,
     {
         int (*cb)(const char *, int64_t **, char ***);
 
-        cb = module_Symbol(NULL, cfg->owner, "vlc_entry_cfg_int_enum");
+        cb = vlc_plugin_Symbol(NULL, cfg->owner, "vlc_entry_cfg_int_enum");
         if (cb == NULL)
             return 0;
 
@@ -330,7 +335,7 @@ ssize_t config_GetPszChoices(const char *name,
     {
         int (*cb)(const char *, char ***, char ***);
 
-        cb = module_Symbol(NULL, cfg->owner, "vlc_entry_cfg_str_enum");
+        cb = vlc_plugin_Symbol(NULL, cfg->owner, "vlc_entry_cfg_str_enum");
         if (cb == NULL)
             return 0;
 
@@ -499,5 +504,6 @@ void config_ResetAll(void)
             }
         }
     }
+    config_dirty = true;
     vlc_rwlock_unlock (&config_lock);
 }

@@ -39,7 +39,7 @@ typedef struct chained_filter_t
     /* Private filter chain data (shhhh!) */
     struct chained_filter_t *prev, *next;
     vlc_mouse_t *mouse;
-    picture_t *pending;
+    vlc_picture_chain_t pending;
 } chained_filter_t;
 
 /* */
@@ -61,7 +61,7 @@ struct filter_chain_t
 /**
  * Local prototypes
  */
-static void FilterDeletePictures( picture_t * );
+static void FilterDeletePictures( vlc_picture_chain_t * );
 
 static filter_chain_t *filter_chain_NewInner( vlc_object_t *obj,
     const char *cap, const char *conv_cap, bool fmt_out_change,
@@ -260,6 +260,7 @@ static filter_t *filter_chain_AppendInner( filter_chain_t *chain,
 
     if( filter->p_module == NULL )
         goto error;
+    assert( filter->ops != NULL );
 
     if( chain->last == NULL )
     {
@@ -276,7 +277,7 @@ static filter_t *filter_chain_AppendInner( filter_chain_t *chain,
     if( likely(mouse != NULL) )
         vlc_mouse_Init( mouse );
     chained->mouse = mouse;
-    chained->pending = NULL;
+    vlc_picture_chain_Init( &chained->pending );
 
     msg_Dbg( chain->obj, "Filter '%s' (%p) appended to chain",
              (name != NULL) ? name : module_get_name(filter->p_module, false),
@@ -330,10 +331,11 @@ void filter_chain_DeleteFilter( filter_chain_t *chain, filter_t *filter )
         chain->last = chained->prev;
     }
 
+    filter_Close( filter );
     module_unneed( filter, filter->p_module );
 
     msg_Dbg( chain->obj, "Filter %p removed from chain", (void *)filter );
-    FilterDeletePictures( chained->pending );
+    FilterDeletePictures( &chained->pending );
 
     free( chained->mouse );
     es_format_Clean( &filter->fmt_out );
@@ -429,16 +431,15 @@ static picture_t *FilterChainVideoFilter( chained_filter_t *f, picture_t *p_pic 
     for( ; f != NULL; f = f->next )
     {
         filter_t *p_filter = &f->filter;
-        p_pic = p_filter->pf_video_filter( p_filter, p_pic );
+        p_pic = p_filter->ops->filter_video( p_filter, p_pic );
         if( !p_pic )
             break;
-        if( f->pending )
+        if( !vlc_picture_chain_IsEmpty( &f->pending ) )
         {
             msg_Warn( p_filter, "dropping pictures" );
-            FilterDeletePictures( f->pending );
+            FilterDeletePictures( &f->pending );
         }
-        f->pending = p_pic->p_next;
-        p_pic->p_next = NULL;
+        f->pending = picture_GetAndResetChain( p_pic );
     }
     return p_pic;
 }
@@ -453,11 +454,9 @@ picture_t *filter_chain_VideoFilter( filter_chain_t *p_chain, picture_t *p_pic )
     }
     for( chained_filter_t *b = p_chain->last; b != NULL; b = b->prev )
     {
-        p_pic = b->pending;
-        if( !p_pic )
+        if( vlc_picture_chain_IsEmpty( &b->pending ) )
             continue;
-        b->pending = p_pic->p_next;
-        p_pic->p_next = NULL;
+        p_pic = vlc_picture_chain_PopFront( &b->pending );
 
         p_pic = FilterChainVideoFilter( b->next, p_pic );
         if( p_pic )
@@ -472,8 +471,7 @@ void filter_chain_VideoFlush( filter_chain_t *p_chain )
     {
         filter_t *p_filter = &f->filter;
 
-        FilterDeletePictures( f->pending );
-        f->pending = NULL;
+        FilterDeletePictures( &f->pending );
 
         filter_Flush( p_filter );
     }
@@ -485,7 +483,7 @@ void filter_chain_SubSource( filter_chain_t *p_chain, spu_t *spu,
     for( chained_filter_t *f = p_chain->first; f != NULL; f = f->next )
     {
         filter_t *p_filter = &f->filter;
-        subpicture_t *p_subpic = p_filter->pf_sub_source( p_filter, display_date );
+        subpicture_t *p_subpic = p_filter->ops->source_sub( p_filter, display_date );
         if( p_subpic )
             spu_PutSubpicture( spu, p_subpic );
     }
@@ -497,7 +495,7 @@ subpicture_t *filter_chain_SubFilter( filter_chain_t *p_chain, subpicture_t *p_s
     {
         filter_t *p_filter = &f->filter;
 
-        p_subpic = p_filter->pf_sub_filter( p_filter, p_subpic );
+        p_subpic = p_filter->ops->filter_sub( p_filter, p_subpic );
 
         if( !p_subpic )
             break;
@@ -514,13 +512,13 @@ int filter_chain_MouseFilter( filter_chain_t *p_chain, vlc_mouse_t *p_dst, const
         filter_t *p_filter = &f->filter;
         vlc_mouse_t *p_mouse = f->mouse;
 
-        if( p_filter->pf_video_mouse && p_mouse )
+        if( p_filter->ops->video_mouse && p_mouse )
         {
             vlc_mouse_t old = *p_mouse;
             vlc_mouse_t filtered = current;
 
             *p_mouse = current;
-            if( p_filter->pf_video_mouse( p_filter, &filtered, &old ) )
+            if( p_filter->ops->video_mouse( p_filter, &filtered, &old) )
                 return VLC_EGENERIC;
             current = filtered;
         }
@@ -531,12 +529,11 @@ int filter_chain_MouseFilter( filter_chain_t *p_chain, vlc_mouse_t *p_dst, const
 }
 
 /* Helpers */
-static void FilterDeletePictures( picture_t *picture )
+static void FilterDeletePictures( vlc_picture_chain_t *pictures )
 {
-    while( picture )
+    while( !vlc_picture_chain_IsEmpty( pictures ) )
     {
-        picture_t *next = picture->p_next;
-        picture_Release( picture );
-        picture = next;
+        picture_t *next = vlc_picture_chain_PopFront( pictures );
+        picture_Release( next );
     }
 }

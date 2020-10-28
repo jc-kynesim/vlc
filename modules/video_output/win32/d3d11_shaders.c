@@ -38,10 +38,6 @@
 
 #include "d3d11_shaders.h"
 
-#if !VLC_WINSTORE_APP
-# define D3DCompile(args...)                    shaders->OurD3DCompile(args)
-#endif
-
 #define ST2084_PQ_CONSTANTS  "const float ST2084_m1 = 2610.0 / (4096.0 * 4);\n\
 const float ST2084_m2 = (2523.0 / 4096.0) * 128.0;\n\
 const float ST2084_c1 = 3424.0 / 4096.0;\n\
@@ -65,7 +61,7 @@ static const char* globPixelShaderDefault = "\
     float4x4 Colorspace;\n\
     float4x4 Primaries;\n\
   };\n\
-  Texture2D%s shaderTexture[" STRINGIZE(D3D11_MAX_SHADER_VIEW) "];\n\
+  Texture2D%s shaderTexture[%d];\n\
   SamplerState SamplerStates[2];\n\
   \n\
   struct PS_INPUT\n\
@@ -195,7 +191,7 @@ VS_OUTPUT main( VS_INPUT In )\n\
 }\n\
 ";
 
-static ID3DBlob* D3D11_CompileShader(vlc_object_t *, const d3d11_shaders_t *, const d3d11_device_t *,
+static ID3DBlob* D3D11_CompileShader(vlc_object_t *, const d3d11_shader_compiler_t *, const d3d11_device_t *,
                               const char *psz_shader, bool pixel);
 
 bool IsRGBShader(const d3d_format_t *cfg)
@@ -209,8 +205,9 @@ bool IsRGBShader(const d3d_format_t *cfg)
            cfg->formatTexture != DXGI_FORMAT_420_OPAQUE;
 }
 
-static HRESULT CompileTargetShader(vlc_object_t *o, const d3d11_shaders_t *shaders, bool legacy_shader,
+static HRESULT CompileTargetShader(vlc_object_t *o, const d3d11_shader_compiler_t *compiler,
                                    d3d11_device_t *d3d_dev,
+                                   bool texture_array, size_t texture_count,
                                    const char *psz_sampler,
                                    const char *psz_src_to_linear,
                                    const char *psz_primaries_transform,
@@ -220,7 +217,8 @@ static HRESULT CompileTargetShader(vlc_object_t *o, const d3d11_shaders_t *shade
                                    ID3D11PixelShader **output)
 {
     char *shader;
-    int allocated = asprintf(&shader, globPixelShaderDefault, legacy_shader ? "" : "Array",
+    int allocated = asprintf(&shader, globPixelShaderDefault, texture_array ? "Array" : "",
+                             texture_count * D3D11_MAX_SHADER_VIEW,
                              psz_src_to_linear, psz_linear_to_display,
                              psz_primaries_transform, psz_tone_mapping,
                              psz_adjust_range, psz_move_planes, psz_sampler);
@@ -243,7 +241,7 @@ static HRESULT CompileTargetShader(vlc_object_t *o, const d3d11_shaders_t *shade
     }
 #endif
 
-    ID3DBlob *pPSBlob = D3D11_CompileShader(o, shaders, d3d_dev, shader, true);
+    ID3DBlob *pPSBlob = D3D11_CompileShader(o, compiler, d3d_dev, shader, true);
     free(shader);
     if (!pPSBlob)
         return E_INVALIDARG;
@@ -256,9 +254,10 @@ static HRESULT CompileTargetShader(vlc_object_t *o, const d3d11_shaders_t *shade
     return hr;
 }
 
-HRESULT (D3D11_CompilePixelShader)(vlc_object_t *o, const d3d11_shaders_t *shaders, bool legacy_shader,
+HRESULT (D3D11_CompilePixelShader)(vlc_object_t *o, const d3d11_shader_compiler_t *compiler,
                                  d3d11_device_t *d3d_dev,
-                                 const display_info_t *display,
+                                 bool texture_array, size_t texture_count,
+                                 const display_info_t *display, bool sharp,
                                  video_transfer_func_t transfer,
                                  video_color_primaries_t primaries, bool src_full_range,
                                  d3d_quad_t *quad)
@@ -275,7 +274,7 @@ HRESULT (D3D11_CompilePixelShader)(vlc_object_t *o, const d3d11_shaders_t *shade
 
     D3D11_SAMPLER_DESC sampDesc;
     memset(&sampDesc, 0, sizeof(sampDesc));
-    sampDesc.Filter = D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+    sampDesc.Filter = sharp ? D3D11_FILTER_MIN_MAG_MIP_POINT : D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
     sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
     sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
     sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -284,17 +283,17 @@ HRESULT (D3D11_CompilePixelShader)(vlc_object_t *o, const d3d11_shaders_t *shade
     sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
     HRESULT hr;
-    hr = ID3D11Device_CreateSamplerState(d3d_dev->d3ddevice, &sampDesc, &quad->d3dsampState[0]);
+    hr = ID3D11Device_CreateSamplerState(d3d_dev->d3ddevice, &sampDesc, &quad->SamplerStates[0]);
     if (FAILED(hr)) {
         msg_Err(o, "Could not Create the D3d11 Sampler State. (hr=0x%lX)", hr);
         return hr;
     }
 
     sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
-    hr = ID3D11Device_CreateSamplerState(d3d_dev->d3ddevice, &sampDesc, &quad->d3dsampState[1]);
+    hr = ID3D11Device_CreateSamplerState(d3d_dev->d3ddevice, &sampDesc, &quad->SamplerStates[1]);
     if (FAILED(hr)) {
         msg_Err(o, "Could not Create the D3d11 Sampler State. (hr=0x%lX)", hr);
-        ID3D11SamplerState_Release(quad->d3dsampState[0]);
+        ID3D11SamplerState_Release(quad->SamplerStates[0]);
         return hr;
     }
 
@@ -564,7 +563,7 @@ HRESULT (D3D11_CompilePixelShader)(vlc_object_t *o, const d3d11_shaders_t *shade
         if (src_full_range)
             range_adjust = -1; /* lower the source to studio range */
     }
-    if (!IsRGBShader(quad->textureFormat) && !src_full_range)
+    if (!IsRGBShader(quad->textureFormat) && !src_full_range && IsRGBShader(display->pixelFormat))
         range_adjust--; /* the YUV->RGB conversion already output full range */
 
     if (range_adjust != 0)
@@ -631,13 +630,13 @@ HRESULT (D3D11_CompilePixelShader)(vlc_object_t *o, const d3d11_shaders_t *shade
         }
     }
 
-    hr = CompileTargetShader(o, shaders, legacy_shader, d3d_dev,
+    hr = CompileTargetShader(o, compiler, d3d_dev, texture_array, texture_count,
                                      psz_sampler[0], psz_src_to_linear,
                                      psz_primaries_transform,
                                      psz_linear_to_display, psz_tone_mapping,
                                      psz_adjust_range, psz_move_planes[0], &quad->d3dpixelShader[0]);
     if (!FAILED(hr) && psz_sampler[1])
-        hr = CompileTargetShader(o, shaders, legacy_shader, d3d_dev,
+        hr = CompileTargetShader(o, compiler, d3d_dev, texture_array, texture_count,
                                  psz_sampler[1], psz_src_to_linear,
                                  psz_primaries_transform,
                                  psz_linear_to_display, psz_tone_mapping,
@@ -659,7 +658,7 @@ void D3D11_ReleasePixelShader(d3d_quad_t *quad)
     }
 }
 
-static ID3DBlob* D3D11_CompileShader(vlc_object_t *obj, const d3d11_shaders_t *shaders,
+static ID3DBlob* D3D11_CompileShader(vlc_object_t *obj, const d3d11_shader_compiler_t *compiler,
                                      const d3d11_device_t *d3d_dev,
                                      const char *psz_shader, bool pixel)
 {
@@ -684,6 +683,11 @@ static ID3DBlob* D3D11_CompileShader(vlc_object_t *obj, const d3d11_shaders_t *s
             target = "vs_4_0_level_9_1";
     }
 
+#if VLC_WINSTORE_APP
+    VLC_UNUSED(compiler);
+#else
+# define D3DCompile(args...)    compiler->OurD3DCompile(args)
+#endif
     HRESULT hr = D3DCompile(psz_shader, strlen(psz_shader),
                             NULL, NULL, NULL, "main", target,
                             0, 0, &pShaderBlob, &pErrBlob);
@@ -785,12 +789,12 @@ void D3D11_ClearRenderTargets(d3d11_device_t *d3d_dev, const d3d_format_t *cfg,
     }
 }
 
-static HRESULT D3D11_CompileVertexShader(vlc_object_t *obj, const d3d11_shaders_t *shaders,
+static HRESULT D3D11_CompileVertexShader(vlc_object_t *obj, const d3d11_shader_compiler_t *compiler,
                                          d3d11_device_t *d3d_dev, const char *psz_shader,
-                                         d3d_vshader_t *output)
+                                         d3d_vertex_shader_t *output)
 {
    HRESULT hr = E_FAIL;
-   ID3DBlob *pVSBlob = D3D11_CompileShader(obj, shaders, d3d_dev, psz_shader, false);
+   ID3DBlob *pVSBlob = D3D11_CompileShader(obj, compiler, d3d_dev, psz_shader, false);
    if (!pVSBlob)
        goto error;
 
@@ -822,15 +826,7 @@ error:
    return hr;
 }
 
-void D3D11_SetVertexShader(d3d_vshader_t *dst, d3d_vshader_t *src)
-{
-    dst->layout = src->layout;
-    ID3D11InputLayout_AddRef(dst->layout);
-    dst->shader = src->shader;
-    ID3D11VertexShader_AddRef(dst->shader);
-}
-
-void D3D11_ReleaseVertexShader(d3d_vshader_t *shader)
+void D3D11_ReleaseVertexShader(d3d_vertex_shader_t *shader)
 {
     if (shader->layout)
     {
@@ -844,16 +840,16 @@ void D3D11_ReleaseVertexShader(d3d_vshader_t *shader)
     }
 }
 
-HRESULT (D3D11_CompileFlatVertexShader)(vlc_object_t *obj, const d3d11_shaders_t *shaders,
-                                      d3d11_device_t *d3d_dev, d3d_vshader_t *output)
+HRESULT (D3D11_CompileFlatVertexShader)(vlc_object_t *obj, const d3d11_shader_compiler_t *compiler,
+                                      d3d11_device_t *d3d_dev, d3d_vertex_shader_t *output)
 {
-    return D3D11_CompileVertexShader(obj, shaders, d3d_dev, globVertexShaderFlat, output);
+    return D3D11_CompileVertexShader(obj, compiler, d3d_dev, globVertexShaderFlat, output);
 }
 
-HRESULT (D3D11_CompileProjectionVertexShader)(vlc_object_t *obj, const d3d11_shaders_t *shaders,
-                                            d3d11_device_t *d3d_dev, d3d_vshader_t *output)
+HRESULT (D3D11_CompileProjectionVertexShader)(vlc_object_t *obj, const d3d11_shader_compiler_t *compiler,
+                                            d3d11_device_t *d3d_dev, d3d_vertex_shader_t *output)
 {
-    return D3D11_CompileVertexShader(obj, shaders, d3d_dev, globVertexShaderProjection, output);
+    return D3D11_CompileVertexShader(obj, compiler, d3d_dev, globVertexShaderProjection, output);
 }
 
 #if !VLC_WINSTORE_APP
@@ -871,19 +867,19 @@ static HINSTANCE Direct3D11LoadShaderLibrary(void)
 }
 #endif // !VLC_WINSTORE_APP
 
-int (D3D11_InitShaders)(vlc_object_t *obj, d3d11_shaders_t *shaders)
+int (D3D11_InitShaders)(vlc_object_t *obj, d3d11_shader_compiler_t *compiler)
 {
 #if !VLC_WINSTORE_APP
-    shaders->compiler_dll = Direct3D11LoadShaderLibrary();
-    if (!shaders->compiler_dll) {
+    compiler->compiler_dll = Direct3D11LoadShaderLibrary();
+    if (!compiler->compiler_dll) {
         msg_Err(obj, "cannot load d3dcompiler.dll, aborting");
         return VLC_EGENERIC;
     }
 
-    shaders->OurD3DCompile = (void *)GetProcAddress(shaders->compiler_dll, "D3DCompile");
-    if (!shaders->OurD3DCompile) {
+    compiler->OurD3DCompile = (void *)GetProcAddress(compiler->compiler_dll, "D3DCompile");
+    if (!compiler->OurD3DCompile) {
         msg_Err(obj, "Cannot locate reference to D3DCompile in d3dcompiler DLL");
-        FreeLibrary(shaders->compiler_dll);
+        FreeLibrary(compiler->compiler_dll);
         return VLC_EGENERIC;
     }
 #endif // !VLC_WINSTORE_APP
@@ -891,14 +887,14 @@ int (D3D11_InitShaders)(vlc_object_t *obj, d3d11_shaders_t *shaders)
     return VLC_SUCCESS;
 }
 
-void D3D11_ReleaseShaders(d3d11_shaders_t *shaders)
+void D3D11_ReleaseShaders(d3d11_shader_compiler_t *compiler)
 {
 #if !VLC_WINSTORE_APP
-    if (shaders->compiler_dll)
+    if (compiler->compiler_dll)
     {
-        FreeLibrary(shaders->compiler_dll);
-        shaders->compiler_dll = NULL;
+        FreeLibrary(compiler->compiler_dll);
+        compiler->compiler_dll = NULL;
     }
-    shaders->OurD3DCompile = NULL;
+    compiler->OurD3DCompile = NULL;
 #endif // !VLC_WINSTORE_APP
 }

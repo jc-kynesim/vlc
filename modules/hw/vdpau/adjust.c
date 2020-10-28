@@ -135,14 +135,29 @@ static picture_t *Adjust(filter_t *filter, picture_t *pic)
     return pic;
 }
 
+static void Close(filter_t *filter)
+{
+    filter_sys_t *sys = filter->p_sys;
+
+    var_DelCallback(filter, "hue", HueCallback, &sys->hue);
+    var_DelCallback(filter, "saturation", SaturationCallback,
+                    &sys->saturation);
+    var_DelCallback(filter, "contrast", ContrastCallback, &sys->contrast);
+    var_DelCallback(filter, "brightness", BrightnessCallback,
+                    &sys->brightness);
+    free(sys);
+}
+
 static const char *const options[] = {
     "brightness", "contrast", "saturation", "hue", NULL
 };
 
-static int Open(vlc_object_t *obj)
-{
-    filter_t *filter = (filter_t *)obj;
+static const struct vlc_filter_operations filter_ops = {
+    .filter_video = Adjust, .close = Close,
+};
 
+static int Open(filter_t *filter)
+{
     if ( filter->vctx_in == NULL ||
          vlc_video_context_GetType(filter->vctx_in) != VLC_VIDEO_CONTEXT_VDPAU )
         return VLC_EGENERIC;
@@ -157,7 +172,7 @@ static int Open(vlc_object_t *obj)
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
 
-    filter->pf_video_filter = Adjust;
+    filter->ops = &filter_ops;
     filter->p_sys = sys;
 
     config_ChainParse(filter, "", options, filter->p_cfg);
@@ -186,25 +201,10 @@ static int Open(vlc_object_t *obj)
     return VLC_SUCCESS;
 }
 
-static void Close(vlc_object_t *obj)
-{
-    filter_t *filter = (filter_t *)obj;
-    filter_sys_t *sys = filter->p_sys;
-
-    var_DelCallback(filter, "hue", HueCallback, &sys->hue);
-    var_DelCallback(filter, "saturation", SaturationCallback,
-                    &sys->saturation);
-    var_DelCallback(filter, "contrast", ContrastCallback, &sys->contrast);
-    var_DelCallback(filter, "brightness", BrightnessCallback,
-                    &sys->brightness);
-    free(sys);
-}
-
 vlc_module_begin()
     set_description(N_("VDPAU adjust video filter"))
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
-    set_capability("video filter", 0)
     add_shortcut("adjust")
-    set_callbacks(Open, Close)
+    set_callback_video_filter(Open)
 vlc_module_end()

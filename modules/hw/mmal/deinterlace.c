@@ -60,17 +60,14 @@
 #define MMAL_DEINTERLACE_FULL_RATE_TEXT N_("Full output framerate")
 #define MMAL_DEINTERLACE_FULL_RATE_LONGTEXT N_("Full output framerate. 1 output frame for each interlaced field input")
 
-static int OpenMmalDeinterlace(vlc_object_t *);
-static void CloseMmalDeinterlace(vlc_object_t *);
+static int OpenMmalDeinterlace(filter_t *);
 
 vlc_module_begin()
     set_shortname(N_("MMAL deinterlace"))
     set_description(N_("MMAL-based deinterlace filter plugin"))
-    set_capability("video filter", 900)
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
-    set_callbacks(OpenMmalDeinterlace, CloseMmalDeinterlace)
-    add_shortcut("deinterlace")
+    set_deinterlace_callback(OpenMmalDeinterlace)
     add_bool(MMAL_DEINTERLACE_NO_QPU, false, MMAL_DEINTERLACE_NO_QPU_TEXT,
                     MMAL_DEINTERLACE_NO_QPU_LONGTEXT, true);
     add_bool(MMAL_DEINTERLACE_ADV, false, MMAL_DEINTERLACE_ADV_TEXT,
@@ -196,6 +193,25 @@ static unsigned int seq_delta(unsigned int sseq, unsigned int fseq)
     return fseq == 0 ? 0 : fseq <= sseq ? sseq - fseq : 15 - (fseq - sseq);
 }
 
+static picture_t *but_to_pic(filter_t * p_filter, MMAL_BUFFER_HEADER_T *out_buf)
+{
+    filter_sys_t * const sys = p_filter->p_sys;
+    const unsigned int seq_out = (out_buf->flags / MMAL_BUFFER_HEADER_FLAG_USER0) & 0xf;
+    picture_t * out_pic = di_alloc_opaque(p_filter, out_buf);
+
+    if (out_pic == NULL) {
+        msg_Warn(p_filter, "Failed to alloc new filter output pic");
+        mmal_queue_put_back(sys->out_q, out_buf);  // Wedge buf back into Q in the hope we can alloc a pic later
+        return NULL;
+    }
+
+    // Ignore 0 seqs
+    // Don't think these should actually happen
+    if (seq_out != 0)
+        sys->seq_out = seq_out;
+    return out_pic;
+}
+
 static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
 {
     filter_sys_t * const sys = p_filter->p_sys;
@@ -262,45 +278,27 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
     }
 
     // Return anything that is in the out Q
+    picture_t * chain_tail = ret_pics;
+
+    // Advanced di has a 3 frame latency, so if the seq delta is greater
+    // than that then we are expecting at least two frames of output. Wait
+    // for one of those.
+    // seq_in is seq of the next frame we are going to submit (1-15, no 0)
+    // seq_out is last frame we removed from Q
+    // So after 4 frames sent (1st time we want to wait), 0 rx seq_in=5, seq_out=15, delta=5
+
+    while ((out_buf = (seq_delta(sys->seq_in, sys->seq_out) >= 5 ? mmal_queue_timedwait(sys->out_q, 1000) : mmal_queue_get(sys->out_q))) != NULL)
     {
-        picture_t ** pp_pic = &ret_pics;
+        picture_t * out_pic = but_to_pic(p_filter, out_buf);
+        if (unlikely(out_pic == NULL))
+            break;
 
-        // Advanced di has a 3 frame latency, so if the seq delta is greater
-        // than that then we are expecting at least two frames of output. Wait
-        // for one of those.
-        // seq_in is seq of the next frame we are going to submit (1-15, no 0)
-        // seq_out is last frame we removed from Q
-        // So after 4 frames sent (1st time we want to wait), 0 rx seq_in=5, seq_out=15, delta=5
-
-        while ((out_buf = (seq_delta(sys->seq_in, sys->seq_out) >= 5 ? mmal_queue_timedwait(sys->out_q, 1000) : mmal_queue_get(sys->out_q))) != NULL)
-        {
-            const unsigned int seq_out = (out_buf->flags / MMAL_BUFFER_HEADER_FLAG_USER0) & 0xf;
-            picture_t * out_pic;
-
-            {
-                out_pic = di_alloc_opaque(p_filter, out_buf);
-
-                if (out_pic == NULL) {
-                    msg_Warn(p_filter, "Failed to alloc new filter output pic");
-                    mmal_queue_put_back(sys->out_q, out_buf);  // Wedge buf back into Q in the hope we can alloc a pic later
-                    out_buf = NULL;
-                    break;
-                }
-            }
-            out_buf = NULL;  // Now attached to pic or recycled
-
-            *pp_pic = out_pic;
-            pp_pic = &out_pic->p_next;
-
-            // Ignore 0 seqs
-            // Don't think these should actually happen
-            if (seq_out != 0)
-                sys->seq_out = seq_out;
-        }
-
-        // Crash on lockup
-        assert(ret_pics != NULL || seq_delta(sys->seq_in, sys->seq_out) < 5);
+        vlc_picture_chain_AppendChain( chain_tail, out_pic );
+        chain_tail = out_pic;
     }
+
+    // Crash on lockup
+    assert(ret_pics != NULL || seq_delta(sys->seq_in, sys->seq_out) < 5);
 
     return ret_pics;
 
@@ -346,12 +344,6 @@ static void di_flush(filter_t *p_filter)
 }
 
 
-static void pass_flush(filter_t *p_filter)
-{
-    // Nothing to do
-    VLC_UNUSED(p_filter);
-}
-
 static picture_t * pass_deinterlace(filter_t * p_filter, picture_t * p_pic)
 {
     VLC_UNUSED(p_filter);
@@ -376,9 +368,8 @@ static void control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
     mmal_buffer_header_release(buffer);
 }
 
-static void CloseMmalDeinterlace(vlc_object_t *p_this)
+static void CloseMmalDeinterlace(filter_t *filter)
 {
-    filter_t *filter = (filter_t*)p_this;
     filter_sys_t * const sys = filter->p_sys;
 
     if (sys == NULL)
@@ -424,9 +415,16 @@ static bool is_fmt_valid_in(const vlc_fourcc_t fmt)
     return fmt == VLC_CODEC_MMAL_OPAQUE;
 }
 
-static int OpenMmalDeinterlace(vlc_object_t *p_this)
+static const struct vlc_filter_operations filter_ops = {
+    .filter_video = deinterlace, .flush = di_flush, .close = CloseMmalDeinterlace,
+};
+
+static const struct vlc_filter_operations filter_pass_ops = {
+    .filter_video = pass_deinterlace, .close = CloseMmalDeinterlace,
+};
+
+static int OpenMmalDeinterlace(filter_t *filter)
 {
-    filter_t *filter = (filter_t*)p_this;
     int32_t frame_duration = filter->fmt_in.video.i_frame_rate != 0 ?
             CLOCK_FREQ * filter->fmt_in.video.i_frame_rate_base /
             filter->fmt_in.video.i_frame_rate : 0;
@@ -506,10 +504,10 @@ static int OpenMmalDeinterlace(vlc_object_t *p_this)
 
     if (sys->use_passthrough)
     {
-        filter->pf_video_filter = pass_deinterlace;
-        filter->pf_flush = pass_flush;
+        filter->ops = &filter_pass_ops;
         return VLC_SUCCESS;
     }
+    filter->ops = &filter_ops;
 
     filter->vctx_out = vlc_video_context_Hold(filter->vctx_in);
 
@@ -607,12 +605,10 @@ static int OpenMmalDeinterlace(vlc_object_t *p_this)
         goto fail;
     }
 
-    filter->pf_video_filter = deinterlace;
-    filter->pf_flush = di_flush;
     return 0;
 
 fail:
-    CloseMmalDeinterlace(p_this);
+    CloseMmalDeinterlace(filter);
     return ret;
 }
 

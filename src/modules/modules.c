@@ -102,23 +102,6 @@ static bool module_match_name(const module_t *m, const char *name, size_t len)
      return false;
 }
 
-/**
- * Finds the candidate modules for given criteria.
- *
- * All candidates modules having the specified capability and name will be
- * sorted in decreasing order of priority and returned in a heap-allocated
- * table.
- *
- * \param capability capability, i.e. class of module
- * \param names string of comma-separated requested module shortcut names
- * \param strict whether to exclude modules with no unmatching shortcut names
- * \param modules storage location for the base address of a sorted table
- *                of candidate modules [OUT]
- * \param strict_matches storage location for the count of strictly matched
- *                       modules (optional) [OUT]
- * \return number of modules found or a strictly negative value on error
- */
-static
 ssize_t vlc_module_match(const char *capability, const char *names,
                          bool strict, module_t ***restrict modules,
                          size_t *restrict strict_matches)
@@ -129,44 +112,47 @@ ssize_t vlc_module_match(const char *capability, const char *names,
     module_t **sorted = malloc(total * sizeof (*sorted));
     size_t matches = 0;
 
-    *modules = sorted;
-
     if (total > 0) {
         if (unlikely(unsorted == NULL || sorted == NULL)) {
             free(unsorted);
             free(sorted);
+            *modules = NULL;
             return -1;
         }
         memcpy(unsorted, tab, total * sizeof (*unsorted));
     }
 
+    *modules = sorted;
+
     /* Go through the list of module shortcut names. */
-    while (names[0] != '\0') {
-        const char *shortcut = names;
-        size_t slen = strcspn(names, ",");
+    if (names != NULL) {
+        while (names[0] != '\0') {
+            const char *shortcut = names;
+            size_t slen = strcspn(names, ",");
 
-        names += slen;
-        names += strspn(names, ",");
+            names += slen;
+            names += strspn(names, ",");
 
-        /* "none" matches nothing and ends the search */
-        if (slen == 4 && strncasecmp("none", shortcut, 4) == 0) {
-            total = 0;
-            break;
-        }
+            /* "none" matches nothing and ends the search */
+            if (slen == 4 && strncasecmp("none", shortcut, 4) == 0) {
+                total = 0;
+                break;
+            }
 
-        /* "any" matches everything with strictly positive score */
-        if (slen == 3 && strncasecmp("any", shortcut, 3) == 0) {
-            strict = false;
-            break;
-        }
+            /* "any" matches everything with strictly positive score */
+            if (slen == 3 && strncasecmp("any", shortcut, 3) == 0) {
+                strict = false;
+                break;
+            }
 
-        for (size_t i = 0; i < total; i++) {
-            module_t *cand = unsorted[i];
+            for (size_t i = 0; i < total; i++) {
+                module_t *cand = unsorted[i];
 
-            if (cand != NULL && module_match_name(cand, shortcut, slen)) {
-                assert(matches < total);
-                sorted[matches++] = cand;
-                unsorted[i] = NULL;
+                if (cand != NULL && module_match_name(cand, shortcut, slen)) {
+                    assert(matches < total);
+                    sorted[matches++] = cand;
+                    unsorted[i] = NULL;
+                }
             }
         }
     }
@@ -196,24 +182,9 @@ ssize_t vlc_module_match(const char *capability, const char *names,
     return matches;
 }
 
-static int module_load(vlc_logger_t *log, module_t *m,
-                       vlc_activate_t init, bool forced, va_list args)
+void *vlc_module_map(vlc_logger_t *log, module_t *module)
 {
-    int ret = VLC_SUCCESS;
-
-    if (module_Map(log, m->plugin))
-        return VLC_EGENERIC;
-
-    if (m->pf_activate != NULL)
-    {
-        va_list ap;
-
-        va_copy (ap, args);
-        ret = init(m->pf_activate, forced, ap);
-        va_end (ap);
-    }
-
-    return ret;
+    return vlc_plugin_Map(log, module->plugin) ? NULL : module->pf_activate;
 }
 
 /**
@@ -262,7 +233,16 @@ module_t *(vlc_module_load)(struct vlc_logger *log, const char *capability,
 
     for (size_t i = 0; i < (size_t)total; i++) {
         module_t *cand = mods[i];
-        int ret = module_load(log, cand, probe, i < strict_total, args);
+        int ret = VLC_EGENERIC;
+        void *cb = vlc_module_map(log, cand);
+
+        if (cb != NULL) {
+            va_list ap;
+
+            va_copy(ap, args);
+            ret = probe(cb, i < strict_total, ap);
+            va_end(ap);
+        }
 
         switch (ret) {
             case VLC_SUCCESS:
@@ -358,23 +338,22 @@ module_config_t *module_config_get( const module_t *module, unsigned *restrict p
 {
     const vlc_plugin_t *plugin = module->plugin;
 
+    assert( psize != NULL );
+    *psize = 0;
+
     if (plugin->module != module)
     {   /* For backward compatibility, pretend non-first modules have no
          * configuration items. */
-        *psize = 0;
         return NULL;
     }
 
-    unsigned i,j;
     size_t size = plugin->conf.size;
     module_config_t *config = vlc_alloc( size, sizeof( *config ) );
-
-    assert( psize != NULL );
-    *psize = 0;
 
     if( !config )
         return NULL;
 
+    unsigned i, j;
     for( i = 0, j = 0; i < size; i++ )
     {
         const module_config_t *item = plugin->conf.items + i;

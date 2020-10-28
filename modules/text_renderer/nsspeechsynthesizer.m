@@ -35,8 +35,8 @@
 
 #import <Cocoa/Cocoa.h>
 
-static int Create (vlc_object_t *);
-static void Destroy(vlc_object_t *);
+static int Create (filter_t *);
+static void Destroy(filter_t *);
 static int RenderText(filter_t *,
                       subpicture_region_t *,
                       subpicture_region_t *,
@@ -47,8 +47,7 @@ set_description(N_("Speech synthesis for Mac OS X"))
 set_category(CAT_VIDEO)
 set_subcategory(SUBCAT_VIDEO_SUBPIC)
 
-set_capability("text renderer", 0)
-set_callbacks(Create, Destroy)
+set_callback_text_renderer(Create, 0)
 vlc_module_end ()
 
 typedef struct filter_sys_t
@@ -58,9 +57,12 @@ typedef struct filter_sys_t
     NSString *lastString;
 } filter_sys_t;
 
-static int  Create (vlc_object_t *p_this)
+static const struct vlc_filter_operations filter_ops = {
+    .render = RenderText, .close = Destroy,
+};
+
+static int  Create (filter_t *p_filter)
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys;
 
     p_filter->p_sys = p_sys = malloc(sizeof(filter_sys_t));
@@ -70,14 +72,13 @@ static int  Create (vlc_object_t *p_this)
     p_sys->currentLocale = p_sys->lastString = @"";
     p_sys->speechSynthesizer = [[NSSpeechSynthesizer alloc] init];
 
-    p_filter->pf_render = RenderText;
+    p_filter->ops = &filter_ops;
 
     return VLC_SUCCESS;
 }
 
-static void Destroy(vlc_object_t *p_this)
+static void Destroy(filter_t *p_filter)
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
     [p_sys->speechSynthesizer stopSpeaking];

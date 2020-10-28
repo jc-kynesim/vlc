@@ -27,6 +27,8 @@
 # include "config.h"
 #endif
 
+#include <stdatomic.h>
+
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_codec.h>
@@ -44,7 +46,7 @@ typedef struct
 {
     shine_t s;
     unsigned int samples_per_frame;
-    block_fifo_t *p_fifo;
+    block_t *first, **lastp;
 
     unsigned int i_buffer;
     uint8_t *p_buffer;
@@ -66,11 +68,7 @@ vlc_module_begin();
     set_callbacks( OpenEncoder, CloseEncoder );
 vlc_module_end();
 
-static struct
-{
-    bool busy;
-    vlc_mutex_t lock;
-} entrant = { false, VLC_STATIC_MUTEX, };
+static atomic_bool busy = ATOMIC_VAR_INIT(false);
 
 static int OpenEncoder( vlc_object_t *p_this )
 {
@@ -100,25 +98,18 @@ static int OpenEncoder( vlc_object_t *p_this )
              p_enc->fmt_out.i_bitrate, p_enc->fmt_out.audio.i_rate,
              p_enc->fmt_out.audio.i_channels );
 
-    vlc_mutex_lock( &entrant.lock );
-    if( entrant.busy )
+    if( atomic_exchange(&busy, true) )
     {
         msg_Err( p_enc, "encoder already in progress" );
-        vlc_mutex_unlock( &entrant.lock );
         return VLC_EGENERIC;
     }
-    entrant.busy = true;
-    vlc_mutex_unlock( &entrant.lock );
 
     p_enc->p_sys = p_sys = calloc( 1, sizeof( *p_sys ) );
     if( !p_sys )
         goto enomem;
 
-    if( !( p_sys->p_fifo = block_FifoNew() ) )
-    {
-        free( p_sys );
-        goto enomem;
-    }
+    p_sys->first = NULL;
+    p_sys->lastp = &p_sys->first;
 
     shine_config_t cfg = {
         .wave = {
@@ -147,9 +138,7 @@ static int OpenEncoder( vlc_object_t *p_this )
     return VLC_SUCCESS;
 
 enomem:
-    vlc_mutex_lock( &entrant.lock );
-    entrant.busy = false;
-    vlc_mutex_unlock( &entrant.lock );
+    atomic_store(&busy, false);
     return VLC_ENOMEM;
 }
 
@@ -185,7 +174,8 @@ static block_t *GetPCM( encoder_t *p_enc, block_t *p_block )
 
         p_block->i_buffer -= p_sys->samples_per_frame * 4 - i_buffer;
 
-        block_FifoPut( p_sys->p_fifo, p_pcm_block );
+        *(p_sys->lastp) = p_pcm_block;
+        p_sys->lastp = &p_pcm_block->p_next;
     }
 
     /* We hadn't enough data to make a block, put it in standby */
@@ -215,7 +205,15 @@ static block_t *GetPCM( encoder_t *p_enc, block_t *p_block )
 
 buffered:
     /* and finally get a block back */
-    return block_FifoCount( p_sys->p_fifo ) > 0 ? block_FifoGet( p_sys->p_fifo ) : NULL;
+    p_pcm_block = p_sys->first;
+
+    if( p_pcm_block != NULL ) {
+        p_sys->first = p_pcm_block->p_next;
+        if( p_pcm_block->p_next == NULL )
+            p_sys->lastp = &p_sys->first;
+    }
+
+    return p_pcm_block;
 }
 
 static block_t *EncodeFrame( encoder_t *p_enc, block_t *p_block )
@@ -279,17 +277,14 @@ static void CloseEncoder( vlc_object_t *p_this )
 {
     encoder_sys_t *p_sys = ((encoder_t*)p_this)->p_sys;
 
-    vlc_mutex_lock( &entrant.lock );
-    entrant.busy = false;
-    vlc_mutex_unlock( &entrant.lock );
-
     /* TODO: we should send the last PCM block padded with 0
      * But we don't know if other blocks will come before it's too late */
     if( p_sys->i_buffer )
         free( p_sys->p_buffer );
 
     shine_close(p_sys->s);
+    atomic_store(&busy, false);
 
-    block_FifoRelease( p_sys->p_fifo );
+    block_ChainRelease(p_sys->first);
     free( p_sys );
 }

@@ -114,6 +114,10 @@ typedef struct
 static void OutputStart( sout_stream_t *p_stream );
 static void OutputSend( sout_stream_t *p_stream, sout_stream_id_sys_t *id, block_t * );
 
+static const struct sout_stream_operations ops = {
+    Add, Del, Send, NULL, NULL,
+};
+
 /*****************************************************************************
  * Open:
  *****************************************************************************/
@@ -121,10 +125,6 @@ static int Open( vlc_object_t *p_this )
 {
     sout_stream_t *p_stream = (sout_stream_t*)p_this;
     sout_stream_sys_t *p_sys;
-
-    p_stream->pf_add    = Add;
-    p_stream->pf_del    = Del;
-    p_stream->pf_send   = Send;
 
     p_stream->p_sys = p_sys = malloc( sizeof(*p_sys) );
     if( !p_sys )
@@ -156,6 +156,7 @@ static int Open( vlc_object_t *p_this )
     p_sys->b_drop = false;
     p_sys->i_dts_start = 0;
     TAB_INIT( p_sys->i_id, p_sys->id );
+    p_stream->ops = &ops;
 
     return VLC_SUCCESS;
 }
@@ -169,7 +170,7 @@ static void Close( vlc_object_t * p_this )
     sout_stream_sys_t *p_sys = p_stream->p_sys;
 
     if( p_sys->p_out )
-        sout_StreamChainDelete( p_sys->p_out, p_sys->p_out );
+        sout_StreamChainDelete( p_sys->p_out, NULL );
 
     TAB_CLEAN( p_sys->i_id, p_sys->id );
     free( p_sys->psz_prefix );
@@ -346,7 +347,8 @@ static int OutputNew( sout_stream_t *p_stream,
     /* Create the output */
     msg_Dbg( p_stream, "Using record output `%s'", psz_output );
 
-    p_sys->p_out = sout_StreamChainNew( p_stream->p_sout, psz_output, NULL, NULL );
+    p_sys->p_out = sout_StreamChainNew( VLC_OBJECT(p_stream), psz_output,
+                                        NULL );
 
     if( !p_sys->p_out )
         goto error;
@@ -489,7 +491,7 @@ static void OutputStart( sout_stream_t *p_stream )
                 id->id = NULL;
             }
             if( p_sys->p_out )
-                sout_StreamChainDelete( p_sys->p_out, p_sys->p_out );
+                sout_StreamChainDelete( p_sys->p_out, NULL );
             p_sys->p_out = NULL;
 
             if( i_es > i_best_es )

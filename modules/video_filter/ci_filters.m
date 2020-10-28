@@ -376,9 +376,11 @@ Filter(filter_t *filter, picture_t *src)
 
     if (ctx->src_converter)
     {
-        src = ctx->dst_converter->pf_video_filter(ctx->src_converter, src);
+        // TODO
+        src = ctx->src_converter->ops->filter_video(ctx->src_converter, src);
         if (!src)
             return NULL;
+        assert(!picture_HasChainedPics(src)); // no chaining
     }
 
     @autoreleasepool {
@@ -416,9 +418,10 @@ Filter(filter_t *filter, picture_t *src)
 
     if (ctx->dst_converter)
     {
-        dst = ctx->dst_converter->pf_video_filter(ctx->dst_converter, dst);
+        dst = ctx->dst_converter->ops->filter_video(ctx->dst_converter, dst);
         if (!dst)
             return NULL;
+        assert(!picture_HasChainedPics(dst)); // no chaining
     }
 
     p_sys->mouse_moved = false;
@@ -524,11 +527,13 @@ cvpx_video_context_Destroy(void *priv)
 
     if (ctx->src_converter)
     {
+        filter_Close( ctx->src_converter );
         module_unneed(ctx->src_converter, ctx->src_converter->p_module);
         vlc_object_delete(ctx->src_converter);
     }
     if (ctx->dst_converter)
     {
+        filter_Close( ctx->dst_converter );
         module_unneed(ctx->dst_converter, ctx->dst_converter->p_module);
         vlc_object_delete(ctx->dst_converter);
     }
@@ -564,15 +569,38 @@ CVPX_to_CVPX_converter_Create(filter_t *filter, bool to_rgba)
         vlc_object_delete(converter);
         return NULL;
     }
+    assert( converter->ops != NULL );
 
     return converter;
 }
 
-static int
-Open(vlc_object_t *obj, char const *psz_filter)
+static void
+Close(filter_t *filter)
 {
-    filter_t *filter = (filter_t *)obj;
+    filter_sys_t *p_sys = filter->p_sys;
+    struct ci_filters_ctx *ctx = p_sys->ctx;
+    enum filter_type filter_types[NUM_MAX_EQUIVALENT_VLC_FILTERS];
 
+    filter_desc_table_GetFilterTypes(p_sys->psz_filter, filter_types);
+    for (unsigned int i = 0;
+         i < NUM_MAX_EQUIVALENT_VLC_FILTERS && filter_types[i] != FILTER_NONE;
+         ++i)
+        filter_chain_RemoveFilter(&ctx->fchain, filter_types[i]);
+
+    vlc_video_context_Release(filter->vctx_out);
+    free(p_sys);
+}
+
+static const struct vlc_filter_operations filter_ops =
+{
+    .filter_video = Filter,
+    .video_mouse = Mouse,
+    .close = Close,
+};
+
+static int
+Open(filter_t *filter, char const *psz_filter)
+{
     switch (filter->fmt_in.video.i_chroma)
     {
         case VLC_CODEC_CVPX_NV12:
@@ -677,8 +705,7 @@ Open(vlc_object_t *obj, char const *psz_filter)
     p_sys->psz_filter = psz_filter;
     p_sys->ctx = ctx;
 
-    filter->pf_video_filter = Filter;
-    filter->pf_video_mouse = Mouse;
+    filter->ops = &filter_ops;
 
     return VLC_SUCCESS;
 
@@ -690,63 +717,45 @@ error:
 }
 
 static int
-OpenAdjust(vlc_object_t *obj)
+OpenAdjust(filter_t *filter)
 {
-    return Open(obj, "adjust");
+    return Open(filter, "adjust");
 }
 
 static int
-OpenInvert(vlc_object_t *obj)
+OpenInvert(filter_t *filter)
 {
-    return Open(obj, "invert");
+    return Open(filter, "invert");
 }
 
 static int
-OpenPosterize(vlc_object_t *obj)
+OpenPosterize(filter_t *filter)
 {
-    return Open(obj, "posterize");
+    return Open(filter, "posterize");
 }
 
 static int
-OpenSepia(vlc_object_t *obj)
+OpenSepia(filter_t *filter)
 {
-    return Open(obj, "sepia");
+    return Open(filter, "sepia");
 }
 
 static int
-OpenSharpen(vlc_object_t *obj)
+OpenSharpen(filter_t *filter)
 {
-    return Open(obj, "sharpen");
+    return Open(filter, "sharpen");
 }
 
 static int
-OpenPsychedelic(vlc_object_t *obj)
+OpenPsychedelic(filter_t *filter)
 {
-    return Open(obj, "psychedelic");
+    return Open(filter, "psychedelic");
 }
 
 static int
-OpenCustom(vlc_object_t *obj)
+OpenCustom(filter_t *filter)
 {
-    return Open(obj, "custom");
-}
-
-static void
-Close(vlc_object_t *obj)
-{
-    filter_t *filter = (filter_t *)obj;
-    filter_sys_t *p_sys = filter->p_sys;
-    struct ci_filters_ctx *ctx = p_sys->ctx;
-    enum filter_type filter_types[NUM_MAX_EQUIVALENT_VLC_FILTERS];
-
-    filter_desc_table_GetFilterTypes(p_sys->psz_filter, filter_types);
-    for (unsigned int i = 0;
-         i < NUM_MAX_EQUIVALENT_VLC_FILTERS && filter_types[i] != FILTER_NONE;
-         ++i)
-        filter_chain_RemoveFilter(&ctx->fchain, filter_types[i]);
-
-    vlc_video_context_Release(filter->vctx_out);
-    free(p_sys);
+    return Open(filter, "custom");
 }
 
 #define CI_CUSTOM_FILTER_TEXT N_("Use a specific Core Image Filter")
@@ -754,37 +763,36 @@ Close(vlc_object_t *obj)
     "Example: 'CICrystallize', 'CIBumpDistortion', 'CIThermal', 'CIComicEffect'")
 
 vlc_module_begin()
-    set_capability("video filter", 0)
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
     set_description(N_("Mac OS X hardware video filters"))
 
     add_submodule()
-    set_callbacks(OpenAdjust, Close)
+    set_callback_video_filter(OpenAdjust)
     add_shortcut("adjust")
 
     add_submodule()
-    set_callbacks(OpenInvert, Close)
+    set_callback_video_filter(OpenInvert)
     add_shortcut("invert")
 
     add_submodule()
-    set_callbacks(OpenPosterize, Close)
+    set_callback_video_filter(OpenPosterize)
     add_shortcut("posterize")
 
     add_submodule()
-    set_callbacks(OpenSepia, Close)
+    set_callback_video_filter(OpenSepia)
     add_shortcut("sepia")
 
     add_submodule()
-    set_callbacks(OpenSharpen, Close)
+    set_callback_video_filter(OpenSharpen)
     add_shortcut("sharpen")
 
     add_submodule()
-    set_callbacks(OpenPsychedelic, Close)
+    set_callback_video_filter(OpenPsychedelic)
     add_shortcut("psychedelic")
 
     add_submodule()
-    set_callbacks(OpenCustom, Close)
+    set_callback_video_filter(OpenCustom)
     add_shortcut("ci")
     add_string("ci-filter", "CIComicEffect", CI_CUSTOM_FILTER_TEXT, CI_CUSTOM_FILTER_LONGTEXT, true);
 vlc_module_end()

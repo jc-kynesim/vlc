@@ -31,7 +31,11 @@ import "qrc:///menus/" as Menus
 Widgets.NavigableFocusScope {
     id: root
 
-    height: VLCStyle.globalToolbar_height + VLCStyle.localToolbar_height + VLCStyle.applicationVerticalMargin
+    height: VLCStyle.applicationVerticalMargin
+            + (menubar.visible ? menubar.height : 0)
+            + VLCStyle.globalToolbar_height
+            + VLCStyle.localToolbar_height
+
 
     property int selectedIndex: 0
     property int subSelectedIndex: 0
@@ -50,7 +54,7 @@ Widgets.NavigableFocusScope {
 
     // Triggered when the toogleView button is selected
     function toggleView () {
-        medialib.gridView = !medialib.gridView
+        mainInterface.gridView = !mainInterface.gridView
     }
 
     function search() {
@@ -93,12 +97,9 @@ Widgets.NavigableFocusScope {
         property alias model: globalMenuGroup.model
 
         Column {
-
             id: col
             anchors {
                 fill: parent
-                leftMargin: VLCStyle.applicationHorizontalMargin
-                rightMargin: VLCStyle.applicationHorizontalMargin
                 topMargin: VLCStyle.applicationVerticalMargin
             }
 
@@ -106,48 +107,97 @@ Widgets.NavigableFocusScope {
                 id: globalToolbar
                 width: parent.width
                 height: VLCStyle.globalToolbar_height
+                    + (menubar.visible ? menubar.height : 0)
+                anchors.rightMargin: VLCStyle.applicationHorizontalMargin
 
-                RowLayout {
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.left: parent.left
-                    anchors.leftMargin: VLCStyle.margin_normal
-                    spacing: VLCStyle.margin_xxxsmall
+                property bool colapseTabButtons: globalToolbar.width  > (Math.max(globalToolbarLeft.width, globalToolbarRight.width) + VLCStyle.applicationHorizontalMargin)* 2
+                                                 + globalMenuGroup.model.count * VLCStyle.bannerTabButton_width_large
 
-                    Image {
-                        sourceSize.width: VLCStyle.icon_small
-                        sourceSize.height: VLCStyle.icon_small
-                        source: "qrc:///logo/cone.svg"
-                        enabled: false
-                    }
-
-                    Widgets.SubtitleLabel {
-                        text: "VLC"
-                        font.pixelSize: VLCStyle.fontSize_xxlarge
-                    }
-
+                //drag and dbl click the titlebar in CSD mode
+                Loader {
+                    anchors.fill: parent
+                    active: mainInterface.clientSideDecoration
+                    source: "qrc:///widgets/CSDTitlebarTapNDrapHandler.qml"
                 }
 
-                /* Button for the sources */
-                Widgets.NavigableRow {
-                    id: globalMenuGroup
+                Column {
+                    anchors.fill: parent
+                    anchors.leftMargin: VLCStyle.applicationHorizontalMargin
+                    anchors.rightMargin: VLCStyle.applicationHorizontalMargin
 
+                    Menus.Menubar {
+                        id: menubar
+                        width: parent.width
+                        height: implicitHeight
+                        visible: mainInterface.hasToolbarMenu
+                    }
+
+                    Item {
+                        width: parent.width
+                        height: VLCStyle.globalToolbar_height
+
+                        RowLayout {
+                            id: globalToolbarLeft
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left: parent.left
+                            spacing: VLCStyle.margin_xxxsmall
+
+                            Widgets.IconToolButton {
+                                 id: history_back
+                                 size: VLCStyle.banner_icon_size
+                                 iconText: VLCIcons.topbar_previous
+                                 text: i18n.qtr("Previous")
+                                 height: localToolbar.height
+                                 colorDisabled: VLCStyle.colors.textDisabled
+                                 onClicked: history.previous()
+                                 enabled: !history.previousEmpty
+                             }
+
+                            Image {
+                                sourceSize.width: VLCStyle.icon_small
+                                sourceSize.height: VLCStyle.icon_small
+                                source: "qrc:///logo/cone.svg"
+                                enabled: false
+                            }
+
+                        }
+
+                        /* Button for the sources */
+                        Widgets.NavigableRow {
+                            id: globalMenuGroup
+
+                            anchors {
+                                top: parent.top
+                                bottom: parent.bottom
+                                horizontalCenter: parent.horizontalCenter
+                            }
+
+                            focus: true
+
+                            navigationParent: root
+                            navigationDownItem: localMenuGroup.visible ?  localMenuGroup : playlistGroup
+
+                            delegate: Widgets.BannerTabButton {
+                                iconTxt: model.icon
+                                showText: globalToolbar.colapseTabButtons
+                                selected: model.index === selectedIndex
+                                onClicked: root.itemClicked(model.index)
+                                height: globalMenuGroup.height
+                            }
+                        }
+                    }
+                }
+
+                Loader {
+                    id: globalToolbarRight
                     anchors {
                         top: parent.top
-                        bottom: parent.bottom
-                        horizontalCenter: parent.horizontalCenter
+                        right: parent.right
+                        rightMargin: VLCStyle.applicationHorizontalMargin
                     }
-
-                    focus: true
-
-                    navigationParent: root
-                    navigationDownItem: localMenuGroup.visible ?  localMenuGroup : playlistGroup
-
-                    delegate: Widgets.BannerTabButton {
-                        iconTxt: model.icon
-                        selected: model.index === selectedIndex
-                        onClicked: root.itemClicked(model.index)
-                        height: globalMenuGroup.height
-                    }
+                    height: VLCStyle.globalToolbar_height
+                    active: mainInterface.clientSideDecoration
+                    source: "qrc:///widgets/CSDWindowButtonSet.qml"
                 }
             }
 
@@ -164,6 +214,7 @@ Widgets.NavigableFocusScope {
                         top: parent.top
                         left: parent.left
                         bottom: parent.bottom
+                        leftMargin: VLCStyle.applicationHorizontalMargin
                     }
 
                     model: ObjectModel {
@@ -172,23 +223,12 @@ Widgets.NavigableFocusScope {
                         property int countExtra: 0
 
                         Widgets.IconToolButton {
-                             id: history_back
-                             size: VLCStyle.banner_icon_size
-                             iconText: VLCIcons.topbar_previous
-                             text: i18n.qtr("Previous")
-                             height: localToolbar.height
-                             colorDisabled: VLCStyle.colors.textDisabled
-                             onClicked: history.previous()
-                             enabled: !history.previousEmpty
-                         }
-
-                        Widgets.IconToolButton {
                             id: list_grid_btn
                             size: VLCStyle.banner_icon_size
-                            iconText: medialib.gridView ? VLCIcons.list : VLCIcons.grid
+                            iconText: mainInterface.gridView ? VLCIcons.list : VLCIcons.grid
                             text: i18n.qtr("List/Grid")
                             height: localToolbar.height
-                            onClicked: medialib.gridView = !medialib.gridView
+                            onClicked: mainInterface.gridView = !mainInterface.gridView
                             enabled: true
                         }
 
@@ -196,6 +236,7 @@ Widgets.NavigableFocusScope {
                             id: sortControl
 
                             textRole: "text"
+                            criteriaRole: "criteria"
                             listWidth: VLCStyle.widthSortBox
                             height: localToolbar.height
 
@@ -206,9 +247,18 @@ Widgets.NavigableFocusScope {
 
                             onSortSelected: {
                                 if (contentModel !== undefined) {
-                                    contentModel.sortCriteria = modelData.criteria
+                                    contentModel.sortCriteria = modelData[criteriaRole]
                                 }
                             }
+
+                            onSortOrderSelected: {
+                                if (contentModel !== undefined) {
+                                    contentModel.sortOrder = order
+                                }
+                            }
+
+                            sortKey: contentModel.sortCriteria
+                            sortOrder: contentModel.sortOrder
                         }
                     }
 
@@ -274,6 +324,7 @@ Widgets.NavigableFocusScope {
                         top: parent.top
                         right: parent.right
                         bottom: parent.bottom
+                        rightMargin: VLCStyle.applicationHorizontalMargin
                     }
                     spacing: VLCStyle.margin_xxxsmall
 
@@ -288,25 +339,6 @@ Widgets.NavigableFocusScope {
                         }
 
                         Widgets.IconToolButton {
-                            id: menu_selector
-
-                            size: VLCStyle.banner_icon_size
-                            iconText: VLCIcons.ellipsis
-                            text: i18n.qtr("Menu")
-                            height: playlistGroup.height
-
-                            onClicked: mainMenu.openBelow(this)
-
-                            Menus.MainDropdownMenu {
-                                id: mainMenu
-                                onClosed: {
-                                    if (mainMenu.activeFocus)
-                                        menu_selector.forceActiveFocus()
-                                }
-                            }
-                        }
-
-                        Widgets.IconToolButton {
                             id: playlist_btn
 
                             size: VLCStyle.banner_icon_size
@@ -316,6 +348,22 @@ Widgets.NavigableFocusScope {
 
                             onClicked:  mainInterface.playlistVisible = !mainInterface.playlistVisible
                             color: mainInterface.playlistVisible && !playlist_btn.backgroundVisible ? VLCStyle.colors.accent : VLCStyle.colors.buttonText
+                        }
+
+                        Widgets.IconToolButton {
+                            id: menu_selector
+
+                            size: VLCStyle.banner_icon_size
+                            iconText: VLCIcons.ellipsis
+                            text: i18n.qtr("Menu")
+                            height: playlistGroup.height
+
+                            onClicked: contextMenu.popup(this.mapToGlobal(0, height))
+
+                            QmlGlobalMenu {
+                                id: contextMenu
+                                ctx: mainctx
+                            }
                         }
                     }
 

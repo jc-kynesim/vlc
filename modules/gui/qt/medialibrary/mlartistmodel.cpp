@@ -18,18 +18,6 @@
 
 #include "mlartistmodel.hpp"
 
-namespace {
-    enum Roles
-    {
-        ARTIST_ID = Qt::UserRole + 1,
-        ARTIST_NAME,
-        ARTIST_SHORT_BIO,
-        ARTIST_COVER,
-        ARTIST_NB_ALBUMS,
-        ARTIST_NB_TRACKS
-    };
-}
-
 QHash<QByteArray, vlc_ml_sorting_criteria_t> MLArtistModel::M_names_to_criteria = {
     {"title", VLC_ML_SORTING_ALPHA},
 };
@@ -44,7 +32,7 @@ QVariant MLArtistModel::data(const QModelIndex &index, int role) const
     if (!index.isValid() || index.row() < 0)
         return QVariant();
 
-    const MLArtist* ml_artist = item(static_cast<unsigned int>(index.row()));
+    const MLArtist* ml_artist = item(index.row());
     if ( !ml_artist )
         return QVariant();
 

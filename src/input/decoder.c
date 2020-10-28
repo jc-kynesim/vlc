@@ -387,10 +387,7 @@ static int ModuleThread_UpdateAudioFormat( decoder_t *p_dec )
         vlc_mutex_unlock( &p_owner->lock );
 
         if( p_aout == NULL )
-        {
-            msg_Err( p_dec, "failed to create audio output" );
             return -1;
-        }
 
         p_dec->fmt_out.audio.i_bytes_per_frame =
             p_owner->fmt.audio.i_bytes_per_frame;
@@ -832,7 +829,8 @@ static int DecoderThread_PlaySout( vlc_input_decoder_t *p_owner, block_t *p_sout
     vlc_mutex_unlock( &p_owner->lock );
 
     /* FIXME --VLC_TICK_INVALID inspect stream_output*/
-    return sout_InputSendBuffer( p_owner->p_sout_input, p_sout_block );
+    return sout_InputSendBuffer( p_owner->p_sout, p_owner->p_sout_input,
+                                 p_sout_block );
 }
 
 /* This function process a block for sout
@@ -905,7 +903,7 @@ static void DecoderThread_ProcessSout( vlc_input_decoder_t *p_owner, block_t *p_
                         }
 
                         if( !p_owner->cc.p_sout_input ||
-                            sout_InputSendBuffer( p_owner->cc.p_sout_input, p_cc ) )
+                            sout_InputSendBuffer( p_owner->p_sout, p_owner->cc.p_sout_input, p_cc ) )
                         {
                             block_Release( p_cc );
                         }
@@ -1457,7 +1455,7 @@ static void DecoderThread_Flush( vlc_input_decoder_t *p_owner )
 #ifdef ENABLE_SOUT
     if ( p_owner->p_sout_input != NULL )
     {
-        sout_InputFlush( p_owner->p_sout_input );
+        sout_InputFlush( p_owner->p_sout, p_owner->p_sout_input );
     }
 #endif
     if( p_dec->fmt_out.i_cat == AUDIO_ES )
@@ -1932,9 +1930,9 @@ static void DeleteDecoder( vlc_input_decoder_t *p_owner )
 #ifdef ENABLE_SOUT
     if( p_owner->p_sout_input )
     {
-        sout_InputDelete( p_owner->p_sout_input );
+        sout_InputDelete( p_owner->p_sout, p_owner->p_sout_input );
         if( p_owner->cc.p_sout_input )
-            sout_InputDelete( p_owner->cc.p_sout_input );
+            sout_InputDelete( p_owner->p_sout, p_owner->cc.p_sout_input );
     }
 #endif
 
@@ -2049,9 +2047,11 @@ decoder_New( vlc_object_t *p_parent, const es_format_t *fmt,
 
     assert( p_dec->fmt_in.i_cat != UNKNOWN_ES );
 
+#if VLC_THREAD_PRIORITY_AUDIO != VLC_THREAD_PRIORITY_VIDEO
     if( p_dec->fmt_in.i_cat == AUDIO_ES )
         i_priority = VLC_THREAD_PRIORITY_AUDIO;
     else
+#endif
         i_priority = VLC_THREAD_PRIORITY_VIDEO;
 
 #ifdef ENABLE_SOUT
@@ -2230,7 +2230,7 @@ bool vlc_input_decoder_IsEmpty( vlc_input_decoder_t * p_owner )
     vlc_mutex_lock( &p_owner->lock );
 #ifdef ENABLE_SOUT
     if( p_owner->p_sout_input != NULL )
-        b_empty = sout_InputIsEmpty( p_owner->p_sout_input );
+        b_empty = true;
     else
 #endif
     if( p_owner->fmt.i_cat == VIDEO_ES && p_owner->p_vout != NULL )
@@ -2627,7 +2627,8 @@ int vlc_input_decoder_SetSpuHighlight( vlc_input_decoder_t *p_owner,
 
 #ifdef ENABLE_SOUT
     if( p_owner->p_sout_input )
-        sout_InputControl( p_owner->p_sout_input, SOUT_INPUT_SET_SPU_HIGHLIGHT, spu_hl );
+        sout_InputControl( p_owner->p_sout, p_owner->p_sout_input,
+                           SOUT_INPUT_SET_SPU_HIGHLIGHT, spu_hl );
 #endif
 
     vlc_mutex_lock( &p_owner->lock );

@@ -43,6 +43,7 @@ extern "C" char **environ;
 #include <QDate>
 #include <QMutex>
 #include <QtQuickControls2/QQuickStyle>
+#include <QLoggingCategory>
 
 #include "qt.hpp"
 
@@ -84,6 +85,10 @@ extern "C" char **environ;
   Q_IMPORT_PLUGIN(QtQmlModelsPlugin)
   Q_IMPORT_PLUGIN(QtGraphicalEffectsPlugin)
   Q_IMPORT_PLUGIN(QtGraphicalEffectsPrivatePlugin)
+
+  #if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
+   Q_IMPORT_PLUGIN(QtQmlPlugin)
+  #endif
 
   #if !HAS_QT56
    Q_IMPORT_PLUGIN(AccessibleFactory)
@@ -229,6 +234,14 @@ static void ShowDialog   ( intf_thread_t *, int, int, intf_dialog_args_t * );
 #define AUTORAISE_ON_PLAYBACK_LONGTEXT N_( "This option allows the interface to be raised automatically " \
     "when a video/audio playback starts, or never." )
 
+#define QT_CLIENT_SIDE_DECORATION_TEXT N_( "Enable window titlebar" )
+#define QT_CLIENT_SIDE_DECORATION_LONGTEXT N_( "This option enables the title bar. Disabling it will remove " \
+    "the titlebar and move window buttons within the interface (Client Side Decoration)" )
+
+
+#define QT_MENUBAR_TEXT N_( "Show the menu bar" )
+#define QT_MENUBAR_LONGTEXT N_( "This option displays the classic menu bar" )
+
 #define FULLSCREEN_CONTROL_PIXELS N_( "Fullscreen controller mouse sensitivity" )
 
 #define CONTINUE_PLAYBACK_TEXT N_("Continue playback?")
@@ -322,6 +335,18 @@ vlc_module_begin ()
               QT_DISABLE_VOLUME_KEYS_LONGTEXT      /* longtext */,
               false                                /* advanced mode only */)
 #endif
+
+#if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
+    add_bool( "qt-titlebar",
+#ifdef _WIN32
+              false                              /* use CSD by default on windows */,
+#else
+              true                               /* but not on linux */,
+#endif
+              QT_CLIENT_SIDE_DECORATION_TEXT, QT_CLIENT_SIDE_DECORATION_LONGTEXT, false )
+#endif
+
+    add_bool( "qt-menubar", false, QT_MENUBAR_TEXT, QT_MENUBAR_LONGTEXT, false )
 
     add_bool( "qt-embedded-open", false, QT_NATIVEOPEN_TEXT,
                QT_NATIVEOPEN_TEXT, false )
@@ -577,6 +602,9 @@ static void *Thread( void *obj )
     QApplication::setAttribute( Qt::AA_UseHighDpiPixmaps );
 #endif
 
+#if QT_VERSION >= QT_VERSION_CHECK(5,14,0)
+    QApplication::setHighDpiScaleFactorRoundingPolicy( Qt::HighDpiScaleFactorRoundingPolicy::RoundPreferFloor );
+#endif
     // at the moment, the vout is created in another thread than the rendering thread
     QApplication::setAttribute( Qt::AA_DontCheckOpenGLContextThreadAffinity );
     QQuickWindow::setDefaultAlphaBuffer(true);
@@ -585,6 +613,12 @@ static void *Thread( void *obj )
 
     /* Start the QApplication here */
     QVLCApp app( argc, argv );
+
+#if QT_VERSION >= QT_VERSION_CHECK(5,15,1)
+    //suppress deprecation warnings about QML 'Connections' syntax
+    //legacy connection syntax is required to keep compatibility with Qt <= 5.14
+    QLoggingCategory::setFilterRules("qt.qml.connections.warning=false");
+#endif
 
     //app.setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
 

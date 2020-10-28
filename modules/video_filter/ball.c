@@ -72,10 +72,9 @@ enum { RED, GREEN, BLUE, WHITE };
 
 typedef struct filter_sys_t filter_sys_t;
 
-static int  Create    ( vlc_object_t * );
-static void Destroy   ( vlc_object_t * );
+static int  Create    ( filter_t * );
 
-static picture_t *Filter( filter_t *, picture_t * );
+VIDEO_FILTER_WRAPPER_CLOSE( Filter, Destroy )
 
 static void drawBall( filter_sys_t *p_sys, picture_t *p_outpic );
 static void drawPixelRGB24( filter_sys_t *p_sys, picture_t *p_outpic,
@@ -126,7 +125,6 @@ vlc_module_begin ()
     set_description( N_("Ball video filter") )
     set_shortname( N_( "Ball" ))
     set_help(BALL_HELP)
-    set_capability( "video filter", 0 )
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
 
@@ -147,7 +145,7 @@ vlc_module_begin ()
               EDGE_VISIBLE_TEXT, EDGE_VISIBLE_LONGTEXT, true )
 
     add_shortcut( "ball" )
-    set_callbacks( Create, Destroy )
+    set_callback_video_filter( Create )
 vlc_module_end ()
 
 static const char *const ppsz_filter_options[] = {
@@ -215,15 +213,13 @@ struct filter_sys_t
     } colorList[4];
 };
 
-
 /*****************************************************************************
 * Create: allocates Distort video thread output method
 *****************************************************************************
 * This function allocates and initializes a Distort vout method.
 *****************************************************************************/
-static int Create( vlc_object_t *p_this )
+static int Create( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     char *psz_method;
 
     /* Allocate structure */
@@ -261,7 +257,7 @@ static int Create( vlc_object_t *p_this )
     if( p_sys->p_image == NULL )
         return VLC_EGENERIC;
 
-    p_filter->pf_video_filter = Filter;
+    p_filter->ops = &Filter_ops;
 
     config_ChainParse( p_filter, FILTER_PREFIX, ppsz_filter_options,
                        p_filter->p_cfg );
@@ -275,7 +271,7 @@ static int Create( vlc_object_t *p_this )
         p_sys->ballColor = RED;
     }
     else
-        p_sys->ballColor = getBallColor( p_this, psz_method );
+        p_sys->ballColor = getBallColor( VLC_OBJECT(p_filter), psz_method );
 
     free( psz_method );
 
@@ -318,9 +314,8 @@ static int Create( vlc_object_t *p_this )
 *****************************************************************************
 * Terminate an output method created by DistortCreateOutputMethod
  *****************************************************************************/
-static void Destroy( vlc_object_t *p_this )
+static void Destroy( filter_t *p_filter)
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
     var_DelCallback( p_filter, FILTER_PREFIX "color",
@@ -349,27 +344,13 @@ static void Destroy( vlc_object_t *p_this )
 * until it is displayed and switch the two rendering buffers, preparing next
 * frame.
  *****************************************************************************/
-static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
+static void Filter( filter_t *p_filter, picture_t *p_pic, picture_t *p_outpic )
 {
-    picture_t *p_outpic;
-
-    if( !p_pic ) return NULL;
-
-    p_outpic = filter_NewPicture( p_filter );
-    if( !p_outpic )
-    {
-        picture_Release( p_pic );
-        return NULL;
-    }
-
     filter_sys_t *p_sys = p_filter->p_sys;
     vlc_mutex_lock( &p_sys->lock );
     FilterBall( p_filter, p_pic, p_outpic );
     vlc_mutex_unlock( &p_sys->lock );
-
-    return CopyInfoAndRelease( p_outpic, p_pic );
 }
-
 
 /*****************************************************************************
 * Drawing functions

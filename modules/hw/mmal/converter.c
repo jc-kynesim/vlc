@@ -61,8 +61,7 @@ static const char * const  ppsz_converter_text[] = {
     "Hardware Video Scaler", "ISP", "Resizer"
 };
 
-int OpenConverter(vlc_object_t *);
-void CloseConverter(vlc_object_t *);
+static int OpenConverter(filter_t *);
 
 vlc_module_begin()
     add_submodule()
@@ -71,12 +70,11 @@ vlc_module_begin()
     set_shortname(N_("MMAL resizer"))
     set_description(N_("MMAL resizing conversion filter"))
     add_shortcut("mmal_converter")
-    set_capability( "video converter", 900 )
 #ifndef NDEBUG
     add_integer( MMAL_CONVERTER_TYPE_NAME, FILTER_RESIZER_HVS, MMAL_CONVERTER_TYPE_TEXT, MMAL_CONVERTER_TYPE_LONGTEXT, true )
         change_integer_list( pi_converter_modes, ppsz_converter_text )
 #endif
-    set_callbacks(OpenConverter, CloseConverter)
+    set_callback_video_converter(OpenConverter, 900)
 vlc_module_end()
 
 #define MMAL_SLICE_HEIGHT 16
@@ -116,22 +114,12 @@ static MMAL_FOURCC_T pic_to_slice_mmal_fourcc(MMAL_FOURCC_T fcc)
     return 0;
 }
 
-typedef struct pic_fifo_s {
-    picture_t * head;
-    picture_t * tail;
-} pic_fifo_t;
-
-static picture_t * pic_fifo_get(pic_fifo_t * const pf)
+static picture_t * pic_fifo_get(vlc_picture_chain_t * const pf)
 {
-    picture_t * const pic = pf->head;;
-    if (pic != NULL) {
-        pf->head = pic->p_next;
-        pic->p_next = NULL;
-    }
-    return pic;
+    return vlc_picture_chain_PopFront( pf );
 }
 
-static void pic_fifo_release_all(pic_fifo_t * const pf)
+static void pic_fifo_release_all(vlc_picture_chain_t * const pf)
 {
     picture_t * pic;
     while ((pic = pic_fifo_get(pf)) != NULL) {
@@ -139,20 +127,14 @@ static void pic_fifo_release_all(pic_fifo_t * const pf)
     }
 }
 
-static void pic_fifo_init(pic_fifo_t * const pf)
+static void pic_fifo_init(vlc_picture_chain_t * const pf)
 {
-    pf->head = NULL;
-    pf->tail = NULL;  // Not strictly needed
+    vlc_picture_chain_Init( pf );
 }
 
-static void pic_fifo_put(pic_fifo_t * const pf, picture_t * pic)
+static void pic_fifo_put(vlc_picture_chain_t * const pf, picture_t * pic)
 {
-    pic->p_next = NULL;
-    if (pf->head == NULL)
-        pf->head = pic;
-    else
-        pf->tail->p_next = pic;
-    pf->tail = pic;
+    vlc_picture_chain_Append( pf, pic  );
 }
 
 #define SUBS_MAX 3
@@ -177,7 +159,7 @@ typedef struct
 
     subpic_reg_stash_t subs[SUBS_MAX];
 
-    pic_fifo_t ret_pics;
+    vlc_picture_chain_t ret_pics;
 
     unsigned int pic_n;
     vlc_sem_t sem;
@@ -196,7 +178,7 @@ typedef struct
 
     // Slice specific tracking stuff
     struct {
-        pic_fifo_t pics;
+        vlc_picture_chain_t pics;
         unsigned int line;  // Lines filled
     } slice;
 
@@ -289,8 +271,6 @@ static void conv_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
 
 static void conv_out_q_pic(converter_sys_t * const sys, picture_t * const pic)
 {
-    pic->p_next = NULL;
-
     vlc_mutex_lock(&sys->lock);
     pic_fifo_put(&sys->ret_pics, pic);
     vlc_mutex_unlock(&sys->lock);
@@ -336,7 +316,7 @@ static void slice_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
     if (buf->data != NULL && buf->length != 0)
     {
         // Got slice
-        picture_t *pic = sys->slice.pics.head;
+        picture_t *pic = vlc_picture_chain_PeekFront( &sys->slice.pics );
         const unsigned int scale_lines = sys->output->format->es->video.height;  // Expected lines of callback
 
         if (pic == NULL) {
@@ -384,7 +364,7 @@ static void slice_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
                 sys->slice.line = 0;
 
                 vlc_mutex_lock(&sys->lock);
-                pic_fifo_get(&sys->slice.pics);  // Remove head from Q
+                pic = pic_fifo_get(&sys->slice.pics);  // Remove head from Q
                 vlc_mutex_unlock(&sys->lock);
 
                 buf_to_pic_copy_props(pic, buf);
@@ -731,13 +711,12 @@ fail:
         mmal_buffer_header_release(out_buf);
     if (p_pic != NULL)
         picture_Release(p_pic);
-    conv_flush(p_filter);
+    filter_Flush(p_filter);
     return NULL;
 }
 
-void CloseConverter(vlc_object_t * obj)
+static void CloseConverter(filter_t *p_filter)
 {
-    filter_t * const p_filter = (filter_t *)obj;
     converter_sys_t * const sys = p_filter->p_sys;
 
     if (sys == NULL)
@@ -799,9 +778,12 @@ static MMAL_FOURCC_T filter_enc_in(const video_format_t * const fmt)
 }
 
 
-int OpenConverter(vlc_object_t * obj)
+static const struct vlc_filter_operations filter_ops = {
+    .filter_video = conv_filter, .flush = conv_flush, .close = CloseConverter,
+};
+
+static int OpenConverter(filter_t *p_filter)
 {
-    filter_t * const p_filter = (filter_t *)obj;
     int ret = VLC_EGENERIC;
     converter_sys_t *sys;
     MMAL_STATUS_T status;
@@ -910,7 +892,7 @@ retry:
     if (status != MMAL_SUCCESS) {
         if (resizer_type == FILTER_RESIZER_HVS) {
             msg_Warn(p_filter, "Failed to create HVS resizer - retrying with ISP");
-            CloseConverter(obj);
+            CloseConverter(p_filter);
             resizer_type = FILTER_RESIZER_ISP;
             goto retry;
         }
@@ -987,14 +969,13 @@ retry:
         }
     }
 
-    p_filter->pf_video_filter = conv_filter;
-    p_filter->pf_flush = conv_flush;
+    p_filter->ops = &filter_ops;
     // video_drain NIF in filter structure
 
     return VLC_SUCCESS;
 
 fail:
-    CloseConverter(obj);
+    CloseConverter(p_filter);
 
     if (resizer_type != FILTER_RESIZER_RESIZER && status == MMAL_ENOMEM) {
         resizer_type = FILTER_RESIZER_RESIZER;

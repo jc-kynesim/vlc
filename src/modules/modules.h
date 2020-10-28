@@ -39,10 +39,10 @@ typedef struct vlc_plugin_t
      */
     struct
     {
-        module_config_t *items; /**< Table of configuration parameters */
-        size_t size; /**< Size of items table */
-        size_t count; /**< Number of configuration items */
-        size_t booleans; /**< Number of booleal config items */
+        module_config_t *items; /**< Table of configuration items */
+        size_t size; /**< Total count of all items */
+        size_t count; /**< Count of real options (excludes hints) */
+        size_t booleans; /**< Count of options that are of boolean type */
     } conf;
 
 #ifdef HAVE_DYNAMIC_PLUGINS
@@ -110,8 +110,8 @@ void module_InitBank (void);
 void module_LoadPlugins(vlc_object_t *);
 #define module_LoadPlugins(a) module_LoadPlugins(VLC_OBJECT(a))
 void module_EndBank (bool);
-int module_Map(struct vlc_logger *, vlc_plugin_t *);
-void *module_Symbol(struct vlc_logger *, vlc_plugin_t *, const char *name);
+int vlc_plugin_Map(struct vlc_logger *, vlc_plugin_t *);
+void *vlc_plugin_Symbol(struct vlc_logger *, vlc_plugin_t *, const char *name);
 
 /**
  * Lists of all VLC modules with a given capability.

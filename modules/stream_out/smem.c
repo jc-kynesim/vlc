@@ -189,6 +189,27 @@ void AudioPostrenderDefaultCallback( void* p_audio_data, uint8_t* p_pcm_buffer, 
     VLC_UNUSED( bits_per_sample ); VLC_UNUSED( size ); VLC_UNUSED( pts );
 }
 
+static int Control(sout_stream_t *stream, int query, va_list args)
+{
+    sout_stream_sys_t *sys = stream->p_sys;
+
+    switch (query)
+    {
+        case SOUT_STREAM_IS_SYNCHRONOUS:
+            *va_arg(args, bool *) = sys->time_sync;
+            break;
+
+        default:
+            return VLC_EGENERIC;
+    }
+
+    return VLC_SUCCESS;
+}
+
+static const struct sout_stream_operations ops = {
+    Add, Del, Send, Control, NULL,
+};
+
 /*****************************************************************************
  * Open:
  *****************************************************************************/
@@ -233,11 +254,7 @@ static int Open( vlc_object_t *p_this )
         p_sys->pf_audio_postrender_callback = AudioPostrenderDefaultCallback;
 
     /* Setting stream out module callbacks */
-    p_stream->pf_add    = Add;
-    p_stream->pf_del    = Del;
-    p_stream->pf_send   = Send;
-    p_stream->pace_nocontrol = p_sys->time_sync;
-
+    p_stream->ops = &ops;
     return VLC_SUCCESS;
 }
 

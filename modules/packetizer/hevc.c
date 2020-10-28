@@ -495,13 +495,16 @@ static block_t *GetXPSCopy(decoder_sys_t *p_sys)
     struct hevc_tuple_s *xpstype[3] = {p_sys->rg_vps, p_sys->rg_sps, p_sys->rg_pps};
     size_t xpsmax[3] = {HEVC_VPS_ID_MAX, HEVC_SPS_ID_MAX, HEVC_PPS_ID_MAX};
     for(size_t i=0; i<3; i++)
+    {
+        struct hevc_tuple_s *xps = xpstype[i];
         for(size_t j=0; j<xpsmax[i]; j++)
         {
             block_t *p_dup;
-            if(xpstype[i]->p_nal &&
-               (p_dup = block_Duplicate(xpstype[i]->p_nal)))
+            if(xps[j].p_nal &&
+               (p_dup = block_Duplicate(xps[j].p_nal)))
                 block_ChainLastAppend(&pp_append, p_dup);
         };
+    }
     return p_chain;
 }
 
@@ -547,7 +550,7 @@ static void AppendAsAnnexB(const block_t *p_block,
         if(((set != rg[i].p_decoded) == !b) && rg[i].p_nal)\
         {\
             AppendAsAnnexB(rg[i].p_nal, &p_data, &i_data);\
-            break;\
+            if(b) break;\
         }\
     }
 
@@ -794,7 +797,7 @@ static block_t * ParseAUHead(decoder_t *p_dec, uint8_t i_nal_type, block_t *p_na
             const uint8_t *p_xps = p_nalb->p_buffer;
             size_t i_xps = p_nalb->i_buffer;
             if(hxxx_strip_AnnexB_startcode(&p_xps, &i_xps) &&
-               hevc_get_xps_id(p_nalb->p_buffer, p_nalb->i_buffer, &i_id))
+               hevc_get_xps_id(p_xps, i_xps, &i_id))
                 InsertXPS(p_dec, i_nal_type, i_id, p_nalb);
             if(p_sys->sets != SENT) /* will store/inject on first recovery point */
             {

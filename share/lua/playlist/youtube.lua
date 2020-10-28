@@ -380,7 +380,8 @@ function parse()
             -- "SWF_ARGS", "swfArgs", "PLAYER_CONFIG", "playerConfig" ...
             if string.match( line, "ytplayer%.config" ) then
 
-                local js_url = string.match( line, "\"js\": *\"(.-)\"" )
+                local js_url = string.match( line, '"jsUrl":"(.-)"' )
+                    or string.match( line, "\"js\": *\"(.-)\"" )
                 if js_url then
                     js_url = string.gsub( js_url, "\\/", "/" )
                     -- Resolve URL
@@ -535,7 +536,7 @@ function parse()
             arturl = vlc.strings.decode_uri( arturl )
         end
 
-        return { { path = path, title = title, description = description, artist = artist, arturl = arturl } }
+        return { { path = path, name = title, description = description, artist = artist, arturl = arturl } }
 
     else -- Other supported URL formats
         local video_id = string.match( vlc.path, "/[^/]+/([^?]*)" )

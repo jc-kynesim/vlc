@@ -46,6 +46,10 @@ vlc_module_begin ()
     set_category( CAT_SOUT )
     set_subcategory( SUBCAT_SOUT_STREAM )
     set_callbacks( Open, Close )
+    add_submodule()
+    set_capability("sout filter", 0)
+    add_shortcut("duplicate", "dup")
+    set_callbacks(Open, Close)
 vlc_module_end ()
 
 
@@ -61,9 +65,6 @@ typedef struct
     int             i_nb_streams;
     sout_stream_t   **pp_streams;
 
-    int             i_nb_last_streams;
-    sout_stream_t   **pp_last_streams;
-
     int             i_nb_select;
     char            **ppsz_select;
 } sout_stream_sys_t;
@@ -74,7 +75,8 @@ typedef struct
     void                **pp_ids;
 } sout_stream_id_sys_t;
 
-static bool ESSelected( const es_format_t *fmt, char *psz_select );
+static bool ESSelected( struct vlc_logger *, const es_format_t *fmt,
+                        char *psz_select );
 
 /*****************************************************************************
  * Control
@@ -103,6 +105,10 @@ static int Control( sout_stream_t *p_stream, int i_query, va_list args )
     return VLC_EGENERIC;
 }
 
+static const struct sout_stream_operations ops = {
+    Add, Del, Send, Control, NULL,
+};
+
 /*****************************************************************************
  * Open:
  *****************************************************************************/
@@ -119,43 +125,42 @@ static int Open( vlc_object_t *p_this )
         return VLC_ENOMEM;
 
     TAB_INIT( p_sys->i_nb_streams, p_sys->pp_streams );
-    TAB_INIT( p_sys->i_nb_last_streams, p_sys->pp_last_streams );
     TAB_INIT( p_sys->i_nb_select, p_sys->ppsz_select );
+
+    char **ppsz_select = NULL;
 
     for( p_cfg = p_stream->p_cfg; p_cfg != NULL; p_cfg = p_cfg->p_next )
     {
         if( !strncmp( p_cfg->psz_name, "dst", strlen( "dst" ) ) )
         {
-            sout_stream_t *s, *p_last;
+            sout_stream_t *s;
 
             msg_Dbg( p_stream, " * adding `%s'", p_cfg->psz_value );
-            s = sout_StreamChainNew( p_stream->p_sout, p_cfg->psz_value,
-                p_stream->p_next, &p_last );
+            s = sout_StreamChainNew( VLC_OBJECT(p_stream), p_cfg->psz_value,
+                p_stream->p_next );
 
             if( s )
             {
                 TAB_APPEND( p_sys->i_nb_streams, p_sys->pp_streams, s );
-                TAB_APPEND( p_sys->i_nb_last_streams, p_sys->pp_last_streams,
-                    p_last );
                 TAB_APPEND( p_sys->i_nb_select,  p_sys->ppsz_select, NULL );
+                ppsz_select = &p_sys->ppsz_select[p_sys->i_nb_select - 1];
             }
         }
         else if( !strncmp( p_cfg->psz_name, "select", strlen( "select" ) ) )
         {
             char *psz = p_cfg->psz_value;
-            if( p_sys->i_nb_select > 0 && psz && *psz )
-            {
-                char **ppsz_select = &p_sys->ppsz_select[p_sys->i_nb_select - 1];
 
-                if( *ppsz_select )
+            if( psz && *psz )
+            {
+                if( ppsz_select == NULL )
                 {
-                    msg_Err( p_stream, " * ignore selection `%s' (it already has `%s')",
-                             psz, *ppsz_select );
+                    msg_Err( p_stream, " * ignore selection `%s'", psz );
                 }
                 else
                 {
                     msg_Dbg( p_stream, " * apply selection `%s'", psz );
                     *ppsz_select = strdup( psz );
+                    ppsz_select = NULL;
                 }
             }
         }
@@ -173,13 +178,8 @@ static int Open( vlc_object_t *p_this )
         return VLC_EGENERIC;
     }
 
-    p_stream->pf_add    = Add;
-    p_stream->pf_del    = Del;
-    p_stream->pf_send   = Send;
-    p_stream->pf_control = Control;
-
-    p_stream->p_sys     = p_sys;
-
+    p_stream->p_sys = p_sys;
+    p_stream->ops = &ops;
     return VLC_SUCCESS;
 }
 
@@ -194,11 +194,10 @@ static void Close( vlc_object_t * p_this )
     msg_Dbg( p_stream, "closing a duplication" );
     for( int i = 0; i < p_sys->i_nb_streams; i++ )
     {
-        sout_StreamChainDelete(p_sys->pp_streams[i], p_sys->pp_last_streams[i]);
+        sout_StreamChainDelete(p_sys->pp_streams[i], p_stream->p_next);
         free( p_sys->ppsz_select[i] );
     }
     free( p_sys->pp_streams );
-    free( p_sys->pp_last_streams );
     free( p_sys->ppsz_select );
 
     free( p_sys );
@@ -226,7 +225,8 @@ static void *Add( sout_stream_t *p_stream, const es_format_t *p_fmt )
     {
         void *id_new = NULL;
 
-        if( ESSelected( p_fmt, p_sys->ppsz_select[i_stream] ) )
+        if( ESSelected( p_stream->obj.logger, p_fmt,
+                        p_sys->ppsz_select[i_stream] ) )
         {
             sout_stream_t *out = p_sys->pp_streams[i_stream];
 
@@ -342,7 +342,8 @@ static bool NumInRange( const char *psz_range, int i_num )
         || (beginRange > endRange && (i_num <= beginRange && i_num >= endRange));
 }
 
-static bool ESSelected( const es_format_t *fmt, char *psz_select )
+static bool ESSelected( struct vlc_logger *logger, const es_format_t *fmt,
+                        char *psz_select )
 {
     char  *psz_dup;
     char  *psz;
@@ -473,7 +474,7 @@ static bool ESSelected( const es_format_t *fmt, char *psz_select )
         }
         else
         {
-            fprintf( stderr, "unknown args (%s)\n", psz );
+            vlc_error( logger, "unknown args (%s)", psz );
         }
         /* Next */
         psz = p;

@@ -76,6 +76,8 @@ NavigableFocusScope {
 
     property int scrollBarWidth: scroll_id.visible ? scroll_id.width : 0
 
+    property bool keyNavigationWraps : false
+
     Accessible.role: Accessible.List
 
     function nextPage() {
@@ -153,9 +155,12 @@ NavigableFocusScope {
         Connections {
             target: view.currentItem
             ignoreUnknownSignals: true
-            onActionRight: listview_id.navigationRight(currentIndex)
-            onActionLeft: listview_id.navigationLeft(currentIndex)
+            onActionRight: if ( !listview_id.keyNavigationWraps ) listview_id.navigationRight(currentIndex);
+            onActionLeft: if ( !listview_id.keyNavigationWraps ) listview_id.navigationLeft(currentIndex);
             onActionDown: {
+                if ( listview_id.keyNavigationWraps )
+                    return
+
                 if ( currentIndex !== modelCount - 1 ) {
                     var newIndex = currentIndex + 1
                     var oldIndex = currentIndex
@@ -166,6 +171,9 @@ NavigableFocusScope {
                 }
             }
             onActionUp: {
+                if ( listview_id.keyNavigationWraps )
+                    return
+
                 if ( currentIndex !== 0 ) {
                     var newIndex = currentIndex - 1
                     var oldIndex = currentIndex
@@ -185,11 +193,15 @@ NavigableFocusScope {
                 if ( KeyHelper.matchDown(event) ) {
                     if (currentIndex !== modelCount - 1 )
                         newIndex = currentIndex + 1
+                    else if ( listview_id.keyNavigationWraps )
+                        newIndex = 0
                 } else if ( KeyHelper.matchPageDown(event) ) {
                     newIndex = Math.min(modelCount - 1, currentIndex + 10)
                 } else if ( KeyHelper.matchUp(event) ) {
                     if ( currentIndex !== 0 )
                         newIndex = currentIndex - 1
+                    else if ( listview_id.keyNavigationWraps )
+                        newIndex = modelCount - 1
                 } else if ( KeyHelper.matchPageUp(event) ) {
                     newIndex = Math.max(0, currentIndex - 10)
                 }
@@ -197,12 +209,16 @@ NavigableFocusScope {
                 if ( KeyHelper.matchRight(event) ) {
                     if (currentIndex !== modelCount - 1 )
                         newIndex = currentIndex + 1
+                    else if ( listview_id.keyNavigationWraps )
+                        newIndex = 0
                 }
                 else if ( KeyHelper.matchPageDown(event) ) {
                     newIndex = Math.min(modelCount - 1, currentIndex + 10)
                 } else if ( KeyHelper.matchLeft(event) ) {
                     if ( currentIndex !== 0 )
                         newIndex = currentIndex - 1
+                    else if ( listview_id.keyNavigationWraps )
+                        newIndex = modelCount - 1
                 } else if ( KeyHelper.matchPageUp(event) ) {
                     newIndex = Math.max(0, currentIndex - 10)
                 }
@@ -234,6 +250,8 @@ NavigableFocusScope {
             }
         }
 
+        readonly property bool _fadeRectsOverlap: fadeRectTop.y + fadeRectTop.height > fadeRectBottom.y
+
         Rectangle {
             id: fadeRectTop
             anchors {
@@ -243,7 +261,7 @@ NavigableFocusScope {
                 topMargin: headerItem && (headerPositioning === ListView.OverlayHeader) ? headerItem.height : 0
             }
             height: highlightMargin * 2
-            visible: !!fadeColor && fadeRectTop.opacity !== 0.0
+            visible: !!fadeColor && fadeRectTop.opacity !== 0.0 && !view._fadeRectsOverlap
 
             property bool isHovered: false
             property bool _stateVisible: ((orientation === ListView.Vertical && !view.atYBeginning)
@@ -288,7 +306,7 @@ NavigableFocusScope {
                 right: parent.right
             }
             height: highlightMargin * 2
-            visible: !!fadeColor && fadeRectBottom.opacity !== 0.0
+            visible: !!fadeColor && fadeRectBottom.opacity !== 0.0 && !view._fadeRectsOverlap
 
             property bool isHovered: false
             property bool _stateVisible: ((orientation === ListView.Vertical && !view.atYEnd)

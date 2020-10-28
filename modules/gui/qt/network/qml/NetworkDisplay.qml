@@ -21,7 +21,6 @@ import QtQml.Models 2.2
 import QtQml 2.11
 
 import org.videolan.vlc 0.1
-import org.videolan.medialib 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
@@ -35,6 +34,8 @@ Widgets.NavigableFocusScope {
     onTreeChanged:  loadView()
     Component.onCompleted: loadView()
 
+    property var contentModel
+
     //reset view
     function loadDefaultView() {
         root.tree = undefined
@@ -42,14 +43,28 @@ Widgets.NavigableFocusScope {
 
     function loadView() {
         var page = "";
+        var props = undefined;
         if (root.tree === undefined)
             page ="qrc:///network/NetworkHomeDisplay.qml"
-        else
+        else {
             page = "qrc:///network/NetworkBrowseDisplay.qml"
-        view.replace(page)
-        if (root.tree) {
-            view.currentItem.tree = root.tree
+            props = { providerModel: mediaModel, contextMenu: mediaContextMenu, tree: root.tree }
         }
+        view.replace(page, props)
+        if (view.currentItem.model)
+            root.contentModel = view.currentItem.model
+    }
+
+    NetworkMediaModel {
+        id: mediaModel
+
+        ctx: mainctx
+    }
+
+    NetworkMediaContextMenu {
+        id: mediaContextMenu
+
+        model: mediaModel
     }
 
     Widgets.StackViewExt {

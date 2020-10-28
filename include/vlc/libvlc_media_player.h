@@ -42,18 +42,6 @@ extern "C" {
 typedef struct libvlc_media_player_t libvlc_media_player_t;
 
 /**
- * Description for video, audio tracks and subtitles. It contains
- * id, name (description string) and pointer to next record.
- */
-typedef struct libvlc_track_description_t
-{
-    int   i_id;
-    char *psz_name;
-    struct libvlc_track_description_t *p_next;
-
-} libvlc_track_description_t;
-
-/**
  * Description for titles
  */
 enum
@@ -209,15 +197,24 @@ LIBVLC_API void libvlc_media_player_retain( libvlc_media_player_t *p_mi );
  * Set the media that will be used by the media_player. If any,
  * previous md will be released.
  *
+ * \note The user should listen to the libvlc_MediaPlayerMediaChanged event, to
+ * know when the new media is actually used by the player (or to known that the
+ * older media is no longuer used).
+ *
  * \param p_mi the Media Player
  * \param p_md the Media. Afterwards the p_md can be safely
  *        destroyed.
  */
 LIBVLC_API void libvlc_media_player_set_media( libvlc_media_player_t *p_mi,
-                                                   libvlc_media_t *p_md );
+                                               libvlc_media_t *p_md );
 
 /**
  * Get the media used by the media_player.
+ *
+ * \warning Calling this function just after libvlc_media_player_set_media()
+ * will return the media that was just set, but this media might not be
+ * currently used internally by the player. To detect such case, the user
+ * should listen to the libvlc_MediaPlayerMediaChanged event.
  *
  * \param p_mi the Media Player
  * \return the media associated with p_mi, or NULL if no
@@ -1357,20 +1354,32 @@ libvlc_media_player_get_track_from_id( libvlc_media_player_t *p_mi,
 
 
 /**
- * Select a track or unselect all tracks for one type
+ * Select a track
+ *
+ * This will unselected the current track.
  *
  * \version LibVLC 4.0.0 and later.
  *
  * \note Use libvlc_media_player_select_tracks() for multiple selection
  *
  * \param p_mi the media player
- * \param type type of the selected track
- * \param track track to select or NULL to unselect all tracks of for this type
+ * \param track track to select, can't be NULL
  */
 LIBVLC_API void
 libvlc_media_player_select_track( libvlc_media_player_t *p_mi,
-                                  libvlc_track_type_t type,
                                   const libvlc_media_track_t *track );
+
+/**
+ * Unselect all tracks for a given type
+ *
+ * \version LibVLC 4.0.0 and later.
+ *
+ * \param p_mi the media player
+ * \param type type to unselect
+ */
+LIBVLC_API void
+libvlc_media_player_unselect_track_type( libvlc_media_player_t *p_mi,
+                                         libvlc_track_type_t type );
 
 /**
  * Select multiple tracks for one type
@@ -1386,7 +1395,7 @@ libvlc_media_player_select_track( libvlc_media_player_t *p_mi,
  *
  * \param p_mi the media player
  * \param type type of the selected track
- * \param tracks pointer to the track array
+ * \param tracks pointer to the track array, or NULL if track_count is 0
  * \param track_count number of tracks in the track array
  */
 LIBVLC_API void
@@ -1451,13 +1460,6 @@ LIBVLC_API
 int libvlc_media_player_add_slave( libvlc_media_player_t *p_mi,
                                    libvlc_media_slave_type_t i_type,
                                    const char *psz_uri, bool b_select );
-
-/**
- * Release (free) libvlc_track_description_t
- *
- * \param p_track_description the structure to release
- */
-LIBVLC_API void libvlc_track_description_list_release( libvlc_track_description_t *p_track_description );
 
 /** \defgroup libvlc_video LibVLC video controls
  * @{
@@ -1644,41 +1646,6 @@ LIBVLC_API libvlc_video_viewpoint_t *libvlc_video_new_viewpoint(void);
 LIBVLC_API int libvlc_video_update_viewpoint( libvlc_media_player_t *p_mi,
                                               const libvlc_video_viewpoint_t *p_viewpoint,
                                               bool b_absolute);
-
-/**
- * Get current video subtitle.
- *
- * \param p_mi the media player
- * \return the video subtitle selected, or -1 if none
- */
-LIBVLC_API int libvlc_video_get_spu( libvlc_media_player_t *p_mi );
-
-/**
- * Get the number of available video subtitles.
- *
- * \param p_mi the media player
- * \return the number of available video subtitles
- */
-LIBVLC_API int libvlc_video_get_spu_count( libvlc_media_player_t *p_mi );
-
-/**
- * Get the description of available video subtitles.
- *
- * \param p_mi the media player
- * \return list containing description of available video subtitles.
- * It must be freed with libvlc_track_description_list_release()
- */
-LIBVLC_API libvlc_track_description_t *
-        libvlc_video_get_spu_description( libvlc_media_player_t *p_mi );
-
-/**
- * Set new video subtitle.
- *
- * \param p_mi the media player
- * \param i_spu video subtitle track to select (i_id from track description)
- * \return 0 on success, -1 if out of range
- */
-LIBVLC_API int libvlc_video_set_spu( libvlc_media_player_t *p_mi, int i_spu );
 
 /**
  * Get the current subtitle delay. Positive values means subtitles are being
@@ -1879,42 +1846,6 @@ LIBVLC_API int libvlc_video_get_teletext( libvlc_media_player_t *p_mi );
  * \ref libvlc_teletext_key_t. 100 is the default teletext page.
  */
 LIBVLC_API void libvlc_video_set_teletext( libvlc_media_player_t *p_mi, int i_page );
-
-/**
- * Get number of available video tracks.
- *
- * \param p_mi media player
- * \return the number of available video tracks (int)
- */
-LIBVLC_API int libvlc_video_get_track_count( libvlc_media_player_t *p_mi );
-
-/**
- * Get the description of available video tracks.
- *
- * \param p_mi media player
- * \return list with description of available video tracks, or NULL on error.
- * It must be freed with libvlc_track_description_list_release()
- */
-LIBVLC_API libvlc_track_description_t *
-        libvlc_video_get_track_description( libvlc_media_player_t *p_mi );
-
-/**
- * Get current video track.
- *
- * \param p_mi media player
- * \return the video track ID (int) or -1 if no active input
- */
-LIBVLC_API int libvlc_video_get_track( libvlc_media_player_t *p_mi );
-
-/**
- * Set video track.
- *
- * \param p_mi media player
- * \param i_track the track ID (i_id field from track description)
- * \return 0 on success, -1 if out of range
- */
-LIBVLC_API
-int libvlc_video_set_track( libvlc_media_player_t *p_mi, int i_track );
 
 /**
  * Take a snapshot of the current video window.
@@ -2301,41 +2232,6 @@ LIBVLC_API int libvlc_audio_get_volume( libvlc_media_player_t *p_mi );
  * \return 0 if the volume was set, -1 if it was out of range
  */
 LIBVLC_API int libvlc_audio_set_volume( libvlc_media_player_t *p_mi, int i_volume );
-
-/**
- * Get number of available audio tracks.
- *
- * \param p_mi media player
- * \return the number of available audio tracks (int), or -1 if unavailable
- */
-LIBVLC_API int libvlc_audio_get_track_count( libvlc_media_player_t *p_mi );
-
-/**
- * Get the description of available audio tracks.
- *
- * \param p_mi media player
- * \return list with description of available audio tracks, or NULL.
- * It must be freed with libvlc_track_description_list_release()
- */
-LIBVLC_API libvlc_track_description_t *
-        libvlc_audio_get_track_description( libvlc_media_player_t *p_mi );
-
-/**
- * Get current audio track.
- *
- * \param p_mi media player
- * \return the audio track ID or -1 if no active input.
- */
-LIBVLC_API int libvlc_audio_get_track( libvlc_media_player_t *p_mi );
-
-/**
- * Set current audio track.
- *
- * \param p_mi media player
- * \param i_track the track ID (i_id field from track description)
- * \return 0 on success, -1 on error
- */
-LIBVLC_API int libvlc_audio_set_track( libvlc_media_player_t *p_mi, int i_track );
 
 /**
  * Get current audio channel.

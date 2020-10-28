@@ -408,6 +408,7 @@ static int Open( vlc_object_t *p_this )
 
     p_sys->patfix.i_first_dts = -1;
     p_sys->patfix.i_timesourcepid = 0;
+    p_sys->patfix.b_pcrhasnopcrfield = false;
     p_sys->patfix.status = var_CreateGetBool( p_demux, "ts-patfix" ) ? PAT_WAITING : PAT_FIXTRIED;
 
     /* Init PAT handler */
@@ -623,9 +624,9 @@ static int Demux( demux_t *p_demux )
     /* If we had no PAT within MIN_PAT_INTERVAL, create PAT/PMT from probed streams */
     if( p_sys->i_pmt_es == 0 && !SEEN(GetPID(p_sys, 0)) && p_sys->patfix.status == PAT_MISSING )
     {
+        GetPID(p_sys, 0)->u.p_pat->b_generated = true;
         MissingPATPMTFixup( p_demux );
         p_sys->patfix.status = PAT_FIXTRIED;
-        GetPID(p_sys, 0)->u.p_pat->b_generated = true;
     }
 
     /* We read at most 100 TS packet or until a frame is completed */
@@ -691,7 +692,6 @@ static int Demux( demux_t *p_demux )
 
         /* Probe streams to build PAT/PMT after MIN_PAT_INTERVAL in case we don't see any PAT */
         if( !SEEN( GetPID( p_sys, 0 ) ) &&
-            (p_pid->probed.i_fourcc == 0 || p_pid->i_pid == p_sys->patfix.i_timesourcepid) &&
             (p_pkt->p_buffer[1] & 0xC0) == 0x40 && /* Payload start but not corrupt */
             (p_pkt->p_buffer[3] & 0xD0) == 0x10 )  /* Has payload but is not encrypted */
         {
@@ -2039,7 +2039,7 @@ static int SeekToTime( demux_t *p_demux, const ts_pmt_t *p_pmt, stime_t i_scaled
     return VLC_SUCCESS;
 }
 
-static int ProbeChunk( demux_t *p_demux, int i_program, bool b_end, stime_t *pi_pcr, bool *pb_found )
+static int ProbeChunk( demux_t *p_demux, int i_program, bool b_end, bool *pb_found )
 {
     demux_sys_t *p_sys = p_demux->p_sys;
     int i_count = 0;
@@ -2047,7 +2047,7 @@ static int ProbeChunk( demux_t *p_demux, int i_program, bool b_end, stime_t *pi_
 
     for( ;; )
     {
-        *pi_pcr = -1;
+        stime_t i_pcr = -1;
 
         if( i_count++ > PROBE_CHUNK_COUNT || !( p_pkt = ReadTSPacket( p_demux ) ) )
         {
@@ -2072,9 +2072,13 @@ static int ProbeChunk( demux_t *p_demux, int i_program, bool b_end, stime_t *pi_
             bool b_adaptfield = p_pkt->p_buffer[3] & 0x20;
 
             if( b_adaptfield && p_pkt->i_buffer >= 4 + 2 + 5 )
-                *pi_pcr = GetPCR( p_pkt );
+                i_pcr = GetPCR( p_pkt );
 
-            if( *pi_pcr == -1 &&
+            /* Designated PCR pid will be valid, don't repick (on the fly probing) */
+            if( i_pcr != -1 && !p_pid->probed.i_pcr_count )
+                p_pid->probed.i_pcr_count++;
+
+            if( i_pcr == -1 &&
                 (p_pkt->p_buffer[1] & 0xC0) == 0x40 && /* payload start */
                 (p_pkt->p_buffer[3] & 0xD0) == 0x10 && /* Has payload but is not encrypted */
                 p_pid->type == TYPE_STREAM &&
@@ -2094,13 +2098,13 @@ static int ProbeChunk( demux_t *p_demux, int i_program, bool b_end, stime_t *pi_
                                                     &i_dts, &i_pts, &i_stream_id, NULL ) )
                 {
                     if( i_dts != -1 )
-                        *pi_pcr = i_dts;
+                        i_pcr = i_dts;
                     else if( i_pts != -1 )
-                        *pi_pcr = i_pts;
+                        i_pcr = i_pts;
                 }
             }
 
-            if( *pi_pcr != -1 )
+            if( i_pcr != -1 )
             {
                 ts_pat_t *p_pat = GetPID(p_sys, 0)->u.p_pat;
                 for( int i=0; i<p_pat->programs.i_size; i++ )
@@ -2113,17 +2117,17 @@ static int ProbeChunk( demux_t *p_demux, int i_program, bool b_end, stime_t *pi_
                     {
                         if( b_end )
                         {
-                            p_pmt->i_last_dts = *pi_pcr;
+                            p_pmt->i_last_dts = i_pcr;
                             p_pmt->i_last_dts_byte = vlc_stream_Tell( p_sys->stream );
                         }
                         /* Start, only keep first */
                         else if( b_pcrresult && p_pmt->pcr.i_first == -1 )
                         {
-                            p_pmt->pcr.i_first = *pi_pcr;
+                            p_pmt->pcr.i_first = i_pcr;
                         }
                         else if( p_pmt->pcr.i_first_dts == -1 )
                         {
-                            p_pmt->pcr.i_first_dts = *pi_pcr;
+                            p_pmt->pcr.i_first_dts = i_pcr;
                         }
 
                         if( i_program == 0 || i_program == p_pmt->i_number )
@@ -2147,7 +2151,6 @@ int ProbeStart( demux_t *p_demux, int i_program )
 
     int i_probe_count = 0;
     int64_t i_pos;
-    stime_t i_pcr = -1;
     bool b_found = false;
 
     do
@@ -2158,10 +2161,12 @@ int ProbeStart( demux_t *p_demux, int i_program )
         if( vlc_stream_Seek( p_sys->stream, i_pos ) )
             return VLC_EGENERIC;
 
-        ProbeChunk( p_demux, i_program, false, &i_pcr, &b_found );
+        int i_count =  ProbeChunk( p_demux, i_program, false, &b_found );
+        if( i_count < PROBE_CHUNK_COUNT )
+            break;
 
         /* Go ahead one more chunk if end of file contained only stuffing packets */
-        i_probe_count += PROBE_CHUNK_COUNT;
+        i_probe_count += i_count;
     } while( i_pos < i_stream_size && !b_found &&
              i_probe_count < PROBE_MAX );
 
@@ -2179,7 +2184,6 @@ int ProbeEnd( demux_t *p_demux, int i_program )
 
     int i_probe_count = PROBE_CHUNK_COUNT;
     int64_t i_pos;
-    stime_t i_pcr = -1;
     bool b_found = false;
 
     do
@@ -2190,10 +2194,12 @@ int ProbeEnd( demux_t *p_demux, int i_program )
         if( vlc_stream_Seek( p_sys->stream, i_pos ) )
             return VLC_EGENERIC;
 
-        ProbeChunk( p_demux, i_program, true, &i_pcr, &b_found );
+        int i_count = ProbeChunk( p_demux, i_program, true, &b_found );
+        if( i_count < PROBE_CHUNK_COUNT )
+            break;
 
         /* Go ahead one more chunk if end of file contained only stuffing packets */
-        i_probe_count += PROBE_CHUNK_COUNT;
+        i_probe_count += i_count;
     } while( i_pos > 0 && !b_found &&
              i_probe_count < PROBE_MAX );
 
@@ -2455,7 +2461,7 @@ static void PCRFixHandle( demux_t *p_demux, ts_pmt_t *p_pmt, block_t *p_block )
         {
             int i_cand = FindPCRCandidate( p_pmt );
             p_pmt->i_pid_pcr = i_cand;
-            if ( GetPID( p_sys, p_pmt->i_pid_pcr )->probed.i_pcr_count == 0 )
+            if ( GetPID( p_sys, p_pmt->i_pid_pcr )->probed.i_pcr_count == 0 ) /* does not have PCR field */
                 p_pmt->pcr.b_disable = true;
             msg_Warn( p_demux, "No PCR received for program %d, set up workaround using pid %d",
                       p_pmt->i_number, i_cand );

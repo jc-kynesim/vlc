@@ -114,9 +114,9 @@ typedef struct
     /* general data */
     bool b_init;
     size_t   i_planes;
-    int32_t *i_height;
-    int32_t *i_width;
-    int32_t *i_visible_pitch;
+    int32_t i_height[VOUT_MAX_PLANES];
+    int32_t i_width[VOUT_MAX_PLANES];
+    int32_t i_visible_pitch[VOUT_MAX_PLANES];
     vlc_tick_t i_start_time;
     vlc_tick_t i_last_time;
     vlc_tick_t i_cur_time;
@@ -172,24 +172,22 @@ static int  oldmovie_sliding_offset_apply( filter_t *p_filter, picture_t *p_pic_
  * Module descriptor
  *****************************************************************************/
 
-static int  Open ( vlc_object_t * );
-static void Close( vlc_object_t * );
+static int  Open ( filter_t * );
+static void Close( filter_t * );
 
 vlc_module_begin()
     set_description( N_("Old movie effect video filter") )
     set_shortname( N_( "Old movie" ))
-    set_capability( "video filter", 0 )
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
 
-    set_callbacks( Open, Close )
+    set_callback_video_filter( Open )
 vlc_module_end()
 
 /**
  * Open the filter
  */
-static int Open( vlc_object_t *p_this ) {
-    filter_t *p_filter = (filter_t *)p_this;
+static int Open( filter_t *p_filter ) {
     filter_sys_t *p_sys;
 
     /* Assert video in match with video out */
@@ -216,7 +214,11 @@ static int Open( vlc_object_t *p_this ) {
         return VLC_ENOMEM;
 
     /* init data */
-    p_filter->pf_video_filter = Filter;
+    static const struct vlc_filter_operations filter_ops =
+    {
+        .filter_video = Filter, .close = Close,
+    };
+    p_filter->ops = &filter_ops;
     p_sys->i_start_time = p_sys->i_cur_time = p_sys->i_last_time = vlc_tick_now();
 
     return VLC_SUCCESS;
@@ -225,8 +227,7 @@ static int Open( vlc_object_t *p_this ) {
 /**
  * Close the filter
  */
-static void Close( vlc_object_t *p_this ) {
-    filter_t *p_filter  = (filter_t *)p_this;
+static void Close( filter_t *p_filter ) {
     filter_sys_t *p_sys = p_filter->p_sys;
 
     /* Free allocated memory */
@@ -311,14 +312,6 @@ static int oldmovie_allocate_data( filter_t *p_filter, picture_t *p_pic_in ) {
     * take into account different characteristics for each plane
     */
     p_sys->i_planes = p_pic_in->i_planes;
-    p_sys->i_height = calloc( p_sys->i_planes, sizeof(int32_t) );
-    p_sys->i_width  = calloc( p_sys->i_planes, sizeof(int32_t) );
-    p_sys->i_visible_pitch = calloc( p_sys->i_planes, sizeof(int32_t) );
-
-    if( unlikely( !p_sys->i_height || !p_sys->i_width || !p_sys->i_visible_pitch ) ) {
-        oldmovie_free_allocated_data( p_filter );
-        return VLC_ENOMEM;
-    }
 
     for (size_t i_p=0; i_p < p_sys->i_planes; i_p++) {
         p_sys->i_visible_pitch [i_p] = (int) p_pic_in->p[i_p].i_visible_pitch;
@@ -345,9 +338,6 @@ static void oldmovie_free_allocated_data( filter_t *p_filter ) {
         FREENULL(p_sys->p_dust[i_d]);
 
     p_sys->i_planes = 0;
-    FREENULL( p_sys->i_height );
-    FREENULL( p_sys->i_width );
-    FREENULL( p_sys->i_visible_pitch );
 }
 
 /**

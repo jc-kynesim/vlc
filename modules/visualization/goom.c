@@ -41,7 +41,7 @@
  * Module descriptor
  *****************************************************************************/
 static int  Open         ( vlc_object_t * );
-static void Close        ( vlc_object_t * );
+static void Close        ( filter_t * );
 
 #define WIDTH_TEXT N_("Goom display width")
 #define HEIGHT_TEXT N_("Goom display height")
@@ -66,7 +66,7 @@ vlc_module_begin ()
                  HEIGHT_TEXT, RES_LONGTEXT, false )
     add_integer_with_range( "goom-speed", 6, 1, 10,
                  SPEED_TEXT, SPEED_LONGTEXT, false )
-    set_callbacks( Open, Close )
+    set_callback( Open )
     add_shortcut( "goom" )
 vlc_module_end ()
 
@@ -103,6 +103,12 @@ static block_t *DoWork ( filter_t *, block_t * );
 static void Flush( filter_t * );
 
 static void *Thread( void * );
+
+static const struct vlc_filter_operations filter_ops = {
+    .filter_audio = DoWork,
+    .flush = Flush,
+    .close = Close,
+};
 
 /*****************************************************************************
  * Open: open a scope effect plugin
@@ -154,8 +160,7 @@ static int Open( vlc_object_t *p_this )
 
     p_filter->fmt_in.audio.i_format = VLC_CODEC_FL32;
     p_filter->fmt_out.audio = p_filter->fmt_in.audio;
-    p_filter->pf_audio_filter = DoWork;
-    p_filter->pf_flush = Flush;
+    p_filter->ops = &filter_ops;
     return VLC_SUCCESS;
 }
 
@@ -336,9 +341,8 @@ static void *Thread( void *p_thread_data )
 /*****************************************************************************
  * Close: close the plugin
  *****************************************************************************/
-static void Close( vlc_object_t *p_this )
+static void Close( filter_t *p_filter )
 {
-    filter_t     *p_filter = (filter_t *)p_this;
     goom_thread_t *p_thread = p_filter->p_sys;
 
     /* Stop Goom Thread */

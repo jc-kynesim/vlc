@@ -38,8 +38,8 @@
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
-static int  Create    ( vlc_object_t * );
-static void Destroy   ( vlc_object_t * );
+static int  Create    ( filter_t * );
+static void Destroy   ( filter_t * );
 
 #define FILTER_PREFIX "motiondetect-"
 
@@ -48,10 +48,9 @@ vlc_module_begin ()
     set_shortname( N_( "Motion Detect" ))
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
-    set_capability( "video filter", 0 )
 
     add_shortcut( "motion" )
-    set_callbacks( Create, Destroy )
+    set_callback_video_filter( Create )
 vlc_module_end ()
 
 
@@ -81,12 +80,21 @@ typedef struct
     int color_y_max[NUM_COLORS];
 } filter_sys_t;
 
+static void Flush(filter_t *p_filter)
+{
+    filter_sys_t *p_sys = p_filter->p_sys;
+    if (p_sys->p_old != NULL)
+    {
+        picture_Release(p_sys->p_old);
+        p_sys->p_old = NULL;
+    }
+}
+
 /*****************************************************************************
  * Create
  *****************************************************************************/
-static int Create( vlc_object_t *p_this )
+static int Create( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     const video_format_t *p_fmt = &p_filter->fmt_in.video;
     filter_sys_t *p_sys;
     bool is_yuv_planar;
@@ -106,7 +114,11 @@ static int Create( vlc_object_t *p_this )
                      (char*)&(p_fmt->i_chroma) );
             return VLC_EGENERIC;
     }
-    p_filter->pf_video_filter = Filter;
+    static const struct vlc_filter_operations filter_ops =
+    {
+        .filter_video = Filter, .flush = Flush, .close = Destroy,
+    };
+    p_filter->ops = &filter_ops;
 
     /* Allocate structure */
     p_filter->p_sys = p_sys = malloc( sizeof( filter_sys_t ) );
@@ -131,9 +143,8 @@ static int Create( vlc_object_t *p_this )
 /*****************************************************************************
  * Destroy
  *****************************************************************************/
-static void Destroy( vlc_object_t *p_this )
+static void Destroy( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
     free( p_sys->p_buf2 );
@@ -307,6 +318,7 @@ static picture_t *Filter( filter_t *p_filter, picture_t *p_inpic )
     p_sys->p_old = picture_Hold( p_inpic );
 
 exit:
+    picture_CopyProperties(p_outpic, p_inpic);
     picture_Release( p_inpic );
     return p_outpic;
 }

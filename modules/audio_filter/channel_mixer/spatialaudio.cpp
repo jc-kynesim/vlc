@@ -57,7 +57,7 @@
 
 static int OpenBinauralizer(vlc_object_t *p_this);
 static int Open( vlc_object_t * );
-static void Close( vlc_object_t * );
+static void Close( filter_t * );
 static void Flush( filter_t * );
 
 vlc_module_begin()
@@ -66,7 +66,7 @@ vlc_module_begin()
     set_capability("audio renderer", 1)
     set_category(CAT_AUDIO)
     set_subcategory(SUBCAT_AUDIO_AFILTER)
-    set_callbacks(Open, Close)
+    set_callback(Open)
     add_bool(CFG_PREFIX "headphones", false,
              HEADPHONES_TEXT, HEADPHONES_LONGTEXT, true)
     add_loadfile("hrtf-file", NULL, HRTF_FILE_TEXT, HRTF_FILE_LONGTEXT)
@@ -75,7 +75,7 @@ vlc_module_begin()
     add_submodule()
     set_shortname(N_("Binauralizer"))
     set_capability("audio filter", 0)
-    set_callbacks(OpenBinauralizer, Close)
+    set_callback(OpenBinauralizer)
     add_shortcut("binauralizer")
 vlc_module_end()
 
@@ -318,6 +318,17 @@ static int allocateBuffers(filter_spatialaudio *p_sys)
     return VLC_SUCCESS;
 }
 
+static const struct FilterOperationInitializer {
+    struct vlc_filter_operations ops {};
+    FilterOperationInitializer()
+    {
+        ops.filter_audio = Mix;
+        ops.flush = Flush;
+        ops.change_viewpoint = ChangeViewpoint;
+        ops.close = Close;
+    };
+} filter_ops;
+
 static int OpenBinauralizer(vlc_object_t *p_this)
 {
     filter_t *p_filter = (filter_t *)p_this;
@@ -391,9 +402,7 @@ static int OpenBinauralizer(vlc_object_t *p_this)
     aout_FormatPrepare(outfmt);
 
     p_filter->p_sys = p_sys;
-    p_filter->pf_audio_filter = Mix;
-    p_filter->pf_flush = Flush;
-    p_filter->pf_change_viewpoint = ChangeViewpoint;
+    p_filter->ops = &filter_ops.ops;
 
     return VLC_SUCCESS;
 }
@@ -541,17 +550,13 @@ static int Open(vlc_object_t *p_this)
     }
 
     p_filter->p_sys = p_sys;
-    p_filter->pf_audio_filter = Mix;
-    p_filter->pf_flush = Flush;
-    p_filter->pf_change_viewpoint = ChangeViewpoint;
+    p_filter->ops = &filter_ops.ops;
 
     return VLC_SUCCESS;
 }
 
-static void Close(vlc_object_t *p_this)
+static void Close(filter_t *p_filter)
 {
-    filter_t *p_filter = (filter_t *)p_this;
-
     filter_spatialaudio *p_sys = reinterpret_cast<filter_spatialaudio *>(p_filter->p_sys);
     delete p_sys;
 }

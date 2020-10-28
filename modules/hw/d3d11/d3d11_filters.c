@@ -335,9 +335,39 @@ static int AdjustCallback( vlc_object_t *p_this, char const *psz_var,
     return VLC_SUCCESS;
 }
 
-static int D3D11OpenAdjust(vlc_object_t *obj)
+static void D3D11CloseAdjust(filter_t *filter)
 {
-    filter_t *filter = (filter_t *)obj;
+    filter_sys_t *sys = filter->p_sys;
+
+    var_DelCallback( filter, "contrast",   AdjustCallback, sys );
+    var_DelCallback( filter, "brightness", AdjustCallback, sys );
+    var_DelCallback( filter, "hue",        AdjustCallback, sys );
+    var_DelCallback( filter, "saturation", AdjustCallback, sys );
+    var_DelCallback( filter, "gamma",      AdjustCallback, sys );
+    var_DelCallback( filter, "brightness-threshold",
+                                             AdjustCallback, sys );
+
+    for (int i=0; i<PROCESSOR_SLICES; i++)
+    {
+        if (sys->procInput[i])
+            ID3D11VideoProcessorInputView_Release(sys->procInput[i]);
+        if (sys->procOutput[i])
+            ID3D11VideoProcessorOutputView_Release(sys->procOutput[i]);
+    }
+    ID3D11Texture2D_Release(sys->out[0].texture);
+    ID3D11Texture2D_Release(sys->out[1].texture);
+    D3D11_ReleaseProcessor( &sys->d3d_proc );
+    vlc_video_context_Release(filter->vctx_out);
+
+    free(sys);
+}
+
+static const struct vlc_filter_operations filter_ops = {
+    .filter_video = Filter, .close = D3D11CloseAdjust,
+};
+
+static int D3D11OpenAdjust(filter_t *filter)
+{
     HRESULT hr;
 
     if (!is_d3d11_opaque(filter->fmt_in.video.i_chroma))
@@ -507,7 +537,7 @@ static int D3D11OpenAdjust(vlc_object_t *obj)
         }
     }
 
-    filter->pf_video_filter = Filter;
+    filter->ops = &filter_ops;
     filter->p_sys = sys;
     filter->vctx_out = vlc_video_context_Hold(filter->vctx_in);
     d3d11_device_unlock(sys->d3d_dev);
@@ -533,40 +563,11 @@ error:
     return VLC_EGENERIC;
 }
 
-static void D3D11CloseAdjust(vlc_object_t *obj)
-{
-    filter_t *filter = (filter_t *)obj;
-    filter_sys_t *sys = filter->p_sys;
-
-    var_DelCallback( filter, "contrast",   AdjustCallback, sys );
-    var_DelCallback( filter, "brightness", AdjustCallback, sys );
-    var_DelCallback( filter, "hue",        AdjustCallback, sys );
-    var_DelCallback( filter, "saturation", AdjustCallback, sys );
-    var_DelCallback( filter, "gamma",      AdjustCallback, sys );
-    var_DelCallback( filter, "brightness-threshold",
-                                             AdjustCallback, sys );
-
-    for (int i=0; i<PROCESSOR_SLICES; i++)
-    {
-        if (sys->procInput[i])
-            ID3D11VideoProcessorInputView_Release(sys->procInput[i]);
-        if (sys->procOutput[i])
-            ID3D11VideoProcessorOutputView_Release(sys->procOutput[i]);
-    }
-    ID3D11Texture2D_Release(sys->out[0].texture);
-    ID3D11Texture2D_Release(sys->out[1].texture);
-    D3D11_ReleaseProcessor( &sys->d3d_proc );
-    vlc_video_context_Release(filter->vctx_out);
-
-    free(sys);
-}
-
 vlc_module_begin()
     set_description(N_("Direct3D11 adjust filter"))
-    set_capability("video filter", 0)
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
-    set_callbacks(D3D11OpenAdjust, D3D11CloseAdjust)
+    set_callback_video_filter(D3D11OpenAdjust)
     add_shortcut( "adjust" )
 
     add_float_with_range( "contrast", 1.0, 0.0, 2.0,
@@ -590,16 +591,13 @@ vlc_module_begin()
 
     add_submodule()
     set_description(N_("Direct3D11 deinterlace filter"))
-    set_callbacks( D3D11OpenDeinterlace, D3D11CloseDeinterlace )
-    add_shortcut ("deinterlace")
+    set_deinterlace_callback( D3D11OpenDeinterlace )
 
     add_submodule()
-    set_capability( "video converter", 10 )
-    set_callbacks( D3D11OpenConverter, D3D11CloseConverter )
+    set_callback_video_converter( D3D11OpenConverter, 10 )
 
     add_submodule()
-    set_callbacks( D3D11OpenCPUConverter, D3D11CloseCPUConverter )
-    set_capability( "video converter", 10 )
+    set_callback_video_converter( D3D11OpenCPUConverter, 10 )
 
     add_submodule()
     set_description(N_("Direct3D11"))
@@ -610,7 +608,7 @@ vlc_module_begin()
     set_callback_dec_device( D3D11OpenDecoderDeviceAny, 8 )
 #if VLC_WINSTORE_APP
     /* LEGACY, the d3dcontext and swapchain were given by the host app */
-    add_integer("winrt-d3dcontext",    0x0, NULL, NULL, true) /* ID3D11DeviceContext* */
+    add_integer("winrt-d3dcontext", 0x0, N_("Context"), NULL, true) /* ID3D11DeviceContext* */
 #endif /* VLC_WINSTORE_APP */
     add_shortcut ("d3d11")
 

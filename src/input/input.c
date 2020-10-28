@@ -42,9 +42,9 @@
 #include "item.h"
 #include "resource.h"
 #include "stream.h"
+#include "stream_output/stream_output.h"
 
 #include <vlc_aout.h>
-#include <vlc_sout.h>
 #include <vlc_dialog.h>
 #include <vlc_url.h>
 #include <vlc_charset.h>
@@ -495,13 +495,8 @@ static void *Preparse( void *data )
     if( !Init( p_input ) )
     {   /* if the demux is a playlist, call Mainloop that will call
          * demux_Demux in order to fetch sub items */
-        bool b_is_playlist = false;
-
         if ( input_item_ShouldPreparseSubItems( priv->p_item )
-          && demux_Control( priv->master->p_demux, DEMUX_IS_PLAYLIST,
-                            &b_is_playlist ) )
-            b_is_playlist = false;
-        if( b_is_playlist )
+         && priv->master->p_demux->pf_readdir != NULL )
             MainLoop( p_input, false );
         End( p_input );
     }
@@ -675,7 +670,8 @@ static void MainLoop( input_thread_t *p_input, bool b_interactive )
     bool b_paused_at_eof = false;
 
     demux_t *p_demux = input_priv(p_input)->master->p_demux;
-    const bool b_can_demux = p_demux->pf_demux != NULL;
+    const bool b_can_demux = p_demux->pf_demux != NULL
+                          || p_demux->pf_readdir != NULL;
 
     while( !input_Stopped( p_input ) && input_priv(p_input)->i_state != ERROR_S )
     {
@@ -1317,8 +1313,7 @@ static int Init( input_thread_t * p_input )
 
     if( !priv->b_preparsing && priv->p_sout )
     {
-        priv->b_out_pace_control = priv->p_sout->i_out_pace_nocontrol > 0;
-
+        priv->b_out_pace_control = !sout_instance_ControlsPace(priv->p_sout);
         msg_Dbg( p_input, "starting in %ssync mode",
                  priv->b_out_pace_control ? "a" : "" );
     }
@@ -2713,6 +2708,7 @@ static int InputSourceInit( input_source_t *in, input_thread_t *p_input,
                        &in->b_can_pace_control ) )
         in->b_can_pace_control = false;
 
+    /* Threaded and directory demuxers do not have pace control */
     assert( in->p_demux->pf_demux != NULL || !in->b_can_pace_control );
 
     if( !in->b_can_pace_control )
@@ -2790,6 +2786,14 @@ static int InputSourceInit( input_source_t *in, input_thread_t *p_input,
 
     if( demux_Control( in->p_demux, DEMUX_GET_FPS, &in->f_fps ) )
         in->f_fps = 0.f;
+
+    int input_type;
+    if( !demux_Control( in->p_demux, DEMUX_GET_TYPE, &input_type ) )
+    {
+        vlc_mutex_lock( &input_priv(p_input)->p_item->lock );
+        input_priv(p_input)->p_item->i_type = input_type;
+        vlc_mutex_unlock( &input_priv(p_input)->p_item->lock );
+    }
 
     if( var_GetInteger( p_input, "clock-synchro" ) != -1 )
         in->b_can_pace_control = !var_GetInteger( p_input, "clock-synchro" );

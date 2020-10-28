@@ -141,7 +141,7 @@ static struct vlc_h1_conn *vlc_h1_stream_conn(struct vlc_http_stream *stream)
 }
 
 static struct vlc_http_stream *vlc_h1_stream_open(struct vlc_http_conn *c,
-                                                const struct vlc_http_msg *req)
+                                 const struct vlc_http_msg *req, bool has_data)
 {
     struct vlc_h1_conn *conn = container_of(c, struct vlc_h1_conn, conn);
     size_t len;
@@ -150,7 +150,7 @@ static struct vlc_http_stream *vlc_h1_stream_open(struct vlc_http_conn *c,
     if (conn->active || conn->conn.tls == NULL)
         return NULL;
 
-    char *payload = vlc_http_msg_format(req, &len, conn->proxy);
+    char *payload = vlc_http_msg_format(req, &len, conn->proxy, has_data);
     if (unlikely(payload == NULL))
         return NULL;
 
@@ -228,6 +228,22 @@ static struct vlc_http_msg *vlc_h1_stream_wait(struct vlc_http_stream *stream)
     return resp;
 }
 
+static ssize_t vlc_h1_stream_write(struct vlc_http_stream *stream,
+                                   const void *base, size_t length, bool eos)
+{
+    struct vlc_h1_conn *conn = vlc_h1_stream_conn(stream);
+
+    assert(conn->active);
+
+    if (conn->conn.tls == NULL)
+    {
+        errno = EPIPE;
+        return -1;
+    }
+
+    return vlc_https_chunked_write(conn->conn.tls, base, length, eos);
+}
+
 static block_t *vlc_h1_stream_read(struct vlc_http_stream *stream)
 {
     struct vlc_h1_conn *conn = vlc_h1_stream_conn(stream);
@@ -286,6 +302,7 @@ static void vlc_h1_stream_close(struct vlc_http_stream *stream, bool abort)
 static const struct vlc_http_stream_cbs vlc_h1_stream_callbacks =
 {
     vlc_h1_stream_wait,
+    vlc_h1_stream_write,
     vlc_h1_stream_read,
     vlc_h1_stream_close,
 };
@@ -340,7 +357,7 @@ struct vlc_http_conn *vlc_h1_conn_create(void *ctx, vlc_tls_t *tls, bool proxy)
 struct vlc_http_stream *vlc_h1_request(void *ctx, const char *hostname,
                                        unsigned port, bool proxy,
                                        const struct vlc_http_msg *req,
-                                       bool idempotent,
+                                       bool idempotent, bool has_data,
                                        struct vlc_http_conn **restrict connp)
 {
     struct addrinfo hints =
@@ -376,7 +393,8 @@ struct vlc_http_stream *vlc_h1_request(void *ctx, const char *hostname,
         }
 
         /* Send the HTTP request */
-        struct vlc_http_stream *stream = vlc_http_stream_open(conn, req);
+        struct vlc_http_stream *stream = vlc_http_stream_open(conn, req,
+                                                              has_data);
 
         if (stream != NULL)
         {

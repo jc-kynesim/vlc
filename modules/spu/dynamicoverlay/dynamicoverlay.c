@@ -44,8 +44,8 @@
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static int Create( vlc_object_t * );
-static void Destroy( vlc_object_t * );
+static int Create( filter_t * );
+static void Destroy( filter_t * );
 static subpicture_t *Filter( filter_t *, vlc_tick_t );
 
 static int AdjustCallback( vlc_object_t *p_this, char const *psz_var,
@@ -67,18 +67,21 @@ vlc_module_begin ()
     set_shortname( N_("Overlay" ))
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
-    set_capability( "sub source", 0 )
 
     add_loadfile("overlay-input", NULL, INPUT_TEXT, INPUT_LONGTEXT)
     /* Note: add_loadfile as O_WRONLY w/o O_CREAT, i.e. FIFO must exist */
     add_loadfile("overlay-output", NULL, OUTPUT_TEXT, OUTPUT_LONGTEXT)
 
     add_shortcut( "overlay" )
-    set_callbacks( Create, Destroy )
+    set_callback_sub_source( Create, 0 )
 vlc_module_end ()
 
 static const char *const ppsz_filter_options[] = {
     "input", "output", NULL
+};
+
+static const struct vlc_filter_operations filter_ops = {
+    .source_sub = Filter, .close = Destroy,
 };
 
 /*****************************************************************************
@@ -86,9 +89,8 @@ static const char *const ppsz_filter_options[] = {
  *****************************************************************************
  * This function allocates and initializes a adjust vout method.
  *****************************************************************************/
-static int Create( vlc_object_t *p_this )
+static int Create( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys;
 
     /* Allocate structure */
@@ -110,7 +112,7 @@ static int Create( vlc_object_t *p_this )
     p_sys->b_atomic = false;
     vlc_mutex_init( &p_sys->lock );
 
-    p_filter->pf_sub_source = Filter;
+    p_filter->ops = &filter_ops;
 
     config_ChainParse( p_filter, "overlay-", ppsz_filter_options,
                        p_filter->p_cfg );
@@ -132,9 +134,8 @@ static int Create( vlc_object_t *p_this )
  *****************************************************************************
  * Terminate an output method created by adjustCreateOutputMethod
  *****************************************************************************/
-static void Destroy( vlc_object_t *p_this )
+static void Destroy( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
     BufferDestroy( &p_sys->input );

@@ -22,20 +22,6 @@
 #include "playlist/media.hpp"
 #include "playlist/playlist_controller.hpp"
 
-namespace {
-
-enum Role {
-    NETWORK_NAME = Qt::UserRole + 1,
-    NETWORK_MRL,
-    NETWORK_TYPE,
-    NETWORK_PROTOCOL,
-    NETWORK_SOURCE,
-    NETWORK_TREE,
-    NETWORK_ARTWORK,
-};
-
-}
-
 NetworkDeviceModel::NetworkDeviceModel( QObject* parent )
     : QAbstractListModel( parent )
     , m_ml( nullptr )
@@ -99,7 +85,7 @@ void NetworkDeviceModel::setCtx(QmlMainContext* ctx)
         m_ctx = ctx;
         m_ml = vlc_ml_instance_get( m_ctx->getIntf() );
     }
-    if (m_ctx && m_sdSource != CAT_UNDEFINED) {
+    if (m_ctx && m_sdSource != CAT_UNDEFINED && !m_sourceName.isEmpty()) {
         initializeMediaSources();
     }
     emit ctxChanged();
@@ -108,10 +94,19 @@ void NetworkDeviceModel::setCtx(QmlMainContext* ctx)
 void NetworkDeviceModel::setSdSource(SDCatType s)
 {
     m_sdSource = s;
-    if (m_ctx && m_sdSource != CAT_UNDEFINED) {
+    if (m_ctx && m_sdSource != CAT_UNDEFINED && !m_sourceName.isEmpty()) {
         initializeMediaSources();
     }
     emit sdSourceChanged();
+}
+
+void NetworkDeviceModel::setSourceName(const QString& sourceName)
+{
+    m_sourceName = sourceName;
+    if (m_ctx && m_sdSource != CAT_UNDEFINED && !m_sourceName.isEmpty()) {
+        initializeMediaSources();
+    }
+    emit sourceNameChanged();
 }
 
 int NetworkDeviceModel::getCount() const
@@ -225,6 +220,7 @@ bool NetworkDeviceModel::initializeMediaSources()
         endResetModel();
         emit countChanged();
     }
+    m_name = QString {};
 
     auto provider = vlc_media_source_provider_Get( libvlc );
 
@@ -241,6 +237,13 @@ bool NetworkDeviceModel::initializeMediaSources()
     for ( auto i = 0u; i < nbProviders; ++i )
     {
         auto meta = vlc_media_source_meta_list_Get( providerList.get(), i );
+        const QString sourceName = qfu( meta->name );
+        if ( m_sourceName != '*' && m_sourceName != sourceName )
+            continue;
+
+        m_name += m_name.isEmpty() ? qfu( meta->longname ) : ", " + qfu( meta->longname );
+        emit nameChanged();
+
         auto mediaSource = vlc_media_source_provider_GetMediaSource( provider,
                                                                      meta->name );
         if ( mediaSource == nullptr )

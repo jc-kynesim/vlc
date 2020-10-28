@@ -115,7 +115,7 @@ typedef union
 } ls_pcast32;
 
 static int      Open            ( vlc_object_t * );
-static void     Close           ( vlc_object_t * );
+static void     Close           ( filter_t * );
 static block_t *DoWork          ( filter_t *, block_t * );
 
 static void     DbInit          ( filter_sys_t * );
@@ -193,7 +193,7 @@ vlc_module_begin()
                KNEE_TEXT, KNEE_LONGTEXT, false )
     add_float_with_range( "compressor-makeup-gain", 7.0, 0.0, 24.0,
                MAKEUP_GAIN_TEXT, MAKEUP_GAIN_LONGTEXT, false )
-    set_callbacks( Open, Close )
+    set_callback( Open )
     add_shortcut( "compressor" )
 vlc_module_end ()
 
@@ -256,7 +256,12 @@ static int Open( vlc_object_t *p_this )
     p_filter->fmt_in.audio.i_format = VLC_CODEC_FL32;
     aout_FormatPrepare(&p_filter->fmt_in.audio);
     p_filter->fmt_out.audio = p_filter->fmt_in.audio;
-    p_filter->pf_audio_filter = DoWork;
+
+    static const struct vlc_filter_operations filter_ops =
+    {
+        .filter_audio = DoWork, .close = Close,
+    };
+    p_filter->ops = &filter_ops;
 
     /* At this stage, we are ready! */
     msg_Dbg( p_filter, "compressor successfully initialized" );
@@ -267,9 +272,8 @@ static int Open( vlc_object_t *p_this )
  * Close: destroy interface
  *****************************************************************************/
 
-static void Close( vlc_object_t *p_this )
+static void Close( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t*)p_this;
     vlc_object_t *p_aout = vlc_object_parent(p_filter);
     filter_sys_t *p_sys = p_filter->p_sys;
 

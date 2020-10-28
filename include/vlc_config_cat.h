@@ -65,9 +65,6 @@
 #define AOUT_TITLE N_( "Output modules" )
 #define AOUT_HELP N_("General settings for audio output modules.")
 
-#define AMISC_TITLE N_("Miscellaneous")
-#define AMISC_HELP N_( "Miscellaneous audio settings and modules." )
-
 /* Video */
 #define VIDEO_TITLE N_("Video")
 #define VIDEO_HELP N_("Video settings")
@@ -158,6 +155,9 @@
         "You should probably not do that.\n" \
         "You can also set default parameters for each packetizer." )
 
+#define SOUT_RENDER_TITLE N_( "Renderers" )
+#define SOUT_RENDER_HELP N_( "External renderer discovery related settings." )
+
 #define SOUT_STREAM_TITLE N_("Sout stream")
 #define SOUT_STREAM_HELP N_( "Sout stream modules allow to build a sout " \
                 "processing chain. Please refer to the Streaming Howto for " \
@@ -179,11 +179,17 @@
 #define SD_HELP N_("Services discovery modules are facilities "\
         "that automatically add items to playlist.")
 
+#define PEXPORT_TITLE N_( "Export" )
+#define PEXPORT_HELP N_( "Settings relating to exporting playlists." )
+
 /* Advanced */
 #define AADVANCED_TITLE N_( "Advanced" )
 #define AADVANCED_HELP N_( "Advanced settings. Use with care...")
 
 #define MISC_TITLE N_( "Advanced settings" )
+
+#define ANETWORK_TITLE N_( "Network" )
+#define ANETWORK_HELP N_( "Advanced network settings." )
 
 /* This function is deprecated and is kept only for compatibility */
 static const struct config_category_t categories_array[] =
@@ -201,7 +207,6 @@ static const struct config_category_t categories_array[] =
     { SUBCAT_AUDIO_AFILTER, AFILTER_TITLE, AFILTER_HELP },
     { SUBCAT_AUDIO_RESAMPLER, ARESAMPLER_TITLE, AFILTER_HELP },
     { SUBCAT_AUDIO_VISUAL, AVISUAL_TITLE, AVISUAL_HELP },
-    { SUBCAT_AUDIO_MISC, AMISC_TITLE, AMISC_HELP },
 
     { CAT_VIDEO, VIDEO_TITLE, VIDEO_HELP },
     { SUBCAT_VIDEO_GENERAL, VIDEO_TITLE, VIDEO_GENERAL_HELP },
@@ -225,14 +230,17 @@ static const struct config_category_t categories_array[] =
     { SUBCAT_SOUT_MUX, SOUT_MUX_TITLE, SOUT_MUX_HELP },
     { SUBCAT_SOUT_ACO, SOUT_ACO_TITLE, SOUT_ACO_HELP },
     { SUBCAT_SOUT_PACKETIZER, SOUT_PACKET_TITLE, SOUT_PACKET_HELP },
+    { SUBCAT_SOUT_RENDERER, SOUT_RENDER_TITLE, SOUT_RENDER_HELP },
     { SUBCAT_SOUT_VOD, SOUT_VOD_TITLE, SOUT_VOD_HELP },
 
     { CAT_PLAYLIST, PLAYLIST_TITLE , PLAYLIST_HELP },
     { SUBCAT_PLAYLIST_GENERAL, PLAYLIST_TITLE, PGENERAL_HELP },
+    { SUBCAT_PLAYLIST_EXPORT, PEXPORT_TITLE, PEXPORT_HELP },
     { SUBCAT_PLAYLIST_SD, SD_TITLE, SD_HELP },
 
     { CAT_ADVANCED, AADVANCED_TITLE, AADVANCED_HELP },
     { SUBCAT_ADVANCED_MISC, MISC_TITLE, AADVANCED_HELP },
+    { SUBCAT_ADVANCED_NETWORK, ANETWORK_TITLE, ANETWORK_HELP },
 
     { -1, NULL, NULL }
 };

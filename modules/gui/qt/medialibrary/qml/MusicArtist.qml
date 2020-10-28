@@ -71,7 +71,7 @@ Widgets.NavigableFocusScope {
             Loader {
                 id: albumsLoader
 
-                active: !medialib.gridView
+                active: !mainInterface.gridView
                 focus: true
                 sourceComponent: Column {
                     property alias albumsListView: albumsList
@@ -164,7 +164,7 @@ Widgets.NavigableFocusScope {
     onActiveFocusChanged: {
         if (activeFocus && albumModel.count > 0 && !albumSelectionModel.hasSelection) {
             var initialIndex = 0
-            var albumsListView = medialib.gridView ? view.currentItem : headerItem.albumsListView
+            var albumsListView = mainInterface.gridView ? view.currentItem : headerItem.albumsListView
             if (albumsListView.currentIndex !== -1)
                 initialIndex = albumsListView.currentIndex
             albumSelectionModel.select(albumModel.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect)
@@ -180,7 +180,7 @@ Widgets.NavigableFocusScope {
         if (initialIndex >= albumModel.count)
             initialIndex = 0
         albumSelectionModel.select(albumModel.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect)
-        var albumsListView = medialib.gridView ? view.currentItem : headerItem.albumsListView
+        var albumsListView = mainInterface.gridView ? view.currentItem : headerItem.albumsListView
         if (albumsListView) {
             albumsListView.currentIndex = initialIndex
             albumsListView.positionViewAtIndex(initialIndex, ItemView.Contain)
@@ -224,6 +224,16 @@ Widgets.NavigableFocusScope {
         }
     }
 
+    AlbumContextMenu {
+        id: contextMenu
+        model: albumModel
+    }
+
+    AlbumTrackContextMenu {
+        id: trackContextMenu
+        model: trackModel
+    }
+
     Component {
         id: gridComponent
 
@@ -243,14 +253,15 @@ Widgets.NavigableFocusScope {
 
                 opacity: gridView_id.expandIndex !== -1 && gridView_id.expandIndex !== audioGridItem.index ? .7 : 1
 
-                onItemClicked : {
-                    albumSelectionModel.updateSelection( modifier , gridView_id.currentIndex, index )
-                    gridView_id.currentIndex = index
-                    gridView_id.forceActiveFocus()
-                }
+                onItemClicked : gridView_id.leftClickOnItem(modifier, index)
 
                 onItemDoubleClicked: {
                     if ( model.id !== undefined ) { medialib.addAndPlay( model.id ) }
+                }
+
+                onContextMenuButtonClicked: {
+                    gridView_id.rightClickOnItem(index)
+                    contextMenu.popup(albumSelectionModel.selectedIndexes, globalMousePos, { "information" : index})
                 }
 
                 Behavior on opacity {
@@ -281,30 +292,13 @@ Widgets.NavigableFocusScope {
             onSelectAll: albumSelectionModel.selectAll()
             onSelectionUpdated: albumSelectionModel.updateSelection( keyModifiers, oldIndex, newIndex )
             navigationParent: root
-        }
-    }
 
-    Widgets.MenuExt {
-        id: contextMenu
-
-        property var model: ({})
-        closePolicy: Popup.CloseOnReleaseOutside | Popup.CloseOnEscape
-
-        Widgets.MenuItemExt {
-            id: playMenuItem
-            text: i18n.qtr("Play from start")
-            onTriggered: {
-                medialib.addAndPlay( contextMenu.model.id )
-                history.push(["player"])
+            Connections {
+                target: contextMenu
+                onShowMediaInformation: gridView_id.switchExpandItem( index )
             }
         }
 
-        Widgets.MenuItemExt {
-            text: i18n.qtr("Enqueue")
-            onTriggered: medialib.addToPlaylist( contextMenu.model.id )
-        }
-
-        onClosed: contextMenu.parent.forceActiveFocus()
     }
 
     Component {
@@ -338,10 +332,8 @@ Widgets.NavigableFocusScope {
                     tableView_id.currentIndex = 0;
             }
 
-            onContextMenuButtonClicked: {
-                contextMenu.model = menuModel
-                contextMenu.popup(menuParent)
-            }
+            onContextMenuButtonClicked: trackContextMenu.popup(trackSelectionModel.selectedIndexes, menuParent.mapToGlobal(0,0))
+            onRightClick: trackContextMenu.popup(trackSelectionModel.selectedIndexes, globalMousePos)
 
             Widgets.TableColumns {
                 id: tableColumns
@@ -365,12 +357,12 @@ Widgets.NavigableFocusScope {
 
         anchors.fill: parent
         focus: albumModel.count !== 0
-        initialItem: medialib.gridView ? gridComponent : tableComponent
+        initialItem: mainInterface.gridView ? gridComponent : tableComponent
 
         Connections {
-            target: medialib
+            target: mainInterface
             onGridViewChanged: {
-                if (medialib.gridView)
+                if (mainInterface.gridView)
                     view.replace(gridComponent)
                 else
                     view.replace(tableComponent)

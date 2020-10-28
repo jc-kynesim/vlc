@@ -20,18 +20,6 @@
 
 #include "mlartistmodel.hpp"
 
-namespace {
-    enum Roles
-    {
-        GENRE_ID = Qt::UserRole + 1,
-        GENRE_NAME,
-        GENRE_NB_TRACKS,
-        GENRE_ARTISTS,
-        GENRE_TRACKS,
-        GENRE_ALBUMS,
-        GENRE_COVER
-    };
-}
 
 QHash<QByteArray, vlc_ml_sorting_criteria_t> MLGenreModel::M_names_to_criteria = {
     {"title", VLC_ML_SORTING_ALPHA}
@@ -47,7 +35,7 @@ QVariant MLGenreModel::data(const QModelIndex &index, int role) const
     if (!index.isValid() || index.row() < 0)
         return QVariant();
 
-    const MLGenre* ml_genre = item(static_cast<unsigned int>(index.row()));
+    const MLGenre* ml_genre = item(index.row());
     if (!ml_genre)
         return QVariant();
 

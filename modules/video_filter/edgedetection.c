@@ -45,8 +45,8 @@
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static int Open( vlc_object_t * );
-static void Close( vlc_object_t * );
+static int Open( filter_t * );
+static void Close( filter_t * );
 static picture_t *new_frame( filter_t * );
 static picture_t *Filter( filter_t *, picture_t * );
 static uint8_t sobel( const uint8_t *, const int, const int, int, int);
@@ -72,14 +72,24 @@ vlc_module_begin ()
     set_help( EDGE_DETECTION_LONGTEXT )
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
-    set_capability( "video filter", 0 )
-    set_callbacks( Open, Close )
+    set_callback_video_filter( Open )
 
 vlc_module_end ()
 
 static const struct filter_video_callbacks filter_video_edge_cbs =
 {
     new_frame, NULL,
+};
+
+static void Flush( filter_t *p_filter )
+{
+    filter_chain_t *p_sys = p_filter->p_sys;
+    filter_chain_VideoFlush( p_sys );
+}
+
+static const struct vlc_filter_operations filter_ops =
+{
+    .filter_video = Filter, .flush = Flush, .close = Close,
 };
 
 /*****************************************************************************
@@ -89,10 +99,9 @@ static const struct filter_video_callbacks filter_video_edge_cbs =
  * needed so that the Sobel operator does not give a high response for noise,
  * or small changes in the image.
  *****************************************************************************/
-static int Open( vlc_object_t *p_this )
+static int Open( filter_t *p_filter  )
 {
     int i_ret;
-    filter_t *p_filter = (filter_t *)p_this;
     filter_owner_t owner = {
         .video = &filter_video_edge_cbs,
         .sys = p_filter,
@@ -123,7 +132,7 @@ static int Open( vlc_object_t *p_this )
         return VLC_EGENERIC;
     }
     /* Set callback function */
-    p_filter->pf_video_filter = Filter;
+    p_filter->ops = &filter_ops;
     p_filter->p_sys = sys;
     return VLC_SUCCESS;
 }
@@ -131,9 +140,8 @@ static int Open( vlc_object_t *p_this )
 /******************************************************************************
  * Closes the filter and cleans up all dynamically allocated data.
  ******************************************************************************/
-static void Close( vlc_object_t *p_this )
+static void Close( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_chain_Delete( (filter_chain_t *)p_filter->p_sys );
 }
 

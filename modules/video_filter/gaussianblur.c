@@ -32,15 +32,13 @@
 #include <vlc_plugin.h>
 #include <vlc_filter.h>
 #include <vlc_picture.h>
-#include "filter_picture.h"
 
 #include <math.h>                                          /* exp(), sqrt() */
 
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
-static int  Create    ( vlc_object_t * );
-static void Destroy   ( vlc_object_t * );
+static int  Create    ( filter_t * );
 
 #define SIGMA_MIN (0.01)
 #define SIGMA_MAX (4096.0)
@@ -58,7 +56,6 @@ vlc_module_begin ()
     set_description( N_("Gaussian blur video filter") )
     set_shortname( N_( "Gaussian Blur" ))
     set_help(GAUSSIAN_HELP)
-    set_capability( "video filter", 0 )
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
 
@@ -66,13 +63,13 @@ vlc_module_begin ()
                           SIGMA_TEXT, SIGMA_LONGTEXT,
                           false )
 
-    set_callbacks( Create, Destroy )
+    set_callback_video_filter( Create )
 vlc_module_end ()
 
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static picture_t *Filter( filter_t *, picture_t * );
+VIDEO_FILTER_WRAPPER_CLOSE(Filter, Destroy)
 
 static const char *const ppsz_filter_options[] = {
     "sigma", NULL
@@ -123,10 +120,8 @@ static void gaussianblur_InitDistribution( filter_sys_t *p_sys )
     p_sys->pt_distribution = pt_distribution;
 }
 
-static int Create( vlc_object_t *p_this )
+static int Create( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
-
     if(   p_filter->fmt_in.video.i_chroma != VLC_CODEC_I420
        && p_filter->fmt_in.video.i_chroma != VLC_CODEC_J420
        && p_filter->fmt_in.video.i_chroma != VLC_CODEC_YV12
@@ -155,7 +150,7 @@ static int Create( vlc_object_t *p_this )
     config_ChainParse( p_filter, FILTER_PREFIX, ppsz_filter_options,
                        p_filter->p_cfg );
 
-    p_filter->pf_video_filter = Filter;
+    p_filter->ops = &Filter_ops;
 
     p_sys->f_sigma =
         var_CreateGetFloat( p_filter, FILTER_PREFIX "sigma" );
@@ -174,9 +169,8 @@ static int Create( vlc_object_t *p_this )
     return VLC_SUCCESS;
 }
 
-static void Destroy( vlc_object_t *p_this )
+static void Destroy( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
     free( p_sys->pt_distribution );
@@ -186,23 +180,14 @@ static void Destroy( vlc_object_t *p_this )
     free( p_sys );
 }
 
-static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
+static void Filter( filter_t *p_filter, picture_t *p_pic, picture_t *p_outpic )
 {
-    picture_t *p_outpic;
     filter_sys_t *p_sys = p_filter->p_sys;
     const int i_dim = p_sys->i_dim;
     type_t *pt_buffer;
     type_t *pt_scale;
     const type_t *pt_distribution = p_sys->pt_distribution;
 
-    if( !p_pic ) return NULL;
-
-    p_outpic = filter_NewPicture( p_filter );
-    if( !p_outpic )
-    {
-        picture_Release( p_pic );
-        return NULL;
-    }
     if( !p_sys->pt_buffer )
     {
         p_sys->pt_buffer = realloc_or_free( p_sys->pt_buffer,
@@ -292,6 +277,4 @@ static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
             }
         }
     }
-
-    return CopyInfoAndRelease( p_outpic, p_pic );
 }

@@ -36,13 +36,12 @@
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
-static int  Open (vlc_object_t *);
-static void Close(vlc_object_t *);
+static int  Open (filter_t *);
+static void Close(filter_t *);
 
 vlc_module_begin()
     set_description(N_("Video pictures blending"))
-    set_capability("video blending", 100)
-    set_callbacks(Open, Close)
+    set_callback_video_blending(Open, 100)
 vlc_module_end()
 
 static inline unsigned div255(unsigned v)
@@ -649,7 +648,7 @@ struct filter_sys_t {
 /**
  * It blends 2 picture together.
  */
-static void Blend(filter_t *filter,
+static void DoBlend(filter_t *filter,
                   picture_t *dst, const picture_t *src,
                   int x_offset, int y_offset, int alpha)
 {
@@ -680,9 +679,17 @@ static void Blend(filter_t *filter,
                width, height, alpha);
 }
 
-static int Open(vlc_object_t *object)
+static const struct FilterOperationInitializer {
+    struct vlc_filter_operations ops {};
+    FilterOperationInitializer()
+    {
+        ops.blend_video = DoBlend;
+        ops.close       = Close;
+    };
+} filter_ops;
+
+static int Open(filter_t *filter)
 {
-    filter_t *filter = (filter_t *)object;
     const vlc_fourcc_t src = filter->fmt_in.video.i_chroma;
     const vlc_fourcc_t dst = filter->fmt_out.video.i_chroma;
 
@@ -699,15 +706,13 @@ static int Open(vlc_object_t *object)
         return VLC_EGENERIC;
     }
 
-    filter->pf_video_blend = Blend;
+    filter->ops = &filter_ops.ops;
     filter->p_sys          = sys;
     return VLC_SUCCESS;
 }
 
-static void Close(vlc_object_t *object)
+static void Close(filter_t *filter)
 {
-    filter_t *filter = (filter_t *)object;
     filter_sys_t *p_sys = reinterpret_cast<filter_sys_t *>( filter->p_sys );
     delete p_sys;
 }
-

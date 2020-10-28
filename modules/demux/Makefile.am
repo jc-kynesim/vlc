@@ -87,9 +87,6 @@ libnuv_plugin_la_SOURCES = demux/nuv.c
 libnuv_plugin_la_LIBADD = $(LIBM)
 demux_LTLIBRARIES += libnuv_plugin.la
 
-libnsc_plugin_la_SOURCES = demux/nsc.c
-demux_LTLIBRARIES += libnsc_plugin.la
-
 libmpc_plugin_la_SOURCES = demux/mpc.c
 libmpc_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(demuxdir)'
 libmpc_plugin_la_LIBADD = $(LIBS_mpc) $(LIBM)
@@ -505,6 +502,14 @@ libadaptive_plugin_la_LIBADD += $(GCRYPT_LIBS)
 endif
 demux_LTLIBRARIES += libadaptive_plugin.la
 
+libytdl_plugin_la_SOURCES = demux/ytdl.c
+libytdl_plugin_la_LIBADD = libvlc_json.la
+if !HAVE_WIN32
+if !HAVE_ANDROID
+demux_LTLIBRARIES += libytdl_plugin.la
+endif
+endif
+
 libnoseek_plugin_la_SOURCES = demux/filter/noseek.c
 demux_LTLIBRARIES += libnoseek_plugin.la
 
@@ -512,3 +517,13 @@ libdemux_mock_plugin_la_SOURCES = demux/mock.c
 libdemux_mock_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(demuxdir)'
 libdemux_mock_plugin_la_LIBADD = $(LIBM)
 noinst_LTLIBRARIES += libdemux_mock_plugin.la
+
+BUILT_SOURCES += demux/json/grammar.h
+libvlc_json_la_SOURCES = \
+	demux/json/lexicon.l \
+	demux/json/grammar.y \
+	demux/json/json.c demux/json/json.h
+libvlc_json_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/demux/json
+libvlc_json_la_LIBADD = $(LTLIBVLCCORE) ../compat/libcompat.la $(LIBM)
+libvlc_json_la_LDFLAGS = -static
+noinst_LTLIBRARIES += libvlc_json.la

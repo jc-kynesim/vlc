@@ -52,7 +52,7 @@
 
 /* audio filter */
 static int  OpenFilter ( vlc_object_t * );
-static void CloseFilter( vlc_object_t * );
+static void CloseFilter( filter_t * );
 static block_t *Resample( filter_t *, block_t * );
 
 static void ResampleFloat( filter_t *p_filter,
@@ -87,11 +87,11 @@ vlc_module_begin ()
     set_subcategory( SUBCAT_AUDIO_RESAMPLER )
     set_description( N_("Audio filter for band-limited interpolation resampling") )
     set_capability( "audio converter", 20 )
-    set_callbacks( OpenFilter, CloseFilter )
+    set_callback( OpenFilter )
 
     add_submodule()
     set_capability( "audio resampler", 20 )
-    set_callbacks( OpenFilter, CloseFilter )
+    set_callback( OpenFilter )
 vlc_module_end ()
 
 /*****************************************************************************
@@ -279,6 +279,10 @@ static block_t *Resample( filter_t * p_filter, block_t * p_in_buf )
     return p_out_buf;
 }
 
+static const struct vlc_filter_operations filter_ops = {
+    .filter_audio = Resample, .close = CloseFilter,
+};
+
 /*****************************************************************************
  * OpenFilter:
  *****************************************************************************/
@@ -306,7 +310,7 @@ static int OpenFilter( vlc_object_t *p_this )
 
     p_sys->i_old_wing = 0;
     p_sys->b_first = true;
-    p_filter->pf_audio_filter = Resample;
+    p_filter->ops = &filter_ops;
 
     msg_Dbg( p_this, "%4.4s/%iKHz/%i->%4.4s/%iKHz/%i",
              (char *)&p_filter->fmt_in.i_codec,
@@ -325,9 +329,8 @@ static int OpenFilter( vlc_object_t *p_this )
 /*****************************************************************************
  * CloseFilter : deallocate data structures
  *****************************************************************************/
-static void CloseFilter( vlc_object_t *p_this )
+static void CloseFilter( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     free( p_filter->p_sys->p_buf );
     free( p_filter->p_sys );
 }

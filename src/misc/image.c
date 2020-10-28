@@ -270,7 +270,8 @@ static picture_t *ImageRead( image_handler_t *p_image, block_t *p_block,
             video_format_Copy( &p_image->p_converter->fmt_out.video, p_fmt_out);
         }
 
-        p_pic = p_image->p_converter->pf_video_filter( p_image->p_converter, p_pic );
+        p_pic = p_image->p_converter->ops->filter_video( p_image->p_converter, p_pic );
+        assert(p_pic == NULL || !picture_HasChainedPics(p_pic)); // no chaining
     }
     else
     {
@@ -434,10 +435,11 @@ static block_t *ImageWrite( image_handler_t *p_image, picture_t *p_pic,
         picture_Hold( p_pic );
 
         p_tmp_pic =
-            p_image->p_converter->pf_video_filter( p_image->p_converter, p_pic );
+            p_image->p_converter->ops->filter_video( p_image->p_converter, p_pic );
 
         if( likely(p_tmp_pic != NULL) )
         {
+            assert(!picture_HasChainedPics(p_tmp_pic)); // no chaining
             p_block = p_image->p_enc->pf_encode_video( p_image->p_enc,
                                                        p_tmp_pic );
             picture_Release( p_tmp_pic );
@@ -569,7 +571,9 @@ static picture_t *ImageConvert( image_handler_t *p_image, picture_t *p_pic,
 
     picture_Hold( p_pic );
 
-    return p_image->p_converter->pf_video_filter( p_image->p_converter, p_pic );
+    p_pic = p_image->p_converter->ops->filter_video( p_image->p_converter, p_pic );
+    assert(p_pic == NULL || !picture_HasChainedPics(p_pic)); // no chaining
+    return p_pic;
 }
 
 /**
@@ -808,13 +812,18 @@ static filter_t *CreateConverter( vlc_object_t *p_this,
         DeleteConverter( p_filter );
         return NULL;
     }
+    assert( p_filter->ops != NULL );
 
     return p_filter;
 }
 
 static void DeleteConverter( filter_t * p_filter )
 {
-    if( p_filter->p_module ) module_unneed( p_filter, p_filter->p_module );
+    if( p_filter->p_module )
+    {
+        filter_Close( p_filter );
+        module_unneed( p_filter, p_filter->p_module );
+    }
 
     es_format_Clean( &p_filter->fmt_in );
     es_format_Clean( &p_filter->fmt_out );

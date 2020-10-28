@@ -34,12 +34,12 @@ using namespace sdi_sout;
 SDIOutput::SDIOutput(sout_stream_t *p_stream_)
 {
     p_stream = p_stream_;
-    p_stream->pf_add     = SoutCallback_Add;
-    p_stream->pf_del     = SoutCallback_Del;
-    p_stream->pf_send    = SoutCallback_Send;
-    p_stream->pf_flush   = SoutCallback_Flush;
-    p_stream->pf_control = SoutCallback_Control;
-    p_stream->pace_nocontrol = true;
+    ops.add     = SoutCallback_Add;
+    ops.del     = SoutCallback_Del;
+    ops.send    = SoutCallback_Send;
+    ops.flush   = SoutCallback_Flush;
+    ops.control = SoutCallback_Control;
+    p_stream->ops = &ops;
 
     es_format_Init(&video.configuredfmt, VIDEO_ES, 0);
     video.tenbits = var_InheritBool(p_stream, CFG_PREFIX "tenbits");
@@ -162,6 +162,7 @@ int SDIOutput::Control(int i_query, va_list args)
     switch(i_query)
     {
         case SOUT_STREAM_WANTS_SUBSTREAMS:
+        case SOUT_STREAM_IS_SYNCHRONOUS:
             *va_arg(args, bool *) = true;
             return VLC_SUCCESS;
         default:

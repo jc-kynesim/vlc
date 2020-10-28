@@ -36,15 +36,13 @@
 #include <vlc_filter.h>
 #include <vlc_picture.h>
 #include <vlc_image.h>
-#include "filter_picture.h"
 
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static int  Create    ( vlc_object_t * );
-static void Destroy   ( vlc_object_t * );
+static int  Create    ( filter_t * );
 
-static picture_t *Filter( filter_t *, picture_t * );
+VIDEO_FILTER_WRAPPER_CLOSE(Filter, Destroy)
 
 /*****************************************************************************
  * Module descriptor
@@ -52,12 +50,11 @@ static picture_t *Filter( filter_t *, picture_t * );
 vlc_module_begin ()
     set_description( N_("Psychedelic video filter") )
     set_shortname( N_( "Psychedelic" ))
-    set_capability( "video filter", 0 )
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
 
     add_shortcut( "psychedelic" )
-    set_callbacks( Create, Destroy )
+    set_callback_video_filter( Create )
 vlc_module_end ()
 
 /*****************************************************************************
@@ -79,10 +76,8 @@ typedef struct
  *****************************************************************************
  * This function allocates and initializes a Distort vout method.
  *****************************************************************************/
-static int Create( vlc_object_t *p_this )
+static int Create( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
-
     const vlc_fourcc_t fourcc = p_filter->fmt_in.video.i_chroma;
     const vlc_chroma_description_t *p_chroma = vlc_fourcc_GetChromaDescription( fourcc );
     if( !p_chroma || p_chroma->plane_count != 3 || p_chroma->pixel_size != 1 ) {
@@ -96,7 +91,7 @@ static int Create( vlc_object_t *p_this )
         return VLC_ENOMEM;
     p_filter->p_sys = p_sys;
 
-    p_filter->pf_video_filter = Filter;
+    p_filter->ops = &Filter_ops;
 
     p_sys->x = 10;
     p_sys->y = 10;
@@ -116,9 +111,8 @@ static int Create( vlc_object_t *p_this )
  *****************************************************************************
  * Terminate an output method created by DistortCreateOutputMethod
  *****************************************************************************/
-static void Destroy( vlc_object_t *p_this )
+static void Destroy( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
     if( p_sys->p_image )
@@ -135,24 +129,13 @@ static void Destroy( vlc_object_t *p_this )
  * until it is displayed and switch the two rendering buffers, preparing next
  * frame.
  *****************************************************************************/
-static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
+static void Filter( filter_t *p_filter, picture_t *p_pic, picture_t *p_outpic )
 {
-    picture_t *p_outpic;
-
     unsigned int w, h;
     uint8_t u,v;
 
     picture_t *p_converted;
     video_format_t fmt_out;
-
-    if( !p_pic ) return NULL;
-
-    p_outpic = filter_NewPicture( p_filter );
-    if( !p_outpic )
-    {
-        picture_Release( p_pic );
-        return NULL;
-    }
 
     filter_sys_t *p_sys = p_filter->p_sys;
 
@@ -255,6 +238,4 @@ static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
         else if( p_sys->u == 0 )
             p_sys->v += 1;
     }
-
-    return CopyInfoAndRelease( p_outpic, p_pic );
 }

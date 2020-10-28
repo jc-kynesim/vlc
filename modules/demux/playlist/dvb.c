@@ -45,7 +45,6 @@ int Import_DVB(vlc_object_t *p_this)
 {
     stream_t *demux = (stream_t *)p_this;
 
-    CHECK_FILE(demux);
     if (!stream_HasExtension(demux, ".conf" ) && !demux->obj.force )
         return VLC_EGENERIC;
 
@@ -70,7 +69,7 @@ int Import_DVB(vlc_object_t *p_this)
     input_item_Release(item);
 
     msg_Dbg(demux, "found valid channels.conf file");
-    demux->pf_control = access_vaDirectoryControlHelper;
+    demux->pf_control = PlaylistControl;
     demux->pf_readdir = ReadDir;
 
     return VLC_SUCCESS;

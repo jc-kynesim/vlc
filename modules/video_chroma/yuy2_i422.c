@@ -39,33 +39,27 @@
 /*****************************************************************************
  * Local and extern prototypes.
  *****************************************************************************/
-static int  Activate ( vlc_object_t * );
-
-static void YUY2_I422           ( filter_t *, picture_t *, picture_t * );
-static void YVYU_I422           ( filter_t *, picture_t *, picture_t * );
-static void UYVY_I422           ( filter_t *, picture_t *, picture_t * );
-static picture_t *YUY2_I422_Filter    ( filter_t *, picture_t * );
-static picture_t *YVYU_I422_Filter    ( filter_t *, picture_t * );
-static picture_t *UYVY_I422_Filter    ( filter_t *, picture_t * );
+static int  Activate ( filter_t * );
 
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
 vlc_module_begin ()
     set_description( N_("Conversions from " SRC_FOURCC " to " DEST_FOURCC) )
-    set_capability( "video converter", 80 )
-    set_callback( Activate )
+    set_callback_video_converter( Activate, 80 )
 vlc_module_end ()
+
+VIDEO_FILTER_WRAPPER( YUY2_I422 )
+VIDEO_FILTER_WRAPPER( YVYU_I422 )
+VIDEO_FILTER_WRAPPER( UYVY_I422 )
 
 /*****************************************************************************
  * Activate: allocate a chroma function
  *****************************************************************************
  * This function allocates and initializes a chroma function
  *****************************************************************************/
-static int Activate( vlc_object_t *p_this )
+static int Activate( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
-
     if( p_filter->fmt_in.video.i_width & 1
      || p_filter->fmt_in.video.i_height & 1 )
     {
@@ -83,15 +77,15 @@ static int Activate( vlc_object_t *p_this )
             switch( p_filter->fmt_in.video.i_chroma )
             {
                 case VLC_CODEC_YUYV:
-                    p_filter->pf_video_filter = YUY2_I422_Filter;
+                    p_filter->ops = &YUY2_I422_ops;
                     break;
 
                 case VLC_CODEC_YVYU:
-                    p_filter->pf_video_filter = YVYU_I422_Filter;
+                    p_filter->ops = &YVYU_I422_ops;
                     break;
 
                 case VLC_CODEC_UYVY:
-                    p_filter->pf_video_filter = UYVY_I422_Filter;
+                    p_filter->ops = &UYVY_I422_ops;
                     break;
 
                 default:
@@ -106,10 +100,6 @@ static int Activate( vlc_object_t *p_this )
 }
 
 /* Following functions are local */
-
-VIDEO_FILTER_WRAPPER( YUY2_I422 )
-VIDEO_FILTER_WRAPPER( YVYU_I422 )
-VIDEO_FILTER_WRAPPER( UYVY_I422 )
 
 /*****************************************************************************
  * YUY2_I422: packed YUY2 4:2:2 to planar YUV 4:2:2

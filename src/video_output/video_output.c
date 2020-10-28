@@ -81,10 +81,7 @@ typedef struct vout_thread_sys_t
 
     /* */
     struct {
-        struct {
-            unsigned num;
-            unsigned den;
-        } dar;
+        vlc_rational_t dar;
         struct {
             enum vout_crop_mode mode;
             union {
@@ -172,6 +169,8 @@ typedef struct vout_thread_sys_t
     /* Video filter2 chain */
     struct {
         vlc_mutex_t     lock;
+        bool            changed;
+        bool            new_interlaced;
         char            *configuration;
         video_format_t    src_fmt;
         vlc_video_context *src_vctx;
@@ -362,11 +361,7 @@ bool vout_IsEmpty(vout_thread_t *vout)
     if (!sys->decoder_fifo)
         return true;
 
-    picture_t *picture = picture_fifo_Peek(sys->decoder_fifo);
-    if (picture)
-        picture_Release(picture);
-
-    return !picture;
+    return picture_fifo_IsEmpty(sys->decoder_fifo);
 }
 
 void vout_DisplayTitle(vout_thread_t *vout, const char *title)
@@ -389,7 +384,14 @@ void vout_MouseState(vout_thread_t *vout, const vlc_mouse_t *mouse)
     assert(mouse);
     vout_control_cmd_t cmd;
     vout_control_cmd_Init(&cmd, VOUT_CONTROL_MOUSE_STATE);
-    cmd.mouse = *mouse;
+
+    /* Translate window coordinates to video coordinates */
+    vlc_mutex_lock(&sys->display_lock);
+    if (sys->display)
+        vout_display_TranslateMouseState(sys->display, &cmd.mouse, mouse);
+    else
+        cmd.mouse = *mouse;
+    vlc_mutex_unlock(&sys->display_lock);
 
     vout_control_Push(&sys->control, &cmd);
 }
@@ -489,7 +491,7 @@ void vout_PutPicture(vout_thread_t *vout, picture_t *picture)
 {
     vout_thread_sys_t *sys = VOUT_THREAD_TO_SYS(vout);
     assert(!sys->dummy);
-    picture->p_next = NULL;
+    assert( !picture_HasChainedPics( picture ) );
     picture_fifo_Push(sys->decoder_fifo, picture);
     vout_control_Wake(&sys->control);
 }
@@ -764,15 +766,31 @@ void vout_ControlChangeFilters(vout_thread_t *vout, const char *filters)
 {
     vout_thread_sys_t *sys = VOUT_THREAD_TO_SYS(vout);
     assert(!sys->dummy);
-    vout_control_PushString(&sys->control, VOUT_CONTROL_CHANGE_FILTERS,
-                            filters);
+    vlc_mutex_lock(&sys->filter.lock);
+    if (sys->filter.configuration)
+    {
+        if (filters == NULL || strcmp(sys->filter.configuration, filters))
+        {
+            free(sys->filter.configuration);
+            sys->filter.configuration = filters ? strdup(filters) : NULL;
+            sys->filter.changed = true;
+        }
+    }
+    else if (filters != NULL)
+    {
+        sys->filter.configuration = strdup(filters);
+        sys->filter.changed = true;
+    }
+    vlc_mutex_unlock(&sys->filter.lock);
 }
 
 void vout_ControlChangeInterlacing(vout_thread_t *vout, bool set)
 {
     vout_thread_sys_t *sys = VOUT_THREAD_TO_SYS(vout);
     assert(!sys->dummy);
-    vout_control_PushBool(&sys->control, VOUT_CONTROL_CHANGE_INTERLACE, set);
+    vlc_mutex_lock(&sys->filter.lock);
+    sys->filter.new_interlaced = set;
+    vlc_mutex_unlock(&sys->filter.lock);
 }
 
 void vout_ControlChangeSubSources(vout_thread_t *vout, const char *filters)
@@ -932,13 +950,10 @@ typedef struct {
     config_chain_t *cfg;
 } vout_filter_t;
 
-static void ThreadChangeFilters(vout_thread_sys_t *vout,
-                                const char *filters,
-                                const bool *new_deinterlace,
-                                bool is_locked)
+static void ThreadChangeFilters(vout_thread_sys_t *vout)
 {
     vout_thread_sys_t *sys = vout;
-    ThreadFilterFlush(vout, is_locked);
+    ThreadFilterFlush(vout, true);
     ThreadDelAllFilterCallbacks(vout);
 
     vlc_array_t array_static;
@@ -946,9 +961,6 @@ static void ThreadChangeFilters(vout_thread_sys_t *vout,
 
     vlc_array_init(&array_static);
     vlc_array_init(&array_interactive);
-
-    if (new_deinterlace != NULL)
-        sys->private.interlacing.has_deint = *new_deinterlace;
 
     if (sys->private.interlacing.has_deint)
     {
@@ -961,8 +973,7 @@ static void ThreadChangeFilters(vout_thread_sys_t *vout,
         }
     }
 
-    if (filters == NULL) filters = sys->filter.configuration;
-    char *current = filters ? strdup(filters) : NULL;
+    char *current = sys->filter.configuration ? strdup(sys->filter.configuration) : NULL;
     while (current) {
         config_chain_t *cfg;
         char *name;
@@ -992,9 +1003,6 @@ static void ThreadChangeFilters(vout_thread_sys_t *vout,
         free(current);
         current = next;
     }
-
-    if (!is_locked)
-        vlc_mutex_lock(&sys->filter.lock);
 
     es_format_t fmt_target;
     es_format_InitFromVideo(&fmt_target, &sys->filter.src_fmt);
@@ -1047,57 +1055,52 @@ static void ThreadChangeFilters(vout_thread_sys_t *vout,
 
     es_format_Clean(&fmt_target);
 
-    if (sys->filter.configuration != filters) {
-        free(sys->filter.configuration);
-        sys->filter.configuration = filters ? strdup(filters) : NULL;
-    }
-
-    if (!is_locked)
-        vlc_mutex_unlock(&sys->filter.lock);
+    sys->filter.changed = false;
 }
 
 
 /* */
-static int ThreadDisplayPreparePicture(vout_thread_sys_t *vout, bool reuse,
+VLC_USED
+static picture_t *ThreadDisplayPreparePicture(vout_thread_sys_t *vout, bool reuse_decoded,
                                        bool frame_by_frame, bool *paused)
 {
     vout_thread_sys_t *sys = vout;
-    bool is_late_dropped = sys->is_late_dropped && !sys->pause.is_on && !frame_by_frame;
+    bool is_late_dropped = sys->is_late_dropped && !frame_by_frame;
 
     vlc_mutex_lock(&sys->filter.lock);
 
     picture_t *picture = filter_chain_VideoFilter(sys->filter.chain_static, NULL);
-    assert(!reuse || !picture);
+    assert(!reuse_decoded || !picture);
 
     while (!picture) {
         picture_t *decoded;
-        if (reuse && sys->displayed.decoded) {
+        if (reuse_decoded && sys->displayed.decoded) {
             decoded = picture_Hold(sys->displayed.decoded);
         } else {
             decoded = picture_fifo_Pop(sys->decoder_fifo);
 
             if (decoded) {
-                if (is_late_dropped && !decoded->b_force) {
-                    const vlc_tick_t date = vlc_tick_now();
-                    const vlc_tick_t system_pts =
-                        vlc_clock_ConvertToSystem(sys->clock, date,
-                                                  decoded->date, sys->rate);
+                const vlc_tick_t system_now = vlc_tick_now();
+                const vlc_tick_t system_pts =
+                    vlc_clock_ConvertToSystem(sys->clock, system_now,
+                                              decoded->date, sys->rate);
 
-                    vlc_tick_t late;
-                    if (system_pts == INT64_MAX)
-                    {
-                        /* The clock is paused, notify it (so that the current
-                         * picture is displayed but not the next one), this
-                         * current picture can't be be late. */
-                        *paused = true;
-                        late = 0;
-                    }
-                    else
-                        late = date - system_pts;
+                if (system_pts == INT64_MAX)
+                {
+                    /* The clock is paused, notify it (so that the current
+                        * picture is displayed but not the next one), this
+                        * current picture can't be be late. */
+                    *paused = true;
+                }
+                else if (is_late_dropped && !decoded->b_force)
+                {
+                    vlc_tick_t late = system_now - system_pts;
 
                     vlc_tick_t late_threshold;
-                    if (decoded->format.i_frame_rate && decoded->format.i_frame_rate_base)
-                        late_threshold = VLC_TICK_FROM_MS(500) * decoded->format.i_frame_rate_base / decoded->format.i_frame_rate;
+                    if (decoded->format.i_frame_rate && decoded->format.i_frame_rate_base) {
+                        late_threshold = vlc_tick_from_samples(decoded->format.i_frame_rate_base, decoded->format.i_frame_rate);
+                        late_threshold /=  2;
+                    }
                     else
                         late_threshold = VOUT_DISPLAY_LATE_THRESHOLD;
                     if (late > late_threshold) {
@@ -1121,14 +1124,14 @@ static int ThreadDisplayPreparePicture(vout_thread_sys_t *vout, bool reuse,
                         vlc_video_context_Release(sys->filter.src_vctx);
                     sys->filter.src_vctx = pic_vctx ? vlc_video_context_Hold(pic_vctx) : NULL;
 
-                    ThreadChangeFilters(vout, NULL, NULL, true);
+                    ThreadChangeFilters(vout);
                 }
             }
         }
 
         if (!decoded)
             break;
-        reuse = false;
+        reuse_decoded = false;
 
         if (sys->displayed.decoded)
             picture_Release(sys->displayed.decoded);
@@ -1137,20 +1140,12 @@ static int ThreadDisplayPreparePicture(vout_thread_sys_t *vout, bool reuse,
         sys->displayed.timestamp     = decoded->date;
         sys->displayed.is_interlaced = !decoded->b_progressive;
 
-        picture = filter_chain_VideoFilter(sys->filter.chain_static, decoded);
+        picture = filter_chain_VideoFilter(sys->filter.chain_static, sys->displayed.decoded);
     }
 
     vlc_mutex_unlock(&sys->filter.lock);
 
-    if (!picture)
-        return VLC_EGENERIC;
-
-    assert(!sys->displayed.next);
-    if (!sys->displayed.current)
-        sys->displayed.current = picture;
-    else
-        sys->displayed.next    = picture;
-    return VLC_SUCCESS;
+    return picture;
 }
 
 static vlc_decoder_device * VoutHoldDecoderDevice(vlc_object_t *o, void *opaque)
@@ -1217,16 +1212,17 @@ static picture_t *ConvertRGB32AndBlend(vout_thread_sys_t *vout, picture_t *pic,
     return NULL;
 }
 
-static int ThreadDisplayRenderPicture(vout_thread_sys_t *vout, bool is_forced)
+static int ThreadDisplayRenderPicture(vout_thread_sys_t *vout, bool render_now)
 {
     vout_thread_sys_t *sys = vout;
 
-    picture_t *torender = picture_Hold(sys->displayed.current);
+    // hold it as the filter chain will release it or return it and we release it
+    picture_Hold(sys->displayed.current);
 
     vout_chrono_Start(&sys->render);
 
     vlc_mutex_lock(&sys->filter.lock);
-    picture_t *filtered = filter_chain_VideoFilter(sys->filter.chain_interactive, torender);
+    picture_t *filtered = filter_chain_VideoFilter(sys->filter.chain_interactive, sys->displayed.current);
     vlc_mutex_unlock(&sys->filter.lock);
 
     if (!filtered)
@@ -1249,7 +1245,7 @@ static int ThreadDisplayRenderPicture(vout_thread_sys_t *vout, bool is_forced)
         render_subtitle_date = sys->pause.date;
     else
     {
-        render_subtitle_date = filtered->date <= 1 ? system_now :
+        render_subtitle_date = filtered->date <= VLC_TICK_0 ? system_now :
             vlc_clock_ConvertToSystem(sys->clock, system_now, filtered->date,
                                       sys->rate);
 
@@ -1259,7 +1255,7 @@ static int ThreadDisplayRenderPicture(vout_thread_sys_t *vout, bool is_forced)
         if (unlikely(render_subtitle_date == INT64_MAX))
         {
             render_subtitle_date = system_now;
-            is_forced = true;
+            render_now = true;
         }
     }
 
@@ -1374,7 +1370,7 @@ static int ThreadDisplayRenderPicture(vout_thread_sys_t *vout, bool is_forced)
     }
 
     /* Render the direct buffer */
-    vout_UpdateDisplaySourceProperties(vd, &todisplay->format);
+    vout_UpdateDisplaySourceProperties(vd, &todisplay->format, &sys->source.dar);
 
     todisplay = vout_ConvertForDisplay(vd, todisplay);
     if (todisplay == NULL) {
@@ -1390,7 +1386,7 @@ static int ThreadDisplayRenderPicture(vout_thread_sys_t *vout, bool is_forced)
 
     system_now = vlc_tick_now();
     const vlc_tick_t pts = todisplay->date;
-    vlc_tick_t system_pts = is_forced ? system_now :
+    vlc_tick_t system_pts = render_now ? system_now :
         vlc_clock_ConvertToSystem(sys->clock, system_now, pts, sys->rate);
     if (unlikely(system_pts == INT64_MAX))
     {
@@ -1398,7 +1394,7 @@ static int ThreadDisplayRenderPicture(vout_thread_sys_t *vout, bool is_forced)
          * picture, display the current picture anyway and force the rendering
          * to now. */
         system_pts = system_now;
-        is_forced = true;
+        render_now = true;
     }
 
     const unsigned frame_rate = todisplay->format.i_frame_rate;
@@ -1418,7 +1414,7 @@ static int ThreadDisplayRenderPicture(vout_thread_sys_t *vout, bool is_forced)
 #endif
 
     system_now = vlc_tick_now();
-    if (!is_forced)
+    if (!render_now)
     {
         if (unlikely(system_now > system_pts))
         {
@@ -1467,80 +1463,114 @@ static int ThreadDisplayPicture(vout_thread_sys_t *vout, vlc_tick_t *deadline)
 
     assert(sys->clock);
 
-    if (first)
-        if (ThreadDisplayPreparePicture(vout, true, frame_by_frame, &paused)) /* FIXME not sure it is ok */
-            return VLC_EGENERIC;
+    vlc_mutex_lock(&sys->filter.lock);
+    if (sys->filter.changed ||
+        sys->private.interlacing.has_deint != sys->filter.new_interlaced)
+    {
+        sys->private.interlacing.has_deint = sys->filter.new_interlaced;
+        ThreadChangeFilters(vout);
+    }
+    vlc_mutex_unlock(&sys->filter.lock);
 
-    if (!paused || frame_by_frame)
-        while (!sys->displayed.next
-            && !ThreadDisplayPreparePicture(vout, false, frame_by_frame, &paused))
-            ;
+    if (deadline)
+        *deadline = VLC_TICK_INVALID;
 
-    const vlc_tick_t system_now = vlc_tick_now();
-    const vlc_tick_t render_delay = vout_chrono_GetHigh(&sys->render) + VOUT_MWAIT_TOLERANCE;
+    if (!sys->displayed.current)
+    {
+        assert(!sys->displayed.next);
+        sys->displayed.current =
+            ThreadDisplayPreparePicture(vout, true, frame_by_frame, &paused);
+        if (!sys->displayed.current)
+            return VLC_EGENERIC; // wait with no known deadline
+    }
 
-    bool drop_next_frame = frame_by_frame;
-    vlc_tick_t date_next = VLC_TICK_INVALID;
-
-    if (!paused && sys->displayed.next) {
-        const vlc_tick_t next_system_pts =
-            vlc_clock_ConvertToSystem(sys->clock, system_now,
-                                      sys->displayed.next->date, sys->rate);
-        if (unlikely(next_system_pts == INT64_MAX))
+    bool render_now;
+    if (frame_by_frame)
+    {
+        if (!sys->displayed.next)
         {
-            /* The clock was just paused, don't display the next frame (keep
-             * the current one). */
-            paused = true;
+            sys->displayed.next =
+                ThreadDisplayPreparePicture(vout, false, true, &paused);
         }
-        {
-            date_next = next_system_pts - render_delay;
-            if (date_next <= system_now)
-                drop_next_frame = true;
-        }
-    }
 
-    /* FIXME/XXX we must redisplay the last decoded picture (because
-     * of potential vout updated, or filters update or SPU update)
-     * For now a high update period is needed but it could be removed
-     * if and only if:
-     * - vout module emits events from theselves.
-     * - *and* SPU is modified to emit an event or a deadline when needed.
-     *
-     * So it will be done later.
-     */
-    bool refresh = false;
-
-    vlc_tick_t date_refresh = VLC_TICK_INVALID;
-    if (sys->displayed.date != VLC_TICK_INVALID) {
-        date_refresh = sys->displayed.date + VOUT_REDISPLAY_DELAY - render_delay;
-        refresh = date_refresh <= system_now;
-    }
-    bool force_refresh = !drop_next_frame && refresh;
-
-    if (!frame_by_frame) {
-        if (date_refresh != VLC_TICK_INVALID)
-            *deadline = date_refresh;
-        if (date_next != VLC_TICK_INVALID && date_next < *deadline)
-            *deadline = date_next;
-    }
-
-    if (!first && !refresh && !drop_next_frame) {
-        return VLC_EGENERIC;
-    }
-
-    if (drop_next_frame) {
         picture_Release(sys->displayed.current);
         sys->displayed.current = sys->displayed.next;
         sys->displayed.next    = NULL;
+
+        render_now = true;
+    }
+    else
+    {
+        if (!paused)
+        {
+            if (!sys->displayed.next)
+            {
+                sys->displayed.next =
+                    ThreadDisplayPreparePicture(vout, false, false, &paused);
+            }
+        }
+
+        const vlc_tick_t system_now = vlc_tick_now();
+        const vlc_tick_t render_delay = vout_chrono_GetHigh(&sys->render) + VOUT_MWAIT_TOLERANCE;
+
+        bool dropped_current_frame = false;
+
+        /* FIXME/XXX we must redisplay the last decoded picture (because
+        * of potential vout updated, or filters update or SPU update)
+        * For now a high update period is needed but it could be removed
+        * if and only if:
+        * - vout module emits events from themselves.
+        * - *and* SPU is modified to emit an event or a deadline when needed.
+        *
+        * So it will be done later.
+        */
+        bool refresh = false;
+
+        vlc_tick_t date_refresh = VLC_TICK_INVALID;
+        if (sys->displayed.date != VLC_TICK_INVALID) {
+            date_refresh = sys->displayed.date + VOUT_REDISPLAY_DELAY - render_delay;
+            refresh = date_refresh <= system_now;
+        }
+        render_now = refresh;
+
+        if (!paused && sys->displayed.next) {
+            const vlc_tick_t next_system_pts =
+                vlc_clock_ConvertToSystem(sys->clock, system_now,
+                                        sys->displayed.next->date, sys->rate);
+            if (likely(next_system_pts != INT64_MAX))
+            {
+                vlc_tick_t date_next = next_system_pts - render_delay;
+                if (date_refresh == VLC_TICK_INVALID || date_next < date_refresh)
+                    date_refresh = date_next;
+
+                if (date_next <= system_now)
+                {
+                    // next frame will still need some waiting before display
+                    dropped_current_frame = true;
+                    render_now = false;
+
+                    picture_Release(sys->displayed.current);
+                    sys->displayed.current = sys->displayed.next;
+                    sys->displayed.next    = NULL;
+                }
+            }
+        }
+        if (date_refresh != VLC_TICK_INVALID)
+            *deadline = date_refresh;
+
+        if (!first && !refresh && !dropped_current_frame) {
+            // nothing changed, wait until the next deadline or a control
+            return VLC_EGENERIC;
+        }
     }
 
     if (!sys->displayed.current)
         return VLC_EGENERIC;
 
     /* display the picture immediately */
-    bool is_forced = frame_by_frame || force_refresh || sys->displayed.current->b_force;
-    int ret = ThreadDisplayRenderPicture(vout, is_forced);
-    return force_refresh ? VLC_EGENERIC : ret;
+    render_now |= sys->displayed.current->b_force;
+    int ret = ThreadDisplayRenderPicture(vout, render_now);
+    return render_now ? VLC_EGENERIC : ret;
 }
 
 void vout_ChangePause(vout_thread_t *vout, bool is_paused, vlc_tick_t date)
@@ -1678,17 +1708,13 @@ void vout_ChangeSpuRate(vout_thread_t *vout, size_t channel_id, float rate)
 static void ThreadProcessMouseState(vout_thread_sys_t *p_vout,
                                     const vlc_mouse_t *win_mouse)
 {
-    vlc_mouse_t vid_mouse, tmp1, tmp2, *m;
+    vlc_mouse_t tmp1, tmp2;
+    const vlc_mouse_t *m;
     vout_thread_t *vout = &p_vout->obj;
     vout_thread_sys_t *sys = p_vout;
 
-    /* Translate window coordinates to video coordinates */
-    vlc_mutex_lock(&sys->display_lock);
-    vout_display_TranslateMouseState(sys->display, &vid_mouse, win_mouse);
-    vlc_mutex_unlock(&sys->display_lock);
-
-    /* Then pass up the filter chains. */
-    m = &vid_mouse;
+    /* pass mouse coordinates in the filter chains. */
+    m = win_mouse;
     vlc_mutex_lock(&sys->filter.lock);
     if (sys->filter.chain_static && sys->filter.chain_interactive) {
         if (!filter_chain_MouseFilter(sys->filter.chain_interactive,
@@ -1879,20 +1905,12 @@ static void *Thread(void *object)
             switch(cmd.type) {
                 case VOUT_CONTROL_TERMINATE:
                     return NULL; /* no need to clean &cmd */
-                case VOUT_CONTROL_CHANGE_FILTERS:
-                    ThreadChangeFilters(vout, cmd.string, NULL, false);
-                    break;
-                case VOUT_CONTROL_CHANGE_INTERLACE:
-                    ThreadChangeFilters(vout, NULL, &cmd.boolean, false);
-                    break;
                 case VOUT_CONTROL_MOUSE_STATE:
                     ThreadProcessMouseState(vout, &cmd.mouse);
                     break;
             }
-            vout_control_cmd_Clean(&cmd);
         }
 
-        deadline = VLC_TICK_INVALID;
         wait = ThreadDisplayPicture(vout, &deadline) != VLC_SUCCESS;
 
         const bool picture_interlaced = sys->displayed.is_interlaced;

@@ -49,8 +49,8 @@
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static int  CreateFilter ( vlc_object_t * );
-static void DestroyFilter( vlc_object_t * );
+static int  CreateFilter ( filter_t * );
+static void DestroyFilter( filter_t * );
 static subpicture_t *Filter( filter_t *, vlc_tick_t );
 
 static struct rss_feed_t *FetchRSS( filter_t * );
@@ -188,10 +188,9 @@ static const char *const ppsz_title_modes[] =
  * Module descriptor
  *****************************************************************************/
 vlc_module_begin ()
-    set_capability( "sub source", 1 )
     set_shortname( N_("RSS / Atom") )
     set_help(RSS_HELP)
-    set_callbacks( CreateFilter, DestroyFilter )
+    set_callback_sub_source( CreateFilter, 1 )
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_SUBPIC )
     add_string( CFG_PREFIX "urls", NULL, MSG_TEXT, MSG_LONGTEXT, false )
@@ -240,12 +239,15 @@ static void InitCurrentContext(filter_sys_t *p_sys)
     p_sys->i_cur_char = -1;
 }
 
+static const struct vlc_filter_operations filter_ops = {
+    .source_sub = Filter, .close = DestroyFilter,
+};
+
 /*****************************************************************************
  * CreateFilter: allocates RSS video filter
  *****************************************************************************/
-static int CreateFilter( vlc_object_t *p_this )
+static int CreateFilter( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys;
     char *psz_urls;
     int i_ttl;
@@ -311,7 +313,7 @@ static int CreateFilter( vlc_object_t *p_this )
 
     /* Misc init */
     vlc_mutex_init( &p_sys->lock );
-    p_filter->pf_sub_source = Filter;
+    p_filter->ops = &filter_ops;
     p_sys->last_date = (vlc_tick_t)0;
     p_sys->b_fetched = false;
 
@@ -334,9 +336,8 @@ error:
 /*****************************************************************************
  * DestroyFilter: destroy RSS video filter
  *****************************************************************************/
-static void DestroyFilter( vlc_object_t *p_this )
+static void DestroyFilter( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
     vlc_timer_destroy( p_sys->timer );

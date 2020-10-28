@@ -27,15 +27,13 @@ import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
 
-Widgets.NavigableFocusScope {
+Widgets.PageLoader {
     id: root
 
-    //name and properties of the tab to be initially loaded
-    property string view: "all"
-    property var viewProperties: ({})
     property var model
 
-    readonly property var pageModel: [{
+    defaultPage: "all"
+    pageModel: [{
         name: "all",
         component: artistGridComponent
     }, {
@@ -43,24 +41,8 @@ Widgets.NavigableFocusScope {
         component: artistAlbumsComponent
     }]
 
-    Component.onCompleted: loadView()
-    onViewChanged: {
-        viewProperties = {}
-        loadView()
-    }
-    onViewPropertiesChanged: loadView()
-
-    function loadDefaultView() {
-        root.view = "all"
-        root.viewProperties= ({})
-    }
-
-    function loadView() {
-        var found = stackView.loadView(root.pageModel, view, viewProperties)
-        if (!found)
-            stackView.replace(root.pageModel[0].component)
-        stackView.currentItem.navigationParent = root
-        model = stackView.currentItem.model
+    onCurrentItemChanged: {
+        model = currentItem.model
     }
 
     function _updateArtistsAllHistory(currentIndex) {
@@ -124,27 +106,9 @@ Widgets.NavigableFocusScope {
                 model: artistModel
             }
 
-            Widgets.MenuExt {
+            ArtistContextMenu {
                 id: contextMenu
-                property var model: ({})
-                closePolicy: Popup.CloseOnReleaseOutside | Popup.CloseOnEscape
-
-                Widgets.MenuItemExt {
-                    id: playMenuItem
-                    text: i18n.qtr("Play")
-                    onTriggered: {
-                        medialib.addAndPlay( contextMenu.model.id )
-                        history.push(["player"])
-                    }
-                }
-
-                Widgets.MenuItemExt {
-                    text: "Enqueue"
-                    onTriggered: medialib.addToPlaylist( contextMenu.model.id )
-                }
-
-                onClosed: contextMenu.parent.forceActiveFocus()
-
+                model: artistModel
             }
 
             Component {
@@ -188,13 +152,14 @@ Widgets.NavigableFocusScope {
                         textHorizontalAlignment: Text.AlignHCenter
                         width: VLCStyle.colWidth(1)
 
-                        onItemClicked: {
-                            selectionModel.updateSelection( modifier , view.currentItem.currentIndex, index )
-                            view.currentItem.currentIndex = index
-                            view.currentItem.forceActiveFocus()
-                        }
+                        onItemClicked: artistGrid.leftClickOnItem(modifier, index)
 
                         onItemDoubleClicked: artistAllView.showAlbumView(model)
+
+                        onContextMenuButtonClicked: {
+                            artistGrid.rightClickOnItem(index)
+                            contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
+                        }
                     }
                 }
             }
@@ -233,11 +198,8 @@ Widgets.NavigableFocusScope {
                     onItemDoubleClicked: {
                         artistAllView.showAlbumView(model)
                     }
-
-                    onContextMenuButtonClicked: {
-                        contextMenu.model = menuModel
-                        contextMenu.popup(menuParent)
-                    }
+                    onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes, menuParent.mapToGlobal(0,0))
+                    onRightClick: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
 
                     Widgets.TableColumns {
                         id: tableColumns
@@ -250,13 +212,13 @@ Widgets.NavigableFocusScope {
 
                 anchors.fill: parent
                 focus: true
-                initialItem: medialib.gridView ? gridComponent : tableComponent
+                initialItem: mainInterface.gridView ? gridComponent : tableComponent
             }
 
             Connections {
-                target: medialib
+                target: mainInterface
                 onGridViewChanged: {
-                    if (medialib.gridView) {
+                    if (mainInterface.gridView) {
                         view.replace(gridComponent)
                     } else {
                         view.replace(tableComponent)
@@ -280,12 +242,5 @@ Widgets.NavigableFocusScope {
             onCurrentIndexChanged: _updateArtistsAlbumsHistory(currentIndex, currentAlbumIndex)
             onCurrentAlbumIndexChanged: _updateArtistsAlbumsHistory(currentIndex, currentAlbumIndex)
         }
-    }
-
-    Widgets.StackViewExt {
-        id: stackView
-
-        anchors.fill: parent
-        focus: true
     }
 }

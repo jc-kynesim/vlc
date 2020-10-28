@@ -42,22 +42,6 @@ extern "C" {
  * Stream output modules interface
  */
 
-/** Stream output instance (FIXME: should be private to src/ to avoid
- * invalid unsynchronized access) */
-struct sout_instance_t
-{
-    struct vlc_object_t obj;
-
-    char *psz_sout;
-
-    /** count of output that can't control the space */
-    int                 i_out_pace_nocontrol;
-    bool                b_wants_substreams;
-
-    vlc_mutex_t         lock;
-    sout_stream_t       *p_stream;
-};
-
 /**
  * \defgroup sout_access Access output
  * Raw output byte streams
@@ -183,9 +167,9 @@ static inline int sout_MuxControl( sout_mux_t *p_mux, int i_query, ... )
 /** @} */
 
 enum sout_stream_query_e {
-    SOUT_STREAM_EMPTY,    /* arg1=bool *,       res=can fail (assume true) */
     SOUT_STREAM_WANTS_SUBSTREAMS,  /* arg1=bool *, res=can fail (assume false) */
     SOUT_STREAM_ID_SPU_HIGHLIGHT,  /* arg1=void *, arg2=const vlc_spu_highlight_t *, res=can fail */
+    SOUT_STREAM_IS_SYNCHRONOUS, /* arg1=bool *, can fail (assume false) */
 };
 
 struct sout_stream_operations {
@@ -200,80 +184,23 @@ struct sout_stream_t
 {
     struct vlc_object_t obj;
 
-    module_t          *p_module;
-    sout_instance_t   *p_sout;
-
     char              *psz_name;
     config_chain_t    *p_cfg;
     sout_stream_t     *p_next;
 
     const struct sout_stream_operations *ops;
-
-    /* add, remove a stream */
-    void             *(*pf_add)( sout_stream_t *, const es_format_t * );
-    void              (*pf_del)( sout_stream_t *, void * );
-    /* manage a packet */
-    int               (*pf_send)( sout_stream_t *, void *, block_t* );
-    int               (*pf_control)( sout_stream_t *, int, va_list );
-    void              (*pf_flush)( sout_stream_t *, void * );
-
     void              *p_sys;
-    bool pace_nocontrol;
 };
 
-VLC_API void sout_StreamChainDelete(sout_stream_t *p_first, sout_stream_t *p_last );
-VLC_API sout_stream_t *sout_StreamChainNew(sout_instance_t *p_sout,
-        const char *psz_chain, sout_stream_t *p_next, sout_stream_t **p_last) VLC_USED;
+VLC_API void sout_StreamChainDelete(sout_stream_t *first, sout_stream_t *end);
+VLC_API sout_stream_t *sout_StreamChainNew(vlc_object_t *parent,
+        const char *psz_chain, sout_stream_t *p_next) VLC_USED;
 
-static inline void *sout_StreamIdAdd( sout_stream_t *s,
-                                      const es_format_t *fmt )
-{
-    if (s->ops == NULL)
-        return s->pf_add(s, fmt);
-    return s->ops->add(s, fmt);
-}
-
-static inline void sout_StreamIdDel( sout_stream_t *s,
-                                     void *id )
-{
-    if (s->ops == NULL) {
-        s->pf_del(s, id);
-        return;
-    }
-    s->ops->del(s, id);
-}
-
-static inline int sout_StreamIdSend( sout_stream_t *s,
-                                     void *id, block_t *b )
-{
-    if (s->ops == NULL)
-        return s->pf_send(s, id, b);
-    return s->ops->send(s, id, b);
-}
-
-static inline void sout_StreamFlush( sout_stream_t *s,
-                                     void *id )
-{
-    if (s->ops == NULL) {
-        if (s->pf_flush != NULL)
-            s->pf_flush(s, id);
-        return;
-   }
-   if (s->ops->flush != NULL)
-        s->ops->flush(s, id);
-}
-
-static inline int sout_StreamControlVa( sout_stream_t *s, int i_query, va_list args )
-{
-    if (s->ops == NULL) {
-        if (s->pf_control == NULL)
-            return VLC_EGENERIC;
-        return s->pf_control(s, i_query, args);
-    }
-    if (s->ops->control == NULL)
-        return VLC_EGENERIC;
-    return s->ops->control(s, i_query, args);
-}
+VLC_API void *sout_StreamIdAdd(sout_stream_t *s, const es_format_t *fmt);
+VLC_API void sout_StreamIdDel(sout_stream_t *s, void *id);
+VLC_API int sout_StreamIdSend( sout_stream_t *s, void *id, block_t *b);
+VLC_API void sout_StreamFlush(sout_stream_t *s, void *id);
+VLC_API int sout_StreamControlVa(sout_stream_t *s, int i_query, va_list args);
 
 static inline int sout_StreamControl( sout_stream_t *s, int i_query, ... )
 {
@@ -284,6 +211,16 @@ static inline int sout_StreamControl( sout_stream_t *s, int i_query, ... )
     i_result = sout_StreamControlVa( s, i_query, args );
     va_end( args );
     return i_result;
+}
+
+static inline bool sout_StreamIsSynchronous(sout_stream_t *s)
+{
+    bool b;
+
+    if (sout_StreamControl(s, SOUT_STREAM_IS_SYNCHRONOUS, &b))
+        b = false;
+
+    return b;
 }
 
 /****************************************************************************

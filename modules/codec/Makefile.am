@@ -143,13 +143,6 @@ libsvgdec_plugin_la_LIBADD = $(LIBS_svgdec)
 EXTRA_LTLIBRARIES += libsvgdec_plugin.la
 codec_LTLIBRARIES += $(LTLIBsvgdec)
 
-libsdl_image_plugin_la_SOURCES = codec/sdl_image.c
-libsdl_image_plugin_la_CFLAGS = $(AM_CFLAGS) $(SDL_IMAGE_CFLAGS)
-libsdl_image_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(codecdir)'
-libsdl_image_plugin_la_LIBADD = $(SDL_IMAGE_LIBS)
-EXTRA_LTLIBRARIES += libsdl_image_plugin.la
-codec_LTLIBRARIES += $(LTLIBsdl_image)
-
 libxwd_plugin_la_SOURCES = codec/xwd.c
 libxwd_plugin_la_CFLAGS = $(AM_CFLAGS) $(XPROTO_CFLAGS)
 libxwd_plugin_la_LIBADD = $(XPROTO_LIBS)
@@ -583,7 +576,7 @@ codec_LTLIBRARIES += $(LTLIBdav1d)
 
 ### Hardware encoders ###
 
-libqsv_plugin_la_SOURCES = codec/qsv.c codec/vlc_fifo_helper.h demux/mpeg/timestamps.h
+libqsv_plugin_la_SOURCES = codec/qsv.c demux/mpeg/timestamps.h
 libqsv_plugin_la_CFLAGS = $(AM_CFLAGS) $(MFX_CFLAGS)
 libqsv_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(codecdir)'
 libqsv_plugin_la_LIBADD = $(MFX_LIBS)
@@ -615,7 +608,8 @@ libgstdecode_plugin_la_SOURCES = codec/gstreamer/gstdecode.c \
 								 codec/gstreamer/gstvlcvideopool.c \
 								 codec/gstreamer/gstvlcvideopool.h \
 								 codec/gstreamer/gstvlcvideosink.c \
-								 codec/gstreamer/gstvlcvideosink.h
+								 codec/gstreamer/gstvlcvideosink.h \
+								 codec/gstreamer/fourcc.c
 libgstdecode_plugin_la_CFLAGS = $(AM_CFLAGS) $(GST_VIDEO_CFLAGS) $(GST_APP_CFLAGS)
 libgstdecode_plugin_la_LIBADD = $(GST_VIDEO_LIBS) $(GST_APP_LIBS)
 if HAVE_GST_DECODE

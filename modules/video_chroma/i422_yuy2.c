@@ -47,20 +47,7 @@
 /*****************************************************************************
  * Local and extern prototypes.
  *****************************************************************************/
-static int  Activate ( vlc_object_t * );
-
-static void I422_YUY2               ( filter_t *, picture_t *, picture_t * );
-static void I422_YVYU               ( filter_t *, picture_t *, picture_t * );
-static void I422_UYVY               ( filter_t *, picture_t *, picture_t * );
-static void I422_IUYV               ( filter_t *, picture_t *, picture_t * );
-static picture_t *I422_YUY2_Filter  ( filter_t *, picture_t * );
-static picture_t *I422_YVYU_Filter  ( filter_t *, picture_t * );
-static picture_t *I422_UYVY_Filter  ( filter_t *, picture_t * );
-static picture_t *I422_IUYV_Filter  ( filter_t *, picture_t * );
-#if defined (MODULE_NAME_IS_i422_yuy2)
-static void I422_Y211               ( filter_t *, picture_t *, picture_t * );
-static picture_t *I422_Y211_Filter  ( filter_t *, picture_t * );
-#endif
+static int  Activate ( filter_t * );
 
 /*****************************************************************************
  * Module descriptor
@@ -68,84 +55,22 @@ static picture_t *I422_Y211_Filter  ( filter_t *, picture_t * );
 vlc_module_begin ()
 #if defined (MODULE_NAME_IS_i422_yuy2)
     set_description( N_("Conversions from " SRC_FOURCC " to " DEST_FOURCC) )
-    set_capability( "video converter", 80 )
+    set_callback_video_converter( Activate, 80 )
 # define vlc_CPU_capable() (true)
 # define VLC_TARGET
 #elif defined (MODULE_NAME_IS_i422_yuy2_mmx)
     set_description( N_("MMX conversions from " SRC_FOURCC " to " DEST_FOURCC) )
-    set_capability( "video converter", 100 )
+    set_callback_video_converter( Activate, 100 )
 # define vlc_CPU_capable() vlc_CPU_MMX()
 # define VLC_TARGET VLC_MMX
 #elif defined (MODULE_NAME_IS_i422_yuy2_sse2)
     set_description( N_("SSE2 conversions from " SRC_FOURCC " to " DEST_FOURCC) )
-    set_capability( "video converter", 120 )
+    set_callback_video_converter( Activate, 120 )
 # define vlc_CPU_capable() vlc_CPU_SSE2()
 # define VLC_TARGET VLC_SSE
 #endif
-    set_callback( Activate )
 vlc_module_end ()
 
-/*****************************************************************************
- * Activate: allocate a chroma function
- *****************************************************************************
- * This function allocates and initializes a chroma function
- *****************************************************************************/
-static int Activate( vlc_object_t *p_this )
-{
-    filter_t *p_filter = (filter_t *)p_this;
-
-    if( !vlc_CPU_capable() )
-        return VLC_EGENERIC;
-    if( (p_filter->fmt_in.video.i_x_offset + p_filter->fmt_in.video.i_visible_width) & 1
-     || (p_filter->fmt_in.video.i_y_offset + p_filter->fmt_in.video.i_visible_height) & 1 )
-    {
-        return -1;
-    }
-
-    if( p_filter->fmt_in.video.orientation != p_filter->fmt_out.video.orientation )
-    {
-        return VLC_EGENERIC;
-    }
-
-    switch( p_filter->fmt_in.video.i_chroma )
-    {
-        case VLC_CODEC_I422:
-            switch( p_filter->fmt_out.video.i_chroma )
-            {
-                case VLC_CODEC_YUYV:
-                    p_filter->pf_video_filter = I422_YUY2_Filter;
-                    break;
-
-                case VLC_CODEC_YVYU:
-                    p_filter->pf_video_filter = I422_YVYU_Filter;
-                    break;
-
-                case VLC_CODEC_UYVY:
-                    p_filter->pf_video_filter = I422_UYVY_Filter;
-                    break;
-
-                case VLC_FOURCC('I','U','Y','V'):
-                    p_filter->pf_video_filter = I422_IUYV_Filter;
-                    break;
-
-#if defined (MODULE_NAME_IS_i422_yuy2)
-                case VLC_CODEC_Y211:
-                    p_filter->pf_video_filter = I422_Y211_Filter;
-                    break;
-#endif
-
-                default:
-                    return -1;
-            }
-            break;
-
-        default:
-            return -1;
-    }
-    return 0;
-}
-
-/* Following functions are local */
 
 VIDEO_FILTER_WRAPPER( I422_YUY2 )
 VIDEO_FILTER_WRAPPER( I422_YVYU )
@@ -154,6 +79,69 @@ VIDEO_FILTER_WRAPPER( I422_IUYV )
 #if defined (MODULE_NAME_IS_i422_yuy2)
 VIDEO_FILTER_WRAPPER( I422_Y211 )
 #endif
+
+
+static const struct vlc_filter_operations*
+GetFilterOperations(filter_t *filter)
+{
+    switch( filter->fmt_out.video.i_chroma )
+    {
+        case VLC_CODEC_YUYV:
+            return &I422_YUY2_ops;
+
+        case VLC_CODEC_YVYU:
+            return &I422_YVYU_ops;
+
+        case VLC_CODEC_UYVY:
+            return &I422_UYVY_ops;
+
+        case VLC_FOURCC('I','U','Y','V'):
+            return &I422_IUYV_ops;
+
+#if defined (MODULE_NAME_IS_i422_yuy2)
+        case VLC_CODEC_Y211:
+            return &I422_Y211_ops;
+#endif
+
+        default:
+            return NULL;
+    }
+
+}
+
+/*****************************************************************************
+ * Activate: allocate a chroma function
+ *****************************************************************************
+ * This function allocates and initializes a chroma function
+ *****************************************************************************/
+static int Activate( filter_t *p_filter )
+{
+    if( !vlc_CPU_capable() )
+        return VLC_EGENERIC;
+    if( (p_filter->fmt_in.video.i_x_offset + p_filter->fmt_in.video.i_visible_width) & 1
+     || (p_filter->fmt_in.video.i_y_offset + p_filter->fmt_in.video.i_visible_height) & 1 )
+    {
+        return VLC_EGENERIC;
+    }
+
+    if( p_filter->fmt_in.video.orientation != p_filter->fmt_out.video.orientation )
+    {
+        return VLC_EGENERIC;
+    }
+
+    /* This is a i422 -> * converter. */
+    if( p_filter->fmt_in.video.i_chroma != VLC_CODEC_I422 )
+        return VLC_EGENERIC;
+
+
+    p_filter->ops = GetFilterOperations( p_filter );
+    if( p_filter->ops == NULL)
+        return VLC_EGENERIC;
+
+    return VLC_SUCCESS;
+}
+
+/* Following functions are local */
 
 /*****************************************************************************
  * I422_YUY2: planar YUV 4:2:2 to packed YUY2 4:2:2

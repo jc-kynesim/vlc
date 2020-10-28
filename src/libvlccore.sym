@@ -92,6 +92,7 @@ vlc_decoder_device_Release
 demux_PacketizerDestroy
 demux_PacketizerNew
 demux_New
+demux_Demux
 demux_vaControl
 demux_vaControlHelper
 vlc_demux_chained_New
@@ -267,6 +268,8 @@ module_need
 module_provides
 module_unneed
 vlc_module_load
+vlc_module_map
+vlc_module_match
 vlc_memstream_open
 vlc_memstream_flush
 vlc_memstream_close
@@ -309,8 +312,7 @@ picture_Export
 picture_fifo_Delete
 picture_fifo_Flush
 picture_fifo_New
-picture_fifo_OffsetDate
-picture_fifo_Peek
+picture_fifo_IsEmpty
 picture_fifo_Pop
 picture_fifo_Push
 picture_New
@@ -344,6 +346,11 @@ sout_MuxSendBuffer
 sout_MuxFlush
 sout_StreamChainDelete
 sout_StreamChainNew
+sout_StreamIdAdd
+sout_StreamIdDel
+sout_StreamIdSend
+sout_StreamFlush
+sout_StreamControlVa
 spu_Create
 spu_Destroy
 spu_PutSubpicture
@@ -450,6 +457,9 @@ vlc_accept
 vlc_send
 vlc_sendto
 vlc_sendmsg
+vlc_spawn
+vlc_spawnp
+vlc_waitpid
 utf8_vfprintf
 var_AddCallback
 var_AddListCallback
@@ -966,3 +976,8 @@ vlc_video_context_GetType
 vlc_video_context_GetPrivate
 vlc_video_context_Hold
 vlc_video_context_HoldDevice
+vlc_executor_New
+vlc_executor_Delete
+vlc_executor_Submit
+vlc_executor_Cancel
+vlc_executor_WaitIdle

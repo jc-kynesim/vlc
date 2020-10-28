@@ -32,8 +32,8 @@ Rectangle {
 
     property var plmodel
 
-    signal itemClicked(int button, int modifier)
-    signal itemDoubleClicked(int keys, int modifier)
+    signal itemClicked(int button, int modifier, var globalMousePos)
+    signal itemDoubleClicked(int keys, int modifier, var globalMousePos)
     signal dragStarting()
 
     property alias hovered: mouse.containsMouse
@@ -55,6 +55,31 @@ Rectangle {
     height: Math.max( VLCStyle.fontHeight_normal, VLCStyle.icon_normal ) + VLCStyle.margin_xsmall
 
     property bool dropVisible: false
+
+    function showTooltip(binding) {
+        plInfoTooltip.close()
+        plInfoTooltip.text = Qt.binding(function() { return (textInfo.text + '\n' + textArtist.text); })
+        plInfoTooltip.parent = textInfoColumn
+        if (plmodel.getSelection().length > 1 && binding)
+            plInfoTooltip.timeout = 2000
+        else
+            plInfoTooltip.timeout = 0
+        plInfoTooltip.visible = Qt.binding(function() { return ( (binding ? model.selected : plitem.hovered) && !overlayMenu.visible &&
+                                                                (textInfo.implicitWidth > textInfo.width || textArtist.implicitWidth > textArtist.width)); })
+
+    }
+
+    onHoveredChanged: {
+        if(hovered)
+            showTooltip(false)
+    }
+
+    readonly property bool selected : model.selected
+
+    onSelectedChanged: {
+        if(selected)
+            showTooltip(true)
+    }
 
     Connections {
         target: root
@@ -80,7 +105,7 @@ Rectangle {
     Rectangle {
         z: 2
         width: parent.width
-        height: 2
+        height: 1
         anchors.top: parent.top
         antialiasing: true
         visible: dropVisible
@@ -113,11 +138,11 @@ Rectangle {
         acceptedButtons: acceptedButtons | Qt.RightButton
 
         onClicked:{
-            plitem.itemClicked(mouse.button, mouse.modifiers);
+            plitem.itemClicked(mouse.button, mouse.modifiers, this.mapToGlobal(mouse.x, mouse.y));
         }
         onDoubleClicked: {
             if (mouse.button !== Qt.RightButton)
-                plitem.itemDoubleClicked(mouse.buttons, mouse.modifiers);
+                plitem.itemDoubleClicked(mouse.buttons, mouse.modifiers, this.mapToGlobal(mouse.x, mouse.y));
         }
 
         drag.target: dragItem
@@ -157,13 +182,6 @@ Rectangle {
                 var pos = this.mapToGlobal( mouseX, mouseY)
                 dragItem.updatePos(pos.x + VLCStyle.dp(15, VLCStyle.scale), pos.y)
             }
-        }
-
-        Rectangle {
-            id: selectedBackground
-            color: _colors.bg
-            anchors.fill: parent
-            visible: model.isCurrent && !plitem.hovered && !model.selected
         }
 
         RowLayout {
@@ -216,67 +234,24 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.leftMargin: VLCStyle.margin_large
 
-                ToolTip {
-                    id: textInfoExtendTooltip
-                    text: textArtistHider.visible ? (textInfoHider.visible ? textInfo.text + '\n' + textArtist.text : textArtist.text) : textInfo.text
-                    visible: (root.hovered || model.selected) && (textArtistHider.visible || textInfoHider.visible)
-                    opacity: 0.75
-                    delay: 1000
-                    timeout: 2000
-                }
-
                 Widgets.ListLabel {
                     id: textInfo
+
+                    width: parent.width
 
                     font.weight: model.isCurrent ? Font.Bold : Font.Normal
                     text: model.title
                     color: _colors.text
-
-                    Item {
-                        id: textInfoHider
-                        anchors.fill: parent
-
-                        visible: textInfo.width + textInfoColumn.x > textDuration.x
-
-                        LinearGradient {
-                            anchors.fill: parent
-                            start: Qt.point(0, 0)
-                            end: Qt.point(parent.width - (textInfo.width + textInfoColumn.x - textDuration.x), 0)
-                            gradient: Gradient {
-                                GradientStop { position: 0.75; color: "transparent" }
-                                GradientStop { position: 1.0; color: selectedBackground.visible === true ? selectedBackground.color
-                                                                                                         : Qt.colorEqual(plitem.color, "transparent") ? _colors.banner
-                                                                                                         : plitem.color }
-                            }
-                        }
-                    }
                 }
 
                 Widgets.ListSubtitleLabel {
                     id: textArtist
 
+                    width: parent.width
+
                     font.weight: model.isCurrent ? Font.DemiBold : Font.Normal
                     text: (model.artist ? model.artist : i18n.qtr("Unknown Artist"))
                     color: _colors.text
-
-                    Item {
-                        id: textArtistHider
-                        anchors.fill: parent
-
-                        visible: textArtist.width + textInfoColumn.x > textDuration.x
-
-                        LinearGradient {
-                            anchors.fill: parent
-                            start: Qt.point(0, 0)
-                            end: Qt.point(parent.width - (textArtist.width + textInfoColumn.x - textDuration.x), 0)
-                            gradient: Gradient {
-                                GradientStop { position: 0.75; color: "transparent" }
-                                GradientStop { position: 1.0; color: selectedBackground.visible === true ? selectedBackground.color
-                                                                                                         : Qt.colorEqual(plitem.color, "transparent") ? _colors.banner
-                                                                                                         : plitem.color }
-                            }
-                        }
-                    }
                 }
             }
 
@@ -310,21 +285,25 @@ Rectangle {
                 Layout.preferredHeight: parent.height / 2
 
                 onEntered: {
-                    var delta = drag.source.model.index - model.index
+                    var delta = 1
+
+                    if(!drag.hasUrls)
+                        delta = drag.source.model.index - model.index
+
                     if(delta === 0 || delta === -1)
                         return
 
                     dropVisible = true
                 }
                 onExited: {
-                    var delta = drag.source.model.index - model.index
-                    if(delta === 0 || delta === -1)
-                        return
-
                     dropVisible = false
                 }
                 onDropped: {
-                    var delta = drag.source.model.index - model.index
+                    var delta = 1
+
+                    if(!drop.hasUrls)
+                        delta = drag.source.model.index - model.index
+
                     if(delta === 0 || delta === -1)
                         return
 
@@ -341,7 +320,11 @@ Rectangle {
                 property bool _isLastItem : model.index === plitem.plmodel.count - 1
 
                 onEntered: {
-                    var delta = drag.source.model.index - model.index
+                    var delta = -1
+
+                    if(!drag.hasUrls)
+                        delta = drag.source.model.index - model.index
+
                     if(delta === 0 || delta === 1)
                         return
 
@@ -355,10 +338,6 @@ Rectangle {
                     }
                 }
                 onExited: {
-                    var delta = drag.source.model.index - model.index
-                    if(delta === 0 || delta === 1)
-                        return
-
                     if (_isLastItem)
                     {
                         root.setItemDropIndicatorVisible(model.index, false, false);
@@ -369,7 +348,11 @@ Rectangle {
                     }
                 }
                 onDropped: {
-                    var delta = drag.source.model.index - model.index
+                    var delta = -1
+
+                    if(!drop.hasUrls)
+                        delta = drag.source.model.index - model.index
+
                     if(delta === 0 || delta === 1)
                         return
 
@@ -380,12 +363,12 @@ Rectangle {
                             var urlList = []
                             for ( var url in drop.urls)
                                 urlList.push(drop.urls[url])
-                            mainPlaylistController.insert(root.plmodel.count, urlList)
+                            mainPlaylistController.insert(root.plmodel.count, urlList, false)
                         } else {
                             root.plmodel.moveItemsPost(root.plmodel.getSelection(), root.plmodel.count - 1)
                         }
                         root.setItemDropIndicatorVisible(model.index, false, false);
-                        drop.accept()
+                        drop.accept(Qt.IgnoreAction)
                     }
                     else
                     {
@@ -394,7 +377,6 @@ Rectangle {
                     }
                 }
             }
-
         }
     }
 }

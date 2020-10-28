@@ -139,7 +139,6 @@ int Import_SGIMB( vlc_object_t * p_this )
     const uint8_t *p_peek;
     int i_size;
 
-    CHECK_FILE(p_demux);
     /* Lets check the content to see if this is a sgi mediabase file */
     i_size = vlc_stream_Peek( p_demux->s, &p_peek, MAX_LINE );
     i_size -= sizeof("sgiNameServerHost=") - 1;
@@ -159,7 +158,7 @@ int Import_SGIMB( vlc_object_t * p_this )
 
             msg_Dbg( p_demux, "using SGIMB playlist reader" );
             p_demux->pf_readdir = ReadDir;
-            p_demux->pf_control = access_vaDirectoryControlHelper;
+            p_demux->pf_control = PlaylistControl;
             p_demux->p_sys = p_sys;
             p_sys->psz_uri = NULL;
             p_sys->psz_server = NULL;

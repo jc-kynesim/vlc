@@ -1314,6 +1314,8 @@ static es_out_id_t *bluray_esOutAddUnlocked(bluray_esout_priv_t *esout_priv,
             p_es = p_pair->p_es;
             if(!es_format_IsSimilar(p_fmt, &p_pair->fmt) ||
                p_fmt->b_packetized != p_pair->fmt.b_packetized ||
+               strcmp(fmt.psz_language ? fmt.psz_language : "",
+                      p_pair->fmt.psz_language ? p_pair->fmt.psz_language : "") ||
                esout_priv->b_restart_decoders_on_reuse)
                 es_out_Control(esout_priv->p_dst_out, ES_OUT_SET_ES_FMT, p_pair->p_es, &fmt);
             es_format_Clean(&p_pair->fmt);
@@ -2659,6 +2661,12 @@ static int blurayControl(demux_t *p_demux, int query, va_list args)
             return sendKeyEvent(p_sys, BD_VK_POPUP);
         }
         return VLC_EGENERIC;
+
+    case DEMUX_GET_TYPE:
+    {
+        *va_arg( args, int* ) = ITEM_TYPE_DISC;
+        break;
+    }
 
     case DEMUX_CAN_RECORD:
     case DEMUX_GET_FPS:

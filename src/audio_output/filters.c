@@ -84,7 +84,9 @@ filter_t *aout_filter_Create(vlc_object_t *obj, const filter_owner_t *restrict o
         filter = NULL;
     }
     else
-        assert (filter->pf_audio_filter != NULL);
+    {
+        assert (filter->ops != NULL && filter->ops->filter_audio != NULL);
+    }
     return filter;
 }
 
@@ -116,6 +118,7 @@ static void aout_FiltersPipelineDestroy(filter_t *const *filters, unsigned n)
     {
         filter_t *p_filter = filters[i];
 
+        filter_Close( p_filter );
         module_unneed( p_filter, p_filter->p_module );
         vlc_object_delete(p_filter);
     }
@@ -286,7 +289,7 @@ static block_t *aout_FiltersPipelinePlay(filter_t *const *filters,
 
         /* Please note that p_block->i_nb_samples & i_buffer
          * shall be set by the filter plug-in. */
-        block = filter->pf_audio_filter (filter, block);
+        block = filter->ops->filter_audio (filter, block);
     }
     return block;
 }
@@ -430,6 +433,7 @@ static int AppendFilter(vlc_object_t *obj, const char *type, const char *name,
                                     max - 1, infmt, &filter->fmt_in.audio, false))
     {
         msg_Err (filter, "cannot add user %s \"%s\" (skipped)", type, name);
+        filter_Close( filter );
         module_unneed (filter, filter->p_module);
         vlc_object_delete(filter);
         return -1;

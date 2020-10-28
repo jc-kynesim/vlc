@@ -46,7 +46,7 @@
  * Module descriptor
  *****************************************************************************/
 static int  Open         ( vlc_object_t * );
-static void Close        ( vlc_object_t * );
+static void Close        ( filter_t * );
 
 #define CONFIG_TEXT N_("projectM configuration file")
 #define CONFIG_LONGTEXT N_("File that will be used to configure the projectM " \
@@ -124,7 +124,7 @@ vlc_module_begin ()
     add_integer( "projectm-texture-size", 1024, TEXTURE_TEXT, TEXTURE_LONGTEXT,
                  false )
     add_shortcut( "projectm" )
-    set_callbacks( Open, Close )
+    set_callback( Open )
 vlc_module_end ()
 
 
@@ -156,6 +156,15 @@ struct filter_sys_t
 
 static block_t *DoWork( filter_t *, block_t * );
 static void *Thread( void * );
+
+static const struct FilterOperationInitializer {
+    struct vlc_filter_operations ops {};
+    FilterOperationInitializer()
+    {
+        ops.filter_audio = DoWork;
+        ops.close = Close;
+    };
+} filter_ops;
 
 /**
  * Open the module
@@ -200,7 +209,7 @@ static int Open( vlc_object_t * p_this )
 
     p_filter->fmt_in.audio.i_format = VLC_CODEC_FL32;
     p_filter->fmt_out.audio = p_filter->fmt_in.audio;
-    p_filter->pf_audio_filter = DoWork;
+    p_filter->ops = &filter_ops.ops;
     return VLC_SUCCESS;
 
 error:
@@ -213,9 +222,8 @@ error:
  * Close the module
  * @param p_this: the filter object
  */
-static void Close( vlc_object_t *p_this )
+static void Close( filter_t *p_filter )
 {
-    filter_t  *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = reinterpret_cast<filter_sys_t *>( p_filter->p_sys );
 
     /* Stop the thread

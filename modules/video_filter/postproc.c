@@ -40,8 +40,6 @@
 #include <vlc_picture.h>
 #include <vlc_cpu.h>
 
-#include "filter_picture.h"
-
 #ifdef HAVE_POSTPROC_POSTPROCESS_H
 #   include <postproc/postprocess.h>
 #else
@@ -55,10 +53,9 @@
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static int OpenPostproc( vlc_object_t * );
-static void ClosePostproc( vlc_object_t * );
+static int OpenPostproc( filter_t * );
 
-static picture_t *PostprocPict( filter_t *, picture_t * );
+VIDEO_FILTER_WRAPPER_CLOSE(PostprocPict, ClosePostproc)
 
 static int PPQCallback( vlc_object_t *, char const *,
                         vlc_value_t, vlc_value_t, void * );
@@ -87,9 +84,7 @@ vlc_module_begin ()
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
 
-    set_capability( "video filter", 0 )
-
-    set_callbacks( OpenPostproc, ClosePostproc )
+    set_callback_video_filter( OpenPostproc )
 
     add_integer_with_range( FILTER_PREFIX "q", PP_QUALITY_MAX, 0,
                             PP_QUALITY_MAX, Q_TEXT, Q_LONGTEXT, false )
@@ -121,9 +116,8 @@ typedef struct
 /*****************************************************************************
  * OpenPostproc: probe and open the postproc
  *****************************************************************************/
-static int OpenPostproc( vlc_object_t *p_this )
+static int OpenPostproc( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys;
     vlc_value_t val, val_orig;
     const char *desc;
@@ -252,7 +246,7 @@ static int OpenPostproc( vlc_object_t *p_this )
     var_AddCallback( p_filter, FILTER_PREFIX "q", PPQCallback, NULL );
     var_AddCallback( p_filter, FILTER_PREFIX "name", PPNameCallback, NULL );
 
-    p_filter->pf_video_filter = PostprocPict;
+    p_filter->ops = &PostprocPict_ops;
 
     msg_Warn( p_filter, "Quantification table was not set by video decoder. "
                         "Postprocessing won't look good." );
@@ -262,9 +256,8 @@ static int OpenPostproc( vlc_object_t *p_this )
 /*****************************************************************************
  * ClosePostproc
  *****************************************************************************/
-static void ClosePostproc( vlc_object_t *p_this )
+static void ClosePostproc( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
     /* delete the callback before destroying the mutex */
@@ -280,16 +273,9 @@ static void ClosePostproc( vlc_object_t *p_this )
 /*****************************************************************************
  * PostprocPict
  *****************************************************************************/
-static picture_t *PostprocPict( filter_t *p_filter, picture_t *p_pic )
+static void PostprocPict( filter_t *p_filter, picture_t *p_pic, picture_t *p_outpic )
 {
     filter_sys_t *p_sys = p_filter->p_sys;
-
-    picture_t *p_outpic = filter_NewPicture( p_filter );
-    if( !p_outpic )
-    {
-        picture_Release( p_pic );
-        return NULL;
-    }
 
     /* Lock to prevent issues if pp_mode is changed */
     vlc_mutex_lock( &p_sys->lock );
@@ -318,8 +304,6 @@ static picture_t *PostprocPict( filter_t *p_filter, picture_t *p_pic )
     else
         picture_CopyPixels( p_outpic, p_pic );
     vlc_mutex_unlock( &p_sys->lock );
-
-    return CopyInfoAndRelease( p_outpic, p_pic );
 }
 
 /*****************************************************************************

@@ -41,16 +41,15 @@
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static int  Create      ( vlc_object_t * );
-static void Destroy     ( vlc_object_t * );
+static int  Create      ( filter_t * );
 
 static void RVSepia( picture_t *, picture_t *, int );
 static void PlanarI420Sepia( picture_t *, picture_t *, int);
 static void PackedYUVSepia( picture_t *, picture_t *, int);
-static picture_t *Filter( filter_t *, picture_t * );
 static const char *const ppsz_filter_options[] = {
     "intensity", NULL
 };
+VIDEO_FILTER_WRAPPER_CLOSE(Filter, Destroy)
 
 /*****************************************************************************
  * Module descriptor
@@ -66,11 +65,10 @@ vlc_module_begin ()
     set_help( N_("Gives video a warmer tone by applying sepia effect") )
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
-    set_capability( "video filter", 0 )
     add_integer_with_range( CFG_PREFIX "intensity", 120, 0, 255,
                            SEPIA_INTENSITY_TEXT, SEPIA_INTENSITY_LONGTEXT,
                            false )
-    set_callbacks( Create, Destroy )
+    set_callback_video_filter( Create )
 vlc_module_end ()
 
 /*****************************************************************************
@@ -110,9 +108,8 @@ typedef struct
  *****************************************************************************
  * This function allocates and initializes a Sepia vout method.
  *****************************************************************************/
-static int Create( vlc_object_t *p_this )
+static int Create( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys;
 
     /* Allocate structure */
@@ -143,7 +140,7 @@ static int Create( vlc_object_t *p_this )
              var_CreateGetIntegerCommand( p_filter, CFG_PREFIX "intensity" ) );
     var_AddCallback( p_filter, CFG_PREFIX "intensity", FilterCallback, NULL );
 
-    p_filter->pf_video_filter = Filter;
+    p_filter->ops = &Filter_ops;
 
     return VLC_SUCCESS;
 }
@@ -153,10 +150,8 @@ static int Create( vlc_object_t *p_this )
  *****************************************************************************
  * Terminate an output method
  *****************************************************************************/
-static void Destroy( vlc_object_t *p_this )
+static void Destroy( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
-
     var_DelCallback( p_filter, CFG_PREFIX "intensity", FilterCallback, NULL );
 
     free( p_filter->p_sys );
@@ -169,26 +164,12 @@ static void Destroy( vlc_object_t *p_this )
  * until it is displayed and switch the two rendering buffers, preparing next
  * frame.
  *****************************************************************************/
-static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
+static void Filter( filter_t *p_filter, picture_t *p_pic, picture_t *p_outpic )
 {
-    picture_t *p_outpic;
-
-    if( !p_pic ) return NULL;
-
     filter_sys_t *p_sys = p_filter->p_sys;
     int intensity = atomic_load( &p_sys->i_intensity );
 
-    p_outpic = filter_NewPicture( p_filter );
-    if( !p_outpic )
-    {
-        msg_Warn( p_filter, "can't get output picture" );
-        picture_Release( p_pic );
-        return NULL;
-    }
-
     p_sys->pf_sepia( p_pic, p_outpic, intensity );
-
-    return CopyInfoAndRelease( p_outpic, p_pic );
 }
 
 #if defined(CAN_COMPILE_SSE2)

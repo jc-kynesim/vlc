@@ -36,6 +36,7 @@
 #include "util/qt_dirs.hpp"                     // toNativeSeparators
 #include "util/imagehelper.hpp"
 #include "util/recents.hpp"
+#include "util/color_scheme_model.hpp"
 
 #include "widgets/native/interface_widgets.hpp"     // bgWidget, videoWidget
 #include "dialogs/firstrun/firstrun.hpp"                 // First Run
@@ -47,6 +48,8 @@
 #include "videosurface.hpp"
 
 #include "menus/menus.hpp"                            // Menu creation
+
+#include "vlc_media_library.h"
 
 #include <QCloseEvent>
 #include <QKeyEvent>
@@ -136,6 +139,8 @@ MainInterface::MainInterface(intf_thread_t *_p_intf , QWidget* parent, Qt::Windo
     /* Get the available interfaces */
     m_extraInterfaces = new VLCVarChoiceModel(p_intf, "intf-add", this);
 
+    b_hasMedialibrary = (vlc_ml_instance_get( p_intf ) != NULL);
+
     /* Set the other interface settings */
     settings = getSettings();
 
@@ -143,11 +148,20 @@ MainInterface::MainInterface(intf_thread_t *_p_intf , QWidget* parent, Qt::Windo
     b_playlistDocked = getSettings()->value( "MainWindow/pl-dock-status", true ).toBool();
     playlistVisible  = getSettings()->value( "MainWindow/playlist-visible", false ).toBool();
     playlistWidthFactor = getSettings()->value( "MainWindow/playlist-width-factor", 4.0 ).toDouble();
-
+    m_gridView = getSettings()->value( "MainWindow/grid-view", true).toBool();
+    QString currentColorScheme = getSettings()->value( "MainWindow/color-scheme", "system").toString();
     m_showRemainingTime = getSettings()->value( "MainWindow/ShowRemainingTime", false ).toBool();
+
+    m_colorScheme = new ColorSchemeModel(this);
+    m_colorScheme->setCurrent(currentColorScheme);
 
     /* Should the UI stays on top of other windows */
     b_interfaceOnTop = var_InheritBool( p_intf, "video-on-top" );
+
+#if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
+    m_clientSideDecoration = ! var_InheritBool( p_intf, "qt-titlebar" );
+#endif
+    m_hasToolbarMenu = var_InheritBool( p_intf, "qt-menubar" );
 
     QString platformName = QGuiApplication::platformName();
 
@@ -166,7 +180,8 @@ MainInterface::MainInterface(intf_thread_t *_p_intf , QWidget* parent, Qt::Windo
     /*********************************
      * Create the Systray Management *
      *********************************/
-    initSystray();
+    //postpone systray initialisation to speedup starting time
+    QMetaObject::invokeMethod(this, &MainInterface::initSystray, Qt::QueuedConnection);
 
     /*************************************************************
      * Connect the input manager to the GUI elements it manages  *
@@ -184,6 +199,8 @@ MainInterface::MainInterface(intf_thread_t *_p_intf , QWidget* parent, Qt::Windo
 
     /* VideoWidget connects for asynchronous calls */
     connect( this, &MainInterface::askToQuit, THEDP, &DialogsProvider::quit, Qt::QueuedConnection  );
+
+    connect(this, &MainInterface::interfaceFullScreenChanged, this, &MainInterface::useClientSideDecorationChanged);
 
     connect( THEDP, &DialogsProvider::toolBarConfUpdated, this, &MainInterface::toolBarConfUpdated );
 
@@ -229,6 +246,8 @@ MainInterface::~MainInterface()
     settings->setValue( "playlist-visible", playlistVisible );
     settings->setValue( "playlist-width-factor", playlistWidthFactor);
 
+    settings->setValue( "grid-view", m_gridView );
+    settings->setValue( "color-scheme", m_colorScheme->getCurrent() );
     /* Save the stackCentralW sizes */
     settings->endGroup();
 
@@ -243,6 +262,20 @@ MainInterface::~MainInterface()
     var_DelCallback( libvlc, "intf-popupmenu", PopupMenuCB, p_intf );
 
     p_intf->p_sys->p_mi = NULL;
+}
+
+bool MainInterface::hasVLM() const {
+#ifdef ENABLE_VLM
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool MainInterface::useClientSideDecoration() const
+{
+    //don't show CSD when interface is fullscreen
+    return m_clientSideDecoration && !b_interfaceFullScreen;
 }
 
 void MainInterface::computeMinimumSize()
@@ -364,6 +397,12 @@ void MainInterface::setShowRemainingTime( bool show )
 {
     m_showRemainingTime = show;
     emit showRemainingTimeChanged(show);
+}
+
+void MainInterface::setGridView(bool asGrid)
+{
+    m_gridView = asGrid;
+    emit gridViewChanged( asGrid );
 }
 
 void MainInterface::setInterfaceAlwaysOnTop( bool on_top )
@@ -669,11 +708,6 @@ void MainInterface::emitBoss()
 void MainInterface::emitShow()
 {
     emit askShow();
-}
-
-void MainInterface::popupMenu(bool show)
-{
-    emit askPopupMenu( show );
 }
 
 void MainInterface::emitRaise()

@@ -24,11 +24,8 @@ import org.videolan.vlc 0.1
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-import "qrc:///player/" as Player
-import "qrc:///about/" as AB
 import "qrc:///dialogs/" as DG
 import "qrc:///playlist/" as PL
-import QtQuick.Window 2.11
 
 Rectangle {
     id: root
@@ -37,6 +34,7 @@ Rectangle {
     property bool _playlistReady: false
 
     property alias mainInterfaceRect: root
+    property variant g_dialogs: dialogsLoader.item
 
     Binding {
         target: VLCStyle.self
@@ -52,19 +50,15 @@ Rectangle {
 
     Loader {
         id: playlistWindowLoader
+        asynchronous: true
         active: !mainInterface.playlistDocked && mainInterface.playlistVisible
-        sourceComponent: Window {
-            visible: true
-            title: i18n.qtr("Playlist")
-            color: VLCStyle.colors.bg
-            onClosing: mainInterface.playlistVisible = false
-            PL.PlaylistListView {
-                id: playlistView
-                focus: true
-                anchors.fill: parent
-            }
-        }
+        source: "qrc:///playlist/PlaylistDetachedWindow.qml"
     }
+    Connections {
+        target: playlistWindowLoader.item
+        onClosing: mainInterface.playlistVisible = false
+    }
+
 
     PlaylistControllerModel {
         id: mainPlaylistController
@@ -77,29 +71,10 @@ Rectangle {
         }
     }
 
-    Component {
-        id: audioplayerComp
-        Player.Player {
-            focus: true
-        }
-    }
-
-    Component {
-        id: aboutComp
-        AB.About {
-            focus: true
-            onActionCancel: {
-                console.log("onActionCancel")
-                history.previous()
-            }
-        }
-    }
-
     readonly property var pageModel: [
-        { name: "about", component: aboutComp },
-        { name: "mc", url: "qrc:///medialibrary/MainDisplay.qml" },
-        { name: "playlist", url: "qrc:///playlist/PlaylistMainView.qml" },
-        { name: "player", component: audioplayerComp },
+        { name: "about", url: "qrc:///about/About.qml" },
+        { name: "mc", url: "qrc:///main/MainDisplay.qml" },
+        { name: "player", url:"qrc:///player/Player.qml" },
     ]
 
     function loadCurrentHistoryView() {
@@ -125,7 +100,7 @@ Rectangle {
             if (medialib)
                 history.push(["mc", "video"])
             else
-                history.push(["playlist"])
+                history.push(["mc", "home"])
         }
     }
 
@@ -167,7 +142,7 @@ Rectangle {
                             if (medialib)
                                 history.push(["mc", "video"])
                             else
-                                history.push(["playlist"])
+                                history.push(["mc", "home"])
                         }
                         else
                             history.previous()
@@ -188,10 +163,24 @@ Rectangle {
         }
     }
 
-    DG.Dialogs {
-        id: g_dialogs
+    Loader {
+        asynchronous: true
+        source: "qrc:///menus/GlobalShortcuts.qml"
+    }
+
+    Loader {
+        id: dialogsLoader
+
         anchors.fill: parent
-        bgContent: root
+        asynchronous: true
+        source: "qrc:///dialogs/Dialogs.qml"
+
+        onLoaded:  {
+            item.bgContent = root
+        }
+    }
+    Connections {
+        target: dialogsLoader.item
         onRestoreFocus: {
             stackView.focus = true
         }

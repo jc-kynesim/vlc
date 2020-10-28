@@ -181,8 +181,8 @@ typedef enum video_orientation_t
     ORIENT_BOTTOM_LEFT, /**< Flipped vertically */
     ORIENT_BOTTOM_RIGHT, /**< Rotated 180 degrees */
     ORIENT_LEFT_TOP, /**< Transposed */
-    ORIENT_LEFT_BOTTOM, /**< Rotated 90 degrees clockwise */
-    ORIENT_RIGHT_TOP, /**< Rotated 90 degrees anti-clockwise */
+    ORIENT_LEFT_BOTTOM, /**< Rotated 90 degrees anti-clockwise */
+    ORIENT_RIGHT_TOP, /**< Rotated 90 degrees clockwise */
     ORIENT_RIGHT_BOTTOM, /**< Anti-transposed */
 
     ORIENT_NORMAL      = ORIENT_TOP_LEFT,
@@ -206,7 +206,7 @@ typedef enum video_orientation_t
 #define ORIENT_HFLIP(orient) ((orient) ^ 1)
 /** Applies vertical flip to an orientation */
 #define ORIENT_VFLIP(orient) ((orient) ^ 2)
-/** Applies horizontal flip to an orientation */
+/** Applies 180 degree rotation to an orientation */
 #define ORIENT_ROTATE_180(orient) ((orient) ^ 3)
 
 typedef enum video_transform_t
@@ -375,7 +375,6 @@ struct video_format_t
 
     video_multiview_mode_t multiview_mode;        /** Multiview mode, 2D, 3D */
     bool b_multiview_right_eye_first;   /** Multiview left or right eye first*/
-    bool b_multiview_left_eye;
 
     video_projection_mode_t projection_mode;            /**< projection mode */
     vlc_viewpoint_t pose;
