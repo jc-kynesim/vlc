@@ -148,6 +148,7 @@ struct picture_t
      */
     bool            b_progressive;          /**< is it a progressive frame? */
     bool            b_top_field_first;             /**< which field is first */
+    bool            b_multiview_left_eye; /**< left eye or right eye in multiview */
     unsigned int    i_nb_fields;                  /**< number of displayed fields */
     picture_context_t *context;      /**< video format-specific data pointer */
     /**@}*/
@@ -166,6 +167,142 @@ static inline vlc_video_context* picture_GetVideoContext(picture_t *pic)
 {
     return pic->context ? pic->context->vctx : NULL;
 }
+
+/**
+ * Check whether a picture has other pictures linked
+ */
+static inline bool picture_HasChainedPics(const picture_t *pic)
+{
+    return pic->p_next != NULL;
+}
+
+/**
+ * picture chaining helpers
+ */
+
+typedef struct vlc_pic_chain {
+    picture_t *front;
+    picture_t *tail;
+} vlc_picture_chain_t;
+
+/**
+ * Initializes or reset a picture chain
+ *
+ * \warning do not call this if the chain still holds pictures, it will leak them.
+ */
+static inline void vlc_picture_chain_Init(vlc_picture_chain_t *chain)
+{
+    chain->front = NULL;
+    // chain->tail = NULL not needed
+}
+
+/**
+ * Check whether a picture chain holds pictures or not.
+ *
+ * \return true if it is empty.
+ */
+static inline bool vlc_picture_chain_IsEmpty(const vlc_picture_chain_t *chain)
+{
+    return chain->front == NULL;
+}
+
+/**
+ * Check whether a picture chain has more than one picture.
+ */
+static inline bool vlc_picture_chain_HasNext(const vlc_picture_chain_t *chain)
+{
+    return !vlc_picture_chain_IsEmpty(chain) && chain->front != chain->tail;
+}
+
+/**
+ * Pop the front of a picture chain.
+ *
+ * The next picture in the chain becomes the front of the picture chain.
+ *
+ * \return the front of the picture chain (the picture itself)
+ */
+static inline picture_t * vlc_picture_chain_PopFront(vlc_picture_chain_t *chain)
+{
+    picture_t *front = chain->front;
+    if (front)
+    {
+        chain->front = front->p_next;
+        // unlink the front picture from the rest of the chain
+        front->p_next = NULL;
+    }
+    return front;
+}
+
+/**
+ * Peek the front of a picture chain.
+ *
+ * The picture chain is unchanged.
+ *
+ * \return the front of the picture chain (the picture itself)
+ */
+static inline picture_t * vlc_picture_chain_PeekFront(vlc_picture_chain_t *chain)
+{
+    return chain->front;
+}
+
+/**
+ * Append a picture to a picture chain.
+ *
+ * \param chain the picture chain pointer
+ * \param tail the known tail of the picture chain
+ * \param pic the picture to append to the chain
+ *
+ * \return the new tail of the picture chain
+ */
+static inline void vlc_picture_chain_Append(vlc_picture_chain_t *chain,
+                                            picture_t *pic)
+{
+    if (chain->front == NULL)
+        chain->front = pic;
+    else
+        chain->tail->p_next = pic;
+    // make sure the picture doesn't have chained pics
+    vlc_assert( !picture_HasChainedPics( pic ) );
+    pic->p_next = NULL; // we're appending a picture, not a chain
+    chain->tail = pic;
+}
+
+/**
+ * Append a picture chain to a picture chain.
+ */
+static inline void vlc_picture_chain_AppendChain(picture_t *chain, picture_t *tail)
+{
+    chain->p_next = tail;
+}
+
+/**
+ * Copy the picture chain in another picture chain and clear the original
+ * picture chain.
+ *
+ * \param in picture chain to copy and clear
+ * \param out picture chain to copy into
+ */
+static inline void vlc_picture_chain_GetAndClear(vlc_picture_chain_t *in,
+                                                 vlc_picture_chain_t *out)
+{
+    *out = *in;
+    vlc_picture_chain_Init(in);
+}
+
+/**
+ * Reset a picture chain.
+ *
+ * \return the picture chain that was contained in the picture
+ */
+static inline vlc_picture_chain_t picture_GetAndResetChain(picture_t *pic)
+{
+    vlc_picture_chain_t chain = (vlc_picture_chain_t) { pic->p_next, pic->p_next };
+    while ( chain.tail && chain.tail->p_next ) // find the proper tail
+        chain.tail = chain.tail->p_next;
+    pic->p_next = NULL;
+    return chain;
+}
+
 
 /**
  * This function will create a new picture.

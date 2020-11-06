@@ -16,8 +16,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-#ifndef MCRECENTSMODEL_H
-#define MCRECENTSMODEL_H
+#ifndef ML_RECENTS_VIDEO_MODEL_H
+#define ML_RECENTS_VIDEO_MODEL_H
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -59,4 +59,4 @@ private:
     int m_video_count;
 };
 
-#endif // MCRECENTSMODEL_H
+#endif // ML_RECENTS_VIDEO_MODEL_H

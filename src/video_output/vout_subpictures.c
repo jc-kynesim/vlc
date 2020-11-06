@@ -225,7 +225,10 @@ static ssize_t spu_GetFreeChannelId(spu_t *spu, enum vlc_vout_order *order)
 static void FilterRelease(filter_t *filter)
 {
     if (filter->p_module)
+    {
+        filter_Close(filter);
         module_unneed(filter, filter->p_module);
+    }
     vlc_object_delete(filter);
 }
 
@@ -272,6 +275,7 @@ static filter_t *SpuRenderCreateAndLoadText(spu_t *spu)
         vlc_object_delete(text);
         return NULL;
     }
+    assert( text->ops != NULL );
 
     return text;
 }
@@ -305,6 +309,7 @@ static filter_t *SpuRenderCreateAndLoadScale(vlc_object_t *object,
         vlc_object_delete(scale);
         return NULL;
     }
+    assert( scale->ops != NULL );
 
     return scale;
 }
@@ -343,7 +348,7 @@ static int SpuRenderText(spu_t *spu,
     text->fmt_out.video.i_height =
     text->fmt_out.video.i_visible_height = i_original_height;
 
-    int i_ret = text->pf_render(text, region, region, chroma_list);
+    int i_ret = text->ops->render(text, region, region, chroma_list);
 
     vlc_mutex_unlock(&sys->textlock);
     return i_ret;
@@ -750,16 +755,16 @@ spu_SelectSubpictures(spu_t *spu, vlc_tick_t system_now,
             const vlc_tick_t ephemer_date  = current->b_subtitle ? ephemer_subtitle_date  : ephemer_osd_date;
 
             /* Destroy late and obsolete ephemer subpictures */
-            bool is_rejeted = is_late && render_entry->stop  <= stop_date;
+            bool is_rejected = is_late && render_entry->stop <= stop_date;
             if (current->b_ephemer) {
                 if (render_entry->start < ephemer_date)
-                    is_rejeted = true;
+                    is_rejected = true;
                 else if (render_entry->start == ephemer_date &&
                          current->i_order < selected_max_order)
-                    is_rejeted = true;
+                    is_rejected = true;
             }
 
-            if (is_rejeted)
+            if (is_rejected)
             {
                 spu_PrerenderCancel(sys, current);
                 subpicture_Delete(current);
@@ -996,7 +1001,8 @@ static void SpuRenderRegion(spu_t *spu,
                 scale_yuvp->fmt_out.video = region->fmt;
                 scale_yuvp->fmt_out.video.i_chroma = chroma_list[0];
 
-                picture = scale_yuvp->pf_video_filter(scale_yuvp, picture);
+                picture = scale_yuvp->ops->filter_video(scale_yuvp, picture);
+                assert(picture == NULL || !picture_HasChainedPics(picture)); // no chaining
                 if (!picture) {
                     /* Well we will try conversion+scaling */
                     msg_Warn(spu, "%4.4s to %4.4s conversion failed",
@@ -1027,7 +1033,8 @@ static void SpuRenderRegion(spu_t *spu,
                 scale->fmt_out.video.i_visible_height =
                     spu_scale_h(region->fmt.i_visible_height, scale_size);
 
-                picture = scale->pf_video_filter(scale, picture);
+                picture = scale->ops->filter_video(scale, picture);
+                assert(picture == NULL || !picture_HasChainedPics(picture)); // no chaining
                 if (!picture)
                     msg_Err(spu, "scaling failed");
             }

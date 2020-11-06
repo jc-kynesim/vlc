@@ -327,6 +327,7 @@ static void stream_close(struct vlc_http_stream *s, bool abort)
 static const struct vlc_http_stream_cbs stream_callbacks =
 {
     stream_read_headers,
+    NULL,
     stream_read,
     stream_close,
 };
@@ -335,7 +336,8 @@ static struct vlc_http_stream stream = { &stream_callbacks };
 
 struct vlc_http_msg *vlc_http_mgr_request(struct vlc_http_mgr *mgr, bool https,
                                           const char *host, unsigned port,
-                                          const struct vlc_http_msg *req)
+                                          const struct vlc_http_msg *req,
+                                          bool idempotent, bool payload)
 {
     const char *str;
     char *end;
@@ -344,6 +346,8 @@ struct vlc_http_msg *vlc_http_mgr_request(struct vlc_http_mgr *mgr, bool https,
     assert(mgr == NULL);
     assert(!strcmp(host, "www.example.com"));
     assert(port == 8443);
+    assert(idempotent);
+    assert(!payload);
 
     str = vlc_http_msg_get_method(req);
     assert(!strcmp(str, "GET"));

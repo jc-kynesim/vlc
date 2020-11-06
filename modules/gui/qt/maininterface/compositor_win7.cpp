@@ -78,7 +78,8 @@ void CompositorWin7::window_set_fullscreen(struct vout_window_t * p_wnd, const c
 
 
 CompositorWin7::CompositorWin7(intf_thread_t *p_intf, QObject* parent)
-    : CompositorDummy(p_intf, parent)
+    : QObject(parent)
+    , m_intf(p_intf)
 {
 }
 
@@ -198,7 +199,7 @@ MainInterface* CompositorWin7::makeMainInterface()
     m_taskbarWidget = new WinTaskbarWidget(m_intf, m_qmlView.get(), this);
     qApp->installNativeEventFilter(m_taskbarWidget);
 
-    MainUI* m_ui = new MainUI(m_intf, m_rootWindow, this);
+    MainUI* m_ui = new MainUI(m_intf, m_rootWindow, m_qmlView.get(), this);
     m_ui->setup(m_qmlView->engine());
 
 
@@ -208,8 +209,24 @@ MainInterface* CompositorWin7::makeMainInterface()
             m_qmlView.get(), &QQuickView::setTitle);
     connect(m_rootWindow, &MainInterface::windowIconChanged,
             m_qmlView.get(), &QQuickView::setIcon);
+    connect(m_rootWindow, &MainInterface::requestInterfaceMaximized,
+            m_qmlView.get(), &QWindow::showMaximized);
+    connect(m_rootWindow, &MainInterface::requestInterfaceNormal,
+            m_qmlView.get(), &QWindow::showNormal);
 
     return m_rootWindow;
+}
+
+void CompositorWin7::destroyMainInterface()
+{
+    m_qmlVideoSurfaceProvider.reset();
+    m_videoWindowHandler.reset();
+    m_qmlView.reset();
+    if (m_rootWindow)
+    {
+        delete m_rootWindow;
+        m_rootWindow = nullptr;
+    }
 }
 
 bool CompositorWin7::setupVoutWindow(vout_window_t *p_wnd)

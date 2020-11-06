@@ -530,9 +530,6 @@ static int vout_SetSourceAspect(vout_display_t *vd,
     if (sar_num > 0 && sar_den > 0) {
         osys->source.i_sar_num = sar_num;
         osys->source.i_sar_den = sar_den;
-    } else {
-        osys->source.i_sar_num = osys->source.i_sar_num;
-        osys->source.i_sar_den = osys->source.i_sar_den;
     }
 
     if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_SOURCE_ASPECT))
@@ -556,7 +553,7 @@ void VoutFixFormatAR(video_format_t *fmt)
     }
 }
 
-void vout_UpdateDisplaySourceProperties(vout_display_t *vd, const video_format_t *source)
+void vout_UpdateDisplaySourceProperties(vout_display_t *vd, const video_format_t *source, const vlc_rational_t *forced_dar)
 {
     vout_display_priv_t *osys = container_of(vd, vout_display_priv_t, display);
     int err1 = 0, err2 = 0;
@@ -566,12 +563,13 @@ void vout_UpdateDisplaySourceProperties(vout_display_t *vd, const video_format_t
     if (fixed_src.i_sar_num * osys->source.i_sar_den !=
         fixed_src.i_sar_den * osys->source.i_sar_num) {
 
+        if (forced_dar->num == 0) {
         osys->source.i_sar_num = fixed_src.i_sar_num;
         osys->source.i_sar_den = fixed_src.i_sar_den;
 
-        /* FIXME it will override any AR that the user would have forced */
         err1 = vout_SetSourceAspect(vd, osys->source.i_sar_num,
                                     osys->source.i_sar_den);
+        }
     }
     if (source->i_x_offset       != osys->source.i_x_offset ||
         source->i_y_offset       != osys->source.i_y_offset ||

@@ -695,7 +695,7 @@ dnl Check for system libs needed
 need_libc=false
 
 dnl Check for usual libc functions
-AC_CHECK_FUNCS([accept4 fcntl flock fstatat fstatvfs fork getmntent_r getenv getpwuid_r isatty memalign mkostemp mmap open_memstream newlocale pipe2 pread posix_fadvise posix_madvise setlocale stricmp strnicmp strptime uselocale])
+AC_CHECK_FUNCS([accept4 fcntl flock fstatat fstatvfs fork getmntent_r getenv getpwuid_r isatty memalign mkostemp mmap open_memstream newlocale pipe2 pread posix_fadvise posix_madvise setlocale stricmp strnicmp strptime uselocale wordexp])
 AC_REPLACE_FUNCS([aligned_alloc atof atoll dirfd fdopendir flockfile fsync getdelim getpid lfind lldiv memrchr nrand48 poll posix_memalign recvmsg rewind sendmsg setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy tfind timegm timespec_get strverscmp pathconf])
 AC_REPLACE_FUNCS([gettimeofday])
 AC_CHECK_FUNC(fdatasync,,
@@ -950,7 +950,7 @@ dnl Check for headers
 dnl
 
 dnl  POSIX
-AC_CHECK_HEADERS([arpa/inet.h poll.h pthread.h search.h sys/shm.h sys/socket.h sys/uio.h])
+AC_CHECK_HEADERS([arpa/inet.h poll.h pthread.h search.h sys/shm.h sys/socket.h sys/uio.h wordexp.h])
 AC_CHECK_HEADERS([net/if.h], [], [],
 [
 #include <sys/types.h>
@@ -2814,7 +2814,7 @@ AC_ARG_ENABLE([swscale],
           (default enabled)]))
 if test "${enable_swscale}" != "no"
 then
-  PKG_CHECK_MODULES(SWSCALE,[libswscale],
+  PKG_CHECK_MODULES(SWSCALE,[libswscale >= 0.5.0],
     [
       VLC_SAVE_FLAGS
       CPPFLAGS="${CPPFLAGS} ${SWSCALE_CFLAGS}"
@@ -3010,6 +3010,11 @@ AS_IF([test "${enable_speex}" != "no"], [
   ])
 ])
 AM_CONDITIONAL([HAVE_SPEEXDSP], [test "$have_speexdsp" = "yes"])
+
+dnl
+dnl  RNNoise plugin - Recurrent neural network for audio noise reduction
+dnl
+PKG_ENABLE_MODULES_VLC([RNNOISE], [], [rnnoise], [Rnnoise denoiser], [auto])
 
 dnl
 dnl  Opus plugin
@@ -3521,19 +3526,6 @@ AC_SUBST([WAYLAND_PROTOCOLS])
 AC_SUBST([WAYLAND_SCANNER])
 AM_CONDITIONAL([HAVE_XKBCOMMON], [test "${have_xkbcommon}" = "yes"])
 
-
-dnl
-dnl  SDL image decoder module
-dnl
-AC_ARG_ENABLE([sdl-image],
-  AS_HELP_STRING([--enable-sdl-image], [SDL image support (default enabled)]))
-AS_IF([test "${enable_sdl_image}" != "no"],[
-  PKG_CHECK_MODULES(SDL_IMAGE, [SDL_image >= 1.2.10], [
-    VLC_ADD_PLUGIN([sdl_image])
-  ], [
-    AC_MSG_WARN([${SDL_IMAGE_PKG_ERRORS}. You should install it alongside your SDL package.])
-  ])
-])
 
 dnl
 dnl  freetype module
@@ -4652,7 +4644,6 @@ AM_COND_IF([HAVE_WIN32], [
 
 AM_COND_IF([HAVE_DARWIN], [
   AC_CONFIG_FILES([
-    modules/gui/macosx/UI/InfoPlist.strings:modules/gui/macosx/Resources/InfoPlist.strings.in
     share/macosx/Info.plist:share/Info.plist.in
   ])
 ])

@@ -40,8 +40,8 @@
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static int Create( vlc_object_t * );
-static void Destroy( vlc_object_t * );
+static int Create( filter_t * );
+static void Destroy( filter_t * );
 
 static picture_t *Filter( filter_t *, picture_t * );
 
@@ -75,7 +75,6 @@ vlc_module_begin ()
     set_shortname( N_("Blendbench" ))
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
-    set_capability( "video filter", 0 )
 
     set_section( N_("Benchmarking"), NULL )
     add_integer( CFG_PREFIX "loops", 1000, LOOPS_TEXT,
@@ -95,7 +94,7 @@ vlc_module_begin ()
     add_string( CFG_PREFIX "blend-chroma", "YUVA", BLEND_CHROMA_TEXT,
               BLEND_CHROMA_LONGTEXT, false )
 
-    set_callbacks( Create, Destroy )
+    set_callback_video_filter( Create )
 vlc_module_end ()
 
 static const char *const ppsz_filter_options[] = {
@@ -144,12 +143,16 @@ static int blendbench_LoadImage( vlc_object_t *p_this, picture_t **pp_pic,
     return VLC_SUCCESS;
 }
 
+static const struct vlc_filter_operations filter_ops =
+{
+    .filter_video = Filter, .close = Destroy,
+};
+
 /*****************************************************************************
  * Create: allocates video thread output method
  *****************************************************************************/
-static int Create( vlc_object_t *p_this )
+static int Create( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys;
     char *psz_temp, *psz_cmd;
     int i_ret;
@@ -162,7 +165,7 @@ static int Create( vlc_object_t *p_this )
     p_sys = p_filter->p_sys;
     p_sys->b_done = false;
 
-    p_filter->pf_video_filter = Filter;
+    p_filter->ops = &filter_ops;
 
     /* needed to get options passed in transcode using the
      * adjust{name=value} syntax */
@@ -178,7 +181,7 @@ static int Create( vlc_object_t *p_this )
     p_sys->i_base_chroma = !psz_temp || strlen( psz_temp ) != 4 ? 0 :
         VLC_FOURCC( psz_temp[0], psz_temp[1], psz_temp[2], psz_temp[3] );
     psz_cmd = var_CreateGetStringCommand( p_filter, CFG_PREFIX "base-image" );
-    i_ret = blendbench_LoadImage( p_this, &p_sys->p_base_image,
+    i_ret = blendbench_LoadImage( VLC_OBJECT(p_filter), &p_sys->p_base_image,
                                   p_sys->i_base_chroma, psz_cmd, "Base" );
     free( psz_temp );
     free( psz_cmd );
@@ -193,7 +196,7 @@ static int Create( vlc_object_t *p_this )
     p_sys->i_blend_chroma = !psz_temp || strlen( psz_temp ) != 4
         ? 0 : VLC_FOURCC( psz_temp[0], psz_temp[1], psz_temp[2], psz_temp[3] );
     psz_cmd = var_CreateGetStringCommand( p_filter, CFG_PREFIX "blend-image" );
-    i_ret = blendbench_LoadImage( p_this, &p_sys->p_blend_image, p_sys->i_blend_chroma,
+    i_ret = blendbench_LoadImage( VLC_OBJECT(p_filter), &p_sys->p_blend_image, p_sys->i_blend_chroma,
                                   psz_cmd, "Blend" );
 
     free( psz_temp );
@@ -213,9 +216,8 @@ static int Create( vlc_object_t *p_this )
 /*****************************************************************************
  * Destroy: destroy video thread output method
  *****************************************************************************/
-static void Destroy( vlc_object_t *p_this )
+static void Destroy( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
     picture_Release( p_sys->p_base_image );
@@ -248,13 +250,13 @@ static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
         vlc_object_delete(p_blend);
         return NULL;
     }
+    assert( p_blend->ops != NULL );
 
     vlc_tick_t time = vlc_tick_now();
     for( int i_iter = 0; i_iter < p_sys->i_loops; ++i_iter )
     {
-        p_blend->pf_video_blend( p_blend,
-                                 p_sys->p_base_image, p_sys->p_blend_image,
-                                 0, 0, p_sys->i_alpha );
+        filter_Blend( p_blend, p_sys->p_base_image,
+                      0, 0, p_sys->p_blend_image, p_sys->i_alpha );
     }
     time = vlc_tick_now() - time;
 
@@ -266,6 +268,7 @@ static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
                   p_sys->p_blend_image->p[Y_PLANE].i_visible_pitch *
                   p_sys->p_blend_image->p[Y_PLANE].i_visible_lines );
 
+    filter_Close( p_blend );
     module_unneed( p_blend, p_blend->p_module );
 
     vlc_object_delete(p_blend);

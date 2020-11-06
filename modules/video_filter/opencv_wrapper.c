@@ -45,8 +45,8 @@
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static int  Create    ( vlc_object_t * );
-static void Destroy   ( vlc_object_t * );
+static int  Create    ( filter_t * );
+static void Destroy   ( filter_t * );
 
 static picture_t* Filter( filter_t*, picture_t* );
 
@@ -70,9 +70,8 @@ vlc_module_begin ()
     set_shortname( N_("OpenCV" ))
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
-    set_capability( "video filter", 0 )
     add_shortcut( "opencv_wrapper" )
-    set_callbacks( Create, Destroy )
+    set_callback_video_filter( Create )
     add_float_with_range( "opencv-scale", 1.0, 0.1, 2.0,
                           N_("Scale factor (0.1-2.0)"),
                           N_("Amount by which to scale the picture before sending it to the internal OpenCV filter"),
@@ -144,9 +143,8 @@ typedef struct
  *****************************************************************************
  * This function allocates and initializes a opencv_wrapper vout method.
  *****************************************************************************/
-static int Create( vlc_object_t *p_this )
+static int Create( filter_t* p_filter )
 {
-    filter_t* p_filter = (filter_t*)p_this;
     filter_sys_t *p_sys;
     char *psz_chroma, *psz_output;
 
@@ -187,7 +185,7 @@ static int Create( vlc_object_t *p_this )
 
         return VLC_ENOMOD;
     }
-
+    assert( p_sys->p_opencv->ops != NULL );
 
     /* Init structure */
     p_sys->p_image = image_HandlerCreate( p_filter );
@@ -249,8 +247,12 @@ static int Create( vlc_object_t *p_this )
     msg_Dbg( p_filter, "opencv_wrapper successfully started" );
 #endif
 
+    static const struct vlc_filter_operations filter_ops =
+    {
+        .filter_video = Filter, .close = Destroy,
+    };
+    p_filter->ops = &filter_ops;
     p_filter->p_sys = p_sys;
-    p_filter->pf_video_filter = Filter;
 
     return VLC_SUCCESS;
 }
@@ -260,13 +262,13 @@ static int Create( vlc_object_t *p_this )
  *****************************************************************************
  * Terminate an output method created by opencv_wrapperCreateOutputMethod
  *****************************************************************************/
-static void Destroy( vlc_object_t *p_this )
+static void Destroy( filter_t* p_filter )
 {
-    filter_t* p_filter = (filter_t*)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
     ReleaseImages( p_filter );
 
     // Release the internal OpenCV filter.
+    filter_Close( p_sys->p_opencv );
     module_unneed( p_sys->p_opencv, p_sys->p_opencv->p_module );
     vlc_object_delete(p_sys->p_opencv);
 
@@ -414,7 +416,7 @@ static picture_t* Filter( filter_t* p_filter, picture_t* p_pic )
     VlcPictureToIplImage( p_filter, p_pic );
     // Pass the image (as a pointer to the first IplImage*) to the
     // internal OpenCV filter for processing.
-    p_sys->p_opencv->pf_video_filter( p_sys->p_opencv, (picture_t*)&(p_sys->p_cv_image[0]) );
+    p_sys->p_opencv->ops->filter_video( p_sys->p_opencv, (picture_t*)&(p_sys->p_cv_image[0]) );
 
     if(p_sys->i_wrapper_output == PROCESSED) {
         // Processed video
@@ -459,4 +461,3 @@ static picture_t* Filter( filter_t* p_filter, picture_t* p_pic )
         return NULL;
     }
 }
-

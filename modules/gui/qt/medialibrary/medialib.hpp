@@ -38,7 +38,6 @@ class MediaLib : public QObject
 {
     Q_OBJECT
 
-    Q_PROPERTY(bool gridView READ isGridView WRITE setGridView NOTIFY gridViewChanged)
     Q_PROPERTY(bool discoveryPending READ discoveryPending NOTIFY discoveryPendingChanged)
     Q_PROPERTY(int  parsingProgress READ parsingProgress NOTIFY parsingProgressChanged)
     Q_PROPERTY(QString discoveryEntryPoint READ discoveryEntryPoint NOTIFY discoveryEntryPointChanged)
@@ -47,15 +46,15 @@ class MediaLib : public QObject
 public:
     MediaLib(intf_thread_t* _intf, QObject* _parent = nullptr );
 
-    Q_INVOKABLE void addToPlaylist(const MLParentId &itemId);
-    Q_INVOKABLE void addToPlaylist(const QString& mrl);
-    Q_INVOKABLE void addToPlaylist(const QUrl& mrl);
-    Q_INVOKABLE void addToPlaylist(const QVariantList& itemIdList);
+    Q_INVOKABLE void addToPlaylist(const MLParentId &itemId, const QStringList* options = nullptr);
+    Q_INVOKABLE void addToPlaylist(const QString& mrl, const QStringList* options = nullptr);
+    Q_INVOKABLE void addToPlaylist(const QUrl& mrl, const QStringList* options = nullptr);
+    Q_INVOKABLE void addToPlaylist(const QVariantList& itemIdList, const QStringList* options = nullptr);
 
-    Q_INVOKABLE void addAndPlay(const MLParentId &itemId);
-    Q_INVOKABLE void addAndPlay(const QString& mrl);
-    Q_INVOKABLE void addAndPlay(const QUrl& mrl);
-    Q_INVOKABLE void addAndPlay(const QVariantList&itemIdList);
+    Q_INVOKABLE void addAndPlay(const MLParentId &itemId, const QStringList* options = nullptr);
+    Q_INVOKABLE void addAndPlay(const QString& mrl, const QStringList* options = nullptr);
+    Q_INVOKABLE void addAndPlay(const QUrl& mrl, const QStringList* options = nullptr);
+    Q_INVOKABLE void addAndPlay(const QVariantList&itemIdList, const QStringList* options = nullptr);
 
     Q_INVOKABLE void reload();
 
@@ -67,7 +66,6 @@ public:
     vlc_medialibrary_t* vlcMl();
 
 signals:
-    void gridViewChanged();
     void reloadStarted();
     void reloadCompleted();
     void discoveryStarted();
@@ -78,16 +76,11 @@ signals:
     void idleChanged();
 
 private:
-    bool isGridView() const;
-    void setGridView(bool);
     static void onMediaLibraryEvent( void* data, const vlc_ml_event_t* event );
 
 private:
-    void openMRLFromMedia(const vlc_ml_media_t& media, bool start );
-
     intf_thread_t* m_intf;
 
-    bool m_gridView;
     bool m_idle = false;
     bool m_discoveryPending = false;
     int m_parsingProgress = 0;

@@ -28,6 +28,8 @@
 
 #include "widgets/native/qvlcframe.hpp"
 #include "player/player_controller.hpp"
+#include "util/color_scheme_model.hpp"
+#include "medialibrary/medialib.hpp"
 
 #include <QSystemTrayIcon>
 #include <QStackedWidget>
@@ -148,6 +150,13 @@ class MainInterface : public QVLCMW
     Q_PROPERTY(bool showRemainingTime READ isShowRemainingTime WRITE setShowRemainingTime NOTIFY showRemainingTimeChanged)
     Q_PROPERTY(VLCVarChoiceModel* extraInterfaces READ getExtraInterfaces CONSTANT)
     Q_PROPERTY(float intfScaleFactor READ getIntfScaleFactor NOTIFY intfScaleFactorChanged)
+    Q_PROPERTY(bool mediaLibraryAvailable READ hasMediaLibrary CONSTANT)
+    Q_PROPERTY(MediaLib* mediaLibrary READ getMediaLibrary CONSTANT)
+    Q_PROPERTY(bool gridView READ hasGridView WRITE setGridView NOTIFY gridViewChanged)
+    Q_PROPERTY(ColorSchemeModel* colorScheme READ getColorScheme CONSTANT)
+    Q_PROPERTY(bool hasVLM READ hasVLM CONSTANT)
+    Q_PROPERTY(bool clientSideDecoration READ useClientSideDecoration NOTIFY useClientSideDecorationChanged)
+    Q_PROPERTY(bool hasToolbarMenu READ hasToolbarMenu NOTIFY hasToolbarMenuChanged)
 
 public:
     /* tors */
@@ -181,6 +190,13 @@ public:
     inline bool isHideAfterCreation() const { return b_hideAfterCreation; }
     inline bool isShowRemainingTime() const  { return m_showRemainingTime; }
     inline float getIntfScaleFactor() const { return m_intfScaleFactor; }
+    inline bool hasMediaLibrary() const { return b_hasMedialibrary; }
+    inline MediaLib* getMediaLibrary() const { return m_medialib; }
+    inline bool hasGridView() const { return m_gridView; }
+    inline ColorSchemeModel* getColorScheme() const { return m_colorScheme; }
+    bool hasVLM() const;
+    bool useClientSideDecoration() const;
+    inline bool hasToolbarMenu() const { return m_hasToolbarMenu; }
 
     bool hasEmbededVideo() const;
     VideoSurfaceProvider* getVideoSurfaceProvider() const;
@@ -241,10 +257,17 @@ protected:
 #ifdef QT5_HAS_WAYLAND
     bool                 b_hasWayland;
 #endif
-    bool                 b_hasMedialibrary = false;
+    bool                 b_hasMedialibrary;
+    MediaLib*            m_medialib = nullptr;
+    bool                 m_gridView;
+    ColorSchemeModel*    m_colorScheme;
+    bool                 m_clientSideDecoration = false;
+    bool                 m_hasToolbarMenu = false;
+
     /* States */
     bool                 playlistVisible;       ///< Is the playlist visible ?
     double               playlistWidthFactor;   ///< playlist size: root.width / playlistScaleFactor
+
 
     static const Qt::Key kc[10]; /* easter eggs */
     int i_kc_offset;
@@ -261,12 +284,12 @@ public slots:
     void setPlaylistWidthFactor( double );
     void setInterfaceAlwaysOnTop( bool );
     void setShowRemainingTime( bool );
+    void setGridView( bool );
     void incrementIntfUserScaleFactor( bool increment);
 
     void emitBoss();
     void emitRaise();
     void emitShow();
-    void popupMenu( bool show );
 
     virtual void reloadPrefs();
     VLCVarChoiceModel* getExtraInterfaces();
@@ -292,7 +315,6 @@ signals:
     void askShow();
     void askBoss();
     void askRaise();
-    void askPopupMenu( bool show );
     void kc_pressed(); /* easter eggs */
 
     void playlistDockedChanged(bool);
@@ -303,6 +325,15 @@ signals:
     void hasEmbededVideoChanged(bool);
     void toolBarConfUpdated();
     void showRemainingTimeChanged(bool);
+    void gridViewChanged( bool );
+    void colorSchemeChanged( QString );
+    void useClientSideDecorationChanged();
+    void hasToolbarMenuChanged();
+
+    /// forward window maximise query to the actual window or widget
+    void requestInterfaceMaximized();
+    /// forward window normal query to the actual window or widget
+    void requestInterfaceNormal();
 
     void intfScaleFactorChanged();
 };

@@ -55,6 +55,7 @@ Codecs:
  * Support AGM decoder
  * Support VP4 decoder
  * Add NVDEC hardware decoder
+ * Remove SDL_image support
 
 Access:
  * Enable SMB2 / SMB3 support on mobile ports with libsmb2
@@ -65,9 +66,11 @@ Access:
  * Audio CD data tracks are now correctly detected and skipped
  * Deprecates Audio CD CDDB lookups in favor of more accurate Musicbrainz
  * Improved CD-TEXT and added Shift-JIS encoding support
+ * Support for YoutubeDL (where available).
 
 Access output:
  * Added support for the RIST (Reliable Internet Stream Transport) Protocol
+ * Added support for HTTP PUT (HTTP upload)
 
 Video output:
  * Added X11 RENDER video output plugin
@@ -77,6 +80,9 @@ Video output:
  * Remove RealRTSP plugin
  * Remove Real demuxer plugin
  * Fix washed out black on NVIDIA cards with Direct3D9
+
+Audio filter:
+ * Add RNNoise recurrent neural network denoiser
 
 Video filter:
  * Update yadif

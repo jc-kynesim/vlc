@@ -198,6 +198,7 @@ MainInterface* CompositorDirectComposition::makeMainInterface()
         m_rootWindow->setAttribute(Qt::WA_NativeWindow);
         m_rootWindow->setAttribute(Qt::WA_DontCreateNativeAncestors);
         m_rootWindow->setAttribute(Qt::WA_TranslucentBackground);
+
         m_rootWindow->winId();
         m_rootWindow->show();
 
@@ -234,7 +235,12 @@ MainInterface* CompositorDirectComposition::makeMainInterface()
         connect(m_qmlVideoSurfaceProvider.get(), &VideoSurfaceProvider::hasVideoChanged,
                 m_interfaceWindowHandler, &InterfaceWindowHandlerWin32::onVideoEmbedChanged);
 
-        m_ui = std::make_unique<MainUI>(m_intf, m_rootWindow);
+        connect(m_rootWindow, &MainInterface::requestInterfaceMaximized,
+                m_rootWindow, &MainInterface::showMaximized);
+        connect(m_rootWindow, &MainInterface::requestInterfaceNormal,
+                m_rootWindow, &MainInterface::showNormal);
+
+        m_ui = std::make_unique<MainUI>(m_intf, m_rootWindow, m_rootWindow->windowHandle());
         ret = m_ui->setup(m_uiSurface->engine());
         if (! ret)
         {
@@ -265,7 +271,6 @@ void CompositorDirectComposition::destroyMainInterface()
         m_uiVisual.Reset();
     }
     m_uiSurface.reset();
-    m_ui.reset();
     m_rootVisual.Reset();
     m_dcompTarget.Reset();
     m_qmlVideoSurfaceProvider.reset();
@@ -274,6 +279,7 @@ void CompositorDirectComposition::destroyMainInterface()
         delete m_rootWindow;
         m_rootWindow = nullptr;
     }
+    m_ui.reset();
 }
 
 bool CompositorDirectComposition::setupVoutWindow(vout_window_t *p_wnd)

@@ -86,7 +86,20 @@ Item {
     
     property color roundPlayCoverBorder: "#979797"
 
-    property color playlistSeparator: colors_id.white
+    // playlist
+    property color playlistSeparator: white
+    property color plItemHover_Focus: bannerHover
+    property color plItemSelect:      isThemeDark ? "#1E1E1E" : "#EDEDED"
+
+    function getPLItemColor(selected, hovered, focus)
+    {
+        if (hovered || focus)
+            return plItemHover_Focus
+        else if ( selected )
+            return plItemSelect
+        else
+            return "transparent"
+    }
 
     // basic color definitions for color blending:
     property color black: "black"
@@ -107,9 +120,16 @@ Item {
 
     property color seekpoint: "red";
 
-    property var colorSchemes: ["system", "day", "night"]
+    property var colorSchemes: mainInterface.colorScheme
+    Component.onCompleted:  {
+        mainInterface.colorScheme.setAvailableColorSchemes(["system", "day", "night"])
+    }
 
-    state: settings.VLCStyle_colors_state
+    property color windowCSDButtonDarkBg:  "#80484848"
+    property color windowCSDButtonLightBg: "#80DADADA"
+    property color windowCSDButtonBg: isThemeDark ? windowCSDButtonDarkBg : windowCSDButtonLightBg
+
+    state: mainInterface.colorScheme.current
     states: [
         //other styles are provided for testing purpose
         State {
@@ -135,8 +155,8 @@ Item {
 
                 textActiveSource: "#ff950d";
 
-                banner: "#eff0f1";
-                bannerHover: "#3daee9";
+                banner: "#d8d8d8";
+                bannerHover: "#DDDDDD";
 
                 accent: "#ff950d";
                 alert: "#ff0000";
@@ -163,7 +183,7 @@ Item {
                 buttonBorder: "#575b5f"
                 textActiveSource: "#ff950d"
                 banner: "#31363b"
-                bannerHover: "#3daee9"
+                bannerHover: "#272727"
                 accent: "#ff950d"
                 alert: "#ff0000"
                 separator: "#2d2d2d"

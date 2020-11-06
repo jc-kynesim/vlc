@@ -42,11 +42,10 @@
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static int  Create    ( vlc_object_t * );
-static void Destroy   ( vlc_object_t * );
+static int  Create    ( filter_t * );
 
-static picture_t *Filter( filter_t *, picture_t * );
 static picture_t *FilterPacked( filter_t *, picture_t * );
+VIDEO_FILTER_WRAPPER_CLOSE( Filter, Destroy )
 
 /*****************************************************************************
  * Module descriptor
@@ -71,14 +70,13 @@ vlc_module_begin ()
     set_help(COLOR_HELP)
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
-    set_capability( "video filter", 0 )
     add_rgb(CFG_PREFIX "color", 0x00FF0000, COLOR_TEXT, COLOR_LONGTEXT)
         change_integer_list( pi_color_values, ppsz_color_descriptions )
     add_integer( CFG_PREFIX "saturationthres", 20,
                  N_("Saturation threshold"), "", false )
     add_integer( CFG_PREFIX "similaritythres", 15,
                  N_("Similarity threshold"), "", false )
-    set_callbacks( Create, Destroy )
+    set_callback_video_filter( Create )
 vlc_module_end ()
 
 static const char *const ppsz_filter_options[] = {
@@ -102,24 +100,28 @@ typedef struct
     atomic_int i_color;
 } filter_sys_t;
 
+static const struct vlc_filter_operations packed_filter_ops =
+{
+    .filter_video = FilterPacked, .close = Destroy,
+};
+
 /*****************************************************************************
  * Create: allocates adjust video thread output method
  *****************************************************************************
  * This function allocates and initializes a adjust vout method.
  *****************************************************************************/
-static int Create( vlc_object_t *p_this )
+static int Create( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys;
 
     switch( p_filter->fmt_in.video.i_chroma )
     {
         CASE_PLANAR_YUV
-            p_filter->pf_video_filter = Filter;
+            p_filter->ops = &Filter_ops;
             break;
 
         CASE_PACKED_YUV_422
-            p_filter->pf_video_filter = FilterPacked;
+            p_filter->ops = &packed_filter_ops;
             break;
 
         default:
@@ -160,7 +162,7 @@ static int Create( vlc_object_t *p_this )
  *****************************************************************************
  * Terminate an output method created by adjustCreateOutputMethod
  *****************************************************************************/
-static void Destroy( vlc_object_t *p_this )
+static void Destroy( filter_t *p_this )
 {
     filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
@@ -204,22 +206,12 @@ static bool IsSimilar( int u, int v,
  * waits until it is displayed and switch the two rendering buffers, preparing
  * next frame.
  *****************************************************************************/
-static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
+static void Filter( filter_t *p_filter, picture_t *p_pic, picture_t *p_outpic )
 {
-    picture_t *p_outpic;
     filter_sys_t *p_sys = p_filter->p_sys;
     int i_simthres = atomic_load( &p_sys->i_simthres );
     int i_satthres = atomic_load( &p_sys->i_satthres );
     int i_color = atomic_load( &p_sys->i_color );
-
-    if( !p_pic ) return NULL;
-
-    p_outpic = filter_NewPicture( p_filter );
-    if( !p_outpic )
-    {
-        picture_Release( p_pic );
-        return NULL;
-    }
 
     /* Copy the Y plane */
     plane_CopyPixels( &p_outpic->p[Y_PLANE], &p_pic->p[Y_PLANE] );
@@ -256,8 +248,6 @@ static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
             p_src_v++;
         }
     }
-
-    return CopyInfoAndRelease( p_outpic, p_pic );
 }
 
 static picture_t *FilterPacked( filter_t *p_filter, picture_t *p_pic )

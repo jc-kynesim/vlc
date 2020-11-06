@@ -143,6 +143,9 @@ vlc_module_begin ()
     set_capability( "sout output", 0 )
     add_shortcut( "mosaic-bridge" )
 
+    set_category( CAT_SOUT )
+    set_subcategory( SUBCAT_SOUT_STREAM )
+
     add_string( CFG_PREFIX "id", "Id", ID_TEXT, ID_LONGTEXT,
                 false )
     add_integer( CFG_PREFIX "width", 0, WIDTH_TEXT,
@@ -164,6 +167,27 @@ vlc_module_begin ()
 
     set_callbacks( Open, Close )
 vlc_module_end ()
+
+static int Control(sout_stream_t *stream, int query, va_list args)
+{
+    (void) stream;
+
+    switch (query)
+    {
+        case SOUT_STREAM_IS_SYNCHRONOUS:
+            *va_arg(args, bool *) = true;
+            break;
+
+        default:
+            return VLC_EGENERIC;
+    }
+
+    return VLC_SUCCESS;
+}
+
+static const struct sout_stream_operations ops = {
+    Add, Del, Send, Control, NULL,
+};
 
 static const char *const ppsz_sout_options[] = {
     "id", "width", "height", "sar", "vfilter", "chroma", "alpha", "x", "y", NULL
@@ -244,11 +268,7 @@ static int Open( vlc_object_t *p_this )
 
 #undef INT_COMMAND
 
-    p_stream->pf_add    = Add;
-    p_stream->pf_del    = Del;
-    p_stream->pf_send   = Send;
-    p_stream->pace_nocontrol = true;
-
+    p_stream->ops = &ops;
     return VLC_SUCCESS;
 }
 
@@ -416,8 +436,7 @@ static void *Add( sout_stream_t *p_stream, const es_format_t *p_fmt )
 
     //p_es->fmt = *p_fmt;
     p_es->psz_id = p_sys->psz_id;
-    p_es->p_picture = NULL;
-    p_es->pp_last = &p_es->p_picture;
+    vlc_picture_chain_Init( &p_es->pictures );
     p_es->b_empty = false;
 
     vlc_global_unlock( VLC_MOSAIC_MUTEX );
@@ -460,11 +479,10 @@ static void Del( sout_stream_t *p_stream, void *id )
     p_es = p_sys->p_es;
 
     p_es->b_empty = true;
-    while ( p_es->p_picture )
+    while ( !vlc_picture_chain_IsEmpty( &p_es->pictures ) )
     {
-        picture_t *p_next = p_es->p_picture->p_next;
-        picture_Release( p_es->p_picture );
-        p_es->p_picture = p_next;
+        picture_t *es_picture = vlc_picture_chain_PopFront( &p_es->pictures );
+        picture_Release( es_picture );
     }
 
     for ( i = 0; i < p_bridge->i_es_num; i++ )
@@ -571,9 +589,7 @@ static void decoder_queue_video( decoder_t *p_dec, picture_t *p_pic )
     /* push the picture in the mosaic-struct structure */
     bridged_es_t *p_es = p_sys->p_es;
     vlc_global_lock( VLC_MOSAIC_MUTEX );
-    *p_es->pp_last = p_new_pic;
-    p_new_pic->p_next = NULL;
-    p_es->pp_last = &p_new_pic->p_next;
+    vlc_picture_chain_Append( &p_es->pictures, p_new_pic );
     vlc_global_unlock( VLC_MOSAIC_MUTEX );
 }
 

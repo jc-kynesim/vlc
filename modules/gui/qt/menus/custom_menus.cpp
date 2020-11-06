@@ -202,11 +202,16 @@ void RendererMenu::RendererSelected(QAction *action)
 
 /*   CheckableListMenu   */
 
-CheckableListMenu::CheckableListMenu(QString title, QAbstractListModel* model , QWidget *parent)
+CheckableListMenu::CheckableListMenu(QString title, QAbstractListModel* model , GroupingMode grouping,  QWidget *parent)
     : QMenu(parent)
     , m_model(model)
+    , m_grouping(grouping)
 {
     this->setTitle(title);
+    if (m_grouping == GROUPED)
+    {
+        m_actionGroup = new QActionGroup(this);
+    }
 
     connect(m_model, &QAbstractListModel::rowsAboutToBeRemoved, this, &CheckableListMenu::onRowsAboutToBeRemoved);
     connect(m_model, &QAbstractListModel::rowsInserted, this, &CheckableListMenu::onRowInserted);
@@ -221,6 +226,8 @@ void CheckableListMenu::onRowsAboutToBeRemoved(const QModelIndex &, int first, i
     for (int i = last; i >= first; i--)
     {
         QAction* action = actions()[i];
+        if (m_actionGroup)
+            m_actionGroup->removeAction(action);
         delete action;
     }
     if (actions().count() == 0)
@@ -237,6 +244,8 @@ void CheckableListMenu::onRowInserted(const QModelIndex &, int first, int last)
 
         QAction *choiceAction = new QAction(title, this);
         addAction(choiceAction);
+        if (m_actionGroup)
+            m_actionGroup->addAction(choiceAction);
         connect(choiceAction, &QAction::triggered, [this, i](bool checked){
             QModelIndex dataIndex = m_model->index(i);
             m_model->setData(dataIndex, QVariant::fromValue<bool>(checked), Qt::CheckStateRole);
@@ -267,7 +276,11 @@ void CheckableListMenu::onDataChanged(const QModelIndex &topLeft, const QModelIn
 void CheckableListMenu::onModelAboutToBeReset()
 {
     for (QAction* action  :actions())
+    {
+        if (m_actionGroup)
+            m_actionGroup->removeAction(action);
         delete action;
+    }
     setEnabled(false);
 }
 
@@ -308,4 +321,82 @@ BooleanPropertyAction::BooleanPropertyAction(QString title, QObject *model, QStr
 void BooleanPropertyAction::setModelChecked(bool checked)
 {
     m_model->setProperty(qtu(m_propertyName), QVariant::fromValue<bool>(checked) );
+}
+
+
+RecentMenu::RecentMenu(MLRecentsModel* model, MediaLib* ml,  QWidget* parent)
+    : QMenu(parent)
+    , m_model(model)
+    , m_ml(ml)
+{
+    connect(m_model, &MLRecentsModel::rowsAboutToBeRemoved, this, &RecentMenu::onRowsAboutToBeRemoved);
+    connect(m_model, &MLRecentsModel::rowsInserted, this, &RecentMenu::onRowInserted);
+    connect(m_model, &MLRecentsModel::dataChanged, this, &RecentMenu::onDataChanged);
+    connect(m_model, &MLRecentsModel::modelAboutToBeReset, this, &RecentMenu::onModelAboutToBeReset);
+    connect(m_model, &MLRecentsModel::modelReset, this, &RecentMenu::onModelReset);
+    m_separator = addSeparator();
+    addAction( qtr("&Clear"), m_model, &MLRecentsModel::clearHistory );
+    onModelReset();
+}
+
+void RecentMenu::onRowsAboutToBeRemoved(const QModelIndex&, int first, int last)
+{
+    for (int i = last; i >= first; i--)
+    {
+        QAction* action = actions()[i];
+        delete action;
+    }
+    if (actions().count() == 0)
+        setEnabled(false);
+}
+
+void RecentMenu::onRowInserted(const QModelIndex&, int first, int last)
+{
+    for (int i = first; i <= last; i++)
+    {
+        QModelIndex index = m_model->index(i);
+        QString url = m_model->data(index, MLRecentsModel::RECENT_MEDIA_URL).toString();
+
+        QAction *choiceAction = new QAction(url, this);
+        insertAction(m_separator , choiceAction);
+        connect(choiceAction, &QAction::triggered, [this, i](){
+            QModelIndex dataIndex = m_model->index(i);
+            MLParentId id = m_model->data(dataIndex, MLRecentsModel::RECENT_MEDIA_ID).value<MLParentId>();
+            m_ml->addAndPlay(id);
+        });
+        setEnabled(true);
+    }
+}
+
+void RecentMenu::onDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight, const QVector<int>& )
+{
+    for (int i = topLeft.row(); i <= bottomRight.row(); i++)
+    {
+        QAction *choiceAction = actions()[i];
+
+        QModelIndex index = m_model->index(i);
+        QString title = m_model->data(index, MLRecentsModel::RECENT_MEDIA_URL).toString();
+
+        choiceAction->setText(title);
+    }
+}
+
+void RecentMenu::onModelAboutToBeReset()
+{
+    for (QAction* action  :actions())
+    {
+        if (action == m_separator)
+            break;
+        delete action;
+    }
+    setEnabled(false);
+}
+
+void RecentMenu::onModelReset()
+{
+    int nb_rows = m_model->rowCount();
+    if (nb_rows == 0)
+        setEnabled(false);
+    else
+        onRowInserted({}, 0, nb_rows - 1);
 }

@@ -25,6 +25,7 @@
 
 #include <QMenu>
 #include <QAbstractListModel>
+#include "medialibrary/mlrecentsmodel.hpp"
 
 class RendererAction : public QAction
 {
@@ -72,13 +73,19 @@ class CheckableListMenu : public QMenu
 {
     Q_OBJECT
 public:
+    enum GroupingMode {
+        GROUPED,
+        UNGROUPED
+    };
+
     /**
      * @brief CheckableListMenu
      * @param title the title of the menu
      * @param model the model to observe, the model should provide at least Qt::DisplayRole and Qt::CheckStateRole
+     * @param grouping whether the menu should use an ActionGroup or not
      * @param parent QObject parent
      */
-    CheckableListMenu(QString title, QAbstractListModel* model , QWidget *parent = nullptr);
+    CheckableListMenu(QString title, QAbstractListModel* model ,  GroupingMode grouping = UNGROUPED, QWidget *parent = nullptr);
 
 private slots:
     void onRowsAboutToBeRemoved(const QModelIndex &parent, int first, int last);
@@ -89,7 +96,8 @@ private slots:
 
 private:
     QAbstractListModel* m_model;
-    QMenu * m_submenu;
+    GroupingMode m_grouping;
+    QActionGroup* m_actionGroup = nullptr;
 };
 
 
@@ -115,5 +123,25 @@ private:
     QObject* m_model;
     QString m_propertyName;
 };
+
+class RecentMenu : public QMenu
+{
+    Q_OBJECT
+public:
+    RecentMenu(MLRecentsModel* model, MediaLib* ml, QWidget *parent = nullptr);
+
+private slots:
+    void onRowsAboutToBeRemoved(const QModelIndex &parent, int first, int last);
+    void onRowInserted(const QModelIndex &parent, int first, int last);
+    void onDataChanged(const QModelIndex &topLeft, const QModelIndex &bottomRight, const QVector<int> &roles = QVector<int>());
+    void onModelAboutToBeReset();
+    void onModelReset();
+
+private:
+    MLRecentsModel* m_model = nullptr;
+    QAction* m_separator = nullptr;
+    MediaLib* m_ml = nullptr;
+};
+
 
 #endif // CUSTOM_MENUS_HPP

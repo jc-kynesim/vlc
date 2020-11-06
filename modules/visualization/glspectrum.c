@@ -51,7 +51,7 @@
  * Module descriptor
  *****************************************************************************/
 static int Open(vlc_object_t *);
-static void Close(vlc_object_t *);
+static void Close(filter_t *);
 
 #define WIDTH_TEXT N_("Video width")
 #define WIDTH_LONGTEXT N_("The width of the visualization window, in pixels.")
@@ -70,7 +70,7 @@ vlc_module_begin()
     add_integer("glspectrum-height", 300, HEIGHT_TEXT, HEIGHT_LONGTEXT, false)
 
     add_shortcut("glspectrum")
-    set_callbacks(Open, Close)
+    set_callback(Open)
 vlc_module_end()
 
 
@@ -110,6 +110,10 @@ static void *Thread(void *);
 
 const GLfloat lightZeroColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
 const GLfloat lightZeroPosition[] = {0.0f, 3.0f, 10.0f, 0.0f};
+
+static const struct vlc_filter_operations filter_ops = {
+    .filter_audio = DoWork, .close = Close,
+};
 
 /**
  * Open the module.
@@ -160,7 +164,7 @@ static int Open(vlc_object_t * p_this)
 
     p_filter->fmt_in.audio.i_format = VLC_CODEC_FL32;
     p_filter->fmt_out.audio = p_filter->fmt_in.audio;
-    p_filter->pf_audio_filter = DoWork;
+    p_filter->ops = &filter_ops;
 
     return VLC_SUCCESS;
 }
@@ -170,9 +174,8 @@ static int Open(vlc_object_t * p_this)
  * Close the module.
  * @param p_this: the filter object
  */
-static void Close(vlc_object_t *p_this)
+static void Close(filter_t *p_filter)
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
     /* Terminate the thread. */

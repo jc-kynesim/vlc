@@ -151,18 +151,17 @@ noreturn void sout_MuxFlush(sout_mux_t *mux, sout_input_t *input)
 }
 
 noreturn void sout_StreamChainDelete(sout_stream_t *first,
-                                     sout_stream_t *last)
+                                     sout_stream_t *end)
 {
-    (void) first; (void) last;
+    (void) first; (void) end;
     vlc_assert_unreachable ();
 }
 
 noreturn sout_stream_t *sout_StreamChainNew(sout_instance_t *sout,
                                             const char *chain,
-                                            sout_stream_t *next,
-                                            sout_stream_t **last)
+                                            sout_stream_t *next)
 {
-    (void) sout; (void) chain; (void) next; (void) last;
+    (void) sout; (void) chain; (void) next;
     vlc_assert_unreachable ();
 }
 
@@ -284,3 +283,29 @@ noreturn void vlc_control_cancel (vlc_cleanup_t *cleaner)
     vlc_assert_unreachable ();
 }
 #endif
+
+#include <errno.h>
+#include <vlc_spawn.h>
+
+VLC_WEAK
+int vlc_spawn(pid_t *pid, const char *file, const int *fds,
+              const char *const *args)
+{
+    (void) pid; (void) file; (void) fds; (void) args;
+    return ENOSYS;
+}
+
+VLC_WEAK
+int vlc_spawnp(pid_t *pid, const char *path, const int *fds,
+               const char *const *args)
+{
+    (void) pid; (void) path; (void) fds; (void) args;
+    return ENOSYS;
+}
+
+VLC_WEAK
+int vlc_waitpid(pid_t pid)
+{
+    (void) pid;
+    vlc_assert_unreachable();
+}

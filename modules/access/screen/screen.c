@@ -263,6 +263,7 @@ static void Close( vlc_object_t *p_this )
         picture_Release( p_sys->p_mouse );
     if( p_sys->p_blend )
     {
+        filter_Close( p_sys->p_blend );
         module_unneed( p_sys->p_blend, p_sys->p_blend->p_module );
         vlc_object_delete(p_sys->p_blend);
     }
@@ -385,12 +386,13 @@ void RenderCursor( demux_t *p_demux, int i_x, int i_y,
                 vlc_object_delete(p_sys->p_blend);
                 p_sys->p_blend = NULL;
             }
+            assert( p_sys->p_blend->ops != NULL );
         }
     }
     if( p_sys->p_blend )
     {
         p_sys->dst.p->p_pixels = p_dst;
-        p_sys->p_blend->pf_video_blend( p_sys->p_blend,
+        p_sys->p_blend->ops->blend_video( p_sys->p_blend,
                                         &p_sys->dst,
                                         p_sys->p_mouse,
 #ifdef SCREEN_SUBSCREEN

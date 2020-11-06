@@ -52,24 +52,6 @@ static char *CheckUnicode (const char *str)
     return IsUTF8 (str) ? strdup (str): NULL;
 }
 
-static bool IsHLS(const unsigned char *buf, size_t length)
-{
-    static const char *const hlsexts[] =
-    {
-        "#EXT-X-MEDIA:",
-        "#EXT-X-VERSION:",
-        "#EXT-X-TARGETDURATION:",
-        "#EXT-X-MEDIA-SEQUENCE:",
-        "#EXT-X-STREAM-INF:",
-    };
-
-    for (size_t i = 0; i < ARRAY_SIZE(hlsexts); i++)
-        if (strnstr((const char *)buf, hlsexts[i], length) != NULL)
-            return true;
-
-    return false;
-}
-
 /*****************************************************************************
  * Import_M3U: main import function
  *****************************************************************************/
@@ -80,7 +62,6 @@ int Import_M3U( vlc_object_t *p_this )
     ssize_t i_peek;
     int offset = 0;
 
-    CHECK_FILE(p_stream);
     i_peek = vlc_stream_Peek( p_stream->s, &p_peek, 1024 );
     if( i_peek < 8 )
         return VLC_EGENERIC;
@@ -88,10 +69,6 @@ int Import_M3U( vlc_object_t *p_this )
     /* Encoding: UTF-8 or unspecified */
     char *(*pf_dup) (const char *) = GuessEncoding;
 
-    if (stream_HasExtension(p_stream, ".m3u8")
-     || strncasecmp((const char *)p_peek, "RTSPtext", 8) == 0) /* QuickTime */
-        pf_dup = CheckUnicode;
-    else
     if (memcmp( p_peek, "\xef\xbb\xbf", 3) == 0) /* UTF-8 Byte Order Mark */
     {
         if( i_peek < 12 )
@@ -102,47 +79,43 @@ int Import_M3U( vlc_object_t *p_this )
         i_peek -= offset;
     }
 
+    if (stream_HasExtension(p_stream, ".m3u8")
+     || strncasecmp((const char *)p_peek, "RTSPtext", 8) == 0) /* QuickTime */
+        pf_dup = CheckUnicode;
+
     /* File type: playlist, or not (HLS manifest or whatever else) */
     char *type = stream_MimeType(p_stream->s);
     bool match;
 
-    if (p_stream->obj.force)
-        match = true;
-    else
-    if (type != NULL
-     && !vlc_ascii_strcasecmp(type, "application/vnd.apple.mpegurl")) /* HLS */
+    if (!p_stream->obj.force
+     && memcmp(p_peek, "#EXTM3U", 7 ) != 0
+     && (type == NULL
+      || (vlc_ascii_strcasecmp(type, "application/mpegurl") != 0
+       && vlc_ascii_strcasecmp(type, "application/x-mpegurl") != 0
+       && vlc_ascii_strcasecmp(type, "audio/mpegurl") != 0
+       && vlc_ascii_strcasecmp(type, "vnd.apple.mpegURL") != 0
+       && vlc_ascii_strcasecmp(type, "audio/x-mpegurl") != 0))
+     && !stream_HasExtension(p_stream, ".m3u8")
+     && !stream_HasExtension(p_stream, ".m3u")
+     && !stream_HasExtension(p_stream, ".vlc")
+     && strncasecmp((const char *)p_peek, "RTSPtext", 8) != 0
+     && !ContainsURL(p_peek, i_peek))
         match = false;
     else
-    if (memcmp(p_peek, "#EXTM3U", 7 ) == 0
-     || (type != NULL
-      && (vlc_ascii_strcasecmp(type, "application/mpegurl") == 0
-       || vlc_ascii_strcasecmp(type, "application/x-mpegurl") == 0
-       || vlc_ascii_strcasecmp(type, "audio/mpegurl") == 0
-       || vlc_ascii_strcasecmp(type, "vnd.apple.mpegURL") == 0
-       || vlc_ascii_strcasecmp(type, "audio/x-mpegurl") == 0))
-     || stream_HasExtension(p_stream, ".m3u8")
-     || stream_HasExtension(p_stream, ".m3u"))
-        match = !IsHLS(p_peek, i_peek);
-    else
-    if (stream_HasExtension(p_stream, ".vlc")
-     || strncasecmp((const char *)p_peek, "RTSPtext", 8) == 0
-     || ContainsURL(p_peek, i_peek))
         match = true;
-    else
-        match = false;
 
     free(type);
 
     if (!match)
         return VLC_EGENERIC;
 
-    if (offset != 0 && vlc_stream_Seek(p_stream->s, offset))
+    if (offset > 0 && vlc_stream_Read(p_stream->s, NULL, offset) < offset)
         return VLC_EGENERIC;
 
     msg_Dbg( p_stream, "found valid M3U playlist" );
     p_stream->p_sys = pf_dup;
     p_stream->pf_readdir = ReadDir;
-    p_stream->pf_control = access_vaDirectoryControlHelper;
+    p_stream->pf_control = PlaylistControl;
 
     return VLC_SUCCESS;
 }
@@ -239,6 +212,7 @@ static void entry_meta_Clean( struct entry_meta_s *e )
     free( e->psz_tvgid );
     free( e->psz_grouptitle );
     while( e->i_options-- ) free( (char*)e->ppsz_options[e->i_options] );
+    TAB_CLEAN( e->i_options, e->ppsz_options );
 }
 
 static void parseEXTINF( char *, char *(*)(const char *), struct entry_meta_s * );
@@ -331,6 +305,12 @@ static int ReadDir( stream_t *p_demux, input_item_node_t *p_subitems )
                     free( meta.psz_album_art );
                     meta.psz_album_art = pf_dup( psz_parse );
                 }
+            }
+            else if ( !strncasecmp( psz_parse, "PLAYLIST:",
+                      sizeof( "PLAYLIST:" ) - 1 ) )
+            {
+                psz_parse += sizeof( "PLAYLIST:" ) - 1;
+                input_item_SetTitle( p_demux->p_input_item, psz_parse );
             }
         }
         else if( !strncasecmp( psz_parse, "RTSPtext", sizeof("RTSPtext") -1 ) )

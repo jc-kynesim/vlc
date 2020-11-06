@@ -43,17 +43,18 @@ pluginsinclude_HEADERS = \
 	../include/vlc_cpu.h \
 	../include/vlc_cxx_helpers.hpp \
 	../include/vlc_decoder.h \
-	../include/vlc_dialog.h \
 	../include/vlc_demux.h \
+	../include/vlc_dialog.h \
 	../include/vlc_epg.h \
 	../include/vlc_es.h \
 	../include/vlc_es_out.h \
 	../include/vlc_events.h \
+	../include/vlc_executor.h \
 	../include/vlc_filter.h \
+	../include/vlc_fingerprinter.h \
 	../include/vlc_fourcc.h \
 	../include/vlc_fs.h \
 	../include/vlc_gcrypt.h \
-	../include/vlc_opengl.h \
 	../include/vlc_hash.h \
 	../include/vlc_http.h \
 	../include/vlc_httpd.h \
@@ -62,19 +63,21 @@ pluginsinclude_HEADERS = \
 	../include/vlc_input.h \
 	../include/vlc_input_item.h \
 	../include/vlc_interface.h \
+	../include/vlc_interrupt.h \
 	../include/vlc_keystore.h \
 	../include/vlc_list.h \
+	../include/vlc_media_library.h \
 	../include/vlc_media_source.h \
+	../include/vlc_memstream.h \
 	../include/vlc_messages.h \
 	../include/vlc_meta.h \
 	../include/vlc_meta_fetcher.h \
-	../include/vlc_media_library.h \
-	../include/vlc_memstream.h \
 	../include/vlc_mime.h \
 	../include/vlc_modules.h \
 	../include/vlc_mouse.h \
 	../include/vlc_network.h \
 	../include/vlc_objects.h \
+	../include/vlc_opengl.h \
 	../include/vlc_picture.h \
 	../include/vlc_picture_fifo.h \
 	../include/vlc_picture_pool.h \
@@ -85,12 +88,11 @@ pluginsinclude_HEADERS = \
 	../include/vlc_probe.h \
 	../include/vlc_queue.h \
 	../include/vlc_rand.h \
-	../include/vlc_services_discovery.h \
-	../include/vlc_fingerprinter.h \
-	../include/vlc_interrupt.h \
 	../include/vlc_renderer_discovery.h \
+	../include/vlc_services_discovery.h \
 	../include/vlc_sort.h \
 	../include/vlc_sout.h \
+	../include/vlc_spawn.h \
 	../include/vlc_spu.h \
 	../include/vlc_stream.h \
 	../include/vlc_stream_extractor.h \
@@ -98,22 +100,22 @@ pluginsinclude_HEADERS = \
 	../include/vlc_subpicture.h \
 	../include/vlc_text_style.h \
 	../include/vlc_threads.h \
+	../include/vlc_thumbnailer.h \
 	../include/vlc_tick.h \
 	../include/vlc_timestamp_helper.h \
-	../include/vlc_thumbnailer.h \
 	../include/vlc_tls.h \
 	../include/vlc_url.h \
 	../include/vlc_variables.h \
 	../include/vlc_vector.h \
+	../include/vlc_video_splitter.h \
 	../include/vlc_viewpoint.h \
 	../include/vlc_vlm.h \
-	../include/vlc_video_splitter.h \
 	../include/vlc_vout.h \
 	../include/vlc_vout_display.h \
 	../include/vlc_vout_osd.h \
 	../include/vlc_vout_window.h \
-	../include/vlc_xml.h \
 	../include/vlc_xlib.h \
+	../include/vlc_xml.h \
 	$(NULL)
 nodist_pluginsinclude_HEADERS = ../include/vlc_about.h
 
@@ -152,7 +154,7 @@ pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = vlc-plugin.pc
 CLEANFILES += $(pkgconfig_DATA)
 
-.pc.in.pc: $(top_builddir)/config.status
+vlc-plugin.pc: vlc-plugin.pc.in $(top_builddir)/config.status
 	$(AM_V_GEN)cd "$(top_builddir)" && \
 	$(SHELL) ./config.status --file="src/$@"
 
@@ -165,8 +167,8 @@ noinst_DATA = libvlc_win32_rc.rc
 endif
 EXTRA_DIST += libvlc_win32_rc.rc.in
 
-.rc.in.rc: $(top_builddir)/config.status
-	cd "$(top_builddir)" && \
+libvlc_win32_rc.rc: libvlc_win32_rc.rc.in $(top_builddir)/config.status
+	$(AM_V_GEN)cd "$(top_builddir)" && \
 	$(SHELL) ./config.status --file="src/$@"
 
 ###############################################################################
@@ -350,8 +352,7 @@ libvlccore_la_SOURCES = \
 	text/iso_lang.c \
 	text/iso-639_def.h \
 	misc/actions.c \
-	misc/background_worker.c \
-	misc/background_worker.h \
+	misc/executor.c \
 	misc/md5.c \
 	misc/probe.c \
 	misc/rand.c \
@@ -492,6 +493,7 @@ libvlccore_la_SOURCES += \
 	posix/error.c \
 	posix/netconf.c \
 	posix/picture.c \
+	posix/spawn.c \
 	posix/specific.c
 if HAVE_LIBANL
 libvlccore_la_SOURCES += \
@@ -571,6 +573,7 @@ fourcc_tables.h: fourcc_gen$(BUILDEXEEXT)
 check_PROGRAMS = \
 	test_block \
 	test_dictionary \
+	test_executor \
 	test_i18n_atof \
 	test_interrupt \
 	test_list \
@@ -599,6 +602,7 @@ test_block_LDADD = $(LDADD) $(LIBS_libvlccore)
 test_block_DEPENDENCIES =
 
 test_dictionary_SOURCES = test/dictionary.c
+test_executor_SOURCES = test/executor.c
 test_i18n_atof_SOURCES = test/i18n_atof.c
 test_interrupt_SOURCES = test/interrupt.c
 test_interrupt_LDADD = $(LDADD) $(LIBS_libvlccore)

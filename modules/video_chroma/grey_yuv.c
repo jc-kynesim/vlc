@@ -39,68 +39,59 @@
 /*****************************************************************************
  * Local and extern prototypes.
  *****************************************************************************/
-static int  Activate ( vlc_object_t * );
-
-static void GREY_I420( filter_t *, picture_t *, picture_t * );
-static void GREY_YUY2( filter_t *, picture_t *, picture_t * );
-
-static picture_t *GREY_I420_Filter( filter_t *, picture_t * );
-static picture_t *GREY_YUY2_Filter( filter_t *, picture_t * );
+static int  Activate ( filter_t * );
 
 /*****************************************************************************
  * Module descriptor.
  *****************************************************************************/
 vlc_module_begin ()
     set_description( N_("Conversions from " SRC_FOURCC " to " DEST_FOURCC) )
-    set_capability( "video converter", 80 )
-    set_callback( Activate )
+    set_callback_video_converter( Activate, 80 )
 vlc_module_end ()
+
+VIDEO_FILTER_WRAPPER( GREY_I420 )
+VIDEO_FILTER_WRAPPER( GREY_YUY2 )
+
+static const struct vlc_filter_operations *
+GetFilterOperations( filter_t *filter )
+{
+    switch( filter->fmt_out.video.i_chroma )
+    {
+        case VLC_CODEC_I420:
+            return &GREY_I420_ops;
+        case VLC_CODEC_YUYV:
+            return &GREY_YUY2_ops;
+        default:
+            return NULL;
+    }
+}
 
 /*****************************************************************************
  * Activate: allocate a chroma function
  *****************************************************************************
  * This function allocates and initializes a chroma function
  *****************************************************************************/
-static int Activate( vlc_object_t *p_this )
+static int Activate( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
-
     if( p_filter->fmt_out.video.i_width & 1
      || p_filter->fmt_out.video.i_height & 1 )
     {
-        return -1;
+        return VLC_EGENERIC;
     }
 
     if( p_filter->fmt_in.video.i_width != p_filter->fmt_out.video.i_width
        || p_filter->fmt_in.video.i_height != p_filter->fmt_out.video.i_height
        || p_filter->fmt_in.video.orientation != p_filter->fmt_out.video.orientation )
-        return -1;
+        return VLC_EGENERIC;
 
-    switch( p_filter->fmt_in.video.i_chroma )
-    {
-        case VLC_CODEC_GREY:
-            switch( p_filter->fmt_out.video.i_chroma )
-            {
-                case VLC_CODEC_I420:
-                    p_filter->pf_video_filter = GREY_I420_Filter;
-                    break;
-                case VLC_CODEC_YUYV:
-                    p_filter->pf_video_filter = GREY_YUY2_Filter;
-                    break;
-                default:
-                    return -1;
-            }
-            break;
+    if ( p_filter->fmt_in.video.i_chroma != VLC_CODEC_GREY )
+        return VLC_EGENERIC;
+    p_filter->ops = GetFilterOperations(p_filter);
+    if ( p_filter->ops == NULL )
+        return VLC_EGENERIC;
 
-        default:
-            return -1;
-    }
-
-    return 0;
+    return VLC_SUCCESS;
 }
-
-VIDEO_FILTER_WRAPPER( GREY_I420 )
-VIDEO_FILTER_WRAPPER( GREY_YUY2 )
 
 /* Following functions are local */
 

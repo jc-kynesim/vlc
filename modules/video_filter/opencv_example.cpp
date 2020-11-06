@@ -66,7 +66,7 @@ struct filter_sys_t
  * Local prototypes
  ****************************************************************************/
 static int  OpenFilter ( vlc_object_t * );
-static void CloseFilter( vlc_object_t * );
+static void CloseFilter( filter_t * );
 
 static picture_t *Filter( filter_t *, picture_t * );
 
@@ -81,7 +81,7 @@ vlc_module_begin ()
 
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
-    set_callbacks( OpenFilter, CloseFilter )
+    set_callback( OpenFilter )
 
     add_string( "opencv-haarcascade-file", "c:\\haarcascade_frontalface_alt.xml",
                           N_("Haar cascade filename"),
@@ -108,7 +108,15 @@ static int OpenFilter( vlc_object_t *p_this )
     p_sys->event_info.p_region = NULL;
     p_sys->i_id = 0;
 
-    p_filter->pf_video_filter = Filter;
+    static const struct FilterOperationInitializer {
+        struct vlc_filter_operations ops {};
+        FilterOperationInitializer()
+        {
+            ops.filter_video = Filter;
+            ops.close        = CloseFilter;
+        };
+    } filter_ops;
+    p_filter->ops = &filter_ops.ops;
 
     //create the VIDEO_FILTER_EVENT_VARIABLE
     vlc_value_t val;
@@ -131,9 +139,8 @@ static int OpenFilter( vlc_object_t *p_this )
 /*****************************************************************************
  * CloseFilter: clean up the filter
  *****************************************************************************/
-static void CloseFilter( vlc_object_t *p_this )
+static void CloseFilter( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t*)p_this;
     filter_sys_t *p_sys = static_cast<filter_sys_t *>(p_filter->p_sys);
 
     if( p_sys->p_cascade )
@@ -157,7 +164,7 @@ static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
     CvPoint pt1, pt2;
     int scale = 1;
     filter_sys_t *p_sys = static_cast<filter_sys_t *>(p_filter->p_sys);
- 
+
     if ((!p_pic) )
     {
         msg_Err( p_filter, "no image array" );
@@ -217,4 +224,3 @@ static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
 
     return p_pic;
 }
-

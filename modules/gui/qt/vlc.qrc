@@ -24,6 +24,8 @@
         <file alias="wait2.svg">pixmaps/util/wait2.svg</file>
         <file alias="wait3.svg">pixmaps/util/wait3.svg</file>
         <file alias="wait4.svg">pixmaps/util/wait4.svg</file>
+        <file alias="SelectableDelegateModel.qml">util/qml/SelectableDelegateModel.qml</file>
+        <file alias="KeyHelper.js">util/qml/KeyHelper.js</file>
     </qresource>
     <qresource prefix="/toolbar">
         <file alias="faster.svg">pixmaps/faster.svg</file>
@@ -176,10 +178,15 @@
     <qresource prefix="/main">
         <file alias="BannerSources.qml">maininterface/qml/BannerSources.qml</file>
         <file alias="MainInterface.qml">maininterface/qml/MainInterface.qml</file>
+        <file alias="MainDisplay.qml">maininterface/qml/MainDisplay.qml</file>
+        <file alias="NoMedialibHome.qml">maininterface/qml/NoMedialibHome.qml</file>
     </qresource>
     <qresource prefix="/widgets">
         <file alias="BannerTabButton.qml">widgets/qml/BannerTabButton.qml</file>
         <file alias="BusyIndicatorExt.qml">widgets/qml/BusyIndicatorExt.qml</file>
+        <file alias="CSDWindowButton.qml">widgets/qml/CSDWindowButton.qml</file>
+        <file alias="CSDWindowButtonSet.qml">widgets/qml/CSDWindowButtonSet.qml</file>
+        <file alias="CSDTitlebarTapNDrapHandler.qml">widgets/qml/CSDTitlebarTapNDrapHandler.qml</file>
         <file alias="GridItem.qml">widgets/qml/GridItem.qml</file>
         <file alias="ListItem.qml">widgets/qml/ListItem.qml</file>
         <file alias="DrawerExt.qml">widgets/qml/DrawerExt.qml</file>
@@ -225,18 +232,19 @@
         <file alias="HorizontalResizeHandle.qml">widgets/qml/HorizontalResizeHandle.qml</file>
         <file alias="PointingTooltip.qml">widgets/qml/PointingTooltip.qml</file>
         <file alias="FrostedGlassEffect.qml">widgets/qml/FrostedGlassEffect.qml</file>
-    </qresource>
-    <qresource prefix="/util">
-        <file alias="SelectableDelegateModel.qml">util/qml/SelectableDelegateModel.qml</file>
-        <file alias="KeyHelper.js">util/qml/KeyHelper.js</file>
+        <file alias="PageLoader.qml">widgets/qml/PageLoader.qml</file>
     </qresource>
     <qresource prefix="/network">
+        <file alias="DiscoverDisplay.qml">network/qml/DiscoverDisplay.qml</file>
+        <file alias="DiscoverUrlDisplay.qml">network/qml/DiscoverUrlDisplay.qml</file>
         <file alias="NetworkDisplay.qml">network/qml/NetworkDisplay.qml</file>
         <file alias="NetworkHomeDeviceListView.qml">network/qml/NetworkHomeDeviceListView.qml</file>
         <file alias="NetworkHomeDisplay.qml">network/qml/NetworkHomeDisplay.qml</file>
         <file alias="NetworkBrowseDisplay.qml">network/qml/NetworkBrowseDisplay.qml</file>
         <file alias="NetworkGridItem.qml">network/qml/NetworkGridItem.qml</file>
         <file alias="NetworkListItem.qml">network/qml/NetworkListItem.qml</file>
+        <file alias="NetworkThumbnailItem.qml">network/qml/NetworkThumbnailItem.qml</file>
+        <file alias="ServicesHomeDisplay.qml">network/qml/ServicesHomeDisplay.qml</file>
     </qresource>
     <qresource prefix="/medialibrary">
         <file alias="EmptyLabel.qml">medialibrary/qml/EmptyLabel.qml</file>
@@ -253,7 +261,7 @@
         <file alias="MusicTracksDisplay.qml">medialibrary/qml/MusicTracksDisplay.qml</file>
         <file alias="MusicTrackListDisplay.qml">medialibrary/qml/MusicTrackListDisplay.qml</file>
         <file alias="ArtistTopBanner.qml">medialibrary/qml/ArtistTopBanner.qml</file>
-        <file alias="MainDisplay.qml">medialibrary/qml/MainDisplay.qml</file>
+        <file alias="UrlListDisplay.qml">medialibrary/qml/UrlListDisplay.qml</file>
         <file alias="VideoInfoExpandPanel.qml">medialibrary/qml/VideoInfoExpandPanel.qml</file>
         <file alias="VideoListDisplay.qml">medialibrary/qml/VideoListDisplay.qml</file>
         <file alias="VideoGridItem.qml">medialibrary/qml/VideoGridItem.qml</file>
@@ -269,22 +277,13 @@
         <file alias="PLItem.qml">playlist/qml/PLItem.qml</file>
         <file alias="PlaylistListView.qml">playlist/qml/PlaylistListView.qml</file>
         <file alias="PlaylistMenu.qml">playlist/qml/PlaylistMenu.qml</file>
-        <file alias="PlaylistMainView.qml">playlist/qml/PlaylistMainView.qml</file>
         <file alias="PlaylistToolbar.qml">playlist/qml/PlaylistToolbar.qml</file>
+        <file alias="PlaylistDetachedWindow.qml">playlist/qml/PlaylistDetachedWindow.qml</file>
     </qresource>
     <qresource prefix="/menus">
-        <file alias="AudioMenu.qml">menus/qml/AudioMenu.qml</file>
-        <file alias="HelpMenu.qml">menus/qml/HelpMenu.qml</file>
-        <file alias="MainDropdownMenu.qml">menus/qml/MainDropdownMenu.qml</file>
-        <file alias="MainMenubar.qml">menus/qml/MainMenubar.qml</file>
-        <file alias="MediaMenu.qml">menus/qml/MediaMenu.qml</file>
-        <file alias="PlaybackMenu.qml">menus/qml/PlaybackMenu.qml</file>
-        <file alias="SubtitleMenu.qml">menus/qml/SubtitleMenu.qml</file>
-        <file alias="ToolsMenu.qml">menus/qml/ToolsMenu.qml</file>
-        <file alias="VideoMenu.qml">menus/qml/VideoMenu.qml</file>
-        <file alias="CheckableModelSubMenu.qml">menus/qml/CheckableModelSubMenu.qml</file>
-        <file alias="ViewMenu.qml">menus/qml/ViewMenu.qml</file>
-        <file alias="PopupMenu.qml">menus/qml/PopupMenu.qml</file>
+        <file alias="Menubar.qml">menus/qml/Menubar.qml</file>
+        <file alias="GlobalShortcuts.qml">menus/qml/GlobalShortcuts.qml</file>
+        <file alias="GlobalShortcutsMedialib.qml">menus/qml/GlobalShortcutsMedialib.qml</file>
     </qresource>
     <qresource prefix="/player">
         <file alias="Player.qml">player/qml/Player.qml</file>

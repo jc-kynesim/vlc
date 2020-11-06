@@ -204,7 +204,7 @@ vlc_module_begin ()
                 SCODEC_LONGTEXT, false )
     add_bool( SOUT_CFG_PREFIX "soverlay", false, SCODEC_TEXT,
                SCODEC_LONGTEXT, false )
-    add_module_list(SOUT_CFG_PREFIX "sfilter", "spu source", NULL,
+    add_module_list(SOUT_CFG_PREFIX "sfilter", "sub source", NULL,
                     SFILTER_TEXT, SFILTER_LONGTEXT)
 
     set_section( N_("Miscellaneous"), NULL )
@@ -326,9 +326,11 @@ static void SetVideoEncoderConfig( sout_stream_t *p_stream, transcode_encoder_co
     p_cfg->video.threads.i_count = var_GetInteger( p_stream, SOUT_CFG_PREFIX "threads" );
     p_cfg->video.threads.pool_size = var_GetInteger( p_stream, SOUT_CFG_PREFIX "pool-size" );
 
+#if VLC_THREAD_PRIORITY_OUTPUT != VLC_THREAD_PRIORITY_VIDEO
     if( var_GetBool( p_stream, SOUT_CFG_PREFIX "high-priority" ) )
         p_cfg->video.threads.i_priority = VLC_THREAD_PRIORITY_OUTPUT;
     else
+#endif
         p_cfg->video.threads.i_priority = VLC_THREAD_PRIORITY_VIDEO;
 }
 
@@ -362,9 +364,6 @@ static int Control( sout_stream_t *p_stream, int i_query, va_list args )
 {
     switch( i_query )
     {
-        case SOUT_STREAM_EMPTY:
-            return sout_StreamControlVa( p_stream->p_next, i_query, args );
-
         case SOUT_STREAM_ID_SPU_HIGHLIGHT:
         {
             sout_stream_id_sys_t *id = (sout_stream_id_sys_t *) va_arg(args, void *);
@@ -377,6 +376,10 @@ static int Control( sout_stream_t *p_stream, int i_query, va_list args )
     }
     return VLC_EGENERIC;
 }
+
+static const struct sout_stream_operations ops = {
+    Add, Del, Send, Control, NULL,
+};
 
 /*****************************************************************************
  * Open:
@@ -463,12 +466,8 @@ static int Open( vlc_object_t *p_this )
     p_sys->vfilters_cfg.video.b_reorient = p_sys->b_soverlay ||
                                            p_sys->vfilters_cfg.video.psz_spu_sources;
 
-    p_stream->pf_add    = Add;
-    p_stream->pf_del    = Del;
-    p_stream->pf_send   = Send;
-    p_stream->pf_control = Control;
     p_stream->p_sys     = p_sys;
-
+    p_stream->ops = &ops;
     return VLC_SUCCESS;
 }
 

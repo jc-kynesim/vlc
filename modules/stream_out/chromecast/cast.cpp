@@ -313,6 +313,10 @@ static void ProxyFlush(sout_stream_t *p_stream, void *id)
     sout_StreamFlush(p_stream->p_next, id);
 }
 
+static const struct sout_stream_operations proxy_ops = {
+    ProxyAdd, ProxyDel, ProxySend, NULL, ProxyFlush,
+};
+
 static int ProxyOpen(vlc_object_t *p_this)
 {
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
@@ -322,11 +326,7 @@ static int ProxyOpen(vlc_object_t *p_this)
 
     p_stream->p_sys = (sout_stream_sys_t *) p_sys;
     p_sys->out_streams_added = 0;
-
-    p_stream->pf_add     = ProxyAdd;
-    p_stream->pf_del     = ProxyDel;
-    p_stream->pf_send    = ProxySend;
-    p_stream->pf_flush   = ProxyFlush;
+    p_stream->ops = &proxy_ops;
     return VLC_SUCCESS;
 }
 
@@ -434,7 +434,7 @@ void sout_access_out_sys_t::stop()
 
 void sout_access_out_sys_t::prepare(sout_stream_t *p_stream, const std::string &mime)
 {
-    var_SetAddress(p_stream->p_sout, SOUT_CFG_PREFIX "access-out-sys", this);
+    var_SetAddress(p_stream, SOUT_CFG_PREFIX "access-out-sys", this);
 
     vlc_fifo_Lock(m_fifo);
     clearUnlocked();
@@ -822,7 +822,7 @@ bool sout_stream_sys_t::startSoutChain(sout_stream_t *p_stream,
 
     access_out_live.prepare( p_stream, mime );
 
-    p_out = sout_StreamChainNew( p_stream->p_sout, sout.c_str(), NULL, NULL);
+    p_out = sout_StreamChainNew(VLC_OBJECT(p_stream), sout.c_str(), NULL);
     if (p_out == NULL) {
         msg_Dbg(p_stream, "could not create sout chain:%s", sout.c_str());
         out_streams.clear();
@@ -1223,11 +1223,16 @@ static void on_input_event_cb(void *data, enum cc_input_event event, union cc_in
     }
 }
 
+static const struct sout_stream_operations ops = {
+    Add, Del, Send, NULL, Flush,
+};
+
 /*****************************************************************************
  * Open: connect to the Chromecast and initialize the sout
  *****************************************************************************/
 static int Open(vlc_object_t *p_this)
 {
+    vlc_object_t *parent = vlc_object_parent(p_this);
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
     sout_stream_sys_t *p_sys = NULL;
     intf_sys_t *p_intf = NULL;
@@ -1291,20 +1296,16 @@ static int Open(vlc_object_t *p_this)
     p_intf->setOnInputEventCb(on_input_event_cb, p_stream);
 
     /* prevent sout-mux-caching since chromecast-proxy is already doing it */
-    var_Create( p_stream->p_sout, "sout-mux-caching", VLC_VAR_INTEGER );
-    var_SetInteger( p_stream->p_sout, "sout-mux-caching", 0 );
+    var_Create(parent, "sout-mux-caching", VLC_VAR_INTEGER);
+    var_SetInteger(parent, "sout-mux-caching", 0);
 
-    var_Create( p_stream->p_sout, SOUT_CFG_PREFIX "sys", VLC_VAR_ADDRESS );
-    var_SetAddress( p_stream->p_sout, SOUT_CFG_PREFIX "sys", p_sys );
+    var_Create(parent, SOUT_CFG_PREFIX "sys", VLC_VAR_ADDRESS);
+    var_SetAddress(parent, SOUT_CFG_PREFIX "sys", p_sys );
 
-    var_Create( p_stream->p_sout, SOUT_CFG_PREFIX "access-out-sys", VLC_VAR_ADDRESS );
+    var_Create(p_stream, SOUT_CFG_PREFIX "access-out-sys", VLC_VAR_ADDRESS);
 
     // Set the sout callbacks.
-    p_stream->pf_add     = Add;
-    p_stream->pf_del     = Del;
-    p_stream->pf_send    = Send;
-    p_stream->pf_flush   = Flush;
-
+    p_stream->ops = &ops;
     p_stream->p_sys = p_sys;
 
     free(psz_ip);
@@ -1325,12 +1326,13 @@ error:
  *****************************************************************************/
 static void Close(vlc_object_t *p_this)
 {
+    vlc_object_t *parent = vlc_object_parent(p_this);
     sout_stream_t *p_stream = reinterpret_cast<sout_stream_t*>(p_this);
     sout_stream_sys_t *p_sys = reinterpret_cast<sout_stream_sys_t *>( p_stream->p_sys );
 
     assert(p_sys->out_streams.empty() && p_sys->streams.empty());
-    var_Destroy( p_stream->p_sout, SOUT_CFG_PREFIX "sys" );
-    var_Destroy( p_stream->p_sout, SOUT_CFG_PREFIX "sout-mux-caching" );
+    var_Destroy(parent, SOUT_CFG_PREFIX "sys");
+    var_Destroy(parent, SOUT_CFG_PREFIX "sout-mux-caching");
 
     assert(p_sys->streams.empty() && p_sys->out_streams.empty());
 

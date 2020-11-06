@@ -84,6 +84,7 @@ protected:
         return "";
     }
 
+public:
     MLParentId parentId() const;
     void setParentId(MLParentId parentId);
     void unsetParentId();
@@ -102,6 +103,7 @@ protected:
 
     virtual unsigned int getCount() const = 0;
 
+protected:
     virtual void onVlcMlEvent( const vlc_ml_event_t* event );
 
     MLParentId m_parent;
@@ -142,7 +144,7 @@ public:
         m_query_param.i_nbResults = BatchSize;
     }
 
-    int rowCount(const QModelIndex &parent) const override
+    int rowCount(const QModelIndex &parent = {}) const override
     {
         bool countHasChanged = false;
         if (parent.isValid())
@@ -162,7 +164,7 @@ public:
         return m_total_count;
     }
 
-    virtual T* get(unsigned int idx) const
+    virtual T* get(int idx) const
     {
         vlc_mutex_locker lock( &m_item_lock );
         T* obj = item( idx );
@@ -239,8 +241,12 @@ public:
     }
 
 protected:
-    T* item(unsigned int idx) const
+    T* item(int signedidx) const
     {
+        if (signedidx < 0)
+            return nullptr;
+
+        unsigned int idx = static_cast<unsigned int>(signedidx);
         // Must be called in a locked context
         if ( m_initialized == false )
         {
@@ -251,7 +257,7 @@ protected:
             emit countChanged( static_cast<unsigned int>(m_total_count) );
         }
 
-        if ( m_total_count == 0 || idx >= m_total_count || idx < 0 )
+        if ( m_total_count == 0 || idx >= m_total_count  )
             return nullptr;
 
         if ( idx < m_query_param.i_offset ||  idx >= m_query_param.i_offset + m_item_list.size() )
@@ -264,7 +270,7 @@ protected:
         }
 
         //db has changed
-        if ( idx - m_query_param.i_offset >= m_item_list.size() || idx - m_query_param.i_offset < 0 )
+        if ( idx - m_query_param.i_offset >= m_item_list.size() || idx < m_query_param.i_offset )
             return nullptr;
         return m_item_list[idx - m_query_param.i_offset].get();
     }

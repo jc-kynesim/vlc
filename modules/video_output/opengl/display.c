@@ -47,6 +47,8 @@ static void Close(vout_display_t *vd);
     "Extension through which to use the Open Graphics Library (OpenGL).")
 
 vlc_module_begin ()
+    set_category (CAT_VIDEO)
+    set_subcategory (SUBCAT_VIDEO_VOUT)
 #if defined (USE_OPENGL_ES2)
 # define API VLC_OPENGL_ES2
 # define MODULE_VARNAME "gles2"
@@ -62,8 +64,6 @@ vlc_module_begin ()
 # define MODULE_VARNAME "gl"
     set_shortname (N_("OpenGL"))
     set_description (N_("OpenGL video output"))
-    set_category (CAT_VIDEO)
-    set_subcategory (SUBCAT_VIDEO_VOUT)
     set_callback_display(Open, 270)
     add_shortcut ("opengl", "gl")
     add_module("gl", "opengl", NULL, GL_TEXT, PROVIDER_LONGTEXT)
@@ -108,7 +108,6 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
         return VLC_ENOMEM;
 
     sys->gl = NULL;
-    sys->place_changed = false;
 
     vout_window_t *surface = cfg->window;
     char *gl_name = var_InheritString(surface, MODULE_VARNAME);
@@ -143,6 +142,10 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     free(gl_name);
     if (sys->gl == NULL)
         goto error;
+
+    vout_display_PlacePicture(&sys->place, vd->source, cfg);
+    sys->place_changed = true;
+    vlc_gl_Resize (sys->gl, cfg->display.width, cfg->display.height);
 
     /* Initialize video display */
     const vlc_fourcc_t *spu_chromas;

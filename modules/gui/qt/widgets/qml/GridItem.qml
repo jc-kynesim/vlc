@@ -20,7 +20,7 @@ import QtQuick.Controls 2.4
 import QtQuick.Layouts 1.3
 import QtQml.Models 2.2
 import QtGraphicalEffects 1.0
-import org.videolan.medialib 0.1
+import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
@@ -36,6 +36,7 @@ FocusScope {
     property alias playCoverOnlyBorders: picture.playCoverOnlyBorders
     property alias playIconSize: picture.playIconSize
     property alias pictureRadius: picture.radius
+    property alias pictureOverlay: picture.imageOverlay
     property bool selected: false
 
     property alias progress: picture.progress
@@ -49,9 +50,9 @@ FocusScope {
     signal addToPlaylistClicked
     signal itemClicked(Item menuParent, int key, int modifier)
     signal itemDoubleClicked(Item menuParent, int keys, int modifier)
-    signal contextMenuButtonClicked(Item menuParent)
+    signal contextMenuButtonClicked(Item menuParent, var globalMousePos)
 
-    Keys.onMenuPressed: root.contextMenuButtonClicked(picture)
+    Keys.onMenuPressed: root.contextMenuButtonClicked(picture, root.mapToGlobal(0,0))
 
     Accessible.role: Accessible.Cell
     Accessible.name: title
@@ -65,33 +66,38 @@ FocusScope {
 
     property alias _primaryShadowVerticalOffset: primaryShadow.verticalOffset
     property alias _primaryShadowRadius: primaryShadow.radius
+    property alias _primaryShadowSamples: primaryShadow.samples
     property alias _secondaryShadowVerticalOffset: secondaryShadow.verticalOffset
     property alias _secondaryShadowRadius: secondaryShadow.radius
+    property alias _secondaryShadowSamples: secondaryShadow.samples
 
     property int _newIndicatorMedian: VLCStyle.margin_xsmall
 
+    state: _highlighted ? "selected" : "unselected"
     states: [
         State {
             name: "unselected"
-            when: !root._highlighted
             PropertyChanges {
                 target: root
                 _primaryShadowVerticalOffset: VLCStyle.dp(6, VLCStyle.scale)
                 _primaryShadowRadius: VLCStyle.dp(14, VLCStyle.scale)
+                _primaryShadowSamples: 1 + VLCStyle.dp(14, VLCStyle.scale) * 2
                 _secondaryShadowVerticalOffset: VLCStyle.dp(1, VLCStyle.scale)
                 _secondaryShadowRadius: VLCStyle.dp(3, VLCStyle.scale)
+                _secondaryShadowSamples: 1 + VLCStyle.dp(3, VLCStyle.scale) * 2
                 _newIndicatorMedian: VLCStyle.margin_xsmall
             }
         },
         State {
             name: "selected"
-            when: root._highlighted
             PropertyChanges {
                 target: root
                 _primaryShadowVerticalOffset: VLCStyle.dp(32, VLCStyle.scale)
                 _primaryShadowRadius: VLCStyle.dp(72, VLCStyle.scale)
+                _primaryShadowSamples: 1 + VLCStyle.dp(72, VLCStyle.scale) * 2
                 _secondaryShadowVerticalOffset: VLCStyle.dp(6, VLCStyle.scale)
                 _secondaryShadowRadius: VLCStyle.dp(8, VLCStyle.scale)
+                _secondaryShadowSamples: 1 + VLCStyle.dp(8, VLCStyle.scale) * 2
                 _newIndicatorMedian: VLCStyle.margin_small
             }
         }
@@ -99,10 +105,16 @@ FocusScope {
 
     transitions: Transition {
         to: "*"
-        SmoothedAnimation {
-          duration: 64
-          properties: "_primaryShadowVerticalOffset,_primaryShadowRadius,_secondaryShadowVerticalOffset,_secondaryShadowRadius,_newIndicatorMedian"
-       }
+        SequentialAnimation {
+            PropertyAction {
+                properties: "_primaryShadowSamples,_secondaryShadowSamples"
+            }
+
+            SmoothedAnimation {
+                duration: 64
+                properties: "_primaryShadowVerticalOffset,_primaryShadowRadius,_secondaryShadowVerticalOffset,_secondaryShadowRadius,_newIndicatorMedian"
+            }
+        }
     }
 
     MouseArea {
@@ -114,11 +126,11 @@ FocusScope {
         implicitHeight: content.implicitHeight
 
         acceptedButtons: Qt.RightButton | Qt.LeftButton
-        Keys.onMenuPressed: root.contextMenuButtonClicked(picture)
+        Keys.onMenuPressed: root.contextMenuButtonClicked(picture, root.mapToGlobal(0,0))
 
         onClicked: {
             if (mouse.button === Qt.RightButton)
-                contextMenuButtonClicked(picture);
+                contextMenuButtonClicked(picture, mouseArea.mapToGlobal(mouse.x,mouse.y));
             else {
                 root.itemClicked(picture, mouse.button, mouse.modifiers);
             }
@@ -166,10 +178,7 @@ FocusScope {
                 anchors.fill: baseRect
                 source: baseRect
                 horizontalOffset: 0
-                verticalOffset: VLCStyle.dp(6, VLCStyle.scale)
-                radius: VLCStyle.dp(14, VLCStyle.scale)
                 spread: 0
-                samples: ( radius * 2 ) + 1
                 color: Qt.rgba(0, 0, 0, .22)
             }
 
@@ -179,10 +188,7 @@ FocusScope {
                 anchors.fill: baseRect
                 source: baseRect
                 horizontalOffset: 0
-                verticalOffset: VLCStyle.dp(1, VLCStyle.scale)
-                radius: VLCStyle.dp(3, VLCStyle.scale)
                 spread: 0
-                samples: ( radius * 2 ) + 1
                 color: Qt.rgba(0, 0, 0, .18)
             }
 

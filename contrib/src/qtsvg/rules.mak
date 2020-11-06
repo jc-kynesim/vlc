@@ -1,7 +1,7 @@
 # Qt
 
-QTSVG_VERSION_MAJOR := 5.12
-QTSVG_VERSION := $(QTSVG_VERSION_MAJOR).7
+QTSVG_VERSION_MAJOR := 5.15
+QTSVG_VERSION := $(QTSVG_VERSION_MAJOR).1
 QTSVG_URL := https://download.qt.io/official_releases/qt/$(QTSVG_VERSION_MAJOR)/$(QTSVG_VERSION)/submodules/qtsvg-everywhere-src-$(QTSVG_VERSION).tar.xz
 
 DEPS_qtsvg += qt $(DEPS_qt)
@@ -25,7 +25,7 @@ qtsvg: qtsvg-everywhere-src-$(QTSVG_VERSION).tar.xz .sum-qtsvg
 	$(MOVE)
 
 .qtsvg: qtsvg
-	cd $< && $(PREFIX)/bin/qmake
+	cd $< && $(PREFIX)/lib/qt5/bin/qmake
 	# Make && Install libraries
 	cd $< && $(MAKE)
 	cd $< && $(MAKE) -C src sub-plugins-install_subtargets sub-svg-install_subtargets

@@ -117,6 +117,11 @@ struct vlc_player_input
         float pos;
         bool restore_states;
         bool delay_restore;
+        /* Keep a trace of tracks as they appear since they won't be available
+         * for probing when the input gets stopped
+         */
+        bool has_video_tracks;
+        bool has_audio_tracks;
     } ml;
 };
 
@@ -512,6 +517,9 @@ vlc_player_vout_OSDCallback(vlc_object_t *this, const char *var,
 
 void
 vlc_player_osd_Track(vlc_player_t *player, vlc_es_id_t *id, bool select);
+
+void
+vlc_player_osd_Tracks(vlc_player_t *player, vlc_es_id_t * const*selected, vlc_es_id_t *unselect);
 
 void
 vlc_player_osd_Program(vlc_player_t *player, const char *name);

@@ -567,17 +567,35 @@ OpenAdjust_InitFilterParams(filter_t * filter, void * p_data,
     return VLC_SUCCESS;
 }
 
+static void
+CloseAdjust(filter_t *filter)
+{
+    filter_sys_t *const filter_sys = filter->p_sys;
+
+    for (unsigned int i = 0; i < NUM_ADJUST_MODES; ++i)
+    {
+        var_DelCallback(filter, adjust_params_names[i],
+                        FilterCallback, filter_sys->p_data);
+        var_Destroy(filter, adjust_params_names[i]);
+    }
+    free(filter_sys->p_data);
+    Close(filter, filter_sys);
+}
+
+static const struct vlc_filter_operations Adjust_ops = {
+    .filter_video = Adjust, .close = CloseAdjust,
+};
+
 static int
-OpenAdjust(vlc_object_t * obj)
+OpenAdjust(filter_t *filter)
 {
     VAProcPipelineCaps          pipeline_caps;
-    filter_t *const             filter = (filter_t *)obj;
     struct adjust_data *const   p_data = calloc(1, sizeof(*p_data));
     if (!p_data)
         return VLC_ENOMEM;
 
     for (unsigned int i = 0; i < NUM_ADJUST_MODES; ++i)
-        var_Create(obj, adjust_params_names[i],
+        var_Create(filter, adjust_params_names[i],
                    VLC_VAR_FLOAT | VLC_VAR_DOINHERIT | VLC_VAR_ISCOMMAND);
 
     if (Open(filter, VAProcFilterColorBalance, &pipeline_caps, p_data,
@@ -585,33 +603,17 @@ OpenAdjust(vlc_object_t * obj)
         goto error;
 
     for (unsigned int i = 0; i < NUM_ADJUST_MODES; ++i)
-        var_AddCallback(obj, adjust_params_names[i], FilterCallback, p_data);
+        var_AddCallback(filter, adjust_params_names[i], FilterCallback, p_data);
 
-    filter->pf_video_filter = Adjust;
+    filter->ops = &Adjust_ops;
 
     return VLC_SUCCESS;
 
 error:
     for (unsigned int i = 0; i < NUM_ADJUST_MODES; ++i)
-        var_Destroy(obj, adjust_params_names[i]);
+        var_Destroy(filter, adjust_params_names[i]);
     free(p_data);
     return VLC_EGENERIC;
-}
-
-static void
-CloseAdjust(vlc_object_t * obj)
-{
-    filter_t *const     filter = (filter_t *)obj;
-    filter_sys_t *const filter_sys = filter->p_sys;
-
-    for (unsigned int i = 0; i < NUM_ADJUST_MODES; ++i)
-    {
-        var_DelCallback(obj, adjust_params_names[i],
-                        FilterCallback, filter_sys->p_data);
-        var_Destroy(obj, adjust_params_names[i]);
-    }
-    free(filter_sys->p_data);
-    Close(filter, filter_sys);
 }
 
 /***************************
@@ -684,12 +686,27 @@ OpenBasicFilter_InitFilterParams(filter_t * filter, void * p_data,
     return VLC_SUCCESS;
 }
 
+static void
+CloseBasicFilter(filter_t *filter)
+{
+    filter_sys_t *const                 filter_sys = filter->p_sys;
+    struct basic_filter_data *const     p_data = filter_sys->p_data;
+
+    var_DelCallback(filter, p_data->sigma.psz_name, FilterCallback, p_data);
+    var_Destroy(filter, p_data->sigma.psz_name);
+    free(p_data);
+    Close(filter, filter_sys);
+}
+
+static const struct vlc_filter_operations BasicFilter_ops = {
+    .filter_video = BasicFilter, .close = CloseBasicFilter
+};
+
 static int
-OpenBasicFilter(vlc_object_t * obj, VAProcFilterType filter_type,
+OpenBasicFilter(filter_t *filter, VAProcFilterType filter_type,
                 const char *psz_sigma_name, struct range const *p_vlc_range)
 {
     VAProcPipelineCaps                  pipeline_caps;
-    filter_t *const                     filter = (filter_t *)obj;
     assert(filter->psz_name);
     struct basic_filter_data *const     p_data = calloc(1, sizeof(*p_data));
     if (!p_data)
@@ -699,50 +716,37 @@ OpenBasicFilter(vlc_object_t * obj, VAProcFilterType filter_type,
     p_data->sigma.psz_name = psz_sigma_name;
     p_data->sigma.p_vlc_range = p_vlc_range;
 
-    var_Create(obj, p_data->sigma.psz_name,
+    var_Create(filter, p_data->sigma.psz_name,
                VLC_VAR_FLOAT | VLC_VAR_DOINHERIT | VLC_VAR_ISCOMMAND);
 
     if (Open(filter, p_data->filter_type, &pipeline_caps, p_data,
              OpenBasicFilter_InitFilterParams, NULL))
         goto error;
 
-    var_AddCallback(obj, p_data->sigma.psz_name, FilterCallback, p_data);
+    var_AddCallback(filter, p_data->sigma.psz_name, FilterCallback, p_data);
 
-    filter->pf_video_filter = BasicFilter;
+    filter->ops = &BasicFilter_ops;
 
     return VLC_SUCCESS;
 
 error:
-    var_Destroy(obj, p_data->sigma.psz_name);
+    var_Destroy(filter, p_data->sigma.psz_name);
     free(p_data);
     return VLC_EGENERIC;
 }
 
 static int
-OpenDenoiseFilter(vlc_object_t * obj)
+OpenDenoiseFilter(filter_t *filter)
 {
-    return OpenBasicFilter(obj, VAProcFilterNoiseReduction, "denoise-sigma",
+    return OpenBasicFilter(filter, VAProcFilterNoiseReduction, "denoise-sigma",
                            &vlc_denoise_sigma_range);
 }
 
 static int
-OpenSharpenFilter(vlc_object_t * obj)
+OpenSharpenFilter(filter_t *filter)
 {
-    return OpenBasicFilter(obj, VAProcFilterSharpening, "sharpen-sigma",
+    return OpenBasicFilter(filter, VAProcFilterSharpening, "sharpen-sigma",
                            &vlc_sharpen_sigma_range);
-}
-
-static void
-CloseBasicFilter(vlc_object_t * obj)
-{
-    filter_t *const                     filter = (filter_t *)obj;
-    filter_sys_t *const                 filter_sys = filter->p_sys;
-    struct basic_filter_data *const     p_data = filter_sys->p_data;
-
-    var_DelCallback(obj, p_data->sigma.psz_name, FilterCallback, p_data);
-    var_Destroy(obj, p_data->sigma.psz_name);
-    free(p_data);
-    Close(filter, filter_sys);
 }
 
 /*************************
@@ -883,7 +887,7 @@ DeinterlaceX2(filter_t * filter, picture_t * src)
         dest[i]->i_nb_fields = 1;
     }
 
-    dest[0]->p_next = dest[1];
+    vlc_picture_chain_AppendChain( dest[0], dest[1] );
     dest[0]->date = cur->date;
     if (dest[0]->date != VLC_TICK_INVALID)
         dest[1]->date = dest[0]->date + i_field_dur;
@@ -1065,11 +1069,29 @@ OpenDeinterlace_InitHistory(void * p_data, VAProcPipelineCaps const * pipeline_c
     return VLC_SUCCESS;
 }
 
+static void CloseDeinterlace(filter_t *filter)
+{
+    filter_sys_t *const         filter_sys = filter->p_sys;
+    struct deint_data *const    p_data = filter_sys->p_data;
+
+    Deinterlace_Flush(filter);
+    free(p_data->forward_refs.surfaces);
+    free(p_data->history.pp_pics);
+    free(p_data);
+    Close(filter, filter_sys);
+}
+
+static const struct vlc_filter_operations DeinterlaceX2_ops = {
+    .filter_video = DeinterlaceX2, .flush = Deinterlace_Flush, .close = CloseDeinterlace,
+};
+static const struct vlc_filter_operations Deinterlace_ops = {
+    .filter_video = Deinterlace,   .flush = Deinterlace_Flush, .close = CloseDeinterlace,
+};
+
 static int
-OpenDeinterlace(vlc_object_t * obj)
+OpenDeinterlace(filter_t *filter)
 {
     VAProcPipelineCaps          pipeline_caps;
-    filter_t *const             filter = (filter_t *)obj;
     struct deint_data *const    p_data = calloc(1, sizeof(*p_data));
     if (!p_data)
         return VLC_ENOMEM;
@@ -1079,10 +1101,9 @@ OpenDeinterlace(vlc_object_t * obj)
         goto error;
 
     if (p_data->b_double_rate)
-        filter->pf_video_filter = DeinterlaceX2;
+        filter->ops = &DeinterlaceX2_ops;
     else
-        filter->pf_video_filter = Deinterlace;
-    filter->pf_flush = Deinterlace_Flush;
+        filter->ops = &Deinterlace_ops;
 
     for (unsigned int i = 0; i < METADATA_SIZE; ++i)
     {
@@ -1101,25 +1122,6 @@ error:
     return VLC_EGENERIC;
 }
 
-static void
-CloseDeinterlace(vlc_object_t * obj)
-{
-    filter_t *const             filter = (filter_t *)obj;
-    filter_sys_t *const         filter_sys = filter->p_sys;
-    struct deint_data *const    p_data = filter_sys->p_data;
-
-    if (p_data->forward_refs.surfaces)
-        free(p_data->forward_refs.surfaces);
-    if (p_data->history.pp_pics)
-    {
-        while (p_data->history.num_pics)
-            picture_Release(p_data->history.pp_pics[--p_data->history.num_pics]);
-        free(p_data->history.pp_pics);
-    }
-    free(p_data);
-    Close(filter, filter_sys);
-}
-
 /*********************
  * Module descriptor *
  *********************/
@@ -1129,18 +1131,16 @@ vlc_module_begin()
     set_description(N_("Video Accelerated API filters"))
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
-    set_capability("video filter", 0)
 
     add_submodule()
-    set_callbacks(OpenAdjust, CloseAdjust)
+    set_callback_video_filter(OpenAdjust)
     add_shortcut("adjust")
 
     add_submodule()
-    set_callbacks(OpenDeinterlace, CloseDeinterlace)
-    add_shortcut("deinterlace")
+    set_deinterlace_callback(OpenDeinterlace)
 
     add_submodule()
-    set_callbacks(OpenDenoiseFilter, CloseBasicFilter)
+    set_callback_video_filter(OpenDenoiseFilter)
     add_float_with_range("denoise-sigma", 1.f, .0f, .0f,
                          "Denoise strength (0-2)",
                          "Set the Denoise strength, between 0 and 2. "
@@ -1149,10 +1149,9 @@ vlc_module_begin()
     add_shortcut("denoise")
 
     add_submodule()
-    set_callbacks(OpenSharpenFilter, CloseBasicFilter)
+    set_callback_video_filter(OpenSharpenFilter)
     add_shortcut("sharpen")
 
     add_submodule()
-    set_capability("video converter", 10)
-    set_callbacks(vlc_vaapi_OpenChroma, vlc_vaapi_CloseChroma)
+    set_callback_video_converter(vlc_vaapi_OpenChroma, 10)
 vlc_module_end()

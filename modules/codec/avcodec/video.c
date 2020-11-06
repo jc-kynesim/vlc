@@ -92,7 +92,7 @@ typedef struct
 
     /* for direct rendering */
     bool        b_direct_rendering;
-    atomic_bool b_dr_failure;
+    bool        b_dr_failure; /* Protected by lock */
 
     /* Hack to force display of still pictures */
     bool b_first_frame;
@@ -231,105 +231,7 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
                                  * __MAX(ctx->ticks_per_frame, 1);
     }
 
-    switch ( ctx->color_range )
-    {
-    case AVCOL_RANGE_JPEG:
-        fmt->color_range = COLOR_RANGE_FULL;
-        break;
-    case AVCOL_RANGE_MPEG:
-        fmt->color_range = COLOR_RANGE_LIMITED;
-        break;
-    default: /* do nothing */
-        break;
-    }
-
-    switch( ctx->colorspace )
-    {
-        case AVCOL_SPC_BT709:
-            fmt->space = COLOR_SPACE_BT709;
-            break;
-        case AVCOL_SPC_SMPTE170M:
-        case AVCOL_SPC_BT470BG:
-            fmt->space = COLOR_SPACE_BT601;
-            break;
-        case AVCOL_SPC_BT2020_NCL:
-        case AVCOL_SPC_BT2020_CL:
-            fmt->space = COLOR_SPACE_BT2020;
-            break;
-        default:
-            break;
-    }
-
-    switch( ctx->color_trc )
-    {
-        case AVCOL_TRC_LINEAR:
-            fmt->transfer = TRANSFER_FUNC_LINEAR;
-            break;
-        case AVCOL_TRC_GAMMA22:
-            fmt->transfer = TRANSFER_FUNC_SRGB;
-            break;
-        case AVCOL_TRC_BT709:
-            fmt->transfer = TRANSFER_FUNC_BT709;
-            break;
-        case AVCOL_TRC_SMPTE170M:
-        case AVCOL_TRC_BT2020_10:
-        case AVCOL_TRC_BT2020_12:
-            fmt->transfer = TRANSFER_FUNC_BT2020;
-            break;
-#if LIBAVUTIL_VERSION_CHECK( 55, 14, 0, 31, 100)
-        case AVCOL_TRC_ARIB_STD_B67:
-            fmt->transfer = TRANSFER_FUNC_ARIB_B67;
-            break;
-#endif
-#if LIBAVUTIL_VERSION_CHECK( 55, 17, 0, 37, 100)
-        case AVCOL_TRC_SMPTE2084:
-            fmt->transfer = TRANSFER_FUNC_SMPTE_ST2084;
-            break;
-        case AVCOL_TRC_SMPTE240M:
-            fmt->transfer = TRANSFER_FUNC_SMPTE_240;
-            break;
-        case AVCOL_TRC_GAMMA28:
-            fmt->transfer = TRANSFER_FUNC_BT470_BG;
-            break;
-#endif
-        default:
-            break;
-    }
-
-    switch( ctx->color_primaries )
-    {
-        case AVCOL_PRI_BT709:
-            fmt->primaries = COLOR_PRIMARIES_BT709;
-            break;
-        case AVCOL_PRI_BT470BG:
-            fmt->primaries = COLOR_PRIMARIES_BT601_625;
-            break;
-        case AVCOL_PRI_SMPTE170M:
-        case AVCOL_PRI_SMPTE240M:
-            fmt->primaries = COLOR_PRIMARIES_BT601_525;
-            break;
-        case AVCOL_PRI_BT2020:
-            fmt->primaries = COLOR_PRIMARIES_BT2020;
-            break;
-        default:
-            break;
-    }
-
-    switch( ctx->chroma_sample_location )
-    {
-        case AVCHROMA_LOC_LEFT:
-            fmt->chroma_location = CHROMA_LOCATION_LEFT;
-            break;
-        case AVCHROMA_LOC_CENTER:
-            fmt->chroma_location = CHROMA_LOCATION_CENTER;
-            break;
-        case AVCHROMA_LOC_TOPLEFT:
-            fmt->chroma_location = CHROMA_LOCATION_TOP_LEFT;
-            break;
-        default:
-            break;
-    }
-
+    get_video_color_settings(ctx, fmt);
     return 0;
 }
 
@@ -596,7 +498,7 @@ int InitVideoDec( vlc_object_t *obj )
 
     /* ***** libavcodec direct rendering ***** */
     p_sys->b_direct_rendering = false;
-    atomic_init(&p_sys->b_dr_failure, false);
+    p_sys->b_dr_failure = false;
     if( var_CreateGetBool( p_dec, "avcodec-dr" ) &&
        (p_codec->capabilities & AV_CODEC_CAP_DR1) &&
         /* No idea why ... but this fixes flickering on some TSCC streams */
@@ -943,7 +845,7 @@ static int DecodeSidedata( decoder_t *p_dec, const AVFrame *frame, picture_t *p_
         }
 #if LIBAVUTIL_VERSION_CHECK( 56, 7, 0, 4, 100 )
         p_pic->format.b_multiview_right_eye_first = stereo_data->flags & AV_STEREO3D_FLAG_INVERT;
-        p_pic->format.b_multiview_left_eye = (stereo_data->view == AV_STEREO3D_VIEW_LEFT);
+        p_pic->b_multiview_left_eye = (stereo_data->view == AV_STEREO3D_VIEW_LEFT);
 
         p_dec->fmt_out.video.b_multiview_right_eye_first = p_pic->format.b_multiview_right_eye_first;
 #endif
@@ -1499,6 +1401,9 @@ static int lavc_dr_GetFrame(struct AVCodecContext *ctx, AVFrame *frame)
     decoder_t *dec = ctx->opaque;
     decoder_sys_t *sys = dec->p_sys;
 
+    if (sys->b_dr_failure)
+        return -1;
+
     if (ctx->pix_fmt == AV_PIX_FMT_PAL8)
         return -1;
 
@@ -1520,15 +1425,15 @@ static int lavc_dr_GetFrame(struct AVCodecContext *ctx, AVFrame *frame)
     {
         if (pic->p[i].i_pitch % aligns[i])
         {
-            if (!atomic_exchange(&sys->b_dr_failure, true))
-                msg_Warn(dec, "plane %d: pitch not aligned (%d%%%d): disabling direct rendering",
-                         i, pic->p[i].i_pitch, aligns[i]);
+            msg_Warn(dec, "plane %d: pitch not aligned (%d%%%d): disabling direct rendering",
+                     i, pic->p[i].i_pitch, aligns[i]);
+            sys->b_dr_failure = true;
             goto error;
         }
         if (((uintptr_t)pic->p[i].p_pixels) % aligns[i])
         {
-            if (!atomic_exchange(&sys->b_dr_failure, true))
-                msg_Warn(dec, "plane %d not aligned: disabling direct rendering", i);
+            msg_Warn(dec, "plane %d not aligned: disabling direct rendering", i);
+            sys->b_dr_failure = true;
             goto error;
         }
     }
@@ -1765,7 +1670,6 @@ no_reuse:
 
         p_sys->p_va = va;
         p_sys->pix_fmt = hwfmt;
-        p_context->draw_horiz_band = NULL;
         vlc_mutex_unlock(&p_sys->lock);
         return hwfmt;
     }

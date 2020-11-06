@@ -32,15 +32,13 @@
 #include <vlc_plugin.h>
 #include <vlc_filter.h>
 #include <vlc_picture.h>
-#include "filter_picture.h"
 
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static int  Create      ( vlc_object_t * );
-static void Destroy     ( vlc_object_t * );
+static int  Create      ( filter_t * );
 
-static picture_t *Filter( filter_t *, picture_t * );
+VIDEO_FILTER_WRAPPER(Filter)
 
 /*****************************************************************************
  * Module descriptor
@@ -50,9 +48,8 @@ vlc_module_begin ()
     set_shortname( N_("Color inversion" ))
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
-    set_capability( "video filter", 0 )
     add_shortcut( "invert" )
-    set_callbacks( Create, Destroy )
+    set_callback_video_filter( Create )
 vlc_module_end ()
 
 /*****************************************************************************
@@ -60,9 +57,8 @@ vlc_module_end ()
  *****************************************************************************
  * This function allocates and initializes a Invert vout method.
  *****************************************************************************/
-static int Create( vlc_object_t *p_this )
+static int Create( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     vlc_fourcc_t fourcc = p_filter->fmt_in.video.i_chroma;
 
     if( fourcc == VLC_CODEC_YUVP || fourcc == VLC_CODEC_RGBP
@@ -76,18 +72,8 @@ static int Create( vlc_object_t *p_this )
      || p_chroma->pixel_size * 8 != p_chroma->pixel_bits )
         return VLC_EGENERIC;
 
-    p_filter->pf_video_filter = Filter;
+    p_filter->ops = &Filter_ops;
     return VLC_SUCCESS;
-}
-
-/*****************************************************************************
- * Destroy: destroy Invert video thread output method
- *****************************************************************************
- * Terminate an output method created by InvertCreateOutputMethod
- *****************************************************************************/
-static void Destroy( vlc_object_t *p_this )
-{
-    (void)p_this;
 }
 
 /*****************************************************************************
@@ -97,20 +83,10 @@ static void Destroy( vlc_object_t *p_this )
  * until it is displayed and switch the two rendering buffers, preparing next
  * frame.
  *****************************************************************************/
-static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
+static void Filter( filter_t *p_filter, picture_t *p_pic, picture_t *p_outpic )
 {
-    picture_t *p_outpic;
+    VLC_UNUSED(p_filter);
     int i_planes;
-
-    if( !p_pic ) return NULL;
-
-    p_outpic = filter_NewPicture( p_filter );
-    if( !p_outpic )
-    {
-        msg_Warn( p_filter, "can't get output picture" );
-        picture_Release( p_pic );
-        return NULL;
-    }
 
     if( p_pic->format.i_chroma == VLC_CODEC_YUVA )
     {
@@ -168,6 +144,4 @@ static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
                      - p_outpic->p[i_index].i_visible_pitch;
         }
     }
-
-    return CopyInfoAndRelease( p_outpic, p_pic );
 }

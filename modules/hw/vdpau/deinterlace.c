@@ -77,8 +77,8 @@ static picture_t *Deinterlace(filter_t *filter, picture_t *src)
     dst->i_nb_fields = 1;
     src->i_nb_fields = 1;
 
-    assert(src->p_next == NULL);
-    src->p_next = dst;
+    assert(!picture_HasChainedPics(src));
+    vlc_picture_chain_AppendChain( src, dst );
 
     if (src->b_progressive || src->b_top_field_first)
     {
@@ -96,10 +96,24 @@ static picture_t *Deinterlace(filter_t *filter, picture_t *src)
     return src;
 }
 
-static int Open(vlc_object_t *obj)
+static void Flush(filter_t *filter)
 {
-    filter_t *filter = (filter_t *)obj;
+    filter_sys_t *sys = filter->p_sys;
+    sys->last_pts = VLC_TICK_INVALID;
+}
 
+static void Close(filter_t *filter)
+{
+    vlc_video_context_Release(filter->vctx_out);
+}
+
+static const struct vlc_filter_operations filter_ops = {
+    .filter_video = Deinterlace, .close = Close,
+    .flush = Flush,
+};
+
+static int Open(filter_t *filter)
+{
     if ( filter->vctx_in == NULL ||
          vlc_video_context_GetType(filter->vctx_in) != VLC_VIDEO_CONTEXT_VDPAU )
         return VLC_EGENERIC;
@@ -110,7 +124,7 @@ static int Open(vlc_object_t *obj)
     if (!video_format_IsSimilar(&filter->fmt_in.video, &filter->fmt_out.video))
         return VLC_EGENERIC;
 
-    filter_sys_t *sys = malloc(sizeof (*sys));
+    filter_sys_t *sys = vlc_obj_malloc(VLC_OBJECT(filter), sizeof (*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
 
@@ -119,27 +133,16 @@ static int Open(vlc_object_t *obj)
 
     sys->last_pts = VLC_TICK_INVALID;
 
-    filter->pf_video_filter = Deinterlace;
+    filter->ops = &filter_ops;
     filter->p_sys = sys;
     filter->fmt_out.video.i_frame_rate *= 2;
     filter->vctx_out = vlc_video_context_Hold(filter->vctx_in);
     return VLC_SUCCESS;
 }
 
-static void Close(vlc_object_t *obj)
-{
-    filter_t *filter = (filter_t *)obj;
-    filter_sys_t *sys = filter->p_sys;
-
-    vlc_video_context_Release(filter->vctx_out);
-    free(sys);
-}
-
 vlc_module_begin()
     set_description(N_("VDPAU deinterlacing filter"))
-    set_capability("video filter", 0)
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
-    set_callbacks(Open, Close)
-    add_shortcut ("deinterlace")
+    set_deinterlace_callback(Open)
 vlc_module_end()

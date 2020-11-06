@@ -112,7 +112,10 @@ static void PATCallBack( void *data, dvbpsi_pat_t *p_dvbpsipat )
             return;
         }
     }
-    else msg_Warn( p_demux, "Replacing generated PAT with one received from stream" );
+    else if( p_pat->i_version != -1 )
+    {
+        msg_Warn( p_demux, "Replacing generated PAT with one received from stream" );
+    }
 
     /* check content */
     if( !p_dvbpsipat->b_current_next || p_sys->b_user_pmt ||
@@ -181,6 +184,8 @@ static void PATCallBack( void *data, dvbpsi_pat_t *p_dvbpsipat )
         }
 
         pmtpid->u.p_pmt->i_number = p_program->i_number;
+        if( p_pat->b_generated )
+            pmtpid->u.p_pmt->pcr.b_disable = p_sys->patfix.b_pcrhasnopcrfield;
 
         ARRAY_APPEND( p_pat->programs, pmtpid );
 

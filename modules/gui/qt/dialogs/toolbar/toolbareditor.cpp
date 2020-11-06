@@ -22,8 +22,6 @@
 
 #include "toolbareditor.hpp"
 #include "util/i18n.hpp"
-#include "util/recent_media_model.hpp"
-#include "util/settings.hpp"
 #include "util/systempalette.hpp"
 #include "util/qml_main_context.hpp"
 #include "player/playercontrolbarmodel.hpp"
@@ -102,10 +100,8 @@ ToolbarEditorDialog::ToolbarEditorDialog( QWidget *_w, intf_thread_t *_p_intf)
     rootCtx->setContextProperty( "mainctx", new QmlMainContext(p_intf, mainInterface, engine));
     rootCtx->setContextProperty( "mainInterface", mainInterface);
     rootCtx->setContextProperty( "topWindow", mainInterface->windowHandle());
-    rootCtx->setContextProperty( "settings",  new Settings( p_intf, engine));
     rootCtx->setContextProperty( "systemPalette", new SystemPalette(engine));
     rootCtx->setContextProperty( "medialib", nullptr );
-    rootCtx->setContextProperty( "recentsMedias",  new VLCRecentMediaModel( p_intf, engine ));
     rootCtx->setContextProperty( "toolbareditor",  this);
 
     editorView->setSource( QUrl ( QStringLiteral("qrc:/dialogs/ToolbarEditor.qml") ) );

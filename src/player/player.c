@@ -31,6 +31,7 @@
 #include <vlc_tick.h>
 #include <vlc_decoder.h>
 #include <vlc_memstream.h>
+#include <vlc_http.h>
 
 #include "libvlc.h"
 #include "input/resource.h"
@@ -219,7 +220,6 @@ vlc_player_destructor_Thread(void *data)
                                          VLC_TICK_INVALID);
             vlc_player_destructor_AddStoppingInput(player, input);
 
-            vlc_player_UpdateMLStates(player, input);
             input_Stop(input->thread);
         }
 
@@ -228,6 +228,8 @@ vlc_player_destructor_Thread(void *data)
             !vlc_list_is_empty(&player->destructor.joinable_inputs);
         vlc_list_foreach(input, &player->destructor.joinable_inputs, node)
         {
+            vlc_player_UpdateMLStates(player, input);
+
             keep_sout = var_GetBool(input->thread, "sout-keep");
 
             if (input->state == VLC_PLAYER_STATE_STOPPING)
@@ -476,8 +478,10 @@ vlc_player_SelectEsIdList(vlc_player_t *player,
        selection completes. The list will be freed in input.c:ControlRelease */
     struct vlc_es_id_t **allocated_ids =
         vlc_alloc(track_count + 1, sizeof(vlc_es_id_t *));
+    struct vlc_es_id_t **osd_ids = /* create two copies, one for osd message */
+        vlc_alloc(track_count + 1, sizeof(vlc_es_id_t *));
 
-    if (allocated_ids == NULL)
+    if (allocated_ids == NULL || osd_ids == NULL)
         return 0;
 
     track_count = 0;
@@ -487,9 +491,11 @@ vlc_player_SelectEsIdList(vlc_player_t *player,
         if (vlc_es_id_GetCat(es_id_list[i]) == cat)
         {
             vlc_es_id_Hold(es_id);
+            osd_ids[track_count] = es_id;
             allocated_ids[track_count++] = es_id;
         }
     }
+    osd_ids[track_count] = NULL;
     allocated_ids[track_count] = NULL;
 
     /* Attempt to select all the requested tracks */
@@ -499,37 +505,15 @@ vlc_player_SelectEsIdList(vlc_player_t *player,
             .list.ids = allocated_ids,
         });
     if (ret != VLC_SUCCESS)
+    {
+        free(osd_ids);
         return 0;
+    }
 
     /* Display track selection message */
-    const char *cat_name = es_format_category_to_string(cat);
-    if (track_count == 0)
-        vlc_player_osd_Message(player, _("%s track: %s"), cat_name, _("N/A"));
-    else if (track_count == 1)
-        vlc_player_osd_Track(player, es_id_list[0], true);
-    else
-    {
-        struct vlc_memstream stream;
-        vlc_memstream_open(&stream);
-        for (size_t i = 0; i < track_count; i++)
-        {
-            const struct vlc_player_track *track =
-                vlc_player_GetTrack(player, es_id_list[i]);
+    vlc_player_osd_Tracks(player, osd_ids, NULL);
+    free(osd_ids);
 
-            if (track)
-            {
-                if (i != 0)
-                    vlc_memstream_puts(&stream, ", ");
-                vlc_memstream_puts(&stream, track->name);
-            }
-        }
-        if (vlc_memstream_close(&stream) == 0)
-        {
-            vlc_player_osd_Message(player, _("%s tracks: %s"), cat_name,
-                                   stream.ptr);
-            free(stream.ptr);
-        }
-    }
     return track_count;
 }
 
@@ -700,8 +684,16 @@ vlc_player_UnselectEsId(vlc_player_t *player, vlc_es_id_t *id)
 
     int ret = input_ControlPushEsHelper(input->thread, INPUT_CONTROL_UNSET_ES,
                                         id);
-    if (ret == VLC_SUCCESS)
-        vlc_player_osd_Track(player, id, false);
+    if (ret != VLC_SUCCESS)
+        return;
+
+    const enum es_format_category_e cat = vlc_es_id_GetCat(id);
+    vlc_es_id_t **selected_es = vlc_player_GetEsIdList(player, cat, NULL);
+    if (selected_es == NULL)
+        return;
+
+    vlc_player_osd_Tracks(player, selected_es, id);
+    free(selected_es);
 }
 
 void
@@ -1920,6 +1912,13 @@ vlc_player_Delete(vlc_player_t *player)
     if (player->renderer)
         vlc_renderer_item_release(player->renderer);
 
+    vlc_http_cookie_jar_t *cookies = var_GetAddress(player, "http-cookies");
+    if (cookies != NULL)
+    {
+        var_Destroy(player, "http-cookies");
+        vlc_http_cookies_destroy(cookies);
+    }
+
     vlc_object_delete(player);
 }
 
@@ -1995,6 +1994,14 @@ vlc_player_New(vlc_object_t *parent, enum vlc_player_lock_type lock_type,
     VAR_CREATE("start-paused", VLC_VAR_BOOL);
     VAR_CREATE("play-and-pause", VLC_VAR_BOOL);
 
+    /* Initialize the shared HTTP cookie jar */
+    vlc_value_t cookies;
+    cookies.p_address = vlc_http_cookies_new();
+    if (likely(cookies.p_address != NULL))
+    {
+        VAR_CREATE("http-cookies", VLC_VAR_ADDRESS);
+        var_SetChecked(player, "http-cookies", VLC_VAR_ADDRESS, cookies);
+    }
 #undef VAR_CREATE
 
     player->resource = input_resource_New(VLC_OBJECT(player));

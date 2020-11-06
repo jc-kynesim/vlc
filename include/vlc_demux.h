@@ -50,6 +50,9 @@
 #define INPUT_UPDATE_META       0x0040
 #define INPUT_UPDATE_TITLE_LIST 0x0100
 
+/* Demux module descriptor helpers */
+#define add_file_extension(ext) add_shortcut("ext-" ext)
+
 /* demux_meta_t is returned by "meta reader" module to the demuxer */
 typedef struct demux_meta_t
 {
@@ -118,6 +121,12 @@ enum demux_query_e
      *
      * arg1=double *quality, arg2=double *strength */
     DEMUX_GET_SIGNAL = 0x107,
+
+    /** Retrieves the demuxed content type
+     * Can fail if the control is not implemented
+     *
+     * arg1= int* */
+    DEMUX_GET_TYPE = 0x109,
 
     /** Sets the paused or playing/resumed state.
      *
@@ -242,14 +251,6 @@ enum demux_query_e
      * It should return the value really used in *p_rate */
     DEMUX_SET_RATE,             /* arg1= float*p_rate res=can fail */
 
-    /** Checks whether the stream is actually a playlist, rather than a real
-     * stream.
-     *
-     * Can fail if the stream is not a playlist (same as returning false).
-     *
-     * arg1= bool * */
-    DEMUX_IS_PLAYLIST,
-
     /* Menu (VCD/DVD/BD) Navigation */
     /** Activate the navigation item selected. Can fail */
     DEMUX_NAV_ACTIVATE,
@@ -289,14 +290,7 @@ static inline void demux_Delete(demux_t *demux)
 VLC_API int demux_vaControlHelper( stream_t *, int64_t i_start, int64_t i_end,
                                    int64_t i_bitrate, int i_align, int i_query, va_list args );
 
-VLC_USED static inline int demux_Demux( demux_t *p_demux )
-{
-    if( !p_demux->pf_demux )
-        return VLC_DEMUXER_SUCCESS;
-
-    return p_demux->pf_demux( p_demux );
-}
-
+VLC_API int demux_Demux( demux_t *p_demux ) VLC_USED;
 VLC_API int demux_vaControl( demux_t *p_demux, int i_query, va_list args );
 
 static inline int demux_Control( demux_t *p_demux, int i_query, ... )

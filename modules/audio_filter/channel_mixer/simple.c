@@ -41,7 +41,7 @@ static int  OpenFilter( vlc_object_t * );
 vlc_module_begin ()
     set_description( N_("Audio filter for simple channel mixing") )
     set_category( CAT_AUDIO )
-    set_subcategory( SUBCAT_AUDIO_MISC )
+    set_subcategory( SUBCAT_AUDIO_AFILTER )
     set_capability( "audio converter", 10 )
     set_callback( OpenFilter );
 vlc_module_end ()
@@ -345,8 +345,11 @@ static int OpenFilter( vlc_object_t *p_this )
     if( do_work == NULL )
         return VLC_EGENERIC;
 
-    p_filter->pf_audio_filter = Filter;
-    p_filter->p_sys = (void *)do_work;
+    static const struct vlc_filter_operations filter_ops =
+        { .filter_audio = Filter };
+
+    p_filter->ops = &filter_ops;
+    p_filter->p_sys = do_work;
     return VLC_SUCCESS;
 }
 
@@ -392,4 +395,3 @@ static block_t *Filter( filter_t *p_filter, block_t *p_block )
 
     return p_out;
 }
-

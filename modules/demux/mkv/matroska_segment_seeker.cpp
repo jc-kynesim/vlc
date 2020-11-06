@@ -118,7 +118,14 @@ SegmentSeeker::add_seekpoint( track_id_t track_id, Seekpoint sp )
     seekpoints_t&  seekpoints = _tracks_seekpoints[ track_id ];
     seekpoints_t::iterator it = std::lower_bound( seekpoints.begin(), seekpoints.end(), sp );
 
-    if( it != seekpoints.end() && it->pts == sp.pts )
+    if( it != seekpoints.end() && it->fpos == sp.fpos )
+    {
+        if (sp.trust_level <= it->trust_level)
+            return;
+
+        *it = sp;
+    }
+    else if( it != seekpoints.end() && it->pts == sp.pts )
     {
         if (sp.trust_level <= it->trust_level)
             return;
@@ -311,8 +318,10 @@ SegmentSeeker::get_seekpoints( matroska_segment_c& ms, vlc_tick_t target_pts,
         if ( start.fpos == std::numeric_limits<fptr_t>::max() )
             return tracks_seekpoint_t();
 
-        if ( end.fpos != std::numeric_limits<fptr_t>::max() || !ms.b_cues )
+        if ( (end.fpos != std::numeric_limits<fptr_t>::max() || !ms.b_cues) &&
+             (needle_pts != start.pts || start.trust_level < Seekpoint::TRUSTED))
             // do not read the whole (infinite?) file to get seek indexes
+            // do not generate an index if we already have the correct seekpoint
             index_range( ms, Range( start.fpos, end.fpos ), needle_pts );
 
         tracks_seekpoint_t tpoints = find_greatest_seekpoints_in_range( start.fpos, target_pts, filter_tracks );

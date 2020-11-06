@@ -492,10 +492,11 @@
         unsigned int confsize;
 
         module_t * p_module = modules[i];
+        bool mod_is_main = module_is_main(p_module);
 
         /* Exclude empty plugins (submodules don't have config */
         /* options, they are stored in the parent module) */
-        if (module_is_main(p_module)) {
+        if (mod_is_main) {
             pluginItem = self;
             _configItems = module_config_get(p_module, &confsize);
             _configSize = confsize;
@@ -507,16 +508,27 @@
 
         for (unsigned int j = 0; j < confsize; j++) {
             int configType = p_configs[j].i_type;
+
             if (configType == CONFIG_CATEGORY) {
+                if( p_configs[j].value.i == -1 ) {
+                    categoryItem = nil;
+                    continue;
+                }
                 categoryItem = [self itemRepresentingCategory:(int)p_configs[j].value.i];
                 if (!categoryItem) {
                     categoryItem = [VLCTreeCategoryItem categoryTreeItemWithCategory:(int)p_configs[j].value.i];
                     if (categoryItem)
                         [[self children] addObject:categoryItem];
                 }
+                continue;
             }
-            else if (configType == CONFIG_SUBCATEGORY) {
+
+            if (configType == CONFIG_SUBCATEGORY) {
                 lastsubcat = (int)p_configs[j].value.i;
+                if( lastsubcat == -1 ) {
+                    subCategoryItem = nil;
+                    continue;
+                }
                 if (categoryItem && ![self isSubCategoryGeneral:lastsubcat]) {
                     subCategoryItem = [categoryItem itemRepresentingSubCategory:lastsubcat];
                     if (!subCategoryItem) {
@@ -525,17 +537,21 @@
                             [[categoryItem children] addObject:subCategoryItem];
                     }
                 }
+                continue;
             }
 
-            if (module_is_main(p_module) && (CONFIG_ITEM(configType) || configType == CONFIG_SECTION)) {
+            if (!CONFIG_ITEM(configType) && configType != CONFIG_SECTION)
+                continue;
+
+            if (mod_is_main) {
                 if (categoryItem && [self isSubCategoryGeneral:lastsubcat]) {
                     [[categoryItem options] addObject:[[VLCTreeLeafItem alloc] initWithConfigItem:&p_configs[j]]];
                 } else if (subCategoryItem) {
                     [[subCategoryItem options] addObject:[[VLCTreeLeafItem alloc] initWithConfigItem:&p_configs[j]]];
                 }
             }
-            else if (!module_is_main(p_module) && (CONFIG_ITEM(configType) || configType == CONFIG_SECTION)) {
-                if (![[subCategoryItem children] containsObject: pluginItem]) {
+            else {
+                if (subCategoryItem && ![[subCategoryItem children] containsObject: pluginItem]) {
                     [[subCategoryItem children] addObject:pluginItem];
                 }
 

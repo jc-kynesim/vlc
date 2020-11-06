@@ -31,7 +31,7 @@ NavigableFocusScope {
     //forwarded from subview
     signal actionForSelection( var selection )
     signal contextMenuButtonClicked(Item menuParent, var menuModel)
-    signal rightClick(Item menuParent, var menuModel)
+    signal rightClick(Item menuParent, var menuModel, var globalMousePos)
     signal itemDoubleClicked(var model)
 
     property var sortModel: []
@@ -221,12 +221,14 @@ NavigableFocusScope {
                 acceptedButtons: Qt.RightButton | Qt.LeftButton
 
                 onClicked: {
-                    selectionDelegateModel.updateSelection( mouse.modifiers , view.currentIndex, index)
-                    view.currentIndex = rowModel.index
-                    lineView.forceActiveFocus()
+                    if (mouse.button === Qt.LeftButton || !selectionDelegateModel.isSelected(root.model.index(index, 0))) {
+                        selectionDelegateModel.updateSelection( mouse.modifiers , view.currentIndex, index)
+                        view.currentIndex = rowModel.index
+                        lineView.forceActiveFocus()
+                    }
 
                     if (mouse.button === Qt.RightButton){
-                        root.rightClick(lineView,rowModel)
+                        root.rightClick(lineView,rowModel, hoverArea.mapToGlobal(mouse.x,mouse.y) )
                     }
                 }
 

@@ -41,17 +41,16 @@
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
-static int  Create    ( vlc_object_t * );
-static void Destroy   ( vlc_object_t * );
+static int  Create    ( filter_t * );
+static void Destroy   ( filter_t * );
 
 vlc_module_begin ()
     set_description( N_("Magnify/Zoom interactive video filter") )
     set_shortname( N_( "Magnify" ))
-    set_capability( "video filter", 0 )
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
 
-    set_callbacks( Create, Destroy )
+    set_callback_video_filter( Create )
 vlc_module_end ()
 
 
@@ -88,9 +87,8 @@ typedef struct
 /*****************************************************************************
  * Create:
  *****************************************************************************/
-static int Create( vlc_object_t *p_this )
+static int Create( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys;
 
     /* */
@@ -129,17 +127,21 @@ static int Create( vlc_object_t *p_this )
     p_sys->i_hide_timeout = VLC_TICK_FROM_MS( var_InheritInteger( p_filter, "mouse-hide-timeout" ) );
 
     /* */
-    p_filter->pf_video_filter = Filter;
-    p_filter->pf_video_mouse = Mouse;
+    static const struct vlc_filter_operations filter_ops =
+    {
+        .filter_video = Filter,
+        .video_mouse = Mouse,
+        .close = Destroy,
+    };
+    p_filter->ops = &filter_ops;
     return VLC_SUCCESS;
 }
 
 /*****************************************************************************
  * Destroy:
  *****************************************************************************/
-static void Destroy( vlc_object_t *p_this )
+static void Destroy( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
     image_HandlerDelete( p_sys->p_image );
@@ -419,4 +421,3 @@ static int Mouse( filter_t *p_filter, vlc_mouse_t *p_new, const vlc_mouse_t *p_o
     p_new->i_y = p_sys->i_y + p_new->i_y * ZOOM_FACTOR / p_sys->i_zoom;
     return VLC_SUCCESS;
 }
-

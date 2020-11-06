@@ -39,8 +39,7 @@
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
-static int  Open (vlc_object_t *);
-static void Close(vlc_object_t *);
+static int  Open (filter_t *);
 
 #define CFG_PREFIX "gradfun-"
 
@@ -58,7 +57,6 @@ vlc_module_begin()
     set_description(N_("Gradfun video filter"))
     set_shortname(N_("Gradfun"))
     set_help(N_("Debanding algorithm"))
-    set_capability("video filter", 0)
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
     add_integer_with_range(CFG_PREFIX "radius", 16, RADIUS_MIN, RADIUS_MAX,
@@ -66,7 +64,7 @@ vlc_module_begin()
     add_float_with_range(CFG_PREFIX "strength", 1.2, STRENGTH_MIN, STRENGTH_MAX,
                          STRENGTH_TEXT, STRENGTH_LONGTEXT, false)
 
-    set_callbacks(Open, Close)
+    set_callback_video_filter(Open)
 vlc_module_end()
 
 /*****************************************************************************
@@ -98,8 +96,8 @@ vlc_module_end()
 #include <stdalign.h>
 #include "gradfun.h"
 
-static picture_t *Filter(filter_t *, picture_t *);
 static int Callback(vlc_object_t *, char const *, vlc_value_t, vlc_value_t, void *);
+VIDEO_FILTER_WRAPPER_CLOSE(Filter, Close)
 
 typedef struct
 {
@@ -110,9 +108,8 @@ typedef struct
     struct vf_priv_s cfg;
 } filter_sys_t;
 
-static int Open(vlc_object_t *object)
+static int Open(filter_t *filter)
 {
-    filter_t *filter = (filter_t *)object;
     const vlc_fourcc_t fourcc = filter->fmt_in.video.i_chroma;
 
     const vlc_chroma_description_t *chroma = vlc_fourcc_GetChromaDescription(fourcc);
@@ -156,14 +153,13 @@ static int Open(vlc_object_t *object)
 #endif
         cfg->filter_line = filter_line_c;
 
-    filter->p_sys           = sys;
-    filter->pf_video_filter = Filter;
+    filter->p_sys = sys;
+    filter->ops   = &Filter_ops;
     return VLC_SUCCESS;
 }
 
-static void Close(vlc_object_t *object)
+static void Close(filter_t *filter)
 {
-    filter_t     *filter = (filter_t *)object;
     filter_sys_t *sys = filter->p_sys;
 
     var_DelCallback(filter, CFG_PREFIX "radius",   Callback, NULL);
@@ -172,15 +168,9 @@ static void Close(vlc_object_t *object)
     free(sys);
 }
 
-static picture_t *Filter(filter_t *filter, picture_t *src)
+static void Filter(filter_t *filter, picture_t *src, picture_t *dst)
 {
     filter_sys_t *sys = filter->p_sys;
-
-    picture_t *dst = filter_NewPicture(filter);
-    if (!dst) {
-        picture_Release(src);
-        return NULL;
-    }
 
     vlc_mutex_lock(&sys->lock);
     float strength = VLC_CLIP(sys->strength, STRENGTH_MIN, STRENGTH_MAX);
@@ -214,10 +204,6 @@ static picture_t *Filter(filter_t *filter, picture_t *src)
             plane_CopyPixels(dstp, srcp);
         }
     }
-
-    picture_CopyProperties(dst, src);
-    picture_Release(src);
-    return dst;
 }
 
 static int Callback(vlc_object_t *object, char const *cmd,
@@ -236,4 +222,3 @@ static int Callback(vlc_object_t *object, char const *cmd,
 
     return VLC_SUCCESS;
 }
-

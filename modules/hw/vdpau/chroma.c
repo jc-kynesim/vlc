@@ -743,10 +743,26 @@ const struct vlc_video_context_operations vdpau_vctx_ops = {
     NULL,
 };
 
-static int OutputOpen(vlc_object_t *obj)
+static void OutputClose(filter_t *filter)
 {
-    filter_t *filter = (filter_t *)obj;
+    vlc_vdp_mixer_t *sys = filter->p_sys;
 
+    Flush(filter);
+    vdp_video_mixer_destroy(sys->vdp, sys->mixer);
+    picture_pool_Release(sys->pool);
+    vlc_video_context_Release(filter->vctx_out);
+}
+
+static const struct vlc_filter_operations filter_output_opaque_ops = {
+    .filter_video = VideoRender, .flush = Flush, .close = OutputClose,
+};
+
+static const struct vlc_filter_operations filter_output_ycbcr_ops = {
+    .filter_video = YCbCrRender, .flush = Flush, .close = OutputClose,
+};
+
+static int OutputOpen(filter_t *filter)
+{
     if (filter->fmt_out.video.i_chroma != VLC_CODEC_VDPAU_OUTPUT)
         return VLC_EGENERIC;
 
@@ -757,7 +773,7 @@ static int OutputOpen(vlc_object_t *obj)
     if (dec_device == NULL)
         return VLC_EGENERIC;
 
-    vlc_vdp_mixer_t *sys = vlc_obj_malloc(obj, sizeof (*sys));
+    vlc_vdp_mixer_t *sys = vlc_obj_malloc(VLC_OBJECT(filter), sizeof (*sys));
     if (unlikely(sys == NULL))
     {
         vlc_decoder_device_Release(dec_device);
@@ -766,7 +782,7 @@ static int OutputOpen(vlc_object_t *obj)
 
     filter->p_sys = sys;
 
-    picture_t *(*video_filter)(filter_t *, picture_t *) = VideoRender;
+    const struct vlc_filter_operations *ops = &filter_output_opaque_ops;
 
     if (filter->fmt_in.video.i_chroma == VLC_CODEC_VDPAU_VIDEO_444)
     {
@@ -789,7 +805,7 @@ static int OutputOpen(vlc_object_t *obj)
     else
     if (vlc_fourcc_to_vdp_ycc(filter->fmt_in.video.i_chroma,
                               &sys->chroma, &sys->format))
-        video_filter = YCbCrRender;
+        ops = &filter_output_ycbcr_ops;
     else
     {
         vlc_decoder_device_Release(dec_device);
@@ -807,7 +823,7 @@ static int OutputOpen(vlc_object_t *obj)
         return VLC_EGENERIC;
 
     /* Allocate the output surface picture pool */
-    sys->pool = OutputPoolAlloc(obj, vdpau_decoder,
+    sys->pool = OutputPoolAlloc(VLC_OBJECT(filter), vdpau_decoder,
                                 &filter->fmt_out.video);
     if (sys->pool == NULL)
     {
@@ -817,7 +833,7 @@ static int OutputOpen(vlc_object_t *obj)
     }
 
     /* Create the video-to-output mixer */
-    sys->mixer = MixerCreate(filter, video_filter == YCbCrRender);
+    sys->mixer = MixerCreate(filter, ops == &filter_output_ycbcr_ops);
     if (sys->mixer == VDP_INVALID_HANDLE)
     {
         picture_pool_Release(sys->pool);
@@ -834,20 +850,8 @@ static int OutputOpen(vlc_object_t *obj)
     sys->procamp.saturation = 1.f;
     sys->procamp.hue = 0.f;
 
-    filter->pf_video_filter = video_filter;
-    filter->pf_flush = Flush;
+    filter->ops = ops;
     return VLC_SUCCESS;
-}
-
-static void OutputClose(vlc_object_t *obj)
-{
-    filter_t *filter = (filter_t *)obj;
-    vlc_vdp_mixer_t *sys = filter->p_sys;
-
-    Flush(filter);
-    vdp_video_mixer_destroy(sys->vdp, sys->mixer);
-    picture_pool_Release(sys->pool);
-    vlc_video_context_Release(filter->vctx_out);
 }
 
 typedef struct
@@ -888,9 +892,12 @@ static bool ChromaMatches(VdpChromaType vdp_type, vlc_fourcc_t vlc_chroma)
     }
 }
 
-static int YCbCrOpen(vlc_object_t *obj)
+static const struct vlc_filter_operations filter_ycbcr_ops = {
+    .filter_video = VideoExport_Filter,
+};
+
+static int YCbCrOpen(filter_t *filter)
 {
-    filter_t *filter = (filter_t *)obj;
     VdpChromaType type;
     VdpYCbCrFormat format;
 
@@ -908,12 +915,12 @@ static int YCbCrOpen(vlc_object_t *obj)
           != filter->fmt_in.video.i_sar_den * filter->fmt_out.video.i_sar_num))
         return VLC_EGENERIC;
 
-    vlc_vdp_yuv_getter_t *sys = vlc_obj_malloc(obj, sizeof (*sys));
+    vlc_vdp_yuv_getter_t *sys = vlc_obj_malloc(VLC_OBJECT(filter), sizeof (*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
     sys->format = format;
 
-    filter->pf_video_filter = VideoExport_Filter;
+    filter->ops = &filter_ycbcr_ops;
     filter->p_sys = sys;
     return VLC_SUCCESS;
 }
@@ -931,10 +938,9 @@ static const char *const algo_names[] = {
 vlc_module_begin()
     set_shortname(N_("VDPAU"))
     set_description(N_("VDPAU surface conversions"))
-    set_capability("video converter", 10)
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
-    set_callbacks(OutputOpen, OutputClose)
+    set_callback_video_converter(OutputOpen, 10)
 
     add_integer("vdpau-deinterlace",
                 VDP_VIDEO_MIXER_FEATURE_DEINTERLACE_TEMPORAL_SPATIAL,
@@ -951,5 +957,5 @@ vlc_module_begin()
        N_("Scaling quality"), N_("High quality scaling level"), true)
 
     add_submodule()
-    set_callback(YCbCrOpen)
+    set_callback_video_converter(YCbCrOpen, 10)
 vlc_module_end()

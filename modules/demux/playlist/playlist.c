@@ -31,6 +31,7 @@
 #include <vlc_plugin.h>
 #include <vlc_demux.h>
 #include <vlc_url.h>
+#include <vlc_access.h>
 
 #if defined( _WIN32 ) || defined( __OS2__ )
 # include <ctype.h>                          /* isalpha */
@@ -65,70 +66,71 @@ vlc_module_begin ()
     add_submodule ()
         set_description( N_("M3U playlist import") )
         add_shortcut( "m3u", "m3u8" )
-        set_capability( "stream_filter", 310 )
+        set_capability( "demux", 10 )
         set_callback( Import_M3U )
+        add_file_extension("m3u")
     add_submodule ()
         set_description( N_("RAM playlist import") )
-        set_capability( "stream_filter", 310 )
+        set_capability( "demux", 10 )
         set_callback( Import_RAM )
     add_submodule ()
         set_description( N_("PLS playlist import") )
-        set_capability( "stream_filter", 310 )
+        set_capability( "demux", 10 )
         set_callback( Import_PLS )
     add_submodule ()
         set_description( N_("B4S playlist import") )
         add_shortcut( "shout-b4s" )
-        set_capability( "stream_filter", 310 )
+        set_capability( "demux", 10 )
         set_callback( Import_B4S )
     add_submodule ()
         set_description( N_("DVB playlist import") )
         add_shortcut( "dvb" )
-        set_capability( "stream_filter", 310 )
+        set_capability( "demux", 10 )
         set_callback( Import_DVB )
     add_submodule ()
         set_description( N_("Podcast parser") )
         add_shortcut( "podcast" )
-        set_capability( "stream_filter", 310 )
+        set_capability( "demux", 10 )
         set_callback( Import_podcast )
     add_submodule ()
         set_description( N_("XSPF playlist import") )
-        set_capability( "stream_filter", 310 )
+        set_capability( "demux", 10 )
         set_callbacks( Import_xspf, Close_xspf )
     add_submodule ()
         set_description( N_("ASX playlist import") )
-        set_capability( "stream_filter", 310 )
+        set_capability( "demux", 10 )
         set_callback( Import_ASX )
     add_submodule ()
         set_description( N_("Kasenna MediaBase parser") )
         add_shortcut( "sgimb" )
-        set_capability( "stream_filter", 310 )
+        set_capability( "demux", 10 )
         set_callbacks( Import_SGIMB, Close_SGIMB )
     add_submodule ()
         set_description( N_("QuickTime Media Link importer") )
         add_shortcut( "qtl" )
-        set_capability( "stream_filter", 310 )
+        set_capability( "demux", 10 )
         set_callback( Import_QTL )
     add_submodule ()
         set_description( N_("Dummy IFO demux") )
-        set_capability( "stream_filter", 312 )
+        set_capability( "demux", 12 )
         set_callback( Import_IFO )
     add_submodule ()
         set_description( N_("Dummy BDMV demux") )
-        set_capability( "stream_filter", 312 )
+        set_capability( "demux", 12 )
         set_callback( Import_BDMV )
     add_submodule ()
         set_description( N_("iTunes Music Library importer") )
         add_shortcut( "itml" )
-        set_capability( "stream_filter", 310 )
+        set_capability( "demux", 10 )
         set_callback( Import_iTML )
     add_submodule()
         set_description(N_("Windows Media Server metafile import") )
-        set_capability("stream_filter", 310)
+        set_capability("demux", 10)
         set_callback(Import_WMS)
     add_submodule ()
         set_description( N_("WPL playlist import") )
         add_shortcut( "wpl" )
-        set_capability( "stream_filter", 310 )
+        set_capability( "demux", 10 )
         set_callbacks( Import_WPL, Close_WPL )
 vlc_module_end ()
 
@@ -199,4 +201,18 @@ char *ProcessMRL(const char *str, const char *base)
     }
 
     return abs;
+}
+
+int PlaylistControl( stream_t *p_access, int i_query, va_list args )
+{
+    switch ( i_query )
+    {
+        case STREAM_GET_TYPE:
+        {
+            *va_arg( args, int* ) = ITEM_TYPE_PLAYLIST;
+            return VLC_SUCCESS;
+        }
+        default:
+            return access_vaDirectoryControlHelper( p_access, i_query, args );
+    }
 }

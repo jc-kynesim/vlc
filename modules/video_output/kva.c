@@ -96,7 +96,6 @@ struct vout_display_sys_t
     bool               b_fixt23;
     PFNWP              p_old_frame;
     RECTL              client_rect;
-    vout_window_t     *parent_window;
     HWND               parent;
     unsigned           button_pressed;
     bool               is_mouse_hidden;
@@ -187,15 +186,10 @@ static void PMThread( void *arg )
                       CS_SIZEREDRAW | CS_MOVENOTIFY,
                       sizeof( PVOID ));
 
-    sys->b_fixt23 = var_CreateGetBool( vd, "kva-fixt23");
-
-    if( !sys->b_fixt23 && vd->cfg->window->type == VOUT_WINDOW_TYPE_HWND )
-        /* If an external window was specified, we'll draw in it. */
-        sys->parent_window = vd->cfg->window;
-
-    if( sys->parent_window )
+    if( !sys->b_fixt23 )
     {
-        sys->parent = ( HWND )sys->parent_window->handle.hwnd;
+        /* If an external window was specified, we'll draw in it. */
+        sys->parent = ( HWND )vd->cfg->window->handle.hwnd;
 
         ULONG i_style = WinQueryWindowULong( sys->parent, QWL_STYLE );
         WinSetWindowULong( sys->parent, QWL_STYLE,
@@ -231,7 +225,7 @@ static void PMThread( void *arg )
 
     WinSetWindowPtr( sys->client, 0, vd );
 
-    if( !sys->parent_window )
+    if( sys->b_fixt23 )
     {
         WinSetWindowPtr( sys->frame, 0, vd );
         sys->p_old_frame = WinSubclassWindow( sys->frame, MyFrameWndProc );
@@ -283,13 +277,13 @@ static void PMThread( void *arg )
     sys->i_result = VLC_SUCCESS;
     DosPostEventSem( sys->ack_event );
 
-    if( !sys->parent_window )
+    if( sys->b_fixt23 )
         WinSetVisibleRegionNotify( sys->frame, TRUE );
 
     while( WinGetMsg( sys->hab, &qm, NULLHANDLE, 0, 0 ))
         WinDispatchMsg( sys->hab, &qm );
 
-    if( !sys->parent_window )
+    if( sys->b_fixt23 )
         WinSetVisibleRegionNotify( sys->frame, FALSE );
 
     kvaEnableScreenSaver();
@@ -302,7 +296,7 @@ exit_open_display :
     kvaDone();
 
 exit_kva_init :
-    if( !sys->parent_window )
+    if( sys->b_fixt23 )
         WinSubclassWindow( sys->frame, sys->p_old_frame );
 
     WinDestroyWindow( sys->frame );
@@ -335,6 +329,14 @@ static int Open ( vout_display_t *vd, const vout_display_cfg_t *cfg,
     vd->sys = sys = calloc( 1, sizeof( *sys ));
     if( !sys )
         return VLC_ENOMEM;
+
+    sys->b_fixt23 = var_CreateGetBool( vd, "kva-fixt23");
+
+    if( !sys->b_fixt23 && cfg->window->type != VOUT_WINDOW_TYPE_HWND )
+    {
+        free( sys );
+        return VLC_EBADVAR;
+    }
 
     DosCreateEventSem( NULL, &sys->ack_event, 0, FALSE );
 
@@ -597,7 +599,7 @@ static int OpenDisplay( vout_display_t *vd, video_format_t *fmt )
     sys->i_screen_width  = WinQuerySysValue( HWND_DESKTOP, SV_CXSCREEN );
     sys->i_screen_height = WinQuerySysValue( HWND_DESKTOP, SV_CYSCREEN );
 
-    if( sys->parent_window )
+    if( !sys->b_fixt23 )
         WinQueryWindowRect( sys->parent, &sys->client_rect );
     else
     {
@@ -869,7 +871,7 @@ static void MousePressed( vout_display_t *vd, HWND hwnd, unsigned button )
 
     vd->sys->button_pressed |= 1 << button;
 
-    vout_display_SendEventMousePressed( vd, button );
+    vout_window_ReportMousePressed( vd->cfg->window, button );
 }
 
 static void MouseReleased( vout_display_t *vd, unsigned button )
@@ -878,7 +880,7 @@ static void MouseReleased( vout_display_t *vd, unsigned button )
     if( !vd->sys->button_pressed )
         WinSetCapture( HWND_DESKTOP, NULLHANDLE );
 
-    vout_display_SendEventMouseReleased( vd, button );
+    vout_window_ReportMouseReleased( vd->cfg->window, button );
 }
 
 #define WM_MOUSELEAVE   0x41F
@@ -938,7 +940,7 @@ static MRESULT EXPENTRY WndProc( HWND hwnd, ULONG msg, MPARAM mp1, MPARAM mp2 )
             /* Invert Y coordinate and add y offset */
             y = ( place.height - y ) + place.y;
 
-            vout_display_SendMouseMovedDisplayCoordinates( vd, x, y );
+            vout_window_ReportMouseMoved( vd->cfg->window, x, y );
 
             result = WinDefWindowProc( hwnd, msg, mp1,mp2 );
             break;
@@ -969,7 +971,7 @@ static MRESULT EXPENTRY WndProc( HWND hwnd, ULONG msg, MPARAM mp1, MPARAM mp2 )
             break;
 
         case WM_BUTTON1DBLCLK :
-            vout_display_SendEventMouseDoubleClick(vd);
+            vout_window_ReportMouseDoubleClick( vd->cfg->window, MOUSE_BUTTON_LEFT );
             break;
 
         case WM_TRANSLATEACCEL :
@@ -985,7 +987,7 @@ static MRESULT EXPENTRY WndProc( HWND hwnd, ULONG msg, MPARAM mp1, MPARAM mp2 )
             int    i_key   = 0;
 
             /* If embedded window, let the parent process keys */
-            if( sys->parent_window )
+            if( !sys->b_fixt23 )
             {
                 WinPostMsg( sys->parent, msg, mp1, mp2 );
                 break;
@@ -1093,7 +1095,7 @@ static MRESULT EXPENTRY WndProc( HWND hwnd, ULONG msg, MPARAM mp1, MPARAM mp2 )
 
     /* If embedded window, we need to change our window size according to a
      * parent window size */
-    if( sys->parent_window )
+    if( !sys->b_fixt23 )
     {
         RECTL rect;
 

@@ -89,8 +89,6 @@ int Import_xspf(vlc_object_t *p_this)
 {
     stream_t *p_stream = (stream_t *)p_this;
 
-    CHECK_FILE(p_stream);
-
     if( !stream_HasExtension( p_stream, ".xspf" )
      && !stream_IsMimeType( p_stream->s, "application/xspf+xml" ) )
         return VLC_EGENERIC;
@@ -102,7 +100,7 @@ int Import_xspf(vlc_object_t *p_this)
     msg_Dbg(p_stream, "using XSPF playlist reader");
     p_stream->p_sys = sys;
     p_stream->pf_readdir = ReadDir;
-    p_stream->pf_control = access_vaDirectoryControlHelper;
+    p_stream->pf_control = PlaylistControl;
 
     return VLC_SUCCESS;
 }

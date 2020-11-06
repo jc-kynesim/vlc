@@ -65,6 +65,11 @@ vlc_module_begin ()
     set_shortname( N_("MP4") )
     set_capability( "demux", 240 )
     set_callbacks( Open, Close )
+    add_file_extension("m4a")
+    add_file_extension("m4v")
+    add_file_extension("moov")
+    add_file_extension("mov")
+    add_file_extension("mp4")
 
     add_category_hint("Hacks", NULL)
     add_bool( CFG_PREFIX"m4a-audioonly", false, MP4_M4A_TEXT, MP4_M4A_LONGTEXT, true )
@@ -714,7 +719,8 @@ static void MP4_Block_Send( demux_t *p_demux, mp4_track_t *p_track, block_t *p_b
             p_track->i_dts_backup = p_block->i_dts;
             p_track->i_pts_backup = p_block->i_pts;
             /* And demux it as ASF packet */
-            DemuxASFPacket( &p_sys->asfpacketsys, p_block->i_buffer, p_block->i_buffer );
+            DemuxASFPacket( &p_sys->asfpacketsys, p_block->i_buffer, p_block->i_buffer,
+                            0, p_block->i_buffer );
             vlc_stream_Delete(p_demux->s);
         }
         block_Release(p_block);

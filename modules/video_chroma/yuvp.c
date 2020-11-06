@@ -40,29 +40,25 @@
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
-static int  Open ( vlc_object_t * );
-static void Close( vlc_object_t * );
+static int  Open ( filter_t * );
 
 vlc_module_begin ()
     set_description( N_("YUVP converter") )
-    set_capability( "video converter", 10 )
-    set_callbacks( Open, Close )
+    set_callback_video_converter( Open, 10 )
 vlc_module_end ()
 
 /****************************************************************************
  * Local prototypes
  ****************************************************************************/
-static picture_t *Convert_Filter( filter_t *, picture_t * );
-static void Convert( filter_t *, picture_t *, picture_t * );
 static void Yuv2Rgb( uint8_t *r, uint8_t *g, uint8_t *b, int y1, int u1, int v1 );
+
+VIDEO_FILTER_WRAPPER( Convert )
 
 /*****************************************************************************
  * Open: probe the filter and return score
  *****************************************************************************/
-static int Open( vlc_object_t *p_this )
+static int Open( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t*)p_this;
-
     /* It only supports YUVP to YUVA/RGBA without scaling
      * (if scaling is required another filter can do it) */
     if( p_filter->fmt_in.video.i_chroma != VLC_CODEC_YUVP ||
@@ -77,7 +73,7 @@ static int Open( vlc_object_t *p_this )
         return VLC_EGENERIC;
     }
 
-    p_filter->pf_video_filter = Convert_Filter;
+    p_filter->ops = &Convert_ops;
 
     msg_Dbg( p_filter, "YUVP to %4.4s converter",
              (const char*)&p_filter->fmt_out.video.i_chroma );
@@ -85,18 +81,9 @@ static int Open( vlc_object_t *p_this )
     return VLC_SUCCESS;
 }
 
-/*****************************************************************************
- * Close: clean up the filter
- *****************************************************************************/
-static void Close( vlc_object_t *p_this )
-{
-    VLC_UNUSED(p_this );
-}
-
 /****************************************************************************
  * Filter: the whole thing
  ****************************************************************************/
-VIDEO_FILTER_WRAPPER( Convert )
 
 static void Convert( filter_t *p_filter, picture_t *p_source,
                                            picture_t *p_dest )

@@ -65,17 +65,16 @@ static const char *const ppsz_pos_descriptions[] =
 { N_("Center"), N_("Left"), N_("Right"), N_("Top"), N_("Bottom"),
   N_("Top-Left"), N_("Top-Right"), N_("Bottom-Left"), N_("Bottom-Right") };
 
-static int  OpenSub  (vlc_object_t *);
-static int  OpenVideo(vlc_object_t *);
-static void Close    (vlc_object_t *);
+static int  OpenSub  (filter_t *);
+static int  OpenVideo(filter_t *);
+static void Close    (filter_t *);
 
 vlc_module_begin ()
 
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_SUBPIC)
 
-    set_capability("sub source", 0)
-    set_callbacks(OpenSub, Close)
+    set_callback_sub_source(OpenSub, 0)
     set_description(N_("Audio Bar Graph Video sub source"))
     set_shortname(N_("Audio Bar Graph Video"))
     add_shortcut("audiobargraph_v")
@@ -93,8 +92,7 @@ vlc_module_begin ()
 
     /* video output filter submodule */
     add_submodule ()
-    set_capability("video filter", 0)
-    set_callbacks(OpenVideo, Close)
+    set_callback_video_filter(OpenVideo)
     set_description(N_("Audio Bar Graph Video sub source"))
     add_shortcut("audiobargraph_v")
 vlc_module_end ()
@@ -487,12 +485,19 @@ out:
     return p_dst;
 }
 
+static const struct vlc_filter_operations filter_sub_ops = {
+    .source_sub = FilterSub, .close = Close
+};
+
+static const struct vlc_filter_operations filter_video_ops = {
+    .filter_video = FilterVideo, .close = Close,
+};
+
 /**
  * Common open function
  */
-static int OpenCommon(vlc_object_t *p_this, bool b_sub)
+static int OpenCommon(filter_t *p_filter, bool b_sub)
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys;
 
     /* */
@@ -558,9 +563,9 @@ static int OpenCommon(vlc_object_t *p_this, bool b_sub)
                          BarGraphCallback, p_sys);
 
     if (b_sub)
-        p_filter->pf_sub_source = FilterSub;
+        p_filter->ops = &filter_sub_ops;
     else
-        p_filter->pf_video_filter = FilterVideo;
+        p_filter->ops = &filter_video_ops;
 
     return VLC_SUCCESS;
 }
@@ -568,25 +573,24 @@ static int OpenCommon(vlc_object_t *p_this, bool b_sub)
 /**
  * Open the sub source
  */
-static int OpenSub(vlc_object_t *p_this)
+static int OpenSub(filter_t *p_filter)
 {
-    return OpenCommon(p_this, true);
+    return OpenCommon(p_filter, true);
 }
 
 /**
  * Open the video filter
  */
-static int OpenVideo(vlc_object_t *p_this)
+static int OpenVideo(filter_t *p_filter)
 {
-    return OpenCommon(p_this, false);
+    return OpenCommon(p_filter, false);
 }
 
 /**
  * Common close function
  */
-static void Close(vlc_object_t *p_this)
+static void Close(filter_t *p_filter)
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
     vlc_object_t *vlc = VLC_OBJECT(vlc_object_instance(p_filter));
 

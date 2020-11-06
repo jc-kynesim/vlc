@@ -128,23 +128,26 @@ static void P010_I42010B( filter_t *p_filter, picture_t *p_src,
 }
 
 /* Following functions are local */
-VIDEO_FILTER_WRAPPER( I420_NV12 )
-VIDEO_FILTER_WRAPPER( YV12_NV12 )
-VIDEO_FILTER_WRAPPER( NV12_I420 )
-VIDEO_FILTER_WRAPPER( NV12_YV12 )
-VIDEO_FILTER_WRAPPER( I42010B_P010 )
-VIDEO_FILTER_WRAPPER( P010_I42010B )
+static void Delete(filter_t *p_filter)
+{
+    filter_sys_t *p_sys = p_filter->p_sys;
+    CopyCleanCache( &p_sys->cache );
+}
+
+VIDEO_FILTER_WRAPPER_CLOSE( I420_NV12, Delete )
+VIDEO_FILTER_WRAPPER_CLOSE( YV12_NV12, Delete )
+VIDEO_FILTER_WRAPPER_CLOSE( NV12_I420, Delete )
+VIDEO_FILTER_WRAPPER_CLOSE( NV12_YV12, Delete )
+VIDEO_FILTER_WRAPPER_CLOSE( I42010B_P010, Delete )
+VIDEO_FILTER_WRAPPER_CLOSE( P010_I42010B, Delete )
 
 /*****************************************************************************
  * Create: allocate a chroma function
  *****************************************************************************
  * This function allocates and initializes a chroma function
  *****************************************************************************/
-static int Create( vlc_object_t *p_this )
+static int Create( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
-
-
     /* video must be even, because 4:2:0 is subsampled by 2 in both ways */
     if( p_filter->fmt_in.video.i_width  & 1
      || p_filter->fmt_in.video.i_height & 1 )
@@ -168,23 +171,23 @@ static int Create( vlc_object_t *p_this )
         case VLC_CODEC_J420:
             if( outfcc != VLC_CODEC_NV12 )
                 return -1;
-            p_filter->pf_video_filter = I420_NV12_Filter;
+            p_filter->ops = &I420_NV12_ops;
             break;
 
         case VLC_CODEC_YV12:
             if( outfcc != VLC_CODEC_NV12 )
                 return -1;
-            p_filter->pf_video_filter = YV12_NV12_Filter;
+            p_filter->ops = &YV12_NV12_ops;
             break;
         case VLC_CODEC_NV12:
             switch( outfcc )
             {
                 case VLC_CODEC_I420:
                 case VLC_CODEC_J420:
-                    p_filter->pf_video_filter = NV12_I420_Filter;
+                    p_filter->ops = &NV12_I420_ops;
                     break;
                 case VLC_CODEC_YV12:
-                    p_filter->pf_video_filter = NV12_YV12_Filter;
+                    p_filter->ops = &NV12_YV12_ops;
                     break;
                 default:
                     return -1;
@@ -195,14 +198,14 @@ static int Create( vlc_object_t *p_this )
             if( outfcc != VLC_CODEC_P010 )
                 return -1;
             pixel_bytes = 2;
-            p_filter->pf_video_filter = I42010B_P010_Filter;
+            p_filter->ops = &I42010B_P010_ops;
             break;
 
         case VLC_CODEC_P010:
             if( outfcc != VLC_CODEC_I420_10L )
                 return -1;
             pixel_bytes = 2;
-            p_filter->pf_video_filter = P010_I42010B_Filter;
+            p_filter->ops = &P010_I42010B_ops;
             break;
 
         default:
@@ -223,18 +226,10 @@ static int Create( vlc_object_t *p_this )
     return 0;
 }
 
-static void Delete(vlc_object_t *p_this)
-{
-    filter_t *p_filter = (filter_t *)p_this;
-    filter_sys_t *p_sys = p_filter->p_sys;
-    CopyCleanCache( &p_sys->cache );
-}
-
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
 vlc_module_begin ()
     set_description( N_("YUV planar to semiplanar conversions") )
-    set_capability( "video converter", 160 )
-    set_callbacks( Create, Delete )
+    set_callback_video_converter( Create, 160 )
 vlc_module_end ()

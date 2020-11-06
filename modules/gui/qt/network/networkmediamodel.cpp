@@ -23,22 +23,6 @@
 #include "playlist/media.hpp"
 #include "playlist/playlist_controller.hpp"
 
-namespace {
-
-enum Role {
-    NETWORK_NAME = Qt::UserRole + 1,
-    NETWORK_MRL,
-    NETWORK_INDEXED,
-    NETWORK_CANINDEX,
-    NETWORK_TYPE,
-    NETWORK_PROTOCOL,
-    NETWORK_TREE,
-    NETWORK_SOURCE,
-    NETWORK_ARTWORK,
-};
-
-}
-
 NetworkMediaModel::NetworkMediaModel( QObject* parent )
     : QAbstractListModel( parent )
     , m_preparseSem(1)
@@ -322,13 +306,28 @@ bool NetworkMediaModel::initializeMediaSources()
         emit typeChanged();
         m_canBeIndexed = canBeIndexed( m_url, m_type );
         emit canBeIndexedChanged();
-        if ( vlc_ml_is_indexed( m_ml, QByteArray(m_treeItem.media->psz_uri).append('/').constData(), &m_indexed ) != VLC_SUCCESS ) {
+        if ( !m_ml || vlc_ml_is_indexed( m_ml, QByteArray(m_treeItem.media->psz_uri).append('/').constData(), &m_indexed ) != VLC_SUCCESS ) {
             m_indexed = false;
         }
         emit isIndexedChanged();
     }
 
-    vlc_media_tree_PreparseCancel( libvlc, this );
+    {
+        input_item_node_t* mediaNode = nullptr;
+        vlc_media_tree_Lock(tree);
+        vlc_media_tree_PreparseCancel( libvlc, this );
+        std::vector<InputItemPtr> itemList;
+        if (vlc_media_tree_Find( tree, m_treeItem.media.get(), &mediaNode, nullptr))
+        {
+            itemList.reserve(mediaNode->i_children);
+            for (int i = 0; i < mediaNode->i_children; i++)
+                itemList.emplace_back(mediaNode->pp_children[i]->p_item);
+        }
+        vlc_media_tree_Unlock(tree);
+        if (!itemList.empty())
+            refreshMediaList( m_treeItem.source, std::move( itemList ), true );
+    }
+
     m_preparseSem.acquire();
     vlc_media_tree_Preparse( tree, libvlc, m_treeItem.media.get(), this );
     m_parsingPending = true;
@@ -460,7 +459,7 @@ void NetworkMediaModel::refreshMediaList( MediaSourcePtr mediaSource,
             free(artwork);
         }
 
-        if ( item.canBeIndexed == true )
+        if ( m_ml && item.canBeIndexed == true )
         {
             if ( vlc_ml_is_indexed( m_ml, qtu( item.mainMrl.toString( QUrl::FullyEncoded ) ),
                                     &item.indexed ) != VLC_SUCCESS )
@@ -486,5 +485,5 @@ void NetworkMediaModel::refreshMediaList( MediaSourcePtr mediaSource,
 
 bool NetworkMediaModel::canBeIndexed(const QUrl& url , ItemType itemType )
 {
-    return static_cast<input_item_type_e>(itemType) != ITEM_TYPE_FILE && (url.scheme() == "smb" || url.scheme() == "ftp" || url.scheme() == "file");
+    return  m_ml && static_cast<input_item_type_e>(itemType) != ITEM_TYPE_FILE && (url.scheme() == "smb" || url.scheme() == "ftp" || url.scheme() == "file");
 }

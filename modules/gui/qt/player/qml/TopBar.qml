@@ -24,6 +24,7 @@ import org.videolan.vlc 0.1
 
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
+import "qrc:///menus/" as Menus
 
 Widgets.NavigableFocusScope{
     id: topFocusScope
@@ -48,7 +49,7 @@ Widgets.NavigableFocusScope{
         id : topcontrolContent
         color: VLCStyle.colors.setColorAlpha(VLCStyle.colors.banner, 0.8)
         anchors.fill: parent
-        implicitHeight: VLCStyle.icon_topbar + topcontrollerMouseArea.anchors.topMargin
+        implicitHeight: topcontrollerMouseArea.implicitHeight + topcontrollerMouseArea.anchors.topMargin
 
         gradient: Gradient {
             GradientStop { position: 0.0; color: VLCStyle.colors.playerBg }
@@ -63,62 +64,144 @@ Widgets.NavigableFocusScope{
             anchors.topMargin: VLCStyle.applicationVerticalMargin
             anchors.leftMargin: VLCStyle.applicationHorizontalMargin
             anchors.rightMargin: VLCStyle.applicationHorizontalMargin
+            implicitHeight: rowLayout.implicitHeight
 
-            RowLayout{
+            //drag and dbl click the titlebar in CSD mode
+            Loader {
                 anchors.fill: parent
-                anchors.leftMargin:  VLCStyle.margin_xsmall
-                anchors.rightMargin: VLCStyle.margin_xsmall
+                active: mainInterface.clientSideDecoration
+                source: "qrc:///widgets/CSDTitlebarTapNDrapHandler.qml"
+            }
 
-                Widgets.IconToolButton {
-                    id: backBtn
+            RowLayout {
+                id: rowLayout
+                anchors.fill: parent
 
-                    Layout.alignment: Qt.AlignTop
-
-                    objectName: "IconToolButton"
-                    size: VLCStyle.icon_normal
-                    iconText: VLCIcons.exit
-                    text: i18n.qtr("Back")
-                    color: VLCStyle.colors.playerFg
-                    onClicked: {
-                        if (player.hasVideoOutput) {
-                           mainPlaylistController.stop()
-                        }
-                        history.previous()
-                    }
-                    KeyNavigation.right: playlistBtn
-                    focus: true
-                }
-
-                Label {
-                    id: titleText
-
+                Column{
+                    id: backAndTitleLayout
                     Layout.fillWidth: true
-                    Layout.preferredHeight: implicitHeight
-                    Layout.leftMargin:  VLCStyle.margin_large
-                    Layout.rightMargin: VLCStyle.margin_large
-                    Layout.alignment: Qt.AlignHCenter | Qt.AlignTop
+                    Layout.alignment: Qt.AlignTop | Qt.AlignLeft
 
-                    horizontalAlignment: Text.AlignHCenter
-                    color: VLCStyle.colors.playerFg
-                    font.pixelSize: VLCStyle.fontSize_xxxlarge
-                    textFormat: Text.PlainText
-                    elide: Text.ElideRight
+                    spacing: 0
+
+                    Menus.Menubar {
+                        id: menubar
+
+                        width: parent.width
+                        height: VLCStyle.icon_normal
+
+                        Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
+
+                        visible: mainInterface.hasToolbarMenu
+                    }
+
+                    RowLayout {
+                        anchors.left: parent.left
+                        spacing: 0
+
+                        Widgets.IconToolButton {
+                            id: backBtn
+
+                            Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
+
+                            objectName: "IconToolButton"
+                            size: VLCStyle.icon_normal
+                            iconText: VLCIcons.topbar_previous
+                            text: i18n.qtr("Back")
+                            color: VLCStyle.colors.playerFg
+                            onClicked: {
+                                if (player.hasVideoOutput) {
+                                    mainPlaylistController.stop()
+                                }
+                                history.previous()
+                            }
+                            KeyNavigation.right: menu_selector
+                            focus: true
+                        }
+
+                        Image {
+                            Layout.alignment: Qt.AlignVCenter
+                            sourceSize.width: VLCStyle.icon_small
+                            sourceSize.height: VLCStyle.icon_small
+                            source: "qrc:///logo/cone.svg"
+                            enabled: false
+                        }
+                    }
+
+                    Label {
+                        id: titleText
+
+                        anchors.left: parent.left
+                        anchors.leftMargin: VLCStyle.icon_normal
+                        width: rowLayout.width - (windowAndGlobalButtonsLayout.width + anchors.leftMargin)
+
+                        horizontalAlignment: Text.AlignLeft
+                        color: VLCStyle.colors.playerFg
+                        font.pixelSize: VLCStyle.fontSize_xxlarge
+                        font.weight: Font.DemiBold
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                    }
+
                 }
 
-                Widgets.IconToolButton {
-                    id: playlistBtn
+                Column{
+                    id: windowAndGlobalButtonsLayout
+                    Layout.alignment: Qt.AlignTop | Qt.AlignRight
 
-                    Layout.alignment: Qt.AlignTop
+                    spacing: 0
 
-                    objectName: PlayerControlBarModel.PLAYLIST_BUTTON
-                    size: VLCStyle.icon_normal
-                    iconText: VLCIcons.playlist
-                    text: i18n.qtr("Playlist")
-                    color: VLCStyle.colors.playerFg
-                    onClicked: togglePlaylistVisiblity()
-                    property bool acceptFocus: true
+                    Loader {
+                        //Layout.alignment: Qt.AlignRight | Qt.AlignTop
+                        anchors.right: parent.right
+                        height: VLCStyle.icon_normal
+                        active: mainInterface.clientSideDecoration
+                        enabled: mainInterface.clientSideDecoration
+                        source: "qrc:///widgets/CSDWindowButtonSet.qml"
+                        onLoaded: {
+                            item.color = VLCStyle.colors.playerFg
+                            item.hoverColor = VLCStyle.colors.windowCSDButtonDarkBg
+                        }
+                    }
 
-                    KeyNavigation.left: backBtn
+                    Row {
+                        //Layout.alignment: Qt.AlignRight | Qt.AlignTop
+                        anchors.right: parent.right
+
+                        Widgets.IconToolButton {
+                            id: playlistBtn
+
+                            objectName: PlayerControlBarModel.PLAYLIST_BUTTON
+                            size: VLCStyle.icon_normal
+                            iconText: VLCIcons.playlist
+                            text: i18n.qtr("Playlist")
+                            color: VLCStyle.colors.playerFg
+                            onClicked: togglePlaylistVisiblity()
+                            property bool acceptFocus: true
+
+                            KeyNavigation.left: menu_selector
+                        }
+
+                        Widgets.IconToolButton {
+                            id: menu_selector
+
+                            size: VLCStyle.icon_normal
+                            iconText: VLCIcons.ellipsis
+                            text: i18n.qtr("Menu")
+                            color: VLCStyle.colors.playerFg
+                            property bool acceptFocus: true
+
+                            onClicked: contextMenu.popup(this.mapToGlobal(0, height))
+
+                            KeyNavigation.left: backBtn
+                            KeyNavigation.right: playlistBtn
+
+                            QmlGlobalMenu {
+                                id: contextMenu
+                                ctx: mainctx
+                            }
+                        }
+                    }
                 }
             }
         }

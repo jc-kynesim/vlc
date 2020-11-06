@@ -230,6 +230,20 @@ Flush(filter_t *filter)
     }
 }
 
+static void
+Close(filter_t *filter)
+{
+    struct filter_sys *sys = filter->p_sys;
+
+    if (sys->state != NULL)
+        ebur128_destroy(&sys->state);
+    free(filter->p_sys);
+}
+
+static const struct vlc_filter_operations filter_ops = {
+    .filter_audio = Process, .flush = Flush, .close = Close,
+};
+
 static int Open(vlc_object_t *this)
 {
     filter_t *filter = (filter_t *) this;
@@ -279,20 +293,8 @@ static int Open(vlc_object_t *this)
 
     filter->p_sys = sys;
     filter->fmt_out.audio = filter->fmt_in.audio;
-    filter->pf_audio_filter = Process;
-    filter->pf_flush = Flush;
+    filter->ops = &filter_ops;
     return VLC_SUCCESS;
-}
-
-static void
-Close(vlc_object_t *this)
-{
-    filter_t *filter = (filter_t*) this;
-    struct filter_sys *sys = filter->p_sys;
-
-    if (sys->state != NULL)
-        ebur128_destroy(&sys->state);
-    free(filter->p_sys);
 }
 
 vlc_module_begin()
@@ -300,7 +302,7 @@ vlc_module_begin()
     set_description("EBU R128 standard for loudness normalisation")
     set_category(CAT_AUDIO)
     set_subcategory(SUBCAT_AUDIO_AFILTER)
-    add_integer_with_range(CFG_PREFIX "mode", 0, 0, 4, NULL, NULL, false)
+    add_integer_with_range(CFG_PREFIX "mode", 0, 0, 4, N_("Mode"), NULL, false)
     set_capability("audio meter", 0)
-    set_callbacks(Open, Close)
+    set_callback(Open)
 vlc_module_end()

@@ -77,12 +77,22 @@ static picture_t *Sharpen(filter_t *filter, picture_t *pic)
     return pic;
 }
 
+static void Close(filter_t *filter)
+{
+    filter_sys_t *sys = filter->p_sys;
+
+    var_DelCallback(filter, "sharpen-sigma", SharpenCallback, sys);
+    free(sys);
+}
+
 static const char *const options[] = { "sigma", NULL };
 
-static int Open(vlc_object_t *obj)
-{
-    filter_t *filter = (filter_t *)obj;
+static const struct vlc_filter_operations filter_ops = {
+    .filter_video = Sharpen, .close = Close,
+};
 
+static int Open(filter_t *filter)
+{
     if ( filter->vctx_in == NULL ||
          vlc_video_context_GetType(filter->vctx_in) != VLC_VIDEO_CONTEXT_VDPAU )
         return VLC_EGENERIC;
@@ -125,7 +135,7 @@ static int Open(vlc_object_t *obj)
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
 
-    filter->pf_video_filter = Sharpen;
+    filter->ops = &filter_ops;
     filter->p_sys = sys;
 
     config_ChainParse(filter, "sharpen-", options, filter->p_cfg);
@@ -138,20 +148,10 @@ static int Open(vlc_object_t *obj)
     return VLC_SUCCESS;
 }
 
-static void Close(vlc_object_t *obj)
-{
-    filter_t *filter = (filter_t *)obj;
-    filter_sys_t *sys = filter->p_sys;
-
-    var_DelCallback(filter, "sharpen-sigma", SharpenCallback, sys);
-    free(sys);
-}
-
 vlc_module_begin()
     set_description(N_("VDPAU sharpen video filter"))
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
-    set_capability("video filter", 0)
     add_shortcut("sharpen")
-    set_callbacks(Open, Close)
+    set_callback_video_filter(Open)
 vlc_module_end()

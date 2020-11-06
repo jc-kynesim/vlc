@@ -38,7 +38,6 @@
  * Module descriptor
  *****************************************************************************/
 static int  OpenFilter( vlc_object_t * );
-static void CloseFilter( vlc_object_t * );
 
 #define REMAP_CFG "aout-remap-"
 
@@ -75,7 +74,7 @@ vlc_module_begin ()
     set_capability( "audio filter", 0 )
     set_category( CAT_AUDIO )
     set_subcategory( SUBCAT_AUDIO_AFILTER )
-    set_callbacks( OpenFilter, CloseFilter )
+    set_callback( OpenFilter )
     set_shortname( "Remap" )
 
 #define CHANNEL( idx ) \
@@ -90,8 +89,6 @@ vlc_module_begin ()
     add_bool( REMAP_CFG "normalize", true, "Normalize channels",
             "When mapping more than one channel to a single output channel, "
             "normalize the output accordingly.", false )
-
-    set_callbacks( OpenFilter, CloseFilter )
 
 vlc_module_end ()
 
@@ -274,7 +271,7 @@ static int OpenFilter( vlc_object_t *p_this )
     audio_format_t *audio_out = &p_filter->fmt_out.audio;
 
     /* Allocate the memory needed to store the module's structure */
-    p_sys = p_filter->p_sys = malloc( sizeof(filter_sys_t) );
+    p_sys = p_filter->p_sys = vlc_obj_malloc( p_this, sizeof(filter_sys_t) );
     if( unlikely( p_sys == NULL ) )
         return VLC_ENOMEM;
 
@@ -306,7 +303,6 @@ static int OpenFilter( vlc_object_t *p_this )
         if (val >= AOUT_CHAN_MAX)
         {
             msg_Err( p_filter, "invalid channel index" );
-            free( p_sys );
             return VLC_EGENERIC;
         }
         if (val < 0)
@@ -355,7 +351,6 @@ static int OpenFilter( vlc_object_t *p_this )
     if( !p_sys->pf_remap )
     {
         msg_Err( p_filter, "Could not decide on %s remap function", b_multiple ? "an add" : "a copy" );
-        free( p_sys );
         return VLC_EGENERIC;
     }
 
@@ -371,18 +366,12 @@ static int OpenFilter( vlc_object_t *p_this )
              aout_FormatPrintChannels( audio_in ),
              aout_FormatPrintChannels( audio_out ) );
 
-    p_filter->pf_audio_filter = Remap;
+    static const struct vlc_filter_operations filter_ops =
+    {
+        .filter_audio = Remap,
+    };
+    p_filter->ops = &filter_ops;
     return VLC_SUCCESS;
-}
-
-/*****************************************************************************
- * CloseFilter:
- *****************************************************************************/
-static void CloseFilter( vlc_object_t *p_this )
-{
-    filter_t *p_filter = (filter_t *) p_this;
-    filter_sys_t *p_sys = p_filter->p_sys;
-    free( p_sys );
 }
 
 /*****************************************************************************

@@ -28,13 +28,6 @@ import "qrc:///style/"
 Widgets.KeyNavigableTableView {
     id: listView_id
 
-    model: MLVideoModel {
-        ml: medialib
-    }
-    selectionDelegateModel: Util.SelectableDelegateModel {
-        model: listView_id.model
-    }
-
     property Component thumbnailHeader: Item {
         Widgets.IconLabel {
             height: VLCStyle.listAlbumCover_height
@@ -81,19 +74,6 @@ Widgets.KeyNavigableTableView {
     headerColor: VLCStyle.colors.bg
 
     onActionForSelection: medialib.addAndPlay(model.getIdsForIndexes( selection ))
-
-    navigationLeft:  function(index) {
-        if (isFocusOnContextButton )
-            isFocusOnContextButton = false
-        else
-            defaultNavigationLeft(index)
-    }
-    navigationRight: function(index) {
-        if (!isFocusOnContextButton)
-            isFocusOnContextButton = true
-        else
-            defaultNavigationRight(index)
-    }
 
     Widgets.TableColumns {
         id: tableColumns

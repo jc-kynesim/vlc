@@ -62,6 +62,22 @@ function get_fmt( fmt_list )
     return fmt
 end
 
+-- Helper emulating vlc.readline() to work around its failure on
+-- very long lines (see #24957)
+function read_long_line()
+    local eol
+    local pos = 0
+    local len = 32768
+    repeat
+        len = len * 2
+        local line = vlc.peek( len )
+        if not line then return nil end
+        eol = string.find( line, "\n", pos + 1 )
+        pos = len
+    until eol or len >= 1024 * 1024 -- No EOF detection, loop until limit
+    return vlc.read( eol or len )
+end
+
 -- Buffering iterator to parse through the HTTP stream several times
 -- without making several HTTP requests
 function buf_iter( s )
@@ -315,31 +331,26 @@ function parse()
         -- (cf. http://en.wikipedia.org/wiki/YouTube#Quality_and_formats)
         fmt = get_url_param( vlc.path, "fmt" )
         while true do
-            local line = vlc.readline()
+            -- The new HTML code layout has fewer and longer lines; always
+            -- use the long line workaround until we get more visibility.
+            local line = new_layout and read_long_line() or vlc.readline()
             if not line then break end
 
             -- The next line is the major configuration line that we need.
-            -- It is very long and readline() is likely to fail on it due
-            -- to #24957, so we need this instead.
-            if string.match( line, '<div id="player%-api">' ) then
-                if not vlc.peek( 1 ) then break end
-                local eol
-                local pos = 0
-                local len = 32768
-                repeat
-                    len = len * 2
-                    line = vlc.peek( len )
-                    eol = string.find( line, "\n", pos + 1 )
-                    pos = len
-                until eol or len >= 1024 * 1024
-                line = vlc.read( eol or len )
+            -- It is very long so we need this workaround (see #24957).
+            if string.match( line, '^ *<div id="player%-api">' ) then
+                line = read_long_line()
+                if not line then break end
             end
 
-            -- Try to find the video's title
-            if string.match( line, "<meta property=\"og:title\"" ) then
-                _,_,name = string.find( line, "content=\"(.-)\"" )
-                name = vlc.strings.resolve_xml_special_chars( name )
-                name = vlc.strings.resolve_xml_special_chars( name )
+            if not title then
+                local meta = string.match( line, '<meta property="og:title"( .-)>' )
+                if meta then
+                    title = string.match( meta, ' content="(.-)"' )
+                    if title then
+                        title = vlc.strings.resolve_xml_special_chars( title )
+                    end
+                end
             end
 
             if not description then
@@ -348,13 +359,18 @@ function parse()
                 -- unlikely to access it due to #24957
                 description = string.match( line, '\\"shortDescription\\":\\"(.-[^\\])\\"')
                 if description then
-                    if string.match( description, '^\\"' ) then
+                    -- FIXME: do this properly (see #24958)
+                    description = string.gsub( description, '\\(["\\/])', '%1' )
+                else
+                    description = string.match( line, '"shortDescription":"(.-[^\\])"')
+                end
+                if description then
+                    if string.match( description, '^"' ) then
                         description = ""
                     end
                     -- FIXME: do this properly (see #24958)
                     -- This way of unescaping is technically wrong
                     -- so as little as possible of it should be done
-                    description = string.gsub( description, '\\(["\\/])', '%1' )
                     description = string.gsub( description, '\\(["\\/])', '%1' )
                     description = string.gsub( description, '\\n', '\n' )
                     description = string.gsub( description, '\\r', '\r' )
@@ -362,17 +378,34 @@ function parse()
                 end
             end
 
-            if string.match( line, "<meta property=\"og:image\"" ) then
-                _,_,arturl = string.find( line, "content=\"(.-)\"" )
-                arturl = vlc.strings.resolve_xml_special_chars( arturl )
+            if not arturl then
+                local meta = string.match( line, '<meta property="og:image"( .-)>' )
+                if meta then
+                    arturl = string.match( meta, ' content="(.-)"' )
+                    if arturl then
+                        arturl = vlc.strings.resolve_xml_special_chars( arturl )
+                    end
+                end
             end
 
             if not artist then
                 artist = string.match(line, '\\"author\\":\\"(.-)\\"')
                 if artist then
                     -- FIXME: do this properly (see #24958)
-                    artist = string.gsub( artist, "\\/", "/" )
+                    artist = string.gsub( artist, '\\(["\\/])', '%1' )
+                else
+                    artist = string.match( line, '"author":"(.-)"' )
+                end
+                if artist then
+                    -- FIXME: do this properly (see #24958)
                     artist = string.gsub( artist, "\\u0026", "&" )
+                end
+            end
+
+            if not new_layout then
+                if string.match( line, '<script nonce="' ) then
+                    vlc.msg.dbg( "Detected new YouTube HTML code layout" )
+                    new_layout = true
                 end
             end
 
@@ -380,7 +413,8 @@ function parse()
             -- "SWF_ARGS", "swfArgs", "PLAYER_CONFIG", "playerConfig" ...
             if string.match( line, "ytplayer%.config" ) then
 
-                local js_url = string.match( line, "\"js\": *\"(.-)\"" )
+                local js_url = string.match( line, '"jsUrl":"(.-)"' )
+                    or string.match( line, "\"js\": *\"(.-)\"" )
                 if js_url then
                     js_url = string.gsub( js_url, "\\/", "/" )
                     -- Resolve URL
@@ -412,9 +446,14 @@ function parse()
                 if not path then
                     local stream_map = string.match( line, '\\"formats\\":%[(.-)%]' )
                     if stream_map then
-                        vlc.msg.dbg( "Found new-style parameters for youtube video stream, parsing..." )
                         -- FIXME: do this properly (see #24958)
                         stream_map = string.gsub( stream_map, '\\(["\\/])', '%1' )
+                    else
+                        stream_map = string.match( line, '"formats":%[(.-)%]' )
+                    end
+                    if stream_map then
+                        vlc.msg.dbg( "Found new-style parameters for youtube video stream, parsing..." )
+                        -- FIXME: do this properly (see #24958)
                         stream_map = string.gsub( stream_map, "\\u0026", "&" )
                         path = pick_stream( stream_map, js_url )
                     end
@@ -424,6 +463,7 @@ function parse()
                     -- If this is a live stream, the URL map will be empty
                     -- and we get the URL from this field instead
                     local hlsvp = string.match( line, '\\"hlsManifestUrl\\": *\\"(.-)\\"' )
+                        or string.match( line, '"hlsManifestUrl":"(.-)"' )
                     if hlsvp then
                         hlsvp = string.gsub( hlsvp, "\\/", "/" )
                         path = hlsvp
@@ -453,7 +493,7 @@ function parse()
             arturl = get_arturl()
         end
 
-        return { { path = path; name = name; description = description; artist = artist; arturl = arturl } }
+        return { { path = path; name = title; description = description; artist = artist; arturl = arturl } }
 
     elseif string.match( vlc.path, "/get_video_info%?" ) then -- video info API
         local line = vlc.read( 1024*1024 ) -- data is on one line only
@@ -535,7 +575,7 @@ function parse()
             arturl = vlc.strings.decode_uri( arturl )
         end
 
-        return { { path = path, title = title, description = description, artist = artist, arturl = arturl } }
+        return { { path = path, name = title, description = description, artist = artist, arturl = arturl } }
 
     else -- Other supported URL formats
         local video_id = string.match( vlc.path, "/[^/]+/([^?]*)" )

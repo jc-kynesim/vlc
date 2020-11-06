@@ -48,12 +48,11 @@ int Import_B4S( vlc_object_t *p_this )
 {
     stream_t *demux = (stream_t *)p_this;
 
-    CHECK_FILE(demux);
     if( !stream_HasExtension( demux, ".b4s" ) )
         return VLC_EGENERIC;
 
     demux->pf_readdir = ReadDir;
-    demux->pf_control = access_vaDirectoryControlHelper;
+    demux->pf_control = PlaylistControl;
 
     return VLC_SUCCESS;
 }

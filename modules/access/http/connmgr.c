@@ -124,23 +124,19 @@ static void vlc_http_mgr_release(struct vlc_http_mgr *mgr,
 static
 struct vlc_http_msg *vlc_http_mgr_reuse(struct vlc_http_mgr *mgr,
                                         const char *host, unsigned port,
-                                        const struct vlc_http_msg *req)
+                                        const struct vlc_http_msg *req,
+                                        bool payload)
 {
     struct vlc_http_conn *conn = vlc_http_mgr_find(mgr, host, port);
     if (conn == NULL)
         return NULL;
 
-    struct vlc_http_stream *stream = vlc_http_stream_open(conn, req);
+    struct vlc_http_stream *stream = vlc_http_stream_open(conn, req, payload);
     if (stream != NULL)
     {
         struct vlc_http_msg *m = vlc_http_msg_get_initial(stream);
         if (m != NULL)
             return m;
-
-        /* NOTE: If the request were not idempotent, we would not know if it
-         * was processed by the other end. Thus POST is not used/supported so
-         * far, and CONNECT is treated as if it were idempotent (which works
-         * fine here). */
     }
     /* Get rid of closing or reset connection */
     vlc_http_mgr_release(mgr, conn);
@@ -149,7 +145,8 @@ struct vlc_http_msg *vlc_http_mgr_reuse(struct vlc_http_mgr *mgr,
 
 static struct vlc_http_msg *vlc_https_request(struct vlc_http_mgr *mgr,
                                               const char *host, unsigned port,
-                                              const struct vlc_http_msg *req)
+                                              const struct vlc_http_msg *req,
+                                              bool idempotent, bool payload)
 {
     vlc_tls_t *tls;
     bool http2 = true;
@@ -164,10 +161,17 @@ static struct vlc_http_msg *vlc_https_request(struct vlc_http_mgr *mgr,
             return NULL;
     }
 
-    /* TODO? non-idempotent request support */
-    struct vlc_http_msg *resp = vlc_http_mgr_reuse(mgr, host, port, req);
-    if (resp != NULL)
-        return resp; /* existing connection reused */
+    if (idempotent)
+    {   /* If the request is idempotent, try to reuse an existing connection.
+         * Otherwise, it is possible but unadvisable as we would not know if
+         * the nonidempotent request was processed if the connection fails
+         * before the response is received.
+         */
+        struct vlc_http_msg *resp = vlc_http_mgr_reuse(mgr, host, port, req,
+                                                       payload);
+        if (resp != NULL)
+            return resp; /* existing connection reused */
+    }
 
     char *proxy = vlc_http_proxy_find(host, port, true);
     if (proxy != NULL)
@@ -202,21 +206,28 @@ static struct vlc_http_msg *vlc_https_request(struct vlc_http_mgr *mgr,
         return NULL;
     }
 
-    mgr->conn = conn;
+    if (mgr->conn != NULL)
+        vlc_http_mgr_release(mgr, mgr->conn);
 
-    return vlc_http_mgr_reuse(mgr, host, port, req);
+    mgr->conn = conn;
+    return vlc_http_mgr_reuse(mgr, host, port, req, payload);
 }
 
 static struct vlc_http_msg *vlc_http_request(struct vlc_http_mgr *mgr,
                                              const char *host, unsigned port,
-                                             const struct vlc_http_msg *req)
+                                             const struct vlc_http_msg *req,
+                                             bool idempotent, bool payload)
 {
     if (mgr->creds != NULL && mgr->conn != NULL)
         return NULL; /* switch from HTTPS to HTTP not implemented */
 
-    struct vlc_http_msg *resp = vlc_http_mgr_reuse(mgr, host, port, req);
-    if (resp != NULL)
-        return resp;
+    if (idempotent)
+    {
+        struct vlc_http_msg *resp = vlc_http_mgr_reuse(mgr, host, port, req,
+                                                       payload);
+        if (resp != NULL)
+            return resp;
+    }
 
     struct vlc_http_conn *conn;
     struct vlc_http_stream *stream;
@@ -232,7 +243,7 @@ static struct vlc_http_msg *vlc_http_request(struct vlc_http_mgr *mgr,
         if (url.psz_host != NULL)
             stream = vlc_h1_request(mgr->logger, url.psz_host,
                                     url.i_port ? url.i_port : 80, true, req,
-                                    true, &conn);
+                                    idempotent, payload, &conn);
         else
             stream = NULL;
 
@@ -240,17 +251,20 @@ static struct vlc_http_msg *vlc_http_request(struct vlc_http_mgr *mgr,
     }
     else
         stream = vlc_h1_request(mgr->logger, host, port ? port : 80, false,
-                                req, true, &conn);
+                                req, idempotent, payload, &conn);
 
     if (stream == NULL)
         return NULL;
 
-    resp = vlc_http_msg_get_initial(stream);
+    struct vlc_http_msg *resp = vlc_http_msg_get_initial(stream);
     if (resp == NULL)
     {
         vlc_http_conn_release(conn);
         return NULL;
     }
+
+    if (mgr->conn != NULL)
+        vlc_http_mgr_release(mgr, mgr->conn);
 
     mgr->conn = conn;
     return resp;
@@ -258,12 +272,14 @@ static struct vlc_http_msg *vlc_http_request(struct vlc_http_mgr *mgr,
 
 struct vlc_http_msg *vlc_http_mgr_request(struct vlc_http_mgr *mgr, bool https,
                                           const char *host, unsigned port,
-                                          const struct vlc_http_msg *m)
+                                          const struct vlc_http_msg *m,
+                                          bool idempotent, bool payload)
 {
     if (port && vlc_http_port_blocked(port))
         return NULL;
 
-    return (https ? vlc_https_request : vlc_http_request)(mgr, host, port, m);
+    return (https ? vlc_https_request : vlc_http_request)(mgr, host, port, m,
+                                                          idempotent, payload);
 }
 
 struct vlc_http_cookie_jar_t *vlc_http_mgr_get_jar(struct vlc_http_mgr *mgr)

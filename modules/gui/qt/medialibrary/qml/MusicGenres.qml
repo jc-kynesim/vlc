@@ -48,7 +48,7 @@ Widgets.NavigableFocusScope {
     Component.onCompleted: loadView()
 
     function loadView() {
-        if (medialib.gridView) {
+        if (mainInterface.gridView) {
             view.replace(gridComponent)
         } else {
             view.replace(tableComponent)
@@ -87,27 +87,6 @@ Widgets.NavigableFocusScope {
         }
     }
 
-    Widgets.MenuExt {
-        id: contextMenu
-        property var model: ({})
-        closePolicy: Popup.CloseOnReleaseOutside | Popup.CloseOnEscape
-        onClosed: contextMenu.parent.forceActiveFocus()
-
-        Widgets.MenuItemExt {
-            id: playMenuItem
-            text: "Play from start"
-            onTriggered: {
-                medialib.addAndPlay( contextMenu.model.id )
-                history.push(["player"])
-            }
-        }
-
-        Widgets.MenuItemExt {
-            text: "Enqueue"
-            onTriggered: medialib.addToPlaylist( contextMenu.model.id )
-        }
-    }
-
     function _actionAtIndex(index) {
         if (selectionModel.selectedIndexes.length > 1) {
             medialib.addAndPlay(model.getIdsForIndexes(selectionModel.selectedIndexes))
@@ -138,6 +117,11 @@ Widgets.NavigableFocusScope {
         }
     }
 
+    GenreContextMenu {
+        id: contextMenu
+        model: genreModel
+    }
+
     /* Grid View */
     Component {
         id: gridComponent
@@ -162,36 +146,39 @@ Widgets.NavigableFocusScope {
                 playCoverBorder.width: VLCStyle.dp(3, VLCStyle.scale)
 
                 onItemDoubleClicked: root.showAlbumView(model)
-                onItemClicked: {
-                    selectionModel.updateSelection( modifier , view.currentItem.currentIndex, index)
-                    view.currentItem.currentIndex = index
-                    view.currentItem.forceActiveFocus()
-                }
+                onItemClicked: gridView_id.leftClickOnItem(modifier, item.index)
+
                 onPlayClicked: {
                     if (model.id)
                         medialib.addAndPlay(model.id)
                 }
 
-                Column {
-                    anchors.centerIn: parent
-                    opacity: item._highlighted ? .3 : 1
+                onContextMenuButtonClicked: {
+                    gridView_id.rightClickOnItem(index)
+                    contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
+                }
 
-                    Label {
-                         width: item.width
-                         elide: Text.ElideRight
-                         font.pixelSize: VLCStyle.fontSize_large
-                         font.weight: Font.DemiBold
-                         text: model.name
-                         color: "white"
-                         horizontalAlignment: Text.AlignHCenter
-                    }
+                pictureOverlay: Item {
+                    Column {
+                        anchors.centerIn: parent
 
-                    Widgets.CaptionLabel {
-                        width: item.width
-                        text: model.nb_tracks > 1 ? i18n.qtr("%1 Tracks").arg(model.nb_tracks) : i18n.qtr("%1 Track").arg(model.nb_tracks)
-                        opacity: .7
-                        color: "white"
-                        horizontalAlignment: Text.AlignHCenter
+                        Label {
+                             width: item.width
+                             elide: Text.ElideRight
+                             font.pixelSize: VLCStyle.fontSize_large
+                             font.weight: Font.DemiBold
+                             text: model.name
+                             color: "white"
+                             horizontalAlignment: Text.AlignHCenter
+                        }
+
+                        Widgets.CaptionLabel {
+                            width: item.width
+                            text: model.nb_tracks > 1 ? i18n.qtr("%1 Tracks").arg(model.nb_tracks) : i18n.qtr("%1 Track").arg(model.nb_tracks)
+                            opacity: .7
+                            color: "white"
+                            horizontalAlignment: Text.AlignHCenter
+                        }
                     }
                 }
             }
@@ -262,19 +249,28 @@ Widgets.NavigableFocusScope {
                 root.showAlbumView(model)
             }
 
-            onContextMenuButtonClicked: {
-                contextMenu.model = menuModel
-                contextMenu.popup(menuParent)
-            }
+            onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes, menuParent.mapToGlobal(0,0))
+            onRightClick: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
         }
     }
 
     Widgets.StackViewExt {
         id: view
 
-        initialItem: medialib.gridView ? gridComponent : tableComponent
+        initialItem: mainInterface.gridView ? gridComponent : tableComponent
 
         anchors.fill: parent
         focus: genreModel.count !== 0
+    }
+
+    Connections {
+        target: mainInterface
+        onGridViewChanged: {
+            if (mainInterface.gridView) {
+                view.replace(gridComponent)
+            } else {
+                view.replace(tableComponent)
+            }
+        }
     }
 }

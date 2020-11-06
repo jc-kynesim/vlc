@@ -259,9 +259,24 @@ static int AdjustCallback( vlc_object_t *p_this, char const *psz_var,
     return VLC_SUCCESS;
 }
 
-static int D3D9OpenAdjust(vlc_object_t *obj)
+static void D3D9CloseAdjust(filter_t *filter)
 {
-    filter_t *filter = (filter_t *)obj;
+    filter_sys_t *sys = filter->p_sys;
+
+    IDirect3DSurface9_Release( sys->hw_surface );
+    IDirectXVideoProcessor_Release( sys->processor );
+    FreeLibrary( sys->hdecoder_dll );
+    vlc_video_context_Release(filter->vctx_out);
+
+    free(sys);
+}
+
+static const struct vlc_filter_operations filter_ops = {
+    .filter_video = Filter, .close = D3D9CloseAdjust,
+};
+
+static int D3D9OpenAdjust(filter_t *filter)
+{
     filter_sys_t *sys = NULL;
     HINSTANCE hdecoder_dll = NULL;
     HRESULT hr;
@@ -450,7 +465,7 @@ static int D3D9OpenAdjust(vlc_object_t *obj)
 
     sys->hdecoder_dll = hdecoder_dll;
 
-    filter->pf_video_filter = Filter;
+    filter->ops = &filter_ops;
     filter->p_sys = sys;
     filter->vctx_out = vlc_video_context_Hold(filter->vctx_in);
 
@@ -468,25 +483,11 @@ error:
     return VLC_EGENERIC;
 }
 
-static void D3D9CloseAdjust(vlc_object_t *obj)
-{
-    filter_t *filter = (filter_t *)obj;
-    filter_sys_t *sys = filter->p_sys;
-
-    IDirect3DSurface9_Release( sys->hw_surface );
-    IDirectXVideoProcessor_Release( sys->processor );
-    FreeLibrary( sys->hdecoder_dll );
-    vlc_video_context_Release(filter->vctx_out);
-
-    free(sys);
-}
-
 vlc_module_begin()
     set_description(N_("Direct3D9 adjust filter"))
-    set_capability("video filter", 0)
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
-    set_callbacks(D3D9OpenAdjust, D3D9CloseAdjust)
+    set_callback_video_filter(D3D9OpenAdjust)
     add_shortcut( "adjust" )
 
     add_float_with_range( "contrast", 1.0, 0.0, 2.0,
@@ -510,16 +511,13 @@ vlc_module_begin()
 
     add_submodule()
     set_description(N_("Direct3D9 deinterlace filter"))
-    set_callbacks(D3D9OpenDeinterlace, D3D9CloseDeinterlace)
-    add_shortcut ("deinterlace")
+    set_deinterlace_callback( D3D9OpenDeinterlace )
 
     add_submodule()
-    set_capability( "video converter", 10 )
-    set_callbacks( D3D9OpenConverter, D3D9CloseConverter )
+    set_callback_video_converter( D3D9OpenConverter, 10 )
 
     add_submodule()
-    set_callbacks( D3D9OpenCPUConverter, D3D9CloseCPUConverter )
-    set_capability( "video converter", 10 )
+    set_callback_video_converter( D3D9OpenCPUConverter, 10 )
 
     add_submodule()
     set_description(N_("Direct3D9"))

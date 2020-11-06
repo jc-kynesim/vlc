@@ -35,17 +35,6 @@
 #include "conn.h"
 #include "transport.h"
 
-static char *vlc_http_authority(const char *host, unsigned port)
-{
-    static const char *const formats[2] = { "%s:%u", "[%s]:%u" };
-    const bool brackets = strchr(host, ':') != NULL;
-    char *authority;
-
-    if (unlikely(asprintf(&authority, formats[brackets], host, port) == -1))
-        return NULL;
-    return authority;
-}
-
 static struct vlc_http_msg *vlc_http_tunnel_open(struct vlc_http_conn *conn,
                                                  const char *hostname,
                                                  unsigned port,
@@ -68,7 +57,7 @@ static struct vlc_http_msg *vlc_http_tunnel_open(struct vlc_http_conn *conn,
         vlc_http_msg_add_creds_basic(req, true, username,
                                      (password != NULL) ? password : "");
 
-    struct vlc_http_stream *stream = vlc_http_stream_open(conn, req);
+    struct vlc_http_stream *stream = vlc_http_stream_open(conn, req, false);
 
     vlc_http_msg_destroy(req);
     if (stream == NULL)

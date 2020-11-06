@@ -42,7 +42,7 @@ Widgets.NavigableFocusScope {
     //the index to "go to" when the view is loaded
     property var initialIndex: 0
     property int gridViewMarginTop: VLCStyle.margin_large
-    property var gridViewRowX: medialib.gridView ? view.currentItem.rowX : undefined
+    property var gridViewRowX: mainInterface.gridView ? view.currentItem.rowX : undefined
 
     navigationCancel: function() {
         if (view.currentItem.currentIndex <= 0) {
@@ -96,6 +96,11 @@ Widgets.NavigableFocusScope {
         model: albumModelId
     }
 
+    AlbumContextMenu {
+        id: contextMenu
+        model: albumModelId
+    }
+
     Component {
         id: gridComponent
 
@@ -117,14 +122,17 @@ Widgets.NavigableFocusScope {
 
                 opacity: gridView_id.expandIndex !== -1 && gridView_id.expandIndex !== audioGridItem.index ? .7 : 1
 
-                onItemClicked : {
-                    selectionModel.updateSelection( modifier , root.currentIndex, index)
-                    gridView_id.currentIndex = index
-                    gridView_id.forceActiveFocus()
-                }
+                onItemClicked : gridView_id.leftClickOnItem(modifier, index)
 
                 onItemDoubleClicked: {
                     if ( model.id !== undefined ) { medialib.addAndPlay( model.id ) }
+                }
+
+                onContextMenuButtonClicked: {
+                    gridView_id.rightClickOnItem(index)
+                    contextMenu.popup(selectionModel.selectedIndexes, globalMousePos, {
+                        "information": index
+                    })
                 }
 
                 Behavior on opacity {
@@ -155,30 +163,12 @@ Widgets.NavigableFocusScope {
             onSelectionUpdated: selectionModel.updateSelection( keyModifiers, oldIndex, newIndex )
 
             navigationParent: root
-        }
-    }
 
-    Widgets.MenuExt {
-        id: contextMenu
-        property var model: ({})
-        closePolicy: Popup.CloseOnReleaseOutside | Popup.CloseOnEscape
-
-        Widgets.MenuItemExt {
-            id: playMenuItem
-            text: "Play from start"
-            onTriggered: {
-                medialib.addAndPlay( contextMenu.model.id )
-                history.push(["player"])
+            Connections {
+                target: contextMenu
+                onShowMediaInformation: gridView_id.switchExpandItem( index )
             }
         }
-
-        Widgets.MenuItemExt {
-            text: "Enqueue"
-            onTriggered: medialib.addToPlaylist( contextMenu.model.id )
-        }
-
-        onClosed: contextMenu.parent.forceActiveFocus()
-
     }
 
     Component {
@@ -210,10 +200,8 @@ Widgets.NavigableFocusScope {
                     tableView_id.currentIndex = 0;
             }
 
-            onContextMenuButtonClicked: {
-                contextMenu.model = menuModel
-                contextMenu.popup(menuParent)
-            }
+            onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes,  menuParent.mapToGlobal(0,0))
+            onRightClick: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
 
             Widgets.TableColumns {
                 id: tableColumns
@@ -241,12 +229,12 @@ Widgets.NavigableFocusScope {
         anchors.fill: parent
         focus: albumModelId.count !== 0
 
-        initialItem: medialib.gridView ? gridComponent : tableComponent
+        initialItem: mainInterface.gridView ? gridComponent : tableComponent
 
         Connections {
-            target: medialib
+            target: mainInterface
             onGridViewChanged: {
-                if (medialib.gridView)
+                if (mainInterface.gridView)
                     view.replace(gridComponent)
                 else
                     view.replace(tableComponent)

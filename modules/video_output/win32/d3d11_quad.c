@@ -42,7 +42,7 @@
 #define nbLatBands SPHERE_SLICES
 #define nbLonBands SPHERE_SLICES
 
-void D3D11_RenderQuad(d3d11_device_t *d3d_dev, d3d_quad_t *quad, d3d_vshader_t *vsshader,
+void D3D11_RenderQuad(d3d11_device_t *d3d_dev, d3d_quad_t *quad, d3d_vertex_shader_t *vsshader,
                       ID3D11ShaderResourceView *resourceView[D3D11_MAX_SHADER_VIEW],
                       d3d11_select_plane_t selectPlane, void *selectOpaque)
 {
@@ -55,18 +55,17 @@ void D3D11_RenderQuad(d3d11_device_t *d3d_dev, d3d_quad_t *quad, d3d_vshader_t *
     ID3D11DeviceContext_IASetInputLayout(d3d_dev->d3dcontext, vsshader->layout);
     ID3D11DeviceContext_IASetVertexBuffers(d3d_dev->d3dcontext, 0, 1, &quad->pVertexBuffer, &quad->vertexStride, &offset);
     ID3D11DeviceContext_IASetIndexBuffer(d3d_dev->d3dcontext, quad->pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
-    if ( quad->pVertexShaderConstants )
-        ID3D11DeviceContext_VSSetConstantBuffers(d3d_dev->d3dcontext, 0, 1, &quad->pVertexShaderConstants);
+    if ( quad->viewpointShaderConstant )
+        ID3D11DeviceContext_VSSetConstantBuffers(d3d_dev->d3dcontext, 0, 1, &quad->viewpointShaderConstant);
 
     ID3D11DeviceContext_VSSetShader(d3d_dev->d3dcontext, vsshader->shader, NULL, 0);
 
-    if (quad->d3dsampState[0])
-        ID3D11DeviceContext_PSSetSamplers(d3d_dev->d3dcontext, 0, 2, quad->d3dsampState);
+    if (quad->SamplerStates[0])
+        ID3D11DeviceContext_PSSetSamplers(d3d_dev->d3dcontext, 0, 2, quad->SamplerStates);
 
     /* pixel shader */
     ID3D11DeviceContext_PSSetConstantBuffers(d3d_dev->d3dcontext, 0, ARRAY_SIZE(quad->pPixelShaderConstants), quad->pPixelShaderConstants);
     assert(quad->resourceCount <= D3D11_MAX_SHADER_VIEW);
-    ID3D11DeviceContext_PSSetShaderResources(d3d_dev->d3dcontext, 0, quad->resourceCount, resourceView);
 
     for (size_t i=0; i<D3D11_MAX_SHADER_VIEW; i++)
     {
@@ -76,17 +75,19 @@ void D3D11_RenderQuad(d3d11_device_t *d3d_dev, d3d_quad_t *quad, d3d_vshader_t *
         if (unlikely(!selectPlane(selectOpaque, i)))
             continue;
 
+        ID3D11DeviceContext_PSSetShaderResources(d3d_dev->d3dcontext, 0, quad->resourceCount, resourceView);
+
         ID3D11DeviceContext_PSSetShader(d3d_dev->d3dcontext, quad->d3dpixelShader[i], NULL, 0);
 
         ID3D11DeviceContext_RSSetViewports(d3d_dev->d3dcontext, 1, &quad->cropViewport[i]);
 
         ID3D11DeviceContext_DrawIndexed(d3d_dev->d3dcontext, quad->indexCount, 0, 0);
-    }
 
-    /* force unbinding the input texture, otherwise we get:
-     * OMSetRenderTargets: Resource being set to OM RenderTarget slot 0 is still bound on input! */
-    ID3D11ShaderResourceView *reset[D3D11_MAX_SHADER_VIEW] = { 0 };
-    ID3D11DeviceContext_PSSetShaderResources(d3d_dev->d3dcontext, 0, quad->resourceCount, reset);
+        // /* force unbinding the input texture, otherwise we get:
+        // * OMSetRenderTargets: Resource being set to OM RenderTarget slot 0 is still bound on input! */
+        // ID3D11ShaderResourceView *reset[D3D11_MAX_SHADER_VIEW] = { 0 };
+        // ID3D11DeviceContext_PSSetShaderResources(d3d_dev->d3dcontext, 0, quad->resourceCount, reset);
+    }
 }
 
 static bool AllocQuadVertices(vlc_object_t *o, d3d11_device_t *d3d_dev, d3d_quad_t *quad, video_projection_mode_t projection)
@@ -178,18 +179,18 @@ void D3D11_ReleaseQuad(d3d_quad_t *quad)
         ID3D11Buffer_Release(quad->pIndexBuffer);
         quad->pIndexBuffer = NULL;
     }
-    if (quad->pVertexShaderConstants)
+    if (quad->viewpointShaderConstant)
     {
-        ID3D11Buffer_Release(quad->pVertexShaderConstants);
-        quad->pVertexShaderConstants = NULL;
+        ID3D11Buffer_Release(quad->viewpointShaderConstant);
+        quad->viewpointShaderConstant = NULL;
     }
     D3D11_ReleasePixelShader(quad);
     for (size_t i=0; i<2; i++)
     {
-        if (quad->d3dsampState[i])
+        if (quad->SamplerStates[i])
         {
-            ID3D11SamplerState_Release(quad->d3dsampState[i]);
-            quad->d3dsampState[i] = NULL;
+            ID3D11SamplerState_Release(quad->SamplerStates[i]);
+            quad->SamplerStates[i] = NULL;
         }
     }
     ReleaseD3D11PictureSys(&quad->picSys);
@@ -610,7 +611,7 @@ static bool ShaderUpdateConstants(vlc_object_t *o, d3d11_device_t *d3d_dev, d3d_
             res = (ID3D11Resource *)quad->pPixelShaderConstants[PS_CONST_COLORSPACE];
             break;
         case VS_CONST_VIEWPOINT:
-            res = (ID3D11Resource *)quad->pVertexShaderConstants;
+            res = (ID3D11Resource *)quad->viewpointShaderConstant;
             break;
     }
 
@@ -727,7 +728,7 @@ static float UpdateZ(float f_fovx, float f_fovy)
 void (D3D11_UpdateViewpoint)(vlc_object_t *o, d3d11_device_t *d3d_dev, d3d_quad_t *quad,
                              const vlc_viewpoint_t *viewpoint, float f_sar)
 {
-    if (!quad->pVertexShaderConstants)
+    if (!quad->viewpointShaderConstant)
         return;
 
     // Convert degree into radian
@@ -778,7 +779,7 @@ int D3D11_AllocateQuad(vlc_object_t *o, d3d11_device_t *d3d_dev,
     {
         static_assert((sizeof(VS_PROJECTION_CONST)%16)==0,"Constant buffers require 16-byte alignment");
         constantDesc.ByteWidth = sizeof(VS_PROJECTION_CONST);
-        hr = ID3D11Device_CreateBuffer(d3d_dev->d3ddevice, &constantDesc, NULL, &quad->pVertexShaderConstants);
+        hr = ID3D11Device_CreateBuffer(d3d_dev->d3ddevice, &constantDesc, NULL, &quad->viewpointShaderConstant);
         if(FAILED(hr)) {
             msg_Err(o, "Could not create the vertex shader constant buffer. (hr=0x%lX)", hr);
             goto error;

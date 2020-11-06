@@ -33,7 +33,8 @@ struct vlc_http_stream;
 struct vlc_http_conn_cbs
 {
     struct vlc_http_stream *(*stream_open)(struct vlc_http_conn *,
-                                           const struct vlc_http_msg *);
+                                           const struct vlc_http_msg *,
+                                           bool has_data);
     void (*release)(struct vlc_http_conn *);
 };
 
@@ -44,9 +45,10 @@ struct vlc_http_conn
 };
 
 static inline struct vlc_http_stream *
-vlc_http_stream_open(struct vlc_http_conn *conn, const struct vlc_http_msg *m)
+vlc_http_stream_open(struct vlc_http_conn *conn, const struct vlc_http_msg *m,
+                     bool has_data)
 {
-    return conn->cbs->stream_open(conn, m);
+    return conn->cbs->stream_open(conn, m, has_data);
 }
 
 static inline void vlc_http_conn_release(struct vlc_http_conn *conn)
@@ -65,6 +67,8 @@ struct vlc_http_conn *vlc_h1_conn_create(void *ctx, struct vlc_tls *,
                                          bool proxy);
 struct vlc_http_stream *vlc_chunked_open(struct vlc_http_stream *,
                                          struct vlc_tls *);
+ssize_t vlc_https_chunked_write(struct vlc_tls *, const void *base, size_t len,
+                                bool eos);
 
 /**
  * Sends an HTTP/1.x request through a new connection.
@@ -90,6 +94,7 @@ struct vlc_http_stream *vlc_chunked_open(struct vlc_http_stream *,
  * \param req HTTP request message
  * \param idempotent whether the HTTP request is idempotent (e.g. GET),
  *                   or not (e.g. POST)
+ * \param has_data whether the HTTP request will have a request payload
  * \param connp pointer to storage space for the established HTTP connection
  *              (or NULL if the connection is not to be reused) [OUT]
  *              can be NULL if the connection is not meant to be reused
@@ -99,7 +104,7 @@ struct vlc_http_stream *vlc_chunked_open(struct vlc_http_stream *,
 struct vlc_http_stream *vlc_h1_request(void *ctx, const char *hostname,
                                        unsigned port, bool proxy,
                                        const struct vlc_http_msg *req,
-                                       bool idempotent,
+                                       bool idempotent, bool has_data,
                                        struct vlc_http_conn **restrict connp);
 
 /** @} */

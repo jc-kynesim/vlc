@@ -462,7 +462,10 @@ static void D3D11_RGBA(filter_t *p_filter, picture_t *src, picture_t *dst)
 static void DeleteFilter( filter_t * p_filter )
 {
     if( p_filter->p_module )
+    {
+        filter_Close( p_filter );
         module_unneed( p_filter, p_filter->p_module );
+    }
 
     es_format_Clean( &p_filter->fmt_in );
     es_format_Clean( &p_filter->fmt_out );
@@ -509,6 +512,7 @@ static filter_t *CreateCPUtoGPUFilter( filter_t *p_this, const es_format_t *p_fm
         DeleteFilter( p_filter );
         return NULL;
     }
+    assert( p_filter->ops != NULL );
 
     return p_filter;
 }
@@ -566,7 +570,7 @@ static void NV12_D3D11(filter_t *p_filter, picture_t *src, picture_t *dst)
         sys->staging_pic->context = NULL; // some CPU filters won't like the mix of CPU/GPU
 
         picture_Hold( src );
-        sys->filter->pf_video_filter(sys->filter, src);
+        sys->filter->ops->filter_video(sys->filter, src);
 
         sys->staging_pic->context = staging_pic_ctx;
         ID3D11DeviceContext_Unmap(sys->d3d_dev->d3dcontext, p_staging_sys->resource[KNOWN_DXGI_INDEX], 0);
@@ -587,9 +591,22 @@ static void NV12_D3D11(filter_t *p_filter, picture_t *src, picture_t *dst)
     dst->i_planes = 0;
 }
 
-VIDEO_FILTER_WRAPPER (D3D11_NV12)
-VIDEO_FILTER_WRAPPER (D3D11_YUY2)
-VIDEO_FILTER_WRAPPER (D3D11_RGBA)
+static void D3D11CloseConverter( filter_t *p_filter )
+{
+    filter_sys_t *p_sys = p_filter->p_sys;
+#if CAN_PROCESSOR
+    if (p_sys->procOutTexture)
+        ID3D11Texture2D_Release(p_sys->procOutTexture);
+    D3D11_ReleaseProcessor( &p_sys->d3d_proc );
+#endif
+    CopyCleanCache(&p_sys->cache);
+    if (p_sys->staging)
+        ID3D11Texture2D_Release(p_sys->staging);
+}
+
+VIDEO_FILTER_WRAPPER_CLOSE(D3D11_NV12, D3D11CloseConverter)
+VIDEO_FILTER_WRAPPER_CLOSE(D3D11_YUY2, D3D11CloseConverter)
+VIDEO_FILTER_WRAPPER_CLOSE(D3D11_RGBA, D3D11CloseConverter)
 
 static picture_t *AllocateCPUtoGPUTexture(filter_t *p_filter, filter_sys_t *p_sys)
 {
@@ -660,10 +677,22 @@ static picture_t *NV12_D3D11_Filter( filter_t *p_filter, picture_t *p_pic )
     return p_outpic;
 }
 
-int D3D11OpenConverter( vlc_object_t *obj )
+static void D3D11CloseCPUConverter( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)obj;
+    filter_sys_t *p_sys = p_filter->p_sys;
+    if (p_sys->filter)
+        DeleteFilter(p_sys->filter);
+    if (p_sys->staging_pic)
+        picture_Release(p_sys->staging_pic);
+    vlc_video_context_Release(p_filter->vctx_out);
+}
 
+static const struct vlc_filter_operations NV12_D3D11_ops = {
+    .filter_video = NV12_D3D11_Filter, .close = D3D11CloseCPUConverter,
+};
+
+int D3D11OpenConverter( filter_t *p_filter )
+{
     if ( !is_d3d11_opaque(p_filter->fmt_in.video.i_chroma) )
         return VLC_EGENERIC;
     if ( GetD3D11ContextPrivate(p_filter->vctx_in) == NULL )
@@ -679,40 +708,40 @@ int D3D11OpenConverter( vlc_object_t *obj )
     case VLC_CODEC_YV12:
         if( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D11_OPAQUE )
             return VLC_EGENERIC;
-        p_filter->pf_video_filter = D3D11_YUY2_Filter;
+        p_filter->ops = &D3D11_YUY2_ops;
         break;
     case VLC_CODEC_I420_10L:
         if( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D11_OPAQUE_10B )
             return VLC_EGENERIC;
-        p_filter->pf_video_filter = D3D11_YUY2_Filter;
+        p_filter->ops = &D3D11_YUY2_ops;
         pixel_bytes = 2;
         break;
     case VLC_CODEC_NV12:
         if( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D11_OPAQUE )
             return VLC_EGENERIC;
-        p_filter->pf_video_filter = D3D11_NV12_Filter;
+        p_filter->ops = &D3D11_NV12_ops;
         break;
     case VLC_CODEC_P010:
         if( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D11_OPAQUE_10B )
             return VLC_EGENERIC;
-        p_filter->pf_video_filter = D3D11_NV12_Filter;
+        p_filter->ops = &D3D11_NV12_ops;
         pixel_bytes = 2;
         break;
     case VLC_CODEC_RGBA:
         if( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D11_OPAQUE_RGBA )
             return VLC_EGENERIC;
-        p_filter->pf_video_filter = D3D11_RGBA_Filter;
+        p_filter->ops = &D3D11_RGBA_ops;
         break;
     case VLC_CODEC_BGRA:
         if( p_filter->fmt_in.video.i_chroma != VLC_CODEC_D3D11_OPAQUE_BGRA )
             return VLC_EGENERIC;
-        p_filter->pf_video_filter = D3D11_RGBA_Filter;
+        p_filter->ops = &D3D11_RGBA_ops;
         break;
     default:
         return VLC_EGENERIC;
     }
 
-    filter_sys_t *p_sys = vlc_obj_calloc(obj, 1, sizeof(filter_sys_t));
+    filter_sys_t *p_sys = vlc_obj_calloc(VLC_OBJECT(p_filter), 1, sizeof(filter_sys_t));
     if (!p_sys)
         return VLC_ENOMEM;
 
@@ -733,9 +762,8 @@ int D3D11OpenConverter( vlc_object_t *obj )
     return VLC_SUCCESS;
 }
 
-int D3D11OpenCPUConverter( vlc_object_t *obj )
+int D3D11OpenCPUConverter( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)obj;
     int err = VLC_EGENERIC;
     filter_sys_t *p_sys = NULL;
 
@@ -753,7 +781,7 @@ int D3D11OpenCPUConverter( vlc_object_t *obj )
     case VLC_CODEC_YV12:
     case VLC_CODEC_NV12:
     case VLC_CODEC_P010:
-        p_filter->pf_video_filter = NV12_D3D11_Filter;
+        p_filter->ops = &NV12_D3D11_ops;
         break;
     default:
         return VLC_EGENERIC;
@@ -773,7 +801,7 @@ int D3D11OpenCPUConverter( vlc_object_t *obj )
         return VLC_EGENERIC;
     }
 
-    p_sys = vlc_obj_calloc(obj, 1, sizeof(filter_sys_t));
+    p_sys = vlc_obj_calloc(VLC_OBJECT(p_filter), 1, sizeof(filter_sys_t));
     if (!p_sys) {
         vlc_decoder_device_Release(dec_device);
         return VLC_ENOMEM;
@@ -826,29 +854,4 @@ done:
         vlc_video_context_Release(p_filter->vctx_out);
     }
     return err;
-}
-
-void D3D11CloseConverter( vlc_object_t *obj )
-{
-    filter_t *p_filter = (filter_t *)obj;
-    filter_sys_t *p_sys = p_filter->p_sys;
-#if CAN_PROCESSOR
-    if (p_sys->procOutTexture)
-        ID3D11Texture2D_Release(p_sys->procOutTexture);
-    D3D11_ReleaseProcessor( &p_sys->d3d_proc );
-#endif
-    CopyCleanCache(&p_sys->cache);
-    if (p_sys->staging)
-        ID3D11Texture2D_Release(p_sys->staging);
-}
-
-void D3D11CloseCPUConverter( vlc_object_t *obj )
-{
-    filter_t *p_filter = (filter_t *)obj;
-    filter_sys_t *p_sys = p_filter->p_sys;
-    if (p_sys->filter)
-        DeleteFilter(p_sys->filter);
-    if (p_sys->staging_pic)
-        picture_Release(p_sys->staging_pic);
-    vlc_video_context_Release(p_filter->vctx_out);
 }

@@ -44,10 +44,8 @@
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-static int  Create    ( vlc_object_t * );
-static void Destroy   ( vlc_object_t * );
+static int  Create    ( filter_t * );
 
-static picture_t *FilterPlanar( filter_t *, picture_t * );
 static picture_t *FilterPacked( filter_t *, picture_t * );
 
 /*****************************************************************************
@@ -74,7 +72,6 @@ vlc_module_begin ()
     set_shortname( N_("Image adjust" ))
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
-    set_capability( "video filter", 0 )
 
     add_float_with_range( "contrast", 1.0, 0.0, 2.0,
                           CONT_TEXT, CONT_LONGTEXT, false )
@@ -96,7 +93,7 @@ vlc_module_begin ()
         change_safe()
 
     add_shortcut( "adjust" )
-    set_callbacks( Create, Destroy )
+    set_callback_video_filter( Create )
 vlc_module_end ()
 
 static const char *const ppsz_filter_options[] = {
@@ -141,13 +138,18 @@ static int BoolCallback( vlc_object_t *obj, char const *varname,
     return VLC_SUCCESS;
 }
 
+VIDEO_FILTER_WRAPPER_CLOSE( FilterPlanar, Destroy )
+
+static const struct vlc_filter_operations packed_filter_ops =
+{
+    .filter_video = FilterPacked, .close = Destroy,
+};
+
 /*****************************************************************************
  * Create: allocates adjust video filter
  *****************************************************************************/
-static int Create( vlc_object_t *p_this )
+static int Create( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
-
     if( p_filter->fmt_in.video.i_chroma != p_filter->fmt_out.video.i_chroma )
     {
         msg_Err( p_filter, "Input and output chromas don't match" );
@@ -155,7 +157,7 @@ static int Create( vlc_object_t *p_this )
     }
 
     /* Allocate structure */
-    filter_sys_t *p_sys = vlc_obj_malloc( p_this, sizeof( *p_sys ) );
+    filter_sys_t *p_sys = vlc_obj_malloc( VLC_OBJECT(p_filter), sizeof( *p_sys ) );
     if( p_sys == NULL )
         return VLC_ENOMEM;
     p_filter->p_sys = p_sys;
@@ -166,7 +168,7 @@ static int Create( vlc_object_t *p_this )
     {
         CASE_PLANAR_YUV
             /* Planar YUV */
-            p_filter->pf_video_filter = FilterPlanar;
+            p_filter->ops = &FilterPlanar_ops;
             p_sys->pf_process_sat_hue_clip = planar_sat_hue_clip_C;
             p_sys->pf_process_sat_hue = planar_sat_hue_C;
             break;
@@ -174,14 +176,14 @@ static int Create( vlc_object_t *p_this )
         CASE_PLANAR_YUV10
         CASE_PLANAR_YUV9
             /* Planar YUV 9-bit or 10-bit */
-            p_filter->pf_video_filter = FilterPlanar;
+            p_filter->ops = &FilterPlanar_ops;
             p_sys->pf_process_sat_hue_clip = planar_sat_hue_clip_C_16;
             p_sys->pf_process_sat_hue = planar_sat_hue_C_16;
             break;
 
         CASE_PACKED_YUV_422
             /* Packed YUV 4:2:2 */
-            p_filter->pf_video_filter = FilterPacked;
+            p_filter->ops = &packed_filter_ops;
             p_sys->pf_process_sat_hue_clip = packed_sat_hue_clip_C;
             p_sys->pf_process_sat_hue = packed_sat_hue_C;
             break;
@@ -224,9 +226,8 @@ static int Create( vlc_object_t *p_this )
 /*****************************************************************************
  * Destroy: destroy adjust video filter
  *****************************************************************************/
-static void Destroy( vlc_object_t *p_this )
+static void Destroy( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
 
     var_DelCallback( p_filter, "contrast", FloatCallback, &p_sys->f_contrast );
@@ -243,24 +244,13 @@ static void Destroy( vlc_object_t *p_this )
 /*****************************************************************************
  * Run the filter on a Planar YUV picture
  *****************************************************************************/
-static picture_t *FilterPlanar( filter_t *p_filter, picture_t *p_pic )
+static void FilterPlanar( filter_t *p_filter, picture_t *p_pic, picture_t *p_outpic )
 {
     /* The full range will only be used for 10-bit */
     int pi_luma[1024];
     int pi_gamma[1024];
 
-    picture_t *p_outpic;
-
     filter_sys_t *p_sys = p_filter->p_sys;
-
-    if( !p_pic ) return NULL;
-
-    p_outpic = filter_NewPicture( p_filter );
-    if( !p_outpic )
-    {
-        picture_Release( p_pic );
-        return NULL;
-    }
 
     bool b_16bit;
     float f_range;
@@ -433,8 +423,6 @@ static picture_t *FilterPlanar( filter_t *p_filter, picture_t *p_pic )
         p_sys->pf_process_sat_hue( p_pic, p_outpic, i_sin, i_cos, i_sat,
                                         i_x, i_y );
     }
-
-    return CopyInfoAndRelease( p_outpic, p_pic );
 }
 
 /*****************************************************************************

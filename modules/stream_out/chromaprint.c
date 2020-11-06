@@ -60,6 +60,8 @@ vlc_module_begin ()
     set_description( N_("Chromaprint stream output") )
     set_capability( "sout output", 0 )
     add_shortcut( "chromaprint" )
+    set_category( CAT_SOUT )
+    set_subcategory( SUBCAT_SOUT_STREAM )
     add_integer( "duration", 90, DURATION_TEXT, DURATION_LONGTEXT, true )
     set_callbacks( Open, Close )
 vlc_module_end ()
@@ -85,6 +87,10 @@ struct sout_stream_id_sys_t
 };
 
 #define BYTESPERSAMPLE 2
+
+static const struct sout_stream_operations ops = {
+    Add, Del, Send, NULL, NULL,
+};
 
 /*****************************************************************************
  * Open:
@@ -116,9 +122,7 @@ static int Open( vlc_object_t *p_this )
         free( p_sys );
         return VLC_EGENERIC;
     }
-    p_stream->pf_add  = Add;
-    p_stream->pf_del  = Del;
-    p_stream->pf_send = Send;
+    p_stream->ops = &ops;
     return VLC_SUCCESS;
 }
 

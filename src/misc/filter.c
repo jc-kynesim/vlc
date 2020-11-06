@@ -134,6 +134,7 @@ int filter_ConfigureBlend( vlc_blender_t *p_blend,
         p_blend->fmt_in.video.i_chroma != p_src->i_chroma )
     {
         /* The chroma is not the same, we need to reload the blend module */
+        filter_Close( p_blend );
         module_unneed( p_blend, p_blend->p_module );
         p_blend->p_module = NULL;
     }
@@ -154,6 +155,7 @@ int filter_ConfigureBlend( vlc_blender_t *p_blend,
         p_blend->p_module = module_need( p_blend, "video blending", NULL, false );
     if( !p_blend->p_module )
         return VLC_EGENERIC;
+    assert( p_blend->ops != NULL );
     return VLC_SUCCESS;
 }
 
@@ -164,14 +166,17 @@ int filter_Blend( vlc_blender_t *p_blend,
     if( !p_blend->p_module )
         return VLC_EGENERIC;
 
-    p_blend->pf_video_blend( p_blend, p_dst, p_src, i_dst_x, i_dst_y, i_alpha );
+    p_blend->ops->blend_video( p_blend, p_dst, p_src, i_dst_x, i_dst_y, i_alpha );
     return VLC_SUCCESS;
 }
 
 void filter_DeleteBlend( vlc_blender_t *p_blend )
 {
     if( p_blend->p_module )
+    {
+        filter_Close( p_blend );
         module_unneed( p_blend, p_blend->p_module );
+    }
 
     vlc_object_delete(p_blend);
 }

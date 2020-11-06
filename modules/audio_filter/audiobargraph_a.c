@@ -62,7 +62,7 @@
  * Module descriptor
  *****************************************************************************/
 static int  Open( vlc_object_t * );
-static void Close( vlc_object_t * );
+static void Close( filter_t * );
 static block_t *DoWork( filter_t *, block_t * );
 
 vlc_module_begin ()
@@ -82,7 +82,7 @@ vlc_module_begin ()
     add_integer( CFG_PREFIX "repetition_time", 2000, REPETITION_TIME_TEXT, REPETITION_TIME_LONGTEXT, false )
     add_obsolete_integer( CFG_PREFIX "connection_reset" )
 
-    set_callbacks( Open, Close )
+    set_callback( Open )
 vlc_module_end ()
 
 typedef struct ValueDate_t {
@@ -137,7 +137,12 @@ static int Open( vlc_object_t *p_this )
     p_filter->fmt_in.audio.i_format = VLC_CODEC_FL32;
     aout_FormatPrepare(&p_filter->fmt_in.audio);
     p_filter->fmt_out.audio = p_filter->fmt_in.audio;
-    p_filter->pf_audio_filter = DoWork;
+
+    static const struct vlc_filter_operations filter_ops =
+    {
+        .filter_audio = DoWork, .close = Close,
+    };
+    p_filter->ops = &filter_ops;
 
     vlc_object_t *vlc = VLC_OBJECT(vlc_object_instance(p_filter));
 
@@ -245,9 +250,8 @@ static block_t *DoWork( filter_t *p_filter, block_t *p_in_buf )
 /*****************************************************************************
  * Close: close the plugin
  *****************************************************************************/
-static void Close( vlc_object_t *p_this )
+static void Close( filter_t * p_filter )
 {
-    filter_t * p_filter = (filter_t *)p_this;
     filter_sys_t *p_sys = p_filter->p_sys;
     vlc_object_t *vlc = VLC_OBJECT(vlc_object_instance(p_filter));
 

@@ -37,25 +37,22 @@
 /****************************************************************************
  * Local prototypes
  ****************************************************************************/
-static int  OpenFilter ( vlc_object_t * );
-static picture_t *Filter( filter_t *, picture_t * );
+static int  OpenFilter ( filter_t * );
+VIDEO_FILTER_WRAPPER(Filter)
 
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
 vlc_module_begin ()
     set_description( N_("Video scaling filter") )
-    set_capability( "video converter", 10 )
-    set_callback( OpenFilter )
+    set_callback_video_converter( OpenFilter, 10 )
 vlc_module_end ()
 
 /*****************************************************************************
  * OpenFilter: probe the filter and return score
  *****************************************************************************/
-static int OpenFilter( vlc_object_t *p_this )
+static int OpenFilter( filter_t *p_filter )
 {
-    filter_t *p_filter = (filter_t*)p_this;
-
     if( ( p_filter->fmt_in.video.i_chroma != VLC_CODEC_YUVP &&
           p_filter->fmt_in.video.i_chroma != VLC_CODEC_YUVA &&
           p_filter->fmt_in.video.i_chroma != VLC_CODEC_I420 &&
@@ -74,7 +71,8 @@ static int OpenFilter( vlc_object_t *p_this )
 
 #warning Converter cannot (really) change output format.
     video_format_ScaleCropAr( &p_filter->fmt_out.video, &p_filter->fmt_in.video );
-    p_filter->pf_video_filter = Filter;
+
+    p_filter->ops = &Filter_ops;
 
     msg_Dbg( p_filter, "%ix%i -> %ix%i", p_filter->fmt_in.video.i_width,
              p_filter->fmt_in.video.i_height, p_filter->fmt_out.video.i_width,
@@ -86,22 +84,10 @@ static int OpenFilter( vlc_object_t *p_this )
 /****************************************************************************
  * Filter: the whole thing
  ****************************************************************************/
-static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
+static void Filter( filter_t *p_filter, picture_t *p_pic, picture_t *p_pic_dst )
 {
-    picture_t *p_pic_dst;
-
-    if( !p_pic ) return NULL;
-
 #warning Converter cannot (really) change output format.
     video_format_ScaleCropAr( &p_filter->fmt_out.video, &p_filter->fmt_in.video );
-
-    /* Request output picture */
-    p_pic_dst = filter_NewPicture( p_filter );
-    if( !p_pic_dst )
-    {
-        picture_Release( p_pic );
-        return NULL;
-    }
 
     if( p_filter->fmt_in.video.i_chroma != VLC_CODEC_RGBA &&
         p_filter->fmt_in.video.i_chroma != VLC_CODEC_ARGB &&
@@ -196,8 +182,4 @@ static picture_t *Filter( filter_t *p_filter, picture_t *p_pic )
             }
         }
     }
-
-    picture_CopyProperties( p_pic_dst, p_pic );
-    picture_Release( p_pic );
-    return p_pic_dst;
 }

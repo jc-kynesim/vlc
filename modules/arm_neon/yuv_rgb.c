@@ -30,12 +30,11 @@
 #include <vlc_cpu.h>
 #include "arm_neon/chroma_neon.h"
 
-static int Open (vlc_object_t *);
+static int Open (filter_t *);
 
 vlc_module_begin ()
     set_description (N_("ARM NEON video chroma YUV->RGBA"))
-    set_capability ("video converter", 250)
-    set_callback(Open)
+    set_callback_video_converter(Open, 250)
 vlc_module_end ()
 
 /*
@@ -131,10 +130,8 @@ VIDEO_FILTER_WRAPPER (YV12_RGBA)
 VIDEO_FILTER_WRAPPER (NV21_RGBA)
 VIDEO_FILTER_WRAPPER (NV12_RGBA)
 
-static int Open (vlc_object_t *obj)
+static int Open (filter_t *filter)
 {
-    filter_t *filter = (filter_t *)obj;
-
     if (!vlc_CPU_ARM_NEON())
         return VLC_EGENERIC;
 
@@ -150,7 +147,7 @@ static int Open (vlc_object_t *obj)
             switch (filter->fmt_in.video.i_chroma)
             {
                 case VLC_CODEC_I420:
-                    filter->pf_video_filter = I420_RV16_Filter;
+                    filter->ops = &I420_RV16_ops;
                     break;
                 default:
                     return VLC_EGENERIC;
@@ -166,16 +163,16 @@ static int Open (vlc_object_t *obj)
             switch (filter->fmt_in.video.i_chroma)
             {
                 case VLC_CODEC_I420:
-                    filter->pf_video_filter = I420_RGBA_Filter;
+                    filter->ops = &I420_RGBA_ops;
                     break;
                 case VLC_CODEC_YV12:
-                    filter->pf_video_filter = YV12_RGBA_Filter;
+                    filter->ops = &YV12_RGBA_ops;
                     break;
                 case VLC_CODEC_NV21:
-                    filter->pf_video_filter = NV21_RGBA_Filter;
+                    filter->ops = &NV21_RGBA_ops;
                     break;
                 case VLC_CODEC_NV12:
-                    filter->pf_video_filter = NV12_RGBA_Filter;
+                    filter->ops = &NV12_RGBA_ops;
                     break;
                 default:
                     return VLC_EGENERIC;
