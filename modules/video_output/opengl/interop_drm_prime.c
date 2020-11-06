@@ -39,7 +39,7 @@
 #include "interop.h"
 #include "../codec/avcodec/drm_pic.h"
 
-#define OPT_MULTIPLANE 0
+#define OPT_MULTIPLANE 1
 /* From https://www.khronos.org/registry/OpenGL/extensions/OES/OES_EGL_image.txt
  * The extension is an OpenGL ES extension but can (and usually is) available on
  * OpenGL implementations. */
