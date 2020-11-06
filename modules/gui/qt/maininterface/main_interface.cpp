@@ -35,7 +35,6 @@
 #include "widgets/native/customwidgets.hpp"               // qtEventToVLCKey, QVLCStackedWidget
 #include "util/qt_dirs.hpp"                     // toNativeSeparators
 #include "util/imagehelper.hpp"
-#include "util/recents.hpp"
 #include "util/color_scheme_model.hpp"
 
 #include "widgets/native/interface_widgets.hpp"     // bgWidget, videoWidget
@@ -139,7 +138,11 @@ MainInterface::MainInterface(intf_thread_t *_p_intf , QWidget* parent, Qt::Windo
     /* Get the available interfaces */
     m_extraInterfaces = new VLCVarChoiceModel(p_intf, "intf-add", this);
 
-    b_hasMedialibrary = (vlc_ml_instance_get( p_intf ) != NULL);
+    vlc_medialibrary_t* ml = vlc_ml_instance_get( p_intf );
+    b_hasMedialibrary = (ml != NULL);
+    if (b_hasMedialibrary) {
+        m_medialib = new MediaLib(p_intf, this);
+    }
 
     /* Set the other interface settings */
     settings = getSettings();
@@ -599,8 +602,8 @@ void MainInterface::dropEventPlay( QDropEvent *event, bool b_play )
         }
     }
 
-    bool first = b_play;
-    foreach( const QUrl &url, mimeData->urls() )
+    QVector<vlc::playlist::Media> medias;
+    for( const QUrl &url: mimeData->urls() )
     {
         if( url.isValid() )
         {
@@ -623,10 +626,7 @@ void MainInterface::dropEventPlay( QDropEvent *event, bool b_play )
             }
 #endif
             if( mrl.length() > 0 )
-            {
-                Open::openMRL( p_intf, mrl, first );
-                first = false;
-            }
+                medias.push_back( vlc::playlist::Media{ mrl, nullptr, nullptr });
         }
     }
 
@@ -637,8 +637,10 @@ void MainInterface::dropEventPlay( QDropEvent *event, bool b_play )
         QUrl(mimeData->text()).isValid() )
     {
         QString mrl = toURI( mimeData->text() );
-        Open::openMRL( p_intf, mrl, first );
+        medias.push_back( vlc::playlist::Media{ mrl, nullptr, nullptr });
     }
+    if (!medias.empty())
+        THEMPL->append(medias, b_play);
     event->accept();
 }
 void MainInterface::dragEnterEvent(QDragEnterEvent *event)

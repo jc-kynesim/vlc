@@ -155,6 +155,8 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlhelper.cpp \
 	gui/qt/medialibrary/mlhelper.hpp \
 	gui/qt/medialibrary/mlqmltypes.hpp \
+	gui/qt/medialibrary/mlrecentsmodel.cpp \
+	gui/qt/medialibrary/mlrecentsmodel.hpp \
 	gui/qt/medialibrary/mlrecentsvideomodel.cpp \
 	gui/qt/medialibrary/mlrecentsvideomodel.hpp \
 	gui/qt/medialibrary/mlurlmodel.cpp \
@@ -204,9 +206,6 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/qmleventfilter.hpp \
 	gui/qt/util/qt_dirs.cpp gui/qt/util/qt_dirs.hpp \
 	gui/qt/util/qvlcapp.hpp \
-	gui/qt/util/recent_media_model.cpp  \
-	gui/qt/util/recent_media_model.hpp \
-	gui/qt/util/recents.cpp gui/qt/util/recents.hpp \
 	gui/qt/util/registry.cpp gui/qt/util/registry.hpp \
 	gui/qt/util/renderer_manager.cpp gui/qt/util/renderer_manager.hpp \
 	gui/qt/util/selectable_list_model.cpp \
@@ -318,6 +317,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlgenre.moc.cpp \
 	gui/qt/medialibrary/mlgenremodel.moc.cpp \
 	gui/qt/medialibrary/mlqmltypes.moc.cpp \
+	gui/qt/medialibrary/mlrecentsmodel.moc.cpp \
 	gui/qt/medialibrary/mlrecentsvideomodel.moc.cpp \
 	gui/qt/medialibrary/mlurlmodel.moc.cpp \
 	gui/qt/medialibrary/mlvideo.moc.cpp \
@@ -343,8 +343,6 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/util/qml_main_context.moc.cpp \
 	gui/qt/util/qmleventfilter.moc.cpp \
 	gui/qt/util/qvlcapp.moc.cpp \
-	gui/qt/util/recent_media_model.moc.cpp \
-	gui/qt/util/recents.moc.cpp \
 	gui/qt/util/renderer_manager.moc.cpp \
 	gui/qt/util/selectable_list_model.moc.cpp \
 	gui/qt/util/sortfilterproxymodel.moc.cpp \
@@ -637,6 +635,7 @@ libqt_plugin_la_QML = \
 	gui/qt/medialibrary/qml/VideoInfoExpandPanel.qml \
 	gui/qt/medialibrary/qml/VideoListDisplay.qml \
 	gui/qt/menus/qml/GlobalShortcuts.qml \
+	gui/qt/menus/qml/GlobalShortcutsMedialib.qml \
 	gui/qt/menus/qml/Menubar.qml \
 	gui/qt/network/qml/DiscoverDisplay.qml \
 	gui/qt/network/qml/DiscoverUrlDisplay.qml \

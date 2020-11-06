@@ -10,6 +10,7 @@
 #include "medialibrary/mlgenremodel.hpp"
 #include "medialibrary/mlurlmodel.hpp"
 #include "medialibrary/mlvideomodel.hpp"
+#include "medialibrary/mlrecentsmodel.hpp"
 #include "medialibrary/mlrecentsvideomodel.hpp"
 #include "medialibrary/mlfoldersmodel.hpp"
 
@@ -23,7 +24,6 @@
 #include "util/qmleventfilter.hpp"
 #include "util/i18n.hpp"
 #include "util/systempalette.hpp"
-#include "util/recent_media_model.hpp"
 #include "util/sortfilterproxymodel.hpp"
 #include "util/navigation_history.hpp"
 
@@ -97,11 +97,10 @@ bool MainUI::setup(QQmlEngine* engine)
     rootCtx->setContextProperty( "mainInterface", m_mainInterface);
     rootCtx->setContextProperty( "topWindow", m_interfaceWindow);
     rootCtx->setContextProperty( "dialogProvider", DialogsProvider::getInstance());
-    rootCtx->setContextProperty( "recentsMedias",  new VLCRecentMediaModel( m_intf, this ));
     rootCtx->setContextProperty( "systemPalette", new SystemPalette(this));
 
     if (m_mainInterface->hasMediaLibrary())
-        rootCtx->setContextProperty( "medialib", new MediaLib(m_intf, this) );
+        rootCtx->setContextProperty( "medialib", m_mainInterface->getMediaLibrary() );
     else
         rootCtx->setContextProperty( "medialib", nullptr );
 
@@ -169,6 +168,14 @@ void MainUI::registerQMLTypes()
         qmlRegisterType<MLUrlModel>( "org.videolan.medialib", 0, 1, "MLUrlModel" );
         qmlRegisterType<MLVideoModel>( "org.videolan.medialib", 0, 1, "MLVideoModel" );
         qmlRegisterType<MLRecentsVideoModel>( "org.videolan.medialib", 0, 1, "MLRecentsVideoModel" );
+
+        qRegisterMetaType<NetworkTreeItem>();
+        qmlRegisterType<NetworkMediaModel>( "org.videolan.medialib", 0, 1, "NetworkMediaModel");
+        qmlRegisterType<NetworkDeviceModel>( "org.videolan.medialib", 0, 1, "NetworkDeviceModel");
+        qmlRegisterType<NetworkSourcesModel>( "org.videolan.medialib", 0, 1, "NetworkSourcesModel");
+        qmlRegisterType<ServicesDiscoveryModel>( "org.videolan.medialib", 0, 1, "ServicesDiscoveryModel");
+        qmlRegisterType<MlFoldersModel>( "org.videolan.medialib", 0, 1, "MLFolderModel");
+        qmlRegisterType<MLRecentsModel>( "org.videolan.medialib", 0, 1, "MLRecentModel" );
 
         //expose base object, they aren't instanciable from QML side
         registerAnonymousType<MLAlbum>("org.videolan.medialib", 1);

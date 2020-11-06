@@ -35,7 +35,6 @@ Item {
     Shortcut{ context: Qt.ApplicationShortcut; sequence:"Ctrl+J"; onActivated: dialogProvider.mediaCodecDialog(); }
     Shortcut{ context: Qt.ApplicationShortcut; sequence:"Ctrl+M"; onActivated: dialogProvider.messagesDialog(); }
     Shortcut{ context: Qt.ApplicationShortcut; sequence:"Ctrl+P"; onActivated: dialogProvider.prefsDialog(); }
-    Shortcut{ context: Qt.ApplicationShortcut; sequence:"Ctrl+B"; onActivated: dialogProvider.bookmarksDialog(); enabled: !!medialib}
     Shortcut{ context: Qt.ApplicationShortcut; sequence:"Ctrl+T"; onActivated: dialogProvider.gotoTimeDialog(); }
     Shortcut{ context: Qt.ApplicationShortcut; sequence:"F1";     onActivated: dialogProvider.helpDialog(); }
 
@@ -44,16 +43,8 @@ Item {
     Shortcut{ context: Qt.ApplicationShortcut; sequence:"Ctrl+L"; onActivated: mainInterface.playlistVisible = !mainInterface.playlistVisible; }
     Shortcut{ context: Qt.ApplicationShortcut; sequence:"F11"; onActivated: mainInterface.toggleInterfaceFullScreen(); }
 
-    Repeater {
-        model: recentsMedias
-
-        Item {
-            Shortcut {
-                sequence: "Ctrl+" + (index + 1)
-                onActivated:  mainPlaylistController.append([mrl], true)
-                context: Qt.ApplicationShortcut
-            }
-        }
+    Loader {
+        active: !!medialib
+        source: "qrc:///menus/GlobalShortcutsMedialib.qml"
     }
-
 }
