@@ -61,19 +61,15 @@ libxcb-shm0-dev \
 libxcb-composite0-dev \
 libxcb-xkb-dev \
 libxcb-xv0-dev \
+libxkbcommon-x11-dev \
 libxss-dev \
 libxt-dev \
 libxtst-dev \
 mesa-common-dev \
-qtquickcontrols2-5-dev \
-qtdeclarative5-dev \
-qml-module-qtqml-models2 \
-qml-module-qtquick2 \
-qml-module-qtquick-layouts \
-qml-module-qtquick-window2 \
-qml-module-qtquick-controls2 \
-qml-module-qtgraphicaleffects \
-qml-module-qtsvg \
+"qt*-dev" \
+"qml-module-*" \
+
+# qml-module-qtsvg \
 
 # Pulse (hopefully) disabled
 # libpulse-dev \
