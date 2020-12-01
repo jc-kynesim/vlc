@@ -25,6 +25,7 @@ import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
+import "qrc:///util/KeyHelper.js" as KeyHelper
 
 Item{
     id: controlButtons
@@ -63,7 +64,8 @@ Item{
         { id:  PlayerControlBarModel.ASPECT_RATIO_COMBOBOX, label: VLCIcons.aspect_ratio, text: i18n.qtr("Aspect Ratio")},
         { id:  PlayerControlBarModel.WIDGET_SPACER, label: VLCIcons.space, text: i18n.qtr("Spacer")},
         { id:  PlayerControlBarModel.WIDGET_SPACER_EXTEND, label: VLCIcons.space, text: i18n.qtr("Expanding Spacer")},
-        { id:  PlayerControlBarModel.PLAYER_SWITCH_BUTTON, label: VLCIcons.fullscreen, text: i18n.qtr("Switch Player")}
+        { id:  PlayerControlBarModel.PLAYER_SWITCH_BUTTON, label: VLCIcons.fullscreen, text: i18n.qtr("Switch Player")},
+        { id:  PlayerControlBarModel.ARTWORK_INFO, label: VLCIcons.info, text: i18n.qtr("Artwork Info")}
     ]
 
     function returnbuttondelegate(inpID){
@@ -99,6 +101,7 @@ Item{
         case PlayerControlBarModel.ASPECT_RATIO_COMBOBOX: return aspectRatioDelegate
         case PlayerControlBarModel.TELETEXT_BUTTONS: return teletextdelegate
         case PlayerControlBarModel.PLAYER_SWITCH_BUTTON: return playerSwitchBtnDelegate
+        case PlayerControlBarModel.ARTWORK_INFO: return artworkInfoDelegate
         }
         console.log("button delegate id " + inpID +  " doesn't exists")
         return spacerDelegate
@@ -144,7 +147,7 @@ Item{
     Component{
         id:playBtnDelegate
 
-        Button {
+        ToolButton {
             id: playBtn
             width: VLCStyle.icon_medium
             height: width
@@ -161,6 +164,16 @@ Item{
             enabled: !paintOnly
 
             property bool realHovered: false
+
+            Keys.onPressed: {
+                if (KeyHelper.matchOk(event) ) {
+                    event.accepted = true
+                }
+            }
+            Keys.onReleased: {
+                if (!event.accepted && KeyHelper.matchOk(event))
+                    mainPlaylistController.togglePlayPause()
+            }
 
             contentItem: Label {
                 id: contentLabel
@@ -288,27 +301,24 @@ Item{
                         State {
                             name: "opaque"
                             when: innerColorRect.stateIndicator
+                            PropertyChanges {
+                                target: innerColorRect
+                                opacity: 1.0
+                            }
                         },
                         State {
                             name: "transparent"
                             when: !innerColorRect.stateIndicator
+                            PropertyChanges {
+                                target: innerColorRect
+                                opacity: 0
+                            }
                         }
                     ]
 
-                    transitions: [
-                        Transition {
-                            from: "opaque"
-                            to: "transparent"
-
-                            NumberAnimation { target: innerColorRect; properties: "opacity"; to: 0; duration: 75; easing.type: Easing.OutSine }
-                        },
-                        Transition {
-                            from: "transparent"
-                            to: "opaque"
-
-                            NumberAnimation { target: innerColorRect; properties: "opacity"; to: 1; duration: 75; easing.type: Easing.InSine }
-                        }
-                    ]
+                    transitions: Transition {
+                        NumberAnimation { properties: "opacity"; duration: 75; easing.type: Easing.InOutSine }
+                    }
 
                     antialiasing: true
                 }
@@ -411,92 +421,22 @@ Item{
 
             text: i18n.qtr("Languages and tracks")
 
-            PlayerMenu {
+            LanguageMenu {
                 id: langMenu
+
                 parent: rootPlayer
+                focus: true
+                x: 0
+                y: rootPlayer.positionSliderY - height
+                z: 1
+
                 onOpened: rootPlayer._menu = langMenu
                 onMenuClosed: {
                     root._lockAutoHide -= 1
                     langBtn.forceActiveFocus()
                     rootPlayer._menu = undefined
                 }
-                focus: true
-
-                title: i18n.qtr("Languages and Tracks")
-
-
-                Connections {
-                    target: player
-                    onInputChanged: {
-                        subtrackMenu.dismiss()
-                        audiotrackMenu.dismiss()
-                        videotrackMenu.dismiss()
-                        langMenu.dismiss()
-                    }
-                }
-
-                PlayerMenu {
-                    id: subtrackMenu
-                    onOpened: rootPlayer._menu = subtrackMenu
-                    parentMenu: langMenu
-                    title: i18n.qtr("Subtitle Track")
-                    enabled: player.isPlaying && player.subtitleTracks.count > 0
-                    Repeater {
-                        model: player.subtitleTracks
-                        PlayerMenuItem {
-                            parentMenu:  subtrackMenu
-                            text: model.display
-                            checkable: true
-                            checked: model.checked
-                            onTriggered: model.checked = !model.checked
-                        }
-                    }
-                    onMenuClosed: langMenu.menuClosed()
-                }
-
-                PlayerMenu {
-                    id: audiotrackMenu
-                    title: i18n.qtr("Audio Track")
-
-                    parentMenu: langMenu
-                    onOpened: rootPlayer._menu = audiotrackMenu
-
-                    enabled: player.isPlaying && player.audioTracks.count > 0
-                    Repeater {
-                        model: player.audioTracks
-                        PlayerMenuItem {
-                            parentMenu: audiotrackMenu
-
-                            text: model.display
-                            checkable: true
-                            checked: model.checked
-                            onTriggered: model.checked = !model.checked
-                        }
-                    }
-                    onMenuClosed: langMenu.menuClosed()
-                }
-
-                PlayerMenu {
-                    id: videotrackMenu
-                    title: i18n.qtr("Video Track")
-                    parentMenu: langMenu
-                    onOpened: rootPlayer._menu = videotrackMenu
-                    enabled: player.isPlaying && player.videoTracks.count > 0
-                    Repeater {
-                        model: player.videoTracks
-                        PlayerMenuItem {
-                            parentMenu: videotrackMenu
-                            text: model.display
-                            checkable: true
-                            checked: model.checked
-                            onTriggered: model.checked = !model.checked
-                        }
-                    }
-                    onMenuClosed: langMenu.menuClosed()
-                }
             }
-
-            property bool acceptFocus: true
         }
     }
 
@@ -523,7 +463,7 @@ Item{
         Widgets.IconToolButton {
             id: menuBtn
             size: VLCStyle.icon_medium
-            iconText: VLCIcons.menu
+            iconText: VLCIcons.ellipsis
             onClicked: contextMenu.popup(this.mapToGlobal(0, 0))
             property bool acceptFocus: true
             text: i18n.qtr("Menu")
@@ -740,7 +680,7 @@ Item{
         Widgets.IconToolButton{
             id: extdSettingsBtn
             size: VLCStyle.icon_medium
-            text: VLCIcons.extended
+            iconText: VLCIcons.extended
             onClicked: dialogProvider.extendedDialog()
             property bool acceptFocus: true
             Accessible.name: i18n.qtr("Extended settings")
@@ -829,6 +769,119 @@ Item{
 
             property bool acceptFocus: true
             text: i18n.qtr("Switch Player")
+        }
+    }
+
+    Component {
+        id: artworkInfoDelegate
+
+        Widgets.FocusBackground {
+            id: artworkInfoItem
+
+            property bool paintOnly: false
+            property VLCColors _colors: VLCStyle.colors
+
+            implicitWidth: playingItemInfoRow.implicitWidth
+            implicitHeight: playingItemInfoRow.implicitHeight
+
+            Keys.onPressed: {
+                if (KeyHelper.matchOk(event) ) {
+                    event.accepted = true
+                }
+            }
+            Keys.onReleased: {
+                if (!event.accepted && KeyHelper.matchOk(event))
+                    history.push(["player"])
+            }
+
+            MouseArea {
+                id: artworkInfoMouseArea
+                anchors.fill: parent
+                visible: !paintOnly
+                onClicked: history.push(["player"])
+                hoverEnabled: true
+            }
+
+            Row {
+                id: playingItemInfoRow
+
+                Item {
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitHeight: childrenRect.height
+                    implicitWidth:  childrenRect.width
+
+                    Rectangle {
+                        id: coverRect
+                        anchors.fill: cover
+                        color: _colors.bg
+                    }
+
+                    DropShadow {
+                        anchors.fill: coverRect
+                        source: coverRect
+                        radius: 8
+                        samples: 17
+                        color: VLCStyle.colors.glowColorBanner
+                        spread: 0.2
+                    }
+
+                    Image {
+                        id: cover
+
+                        source: (mainPlaylistController.currentItem.artwork && mainPlaylistController.currentItem.artwork.toString())
+                                ? mainPlaylistController.currentItem.artwork
+                                : VLCStyle.noArtAlbum
+                        fillMode: Image.PreserveAspectFit
+
+                        width: VLCStyle.dp(60)
+                        height: VLCStyle.dp(60)
+                    }
+                }
+
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    leftPadding: VLCStyle.margin_xsmall
+
+                    ToolTip {
+                        text: i18n.qtr("%1\n%2").arg(titleLabel.text).arg(artistLabel.text)
+                        visible: (titleLabel.implicitWidth > titleLabel.width || artistLabel.implicitWidth > titleLabel.width)
+                                 && (artworkInfoMouseArea.containsMouse || artworkInfoItem.active)
+                        delay: 500 
+                         
+                        contentItem: Text {
+                                  text: i18n.qtr("%1\n%2").arg(titleLabel.text).arg(artistLabel.text)
+                                  color: _colors.tooltipTextColor
+                        }
+
+                        background: Rectangle {
+                            color: _colors.tooltipColor
+                        }
+                    }
+
+                    Widgets.MenuLabel {
+                        id: titleLabel
+                        width: implicitWidth < VLCStyle.artworkInfoTextWidth ? implicitWidth : VLCStyle.artworkInfoTextWidth
+                        text: mainPlaylistController.currentItem.title
+                        visible: text !== ""
+                        color: _colors.text
+                    }
+
+                    Widgets.MenuCaption {
+                        id: artistLabel
+                        width: implicitWidth < VLCStyle.artworkInfoTextWidth ? implicitWidth : VLCStyle.artworkInfoTextWidth
+                        text: mainPlaylistController.currentItem.artist
+                        visible: text !== ""
+                        color: _colors.menuCaption
+                    }
+
+                    Widgets.MenuCaption {
+                        id: progressIndicator
+                        text: player.time.toString() + " / " + player.length.toString()
+                        visible: text !== ""
+                        color: _colors.menuCaption
+                    }
+                }
+            }
         }
     }
 }

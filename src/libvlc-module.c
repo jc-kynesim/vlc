@@ -547,11 +547,6 @@ static const char *const ppsz_clock_master_descriptions[] = {
     N_("Monotonic")
 };
 
-#define NETSYNC_TEXT N_("Network synchronisation" )
-#define NETSYNC_LONGTEXT N_( "This allows you to remotely " \
-        "synchronise clocks for server and client. The detailed settings " \
-        "are available in Advanced / Network Sync." )
-
 static const int pi_clock_values[] = { -1, 0, 1 };
 static const char *const ppsz_clock_descriptions[] =
 { N_("Default"), N_("Disable"), N_("Enable") };
@@ -1014,8 +1009,7 @@ static const char *const ppsz_prefres[] = {
 #define SOUT_KEEP_TEXT N_("Keep stream output open" )
 #define SOUT_KEEP_LONGTEXT N_( \
     "This allows you to keep an unique stream output instance across " \
-    "multiple playlist item (automatically insert the gather stream output " \
-    "if not specified)" )
+    "multiple playlist item." )
 
 #define SOUT_MUX_CACHING_TEXT N_("Stream output muxer caching (ms)")
 #define SOUT_MUX_CACHING_LONGTEXT N_( \
@@ -1993,9 +1987,6 @@ vlc_module_begin ()
     add_integer( "clock-master", VLC_CLOCK_MASTER_DEFAULT,
                  CLOCK_MASTER_TEXT, NULL, true )
         change_integer_list( pi_clock_master_values, ppsz_clock_master_descriptions )
-
-    add_bool( "network-synchronisation", false, NETSYNC_TEXT,
-              NETSYNC_LONGTEXT, true )
 
     add_directory("input-record-path", NULL,
                   INPUT_RECORD_PATH_TEXT, INPUT_RECORD_PATH_LONGTEXT)

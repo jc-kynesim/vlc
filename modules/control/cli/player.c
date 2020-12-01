@@ -32,6 +32,7 @@
 #include <vlc_interface.h>
 #include <vlc_aout.h>
 #include <vlc_vout.h>
+#include <vlc_playlist.h>
 #include <vlc_player.h>
 
 #include "cli.h"
@@ -53,14 +54,13 @@ static void
 player_on_media_changed(vlc_player_t *player, input_item_t *item, void *data)
 {
     struct player_cli *pc = data;
-    intf_thread_t *p_intf = pc->intf;
 
     (void) player;
 
     if (item != NULL)
     {
         vlc_mutex_lock(&item->lock);
-        msg_rc(STATUS_CHANGE "( new input: %s )", item->psz_uri);
+        msg_print(pc->intf, STATUS_CHANGE "( new input: %s )", item->psz_uri);
         vlc_mutex_unlock(&item->lock);
     }
 }
@@ -70,7 +70,6 @@ player_on_state_changed(vlc_player_t *player,
                         enum vlc_player_state state, void *data)
 { VLC_UNUSED(player);
     struct player_cli *pc = data;
-    intf_thread_t *p_intf = pc->intf;
 
     char const *psz_cmd;
     switch (state)
@@ -90,7 +89,7 @@ player_on_state_changed(vlc_player_t *player,
         break;
     }
 
-    msg_rc(STATUS_CHANGE "( %s state: %d )", psz_cmd, state);
+    msg_print(pc->intf, STATUS_CHANGE "( %s state: %d )", psz_cmd, state);
 }
 
 static void
@@ -106,9 +105,8 @@ static void
 player_on_rate_changed(vlc_player_t *player, float new_rate, void *data)
 { VLC_UNUSED(player);
     struct player_cli *pc = data;
-    intf_thread_t *p_intf = pc->intf;
 
-    msg_rc(STATUS_CHANGE "( new rate: %.3f )", new_rate);
+    msg_print(pc->intf, STATUS_CHANGE "( new rate: %.3f )", new_rate);
 }
 
 static void
@@ -116,12 +114,11 @@ player_on_position_changed(vlc_player_t *player,
                            vlc_tick_t new_time, float new_pos, void *data)
 { VLC_UNUSED(player); VLC_UNUSED(new_pos);
     struct player_cli *pc = data;
-    intf_thread_t *p_intf = pc->intf;
 
     if (pc->input_buffering)
     {
-        msg_rc(STATUS_CHANGE "( time: %"PRId64"s )",
-               SEC_FROM_VLC_TICK(new_time));
+        msg_print(pc->intf, STATUS_CHANGE "( time: %"PRId64"s )",
+                  SEC_FROM_VLC_TICK(new_time));
         pc->input_buffering = false;
     }
 
@@ -130,7 +127,7 @@ player_on_position_changed(vlc_player_t *player,
     if (pc->show_position && position != pc->position)
     {
         pc->position = position;
-        msg_rc("pos: %ld%%", pc->position);
+        msg_print(pc->intf, "pos: %ld%%", pc->position);
     }
 }
 
@@ -147,10 +144,8 @@ static void
 player_aout_on_volume_changed(audio_output_t *aout, float volume, void *data)
 { VLC_UNUSED(aout);
     struct player_cli *pc = data;
-    intf_thread_t *p_intf = pc->intf;
 
-    msg_rc(STATUS_CHANGE "( audio volume: %ld )",
-            lroundf(volume * 100));
+    msg_print(pc->intf, STATUS_CHANGE "( audio volume: %f )", volume);
 }
 
 static const struct vlc_player_aout_cbs player_aout_cbs =
@@ -158,44 +153,53 @@ static const struct vlc_player_aout_cbs player_aout_cbs =
     .on_volume_changed = player_aout_on_volume_changed,
 };
 
-static void PlayerDoVoid(intf_thread_t *intf, void (*cb)(vlc_player_t *))
+static int PlayerDoVoid(struct cli_client *cl, void *data,
+                        void (*cb)(vlc_player_t *))
 {
-    vlc_playlist_t *playlist = intf->p_sys->playlist;
-    vlc_player_t *player = vlc_playlist_GetPlayer(playlist);
+    vlc_player_t *player = data;
 
     vlc_player_Lock(player);
     cb(player);
     vlc_player_Unlock(player);
+    (void) cl;
+    return 0;
 }
 
-static void PlayerDoFloat(intf_thread_t *intf, const char *const *args,
-                          size_t count,
-                          void (*setter)(vlc_player_t *, float),
-                          float (*getter)(vlc_player_t *))
+static int PlayerDoFloat(struct cli_client *cl, const char *const *args,
+                         size_t count, void *data,
+                         void (*setter)(vlc_player_t *, float),
+                         float (*getter)(vlc_player_t *))
 {
-    vlc_playlist_t *playlist = intf->p_sys->playlist;
-    vlc_player_t *player = vlc_playlist_GetPlayer(playlist);
+    vlc_player_t *player = data;
+    int ret = 0;
 
     vlc_player_Lock(player);
-    if (count < 2)
-        msg_print(intf, "%f", getter(player));
-    else
-        setter(player, atof(args[1]));
+    switch (count)
+    {
+        case 1:
+            cli_printf(cl, "%f", getter(player));
+            break;
+        case 2:
+            setter(player, atof(args[1]));
+            break;
+        default:
+            ret = VLC_EGENERIC; /* EINVAL */
+    }
     vlc_player_Unlock(player);
+    return ret;
 }
 
-static void PlayerPause(intf_thread_t *intf, const char *const *args,
-                        size_t count)
+static int PlayerPause(struct cli_client *cl, const char *const *args,
+                       size_t count, void *data)
 {
-    PlayerDoVoid(intf, vlc_player_TogglePause);
     (void) args; (void) count;
+    return PlayerDoVoid(cl, data, vlc_player_TogglePause);
 }
 
-static void PlayerFastForward(intf_thread_t *intf, const char *const *args,
-                              size_t count)
+static int PlayerFastForward(struct cli_client *cl, const char *const *args,
+                             size_t count, void *data)
 {
-    vlc_playlist_t *playlist = intf->p_sys->playlist;
-    vlc_player_t *player = vlc_playlist_GetPlayer(playlist);
+    vlc_player_t *player = data;
 
     vlc_player_Lock(player);
     if (vlc_player_CanChangeRate(player))
@@ -206,20 +210,20 @@ static void PlayerFastForward(intf_thread_t *intf, const char *const *args,
     }
     else
     {
-        int secs = var_InheritInteger(intf, "extrashort-jump-size");
+        int secs = var_InheritInteger(cl->intf, "extrashort-jump-size");
         vlc_tick_t t = vlc_player_GetTime(player) + vlc_tick_from_sec(secs);
 
         vlc_player_SetTime(player, t);
     }
     vlc_player_Unlock(player);
     (void) args; (void) count;
+    return 0;
 }
 
-static void PlayerRewind(intf_thread_t *intf, const char *const *args,
-                         size_t count)
+static int PlayerRewind(struct cli_client *cl, const char *const *args,
+                         size_t count, void *data)
 {
-    vlc_playlist_t *playlist = intf->p_sys->playlist;
-    vlc_player_t *player = vlc_playlist_GetPlayer(playlist);
+    vlc_player_t *player = data;
 
     vlc_player_Lock(player);
     if (vlc_player_CanRewind(player))
@@ -229,27 +233,28 @@ static void PlayerRewind(intf_thread_t *intf, const char *const *args,
     }
     else
     {
-        int secs = var_InheritInteger(intf, "extrashort-jump-size");
+        int secs = var_InheritInteger(cl->intf, "extrashort-jump-size");
         vlc_tick_t t = vlc_player_GetTime(player) - vlc_tick_from_sec(secs);
 
         vlc_player_SetTime(player, t);
     }
     vlc_player_Unlock(player);
     (void) args; (void) count;
+    return 0;
 }
 
-static void PlayerFaster(intf_thread_t *intf, const char *const *args,
-                         size_t count)
+static int PlayerFaster(struct cli_client *cl, const char *const *args,
+                        size_t count, void *data)
 {
-    PlayerDoVoid(intf, vlc_player_IncrementRate);
     (void) args; (void) count;
+    return PlayerDoVoid(cl, data, vlc_player_IncrementRate);
 }
 
-static void PlayerSlower(intf_thread_t *intf, const char *const *args,
-                         size_t count)
+static int PlayerSlower(struct cli_client *cl, const char *const *args,
+                        size_t count, void *data)
 {
-    PlayerDoVoid(intf, vlc_player_DecrementRate);
     (void) args; (void) count;
+    return PlayerDoVoid(cl, data, vlc_player_DecrementRate);
 }
 
 static void PlayerDoNormal(vlc_player_t *player)
@@ -257,62 +262,64 @@ static void PlayerDoNormal(vlc_player_t *player)
     vlc_player_ChangeRate(player, 1.f);
 }
 
-static void PlayerNormal(intf_thread_t *intf, const char *const *args,
-                         size_t count)
+static int PlayerNormal(struct cli_client *cl, const char *const *args,
+                        size_t count, void *data)
 {
-    PlayerDoVoid(intf, PlayerDoNormal);
     (void) args; (void) count;
+    return PlayerDoVoid(cl, data, PlayerDoNormal);
 }
 
-static void PlayerRate(intf_thread_t *intf, const char *const *args, size_t n)
+static int PlayerRate(struct cli_client *cl, const char *const *args, size_t n,
+                      void *data)
 {
-    PlayerDoFloat(intf, args, n, vlc_player_ChangeRate, vlc_player_GetRate);
+    return PlayerDoFloat(cl, args, n, data, vlc_player_ChangeRate,
+                         vlc_player_GetRate);
 }
 
-static void PlayerFrame(intf_thread_t *intf, const char *const *args,
-                        size_t count)
+static int PlayerFrame(struct cli_client *cl, const char *const *args,
+                       size_t count, void *data)
 {
-    PlayerDoVoid(intf, vlc_player_NextVideoFrame);
     (void) args; (void) count;
+    return PlayerDoVoid(cl, data, vlc_player_NextVideoFrame);
 }
 
-static void PlayerChapterPrev(intf_thread_t *intf, const char *const *args,
-                              size_t count)
+static int PlayerChapterPrev(struct cli_client *cl, const char *const *args,
+                             size_t count, void *data)
 {
-    PlayerDoVoid(intf, vlc_player_SelectPrevChapter);
     (void) args; (void) count;
+    return PlayerDoVoid(cl, data, vlc_player_SelectPrevChapter);
 }
 
-static void PlayerChapterNext(intf_thread_t *intf, const char *const *args,
-                              size_t count)
+static int PlayerChapterNext(struct cli_client *cl, const char *const *args,
+                             size_t count, void *data)
 {
-    PlayerDoVoid(intf, vlc_player_SelectNextChapter);
     (void) args; (void) count;
+    return PlayerDoVoid(cl, data, vlc_player_SelectNextChapter);
 }
 
-static void PlayerTitlePrev(intf_thread_t *intf, const char *const *args,
-                            size_t count)
+static int PlayerTitlePrev(struct cli_client *cl, const char *const *args,
+                           size_t count, void *data)
 {
-    PlayerDoVoid(intf, vlc_player_SelectPrevTitle);
     (void) args; (void) count;
+    return PlayerDoVoid(cl, data, vlc_player_SelectPrevTitle);
 }
 
-static void PlayerTitleNext(intf_thread_t *intf, const char *const *args,
-                            size_t count)
+static int PlayerTitleNext(struct cli_client *cl, const char *const *args,
+                           size_t count, void *data)
 {
-    PlayerDoVoid(intf, vlc_player_SelectNextTitle);
     (void) args; (void) count;
+    return PlayerDoVoid(cl, data, vlc_player_SelectNextTitle);
 }
 
-static void PlayerSeek(intf_thread_t *intf, const char *const *args,
-                       size_t count)
+static int PlayerSeek(struct cli_client *cl, const char *const *args,
+                      size_t count, void *data)
 {
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
 
     if (count != 2)
     {
-        msg_print(intf, "%s expects one parameter", args[0]);
-        return;
+        cli_printf(cl, "%s expects one parameter", args[0]);
+        return VLC_EGENERIC; /* EINVAL */
     }
 
     char *end;
@@ -334,12 +341,14 @@ static void PlayerSeek(intf_thread_t *intf, const char *const *args,
     else
         vlc_player_SetTime(player, vlc_tick_from_sec(value));
     vlc_player_Unlock(player);
+    return 0;
 }
 
-static void PlayerSetChapter(intf_thread_t *intf, const char *const *args,
-                             size_t count)
+static int PlayerSetChapter(struct cli_client *cl, const char *const *args,
+                            size_t count, void *data)
 {
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
+    int ret = 0;
 
     vlc_player_Lock(player);
 
@@ -352,18 +361,23 @@ static void PlayerSetChapter(intf_thread_t *intf, const char *const *args,
         if (title != NULL)
             chapter = vlc_player_GetSelectedChapterIdx(player);
         if (chapter != -1)
-            msg_print(intf, "Currently playing chapter %zd/%zu.",
-                      chapter, title->chapter_count);
+            cli_printf(cl, "Currently playing chapter %zd/%zu.",
+                       chapter, title->chapter_count);
         else
-            msg_print(intf, "No chapter selected.");
+        {
+            cli_printf(cl, "No chapter selected.");
+            ret = VLC_ENOITEM;
+        }
     }
     vlc_player_Unlock(player);
+    return ret;
 }
 
-static void PlayerSetTitle(intf_thread_t *intf, const char *const *args,
-                           size_t count)
+static int PlayerSetTitle(struct cli_client *cl, const char *const *args,
+                          size_t count, void *data)
 {
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
+    int ret = 0;
 
     vlc_player_Lock(player);
 
@@ -382,21 +396,25 @@ static void PlayerSetTitle(intf_thread_t *intf, const char *const *args,
         if (titles != NULL)
             title_count = vlc_player_title_list_GetCount(titles);
         if (title != -1 && title_count != 0)
-            msg_print(intf, "Currently playing title %zd/%zu.", title,
-                      title_count);
+            cli_printf(cl, "Currently playing title %zd/%zu.", title,
+                       title_count);
         else
-            msg_print(intf, "No title selected.");
+        {
+            cli_printf(cl, "No title selected.");
+            ret = VLC_ENOITEM;
+        }
     }
     vlc_player_Unlock(player);
+    return ret;
 }
 
-static void PlayerSetTrack(intf_thread_t *intf, const char *const *args,
-                           size_t count)
+static int PlayerSetTrack(struct cli_client *cl, const char *const *args,
+                          size_t count, void *data)
 {
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
     const char *psz_cmd = args[0];
-
     enum es_format_category_e cat;
+    int ret = VLC_EGENERIC; /* EINVAL */
 
     switch (psz_cmd[0])
     {
@@ -425,7 +443,10 @@ static void PlayerSetTrack(intf_thread_t *intf, const char *const *args,
         struct vlc_player_track const *track =
             vlc_player_GetTrackAt(player, cat, (size_t)idx);
         if (track != NULL)
+        {
             vlc_player_SelectTrack(player, track, VLC_PLAYER_SELECT_EXCLUSIVE);
+            ret = 0;
+        }
     }
     else
     {
@@ -434,24 +455,26 @@ static void PlayerSetTrack(intf_thread_t *intf, const char *const *args,
         char const *name = cur_track ? cur_track->name : psz_cmd;
         size_t track_count = vlc_player_GetTrackCount(player, cat);
 
-        msg_print(intf, "+----[ %s ]", name);
+        cli_printf(cl, "+----[ %s ]", name);
         for (size_t i = 0; i < track_count; ++i)
         {
             struct vlc_player_track const *track =
                     vlc_player_GetTrackAt(player, cat, i);
-            msg_print(intf, "| %zu - %s%s",
-                      i, track->name, track == cur_track ? " *" : "");
+            cli_printf(cl, "| %zu - %s%s",
+                       i, track->name, track == cur_track ? " *" : "");
         }
-        msg_print(intf, "+----[ end of %s ]", name);
+        cli_printf(cl, "+----[ end of %s ]", name);
+        ret = 0;
     }
 out:
     vlc_player_Unlock(player);
+    return ret;
 }
 
-static void PlayerRecord(intf_thread_t *intf, const char *const *args,
-                         size_t count)
+static int PlayerRecord(struct cli_client *cl, const char *const *args,
+                        size_t count, void *data)
 {
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
 
     vlc_player_Lock(player);
 
@@ -469,12 +492,14 @@ static void PlayerRecord(intf_thread_t *intf, const char *const *args,
     if (cur_value != new_value)
         vlc_player_SetRecordingEnabled(player, new_value);
     vlc_player_Unlock(player);
+    (void) cl;
+    return 0;
 }
 
-static void PlayerItemInfo(intf_thread_t *intf, const char *const *args,
-                           size_t count)
+static int PlayerItemInfo(struct cli_client *cl, const char *const *args,
+                          size_t count, void *data)
 {
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
     input_item_t *item;
 
     vlc_player_Lock(player);
@@ -488,79 +513,83 @@ static void PlayerItemInfo(intf_thread_t *intf, const char *const *args,
             info_category_t *category = item->pp_categories[i];
             info_t *info;
 
-            msg_print(intf, "+----[ %s ]", category->psz_name);
-            msg_print(intf, "| ");
+            cli_printf(cl, "+----[ %s ]", category->psz_name);
+            cli_printf(cl, "| ");
             info_foreach(info, &category->infos)
-                msg_print(intf, "| %s: %s", info->psz_name,
-                          info->psz_value);
-            msg_print(intf, "| ");
+                cli_printf(cl, "| %s: %s", info->psz_name,
+                           info->psz_value);
+            cli_printf(cl, "| ");
         }
-        msg_print(intf, "+----[ end of stream info ]");
+        cli_printf(cl, "+----[ end of stream info ]");
         vlc_mutex_unlock(&item->lock);
     }
     else
-    {
-        msg_print(intf, "no input");
-    }
+        cli_printf(cl, "no input");
     vlc_player_Unlock(player);
     (void) args; (void) count;
+    return (item != NULL) ? 0 : VLC_ENOITEM;
 }
 
-static void PlayerGetTime(intf_thread_t *intf, const char *const *args,
-                          size_t count)
+static int PlayerGetTime(struct cli_client *cl, const char *const *args,
+                         size_t count, void *data)
 {
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
     vlc_tick_t t;
 
     vlc_player_Lock(player);
     t = vlc_player_GetTime(player);
     vlc_player_Unlock(player);
-    if (t != VLC_TICK_INVALID)
-        msg_print(intf, "%"PRIu64, SEC_FROM_VLC_TICK(t));
+    if (t == VLC_TICK_INVALID)
+        return VLC_ENOITEM;
 
+    cli_printf(cl, "%"PRIu64, SEC_FROM_VLC_TICK(t));
     (void) args; (void) count;
+    return 0;
 }
 
-static void PlayerGetLength(intf_thread_t *intf, const char *const *args,
-                            size_t count)
+static int PlayerGetLength(struct cli_client *cl, const char *const *args,
+                           size_t count, void *data)
 {
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
     vlc_tick_t l;
 
     vlc_player_Lock(player);
     l = vlc_player_GetLength(player);
     vlc_player_Unlock(player);
 
-    if (l != VLC_TICK_INVALID)
-        msg_print(intf, "%"PRIu64, SEC_FROM_VLC_TICK(l));
+    if (l == VLC_TICK_INVALID)
+        return VLC_ENOITEM;
 
+    cli_printf(cl, "%"PRIu64, SEC_FROM_VLC_TICK(l));
     (void) args; (void) count;
+    return 0;
 }
 
-static void PlayerGetTitle(intf_thread_t *intf, const char *const *args,
-                           size_t count)
+static int PlayerGetTitle(struct cli_client *cl, const char *const *args,
+                          size_t count, void *data)
 {
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
     const struct vlc_player_title *title;
 
     vlc_player_Lock(player);
     title = vlc_player_GetSelectedTitle(player);
-    msg_print(intf, "%s", (title != NULL) ? title->name : "");
+    cli_printf(cl, "%s", (title != NULL) ? title->name : "");
     vlc_player_Unlock(player);
     (void) args; (void) count;
+    return (title != NULL) ? 0 : VLC_ENOITEM;
 }
 
-static void PlayerVoutSnapshot(intf_thread_t *intf, const char *const *args,
-                               size_t count)
+static int PlayerVoutSnapshot(struct cli_client *cl, const char *const *args,
+                              size_t count, void *data)
 {
-    PlayerDoVoid(intf, vlc_player_vout_Snapshot);
     (void) args; (void) count;
+    return PlayerDoVoid(cl, data, vlc_player_vout_Snapshot);
 }
 
-static void PlayerFullscreen(intf_thread_t *intf, const char *const *args,
-                             size_t count)
+static int PlayerFullscreen(struct cli_client *cl, const char *const *args,
+                            size_t count, void *data)
 {
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
     bool fs = !vlc_player_vout_IsFullscreen(player);
 
     if (count > 1)
@@ -572,33 +601,48 @@ static void PlayerFullscreen(intf_thread_t *intf, const char *const *args,
     }
 
     vlc_player_vout_SetFullscreen(player, fs);
+    (void) cl;
+    return 0;
 }
 
-static void Volume(intf_thread_t *intf, const char *const *args, size_t count)
+static int Volume(struct cli_client *cl, const char *const *args, size_t count,
+                  void *data)
 {
-    const char *arg = count > 1 ? args[1] : "";
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
 
     vlc_player_Lock(player);
-    if ( *arg )
+    if (count == 2)
     {
-        /* Set. */
-        float volume = atol(arg) / 100.f;
+        /* NOTE: For unfortunate hysterical raisins, integer value above 1 are
+         * interpreted in a scale of 256 parts. Floating point values are taken
+         * as ratio as usual in the VLC code.
+         * Yes, this sucks (hopefully nobody uses volume 1/256).
+         */
+        char *end;
+        unsigned long ul = strtoul(args[1], &end, 10);
+        float volume;
+
+        static_assert ((AOUT_VOLUME_DEFAULT & (AOUT_VOLUME_DEFAULT - 1)) == 0,
+                       "AOUT_VOLUME_DEFAULT must be a power of two.");
+
+        if (*end == '\0' && ul > 1 && ul <= AOUT_VOLUME_MAX)
+            volume = ldexpf(ul, -ctz(AOUT_VOLUME_DEFAULT));
+        else
+            volume = atof(args[1]);
+
         vlc_player_aout_SetVolume(player, volume);
     }
     else
-    {
-        /* Get. */
-        long int volume = lroundf(vlc_player_aout_GetVolume(player) * 100.f);
-        msg_print(intf, STATUS_CHANGE "( audio volume: %ld )", volume);
-    }
+        cli_printf(cl, STATUS_CHANGE "( audio volume: %f )",
+                   vlc_player_aout_GetVolume(player));
     vlc_player_Unlock(player);
+    return 0;
 }
 
-static void VolumeMove(intf_thread_t *intf, const char *const *args,
-                       size_t count)
+static int VolumeMove(struct cli_client *cl, const char *const *args,
+                      size_t count, void *data)
 {
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
     const char *psz_cmd = args[0];
     const char *arg = count > 1 ? args[1] : "";
 
@@ -611,12 +655,14 @@ static void VolumeMove(intf_thread_t *intf, const char *const *args,
     vlc_player_Lock(player);
     vlc_player_aout_IncrementVolume(player, i_nb_steps, &volume);
     vlc_player_Unlock(player);
+    (void) cl;
+    return 0;
 }
 
-static void VideoConfig(intf_thread_t *intf, const char *const *args,
-                        size_t n_args)
+static int VideoConfig(struct cli_client *cl, const char *const *args,
+                       size_t n_args, void *data)
 {
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
     vout_thread_t *p_vout = vlc_player_vout_Hold(player);
     const char * psz_variable = NULL;
     const char *psz_cmd = args[0];
@@ -661,7 +707,7 @@ static void VideoConfig(intf_thread_t *intf, const char *const *args,
             if( psz_value == NULL )
             {
                 vout_Release(p_vout);
-                return;
+                return VLC_ENOVAR;
             }
         }
 
@@ -670,14 +716,14 @@ static void VideoConfig(intf_thread_t *intf, const char *const *args,
         {
             vout_Release(p_vout);
             free( psz_value );
-            return;
+            return VLC_ENOMEM;
         }
 
         /* Get the descriptive name of the variable */
         var_Change( p_vout, psz_variable, VLC_VAR_GETTEXT, &name );
         if( !name ) name = strdup(psz_variable);
 
-        msg_print(intf, "+----[ %s ]", name);
+        cli_printf(cl, "+----[ %s ]", name);
         if( !strcmp( psz_variable, "zoom" ) )
         {
             for ( size_t i = 0; i < count; i++ )
@@ -687,7 +733,7 @@ static void VideoConfig(intf_thread_t *intf, const char *const *args,
                 if (f_value == val[i].f_float)
                     fmt = "| %f - %s*";
 
-                msg_print(intf, fmt, val[i].f_float, text[i]);
+                cli_printf(cl, fmt, val[i].f_float, text[i]);
                 free(text[i]);
             }
         }
@@ -700,7 +746,7 @@ static void VideoConfig(intf_thread_t *intf, const char *const *args,
                 if (strcmp(psz_value, val[i].psz_string) == 0)
                     fmt = "| %s - %s*";
 
-                msg_print(intf, fmt, val[i].psz_string, text[i]);
+                cli_printf(cl, fmt, val[i].psz_string, text[i]);
                 free(text[i]);
                 free(val[i].psz_string);
             }
@@ -708,27 +754,33 @@ static void VideoConfig(intf_thread_t *intf, const char *const *args,
         }
         free(text);
         free(val);
-        msg_print(intf, "+----[ end of %s ]", name);
+        cli_printf(cl, "+----[ end of %s ]", name);
 
         free( name );
     }
     vout_Release(p_vout);
+    return 0;
 }
 
-static void AudioDevice(intf_thread_t *intf, const char *const *args,
-                        size_t count)
+static int AudioDevice(struct cli_client *cl, const char *const *args,
+                       size_t count, void *data)
 {
     const char *cmd = args[0];
     const char *arg = count > 1 ? args[1] : "";
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
     audio_output_t *aout = vlc_player_aout_Hold(player);
+    int ret = 0;
+
     if (aout == NULL)
-        return;
+        return VLC_ENOOBJ;
 
     char **ids, **names;
     int n = aout_DevicesList(aout, &ids, &names);
     if (n < 0)
+    {
+        ret = VLC_ENOMEM;
         goto out;
+    }
 
     bool setdev = count > 1;
     if (setdev)
@@ -751,18 +803,18 @@ static void AudioDevice(intf_thread_t *intf, const char *const *args,
         char *dev = aout_DeviceGet(aout);
         const char *devstr = (dev != NULL) ? dev : "";
 
-        msg_print(intf, "+----[ %s ]", cmd);
+        cli_printf(cl, "+----[ %s ]", cmd);
         for ( int i = 0; i < n; i++ )
         {
             const char *fmt = "| %s - %s";
 
             if( !strcmp(devstr, ids[i]) )
                 fmt = "| %s - %s *";
-            msg_print(intf, fmt, ids[i], names[i]);
+            cli_printf(cl, fmt, ids[i], names[i]);
             free( names[i] );
             free( ids[i] );
         }
-        msg_print(intf, "+----[ end of %s ]", cmd);
+        cli_printf(cl, "+----[ end of %s ]", cmd);
 
         free( dev );
     }
@@ -771,17 +823,20 @@ static void AudioDevice(intf_thread_t *intf, const char *const *args,
     free(names);
 out:
     aout_Release(aout);
+    return ret;
 }
 
-static void AudioChannel(intf_thread_t *intf, const char *const *args,
-                         size_t n_args)
+static int AudioChannel(struct cli_client *cl, const char *const *args,
+                        size_t n_args, void *data)
 {
     const char *cmd = args[0];
     const char *arg = n_args > 1 ? args[1] : "";
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
     audio_output_t *p_aout = vlc_player_aout_Hold(player);
+    int ret = 0;
+
     if ( p_aout == NULL )
-         return;
+         return VLC_ENOOBJ;
 
     if ( !*arg )
     {
@@ -792,11 +847,14 @@ static void AudioChannel(intf_thread_t *intf, const char *const *args,
 
         if ( var_Change( p_aout, "stereo-mode", VLC_VAR_GETCHOICES,
                          &count, &val, &text ) < 0 )
+        {
+            ret = VLC_ENOVAR;
             goto out;
+        }
 
         int i_value = var_GetInteger( p_aout, "stereo-mode" );
 
-        msg_print(intf, "+----[ %s ]", cmd);
+        cli_printf(cl, "+----[ %s ]", cmd);
         for ( size_t i = 0; i < count; i++ )
         {
             const char *fmt = "| %"PRId64" - %s";
@@ -804,23 +862,24 @@ static void AudioChannel(intf_thread_t *intf, const char *const *args,
             if (i_value == val[i].i_int)
                 fmt = "| %"PRId64" - %s*";
 
-            msg_print(intf, fmt, val[i].i_int, text[i]);
+            cli_printf(cl, fmt, val[i].i_int, text[i]);
             free(text[i]);
         }
         free(text);
         free(val);
-        msg_print(intf, "+----[ end of %s ]", cmd);
+        cli_printf(cl, "+----[ end of %s ]", cmd);
     }
     else
         var_SetInteger(p_aout, "stereo-mode", atoi(arg));
 out:
     aout_Release(p_aout);
+    return ret;
 }
 
-static void Statistics(intf_thread_t *intf, const char *const *args,
-                       size_t count)
+static int Statistics(struct cli_client *cl, const char *const *args,
+                      size_t count, void *data)
 {
-    vlc_player_t *player = vlc_playlist_GetPlayer(intf->p_sys->playlist);
+    vlc_player_t *player = data;
     input_item_t *item;
 
     vlc_player_Lock(player);
@@ -828,67 +887,122 @@ static void Statistics(intf_thread_t *intf, const char *const *args,
 
     if (item != NULL)
     {
-        msg_print(intf, "+----[ begin of statistical info ]");
+        cli_printf(cl, "+----[ begin of statistical info ]");
         vlc_mutex_lock(&item->lock);
 
         /* Input */
-        msg_print(intf, _("+-[Incoming]"));
-        msg_print(intf, _("| input bytes read : %8.0f KiB"),
-                  (float)(item->p_stats->i_read_bytes) / 1024.f);
-        msg_print(intf, _("| input bitrate    :   %6.0f kb/s"),
-                  (float)(item->p_stats->f_input_bitrate) * 8000.f);
-        msg_print(intf, _("| demux bytes read : %8.0f KiB"),
-                  (float)(item->p_stats->i_demux_read_bytes) / 1024.f);
-        msg_print(intf, _("| demux bitrate    :   %6.0f kb/s"),
-                  (float)(item->p_stats->f_demux_bitrate) * 8000.f);
-        msg_print(intf, _("| demux corrupted  :    %5"PRIi64),
-                  item->p_stats->i_demux_corrupted);
-        msg_print(intf, _("| discontinuities  :    %5"PRIi64),
+        cli_printf(cl, _("+-[Incoming]"));
+        cli_printf(cl, _("| input bytes read : %8.0f KiB"),
+                   (float)(item->p_stats->i_read_bytes) / 1024.f);
+        cli_printf(cl, _("| input bitrate    :   %6.0f kb/s"),
+                   (float)(item->p_stats->f_input_bitrate) * 8000.f);
+        cli_printf(cl, _("| demux bytes read : %8.0f KiB"),
+                   (float)(item->p_stats->i_demux_read_bytes) / 1024.f);
+        cli_printf(cl, _("| demux bitrate    :   %6.0f kb/s"),
+                   (float)(item->p_stats->f_demux_bitrate) * 8000.f);
+        cli_printf(cl, _("| demux corrupted  :    %5"PRIi64),
+                   item->p_stats->i_demux_corrupted);
+        cli_printf(cl, _("| discontinuities  :    %5"PRIi64),
                   item->p_stats->i_demux_discontinuity);
-        msg_print(intf, "|");
+        cli_printf(cl, "|");
 
         /* Video */
-        msg_print(intf, _("+-[Video Decoding]"));
-        msg_print(intf, _("| video decoded    :    %5"PRIi64),
-                  item->p_stats->i_decoded_video);
-        msg_print(intf, _("| frames displayed :    %5"PRIi64),
-                  item->p_stats->i_displayed_pictures);
-        msg_print(intf, _("| frames late      :    %5"PRIi64),
-                  item->p_stats->i_late_pictures);
-        msg_print(intf, _("| frames lost      :    %5"PRIi64),
-                  item->p_stats->i_lost_pictures);
-        msg_print(intf, "|");
+        cli_printf(cl, _("+-[Video Decoding]"));
+        cli_printf(cl, _("| video decoded    :    %5"PRIi64),
+                   item->p_stats->i_decoded_video);
+        cli_printf(cl, _("| frames displayed :    %5"PRIi64),
+                   item->p_stats->i_displayed_pictures);
+        cli_printf(cl, _("| frames late      :    %5"PRIi64),
+                   item->p_stats->i_late_pictures);
+        cli_printf(cl, _("| frames lost      :    %5"PRIi64),
+                   item->p_stats->i_lost_pictures);
+        cli_printf(cl, "|");
 
         /* Audio*/
-        msg_print(intf, "%s", _("+-[Audio Decoding]"));
-        msg_print(intf, _("| audio decoded    :    %5"PRIi64),
-                  item->p_stats->i_decoded_audio);
-        msg_print(intf, _("| buffers played   :    %5"PRIi64),
-                  item->p_stats->i_played_abuffers);
-        msg_print(intf, _("| buffers lost     :    %5"PRIi64),
-                  item->p_stats->i_lost_abuffers);
-        msg_print(intf, "|");
+        cli_printf(cl, "%s", _("+-[Audio Decoding]"));
+        cli_printf(cl, _("| audio decoded    :    %5"PRIi64),
+                   item->p_stats->i_decoded_audio);
+        cli_printf(cl, _("| buffers played   :    %5"PRIi64),
+                   item->p_stats->i_played_abuffers);
+        cli_printf(cl, _("| buffers lost     :    %5"PRIi64),
+                   item->p_stats->i_lost_abuffers);
+        cli_printf(cl, "|");
 
         vlc_mutex_unlock(&item->lock);
-        msg_print(intf,  "+----[ end of statistical info ]" );
+        cli_printf(cl,  "+----[ end of statistical info ]" );
     }
     vlc_player_Unlock(player);
     (void) args; (void) count;
+    return (item != NULL) ? 0 : VLC_ENOITEM;
 }
 
-static void IsPlaying(intf_thread_t *intf, const char *const *args,
-                      size_t count)
+static int IsPlaying(struct cli_client *cl, const char *const *args,
+                     size_t count, void *data)
 {
-    intf_sys_t *sys = intf->p_sys;
-    vlc_player_t *player = vlc_playlist_GetPlayer(sys->playlist);
+    vlc_player_t *player = data;
     enum vlc_player_state state;
 
     vlc_player_Lock(player);
     state = vlc_player_GetState(player);
-    msg_print(intf, "%d", state == VLC_PLAYER_STATE_PLAYING
-                       || state == VLC_PLAYER_STATE_PAUSED);
+    cli_printf(cl, "%d", state == VLC_PLAYER_STATE_PLAYING
+                      || state == VLC_PLAYER_STATE_PAUSED);
     vlc_player_Unlock(player);
     (void) args; (void) count;
+    return 0;
+}
+
+static int PlayerStatus(struct cli_client *cl, const char *const *args,
+                        size_t count, void *data)
+{
+    vlc_player_t *player = data;
+
+    vlc_player_Lock(player);
+
+    input_item_t *item = vlc_player_GetCurrentMedia(player);
+    if (item != NULL)
+    {
+        char *uri = input_item_GetURI(item);
+        if (likely(uri != NULL))
+        {
+            cli_printf(cl, STATUS_CHANGE "( new input: %s )", uri);
+            free(uri);
+        }
+    }
+
+    float volume = vlc_player_aout_GetVolume(player);
+    if (isgreaterequal(volume, 0.f))
+        cli_printf(cl, STATUS_CHANGE "( audio volume: %ld )",
+                  lroundf(volume * 100.f));
+
+    enum vlc_player_state state = vlc_player_GetState(player);
+
+    vlc_player_Unlock(player);
+
+    int stnum = -1;
+    const char *stname = "unknown";
+
+    switch (state)
+    {
+        case VLC_PLAYER_STATE_STOPPING:
+        case VLC_PLAYER_STATE_STOPPED:
+            stnum = 5;
+            stname = "stop";
+            break;
+        case VLC_PLAYER_STATE_PLAYING:
+            stnum = 3;
+            stname = "play";
+            break;
+        case VLC_PLAYER_STATE_PAUSED:
+            stnum = 4;
+            stname = "pause";
+            break;
+        default:
+            break;
+    }
+
+    cli_printf(cl, STATUS_CHANGE "( %s state: %u )", stname, stnum);
+    (void) args; (void) count;
+    return 0;
 }
 
 static const struct cli_handler cmds[] =
@@ -912,6 +1026,7 @@ static const struct cli_handler cmds[] =
     { "snapshot", PlayerVoutSnapshot },
 
     { "is_playing", IsPlaying },
+    { "status", PlayerStatus },
     { "stats", Statistics },
 
     /* DVD commands */
@@ -954,7 +1069,7 @@ void *RegisterPlayer(intf_thread_t *intf)
     pc->input_buffering = false;
     pc->show_position = var_InheritBool(intf, "rc-show-pos");
 
-    RegisterHandlers(intf, cmds, ARRAY_SIZE(cmds));
+    RegisterHandlers(intf, cmds, ARRAY_SIZE(cmds), player);
 
     vlc_player_Lock(player);
     pc->player_listener = vlc_player_AddListener(player, &player_cbs, pc);
@@ -971,7 +1086,6 @@ void *RegisterPlayer(intf_thread_t *intf)
         goto error;
     }
 
-    player_on_state_changed(player, vlc_player_GetState(player), pc);
     vlc_player_Unlock(player);
     return pc;
 

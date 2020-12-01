@@ -4,7 +4,9 @@
 #include <QCoreApplication>
 #include <QOpenGLFramebufferObject>
 #include <QOpenGLFunctions>
+#include <QOffscreenSurface>
 #include <QThread>
+#include <QSemaphore>
 #include <cmath>
 
 #include <mutex>
@@ -20,11 +22,37 @@ public:
         mBuffers[0] = NULL;
         mBuffers[1] = NULL;
         mBuffers[2] = NULL;
+
+        /* Use default format for context. */
+        mContext = new QOpenGLContext(widget);
+
+        /* Use offscreen surface to render the buffers */
+        mSurface = new QOffscreenSurface(nullptr, widget);
+
+        /* Widget doesn't have an OpenGL context right now, we'll get it later. */
+        QObject::connect(widget, &QtVLCWidget::contextReady, [this](QOpenGLContext *render_context) {
+            /* Video view is now ready, we can start */
+            mSurface->setFormat(mWidget->format());
+            mSurface->create();
+
+            mContext->setFormat(mWidget->format());
+            mContext->setShareContext(render_context);
+            mContext->create();
+
+            videoReady.release();
+        });
     }
 
     ~VLCVideo()
     {
         cleanup(this);
+    }
+
+    /// return whether we are using OpenGLES or OpenGL, which is needed to know
+    /// whether we use the libvlc OpenGLES2 engine or the OpenGL one
+    bool isOpenGLES()
+    {
+        return mContext->isOpenGLES();
     }
 
     /// return the texture to be displayed
@@ -68,10 +96,17 @@ public:
     static bool setup(void** data, const libvlc_video_setup_device_cfg_t *cfg,
                       libvlc_video_setup_device_info_t *out)
     {
+        Q_UNUSED(cfg);
+        Q_UNUSED(out);
+
         if (!QOpenGLContext::supportsThreadedOpenGL())
             return false;
 
         VLCVideo* that = static_cast<VLCVideo*>(*data);
+
+        /* Wait for rendering view to be ready. */
+        that->videoReady.acquire();
+
         that->m_width = 0;
         that->m_height = 0;
         return true;
@@ -82,6 +117,9 @@ public:
     static void cleanup(void* data)
     {
         VLCVideo* that = static_cast<VLCVideo*>(data);
+
+        that->videoReady.release();
+
         if (that->m_width == 0 && that->m_height == 0)
             return;
         delete that->mBuffers[0];
@@ -108,9 +146,9 @@ public:
     {
         VLCVideo* that = static_cast<VLCVideo*>(data);
         if (current)
-            that->mWidget->makeCurrent();
+            that->mContext->makeCurrent(that->mSurface);
         else
-            that->mWidget->doneCurrent();
+            that->mContext->doneCurrent();
         return true;
     }
 
@@ -118,12 +156,22 @@ public:
     static void* get_proc_address(void* data, const char* current)
     {
         VLCVideo* that = static_cast<VLCVideo*>(data);
-        QOpenGLContext *ctx = that->mWidget->context();
-        return reinterpret_cast<void*>(ctx->getProcAddress(current));
+        /* Qt usual expects core symbols to be queryable, even though it's not
+         * mentioned in the API. Cf QPlatformOpenGLContext::getProcAddress.
+         * Thus, we don't need to wrap the function symbols here, but it might
+         * fail to work (not crash though) on exotic platforms since Qt doesn't
+         * commit to this behaviour. A way to handle this in a more stable way
+         * would be to store the mContext->functions() table in a thread local
+         * variable, and wrap every call to OpenGL in a function using this
+         * thread local state to call the correct variant. */
+        return reinterpret_cast<void*>(that->mContext->getProcAddress(current));
     }
 
 private:
     QtVLCWidget *mWidget;
+    QOpenGLContext *mContext;
+    QOffscreenSurface *mSurface;
+    QSemaphore videoReady;
 
     //FBO data
     unsigned m_width = 0;
@@ -149,7 +197,7 @@ QtVLCWidget::QtVLCWidget(QWidget *parent)
     // support it, the widget will become transparent apart from the logo.
 
     const char *args[] = {
-        "--verbose=4"
+        "--verbose=2"
     };
     m_vlc = libvlc_new(sizeof(args) / sizeof(*args), args);
 
@@ -171,7 +219,8 @@ bool QtVLCWidget::playMedia(const char* url)
     }
 
     // Define the opengl rendering callbacks
-    libvlc_video_set_output_callbacks(m_mp, libvlc_video_engine_opengl,
+    libvlc_video_set_output_callbacks(m_mp,
+        mVLC->isOpenGLES() ? libvlc_video_engine_gles2 : libvlc_video_engine_opengl,
         VLCVideo::setup, VLCVideo::cleanup, nullptr, VLCVideo::resizeRenderTextures, VLCVideo::swap,
         VLCVideo::make_current, VLCVideo::get_proc_address, nullptr, nullptr,
         mVLC);
@@ -281,6 +330,8 @@ void QtVLCWidget::initializeGL()
     m_program->setUniformValue("texture", 0);
 
     m_program->bindAttributeLocation("position", 0);
+
+    emit contextReady(context());
 }
 
 void QtVLCWidget::paintGL()
@@ -318,5 +369,7 @@ void QtVLCWidget::paintGL()
 
 void QtVLCWidget::resizeGL(int w, int h)
 {
+    Q_UNUSED(w);
+    Q_UNUSED(h);
     /* TODO */
 }

@@ -35,9 +35,9 @@
 #define PROFILE_NAME_1 "Minimalist Style"
 #define VALUE_1 "0;64;3;1;4;64;11;64;34;64;9;64;33 | 3;0;1;4"
 #define PROFILE_NAME_2 "One-Liner Style"
-#define VALUE_2 "0;64;3;1;4;64;7;9;8;64;64;11;10;12;13;65;33 | 17;3;0;1;4;18"
+#define VALUE_2 "0;64;3;1;4;64;7;9;8;64;64;11;10;12;13;#33 | 17;3;0;1;4;18"
 #define PROFILE_NAME_3 "Simplest Style"
-#define VALUE_3 "33;65;0;4;1;65;7 | 3;0;4"
+#define VALUE_3 "33;#0;4;1;#7 | 3;0;4"
 
 ToolbarEditorDialog::ToolbarEditorDialog( QWidget *_w, intf_thread_t *_p_intf)
     : QVLCDialog( _w,  _p_intf )
@@ -80,11 +80,16 @@ ToolbarEditorDialog::ToolbarEditorDialog( QWidget *_w, intf_thread_t *_p_intf)
     /* Load defaults ones if we have no combos */
     if( i_size == 0 )
     {
+        profileCombo->addItem( qtr("Default Style"), PlayerControlBarModel::getSerializedDefaultStyle() );
         profileCombo->addItem( PROFILE_NAME_1, QString( VALUE_1 ) );
         profileCombo->addItem( PROFILE_NAME_2, QString( VALUE_2 ) );
         profileCombo->addItem( PROFILE_NAME_3, QString( VALUE_3 ) );
+        profileCombo->setCurrentIndex(0);
     }
-    profileCombo->setCurrentIndex( -1 );
+    else
+    {
+        profileCombo->setCurrentIndex( -1 );
+    }
 
     /* Drag and Drop */
     editorView = new QQuickWidget(this);
@@ -175,17 +180,28 @@ void ToolbarEditorDialog::changeProfile( int i )
 {
     QStringList qs_list = profileCombo->itemData( i ).toString().split( "|" );
     if( qs_list.count() < 2 )
-            return;
-    emit updatePlayerModel("MainPlayerToolbar",qs_list[0]);
-    emit updatePlayerModel("MiniPlayerToolbar",qs_list[1]);
-}
+        return;
 
-void ToolbarEditorDialog::deleteCursor()
-{
-    QApplication::setOverrideCursor(Qt::ForbiddenCursor);
-}
+    QStringList align_list_main = qs_list[0].split("#");
+    QStringList align_list_mini = qs_list[1].split("#");
 
-void ToolbarEditorDialog::restoreCursor()
-{
-    QApplication::restoreOverrideCursor();
+    emit updatePlayerModel("MainPlayerToolbar-left", align_list_main[0]);
+    if(align_list_main.size() >= 2)
+        emit updatePlayerModel("MainPlayerToolbar-center", align_list_main[1]);
+    else
+        emit updatePlayerModel("MainPlayerToolbar-center", "");
+    if(align_list_main.size() >= 3)
+        emit updatePlayerModel("MainPlayerToolbar-right", align_list_main[2]);
+    else
+        emit updatePlayerModel("MainPlayerToolbar-right", "");
+
+    emit updatePlayerModel("MiniPlayerToolbar-left", align_list_mini[0]);
+    if(align_list_mini.size() >= 2)
+        emit updatePlayerModel("MiniPlayerToolbar-center", align_list_mini[1]);
+    else
+        emit updatePlayerModel("MiniPlayerToolbar-center", "");
+    if(align_list_mini.size() >= 3)
+        emit updatePlayerModel("MiniPlayerToolbar-right", align_list_mini[2]);
+    else
+        emit updatePlayerModel("MiniPlayerToolbar-right", "");
 }

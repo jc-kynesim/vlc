@@ -82,6 +82,7 @@ Item {
     property int icon_xlarge: dp(128, scale);
 
     property int icon_topbar: dp(38, scale)
+    property int icon_checkedDelegate: dp(40, scale)
 
     property int play_cover_small: dp(24, scale)
 
@@ -123,6 +124,8 @@ Item {
     property int miniPlayerHeight: dp(76, scale)
 
     property int expandAlbumTracksHeight: dp(200, scale)
+
+    readonly property real artworkInfoTextWidth: (appWidth / 6)
 
     //combobox
     property int combobox_width_small: dp(64, scale)

@@ -31,6 +31,7 @@
 #include "mlqmltypes.hpp"
 #include "medialib.hpp"
 #include <memory>
+#include "mlevent.hpp"
 
 class MediaLib;
 
@@ -46,7 +47,6 @@ public:
 
     Q_PROPERTY( MLParentId parentId READ parentId WRITE setParentId NOTIFY parentIdChanged RESET unsetParentId )
     Q_PROPERTY( MediaLib* ml READ ml WRITE setMl )
-    Q_PROPERTY( unsigned int maxItems MEMBER m_nb_max_items )
     Q_PROPERTY( QString searchPattern READ searchPattern WRITE setSearchPattern )
 
     Q_PROPERTY( Qt::SortOrder sortOrder READ getSortOrder WRITE setSortOder NOTIFY sortOrderChanged )
@@ -104,7 +104,7 @@ public:
     virtual unsigned int getCount() const = 0;
 
 protected:
-    virtual void onVlcMlEvent( const vlc_ml_event_t* event );
+    virtual void onVlcMlEvent( const MLEvent &event );
 
     MLParentId m_parent;
 
@@ -114,14 +114,9 @@ protected:
     std::unique_ptr<char, void(*)(void*)> m_search_pattern_cstr;
     QString m_search_pattern;
 
-    unsigned int m_nb_max_items;
-
-    mutable vlc_mutex_t m_item_lock;
-
     std::unique_ptr<vlc_ml_event_callback_t,
                     std::function<void(vlc_ml_event_callback_t*)>> m_ml_event_handle;
-    std::atomic_bool m_need_reset;
-    std::atomic_bool m_is_reloading;
+    bool m_need_reset;
 };
 
 /**
@@ -140,33 +135,28 @@ public:
     MLSlidingWindowModel(QObject* parent = nullptr)
         : MLBaseModel(parent)
         , m_initialized(false)
+        , m_total_count(0)
     {
         m_query_param.i_nbResults = BatchSize;
     }
 
     int rowCount(const QModelIndex &parent = {}) const override
     {
-        bool countHasChanged = false;
         if (parent.isValid())
             return 0;
+
+        if ( m_initialized == false )
         {
-            vlc_mutex_locker lock( &m_item_lock );
-            if ( m_initialized == false )
-            {
-                m_item_list = const_cast<MLSlidingWindowModel<T>*>(this)->fetch();
-                m_total_count = countTotalElements();
-                m_initialized = true;
-                countHasChanged = true;
-            }
-        }
-        if (countHasChanged)
+            m_total_count = countTotalElements();
+            m_initialized = true;
             emit countChanged( static_cast<unsigned int>(m_total_count) );
+        }
+
         return m_total_count;
     }
 
     virtual T* get(int idx) const
     {
-        vlc_mutex_locker lock( &m_item_lock );
         T* obj = item( idx );
         if (!obj)
             return nullptr;
@@ -175,20 +165,16 @@ public:
 
     void clear() override
     {
-        {
-            vlc_mutex_locker lock( &m_item_lock );
-            m_query_param.i_offset = 0;
-            m_initialized = false;
-            m_total_count = 0;
-            m_item_list.clear();
-        }
+        m_query_param.i_offset = 0;
+        m_initialized = false;
+        m_total_count = 0;
+        m_item_list.clear();
         emit countChanged( static_cast<unsigned int>(m_total_count) );
     }
 
 
     virtual QVariant getIdForIndex( QVariant index ) const override
     {
-        vlc_mutex_locker lock( &m_item_lock );
         T* obj = nullptr;
         if (index.canConvert<int>())
             obj = item( index.toInt() );
@@ -205,7 +191,6 @@ public:
     {
         QVariantList idList;
         idList.reserve(indexes.length());
-        vlc_mutex_locker lock( &m_item_lock );
         std::transform( indexes.begin(), indexes.end(),std::back_inserter(idList), [this](const QModelIndex& index) -> QVariant {
             T* obj = item( index.row() );
             if (!obj)
@@ -220,7 +205,6 @@ public:
         QVariantList idList;
 
         idList.reserve(indexes.length());
-        vlc_mutex_locker lock( &m_item_lock );
         std::transform( indexes.begin(), indexes.end(),std::back_inserter(idList), [this](const QVariant& index) -> QVariant {
             T* obj = nullptr;
             if (index.canConvert<int>())
@@ -247,7 +231,6 @@ protected:
             return nullptr;
 
         unsigned int idx = static_cast<unsigned int>(signedidx);
-        // Must be called in a locked context
         if ( m_initialized == false )
         {
             m_total_count = countTotalElements();
@@ -257,7 +240,7 @@ protected:
             emit countChanged( static_cast<unsigned int>(m_total_count) );
         }
 
-        if ( m_total_count == 0 || idx >= m_total_count  )
+        if ( idx >= m_total_count  )
             return nullptr;
 
         if ( idx < m_query_param.i_offset ||  idx >= m_query_param.i_offset + m_item_list.size() )
@@ -275,16 +258,16 @@ protected:
         return m_item_list[idx - m_query_param.i_offset].get();
     }
 
-    virtual void onVlcMlEvent(const vlc_ml_event_t* event) override
+    virtual void onVlcMlEvent(const MLEvent &event) override
     {
-        switch (event->i_type)
+        switch (event.i_type)
         {
             case VLC_ML_EVENT_MEDIA_THUMBNAIL_GENERATED:
             {
-                if (event->media_thumbnail_generated.b_success) {
+                if (event.media_thumbnail_generated.b_success) {
                     int idx = static_cast<int>(m_query_param.i_offset);
                     for ( const auto& it : m_item_list ) {
-                        if (it->getId().id == event->media_thumbnail_generated.p_media->i_id) {
+                        if (it->getId().id == event.media_thumbnail_generated.i_media_id) {
                             thumbnailUpdated(idx);
                             break;
                         }
@@ -304,10 +287,7 @@ private:
     virtual std::vector<std::unique_ptr<T>> fetch() = 0;
     virtual void thumbnailUpdated( int ) {}
 
-protected:
     mutable std::vector<std::unique_ptr<T>> m_item_list;
-
-private:
     mutable bool m_initialized;
     mutable size_t m_total_count;
 };

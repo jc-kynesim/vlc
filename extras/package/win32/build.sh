@@ -367,10 +367,8 @@ if [ ! -z "$WINSTORE" ]; then
     CONFIGFLAGS="$CONFIGFLAGS --enable-winstore-app"
     # uses CreateFile to access files/drives outside of the app
     CONFIGFLAGS="$CONFIGFLAGS --disable-vcd"
-    # OpenGL is not supported in UWP
-    CONFIGFLAGS="$CONFIGFLAGS --disable-gl"
     # other modules that were disabled in the old UWP builds
-    CONFIGFLAGS="$CONFIGFLAGS --disable-crystalhd --disable-dxva2"
+    CONFIGFLAGS="$CONFIGFLAGS --disable-dxva2"
 
 else
     CONFIGFLAGS="$CONFIGFLAGS --enable-dvdread --enable-caca"

@@ -18,6 +18,7 @@
 import QtQuick 2.11
 import QtQuick.Controls 2.4
 import QtQuick.Layouts 1.3
+import QtQml.Models 2.11
 import QtGraphicalEffects 1.0
 
 import org.videolan.vlc 0.1
@@ -34,6 +35,7 @@ Widgets.NavigableFocusScope {
     property var _menu: undefined
 
     property bool hasEmbededVideo: mainInterface.hasEmbededVideo
+    readonly property int positionSliderY: controlBarView.y + VLCStyle.fontHeight_normal + VLCStyle.margin_xsmall
 
     function dismiss() {
         if (_menu)
@@ -69,6 +71,171 @@ Widgets.NavigableFocusScope {
                mainPlaylistController.stop()
             }
             history.previous()
+        }
+    }
+
+    Widgets.DrawerExt {
+        id: csdGroup
+
+        z: 4
+        anchors.right: parent.right
+        anchors.top: parent.top
+        state: topcontrolView.state
+        edge: Widgets.DrawerExt.Edges.Top
+        width: contentItem.width
+        focus: true
+
+        component: Column {
+            spacing: VLCStyle.margin_xxsmall
+            focus: true
+
+            onActiveFocusChanged: if (activeFocus) menu_selector.forceActiveFocus()
+
+            Loader {
+                focus: false
+                anchors.right: parent.right
+                height: VLCStyle.icon_normal
+                active: mainInterface.clientSideDecoration
+                enabled: mainInterface.clientSideDecoration
+                visible: mainInterface.clientSideDecoration
+                source: "qrc:///widgets/CSDWindowButtonSet.qml"
+                onLoaded: {
+                    item.color = VLCStyle.colors.playerFg
+                    item.hoverColor = VLCStyle.colors.windowCSDButtonDarkBg
+                }
+            }
+
+            Row {
+                anchors.right: parent.right
+                focus: true
+                KeyNavigation.down: playlistpopup.state === "visible" ? playlistpopup : (audioControls.visible ? audioControls : controlBarView)
+
+                Widgets.IconToolButton {
+                    id: menu_selector
+
+                    focus: true
+                    size: VLCStyle.banner_icon_size
+                    iconText: VLCIcons.ellipsis
+                    text: i18n.qtr("Menu")
+                    color: VLCStyle.colors.playerFg
+                    property bool acceptFocus: true
+
+                    onClicked: contextMenu.popup(this.mapToGlobal(0, height))
+
+                    KeyNavigation.left: topcontrolView
+                    KeyNavigation.right: playlistBtn
+
+                    QmlGlobalMenu {
+                        id: contextMenu
+                        ctx: mainctx
+                    }
+                }
+
+                Widgets.IconToolButton {
+                    id: playlistBtn
+
+                    objectName: PlayerControlBarModel.PLAYLIST_BUTTON
+                    size: VLCStyle.banner_icon_size
+                    iconText: VLCIcons.playlist
+                    text: i18n.qtr("Playlist")
+                    color: VLCStyle.colors.playerFg
+                    focus: false
+                    onClicked:  {
+                        if (mainInterface.playlistDocked)
+                            playlistpopup.showPlaylist = !playlistpopup.showPlaylist
+                        else
+                            mainInterface.playlistVisible = !mainInterface.playlistVisible
+                    }
+                    property bool acceptFocus: true
+
+                    KeyNavigation.left: menu_selector
+                }
+            }
+        }
+    }
+
+    Widgets.DrawerExt {
+        id: playlistpopup
+
+        property bool showPlaylist: false
+        property var previousFocus: undefined
+
+        z: 2
+        anchors {
+            top: parent.top
+            right: parent.right
+            bottom: parent.bottom
+            bottomMargin: parent.height - rootPlayer.positionSliderY
+        }
+        focus: false
+        edge: Widgets.DrawerExt.Edges.Right
+        state: showPlaylist && mainInterface.playlistDocked ? "visible" : "hidden"
+        component: Rectangle {
+            color: VLCStyle.colors.setColorAlpha(VLCStyle.colors.banner, 0.8)
+            width: rootPlayer.width/4
+            height: playlistpopup.height
+
+            PL.PlaylistListView {
+                id: playlistView
+                focus: true
+                anchors.fill: parent
+
+                forceDark: true
+                navigationParent: rootPlayer
+                navigationUpItem: csdGroup
+                navigationDownItem: controlBarView
+                navigationLeft: closePlaylist
+                navigationCancel: closePlaylist
+
+                function closePlaylist() {
+                    playlistpopup.showPlaylist = false
+                    controlBarView.forceActiveFocus()
+                    if (audioControls.visible)
+                        audioControls.forceActiveFocus()
+                    else
+                        controlBarView.forceActiveFocus()
+                }
+            }
+        }
+        onStateChanged: {
+            if (state === "hidden")
+                toolbarAutoHide.restart()
+        }
+    }
+
+    /// Backgrounds of topControlbar and controlBar are drawn separately since they outgrow their content
+    /* top control bar background */
+    Widgets.DrawerExt {
+        z: 1
+        edge: Widgets.DrawerExt.Edges.Top
+        state: topcontrolView.state
+        width: parent.width
+        height: VLCStyle.dp(206, VLCStyle.scale)
+        component: Rectangle {
+            width: rootPlayer.width
+            height: VLCStyle.dp(206, VLCStyle.scale)
+            gradient: Gradient {
+                GradientStop { position: 0; color: VLCStyle.colors.setColorAlpha(VLCStyle.colors.playerBg, .8) }
+                GradientStop { position: 1; color: "transparent" }
+            }
+        }
+    }
+
+    /* bottom control bar background */
+    Widgets.DrawerExt {
+        z: 1
+        anchors.bottom: parent.bottom
+        width: parent.width
+        edge: Widgets.DrawerExt.Edges.Bottom
+        state: topcontrolView.state
+        height: VLCStyle.dp(206, VLCStyle.scale)
+        component: Rectangle {
+            width: rootPlayer.width
+            height: VLCStyle.dp(206, VLCStyle.scale)
+            gradient: Gradient {
+                GradientStop { position: 0; color: "transparent" }
+                GradientStop { position: 1; color: VLCStyle.colors.setColorAlpha(VLCStyle.colors.playerBg, .8) }
+            }
         }
     }
 
@@ -110,18 +277,11 @@ Widgets.NavigableFocusScope {
                     }
 
                     lockAutoHide: playlistpopup.state === "visible"
-
-                    onTogglePlaylistVisiblity:  {
-                        if (mainInterface.playlistDocked)
-                            playlistpopup.showPlaylist = !playlistpopup.showPlaylist
-                        else
-                            mainInterface.playlistVisible = !mainInterface.playlistVisible
-                    }
-
                     title: mainPlaylistController.currentItem.title
 
                     navigationParent: rootPlayer
-                    navigationDownItem: playlistpopup.showPlaylist ? playlistpopup : controlBarView
+                    navigationDownItem: playlistpopup.showPlaylist ? playlistpopup : (audioControls.visible ? audioControls : controlBarView)
+                    navigationRightItem: csdGroup
                 }
 
                 ResumeDialog {
@@ -146,10 +306,11 @@ Widgets.NavigableFocusScope {
 
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.topMargin: VLCStyle.margin_xsmall
 
             ColumnLayout {
                 anchors.fill: parent
-                spacing: VLCStyle.margin_small
+                spacing: 0
 
 
                 visible: !rootPlayer.hasEmbededVideo
@@ -159,11 +320,12 @@ Widgets.NavigableFocusScope {
                 }
 
                 Item {
-                    Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.preferredHeight: Math.max(Math.min(parent.height, parent.width - VLCStyle.margin_small * 2), 0)
                     Layout.maximumHeight: rootPlayer.height / 2
                     Layout.minimumHeight: 1
-                    Layout.topMargin: albumLabel.Layout.preferredHeight + artistLabel.Layout.preferredHeight
+                    Layout.preferredWidth: height * cover.sar
+                    Layout.alignment: Qt.AlignHCenter
 
                     Image {
                         id: cover
@@ -174,51 +336,96 @@ Widgets.NavigableFocusScope {
 
                         //source aspect ratio
                         readonly property real sar: cover.sourceSize.width / cover.sourceSize.height
-
-                        height: Math.min(parent.height, parent.width - VLCStyle.margin_small * 2)
-                        width: height  * sar
-                        anchors.centerIn: parent
+                        anchors.fill: parent
                     }
-
 
                     DropShadow {
                         anchors.fill: cover
                         source: cover
-                        horizontalOffset: 3
-                        verticalOffset: 10
-                        radius: 12
-                        samples: 17
-                        color: "black"
+                        horizontalOffset: 0
+                        verticalOffset: VLCStyle.dp(1, VLCStyle.scale)
+                        radius: VLCStyle.dp(3, VLCStyle.scale)
+                        samples: 1 + VLCStyle.dp(3, VLCStyle.scale) * 2
+                        color: Qt.rgba(0, 0, 0, .18)
+                    }
+
+                    DropShadow {
+                        anchors.fill: cover
+                        source: cover
+                        horizontalOffset: 0
+                        verticalOffset: VLCStyle.dp(6, VLCStyle.scale)
+                        radius: VLCStyle.dp(14, VLCStyle.scale)
+                        samples: 1 + VLCStyle.dp(14, VLCStyle.scale) * 2
+                        color: Qt.rgba(0, 0, 0, .22)
                     }
                 }
 
-                Label {
+                Widgets.SubtitleLabel {
                     id: albumLabel
 
                     Layout.fillWidth: true
                     Layout.preferredHeight: implicitHeight
-                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: VLCStyle.margin_normal
 
                     text: mainPlaylistController.currentItem.album
-                    font.pixelSize: VLCStyle.fontSize_xxlarge
-                    font.bold: true
+                    font.weight: Font.Light
                     horizontalAlignment: Text.AlignHCenter
                     color: VLCStyle.colors.playerFg
                     Accessible.description: i18n.qtr("album")
                 }
 
-                Label {
+                Widgets.MenuLabel {
                     id: artistLabel
 
                     Layout.fillWidth: true
                     Layout.preferredHeight: implicitHeight
-                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: VLCStyle.margin_xxsmall
 
                     text: mainPlaylistController.currentItem.artist
+                    font.weight: Font.Light
                     horizontalAlignment: Text.AlignHCenter
-                    font.pixelSize: VLCStyle.fontSize_xlarge
                     color: VLCStyle.colors.playerFg
                     Accessible.description: i18n.qtr("artist")
+                }
+
+                Widgets.NavigableRow {
+                    id: audioControls
+
+                    Layout.preferredHeight: implicitHeight
+                    Layout.preferredWidth: implicitWidth
+                    Layout.topMargin: VLCStyle.margin_xsmall
+                    Layout.alignment: Qt.AlignHCenter
+                    visible: player.videoTracks.count === 0
+                    focus: visible
+                    navigationParent: rootPlayer
+                    KeyNavigation.up: topcontrolView
+                    KeyNavigation.down: controlBarView
+
+                    model: ObjectModel {
+                        Widgets.IconToolButton {
+                            size: VLCStyle.icon_medium
+                            iconText: VLCIcons.skip_back
+                            onClicked: player.jumpBwd()
+                            text: i18n.qtr("Step back")
+                            color: VLCStyle.colors.playerFg
+                        }
+
+                        Widgets.IconToolButton {
+                            size: VLCStyle.icon_medium
+                            iconText: VLCIcons.visualization
+                            onClicked: player.toggleVisualization()
+                            text: i18n.qtr("Visualization")
+                            color: VLCStyle.colors.playerFg
+                        }
+
+                        Widgets.IconToolButton{
+                            size: VLCStyle.icon_medium
+                            iconText: VLCIcons.skip_for
+                            onClicked: player.jumpFwd()
+                            text: i18n.qtr("Step forward")
+                            color: VLCStyle.colors.playerFg
+                        }
+                    }
                 }
 
                 Item {
@@ -226,50 +433,7 @@ Widgets.NavigableFocusScope {
                 }
             }
 
-            Widgets.DrawerExt {
-                id: playlistpopup
 
-                z: 2
-
-                anchors {
-                    top: centralLayout.top
-                    right: parent.right
-                    bottom: centralLayout.bottom
-                }
-                property bool showPlaylist: false
-                property var previousFocus: undefined
-                focus: false
-                edge: Widgets.DrawerExt.Edges.Right
-                state: showPlaylist && mainInterface.playlistDocked ? "visible" : "hidden"
-                component: Rectangle {
-                    color: VLCStyle.colors.setColorAlpha(VLCStyle.colors.banner, 0.8)
-                    width: rootPlayer.width/4
-                    height: playlistpopup.height
-
-                    PL.PlaylistListView {
-                        id: playlistView
-                        focus: true
-                        anchors.fill: parent
-
-                        forceDark: true
-                        navigationParent: rootPlayer
-                        navigationUpItem: topcontrolView
-                        navigationDownItem: controlBarView
-                        navigationLeft: function() {
-                            playlistpopup.showPlaylist = false
-                            controlBarView.forceActiveFocus()
-                        }
-                        navigationCancel: function() {
-                            playlistpopup.showPlaylist = false
-                            controlBarView.forceActiveFocus()
-                        }
-                    }
-                }
-                onStateChanged: {
-                    if (state === "hidden")
-                        toolbarAutoHide.restart()
-                }
-            }
         }
 
         Widgets.DrawerExt {
@@ -286,12 +450,8 @@ Widgets.NavigableFocusScope {
             state: "visible"
             edge: Widgets.DrawerExt.Edges.Bottom
 
-            component: Rectangle {
+            component: Item {
                 id: controllerBarId
-                gradient: Gradient {
-                    GradientStop { position: 1.0; color: VLCStyle.colors.playerBg }
-                    GradientStop { position: 0.0; color: "transparent" }
-                }
 
                 width: controlBarView.width
                 height: controllerId.implicitHeight + controllerId.anchors.bottomMargin
@@ -320,7 +480,7 @@ Widgets.NavigableFocusScope {
                         }
 
                         navigationParent: rootPlayer
-                        navigationUpItem: playlistpopup.showPlaylist ? playlistpopup : topcontrolView
+                        navigationUpItem: playlistpopup.showPlaylist ? playlistpopup : (audioControls.visible ? audioControls : topcontrolView)
                     }
                 }
             }

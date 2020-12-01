@@ -60,7 +60,7 @@ bool IndexReader::parseIndex(block_t *p_block, BaseRepresentation *rep)
     if(!uuid_box)
         return false;
 
-    SegmentTimeline *timelineadd = new (std::nothrow) SegmentTimeline(rep->inheritTimescale());
+    SegmentTimeline *timelineadd = new (std::nothrow) SegmentTimeline(NULL);
     if (timelineadd)
     {
         const MP4_Box_data_tfrf_t *p_tfrfdata = uuid_box->data.p_tfrf;
@@ -71,7 +71,9 @@ bool IndexReader::parseIndex(block_t *p_block, BaseRepresentation *rep)
             timelineadd->addElement(i+1, dur, 0, stime);
         }
 
-        rep->mergeWithTimeline(timelineadd);
+        rep->inheritSegmentTemplate()->
+             inheritSegmentTimeline()->
+             updateWith(*timelineadd);
         delete timelineadd;
 
 #ifndef NDEBUG

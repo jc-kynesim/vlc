@@ -185,8 +185,6 @@ static int VolumeSetLocked(audio_output_t *aout, float vol)
         vol = 1.f;
     }
 
-    aout_GainRequest(aout, gain);
-
     sys->gain = gain;
     sys->requested_volume = vol;
     return 0;
@@ -198,6 +196,7 @@ static int VolumeSet(audio_output_t *aout, float vol)
 
     EnterCriticalSection(&sys->lock);
     int ret = VolumeSetLocked(aout, vol);
+    aout_GainRequest(aout, sys->gain);
     WakeConditionVariable(&sys->work);
     LeaveCriticalSection(&sys->lock);
     return ret;
@@ -988,9 +987,7 @@ static HRESULT MMSession(audio_output_t *aout, IMMDeviceEnumerator *it)
             BOOL mute;
 
             hr = ISimpleAudioVolume_GetMute(volume, &mute);
-            if (SUCCEEDED(hr))
-                aout_MuteReport(aout, mute != FALSE);
-            else
+            if (FAILED(hr))
                 msg_Err(aout, "cannot get mute (error 0x%lX)", hr);
 
             if (sys->requested_mute >= 0)
@@ -1002,6 +999,9 @@ static HRESULT MMSession(audio_output_t *aout, IMMDeviceEnumerator *it)
                     msg_Err(aout, "cannot set mute (error 0x%lX)", hr);
             }
             sys->requested_mute = -1;
+
+            if (SUCCEEDED(hr))
+                aout_MuteReport(aout, mute != FALSE);
         }
 
         SleepConditionVariableCS(&sys->work, &sys->lock, INFINITE);

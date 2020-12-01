@@ -20,6 +20,7 @@
 # include "config.h"
 #endif
 
+#include "dialogs/extensions/extensions_manager.hpp"
 #include "player_controller.hpp"
 #include "player_controller_p.hpp"
 
@@ -1245,6 +1246,36 @@ void PlayerController::setSecondarySubtitleDelay(VLCTick delay)
                                 delay, VLC_PLAYER_WHENCE_ABSOLUTE);
 }
 
+int PlayerController::getAudioDelayMS() const
+{
+    return MS_FROM_VLC_TICK( getAudioDelay() );
+}
+
+void PlayerController::setAudioDelayMS(int ms)
+{
+    setAudioDelay( VLC_TICK_FROM_MS(ms) );
+}
+
+int PlayerController::getSubtitleDelayMS() const
+{
+    return MS_FROM_VLC_TICK( getSubtitleDelay() );
+}
+
+void PlayerController::setSubtitleDelayMS(int ms)
+{
+    setSubtitleDelay( VLC_TICK_FROM_MS(ms) );
+}
+
+int PlayerController::getSecondarySubtitleDelayMS() const
+{
+    return MS_FROM_VLC_TICK( getSecondarySubtitleDelay() );
+}
+
+void PlayerController::setSecondarySubtitleDelayMS(int ms)
+{
+    setSecondarySubtitleDelay( VLC_TICK_FROM_MS(ms) );
+}
+
 void PlayerController::setSubtitleFPS(float fps)
 {
     Q_D(PlayerController);
@@ -1565,6 +1596,17 @@ void PlayerController::updateTime(vlc_tick_t system_now, bool forceUpdate)
     }
 }
 
+void PlayerController::openVLsub()
+{
+    Q_D(PlayerController);
+
+    const auto extensionManager = ExtensionsManager::getInstance( d->p_intf );
+    if ( !extensionManager->isLoaded() )
+        extensionManager->loadExtensions();
+
+    extensionManager->openVLsub();
+}
+
 void PlayerController::updateTimeFromTimer()
 {
     Q_D(PlayerController);
@@ -1612,6 +1654,29 @@ void PlayerController::toggleRecord()
 {
     Q_D(PlayerController);
     setRecording(!d->m_recording);
+}
+
+void PlayerController::toggleVisualization()
+{
+    Q_D(PlayerController);
+
+    if ( d->m_audioVisualization.rowCount() < 1 )
+        return;
+
+    if ( !d->m_audioVisualization.hasCurrent()
+         || d->m_audioVisualization.currentRow() == 0 /*0th row is "Disable"*/)
+    {
+        const int r = rand() % d->m_audioVisualization.rowCount();
+        d->m_audioVisualization.setData( d->m_audioVisualization.index( r )
+                                         , QVariant::fromValue<bool>( true )
+                                         , Qt::CheckStateRole );
+    }
+    else
+    {
+        d->m_audioVisualization.setData( d->m_audioVisualization.index(0)
+                                         , QVariant::fromValue<bool>( true )
+                                         , Qt::CheckStateRole);
+    }
 }
 
 void PlayerController::setRecording( bool recording )

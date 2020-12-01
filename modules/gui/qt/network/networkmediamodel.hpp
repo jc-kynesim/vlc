@@ -65,9 +65,41 @@ public:
         return source.get() != nullptr;
     }
 
+    bool isValid() {
+        vlc_media_tree_Lock(source->tree);
+        input_item_node_t* node;
+        bool ret = vlc_media_tree_Find( source->tree, media.get(), &node, nullptr);
+        vlc_media_tree_Unlock(source->tree);
+        return ret;
+    }
+
     MediaSourcePtr source;
     InputItemPtr media;
 };
+
+class PathNode
+{
+    Q_GADGET
+    Q_PROPERTY( QVariant tree READ getTree CONSTANT )
+    Q_PROPERTY( QString display READ getDisplay CONSTANT )
+
+public:
+    PathNode() = default;
+    PathNode( const NetworkTreeItem &tree, const QString &display )
+        : m_tree( QVariant::fromValue(tree) )
+        , m_display( display )
+    {
+    }
+
+    QVariant getTree() const { return m_tree; }
+    QString getDisplay() const { return m_display; }
+
+private:
+    const QVariant m_tree;
+    const QString m_display;
+};
+
+Q_DECLARE_METATYPE(PathNode)
 
 class NetworkMediaModel : public QAbstractListModel, public NetworkSourceListener::SourceListenerCb
 {
@@ -101,6 +133,7 @@ public:
 
     Q_PROPERTY(QmlMainContext* ctx READ getCtx WRITE setCtx NOTIFY ctxChanged)
     Q_PROPERTY(QVariant tree READ getTree WRITE setTree NOTIFY treeChanged)
+    Q_PROPERTY(QVariantList path READ getPath NOTIFY pathChanged)
 
     Q_PROPERTY(QString name READ getName NOTIFY nameChanged)
     Q_PROPERTY(QUrl url READ getUrl NOTIFY urlChanged)
@@ -127,6 +160,7 @@ public:
 
     inline QmlMainContext* getCtx() const { return m_ctx; }
     inline QVariant getTree() const { return QVariant::fromValue( m_treeItem); }
+    inline QVariantList getPath() const { return m_path; }
 
     inline QString getName() const { return m_name; }
     inline QUrl getUrl() const { return m_url; }
@@ -158,6 +192,7 @@ signals:
     void treeChanged();
     void isOnProviderListChanged();
     void sdSourceChanged();
+    void pathChanged();
 
 private:
     struct Item
@@ -201,6 +236,9 @@ private:
     bool m_hasTree = false;
     NetworkTreeItem m_treeItem;
     std::unique_ptr<NetworkSourceListener> m_listener;
+    QVariantList m_path;
 };
+
+Q_DECLARE_METATYPE(NetworkTreeItem)
 
 #endif // MLNETWORKMEDIAMODEL_HPP

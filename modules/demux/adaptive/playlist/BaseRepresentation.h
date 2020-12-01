@@ -40,7 +40,7 @@ namespace adaptive
     {
         class BaseAdaptationSet;
         class AbstractPlaylist;
-        class BaseSegmentTemplate;
+        class SegmentTemplateSegment;
 
         class BaseRepresentation : public CommonAttributesElements,
                                    public SegmentInformation
@@ -66,6 +66,7 @@ namespace adaptive
 
                 virtual vlc_tick_t  getMinAheadTime         (uint64_t) const;
                 virtual bool        needsUpdate             (uint64_t) const;
+                virtual bool        needsIndex              () const;
                 virtual bool        runLocalUpdates         (SharedResources *);
                 virtual void        scheduleNextUpdate      (uint64_t, bool);
 
@@ -73,10 +74,17 @@ namespace adaptive
 
                 /* for segment templates */
                 virtual std::string contextualize(size_t, const std::string &,
-                                                  const BaseSegmentTemplate *) const;
+                                                  const SegmentTemplate *) const;
 
                 static bool         bwCompare(const BaseRepresentation *a,
                                               const BaseRepresentation *b);
+
+                virtual uint64_t translateSegmentNumber(uint64_t, const BaseRepresentation *) const;
+                bool getSegmentNumberByTime(vlc_tick_t, uint64_t *) const;
+                bool getPlaybackTimeDurationBySegmentNumber(uint64_t, vlc_tick_t *, vlc_tick_t *) const;
+                bool getMediaPlaybackRange(vlc_tick_t *rangeBegin,
+                                                               vlc_tick_t *rangeEnd,
+                                                               vlc_tick_t *rangeLength) const;
             protected:
                 virtual bool        validateCodec(const std::string &) const;
                 BaseAdaptationSet                  *adaptationSet;

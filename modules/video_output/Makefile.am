@@ -20,7 +20,7 @@ libdecklinkoutput_plugin_la_LIBADD = $(LIBS_decklink) $(LIBDL) -lpthread
 vout_LTLIBRARIES += libdecklinkoutput_plugin.la
 endif
 
-libglinterop_cvpx_plugin_la_SOURCES = video_output/opengl/interop_cvpx.c \
+libglinterop_cvpx_plugin_la_SOURCES = video_output/opengl/interop_cvpx.m \
 	video_output/opengl/interop.h
 libglinterop_cvpx_plugin_la_SOURCES += codec/vt_utils.c codec/vt_utils.h
 libglinterop_cvpx_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)' \
@@ -45,6 +45,7 @@ vout_LTLIBRARIES += libvout_macosx_plugin.la libcaopengllayer_plugin.la \
 endif
 if HAVE_IOS
 libglinterop_cvpx_plugin_la_CFLAGS = $(AM_CFLAGS) -DUSE_OPENGL_ES2
+libglinterop_cvpx_plugin_la_LDFLAGS += -Wl,-framework,IOSurface,-framework,OpenGLES
 endif
 
 libvout_ios_plugin_la_SOURCES = video_output/ios.m
@@ -52,11 +53,22 @@ libvout_ios_plugin_la_CFLAGS = $(AM_CFLAGS) $(OPENGL_COMMONCFLAGS) -DUSE_OPENGL_
 libvout_ios_plugin_la_LIBADD = libvlc_opengles.la
 libvout_ios_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)' \
 	-Wl,-framework,Foundation,-framework,OpenGLES,-framework,QuartzCore,-framework,UIKit
+
+libuiview_window_plugin_la_SOURCES = video_output/apple/VLCVideoUIView.m
+libuiview_window_plugin_la_LDFLAGS = $(AM_LDFLAGS) \
+	-Wl,-framework,Foundation,-framework,OpenGLES,-framework,QuartzCore,-framework,UIKit
+libuiview_window_plugin_la_OBJCFLAGS = $(AM_OBJCFLAGS) -fobjc-arc
+
 if HAVE_IOS
-vout_LTLIBRARIES += libvout_ios_plugin.la libglinterop_cvpx_plugin.la
+vout_LTLIBRARIES += libvout_ios_plugin.la \
+	libglinterop_cvpx_plugin.la \
+	libuiview_window_plugin.la
 endif
 if HAVE_TVOS
-vout_LTLIBRARIES += libvout_ios_plugin.la libglinterop_cvpx_plugin.la
+vout_LTLIBRARIES += \
+	libvout_ios_plugin.la \
+	libglinterop_cvpx_plugin.la \
+	libuiview_window_plugin.la
 endif
 
 libglinterop_vaapi_plugin_la_SOURCES = video_output/opengl/interop_vaapi.c \

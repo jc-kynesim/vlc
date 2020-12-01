@@ -21,46 +21,44 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
+#include <stdatomic.h>
 #include <stdio.h>
 #include <vlc_common.h>
-#include <vlc_playlist.h>
+#include <vlc_list.h>
 
-struct intf_sys_t
+struct cli_client
 {
-    vlc_thread_t thread;
-    void *commands;
-    void *player_cli;
-
-    /* playlist */
-    vlc_playlist_t              *playlist;
-
-    vlc_mutex_t output_lock;
+    intf_thread_t *intf;
 #ifndef _WIN32
     FILE *stream;
     int fd;
-    char *psz_unix_path;
-#else
-    HANDLE hConsoleIn;
-    bool b_quiet;
-    int i_socket;
+    atomic_bool zombie;
+    vlc_mutex_t output_lock;
+    struct vlc_list node;
+    vlc_thread_t thread;
 #endif
-    int *pi_socket_listen;
 };
+
+VLC_FORMAT(2, 3)
+int cli_printf(struct cli_client *cl, const char *fmt, ...);
 
 VLC_FORMAT(2, 3)
 void msg_print(intf_thread_t *p_intf, const char *psz_fmt, ...);
 
-#define msg_rc(...) msg_print(p_intf, __VA_ARGS__)
+#define msg_rc(...) cli_printf(cl, __VA_ARGS__)
 #define STATUS_CHANGE "status change: "
+
+typedef int (*cli_callback)(struct cli_client *, const char *const *, size_t,
+                            void *);
 
 struct cli_handler
 {
     const char *name;
-    void (*callback)(intf_thread_t *intf, const char *const *, size_t);
+    cli_callback callback;
 };
 
 void RegisterHandlers(intf_thread_t *intf, const struct cli_handler *handlers,
-                      size_t count);
+                      size_t count, void *opaque);
 
 void *RegisterPlayer(intf_thread_t *intf);
 void DeregisterPlayer(intf_thread_t *intf, void *);

@@ -332,6 +332,33 @@ static void input_item_duration_changed( const vlc_event_t *p_event,
     libvlc_event_send( &p_md->event_manager, &event );
 }
 
+static void input_item_attachments_found( const vlc_event_t *p_event,
+                                                 void * user_data )
+{
+    libvlc_media_t * p_md = user_data;
+    libvlc_event_t event;
+
+    libvlc_picture_list_t* list = libvlc_picture_list_from_attachments(
+                p_event->u.input_item_attachments_found.attachments,
+                p_event->u.input_item_attachments_found.count );
+    if( !list )
+        return;
+    if( !libvlc_picture_list_count(list) )
+    {
+        libvlc_picture_list_destroy( list );
+        return;
+    }
+
+    /* Construct the event */
+    event.type = libvlc_MediaAttachedThumbnailsFound;
+    event.u.media_attached_thumbnails_found.thumbnails = list;
+
+    /* Send the event */
+    libvlc_event_send( &p_md->event_manager, &event );
+
+    libvlc_picture_list_destroy( list );
+}
+
 static void send_parsed_changed( libvlc_media_t *p_md,
                                  libvlc_media_parsed_status_t new_status )
 {
@@ -357,24 +384,21 @@ static void send_parsed_changed( libvlc_media_t *p_md,
 
     vlc_mutex_unlock( &p_md->parsed_lock );
 
-    if( new_status == libvlc_media_parsed_status_done )
-    {
-        libvlc_media_list_t *p_subitems = media_get_subitems( p_md, false );
-        if( p_subitems != NULL )
-        {
-            /* notify the media list */
-            libvlc_media_list_lock( p_subitems );
-            libvlc_media_list_internal_end_reached( p_subitems );
-            libvlc_media_list_unlock( p_subitems );
-        }
-    }
-
     /* Construct the event */
     event.type = libvlc_MediaParsedChanged;
     event.u.media_parsed_changed.new_status = new_status;
 
     /* Send the event */
     libvlc_event_send( &p_md->event_manager, &event );
+
+    libvlc_media_list_t *p_subitems = media_get_subitems( p_md, false );
+    if( p_subitems != NULL )
+    {
+        /* notify the media list */
+        libvlc_media_list_lock( p_subitems );
+        libvlc_media_list_internal_end_reached( p_subitems );
+        libvlc_media_list_unlock( p_subitems );
+    }
 }
 
 /**
@@ -407,6 +431,7 @@ static void input_item_preparse_ended(input_item_t *item,
             return;
     }
     send_parsed_changed( p_md, new_status );
+    libvlc_media_release( p_md );
 }
 
 /**
@@ -423,6 +448,10 @@ static void install_input_item_observer( libvlc_media_t *p_md )
                       vlc_InputItemDurationChanged,
                       input_item_duration_changed,
                       p_md );
+    vlc_event_attach( &p_md->p_input_item->event_manager,
+                      vlc_InputItemAttachmentsFound,
+                      input_item_attachments_found,
+                      p_md );
 }
 
 /**
@@ -438,6 +467,10 @@ static void uninstall_input_item_observer( libvlc_media_t *p_md )
     vlc_event_detach( &p_md->p_input_item->event_manager,
                       vlc_InputItemDurationChanged,
                       input_item_duration_changed,
+                      p_md );
+    vlc_event_detach( &p_md->p_input_item->event_manager,
+                      vlc_InputItemAttachmentsFound,
+                      input_item_attachments_found,
                       p_md );
 }
 
@@ -838,11 +871,15 @@ static int media_parse(libvlc_media_t *media, bool b_async,
         if (parse_flag & libvlc_media_do_interact)
             parse_scope |= META_REQUEST_OPTION_DO_INTERACT;
 
+        libvlc_media_retain(media);
         ret = libvlc_MetadataRequest(libvlc, item, parse_scope,
                                      &input_preparser_callbacks, media,
                                      timeout, media);
         if (ret != VLC_SUCCESS)
+        {
+            libvlc_media_release(media);
             return ret;
+        }
     }
     else
         return VLC_EGENERIC;

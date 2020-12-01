@@ -80,24 +80,8 @@ uint64_t DefaultBufferingLogic::getStartSegmentNumber(BaseRepresentation *rep) c
     if(rep->getPlaylist()->isLive())
         return getLiveStartSegmentNumber(rep);
 
-    const MediaSegmentTemplate *segmentTemplate = rep->inheritSegmentTemplate();
-    if(segmentTemplate)
-    {
-        const SegmentTimeline *timeline = segmentTemplate->inheritSegmentTimeline();
-        if(timeline)
-            return timeline->minElementNumber();
-        return segmentTemplate->inheritStartNumber();
-    }
-
-    const SegmentList *list = rep->inheritSegmentList();
-    if(list)
-        return list->getStartIndex();
-
-    const SegmentBase *base = rep->inheritSegmentBase();
-    if(base)
-        return base->getSequenceNumber();
-
-    return 0;
+    const AbstractSegmentBaseType *profile = rep->inheritSegmentProfile();
+    return profile ? profile->getStartSegmentNumber() : 0;
 }
 
 vlc_tick_t DefaultBufferingLogic::getMinBuffering(const AbstractPlaylist *p) const
@@ -154,74 +138,84 @@ uint64_t DefaultBufferingLogic::getLiveStartSegmentNumber(BaseRepresentation *re
 
     SegmentList *segmentList = rep->inheritSegmentList();
     SegmentBase *segmentBase = rep->inheritSegmentBase();
-    MediaSegmentTemplate *mediaSegmentTemplate = rep->inheritSegmentTemplate();
+    SegmentTemplate *mediaSegmentTemplate = rep->inheritSegmentTemplate();
+
+    SegmentTimeline *timeline;
     if(mediaSegmentTemplate)
+        timeline = mediaSegmentTemplate->inheritSegmentTimeline();
+    else if(segmentList)
+        timeline = segmentList->inheritSegmentTimeline();
+    else
+        timeline = NULL;
+
+    if(timeline)
     {
         uint64_t start = 0;
-        const Timescale timescale = mediaSegmentTemplate->inheritTimescale();
+        const Timescale timescale = timeline->inheritTimescale();
 
-        const SegmentTimeline *timeline = mediaSegmentTemplate->inheritSegmentTimeline();
-        if(timeline)
+        uint64_t safeMinElementNumber = timeline->minElementNumber();
+        uint64_t safeMaxElementNumber = timeline->maxElementNumber();
+        stime_t safeedgetime, safestarttime, duration;
+        for(unsigned i=0; i<SAFETY_BUFFERING_EDGE_OFFSET; i++)
         {
-            uint64_t safeMinElementNumber = timeline->minElementNumber();
-            uint64_t safeMaxElementNumber = timeline->maxElementNumber();
-            stime_t safeedgetime, safestarttime, duration;
-            for(unsigned i=0; i<SAFETY_BUFFERING_EDGE_OFFSET; i++)
-            {
-                if(safeMinElementNumber == safeMaxElementNumber)
-                    break;
-                safeMaxElementNumber--;
-            }
-            bool b_ret = timeline->getScaledPlaybackTimeDurationBySegmentNumber(safeMaxElementNumber,
-                                                                                &safeedgetime, &duration);
-            if(unlikely(!b_ret))
-                return 0;
-            safeedgetime += duration - 1;
-
-            for(unsigned i=0; i<SAFETY_EXPURGING_OFFSET; i++)
-            {
-                if(safeMinElementNumber + 1 >= safeMaxElementNumber)
-                    break;
-                safeMinElementNumber++;
-            }
-            b_ret = timeline->getScaledPlaybackTimeDurationBySegmentNumber(safeMinElementNumber,
-                                                                           &safestarttime, &duration);
-            if(unlikely(!b_ret))
-                return 0;
-
-            if(playlist->timeShiftBufferDepth.Get())
-            {
-                stime_t edgetime;
-                bool b_ret = timeline->getScaledPlaybackTimeDurationBySegmentNumber(timeline->maxElementNumber(),
-                                                                                    &edgetime, &duration);
-                if(unlikely(!b_ret))
-                    return 0;
-                edgetime += duration - 1;
-                stime_t timeshiftdepth = timescale.ToScaled(playlist->timeShiftBufferDepth.Get());
-                if(safestarttime + timeshiftdepth < edgetime)
-                {
-                    safestarttime = edgetime - timeshiftdepth;
-                    safeMinElementNumber = timeline->getElementNumberByScaledPlaybackTime(safestarttime);
-                }
-            }
-            assert(safestarttime<=safeedgetime);
-
-            stime_t starttime;
-            if(safeedgetime - safestarttime > timescale.ToScaled(i_buffering))
-                starttime = safeedgetime - timescale.ToScaled(i_buffering);
-            else
-                starttime = safestarttime;
-
-            start = timeline->getElementNumberByScaledPlaybackTime(starttime);
-            assert(start >= timeline->minElementNumber());
-            assert(start >= safeMinElementNumber);
-            assert(start <= timeline->maxElementNumber());
-            assert(start <= safeMaxElementNumber);
-
-            return start;
+            if(safeMinElementNumber == safeMaxElementNumber)
+                break;
+            safeMaxElementNumber--;
         }
+        bool b_ret = timeline->getScaledPlaybackTimeDurationBySegmentNumber(safeMaxElementNumber,
+                                                                            &safeedgetime, &duration);
+        if(unlikely(!b_ret))
+            return 0;
+        safeedgetime += duration - 1;
+
+        for(unsigned i=0; i<SAFETY_EXPURGING_OFFSET; i++)
+        {
+            if(safeMinElementNumber + 1 >= safeMaxElementNumber)
+                break;
+            safeMinElementNumber++;
+        }
+        b_ret = timeline->getScaledPlaybackTimeDurationBySegmentNumber(safeMinElementNumber,
+                                                                       &safestarttime, &duration);
+        if(unlikely(!b_ret))
+            return 0;
+
+        if(playlist->timeShiftBufferDepth.Get())
+        {
+            stime_t edgetime;
+            bool b_ret = timeline->getScaledPlaybackTimeDurationBySegmentNumber(timeline->maxElementNumber(),
+                                                                                &edgetime, &duration);
+            if(unlikely(!b_ret))
+                return 0;
+            edgetime += duration - 1;
+            stime_t timeshiftdepth = timescale.ToScaled(playlist->timeShiftBufferDepth.Get());
+            if(safestarttime + timeshiftdepth < edgetime)
+            {
+                safestarttime = edgetime - timeshiftdepth;
+                safeMinElementNumber = timeline->getElementNumberByScaledPlaybackTime(safestarttime);
+            }
+        }
+        assert(safestarttime<=safeedgetime);
+
+        stime_t starttime;
+        if(safeedgetime - safestarttime > timescale.ToScaled(i_buffering))
+            starttime = safeedgetime - timescale.ToScaled(i_buffering);
+        else
+            starttime = safestarttime;
+
+        start = timeline->getElementNumberByScaledPlaybackTime(starttime);
+        assert(start >= timeline->minElementNumber());
+        assert(start >= safeMinElementNumber);
+        assert(start <= timeline->maxElementNumber());
+        assert(start <= safeMaxElementNumber);
+
+        return start;
+    }
+    else if(mediaSegmentTemplate)
+    {
         /* Else compute, current time and timeshiftdepth based */
-        else if(mediaSegmentTemplate->duration.Get())
+        uint64_t start = 0;
+        stime_t scaledduration = mediaSegmentTemplate->inheritDuration();
+        if(scaledduration)
         {
             /* Compute playback offset and effective finished segment from wall time */
             vlc_tick_t now = vlc_tick_from_sec(time(NULL));
@@ -231,7 +225,7 @@ uint64_t DefaultBufferingLogic::getLiveStartSegmentNumber(BaseRepresentation *re
             const Timescale timescale = mediaSegmentTemplate->inheritTimescale();
             if(!timescale)
                 return startnumber;
-            const vlc_tick_t duration = timescale.ToTime(mediaSegmentTemplate->inheritDuration());
+            const vlc_tick_t duration = timescale.ToTime(scaledduration);
             if(!duration)
                 return startnumber;
 
@@ -269,7 +263,7 @@ uint64_t DefaultBufferingLogic::getLiveStartSegmentNumber(BaseRepresentation *re
     else if (segmentList && !segmentList->getSegments().empty())
     {
         const Timescale timescale = segmentList->inheritTimescale();
-        const std::vector<ISegment *> list = segmentList->getSegments();
+        const std::vector<Segment *> &list = segmentList->getSegments();
         const ISegment *back = list.back();
 
         /* working around HLS discontinuities by using durations */
@@ -302,11 +296,14 @@ uint64_t DefaultBufferingLogic::getLiveStartSegmentNumber(BaseRepresentation *re
         uint64_t safeedgenumber = back->getSequenceNumber() -
                         std::min((uint64_t)list.size() - 1,
                                  (uint64_t)SAFETY_BUFFERING_EDGE_OFFSET);
-
         uint64_t safestartnumber = availableliststartnumber;
-        if(safeedgenumber > safestartnumber)
-            safestartnumber -= std::min(safeedgenumber-safestartnumber - 1,
-                                        (uint64_t)SAFETY_EXPURGING_OFFSET);
+
+        for(unsigned i=0; i<SAFETY_EXPURGING_OFFSET; i++)
+        {
+            if(safestartnumber + 1 >= safeedgenumber)
+                break;
+            safestartnumber++;
+        }
 
         stime_t maxbufferizable = 0;
         stime_t safeedgeduration = 0;
@@ -335,17 +332,19 @@ uint64_t DefaultBufferingLogic::getLiveStartSegmentNumber(BaseRepresentation *re
     }
     else if(segmentBase)
     {
-        const std::vector<ISegment *> list = segmentBase->subSegments();
+        const std::vector<Segment *> &list = segmentBase->subSegments();
         if(!list.empty())
             return segmentBase->getSequenceNumber();
 
         const Timescale timescale = rep->inheritTimescale();
-        const ISegment *back = list.back();
+        if(!timeline->isValid())
+            return std::numeric_limits<uint64_t>::max();
+        const Segment *back = list.back();
         const stime_t bufferingstart = back->startTime.Get() + back->duration.Get() -
                                        timescale.ToScaled(i_buffering);
 
-        uint64_t start;
-        if(!SegmentInfoCommon::getSegmentNumberByScaledTime(list, bufferingstart, &start))
+        uint64_t start = AbstractSegmentBaseType::findSegmentNumberByScaledTime(list, bufferingstart);
+        if(start == std::numeric_limits<uint64_t>::max())
             return list.front()->getSequenceNumber();
 
         if(segmentBase->getSequenceNumber() + SAFETY_BUFFERING_EDGE_OFFSET <= start)

@@ -107,6 +107,7 @@ typedef struct
     enum PixelFormat pix_fmt;
     int profile;
     int level;
+    vlc_video_context *vctx_out;
 
     // decoder output seen by lavc, regardless of texture padding
     unsigned decoder_width;
@@ -869,7 +870,7 @@ static int DecodeSidedata( decoder_t *p_dec, const AVFrame *frame, picture_t *p_
     else
         p_pic->format.multiview_mode = p_dec->fmt_out.video.multiview_mode;
 
-    if (format_changed && decoder_UpdateVideoFormat( p_dec ))
+    if (format_changed && decoder_UpdateVideoOutput( p_dec, p_sys->vctx_out ))
         return -1;
 
     const AVFrameSideData *p_avcc = av_frame_get_side_data( frame, AV_FRAME_DATA_A53_CC );
@@ -1312,7 +1313,11 @@ void EndVideoDec( vlc_object_t *obj )
     avcodec_free_context( &ctx );
 
     if( p_sys->p_va )
+    {
         vlc_va_Delete( p_sys->p_va );
+        vlc_video_context_Release( p_sys->vctx_out );
+        p_sys->vctx_out = NULL;
+    }
 
     free( p_sys );
 }
@@ -1612,6 +1617,8 @@ no_reuse:
         msg_Err(p_dec, "existing hardware acceleration cannot be reused");
         vlc_va_Delete(p_sys->p_va);
         p_sys->p_va = NULL;
+        vlc_video_context_Release( p_sys->vctx_out );
+        p_sys->vctx_out = NULL;
         p_context->hwaccel_context = NULL;
     }
 
@@ -1699,6 +1706,7 @@ no_reuse:
         }
 
         p_sys->p_va = va;
+        p_sys->vctx_out = vlc_video_context_Hold( vctx_out );
         p_sys->pix_fmt = hwfmt;
         vlc_mutex_unlock(&p_sys->lock);
         return hwfmt;

@@ -26,7 +26,7 @@ import QtQml.Models 2.11
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
 import "qrc:///menus/" as Menus
-
+import "qrc:///util/KeyHelper.js" as KeyHelper
 
 Widgets.NavigableFocusScope {
     id: root
@@ -41,16 +41,15 @@ Widgets.NavigableFocusScope {
     property int subSelectedIndex: 0
 
     signal itemClicked(int index)
-    signal subItemClicked(int index)
 
     property alias sortModel: sortControl.model
     property var contentModel
 
     property alias model: pLBannerSources.model
-    property alias subTabModel: localMenuGroup.model
     signal toogleMenu()
 
     property var extraLocalActions: undefined
+    property alias localMenuDelegate: localMenuGroup.sourceComponent
 
     // Triggered when the toogleView button is selected
     function toggleView () {
@@ -280,42 +279,85 @@ Widgets.NavigableFocusScope {
                     }
 
                     navigationParent: root
-                    navigationRightItem: localMenuGroup
+                    navigationRightItem: localMenuGroup.visible ? localMenuGroup : playlistGroup
                     navigationUpItem: globalMenuGroup
                 }
 
-                Widgets.NavigableRow {
-                    id: localMenuGroup
-                    anchors {
-                        top: parent.top
-                        bottom: parent.bottom
-                        horizontalCenter: parent.horizontalCenter
-                    }
+                Flickable {
+                    id: localMenuView
 
-                    visible: !!model
-                    enabled: !!model
-                    onVisibleChanged: {
-                        //reset the focus on the global group when the local group is hidden,
-                        //this avoids losing the focus if the subview changes
-                        if (!visible && localMenuGroup.focus) {
-                                        localMenuGroup.focus = false
-                                        globalMenuGroup.focus = true
+                    readonly property int availableWidth: parent.width
+                                                          - (localContextGroup.width + playlistGroup.width)
+                                                          - (VLCStyle.applicationHorizontalMargin * 2)
+                                                          - (VLCStyle.margin_xxsmall * 2)
+                    readonly property bool _alignHCenter: ((localToolbar.width - width) / 2) + width < playlistGroup.x
+
+                    width: Math.min(contentWidth, availableWidth)
+                    height: VLCStyle.localToolbar_height
+                    clip: true
+                    contentWidth: localMenuGroup.width
+                    contentHeight: VLCStyle.localToolbar_height // don't allow vertical flickering
+                    anchors.rightMargin: VLCStyle.margin_xxsmall // only applied when right aligned
+
+                    on_AlignHCenterChanged: {
+                        if (_alignHCenter) {
+                            anchors.horizontalCenter = localToolbar.horizontalCenter
+                            anchors.right = undefined
+                        } else {
+                            anchors.horizontalCenter = undefined
+                            anchors.right = playlistGroup.left
                         }
                     }
 
-                    delegate: Widgets.BannerTabButton {
-                        text: model.displayText
-                        selected: model.index === subSelectedIndex
-                        onClicked:  root.subItemClicked(model.index)
-                        height: localMenuGroup.height
-                        color: VLCStyle.colors.bg
-                        colorSelected: VLCStyle.colors.bg
-                    }
+                    Loader {
+                        id: localMenuGroup
 
-                    navigationParent: root
-                    navigationLeftItem: localContextGroup.enabled ? localContextGroup : undefined
-                    navigationRightItem: playlistGroup.enabled ? playlistGroup : undefined
-                    navigationUpItem:  globalMenuGroup
+                        focus: !!item && item.focus && item.visible
+                        visible: !!item
+                        y: (VLCStyle.localToolbar_height - item.height) / 2
+                        width: !!item
+                               ? clamp(localMenuView.availableWidth
+                                       , localMenuGroup.item.minimumWidth || localMenuGroup.item.implicitWidth
+                                       , localMenuGroup.item.maximumWidth || localMenuGroup.item.implicitWidth)
+                               : 0
+
+                        function clamp(num, min, max) {
+                          return num <= min ? min : num >= max ? max : num;
+                        }
+
+                        onVisibleChanged: {
+                            //reset the focus on the global group when the local group is hidden,
+                            //this avoids losing the focus if the subview changes
+                            if (!visible && localMenuGroup.focus) {
+                                localMenuGroup.focus = false
+                                globalMenuGroup.focus = true
+                            }
+                        }
+
+                        onItemChanged: {
+                            if (!item)
+                                return
+                            if (item.hasOwnProperty("navigationParent")) {
+                                item.navigationParent = root
+                                item.navigationLeftItem = localContextGroup.enabled ? localContextGroup : undefined
+                                item.navigationRightItem = playlistGroup.enabled ? playlistGroup : undefined
+                                item.navigationUpItem = globalMenuGroup
+                            } else {
+                                item.KeyNavigation.left = localContextGroup.enabled ? localContextGroup : undefined
+                                item.KeyNavigation.right = playlistGroup.enabled ? playlistGroup : undefined
+                                item.KeyNavigation.up = globalMenuGroup
+                                item.Keys.pressed.connect(function (event) {
+                                    if (event.accepted)
+                                        return
+                                    if (KeyHelper.matchDown(event)) {
+                                        root.navigationDown()
+                                        event.accepted = true
+                                    }
+                                })
+                            }
+                        }
+
+                    }
                 }
 
                 Widgets.NavigableRow {
@@ -368,7 +410,7 @@ Widgets.NavigableFocusScope {
                     }
 
                     navigationParent: root
-                    navigationLeftItem: localMenuGroup
+                    navigationLeftItem: localMenuGroup.visible ? localMenuGroup : localContextGroup
                     navigationUpItem: globalMenuGroup
                 }
             }

@@ -175,7 +175,11 @@ static int Open( vlc_object_t * p_this )
         return VLC_EGENERIC;
     }
 
-    p_sys->packet_sys.p_demux = p_demux;
+    p_sys->packet_sys.priv = p_demux;
+    p_sys->packet_sys.s = p_demux->s;
+    p_sys->packet_sys.logger = p_demux->obj.logger;
+    p_sys->packet_sys.b_deduplicate = false;
+    p_sys->packet_sys.b_can_hold_multiple_packets = false;
     p_sys->packet_sys.pf_doskip = Packet_DoSkip;
     p_sys->packet_sys.pf_send = Packet_Enqueue;
     p_sys->packet_sys.pf_gettrackinfo = Packet_GetTrackInfo;
@@ -571,7 +575,7 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
 static void Packet_SetAR( asf_packet_sys_t *p_packetsys, uint8_t i_stream_number,
                           uint8_t i_ratio_x, uint8_t i_ratio_y )
 {
-    demux_t *p_demux = p_packetsys->p_demux;
+    demux_t *p_demux = p_packetsys->priv;
     demux_sys_t *p_sys = p_demux->p_sys;
     asf_track_t *tk = p_sys->track[i_stream_number];
 
@@ -586,7 +590,7 @@ static void Packet_SetAR( asf_packet_sys_t *p_packetsys, uint8_t i_stream_number
 
 static void Packet_SetSendTime( asf_packet_sys_t *p_packetsys, vlc_tick_t i_time )
 {
-    demux_t *p_demux = p_packetsys->p_demux;
+    demux_t *p_demux = p_packetsys->priv;
     demux_sys_t *p_sys = p_demux->p_sys;
 
     p_sys->i_sendtime = VLC_TICK_0 + i_time;
@@ -595,7 +599,7 @@ static void Packet_SetSendTime( asf_packet_sys_t *p_packetsys, vlc_tick_t i_time
 static void Packet_UpdateTime( asf_packet_sys_t *p_packetsys, uint8_t i_stream_number,
                                vlc_tick_t i_time )
 {
-    demux_t *p_demux = p_packetsys->p_demux;
+    demux_t *p_demux = p_packetsys->priv;
     demux_sys_t *p_sys = p_demux->p_sys;
     asf_track_t *tk = p_sys->track[i_stream_number];
 
@@ -606,7 +610,7 @@ static void Packet_UpdateTime( asf_packet_sys_t *p_packetsys, uint8_t i_stream_n
 static asf_track_info_t * Packet_GetTrackInfo( asf_packet_sys_t *p_packetsys,
                                                uint8_t i_stream_number )
 {
-    demux_t *p_demux = p_packetsys->p_demux;
+    demux_t *p_demux = p_packetsys->priv;
     demux_sys_t *p_sys = p_demux->p_sys;
     asf_track_t *tk = p_sys->track[i_stream_number];
 
@@ -618,7 +622,7 @@ static asf_track_info_t * Packet_GetTrackInfo( asf_packet_sys_t *p_packetsys,
 
 static bool Packet_DoSkip( asf_packet_sys_t *p_packetsys, uint8_t i_stream_number, bool b_packet_keyframe )
 {
-    demux_t *p_demux = p_packetsys->p_demux;
+    demux_t *p_demux = p_packetsys->priv;
     demux_sys_t *p_sys = p_demux->p_sys;
     const asf_track_t *tk = p_sys->track[i_stream_number];
 
@@ -652,7 +656,7 @@ static bool Packet_DoSkip( asf_packet_sys_t *p_packetsys, uint8_t i_stream_numbe
 
 static void Packet_Enqueue( asf_packet_sys_t *p_packetsys, uint8_t i_stream_number, block_t **pp_frame )
 {
-    demux_t *p_demux = p_packetsys->p_demux;
+    demux_t *p_demux = p_packetsys->priv;
     demux_sys_t *p_sys = p_demux->p_sys;
     asf_track_t *tk = p_sys->track[i_stream_number];
     if ( !tk )
@@ -898,14 +902,14 @@ static int DemuxInit( demux_t *p_demux )
             goto error;
         memset( tk, 0, sizeof( asf_track_t ) );
 
+        ASFPacketTrackInit( &tk->info );
         tk->i_time = VLC_TICK_INVALID;
         tk->info.p_sp = p_sp;
         tk->p_es = NULL;
-        tk->info.p_esp = NULL;
-        tk->info.p_frame = NULL;
-        tk->info.i_cat = UNKNOWN_ES;
         tk->queue.p_first = NULL;
         tk->queue.pp_last = &tk->queue.p_first;
+        tk->info.i_pkt = 0;
+        tk->info.i_pktcount = 0;
 
         if ( !b_mms )
         {
@@ -1358,6 +1362,7 @@ static int DemuxInit( demux_t *p_demux )
 
     p_sys->packet_sys.pi_preroll = &p_sys->p_fp->i_preroll;
     p_sys->packet_sys.pi_preroll_start = &p_sys->i_preroll_start;
+    p_sys->packet_sys.b_can_hold_multiple_packets = false;
 
     return VLC_SUCCESS;
 
@@ -1371,11 +1376,7 @@ error:
  *****************************************************************************/
 static void FlushQueue( asf_track_t *tk )
 {
-    if( tk->info.p_frame )
-    {
-        block_ChainRelease( tk->info.p_frame );
-        tk->info.p_frame = NULL;
-    }
+    ASFPacketTrackReset( &tk->info );
     if( tk->queue.p_first )
     {
         block_ChainRelease( tk->queue.p_first );

@@ -296,7 +296,7 @@ SegmentChunk * SegmentTracker::getNextChunk(bool switch_allowed,
     if(!current.init_sent)
     {
         ++next;
-        segment = current.rep->getSegment(BaseRepresentation::INFOTYPE_INIT);
+        segment = current.rep->getInitSegment();
         if(segment)
             return segment->toChunk(resources, connManager, current.number, current.rep);
         current = next;
@@ -305,15 +305,17 @@ SegmentChunk * SegmentTracker::getNextChunk(bool switch_allowed,
     if(!current.index_sent)
     {
         ++next;
-        segment = current.rep->getSegment(BaseRepresentation::INFOTYPE_INDEX);
-        if(segment)
-            return segment->toChunk(resources, connManager, current.number, current.rep);
+        if(current.rep->needsIndex())
+        {
+            segment = current.rep->getIndexSegment();
+            if(segment)
+                return segment->toChunk(resources, connManager, current.number, current.rep);
+        }
         current = next;
     }
 
     bool b_gap = false;
-    segment = current.rep->getNextSegment(BaseRepresentation::INFOTYPE_MEDIA,
-                                          current.number, &current.number, &b_gap);
+    segment = current.rep->getNextMediaSegment(current.number, &current.number, &b_gap);
     if(!segment)
         return NULL;
     if(b_gap)

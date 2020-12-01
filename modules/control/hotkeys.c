@@ -223,8 +223,8 @@ INTF_ACTION_HANDLER(PlaylistBookmark)
 {
     bool set = action_id >= ACTIONID_SET_BOOKMARK1 &&
                action_id <= ACTIONID_SET_BOOKMARK10;
-    int id = set ? ACTIONID_SET_BOOKMARK1 : ACTIONID_PLAY_BOOKMARK1;
-    id -= action_id - 1;
+    int id = (set ? 1 - ACTIONID_SET_BOOKMARK1 : 1 - ACTIONID_PLAY_BOOKMARK1);
+    id += action_id;
     char *bookmark_name;
     if (asprintf(&bookmark_name, "bookmark%i", id) == -1)
         return;
@@ -1268,6 +1268,11 @@ Close(vlc_object_t *this)
     free(sys);
 }
 
+static void AutoRun(libvlc_int_t *libvlc)
+{
+    intf_Create(libvlc, MODULE_STRING);
+}
+
 vlc_module_begin ()
     set_shortname(N_("Hotkeys"))
     set_description(N_("Hotkeys management interface"))
@@ -1275,4 +1280,8 @@ vlc_module_begin ()
     set_callbacks(Open, Close)
     set_category(CAT_INTERFACE)
     set_subcategory(SUBCAT_INTERFACE_HOTKEYS)
+
+    add_submodule()
+    set_capability("autorun", 20)
+    set_callback(AutoRun)
 vlc_module_end ()

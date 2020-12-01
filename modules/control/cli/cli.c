@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <math.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #ifdef HAVE_WORDEXP_H
@@ -63,57 +64,32 @@
 
 #include "cli.h"
 
+struct intf_sys_t
+{
+    vlc_thread_t thread;
+    void *commands;
+    void *player_cli;
+
+#ifndef _WIN32
+    vlc_mutex_t clients_lock;
+    struct vlc_list clients;
+#else
+    HANDLE hConsoleIn;
+    bool b_quiet;
+    int i_socket;
+#endif
+    int *pi_socket_listen;
+};
+
 #define MAX_LINE_LENGTH 1024
 
-static void msg_vprint(intf_thread_t *p_intf, const char *psz_fmt, va_list args)
-{
-#ifndef _WIN32
-    intf_sys_t *sys = p_intf->p_sys;
-    int fd;
-
-    vlc_mutex_lock(&sys->output_lock);
-    fd = sys->fd;
-    if (fd != -1)
-    {
-        char *msg;
-        int len = vasprintf(&msg, psz_fmt, args);
-
-        if (unlikely(len < 0))
-            return;
-
-        struct iovec iov[2] = { { msg, len }, { (char *)"\n", 1 } };
-
-        vlc_writev(sys->fd, iov, ARRAY_SIZE(iov));
-        free(msg);
-    }
-    vlc_mutex_unlock(&sys->output_lock);
-#else
-    char fmt_eol[strlen (psz_fmt) + 3], *msg;
-    int len;
-
-    snprintf (fmt_eol, sizeof (fmt_eol), "%s\r\n", psz_fmt);
-    len = vasprintf( &msg, fmt_eol, args );
-
-    if( len < 0 )
-        return;
-
-    if( p_intf->p_sys->i_socket == -1 )
-        utf8_fprintf( stdout, "%s", msg );
-    else
-        net_Write( p_intf, p_intf->p_sys->i_socket, msg, len );
-
-    free( msg );
-#endif
-}
-
-void msg_print(intf_thread_t *intf, const char *fmt, ...)
-{
-    va_list ap;
-
-    va_start(ap, fmt);
-    msg_vprint(intf, fmt, ap);
-    va_end(ap);
-}
+struct command {
+    union {
+        const char *name;
+        struct cli_handler handler;
+    };
+    void *data;
+};
 
 static int cmdcmp(const void *a, const void *b)
 {
@@ -124,29 +100,32 @@ static int cmdcmp(const void *a, const void *b)
 }
 
 void RegisterHandlers(intf_thread_t *intf, const struct cli_handler *handlers,
-                      size_t count)
+                      size_t count, void *opaque)
 {
     intf_sys_t *sys = intf->p_sys;
 
     for (size_t i = 0; i < count; i++)
     {
-        const char *const *name = &handlers[i].name;
-        const char *const **pp;
+        struct command *cmd = malloc(sizeof (*cmd));
+        if (unlikely(cmd == NULL))
+            break;
 
-        pp = tsearch(name, &sys->commands, cmdcmp);
+        cmd->handler = handlers[i];
+        cmd->data = opaque;
 
+        struct command **pp = tsearch(&cmd->name, &sys->commands, cmdcmp);
         if (unlikely(pp == NULL))
+        {
+            free(cmd);
             continue;
+        }
 
-        assert(*pp == name); /* Fails if duplicate command */
+        assert(*pp == cmd); /* Fails if duplicate command */
     }
 }
 
-#if defined (_WIN32) && !VLC_WINSTORE_APP
-# include "../intromsg.h"
-#endif
-
-static void Help( intf_thread_t *p_intf, const char *const *args, size_t count)
+static int Help(struct cli_client *cl, const char *const *args, size_t count,
+                void *data)
 {
     msg_rc("%s", _("+----[ Remote control commands ]"));
     msg_rc(  "| ");
@@ -206,48 +185,56 @@ static void Help( intf_thread_t *p_intf, const char *const *args, size_t count)
     msg_rc("%s", _("| quit . . . . . . . . . . . . . . . . . . .  quit vlc"));
     msg_rc(  "| ");
     msg_rc("%s", _("+----[ end of help ]"));
-    (void) args; (void) count;
+    (void) args; (void) count; (void) data;
+    return 0;
 }
 
-static void Intf(intf_thread_t *intf, const char *const *args, size_t count)
+static int Intf(struct cli_client *cl, const char *const *args, size_t count,
+                void *data)
 {
-    intf_Create(vlc_object_instance(intf), count == 1 ? "" : args[1]);
+    intf_thread_t *intf = data;
+
+    (void) cl;
+
+    return intf_Create(vlc_object_instance(intf), count == 1 ? "" : args[1]);
 }
 
-static void Quit(intf_thread_t *intf, const char *const *args, size_t count)
+static int Quit(struct cli_client *cl, const char *const *args, size_t count,
+                void *data)
 {
+    intf_thread_t *intf = data;
+
     libvlc_Quit(vlc_object_instance(intf));
-    (void) args; (void) count;
+    (void) cl; (void) args; (void) count;
+    return 0;
 }
 
-static void LogOut(intf_thread_t *intf, const char *const *args, size_t count)
+static int LogOut(struct cli_client *cl, const char *const *args, size_t count,
+                  void *data)
 {
-    intf_sys_t *sys = intf->p_sys;
-
     /* Close connection */
 #ifndef _WIN32
-    if (sys->pi_socket_listen != NULL)
-    {
-        vlc_mutex_lock(&sys->output_lock);
-        sys->fd = -1;
-        vlc_mutex_unlock(&sys->output_lock);
-        fclose(sys->stream);
-        sys->stream = NULL;
+    /* Force end-of-file on the file descriptor. */
+    int fd = vlc_open("/dev/null", O_RDONLY);
+    if (fd != -1)
+    {   /* POSIX requires flushing before, and seeking after, replacing a
+         * file descriptor underneath an I/O stream.
+         */
+        int fd2 = fileno(cl->stream);
+
+        fflush(cl->stream);
+        if (fd2 != 1)
+            vlc_dup2(fd, fd2);
+        else
+            dup2(fd, fd2);
+        fseek(cl->stream, 0, SEEK_SET);
+        vlc_close(fd);
     }
-    else
-    {   /* Force end-of-file on the standard input. */
-        int fd = vlc_open("/dev/null", O_RDONLY);
-        if (fd != -1)
-        {   /* POSIX requires flushing before, and seeking after, replacing a
-             * file descriptor underneath an I/O stream.
-             */
-            fflush(sys->stream);
-            dup2(fd, 0 /* fileno(sys->stream) */);
-            fseek(sys->stream, 0, SEEK_SET);
-            vlc_close(fd);
-        }
-    }
+    (void) data;
 #else
+    intf_thread_t *intf = data;
+    intf_sys_t *sys = intf->p_sys;
+
     if (sys->i_socket != -1)
     {
         net_Close(sys->i_socket);
@@ -255,14 +242,21 @@ static void LogOut(intf_thread_t *intf, const char *const *args, size_t count)
     }
 #endif
     (void) args; (void) count;
+    return 0;
 }
 
-static void KeyAction(intf_thread_t *intf, const char *const *args, size_t n)
+static int KeyAction(struct cli_client *cl, const char *const *args, size_t n,
+                     void *data)
 {
+    intf_thread_t *intf = data;
     vlc_object_t *vlc = VLC_OBJECT(vlc_object_instance(intf));
 
-    if (n > 1)
-        var_SetInteger(vlc, "key-action", vlc_actions_get_id(args[1]));
+    if (n != 2)
+        return VLC_EGENERIC; /* EINVAL */
+
+    var_SetInteger(vlc, "key-action", vlc_actions_get_id(args[1]));
+    (void) cl;
+    return 0;
 }
 
 static const struct cli_handler cmds[] =
@@ -280,21 +274,15 @@ static const struct cli_handler cmds[] =
     { "hotkey", KeyAction },
 };
 
-static void UnknownCmd(intf_thread_t *intf, const char *const *args,
-                       size_t count)
-{
-    msg_print(intf, _("Unknown command `%s'. Type `help' for help."), args[0]);
-    (void) count;
-}
-
-static void Process(intf_thread_t *intf, const char *line)
+static int Process(intf_thread_t *intf, struct cli_client *cl, const char *line)
 {
     intf_sys_t *sys = intf->p_sys;
     /* Skip heading spaces */
     const char *cmd = line + strspn(line, " ");
+    int ret;
 
     if (*cmd == '\0')
-        return; /* Ignore empty line */
+        return 0; /* Ignore empty line */
 
 #ifdef HAVE_WORDEXP
     wordexp_t we;
@@ -303,15 +291,24 @@ static void Process(intf_thread_t *intf, const char *line)
     if (val != 0)
     {
         if (val == WRDE_NOSPACE)
+        {
+            ret = VLC_ENOMEM;
 error:      wordfree(&we);
-        msg_print(intf, N_("parse error"));
-        return;
+        }
+        else
+            ret = VLC_EGENERIC;
+
+        cli_printf(cl, N_("parse error"));
+        return ret;
     }
 
     size_t count = we.we_wordc;
     const char **args = vlc_alloc(count, sizeof (*args));
     if (unlikely(args == NULL))
+    {
+        ret = VLC_ENOMEM;
         goto error;
+    }
 
     for (size_t i = 0; i < we.we_wordc; i++)
         args[i] = we.we_wordv[i];
@@ -334,76 +331,254 @@ error:      wordfree(&we);
 
     if (count > 0)
     {
-        void (*cb)(intf_thread_t *, const char *const *, size_t) = UnknownCmd;
-        const struct cli_handler **h = tfind(&args[0], &sys->commands, cmdcmp);
+        const struct command **pp = tfind(&args[0], &sys->commands, cmdcmp);
 
-        if (h != NULL)
-            cb = (*h)->callback;
+        if (pp != NULL)
+        {
+            const struct command *c = *pp;;
 
-        cb(intf, args, count);
+            ret = c->handler.callback(cl, args, count, c->data);
+        }
+        else
+        {
+            cli_printf(cl, _("Unknown command `%s'. Type `help' for help."),
+                      args[0]);
+            ret = VLC_EGENERIC;
+        }
     }
 
 #ifdef HAVE_WORDEXP
     free(args);
     wordfree(&we);
 #endif
+    return ret;
 }
 
 #ifndef _WIN32
+static ssize_t cli_writev(struct cli_client *cl,
+                          const struct iovec *iov, unsigned iovlen)
+{
+    ssize_t val;
+
+    vlc_mutex_lock(&cl->output_lock);
+    if (cl->fd != -1)
+        val = vlc_writev(cl->fd, iov, iovlen);
+    else
+        errno = EPIPE, val = -1;
+    vlc_mutex_unlock(&cl->output_lock);
+    return val;
+}
+
+static int cli_vprintf(struct cli_client *cl, const char *fmt, va_list args)
+{
+    char *msg;
+    int len = vasprintf(&msg, fmt, args);
+
+    if (likely(len >= 0))
+    {
+        struct iovec iov[2] = { { msg, len }, { (char *)"\n", 1 } };
+
+        cli_writev(cl, iov, ARRAY_SIZE(iov));
+        len++;
+        free(msg);
+    }
+    return len;
+}
+
+int cli_printf(struct cli_client *cl, const char *fmt, ...)
+{
+    va_list ap;
+    int len;
+
+    va_start(ap, fmt);
+    len = cli_vprintf(cl, fmt, ap);
+    va_end(ap);
+    return len;
+}
+
+static void msg_vprint(intf_thread_t *p_intf, const char *fmt, va_list args)
+{
+    intf_sys_t *sys = p_intf->p_sys;
+    struct cli_client *cl;
+
+    vlc_mutex_lock(&sys->clients_lock);
+    vlc_list_foreach (cl, &sys->clients, node)
+        cli_vprintf(cl, fmt, args);
+    vlc_mutex_unlock(&sys->clients_lock);
+}
+
+void msg_print(intf_thread_t *intf, const char *fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    msg_vprint(intf, fmt, ap);
+    va_end(ap);
+}
+
+static void *cli_client_thread(void *data)
+{
+    struct cli_client *cl = data;
+    intf_thread_t *intf = cl->intf;
+    char cmd[MAX_LINE_LENGTH + 1];
+
+    while (fgets(cmd, sizeof (cmd), cl->stream) != NULL)
+    {
+        int canc = vlc_savecancel();
+        if (cmd[0] != '\0')
+            cmd[strlen(cmd) - 1] = '\0'; /* remove trailing LF */
+        Process(intf, cl, cmd);
+        vlc_restorecancel(canc);
+    }
+
+    if (cl->stream == stdin)
+    {
+        int canc = vlc_savecancel();
+        libvlc_Quit(vlc_object_instance(intf));
+        vlc_restorecancel(canc);
+    }
+
+    atomic_store_explicit(&cl->zombie, true, memory_order_release);
+    return NULL;
+}
+
+static struct cli_client *cli_client_new(intf_thread_t *intf, int fd,
+                                         FILE *stream)
+{
+    struct cli_client *cl = malloc(sizeof (*cl));
+    if (unlikely(cl == NULL))
+        return NULL;
+
+    cl->stream = stream;
+    cl->fd = fd;
+    atomic_init(&cl->zombie, false);
+    cl->intf = intf;
+    vlc_mutex_init(&cl->output_lock);
+
+    if (vlc_clone(&cl->thread, cli_client_thread, cl, VLC_THREAD_PRIORITY_LOW))
+    {
+        free(cl);
+        cl = NULL;
+    }
+    return cl;
+}
+
+/**
+ * Creates a client from a file descriptor.
+ *
+ * This works with (pseudo-)terminals, stream sockets, serial ports, etc.
+ */
+static struct cli_client *cli_client_new_fd(intf_thread_t *intf, int fd)
+{
+    fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) & ~O_NONBLOCK);
+
+    FILE *stream = fdopen(fd, "r");
+    if (stream == NULL)
+    {
+        vlc_close(fd);
+        return NULL;
+    }
+
+    struct cli_client *cl = cli_client_new(intf, fd, stream);
+    if (unlikely(cl == NULL))
+        fclose(stream);
+    return cl;
+}
+
+/**
+ * Creates a client from the standard input and output.
+ */
+static struct cli_client *cli_client_new_std(intf_thread_t *intf)
+{
+    return cli_client_new(intf, 1, stdin);
+}
+
+static void cli_client_delete(struct cli_client *cl)
+{
+    vlc_cancel(cl->thread);
+    vlc_join(cl->thread, NULL);
+
+    if (cl->stream != stdin)
+        fclose(cl->stream);
+    free(cl);
+}
+
 static void *Run(void *data)
 {
     intf_thread_t *intf = data;
     intf_sys_t *sys = intf->p_sys;
 
+    assert(sys->pi_socket_listen != NULL);
+
     for (;;)
     {
-        char buf[MAX_LINE_LENGTH + 1];
+        int fd = net_Accept(intf, sys->pi_socket_listen);
+        if (fd == -1)
+            continue;
 
-        while (sys->stream == NULL)
+        int canc = vlc_savecancel();
+        struct cli_client *cl = cli_client_new_fd(intf, fd);
+
+        if (cl != NULL)
         {
-            assert(sys->pi_socket_listen != NULL);
+            vlc_mutex_lock(&sys->clients_lock);
+            vlc_list_append(&cl->node, &sys->clients);
+            vlc_mutex_unlock(&sys->clients_lock);
+        }
 
-            int fd = net_Accept(intf, sys->pi_socket_listen);
-            if (fd == -1)
-                continue;
-
-            int canc = vlc_savecancel();
-
-            fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) & ~O_NONBLOCK);
-            sys->stream = fdopen(fd, "r");
-            if (sys->stream != NULL)
+        /* Reap any dead client */
+        vlc_list_foreach (cl, &sys->clients, node)
+            if (atomic_load_explicit(&cl->zombie, memory_order_acquire))
             {
-                vlc_mutex_lock(&sys->output_lock);
-                sys->fd = fd;
-                vlc_mutex_unlock(&sys->output_lock);
+                vlc_mutex_lock(&sys->clients_lock);
+                vlc_list_remove(&cl->node);
+                vlc_mutex_unlock(&sys->clients_lock);
+                cli_client_delete(cl);
             }
-            else
-                vlc_close(fd);
-            vlc_restorecancel(canc);
-        }
 
-        char *cmd = fgets(buf, sizeof (buf), sys->stream);
-        if (cmd != NULL)
-        {
-            int canc = vlc_savecancel();
-            if (cmd[0] != '\0')
-                cmd[strlen(cmd) - 1] = '\0'; /* remove trailing LF */
-            Process(intf, cmd);
-            vlc_restorecancel(canc);
-        }
-        else if (sys->pi_socket_listen == NULL)
-            break;
-        else
-            LogOut(intf, NULL, 0);
+        vlc_restorecancel(canc);
     }
-
-    int canc = vlc_savecancel();
-    libvlc_Quit(vlc_object_instance(intf));
-    vlc_restorecancel(canc);
-    return NULL;
 }
 
 #else
+static void msg_vprint(intf_thread_t *p_intf, const char *psz_fmt, va_list args)
+{
+    char fmt_eol[strlen (psz_fmt) + 3], *msg;
+    int len;
+
+    snprintf (fmt_eol, sizeof (fmt_eol), "%s\r\n", psz_fmt);
+    len = vasprintf( &msg, fmt_eol, args );
+
+    if( len < 0 )
+        return;
+
+    if( p_intf->p_sys->i_socket == -1 )
+        utf8_fprintf( stdout, "%s", msg );
+    else
+        net_Write( p_intf, p_intf->p_sys->i_socket, msg, len );
+
+    free( msg );
+}
+
+void msg_print(intf_thread_t *intf, const char *fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    msg_vprint(intf, fmt, ap);
+    va_end(ap);
+}
+
+int cli_printf(struct cli_client *cl, const char *fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    msg_vprint(cl->intf, fmt, ap);
+    va_end(ap);
+    return VLC_SUCCESS;
+}
+
 #if !VLC_WINSTORE_APP
 static bool ReadWin32( intf_thread_t *p_intf, unsigned char *p_buffer, int *pi_size )
 {
@@ -588,7 +763,9 @@ static void *Run( void *data )
         /* Is there something to do? */
         if( !b_complete ) continue;
 
-        Process(p_intf, p_buffer);
+        struct cli_client cl = { p_intf };
+
+        Process(p_intf, &cl, p_buffer);
 
         /* Command processed */
         i_size = 0; p_buffer[0] = 0;
@@ -596,6 +773,10 @@ static void *Run( void *data )
 
     vlc_assert_unreachable();
 }
+
+#undef msg_rc
+#define msg_rc(...)  msg_print(p_intf, __VA_ARGS__)
+#include "../intromsg.h"
 #endif
 
 /*****************************************************************************
@@ -603,84 +784,90 @@ static void *Run( void *data )
  *****************************************************************************/
 static int Activate( vlc_object_t *p_this )
 {
-    /* FIXME: This function is full of memory leaks and bugs in error paths. */
     intf_thread_t *p_intf = (intf_thread_t*)p_this;
-    char *psz_host, *psz_unix_path = NULL;
+    struct cli_client *cl;
+    char *psz_host;
     int  *pi_socket = NULL;
 
+    intf_sys_t *p_sys = vlc_obj_malloc(p_this, sizeof (*p_sys));
+    if (unlikely(p_sys == NULL))
+        return VLC_ENOMEM;
+
+    p_intf->p_sys = p_sys;
+    p_sys->commands = NULL;
 #ifndef _WIN32
-#if defined(HAVE_ISATTY)
-    /* Check that stdin is a TTY */
-    if( !var_InheritBool( p_intf, "rc-fake-tty" ) && !isatty( 0 ) )
-    {
-        msg_Warn( p_intf, "fd 0 is not a TTY" );
-        return VLC_EGENERIC;
-    }
+    vlc_mutex_init(&p_sys->clients_lock);
+    vlc_list_init(&p_sys->clients);
 #endif
+    RegisterHandlers(p_intf, cmds, ARRAY_SIZE(cmds), p_intf);
+
+    p_sys->player_cli = RegisterPlayer(p_intf);
+    if (unlikely(p_sys->player_cli == NULL))
+        goto error;
+
+    RegisterPlaylist(p_intf);
+
+#ifndef _WIN32
+# ifndef HAVE_ISATTY
+#  define isatty(fd) (fd, 0)
+# endif
+    /* Start CLI on the standard input if it is an actual console */
+    if (isatty(fileno(stdin)) || var_InheritBool(p_intf, "rc-fake-tty"))
+    {
+        cl = cli_client_new_std(p_intf);
+        if (cl == NULL)
+            goto error;
+        vlc_list_append(&cl->node, &p_sys->clients);
+    }
+
 #ifdef AF_LOCAL
-    psz_unix_path = var_InheritString( p_intf, "rc-unix" );
+    char *psz_unix_path = var_InheritString(p_intf, "rc-unix");
     if( psz_unix_path )
     {
         int i_socket;
-        struct sockaddr_un addr;
-
-        memset( &addr, 0, sizeof(struct sockaddr_un) );
+        struct sockaddr_un addr = { .sun_family = AF_LOCAL };
+        struct stat st;
 
         msg_Dbg( p_intf, "trying UNIX socket" );
 
         /* The given unix path cannot be longer than sun_path - 1 to take into
          * account the terminated null character. */
-        if ( strlen(psz_unix_path) + 1 >= sizeof( addr.sun_path ) )
+        size_t len = strlen(psz_unix_path);
+        if (len >= sizeof (addr.sun_path))
         {
             msg_Err( p_intf, "rc-unix value is longer than expected" );
-            return VLC_EGENERIC;
+            goto error;
         }
+        memcpy(addr.sun_path, psz_unix_path, len + 1);
+        free(psz_unix_path);
 
         if( (i_socket = vlc_socket( PF_LOCAL, SOCK_STREAM, 0, false ) ) < 0 )
         {
             msg_Warn( p_intf, "can't open socket: %s", vlc_strerror_c(errno) );
-            free( psz_unix_path );
-            return VLC_EGENERIC;
+            goto error;
         }
 
-        addr.sun_family = AF_LOCAL;
-        strncpy( addr.sun_path, psz_unix_path, sizeof( addr.sun_path ) - 1 );
-        addr.sun_path[sizeof( addr.sun_path ) - 1] = '\0';
-
-        if (bind (i_socket, (struct sockaddr *)&addr, sizeof (addr))
-         && (errno == EADDRINUSE)
-         && connect (i_socket, (struct sockaddr *)&addr, sizeof (addr))
-         && (errno == ECONNREFUSED))
+        if (vlc_stat(addr.sun_path, &st) == 0 && S_ISSOCK(st.st_mode))
         {
-            msg_Info (p_intf, "Removing dead UNIX socket: %s", psz_unix_path);
-            unlink (psz_unix_path);
-
-            if (bind (i_socket, (struct sockaddr *)&addr, sizeof (addr)))
-            {
-                msg_Err (p_intf, "cannot bind UNIX socket at %s: %s",
-                         psz_unix_path, vlc_strerror_c(errno));
-                free (psz_unix_path);
-                net_Close (i_socket);
-                return VLC_EGENERIC;
-            }
+            msg_Dbg(p_intf, "unlinking old %s socket", addr.sun_path);
+            unlink(addr.sun_path);
         }
 
-        if( listen( i_socket, 1 ) )
+        if (bind(i_socket, (struct sockaddr *)&addr, sizeof (addr))
+         || listen(i_socket, 1))
         {
             msg_Warn (p_intf, "can't listen on socket: %s",
                       vlc_strerror_c(errno));
-            free( psz_unix_path );
             net_Close( i_socket );
-            return VLC_EGENERIC;
+            goto error;
         }
 
         /* FIXME: we need a core function to merge listening sockets sets */
         pi_socket = calloc( 2, sizeof( int ) );
         if( pi_socket == NULL )
         {
-            free( psz_unix_path );
             net_Close( i_socket );
-            return VLC_ENOMEM;
+            goto error;
         }
         pi_socket[0] = i_socket;
         pi_socket[1] = -1;
@@ -701,7 +888,7 @@ static int Activate( vlc_object_t *p_this )
             if( asprintf( &psz_backward_compat_host, "//%s", psz_host ) < 0 )
             {
                 free( psz_host );
-                return VLC_EGENERIC;
+                goto error;
             }
             free( psz_host );
             psz_host = psz_backward_compat_host;
@@ -717,44 +904,20 @@ static int Activate( vlc_object_t *p_this )
                       url.psz_host, url.i_port );
             vlc_UrlClean( &url );
             free( psz_host );
-            return VLC_EGENERIC;
+            goto error;
         }
 
         vlc_UrlClean( &url );
         free( psz_host );
     }
 
-    intf_sys_t *p_sys = malloc( sizeof( *p_sys ) );
-    if( unlikely(p_sys == NULL) )
-    {
-        net_ListenClose( pi_socket );
-        free( psz_unix_path );
-        return VLC_ENOMEM;
-    }
-
-    p_intf->p_sys = p_sys;
-    p_sys->commands = NULL;
-    vlc_mutex_init(&p_sys->output_lock);
     p_sys->pi_socket_listen = pi_socket;
-    p_sys->playlist = vlc_intf_GetMainPlaylist(p_intf);;
-
-    RegisterHandlers(p_intf, cmds, ARRAY_SIZE(cmds));
-
-    /* Line-buffered stdout */
-    setvbuf( stdout, (char *)NULL, _IOLBF, 0 );
 
 #ifndef _WIN32
-    if (pi_socket == NULL)
-    {
-        p_sys->stream = stdin;
-        p_sys->fd = 1;
-    }
-    else
-    {
-        p_sys->stream = NULL;
-        p_sys->fd = -1;
-    }
-    p_sys->psz_unix_path = psz_unix_path;
+    /* Line-buffered stdout */
+    setvbuf(stdout, NULL, _IOLBF, 0);
+
+    if (pi_socket != NULL)
 #else
     p_sys->i_socket = -1;
 #if VLC_WINSTORE_APP
@@ -765,30 +928,24 @@ static int Activate( vlc_object_t *p_this )
         intf_consoleIntroMsg( p_intf );
 #endif
 #endif
-
-    p_sys->player_cli = RegisterPlayer(p_intf);
-    if (unlikely(p_sys->player_cli == NULL))
-        goto error;
-
-    RegisterPlaylist(p_intf);
-
     if( vlc_clone( &p_sys->thread, Run, p_intf, VLC_THREAD_PRIORITY_LOW ) )
         goto error;
 
-    msg_rc( "%s", _("Remote control interface initialized. Type `help' for help.") );
+    msg_print(p_intf, "%s",
+             _("Remote control interface initialized. Type `help' for help."));
 
     return VLC_SUCCESS;
 
 error:
+    if (p_sys->player_cli != NULL)
+        DeregisterPlayer(p_intf, p_sys->player_cli);
+#ifndef _WIN32
+    vlc_list_foreach (cl, &p_sys->clients, node)
+        cli_client_delete(cl);
+#endif
+    tdestroy(p_sys->commands, free);
     net_ListenClose( pi_socket );
-    free( psz_unix_path );
-    free( p_sys );
     return VLC_EGENERIC;
-}
-
-static void dummy_free(void *p)
-{
-    (void) p;
 }
 
 /*****************************************************************************
@@ -799,29 +956,32 @@ static void Deactivate( vlc_object_t *p_this )
     intf_thread_t *p_intf = (intf_thread_t*)p_this;
     intf_sys_t *p_sys = p_intf->p_sys;
 
-    vlc_cancel( p_sys->thread );
-    vlc_join( p_sys->thread, NULL );
+#ifndef _WIN32
+    if (p_sys->pi_socket_listen != NULL)
+#endif
+    {
+        vlc_cancel(p_sys->thread);
+        vlc_join(p_sys->thread, NULL);
+    }
 
     DeregisterPlayer(p_intf, p_sys->player_cli);
-    tdestroy(p_sys->commands, dummy_free);
+
+#ifndef _WIN32
+    struct cli_client *cl;
+
+    vlc_list_foreach (cl, &p_sys->clients, node)
+        cli_client_delete(cl);
+#endif
+    tdestroy(p_sys->commands, free);
 
     if (p_sys->pi_socket_listen != NULL)
     {
         net_ListenClose(p_sys->pi_socket_listen);
-#ifndef _WIN32
-        if (p_sys->stream != NULL)
-            fclose(p_sys->stream);
-        if (p_sys->psz_unix_path != NULL)
-        {
-            unlink(p_sys->psz_unix_path);
-            free(p_sys->psz_unix_path);
-        }
-#else
+#ifdef _WIN32
         if (p_sys->i_socket != -1)
             net_Close(p_sys->i_socket);
 #endif
     }
-    free( p_sys );
 }
 
 /*****************************************************************************

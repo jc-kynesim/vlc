@@ -29,6 +29,8 @@ class PlayerControlBarModel : public QAbstractListModel
     Q_OBJECT
     Q_PROPERTY(QmlMainContext* mainCtx READ getMainCtx WRITE setMainCtx NOTIFY ctxChanged)
     Q_PROPERTY(QString configName READ getConfigName WRITE setConfigName NOTIFY configNameChanged)
+    Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
+
 
 public:
     explicit PlayerControlBarModel(QObject *_parent = nullptr);
@@ -68,6 +70,7 @@ public:
         CHAPTER_NEXT_BUTTON,
         BUTTON_MAX,
         PLAYER_SWITCH_BUTTON,
+        ARTWORK_INFO,
 
         SPLITTER = 0x20,
         VOLUME,
@@ -100,9 +103,12 @@ public:
     inline QString getConfigName() { return configName; }
     void setConfigName(QString name);
 
+    static QString getSerializedDefaultStyle();
+
 signals:
     void ctxChanged(QmlMainContext*);
     void configNameChanged(QString);
+    void countChanged();
 
 protected:
     intf_thread_t       *p_intf  = nullptr;
@@ -112,7 +118,7 @@ private:
     QString configName;
 
     void parseAndAdd(const QString& config);
-    void parseDefault(const IconToolButton* config, const size_t config_size);
+    void parseDefault(const QVector<IconToolButton>& config);
 
     bool setButtonAt(int index, const IconToolButton &button);
     void addProfiles();

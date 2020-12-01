@@ -306,7 +306,8 @@ function probe()
     return ( ( vlc.access == "http" or vlc.access == "https" )
              and (
                string.match( vlc.path, "^www%.youtube%.com/" )
-            or string.match( vlc.path, "^gaming%.youtube%.com/" )
+            or string.match( vlc.path, "^music%.youtube%.com/" )
+            or string.match( vlc.path, "^gaming%.youtube%.com/" ) -- out of use
              ) and (
                string.match( vlc.path, "/watch%?" ) -- the html page
             or string.match( vlc.path, "/live$" ) -- user live stream html page
@@ -319,14 +320,14 @@ end
 
 -- Parse function.
 function parse()
-    if string.match( vlc.path, "^gaming%.youtube%.com/" ) then
-        url = string.gsub( vlc.path, "^gaming%.youtube%.com", "www.youtube.com" )
-        return { { path = vlc.access.."://"..url } }
-    end
-    if string.match( vlc.path, "/watch%?" )
+    if not string.match( vlc.path, "^www%.youtube%.com/" ) then
+        -- Skin subdomain
+        return { { path = vlc.access.."://"..string.gsub( vlc.path, "^([^/]*)/", "www.youtube.com/" ) } }
+    elseif string.match( vlc.path, "/watch%?" )
         or string.match( vlc.path, "/live$" )
         or string.match( vlc.path, "/live%?" )
     then -- This is the HTML page's URL
+        local js_url
         -- fmt is the format of the video
         -- (cf. http://en.wikipedia.org/wiki/YouTube#Quality_and_formats)
         fmt = get_url_param( vlc.path, "fmt" )
@@ -409,11 +410,10 @@ function parse()
                 end
             end
 
-            -- JSON parameters, also formerly known as "swfConfig",
-            -- "SWF_ARGS", "swfArgs", "PLAYER_CONFIG", "playerConfig" ...
-            if string.match( line, "ytplayer%.config" ) then
-
-                local js_url = string.match( line, '"jsUrl":"(.-)"' )
+            -- We need this when parsing the main stream configuration;
+            -- it can indeed be found on that same line (among others).
+            if not js_url then
+                js_url = string.match( line, '"jsUrl":"(.-)"' )
                     or string.match( line, "\"js\": *\"(.-)\"" )
                 if js_url then
                     js_url = string.gsub( js_url, "\\/", "/" )
@@ -424,6 +424,11 @@ function parse()
                     end
                     js_url = string.gsub( js_url, "^//", vlc.access.."://" )
                 end
+            end
+
+            -- JSON parameters, also formerly known as "swfConfig",
+            -- "SWF_ARGS", "swfArgs", "PLAYER_CONFIG", "playerConfig" ...
+            if string.match( line, "ytplayer%.config" ) then
 
                 -- Classic parameters - out of use since early 2020
                 if not fmt then
@@ -480,6 +485,16 @@ function parse()
                 -- of "embedded" and "detailpage" have historically been
                 -- wrong and failed for various restricted videos.
                 path = vlc.access.."://www.youtube.com/get_video_info?video_id="..video_id..copy_url_param( vlc.path, "fmt" )
+
+                -- The YouTube API output doesn't provide the URL to the
+                -- javascript code necessary to descramble URL signatures,
+                -- without which functionality can be seriously limited.
+                -- #18801 prevents us from using a subrequest to the API,
+                -- so we forward the URL this way.
+                if js_url then
+                    path = path.."&jsurl="..vlc.strings.encode_uri_component( js_url )
+                end
+
                 vlc.msg.warn( "Couldn't extract video URL, falling back to alternate youtube API" )
             end
         end
@@ -502,6 +517,11 @@ function parse()
             return { }
         end
 
+        local js_url = get_url_param( vlc.path, "jsurl" )
+        if js_url then
+            js_url= vlc.strings.decode_uri( js_url )
+        end
+
         -- Classic parameters - out of use since early 2020
         local fmt = get_url_param( vlc.path, "fmt" )
         if not fmt then
@@ -516,7 +536,7 @@ function parse()
         if url_map then
             vlc.msg.dbg( "Found classic parameters for youtube video stream, parsing..." )
             url_map = vlc.strings.decode_uri( url_map )
-            path = pick_url( url_map, fmt )
+            path = pick_url( url_map, fmt, js_url )
         end
 
         -- New-style parameters
@@ -527,7 +547,7 @@ function parse()
                 stream_map = vlc.strings.decode_uri( stream_map )
                 -- FIXME: do this properly (see #24958)
                 stream_map = string.gsub( stream_map, "\\u0026", "&" )
-                path = pick_stream( stream_map )
+                path = pick_stream( stream_map, js_url )
             end
         end
 
@@ -538,6 +558,17 @@ function parse()
             if hlsvp then
                 hlsvp = vlc.strings.decode_uri( hlsvp )
                 path = hlsvp
+            end
+        end
+
+        if not path and get_url_param( vlc.path, "el" ) ~= "detailpage" then
+            -- Retry with the other known value for the "el" parameter;
+            -- either value has historically been wrong and failed for
+            -- some videos but not others.
+            local video_id = get_url_param( vlc.path, "video_id" )
+            if video_id then
+                path = vlc.access.."://www.youtube.com/get_video_info?video_id="..video_id.."&el=detailpage"..copy_url_param( vlc.path, "fmt" )..copy_url_param( vlc.path, "jsurl" )
+                vlc.msg.warn( "Couldn't extract video URL, retrying with alternate YouTube API parameters" )
             end
         end
 
@@ -561,6 +592,7 @@ function parse()
             -- FIXME: do this properly (see #24958)
             description = string.gsub( description, '\\(["\\/])', '%1' )
             description = string.gsub( description, '\\n', '\n' )
+            description = string.gsub( description, '\\r', '\r' )
             description = string.gsub( description, "\\u0026", "&" )
         end
         local artist = string.match( line, "%%22author%%22%%3A%%22(.-)%%22" )

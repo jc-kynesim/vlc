@@ -146,6 +146,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlbasemodel.hpp \
 	gui/qt/medialibrary/mlbookmarkmodel.cpp \
 	gui/qt/medialibrary/mlbookmarkmodel.hpp \
+	gui/qt/medialibrary/mlevent.hpp \
 	gui/qt/medialibrary/mlfoldersmodel.cpp \
 	gui/qt/medialibrary/mlfoldersmodel.hpp \
 	gui/qt/medialibrary/mlgenre.cpp \
@@ -614,6 +615,9 @@ libqt_plugin_la_QML = \
 	gui/qt/maininterface/qml/BannerSources.qml \
 	gui/qt/maininterface/qml/MainInterface.qml \
 	gui/qt/maininterface/qml/MainDisplay.qml \
+	gui/qt/maininterface/qml/MainGridView.qml \
+	gui/qt/maininterface/qml/MainTableView.qml \
+	gui/qt/maininterface/qml/MiniPlayerBottomMargin.qml \
 	gui/qt/maininterface/qml/NoMedialibHome.qml \
 	gui/qt/medialibrary/qml/ArtistTopBanner.qml \
 	gui/qt/medialibrary/qml/AudioGridItem.qml \
@@ -637,8 +641,10 @@ libqt_plugin_la_QML = \
 	gui/qt/menus/qml/GlobalShortcuts.qml \
 	gui/qt/menus/qml/GlobalShortcutsMedialib.qml \
 	gui/qt/menus/qml/Menubar.qml \
+	gui/qt/network/qml/AddressbarButton.qml \
 	gui/qt/network/qml/DiscoverDisplay.qml \
 	gui/qt/network/qml/DiscoverUrlDisplay.qml \
+	gui/qt/network/qml/NetworkAddressbar.qml \
 	gui/qt/network/qml/NetworkBrowseDisplay.qml \
 	gui/qt/network/qml/NetworkDisplay.qml \
 	gui/qt/network/qml/NetworkGridItem.qml \
@@ -649,6 +655,7 @@ libqt_plugin_la_QML = \
 	gui/qt/network/qml/ServicesHomeDisplay.qml \
 	gui/qt/player/qml/ControlBar.qml \
 	gui/qt/player/qml/ControlButtons.qml \
+	gui/qt/player/qml/LanguageMenu.qml \
 	gui/qt/player/qml/MiniPlayer.qml \
 	gui/qt/player/qml/Player.qml \
 	gui/qt/player/qml/PlayerButtonsLayout.qml \
@@ -674,6 +681,7 @@ libqt_plugin_la_QML = \
 	gui/qt/widgets/qml/BannerTabButton.qml \
 	gui/qt/widgets/qml/BusyIndicatorExt.qml \
 	gui/qt/widgets/qml/CaptionLabel.qml \
+	gui/qt/widgets/qml/CheckedDelegate.qml \
 	gui/qt/widgets/qml/ComboBoxExt.qml \
 	gui/qt/widgets/qml/ContextButton.qml \
 	gui/qt/widgets/qml/CSDWindowButton.qml \
@@ -694,6 +702,7 @@ libqt_plugin_la_QML = \
 	gui/qt/widgets/qml/LabelSeparator.qml \
 	gui/qt/widgets/qml/ListItem.qml \
 	gui/qt/widgets/qml/ListLabel.qml \
+	gui/qt/widgets/qml/LocalTabBar.qml \
 	gui/qt/widgets/qml/MediaCover.qml \
 	gui/qt/widgets/qml/SubtitleLabel.qml \
 	gui/qt/widgets/qml/MenuCaption.qml \
@@ -715,6 +724,7 @@ libqt_plugin_la_QML = \
 	gui/qt/widgets/qml/PageLoader.qml \
 	gui/qt/widgets/qml/TabButtonExt.qml \
 	gui/qt/widgets/qml/TableColumns.qml \
+	gui/qt/widgets/qml/TransparentSpinBox.qml \
 	gui/qt/widgets/qml/TextToolButton.qml \
 	gui/qt/widgets/qml/ToolTipArea.qml \
 	gui/qt/widgets/qml/VideoProgressBar.qml \

@@ -145,6 +145,9 @@ typedef struct
     } hacks;
 
     mp4_fragments_index_t *p_fragsindex;
+
+    ssize_t i_attachments;
+    input_attachment_t **pp_attachments;
 } demux_sys_t;
 
 #define DEMUX_INCREMENT VLC_TICK_FROM_MS(250) /* How far the pcr will go, each round */
@@ -711,20 +714,25 @@ static void MP4_Block_Send( demux_t *p_demux, mp4_track_t *p_track, block_t *p_b
     /* ASF packets in mov */
     if( p_track->p_asf )
     {
-        /* Fake a new stream from MP4 block */
-        stream_t *p_stream = p_demux->s;
-        p_demux->s = vlc_stream_MemoryNew( p_demux, p_block->p_buffer, p_block->i_buffer, true );
-        if ( p_demux->s )
+        p_sys->asfpacketsys.s = vlc_stream_MemoryNew( p_demux, p_block->p_buffer, p_block->i_buffer, true );
+        if ( p_sys->asfpacketsys.s )
         {
             p_track->i_dts_backup = p_block->i_dts;
             p_track->i_pts_backup = p_block->i_pts;
             /* And demux it as ASF packet */
-            DemuxASFPacket( &p_sys->asfpacketsys, p_block->i_buffer, p_block->i_buffer,
-                            0, p_block->i_buffer );
-            vlc_stream_Delete(p_demux->s);
+            uint64_t startpos;
+            do
+            {
+                startpos = vlc_stream_Tell(p_sys->asfpacketsys.s);
+                DemuxASFPacket( &p_sys->asfpacketsys,
+                                p_block->i_buffer - startpos,
+                                p_block->i_buffer - startpos,
+                                0, p_block->i_buffer );
+            } while( vlc_stream_Tell(p_sys->asfpacketsys.s) != p_block->i_buffer &&
+                     vlc_stream_Tell(p_sys->asfpacketsys.s) != startpos );
+            vlc_stream_Delete(p_sys->asfpacketsys.s);
         }
         block_Release(p_block);
-        p_demux->s = p_stream;
     }
     else
         es_out_Send( p_demux->out, p_track->p_es, p_block );
@@ -804,6 +812,7 @@ static int Open( vlc_object_t * p_this )
     p_demux->pf_control = Control;
 
     p_sys->context.i_lastseqnumber = UINT32_MAX;
+    p_sys->i_attachments = -1;
 
     p_demux->p_sys = p_sys;
 
@@ -1167,9 +1176,13 @@ static int Open( vlc_object_t * p_this )
     /* */
     LoadChapter( p_demux );
 
-    p_sys->asfpacketsys.p_demux = p_demux;
+    p_sys->asfpacketsys.priv = p_demux;
+    p_sys->asfpacketsys.s = p_demux->s;
+    p_sys->asfpacketsys.logger = p_demux->obj.logger;
     p_sys->asfpacketsys.pi_preroll = &p_sys->i_preroll;
     p_sys->asfpacketsys.pi_preroll_start = &p_sys->i_preroll_start;
+    p_sys->asfpacketsys.b_deduplicate = true;
+    p_sys->asfpacketsys.b_can_hold_multiple_packets = true;
     p_sys->asfpacketsys.pf_doskip = NULL;
     p_sys->asfpacketsys.pf_send = MP4ASF_Send;
     p_sys->asfpacketsys.pf_gettrackinfo = MP4ASF_GetTrackInfo;
@@ -2044,9 +2057,19 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
             input_attachment_t ***ppp_attach = va_arg( args, input_attachment_t*** );
             int *pi_int = va_arg( args, int * );
 
-            *pi_int = MP4_GetAttachments( p_sys->p_root, ppp_attach );
-            for( int i=0; i<*pi_int; i++ )
+            if( p_sys->i_attachments == -1 )
+                p_sys->i_attachments = MP4_GetAttachments( p_sys->p_root, &p_sys->pp_attachments );
+            if( !p_sys->i_attachments )
+                return VLC_EGENERIC;
+            *ppp_attach = calloc( p_sys->i_attachments, sizeof(**ppp_attach ) );
+            if( !*ppp_attach )
+                return VLC_ENOMEM;
+            for ( ssize_t i = 0; i < p_sys->i_attachments; ++i )
+            {
+                (*ppp_attach)[i] = vlc_input_attachment_Hold( p_sys->pp_attachments[i] );
                 msg_Dbg( p_demux, "adding attachment %s", (*ppp_attach)[i]->psz_name );
+            }
+            *pi_int = p_sys->i_attachments;
 
             return VLC_SUCCESS;
         }
@@ -2168,6 +2191,10 @@ static void Close ( vlc_object_t * p_this )
     for( i_track = 0; i_track < p_sys->i_tracks; i_track++ )
         MP4_TrackClean( p_demux->out, &p_sys->track[i_track] );
     free( p_sys->track );
+
+    for ( ssize_t i = 0; i < p_sys->i_attachments; ++i )
+        vlc_input_attachment_Release( p_sys->pp_attachments[i] );
+    free( p_sys->pp_attachments );
 
     free( p_sys );
 }
@@ -3567,8 +3594,7 @@ static void MP4_TrackClean( es_out_t *out, mp4_track_t *p_track )
     if( !p_track->i_sample_size )
         free( p_track->p_sample_size );
 
-    if ( p_track->asfinfo.p_frame )
-        block_ChainRelease( p_track->asfinfo.p_frame );
+    ASFPacketTrackReset( &p_track->asfinfo );
 
     free( p_track->context.runs.p_array );
 }
@@ -3582,6 +3608,7 @@ static void MP4_TrackInit( mp4_track_t *p_track, const MP4_Box_t *p_trackbox )
     const MP4_Box_t *p_tkhd = MP4_BoxGet( p_trackbox, "tkhd" );
     if(likely(p_tkhd) && BOXDATA(p_tkhd))
         p_track->i_track_ID = BOXDATA(p_tkhd)->i_track_ID;
+    ASFPacketTrackInit( &p_track->asfinfo );
 }
 
 static void MP4_TrackSelect( demux_t *p_demux, mp4_track_t *p_track, bool b_select )
@@ -5151,7 +5178,8 @@ end:
 inline static mp4_track_t *MP4ASF_GetTrack( asf_packet_sys_t *p_packetsys,
                                             uint8_t i_stream_number )
 {
-    demux_sys_t *p_sys = p_packetsys->p_demux->p_sys;
+    demux_t *p_demux = p_packetsys->priv;
+    demux_sys_t *p_sys = p_demux->p_sys;
     for ( unsigned int i=0; i<p_sys->i_tracks; i++ )
     {
         if ( p_sys->track[i].p_asf &&
@@ -5176,6 +5204,7 @@ static asf_track_info_t * MP4ASF_GetTrackInfo( asf_packet_sys_t *p_packetsys,
 static void MP4ASF_Send( asf_packet_sys_t *p_packetsys, uint8_t i_stream_number,
                          block_t **pp_frame )
 {
+    demux_t *p_demux = p_packetsys->priv;
     mp4_track_t *p_track = MP4ASF_GetTrack( p_packetsys, i_stream_number );
     if ( !p_track )
     {
@@ -5186,7 +5215,7 @@ static void MP4ASF_Send( asf_packet_sys_t *p_packetsys, uint8_t i_stream_number,
         block_t *p_gather = block_ChainGather( *pp_frame );
         p_gather->i_dts = p_track->i_dts_backup;
         p_gather->i_pts = p_track->i_pts_backup;
-        es_out_Send( p_packetsys->p_demux->out, p_track->p_es, p_gather );
+        es_out_Send( p_demux->out, p_track->p_es, p_gather );
     }
 
     *pp_frame = NULL;
@@ -5197,10 +5226,6 @@ static void MP4ASF_ResetFrames( demux_sys_t *p_sys )
     for ( unsigned int i=0; i<p_sys->i_tracks; i++ )
     {
         mp4_track_t *p_track = &p_sys->track[i];
-        if( p_track->asfinfo.p_frame )
-        {
-            block_ChainRelease( p_track->asfinfo.p_frame );
-            p_track->asfinfo.p_frame = NULL;
-        }
+        ASFPacketTrackReset( &p_track->asfinfo );
     }
 }

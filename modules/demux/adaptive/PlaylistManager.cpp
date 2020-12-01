@@ -51,6 +51,7 @@
 using namespace adaptive::http;
 using namespace adaptive::logic;
 using namespace adaptive;
+using vlc::threads::mutex_locker;
 
 PlaylistManager::PlaylistManager( demux_t *p_demux_,
                                   SharedResources *res,
@@ -75,8 +76,6 @@ PlaylistManager::PlaylistManager( demux_t *p_demux_,
     demux.i_firstpcr = VLC_TICK_INVALID;
     vlc_mutex_init(&demux.lock);
     vlc_cond_init(&demux.cond);
-    vlc_mutex_init(&lock);
-    vlc_cond_init(&waitcond);
     vlc_mutex_init(&cached.lock);
     cached.b_live = false;
     cached.f_position = 0.0;
@@ -117,10 +116,8 @@ bool PlaylistManager::setupPeriod()
         return false;
 
     std::vector<BaseAdaptationSet*> sets = currentPeriod->getAdaptationSets();
-    std::vector<BaseAdaptationSet*>::iterator it;
-    for(it=sets.begin();it!=sets.end();++it)
+    for(BaseAdaptationSet *set : sets)
     {
-        BaseAdaptationSet *set = *it;
         if(set && streamFactory)
         {
             SegmentTracker *tracker = new SegmentTracker(resources, logic,
@@ -184,16 +181,17 @@ bool PlaylistManager::started() const
 
 void PlaylistManager::stop()
 {
-    if(b_thread)
-    {
-        vlc_mutex_lock(&lock);
-        b_canceled = true;
-        vlc_cond_signal(&waitcond);
-        vlc_mutex_unlock(&lock);
+    if(!b_thread)
+        return;
 
-        vlc_join(thread, NULL);
-        b_thread = false;
+    {
+        mutex_locker locker {lock};
+        b_canceled = true;
+        waitcond.signal();
     }
+
+    vlc_join(thread, NULL);
+    b_thread = false;
 }
 
 struct PrioritizedAbstractStream
@@ -223,20 +221,19 @@ AbstractStream::buffering_status PlaylistManager::bufferize(vlc_tick_t i_nzdeadl
     /* First reorder by status >> buffering level */
     std::vector<PrioritizedAbstractStream> prioritized_streams(streams.size());
     std::vector<PrioritizedAbstractStream>::iterator it = prioritized_streams.begin();
-    std::vector<AbstractStream *>::iterator sit = streams.begin();
-    for( ; sit!=streams.end(); ++sit)
+    for(AbstractStream *stream : streams)
     {
         PrioritizedAbstractStream &p = *it;
-        p.st = *sit;
+        p.st = stream;
         p.status = p.st->getLastBufferStatus();
         p.demuxed_amount = p.st->getDemuxedAmount(i_nzdeadline);
         ++it;
     }
     std::sort(prioritized_streams.begin(), prioritized_streams.end(), streamCompare);
 
-    for(it=prioritized_streams.begin(); it!=prioritized_streams.end(); ++it)
+    for(PrioritizedAbstractStream &pst : prioritized_streams)
     {
-        AbstractStream *st = (*it).st;
+        AbstractStream *st = pst.st;
 
         if(!st->isValid())
             continue;
@@ -284,11 +281,8 @@ AbstractStream::status PlaylistManager::dequeue(vlc_tick_t i_floor, vlc_tick_t *
 
     const vlc_tick_t i_nzdeadline = *pi_nzbarrier;
 
-    std::vector<AbstractStream *>::iterator it;
-    for(it=streams.begin(); it!=streams.end(); ++it)
+    for(AbstractStream *st : streams)
     {
-        AbstractStream *st = *it;
-
         vlc_tick_t i_pcr;
         AbstractStream::status i_ret = st->dequeue(i_nzdeadline, &i_pcr);
         if( i_ret > i_return )
@@ -306,11 +300,8 @@ void PlaylistManager::drain()
     for(;;)
     {
         bool b_drained = true;
-        std::vector<AbstractStream *>::iterator it;
-        for(it=streams.begin(); it!=streams.end(); ++it)
+        for(AbstractStream *st : streams)
         {
-            AbstractStream *st = *it;
-
             if (!st->isValid() || st->isDisabled())
                 continue;
 
@@ -334,10 +325,9 @@ vlc_tick_t PlaylistManager::getResumeTime() const
 vlc_tick_t PlaylistManager::getFirstDTS() const
 {
     vlc_tick_t mindts = VLC_TICK_INVALID;
-    std::vector<AbstractStream *>::const_iterator it;
-    for(it=streams.begin(); it!=streams.end(); ++it)
+    for(const AbstractStream *stream : streams)
     {
-        const vlc_tick_t dts = (*it)->getFirstDTS();
+        const vlc_tick_t dts = stream->getFirstDTS();
         if(mindts == VLC_TICK_INVALID)
             mindts = dts;
         else if(dts != VLC_TICK_INVALID)
@@ -348,11 +338,11 @@ vlc_tick_t PlaylistManager::getFirstDTS() const
 
 unsigned PlaylistManager::getActiveStreamsCount() const
 {
+    // TODO improve
     unsigned count = 0;
-    std::vector<AbstractStream *>::const_iterator it;
-    for(it=streams.begin(); it!=streams.end(); ++it)
+    for(const AbstractStream* st : streams)
     {
-        if((*it)->isValid() && !(*it)->isDisabled())
+        if(st->isValid() && !st->isDisabled())
             count++;
     }
     return count;
@@ -365,10 +355,8 @@ bool PlaylistManager::setPosition(vlc_tick_t time)
     for(int real = 0; real < 2; real++)
     {
         /* Always probe if we can seek first */
-        std::vector<AbstractStream *>::iterator it;
-        for(it=streams.begin(); it!=streams.end(); ++it)
+        for(AbstractStream* st : streams)
         {
-            AbstractStream *st = *it;
             if(st->isValid() && !st->isDisabled())
             {
                 hasValidStream = true;
@@ -399,9 +387,8 @@ void PlaylistManager::scheduleNextUpdate()
 
 bool PlaylistManager::updatePlaylist()
 {
-    std::vector<AbstractStream *>::const_iterator it;
-    for(it=streams.begin(); it!=streams.end(); ++it)
-        (*it)->runUpdates();
+    for(AbstractStream* st : streams)
+        st->runUpdates();
 
     updateControlsPosition();
     return true;
@@ -626,41 +613,36 @@ int PlaylistManager::doControl(int i_query, va_list args)
 
 void PlaylistManager::setBufferingRunState(bool b)
 {
-    vlc_mutex_lock(&lock);
+    mutex_locker locker {lock};
     b_buffering = b;
-    vlc_cond_signal(&waitcond);
-    vlc_mutex_unlock(&lock);
+    waitcond.signal();
 }
 
 void PlaylistManager::Run()
 {
-    vlc_mutex_lock(&lock);
+    mutex_locker locker {lock};
     const vlc_tick_t i_min_buffering = bufferingLogic->getMinBuffering(playlist);
     const vlc_tick_t i_extra_buffering = bufferingLogic->getMaxBuffering(playlist) - i_min_buffering;
     while(1)
     {
         while(!b_buffering && !b_canceled)
-            vlc_cond_wait(&waitcond, &lock);
+            waitcond.wait(lock);
         if (b_canceled)
             break;
 
         if(needsUpdate())
         {
-            int canc = vlc_savecancel();
             if(updatePlaylist())
                 scheduleNextUpdate();
             else
                 failedupdates++;
-            vlc_restorecancel(canc);
         }
 
         vlc_mutex_lock(&demux.lock);
         vlc_tick_t i_nzpcr = demux.i_nzpcr;
         vlc_mutex_unlock(&demux.lock);
 
-        int canc = vlc_savecancel();
         AbstractStream::buffering_status i_return = bufferize(i_nzpcr, i_min_buffering, i_extra_buffering);
-        vlc_restorecancel( canc );
 
         if(i_return != AbstractStream::buffering_lessthanmin)
         {
@@ -674,19 +656,18 @@ void PlaylistManager::Run()
             else /*if(i_return == AbstractStream::buffering_suspended)*/
                 i_deadline += VLC_TICK_FROM_MS(250);
 
-            vlc_mutex_lock(&demux.lock);
+            // TODO: The current function doesn't seem to modify shared
+            //       state under demux lock.
             vlc_cond_signal(&demux.cond);
-            vlc_mutex_unlock(&demux.lock);
 
             while(b_buffering &&
-                    vlc_cond_timedwait(&waitcond, &lock, i_deadline) == 0 &&
+                    waitcond.timedwait(lock, i_deadline) == 0 &&
                     i_deadline > vlc_tick_now() &&
                     !b_canceled);
             if (b_canceled)
                 break;
         }
     }
-    vlc_mutex_unlock(&lock);
 }
 
 void * PlaylistManager::managerThread(void *opaque)
@@ -706,10 +687,8 @@ void PlaylistManager::updateControlsPosition()
 
     vlc_tick_t rapPlaylistStart = 0;
     vlc_tick_t rapDemuxStart = 0;
-    std::vector<AbstractStream *>::iterator it;
-    for(it=streams.begin(); it!=streams.end(); ++it)
+    for(AbstractStream* st : streams)
     {
-        AbstractStream *st = *it;
         if(st->isValid() && !st->isDisabled() && st->isSelected())
         {
             if(st->getMediaPlaybackTimes(&cached.playlistStart, &cached.playlistEnd,
@@ -847,8 +826,19 @@ AbstractAdaptationLogic *PlaylistManager::createLogic(AbstractAdaptationLogic::L
 
     if(logic)
     {
-        logic->setMaxDeviceResolution( var_InheritInteger(p_demux, "adaptive-maxwidth"),
-                                       var_InheritInteger(p_demux, "adaptive-maxheight") );
+        int w = var_InheritInteger(p_demux, "adaptive-maxwidth");
+        int h = var_InheritInteger(p_demux, "adaptive-maxheight");
+        if(h == 0)
+        {
+            h = var_InheritInteger(p_demux, "preferred-resolution");
+            /* Adapt for slightly different minimum/maximum semantics */
+            if(h == -1)
+                h = 0;
+            else if(h == 0)
+                h = 1;
+        }
+
+        logic->setMaxDeviceResolution(w, h);
     }
 
     return logic;

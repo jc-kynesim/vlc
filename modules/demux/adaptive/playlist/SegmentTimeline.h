@@ -23,7 +23,8 @@
 #ifndef SEGMENTTIMELINE_H
 #define SEGMENTTIMELINE_H
 
-#include "SegmentInfoCommon.h"
+#include "Inheritables.hpp"
+
 #include <vlc_common.h>
 #include <list>
 
@@ -31,13 +32,14 @@ namespace adaptive
 {
     namespace playlist
     {
-        class SegmentTimeline : public TimescaleAble
+        class AbstractMultipleSegmentBaseType;
+
+        class SegmentTimeline : public AttrsNode
         {
             class Element;
 
             public:
-                SegmentTimeline(TimescaleAble *);
-                SegmentTimeline(uint64_t);
+                SegmentTimeline(AbstractMultipleSegmentBaseType *);
                 virtual ~SegmentTimeline();
                 void addElement(uint64_t, stime_t d, uint64_t r = 0, stime_t t = 0);
                 uint64_t getElementNumberByScaledPlaybackTime(stime_t) const;
@@ -47,6 +49,7 @@ namespace adaptive
                 stime_t getTotalLength() const;
                 uint64_t maxElementNumber() const;
                 uint64_t minElementNumber() const;
+                uint64_t getElementIndexBySequence(uint64_t) const;
                 void pruneByPlaybackTime(vlc_tick_t);
                 size_t pruneBySequenceNumber(uint64_t);
                 void updateWith(SegmentTimeline &);
@@ -55,6 +58,7 @@ namespace adaptive
             private:
                 std::list<Element *> elements;
                 stime_t totalLength;
+                AbstractMultipleSegmentBaseType *parent;
 
                 class Element
                 {

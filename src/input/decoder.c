@@ -449,16 +449,21 @@ static int ModuleThread_UpdateVideoFormat( decoder_t *p_dec, vlc_video_context *
             dpb_size = 2;
             break;
         }
-
-        p_owner->out_pool = picture_pool_NewFromFormat( &p_dec->fmt_out.video,
+        picture_pool_t *pool = picture_pool_NewFromFormat( &p_dec->fmt_out.video,
                             dpb_size + p_dec->i_extra_picture_buffers + 1 );
-        if (p_owner->out_pool == NULL)
+
+        if( pool == NULL)
         {
             msg_Err(p_dec, "Failed to create a pool of %d %4.4s pictures",
                            dpb_size + p_dec->i_extra_picture_buffers + 1,
                            (char*)&p_dec->fmt_out.video.i_chroma);
             return -1;
         }
+
+        vlc_mutex_lock( &p_owner->lock );
+        p_owner->out_pool = pool;
+        vlc_mutex_unlock( &p_owner->lock );
+
     }
 
     vout_configuration_t cfg = {
@@ -544,13 +549,12 @@ static int CreateVoutIfNeeded(vlc_input_decoder_t *p_owner)
 
     DecoderUpdateFormatLocked( p_owner );
     p_owner->fmt.video.i_chroma = p_dec->fmt_out.i_codec;
+    picture_pool_t *pool = p_owner->out_pool;
+    p_owner->out_pool = NULL;
     vlc_mutex_unlock( &p_owner->lock );
 
-     if ( p_owner->out_pool != NULL )
-     {
-         picture_pool_Release( p_owner->out_pool );
-         p_owner->out_pool = NULL;
-     }
+     if ( pool != NULL )
+         picture_pool_Release( pool );
 
     if( p_vout == NULL )
     {
@@ -1467,6 +1471,11 @@ static void DecoderThread_Flush( vlc_input_decoder_t *p_owner )
     {
         if( p_owner->p_vout )
             vout_FlushAll( p_owner->p_vout );
+
+        /* Reset the pool cancel state, previously set by
+         * vlc_input_decoder_Flush() */
+        if( p_owner->out_pool != NULL )
+            picture_pool_Cancel( p_owner->out_pool, false );
     }
     else if( p_dec->fmt_out.i_cat == SPU_ES )
     {
@@ -1949,9 +1958,6 @@ static void DeleteDecoder( vlc_input_decoder_t *p_owner )
         case VIDEO_ES: {
             vout_thread_t *vout = p_owner->p_vout;
 
-            if (p_owner->out_pool)
-                picture_pool_Cancel( p_owner->out_pool, false );
-
             if (vout != NULL)
             {
                 /* Hold the vout since PutVout will likely release it and a
@@ -2287,6 +2293,17 @@ void vlc_input_decoder_Flush( vlc_input_decoder_t *p_owner )
     vlc_fifo_Signal( p_owner->p_fifo );
 
     vlc_fifo_Unlock( p_owner->p_fifo );
+
+    if ( p_owner->fmt.i_cat == VIDEO_ES )
+    {
+        /* Set the pool cancel state. This will unblock the module if it is
+         * waiting for new pictures (likely). This state will be reset back
+         * from the DecoderThread once the flush request is processed. */
+        vlc_mutex_lock( &p_owner->lock );
+        if( p_owner->out_pool != NULL )
+            picture_pool_Cancel( p_owner->out_pool, true );
+        vlc_mutex_unlock( &p_owner->lock );
+    }
 
     if( p_owner->paused )
     {

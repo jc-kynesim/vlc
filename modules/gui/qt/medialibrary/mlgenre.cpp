@@ -173,7 +173,11 @@ public:
         painter.end();
 
         if (image.save(m_filepath, "jpg"))
-            m_genre->setCover(QUrl::fromLocalFile(m_filepath).toString());
+            /* Set the cover from the main thread */
+            QMetaObject::invokeMethod(m_genre, [genre = m_genre, cover = QUrl::fromLocalFile(m_filepath).toString()]
+                {
+                    genre->setCover(std::move(cover));
+                });
 
         {
             QMutexLocker lock(&m_taskLock);
@@ -185,9 +189,9 @@ public:
     void cancel()
     {
         QMutexLocker lock(&m_taskLock);
+        m_canceled = true;
         if (!m_running)
             return;
-        m_canceled = true;
         m_taskCond.wait(&m_taskLock);
     }
 

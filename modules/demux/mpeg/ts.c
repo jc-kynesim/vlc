@@ -550,7 +550,7 @@ static int Open( vlc_object_t *p_this )
 static void FreeDictAttachment( void *p_value, void *p_obj )
 {
     VLC_UNUSED(p_obj);
-    vlc_input_attachment_Delete( (input_attachment_t *) p_value );
+    vlc_input_attachment_Release( (input_attachment_t *) p_value );
 }
 
 static void Close( vlc_object_t *p_this )
@@ -1196,7 +1196,7 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
                                          p_entry; p_entry = p_entry->p_next )
             {
                 msg_Err(p_demux, "GET ATTACHMENT %s", p_entry->psz_key);
-                (*ppp_attach)[*pi_int] = vlc_input_attachment_Duplicate(
+                (*ppp_attach)[*pi_int] = vlc_input_attachment_Hold(
                                                 (input_attachment_t *) p_entry->p_value );
                 if( (*ppp_attach)[*pi_int] )
                     (*pi_int)++;
@@ -2237,9 +2237,13 @@ static void ProgramSetPCR( demux_t *p_demux, ts_pmt_t *p_pmt, stime_t i_pcr )
 
         if( i_mindts != VLC_TICK_INVALID )
         {
-            msg_Dbg( p_demux, "Program %d PCR prequeue fixup %"PRId64"->%"PRId64,
-                     p_pmt->i_number, TO_SCALE(i_mindts), i_pcr );
-            i_pcr = TO_SCALE(i_mindts);
+            if( i_pcr > p_pmt->pcr.i_first ) /* don't bork the natural pcr offset */
+            {
+                msg_Dbg( p_demux, "Program %d PCR prequeue fixup %"PRId64"->%"PRId64,
+                         p_pmt->i_number, TO_SCALE(i_mindts), i_pcr );
+                i_pcr = TO_SCALE(i_mindts);
+            }
+            else i_pcr = p_pmt->pcr.i_first;
         }
     }
 

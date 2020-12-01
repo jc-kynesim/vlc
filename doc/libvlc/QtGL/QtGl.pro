@@ -1,9 +1,8 @@
 TEMPLATE = app
 TARGET = qtglvlc
-DEPENDPATH += .
-INCLUDEPATH += . ../../../include
-LIBS += -lvlc
-#-L../../../../build/git64/lib/.libs
+
+CONFIG += link_pkgconfig force_debug_info
+PKGCONFIG = libvlc
 QT += widgets
 
 SOURCES += main.cpp qtvlcwidget.cpp

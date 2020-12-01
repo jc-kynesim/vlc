@@ -25,15 +25,12 @@ MLBaseModel::MLBaseModel(QObject *parent)
     : QAbstractListModel(parent)
     , m_ml(nullptr)
     , m_search_pattern_cstr( nullptr, &free )
-    , m_nb_max_items( 0 )
     , m_ml_event_handle( nullptr, [this](vlc_ml_event_callback_t* cb ) {
             assert( m_ml != nullptr );
             vlc_ml_event_unregister_callback( m_ml, cb );
         })
     , m_need_reset( false )
-    , m_is_reloading( false )
 {
-    vlc_mutex_init( &m_item_lock );
     memset(&m_query_param, 0, sizeof(vlc_ml_query_params_t));
     m_query_param.b_desc = false;
     m_query_param.i_nbResults = 20; //FIXME: value for test
@@ -72,21 +69,15 @@ void MLBaseModel::onResetRequested()
     endResetModel();
 }
 
-void MLBaseModel::onVlcMlEvent(const vlc_ml_event_t* event)
+void MLBaseModel::onVlcMlEvent(const MLEvent &event)
 {
-    switch(event->i_type)
+    switch(event.i_type)
     {
         case VLC_ML_EVENT_BACKGROUND_IDLE_CHANGED:
-            if ( event->background_idle_changed.b_idle == false )
-                m_is_reloading = true;
-            else
+            if ( event.background_idle_changed.b_idle && m_need_reset )
             {
-                m_is_reloading = false;
-                if ( m_need_reset )
-                {
-                    emit resetRequested();
-                    m_need_reset = false;
-                }
+                emit resetRequested();
+                m_need_reset = false;
             }
             break;
     }
@@ -103,7 +94,9 @@ QString MLBaseModel::getFirstSymbol(QString str)
 void MLBaseModel::onVlcMlEvent(void* data, const vlc_ml_event_t* event)
 {
     auto self = static_cast<MLBaseModel*>(data);
-    self->onVlcMlEvent(event);
+    QMetaObject::invokeMethod(self, [self, event = MLEvent(event)] {
+        self->onVlcMlEvent(event);
+    });
 }
 
 MLParentId MLBaseModel::parentId() const

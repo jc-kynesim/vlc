@@ -70,12 +70,12 @@ static void parseAvailability(MPD *mpd, Node *node, T *s)
     if(node->hasAttribute("availabilityTimeOffset"))
     {
         double val = Integer<double>(node->getAttributeValue("availabilityTimeOffset"));
-        s->setAvailabilityTimeOffset(val * CLOCK_FREQ);
+        s->addAttribute(new AvailabilityTimeOffsetAttr(val * CLOCK_FREQ));
     }
     if(node->hasAttribute("availabilityTimeComplete"))
     {
         bool b = (node->getAttributeValue("availabilityTimeComplete") == "false");
-        s->setAvailabilityTimeComplete(!b);
+        s->addAttribute(new AvailabilityTimeCompleteAttr(!b));
         if(b)
             mpd->setLowLatency(b);
     }
@@ -182,6 +182,51 @@ void IsoffMainParser::parsePeriods(MPD *mpd, Node *root)
     }
 }
 
+void IsoffMainParser::parseSegmentBaseType(MPD *, Node *node,
+                                           AbstractSegmentBaseType *base,
+                                           SegmentInformation *parent)
+{
+    parseInitSegment(DOMHelper::getFirstChildElementByName(node, "Initialization"), base, parent);
+
+    if(node->hasAttribute("indexRange"))
+    {
+        size_t start = 0, end = 0;
+        if (std::sscanf(node->getAttributeValue("indexRange").c_str(), "%zu-%zu", &start, &end) == 2)
+        {
+            IndexSegment *index = new (std::nothrow) DashIndexSegment(parent);
+            if(index)
+            {
+                index->setByteRange(start, end);
+                base->indexSegment.Set(index);
+                /* index must be before data, so data starts at index end */
+                if(dynamic_cast<SegmentBase *>(base))
+                    dynamic_cast<SegmentBase *>(base)->setByteRange(end + 1, 0);
+            }
+        }
+    }
+
+    if(node->hasAttribute("timescale"))
+    {
+        TimescaleAttr *prop = new TimescaleAttr(Timescale(Integer<uint64_t>(node->getAttributeValue("timescale"))));
+        base->addAttribute(prop);
+    }
+}
+
+void IsoffMainParser::parseMultipleSegmentBaseType(MPD *mpd, Node *node,
+                                                   AbstractMultipleSegmentBaseType *base,
+                                                   SegmentInformation *parent)
+{
+    parseSegmentBaseType(mpd, node, base, parent);
+
+    if(node->hasAttribute("duration"))
+        base->addAttribute(new DurationAttr(Integer<stime_t>(node->getAttributeValue("duration"))));
+
+    if(node->hasAttribute("startNumber"))
+        base->addAttribute(new StartnumberAttr(Integer<uint64_t>(node->getAttributeValue("startNumber"))));
+
+    parseTimeline(DOMHelper::getFirstChildElementByName(node, "SegmentTimeline"), base);
+}
+
 size_t IsoffMainParser::parseSegmentTemplate(MPD *mpd, Node *templateNode, SegmentInformation *info)
 {
     size_t total = 0;
@@ -192,33 +237,26 @@ size_t IsoffMainParser::parseSegmentTemplate(MPD *mpd, Node *templateNode, Segme
     if(templateNode->hasAttribute("media"))
         mediaurl = templateNode->getAttributeValue("media");
 
-    MediaSegmentTemplate *mediaTemplate = NULL;
-    if( !(mediaTemplate = new (std::nothrow) MediaSegmentTemplate(info)) )
+    SegmentTemplate *mediaTemplate = new (std::nothrow) SegmentTemplate(info);
+    if(!mediaTemplate)
         return total;
     mediaTemplate->setSourceUrl(mediaurl);
 
-    if(templateNode->hasAttribute("startNumber"))
-        mediaTemplate->setStartNumber(Integer<uint64_t>(templateNode->getAttributeValue("startNumber")));
-
-    if(templateNode->hasAttribute("timescale"))
-        mediaTemplate->setTimescale(Integer<uint64_t>(templateNode->getAttributeValue("timescale")));
-
-    if(templateNode->hasAttribute("duration"))
-        mediaTemplate->duration.Set(Integer<stime_t>(templateNode->getAttributeValue("duration")));
+    parseMultipleSegmentBaseType(mpd, templateNode, mediaTemplate, info);
 
     parseAvailability<SegmentInformation>(mpd, templateNode, info);
 
-    InitSegmentTemplate *initTemplate = NULL;
-
-    if(templateNode->hasAttribute("initialization"))
+    if(templateNode->hasAttribute("initialization")) /* /!\ != Initialization */
     {
+        SegmentTemplateInit *initTemplate;
         std::string initurl = templateNode->getAttributeValue("initialization");
-        if(!initurl.empty() && (initTemplate = new (std::nothrow) InitSegmentTemplate(info)))
+        if(!initurl.empty() && (initTemplate = new (std::nothrow) SegmentTemplateInit(mediaTemplate, info)))
+        {
             initTemplate->setSourceUrl(initurl);
+            delete mediaTemplate->initialisationSegment.Get();
+            mediaTemplate->initialisationSegment.Set(initTemplate);
+        }
     }
-    mediaTemplate->initialisationSegment.Set(initTemplate);
-
-    parseTimeline(DOMHelper::getFirstChildElementByName(templateNode, "SegmentTimeline"), mediaTemplate);
 
     info->setSegmentTemplate(mediaTemplate);
 
@@ -233,7 +271,7 @@ size_t IsoffMainParser::parseSegmentInformation(MPD *mpd, Node *node,
     total += parseSegmentList(mpd, DOMHelper::getFirstChildElementByName(node, "SegmentList"), info);
     total += parseSegmentTemplate(mpd, DOMHelper::getFirstChildElementByName(node, "SegmentTemplate" ), info);
     if(node->hasAttribute("timescale"))
-        info->setTimescale(Integer<uint64_t>(node->getAttributeValue("timescale")));
+        info->addAttribute(new TimescaleAttr(Timescale(Integer<uint64_t>(node->getAttributeValue("timescale")))));
 
     parseAvailability<SegmentInformation>(mpd, node, info);
 
@@ -354,11 +392,11 @@ void    IsoffMainParser::parseRepresentations (MPD *mpd, Node *adaptationSetNode
         /* Empty Representation with just baseurl (ex: subtitles) */
         if(i_total == 0 &&
            (currentRepresentation->baseUrl.Get() && !currentRepresentation->baseUrl.Get()->empty()) &&
-            adaptationSet->getSegment(SegmentInformation::INFOTYPE_MEDIA, 0) == NULL)
+            adaptationSet->getMediaSegment(0) == NULL)
         {
             SegmentBase *base = new (std::nothrow) SegmentBase(currentRepresentation);
             if(base)
-                currentRepresentation->setSegmentBase(base);
+                currentRepresentation->addAttribute(base);
         }
 
         adaptationSet->addRepresentation(currentRepresentation);
@@ -371,34 +409,19 @@ size_t IsoffMainParser::parseSegmentBase(MPD *mpd, Node * segmentBaseNode, Segme
     if(!segmentBaseNode || !(base = new (std::nothrow) SegmentBase(info)))
         return 0;
 
-    if(segmentBaseNode->hasAttribute("indexRange"))
-    {
-        size_t start = 0, end = 0;
-        if (std::sscanf(segmentBaseNode->getAttributeValue("indexRange").c_str(), "%zu-%zu", &start, &end) == 2)
-        {
-            IndexSegment *index = new (std::nothrow) DashIndexSegment(info);
-            if(index)
-            {
-                index->setByteRange(start, end);
-                base->indexSegment.Set(index);
-                /* index must be before data, so data starts at index end */
-                base->setByteRange(end + 1, 0);
-            }
-        }
-    }
+    parseSegmentBaseType(mpd, segmentBaseNode, base, info);
 
-    parseInitSegment(DOMHelper::getFirstChildElementByName(segmentBaseNode, "Initialization"), base, info);
     parseAvailability<SegmentInformation>(mpd, segmentBaseNode, info);
 
     if(!base->initialisationSegment.Get() && base->indexSegment.Get() && base->indexSegment.Get()->getOffset())
     {
-        Segment *initSeg = new InitSegment( info );
+        InitSegment *initSeg = new InitSegment( info );
         initSeg->setSourceUrl(base->getUrlSegment().toString());
         initSeg->setByteRange(0, base->indexSegment.Get()->getOffset() - 1);
         base->initialisationSegment.Set(initSeg);
     }
 
-    info->setSegmentBase(base);
+    info->addAttribute(base);
 
     return 1;
 }
@@ -412,13 +435,7 @@ size_t IsoffMainParser::parseSegmentList(MPD *mpd, Node * segListNode, SegmentIn
         SegmentList *list;
         if((list = new (std::nothrow) SegmentList(info)))
         {
-            parseInitSegment(DOMHelper::getFirstChildElementByName(segListNode, "Initialization"), list, info);
-
-            if(segListNode->hasAttribute("duration"))
-                list->duration.Set(Integer<stime_t>(segListNode->getAttributeValue("duration")));
-
-            if(segListNode->hasAttribute("timescale"))
-                list->setTimescale(Integer<uint64_t>(segListNode->getAttributeValue("timescale")));
+            parseMultipleSegmentBaseType(mpd, segListNode, list, info);
 
             parseAvailability<SegmentInformation>(mpd, segListNode, info);
 
@@ -443,11 +460,12 @@ size_t IsoffMainParser::parseSegmentList(MPD *mpd, Node * segListNode, SegmentIn
                     seg->setByteRange(atoi(range.substr(0, pos).c_str()), atoi(range.substr(pos + 1, range.size()).c_str()));
                 }
 
-                if(list->duration.Get())
+                stime_t duration = list->inheritDuration();
+                if(duration)
                 {
                     seg->startTime.Set(nzStartTime);
-                    seg->duration.Set(list->duration.Get());
-                    nzStartTime += list->duration.Get();
+                    seg->duration.Set(duration);
+                    nzStartTime += duration;
                 }
 
                 seg->setSequenceNumber(total);
@@ -462,12 +480,12 @@ size_t IsoffMainParser::parseSegmentList(MPD *mpd, Node * segListNode, SegmentIn
     return total;
 }
 
-void IsoffMainParser::parseInitSegment(Node *initNode, Initializable<Segment> *init, SegmentInformation *parent)
+void IsoffMainParser::parseInitSegment(Node *initNode, Initializable<InitSegment> *init, SegmentInformation *parent)
 {
     if(!initNode)
         return;
 
-    Segment *seg = new InitSegment( parent );
+    InitSegment *seg = new InitSegment( parent );
     seg->setSourceUrl(initNode->getAttributeValue("sourceURL"));
 
     if(initNode->hasAttribute("range"))
@@ -480,7 +498,7 @@ void IsoffMainParser::parseInitSegment(Node *initNode, Initializable<Segment> *i
     init->initialisationSegment.Set(seg);
 }
 
-void IsoffMainParser::parseTimeline(Node *node, MediaSegmentTemplate *templ)
+void IsoffMainParser::parseTimeline(Node *node, AbstractMultipleSegmentBaseType *base)
 {
     if(!node)
         return;
@@ -488,10 +506,10 @@ void IsoffMainParser::parseTimeline(Node *node, MediaSegmentTemplate *templ)
     uint64_t number = 0;
     if(node->hasAttribute("startNumber"))
         number = Integer<uint64_t>(node->getAttributeValue("startNumber"));
-    else if(templ->inheritStartNumber())
-        number = templ->inheritStartNumber();
+    else if(base->inheritStartNumber())
+        number = base->inheritStartNumber();
 
-    SegmentTimeline *timeline = new (std::nothrow) SegmentTimeline(templ);
+    SegmentTimeline *timeline = new (std::nothrow) SegmentTimeline(base);
     if(timeline)
     {
         std::vector<Node *> elements = DOMHelper::getElementByTagName(node, "S", false);
@@ -519,7 +537,8 @@ void IsoffMainParser::parseTimeline(Node *node, MediaSegmentTemplate *templ)
 
             number += (1 + r);
         }
-        templ->setSegmentTimeline(timeline);
+        //base->setSegmentTimeline(timeline);
+        base->addAttribute(timeline);
     }
 }
 

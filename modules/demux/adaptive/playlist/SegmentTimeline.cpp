@@ -24,22 +24,19 @@
 #endif
 
 #include "SegmentTimeline.h"
+#include "SegmentBaseType.hpp"
+#include "SegmentInformation.hpp"
 
 #include <algorithm>
+#include <sstream>
 
 using namespace adaptive::playlist;
 
-SegmentTimeline::SegmentTimeline(TimescaleAble *parent)
-    :TimescaleAble(parent)
+SegmentTimeline::SegmentTimeline(AbstractMultipleSegmentBaseType *parent_)
+    : AttrsNode(Type::TIMELINE, parent_)
 {
     totalLength = 0;
-}
-
-SegmentTimeline::SegmentTimeline(uint64_t scale)
-    :TimescaleAble(NULL)
-{
-    setTimescale(scale);
-    totalLength = 0;
+    parent = parent_;
 }
 
 SegmentTimeline::~SegmentTimeline()
@@ -165,6 +162,21 @@ uint64_t SegmentTimeline::minElementNumber() const
     if(elements.empty())
         return 0;
     return elements.front()->number;
+}
+
+uint64_t SegmentTimeline::getElementIndexBySequence(uint64_t number) const
+{
+    std::list<Element *>::const_iterator it;
+    for(it = elements.begin(); it != elements.end(); ++it)
+    {
+        const Element *el = *it;
+        if(number >= el->number)
+        {
+            if(number <= el->number + el->r)
+                return std::distance(elements.begin(), it);
+        }
+    }
+    return std::numeric_limits<uint64_t>::max();
 }
 
 void SegmentTimeline::pruneByPlaybackTime(vlc_tick_t time)

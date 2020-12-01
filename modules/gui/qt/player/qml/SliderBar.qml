@@ -81,7 +81,7 @@ Slider {
         width: control.availableWidth
         implicitHeight: control.implicitHeight
         height: implicitHeight
-        color:  isMiniplayer ? (VLCStyle.colors.sliderBarMiniplayerBgColor) : VLCStyle.colors.setColorAlpha( VLCStyle.colors.playerFg, 0.7 )
+        color:  isMiniplayer ? (VLCStyle.colors.sliderBarMiniplayerBgColor) : VLCStyle.colors.setColorAlpha( VLCStyle.colors.playerFg, 0.2 )
         radius: implicitHeight
 
         MouseArea {
@@ -99,7 +99,10 @@ Slider {
             }
             onReleased: control._isHold = false
             onPositionChanged: function (event) {
-                if (pressed && (event.x <= control.width)) {
+                if (pressed) {
+                    if (event.x < 0) event.x = 0;
+                    else if (event.x > control.width) event.x = control.width;
+
                     control.value = event.x / control.width
                     player.position = control.value
                 }

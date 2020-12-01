@@ -39,9 +39,6 @@
 using namespace adaptive::http;
 using namespace adaptive::playlist;
 
-const int ISegment::SEQUENCE_INVALID = 0;
-const int ISegment::SEQUENCE_FIRST   = 1;
-
 ISegment::ISegment(const ICanonicalUrl *parent):
     ICanonicalUrl( parent ),
     startByte  (0),
@@ -51,7 +48,7 @@ ISegment::ISegment(const ICanonicalUrl *parent):
     classId = CLASSID_ISEGMENT;
     startTime.Set(0);
     duration.Set(0);
-    sequence = SEQUENCE_INVALID;
+    sequence = 0;
     templated = false;
     discontinuity = false;
 }
@@ -122,7 +119,7 @@ void ISegment::setByteRange(size_t start, size_t end)
 
 void ISegment::setSequenceNumber(uint64_t seq)
 {
-    sequence = SEQUENCE_FIRST + seq;
+    sequence = seq;
 }
 
 uint64_t ISegment::getSequenceNumber() const
@@ -209,15 +206,14 @@ void Segment::addSubSegment(SubSegment *subsegment)
     {
         /* Use our own sequence number, and since it it now
            uneffective, also for next subsegments numbering */
-        subsegment->setSequenceNumber(getSequenceNumber());
-        setSequenceNumber(getSequenceNumber());
+        subsegment->setSequenceNumber(subsegments.size());
     }
     subsegments.push_back(subsegment);
 }
 
 Segment::~Segment()
 {
-    std::vector<SubSegment*>::iterator it;
+    std::vector<Segment*>::iterator it;
     for(it=subsegments.begin();it!=subsegments.end();++it)
         delete *it;
 }
@@ -239,7 +235,7 @@ void Segment::debug(vlc_object_t *obj, int indent) const
         std::string text(indent, ' ');
         text.append("Segment");
         msg_Dbg(obj, "%s", text.c_str());
-        std::vector<SubSegment *>::const_iterator l;
+        std::vector<Segment *>::const_iterator l;
         for(l = subsegments.begin(); l != subsegments.end(); ++l)
             (*l)->debug(obj, indent + 1);
     }
@@ -260,20 +256,9 @@ Url Segment::getUrlSegment() const
     }
 }
 
-std::vector<ISegment*> Segment::subSegments()
+const std::vector<Segment*> & Segment::subSegments() const
 {
-    std::vector<ISegment*> list;
-    if(!subsegments.empty())
-    {
-        std::vector<SubSegment*>::iterator it;
-        for(it=subsegments.begin();it!=subsegments.end();++it)
-            list.push_back(*it);
-    }
-    else
-    {
-        list.push_back(this);
-    }
-    return list;
+    return subsegments;
 }
 
 InitSegment::InitSegment(ICanonicalUrl *parent) :
@@ -290,33 +275,12 @@ IndexSegment::IndexSegment(ICanonicalUrl *parent) :
     classId = CLASSID_INDEXSEGMENT;
 }
 
-SubSegment::SubSegment(ISegment *main, size_t start, size_t end) :
-    ISegment(main)
+SubSegment::SubSegment(Segment *main, size_t start, size_t end) :
+    Segment(main)
 {
     setByteRange(start, end);
     debugName = "SubSegment";
     classId = CLASSID_SUBSEGMENT;
 }
 
-SegmentChunk* SubSegment::createChunk(AbstractChunkSource *source, BaseRepresentation *rep)
-{
-     /* act as factory */
-    return new (std::nothrow) SegmentChunk(source, rep);
-}
 
-Url SubSegment::getUrlSegment() const
-{
-    return getParentUrlSegment();
-}
-
-std::vector<ISegment*> SubSegment::subSegments()
-{
-    std::vector<ISegment*> list;
-    list.push_back(this);
-    return list;
-}
-
-void SubSegment::addSubSegment(SubSegment *)
-{
-
-}

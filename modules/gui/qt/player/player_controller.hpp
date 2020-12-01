@@ -135,6 +135,9 @@ public:
     Q_PROPERTY(VLCTick audioDelay READ getAudioDelay WRITE setAudioDelay NOTIFY audioDelayChanged)
     Q_PROPERTY(VLCTick subtitleDelay READ getSubtitleDelay WRITE setSubtitleDelay NOTIFY subtitleDelayChanged)
     Q_PROPERTY(VLCTick secondarySubtitleDelay READ getSecondarySubtitleDelay WRITE setSecondarySubtitleDelay NOTIFY secondarySubtitleDelayChanged)
+    Q_PROPERTY(int audioDelayMS READ getAudioDelayMS WRITE setAudioDelayMS NOTIFY audioDelayChanged)
+    Q_PROPERTY(int subtitleDelayMS READ getSubtitleDelayMS WRITE setSubtitleDelayMS NOTIFY subtitleDelayChanged)
+    Q_PROPERTY(int secondarySubtitleDelayMS READ getSecondarySubtitleDelayMS WRITE setSecondarySubtitleDelayMS NOTIFY secondarySubtitleDelayChanged)
     Q_PROPERTY(float subtitleFPS READ getSubtitleFPS WRITE setSubtitleFPS NOTIFY subtitleFPSChanged)
 
     //title/chapters/menu
@@ -222,6 +225,7 @@ public slots:
     Q_INVOKABLE void toggleABloopState();
     Q_INVOKABLE void snapshot();
     Q_INVOKABLE void toggleRecord();
+    Q_INVOKABLE void toggleVisualization();
 
 public:
     PlayerController( intf_thread_t * );
@@ -277,6 +281,7 @@ public slots:
     void updateTimeFromTimer();
     bool canRestorePlayback() const;
     void restorePlaybackPos();
+    void openVLsub();
 
     //tracks
     TrackListModel* getVideoTracks();
@@ -289,6 +294,12 @@ public slots:
     VLCTick getSecondarySubtitleDelay() const;
     void setSubtitleDelay( VLCTick );
     void setSecondarySubtitleDelay( VLCTick );
+    int getAudioDelayMS() const;
+    void setAudioDelayMS( int );
+    int getSubtitleDelayMS() const;
+    void setSubtitleDelayMS( int );
+    int getSecondarySubtitleDelayMS() const;
+    void setSecondarySubtitleDelayMS( int );
     float getSubtitleFPS( ) const;
     void setSubtitleFPS( float );
 

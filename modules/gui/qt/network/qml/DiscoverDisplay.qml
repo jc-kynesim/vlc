@@ -49,6 +49,7 @@ Widgets.PageLoader {
     onCurrentItemChanged: {
         sortModel = currentItem.sortModel
         contentModel = currentItem.model
+        localMenuDelegate = !!currentItem.localMenuDelegate ? currentItem.localMenuDelegate : menuDelegate
     }
 
 
@@ -65,6 +66,19 @@ Widgets.PageLoader {
                            name: e.name,
                        })
             })
+        }
+    }
+
+    property Component localMenuDelegate: menuDelegate
+
+    Component {
+        id: menuDelegate
+
+        Widgets.LocalTabBar {
+            currentView: root.view
+            model: tabModel
+
+            onClicked: root.loadIndex(index)
         }
     }
 }

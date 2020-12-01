@@ -51,6 +51,11 @@
 static int  Open (vlc_object_t *);
 static void Close(vlc_object_t *);
 
+#define NETSYNC_TEXT N_("Network synchronisation" )
+#define NETSYNC_LONGTEXT N_( "This allows you to remotely " \
+        "synchronise clocks for server and client. The detailed settings " \
+        "are available in Advanced / Network Sync." )
+
 #define NETSYNC_TEXT N_("Network master clock")
 #define NETSYNC_LONGTEXT N_("When set, " \
   "this VLC instance will act as the master clock for synchronization " \
@@ -64,12 +69,20 @@ static void Close(vlc_object_t *);
 #define NETSYNC_TIMEOUT_LONGTEXT N_("Length of time (in ms) " \
   "until aborting data reception.")
 
+static void AutoRun(libvlc_int_t *libvlc)
+{
+    if (var_InheritBool(libvlc, "network-synchronisation"))
+        intf_Create(libvlc, MODULE_STRING);
+}
+
 vlc_module_begin()
     set_shortname(N_("Network Sync"))
     set_description(N_("Network synchronization"))
     set_category(CAT_ADVANCED)
     set_subcategory(SUBCAT_ADVANCED_MISC)
 
+    add_bool("network-synchronisation", false, NETSYNC_TEXT, NETSYNC_LONGTEXT,
+             true)
     add_bool("netsync-master", false,
               NETSYNC_TEXT, NETSYNC_LONGTEXT, true)
     add_string("netsync-master-ip", NULL, MIP_TEXT, MIP_LONGTEXT,
@@ -79,6 +92,10 @@ vlc_module_begin()
 
     set_capability("interface", 0)
     set_callbacks(Open, Close)
+
+    add_submodule()
+    set_capability("autorun", 40)
+    set_callback(AutoRun)
 vlc_module_end()
 
 /*****************************************************************************

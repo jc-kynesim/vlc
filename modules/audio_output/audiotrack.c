@@ -40,6 +40,8 @@
 
 #define AUDIOTIMESTAMP_INTERVAL_US VLC_TICK_FROM_MS(500) // 500ms
 
+#define AUDIOTRACK_MAX_BUFFER_US VLC_TICK_FROM_MS(750) // 750ms
+
 static int  Open( vlc_object_t * );
 static void Close( vlc_object_t * );
 static void Stop( audio_output_t * );
@@ -98,7 +100,7 @@ typedef struct
 
     /* Used by AudioTrack_getPlaybackHeadPosition */
     struct {
-        uint32_t i_wrap_count;
+        uint64_t i_wrap_count;
         uint32_t i_last;
     } headpos;
 
@@ -106,8 +108,11 @@ typedef struct
     struct {
         jobject p_obj; /* AudioTimestamp ref */
         vlc_tick_t i_frame_us;
-        jlong i_frame_pos;
-        vlc_tick_t i_play_time; /* time when play was called */
+
+        jlong i_frame_post_last;
+        uint64_t i_frame_wrap_count;
+        uint64_t i_frame_pos;
+
         vlc_tick_t i_last_time;
     } timestamp;
 
@@ -118,7 +123,6 @@ typedef struct
         vlc_tick_t p_us[SMOOTHPOS_SAMPLE_COUNT];
         vlc_tick_t i_us;
         vlc_tick_t i_last_time;
-        vlc_tick_t i_latency_us;
     } smoothpos;
 
     uint32_t i_max_audiotrack_samples;
@@ -144,8 +148,6 @@ typedef struct
     bool b_thread_running;  /* Set to false by aout to stop the thread */
     bool b_thread_paused;   /* If true, the thread won't process any data, see
                              * Pause() */
-    bool b_thread_waiting;  /* If true, the thread is waiting for enough spaces
-                             * in AudioTrack internal buffers */
 
     uint64_t i_samples_written; /* Number of samples written since last flush */
     bool b_audiotrack_exception; /* True if audiotrack threw an exception */
@@ -211,6 +213,8 @@ static struct
         jmethodID writeShortV23;
         jmethodID writeBufferV21;
         jmethodID writeFloat;
+        jmethodID getBufferSizeInFrames;
+        jmethodID getLatency;
         jmethodID getPlaybackHeadPosition;
         jmethodID getTimestamp;
         jmethodID getMinBufferSize;
@@ -274,10 +278,6 @@ static struct
         bool has_ERROR_DEAD_OBJECT;
         jint STREAM_MUSIC;
     } AudioManager;
-    struct {
-        jclass clazz;
-        jmethodID getOutputLatency;
-    } AudioSystem;
     struct {
         jclass clazz;
         jmethodID ctor;
@@ -364,6 +364,13 @@ InitJNIFields( audio_output_t *p_aout, JNIEnv* env )
     } else
         GET_ID( GetMethodID, AudioTrack.write, "write", "([BII)I", true );
 
+    GET_ID( GetMethodID, AudioTrack.getBufferSizeInFrames,
+            "getBufferSizeInFrames", "()I", false );
+
+#ifdef AUDIOTRACK_HW_LATENCY
+    GET_ID( GetMethodID, AudioTrack.getLatency, "getLatency", "()I", false );
+#endif
+
     GET_ID( GetMethodID, AudioTrack.getTimestamp,
             "getTimestamp", "(Landroid/media/AudioTimestamp;)Z", false );
     GET_ID( GetMethodID, AudioTrack.getPlaybackHeadPosition,
@@ -430,17 +437,6 @@ InitJNIFields( audio_output_t *p_aout, JNIEnv* env )
         GET_ID( GetFieldID, AudioTimestamp.nanoTime,
                 "nanoTime", "J", true );
     }
-
-#ifdef AUDIOTRACK_HW_LATENCY
-    /* AudioSystem class init */
-    GET_CLASS( "android/media/AudioSystem", false );
-    if( clazz )
-    {
-        jfields.AudioSystem.clazz = (jclass) (*env)->NewGlobalRef( env, clazz );
-        GET_ID( GetStaticMethodID, AudioSystem.getOutputLatency,
-                "getOutputLatency", "(I)I", false );
-    }
-#endif
 
     /* AudioFormat class init */
     GET_CLASS( "android/media/AudioFormat", true );
@@ -574,6 +570,14 @@ frames_to_bytes( aout_sys_t *p_sys, uint64_t i_frames )
 }
 #define FRAMES_TO_BYTES(x) frames_to_bytes( p_sys, (x) )
 
+static inline uint64_t
+us_to_frames( aout_sys_t *p_sys, vlc_tick_t i_us )
+{
+    return samples_from_vlc_tick( i_us, p_sys->fmt.i_rate );
+}
+#define US_TO_FRAMES(x) us_to_frames( p_sys, x)
+#define US_TO_BYTES(x) frames_to_bytes( p_sys, us_to_frames( p_sys, x ) )
+
 /**
  * Get the AudioTrack position
  *
@@ -603,7 +607,7 @@ AudioTrack_getPlaybackHeadPosition( JNIEnv *env, audio_output_t *p_aout )
     if( p_sys->headpos.i_last > i_pos )
         p_sys->headpos.i_wrap_count++;
     p_sys->headpos.i_last = i_pos;
-    return p_sys->headpos.i_last + ((uint64_t)p_sys->headpos.i_wrap_count << 32);
+    return p_sys->headpos.i_last + (p_sys->headpos.i_wrap_count << 32);
 }
 
 /**
@@ -612,13 +616,16 @@ AudioTrack_getPlaybackHeadPosition( JNIEnv *env, audio_output_t *p_aout )
  * Called after flush, or start
  */
 static void
-AudioTrack_ResetPlaybackHeadPosition( JNIEnv *env, audio_output_t *p_aout )
+AudioTrack_ResetWrapCount( JNIEnv *env, audio_output_t *p_aout )
 {
     (void) env;
     aout_sys_t *p_sys = p_aout->sys;
 
     p_sys->headpos.i_last = 0;
     p_sys->headpos.i_wrap_count = 0;
+
+    p_sys->timestamp.i_frame_post_last = 0;
+    p_sys->timestamp.i_frame_wrap_count = 0;
 }
 
 /**
@@ -630,7 +637,6 @@ AudioTrack_ResetPositions( JNIEnv *env, audio_output_t *p_aout )
     aout_sys_t *p_sys = p_aout->sys;
     VLC_UNUSED( env );
 
-    p_sys->timestamp.i_play_time = vlc_tick_now();
     p_sys->timestamp.i_last_time = 0;
     p_sys->timestamp.i_frame_us = 0;
     p_sys->timestamp.i_frame_pos = 0;
@@ -639,7 +645,6 @@ AudioTrack_ResetPositions( JNIEnv *env, audio_output_t *p_aout )
     p_sys->smoothpos.i_idx = 0;
     p_sys->smoothpos.i_last_time = 0;
     p_sys->smoothpos.i_us = 0;
-    p_sys->smoothpos.i_latency_us = 0;
 }
 
 /**
@@ -651,8 +656,31 @@ AudioTrack_Reset( JNIEnv *env, audio_output_t *p_aout )
     aout_sys_t *p_sys = p_aout->sys;
 
     AudioTrack_ResetPositions( env, p_aout );
-    AudioTrack_ResetPlaybackHeadPosition( env, p_aout );
+    AudioTrack_ResetWrapCount( env, p_aout );
     p_sys->i_samples_written = 0;
+}
+
+static vlc_tick_t
+AudioTrack_GetLatencyUs( JNIEnv *env, audio_output_t *p_aout )
+{
+    aout_sys_t *p_sys = p_aout->sys;
+
+    if( jfields.AudioTrack.getLatency )
+    {
+        int i_latency_ms = JNI_AT_CALL_INT( getLatency );
+
+        /* getLatency() includes the latency due to AudioTrack buffer size,
+         * AudioMixer (if any) and audio hardware driver. We only need the
+         * audio hardware latency */
+        if( i_latency_ms > 0 )
+        {
+            vlc_tick_t i_latency_us = VLC_TICK_FROM_MS( i_latency_ms )
+                - FRAMES_TO_US( p_sys->i_max_audiotrack_samples );
+            return i_latency_us >= 0 ? i_latency_us : 0;
+        }
+    }
+
+    return 0;
 }
 
 /**
@@ -672,6 +700,8 @@ AudioTrack_GetSmoothPositionUs( JNIEnv *env, audio_output_t *p_aout )
     if( i_now - p_sys->smoothpos.i_last_time >= SMOOTHPOS_INTERVAL_US )
     {
         i_audiotrack_us = FRAMES_TO_US( AudioTrack_getPlaybackHeadPosition( env, p_aout ) );
+        if( i_audiotrack_us == 0 )
+            goto bailout;
 
         p_sys->smoothpos.i_last_time = i_now;
 
@@ -688,21 +718,12 @@ AudioTrack_GetSmoothPositionUs( JNIEnv *env, audio_output_t *p_aout )
             p_sys->smoothpos.i_us += p_sys->smoothpos.p_us[i];
         p_sys->smoothpos.i_us /= p_sys->smoothpos.i_count;
 
-        if( jfields.AudioSystem.getOutputLatency )
-        {
-            int i_latency_ms = JNI_CALL( CallStaticIntMethod,
-                                         jfields.AudioSystem.clazz,
-                                         jfields.AudioSystem.getOutputLatency,
-                                         jfields.AudioManager.STREAM_MUSIC );
-
-            p_sys->smoothpos.i_latency_us = i_latency_ms > 0 ?
-                                            i_latency_ms * 1000L : 0;
-        }
     }
     if( p_sys->smoothpos.i_us != 0 )
-        return p_sys->smoothpos.i_us + i_now - p_sys->smoothpos.i_latency_us;
-    else
-        return 0;
+        return p_sys->smoothpos.i_us + i_now - AudioTrack_GetLatencyUs( env, p_aout );
+
+bailout:
+    return 0;
 }
 
 static vlc_tick_t
@@ -735,27 +756,37 @@ AudioTrack_GetTimestampPositionUs( JNIEnv *env, audio_output_t *p_aout )
     /* Fetch an AudioTrack timestamp every AUDIOTIMESTAMP_INTERVAL_US (500ms) */
     if( i_now - p_sys->timestamp.i_last_time >= AUDIOTIMESTAMP_INTERVAL_US )
     {
-        p_sys->timestamp.i_last_time = i_now;
-
         if( JNI_AT_CALL_BOOL( getTimestamp, p_sys->timestamp.p_obj ) )
         {
             p_sys->timestamp.i_frame_us = VLC_TICK_FROM_NS(JNI_AUDIOTIMESTAMP_GET_LONG( nanoTime ));
-            p_sys->timestamp.i_frame_pos = JNI_AUDIOTIMESTAMP_GET_LONG( framePosition );
+
+            /* the low-order 32 bits of position is in wrapping frame units
+             * similar to AudioTrack#getPlaybackHeadPosition. */
+            jlong i_frame_post_last = JNI_AUDIOTIMESTAMP_GET_LONG( framePosition );
+            if( p_sys->timestamp.i_frame_post_last > i_frame_post_last )
+                p_sys->timestamp.i_frame_wrap_count++;
+            p_sys->timestamp.i_frame_post_last = i_frame_post_last;
+            p_sys->timestamp.i_frame_pos = i_frame_post_last
+                                         + (p_sys->timestamp.i_frame_wrap_count << 32);
+
+            /* frame time should be after last play time
+             * frame time shouldn't be in the future
+             * frame time should be less than 10 seconds old */
+            if( p_sys->timestamp.i_frame_us != 0 && p_sys->timestamp.i_frame_pos != 0
+             && i_now > p_sys->timestamp.i_frame_us
+             && ( i_now - p_sys->timestamp.i_frame_us ) <= VLC_TICK_FROM_SEC(10) )
+                p_sys->timestamp.i_last_time = i_now;
+            else
+            {
+                p_sys->timestamp.i_last_time = 0;
+                p_sys->timestamp.i_frame_us = 0;
+            }
         }
         else
-        {
             p_sys->timestamp.i_frame_us = 0;
-            p_sys->timestamp.i_frame_pos = 0;
-        }
     }
 
-    /* frame time should be after last play time
-     * frame time shouldn't be in the future
-     * frame time should be less than 10 seconds old */
-    if( p_sys->timestamp.i_frame_us != 0 && p_sys->timestamp.i_frame_pos != 0
-     && p_sys->timestamp.i_frame_us > p_sys->timestamp.i_play_time
-     && i_now > p_sys->timestamp.i_frame_us
-     && ( i_now - p_sys->timestamp.i_frame_us ) <= VLC_TICK_FROM_SEC(10) )
+    if( p_sys->timestamp.i_frame_us != 0 )
     {
         vlc_tick_t i_time_diff = i_now - p_sys->timestamp.i_frame_us;
         jlong i_frames_diff = samples_from_vlc_tick(i_time_diff, p_sys->fmt.i_rate);
@@ -787,20 +818,12 @@ TimeGet( audio_output_t *p_aout, vlc_tick_t *restrict p_delay )
 /* Debug log for both delays */
 #if 0
 {
-    vlc_tick_t i_written_us = FRAMES_TO_US( p_sys->i_samples_written );
     vlc_tick_t i_ts_us = AudioTrack_GetTimestampPositionUs( env, p_aout );
-    vlc_tick_t i_smooth_us = 0;
+    vlc_tick_t i_smooth_us = AudioTrack_GetSmoothPositionUs(env, p_aout );
+    vlc_tick_t i_latency_us = AudioTrack_GetLatencyUs( env, p_aout );
 
-    if( i_ts_us > 0 )
-        i_smooth_us = AudioTrack_GetSmoothPositionUs(env, p_aout );
-    else if ( p_sys->smoothpos.i_us != 0 )
-        i_smooth_us = p_sys->smoothpos.i_us + vlc_tick_now()
-            - p_sys->smoothpos.i_latency_us;
-
-    msg_Err( p_aout, "TimeGet: TimeStamp: %lld, Smooth: %lld (latency: %lld)",
-                    i_ts_us ? i_written_us - i_ts_us : 0,
-                    i_smooth_us ? i_written_us - i_smooth_us : 0,
-                    p_sys->smoothpos.i_latency_us );
+    msg_Err( p_aout, "TimeGet: TimeStamp: %"PRId64", Smooth: %"PRId64" (latency: %"PRId64")",
+             i_ts_us, i_smooth_us, i_latency_us );
 }
 #endif
 
@@ -1060,6 +1083,12 @@ AudioTrack_Create( JNIEnv *env, audio_output_t *p_aout,
         return -1;
     }
     i_size = i_min_buffer_size * 2;
+
+    /* Clip the buffer size to a maximum safe size since audiotrack init will
+     * fail of the requested size is too big. */
+    const int i_max_size = US_TO_BYTES( AUDIOTRACK_MAX_BUFFER_US );
+    if( i_size > i_max_size )
+        i_size = i_max_size;
 
     /* create AudioTrack object */
     if( AudioTrack_New( env, p_aout, i_rate, i_channel_config,
@@ -1339,7 +1368,10 @@ Start( audio_output_t *p_aout, audio_sample_format_t *restrict p_fmt )
     if( i_ret != 0 )
         return VLC_EGENERIC;
 
-    p_sys->i_max_audiotrack_samples = BYTES_TO_FRAMES( p_sys->audiotrack_args.i_size );
+    if( jfields.AudioTrack.getBufferSizeInFrames )
+        p_sys->i_max_audiotrack_samples = JNI_AT_CALL_INT( getBufferSizeInFrames );
+    else
+        p_sys->i_max_audiotrack_samples = BYTES_TO_FRAMES( p_sys->audiotrack_args.i_size );
 
 #ifdef AUDIOTRACK_HW_LATENCY
     if( jfields.AudioTimestamp.clazz )
@@ -1579,9 +1611,9 @@ Stop( audio_output_t *p_aout )
  * that we won't wait in AudioTrack.write() method.
  */
 static int
-AudioTrack_PlayByteArray( JNIEnv *env, audio_output_t *p_aout,
-                          size_t i_data_size, size_t i_data_offset,
-                          bool b_force )
+AudioTrack_WriteByteArray( JNIEnv *env, audio_output_t *p_aout,
+                           size_t i_data_size, size_t i_data_offset,
+                           bool b_force )
 {
     aout_sys_t *p_sys = p_aout->sys;
     uint64_t i_samples;
@@ -1623,8 +1655,8 @@ AudioTrack_PlayByteArray( JNIEnv *env, audio_output_t *p_aout,
  * flags.
  */
 static int
-AudioTrack_PlayByteArrayV23( JNIEnv *env, audio_output_t *p_aout,
-                             size_t i_data_size, size_t i_data_offset )
+AudioTrack_WriteByteArrayV23( JNIEnv *env, audio_output_t *p_aout,
+                              size_t i_data_size, size_t i_data_offset )
 {
     aout_sys_t *p_sys = p_aout->sys;
 
@@ -1639,8 +1671,8 @@ AudioTrack_PlayByteArrayV23( JNIEnv *env, audio_output_t *p_aout,
  * flags.
  */
 static int
-AudioTrack_PlayByteBuffer( JNIEnv *env, audio_output_t *p_aout,
-                           size_t i_data_size, size_t i_data_offset )
+AudioTrack_WriteByteBuffer( JNIEnv *env, audio_output_t *p_aout,
+                            size_t i_data_size, size_t i_data_offset )
 {
     aout_sys_t *p_sys = p_aout->sys;
 
@@ -1676,7 +1708,7 @@ AudioTrack_PlayByteBuffer( JNIEnv *env, audio_output_t *p_aout,
  * flags.
  */
 static int
-AudioTrack_PlayShortArrayV23( JNIEnv *env, audio_output_t *p_aout,
+AudioTrack_WriteShortArrayV23( JNIEnv *env, audio_output_t *p_aout,
                                size_t i_data_size, size_t i_data_offset )
 {
     aout_sys_t *p_sys = p_aout->sys;
@@ -1697,8 +1729,8 @@ AudioTrack_PlayShortArrayV23( JNIEnv *env, audio_output_t *p_aout,
  * flags.
  */
 static int
-AudioTrack_PlayFloatArray( JNIEnv *env, audio_output_t *p_aout,
-                           size_t i_data_size, size_t i_data_offset )
+AudioTrack_WriteFloatArray( JNIEnv *env, audio_output_t *p_aout,
+                            size_t i_data_size, size_t i_data_offset )
 {
     aout_sys_t *p_sys = p_aout->sys;
     int i_ret;
@@ -1713,8 +1745,8 @@ AudioTrack_PlayFloatArray( JNIEnv *env, audio_output_t *p_aout,
 }
 
 static int
-AudioTrack_Play( JNIEnv *env, audio_output_t *p_aout, size_t i_data_size,
-                 size_t i_data_offset, bool b_force )
+AudioTrack_Write( JNIEnv *env, audio_output_t *p_aout, size_t i_data_size,
+                  size_t i_data_offset, bool b_force )
 {
     aout_sys_t *p_sys = p_aout->sys;
     int i_ret;
@@ -1722,24 +1754,24 @@ AudioTrack_Play( JNIEnv *env, audio_output_t *p_aout, size_t i_data_size,
     switch( p_sys->i_write_type )
     {
     case WRITE_BYTEARRAYV23:
-        i_ret = AudioTrack_PlayByteArrayV23( env, p_aout, i_data_size,
-                                             i_data_offset );
-        break;
-    case WRITE_BYTEBUFFER:
-        i_ret = AudioTrack_PlayByteBuffer( env, p_aout, i_data_size,
-                                           i_data_offset );
-        break;
-    case WRITE_SHORTARRAYV23:
-        i_ret = AudioTrack_PlayShortArrayV23( env, p_aout, i_data_size,
+        i_ret = AudioTrack_WriteByteArrayV23( env, p_aout, i_data_size,
                                               i_data_offset );
         break;
+    case WRITE_BYTEBUFFER:
+        i_ret = AudioTrack_WriteByteBuffer( env, p_aout, i_data_size,
+                                            i_data_offset );
+        break;
+    case WRITE_SHORTARRAYV23:
+        i_ret = AudioTrack_WriteShortArrayV23( env, p_aout, i_data_size,
+                                               i_data_offset );
+        break;
     case WRITE_BYTEARRAY:
-        i_ret = AudioTrack_PlayByteArray( env, p_aout, i_data_size,
-                                          i_data_offset, b_force );
+        i_ret = AudioTrack_WriteByteArray( env, p_aout, i_data_size,
+                                           i_data_offset, b_force );
         break;
     case WRITE_FLOATARRAY:
-        i_ret = AudioTrack_PlayFloatArray( env, p_aout, i_data_size,
-                                           i_data_offset );
+        i_ret = AudioTrack_WriteFloatArray( env, p_aout, i_data_size,
+                                            i_data_offset );
         break;
     default:
         vlc_assert_unreachable();
@@ -1783,7 +1815,6 @@ AudioTrack_Thread( void *p_data )
     audio_output_t *p_aout = p_data;
     aout_sys_t *p_sys = p_aout->sys;
     JNIEnv *env = GET_ENV();
-    vlc_tick_t i_play_deadline = 0;
     vlc_tick_t i_last_time_blocked = 0;
 
     if( !env )
@@ -1797,20 +1828,6 @@ AudioTrack_Thread( void *p_data )
         size_t i_data_size;
 
         vlc_mutex_lock( &p_sys->lock );
-
-        /* Wait for free space in Audiotrack internal buffer */
-        if( i_play_deadline != 0 && vlc_tick_now() < i_play_deadline )
-        {
-            /* Don't wake up the thread when there is new data since we are
-             * waiting for more space */
-            p_sys->b_thread_waiting = true;
-            while( p_sys->b_thread_running && i_ret == 0 )
-                i_ret = vlc_cond_timedwait( &p_sys->thread_cond,
-                                            &p_sys->lock,
-                                            i_play_deadline );
-            i_play_deadline = 0;
-            p_sys->b_thread_waiting = false;
-        }
 
         /* Wait for not paused state */
         while( p_sys->b_thread_running && p_sys->b_thread_paused )
@@ -1846,26 +1863,35 @@ AudioTrack_Thread( void *p_data )
         i_data_size = __MIN( p_sys->circular.i_size - i_data_offset,
                              p_sys->circular.i_write - p_sys->circular.i_read );
 
-        i_ret = AudioTrack_Play( env, p_aout, i_data_size, i_data_offset,
-                                 b_forced );
+        i_ret = AudioTrack_Write( env, p_aout, i_data_size, i_data_offset,
+                                  b_forced );
         if( i_ret >= 0 )
         {
-            if( p_sys->i_write_type == WRITE_BYTEARRAY )
-            {
-                if( i_ret != 0 )
-                    i_last_time_blocked = 0;
-                else if( i_last_time_blocked == 0 )
-                    i_last_time_blocked = vlc_tick_now();
-            }
-
             if( i_ret == 0 )
-                i_play_deadline = vlc_tick_now() + __MAX( 10000, FRAMES_TO_US(
-                                  p_sys->i_max_audiotrack_samples / 5 ) );
+            {
+                vlc_tick_t i_now = vlc_tick_now();
+
+                /* cf. b_forced HACK comment */
+                if( p_sys->i_write_type == WRITE_BYTEARRAY && i_last_time_blocked == 0 )
+                    i_last_time_blocked = i_now;
+
+                /* Wait for free space in Audiotrack internal buffer */
+                vlc_tick_t i_play_deadline = i_now + __MAX( 10000,
+                        FRAMES_TO_US( p_sys->i_max_audiotrack_samples / 5 ) );
+
+                while( p_sys->b_thread_running && i_ret == 0 )
+                    i_ret = vlc_cond_timedwait( &p_sys->thread_cond, &p_sys->lock,
+                                                i_play_deadline );
+
+            }
             else
+            {
+                i_last_time_blocked = 0;
                 p_sys->circular.i_read += i_ret;
+                vlc_cond_signal( &p_sys->aout_cond );
+            }
         }
 
-        vlc_cond_signal( &p_sys->aout_cond );
         vlc_mutex_unlock( &p_sys->lock );
     }
 
@@ -2005,8 +2031,7 @@ Play( audio_output_t *p_aout, block_t *p_buffer, vlc_tick_t i_date )
         i_buffer_offset += i_data_size;
         p_sys->circular.i_write += i_data_size;
 
-        if( !p_sys->b_thread_waiting )
-            vlc_cond_signal( &p_sys->thread_cond );
+        vlc_cond_signal( &p_sys->thread_cond );
     }
 
 bailout:

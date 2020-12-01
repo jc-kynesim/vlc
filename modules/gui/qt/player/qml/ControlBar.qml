@@ -84,36 +84,94 @@ Widgets.NavigableFocusScope {
             Layout.alignment: Qt.AlignLeft | Qt.AlignTop
             Layout.fillWidth: true
             enabled: player.playingState == PlayerController.PLAYING_STATE_PLAYING || player.playingState == PlayerController.PLAYING_STATE_PAUSED
-            Keys.onDownPressed: buttons.focus = true
+            Keys.onDownPressed: buttons_left.focus = true
 
             parentWindow: mainInterfaceRect
         }
 
-
-        PlayerButtonsLayout {
-            id: buttons
-
-            model: playerControlBarModel
-            forceColors: true
-
-            Layout.fillHeight: true
+        Item {
             Layout.fillWidth: true
+            Layout.bottomMargin: VLCStyle.margin_xsmall
+            Layout.preferredHeight: Math.max(buttons_left.implicitHeight, buttons_center.implicitHeight, buttons_right.implicitHeight)
 
-            focus: true
+            PlayerButtonsLayout {
+                id: buttons_left
 
-            navigationParent: root
-            navigationUp: function(index) {
-                if (trackPositionSlider.enabled)
-                    trackPositionSlider.focus = true
-                else
-                    root.navigationUp(index)
+                model: playerControlBarModel_left
+                forceColors: true
+
+                focus: true
+
+                anchors.left: parent.left
+
+                visible: model.count > 0 && (playerControlBarModel_center.count > 0 ? ((x+width) < buttons_center.x) : true)
+
+                navigationParent: root
+                navigationUp: function(index) {
+                    if (trackPositionSlider.enabled)
+                        trackPositionSlider.focus = true
+                    else
+                        root.navigationUp(index)
+                }
+
+                navigationRightItem: buttons_center
+
+                Keys.priority: Keys.AfterItem
+                Keys.onPressed: defaultKeyAction(event, 0)
             }
 
+            PlayerButtonsLayout {
+                id: buttons_center
 
-            Keys.priority: Keys.AfterItem
-            Keys.onPressed: defaultKeyAction(event, 0)
+                model: playerControlBarModel_center
+                forceColors: true
+
+                focus: true
+
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                navigationParent: root
+                navigationUp: function(index) {
+                    if (trackPositionSlider.enabled)
+                        trackPositionSlider.focus = true
+                    else
+                        root.navigationUp(index)
+                }
+
+                navigationLeftItem: buttons_left
+                navigationRightItem: buttons_right
+
+                Keys.priority: Keys.AfterItem
+                Keys.onPressed: defaultKeyAction(event, 0)
+            }
+
+            PlayerButtonsLayout {
+                id: buttons_right
+
+                model: playerControlBarModel_right
+                forceColors: true
+
+                focus: true
+
+                anchors.right: parent.right
+
+                visible: model.count > 0 && (playerControlBarModel_center.count > 0 ? ((buttons_center.x + buttons_center.width) < x)
+                                                                              : !(((buttons_left.x + buttons_left.width) > x) && playerControlBarModel_left.count > 0))
+
+                navigationParent: root
+                navigationUp: function(index) {
+                    if (trackPositionSlider.enabled)
+                        trackPositionSlider.focus = true
+                    else
+                        root.navigationUp(index)
+                }
+
+                navigationLeftItem: buttons_center
+
+                Keys.priority: Keys.AfterItem
+                Keys.onPressed: defaultKeyAction(event, 0)
+            }
         }
-
     }
     Connections{
         target: mainInterface
@@ -121,9 +179,21 @@ Widgets.NavigableFocusScope {
     }
 
     PlayerControlBarModel{
-        id:playerControlBarModel
+        id:playerControlBarModel_left
         mainCtx: mainctx
-        configName: "MainPlayerToolbar"
+        configName: "MainPlayerToolbar-left"
+    }
+
+    PlayerControlBarModel{
+        id:playerControlBarModel_center
+        mainCtx: mainctx
+        configName: "MainPlayerToolbar-center"
+    }
+
+    PlayerControlBarModel{
+        id:playerControlBarModel_right
+        mainCtx: mainctx
+        configName: "MainPlayerToolbar-right"
     }
 
     ControlButtons{

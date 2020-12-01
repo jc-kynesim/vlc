@@ -1,43 +1,26 @@
 #include "navigation_history.hpp"
 #include <cassert>
+#include "network/networkmediamodel.hpp"
 
 NavigationHistory::NavigationHistory(QObject *parent)
-    : QObject(parent), m_position(-1)
+    : QObject(parent)
 {
-
 }
 
 QVariant NavigationHistory::getCurrent()
 {
-    return m_history[m_position];
+    return m_history.back();
 }
 
 bool NavigationHistory::isPreviousEmpty()
 {
-    return m_position < 1;
-}
-
-bool NavigationHistory::isNextEmpty()
-{
-    return m_position == m_history.length() - 1;
+    return m_history.count() <= 1;
 }
 
 void NavigationHistory::push(QVariantMap item, PostAction postAction)
 {
-    if (m_position < m_history.length() - 1) {
-        /* We want to push a new view while we have other views
-         * after the current one.
-         * In the case we delete all the following views. */
-        m_history.erase(m_history.begin() + m_position + 1, m_history.end());
-        emit nextEmptyChanged(true);
-    }
-
-    //m_history.push_back(VariantToPropertyMap(item));
     m_history.push_back(item);
-    // Set to last position
-    m_position++;
-    if (m_position == 1)
-        emit previousEmptyChanged(true);
+    emit previousEmptyChanged(false);
     if (postAction == PostAction::Go)
         emit currentChanged(m_history.back());
 }
@@ -62,6 +45,53 @@ static void pushListRec(QVariantMap& itemMap, QVariantList::const_iterator it, Q
     }
 }
 
+
+static bool isNodeValid(QVariant& value)
+{
+    if (value.canConvert(QVariant::StringList)
+        || value.canConvert(QVariant::StringList)
+        || value.canConvert(QVariant::String)
+        || value.canConvert(QVariant::UInt)
+        || value.canConvert(QVariant::Int)
+        || value.canConvert(QVariant::Bool)
+        )
+    {
+        return true;
+    }
+    else if ( value.canConvert(QVariant::List) )
+    {
+        QVariantList valueList = value.toList();
+        for (QVariant& v : valueList) {
+            if (!isNodeValid(v))
+                return false;
+        }
+        return true;
+    }
+    else if (value.canConvert<NetworkTreeItem>() )
+    {
+        NetworkTreeItem item = value.value<NetworkTreeItem>();
+        if ( ! item.isValid() )
+        {
+            return false;
+        }
+        return true;
+    }
+    else if ( value.canConvert(QVariant::Map) )
+    {
+        QVariantMap valueList = value.toMap();
+        for (QVariant& v : valueList.values()) {
+            if (!isNodeValid(v)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    assert(false);
+    return false;
+}
+
+
 void NavigationHistory::push(QVariantList itemList, NavigationHistory::PostAction postAction)
 {
     QVariantMap itemMap;
@@ -74,7 +104,7 @@ void NavigationHistory::update(QVariantMap item)
 {
     int length = m_history.length();
     assert(length >= 1);
-    m_history.replace(m_position, item);
+    m_history.back() = item;
 }
 
 void NavigationHistory::update(QVariantList itemList)
@@ -86,33 +116,19 @@ void NavigationHistory::update(QVariantList itemList)
 
 void NavigationHistory::previous(PostAction postAction)
 {
-    if (m_position == 0)
+    if (m_history.count() == 1)
         return;
 
-    //delete m_history.back();
-    m_position--;
+    m_history.pop_back();
+    while (!isNodeValid(m_history.back())) {
+        m_history.pop_back();
+        if (m_history.count() == 1)
+            break;
+    }
 
-    if (m_position == 0)
+    if (m_history.count() == 1)
         emit previousEmptyChanged(true);
-    if (m_position == m_history.length() - 2)
-        emit nextEmptyChanged(false);
 
     if (postAction == PostAction::Go)
-        emit currentChanged(m_history[m_position]);
-}
-
-void NavigationHistory::next(PostAction postAction)
-{
-    if (m_position == m_history.length() - 1)
-        return;
-
-    m_position++;
-
-    if (m_position == 1)
-        emit previousEmptyChanged(false);
-    if (m_position == m_history.length() - 1)
-        emit nextEmptyChanged(true);
-
-    if (postAction == PostAction::Go)
-        emit currentChanged(m_history[m_position]);
+        emit currentChanged( m_history.back() );
 }
