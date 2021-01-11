@@ -1085,6 +1085,8 @@ static picture_t *ThreadDisplayPreparePicture(vout_thread_sys_t *vout, bool reus
                     vlc_clock_ConvertToSystem(sys->clock, system_now,
                                               decoded->date, sys->rate);
 
+                msg_Info(&vout->obj, "%s: PTS=%" PRId64, __func__, decoded->date);
+
                 if (system_pts == INT64_MAX)
                 {
                     /* The clock is paused, notify it (so that the current

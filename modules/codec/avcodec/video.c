@@ -625,7 +625,7 @@ static void Flush( decoder_t *p_dec )
     decoder_sys_t *p_sys = p_dec->p_sys;
     AVCodecContext *p_context = p_sys->p_context;
 
-    msg_Info(p_dec, "<<< %s", __func__);
+    msg_Info(p_dec, "<<< %s: (extra=%p[%d])", __func__, p_context->extradata, p_context->extradata_size);
 
     p_sys->i_late_frames = 0;
     p_sys->framedrop = FRAMEDROP_NONE;
@@ -1241,7 +1241,7 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
                 p_pic->b_still = true;
             p_sys->b_first_frame = false;
             vlc_mutex_unlock(&p_sys->lock);
-//            msg_Info(p_dec, "%s: Q Vid: %#x\n", __func__, p_pic->format.i_chroma);
+            msg_Info(p_dec, "%s: Q Vid: %#x, PTS:%" PRId64, __func__, p_pic->format.i_chroma, p_pic->date);
             decoder_QueueVideo( p_dec, p_pic );
         }
         else

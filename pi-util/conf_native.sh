@@ -15,6 +15,6 @@ OUT=$BASE/out/$ARM-rel
 echo "Configuring in $OUT"
 mkdir -p $OUT
 cd $OUT
-$BASE/configure  --disable-mmal --disable-vdpau --enable-gles2
+$BASE/configure  --disable-vdpau --enable-gles2
 echo "Configured in $OUT"
 
