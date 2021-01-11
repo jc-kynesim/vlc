@@ -24,7 +24,7 @@
 #include "BufferingLogic.hpp"
 #include "../playlist/BaseRepresentation.h"
 #include "../playlist/BasePeriod.h"
-#include "../playlist/AbstractPlaylist.hpp"
+#include "../playlist/BasePlaylist.hpp"
 #include "../playlist/SegmentTemplate.h"
 #include "../playlist/SegmentTimeline.h"
 #include "../playlist/SegmentList.h"
@@ -69,6 +69,12 @@ void AbstractBufferingLogic::setUserLiveDelay(vlc_tick_t v)
     userLiveDelay = v;
 }
 
+/* Try to never buffer up to really end */
+/* Enforce no overlap for demuxers segments 3.0.0 */
+/* FIXME: check duration instead ? */
+const unsigned DefaultBufferingLogic::SAFETY_BUFFERING_EDGE_OFFSET = 1;
+const unsigned DefaultBufferingLogic::SAFETY_EXPURGING_OFFSET = 2;
+
 DefaultBufferingLogic::DefaultBufferingLogic()
     : AbstractBufferingLogic()
 {
@@ -84,7 +90,7 @@ uint64_t DefaultBufferingLogic::getStartSegmentNumber(BaseRepresentation *rep) c
     return profile ? profile->getStartSegmentNumber() : 0;
 }
 
-vlc_tick_t DefaultBufferingLogic::getMinBuffering(const AbstractPlaylist *p) const
+vlc_tick_t DefaultBufferingLogic::getMinBuffering(const BasePlaylist *p) const
 {
     if(isLowLatency(p))
         return BUFFERING_LOWEST_LIMIT;
@@ -96,7 +102,7 @@ vlc_tick_t DefaultBufferingLogic::getMinBuffering(const AbstractPlaylist *p) con
     return std::max(buffering, BUFFERING_LOWEST_LIMIT);
 }
 
-vlc_tick_t DefaultBufferingLogic::getMaxBuffering(const AbstractPlaylist *p) const
+vlc_tick_t DefaultBufferingLogic::getMaxBuffering(const BasePlaylist *p) const
 {
     if(isLowLatency(p))
         return getMinBuffering(p);
@@ -110,7 +116,7 @@ vlc_tick_t DefaultBufferingLogic::getMaxBuffering(const AbstractPlaylist *p) con
     return std::max(buffering, getMinBuffering(p));
 }
 
-vlc_tick_t DefaultBufferingLogic::getLiveDelay(const AbstractPlaylist *p) const
+vlc_tick_t DefaultBufferingLogic::getLiveDelay(const BasePlaylist *p) const
 {
     if(isLowLatency(p))
         return getMinBuffering(p);
@@ -125,16 +131,10 @@ vlc_tick_t DefaultBufferingLogic::getLiveDelay(const AbstractPlaylist *p) const
 
 uint64_t DefaultBufferingLogic::getLiveStartSegmentNumber(BaseRepresentation *rep) const
 {
-    AbstractPlaylist *playlist = rep->getPlaylist();
+    BasePlaylist *playlist = rep->getPlaylist();
 
     /* Get buffering offset min <= max <= live delay */
     vlc_tick_t i_buffering = getBufferingOffset(playlist);
-
-    /* Try to never buffer up to really end */
-    /* Enforce no overlap for demuxers segments 3.0.0 */
-    /* FIXME: check duration instead ? */
-    const unsigned SAFETY_BUFFERING_EDGE_OFFSET = 1;
-    const unsigned SAFETY_EXPURGING_OFFSET = 2;
 
     SegmentList *segmentList = rep->inheritSegmentList();
     SegmentBase *segmentBase = rep->inheritSegmentBase();
@@ -146,7 +146,7 @@ uint64_t DefaultBufferingLogic::getLiveStartSegmentNumber(BaseRepresentation *re
     else if(segmentList)
         timeline = segmentList->inheritSegmentTimeline();
     else
-        timeline = NULL;
+        timeline = nullptr;
 
     if(timeline)
     {
@@ -182,7 +182,7 @@ uint64_t DefaultBufferingLogic::getLiveStartSegmentNumber(BaseRepresentation *re
         if(playlist->timeShiftBufferDepth.Get())
         {
             stime_t edgetime;
-            bool b_ret = timeline->getScaledPlaybackTimeDurationBySegmentNumber(timeline->maxElementNumber(),
+            b_ret = timeline->getScaledPlaybackTimeDurationBySegmentNumber(timeline->maxElementNumber(),
                                                                                 &edgetime, &duration);
             if(unlikely(!b_ret))
                 return 0;
@@ -218,7 +218,7 @@ uint64_t DefaultBufferingLogic::getLiveStartSegmentNumber(BaseRepresentation *re
         if(scaledduration)
         {
             /* Compute playback offset and effective finished segment from wall time */
-            vlc_tick_t now = vlc_tick_from_sec(time(NULL));
+            vlc_tick_t now = vlc_tick_from_sec(time(nullptr));
             vlc_tick_t playbacktime = now - i_buffering;
             vlc_tick_t minavailtime = playlist->availabilityStartTime.Get() + rep->getPeriodStart();
             const uint64_t startnumber = mediaSegmentTemplate->inheritStartNumber();
@@ -358,12 +358,12 @@ uint64_t DefaultBufferingLogic::getLiveStartSegmentNumber(BaseRepresentation *re
     return std::numeric_limits<uint64_t>::max();
 }
 
-vlc_tick_t DefaultBufferingLogic::getBufferingOffset(const AbstractPlaylist *p) const
+vlc_tick_t DefaultBufferingLogic::getBufferingOffset(const BasePlaylist *p) const
 {
     return p->isLive() ? getLiveDelay(p) : getMaxBuffering(p);
 }
 
-bool DefaultBufferingLogic::isLowLatency(const AbstractPlaylist *p) const
+bool DefaultBufferingLogic::isLowLatency(const BasePlaylist *p) const
 {
     if(userLowLatency.isSet())
         return userLowLatency.value();

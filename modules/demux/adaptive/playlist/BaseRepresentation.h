@@ -39,7 +39,7 @@ namespace adaptive
     namespace playlist
     {
         class BaseAdaptationSet;
-        class AbstractPlaylist;
+        class BasePlaylist;
         class SegmentTemplateSegment;
 
         class BaseRepresentation : public CommonAttributesElements,
@@ -62,7 +62,7 @@ namespace adaptive
                 const std::list<std::string> & getCodecs    () const;
                 void                addCodecs               (const std::string &);
                 bool                consistentSegmentNumber () const;
-                virtual void        pruneByPlaybackTime     (vlc_tick_t);
+                virtual void        pruneByPlaybackTime     (vlc_tick_t) override;
 
                 virtual vlc_tick_t  getMinAheadTime         (uint64_t) const;
                 virtual bool        needsUpdate             (uint64_t) const;

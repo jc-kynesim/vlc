@@ -30,7 +30,7 @@
 #include "mlhelper.hpp"
 #include "mlqmltypes.hpp"
 
-class MLUrl {
+class MLUrl : public MLItem {
 public:
     MLUrl( const vlc_ml_media_t *_data );
 
@@ -38,17 +38,13 @@ public:
 
     QString getUrl() const;
     QString getLastPlayedDate() const;
-    MLParentId getId() const { return m_id; }
-
-    MLUrl *clone() const;
 
 private:
-    MLParentId m_id;
     QString m_url;
     QString m_lastPlayedDate;
 };
 
-class MLUrlModel : public MLSlidingWindowModel<MLUrl>
+class MLUrlModel : public MLBaseModel
 {
     Q_OBJECT
 
@@ -69,11 +65,19 @@ public:
 
     Q_INVOKABLE void addAndPlay( const QString& url );
 
+protected:
+    ListCacheLoader<std::unique_ptr<MLItem>> *createLoader() const override;
+
 private:
-    std::vector<std::unique_ptr<MLUrl>> fetch() override;
-    size_t countTotalElements() const override;
     vlc_ml_sorting_criteria_t roleToCriteria(int role) const override;
     virtual void onVlcMlEvent( const MLEvent &event ) override;
+
+    struct Loader : public BaseLoader
+    {
+        Loader(const MLUrlModel &model) : BaseLoader(model) {}
+        size_t count() const override;
+        std::vector<std::unique_ptr<MLItem>> load(size_t index, size_t count) const override;
+    };
 };
 
 #endif // MLURLMODEL_H

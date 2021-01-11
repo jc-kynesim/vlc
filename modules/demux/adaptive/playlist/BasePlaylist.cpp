@@ -1,8 +1,8 @@
 /*
- * AbstractAbstractPlaylist.cpp
+ * BasePlaylist.cpp
  *****************************************************************************
  * Copyright (C) 2010 - 2011 Klagenfurt University
- * Copyright (C) 2015 VideoLAN and VLC authors
+ * Copyright (C) 2015 - 2020 VideoLabs, VideoLAN and VLC authors
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published
@@ -22,7 +22,7 @@
 # include "config.h"
 #endif
 
-#include "AbstractPlaylist.hpp"
+#include "BasePlaylist.hpp"
 #include "../tools/Helper.h"
 #include "BasePeriod.h"
 #include "SegmentTimeline.h"
@@ -33,8 +33,8 @@
 
 using namespace adaptive::playlist;
 
-AbstractPlaylist::AbstractPlaylist (vlc_object_t *p_object_) :
-    ICanonicalUrl(), AttrsNode(Type::PLAYLIST),
+BasePlaylist::BasePlaylist (vlc_object_t *p_object_) :
+    ICanonicalUrl(), AttrsNode(Type::Playlist),
     p_object(p_object_)
 {
     playbackStart.Set(0);
@@ -50,64 +50,69 @@ AbstractPlaylist::AbstractPlaylist (vlc_object_t *p_object_) :
     b_needsUpdates = true;
 }
 
-AbstractPlaylist::~AbstractPlaylist()
+BasePlaylist::~BasePlaylist()
 {
     for(size_t i = 0; i < this->periods.size(); i++)
         delete(this->periods.at(i));
 }
 
-const std::vector<BasePeriod *>& AbstractPlaylist::getPeriods()
+const std::vector<BasePeriod *>& BasePlaylist::getPeriods()
 {
     return periods;
 }
 
-void AbstractPlaylist::addBaseUrl(const std::string &url)
+void BasePlaylist::addBaseUrl(const std::string &url)
 {
     baseUrls.push_back(url);
 }
 
-void AbstractPlaylist::setPlaylistUrl(const std::string &url)
+void BasePlaylist::setPlaylistUrl(const std::string &url)
 {
     playlistUrl = url;
 }
 
-void AbstractPlaylist::addPeriod(BasePeriod *period)
+void BasePlaylist::addPeriod(BasePeriod *period)
 {
     period->setParentNode(this);
     periods.push_back(period);
 }
 
-bool AbstractPlaylist::isLowLatency() const
+bool BasePlaylist::isLive() const
 {
     return false;
 }
 
-void AbstractPlaylist::setType(const std::string &type_)
+bool BasePlaylist::isLowLatency() const
+{
+    return false;
+}
+
+void BasePlaylist::setType(const std::string &type_)
 {
     type = type_;
 }
 
-void AbstractPlaylist::setMinBuffering( vlc_tick_t min )
+void BasePlaylist::setMinBuffering( vlc_tick_t min )
 {
     minBufferTime = min;
 }
 
-void AbstractPlaylist::setMaxBuffering( vlc_tick_t max )
+void BasePlaylist::setMaxBuffering( vlc_tick_t max )
 {
     maxBufferTime = max;
 }
 
-vlc_tick_t AbstractPlaylist::getMinBuffering() const
+vlc_tick_t BasePlaylist::getMinBuffering() const
 {
     return minBufferTime;
 }
 
-vlc_tick_t AbstractPlaylist::getMaxBuffering() const
+vlc_tick_t BasePlaylist::getMaxBuffering() const
 {
     return maxBufferTime;
 }
 
-Url AbstractPlaylist::getUrlSegment() const
+Url BasePlaylist::getUrlSegment() const
 {
     Url ret;
 
@@ -120,22 +125,22 @@ Url AbstractPlaylist::getUrlSegment() const
     return ret;
 }
 
-vlc_object_t * AbstractPlaylist::getVLCObject() const
+vlc_object_t * BasePlaylist::getVLCObject() const
 {
     return p_object;
 }
 
-BasePeriod* AbstractPlaylist::getFirstPeriod()
+BasePeriod* BasePlaylist::getFirstPeriod()
 {
     std::vector<BasePeriod *> periods = getPeriods();
 
     if( !periods.empty() )
         return periods.front();
     else
-        return NULL;
+        return nullptr;
 }
 
-BasePeriod* AbstractPlaylist::getNextPeriod(BasePeriod *period)
+BasePeriod* BasePlaylist::getNextPeriod(BasePeriod *period)
 {
     std::vector<BasePeriod *> periods = getPeriods();
 
@@ -145,20 +150,25 @@ BasePeriod* AbstractPlaylist::getNextPeriod(BasePeriod *period)
             return periods.at(i + 1);
     }
 
-    return NULL;
+    return nullptr;
 }
 
-bool AbstractPlaylist::needsUpdates() const
+bool BasePlaylist::needsUpdates() const
 {
     return b_needsUpdates;
 }
 
-void AbstractPlaylist::updateWith(AbstractPlaylist *updatedAbstractPlaylist)
+void BasePlaylist::updateWith(BasePlaylist *updatedPlaylist)
 {
-    availabilityEndTime.Set(updatedAbstractPlaylist->availabilityEndTime.Get());
+    availabilityEndTime.Set(updatedPlaylist->availabilityEndTime.Get());
 
-    for(size_t i = 0; i < periods.size() && i < updatedAbstractPlaylist->periods.size(); i++)
-        periods.at(i)->updateWith(updatedAbstractPlaylist->periods.at(i));
+    for(size_t i = 0; i < periods.size() && i < updatedPlaylist->periods.size(); i++)
+        periods.at(i)->updateWith(updatedPlaylist->periods.at(i));
 }
 
-
+void BasePlaylist::debug() const
+{
+    std::vector<BasePeriod *>::const_iterator i;
+    for(i = periods.begin(); i != periods.end(); ++i)
+        (*i)->debug(VLC_OBJECT(p_object));
+}

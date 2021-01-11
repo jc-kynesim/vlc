@@ -784,7 +784,7 @@ aviindex:
         {
             continue;
         }
-        p_strl = AVI_ChunkFind( p_hdrl, AVIFOURCC_strl, i, true );
+        p_strl = AVI_ChunkFind( p_hdrl, AVIFOURCC_strl, tk->fmt.i_id, true );
         p_auds = AVI_ChunkFind( p_strl, AVIFOURCC_strf, 0, false );
 
         if( p_auds &&
@@ -2511,7 +2511,8 @@ static void AVI_IndexLoad_indx( demux_t *p_demux,
                 {
                     break;
                 }
-                if( ck_sub.indx.i_indextype == AVI_INDEX_OF_CHUNKS )
+                if( ck_sub.common.i_chunk_fourcc == AVIFOURCC_indx &&
+                     ck_sub.indx.i_indextype == AVI_INDEX_OF_CHUNKS )
                     __Parse_indx( p_demux, &p_index[i_stream], pi_last_offset, &ck_sub.indx );
                 AVI_ChunkClean( p_demux->s, &ck_sub );
             }
@@ -2857,7 +2858,8 @@ static void AVI_ExtractSubtitle( demux_t *p_demux,
             p_indx->i_entriesinuse > 0 )
         {
             if( vlc_stream_Seek( p_demux->s, p_indx->idx.super[0].i_offset ) ||
-                AVI_ChunkRead( p_demux->s, &ck, NULL  ) )
+                AVI_ChunkRead( p_demux->s, &ck, NULL  ) ||
+                ck.common.i_chunk_fourcc != AVIFOURCC_indx )
                 goto exit;
             p_indx = &ck.indx;
         }
@@ -2932,7 +2934,7 @@ static void AVI_ExtractSubtitle( demux_t *p_demux,
     if( i_size < 6 || GetWLE( &p[0] ) != 0x04 )
         goto exit;
     const unsigned i_payload = GetDWLE( &p[2] );
-    if( i_size < 6 + i_payload || i_payload <= 0 )
+    if( i_size - 6 < i_payload || i_payload == 0 )
         goto exit;
     p += 6;
     i_size -= 6;

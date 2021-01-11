@@ -40,6 +40,11 @@ FocusScope{
 
     property alias parentWindow: volumeTooltip.parentWindow
 
+    // these are uninitialized because they will be set by button loader
+    // not 'undefined' because the loader must know if they exist
+    property var navigationLeft: null
+    property var navigationRight: null
+
     RowLayout{
         id: volumeWidget
         Widgets.IconToolButton{
@@ -77,12 +82,15 @@ FocusScope{
 
             Accessible.name: i18n.qtr("Volume")
 
+            Keys.onPressed: {
+                if (KeyHelper.matchOk(event)) {
+                    event.accepted = true
+                }
+            }
+
             Keys.onReleased: {
-                if (event.accepted)
-                    return;
                 if (KeyHelper.matchOk(event)) {
                     player.muted = !player.muted
-                    event.accepted = true
                 }
             }
 
@@ -118,6 +126,8 @@ FocusScope{
                 }
                 if (right)
                     right.forceActiveFocus()
+                else if (!!navigationRight)
+                    navigationRight()
             }
             Keys.onLeftPressed: {
                 var left = widgetfscope.KeyNavigation.left
@@ -126,6 +136,8 @@ FocusScope{
                 }
                 if (left)
                     left.forceActiveFocus()
+                else if (!!navigationLeft)
+                    navigationLeft()
             }
 
             property color sliderColor: (volControl.position > fullvolpos) ? VLCStyle.colors.volmax : widgetfscope.color

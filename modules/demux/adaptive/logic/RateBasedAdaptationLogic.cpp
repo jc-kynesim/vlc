@@ -53,8 +53,8 @@ RateBasedAdaptationLogic::~RateBasedAdaptationLogic()
 
 BaseRepresentation *RateBasedAdaptationLogic::getNextRepresentation(BaseAdaptationSet *adaptSet, BaseRepresentation *currep)
 {
-    if(adaptSet == NULL)
-        return NULL;
+    if(adaptSet == nullptr)
+        return nullptr;
 
     vlc_mutex_lock(&lock);
     size_t availBps = currentBps + ((currep) ? currep->getBandwidth() : 0);
@@ -66,11 +66,11 @@ BaseRepresentation *RateBasedAdaptationLogic::getNextRepresentation(BaseAdaptati
 
     RepresentationSelector selector(maxwidth, maxheight);
     BaseRepresentation *rep = selector.select(adaptSet, availBps);
-    if ( rep == NULL )
+    if ( rep == nullptr )
     {
         rep = selector.select(adaptSet);
-        if ( rep == NULL )
-            return NULL;
+        if ( rep == nullptr )
+            return nullptr;
     }
 
     return rep;
@@ -107,7 +107,7 @@ void RateBasedAdaptationLogic::updateDownloadRate(const ID &, size_t size, vlc_t
 
 void RateBasedAdaptationLogic::trackerEvent(const SegmentTrackerEvent &event)
 {
-    if(event.type == SegmentTrackerEvent::SWITCHING)
+    if(event.type == SegmentTrackerEvent::Type::RepresentationSwitch)
     {
         vlc_mutex_lock(&lock);
         if(event.u.switching.prev)
@@ -129,16 +129,16 @@ FixedRateAdaptationLogic::FixedRateAdaptationLogic(vlc_object_t *obj, size_t bps
 
 BaseRepresentation *FixedRateAdaptationLogic::getNextRepresentation(BaseAdaptationSet *adaptSet, BaseRepresentation *)
 {
-    if(adaptSet == NULL)
-        return NULL;
+    if(adaptSet == nullptr)
+        return nullptr;
 
     RepresentationSelector selector(maxwidth, maxheight);
     BaseRepresentation *rep = selector.select(adaptSet, currentBps);
-    if ( rep == NULL )
+    if ( rep == nullptr )
     {
         rep = selector.select(adaptSet);
-        if ( rep == NULL )
-            return NULL;
+        if ( rep == nullptr )
+            return nullptr;
     }
     return rep;
 }

@@ -204,12 +204,18 @@ enum vlc_module_properties
 #define CONCATENATE( y, z ) CRUDE_HACK( y, z )
 #define CRUDE_HACK( y, z )  y##__##z
 
+#if defined(__cplusplus)
+#define EXTERN_SYMBOL extern "C"
+#else
+#define EXTERN_SYMBOL
+#endif
+
 /* If the module is built-in, then we need to define foo_InitModule instead
  * of InitModule. Same for Activate- and DeactivateModule. */
 #ifdef __PLUGIN__
 # define VLC_SYMBOL(symbol) symbol
 # define VLC_MODULE_NAME_HIDDEN_SYMBOL \
-    const char vlc_module_name[] = MODULE_STRING;
+    EXTERN_SYMBOL const char vlc_module_name[] = MODULE_STRING;
 #else
 # define VLC_SYMBOL(symbol)  CONCATENATE(symbol, MODULE_NAME)
 # define VLC_MODULE_NAME_HIDDEN_SYMBOL
@@ -228,12 +234,6 @@ enum vlc_module_properties
 # endif
 #else
 # define DLL_SYMBOL
-#endif
-
-#if defined( __cplusplus )
-#   define EXTERN_SYMBOL           extern "C"
-#else
-#   define EXTERN_SYMBOL
 #endif
 
 EXTERN_SYMBOL typedef int (*vlc_set_cb) (void *, void *, int, ...);
@@ -313,7 +313,7 @@ VLC_METADATA_EXPORTS
 #define set_callbacks( activate, deactivate ) \
     set_callback(activate) \
     if (vlc_module_set(VLC_MODULE_CB_CLOSE, #deactivate, \
-                       (void (*)(vlc_object_t *)){ deactivate })) \
+                       (void (*)(vlc_object_t *))( deactivate ))) \
         goto error;
 
 #define cannot_unload_broken_library( ) \

@@ -26,14 +26,7 @@
 #define VLC_PICTURE_H 1
 
 #include <assert.h>
-#ifndef __cplusplus
-#include <stdatomic.h>
-#else
-#include <atomic>
-using std::atomic_uintptr_t;
-using std::memory_order_relaxed;
-using std::memory_order_release;
-#endif
+#include <vlc_atomic.h>
 
 /**
  * \file
@@ -161,7 +154,7 @@ struct picture_t
     /** Next picture in a FIFO a pictures */
     struct picture_t *p_next;
 
-    atomic_uintptr_t refs;
+    vlc_atomic_rc_t refs;
 };
 
 static inline vlc_video_context* picture_GetVideoContext(picture_t *pic)
@@ -297,7 +290,7 @@ static inline void vlc_picture_chain_GetAndClear(vlc_picture_chain_t *in,
  */
 static inline vlc_picture_chain_t picture_GetAndResetChain(picture_t *pic)
 {
-    vlc_picture_chain_t chain = (vlc_picture_chain_t) { pic->p_next, pic->p_next };
+    vlc_picture_chain_t chain = { pic->p_next, pic->p_next };
     while ( chain.tail && chain.tail->p_next ) // find the proper tail
         chain.tail = chain.tail->p_next;
     pic->p_next = NULL;
@@ -361,8 +354,7 @@ VLC_API void picture_Destroy(picture_t *picture);
  */
 static inline picture_t *picture_Hold(picture_t *picture)
 {
-    atomic_fetch_add_explicit(&picture->refs, (uintptr_t)1,
-                              memory_order_relaxed);
+    vlc_atomic_rc_inc(&picture->refs);
     return picture;
 }
 
@@ -375,10 +367,7 @@ static inline picture_t *picture_Hold(picture_t *picture)
  */
 static inline void picture_Release(picture_t *picture)
 {
-    uintptr_t refs = atomic_fetch_sub_explicit(&picture->refs, (uintptr_t)1,
-                                               memory_order_release);
-    vlc_assert(refs > 0);
-    if (refs == 1)
+    if (vlc_atomic_rc_dec(&picture->refs))
         picture_Destroy(picture);
 }
 

@@ -29,27 +29,32 @@ Widgets.NavigableFocusScope {
     id: root
 
     property variant model: MLAlbumModel{}
-    implicitHeight: artAndControl.height + ( layout.anchors.margins * 2 )
+    implicitHeight: artAndControl.height + VLCStyle.margin_large + VLCStyle.margin_xxsmall
     implicitWidth: layout.implicitWidth
     signal retract()
-
-    clip: true
 
     Rectangle {
         anchors.fill: parent
         color: VLCStyle.colors.bgAlt
 
-        Widgets.IconLabel {
-            text: VLCIcons.close
-            color: VLCStyle.colors.caption
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.margins: VLCStyle.margin_normal
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: root.retract()
+        Rectangle {
+            anchors {
+                top: parent.top
+                left: parent.left
+                right: parent.right
             }
+            color: VLCStyle.colors.buttonBorder
+            height: VLCStyle.expandDelegate_border
+        }
+
+        Rectangle {
+            anchors {
+                bottom: parent.bottom
+                left: parent.left
+                right: parent.right
+            }
+            color: VLCStyle.colors.buttonBorder
+            height: VLCStyle.expandDelegate_border
         }
     }
 
@@ -57,9 +62,11 @@ Widgets.NavigableFocusScope {
         id: layout
 
         anchors.fill: parent
-        anchors.margins: VLCStyle.margin_normal
-
-        spacing: VLCStyle.margin_normal
+        anchors.leftMargin: VLCStyle.margin_normal
+        anchors.topMargin: VLCStyle.margin_large
+        anchors.rightMargin: VLCStyle.margin_small
+        anchors.bottomMargin: VLCStyle.margin_xxsmall
+        spacing: VLCStyle.margin_large
 
         FocusScope {
             id: artAndControl
@@ -74,14 +81,27 @@ Widgets.NavigableFocusScope {
                 id: artAndControlLayout
 
                 spacing: VLCStyle.margin_normal
+                bottomPadding: VLCStyle.margin_large
 
                 /* A bigger cover for the album */
-                Image {
-                    id: expand_cover_id
+                Item {
                     height: VLCStyle.expandCover_music_height
                     width: VLCStyle.expandCover_music_width
-                    source: model.cover || VLCStyle.noArtAlbum
-                    sourceSize: Qt.size(width, height)
+
+                    Widgets.RoundImage {
+                        id: expand_cover_id
+                        asynchronous: true
+                        height: VLCStyle.expandCover_music_height
+                        width: VLCStyle.expandCover_music_width
+                        radius: VLCStyle.expandCover_music_radius
+                        source: model.cover || VLCStyle.noArtAlbum
+                        sourceSize: Qt.size(width, height)
+                    }
+
+                    Widgets.ListCoverShadow {
+                        source: expand_cover_id
+                        anchors.fill: parent
+                    }
                 }
 
                 Widgets.NavigableRow {
@@ -89,7 +109,7 @@ Widgets.NavigableFocusScope {
 
                     focus: true
                     width: expand_cover_id.width
-                    spacing: VLCStyle.margin_large
+                    spacing: VLCStyle.margin_small
 
                     Layout.alignment: Qt.AlignCenter
 
@@ -127,14 +147,28 @@ Widgets.NavigableFocusScope {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
-            /* The title of the albums */
-            Widgets.SubtitleLabel {
-                id: expand_infos_title_id
-
-                text: model.title || i18n.qtr("Unknown title")
-
+            RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: implicitHeight
+                Layout.preferredHeight: expand_infos_title_id.implicitHeight
+
+                /* The title of the albums */
+                Widgets.SubtitleLabel {
+                    id: expand_infos_title_id
+
+                    text: model.title || i18n.qtr("Unknown title")
+
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: implicitHeight
+                }
+
+                Widgets.IconLabel {
+                    text: VLCIcons.close
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.retract()
+                    }
+                }
             }
 
             Widgets.CaptionLabel {
@@ -147,7 +181,6 @@ Widgets.NavigableFocusScope {
 
                 Layout.fillWidth: true
                 Layout.preferredHeight: implicitHeight
-                Layout.topMargin: VLCStyle.margin_xxsmall
             }
 
             /* The list of the tracks available */
@@ -163,6 +196,8 @@ Widgets.NavigableFocusScope {
 
                     Widgets.ListLabel {
                         text: rowModel ? rowModel.track_number : ""
+                        color: foregroundColor
+                        font.weight: Font.Normal
 
                         Layout.fillHeight: true
                         Layout.preferredWidth: VLCStyle.margin_large
@@ -170,6 +205,7 @@ Widgets.NavigableFocusScope {
 
                     Widgets.ListLabel {
                         text: rowModel ? rowModel.title : ""
+                        color: foregroundColor
 
                         Layout.fillHeight: true
                         Layout.fillWidth: true
@@ -192,8 +228,9 @@ Widgets.NavigableFocusScope {
 
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.topMargin: VLCStyle.margin_normal
+                Layout.topMargin: VLCStyle.margin_large
 
+                rowHeight: VLCStyle.tableRow_height
                 headerColor: VLCStyle.colors.bgAlt
 
                 parentId : root.model.id

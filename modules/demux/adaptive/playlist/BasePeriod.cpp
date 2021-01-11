@@ -27,7 +27,7 @@
 #endif
 
 #include "BasePeriod.h"
-#include "AbstractPlaylist.hpp"
+#include "BasePlaylist.hpp"
 #include "SegmentBaseType.hpp"
 #include "../Streams.hpp"
 
@@ -37,7 +37,7 @@
 
 using namespace adaptive::playlist;
 
-BasePeriod::BasePeriod(AbstractPlaylist *playlist_) :
+BasePeriod::BasePeriod(BasePlaylist *playlist_) :
     SegmentInformation( playlist_ )
 {
     duration.Set(0);
@@ -51,7 +51,7 @@ BasePeriod::~BasePeriod ()
     childs.clear();
 }
 
-AbstractPlaylist *BasePeriod::getPlaylist() const
+BasePlaylist *BasePeriod::getPlaylist() const
 {
     return playlist;
 }
@@ -63,7 +63,7 @@ const std::vector<BaseAdaptationSet*>&  BasePeriod::getAdaptationSets() const
 
 void BasePeriod::addAdaptationSet(BaseAdaptationSet *adaptationSet)
 {
-    if ( adaptationSet != NULL )
+    if ( adaptationSet != nullptr )
     {
         if(adaptationSet->getRepresentations().empty())
         {
@@ -83,7 +83,7 @@ BaseAdaptationSet *BasePeriod::getAdaptationSetByID(const adaptive::ID &id)
         if( (*it)->getID() == id )
             return *it;
     }
-    return NULL;
+    return nullptr;
 }
 
 void BasePeriod::debug(vlc_object_t *obj, int indent) const

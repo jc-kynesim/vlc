@@ -103,6 +103,27 @@ Widgets.NavigableFocusScope {
         model: genreModel
     }
 
+    Widgets.DragItem {
+        id: genreDragItem
+
+        function updateComponents(maxCovers) {
+          var items = selectionModel.selectedIndexes.slice(0, maxCovers).map(function (x){
+            return genreModel.getDataAt(x.row)
+          })
+          var title = items.map(function (item){ return item.name}).join(", ")
+          var covers = items.map(function (item) { return {artwork: item.cover || VLCStyle.noArtCover}})
+          return {
+            covers: covers,
+            title: title,
+            count: selectionModel.selectedIndexes.length
+          }
+        }
+
+        function insertIntoPlaylist(index) {
+            medialib.insertIntoPlaylist(index, genreModel.getIdsForIndexes(selectionModel.selectedIndexes))
+        }
+    }
+
     /*
      *define the intial position/selection
      * This is done on activeFocus rather than Component.onCompleted because selectionModel.
@@ -145,6 +166,7 @@ Widgets.NavigableFocusScope {
                 pictureHeight: height
                 image: model.cover || VLCStyle.noArtAlbum
                 playCoverBorder.width: VLCStyle.dp(3, VLCStyle.scale)
+                dragItem: genreDragItem
 
                 onItemDoubleClicked: root.showAlbumView(model)
                 onItemClicked: gridView_id.leftClickOnItem(modifier, item.index)
@@ -207,41 +229,18 @@ Widgets.NavigableFocusScope {
                                                     VLCStyle.gridColumnsForWidth(tableView_id.availableRowWidth - VLCStyle.listAlbumCover_width - VLCStyle.column_margin_width) - 1
                                                     , 1)
 
-            property Component thumbnailHeader: Item {
-                Widgets.IconLabel {
-                    height: VLCStyle.listAlbumCover_height
-                    width: VLCStyle.listAlbumCover_width
-                    horizontalAlignment: Text.AlignHCenter
-                    text: VLCIcons.album_cover
-                    color: VLCStyle.colors.caption
-                }
-            }
-
-            property Component thumbnailColumn: Item {
-
-                property var rowModel: parent.rowModel
-                property var model: parent.colModel
-                readonly property bool currentlyFocused: parent.currentlyFocused
-                readonly property bool containsMouse: parent.containsMouse
-
-                Widgets.MediaCover {
-                    anchors.verticalCenter: parent.verticalCenter
-                    source: ( !rowModel ? undefined : rowModel[model.criteria] ) || VLCStyle.noArtCover
-                    playCoverVisible: currentlyFocused || containsMouse
-                    playIconSize: VLCStyle.play_cover_small
-                    onPlayIconClicked:  medialib.addAndPlay( rowModel.id )
-                }
-            }
-
             model: genreModel
             selectionDelegateModel: selectionModel
             headerColor: VLCStyle.colors.bg
             focus: true
             onActionForSelection: _actionAtIndex(selection)
             navigationParent: root
+            dragItem: genreDragItem
+            rowHeight: VLCStyle.tableCoverRow_height
+            headerTopPadding: VLCStyle.margin_normal
 
             sortModel:  [
-                { isPrimary: true, criteria: "cover", width: VLCStyle.listAlbumCover_width, headerDelegate: thumbnailHeader, colDelegate: thumbnailColumn },
+                { isPrimary: true, criteria: "cover", width: VLCStyle.listAlbumCover_width, headerDelegate: tableColumns.titleHeaderDelegate, colDelegate: tableColumns.titleDelegate },
                 { criteria: "name", width: VLCStyle.colWidth(tableView_id._nameColSpan), text: i18n.qtr("Name") },
                 { criteria: "nb_tracks", width: VLCStyle.colWidth(1), text: i18n.qtr("Tracks") }
             ]
@@ -252,6 +251,15 @@ Widgets.NavigableFocusScope {
 
             onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes, menuParent.mapToGlobal(0,0))
             onRightClick: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
+
+            Widgets.TableColumns {
+                id: tableColumns
+
+                showTitleText: false
+                titleCover_height: VLCStyle.listAlbumCover_height
+                titleCover_width: VLCStyle.listAlbumCover_width
+                titleCover_radius: VLCStyle.listAlbumCover_radius
+            }
         }
     }
 

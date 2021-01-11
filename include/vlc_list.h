@@ -92,7 +92,7 @@ static inline void vlc_list_add_after(struct vlc_list *restrict node,
  * Inserts an element before another.
  *
  * \param node Node pointer of the element to insert [OUT].
- * \param prev Node pointer of the next element.
+ * \param next Node pointer of the next element.
  */
 static inline void vlc_list_add_before(struct vlc_list *restrict node,
                                        struct vlc_list *next)
@@ -143,7 +143,7 @@ static inline void vlc_list_remove(struct vlc_list *restrict node)
 /**
  * Replaces an element with another one.
  *
- * \param origin Node pointer of the element to remove from the list [IN].
+ * \param original Node pointer of the element to remove from the list [IN].
  * \param substitute Node pointer of the replacement [OUT].
  */
 static inline void vlc_list_replace(const struct vlc_list *original,
@@ -213,7 +213,8 @@ struct vlc_list_it vlc_list_it_start(const struct vlc_list *head)
 {
     struct vlc_list *first = head->next;
 
-    return (struct vlc_list_it){ head, first, first->next };
+    struct vlc_list_it it = { head, first, first->next };
+    return it;
 }
 
 static inline bool vlc_list_it_continue(const struct vlc_list_it *restrict it)
@@ -233,7 +234,7 @@ static inline void vlc_list_it_next(struct vlc_list_it *restrict it)
     ((sizeof (*(p)) + sizeof (max_align_t) - 1) / sizeof (max_align_t))
 
 #define vlc_list_entry_dummy(p) \
-    (0 ? (p) : ((void *)(&(max_align_t[vlc_list_entry_aligned_size(p)]){})))
+    (0 ? (p) : ((void *)(&(max_align_t[vlc_list_entry_aligned_size(p)]){0})))
 
 #define vlc_list_offset_p(p, member) \
     ((p) = vlc_list_entry_dummy(p), (char *)(&(p)->member) - (char *)(p))

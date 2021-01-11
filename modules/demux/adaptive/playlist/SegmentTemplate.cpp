@@ -26,19 +26,17 @@
 #include "SegmentTemplate.h"
 #include "SegmentTimeline.h"
 #include "SegmentInformation.hpp"
-#include "AbstractPlaylist.hpp"
+#include "BasePlaylist.hpp"
 #include <limits>
 
 using namespace adaptive::playlist;
 
-SegmentTemplateSegment::SegmentTemplateSegment( SegmentTemplate *templ_,
-                                                ICanonicalUrl *parent ) :
+SegmentTemplateSegment::SegmentTemplateSegment( ICanonicalUrl *parent ) :
     Segment( parent )
 {
     debugName = "SegmentTemplateSegment";
-    classId = Segment::CLASSID_SEGMENT;
     templated = true;
-    templ = templ_;
+    templ = nullptr;
 }
 
 SegmentTemplateSegment::~SegmentTemplateSegment()
@@ -51,36 +49,43 @@ void SegmentTemplateSegment::setSourceUrl(const std::string &url)
     sourceUrl = Url(Url::Component(url, templ));
 }
 
-SegmentTemplate::SegmentTemplate( SegmentInformation *parent ) :
-    AbstractMultipleSegmentBaseType( parent, AbstractAttr::Type::SEGMENTTEMPLATE )
+void SegmentTemplateSegment::setParentTemplate( SegmentTemplate *templ_ )
 {
-    initialisationSegment.Set( NULL );
+    templ = templ_;
+}
+
+SegmentTemplate::SegmentTemplate( SegmentTemplateSegment *seg, SegmentInformation *parent ) :
+    AbstractMultipleSegmentBaseType( parent, AbstractAttr::Type::SegmentTemplate )
+{
+    initialisationSegment.Set( nullptr );
     parentSegmentInformation = parent;
-    segments.push_back( new SegmentTemplateSegment( this, parent ) );
+    virtualsegment = seg;
+    virtualsegment->setParent( parentSegmentInformation );
+    virtualsegment->setParentTemplate( this );
 }
 
 SegmentTemplate::~SegmentTemplate()
 {
-    delete *segments.begin();
+    delete virtualsegment;
 }
 
 void SegmentTemplate::setSourceUrl( const std::string &url )
 {
-    (*segments.begin())->setSourceUrl(url);
+    virtualsegment->setSourceUrl(url);
 }
 
 void SegmentTemplate::pruneByPlaybackTime(vlc_tick_t time)
 {
-    const AbstractAttr *p = getAttribute(Type::TIMELINE);
+    AbstractAttr *p = getAttribute(Type::Timeline);
     if(p)
-        return ((SegmentTimeline *) p)->pruneByPlaybackTime(time);
+        return static_cast<SegmentTimeline *> (p)->pruneByPlaybackTime(time);
 }
 
 size_t SegmentTemplate::pruneBySequenceNumber(uint64_t number)
 {
-    const AbstractAttr *p = getAttribute(Type::TIMELINE);
+    AbstractAttr *p = getAttribute(Type::Timeline);
     if(p)
-        return ((SegmentTimeline *) p)->pruneBySequenceNumber(number);
+        return static_cast<SegmentTimeline *> (p)->pruneBySequenceNumber(number);
     return 0;
 }
 
@@ -112,10 +117,11 @@ uint64_t SegmentTemplate::getLiveTemplateNumber(vlc_tick_t playbacktime, bool ab
 void SegmentTemplate::debug(vlc_object_t *obj, int indent) const
 {
     AbstractSegmentBaseType::debug(obj, indent);
-    (*segments.begin())->debug(obj, indent);
-    const AbstractAttr *p = getAttribute(Type::TIMELINE);
+    if(virtualsegment)
+        virtualsegment->debug(obj, indent);
+    const AbstractAttr *p = getAttribute(Type::Timeline);
     if(p)
-        ((SegmentTimeline *) p)->debug(obj, indent + 1);
+        static_cast<const SegmentTimeline *> (p)->debug(obj, indent + 1);
 }
 
 vlc_tick_t SegmentTemplate::getMinAheadTime(uint64_t number) const
@@ -129,7 +135,7 @@ vlc_tick_t SegmentTemplate::getMinAheadTime(uint64_t number) const
     else
     {
         const Timescale timescale = inheritTimescale();
-        uint64_t current = getLiveTemplateNumber(vlc_tick_from_sec(time(NULL)));
+        uint64_t current = getLiveTemplateNumber(vlc_tick_from_sec(time(nullptr)));
         stime_t i_length = (current - number) * inheritDuration();
         return timescale.ToTime(i_length);
     }
@@ -138,9 +144,9 @@ vlc_tick_t SegmentTemplate::getMinAheadTime(uint64_t number) const
 Segment * SegmentTemplate::getMediaSegment(uint64_t number) const
 {
     const SegmentTimeline *tl = inheritSegmentTimeline();
-    if(tl == NULL || tl->maxElementNumber() > number)
-        return *segments.begin();
-    return NULL;
+    if(tl == nullptr || (tl->maxElementNumber() >= number && tl->minElementNumber() <= number))
+        return virtualsegment;
+    return nullptr;
 }
 
 InitSegment * SegmentTemplate::getInitSegment() const
@@ -159,12 +165,12 @@ Segment *  SegmentTemplate::getNextMediaSegment(uint64_t i_pos,uint64_t *pi_newp
     {
         *pi_newpos = std::max(timeline->minElementNumber(), i_pos);
         if (timeline->maxElementNumber() < i_pos)
-            return NULL;
+            return nullptr;
     }
     else
     {
         /* check template upper bound */
-        const AbstractPlaylist *playlist = parentSegmentInformation->getPlaylist();
+        const BasePlaylist *playlist = parentSegmentInformation->getPlaylist();
         if(!playlist->isLive())
         {
             const Timescale timescale = inheritTimescale();
@@ -179,7 +185,7 @@ Segment *  SegmentTemplate::getNextMediaSegment(uint64_t i_pos,uint64_t *pi_newp
                 if(i_pos >= endnum)
                 {
                     *pi_newpos = i_pos;
-                    return NULL;
+                    return nullptr;
                 }
             }
         }
@@ -187,7 +193,7 @@ Segment *  SegmentTemplate::getNextMediaSegment(uint64_t i_pos,uint64_t *pi_newp
         /* start number */
         *pi_newpos = std::max(inheritStartNumber(), i_pos);
     }
-    return *segments.begin();
+    return virtualsegment;
 }
 
 uint64_t SegmentTemplate::getStartSegmentNumber() const
@@ -210,10 +216,10 @@ bool SegmentTemplate::getSegmentNumberByTime(vlc_tick_t time, uint64_t *ret) con
     const stime_t duration = inheritDuration();
     if( duration && parent )
     {
-        AbstractPlaylist *playlist = parent->getPlaylist();
+        BasePlaylist *playlist = parent->getPlaylist();
         if( playlist->isLive() )
         {
-            vlc_tick_t now = vlc_tick_from_sec(::time(NULL));
+            vlc_tick_t now = vlc_tick_from_sec(::time(nullptr));
             if(playlist->availabilityStartTime.Get())
             {
                 if(time >= playlist->availabilityStartTime.Get() && time < now)
@@ -274,7 +280,6 @@ SegmentTemplateInit::SegmentTemplateInit( SegmentTemplate *templ_,
     InitSegment(parent)
 {
     debugName = "InitSegmentTemplate";
-    classId = InitSegment::CLASSID_INITSEGMENT;
     templ = templ_;
 }
 

@@ -11,7 +11,7 @@ pseudo-bundle:
 	$(LN_S) -nf $(abs_top_builddir)/modules/gui/macosx/UI $(top_builddir)/bin/Contents/Resources/Base.lproj
 	$(LN_S) -nf $(abs_top_builddir)/share/macosx/Info.plist $(top_builddir)/bin/Contents/Info.plist
 	$(LN_S) -nf $(CONTRIB_DIR)/Frameworks
-	cd $(top_builddir)/bin/Contents/Resources/ && find $(abs_top_srcdir)/modules/gui/macosx/Resources/ -type f -exec $(LN_S) -f {} \;
+	cd $(top_builddir)/bin/Contents/Resources/ && find $(abs_top_srcdir)/modules/gui/macosx/Resources/ -type f -not -path "*.lproj/*" -exec $(LN_S) -f {} \;
 
 macos-install:
 	rm -Rf "$(macos_destdir)"
@@ -26,8 +26,8 @@ VLC.app: macos-install
 	## Copy Contents
 	cp -R "$(macos_destdir)$(datadir)/macosx/" $@
 	## Copy .strings file and .nib files
-	cp -R "$(top_builddir)/modules/gui/macosx/UI" $@/Contents/Resources/Base.lproj
-	cp "$(srcdir)/modules/gui/macosx/Resources/InfoPlist.strings" $@/Contents/Resources/Base.lproj/
+	cp -R "$(srcdir)/modules/gui/macosx/Resources/"*.lproj $@/Contents/Resources/
+	cp -R "$(top_builddir)/modules/gui/macosx/UI/." $@/Contents/Resources/Base.lproj/
 	## Copy Info.plist and convert to binary
 	cp -R "$(top_builddir)/share/macosx/Info.plist" $@/Contents/
 	xcrun plutil -convert binary1 $@/Contents/Info.plist
@@ -62,7 +62,11 @@ endif
 	cp "$(macos_destdir)$(prefix)/bin/vlc" $@/Contents/MacOS/VLC
 	install_name_tool -rpath "$(libdir)" "@executable_path/../Frameworks/" $@/Contents/MacOS/VLC
 	## Generate plugin cache
-	VLC_LIB_PATH="$@/Contents/Frameworks" bin/vlc-cache-gen $@/Contents/Frameworks/plugins
+	if test "$(build)" = "$(host)"; then \
+		VLC_LIB_PATH="$@/Contents/Frameworks" bin/vlc-cache-gen $@/Contents/Frameworks/plugins ; \
+	else \
+		echo "Cross-compilation: cache generation skipped!" ; \
+	fi
 	find $@ -type d -exec chmod ugo+rx '{}' \;
 	find $@ -type f -exec chmod ugo+r '{}' \;
 

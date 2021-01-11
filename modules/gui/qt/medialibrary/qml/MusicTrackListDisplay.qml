@@ -24,10 +24,9 @@ import org.videolan.medialib 0.1
 
 import "qrc:///util/" as Util
 import "qrc:///widgets/" as Widgets
-import "qrc:///main/" as MainInterface
 import "qrc:///style/"
 
-MainInterface.MainTableView {
+Widgets.KeyNavigableTableView {
     id: root
 
     property var sortModelSmall: [
@@ -44,10 +43,11 @@ MainInterface.MainTableView {
         { criteria: "duration_short", width: VLCStyle.colWidth(1), text: i18n.qtr("Duration"), showSection: "", colDelegate: tableColumns.timeColDelegate, headerDelegate: tableColumns.timeHeaderDelegate },
     ]
 
+    readonly property int _expandingColsSpan: Math.floor((VLCStyle.gridColumnsForWidth(root.availableRowWidth) - 3 /* static cols (track_number, etc)*/) / 3)
     property var sortModelLarge: [
-        { isPrimary: true, criteria: "title",       width: VLCStyle.colWidth(2), text: i18n.qtr("Title"),    showSection: "title", colDelegate: tableColumns.titleDelegate, headerDelegate: tableColumns.titleHeaderDelegate },
-        { criteria: "album_title", width: VLCStyle.colWidth(2), text: i18n.qtr("Album"),    showSection: "album_title" },
-        { criteria: "main_artist", width: VLCStyle.colWidth(2), text: i18n.qtr("Artist"),   showSection: "main_artist" },
+        { isPrimary: true, criteria: "title",       width: VLCStyle.colWidth(root._expandingColsSpan), text: i18n.qtr("Title"),    showSection: "title", colDelegate: tableColumns.titleDelegate, headerDelegate: tableColumns.titleHeaderDelegate },
+        { criteria: "album_title", width: VLCStyle.colWidth(root._expandingColsSpan), text: i18n.qtr("Album"),    showSection: "album_title" },
+        { criteria: "main_artist", width: VLCStyle.colWidth(root._expandingColsSpan), text: i18n.qtr("Artist"),   showSection: "main_artist" },
         { criteria: "duration_short", width: VLCStyle.colWidth(1), text: i18n.qtr("Duration"), showSection: "", colDelegate: tableColumns.timeColDelegate, headerDelegate: tableColumns.timeHeaderDelegate },
         { criteria: "track_number",width: VLCStyle.colWidth(1), text: i18n.qtr("Track"), showSection: "" },
         { criteria: "disc_number", width: VLCStyle.colWidth(1), text: i18n.qtr("Disc"),  showSection: "" },
@@ -62,6 +62,7 @@ MainInterface.MainTableView {
 
     model: rootmodel
     selectionDelegateModel: selectionModel
+    rowHeight: VLCStyle.tableCoverRow_height
 
     property alias parentId: rootmodel.parentId
 

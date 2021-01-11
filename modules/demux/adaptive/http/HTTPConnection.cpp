@@ -140,8 +140,8 @@ void HTTPConnection::disconnect()
     transport->disconnect();
 }
 
-enum RequestStatus
-    HTTPConnection::request(const std::string &path, const BytesRange &range)
+RequestStatus HTTPConnection::request(const std::string &path,
+                                      const BytesRange &range)
 {
     queryOk = false;
     chunked = false;
@@ -187,7 +187,7 @@ enum RequestStatus
         return RequestStatus::GenericError;
     }
 
-    enum RequestStatus status = parseReply();
+    RequestStatus status = parseReply();
     if(status == RequestStatus::Success)
     {
         queryOk = true;
@@ -252,8 +252,7 @@ bool HTTPConnection::send(const void *buf, size_t size)
     return transport->send(buf, size);
 }
 
-enum RequestStatus
-    HTTPConnection::parseReply()
+RequestStatus HTTPConnection::parseReply()
 {
     std::string statusline = readLine();
 
@@ -477,7 +476,7 @@ const ConnectionParams & HTTPConnection::getRedirection() const
 StreamUrlConnection::StreamUrlConnection(vlc_object_t *p_object)
     : AbstractConnection(p_object)
 {
-    p_streamurl = NULL;
+    p_streamurl = nullptr;
     bytesRead = 0;
     contentLength = 0;
 }
@@ -491,7 +490,7 @@ void StreamUrlConnection::reset()
 {
     if(p_streamurl)
         vlc_stream_Delete(p_streamurl);
-    p_streamurl = NULL;
+    p_streamurl = nullptr;
     bytesRead = 0;
     contentLength = 0;
     contentType = std::string();
@@ -507,8 +506,8 @@ bool StreamUrlConnection::canReuse(const ConnectionParams &params_) const
             params.getPort() == params_.getPort());
 }
 
-enum RequestStatus
-    StreamUrlConnection::request(const std::string &path, const BytesRange &range)
+RequestStatus StreamUrlConnection::request(const std::string &path,
+                                           const BytesRange &range)
 {
     reset();
 
@@ -602,8 +601,10 @@ NativeConnectionFactory::~NativeConnectionFactory()
 AbstractConnection * NativeConnectionFactory::createConnection(vlc_object_t *p_object,
                                                          const ConnectionParams &params)
 {
-    if((params.getScheme() != "http" && params.getScheme() != "https") || params.getHostname().empty())
-        return NULL;
+    if(params.usesAccess() ||
+       (params.getScheme() != "http" && params.getScheme() != "https") ||
+       params.getHostname().empty())
+        return nullptr;
 
     ConnectionParams proxy;
 
@@ -620,7 +621,7 @@ AbstractConnection * NativeConnectionFactory::createConnection(vlc_object_t *p_o
     const bool b_secure = (params.getScheme() == "https");
     Transport *socket = new (std::nothrow) Transport(b_secure);
     if(!socket)
-        return NULL;
+        return nullptr;
 
     /* disable pipelined tls until we have ticket/resume session support */
     HTTPConnection *conn = new (std::nothrow)
@@ -628,7 +629,7 @@ AbstractConnection * NativeConnectionFactory::createConnection(vlc_object_t *p_o
     if(!conn)
     {
         delete socket;
-        return NULL;
+        return nullptr;
     }
 
     return conn;
@@ -644,32 +645,4 @@ AbstractConnection * StreamUrlConnectionFactory::createConnection(vlc_object_t *
                                                                   const ConnectionParams &)
 {
     return new (std::nothrow) StreamUrlConnection(p_object);
-}
-
-ConnectionFactory::ConnectionFactory( AuthStorage *authstorage )
-{
-    native = new NativeConnectionFactory( authstorage );
-    streamurl = new StreamUrlConnectionFactory();
-}
-
-ConnectionFactory::~ConnectionFactory()
-{
-    delete native;
-    delete streamurl;
-}
-
-AbstractConnection * ConnectionFactory::createConnection(vlc_object_t *p_object,
-                                                         const ConnectionParams &params)
-{
-    bool b_streamurl = var_InheritBool(p_object, "adaptive-use-access");
-    if(!b_streamurl && !params.usesAccess())
-    {
-        return native->createConnection(p_object, params);
-    }
-    else
-    {
-        ConnectionParams paramsaccess = params;
-        paramsaccess.setUseAccess(true);
-        return streamurl->createConnection(p_object, paramsaccess);
-    }
 }

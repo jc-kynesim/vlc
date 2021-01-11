@@ -24,6 +24,7 @@
 #endif
 #include "vlc_common.h"
 
+
 #include <memory>
 #include <QObject>
 #include <QAbstractListModel>
@@ -32,6 +33,11 @@
 #include "medialib.hpp"
 #include <memory>
 #include "mlevent.hpp"
+#include "mlqueryparams.hpp"
+#include "util/listcacheloader.hpp"
+
+template <typename T>
+class ListCache;
 
 class MediaLib;
 
@@ -45,7 +51,7 @@ public:
 
     Q_INVOKABLE void sortByColumn(QByteArray name, Qt::SortOrder order);
 
-    Q_PROPERTY( MLParentId parentId READ parentId WRITE setParentId NOTIFY parentIdChanged RESET unsetParentId )
+    Q_PROPERTY( MLItemId parentId READ parentId WRITE setParentId NOTIFY parentIdChanged RESET unsetParentId )
     Q_PROPERTY( MediaLib* ml READ ml WRITE setMl )
     Q_PROPERTY( QString searchPattern READ searchPattern WRITE setSearchPattern )
 
@@ -53,9 +59,9 @@ public:
     Q_PROPERTY( QString sortCriteria READ getSortCriteria WRITE setSortCriteria NOTIFY sortCriteriaChanged RESET unsetSortCriteria )
     Q_PROPERTY( unsigned int count READ getCount NOTIFY countChanged )
 
-    Q_INVOKABLE virtual QVariant getIdForIndex( QVariant index) const = 0;
-    Q_INVOKABLE virtual QVariantList getIdsForIndexes( QVariantList indexes ) const = 0;
-    Q_INVOKABLE virtual QVariantList getIdsForIndexes( QModelIndexList indexes ) const = 0;
+    Q_INVOKABLE virtual QVariant getIdForIndex( QVariant index) const;
+    Q_INVOKABLE virtual QVariantList getIdsForIndexes( QVariantList indexes ) const;
+    Q_INVOKABLE virtual QVariantList getIdsForIndexes( QModelIndexList indexes ) const;
 
     Q_INVOKABLE QMap<QString, QVariant> getDataAt(int index);
 
@@ -68,12 +74,15 @@ signals:
 
 protected slots:
     void onResetRequested();
+    void onLocalSizeAboutToBeChanged(size_t size);
+    void onLocalSizeChanged(size_t size);
+    void onLocalDataChanged(size_t index, size_t count);
 
 private:
     static void onVlcMlEvent( void* data, const vlc_ml_event_t* event );
 
 protected:
-    virtual void clear() = 0;
+    virtual void clear();
     virtual vlc_ml_sorting_criteria_t roleToCriteria(int role) const = 0;
     static QString getFirstSymbol(QString str);
     virtual vlc_ml_sorting_criteria_t nameToCriteria(QByteArray) const {
@@ -84,9 +93,35 @@ protected:
         return "";
     }
 
+    void validateCache() const;
+    void invalidateCache();
+    MLItem* item(int signedidx) const;
+    virtual void onVlcMlEvent( const MLEvent &event );
+
+    virtual ListCacheLoader<std::unique_ptr<MLItem>> *createLoader() const = 0;
+
+    virtual void thumbnailUpdated( int ) {}
+
+    /* Data loader for the cache */
+    struct BaseLoader : public ListCacheLoader<std::unique_ptr<MLItem>>
+    {
+        BaseLoader(vlc_medialibrary_t *ml, MLItemId parent, QString searchPattern,
+                   vlc_ml_sorting_criteria_t sort, bool sort_desc);
+        BaseLoader(const MLBaseModel &model);
+
+        MLQueryParams getParams(size_t index = 0, size_t count = 0) const;
+
+    protected:
+        vlc_medialibrary_t *m_ml;
+        MLItemId m_parent;
+        QString m_searchPattern;
+        vlc_ml_sorting_criteria_t m_sort;
+        bool m_sort_desc;
+    };
+
 public:
-    MLParentId parentId() const;
-    void setParentId(MLParentId parentId);
+    MLItemId parentId() const;
+    void setParentId(MLItemId parentId);
     void unsetParentId();
 
     MediaLib* ml() const;
@@ -101,195 +136,23 @@ public:
     void setSortCriteria(const QString& criteria);
     void unsetSortCriteria();
 
-    virtual unsigned int getCount() const = 0;
+    int rowCount(const QModelIndex &parent = {}) const;
+    virtual unsigned int getCount() const;
 
 protected:
-    virtual void onVlcMlEvent( const MLEvent &event );
+    MLItemId m_parent;
 
-    MLParentId m_parent;
-
-    vlc_medialibrary_t* m_ml;
-    MediaLib* m_mediaLib;
-    mutable vlc_ml_query_params_t m_query_param;
-    std::unique_ptr<char, void(*)(void*)> m_search_pattern_cstr;
+    vlc_medialibrary_t* m_ml = nullptr;
+    MediaLib* m_mediaLib = nullptr;
     QString m_search_pattern;
+    vlc_ml_sorting_criteria_t m_sort = VLC_ML_SORTING_DEFAULT;
+    bool m_sort_desc = false;
 
     std::unique_ptr<vlc_ml_event_callback_t,
                     std::function<void(vlc_ml_event_callback_t*)>> m_ml_event_handle;
-    bool m_need_reset;
-};
+    bool m_need_reset = false;
 
-/**
- * Implements a basic sliding window.
- * const_cast & immutable are unavoidable, since all access member functions
- * are marked as const. fetchMore & canFetchMore don't allow for the full size
- * to be known (so the scrollbar would grow as we scroll, until we displayed all
- * elements), and implies having all elements loaded in RAM at all time.
- */
-template <typename T>
-class MLSlidingWindowModel : public MLBaseModel
-{
-public:
-    static constexpr size_t BatchSize = 100;
-
-    MLSlidingWindowModel(QObject* parent = nullptr)
-        : MLBaseModel(parent)
-        , m_initialized(false)
-        , m_total_count(0)
-    {
-        m_query_param.i_nbResults = BatchSize;
-    }
-
-    int rowCount(const QModelIndex &parent = {}) const override
-    {
-        if (parent.isValid())
-            return 0;
-
-        if ( m_initialized == false )
-        {
-            m_total_count = countTotalElements();
-            m_initialized = true;
-            emit countChanged( static_cast<unsigned int>(m_total_count) );
-        }
-
-        return m_total_count;
-    }
-
-    virtual T* get(int idx) const
-    {
-        T* obj = item( idx );
-        if (!obj)
-            return nullptr;
-        return obj->clone();
-    }
-
-    void clear() override
-    {
-        m_query_param.i_offset = 0;
-        m_initialized = false;
-        m_total_count = 0;
-        m_item_list.clear();
-        emit countChanged( static_cast<unsigned int>(m_total_count) );
-    }
-
-
-    virtual QVariant getIdForIndex( QVariant index ) const override
-    {
-        T* obj = nullptr;
-        if (index.canConvert<int>())
-            obj = item( index.toInt() );
-        else if ( index.canConvert<QModelIndex>() )
-            obj = item( index.value<QModelIndex>().row() );
-
-        if (!obj)
-            return {};
-
-        return QVariant::fromValue(obj->getId());
-    }
-
-    virtual QVariantList getIdsForIndexes( QModelIndexList indexes ) const override
-    {
-        QVariantList idList;
-        idList.reserve(indexes.length());
-        std::transform( indexes.begin(), indexes.end(),std::back_inserter(idList), [this](const QModelIndex& index) -> QVariant {
-            T* obj = item( index.row() );
-            if (!obj)
-                return {};
-            return QVariant::fromValue(obj->getId());
-        });
-        return idList;
-    }
-
-    virtual QVariantList getIdsForIndexes( QVariantList indexes ) const override
-    {
-        QVariantList idList;
-
-        idList.reserve(indexes.length());
-        std::transform( indexes.begin(), indexes.end(),std::back_inserter(idList), [this](const QVariant& index) -> QVariant {
-            T* obj = nullptr;
-            if (index.canConvert<int>())
-                obj = item( index.toInt() );
-            else if ( index.canConvert<QModelIndex>() )
-                obj = item( index.value<QModelIndex>().row() );
-
-            if (!obj)
-                return {};
-
-            return QVariant::fromValue(obj->getId());
-        });
-        return idList;
-    }
-
-    unsigned int getCount() const override {
-        return static_cast<unsigned int>(m_total_count);
-    }
-
-protected:
-    T* item(int signedidx) const
-    {
-        if (signedidx < 0)
-            return nullptr;
-
-        unsigned int idx = static_cast<unsigned int>(signedidx);
-        if ( m_initialized == false )
-        {
-            m_total_count = countTotalElements();
-            if ( m_total_count > 0 )
-                m_item_list = const_cast<MLSlidingWindowModel<T>*>(this)->fetch();
-            m_initialized = true;
-            emit countChanged( static_cast<unsigned int>(m_total_count) );
-        }
-
-        if ( idx >= m_total_count  )
-            return nullptr;
-
-        if ( idx < m_query_param.i_offset ||  idx >= m_query_param.i_offset + m_item_list.size() )
-        {
-            if (m_query_param.i_nbResults == 0)
-                m_query_param.i_offset = 0;
-            else
-                m_query_param.i_offset = idx - idx % m_query_param.i_nbResults;
-            m_item_list = const_cast<MLSlidingWindowModel<T>*>(this)->fetch();
-        }
-
-        //db has changed
-        if ( idx - m_query_param.i_offset >= m_item_list.size() || idx < m_query_param.i_offset )
-            return nullptr;
-        return m_item_list[idx - m_query_param.i_offset].get();
-    }
-
-    virtual void onVlcMlEvent(const MLEvent &event) override
-    {
-        switch (event.i_type)
-        {
-            case VLC_ML_EVENT_MEDIA_THUMBNAIL_GENERATED:
-            {
-                if (event.media_thumbnail_generated.b_success) {
-                    int idx = static_cast<int>(m_query_param.i_offset);
-                    for ( const auto& it : m_item_list ) {
-                        if (it->getId().id == event.media_thumbnail_generated.i_media_id) {
-                            thumbnailUpdated(idx);
-                            break;
-                        }
-                        idx += 1;
-                    }
-                }
-                break;
-            }
-            default:
-                break;
-        }
-        MLBaseModel::onVlcMlEvent( event );
-    }
-
-private:
-    virtual size_t countTotalElements() const = 0;
-    virtual std::vector<std::unique_ptr<T>> fetch() = 0;
-    virtual void thumbnailUpdated( int ) {}
-
-    mutable std::vector<std::unique_ptr<T>> m_item_list;
-    mutable bool m_initialized;
-    mutable size_t m_total_count;
+    mutable std::unique_ptr<ListCache<std::unique_ptr<MLItem>>> m_cache;
 };
 
 #endif // MLBASEMODEL_HPP

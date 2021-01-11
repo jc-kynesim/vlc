@@ -38,23 +38,25 @@ namespace adaptive
         class AbstractAttr
         {
             public:
-                enum Type
+                enum class Type
                 {
-                    NONE,
-                    PLAYLIST,
-                    SEGMENTINFORMATION,
-                    SEGMENTLIST,
-                    SEGMENTBASE,
-                    SEGMENTTEMPLATE,
-                    TIMESCALE,
-                    TIMELINE,
-                    DURATION,
-                    STARTNUMBER,
-                    AVAILABILITYTTIMEOFFSET,
-                    AVAILABILITYTTIMECOMPLETE,
+                    None,
+                    Playlist,
+                    SegmentInformation,
+                    SegmentList,
+                    SegmentBase,
+                    SegmentTemplate,
+                    Timescale,
+                    Timeline,
+                    Duration,
+                    StartNumber,
+                    AvailabilityTimeOffset,
+                    AvailabilityTimeComplete,
                 };
                 AbstractAttr(enum Type);
                 virtual ~AbstractAttr();
+                AbstractAttr(const AbstractAttr &) = delete;
+                AbstractAttr & operator=(const AbstractAttr &) = delete;
                 Type getType() const;
                 bool operator ==(const AbstractAttr &t) const { return type == t.getType(); }
                 bool operator !=(const AbstractAttr &t) const { return type != t.getType(); }
@@ -69,8 +71,10 @@ namespace adaptive
         class AttrsNode : public AbstractAttr
         {
             public:
-                AttrsNode( enum Type, AttrsNode * = NULL );
+                AttrsNode( Type, AttrsNode * = nullptr );
                 ~AttrsNode();
+                AttrsNode(const AttrsNode &) = delete;
+                AttrsNode & operator=(const AttrsNode &) = delete;
                 void addAttribute( AbstractAttr * );
                 void replaceAttribute( AbstractAttr * );
                 AbstractAttr * inheritAttribute(AbstractAttr::Type);
@@ -102,31 +106,33 @@ namespace adaptive
             public:
                 AttrWrapper(T v) : AbstractAttr(e) { value = v; }
                 virtual ~AttrWrapper() {}
+                AttrWrapper(const AttrWrapper &) = delete;
+                AttrWrapper<e, T> & operator=(const AttrWrapper<e, T> &) = delete;
                 operator const T&() const { return value; }
 
             protected:
                 T value;
         };
 
-        typedef AttrWrapper<AbstractAttr::Type::AVAILABILITYTTIMEOFFSET, vlc_tick_t> AvailabilityTimeOffsetAttr;
-        typedef AttrWrapper<AbstractAttr::Type::AVAILABILITYTTIMECOMPLETE, bool>     AvailabilityTimeCompleteAttr;
-        typedef AttrWrapper<AbstractAttr::Type::STARTNUMBER, uint64_t>               StartnumberAttr;
+        using AvailabilityTimeOffsetAttr   = AttrWrapper<AbstractAttr::Type::AvailabilityTimeOffset, vlc_tick_t>;
+        using AvailabilityTimeCompleteAttr = AttrWrapper<AbstractAttr::Type::AvailabilityTimeComplete, bool>;
+        using StartnumberAttr              = AttrWrapper<AbstractAttr::Type::StartNumber, uint64_t>;
 
         class TimescaleAttr:
-                public AttrWrapper<AbstractAttr::Type::TIMESCALE, Timescale>
+                public AttrWrapper<AbstractAttr::Type::Timescale, Timescale>
         {
             public:
                 TimescaleAttr(Timescale v) :
-                    AttrWrapper<AbstractAttr::Type::TIMESCALE, Timescale>( v ) {}
+                    AttrWrapper<AbstractAttr::Type::Timescale, Timescale>( v ) {}
                 virtual bool isValid() const { return value.isValid(); }
         };
 
         class DurationAttr:
-                public AttrWrapper<AbstractAttr::Type::DURATION, stime_t>
+                public AttrWrapper<AbstractAttr::Type::Duration, stime_t>
         {
             public:
                 DurationAttr(stime_t v) :
-                    AttrWrapper<AbstractAttr::Type::DURATION, stime_t>( v ) {}
+                    AttrWrapper<AbstractAttr::Type::Duration, stime_t>( v ) {}
                 virtual bool isValid() const { return value > 0; }
         };
     }

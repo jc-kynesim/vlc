@@ -42,6 +42,7 @@
 #include <map>
 #include <cctype>
 #include <algorithm>
+#include <limits>
 
 using namespace adaptive;
 using namespace adaptive::playlist;
@@ -76,7 +77,7 @@ static Tag * getTagFromList(std::list<Tag *> &list, int tag)
         if( (*it)->getType() == tag )
             return *it;
     }
-    return NULL;
+    return nullptr;
 }
 
 static void releaseTagsList(std::list<Tag *> &list)
@@ -198,7 +199,7 @@ static bool parseEncryption(const AttributesTag *keytag, const Url &playlistUrl,
     else
     {
         /* unsupported or invalid */
-        encryption.method = CommonEncryption::Method::NONE;
+        encryption.method = CommonEncryption::Method::None;
         encryption.uri.clear();
         encryption.iv.clear();
         return false;
@@ -219,9 +220,9 @@ void M3U8Parser::parseSegments(vlc_object_t *, Representation *rep, const std::l
     uint64_t sequenceNumber = 0;
     bool discontinuity = false;
     std::size_t prevbyterangeoffset = 0;
-    const SingleValueTag *ctx_byterange = NULL;
+    const SingleValueTag *ctx_byterange = nullptr;
     CommonEncryption encryption;
-    const ValuesListTag *ctx_extinf = NULL;
+    const ValuesListTag *ctx_extinf = nullptr;
 
     std::list<Tag *>::const_iterator it;
     for(it = tagslist.begin(); it != tagslist.end(); ++it)
@@ -247,8 +248,8 @@ void M3U8Parser::parseSegments(vlc_object_t *, Representation *rep, const std::l
                 const SingleValueTag *uritag = static_cast<const SingleValueTag *>(tag);
                 if(uritag->getValue().value.empty())
                 {
-                    ctx_extinf = NULL;
-                    ctx_byterange = NULL;
+                    ctx_extinf = nullptr;
+                    ctx_byterange = nullptr;
                     break;
                 }
 
@@ -265,7 +266,7 @@ void M3U8Parser::parseSegments(vlc_object_t *, Representation *rep, const std::l
                     const Attribute *durAttribute = ctx_extinf->getAttributeByName("DURATION");
                     if(durAttribute)
                         nzDuration = vlc_tick_from_sec(durAttribute->floatingPoint());
-                    ctx_extinf = NULL;
+                    ctx_extinf = nullptr;
                 }
                 segment->duration.Set(timescale.ToScaled(nzDuration));
                 segment->startTime.Set(timescale.ToScaled(nzStartTime));
@@ -286,7 +287,7 @@ void M3U8Parser::parseSegments(vlc_object_t *, Representation *rep, const std::l
                         range.first = prevbyterangeoffset;
                     prevbyterangeoffset = range.first + range.second;
                     segment->setByteRange(range.first, prevbyterangeoffset - 1);
-                    ctx_byterange = NULL;
+                    ctx_byterange = nullptr;
                 }
 
                 if(discontinuity)
@@ -295,7 +296,7 @@ void M3U8Parser::parseSegments(vlc_object_t *, Representation *rep, const std::l
                     discontinuity = false;
                 }
 
-                if(encryption.method != CommonEncryption::Method::NONE)
+                if(encryption.method != CommonEncryption::Method::None)
                     segment->setEncryption(encryption);
             }
             break;
@@ -374,13 +375,13 @@ M3U8 * M3U8Parser::parse(vlc_object_t *p_object, stream_t *p_stream, const std::
        (psz_line[7] && !std::isspace(psz_line[7])))
     {
         free(psz_line);
-        return NULL;
+        return nullptr;
     }
     free(psz_line);
 
     M3U8 *playlist = new (std::nothrow) M3U8(p_object);
     if(!playlist)
-        return NULL;
+        return nullptr;
 
     if(!playlisturl.empty())
         playlist->setPlaylistUrl( Helper::getDirectoryPath(playlisturl).append("/") );
@@ -566,7 +567,7 @@ M3U8 * M3U8Parser::parse(vlc_object_t *p_object, stream_t *p_stream, const std::
     playlist->addPeriod(period);
 
     auto xstart = std::find_if(tagslist.cbegin(), tagslist.cend(),
-                               [](auto t) {return t->getType() == AttributesTag::EXTXSTART;});
+                               [](const Tag * t) {return t->getType() == AttributesTag::EXTXSTART;});
     if(xstart != tagslist.end())
     {
         auto xstartTag = static_cast<const AttributesTag *>(*xstart);
@@ -587,7 +588,7 @@ M3U8 * M3U8Parser::parse(vlc_object_t *p_object, stream_t *p_stream, const std::
 std::list<Tag *> M3U8Parser::parseEntries(stream_t *stream)
 {
     std::list<Tag *> entrieslist;
-    Tag *lastTag = NULL;
+    Tag *lastTag = nullptr;
     char *psz_line;
 
     while((psz_line = vlc_stream_ReadLine(stream)))
@@ -635,11 +636,11 @@ std::list<Tag *> M3U8Parser::parseEntries(stream_t *stream)
                 if(tag)
                     entrieslist.push_back(tag);
             }
-            lastTag = NULL;
+            lastTag = nullptr;
         }
         else // drop
         {
-            lastTag = NULL;
+            lastTag = nullptr;
         }
 
         free(psz_line);

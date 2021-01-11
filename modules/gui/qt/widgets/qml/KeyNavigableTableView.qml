@@ -41,6 +41,7 @@ NavigableFocusScope {
 
         anchors.fill: parent
         text: !rowModel ? "" : (rowModel[model.criteria] || "")
+        color: parent.foregroundColor
     }
     property Component tableHeaderDelegate: Widgets.CaptionLabel {
         text: model.text || ""
@@ -62,13 +63,17 @@ NavigableFocusScope {
     property var headerItem: view.headerItem.loadedHeader
     property alias tableHeaderItem: view.headerItem
     property color headerColor
+    property int headerTopPadding: 0
 
     property alias footerItem: view.footerItem
     property alias footer: view.footer
 
     property var selectionDelegateModel
-    property real rowHeight: VLCStyle.fontHeight_normal + VLCStyle.margin_large
-    readonly property real availableRowWidth: width - ( VLCStyle.table_section_width * 2 )
+    property real rowHeight: VLCStyle.tableRow_height
+    readonly property int _contextButtonHorizontalSpace: VLCStyle.icon_normal + VLCStyle.margin_xxsmall * 2
+    readonly property real availableRowWidth: width
+                                              - ( !!section.property ? VLCStyle.table_section_width * 2 : 0 )
+                                              - _contextButtonHorizontalSpace
     property alias spacing: view.spacing
     property int horizontalSpacing: VLCStyle.column_margin_width
 
@@ -78,6 +83,7 @@ NavigableFocusScope {
 
     property alias add:       view.add
     property alias displaced: view.displaced
+    property Item dragItem
 
     Accessible.role: Accessible.Table
 
@@ -110,17 +116,19 @@ NavigableFocusScope {
                 x: contentX - VLCStyle.table_section_width
                 y: row.y
                 height: row.height
+                topPadding: root.headerTopPadding
                 leftPadding: VLCStyle.table_section_text_margin
                 text: view.currentSection
                 color: VLCStyle.colors.accent
-                visible: text !== "" && view.contentY > (VLCStyle.fontHeight_normal + VLCStyle.margin_xxsmall - col.height)
+                visible: text !== "" && view.contentY > (row.height - col.height - row.topPadding)
+                verticalAlignment: Text.AlignTop
             }
 
             Column {
                 id: col
 
                 width: parent.width
-                height: childrenRect.height
+                height: implicitHeight
 
                 Loader {
                     id: headerLoader
@@ -135,9 +143,11 @@ NavigableFocusScope {
                         leftMargin: VLCStyle.margin_xxxsmall
                         rightMargin: VLCStyle.margin_xxxsmall
                         horizontalCenter: parent.horizontalCenter
+                        horizontalCenterOffset: - root._contextButtonHorizontalSpace / 2
                     }
-                    height: childrenRect.height + VLCStyle.margin_xxsmall
-                    topPadding: VLCStyle.margin_xxsmall
+                    height: implicitHeight
+                    topPadding: root.headerTopPadding
+                    bottomPadding: VLCStyle.margin_xsmall
                     spacing: root.horizontalSpacing
 
                     Repeater {
@@ -173,12 +183,6 @@ NavigableFocusScope {
                         }
                     }
                 }
-
-                Rectangle {
-                    width: parent.width
-                    height: 1
-                    color: VLCStyle.colors.textInactive
-                }
             }
         }
 
@@ -196,20 +200,14 @@ NavigableFocusScope {
 
             property var rowModel: model
             property bool selected: selectionDelegateModel.isSelected(root.model.index(index, 0))
-            property alias showSeparator: separator.visible
             readonly property bool highlighted: selected || hoverArea.containsMouse || activeFocus
+            readonly property color foregroundColor: highlighted ? VLCStyle.colors.bgHoverText : VLCStyle.colors.text
             readonly property int _index: index
+            property int _modifiersOnLastPress: Qt.NoModifier
 
             width: view.width
             height: root.rowHeight
             color: highlighted ? VLCStyle.colors.bgHover : "transparent"
-
-            onHighlightedChanged: {
-                showSeparator = !highlighted
-                var nextItem = view.itemAtIndex(index + 1)
-                if ( nextItem && lineView.ListView.nextSection === lineView.ListView.section)
-                    nextItem.showSeparator = !highlighted && !nextItem.highlighted
-            }
 
             Connections {
                 target: selectionDelegateModel
@@ -222,6 +220,20 @@ NavigableFocusScope {
                 hoverEnabled: true
                 Keys.onMenuPressed: root.contextMenuButtonClicked(contextButton,rowModel)
                 acceptedButtons: Qt.RightButton | Qt.LeftButton
+                drag.target: root.dragItem
+                drag.axis: Drag.XAndYAxis
+                drag.onActiveChanged: {
+                    // perform the "click" action because the click action is only executed on mouse release (we are in the pressed state)
+                    // but we will need the updated list on drop
+                    if (drag.active && !selectionDelegateModel.isSelected(root.model.index(index, 0))) {
+                        selectionDelegateModel.updateSelection(_modifiersOnLastPress , view.currentIndex, index)
+                    } else if (root.dragItem) {
+                        root.dragItem.Drag.drop()
+                    }
+                    root.dragItem.Drag.active = drag.active
+                }
+
+                onPressed: _modifiersOnLastPress = mouse.modifiers
 
                 onClicked: {
                     if (mouse.button === Qt.LeftButton || !selectionDelegateModel.isSelected(root.model.index(index, 0))) {
@@ -235,20 +247,17 @@ NavigableFocusScope {
                     }
                 }
 
+                onPositionChanged: {
+                    if (drag.active) {
+                        var pos = drag.target.parent.mapFromItem(hoverArea, mouseX, mouseY)
+                        drag.target.x = pos.x + 12
+                        drag.target.y = pos.y + 12
+                    }
+                }
+
                 onDoubleClicked: {
                     actionForSelection(selectionDelegateModel.selectedIndexes)
                     root.itemDoubleClicked(model)
-                }
-
-                Rectangle {
-                    id: separator
-
-                    anchors.top: parent.top
-                    anchors.right: content.right
-                    width: content.width + (lineView.ListView.previousSection !== lineView.ListView.section
-                                            ? VLCStyle.table_section_width : 0)
-                    height: VLCStyle.heightBar_xxxsmall
-                    color: VLCStyle.colors.separator
                 }
 
                 Row {
@@ -260,6 +269,7 @@ NavigableFocusScope {
                         leftMargin: VLCStyle.margin_xxxsmall
                         rightMargin: VLCStyle.margin_xxxsmall
                         horizontalCenter: parent.horizontalCenter
+                        horizontalCenterOffset: - root._contextButtonHorizontalSpace / 2
                         top: parent.top
                         bottom: parent.bottom
                     }
@@ -284,6 +294,7 @@ NavigableFocusScope {
                                 property var colModel: modelData
                                 readonly property bool currentlyFocused: lineView.activeFocus
                                 readonly property bool containsMouse: hoverArea.containsMouse
+                                readonly property color foregroundColor: lineView.foregroundColor
                                 readonly property int index: lineView._index
 
                                 anchors.fill: parent
@@ -295,9 +306,10 @@ NavigableFocusScope {
                 }
 
                 Widgets.ContextButton {
-                    anchors.right: content.right
-                    anchors.top: content.top
-                    anchors.bottom: content.bottom
+                    anchors.left: content.right
+                    anchors.leftMargin: VLCStyle.margin_xxsmall
+                    anchors.verticalCenter: content.verticalCenter
+                    color: lineView.foregroundColor
                     backgroundColor: hovered || activeFocus ?
                                          VLCStyle.colors.getBgColor( lineView.selected, hovered,
                                                                      activeFocus ) : "transparent"

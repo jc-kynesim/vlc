@@ -30,7 +30,7 @@ Item {
     FontMetrics { id: fontMetrics_large;    font.pixelSize: dp(14, scale); }
     FontMetrics { id: fontMetrics_xlarge;   font.pixelSize: dp(16, scale); }
     FontMetrics { id: fontMetrics_xxlarge;  font.pixelSize: dp(20, scale); }
-    FontMetrics { id: fontMetrics_xxxlarge; font.pixelSize: dp(30, scale); }
+    FontMetrics { id: fontMetrics_xxxlarge; font.pixelSize: dp(24, scale); }
 
     property alias self: vlc_style
 
@@ -71,8 +71,13 @@ Item {
 
     property int listAlbumCover_height: dp(32, scale)
     property int listAlbumCover_width: listAlbumCover_height * 16.0/9
+    property int listAlbumCover_radius: dp(3, scale)
     property int trackListAlbumCover_width: dp(32, scale)
     property int trackListAlbumCover_heigth: dp(32, scale)
+    property int trackListAlbumCover_radius: dp(2, scale)
+
+    property int tableCoverRow_height: Math.max(listAlbumCover_height, fontHeight_normal) + margin_xsmall * 2
+    property int tableRow_height: fontHeight_normal + margin_small * 2
 
     property int icon_xsmall: dp(8, scale);
     property int icon_small: dp(16, scale);
@@ -125,8 +130,6 @@ Item {
 
     property int expandAlbumTracksHeight: dp(200, scale)
 
-    readonly property real artworkInfoTextWidth: (appWidth / 6)
-
     //combobox
     property int combobox_width_small: dp(64, scale)
     property int combobox_width_normal: dp(96, scale)
@@ -146,30 +149,41 @@ Item {
 
     property int gridCover_network_width: colWidth(1)
     property int gridCover_network_height: gridCover_network_width
-    property int gridCover_network_border: dp(2, scale)
+    property int gridCover_network_border: dp(3, scale)
 
     property int gridCover_music_width: colWidth(1)
     property int gridCover_music_height: gridCover_music_width
-    property int gridCover_music_border: dp(2, scale)
+    property int gridCover_music_border: dp(3, scale)
 
     property int gridCover_video_width: colWidth(2)
     property int gridCover_video_height: ( gridCover_video_width * 10.0 ) / 16
-    property int gridCover_video_border: dp(3, scale)
+    property int gridCover_video_border: dp(4, scale)
+
+    property int gridCover_video_width_large: dp(406, scale)
+    property int gridCover_video_height_large: ( gridCover_video_width_large * 10.0 ) / 16
+    
+    property int gridCover_radius: dp(4, scale)
 
     property int expandCover_music_height: dp(171, scale)
     property int expandCover_music_width: dp(171, scale)
+    property int expandCover_music_radius: gridCover_radius
+    property int expandDelegate_border: dp(1, scale)
 
     property int artistGridCover_radius: dp(90, scale)
 
     //GridItem
     property int gridItem_network_width: VLCStyle.gridCover_network_width
-    property int gridItem_network_height: VLCStyle.gridCover_network_height + VLCStyle.margin_xsmall + VLCStyle.fontHeight_normal + VLCStyle.fontHeight_small
+    property int gridItem_network_height: VLCStyle.gridCover_network_height + VLCStyle.margin_xsmall + VLCStyle.fontHeight_normal + VLCStyle.margin_xsmall + VLCStyle.fontHeight_normal
 
     property int gridItem_music_width: VLCStyle.gridCover_music_width
-    property int gridItem_music_height: VLCStyle.gridCover_music_height + VLCStyle.margin_xsmall + VLCStyle.fontHeight_normal + VLCStyle.fontHeight_small
+    property int gridItem_music_height: VLCStyle.gridCover_music_height + VLCStyle.margin_xsmall + VLCStyle.fontHeight_normal + VLCStyle.margin_xsmall + VLCStyle.fontHeight_small
 
     property int gridItem_video_width: VLCStyle.gridCover_video_width
-    property int gridItem_video_height: VLCStyle.gridCover_video_height + VLCStyle.margin_xxsmall + VLCStyle.fontHeight_normal + VLCStyle.fontHeight_small
+    property int gridItem_video_height: VLCStyle.gridCover_video_height + VLCStyle.margin_xxsmall + VLCStyle.fontHeight_normal + VLCStyle.fontHeight_normal
+
+    property int gridItem_video_width_large: VLCStyle.gridCover_video_width_large
+    property int gridItem_video_height_large: VLCStyle.gridCover_video_height_large + VLCStyle.margin_xxsmall + VLCStyle.fontHeight_large +
+                                              VLCStyle.margin_xxsmall + VLCStyle.fontHeight_normal
 
     property int column_width: dp(114, scale)
     property int column_margin_width: dp(32, scale)
@@ -177,7 +191,7 @@ Item {
     property int table_cover_border: dp(2, scale)
 
     property int artistBanner_height: dp(200, scale)
-    
+
     //global application size, updated by the root widget
     property int appWidth: 0
     property int appHeight: 0

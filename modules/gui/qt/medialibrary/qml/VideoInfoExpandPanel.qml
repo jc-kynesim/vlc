@@ -41,8 +41,27 @@ Widgets.NavigableFocusScope {
 
         implicitHeight: contentLayout.implicitHeight + ( VLCStyle.margin_normal * 2 )
         width: parent.width
-        clip: true
         color: VLCStyle.colors.bgAlt
+
+        Rectangle {
+            anchors {
+                top: parent.top
+                left: parent.left
+                right: parent.right
+            }
+            color: VLCStyle.colors.buttonBorder
+            height: VLCStyle.expandDelegate_border
+        }
+
+        Rectangle {
+            anchors {
+                bottom: parent.bottom
+                left: parent.left
+                right: parent.right
+            }
+            color: VLCStyle.colors.buttonBorder
+            height: VLCStyle.expandDelegate_border
+        }
 
         RowLayout {
             id: contentLayout
@@ -69,15 +88,26 @@ Widgets.NavigableFocusScope {
 
                     spacing: VLCStyle.margin_normal
 
-                    /* A bigger cover for the album */
-                    Image {
-                        id: expand_cover_id
-
+                    Item {
                         height: VLCStyle.gridCover_video_height
                         width: VLCStyle.gridCover_video_width
-                        source: model.thumbnail || VLCStyle.noArtCover
-                        sourceSize: Qt.size(width, height)
-                        fillMode: Image.PreserveAspectFit
+
+                        /* A bigger cover for the album */
+                        Widgets.RoundImage {
+                            id: expand_cover_id
+
+                            anchors.fill: parent
+                            asynchronous: true
+                            source: model.thumbnail || VLCStyle.noArtCover
+                            sourceSize: Qt.size(width, height)
+                            fillMode: Image.PreserveAspectFit
+                            radius: VLCStyle.gridCover_radius
+                        }
+
+                        Widgets.ListCoverShadow {
+                            anchors.fill: expand_cover_id
+                            source: expand_cover_id
+                        }
                     }
 
                     Widgets.NavigableRow {
@@ -119,15 +149,28 @@ Widgets.NavigableFocusScope {
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignLeft | Qt.AlignTop
 
-                Widgets.SubtitleLabel {
-                    text: model.title || i18n.qtr("Unknown title")
+                RowLayout {
                     width: parent.width
+
+                    Widgets.SubtitleLabel {
+                        text: model.title || i18n.qtr("Unknown title")
+
+                        Layout.fillWidth: true
+                    }
+
+                    Widgets.IconLabel {
+                        text: VLCIcons.close
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: expandRect.retract()
+                        }
+                    }
                 }
 
                 Widgets.CaptionLabel {
                     text: model.duration
                     color: VLCStyle.colors.text
-                    topPadding: VLCStyle.margin_xxsmall
                     width: parent.width
                 }
 
@@ -251,18 +294,6 @@ Widgets.NavigableFocusScope {
                         }
 
                     }
-                }
-            }
-
-            Widgets.IconLabel {
-                text: VLCIcons.close
-                color: VLCStyle.colors.caption
-
-                Layout.alignment: Qt.AlignTop
-
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: expandRect.retract()
                 }
             }
         }

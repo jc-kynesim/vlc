@@ -105,7 +105,7 @@ static picture_t *filter_chain_VideoBufferNew( filter_t *filter )
         // HACK as intermediate filters may not have the same video format as
         // the last one handled by the owner
         filter_owner_t saved_owner = filter->owner;
-        filter->owner = (filter_owner_t) {};
+        filter->owner = (filter_owner_t) {0};
         pic = filter_NewPicture( filter );
         filter->owner = saved_owner;
         if( pic == NULL )
@@ -158,7 +158,7 @@ filter_chain_t *filter_chain_NewVideo( vlc_object_t *obj, bool allow_change,
         chain->parent_video_owner = *owner;
     }
     else
-        chain->parent_video_owner = (filter_owner_t){};
+        chain->parent_video_owner = (filter_owner_t){0};
     return chain;
 }
 

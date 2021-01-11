@@ -29,7 +29,7 @@
 #include "Segment.h"
 #include "BaseAdaptationSet.h"
 #include "BaseRepresentation.h"
-#include "AbstractPlaylist.hpp"
+#include "BasePlaylist.hpp"
 #include "SegmentChunk.hpp"
 #include "../http/BytesRange.hpp"
 #include "../http/HTTPConnectionManager.h"
@@ -45,7 +45,6 @@ ISegment::ISegment(const ICanonicalUrl *parent):
     endByte    (0)
 {
     debugName = "Segment";
-    classId = CLASSID_ISEGMENT;
     startTime.Set(0);
     duration.Set(0);
     sequence = 0;
@@ -62,7 +61,7 @@ bool ISegment::prepareChunk(SharedResources *res, SegmentChunk *chunk, BaseRepre
     CommonEncryption enc = encryption;
     enc.mergeWith(rep->intheritEncryption());
 
-    if(enc.method != CommonEncryption::Method::NONE)
+    if(enc.method != CommonEncryption::Method::None)
     {
         CommonEncryptionSession *encryptionSession = new CommonEncryptionSession();
         if(!encryptionSession->start(res, enc))
@@ -89,11 +88,12 @@ SegmentChunk* ISegment::toChunk(SharedResources *res, AbstractConnectionManager 
         SegmentChunk *chunk = createChunk(source, rep);
         if(chunk)
         {
+            chunk->sequence = index;
             chunk->discontinuity = discontinuity;
             if(!prepareChunk(res, chunk, rep))
             {
                 delete chunk;
-                return NULL;
+                return nullptr;
             }
             connManager->start(source);
             return chunk;
@@ -103,7 +103,7 @@ SegmentChunk* ISegment::toChunk(SharedResources *res, AbstractConnectionManager 
             delete source;
         }
     }
-    return NULL;
+    return nullptr;
 }
 
 bool ISegment::isTemplate() const
@@ -182,16 +182,9 @@ void ISegment::setEncryption(CommonEncryption &e)
     encryption = e;
 }
 
-int ISegment::getClassId() const
-{
-    return classId;
-}
-
 Segment::Segment(ICanonicalUrl *parent) :
         ISegment(parent)
 {
-    size = -1;
-    classId = CLASSID_SEGMENT;
 }
 
 SegmentChunk* Segment::createChunk(AbstractChunkSource *source, BaseRepresentation *rep)
@@ -265,14 +258,12 @@ InitSegment::InitSegment(ICanonicalUrl *parent) :
     Segment(parent)
 {
     debugName = "InitSegment";
-    classId = CLASSID_INITSEGMENT;
 }
 
 IndexSegment::IndexSegment(ICanonicalUrl *parent) :
     Segment(parent)
 {
     debugName = "IndexSegment";
-    classId = CLASSID_INDEXSEGMENT;
 }
 
 SubSegment::SubSegment(Segment *main, size_t start, size_t end) :
@@ -280,7 +271,6 @@ SubSegment::SubSegment(Segment *main, size_t start, size_t end) :
 {
     setByteRange(start, end);
     debugName = "SubSegment";
-    classId = CLASSID_SUBSEGMENT;
 }
 
 

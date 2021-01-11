@@ -26,7 +26,7 @@ QHash<QByteArray, vlc_ml_sorting_criteria_t> MLGenreModel::M_names_to_criteria =
 };
 
 MLGenreModel::MLGenreModel(QObject *parent)
-    : MLSlidingWindowModel<MLGenre>(parent)
+    : MLBaseModel(parent)
 {
 }
 
@@ -35,7 +35,7 @@ QVariant MLGenreModel::data(const QModelIndex &index, int role) const
     if (!index.isValid() || index.row() < 0)
         return QVariant();
 
-    const MLGenre* ml_genre = item(index.row());
+    const MLGenre* ml_genre = static_cast<MLGenre *>(item(index.row()));
     if (!ml_genre)
         return QVariant();
 
@@ -68,27 +68,6 @@ QHash<int, QByteArray> MLGenreModel::roleNames() const
     };
 }
 
-std::vector<std::unique_ptr<MLGenre>> MLGenreModel::fetch()
-{
-    ml_unique_ptr<vlc_ml_genre_list_t> genre_list(
-        vlc_ml_list_genres(m_ml, &m_query_param)
-    );
-    if ( genre_list == nullptr )
-        return {};
-    std::vector<std::unique_ptr<MLGenre>> res;
-    for( const vlc_ml_genre_t& genre: ml_range_iterate<vlc_ml_genre_t>( genre_list ) )
-        res.emplace_back( std::make_unique<MLGenre>( m_ml, &genre ) );
-    return res;
-}
-
-size_t MLGenreModel::countTotalElements() const
-{
-    auto queryParams = m_query_param;
-    queryParams.i_offset = 0;
-    queryParams.i_nbResults = 0;
-    return vlc_ml_count_genres( m_ml, &queryParams );
-}
-
 void MLGenreModel::onVlcMlEvent(const MLEvent &event)
 {
     switch (event.i_type)
@@ -99,7 +78,7 @@ void MLGenreModel::onVlcMlEvent(const MLEvent &event)
             m_need_reset = true;
             break;
     }
-    MLSlidingWindowModel::onVlcMlEvent(event);
+    MLBaseModel::onVlcMlEvent(event);
 }
 
 void MLGenreModel::thumbnailUpdated(int idx)
@@ -121,4 +100,36 @@ vlc_ml_sorting_criteria_t MLGenreModel::roleToCriteria(int role) const
 vlc_ml_sorting_criteria_t MLGenreModel::nameToCriteria(QByteArray name) const
 {
     return M_names_to_criteria.value(name, VLC_ML_SORTING_DEFAULT);
+}
+
+ListCacheLoader<std::unique_ptr<MLItem>> *
+MLGenreModel::createLoader() const
+{
+    return new Loader(*this);
+}
+
+size_t MLGenreModel::Loader::count() const
+{
+    MLQueryParams params = getParams();
+    auto queryParams = params.toCQueryParams();
+
+    return vlc_ml_count_genres( m_ml, &queryParams );
+}
+
+std::vector<std::unique_ptr<MLItem>>
+MLGenreModel::Loader::load(size_t index, size_t count) const
+{
+    MLQueryParams params = getParams(index, count);
+    auto queryParams = params.toCQueryParams();
+
+    ml_unique_ptr<vlc_ml_genre_list_t> genre_list(
+        vlc_ml_list_genres(m_ml, &queryParams)
+    );
+    if ( genre_list == nullptr )
+        return {};
+    std::vector<std::unique_ptr<MLItem>> res;
+    for( const vlc_ml_genre_t& genre: ml_range_iterate<vlc_ml_genre_t>( genre_list ) )
+        res.emplace_back( std::make_unique<MLGenre>( m_ml, &genre ) );
+    return res;
+
 }

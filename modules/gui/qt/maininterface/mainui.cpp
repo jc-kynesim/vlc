@@ -160,7 +160,7 @@ void MainUI::registerQMLTypes()
 
     if (m_mainInterface->hasMediaLibrary())
     {
-        qRegisterMetaType<MLParentId>();
+        qRegisterMetaType<MLItemId>();
         qmlRegisterType<MLAlbumModel>( "org.videolan.medialib", 0, 1, "MLAlbumModel" );
         qmlRegisterType<MLArtistModel>( "org.videolan.medialib", 0, 1, "MLArtistModel" );
         qmlRegisterType<MLAlbumTrackModel>( "org.videolan.medialib", 0, 1, "MLAlbumTrackModel" );
@@ -182,7 +182,6 @@ void MainUI::registerQMLTypes()
         registerAnonymousType<MLArtist>("org.videolan.medialib", 1);
         registerAnonymousType<MLAlbumTrack>("org.videolan.medialib", 1);
         registerAnonymousType<MLGenre>("org.videolan.medialib", 1);
-        registerAnonymousType<MLVideo>("org.videolan.medialib", 1);
 
         qmlRegisterType<AlbumContextMenu>( "org.videolan.medialib", 0, 1, "AlbumContextMenu" );
         qmlRegisterType<ArtistContextMenu>( "org.videolan.medialib", 0, 1, "ArtistContextMenu" );
@@ -222,6 +221,7 @@ void MainUI::registerQMLTypes()
 
     qmlRegisterType<PlayerControlBarModel>( "org.videolan.vlc", 0, 1, "PlayerControlBarModel");
 
+    qRegisterMetaType<QmlMainContext*>();
     qmlRegisterType<QmlGlobalMenu>( "org.videolan.vlc", 0, 1, "QmlGlobalMenu" );
     qmlRegisterType<QmlMenuBar>( "org.videolan.vlc", 0, 1, "QmlMenuBar" );
     qmlRegisterType<NetworkMediaContextMenu>( "org.videolan.vlc", 0, 1, "NetworkMediaContextMenu" );

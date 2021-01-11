@@ -221,7 +221,7 @@ QMenu *VLCMenuBar::FileMenu( intf_thread_t *p_intf, QMenu *menu, MainInterface *
     addDPStaticEntry( menu, qtr( "Open &Location from clipboard" ),
                       NULL, &DialogsProvider::openUrlDialog, "Ctrl+V" );
 
-    if( var_InheritBool( p_intf, "qt-recentplay" ) && mi->hasMediaLibrary() )
+    if( mi && var_InheritBool( p_intf, "qt-recentplay" ) && mi->hasMediaLibrary() )
     {
         MLRecentsModel* recentModel = new MLRecentsModel(nullptr);
         recentModel->setMl(mi->getMediaLibrary());
@@ -530,7 +530,7 @@ QMenu *VLCMenuBar::NavigMenu( intf_thread_t *p_intf, QMenu *menu )
     menu->addMenu( submenu );
     menu->addMenu( new CheckableListMenu( qtr("&Program") , THEMIM->getPrograms(), CheckableListMenu::GROUPED , menu) );
 
-    if (p_intf->p_sys->p_mi->hasMediaLibrary() )
+    if (p_intf->p_sys->p_mi && p_intf->p_sys->p_mi->hasMediaLibrary() )
     {
         submenu = new QMenu( qtr( I_MENU_BOOKMARK ), menu );
         submenu->setTearOffEnabled( true );
@@ -861,7 +861,7 @@ QMenu* VLCMenuBar::PopupMenu( intf_thread_t *p_intf, bool show )
             /* Open skin dialog box */
             if (var_Type(p_object, "intf-skins-interactive") & VLC_VAR_ISCOMMAND)
             {
-                QAction* openSkinAction = new QAction(qtr("Open skin..."));
+                QAction* openSkinAction = new QAction(qtr("Open skin..."), menu);
                 openSkinAction->setShortcut( QKeySequence( "Ctrl+Shift+S" ));
                 connect(openSkinAction, &QAction::triggered, [=]() {
                     var_TriggerCallback(p_object, "intf-skins-interactive");

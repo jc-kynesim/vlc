@@ -22,9 +22,8 @@
 
 #include <vlc_thumbnailer.h>
 
-VideoDescription::VideoDescription(const QString &codec, const QString &language, const unsigned int fps, QObject *parent)
-    : QObject(parent)
-    , m_codec(codec)
+VideoDescription::VideoDescription(const QString &codec, const QString &language, const unsigned int fps)
+    : m_codec(codec)
     , m_language(language)
     , m_fps(fps)
 {
@@ -45,9 +44,8 @@ unsigned int VideoDescription::getFps() const
     return m_fps;
 }
 
-AudioDescription::AudioDescription(const QString &codec, const QString &language, const unsigned int nbChannels, const unsigned int sampleRate, QObject *parent)
-    : QObject(parent)
-    , m_codec(codec)
+AudioDescription::AudioDescription(const QString &codec, const QString &language, const unsigned int nbChannels, const unsigned int sampleRate)
+    : m_codec(codec)
     , m_language(language)
     , m_nbchannels(nbChannels)
     , m_sampleRate(sampleRate)
@@ -74,10 +72,9 @@ unsigned int AudioDescription::getSampleRate() const
     return m_sampleRate;
 }
 
-MLVideo::MLVideo(vlc_medialibrary_t* ml, const vlc_ml_media_t* data, QObject* parent)
-    : QObject( parent )
+MLVideo::MLVideo(vlc_medialibrary_t* ml, const vlc_ml_media_t* data)
+    : MLItem( MLItemId( data->i_id, VLC_ML_PARENT_UNKNOWN ) )
     , m_ml( ml )
-    , m_id( data->i_id, VLC_ML_PARENT_UNKNOWN )
     , m_title( QString::fromUtf8( data->psz_title ) )
     , m_thumbnail( QString::fromUtf8( data->thumbnails[VLC_ML_THUMBNAIL_SMALL].psz_mrl ) )
     , m_progress( data->f_progress )
@@ -105,22 +102,20 @@ MLVideo::MLVideo(vlc_medialibrary_t* ml, const vlc_ml_media_t* data, QObject* pa
         if ( track.i_type == VLC_ML_TRACK_TYPE_AUDIO ) {
             numChannel = std::max( numChannel , track.a.i_nbChannels );
 
-            m_audioDesc.push_back( new AudioDescription ( QString::fromUtf8( track.psz_codec ) ,
-                                                         QString::fromUtf8( track.psz_language  ) ,
-                                                         track.a.i_nbChannels ,
-                                                         track.a.i_sampleRate ,
-                                                         this )
-                                   );
+            m_audioDesc.push_back( { QString::fromUtf8( track.psz_codec ) ,
+                                     QString::fromUtf8( track.psz_language  ) ,
+                                     track.a.i_nbChannels ,
+                                     track.a.i_sampleRate }
+                                 );
         }
         else if ( track.i_type == VLC_ML_TRACK_TYPE_VIDEO ){
             maxWidth = std::max( maxWidth, track.v.i_width );
             maxHeight = std::max( maxHeight, track.v.i_height );
 
-            m_videoDesc.push_back(  new VideoDescription( QString::fromUtf8( track.psz_codec ) ,
-                                                        QString::fromUtf8( track.psz_language ) ,
-                                                        track.v.i_fpsNum,
-                                                        this )
-                                  );
+            m_videoDesc.push_back( { QString::fromUtf8( track.psz_codec ) ,
+                                     QString::fromUtf8( track.psz_language ) ,
+                                     track.v.i_fpsNum }
+                                 );
         }
     }
 
@@ -141,19 +136,6 @@ MLVideo::MLVideo(vlc_medialibrary_t* ml, const vlc_ml_media_t* data, QObject* pa
         m_resolution = "720p";  
     }
 
-MLVideo::MLVideo(const MLVideo& video, QObject* parent)
-    : QObject( parent )
-    , m_ml( video.m_ml )
-    , m_id( video.m_id )
-    , m_title( video.m_title )
-    , m_thumbnail( video.m_thumbnail )
-    , m_duration( video.m_duration )
-    , m_mrl( video.m_mrl )
-    , m_progress( video.m_progress )
-    , m_playCount( video.m_playCount )
-{
-}
-
 void MLVideo::onMlEvent( void* data, const vlc_ml_event_t* event )
 {
     auto self = static_cast<MLVideo*>(data);
@@ -165,7 +147,7 @@ void MLVideo::onMlEvent( const vlc_ml_event_t* event )
     if ( event->i_type != VLC_ML_EVENT_MEDIA_THUMBNAIL_GENERATED ||
          event->media_thumbnail_generated.i_size != VLC_ML_THUMBNAIL_SMALL )
         return;
-    if ( event->media_thumbnail_generated.p_media->i_id != m_id.id )
+    if ( event->media_thumbnail_generated.p_media->i_id != getId().id )
         return;
     if ( event->media_thumbnail_generated.b_success == false )
     {
@@ -177,12 +159,6 @@ void MLVideo::onMlEvent( const vlc_ml_event_t* event )
             .p_media->thumbnails[event->media_thumbnail_generated.i_size].psz_mrl;
     m_thumbnail = QString::fromUtf8( thumbnailMrl );
     vlc_ml_event_unregister_from_callback( m_ml, m_ml_event_handle.release() );
-    emit onThumbnailChanged( m_thumbnail );
-}
-
-MLParentId MLVideo::getId() const
-{
-    return m_id;
 }
 
 QString MLVideo::getTitle() const
@@ -196,7 +172,7 @@ QString MLVideo::getThumbnail()
          m_thumbnailStatus == VLC_ML_THUMBNAIL_STATUS_FAILURE )
     {
         m_ml_event_handle.reset( vlc_ml_event_register_callback( m_ml, onMlEvent, this ) );
-        vlc_ml_media_generate_thumbnail( m_ml, m_id.id, VLC_ML_THUMBNAIL_SMALL,
+        vlc_ml_media_generate_thumbnail( m_ml, getId().id, VLC_ML_THUMBNAIL_SMALL,
                                          512, 320, .15 );
     }
 
@@ -247,17 +223,12 @@ QString MLVideo::getProgressTime() const
     return MsToString(m_duration * m_progress);
 }
 
-QObjectList MLVideo::getVideoDesc() const
+QList<VideoDescription> MLVideo::getVideoDesc() const
 {
     return m_videoDesc;
 }
 
-QObjectList MLVideo::getAudioDesc() const
+QList<AudioDescription> MLVideo::getAudioDesc() const
 {
     return m_audioDesc;
-}
-
-MLVideo*MLVideo::clone(QObject* parent) const
-{
-    return new MLVideo(*this, parent);
 }

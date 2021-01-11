@@ -496,14 +496,11 @@ static int OpenDecoder( vlc_object_t *p_this )
     /* Get the list of all the available gstreamer decoders */
     p_list = gst_element_factory_list_get_elements(
             GST_ELEMENT_FACTORY_TYPE_DECODER, GST_RANK_MARGINAL );
-    VLC_GST_CHECK( p_list, NULL, "no decoder list found", VLC_ENOMOD );
     if( !dbin )
     {
         GList *p_l;
         /* Sort them as per ranks */
         p_list = g_list_sort( p_list, gst_plugin_feature_rank_compare_func );
-        VLC_GST_CHECK( p_list, NULL, "failed to sort decoders list",
-                VLC_ENOMOD );
         p_l = g_list_find_custom( p_list, &caps, find_decoder_func );
         VLC_GST_CHECK( p_l, NULL, "no suitable decoder found",
                 VLC_ENOMOD );
@@ -533,8 +530,6 @@ static int OpenDecoder( vlc_object_t *p_this )
     /* Queue: GStreamer thread will dump buffers into this queue,
      * DecodeBlock() will pop out the buffers from the queue */
     p_sys->p_que = gst_atomic_queue_new( 0 );
-    VLC_GST_CHECK( p_sys->p_que, NULL, "failed to create queue",
-            VLC_ENOMEM );
 
     p_sys->p_decode_src = gst_element_factory_make( "appsrc", NULL );
     VLC_GST_CHECK( p_sys->p_decode_src, NULL, "appsrc not found",

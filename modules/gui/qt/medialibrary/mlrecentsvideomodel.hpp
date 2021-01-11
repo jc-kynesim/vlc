@@ -31,7 +31,7 @@
 
 #include <QObject>
 
-class MLRecentsVideoModel : public MLSlidingWindowModel<MLVideo>
+class MLRecentsVideoModel : public MLBaseModel
 {
     Q_OBJECT
     Q_PROPERTY(int numberOfItemsToShow READ getNumberOfItemsToShow WRITE setNumberOfItemsToShow)
@@ -44,9 +44,10 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     int numberOfItemsToShow = 10;
 
+protected:
+    ListCacheLoader<std::unique_ptr<MLItem>> *createLoader() const override;
+
 private:
-    std::vector<std::unique_ptr<MLVideo>> fetch() override;
-    size_t countTotalElements() const override;
     vlc_ml_sorting_criteria_t roleToCriteria( int /* role */ ) const override{
         return VLC_ML_SORTING_DEFAULT;
     }
@@ -56,7 +57,21 @@ private:
     virtual void onVlcMlEvent( const MLEvent &event ) override;
     void setNumberOfItemsToShow(int);
     int getNumberOfItemsToShow();
-    int m_video_count;
+
+    struct Loader : public BaseLoader
+    {
+        Loader(const MLRecentsVideoModel &model, int numberOfItemsToShow)
+            : BaseLoader(model)
+            , m_numberOfItemsToShow(numberOfItemsToShow)
+        {
+        }
+
+        size_t count() const override;
+        std::vector<std::unique_ptr<MLItem>> load(size_t index, size_t count) const override;
+
+    private:
+        int m_numberOfItemsToShow;
+    };
 };
 
 #endif // ML_RECENTS_VIDEO_MODEL_H

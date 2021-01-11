@@ -21,7 +21,7 @@
 
 MLArtist::MLArtist(const vlc_ml_artist_t* _data, QObject *_parent)
     : QObject(_parent)
-    , m_id      ( _data->i_id, VLC_ML_PARENT_ARTIST )
+    , MLItem    ( MLItemId( _data->i_id, VLC_ML_PARENT_ARTIST ) )
     , m_name    ( QString::fromUtf8( _data->psz_name ) )
     , m_shortBio( QString::fromUtf8( _data->psz_shortbio ) )
     , m_cover   ( QString::fromUtf8( _data->thumbnails[VLC_ML_THUMBNAIL_SMALL].psz_mrl ) )
@@ -29,23 +29,6 @@ MLArtist::MLArtist(const vlc_ml_artist_t* _data, QObject *_parent)
     , m_nbTracks( _data->i_nb_tracks )
 {
     assert( _data );
-}
-
-MLArtist::MLArtist(const MLArtist &artist, QObject *_parent)
-    : QObject(_parent)
-    , m_id      ( artist.m_id )
-    , m_name    ( artist.m_name )
-    , m_shortBio( artist.m_shortBio )
-    , m_cover   ( artist.m_cover )
-    , m_nbAlbums( artist.m_nbAlbums )
-    , m_nbTracks( artist.m_nbTracks )
-{
-
-}
-
-MLParentId MLArtist::getId() const
-{
-    return m_id;
 }
 
 QString MLArtist::getName() const
@@ -73,12 +56,6 @@ unsigned int MLArtist::getNbTracks() const
 {
     return m_nbTracks;
 }
-
-MLArtist *MLArtist::clone(QObject *parent) const
-{
-    return new MLArtist(*this, parent);
-}
-
 
 QString MLArtist::getPresName() const
 {

@@ -36,13 +36,16 @@ T.TabButton {
     implicitHeight: contentItem.implicitHeight
 
     property string iconTxt: ""
+    property int iconSize: VLCStyle.icon_normal
     property bool selected: false
-    property color color: VLCStyle.colors.text
+    property color color: focusBackground.foregroundColor
     property bool busy: false
 
     font.pixelSize: VLCStyle.fontSize_normal
 
     background: FocusBackground {
+        id: focusBackground
+
         height: control.height
         width: control.width
         active: (control.activeFocus || control.hovered)
@@ -78,7 +81,7 @@ T.TabButton {
                     text: control.iconTxt
                     color: control.color
 
-                    font.pixelSize: VLCIcons.pixelSize(VLCStyle.icon_topbar)
+                    font.pixelSize: VLCIcons.pixelSize(control.iconSize)
                 }
 
                 BusyIndicator {
@@ -88,7 +91,7 @@ T.TabButton {
             }
 
 
-            Widgets.MenuCaption {
+            Widgets.ListLabel {
                 text: control.text
                 color: control.color
             }

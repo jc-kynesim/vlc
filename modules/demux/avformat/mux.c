@@ -398,16 +398,20 @@ static int MuxBlock( sout_mux_t *p_mux, sout_input_t *p_input )
         pkt.flags |= AV_PKT_FLAG_KEY;
     }
 
-    if( p_data->i_pts > 0 )
-        pkt.pts = TO_AV_TS(p_data->i_pts * p_stream->time_base.den /
-            CLOCK_FREQ / p_stream->time_base.num);
-    if( p_data->i_dts > 0 )
-        pkt.dts = TO_AV_TS(p_data->i_dts * p_stream->time_base.den /
-            CLOCK_FREQ / p_stream->time_base.num);
+    if( p_data->i_pts >= VLC_TICK_0 )
+        pkt.pts = av_rescale_q( p_data->i_pts - VLC_TICK_0,
+                                VLC_TIME_BASE_Q, p_stream->time_base );
+    if( p_data->i_dts >= VLC_TICK_0 )
+        pkt.dts = av_rescale_q( p_data->i_dts - VLC_TICK_0,
+                                VLC_TIME_BASE_Q, p_stream->time_base );
 
     /* this is another hack to prevent libavformat from triggering the "non monotone timestamps" check in avformat/utils.c */
-    p_stream->cur_dts = ( p_data->i_dts * p_stream->time_base.den /
-            CLOCK_FREQ / p_stream->time_base.num ) - 1;
+    if( p_stream->cur_dts >= pkt.dts )
+    {
+        msg_Warn( p_mux, "Non monotonic stream %d(%4.4s) %"PRId64" >= %"PRId64,
+                  p_input->fmt.i_id, (const char *) &p_input->fmt.i_codec, p_stream->cur_dts, pkt.dts );
+        p_stream->cur_dts = pkt.dts - 1;
+    }
 
     if( av_write_frame( p_sys->oc, &pkt ) < 0 )
     {
@@ -417,6 +421,8 @@ static int MuxBlock( sout_mux_t *p_mux, sout_input_t *p_input )
         block_Release( p_data );
         return VLC_EGENERIC;
     }
+
+    p_stream->cur_dts = pkt.dts;
 
     block_Release( p_data );
     return VLC_SUCCESS;

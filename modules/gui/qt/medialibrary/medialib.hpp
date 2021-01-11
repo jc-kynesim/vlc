@@ -28,6 +28,7 @@
 #include <QMetaObject>
 #include <QMetaMethod>
 #include <QQmlEngine>
+#include <QThreadPool>
 
 #include <memory>
 
@@ -46,15 +47,16 @@ class MediaLib : public QObject
 public:
     MediaLib(intf_thread_t* _intf, QObject* _parent = nullptr );
 
-    Q_INVOKABLE void addToPlaylist(const MLParentId &itemId, const QStringList* options = nullptr);
+    Q_INVOKABLE void addToPlaylist(const MLItemId &itemId, const QStringList* options = nullptr);
     Q_INVOKABLE void addToPlaylist(const QString& mrl, const QStringList* options = nullptr);
     Q_INVOKABLE void addToPlaylist(const QUrl& mrl, const QStringList* options = nullptr);
     Q_INVOKABLE void addToPlaylist(const QVariantList& itemIdList, const QStringList* options = nullptr);
 
-    Q_INVOKABLE void addAndPlay(const MLParentId &itemId, const QStringList* options = nullptr);
+    Q_INVOKABLE void addAndPlay(const MLItemId &itemId, const QStringList* options = nullptr);
     Q_INVOKABLE void addAndPlay(const QString& mrl, const QStringList* options = nullptr);
     Q_INVOKABLE void addAndPlay(const QUrl& mrl, const QStringList* options = nullptr);
     Q_INVOKABLE void addAndPlay(const QVariantList&itemIdList, const QStringList* options = nullptr);
+    Q_INVOKABLE void insertIntoPlaylist(size_t index, const QVariantList &itemIds /*QList<MLParentId>*/, const QStringList *options = nullptr);
 
     Q_INVOKABLE void reload();
 
@@ -64,6 +66,8 @@ public:
     inline int parsingProgress() const { return m_parsingProgress; }
 
     vlc_medialibrary_t* vlcMl();
+
+    QThreadPool &threadPool() { return m_threadPool; }
 
 signals:
     void reloadStarted();
@@ -90,4 +94,5 @@ private:
     vlc_medialibrary_t* m_ml;
     std::unique_ptr<vlc_ml_event_callback_t, std::function<void(vlc_ml_event_callback_t*)>> m_event_cb;
 
+    QThreadPool m_threadPool;
 };

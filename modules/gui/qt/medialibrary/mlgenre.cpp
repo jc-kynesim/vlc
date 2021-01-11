@@ -211,24 +211,14 @@ private:
 
 MLGenre::MLGenre(vlc_medialibrary_t* ml, const vlc_ml_genre_t *_data, QObject *_parent )
     : QObject(_parent)
+    , MLItem    ( MLItemId( _data->i_id, VLC_ML_PARENT_GENRE ) )
     , m_ml      ( ml )
-    , m_id      ( _data->i_id, VLC_ML_PARENT_GENRE )
     , m_name    ( QString::fromUtf8( _data->psz_name ) )
     , m_nbTracks ( (unsigned int)_data->i_nb_tracks )
 
 {
     assert(_data);
     connect(this, &MLGenre::askGenerateCover, this, &MLGenre::generateThumbnail);
-}
-
-MLGenre::MLGenre(const MLGenre &genre, QObject *_parent)
-    : QObject(_parent)
-    , m_ml      ( genre.m_ml )
-    , m_id      ( genre.m_id )
-    , m_name    ( genre.m_name )
-    , m_nbTracks( genre.m_nbTracks )
-{
-
 }
 
 MLGenre::~MLGenre()
@@ -240,11 +230,6 @@ MLGenre::~MLGenre()
         }
         delete m_coverTask;
     }
-}
-
-MLParentId MLGenre::getId() const
-{
-    return m_id;
 }
 
 QString MLGenre::getName() const
@@ -267,19 +252,11 @@ QString MLGenre::getCover() const
     return m_cover;
 }
 
-void MLGenre::setCover(const QString cover)
+void MLGenre::setCover(QString cover)
 {
     m_cover = cover;
     //TODO store in media library
-    emit coverChanged(m_cover);
 }
-
-MLGenre *MLGenre::clone(QObject *parent) const
-{
-    return new MLGenre(*this, parent);
-}
-
-
 
 void MLGenre::generateThumbnail()
 {
@@ -291,7 +268,7 @@ void MLGenre::generateThumbnail()
         dir.mkdir("qt-genre-covers");
         dir.cd("qt-genre-covers");
 
-        QString filename = QString("genre_thumbnail_%1.jpg").arg(m_id.id);
+        QString filename = QString("genre_thumbnail_%1.jpg").arg(getId().id);
         QString absoluteFilePath =  dir.absoluteFilePath(filename);
         if (dir.exists(filename))
         {

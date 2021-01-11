@@ -34,37 +34,24 @@
 #include "mlhelper.hpp"
 #include "mlqmltypes.hpp"
 
-class MLArtist : public QObject
+class MLArtist : public QObject, public MLItem
 {
     Q_OBJECT
-
-    Q_PROPERTY(MLParentId id READ getId CONSTANT)
-    Q_PROPERTY(QString name READ getName CONSTANT)
-    Q_PROPERTY(QString shortbio READ getShortBio CONSTANT)
-    Q_PROPERTY(QString cover READ getCover CONSTANT)
-    Q_PROPERTY(unsigned int nbalbums READ getNbAlbums CONSTANT)
-    Q_PROPERTY(unsigned int nbtracks READ getNbTracks CONSTANT)
 
 public:
     MLArtist(const vlc_ml_artist_t *_data, QObject *_parent = nullptr);
 
-    MLParentId getId() const;
     QString getName() const;
     QString getShortBio() const;
     QString getCover() const;
     unsigned int getNbAlbums() const;
     unsigned int getNbTracks() const;
 
-    MLArtist* clone(QObject *parent = nullptr) const;
-
     Q_INVOKABLE QString getPresName() const;
     Q_INVOKABLE QString getPresImage() const;
     Q_INVOKABLE QString getPresInfo() const;
 
 private:
-    MLArtist(const MLArtist &artist, QObject *_parent = nullptr);
-
-    MLParentId m_id;
     QString m_name;
     QString m_shortBio;
     QString m_cover;

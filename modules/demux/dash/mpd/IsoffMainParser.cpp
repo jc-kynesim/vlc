@@ -33,9 +33,9 @@
 #include "../../adaptive/playlist/SegmentList.h"
 #include "../../adaptive/playlist/SegmentTimeline.h"
 #include "../../adaptive/playlist/SegmentInformation.hpp"
+#include "../../adaptive/playlist/BasePeriod.h"
 #include "MPD.h"
 #include "Representation.h"
-#include "Period.h"
 #include "AdaptationSet.h"
 #include "ProgramInformation.h"
 #include "DASHSegment.h"
@@ -162,7 +162,7 @@ void IsoffMainParser::parsePeriods(MPD *mpd, Node *root)
 
     for(it = periods.begin(); it != periods.end(); ++it)
     {
-        Period *period = new (std::nothrow) Period(mpd);
+        BasePeriod *period = new (std::nothrow) BasePeriod(mpd);
         if (!period)
             continue;
         parseSegmentInformation(mpd, *it, period, &nextid);
@@ -174,7 +174,7 @@ void IsoffMainParser::parsePeriods(MPD *mpd, Node *root)
         if(!baseUrls.empty())
         {
             period->baseUrl.Set( new Url( baseUrls.front()->getText() ) );
-            parseAvailability<Period>(mpd, baseUrls.front(), period);
+            parseAvailability<BasePeriod>(mpd, baseUrls.front(), period);
         }
 
         parseAdaptationSets(mpd, *it, period);
@@ -230,14 +230,14 @@ void IsoffMainParser::parseMultipleSegmentBaseType(MPD *mpd, Node *node,
 size_t IsoffMainParser::parseSegmentTemplate(MPD *mpd, Node *templateNode, SegmentInformation *info)
 {
     size_t total = 0;
-    if (templateNode == NULL)
+    if (templateNode == nullptr)
         return total;
 
     std::string mediaurl;
     if(templateNode->hasAttribute("media"))
         mediaurl = templateNode->getAttributeValue("media");
 
-    SegmentTemplate *mediaTemplate = new (std::nothrow) SegmentTemplate(info);
+    SegmentTemplate *mediaTemplate = new (std::nothrow) SegmentTemplate(new SegmentTemplateSegment(), info);
     if(!mediaTemplate)
         return total;
     mediaTemplate->setSourceUrl(mediaurl);
@@ -283,7 +283,7 @@ size_t IsoffMainParser::parseSegmentInformation(MPD *mpd, Node *node,
     return total;
 }
 
-void    IsoffMainParser::parseAdaptationSets  (MPD *mpd, Node *periodNode, Period *period)
+void    IsoffMainParser::parseAdaptationSets  (MPD *mpd, Node *periodNode, BasePeriod *period)
 {
     std::vector<Node *> adaptationSets = DOMHelper::getElementByTagName(periodNode, "AdaptationSet", false);
     std::vector<Node *>::const_iterator it;
@@ -392,7 +392,7 @@ void    IsoffMainParser::parseRepresentations (MPD *mpd, Node *adaptationSetNode
         /* Empty Representation with just baseurl (ex: subtitles) */
         if(i_total == 0 &&
            (currentRepresentation->baseUrl.Get() && !currentRepresentation->baseUrl.Get()->empty()) &&
-            adaptationSet->getMediaSegment(0) == NULL)
+            adaptationSet->getMediaSegment(0) == nullptr)
         {
             SegmentBase *base = new (std::nothrow) SegmentBase(currentRepresentation);
             if(base)
@@ -571,8 +571,8 @@ void IsoffMainParser::parseProgramInformation(Node * node, MPD *mpd)
 
 Profile IsoffMainParser::getProfile() const
 {
-    Profile res(Profile::Unknown);
-    if(this->root == NULL)
+    Profile res(Profile::Name::Unknown);
+    if(this->root == nullptr)
         return res;
 
     std::string urn = root->getAttributeValue("profiles");
@@ -580,14 +580,14 @@ Profile IsoffMainParser::getProfile() const
         urn = root->getAttributeValue("profile"); //The standard spells it the both ways...
 
     size_t pos;
-    size_t nextpos = -1;
+    size_t nextpos = std::string::npos;
     do
     {
         pos = nextpos + 1;
         nextpos = urn.find_first_of(",", pos);
         res = Profile(urn.substr(pos, nextpos - pos));
     }
-    while (nextpos != std::string::npos && res == Profile::Unknown);
+    while (nextpos != std::string::npos && res == Profile::Name::Unknown);
 
     return res;
 }

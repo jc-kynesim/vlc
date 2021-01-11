@@ -31,25 +31,13 @@
 #include "mlhelper.hpp"
 #include "mlqmltypes.hpp"
 
-class MLAlbumTrack : public QObject
+class MLAlbumTrack : public QObject, public MLItem
 {
     Q_OBJECT
-
-    Q_PROPERTY(MLParentId id READ getId CONSTANT)
-    Q_PROPERTY(QString title READ getTitle CONSTANT)
-    Q_PROPERTY(QString album_title READ getAlbumTitle CONSTANT)
-    Q_PROPERTY(QString main_artist READ getArtist CONSTANT)
-    Q_PROPERTY(QString cover READ getCover CONSTANT)
-    Q_PROPERTY(unsigned int track_number READ getTrackNumber CONSTANT)
-    Q_PROPERTY(unsigned int disc_number READ getDiscNumber CONSTANT)
-    Q_PROPERTY(QString duration READ getDuration CONSTANT)
-    Q_PROPERTY(QString durationShort READ getDurationShort CONSTANT)
-    Q_PROPERTY(QString mrl READ getMRL CONSTANT)
 
 public:
     MLAlbumTrack(vlc_medialibrary_t *_ml, const vlc_ml_media_t *_data, QObject *_parent = nullptr);
 
-    MLParentId getId() const;
     QString getTitle() const;
     QString getAlbumTitle() const;
     QString getArtist() const;
@@ -60,12 +48,7 @@ public:
     QString getDurationShort() const;
     QString getMRL() const;
 
-    MLAlbumTrack* clone(QObject *parent = nullptr) const;
-
 private:
-    MLAlbumTrack(const MLAlbumTrack& albumtrack, QObject *_parent = nullptr);
-
-    MLParentId m_id;
     QString m_title;
     QString m_albumTitle;
     QString m_artist;
@@ -77,8 +60,4 @@ private:
     QString m_mrl;
 
    ml_unique_ptr<vlc_ml_media_t> m_data;
-
-signals:
-
-public slots:
 };

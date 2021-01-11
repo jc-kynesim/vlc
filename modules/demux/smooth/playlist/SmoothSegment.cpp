@@ -24,7 +24,7 @@
 #include "SmoothSegment.hpp"
 
 #include "../../adaptive/playlist/BaseRepresentation.h"
-#include "../../adaptive/playlist/AbstractPlaylist.hpp"
+#include "../../adaptive/playlist/BasePlaylist.hpp"
 #include "../mp4/IndexReader.hpp"
 
 using namespace smooth::playlist;
@@ -49,7 +49,7 @@ void SmoothSegmentChunk::onDownload(block_t **pp_block)
         return;
 
     IndexReader br(rep->getPlaylist()->getVLCObject());
-    br.parseIndex(*pp_block, rep);
+    br.parseIndex(*pp_block, rep, sequence);
 
     /* If timeshift depth is present, we use it for expiring segments
        as we never update playlist itself */
@@ -64,19 +64,20 @@ void SmoothSegmentChunk::onDownload(block_t **pp_block)
     }
 }
 
-SmoothSegmentTemplate::SmoothSegmentTemplate(SegmentInformation *parent) :
-    SegmentTemplate( parent )
+SmoothSegmentTemplateSegment::SmoothSegmentTemplateSegment(ICanonicalUrl *parent)
+    : SegmentTemplateSegment(parent)
 {
 
 }
 
-SmoothSegmentTemplate::~SmoothSegmentTemplate()
+SmoothSegmentTemplateSegment::~SmoothSegmentTemplateSegment()
 {
 
 }
 
-SegmentChunk* SmoothSegmentTemplate::createChunk(AbstractChunkSource *source, BaseRepresentation *rep)
+SegmentChunk* SmoothSegmentTemplateSegment::createChunk(AbstractChunkSource *source, BaseRepresentation *rep)
 {
      /* act as factory */
     return new (std::nothrow) SmoothSegmentChunk(source, rep);
 }
+

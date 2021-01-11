@@ -29,11 +29,12 @@
 
 #include <algorithm>
 #include <sstream>
+#include <limits>
 
 using namespace adaptive::playlist;
 
 SegmentTimeline::SegmentTimeline(AbstractMultipleSegmentBaseType *parent_)
-    : AttrsNode(Type::TIMELINE, parent_)
+    : AttrsNode(Type::Timeline, parent_)
 {
     totalLength = 0;
     parent = parent_;
@@ -76,7 +77,7 @@ stime_t SegmentTimeline::getMinAheadScaledTime(uint64_t number) const
         const Element *el = *it;
         if(number > el->number + el->r)
             break;
-        else if(number < el->number + el->r)
+        else if(number < el->number)
             totalscaledtime += (el->d * (el->r + 1));
         else /* within repeat range */
             totalscaledtime += el->d * (el->number + el->r - number);
@@ -87,7 +88,7 @@ stime_t SegmentTimeline::getMinAheadScaledTime(uint64_t number) const
 
 uint64_t SegmentTimeline::getElementNumberByScaledPlaybackTime(stime_t scaled) const
 {
-    const Element *prevel = NULL;
+    const Element *prevel = nullptr;
     std::list<Element *>::const_iterator it;
 
     if(!elements.size())
@@ -203,6 +204,7 @@ size_t SegmentTimeline::pruneBySequenceNumber(uint64_t number)
             el->t += count * el->d;
             el->r -= count;
             prunednow += count;
+            totalLength -= count * el->d;
             break;
         }
         else

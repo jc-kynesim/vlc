@@ -493,6 +493,9 @@ static csa_t *csaSetup( vlc_object_t *p_this )
 
     csa_t *csa = csa_New();
 
+    if( unlikely(csa == NULL) )
+        return NULL;
+
     if( csa_SetCW( p_this, csa, csack, true ) )
     {
         free(csack);
@@ -828,10 +831,10 @@ static int ActiveKeyCallback( vlc_object_t *p_this, char const *psz_cmd,
         return VLC_EBADVAR;
 
     vlc_mutex_lock( &p_sys->csa_lock );
-    i_res = csa_UseKey( p_this, p_sys->csa, use_odd );
+    csa_UseKey( p_this, p_sys->csa, use_odd );
     vlc_mutex_unlock( &p_sys->csa_lock );
 
-    return i_res;
+    return VLC_SUCCESS;
 }
 
 /*****************************************************************************

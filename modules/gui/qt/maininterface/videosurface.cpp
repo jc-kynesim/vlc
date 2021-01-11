@@ -25,10 +25,15 @@ VideoSurfaceProvider::VideoSurfaceProvider(QObject* parent)
 {
 }
 
-bool VideoSurfaceProvider::hasVideo()
+bool VideoSurfaceProvider::isEnabled()
 {
     QMutexLocker lock(&m_voutlock);
     return m_voutWindow != nullptr;
+}
+
+bool VideoSurfaceProvider::hasVideoEmbed() const
+{
+    return m_videoEmbed;
 }
 
 void VideoSurfaceProvider::enable(vout_window_t* voutWindow)
@@ -38,16 +43,23 @@ void VideoSurfaceProvider::enable(vout_window_t* voutWindow)
         QMutexLocker lock(&m_voutlock);
         m_voutWindow = voutWindow;
     }
-    emit hasVideoChanged(true);
+    emit videoEnabledChanged(true);
 }
 
 void VideoSurfaceProvider::disable()
 {
+    setVideoEmbed(false);
     {
         QMutexLocker lock(&m_voutlock);
         m_voutWindow = nullptr;
     }
-    emit hasVideoChanged(false);
+    emit videoEnabledChanged(false);
+}
+
+void VideoSurfaceProvider::setVideoEmbed(bool embed)
+{
+    m_videoEmbed = embed;
+    emit hasVideoEmbedChanged(embed);
 }
 
 void VideoSurfaceProvider::onWindowClosed()
@@ -106,6 +118,7 @@ void VideoSurfaceProvider::onKeyPressed(int key, Qt::KeyboardModifiers modifiers
 
 void VideoSurfaceProvider::onSurfaceSizeChanged(QSizeF size)
 {
+    emit surfaceSizeChanged(size);
     QMutexLocker lock(&m_voutlock);
     if (m_voutWindow)
         vout_window_ReportSize(m_voutWindow, size.width(), size.height());
@@ -120,6 +133,8 @@ VideoSurface::VideoSurface(QQuickItem* parent)
     setFlag(ItemAcceptsInputMethod, true);
     setFlag(ItemHasContents, true);
 
+    connect(this, &QQuickItem::xChanged, this, &VideoSurface::onSurfacePositionChanged);
+    connect(this, &QQuickItem::yChanged, this, &VideoSurface::onSurfacePositionChanged);
     connect(this, &QQuickItem::widthChanged, this, &VideoSurface::onSurfaceSizeChanged);
     connect(this, &QQuickItem::heightChanged, this, &VideoSurface::onSurfaceSizeChanged);
     connect(this, &QQuickItem::enabledChanged, this, &VideoSurface::onSurfaceSizeChanged);
@@ -269,22 +284,55 @@ QSGNode*VideoSurface::updatePaintNode(QSGNode* oldNode, QQuickItem::UpdatePaintN
         connect(this, &VideoSurface::mouseWheeled, m_provider, &VideoSurfaceProvider::onMouseWheeled);
         connect(this, &VideoSurface::keyPressed, m_provider, &VideoSurfaceProvider::onKeyPressed);
         connect(this, &VideoSurface::surfaceSizeChanged, m_provider, &VideoSurfaceProvider::onSurfaceSizeChanged);
+        connect(this, &VideoSurface::surfacePositionChanged, m_provider, &VideoSurfaceProvider::surfacePositionChanged);
 
-        connect(m_provider, &VideoSurfaceProvider::hasVideoChanged, this, &VideoSurface::onProviderVideoChanged);
+        connect(m_provider, &VideoSurfaceProvider::hasVideoEmbedChanged, this, &VideoSurface::onProviderVideoChanged);
 
-        onSurfaceSizeChanged();
+        updatePositionAndSize();
     }
     return node;
 }
 
 void VideoSurface::onProviderVideoChanged(bool hasVideo)
 {
-    if (hasVideo)
-        emit surfaceSizeChanged(size() * this->window()->effectiveDevicePixelRatio());
+    if (!hasVideo)
+        return;
+    updatePositionAndSize();
 }
 
 void VideoSurface::onSurfaceSizeChanged()
 {
-    if (isEnabled())
-        emit surfaceSizeChanged(size() * this->window()->effectiveDevicePixelRatio());
+    if (!isEnabled())
+        return;
+    QQuickWindow* window = this->window();
+    if (!window)
+        return;
+    emit surfaceSizeChanged(size() * window->effectiveDevicePixelRatio());
+}
+
+void VideoSurface::onSurfacePositionChanged()
+{
+    if (!isEnabled())
+        return;
+
+    QPointF scenePosition = this->mapToScene(QPointF(0,0));
+    QQuickWindow* window = this->window();
+    if (!window)
+        return;
+    qreal dpr = this->window()->effectiveDevicePixelRatio();
+    emit surfacePositionChanged(scenePosition * dpr);
+}
+
+void VideoSurface::updatePositionAndSize()
+{
+    if (!isEnabled())
+        return;
+
+    QQuickWindow* window = this->window();
+    if (!window)
+        return;
+    qreal dpr = this->window()->effectiveDevicePixelRatio();
+    emit surfaceSizeChanged(size() * dpr);
+    QPointF scenePosition = this->mapToScene(QPointF(0, 0));
+    emit surfacePositionChanged(scenePosition * dpr);
 }

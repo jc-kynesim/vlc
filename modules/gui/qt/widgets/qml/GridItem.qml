@@ -45,6 +45,7 @@ FocusScope {
     property real pictureWidth: VLCStyle.colWidth(1)
     property real pictureHeight: pictureWidth
     property int titleMargin: VLCStyle.margin_xsmall
+    property Item dragItem
 
     signal playClicked
     signal addToPlaylistClicked
@@ -64,58 +65,131 @@ FocusScope {
 
     readonly property int selectedBorderWidth: VLCStyle.column_margin_width - ( VLCStyle.margin_small * 2 )
 
-    property alias _primaryShadowVerticalOffset: primaryShadow.verticalOffset
-    property alias _primaryShadowRadius: primaryShadow.radius
-    property alias _primaryShadowSamples: primaryShadow.samples
-    property alias _secondaryShadowVerticalOffset: secondaryShadow.verticalOffset
-    property alias _secondaryShadowRadius: secondaryShadow.radius
-    property alias _secondaryShadowSamples: secondaryShadow.samples
-
     property int _newIndicatorMedian: VLCStyle.margin_xsmall
+    property int _modifiersOnLastPress: Qt.NoModifier
 
     state: _highlighted ? "selected" : "unselected"
     states: [
         State {
             name: "unselected"
+
+            PropertyChanges {
+                target: selectedShadow
+                opacity: 0
+                visible: false
+            }
+
+            PropertyChanges {
+                target: unselectedShadow
+                opacity: 1
+                visible: true
+            }
+
+            PropertyChanges {
+                target: picture
+                playCoverOpacity: 0
+                playCoverVisible: false
+            }
+
             PropertyChanges {
                 target: root
-                _primaryShadowVerticalOffset: VLCStyle.dp(6, VLCStyle.scale)
-                _primaryShadowRadius: VLCStyle.dp(14, VLCStyle.scale)
-                _primaryShadowSamples: 1 + VLCStyle.dp(14, VLCStyle.scale) * 2
-                _secondaryShadowVerticalOffset: VLCStyle.dp(1, VLCStyle.scale)
-                _secondaryShadowRadius: VLCStyle.dp(3, VLCStyle.scale)
-                _secondaryShadowSamples: 1 + VLCStyle.dp(3, VLCStyle.scale) * 2
                 _newIndicatorMedian: VLCStyle.margin_xsmall
             }
         },
         State {
             name: "selected"
+
+            PropertyChanges {
+                target: selectedShadow
+                opacity: 1
+                visible: true
+            }
+
+            PropertyChanges {
+                target: unselectedShadow
+                opacity: 0
+                visible: false
+            }
+
+            PropertyChanges {
+                target: picture
+                playCoverOpacity: 1
+                playCoverVisible: true
+            }
+
             PropertyChanges {
                 target: root
-                _primaryShadowVerticalOffset: VLCStyle.dp(32, VLCStyle.scale)
-                _primaryShadowRadius: VLCStyle.dp(72, VLCStyle.scale)
-                _primaryShadowSamples: 1 + VLCStyle.dp(72, VLCStyle.scale) * 2
-                _secondaryShadowVerticalOffset: VLCStyle.dp(6, VLCStyle.scale)
-                _secondaryShadowRadius: VLCStyle.dp(8, VLCStyle.scale)
-                _secondaryShadowSamples: 1 + VLCStyle.dp(8, VLCStyle.scale) * 2
                 _newIndicatorMedian: VLCStyle.margin_small
             }
         }
     ]
 
-    transitions: Transition {
-        to: "*"
-        SequentialAnimation {
-            PropertyAction {
-                properties: "_primaryShadowSamples,_secondaryShadowSamples"
-            }
+    transitions: [
+        Transition {
+            from: "unselected"
+            to: "selected"
+            // reversible: true // doesn't work
 
-            SmoothedAnimation {
-                duration: 64
-                properties: "_primaryShadowVerticalOffset,_primaryShadowRadius,_secondaryShadowVerticalOffset,_secondaryShadowRadius,_newIndicatorMedian"
+            SequentialAnimation {
+                PropertyAction {
+                    targets: [picture, selectedShadow]
+                    properties: "playCoverVisible,visible"
+                }
+
+                ParallelAnimation {
+                    NumberAnimation {
+                        properties: "opacity,playCoverOpacity"
+                        duration: 240
+                        easing.type: Easing.InSine
+                    }
+
+                    SmoothedAnimation {
+                        target: root
+                        property: "_newIndicatorMedian"
+                        duration: 240
+                        easing.type: Easing.InSine
+                    }
+                }
+
+                PropertyAction {
+                    target: unselectedShadow
+                    property: "visible"
+                }
+            }
+        },
+
+        Transition {
+            from: "selected"
+            to: "unselected"
+
+            SequentialAnimation {
+                PropertyAction {
+                    target: unselectedShadow
+                    property: "visible"
+                }
+
+                ParallelAnimation {
+                    NumberAnimation {
+                        properties: "opacity,playCoverOpacity"
+                        duration: 200
+                        easing.type: Easing.OutSine
+                    }
+
+                    SmoothedAnimation {
+                        target: root
+                        duration: 200
+                        property: "_newIndicatorMedian"
+                        easing.type: Easing.OutSine
+                    }
+                }
+
+                PropertyAction {
+                    targets: [picture, selectedShadow]
+                    properties: "playCoverVisible,visible"
+                }
             }
         }
-    }
+    ]
 
     MouseArea {
         id: mouseArea
@@ -124,6 +198,18 @@ FocusScope {
         anchors.fill: parent
         implicitWidth: content.implicitWidth
         implicitHeight: content.implicitHeight
+        drag.target: root.dragItem
+        drag.axis: Drag.XAndYAxis
+        drag.onActiveChanged: {
+            // perform the "click" action because the click action is only executed on mouse release (we are in the pressed state)
+            // but we will need the updated list on drop
+            if (drag.active && !selected) {
+                root.itemClicked(picture, Qt.LeftButton, root._modifiersOnLastPress)
+            } else if (root.dragItem) {
+                root.dragItem.Drag.drop()
+            }
+            root.dragItem.Drag.active = drag.active
+        }
 
         acceptedButtons: Qt.RightButton | Qt.LeftButton
         Keys.onMenuPressed: root.contextMenuButtonClicked(picture, root.mapToGlobal(0,0))
@@ -139,6 +225,16 @@ FocusScope {
         onDoubleClicked: {
             if (mouse.button === Qt.LeftButton)
                 root.itemDoubleClicked(picture,mouse.buttons, mouse.modifiers)
+        }
+
+        onPressed: _modifiersOnLastPress = mouse.modifiers
+
+        onPositionChanged: {
+            if (drag.active) {
+                var pos = drag.target.parent.mapFromItem(mouseArea, mouseX, mouseY)
+                drag.target.x = pos.x + 12
+                drag.target.y = pos.y + 12
+            }
         }
 
         FocusScope {
@@ -157,7 +253,7 @@ FocusScope {
                 y: - root.selectedBorderWidth
                 width: root.width + ( root.selectedBorderWidth * 2 )
                 height:  root.height + ( root.selectedBorderWidth * 2 )
-                color: VLCStyle.colors.bgAlt
+                color: VLCStyle.colors.bgHover
                 visible: root.selected || root._highlighted
             }
 
@@ -172,24 +268,35 @@ FocusScope {
                 color: VLCStyle.colors.bg
             }
 
-            DropShadow {
-                id: primaryShadow
+            // animating shadows properties are expensive and not smooth
+            // thus we use two different shadows for states "selected" and "unselected"
+            // and animate their opacity on state changes to get better animation
+            CoverShadow {
+                id: unselectedShadow
 
                 anchors.fill: baseRect
                 source: baseRect
-                horizontalOffset: 0
-                spread: 0
-                color: Qt.rgba(0, 0, 0, .22)
+                cached: true
+                secondaryVerticalOffset: VLCStyle.dp(1, VLCStyle.scale)
+                secondaryRadius: VLCStyle.dp(2, VLCStyle.scale)
+                secondarySamples: 1 + VLCStyle.dp(2, VLCStyle.scale) * 2
+                primaryVerticalOffset: VLCStyle.dp(4, VLCStyle.scale)
+                primaryRadius: VLCStyle.dp(9, VLCStyle.scale)
+                primarySamples: 1 + VLCStyle.dp(9, VLCStyle.scale) * 2
             }
 
-            DropShadow {
-                id: secondaryShadow
+            CoverShadow {
+                id: selectedShadow
 
                 anchors.fill: baseRect
                 source: baseRect
-                horizontalOffset: 0
-                spread: 0
-                color: Qt.rgba(0, 0, 0, .18)
+                cached: true
+                secondaryVerticalOffset: VLCStyle.dp(6, VLCStyle.scale)
+                secondaryRadius: VLCStyle.dp(18, VLCStyle.scale)
+                secondarySamples: 1 + VLCStyle.dp(18, VLCStyle.scale) * 2
+                primaryVerticalOffset: VLCStyle.dp(32, VLCStyle.scale)
+                primaryRadius: VLCStyle.dp(72, VLCStyle.scale)
+                primarySamples: 1 + VLCStyle.dp(72, VLCStyle.scale) * 2
             }
 
             Column {
@@ -204,6 +311,8 @@ FocusScope {
                     height: pictureHeight
                     playCoverVisible: root._highlighted
                     onPlayIconClicked: root.playClicked()
+                    clip: true
+                    radius: VLCStyle.gridCover_radius
 
                     /* new indicator (triangle at top-left of cover)*/
                     Rectangle {
@@ -231,13 +340,14 @@ FocusScope {
                     width: titleLabel.width
                     visible: root.title !== ""
 
-                    Widgets.MenuLabel {
+                    Widgets.ListLabel {
                         id: titleLabel
 
                         elide: Text.ElideNone
                         width: pictureWidth
                         horizontalAlignment: root.textHorizontalAlignment
                         topPadding: root.titleMargin
+                        color: selectionRect.visible ? VLCStyle.colors.bgHoverText : VLCStyle.colors.text
                     }
                 }
 
@@ -247,6 +357,10 @@ FocusScope {
                     visible: text !== ""
                     text: root.subtitle
                     width: pictureWidth
+                    topPadding: VLCStyle.margin_xsmall
+                    color: selectionRect.visible
+                           ? VLCStyle.colors.setColorAlpha(VLCStyle.colors.bgHoverText, .6)
+                           : VLCStyle.colors.menuCaption
                 }
             }
         }

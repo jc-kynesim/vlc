@@ -20,34 +20,29 @@
 #include "mlbasemodel.hpp"
 #include "medialib.hpp"
 #include <vlc_cxx_helpers.hpp>
+#include "util/listcache.hpp"
+
+static constexpr ssize_t COUNT_UNINITIALIZED =
+    ListCache<std::unique_ptr<MLItem>>::COUNT_UNINITIALIZED;
 
 MLBaseModel::MLBaseModel(QObject *parent)
     : QAbstractListModel(parent)
-    , m_ml(nullptr)
-    , m_search_pattern_cstr( nullptr, &free )
     , m_ml_event_handle( nullptr, [this](vlc_ml_event_callback_t* cb ) {
             assert( m_ml != nullptr );
             vlc_ml_event_unregister_callback( m_ml, cb );
         })
-    , m_need_reset( false )
 {
-    memset(&m_query_param, 0, sizeof(vlc_ml_query_params_t));
-    m_query_param.b_desc = false;
-    m_query_param.i_nbResults = 20; //FIXME: value for test
-    m_query_param.i_sort = VLC_ML_SORTING_DEFAULT;
-
     connect( this, &MLBaseModel::resetRequested, this, &MLBaseModel::onResetRequested );
 }
 
-MLBaseModel::~MLBaseModel()
-{
-}
+/* For std::unique_ptr, see Effective Modern C++, Item 22 */
+MLBaseModel::~MLBaseModel() = default;
 
 void MLBaseModel::sortByColumn(QByteArray name, Qt::SortOrder order)
 {
     beginResetModel();
-    m_query_param.b_desc = (order == Qt::SortOrder::DescendingOrder);
-    m_query_param.i_sort = nameToCriteria(name);
+    m_sort_desc = (order == Qt::SortOrder::DescendingOrder);
+    m_sort = nameToCriteria(name);
     clear();
     endResetModel();
 }
@@ -69,6 +64,27 @@ void MLBaseModel::onResetRequested()
     endResetModel();
 }
 
+void MLBaseModel::onLocalSizeAboutToBeChanged(size_t size)
+{
+    (void) size;
+    beginResetModel();
+}
+
+void MLBaseModel::onLocalSizeChanged(size_t size)
+{
+    (void) size;
+    endResetModel();
+    emit countChanged(size);
+}
+
+void MLBaseModel::onLocalDataChanged(size_t offset, size_t count)
+{
+    assert(count);
+    auto first = index(offset);
+    auto last = index(offset + count - 1);
+    emit dataChanged(first, last);
+}
+
 void MLBaseModel::onVlcMlEvent(const MLEvent &event)
 {
     switch(event.i_type)
@@ -80,6 +96,34 @@ void MLBaseModel::onVlcMlEvent(const MLEvent &event)
                 m_need_reset = false;
             }
             break;
+        case VLC_ML_EVENT_MEDIA_THUMBNAIL_GENERATED:
+        {
+            if (event.media_thumbnail_generated.b_success) {
+                if (!m_cache)
+                    break;
+
+                ssize_t stotal = m_cache->count();
+                if (stotal == COUNT_UNINITIALIZED)
+                    break;
+
+                size_t total = static_cast<size_t>(stotal);
+                for (size_t i = 0; i < total; ++i)
+                {
+                    const std::unique_ptr<MLItem> *item = m_cache->get(i);
+                    if (!item)
+                        /* Only consider items available locally in cache */
+                        break;
+
+                    MLItem *localItem = item->get();
+                    if (localItem->getId().id == event.media_thumbnail_generated.i_media_id)
+                    {
+                        thumbnailUpdated(i);
+                        break;
+                    }
+                }
+            }
+            break;
+        }
     }
 }
 
@@ -99,12 +143,12 @@ void MLBaseModel::onVlcMlEvent(void* data, const vlc_ml_event_t* event)
     });
 }
 
-MLParentId MLBaseModel::parentId() const
+MLItemId MLBaseModel::parentId() const
 {
     return m_parent;
 }
 
-void MLBaseModel::setParentId(MLParentId parentId)
+void MLBaseModel::setParentId(MLItemId parentId)
 {
     beginResetModel();
     m_parent = parentId;
@@ -116,7 +160,7 @@ void MLBaseModel::setParentId(MLParentId parentId)
 void MLBaseModel::unsetParentId()
 {
     beginResetModel();
-    m_parent = MLParentId();
+    m_parent = MLItemId();
     clear();
     endResetModel();
     emit parentIdChanged();
@@ -143,26 +187,26 @@ const QString& MLBaseModel::searchPattern() const
 
 void MLBaseModel::setSearchPattern( const QString& pattern )
 {
+    QString patternToApply = pattern.length() < 3 ? nullptr : pattern;
+    if (patternToApply == m_search_pattern)
+        /* No changes */
+        return;
+
     beginResetModel();
-    if ( pattern.length() >= 3 )
-        m_search_pattern_cstr = vlc::wrap_cptr( strdup( qtu( pattern ) ) );
-    else
-        m_search_pattern_cstr.reset();
-    m_search_pattern = pattern;
-    m_query_param.psz_pattern = m_search_pattern_cstr.get();
+    m_search_pattern = patternToApply;
     clear();
     endResetModel();
 }
 
 Qt::SortOrder MLBaseModel::getSortOrder() const
 {
-    return m_query_param.b_desc ? Qt::SortOrder::DescendingOrder : Qt::SortOrder::AscendingOrder;
+    return m_sort_desc ? Qt::SortOrder::DescendingOrder : Qt::SortOrder::AscendingOrder;
 }
 
 void MLBaseModel::setSortOder(Qt::SortOrder order)
 {
     beginResetModel();
-    m_query_param.b_desc = (order == Qt::SortOrder::DescendingOrder);
+    m_sort_desc = (order == Qt::SortOrder::DescendingOrder);
     clear();
     endResetModel();
     emit sortOrderChanged();
@@ -170,13 +214,13 @@ void MLBaseModel::setSortOder(Qt::SortOrder order)
 
 const QString MLBaseModel::getSortCriteria() const
 {
-    return criteriaToName(m_query_param.i_sort);
+    return criteriaToName(m_sort);
 }
 
 void MLBaseModel::setSortCriteria(const QString& criteria)
 {
     beginResetModel();
-    m_query_param.i_sort = nameToCriteria(criteria.toUtf8());
+    m_sort = nameToCriteria(criteria.toUtf8());
     clear();
     endResetModel();
     emit sortCriteriaChanged();
@@ -185,8 +229,147 @@ void MLBaseModel::setSortCriteria(const QString& criteria)
 void MLBaseModel::unsetSortCriteria()
 {
     beginResetModel();
-    m_query_param.i_sort = VLC_ML_SORTING_DEFAULT;
+    m_sort = VLC_ML_SORTING_DEFAULT;
     clear();
     endResetModel();
     emit sortCriteriaChanged();
+}
+
+int MLBaseModel::rowCount(const QModelIndex &parent) const
+{
+    if (!m_mediaLib || parent.isValid())
+        return 0;
+
+    validateCache();
+
+    return m_cache->count();
+}
+
+void MLBaseModel::clear()
+{
+    invalidateCache();
+    emit countChanged( static_cast<unsigned int>(0) );
+}
+
+QVariant MLBaseModel::getIdForIndex(QVariant index) const
+{
+    MLItem* obj = nullptr;
+    if (index.canConvert<int>())
+        obj = item( index.toInt() );
+    else if ( index.canConvert<QModelIndex>() )
+        obj = item( index.value<QModelIndex>().row() );
+
+    if (!obj)
+        return {};
+
+    return QVariant::fromValue(obj->getId());
+}
+
+
+QVariantList MLBaseModel::getIdsForIndexes(QModelIndexList indexes) const
+{
+    QVariantList idList;
+    idList.reserve(indexes.length());
+    std::transform( indexes.begin(), indexes.end(),std::back_inserter(idList), [this](const QModelIndex& index) -> QVariant {
+        MLItem* obj = item( index.row() );
+        if (!obj)
+            return {};
+        return QVariant::fromValue(obj->getId());
+    });
+    return idList;
+}
+
+QVariantList MLBaseModel::getIdsForIndexes(QVariantList indexes) const
+{
+    QVariantList idList;
+
+    idList.reserve(indexes.length());
+    std::transform( indexes.begin(), indexes.end(),std::back_inserter(idList),
+                    [this](const QVariant& index) -> QVariant {
+        MLItem* obj = nullptr;
+        if (index.canConvert<int>())
+            obj = item( index.toInt() );
+        else if ( index.canConvert<QModelIndex>() )
+            obj = item( index.value<QModelIndex>().row() );
+
+        if (!obj)
+            return {};
+
+        return QVariant::fromValue(obj->getId());
+    });
+    return idList;
+}
+
+unsigned MLBaseModel::getCount() const
+{
+    if (!m_mediaLib)
+        return 0;
+    validateCache();
+    if (m_cache->count() == COUNT_UNINITIALIZED)
+        return 0;
+    return static_cast<unsigned>(m_cache->count());
+}
+
+void MLBaseModel::validateCache() const
+{
+    if (m_cache)
+        return;
+
+    auto &threadPool = m_mediaLib->threadPool();
+    auto loader = createLoader();
+    m_cache.reset(new ListCache<std::unique_ptr<MLItem>>(threadPool, loader));
+    connect(&*m_cache, &BaseListCache::localSizeAboutToBeChanged,
+            this, &MLBaseModel::onLocalSizeAboutToBeChanged);
+    connect(&*m_cache, &BaseListCache::localSizeChanged,
+            this, &MLBaseModel::onLocalSizeChanged);
+    connect(&*m_cache, &BaseListCache::localDataChanged,
+            this, &MLBaseModel::onLocalDataChanged);
+
+    m_cache->initCount();
+}
+
+void MLBaseModel::invalidateCache()
+{
+    m_cache.reset();
+}
+
+MLItem *MLBaseModel::item(int signedidx) const
+{
+    validateCache();
+
+    ssize_t count = m_cache->count();
+    if (count == COUNT_UNINITIALIZED || signedidx < 0
+            || signedidx >= count)
+        return nullptr;
+
+    unsigned int idx = static_cast<unsigned int>(signedidx);
+    m_cache->refer(idx);
+
+    const std::unique_ptr<MLItem> *item = m_cache->get(idx);
+    if (!item)
+        /* Not in cache */
+        return nullptr;
+
+    /* Return raw pointer */
+    return item->get();
+}
+
+MLBaseModel::BaseLoader::BaseLoader(vlc_medialibrary_t *ml, MLItemId parent, QString searchPattern,
+                                    vlc_ml_sorting_criteria_t sort, bool sort_desc)
+    : m_ml(ml)
+    , m_parent(parent)
+    , m_searchPattern(searchPattern)
+    , m_sort(sort)
+    , m_sort_desc(sort_desc)
+{
+}
+
+MLBaseModel::BaseLoader::BaseLoader(const MLBaseModel &model)
+    : BaseLoader(model.m_ml, model.m_parent, model.m_search_pattern, model.m_sort, model.m_sort_desc)
+{
+}
+
+MLQueryParams MLBaseModel::BaseLoader::getParams(size_t index, size_t count) const
+{
+    return { m_searchPattern.toUtf8(), m_sort, m_sort_desc, index, count };
 }

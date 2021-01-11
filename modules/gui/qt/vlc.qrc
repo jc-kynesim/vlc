@@ -239,11 +239,16 @@
         <file alias="CheckedDelegate.qml">widgets/qml/CheckedDelegate.qml</file>
         <file alias="PageLoader.qml">widgets/qml/PageLoader.qml</file>
         <file alias="LocalTabBar.qml">widgets/qml/LocalTabBar.qml</file>
+        <file alias="IconButton.qml">widgets/qml/IconButton.qml</file>
+        <file alias="DragItem.qml">widgets/qml/DragItem.qml</file>
+        <file alias="CoverShadow.qml">widgets/qml/CoverShadow.qml</file>
+        <file alias="ListCoverShadow.qml">widgets/qml/ListCoverShadow.qml</file>
     </qresource>
     <qresource prefix="/network">
         <file alias="AddressbarButton.qml">network/qml/AddressbarButton.qml</file>
         <file alias="DiscoverDisplay.qml">network/qml/DiscoverDisplay.qml</file>
         <file alias="DiscoverUrlDisplay.qml">network/qml/DiscoverUrlDisplay.qml</file>
+        <file alias="NetworkCustomCover.qml">network/qml/NetworkCustomCover.qml</file>
         <file alias="NetworkDisplay.qml">network/qml/NetworkDisplay.qml</file>
         <file alias="NetworkHomeDeviceListView.qml">network/qml/NetworkHomeDeviceListView.qml</file>
         <file alias="NetworkHomeDisplay.qml">network/qml/NetworkHomeDisplay.qml</file>
@@ -274,6 +279,7 @@
         <file alias="VideoListDisplay.qml">medialibrary/qml/VideoListDisplay.qml</file>
         <file alias="VideoGridItem.qml">medialibrary/qml/VideoGridItem.qml</file>
         <file alias="AudioGridItem.qml">medialibrary/qml/AudioGridItem.qml</file>
+        <file alias="VideoDisplayRecentVideos.qml">medialibrary/qml/VideoDisplayRecentVideos.qml</file>
     </qresource>
     <qresource prefix="/style">
         <file alias="qmldir">style/qmldir</file>
@@ -283,6 +289,7 @@
     </qresource>
     <qresource prefix="/playlist">
         <file alias="PLItem.qml">playlist/qml/PLItem.qml</file>
+        <file alias="PlaylistDroppable.qml">playlist/qml/PlaylistDroppable.qml</file>
         <file alias="PlaylistListView.qml">playlist/qml/PlaylistListView.qml</file>
         <file alias="PlaylistMenu.qml">playlist/qml/PlaylistMenu.qml</file>
         <file alias="PlaylistToolbar.qml">playlist/qml/PlaylistToolbar.qml</file>
@@ -304,10 +311,12 @@
         <file alias="TeletextWidget.qml">player/qml/TeletextWidget.qml</file>
         <file alias="MiniPlayer.qml">player/qml/MiniPlayer.qml</file>
         <file alias="TopBar.qml">player/qml/TopBar.qml</file>
+        <file alias="PIPPlayer.qml">player/qml/PIPPlayer.qml</file>
         <file alias="PlayerButtonsLayout.qml">player/qml/PlayerButtonsLayout.qml</file>
         <file alias="PlayerMenu.qml">player/qml/PlayerMenu.qml</file>
         <file alias="PlayerMenuItem.qml">player/qml/PlayerMenuItem.qml</file>
         <file alias="LanguageMenu.qml">player/qml/LanguageMenu.qml</file>
+        <file alias="ButtonsLayout.qml">player/qml/ButtonsLayout.qml</file>
     </qresource>
     <qresource prefix="/about">
         <file alias="About.qml">dialogs/help/qml/About.qml</file>

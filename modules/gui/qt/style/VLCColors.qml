@@ -61,7 +61,9 @@ Item {
     property color bgAltInactive: systemPalette.alternateBaseInactive;
 
     property color bgHover: systemPalette.highlight;
+    property color bgHoverText: systemPalette.highlightText;
     property color bgHoverInactive: systemPalette.highlightInactive;
+    property color bgHoverTextInactive: systemPalette.highlightTextInactive;
 
     property color button: systemPalette.button;
     property color buttonText: systemPalette.buttonText;
@@ -87,7 +89,7 @@ Item {
     property color roundPlayCoverBorder: "#979797"
 
     // playlist
-    property color playlistSeparator: white
+    property color playlistSeparator: isThemeDark ? "white" : "#f2f2f2"
     property color plItemHover_Focus: bannerHover
     property color plItemSelect:      isThemeDark ? "#1E1E1E" : "#EDEDED"
 
@@ -116,6 +118,7 @@ Item {
 
     //vlc orange
     property color accent: "#FFFF950D";
+    property color accentText: "#ffffff";
 
     property color alert: "red";
 
@@ -150,7 +153,9 @@ Item {
                 bgAltInactive: "#eff0f1"
 
                 bgHover: "#ededed"
+                bgHoverText: text
                 bgHoverInactive: "#3daee9"
+                bgHoverTextInactive: text
 
                 button: "#eff0f1";
                 buttonText: "#232627";
@@ -180,7 +185,9 @@ Item {
                 bgAlt: "#31363b"
                 bgAltInactive: "#31363b"
                 bgHover: "#2d2d2d"
+                bgHoverText: text
                 bgHoverInactive: "#3daee9"
+                bgHoverTextInactive: text
                 button: "#31363b"
                 buttonText: "#eff0f1"
                 buttonBorder: "#575b5f"
@@ -205,7 +212,9 @@ Item {
                 bgAltInactive: systemPalette.alternateBaseInactive
 
                 bgHover: systemPalette.highlight
+                bgHoverText: systemPalette.highlightText
                 bgHoverInactive: systemPalette.highlightInactive
+                bgHoverTextInactive: systemPalette.highlightTextInactive
 
                 text: systemPalette.text
                 textDisabled: systemPalette.textDisabled

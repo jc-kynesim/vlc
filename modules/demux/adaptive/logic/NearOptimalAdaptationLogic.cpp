@@ -66,14 +66,14 @@ BaseRepresentation *
 NearOptimalAdaptationLogic::getNextQualityIndex( BaseAdaptationSet *adaptSet, RepresentationSelector &selector,
                                                  float gammaP, float VD, float Q )
 {
-    BaseRepresentation *ret = NULL;
-    BaseRepresentation *prev = NULL;
+    BaseRepresentation *ret = nullptr;
+    BaseRepresentation *prev = nullptr;
     float argmax;
     for(BaseRepresentation *rep = selector.lowest(adaptSet);
                             rep && rep != prev; rep = selector.higher(adaptSet, rep))
     {
         float arg = ( VD * (getUtility(rep) + gammaP) - Q ) / rep->getBandwidth();
-        if(ret == NULL || argmax <= arg)
+        if(ret == nullptr || argmax <= arg)
         {
             ret = rep;
             argmax = arg;
@@ -89,8 +89,8 @@ BaseRepresentation *NearOptimalAdaptationLogic::getNextRepresentation(BaseAdapta
 
     BaseRepresentation *lowest = selector.lowest(adaptSet);
     BaseRepresentation *highest = selector.highest(adaptSet);
-    if(lowest == NULL || highest == NULL)
-        return NULL;
+    if(lowest == nullptr || highest == nullptr)
+        return nullptr;
 
     const float umin = getUtility(lowest);
     const float umax = getUtility(highest);
@@ -113,7 +113,7 @@ BaseRepresentation *NearOptimalAdaptationLogic::getNextRepresentation(BaseAdapta
     const float Vd = (secf_from_vlc_tick(ctxcopy.buffering_min) - 1.0) / (umin + gammaP);
 
     BaseRepresentation *m;
-    if(prevRep == NULL) /* Starting */
+    if(prevRep == nullptr) /* Starting */
     {
         m = selector.select(adaptSet, bps);
     }
@@ -198,7 +198,7 @@ void NearOptimalAdaptationLogic::trackerEvent(const SegmentTrackerEvent &event)
 {
     switch(event.type)
     {
-    case SegmentTrackerEvent::SWITCHING:
+    case SegmentTrackerEvent::Type::RepresentationSwitch:
         {
             vlc_mutex_lock(&lock);
             if(event.u.switching.prev)
@@ -210,7 +210,7 @@ void NearOptimalAdaptationLogic::trackerEvent(const SegmentTrackerEvent &event)
         }
         break;
 
-    case SegmentTrackerEvent::BUFFERING_STATE:
+    case SegmentTrackerEvent::Type::BufferingStateUpdate:
         {
             const ID &id = *event.u.buffering.id;
             vlc_mutex_lock(&lock);
@@ -234,7 +234,7 @@ void NearOptimalAdaptationLogic::trackerEvent(const SegmentTrackerEvent &event)
         }
         break;
 
-    case SegmentTrackerEvent::BUFFERING_LEVEL_CHANGE:
+    case SegmentTrackerEvent::Type::BufferingLevelChange:
         {
             const ID &id = *event.u.buffering.id;
             vlc_mutex_lock(&lock);

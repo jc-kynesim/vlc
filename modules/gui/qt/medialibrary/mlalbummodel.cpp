@@ -29,7 +29,7 @@ QHash<QByteArray, vlc_ml_sorting_criteria_t> MLAlbumModel::M_names_to_criteria =
 };
 
 MLAlbumModel::MLAlbumModel(QObject *parent)
-    : MLSlidingWindowModel<MLAlbum>(parent)
+    : MLBaseModel(parent)
 {
 }
 
@@ -38,7 +38,7 @@ QVariant MLAlbumModel::data(const QModelIndex &index, int role) const
     if (!index.isValid() || index.row() < 0)
         return QVariant();
 
-    const MLAlbum* ml_item = item(index.row());
+    const MLAlbum* ml_item = static_cast<MLAlbum *>(item(index.row()));
     if ( ml_item == NULL )
         return QVariant();
 
@@ -88,21 +88,6 @@ QHash<int, QByteArray> MLAlbumModel::roleNames() const
     };
 }
 
-std::vector<std::unique_ptr<MLAlbum>> MLAlbumModel::fetch( )
-{
-    ml_unique_ptr<vlc_ml_album_list_t> album_list;
-    if ( m_parent.id <= 0 )
-        album_list.reset( vlc_ml_list_albums(m_ml, &m_query_param ) );
-    else
-        album_list.reset( vlc_ml_list_albums_of(m_ml, &m_query_param, m_parent.type, m_parent.id ) );
-    if ( album_list == nullptr )
-        return {};
-    std::vector<std::unique_ptr<MLAlbum>> res;
-    for( const vlc_ml_album_t& album: ml_range_iterate<vlc_ml_album_t>( album_list ) )
-        res.emplace_back( std::make_unique<MLAlbum>( m_ml, &album ) );
-    return res;
-}
-
 vlc_ml_sorting_criteria_t MLAlbumModel::nameToCriteria(QByteArray name) const
 {
     return M_names_to_criteria.value(name, VLC_ML_SORTING_DEFAULT);
@@ -135,7 +120,7 @@ void MLAlbumModel::onVlcMlEvent(const MLEvent &event)
         default:
             break;
     }
-    MLSlidingWindowModel::onVlcMlEvent( event );
+    MLBaseModel::onVlcMlEvent( event );
 }
 
 void MLAlbumModel::thumbnailUpdated(int idx)
@@ -161,12 +146,37 @@ vlc_ml_sorting_criteria_t MLAlbumModel::roleToCriteria(int role) const
     }
 }
 
-size_t MLAlbumModel::countTotalElements() const
+ListCacheLoader<std::unique_ptr<MLItem>> *
+MLAlbumModel::createLoader() const
 {
-    auto queryParams = m_query_param;
-    queryParams.i_offset = 0;
-    queryParams.i_nbResults = 0;
+    return new Loader(*this);
+}
+
+size_t MLAlbumModel::Loader::count() const
+{
+    MLQueryParams params = getParams();
+    auto queryParams = params.toCQueryParams();
+
     if ( m_parent.id <= 0 )
         return vlc_ml_count_albums(m_ml, &queryParams);
     return vlc_ml_count_albums_of(m_ml, &queryParams, m_parent.type, m_parent.id);
+}
+
+std::vector<std::unique_ptr<MLItem>>
+MLAlbumModel::Loader::load(size_t index, size_t count) const
+{
+    MLQueryParams params = getParams(index, count);
+    auto queryParams = params.toCQueryParams();
+
+    ml_unique_ptr<vlc_ml_album_list_t> album_list;
+    if ( m_parent.id <= 0 )
+        album_list.reset( vlc_ml_list_albums(m_ml, &queryParams) );
+    else
+        album_list.reset( vlc_ml_list_albums_of(m_ml, &queryParams, m_parent.type, m_parent.id ) );
+    if ( album_list == nullptr )
+        return {};
+    std::vector<std::unique_ptr<MLItem>> res;
+    for( const vlc_ml_album_t& album: ml_range_iterate<vlc_ml_album_t>( album_list ) )
+        res.emplace_back( std::make_unique<MLAlbum>( m_ml, &album ) );
+    return res;
 }

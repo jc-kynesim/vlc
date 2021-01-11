@@ -35,6 +35,9 @@ MediaLib::MediaLib(intf_thread_t *_intf, QObject *_parent)
 {
     m_event_cb.reset( vlc_ml_event_register_callback( m_ml, MediaLib::onMediaLibraryEvent,
                                                       this ) );
+
+    /* https://xkcd.com/221/ */
+    m_threadPool.setMaxThreadCount(4);
 }
 
 void MediaLib::addToPlaylist(const QString& mrl, const QStringList* options)
@@ -50,7 +53,7 @@ void MediaLib::addToPlaylist(const QUrl& mrl, const QStringList* options)
 }
 
 // A specific item has been asked to be added to the playlist
-void MediaLib::addToPlaylist(const MLParentId & itemId, const QStringList* options)
+void MediaLib::addToPlaylist(const MLItemId & itemId, const QStringList* options)
 {
     //invalid item
     if (itemId.id == 0)
@@ -96,9 +99,9 @@ void MediaLib::addToPlaylist(const QVariantList& itemIdList, const QStringList* 
             auto mrl = varValue.value<QString>();
             addToPlaylist(mrl, options);
         }
-        else if (varValue.canConvert<MLParentId>())
+        else if (varValue.canConvert<MLItemId>())
         {
-            MLParentId itemId = varValue.value<MLParentId>();
+            MLItemId itemId = varValue.value<MLItemId>();
             addToPlaylist(itemId, options);
         }
     }
@@ -106,7 +109,7 @@ void MediaLib::addToPlaylist(const QVariantList& itemIdList, const QStringList* 
 
 // A specific item has been asked to be played,
 // so it's added to the playlist and played
-void MediaLib::addAndPlay(const MLParentId & itemId, const QStringList* options )
+void MediaLib::addAndPlay(const MLItemId & itemId, const QStringList* options )
 {
     if (itemId.id == 0)
         return;
@@ -170,9 +173,9 @@ void MediaLib::addAndPlay(const QVariantList& itemIdList, const QStringList* opt
             else
                 addToPlaylist(mrl, options);
         }
-        else if (varValue.canConvert<MLParentId>())
+        else if (varValue.canConvert<MLItemId>())
         {
-            MLParentId itemId = varValue.value<MLParentId>();
+            MLItemId itemId = varValue.value<MLItemId>();
             if (b_start)
                 addAndPlay(itemId, options);
             else
@@ -182,6 +185,42 @@ void MediaLib::addAndPlay(const QVariantList& itemIdList, const QStringList* opt
         }
         b_start = false;
     }
+}
+
+void MediaLib::insertIntoPlaylist(const size_t index, const QVariantList &itemIds, const QStringList *options)
+{
+    QVector<vlc::playlist::Media> medias;
+    for ( const auto &id : itemIds )
+    {
+        if (!id.canConvert<MLItemId>())
+            continue;
+
+        const MLItemId itemId = id.value<MLItemId>();
+        if (itemId.id == 0)
+            continue;
+        if (itemId.type == VLC_ML_PARENT_UNKNOWN)
+        {
+            vlc::playlist::InputItemPtr item(vlc_ml_get_input_item( m_ml, itemId.id ), false);
+            if (item)
+                medias.push_back(vlc::playlist::Media(item.get(), options));
+        }
+        else
+        {
+            vlc_ml_query_params_t query;
+            memset(&query, 0, sizeof(vlc_ml_query_params_t));
+            ml_unique_ptr<vlc_ml_media_list_t> media_list(vlc_ml_list_media_of( m_ml, &query, itemId.type, itemId.id));
+            if (media_list == nullptr)
+                return;
+
+            auto mediaRange = ml_range_iterate<vlc_ml_media_t>( media_list );
+            std::transform(mediaRange.begin(), mediaRange.end(), std::back_inserter(medias), [&](vlc_ml_media_t& m) {
+                vlc::playlist::InputItemPtr item(vlc_ml_get_input_item( m_ml, m.i_id ), false);
+                return vlc::playlist::Media(item.get(), options);
+            });
+        }
+    }
+    if (!medias.isEmpty())
+        m_intf->p_sys->p_mainPlaylistController->insert( index, medias );
 }
 
 void MediaLib::reload()

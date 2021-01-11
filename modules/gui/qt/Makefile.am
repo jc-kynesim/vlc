@@ -156,6 +156,8 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlhelper.cpp \
 	gui/qt/medialibrary/mlhelper.hpp \
 	gui/qt/medialibrary/mlqmltypes.hpp \
+	gui/qt/medialibrary/mlqueryparams.cpp \
+	gui/qt/medialibrary/mlqueryparams.hpp \
 	gui/qt/medialibrary/mlrecentsmodel.cpp \
 	gui/qt/medialibrary/mlrecentsmodel.hpp \
 	gui/qt/medialibrary/mlrecentsvideomodel.cpp \
@@ -195,11 +197,14 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/playlist/playlist_model.cpp \
 	gui/qt/playlist/playlist_model.hpp \
 	gui/qt/playlist/playlist_model_p.hpp \
+	gui/qt/util/asynctask.hpp \
 	gui/qt/util/audio_device_model.cpp  \
 	gui/qt/util/audio_device_model.hpp \
 	gui/qt/util/color_scheme_model.cpp gui/qt/util/color_scheme_model.hpp \
 	gui/qt/util/imagehelper.cpp gui/qt/util/imagehelper.hpp \
 	gui/qt/util/i18n.cpp gui/qt/util/i18n.hpp \
+	gui/qt/util/listcache.hpp \
+	gui/qt/util/listcacheloader.hpp \
 	gui/qt/util/navigation_history.cpp gui/qt/util/navigation_history.hpp \
 	gui/qt/util/qml_main_context.cpp \
 	gui/qt/util/qml_main_context.hpp \
@@ -337,9 +342,11 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/playlist/playlist_controller.moc.cpp \
 	gui/qt/playlist/playlist_item.moc.cpp \
 	gui/qt/playlist/playlist_model.moc.cpp \
+	gui/qt/util/asynctask.moc.cpp \
 	gui/qt/util/audio_device_model.moc.cpp \
 	gui/qt/util/color_scheme_model.moc.cpp \
 	gui/qt/util/i18n.moc.cpp \
+	gui/qt/util/listcache.moc.cpp \
 	gui/qt/util/navigation_history.moc.cpp \
 	gui/qt/util/qml_main_context.moc.cpp \
 	gui/qt/util/qmleventfilter.moc.cpp \
@@ -635,6 +642,7 @@ libqt_plugin_la_QML = \
 	gui/qt/medialibrary/qml/MusicTracksDisplay.qml \
 	gui/qt/medialibrary/qml/UrlListDisplay.qml \
 	gui/qt/medialibrary/qml/VideoDisplay.qml \
+	gui/qt/medialibrary/qml/VideoDisplayRecentVideos.qml \
 	gui/qt/medialibrary/qml/VideoGridItem.qml \
 	gui/qt/medialibrary/qml/VideoInfoExpandPanel.qml \
 	gui/qt/medialibrary/qml/VideoListDisplay.qml \
@@ -646,6 +654,7 @@ libqt_plugin_la_QML = \
 	gui/qt/network/qml/DiscoverUrlDisplay.qml \
 	gui/qt/network/qml/NetworkAddressbar.qml \
 	gui/qt/network/qml/NetworkBrowseDisplay.qml \
+	gui/qt/network/qml/NetworkCustomCover.qml \
 	gui/qt/network/qml/NetworkDisplay.qml \
 	gui/qt/network/qml/NetworkGridItem.qml \
 	gui/qt/network/qml/NetworkHomeDisplay.qml \
@@ -657,6 +666,7 @@ libqt_plugin_la_QML = \
 	gui/qt/player/qml/ControlButtons.qml \
 	gui/qt/player/qml/LanguageMenu.qml \
 	gui/qt/player/qml/MiniPlayer.qml \
+	gui/qt/player/qml/PIPPlayer.qml \
 	gui/qt/player/qml/Player.qml \
 	gui/qt/player/qml/PlayerButtonsLayout.qml \
 	gui/qt/player/qml/PlayerMenu.qml \
@@ -667,7 +677,9 @@ libqt_plugin_la_QML = \
 	gui/qt/player/qml/TopBar.qml \
 	gui/qt/player/qml/TrackInfo.qml \
 	gui/qt/player/qml/VolumeWidget.qml \
+	gui/qt/player/qml/ButtonsLayout.qml \
 	gui/qt/playlist/qml/PLItem.qml \
+	gui/qt/playlist/qml/PlaylistDroppable.qml \
 	gui/qt/playlist/qml/PlaylistListView.qml \
 	gui/qt/playlist/qml/PlaylistMenu.qml \
 	gui/qt/playlist/qml/PlaylistToolbar.qml \
@@ -684,22 +696,26 @@ libqt_plugin_la_QML = \
 	gui/qt/widgets/qml/CheckedDelegate.qml \
 	gui/qt/widgets/qml/ComboBoxExt.qml \
 	gui/qt/widgets/qml/ContextButton.qml \
+	gui/qt/widgets/qml/CoverShadow.qml \
 	gui/qt/widgets/qml/CSDWindowButton.qml \
 	gui/qt/widgets/qml/CSDWindowButtonSet.qml \
 	gui/qt/widgets/qml/CSDTitlebarTapNDrapHandler.qml \
 	gui/qt/widgets/qml/DNDLabel.qml \
+	gui/qt/widgets/qml/DragItem.qml \
 	gui/qt/widgets/qml/DrawerExt.qml \
 	gui/qt/widgets/qml/ExpandGridView.qml \
 	gui/qt/widgets/qml/FocusBackground.qml \
 	gui/qt/widgets/qml/GridItem.qml \
 	gui/qt/widgets/qml/HorizontalResizeHandle.qml \
 	gui/qt/widgets/qml/IconLabel.qml \
+	gui/qt/widgets/qml/IconButton.qml \
 	gui/qt/widgets/qml/IconToolButton.qml \
 	gui/qt/widgets/qml/ImageToolButton.qml \
 	gui/qt/widgets/qml/KeyNavigableGridView.qml \
 	gui/qt/widgets/qml/KeyNavigableListView.qml \
 	gui/qt/widgets/qml/KeyNavigableTableView.qml \
 	gui/qt/widgets/qml/LabelSeparator.qml \
+	gui/qt/widgets/qml/ListCoverShadow.qml \
 	gui/qt/widgets/qml/ListItem.qml \
 	gui/qt/widgets/qml/ListLabel.qml \
 	gui/qt/widgets/qml/LocalTabBar.qml \

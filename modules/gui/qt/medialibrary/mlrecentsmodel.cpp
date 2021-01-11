@@ -20,26 +20,21 @@
 #include <QDateTime>
 
 MLRecentMedia::MLRecentMedia( const vlc_ml_media_t *media )
-    : m_id (media->i_id, VLC_ML_PARENT_UNKNOWN)
+    : MLItem( MLItemId( media->i_id, VLC_ML_PARENT_UNKNOWN ) )
     , m_url ( media->p_files->i_nb_items > 0 ? media->p_files->p_items[0].psz_mrl : "" )
     , m_lastPlayedDate(QDateTime::fromTime_t( media->i_last_played_date ))
 {
 }
 
 MLRecentMedia::MLRecentMedia( const MLRecentMedia& media )
-    : m_id(media.m_id)
+    : MLItem(media.getId())
     , m_url(media.m_url)
     , m_lastPlayedDate(media.m_lastPlayedDate)
 {
 }
 
-MLRecentMedia* MLRecentMedia::clone() const {
-    return new MLRecentMedia( *this );
-}
-
-
 MLRecentsModel::MLRecentsModel( QObject* parent )
-    : MLSlidingWindowModel<MLRecentMedia>( parent )
+    : MLBaseModel( parent )
 {
 }
 
@@ -48,7 +43,7 @@ QVariant MLRecentsModel::data( const QModelIndex& index , int role ) const
     if (!index.isValid() || index.row() < 0)
         return QVariant();
 
-    const MLRecentMedia* media = item(index.row());
+    const MLRecentMedia* media = static_cast<MLRecentMedia *>(item(index.row()));
     if ( !media )
         return QVariant();
 
@@ -79,10 +74,55 @@ void MLRecentsModel::clearHistory()
     vlc_ml_clear_history(m_ml);
 }
 
-std::vector<std::unique_ptr<MLRecentMedia> > MLRecentsModel::fetch()
+void MLRecentsModel::onVlcMlEvent( const MLEvent &event )
 {
-    std::vector<std::unique_ptr<MLRecentMedia>> res;
-    auto queryParams = m_query_param;
+    switch ( event.i_type )
+    {
+        case VLC_ML_EVENT_HISTORY_CHANGED:
+            emit resetRequested();
+            break;
+        case VLC_ML_EVENT_MEDIA_ADDED:
+        case VLC_ML_EVENT_MEDIA_UPDATED:
+        case VLC_ML_EVENT_MEDIA_DELETED:
+            m_need_reset = true;
+            break;
+        default:
+            break;
+    }
+    MLBaseModel::onVlcMlEvent( event );
+}
+void MLRecentsModel::setNumberOfItemsToShow( int n ){
+    m_numberOfItemsToShow = n;
+    invalidateCache();
+}
+int MLRecentsModel::getNumberOfItemsToShow() const {
+    return m_numberOfItemsToShow;
+}
+
+ListCacheLoader<std::unique_ptr<MLItem>> *
+MLRecentsModel::createLoader() const
+{
+    return new Loader(*this, m_numberOfItemsToShow);
+}
+
+size_t MLRecentsModel::Loader::count() const
+{
+    MLQueryParams params = getParams();
+    auto queryParams = params.toCQueryParams();
+
+    size_t realCount = vlc_ml_count_history( m_ml, &queryParams );
+    if (m_numberOfItemsToShow >= 0)
+        return std::min( realCount, static_cast<size_t>(m_numberOfItemsToShow) );
+    return realCount;
+}
+
+std::vector<std::unique_ptr<MLItem>>
+MLRecentsModel::Loader::load(size_t index, size_t count) const
+{
+    MLQueryParams params = getParams(index, count);
+    auto queryParams = params.toCQueryParams();
+
+    std::vector<std::unique_ptr<MLItem>> res;
     if (m_numberOfItemsToShow >= 0)
     {
         if (queryParams.i_offset <= static_cast<uint32_t>(m_numberOfItemsToShow))
@@ -98,36 +138,4 @@ std::vector<std::unique_ptr<MLRecentMedia> > MLRecentsModel::fetch()
     for( vlc_ml_media_t &media: ml_range_iterate<vlc_ml_media_t>( media_list ) )
         res.emplace_back( std::make_unique<MLRecentMedia>( &media ) );
     return res;
-}
-
-size_t MLRecentsModel::countTotalElements() const
-{
-    auto queryParams = m_query_param;
-    queryParams.i_offset = 0;
-    queryParams.i_nbResults = m_numberOfItemsToShow;
-    size_t realCount = vlc_ml_count_history( m_ml, &queryParams );
-    if (m_numberOfItemsToShow >= 0)
-        return std::min( realCount, static_cast<size_t>(m_numberOfItemsToShow) );
-    return realCount;
-}
-
-void MLRecentsModel::onVlcMlEvent( const MLEvent &event )
-{
-    switch ( event.i_type )
-    {
-        case VLC_ML_EVENT_MEDIA_ADDED:
-        case VLC_ML_EVENT_MEDIA_UPDATED:
-        case VLC_ML_EVENT_MEDIA_DELETED:
-            m_need_reset = true;
-            break;
-        default:
-            break;
-    }
-    MLBaseModel::onVlcMlEvent( event );
-}
-void MLRecentsModel::setNumberOfItemsToShow( int n ){
-    m_numberOfItemsToShow = n;
-}
-int MLRecentsModel::getNumberOfItemsToShow() const {
-    return m_numberOfItemsToShow;
 }

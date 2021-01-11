@@ -23,7 +23,7 @@ QHash<QByteArray, vlc_ml_sorting_criteria_t> MLArtistModel::M_names_to_criteria 
 };
 
 MLArtistModel::MLArtistModel(QObject *parent)
-    : MLSlidingWindowModel(parent)
+    : MLBaseModel(parent)
 {
 }
 
@@ -32,7 +32,7 @@ QVariant MLArtistModel::data(const QModelIndex &index, int role) const
     if (!index.isValid() || index.row() < 0)
         return QVariant();
 
-    const MLArtist* ml_artist = item(index.row());
+    const MLArtist* ml_artist = static_cast<MLArtist *>(item(index.row()));
     if ( !ml_artist )
         return QVariant();
 
@@ -65,32 +65,6 @@ QHash<int, QByteArray> MLArtistModel::roleNames() const
         { ARTIST_NB_ALBUMS, "nb_albums" },
         { ARTIST_NB_TRACKS, "nb_tracks" }
     };
-}
-
-std::vector<std::unique_ptr<MLArtist>> MLArtistModel::fetch()
-{
-    ml_unique_ptr<vlc_ml_artist_list_t> artist_list;
-    if ( m_parent.id <= 0 )
-        artist_list.reset( vlc_ml_list_artists(m_ml, &m_query_param, false) );
-    else
-        artist_list.reset( vlc_ml_list_artist_of(m_ml, &m_query_param, m_parent.type, m_parent.id) );
-    if ( artist_list == nullptr )
-        return {};
-    std::vector<std::unique_ptr<MLArtist>> res;
-    for( const vlc_ml_artist_t& artist: ml_range_iterate<vlc_ml_artist_t>( artist_list ) )
-        res.emplace_back( std::make_unique<MLArtist>( &artist ) );
-    return res;
-}
-
-size_t MLArtistModel::countTotalElements() const
-{
-    auto queryParams = m_query_param;
-    queryParams.i_offset = 0;
-    queryParams.i_nbResults = 0;
-
-    if ( m_parent.id <= 0 )
-        return vlc_ml_count_artists(m_ml, &queryParams, false);
-    return vlc_ml_count_artists_of(m_ml, &queryParams, m_parent.type, m_parent.id );
 }
 
 vlc_ml_sorting_criteria_t MLArtistModel::roleToCriteria(int role) const
@@ -129,10 +103,45 @@ void MLArtistModel::onVlcMlEvent(const MLEvent &event)
                 m_need_reset = true;
             break;
     }
-    MLSlidingWindowModel::onVlcMlEvent(event);
+    MLBaseModel::onVlcMlEvent(event);
 }
 
 void MLArtistModel::thumbnailUpdated(int idx)
 {
     emit dataChanged(index(idx), index(idx), {ARTIST_COVER});
+}
+
+ListCacheLoader<std::unique_ptr<MLItem>> *
+MLArtistModel::createLoader() const
+{
+    return new Loader(*this);
+}
+
+size_t MLArtistModel::Loader::count() const
+{
+    MLQueryParams params = getParams();
+    auto queryParams = params.toCQueryParams();
+
+    if ( m_parent.id <= 0 )
+        return vlc_ml_count_artists(m_ml, &queryParams, false);
+    return vlc_ml_count_artists_of(m_ml, &queryParams, m_parent.type, m_parent.id );
+}
+
+std::vector<std::unique_ptr<MLItem>>
+MLArtistModel::Loader::load(size_t index, size_t count) const
+{
+    MLQueryParams params = getParams(index, count);
+    auto queryParams = params.toCQueryParams();
+
+    ml_unique_ptr<vlc_ml_artist_list_t> artist_list;
+    if ( m_parent.id <= 0 )
+        artist_list.reset( vlc_ml_list_artists(m_ml, &queryParams, false) );
+    else
+        artist_list.reset( vlc_ml_list_artist_of(m_ml, &queryParams, m_parent.type, m_parent.id) );
+    if ( artist_list == nullptr )
+        return {};
+    std::vector<std::unique_ptr<MLItem>> res;
+    for( const vlc_ml_artist_t& artist: ml_range_iterate<vlc_ml_artist_t>( artist_list ) )
+        res.emplace_back( std::make_unique<MLArtist>( &artist ) );
+    return res;
 }

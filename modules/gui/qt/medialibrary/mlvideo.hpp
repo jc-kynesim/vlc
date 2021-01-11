@@ -32,16 +32,17 @@
 
 #include <functional>
 
-class VideoDescription : public QObject
+class VideoDescription
 {
-    Q_OBJECT
+    Q_GADGET
 
     Q_PROPERTY(QString codec READ getCodec CONSTANT)
     Q_PROPERTY(QString language READ getLanguage CONSTANT)
     Q_PROPERTY(unsigned int fps READ getFps CONSTANT)
 
 public:
-    VideoDescription(const QString& codec, const QString& language, unsigned int fps, QObject *parent = nullptr);
+    VideoDescription() = default;
+    VideoDescription(const QString& codec, const QString& language, unsigned int fps);
 
     QString getCodec() const;
     QString getLanguage() const;
@@ -54,9 +55,11 @@ private:
     unsigned int m_fps;
 };
 
-class AudioDescription : public QObject
+Q_DECLARE_METATYPE(VideoDescription)
+
+class AudioDescription
 {
-    Q_OBJECT
+    Q_GADGET
 
     Q_PROPERTY(QString codec READ getCodec CONSTANT)
     Q_PROPERTY(QString language READ getLanguage CONSTANT)
@@ -64,7 +67,8 @@ class AudioDescription : public QObject
     Q_PROPERTY(unsigned int sampleRate READ getSampleRate CONSTANT)
 
 public:
-    AudioDescription(const QString& codec, const QString& language, unsigned int nbChannels, unsigned int sampleRate, QObject *parent = nullptr);
+    AudioDescription() = default;
+    AudioDescription(const QString& codec, const QString& language, unsigned int nbChannels, unsigned int sampleRate);
 
     QString getCodec() const;
     QString getLanguage() const;
@@ -79,29 +83,13 @@ private:
     unsigned int m_sampleRate;
 };
 
-class MLVideo : public QObject
+Q_DECLARE_METATYPE(AudioDescription)
+
+class MLVideo : public MLItem
 {
-    Q_OBJECT
-
-    Q_PROPERTY(MLParentId id READ getId CONSTANT);
-    Q_PROPERTY(QString title READ getTitle CONSTANT);
-    Q_PROPERTY(QString thumbnail READ getThumbnail NOTIFY onThumbnailChanged);
-    Q_PROPERTY(QString duration READ getDuration CONSTANT);
-    Q_PROPERTY(QString durationShort READ getDurationShort CONSTANT);
-    Q_PROPERTY(QString mrl READ getMRL CONSTANT);
-    Q_PROPERTY(QString displayMrl READ getDisplayMRL CONSTANT)
-    Q_PROPERTY(float progress READ getProgress CONSTANT);
-    Q_PROPERTY(unsigned int playCount READ getPlayCount CONSTANT);
-    Q_PROPERTY(QString resolution_name READ getResolutionName CONSTANT);
-    Q_PROPERTY(QString channel READ getChannel CONSTANT);
-    Q_PROPERTY(QString progressTime READ getProgressTime CONSTANT);
-    Q_PROPERTY(QObjectList audioDesc READ getAudioDesc CONSTANT);
-    Q_PROPERTY(QObjectList videoDesc READ getVideoDesc CONSTANT);
-
 public:
-    MLVideo(vlc_medialibrary_t *ml, const vlc_ml_media_t *data, QObject *parent = nullptr);
+    MLVideo(vlc_medialibrary_t *ml, const vlc_ml_media_t *data);
 
-    MLParentId getId() const;
     QString getTitle() const;
     QString getThumbnail();
     QString getDuration() const;
@@ -113,23 +101,14 @@ public:
     float getProgress() const;
     unsigned int getPlayCount() const;
     QString getProgressTime() const;
-    QObjectList getAudioDesc() const;
-    QObjectList getVideoDesc() const;
-
-    MLVideo* clone(QObject* parent = nullptr) const;
-
-signals:
-    void onThumbnailChanged( QString );
+    QList<AudioDescription> getAudioDesc() const;
+    QList<VideoDescription> getVideoDesc() const;
 
 private:
-    MLVideo(const MLVideo& video, QObject* parent = nullptr);
-
     static void onMlEvent( void* data, const vlc_ml_event_t* event );
     void onMlEvent( const vlc_ml_event_t* event );
 
-
     vlc_medialibrary_t* m_ml;
-    MLParentId m_id;
     QString m_title;
     QString m_thumbnail;
     int64_t m_duration;
@@ -140,8 +119,8 @@ private:
     QString m_progressTime;
     unsigned int m_playCount;
     vlc_ml_thumbnail_status_t m_thumbnailStatus;
-    QObjectList m_audioDesc;
-    QObjectList m_videoDesc;
+    QList<AudioDescription> m_audioDesc;
+    QList<VideoDescription> m_videoDesc;
 
     std::unique_ptr<vlc_ml_event_callback_t,
                     std::function<void(vlc_ml_event_callback_t*)>> m_ml_event_handle;

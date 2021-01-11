@@ -30,6 +30,7 @@
 #include <vlc_common.h>
 
 #include <vector>
+#include <list>
 #include <string>
 
 namespace adaptive
@@ -39,7 +40,6 @@ namespace adaptive
         class ConnectionParams;
         class AbstractConnectionFactory;
         class AbstractConnection;
-        class AuthStorage;
         class Downloader;
         class AbstractChunkSource;
 
@@ -53,7 +53,7 @@ namespace adaptive
                 virtual void start(AbstractChunkSource *) = 0;
                 virtual void cancel(AbstractChunkSource *) = 0;
 
-                virtual void updateDownloadRate(const ID &, size_t, vlc_tick_t); /* impl */
+                virtual void updateDownloadRate(const ID &, size_t, vlc_tick_t) override;
                 void setDownloadRateObserver(IDownloadRateObserver *);
 
             protected:
@@ -66,22 +66,23 @@ namespace adaptive
         class HTTPConnectionManager : public AbstractConnectionManager
         {
             public:
-                HTTPConnectionManager           (vlc_object_t *p_object, AuthStorage *);
+                HTTPConnectionManager           (vlc_object_t *p_object);
                 virtual ~HTTPConnectionManager  ();
 
-                virtual void    closeAllConnections () /* impl */;
-                virtual AbstractConnection * getConnection(ConnectionParams &) /* impl */;
+                virtual void    closeAllConnections ()  override;
+                virtual AbstractConnection * getConnection(ConnectionParams &)  override;
 
-                virtual void start(AbstractChunkSource *) /* impl */;
-                virtual void cancel(AbstractChunkSource *) /* impl */;
+                virtual void start(AbstractChunkSource *)  override;
+                virtual void cancel(AbstractChunkSource *)  override;
                 void         setLocalConnectionsAllowed();
+                void         addFactory(AbstractConnectionFactory *);
 
             private:
                 void    releaseAllConnections ();
                 Downloader                                         *downloader;
                 vlc_mutex_t                                         lock;
                 std::vector<AbstractConnection *>                   connectionPool;
-                AbstractConnectionFactory                          *factory;
+                std::list<AbstractConnectionFactory *>              factories;
                 bool                                                localAllowed;
                 AbstractConnection * reuseConnection(ConnectionParams &);
         };

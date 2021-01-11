@@ -16,10 +16,10 @@ $(TARBALLS)/libebur128-$(LIBEBUR128_VERSION).tar.gz:
 libebur128: libebur128-$(LIBEBUR128_VERSION).tar.gz .sum-libebur128
 	$(UNPACK)
 	$(call pkg_static,"./ebur128/libebur128.pc.cmake")
+	$(APPLY) $(SRC)/libebur128/0001-CMake-Respect-the-BUILD_SHARED_LIBS-option-instead-o.patch
 	$(MOVE)
 
 .libebur128: libebur128 toolchain.cmake
-	cd $< && $(HOSTVARS_PIC) $(CMAKE) -DENABLE_INTERNAL_QUEUE_H=TRUE
+	cd $< && $(HOSTVARS_PIC) $(CMAKE) -DENABLE_INTERNAL_QUEUE_H=TRUE -DBUILD_SHARED_LIBS=FALSE
 	cd $< && $(CMAKEBUILD) . --target install
-	rm -f $(PREFIX)/lib/libebur128.so*
 	touch $@

@@ -32,7 +32,7 @@
 #include <QObject>
 #include <QDateTime>
 
-class MLRecentMedia {
+class MLRecentMedia : public MLItem {
 public:
     MLRecentMedia( const vlc_ml_media_t *_data );
 
@@ -40,17 +40,13 @@ public:
 
     inline QUrl getUrl() const { return m_url; }
     inline QDateTime getLastPlayedDate() const { return m_lastPlayedDate; }
-    inline MLParentId getId() const { return m_id; }
-
-    MLRecentMedia *clone() const;
 
 private:
-    MLParentId m_id;
     QUrl m_url;
     QDateTime m_lastPlayedDate;
 };
 
-class MLRecentsModel : public MLSlidingWindowModel<MLRecentMedia>
+class MLRecentsModel : public MLBaseModel
 {
     Q_OBJECT
     Q_PROPERTY(int numberOfItemsToShow READ getNumberOfItemsToShow WRITE setNumberOfItemsToShow)
@@ -75,9 +71,10 @@ public:
     void setNumberOfItemsToShow(int);
     int getNumberOfItemsToShow() const;
 
+protected:
+    ListCacheLoader<std::unique_ptr<MLItem>> *createLoader() const override;
+
 private:
-    std::vector<std::unique_ptr<MLRecentMedia>> fetch() override;
-    size_t countTotalElements() const override;
     vlc_ml_sorting_criteria_t roleToCriteria( int /* role */ ) const override{
         return VLC_ML_SORTING_DEFAULT;
     }
@@ -85,6 +82,21 @@ private:
         return VLC_ML_SORTING_DEFAULT;
     }
     virtual void onVlcMlEvent( const MLEvent &event ) override;
+
+    struct Loader : public BaseLoader
+    {
+        Loader(const MLRecentsModel &model, int numberOfItemsToShow)
+            : BaseLoader(model)
+            , m_numberOfItemsToShow(numberOfItemsToShow)
+        {
+        }
+
+        size_t count() const override;
+        std::vector<std::unique_ptr<MLItem>> load(size_t index, size_t count) const override;
+
+    private:
+        int m_numberOfItemsToShow;
+    };
 };
 
 #endif // ML_RECENTS_MODEL_H

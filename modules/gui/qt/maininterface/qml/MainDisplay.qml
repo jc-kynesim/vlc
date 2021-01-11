@@ -35,6 +35,10 @@ Widgets.NavigableFocusScope {
     property string view: ""
     property var viewProperties: ({})
 
+    property alias g_mainDisplay: root
+    property bool _inhibitMiniPlayer: false
+    property bool _showMiniPlayer: false
+
     onViewChanged: {
         viewProperties = ({})
         loadView()
@@ -70,6 +74,9 @@ Widgets.NavigableFocusScope {
             sourcesBanner.subSelectedIndex = stackView.currentItem.pageModel.findIndex(function (e) {
                 return e.name === stackView.currentItem.view
             })
+
+        if (player.hasVideoOutput && mainInterface.hasEmbededVideo)
+            _showMiniPlayer = true
     }
 
     navigationCancel: function() {
@@ -124,6 +131,7 @@ Widgets.NavigableFocusScope {
         }
     ]
 
+
     property var tabModel: ListModel {
         id: tabModelid
         Component.onCompleted: {
@@ -137,6 +145,12 @@ Widgets.NavigableFocusScope {
                        })
             })
         }
+    }
+
+
+    function showPlayer() {
+        root._inhibitMiniPlayer = true
+        history.push(["player"])
     }
 
     Rectangle {
@@ -298,6 +312,8 @@ Widgets.NavigableFocusScope {
                                     top: parent.top
                                     bottom: parent.bottom
                                     left: parent.left
+
+                                    leftMargin: -(width / 2)
                                 }
 
                                 atRight: false
@@ -315,14 +331,51 @@ Widgets.NavigableFocusScope {
                 }
             }
 
+            Player.PIPPlayer {
+                id: playerPip
+                anchors {
+                    bottom: miniPlayer.top
+                    left: parent.left
+                    bottomMargin: VLCStyle.margin_normal
+                    leftMargin: VLCStyle.margin_normal + VLCStyle.applicationHorizontalMargin
+                }
+
+                width: VLCStyle.dp(320, VLCStyle.scale)
+                height: VLCStyle.dp(180, VLCStyle.scale)
+                z: 2
+                visible: !root._inhibitMiniPlayer && root._showMiniPlayer
+                enabled: !root._inhibitMiniPlayer && root._showMiniPlayer
+
+                dragXMin: 0
+                dragXMax: root.width - playerPip.width
+                dragYMin: sourcesBanner.y + sourcesBanner.height
+                dragYMax: miniPlayer.y - playerPip.height
+
+                //keep the player visible on resize
+                Connections {
+                    target: root
+                    onWidthChanged: {
+                        if (playerPip.x > playerPip.dragXMax)
+                            playerPip.x = playerPip.dragXMax
+                    }
+                    onHeightChanged: {
+                        if (playerPip.y > playerPip.dragYMax)
+                            playerPip.y = playerPip.dragYMax
+                    }
+                }
+            }
+
+
             Player.MiniPlayer {
                 id: miniPlayer
+
+                visible: !root._inhibitMiniPlayer
 
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
 
-                z: 2
+                z: 3
                 navigationParent: medialibId
                 navigationUpItem: stackView
                 navigationCancelItem:sourcesBanner
@@ -332,6 +385,17 @@ Widgets.NavigableFocusScope {
                 }
 
                 mainContent: mainColumn
+            }
+
+            Connections {
+                target: player
+                onHasVideoOutputChanged: {
+                    if (player.hasVideoOutput && mainInterface.hasEmbededVideo) {
+                        g_mainDisplay.showPlayer()
+                    } else {
+                        _showMiniPlayer = false;
+                    }
+                }
             }
         }
     }

@@ -54,10 +54,10 @@ namespace adaptive
                 void                setBytesRange   (const BytesRange &);
                 const BytesRange &  getBytesRange   () const;
                 virtual std::string getContentType  () const;
-                enum RequestStatus  getRequestStatus() const;
+                RequestStatus       getRequestStatus() const;
 
             protected:
-                enum RequestStatus  requeststatus;
+                RequestStatus       requeststatus;
                 size_t              contentLength;
                 BytesRange          bytesRange;
         };
@@ -68,7 +68,7 @@ namespace adaptive
                 virtual ~AbstractChunk();
 
                 std::string         getContentType          ();
-                enum RequestStatus  getRequestStatus        () const;
+                RequestStatus       getRequestStatus        () const;
                 size_t              getBytesRead            () const;
                 uint64_t            getStartByteInFile      () const;
                 bool                isEmpty                 () const;
@@ -94,10 +94,10 @@ namespace adaptive
                                 const ID &, bool = false);
                 virtual ~HTTPChunkSource();
 
-                virtual block_t *   readBlock       (); /* impl */
-                virtual block_t *   read            (size_t); /* impl */
-                virtual bool        hasMoreData     () const; /* impl */
-                virtual std::string getContentType  () const; /* reimpl */
+                virtual block_t *   readBlock       ()  override;
+                virtual block_t *   read            (size_t)  override;
+                virtual bool        hasMoreData     () const  override;
+                virtual std::string getContentType  () const  override;
 
                 static const size_t CHUNK_SIZE = 32768;
 
@@ -124,14 +124,14 @@ namespace adaptive
                 HTTPChunkBufferedSource(const std::string &url, AbstractConnectionManager *,
                                         const ID &, bool = false);
                 virtual ~HTTPChunkBufferedSource();
-                virtual block_t *  readBlock       (); /* reimpl */
-                virtual block_t *  read            (size_t); /* reimpl */
-                virtual bool       hasMoreData     () const; /* impl */
+                virtual block_t *  readBlock       ()  override;
+                virtual block_t *  read            (size_t)  override;
+                virtual bool       hasMoreData     () const  override;
                 void               hold();
                 void               release();
 
             protected:
-                virtual bool       prepare(); /* reimpl */
+                virtual bool       prepare()  override;
                 void               bufferize(size_t);
                 bool               isDone() const;
 
@@ -154,7 +154,7 @@ namespace adaptive
                 virtual ~HTTPChunk();
 
             protected:
-                virtual void        onDownload      (block_t **) {} /* impl */
+                virtual void        onDownload      (block_t **)  override {}
         };
     }
 }

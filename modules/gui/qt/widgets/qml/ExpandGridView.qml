@@ -72,7 +72,7 @@ NavigableFocusScope {
     property alias expandItem: expandItemLoader.item
 
     property Component headerDelegate: Item{}
-    property int headerHeight: headerItemLoader.implicitHeight
+    property alias headerHeight: headerItemLoader.implicitHeight
     property alias headerItem: headerItemLoader.item
 
     property alias footerItem: footerItemLoader.item
@@ -367,6 +367,13 @@ NavigableFocusScope {
         }
 
         Connections {
+            target: headerItemLoader
+            onHeightChanged: {
+                flickable.layout(true)
+            }
+        }
+
+        Connections {
             target: footerItem
             onHeightChanged: {
                 if (flickable.contentY + flickable.height > footerItemLoader.y + footerItemLoader.height)
@@ -446,10 +453,7 @@ NavigableFocusScope {
 
             if (root.expandIndex !== -1) {
                 var expandItemPos = root.getItemPos(expandItemGridId)
-                expandItem.x = expandItemPos[0]
                 expandItem.y = expandItemPos[1]
-
-                expandItem.width = root.getNbItemsPerRow() * root._effectiveCellWidth - root.horizontalSpacing
             }
 
             // Place the delegates after the expandItem

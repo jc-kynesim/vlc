@@ -33,7 +33,7 @@ Rectangle {
     property bool _interfaceReady: false
     property bool _playlistReady: false
 
-    property alias mainInterfaceRect: root
+    property alias g_root: root
     property variant g_dialogs: dialogsLoader.item
 
     Binding {
@@ -146,17 +146,6 @@ Rectangle {
                         }
                         else
                             history.previous()
-                    }
-                }
-            }
-
-            Connections {
-                target: player.videoTracks
-                onDataChanged: {
-                    if (player.videoTracks.rowCount() > 0
-                            && player.playingState === PlayerController.PLAYING_STATE_PLAYING
-                            && history.current.view !== "player") {
-                        history.push(["player"])
                     }
                 }
             }

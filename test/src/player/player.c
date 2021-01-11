@@ -2301,6 +2301,8 @@ test_timers_playback(struct ctx *ctx, struct timer_state timers[],
         struct timer_state *timer = &timers[timer_idx];
         vec_report_timer *vec = &timer->vec;
 
+        assert(vec->size > 1);
+
         for (size_t i = 1; i < vec->size; ++i)
         {
             struct report_timer *prev_report = &vec->data[i - 1];
@@ -2362,6 +2364,7 @@ test_timers_playback(struct ctx *ctx, struct timer_state timers[],
 
         /* It should not receive all update points */
         assert(vec->size < MAX_UPDATE_COUNT);
+        assert(vec->size > 1);
 
         for (size_t i = 1; i < vec->size; ++i)
         {
@@ -2854,10 +2857,6 @@ main(void)
     test_init();
 
     struct ctx ctx;
-    ctx_init(&ctx, 0);
-    test_audio_loudness_meter(&ctx);
-    ctx_destroy(&ctx);
-    return 0;
 
     /* Test with --aout=none --vout=none */
     ctx_init(&ctx, DISABLE_VIDEO_OUTPUT | DISABLE_AUDIO_OUTPUT);
@@ -2883,7 +2882,6 @@ main(void)
     test_programs(&ctx);
     test_timers(&ctx);
     test_teletext(&ctx);
-    test_audio_loudness_meter(&ctx);
 
     test_delete_while_playback(VLC_OBJECT(ctx.vlc->p_libvlc_int), true);
     test_delete_while_playback(VLC_OBJECT(ctx.vlc->p_libvlc_int), false);
@@ -2892,6 +2890,7 @@ main(void)
     /* Test with --no-video */
     ctx_init(&ctx, DISABLE_VIDEO);
     test_es_selection_override(&ctx);
+    test_audio_loudness_meter(&ctx);
 
     ctx_destroy(&ctx);
     return 0;

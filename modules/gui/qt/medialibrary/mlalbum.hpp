@@ -31,24 +31,13 @@
 #include "mlhelper.hpp"
 #include "mlqmltypes.hpp"
 
-class MLAlbum : public QObject
+class MLAlbum : public QObject, public MLItem
 {
     Q_OBJECT
-
-    Q_PROPERTY(MLParentId id READ getId CONSTANT)
-    Q_PROPERTY(QString title READ getTitle CONSTANT)
-    Q_PROPERTY(unsigned int releaseyear READ getReleaseYear CONSTANT)
-    Q_PROPERTY(QString shortsummary READ getShortSummary CONSTANT)
-    Q_PROPERTY(QString cover READ getCover CONSTANT)
-    Q_PROPERTY(QString artist READ getArtist CONSTANT)
-    Q_PROPERTY(unsigned int nbtracks READ getNbTracks CONSTANT)
-    Q_PROPERTY(QString duration READ getDuration CONSTANT)
-    Q_PROPERTY(QString durationShort READ getDuration CONSTANT)
 
 public:
     MLAlbum(vlc_medialibrary_t* _ml, const vlc_ml_album_t *_data, QObject *_parent = nullptr);
 
-    MLParentId getId() const;
     QString getTitle() const;
     unsigned int getReleaseYear() const;
     QString getShortSummary() const;
@@ -58,19 +47,13 @@ public:
     QString getDuration() const;
     QString getDurationShort() const;
 
-    MLAlbum* clone(QObject *parent = nullptr) const;
-
     Q_INVOKABLE QString getPresName() const;
     Q_INVOKABLE QString getPresImage() const;
     Q_INVOKABLE QString getPresInfo() const;
 
 private:
-    //private ctor for cloning
-    MLAlbum(const MLAlbum &_album, QObject *_parent = nullptr);
-
     vlc_medialibrary_t* m_ml;
 
-    MLParentId m_id;
     QString m_title;
     unsigned int m_releaseYear;
     QString m_shortSummary;

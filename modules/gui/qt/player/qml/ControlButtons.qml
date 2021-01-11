@@ -138,6 +138,7 @@ Item{
             id: prevBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.previous
+            enabled: mainPlaylistController.hasPrev
             onClicked: mainPlaylistController.prev()
             property bool acceptFocus: true
             text: i18n.qtr("Previous")
@@ -354,6 +355,7 @@ Item{
             id: nextBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.next
+            enabled: mainPlaylistController.hasNext
             onClicked: mainPlaylistController.next()
             property bool acceptFocus: true
             text: i18n.qtr("Next")
@@ -363,13 +365,11 @@ Item{
     Component{
         id: chapterPreviousBtnDelegate
         Widgets.IconToolButton {
-            id: chapterPreviousBtnDelegate
+            id: chapterPreviousBtn
             size: VLCStyle.icon_medium
-            width: visible? VLCStyle.icon_medium : 0
             iconText: VLCIcons.dvd_prev
             onClicked: player.chapterPrev()
-            visible: player.hasChapters
-            enabled: visible
+            enabled: !paintOnly && player.hasChapters
             property bool acceptFocus: visible
             text: i18n.qtr("Previous chapter")
         }
@@ -379,13 +379,11 @@ Item{
     Component{
         id: chapterNextBtnDelegate
         Widgets.IconToolButton {
-            id: chapterPreviousBtnDelegate
+            id: chapterNextBtn
             size: VLCStyle.icon_medium
-            width: visible? VLCStyle.icon_medium : 0
             iconText: VLCIcons.dvd_next
             onClicked: player.chapterNext()
-            visible: player.hasChapters
-            enabled: visible
+            enabled: !paintOnly && player.hasChapters
             property bool acceptFocus: visible
             text: i18n.qtr("Next chapter")
         }
@@ -427,7 +425,7 @@ Item{
                 parent: rootPlayer
                 focus: true
                 x: 0
-                y: rootPlayer.positionSliderY - height
+                y: (!!rootPlayer) ? (rootPlayer.positionSliderY - height) : 0
                 z: 1
 
                 onOpened: rootPlayer._menu = langMenu
@@ -760,7 +758,7 @@ Item{
 
             onClicked: {
                 if (isMiniplayer) {
-                    history.push(["player"])
+                    g_mainDisplay.showPlayer()
                 }
                 else {
                     history.previous()
@@ -781,7 +779,11 @@ Item{
             property bool paintOnly: false
             property VLCColors _colors: VLCStyle.colors
 
-            implicitWidth: playingItemInfoRow.implicitWidth
+            readonly property real minimumWidth: cover.width
+            property real extraWidth: 0
+
+            implicitWidth: paintOnly ? playingItemInfoRow.width : (minimumWidth + extraWidth)
+
             implicitHeight: playingItemInfoRow.implicitHeight
 
             Keys.onPressed: {
@@ -791,21 +793,23 @@ Item{
             }
             Keys.onReleased: {
                 if (!event.accepted && KeyHelper.matchOk(event))
-                    history.push(["player"])
+		    g_mainDisplay.showPlayer()
             }
 
             MouseArea {
                 id: artworkInfoMouseArea
                 anchors.fill: parent
                 visible: !paintOnly
-                onClicked: history.push(["player"])
+                onClicked: g_mainDisplay.showPlayer()
                 hoverEnabled: true
             }
 
             Row {
                 id: playingItemInfoRow
+                width: (coverItem.width + infoColumn.width)
 
                 Item {
+                    id: coverItem
                     anchors.verticalCenter: parent.verticalCenter
                     implicitHeight: childrenRect.height
                     implicitWidth:  childrenRect.width
@@ -828,9 +832,14 @@ Item{
                     Image {
                         id: cover
 
-                        source: (mainPlaylistController.currentItem.artwork && mainPlaylistController.currentItem.artwork.toString())
-                                ? mainPlaylistController.currentItem.artwork
-                                : VLCStyle.noArtAlbum
+                        source: {
+                            if (paintOnly)
+                                VLCStyle.noArtAlbum
+                            else
+                                (mainPlaylistController.currentItem.artwork && mainPlaylistController.currentItem.artwork.toString())
+                                                                ? mainPlaylistController.currentItem.artwork
+                                                                : VLCStyle.noArtAlbum
+                        }
                         fillMode: Image.PreserveAspectFit
 
                         width: VLCStyle.dp(60)
@@ -839,8 +848,13 @@ Item{
                 }
 
                 Column {
+                    id: infoColumn
                     anchors.verticalCenter: parent.verticalCenter
                     leftPadding: VLCStyle.margin_xsmall
+
+                    width: (paintOnly ? Math.max(titleLabel.width, artistLabel.width, progressIndicator.width) : implicitWidth) + VLCStyle.margin_xsmall
+
+                    visible: paintOnly || artworkInfoItem.extraWidth > 0
 
                     ToolTip {
                         text: i18n.qtr("%1\n%2").arg(titleLabel.text).arg(artistLabel.text)
@@ -860,23 +874,50 @@ Item{
 
                     Widgets.MenuLabel {
                         id: titleLabel
-                        width: implicitWidth < VLCStyle.artworkInfoTextWidth ? implicitWidth : VLCStyle.artworkInfoTextWidth
-                        text: mainPlaylistController.currentItem.title
+
+                        width: {
+                            if (!paintOnly)
+                                artworkInfoItem.implicitWidth - titleLabel.mapToItem(artworkInfoItem, titleLabel.x, titleLabel.y).x
+                        }
+
+                        text: {
+                            if (paintOnly)
+                                i18n.qtr("Title")
+                            else
+                                mainPlaylistController.currentItem.title
+                        }
                         visible: text !== ""
                         color: _colors.text
                     }
 
                     Widgets.MenuCaption {
                         id: artistLabel
-                        width: implicitWidth < VLCStyle.artworkInfoTextWidth ? implicitWidth : VLCStyle.artworkInfoTextWidth
-                        text: mainPlaylistController.currentItem.artist
+                        width: {
+                            if (!paintOnly)
+                                artworkInfoItem.implicitWidth - artistLabel.mapToItem(artworkInfoItem, artistLabel.x, artistLabel.y).x
+                        }
+                        text: {
+                            if (paintOnly)
+                                i18n.qtr("Artist")
+                            else
+                                mainPlaylistController.currentItem.artist
+                        }
                         visible: text !== ""
                         color: _colors.menuCaption
                     }
 
                     Widgets.MenuCaption {
                         id: progressIndicator
-                        text: player.time.toString() + " / " + player.length.toString()
+                        width: {
+                            if (!paintOnly)
+                                artworkInfoItem.implicitWidth - progressIndicator.mapToItem(artworkInfoItem, progressIndicator.x, progressIndicator.y).x
+                        }
+                        text: {
+                            if (paintOnly)
+                                " -- / -- "
+                            else
+                                player.time.toString() + " / " + player.length.toString()
+                        }
                         visible: text !== ""
                         color: _colors.menuCaption
                     }

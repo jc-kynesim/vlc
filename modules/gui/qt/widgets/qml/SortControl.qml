@@ -27,8 +27,13 @@ import "qrc:///widgets/" as Widgets
 Widgets.NavigableFocusScope {
     id: root
 
-    width: childrenRect.width
-    height: childrenRect.height
+    // when height/width is explicitly set (force size), implicit values will not be used.
+    // when height/width is not explicitly set, IconToolButton will set its ...
+    // height and width to these implicit counterparts because ...
+    // height and width will be set to implicit values when they are not ...
+    // explicitly set.
+    implicitWidth: button.implicitWidth
+    implicitHeight: button.implicitHeight
 
     property alias model: list.model
     property string textRole
@@ -48,6 +53,8 @@ Widgets.NavigableFocusScope {
 
     property bool _intSortOrder : false
 
+    property alias size: button.size
+
     signal sortSelected(var modelData)
     signal sortOrderSelected(var order)
 
@@ -64,7 +71,12 @@ Widgets.NavigableFocusScope {
     Widgets.IconToolButton {
         id: button
 
-        size: VLCStyle.banner_icon_size
+        // set height and width to root height and width so that ...
+        // we can forcefully set SortControl's width and height.
+        height: root.height
+        width: root.width
+
+        size: VLCStyle.icon_normal
         iconText: VLCIcons.topbar_sort
         text: i18n.qtr("Sort")
 
@@ -96,13 +108,16 @@ Widgets.NavigableFocusScope {
 
             button.KeyNavigation.down = list
             button.highlighted = true
+
             list.forceActiveFocus()
         }
 
         onClosed: {
             button.KeyNavigation.down = null
             button.highlighted = false
-            button.forceActiveFocus()
+
+            if (button.focusPolicy !== Qt.NoFocus)
+                button.forceActiveFocus()
         }
 
         contentItem: ListView {
@@ -114,6 +129,11 @@ Widgets.NavigableFocusScope {
 
             ScrollIndicator.vertical: ScrollIndicator { }
 
+            highlight: Rectangle {
+                color: _colors.accent
+                opacity: 0.8
+            }
+
             delegate: ItemDelegate {
                 id: itemDelegate
 
@@ -124,6 +144,7 @@ Widgets.NavigableFocusScope {
                 background: Item {}
                 contentItem: Item {
                     implicitHeight: itemRow.implicitHeight
+                    width: itemDelegate.width
 
                     Rectangle {
                         anchors.fill: parent
@@ -208,7 +229,7 @@ Widgets.NavigableFocusScope {
         }
 
         function updateBgRect() {
-            glassEffect.popupGlobalPos = mainInterfaceRect.mapFromItem(root, popup.x, popup.y)
+            glassEffect.popupGlobalPos = g_root.mapFromItem(root, popup.x, popup.y)
         }
 
         background: Rectangle {
@@ -217,7 +238,7 @@ Widgets.NavigableFocusScope {
 
             Widgets.FrostedGlassEffect {
                 id: glassEffect
-                source: mainInterfaceRect
+                source: g_root
 
                 anchors.fill: parent
                 anchors.margins: VLCStyle.dp(1)
@@ -231,7 +252,7 @@ Widgets.NavigableFocusScope {
         }
 
         Connections {
-            target: mainInterfaceRect
+            target: g_root
 
             enabled: popup.visible
 

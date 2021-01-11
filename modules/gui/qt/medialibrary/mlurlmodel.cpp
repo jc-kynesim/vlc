@@ -21,7 +21,7 @@
 #include <QDateTime>
 
 MLUrlModel::MLUrlModel(QObject *parent)
-    : MLSlidingWindowModel<MLUrl>(parent)
+    : MLBaseModel(parent)
 {
 }
 
@@ -30,7 +30,7 @@ QVariant MLUrlModel::data(const QModelIndex &index, int role) const
     if (!index.isValid() || index.row() < 0)
         return QVariant();
 
-    const MLUrl* ml_url = item(static_cast<unsigned int>(index.row()));
+    const MLUrl* ml_url = static_cast<MLUrl *>(item(index.row()));
     if ( !ml_url )
         return QVariant();
 
@@ -66,32 +66,10 @@ void MLUrlModel::addAndPlay( const QString &url )
         }
         if (!s)
             return;
-        MLParentId itemId( s->i_id, VLC_ML_PARENT_UNKNOWN );
+        MLItemId itemId( s->i_id, VLC_ML_PARENT_UNKNOWN );
         m_mediaLib->addAndPlay(itemId);
         emit resetRequested();
     });
-}
-
-size_t MLUrlModel::countTotalElements() const
-{
-    auto queryParams = m_query_param;
-    queryParams.i_offset = 0;
-    queryParams.i_nbResults = 0;
-    auto s = vlc_ml_count_stream_history( m_ml, &queryParams );
-    return s;
-}
-
-std::vector<std::unique_ptr<MLUrl>> MLUrlModel::fetch()
-{
-    ml_unique_ptr<vlc_ml_media_list_t> media_list;
-    media_list.reset( vlc_ml_list_stream_history(m_ml, &m_query_param) );
-    if ( media_list == nullptr )
-        return {};
-
-    std::vector<std::unique_ptr<MLUrl>> res;
-    for( const vlc_ml_media_t& media: ml_range_iterate<vlc_ml_media_t>( media_list ) )
-        res.emplace_back( std::make_unique<MLUrl>( &media ) );
-    return res;
 }
 
 vlc_ml_sorting_criteria_t MLUrlModel::roleToCriteria(int role) const
@@ -119,7 +97,7 @@ void MLUrlModel::onVlcMlEvent(const MLEvent &event)
 }
 
 MLUrl::MLUrl(const vlc_ml_media_t *_data)
-    : m_id( _data->i_id, VLC_ML_PARENT_UNKNOWN )
+    : MLItem( MLItemId( _data->i_id, VLC_ML_PARENT_UNKNOWN ) )
     , m_url( _data->p_files->i_nb_items > 0 ? _data->p_files->p_items[0].psz_mrl : "" )
     , m_lastPlayedDate(
           QDateTime::fromTime_t( _data->i_last_played_date ).toString( QLocale::system().dateFormat( QLocale::ShortFormat ) )
@@ -128,7 +106,7 @@ MLUrl::MLUrl(const vlc_ml_media_t *_data)
 }
 
 MLUrl::MLUrl(const MLUrl &url)
-    : m_id( url.m_id )
+    : MLItem( url.getId() )
     , m_url( url.m_url )
     , m_lastPlayedDate( url.m_lastPlayedDate )
 {
@@ -144,6 +122,33 @@ QString MLUrl::getLastPlayedDate() const
     return m_lastPlayedDate;
 }
 
-MLUrl *MLUrl::clone() const {
-    return new MLUrl( *this );
+ListCacheLoader<std::unique_ptr<MLItem>> *
+MLUrlModel::createLoader() const
+{
+    return new Loader(*this);
+}
+
+size_t MLUrlModel::Loader::count() const
+{
+    MLQueryParams params = getParams();
+    auto queryParams = params.toCQueryParams();
+
+    return vlc_ml_count_stream_history( m_ml, &queryParams );
+}
+
+std::vector<std::unique_ptr<MLItem>>
+MLUrlModel::Loader::load(size_t index, size_t count) const
+{
+    MLQueryParams params = getParams(index, count);
+    auto queryParams = params.toCQueryParams();
+
+    ml_unique_ptr<vlc_ml_media_list_t> media_list;
+    media_list.reset( vlc_ml_list_stream_history(m_ml, &queryParams) );
+    if ( media_list == nullptr )
+        return {};
+
+    std::vector<std::unique_ptr<MLItem>> res;
+    for( const vlc_ml_media_t& media: ml_range_iterate<vlc_ml_media_t>( media_list ) )
+        res.emplace_back( std::make_unique<MLUrl>( &media ) );
+    return res;
 }

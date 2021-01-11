@@ -28,34 +28,35 @@
 #include "SegmentList.h"
 #include "SegmentTemplate.h"
 #include "SegmentTimeline.h"
-#include "AbstractPlaylist.hpp"
+#include "BasePlaylist.hpp"
 #include "BaseRepresentation.h"
 #include "../encryption/CommonEncryption.hpp"
 
 #include <algorithm>
 #include <cassert>
+#include <limits>
 
 using namespace adaptive::playlist;
 
 SegmentInformation::SegmentInformation(SegmentInformation *parent_) :
     ICanonicalUrl( parent_ ),
-    AttrsNode( AbstractAttr::SEGMENTINFORMATION, parent_ )
+    AttrsNode( AbstractAttr::Type::SegmentInformation, parent_ )
 {
     parent = parent_;
     init();
 }
 
-SegmentInformation::SegmentInformation(AbstractPlaylist * parent_) :
+SegmentInformation::SegmentInformation(BasePlaylist * parent_) :
     ICanonicalUrl(parent_),
-    AttrsNode( AbstractAttr::SEGMENTINFORMATION, NULL )
+    AttrsNode( AbstractAttr::Type::SegmentInformation, nullptr )
 {
-    parent = NULL;
+    parent = nullptr;
     init();
 }
 
 void SegmentInformation::init()
 {
-    baseUrl.Set(NULL);
+    baseUrl.Set(nullptr);
 }
 
 SegmentInformation::~SegmentInformation()
@@ -63,12 +64,12 @@ SegmentInformation::~SegmentInformation()
     delete baseUrl.Get();
 }
 
-AbstractPlaylist * SegmentInformation::getPlaylist() const
+BasePlaylist * SegmentInformation::getPlaylist() const
 {
     if(parent)
         return parent->getPlaylist();
     else
-        return NULL;
+        return nullptr;
 }
 
 const AbstractSegmentBaseType * SegmentInformation::inheritSegmentProfile() const
@@ -88,7 +89,7 @@ Segment *  SegmentInformation::getNextMediaSegment(uint64_t i_pos,uint64_t *pi_n
 {
     const AbstractSegmentBaseType *profile = inheritSegmentProfile();
     if(!profile)
-        return NULL;
+        return nullptr;
     return profile->getNextMediaSegment(i_pos, pi_newpos, pb_gap);
 }
 
@@ -96,7 +97,7 @@ InitSegment * SegmentInformation::getInitSegment() const
 {
     const AbstractSegmentBaseType *profile = inheritSegmentProfile();
     if(!profile)
-        return NULL;
+        return nullptr;
     return profile->getInitSegment();
 }
 
@@ -104,7 +105,7 @@ IndexSegment *SegmentInformation::getIndexSegment() const
 {
     const AbstractSegmentBaseType *profile = inheritSegmentProfile();
     if(!profile)
-        return NULL;
+        return nullptr;
     return profile->getIndexSegment();
 }
 
@@ -112,7 +113,7 @@ Segment * SegmentInformation::getMediaSegment(uint64_t pos) const
 {
     const AbstractSegmentBaseType *profile = inheritSegmentProfile();
     if(!profile)
-        return NULL;
+        return nullptr;
     return profile->getMediaSegment(pos);
 }
 
@@ -124,20 +125,20 @@ SegmentInformation * SegmentInformation::getChildByID(const adaptive::ID &id)
         if( (*it)->getID() == id )
             return *it;
     }
-    return NULL;
+    return nullptr;
 }
 
 void SegmentInformation::updateWith(SegmentInformation *updated)
 {
     /* Support Segment List for now */
-    AbstractAttr *p = getAttribute(Type::SEGMENTLIST);
-    if(p && p->isValid() && updated->getAttribute(Type::SEGMENTLIST))
+    AbstractAttr *p = getAttribute(Type::SegmentList);
+    if(p && p->isValid() && updated->getAttribute(Type::SegmentList))
     {
         inheritSegmentList()->updateWith(updated->inheritSegmentList());
     }
 
-    p = getAttribute(Type::SEGMENTTEMPLATE);
-    if(p && p->isValid() && updated->getAttribute(Type::SEGMENTTEMPLATE))
+    p = getAttribute(Type::SegmentTemplate);
+    if(p && p->isValid() && updated->getAttribute(Type::SegmentTemplate))
     {
         inheritSegmentTemplate()->updateWith(updated->inheritSegmentTemplate());
     }
@@ -155,11 +156,11 @@ void SegmentInformation::updateWith(SegmentInformation *updated)
 
 void SegmentInformation::pruneByPlaybackTime(vlc_tick_t time)
 {
-    SegmentList *segmentList = static_cast<SegmentList *>(getAttribute(Type::SEGMENTLIST));
+    SegmentList *segmentList = static_cast<SegmentList *>(getAttribute(Type::SegmentList));
     if(segmentList)
         segmentList->pruneByPlaybackTime(time);
 
-    SegmentTemplate *templ = static_cast<SegmentTemplate *>(getAttribute(Type::SEGMENTTEMPLATE));
+    SegmentTemplate *templ = static_cast<SegmentTemplate *>(getAttribute(Type::SegmentTemplate));
     if(templ)
         templ->pruneByPlaybackTime(time);
 
@@ -172,18 +173,18 @@ void SegmentInformation::pruneBySegmentNumber(uint64_t num)
 {
     assert(dynamic_cast<BaseRepresentation *>(this));
 
-    SegmentList *segmentList = static_cast<SegmentList *>(getAttribute(Type::SEGMENTLIST));
+    SegmentList *segmentList = static_cast<SegmentList *>(getAttribute(Type::SegmentList));
     if(segmentList)
         segmentList->pruneBySegmentNumber(num);
 
-    SegmentTemplate *templ = static_cast<SegmentTemplate *>(getAttribute(Type::SEGMENTTEMPLATE));
+    SegmentTemplate *templ = static_cast<SegmentTemplate *>(getAttribute(Type::SegmentTemplate));
     if(templ)
         templ->pruneBySequenceNumber(num);
 }
 
 const CommonEncryption & SegmentInformation::intheritEncryption() const
 {
-    if(parent && commonEncryption.method == CommonEncryption::Method::NONE)
+    if(parent && commonEncryption.method == CommonEncryption::Method::None)
         return parent->intheritEncryption();
     return commonEncryption;
 }
@@ -212,19 +213,19 @@ vlc_tick_t SegmentInformation::getPeriodDuration() const
 AbstractSegmentBaseType * SegmentInformation::getProfile() const
 {
     AbstractAttr *p;
-    if((p = getAttribute(Type::SEGMENTTEMPLATE)))
-        return (SegmentTemplate *) p;
-    else if((p = getAttribute(Type::SEGMENTLIST)))
-        return (SegmentList *) p;
-    else if((p = getAttribute(Type::SEGMENTBASE)))
-        return (SegmentBase *) p;
+    if((p = getAttribute(Type::SegmentTemplate)))
+        return static_cast<SegmentTemplate *> (p);
+    else if((p = getAttribute(Type::SegmentList)))
+        return static_cast<SegmentList *> (p);
+    else if((p = getAttribute(Type::SegmentBase)))
+        return static_cast<SegmentBase *> (p);
 
-    return NULL;
+    return nullptr;
 }
 
 void SegmentInformation::updateSegmentList(SegmentList *list, bool restamp)
 {
-    SegmentList *segmentList = static_cast<SegmentList *>(getAttribute(Type::SEGMENTLIST));
+    SegmentList *segmentList = static_cast<SegmentList *>(getAttribute(Type::SegmentList));
     if(segmentList && restamp)
     {
         segmentList->updateWith(list, restamp);
@@ -238,7 +239,7 @@ void SegmentInformation::updateSegmentList(SegmentList *list, bool restamp)
 
 void SegmentInformation::setSegmentTemplate(SegmentTemplate *templ)
 {
-    SegmentTemplate *local = static_cast<SegmentTemplate *>(getAttribute(Type::SEGMENTTEMPLATE));
+    SegmentTemplate *local = static_cast<SegmentTemplate *>(getAttribute(Type::SegmentTemplate));
     if(local)
     {
         local->updateWith(templ);
@@ -250,33 +251,23 @@ void SegmentInformation::setSegmentTemplate(SegmentTemplate *templ)
     }
 }
 
-static void insertIntoSegment(std::vector<Segment *> &seglist, size_t start,
+static void insertIntoSegment(Segment *container, size_t start,
                               size_t end, stime_t time, stime_t duration)
 {
-    std::vector<Segment *>::iterator segIt;
-    for(segIt = seglist.begin(); segIt < seglist.end(); ++segIt)
+    if(end == 0 || container->contains(end))
     {
-        Segment *segment = *segIt;
-        if(segment->getClassId() == Segment::CLASSID_SEGMENT &&
-           (end == 0 || segment->contains(end)))
-        {
-            SubSegment *subsegment = new SubSegment(segment, start, (end != 0) ? end : 0);
-            subsegment->startTime.Set(time);
-            subsegment->duration.Set(duration);
-            segment->addSubSegment(subsegment);
-            break;
-        }
+        SubSegment *subsegment = new SubSegment(container, start, (end != 0) ? end : 0);
+        subsegment->startTime.Set(time);
+        subsegment->duration.Set(duration);
+        container->addSubSegment(subsegment);
     }
 }
 
 void SegmentInformation::SplitUsingIndex(std::vector<SplitPoint> &splitlist)
 {
-    SegmentBase *segmentBase = inheritSegmentBase();
+    Segment *segmentBase = inheritSegmentBase();
     if(!segmentBase)
         return;
-
-    std::vector<Segment *> seglist;
-    seglist.push_back( segmentBase );
 
     size_t prevstart = 0;
     stime_t prevtime = 0;
@@ -289,7 +280,7 @@ void SegmentInformation::SplitUsingIndex(std::vector<SplitPoint> &splitlist)
         if(splitIt != splitlist.begin())
         {
             /* do previous splitpoint */
-            insertIntoSegment(seglist, prevstart, split.offset - 1, prevtime, split.duration);
+            insertIntoSegment(segmentBase, prevstart, split.offset - 1, prevtime, split.duration);
         }
         prevstart = split.offset;
         prevtime = split.time;
@@ -297,11 +288,11 @@ void SegmentInformation::SplitUsingIndex(std::vector<SplitPoint> &splitlist)
 
     if(splitlist.size() == 1)
     {
-        insertIntoSegment(seglist, prevstart, 0, prevtime, split.duration);
+        insertIntoSegment(segmentBase, prevstart, 0, prevtime, split.duration);
     }
     else if(splitlist.size() > 1)
     {
-        insertIntoSegment(seglist, prevstart, split.offset - 1, prevtime, split.duration);
+        insertIntoSegment(segmentBase, prevstart, split.offset - 1, prevtime, split.duration);
     }
 }
 
