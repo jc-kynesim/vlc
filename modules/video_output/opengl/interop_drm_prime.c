@@ -374,10 +374,12 @@ Open(vlc_object_t *obj)
     video_format_TransformBy(&interop->fmt_out, TRANSFORM_VFLIP);
 
 #if OPT_MULTIPLANE
-#error Bad
     int ret = opengl_interop_init(interop, GL_TEXTURE_2D, VLC_CODEC_I420, interop->fmt_in.space);
 #else
-    int ret = opengl_interop_init(interop, GL_TEXTURE_EXTERNAL_OES, VLC_CODEC_DRM_PRIME_OPAQUE, COLOR_SPACE_UNDEF /*interop->fmt_in.space*/);
+    // If using EXTERNAL_OES then color space must be UNDEFINED with VLCs
+    // current shader code.  It doesn't do RGB->RGB colour conversions.
+//    int ret = opengl_interop_init(interop, GL_TEXTURE_EXTERNAL_OES, VLC_CODEC_DRM_PRIME_OPAQUE, COLOR_SPACE_UNDEF);
+    int ret = opengl_interop_init(interop, GL_TEXTURE_EXTERNAL_OES, VLC_CODEC_RGB24, COLOR_SPACE_UNDEF);
 #endif
     if (ret != VLC_SUCCESS)
     {

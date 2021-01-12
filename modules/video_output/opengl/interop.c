@@ -319,7 +319,6 @@ interop_rgb_base_init(struct vlc_gl_interop *interop, GLenum tex_target,
 {
     (void) tex_target;
 
-    msg_Info(interop, "%s: target=%d, chroma=%d", __func__, tex_target, chroma);
     switch (chroma)
     {
         case VLC_CODEC_RGB24:
@@ -360,19 +359,6 @@ interop_xyz12_init(struct vlc_gl_interop *interop)
     };
 }
 
-static int
-interop_drm_prime_init(struct vlc_gl_interop *interop)
-{
-    interop->tex_count = 1;
-    interop->tex_target = GL_TEXTURE_EXTERNAL_OES;
-    interop->texs[0] = (struct vlc_gl_tex_cfg) {
-        { 1, 1 }, { 1, 1 }, GL_RGB, GL_RGB, GL_UNSIGNED_SHORT
-    };
-    interop->tex_count = 1;
-    return VLC_SUCCESS;
-}
-
-
 int
 opengl_interop_init_impl(struct vlc_gl_interop *interop, GLenum tex_target,
                          vlc_fourcc_t chroma, video_color_space_t yuv_space)
@@ -393,11 +379,6 @@ opengl_interop_init_impl(struct vlc_gl_interop *interop, GLenum tex_target,
         interop_xyz12_init(interop);
         return VLC_SUCCESS;
     }
-    if (chroma == VLC_CODEC_DRM_PRIME_OPAQUE)
-    {
-        return interop_drm_prime_init(interop);
-    }
-
 
     if (is_yuv)
         return interop_yuv_base_init(interop, tex_target, chroma, desc);
