@@ -39,7 +39,7 @@
 #include "interop.h"
 #include "../codec/avcodec/drm_pic.h"
 
-#define OPT_MULTIPLANE 1
+#define OPT_MULTIPLANE 0
 /* From https://www.khronos.org/registry/OpenGL/extensions/OES/OES_EGL_image.txt
  * The extension is an OpenGL ES extension but can (and usually is) available on
  * OpenGL implementations. */
@@ -374,9 +374,10 @@ Open(vlc_object_t *obj)
     video_format_TransformBy(&interop->fmt_out, TRANSFORM_VFLIP);
 
 #if OPT_MULTIPLANE
+#error Bad
     int ret = opengl_interop_init(interop, GL_TEXTURE_2D, VLC_CODEC_I420, interop->fmt_in.space);
 #else
-    int ret = opengl_interop_init(interop, GL_TEXTURE_EXTERNAL_OES, VLC_CODEC_DRM_PRIME_OPAQUE, interop->fmt_in.space);
+    int ret = opengl_interop_init(interop, GL_TEXTURE_EXTERNAL_OES, VLC_CODEC_DRM_PRIME_OPAQUE, COLOR_SPACE_UNDEF /*interop->fmt_in.space*/);
 #endif
     if (ret != VLC_SUCCESS)
     {

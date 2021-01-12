@@ -777,8 +777,8 @@ opengl_fragment_shader_init(struct vlc_gl_sampler *sampler, GLenum tex_target,
 
     if (chroma == VLC_CODEC_XYZ12)
         return xyz12_shader_init(sampler);
-    if (chroma == VLC_CODEC_DRM_PRIME_OPAQUE)
-        return drm_prime_shader_init(sampler);
+//    if (chroma == VLC_CODEC_DRM_PRIME_OPAQUE)
+//        return drm_prime_shader_init(sampler);
 
     if (is_yuv)
     {
@@ -791,6 +791,7 @@ opengl_fragment_shader_init(struct vlc_gl_sampler *sampler, GLenum tex_target,
     }
 
     const char *glsl_sampler, *lookup;
+    fprintf(stderr, "yuv=%d, tex_target=%d\n", is_yuv, tex_target);
     switch (tex_target)
     {
         case GL_TEXTURE_EXTERNAL_OES:
