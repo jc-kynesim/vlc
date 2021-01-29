@@ -118,6 +118,7 @@ typedef struct vout_thread_sys_t
 
     /* Thread & synchronization */
     vout_control_t  control;
+    atomic_bool     control_is_terminated; // shutdown the vout thread
     vlc_thread_t    thread;
 
     struct {
@@ -382,18 +383,17 @@ void vout_MouseState(vout_thread_t *vout, const vlc_mouse_t *mouse)
     vout_thread_sys_t *sys = VOUT_THREAD_TO_SYS(vout);
     assert(!sys->dummy);
     assert(mouse);
-    vout_control_cmd_t cmd;
-    vout_control_cmd_Init(&cmd, VOUT_CONTROL_MOUSE_STATE);
 
     /* Translate window coordinates to video coordinates */
     vlc_mutex_lock(&sys->display_lock);
+    vlc_mouse_t video_mouse;
     if (sys->display)
-        vout_display_TranslateMouseState(sys->display, &cmd.mouse, mouse);
+        vout_display_TranslateMouseState(sys->display, &video_mouse, mouse);
     else
-        cmd.mouse = *mouse;
+        video_mouse = *mouse;
     vlc_mutex_unlock(&sys->display_lock);
 
-    vout_control_Push(&sys->control, &cmd);
+    vout_control_PushMouse(&sys->control, &video_mouse);
 }
 
 void vout_PutSubpicture( vout_thread_t *vout, subpicture_t *subpic )
@@ -1495,7 +1495,8 @@ static int ThreadDisplayPicture(vout_thread_sys_t *vout, vlc_tick_t *deadline)
                 ThreadDisplayPreparePicture(vout, false, true, &paused);
         }
 
-        picture_Release(sys->displayed.current);
+        if (likely(sys->displayed.current != NULL))
+            picture_Release(sys->displayed.current);
         sys->displayed.current = sys->displayed.next;
         sys->displayed.next    = NULL;
 
@@ -1551,7 +1552,8 @@ static int ThreadDisplayPicture(vout_thread_sys_t *vout, vlc_tick_t *deadline)
                     dropped_current_frame = true;
                     render_now = false;
 
-                    picture_Release(sys->displayed.current);
+                    if (likely(sys->displayed.current != NULL))
+                        picture_Release(sys->displayed.current);
                     sys->displayed.current = sys->displayed.next;
                     sys->displayed.next    = NULL;
                 }
@@ -1893,8 +1895,6 @@ static void *Thread(void *object)
     bool wait = false;
 
     for (;;) {
-        vout_control_cmd_t cmd;
-
         if (wait)
         {
             const vlc_tick_t max_deadline = vlc_tick_now() + VLC_TICK_FROM_MS(100);
@@ -1903,22 +1903,26 @@ static void *Thread(void *object)
             deadline = VLC_TICK_INVALID;
         }
 
-        while (!vout_control_Pop(&sys->control, &cmd, deadline)) {
-            switch(cmd.type) {
-                case VOUT_CONTROL_TERMINATE:
-                    return NULL; /* no need to clean &cmd */
-                case VOUT_CONTROL_MOUSE_STATE:
-                    ThreadProcessMouseState(vout, &cmd.mouse);
-                    break;
-            }
+        vlc_mouse_t video_mouse;
+        while (vout_control_Pop(&sys->control, &video_mouse, deadline) == VLC_SUCCESS) {
+            if (atomic_load(&sys->control_is_terminated))
+                break;
+            ThreadProcessMouseState(vout, &video_mouse);
         }
 
+        if (atomic_load(&sys->control_is_terminated))
+            break;
+
         wait = ThreadDisplayPicture(vout, &deadline) != VLC_SUCCESS;
+
+        if (atomic_load(&sys->control_is_terminated))
+            break;
 
         const bool picture_interlaced = sys->displayed.is_interlaced;
 
         vout_SetInterlacingState(&vout->obj, &sys->private, picture_interlaced);
     }
+    return NULL;
 }
 
 static void vout_ReleaseDisplay(vout_thread_sys_t *vout)
@@ -1974,7 +1978,9 @@ void vout_StopDisplay(vout_thread_t *vout)
 {
     vout_thread_sys_t *sys = VOUT_THREAD_TO_SYS(vout);
 
-    vout_control_PushVoid(&sys->control, VOUT_CONTROL_TERMINATE);
+    atomic_store(&sys->control_is_terminated, true);
+    // wake up so it goes back to the loop that will detect the terminated state
+    vout_control_Wake(&sys->control);
     vlc_join(sys->thread, NULL);
 
     vout_ReleaseDisplay(sys);
@@ -2013,7 +2019,6 @@ void vout_Close(vout_thread_t *vout)
 
     vout_IntfDeinit(VLC_OBJECT(vout));
     vout_snapshot_End(sys->snapshot);
-    vout_control_Dead(&sys->control);
     vout_chrono_Clean(&sys->render);
 
     if (sys->spu)
@@ -2120,6 +2125,7 @@ vout_thread_t *vout_Create(vlc_object_t *object)
                spu_Create(vout, vout) : NULL;
 
     vout_control_Init(&sys->control);
+    atomic_init(&sys->control_is_terminated, false);
 
     sys->title.show     = var_InheritBool(vout, "video-title-show");
     sys->title.timeout  = var_InheritInteger(vout, "video-title-timeout");
@@ -2308,6 +2314,7 @@ int vout_Request(const vout_configuration_t *cfg, vlc_video_context *vctx, input
         vout_DisableWindow(vout);
         return -1;
     }
+    atomic_store(&sys->control_is_terminated, false);
     if (vlc_clone(&sys->thread, Thread, vout, VLC_THREAD_PRIORITY_OUTPUT)) {
         vout_ReleaseDisplay(vout);
         vout_DisableWindow(vout);

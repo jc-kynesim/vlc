@@ -542,6 +542,16 @@ static bool PictureContextRenderPicTs(struct picture_context_t *ctx,
     return false;
 }
 
+static struct vlc_asurfacetexture *
+PictureContextGetTexture(picture_context_t *context)
+{
+    android_video_context_t *avctx =
+        vlc_video_context_GetPrivate(context->vctx, VLC_VIDEO_CONTEXT_AWINDOW);
+    decoder_sys_t *p_sys = avctx->dec_opaque;
+
+    return p_sys->video.surfacetexture;
+}
+
 static void PictureContextDestroy(struct picture_context_t *ctx)
 {
     struct android_picture_ctx *apctx =
@@ -646,21 +656,14 @@ CreateVideoContext(decoder_t *p_dec)
      * projection or an orientation to handle, if the Surface owner is not able
      * to modify its layout, or if there is no external subtitle surfaces. */
 
+    p_sys->video.surfacetexture = NULL;
     bool use_surfacetexture =
         p_dec->fmt_out.video.projection_mode != PROJECTION_MODE_RECTANGULAR
      || (!p_sys->api.b_support_rotation && p_dec->fmt_out.video.orientation != ORIENT_NORMAL)
      || !AWindowHandler_canSetVideoLayout(awh)
      || !has_subtitle_surface;
 
-    if (use_surfacetexture)
-    {
-        p_sys->video.surfacetexture = vlc_asurfacetexture_New(awh);
-        if (p_sys->video.surfacetexture == NULL)
-            goto error;
-        p_sys->video.p_surface = p_sys->video.surfacetexture->window;
-        p_sys->video.p_jsurface = p_sys->video.surfacetexture->jsurface;
-    }
-    else
+    if (!use_surfacetexture)
     {
         p_sys->video.p_surface = AWindowHandler_getANativeWindow(awh, AWindow_Video);
         p_sys->video.p_jsurface = AWindowHandler_getSurface(awh, AWindow_Video);
@@ -670,6 +673,18 @@ CreateVideoContext(decoder_t *p_dec)
             msg_Err(p_dec, "Could not find a valid ANativeWindow");
             goto error;
         }
+    }
+
+    if (use_surfacetexture || p_sys->video.p_surface == NULL)
+    {
+        p_sys->video.surfacetexture = vlc_asurfacetexture_New(awh, false);
+        assert(p_sys->video.surfacetexture);
+        if (p_sys->video.surfacetexture == NULL)
+            goto error;
+        p_sys->video.p_surface = p_sys->video.surfacetexture->window;
+        p_sys->video.p_jsurface = p_sys->video.surfacetexture->jsurface;
+        assert(p_sys->video.p_surface);
+        assert(p_sys->video.p_jsurface);
     }
 
     static const struct vlc_video_context_operations ops =
@@ -686,10 +701,10 @@ CreateVideoContext(decoder_t *p_dec)
 
     android_video_context_t *avctx =
         vlc_video_context_GetPrivate(p_sys->video.ctx, VLC_VIDEO_CONTEXT_AWINDOW);
-    avctx->texture = p_sys->video.surfacetexture;
     avctx->dec_opaque = p_dec->p_sys;
     avctx->render = PictureContextRenderPic;
     avctx->render_ts = p_sys->api.release_out_ts ? PictureContextRenderPicTs : NULL;
+    avctx->get_texture = p_sys->video.surfacetexture ? PictureContextGetTexture : NULL;
 
     for (size_t i = 0; i < ARRAY_SIZE(p_sys->video.apic_ctxs); ++i)
     {
@@ -906,11 +921,7 @@ static int OpenDecoder(vlc_object_t *p_this, pf_MediaCodecApi_init pf_init)
                 goto bailout;
             }
 
-            android_video_context_t *avctx =
-                vlc_video_context_GetPrivate(p_sys->video.ctx,
-                                             VLC_VIDEO_CONTEXT_AWINDOW);
-
-            if (p_sys->api.b_support_rotation && avctx->texture == NULL)
+            if (p_sys->api.b_support_rotation && p_sys->video.surfacetexture == NULL)
             {
                 switch (p_dec->fmt_in.video.orientation)
                 {
@@ -1109,6 +1120,7 @@ static int Video_ProcessOutput(decoder_t *p_dec, mc_api_out *p_out,
             struct android_picture_ctx *apctx =
                 GetPictureContext(p_dec,p_out->buf.i_index);
             assert(apctx);
+            assert(apctx->s.vctx);
             vlc_video_context_Hold(apctx->s.vctx);
             p_pic->context = &apctx->s;
         } else {
@@ -1204,10 +1216,10 @@ static int Video_ProcessOutput(decoder_t *p_dec, mc_api_out *p_out,
 
         /* If MediaCodec can handle the rotation, reset the orientation to
          * Normal in order to ask the vout not to rotate. */
+        p_dec->fmt_out.video.orientation = p_dec->fmt_in.video.orientation;
         if (p_sys->video.i_angle != 0)
         {
             assert(p_dec->fmt_out.i_codec == VLC_CODEC_ANDROID_OPAQUE);
-            p_dec->fmt_out.video.orientation = p_dec->fmt_in.video.orientation;
             video_format_TransformTo(&p_dec->fmt_out.video, ORIENT_NORMAL);
         }
 

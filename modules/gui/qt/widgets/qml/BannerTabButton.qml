@@ -28,8 +28,8 @@ T.TabButton {
     id: control
 
     property color color: VLCStyle.colors.banner
-    property color colorSelected: VLCStyle.colors.bg
     property bool showText: true
+    property bool showCurrentIndicator: true
 
     text: model.displayText
     padding: 0
@@ -45,7 +45,7 @@ T.TabButton {
         height: control.height
         width: control.width
         color: (control.activeFocus || control.hovered) ? VLCStyle.colors.accent
-                                                        :  (control.selected ? control.colorSelected : control.color)
+                                                        : control.color
         Behavior on color {
             ColorAnimation {
                 duration: 128
@@ -68,17 +68,27 @@ T.TabButton {
 
                 text: control.iconTxt
                 font.pixelSize: VLCIcons.pixelSize(VLCStyle.banner_icon_size)
-                color: control.selected && !(control.activeFocus || control.hovered) ? VLCStyle.colors.accent
-                                                                                     : VLCStyle.colors.text
+                color: (control.activeFocus || control.hovered) ? VLCStyle.colors.accentText
+                                                                : ((control.selected) ? VLCStyle.colors.accent : VLCStyle.colors.text)
             }
 
-            Widgets.MenuLabel {
+            Label {
                 id: txt
+
                 visible: showText
+                font.pixelSize: VLCStyle.fontSize_normal
                 font.weight: (control.activeFocus || control.hovered || control.selected) ? Font.DemiBold : Font.Normal
-                color: (control.activeFocus || control.hovered || control.selected) ? VLCStyle.colors.text : VLCStyle.colors.menuCaption
+                color: (control.activeFocus || control.hovered) ? VLCStyle.colors.accentText
+                                                                : ((control.selected) ? VLCStyle.colors.text : VLCStyle.colors.menuCaption)
                 text: control.text
             }
+        }
+
+        Widgets.CurrentIndicator {
+            width: tabRow.width
+            orientation: Qt.Horizontal
+            margin: VLCStyle.dp(3, VLCStyle.scale)
+            visible: control.showCurrentIndicator && control.selected
         }
     }
 }

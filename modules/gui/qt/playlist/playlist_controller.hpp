@@ -25,6 +25,8 @@
 
 #include <QObject>
 #include <QVector>
+#include <QVariantList>
+
 #include "media.hpp"
 #include "playlist_common.hpp"
 #include "playlist_item.hpp"
@@ -71,6 +73,8 @@ public:
     };
     Q_ENUM(SortOrder)
 
+    Q_PROPERTY(QVariantList sortKeyTitleList READ getSortKeyTitleList CONSTANT)
+
     Q_PROPERTY(PlaylistPtr playlistPtr READ getPlaylistPtr WRITE setPlaylistPtr NOTIFY playlistPtrChanged)
 
     Q_PROPERTY(PlaylistItem currentItem READ getCurrentItem NOTIFY currentItemChanged)
@@ -112,6 +116,7 @@ public:
     void sort(const QVector<vlc_playlist_sort_criterion> &);
 
     Q_INVOKABLE void sort(SortKey key, SortOrder order);
+    Q_INVOKABLE void sort(SortKey key);
     Q_INVOKABLE void sort(void);
 
     Q_INVOKABLE void explore(const PlaylistItem& pItem);
@@ -120,6 +125,7 @@ public:
     PlaylistControllerModel(QObject *parent = nullptr);
     PlaylistControllerModel(vlc_playlist_t *playlist, QObject *parent = nullptr);
     virtual ~PlaylistControllerModel();
+
 
 public slots:
     PlaylistItem getCurrentItem() const;
@@ -145,6 +151,7 @@ public slots:
     void setSortOrder(SortOrder sortOrder);
     void switchSortOrder();
 
+    QVariantList getSortKeyTitleList() const;
     PlaylistPtr getPlaylistPtr() const;
     void setPlaylistPtr(PlaylistPtr id);
     void setPlaylistPtr(vlc_playlist_t* newPlaylist);

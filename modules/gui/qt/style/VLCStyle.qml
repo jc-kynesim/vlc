@@ -36,6 +36,10 @@ Item {
 
     property VLCColors colors: VLCColors {}
 
+    // When trying to force night/dark theme colors for items,
+    // this can be used:
+    property VLCColors nightColors: VLCColors { state: "night" }
+
     // Sizes
     property double margin_xxxsmall: dp(2, scale);
     property double margin_xxsmall: dp(4, scale);
@@ -185,6 +189,8 @@ Item {
     property int gridItem_video_height_large: VLCStyle.gridCover_video_height_large + VLCStyle.margin_xxsmall + VLCStyle.fontHeight_large +
                                               VLCStyle.margin_xxsmall + VLCStyle.fontHeight_normal
 
+    property int gridItemSelectedBorder: dp(8, scale)
+
     property int column_width: dp(114, scale)
     property int column_margin_width: dp(32, scale)
 
@@ -200,12 +206,15 @@ Item {
     property int applicationHorizontalMargin: mainInterface.clientSideDecoration ? dp(5, scale) : 0
     property int applicationVerticalMargin: mainInterface.clientSideDecoration ? dp(5, scale) : 0
 
-    property int globalToolbar_height: dp(32, scale)
-    property int localToolbar_height: dp(40, scale)
-    property int banner_icon_size: dp(38, scale)
+    property int globalToolbar_height: dp(40, scale)
+    property int localToolbar_height: dp(48, scale)
+    property int banner_icon_size: dp(28, scale)
 
     property int bannerTabButton_width_small: banner_icon_size
     property int bannerTabButton_width_large: column_width
+
+    property int bannerButton_height: dp(32, scale)
+    property int bannerButton_width: dp(40, scale)
 
     //timings
     property int delayToolTipAppear: 500;
@@ -219,6 +228,9 @@ Item {
     property url noArtAlbum: "qrc:///noart_album.svg";
     property url noArtArtist: "qrc:///noart_artist.svg";
     property url noArtArtistSmall: "qrc:///noart_artist_small.svg";
+    property url noArtAlbumCover: "qrc:///noart_albumCover.svg";
+    property url noArtArtistCover: "qrc:///noart_artistCover.svg";
+    property url noArtVideoCover: "qrc:///noart_videoCover.svg";
 
     //device pixel
     function dp(px, scale) {

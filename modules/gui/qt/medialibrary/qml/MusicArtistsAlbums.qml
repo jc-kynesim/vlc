@@ -29,20 +29,21 @@ import "qrc:///style/"
 
 Widgets.NavigableFocusScope {
     id: root
+
     property alias model: artistModel
     property var sortModel: [
         { text: i18n.qtr("Alphabetic"),  criteria: "title" }
     ]
 
-    property var artistId
-
     property alias currentIndex: artistList.currentIndex
     property alias currentAlbumIndex: albumSubView.currentIndex
     property int initialIndex: 0
     property int initialAlbumIndex: 0
+    property alias currentArtist: albumSubView.artist
 
     onInitialAlbumIndexChanged: resetFocus()
     onInitialIndexChanged: resetFocus()
+    onCurrentIndexChanged: currentArtist = model.getDataAt(currentIndex)
 
     function resetFocus() {
         if (artistModel.count === 0) {
@@ -75,6 +76,11 @@ Widgets.NavigableFocusScope {
                     initialIndex = 0
                 artistList.currentIndex = initialIndex
             }
+        }
+
+        onDataChanged: {
+            if (topLeft.row <= currentIndex && bottomRight.row >= currentIndex)
+                currentArtist = artistModel.getDataAt(currentIndex)
         }
     }
 
@@ -114,14 +120,6 @@ Widgets.NavigableFocusScope {
             footer: MainInterface.MiniPlayerBottomMargin {
             }
 
-            onCurrentIndexChanged: {
-                if (artistList.currentIndex < artistModel.count) {
-                    root.artistId =  artistModel.getIdForIndex(artistList.currentIndex)
-                } else {
-                    root.artistId = undefined
-                }
-            }
-
             navigationParent: root
             navigationRightItem: albumSubView
             navigationCancel: function() {
@@ -133,24 +131,34 @@ Widgets.NavigableFocusScope {
 
             header: Widgets.SubtitleLabel {
                 text: i18n.qtr("Artists")
+                font.pixelSize: VLCStyle.fontSize_large
                 leftPadding: VLCStyle.margin_normal
-                bottomPadding: VLCStyle.margin_normal
-                topPadding: VLCStyle.margin_normal
+                bottomPadding: VLCStyle.margin_small
+                topPadding: VLCStyle.margin_xlarge
             }
 
-            delegate: Widgets.ListItem {
+            delegate: Rectangle {
+                id: item
+
+                property bool _highlighted: mouseArea.containsMouse || this.activeFocus
+
                 height: VLCStyle.play_cover_small + (VLCStyle.margin_xsmall * 2)
                 width: artistList.width
+                color: _highlighted ? VLCStyle.colors.bgHover : "transparent"
 
-                property bool selected: artistList.currentIndex === index
-                property bool _highlighted: selected || this.hovered || this.activeFocus
+                Widgets.CurrentIndicator {
+                   visible: item.ListView.isCurrentItem
+                }
 
-                color: VLCStyle.colors.getBgColor(selected, this.hovered, this.activeFocus)
-
-                cover: Item {
-
-                    width: VLCStyle.play_cover_small
-                    height: VLCStyle.play_cover_small
+                RowLayout {
+                    spacing: VLCStyle.margin_xsmall
+                    anchors {
+                        fill: parent
+                        leftMargin: VLCStyle.margin_normal
+                        rightMargin: VLCStyle.margin_normal
+                        topMargin: VLCStyle.margin_xsmall
+                        bottomMargin: VLCStyle.margin_xsmall
+                    }
 
                     Widgets.RoundImage {
                         source: model.cover || VLCStyle.noArtArtistSmall
@@ -158,34 +166,45 @@ Widgets.NavigableFocusScope {
                         width: VLCStyle.play_cover_small
                         radius: VLCStyle.play_cover_small
                         mipmap: true
+
+                        Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+
+                        Rectangle {
+                            anchors.fill: parent
+                            color: "transparent"
+                            radius: VLCStyle.play_cover_small
+                            border.width: VLCStyle.dp(1, VLCStyle.scale)
+                            border.color: !_highlighted ? VLCStyle.colors.roundPlayCoverBorder : VLCStyle.colors.accent
+                        }
                     }
 
-                    Rectangle {
-                        height: VLCStyle.play_cover_small
-                        width: VLCStyle.play_cover_small
-                        radius: VLCStyle.play_cover_small
-                        color: 'transparent'
-                        border.width: VLCStyle.dp(1, VLCStyle.scale)
-                        border.color: !_highlighted ? VLCStyle.colors.roundPlayCoverBorder : VLCStyle.colors.accent
+                    Widgets.ListLabel {
+                        text: model.name || i18n.qtr("Unknown artist")
+                        color: _highlighted ? VLCStyle.colors.bgHoverText : VLCStyle.colors.text
+
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
                     }
                 }
 
-                line1: model.name || i18n.qtr("Unknown artist")
+                MouseArea {
+                    id: mouseArea
 
-                actionButtons: []
+                    anchors.fill: parent
+                    hoverEnabled: true
 
-                onItemClicked: {
-                    artistId = model.id
-                    selectionModel.updateSelection( modifier , artistList.currentIndex, index)
-                    artistList.currentIndex = index
-                    artistList.forceActiveFocus()
-                }
+                    onClicked: {
+                        selectionModel.updateSelection( mouse.modifiers , artistList.currentIndex, index)
+                        artistList.currentIndex = index
+                        artistList.forceActiveFocus()
+                    }
 
-                onItemDoubleClicked: {
-                    if (keys === Qt.RightButton)
-                        medialib.addAndPlay( model.id )
-                    else
-                        albumSubView.forceActiveFocus()
+                    onDoubleClicked: {
+                        if (mouse.buttons === Qt.LeftButton)
+                            medialib.addAndPlay( model.id )
+                        else
+                            albumSubView.forceActiveFocus()
+                    }
                 }
             }
 
@@ -217,13 +236,9 @@ Widgets.NavigableFocusScope {
             height: parent.height
             width: root.width - artistList.width
             focus: true
-            parentId: root.artistId
             initialIndex: root.initialAlbumIndex
             navigationParent: root
             navigationLeftItem: artistList
-            artist: (artistList.currentIndex >= 0)
-                    ? artistModel.getDataAt(artistList.currentIndex)
-                    : ({})
         }
     }
     }

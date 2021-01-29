@@ -73,6 +73,9 @@ static const struct encoder_owner_callbacks encoder_video_transcode_cbs = {
 
 static vlc_decoder_device * video_get_decoder_device( decoder_t *p_dec )
 {
+    if( !var_InheritBool( p_dec, "hw-dec" ) )
+        return NULL;
+
     struct decoder_owner *p_owner = dec_get_owner( p_dec );
     return TranscodeHoldDecoderDevice(&p_dec->obj, p_owner->id);
 }
@@ -244,9 +247,6 @@ int transcode_video_init( sout_stream_t *p_stream, const es_format_t *p_fmt,
     p_enc_owner->id = id;
     p_enc_owner->enc.cbs = &encoder_video_transcode_cbs;
 
-    /* Will use this format as encoder input for now */
-    transcode_encoder_update_format_in( id->encoder, &encoder_tested_fmt_in );
-
     es_format_Clean( &encoder_tested_fmt_in );
 
     return VLC_SUCCESS;
@@ -271,7 +271,6 @@ static inline bool transcode_video_filters_configured( const sout_stream_id_sys_
 
 static int transcode_video_filters_init( sout_stream_t *p_stream,
                                          const sout_filters_config_t *p_cfg,
-                                         bool b_master_sync,
                                          const es_format_t *p_src,
                                          vlc_video_context *src_ctx,
                                          const es_format_t *p_dst,
@@ -298,11 +297,19 @@ static int transcode_video_filters_init( sout_stream_t *p_stream,
         src_ctx = filter_chain_GetVideoCtxOut( id->p_f_chain );
     }
 
-    if( b_master_sync )
+    if( id->p_enccfg->video.fps.num > 0 &&
+        id->p_enccfg->video.fps.den > 0 &&
+      ( id->p_enccfg->video.fps.num != p_src->video.i_frame_rate ||
+        id->p_enccfg->video.fps.den != p_src->video.i_frame_rate_base ) )
     {
-        filter_chain_AppendFilter( id->p_f_chain, "fps", NULL, p_src );
+        es_format_t dst;
+        es_format_Copy(&dst, p_src);
+        dst.video.i_frame_rate = id->p_enccfg->video.fps.num;
+        dst.video.i_frame_rate_base = id->p_enccfg->video.fps.den;
+        filter_chain_AppendFilter( id->p_f_chain, "fps", NULL, &dst );
         p_src = filter_chain_GetFmtOut( id->p_f_chain );
         src_ctx = filter_chain_GetVideoCtxOut( id->p_f_chain );
+        es_format_Clean(&dst);
     }
 
     /* User filters */
@@ -316,10 +323,10 @@ static int transcode_video_filters_init( sout_stream_t *p_stream,
         filter_chain_AppendFromString( id->p_uf_chain, p_cfg->psz_filters );
         p_src = filter_chain_GetFmtOut( id->p_uf_chain );
         debug_format( p_stream, p_src );
-   }
+    }
 
     /* Update encoder so it matches filters output */
-    transcode_encoder_update_format_in( id->encoder, p_src );
+    transcode_encoder_update_format_in( id->encoder, p_src, id->p_enccfg );
 
     /* SPU Sources */
     if( p_cfg->video.psz_spu_sources )
@@ -495,7 +502,6 @@ int transcode_video_process( sout_stream_t *p_stream, sout_stream_id_sys_t *id,
             {
                 if( transcode_video_filters_init( p_stream,
                                                   id->p_filterscfg,
-                                                 (id->p_enccfg->video.fps.num > 0),
                                                  &id->decoder_out,
                                                  picture_GetVideoContext(p_pic),
                                                  transcode_encoder_format_in( id->encoder ),
@@ -524,10 +530,12 @@ int transcode_video_process( sout_stream_t *p_stream, sout_stream_id_sys_t *id,
             /* The fmt_in may have been overriden by the encoder. */
             const es_format_t *encoder_fmt_in = transcode_encoder_format_in( id->encoder );
 
-            /* In case the encoder wasn't open yet, check if we need to add
-             * a converter between last user filter and encoder. */
-            if( !is_encoder_open &&
-                filter_fmt_out.i_codec != encoder_fmt_in->i_codec )
+            /* check if we need to add a converter between last user filter and encoder. */
+            if( filter_fmt_out.i_codec != encoder_fmt_in->i_codec ||
+                id->decoder_out.video.i_width  != encoder_fmt_in->video.i_width ||
+                id->decoder_out.video.i_height != encoder_fmt_in->video.i_height ||
+                id->decoder_out.video.i_visible_width  != encoder_fmt_in->video.i_visible_width ||
+                id->decoder_out.video.i_visible_height != encoder_fmt_in->video.i_visible_height )
             {
                 if ( !id->p_final_conv_static )
                     id->p_final_conv_static =
@@ -544,9 +552,8 @@ int transcode_video_process( sout_stream_t *p_stream, sout_stream_id_sys_t *id,
                 }
 
                 filter_chain_Reset( id->p_final_conv_static,
-                                    p_fmt_filtered,
-                                    //encoder_vctx_in,
-                                    NULL,
+                                    &id->decoder_out,
+                                    picture_GetVideoContext(p_pic),
                                     encoder_fmt_in );
                 filter_chain_AppendConverter( id->p_final_conv_static, NULL );
             }

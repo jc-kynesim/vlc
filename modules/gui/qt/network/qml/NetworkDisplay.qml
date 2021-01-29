@@ -29,12 +29,13 @@ Widgets.NavigableFocusScope {
     id: root
 
     property var extraLocalActions: undefined
-
+    property bool isViewMultiView: true
     property var tree: undefined
     onTreeChanged:  loadView()
     Component.onCompleted: loadView()
 
     property var contentModel
+    property var sortModel
 
     //reset view
     function loadDefaultView() {
@@ -49,14 +50,17 @@ Widgets.NavigableFocusScope {
         if (root.tree === undefined) {
             page ="qrc:///network/NetworkHomeDisplay.qml"
             root.localMenuDelegate = null
+            isViewMultiView = false
         } else {
             page = "qrc:///network/NetworkBrowseDisplay.qml"
             props = { providerModel: mediaModel, contextMenu: mediaContextMenu, tree: root.tree }
             root.localMenuDelegate = addressBar
+            isViewMultiView = true
         }
         view.replace(page, props)
         if (view.currentItem.model)
             root.contentModel = view.currentItem.model
+        root.sortModel = view.currentItem.sortModel
     }
 
     Component {

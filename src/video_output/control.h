@@ -26,33 +26,16 @@
 #include <vlc_viewpoint.h>
 
 /* */
-enum {
-    VOUT_CONTROL_TERMINATE,
-
-    VOUT_CONTROL_MOUSE_STATE,           /* vlc_mouse_t */
-};
-
-typedef struct {
-    int type;
-
-    union {
-        vlc_mouse_t mouse;
-    };
-} vout_control_cmd_t;
-
-void vout_control_cmd_Init(vout_control_cmd_t *, int type);
-
 typedef struct {
     vlc_mutex_t lock;
     vlc_cond_t  wait_request;
     vlc_cond_t  wait_available;
 
     /* */
-    bool is_dead;
-    bool can_sleep;
+    bool forced_awake;
     bool is_waiting;
     bool is_held;
-    DECL_ARRAY(vout_control_cmd_t) cmd;
+    DECL_ARRAY(vlc_mouse_t) cmd;
 } vout_control_t;
 
 /* */
@@ -60,16 +43,12 @@ void vout_control_Init(vout_control_t *);
 void vout_control_Clean(vout_control_t *);
 
 /* controls outside of the vout thread */
-void vout_control_WaitEmpty(vout_control_t *);
-
-void vout_control_Push(vout_control_t *, vout_control_cmd_t *);
-void vout_control_PushVoid(vout_control_t *, int type);
+void vout_control_PushMouse(vout_control_t *, const vlc_mouse_t *);
 void vout_control_Wake(vout_control_t *);
 void vout_control_Hold(vout_control_t *);
 void vout_control_Release(vout_control_t *);
 
 /* control inside of the vout thread */
-int vout_control_Pop(vout_control_t *, vout_control_cmd_t *, vlc_tick_t deadline);
-void vout_control_Dead(vout_control_t *);
+int vout_control_Pop(vout_control_t *, vlc_mouse_t *, vlc_tick_t deadline);
 
 #endif

@@ -69,6 +69,7 @@ namespace adaptive
         virtual bool reactivate(vlc_tick_t);
         bool isDisabled() const;
         bool isValid() const;
+        void setLivePause(bool);
         enum class Status {
             Eof = 0, /* prioritized */
             Discontinuity,
@@ -98,7 +99,7 @@ namespace adaptive
 
         /**/
         virtual void fillExtraFMTInfo( es_format_t * ) const  override;
-        virtual void trackerEvent(const SegmentTrackerEvent &)  override;
+        virtual void trackerEvent(const TrackerEvent &)  override;
 
     protected:
         bool seekAble() const;
@@ -111,6 +112,7 @@ namespace adaptive
         virtual bool restartDemux();
 
         virtual void prepareRestart(bool = true);
+        bool resetForNewPosition(vlc_tick_t);
 
         bool discontinuity;
         bool needrestart;

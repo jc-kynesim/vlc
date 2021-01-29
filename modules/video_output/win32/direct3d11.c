@@ -46,6 +46,9 @@
 #define COBJMACROS
 #include <initguid.h>
 #include <d3d11.h>
+#ifdef HAVE_D3D11_4_H
+#include <d3d11_4.h>
+#endif
 
 /* avoided until we can pass ISwapchainPanel without c++/cx mode
 # include <windows.ui.xaml.media.dxinterop.h> */
@@ -101,6 +104,12 @@ struct vout_display_sys_t
     d3d_quad_t               picQuad;
 
     ID3D11Asynchronous       *prepareWait;
+#ifdef HAVE_D3D11_4_H
+    ID3D11Fence              *d3dRenderFence;
+    ID3D11DeviceContext4     *d3dcontext4;
+    UINT64                   renderFence;
+    HANDLE                   renderFinished;
+#endif
 
     picture_sys_d3d11_t      stagingSys;
     plane_t                  stagingPlanes[PICTURE_PLANE_MAX];
@@ -468,7 +477,8 @@ static bool SelectRenderPlane(void *opaque, size_t plane)
     return sys->selectPlaneCb(sys->outside_opaque, plane);
 }
 
-static void PreparePicture(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture)
+static void PreparePicture(vout_display_t *vd, picture_t *picture, subpicture_t *subpicture,
+                           vlc_tick_t date)
 {
     vout_display_sys_t *sys = vd->sys;
 
@@ -610,6 +620,22 @@ static void PreparePicture(vout_display_t *vd, picture_t *picture, subpicture_t 
         }
     }
 
+#ifdef HAVE_D3D11_4_H
+    if (sys->d3dcontext4)
+    {
+        if (sys->renderFence == UINT64_MAX)
+            sys->renderFence;
+        else
+            sys->renderFence++;
+
+        ResetEvent(sys->renderFinished);
+        ID3D11Fence_SetEventOnCompletion(sys->d3dRenderFence, sys->renderFence, sys->renderFinished);
+        ID3D11DeviceContext4_Signal(sys->d3dcontext4, sys->d3dRenderFence, sys->renderFence);
+
+        WaitForSingleObject(sys->renderFinished, INFINITE);
+    }
+    else
+#endif
     if (sys->prepareWait)
     {
         ID3D11DeviceContext_End(sys->d3d_dev->d3dcontext, sys->prepareWait);
@@ -617,9 +643,15 @@ static void PreparePicture(vout_display_t *vd, picture_t *picture, subpicture_t 
         while (S_FALSE == ID3D11DeviceContext_GetData(sys->d3d_dev->d3dcontext,
                                                       sys->prepareWait, NULL, 0, 0))
         {
-            d3d11_device_unlock( sys->d3d_dev );
-            SleepEx(2, TRUE);
-            d3d11_device_lock( sys->d3d_dev );
+            vlc_tick_t sleep_duration = (date - vlc_tick_now()) / 4;
+            if (sleep_duration <= VLC_TICK_FROM_MS(2))
+            {
+                // don't wait any longer, the display will likely be late
+                // we'll finish waiting during the Display call
+                break;
+            }
+            // wait a little until the rendering is done
+            SleepEx(MS_FROM_VLC_TICK(sleep_duration), TRUE);
         }
     }
 }
@@ -628,8 +660,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture,
                     subpicture_t *subpicture, vlc_tick_t date)
 {
     vout_display_sys_t *sys = vd->sys;
-
-    VLC_UNUSED(date);
 
     d3d11_device_lock( sys->d3d_dev );
 #if VLC_WINSTORE_APP
@@ -666,7 +696,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture,
             sys->sendMetadataCb( sys->outside_opaque, libvlc_video_metadata_frame_hdr10, &hdr10 );
         }
 
-        PreparePicture(vd, picture, subpicture);
+        PreparePicture(vd, picture, subpicture, date);
 
         sys->startEndRenderingCb( sys->outside_opaque, false );
     }
@@ -680,6 +710,23 @@ static void Display(vout_display_t *vd, picture_t *picture)
 
     d3d11_device_lock( sys->d3d_dev );
     sys->swapCb(sys->outside_opaque);
+
+    if (sys->prepareWait)
+    {
+        vlc_tick_t start = 0;
+        while (S_FALSE == ID3D11DeviceContext_GetData(sys->d3d_dev->d3dcontext,
+                                                      sys->prepareWait, NULL, 0, 0))
+        {
+            if (start == 0)
+                start = vlc_tick_now();
+            // keep waiting until all rendering (plus extra) is known to be finished
+            // to let the vout thread things are not as smooth as it may think
+            SleepEx(2, TRUE);
+        }
+        if (start != 0 && var_InheritInteger(vd, "verbose") >= 4)
+            msg_Dbg(vd, "rendering wasn't finished, waited extra %lld ms", MS_FROM_VLC_TICK(vlc_tick_now() - start));
+    }
+
     d3d11_device_unlock( sys->d3d_dev );
 }
 
@@ -1039,14 +1086,58 @@ static int Direct3D11CreateFormatResources(vout_display_t *vd, const video_forma
     return UpdateStaging(vd, fmt);
 }
 
+#ifdef HAVE_D3D11_4_H
+static HRESULT InitRenderFence(vout_display_sys_t *sys)
+{
+    HRESULT hr;
+    sys->renderFinished = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (unlikely(sys->renderFinished == NULL))
+        return S_FALSE;
+    ID3D11Device5 *d3ddev5 = NULL;
+    hr = ID3D11DeviceContext_QueryInterface(sys->d3d_dev->d3dcontext, &IID_ID3D11DeviceContext4, (void**)&sys->d3dcontext4);
+    if (FAILED(hr))
+        goto error;
+    hr = ID3D11Device_QueryInterface(sys->d3d_dev->d3ddevice, &IID_ID3D11Device5, (void**)&d3ddev5);
+    if (FAILED(hr))
+        goto error;
+    hr = ID3D11Device5_CreateFence(d3ddev5, sys->renderFence, D3D11_FENCE_FLAG_NONE, &IID_ID3D11Fence, (void**)&sys->d3dRenderFence);
+    if (FAILED(hr))
+        goto error;
+    ID3D11Device5_Release(d3ddev5);
+    return hr;
+error:
+    if (d3ddev5)
+        ID3D11Device5_Release(d3ddev5);
+    if (sys->d3dRenderFence)
+    {
+        ID3D11Fence_Release(sys->d3dRenderFence);
+        sys->d3dRenderFence = NULL;
+    }
+    ID3D11DeviceContext4_Release(sys->d3dcontext4);
+    sys->d3dcontext4 = NULL;
+    CloseHandle(sys->renderFinished);
+    return hr;
+}
+#endif // HAVE_D3D11_4_H
+
 static int Direct3D11CreateGenericResources(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
     HRESULT hr;
 
-    D3D11_QUERY_DESC query = { 0 };
-    query.Query = D3D11_QUERY_EVENT;
-    hr = ID3D11Device_CreateQuery(sys->d3d_dev->d3ddevice, &query, (ID3D11Query**)&sys->prepareWait);
+#ifdef HAVE_D3D11_4_H
+    hr = InitRenderFence(sys);
+    if (SUCCEEDED(hr))
+    {
+        msg_Dbg(vd, "using GPU render fence");
+    }
+    else
+#endif
+    {
+        D3D11_QUERY_DESC query = { 0 };
+        query.Query = D3D11_QUERY_EVENT;
+        ID3D11Device_CreateQuery(sys->d3d_dev->d3ddevice, &query, (ID3D11Query**)&sys->prepareWait);
+    }
 
     ID3D11BlendState *pSpuBlendState;
     D3D11_BLEND_DESC spuBlendDesc = { 0 };
@@ -1144,6 +1235,18 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
     D3D11_ReleaseVertexShader(&sys->flatVShader);
     D3D11_ReleaseVertexShader(&sys->projectionVShader);
 
+#ifdef HAVE_D3D11_4_H
+    if (sys->d3dcontext4)
+    {
+        ID3D11Fence_Release(sys->d3dRenderFence);
+        sys->d3dRenderFence = NULL;
+        ID3D11DeviceContext4_Release(sys->d3dcontext4);
+        sys->d3dcontext4 = NULL;
+        CloseHandle(sys->renderFinished);
+        sys->renderFinished = NULL;
+    }
+    else
+#endif
     if (sys->prepareWait)
     {
         ID3D11Query_Release(sys->prepareWait);
@@ -1340,4 +1443,3 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
     }
     return VLC_SUCCESS;
 }
-

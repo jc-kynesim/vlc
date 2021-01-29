@@ -87,6 +87,8 @@ Widgets.NavigableFocusScope {
             Keys.onDownPressed: playerButtonsLayout.focus = true
 
             parentWindow: g_root
+
+            colors: VLCStyle.nightColors
         }
 
         Item {
@@ -109,7 +111,7 @@ Widgets.NavigableFocusScope {
 
                 navigationUpItem: trackPositionSlider.enabled ? trackPositionSlider : root.navigationUpItem
 
-                forceColors: true
+                colors: VLCStyle.nightColors
             }
         }
     }

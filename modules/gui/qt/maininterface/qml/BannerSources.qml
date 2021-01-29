@@ -44,7 +44,7 @@ Widgets.NavigableFocusScope {
 
     property alias sortModel: sortControl.model
     property var contentModel
-
+    property alias isViewMultiView: list_grid_btn.visible
     property alias model: pLBannerSources.model
     signal toogleMenu()
 
@@ -113,6 +113,7 @@ Widgets.NavigableFocusScope {
                             id: globalToolbarLeft
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: parent.left
+                            anchors.leftMargin: VLCStyle.margin_xsmall
                             spacing: VLCStyle.margin_xxxsmall
 
                             Widgets.IconToolButton {
@@ -120,7 +121,8 @@ Widgets.NavigableFocusScope {
                                  size: VLCStyle.banner_icon_size
                                  iconText: VLCIcons.topbar_previous
                                  text: i18n.qtr("Previous")
-                                 height: localToolbar.height
+                                 height: VLCStyle.bannerButton_height
+                                 width: VLCStyle.bannerButton_width
                                  colorDisabled: VLCStyle.colors.textDisabled
                                  onClicked: history.previous()
                                  enabled: !history.previousEmpty
@@ -198,11 +200,11 @@ Widgets.NavigableFocusScope {
                 Widgets.NavigableRow {
                     id: localContextGroup
                     anchors {
-                        top: parent.top
+                        verticalCenter: parent.verticalCenter
                         left: parent.left
-                        bottom: parent.bottom
-                        leftMargin: VLCStyle.applicationHorizontalMargin
+                        leftMargin: VLCStyle.applicationHorizontalMargin + VLCStyle.margin_xsmall
                     }
+                    enabled: list_grid_btn.visible || sortControl.visible
 
                     model: ObjectModel {
                         id: localContextModel
@@ -211,10 +213,12 @@ Widgets.NavigableFocusScope {
 
                         Widgets.IconToolButton {
                             id: list_grid_btn
+
+                            width: VLCStyle.bannerButton_width
+                            height: VLCStyle.bannerButton_height
                             size: VLCStyle.banner_icon_size
                             iconText: mainInterface.gridView ? VLCIcons.list : VLCIcons.grid
                             text: i18n.qtr("List/Grid")
-                            height: localToolbar.height
                             onClicked: mainInterface.gridView = !mainInterface.gridView
                             enabled: true
                         }
@@ -224,9 +228,10 @@ Widgets.NavigableFocusScope {
 
                             textRole: "text"
                             criteriaRole: "criteria"
-                            listWidth: VLCStyle.widthSortBox
-                            height: localToolbar.height
-                            size: VLCStyle.banner_icon_size
+
+                            width: VLCStyle.bannerButton_width
+                            height: VLCStyle.bannerButton_height
+                            iconSize: VLCStyle.banner_icon_size
 
                             popupAlignment: Qt.AlignLeft | Qt.AlignBottom
 
@@ -235,18 +240,18 @@ Widgets.NavigableFocusScope {
 
                             onSortSelected: {
                                 if (contentModel !== undefined) {
-                                    contentModel.sortCriteria = modelData[criteriaRole]
+                                    contentModel.sortCriteria = type
                                 }
                             }
 
                             onSortOrderSelected: {
                                 if (contentModel !== undefined) {
-                                    contentModel.sortOrder = order
+                                    contentModel.sortOrder = type
                                 }
                             }
 
-                            sortKey: contentModel.sortCriteria
-                            sortOrder: contentModel.sortOrder
+                            sortKey: contentModel ? contentModel.sortCriteria : PlaylistControllerModel.SORT_KEY_NONE
+                            sortOrder: contentModel ? contentModel.sortOrder : undefined
                         }
                     }
 
@@ -278,6 +283,7 @@ Widgets.NavigableFocusScope {
                     readonly property int availableWidth: parent.width
                                                           - (localContextGroup.width + playlistGroup.width)
                                                           - (VLCStyle.applicationHorizontalMargin * 2)
+                                                          - (VLCStyle.margin_xsmall * 2)
                                                           - (VLCStyle.margin_xxsmall * 2)
                     readonly property bool _alignHCenter: ((localToolbar.width - width) / 2) + width < playlistGroup.x
 
@@ -352,10 +358,9 @@ Widgets.NavigableFocusScope {
                 Widgets.NavigableRow {
                     id: playlistGroup
                     anchors {
-                        top: parent.top
+                        verticalCenter: parent.verticalCenter
                         right: parent.right
-                        bottom: parent.bottom
-                        rightMargin: VLCStyle.applicationHorizontalMargin
+                        rightMargin: VLCStyle.applicationHorizontalMargin + VLCStyle.margin_xsmall
                     }
                     spacing: VLCStyle.margin_xxxsmall
 
@@ -366,7 +371,8 @@ Widgets.NavigableFocusScope {
                             contentModel: root.contentModel
                             visible: root.contentModel !== undefined
                             enabled: visible
-                            height: playlistGroup.height
+                            height: VLCStyle.bannerButton_height
+                            buttonWidth: VLCStyle.bannerButton_width
                         }
 
                         Widgets.IconToolButton {
@@ -375,10 +381,11 @@ Widgets.NavigableFocusScope {
                             size: VLCStyle.banner_icon_size
                             iconText: VLCIcons.playlist
                             text: i18n.qtr("Playlist")
-                            height: playlistGroup.height
+                            width: VLCStyle.bannerButton_width
+                            height: VLCStyle.bannerButton_height
+                            highlighted: mainInterface.playlistVisible
 
                             onClicked:  mainInterface.playlistVisible = !mainInterface.playlistVisible
-                            color: mainInterface.playlistVisible && !playlist_btn.backgroundVisible ? VLCStyle.colors.accent : VLCStyle.colors.buttonText
                         }
 
                         Widgets.IconToolButton {
@@ -387,7 +394,8 @@ Widgets.NavigableFocusScope {
                             size: VLCStyle.banner_icon_size
                             iconText: VLCIcons.ellipsis
                             text: i18n.qtr("Menu")
-                            height: playlistGroup.height
+                            width: VLCStyle.bannerButton_width
+                            height: VLCStyle.bannerButton_height
 
                             onClicked: contextMenu.popup(this.mapToGlobal(0, height))
 

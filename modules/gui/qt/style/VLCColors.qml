@@ -69,6 +69,8 @@ Item {
     property color buttonText: systemPalette.buttonText;
     property color buttonBorder: blendColors(systemPalette.button, systemPalette.buttonText, 0.8);
 
+    property color icon: blendColors(text, bg, 0.6);
+
     property color textActiveSource: "red";
 
     property color banner: systemPalette.window;
@@ -89,19 +91,9 @@ Item {
     property color roundPlayCoverBorder: "#979797"
 
     // playlist
-    property color playlistSeparator: isThemeDark ? "white" : "#f2f2f2"
-    property color plItemHover_Focus: bannerHover
-    property color plItemSelect:      isThemeDark ? "#1E1E1E" : "#EDEDED"
-
-    function getPLItemColor(selected, hovered, focus)
-    {
-        if (hovered || focus)
-            return plItemHover_Focus
-        else if ( selected )
-            return plItemSelect
-        else
-            return "transparent"
-    }
+    property color plItemHovered:  bannerHover
+    property color plItemSelected: blendColors(plItemHovered, plItemFocused, 0.5)
+    property color plItemFocused: isThemeDark ? "#1E1E1E" : "#EDEDED"
 
     // basic color definitions for color blending:
     property color black: "black"

@@ -110,8 +110,11 @@
         <file alias="menu.svg">pixmaps/menu.svg</file>
         <file alias="VLCIcons.ttf">pixmaps/VLCIcons.ttf</file>
         <file alias="noart_album.svg">pixmaps/noart_album.svg</file>
+        <file alias="noart_albumCover.svg">pixmaps/noart_albumCover.svg</file>
         <file alias="noart_artist.svg">pixmaps/noart_artist.svg</file>
         <file alias="noart_artist_small.svg">pixmaps/noart_artist_small.svg</file>
+        <file alias="noart_artistCover.svg">pixmaps/noart_artistCover.svg</file>
+        <file alias="noart_videoCover.svg">pixmaps/noart_videoCover.svg</file>
         <file alias="play_button.svg">pixmaps/play_button.svg</file>
         <file alias="back.svg">pixmaps/back.svg</file>
     </qresource>
@@ -190,13 +193,13 @@
         <file alias="CSDWindowButton.qml">widgets/qml/CSDWindowButton.qml</file>
         <file alias="CSDWindowButtonSet.qml">widgets/qml/CSDWindowButtonSet.qml</file>
         <file alias="CSDTitlebarTapNDrapHandler.qml">widgets/qml/CSDTitlebarTapNDrapHandler.qml</file>
+        <file alias="CurrentIndicator.qml">widgets/qml/CurrentIndicator.qml</file>
         <file alias="GridItem.qml">widgets/qml/GridItem.qml</file>
         <file alias="ListItem.qml">widgets/qml/ListItem.qml</file>
         <file alias="DrawerExt.qml">widgets/qml/DrawerExt.qml</file>
         <file alias="KeyNavigableGridView.qml">widgets/qml/KeyNavigableGridView.qml</file>
         <file alias="KeyNavigableListView.qml">widgets/qml/KeyNavigableListView.qml</file>
         <file alias="ToolTipArea.qml">widgets/qml/ToolTipArea.qml</file>
-        <file alias="DNDLabel.qml">widgets/qml/DNDLabel.qml</file>
         <file alias="KeyNavigableTableView.qml">widgets/qml/KeyNavigableTableView.qml</file>
         <file alias="TableColumns.qml">widgets/qml/TableColumns.qml</file>
         <file alias="TransparentSpinBox.qml">widgets/qml/TransparentSpinBox.qml</file>
@@ -243,6 +246,7 @@
         <file alias="DragItem.qml">widgets/qml/DragItem.qml</file>
         <file alias="CoverShadow.qml">widgets/qml/CoverShadow.qml</file>
         <file alias="ListCoverShadow.qml">widgets/qml/ListCoverShadow.qml</file>
+        <file alias="OverlayMenu.qml">widgets/qml/OverlayMenu.qml</file>
     </qresource>
     <qresource prefix="/network">
         <file alias="AddressbarButton.qml">network/qml/AddressbarButton.qml</file>
@@ -288,10 +292,10 @@
         <file alias="VLCIcons.qml">style/VLCIcons.qml</file>
     </qresource>
     <qresource prefix="/playlist">
-        <file alias="PLItem.qml">playlist/qml/PLItem.qml</file>
+        <file alias="PlaylistDelegate.qml">playlist/qml/PlaylistDelegate.qml</file>
         <file alias="PlaylistDroppable.qml">playlist/qml/PlaylistDroppable.qml</file>
         <file alias="PlaylistListView.qml">playlist/qml/PlaylistListView.qml</file>
-        <file alias="PlaylistMenu.qml">playlist/qml/PlaylistMenu.qml</file>
+        <file alias="PlaylistOverlayMenu.qml">playlist/qml/PlaylistOverlayMenu.qml</file>
         <file alias="PlaylistToolbar.qml">playlist/qml/PlaylistToolbar.qml</file>
         <file alias="PlaylistDetachedWindow.qml">playlist/qml/PlaylistDetachedWindow.qml</file>
     </qresource>

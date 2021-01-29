@@ -293,13 +293,18 @@ static block_t *ParseMPEGBlock( decoder_t *p_dec, block_t *p_frag )
              i_startcode < RESERVED_START_CODE )
     {
         /* Copy the complete VOL */
-        if( (size_t)p_dec->fmt_out.i_extra != p_frag->i_buffer )
+        if( (size_t)p_dec->fmt_out.i_extra != p_frag->i_buffer ||
+           ( p_frag->i_buffer && memcmp(p_dec->fmt_out.p_extra,
+                                        p_frag->p_buffer, p_frag->i_buffer) ) )
         {
-            p_dec->fmt_out.p_extra =
-                xrealloc( p_dec->fmt_out.p_extra, p_frag->i_buffer );
-            p_dec->fmt_out.i_extra = p_frag->i_buffer;
+            void *p_realloc = realloc( p_dec->fmt_out.p_extra, p_frag->i_buffer );
+            if( p_realloc )
+            {
+                p_dec->fmt_out.p_extra = p_realloc;
+                p_dec->fmt_out.i_extra = p_frag->i_buffer;
+                memcpy( p_realloc, p_frag->p_buffer, p_frag->i_buffer );
+            }
         }
-        memcpy( p_dec->fmt_out.p_extra, p_frag->p_buffer, p_frag->i_buffer );
         ParseVOL( p_dec, &p_dec->fmt_out,
                   p_dec->fmt_out.p_extra, p_dec->fmt_out.i_extra );
 
@@ -367,8 +372,10 @@ static int ParseVOL( decoder_t *p_dec, es_format_t *fmt,
         if( i_vol <= 5 )
             return VLC_EGENERIC;
 
-        if( p_vol[0] == 0x00 && p_vol[1] == 0x00 && p_vol[2] == 0x01 &&
-            p_vol[3] >= 0x20 && p_vol[3] <= 0x2f ) break;
+        uint32_t i_startcode = GetDWBE( p_vol );
+        if( i_startcode >= VIDEO_OBJECT_LAYER_START_CODE &&
+            i_startcode < RESERVED_START_CODE )
+            break;
 
         p_vol++; i_vol--;
     }

@@ -833,11 +833,11 @@ modules/gui/qt/player/qml/ResumeDialog.qml
 modules/gui/qt/player/qml/TeletextWidget.qml
 modules/gui/qt/player/qml/TopBar.qml
 modules/gui/qt/player/qml/VolumeWidget.qml
-modules/gui/qt/playlist/qml/PLItem.qml
+modules/gui/qt/playlist/qml/PlaylistDelegate.qml
 modules/gui/qt/playlist/qml/PlaylistDetachedWindow.qml
 modules/gui/qt/playlist/qml/PlaylistListView.qml
+modules/gui/qt/playlist/qml/PlaylistOverlayMenu.qml
 modules/gui/qt/playlist/qml/PlaylistToolbar.qml
-modules/gui/qt/widgets/qml/DNDLabel.qml
 modules/gui/qt/widgets/qml/DragItem.qml
 modules/gui/qt/widgets/qml/ListItem.qml
 modules/gui/qt/widgets/qml/SearchBox.qml
@@ -1098,7 +1098,7 @@ modules/misc/inhibit/dbus.c
 modules/misc/inhibit/iokit-inhibit.c
 modules/misc/inhibit/wl-idle-inhibit.c
 modules/misc/inhibit/xdg.c
-modules/misc/medialibrary/medialib.cpp
+modules/misc/medialibrary/medialibrary.cpp
 modules/misc/playlist/export.c
 modules/misc/playlist/html.c
 modules/misc/playlist/m3u.c
@@ -1252,7 +1252,7 @@ modules/video_filter/opencv_wrapper.c
 modules/video_filter/posterize.c
 modules/video_filter/postproc.c
 modules/video_filter/psychedelic.c
-modules/video_filter/puzzle.c
+modules/video_filter/puzzle/puzzle.c
 modules/video_filter/ripple.c
 modules/video_filter/rotate.c
 modules/video_filter/scale.c
@@ -1268,7 +1268,6 @@ modules/video_output/caopengllayer.m
 modules/video_output/decklink.cpp
 modules/video_output/fb.c
 modules/video_output/glx.c
-modules/video_output/ios.m
 modules/video_output/kva.c
 modules/video_output/macosx.m
 modules/video_output/opengl/display.c

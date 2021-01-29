@@ -162,8 +162,6 @@ static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
         sys->vgl = NULL;
         sys->gl = NULL;
 
-        var_Create(vlc_object_parent(vd), "macosx-glcontext", VLC_VAR_ADDRESS);
-
         /* Get the drawable object */
         id container = var_CreateGetAddress (vd, "drawable-nsobject");
         if (!container) {
@@ -229,9 +227,7 @@ static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
         sys->gl->release_current = OpenglUnlock;
         sys->gl->swap = OpenglSwap;
         sys->gl->get_proc_address = OurGetProcAddress;
-
-        var_SetAddress(vlc_object_parent(vd), "macosx-glcontext",
-                       [[sys->glView openGLContext] CGLContextObj]);
+        sys->gl->api_type = VLC_OPENGL;
 
         const vlc_fourcc_t *subpicture_chromas;
 
@@ -273,7 +269,6 @@ static void Close(vout_display_t *vd)
         [sys->glView setVoutDisplay:nil];
 
         var_Destroy (vd, "drawable-nsobject");
-        var_Destroy(vlc_object_parent(vd), "macosx-glcontext");
 
         if (sys->vgl != NULL)
         {

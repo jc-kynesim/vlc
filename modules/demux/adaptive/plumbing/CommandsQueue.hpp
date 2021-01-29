@@ -28,15 +28,15 @@
 
 namespace adaptive
 {
-    class FakeESOut;
-    class FakeESOutID;
+    class AbstractFakeEsOut;
+    class AbstractFakeESOutID;
 
     class AbstractCommand
     {
         friend class CommandsFactory;
         public:
             virtual ~AbstractCommand();
-            virtual void Execute( es_out_t * ) = 0;
+            virtual void Execute( ) = 0;
             virtual vlc_tick_t getTime() const;
             int getType() const;
 
@@ -48,8 +48,8 @@ namespace adaptive
     class AbstractFakeEsCommand : public AbstractCommand
     {
         protected:
-            AbstractFakeEsCommand( int, FakeESOutID * );
-            FakeESOutID *p_fakeid;
+            AbstractFakeEsCommand( int, AbstractFakeESOutID * );
+            AbstractFakeESOutID *p_fakeid;
     };
 
     class EsOutSendCommand : public AbstractFakeEsCommand
@@ -57,12 +57,12 @@ namespace adaptive
         friend class CommandsFactory;
         public:
             virtual ~EsOutSendCommand();
-            virtual void Execute( es_out_t *out );
-            virtual vlc_tick_t getTime() const;
+            virtual void Execute( ) override;
+            virtual vlc_tick_t getTime() const override;
             const void * esIdentifier() const;
 
         protected:
-            EsOutSendCommand( FakeESOutID *, block_t * );
+            EsOutSendCommand( AbstractFakeESOutID *, block_t * );
             block_t *p_block;
     };
 
@@ -70,10 +70,10 @@ namespace adaptive
     {
         friend class CommandsFactory;
         public:
-            virtual void Execute( es_out_t *out );
+            virtual void Execute() override;
 
         protected:
-            EsOutDelCommand( FakeESOutID * );
+            EsOutDelCommand( AbstractFakeESOutID * );
     };
 
     class EsOutAddCommand : public AbstractFakeEsCommand
@@ -81,18 +81,18 @@ namespace adaptive
         friend class CommandsFactory;
         public:
             virtual ~EsOutAddCommand();
-            virtual void Execute( es_out_t *out );
+            virtual void Execute() override;
 
         protected:
-            EsOutAddCommand( FakeESOutID * );
+            EsOutAddCommand( AbstractFakeESOutID * );
     };
 
     class EsOutControlPCRCommand : public AbstractCommand
     {
         friend class CommandsFactory;
         public:
-            virtual void Execute( es_out_t *out );
-            virtual vlc_tick_t getTime() const;
+            virtual void Execute() override;
+            virtual vlc_tick_t getTime() const override;
 
         protected:
             EsOutControlPCRCommand( int, vlc_tick_t );
@@ -104,7 +104,7 @@ namespace adaptive
     {
         friend class CommandsFactory;
         public:
-            virtual void Execute( es_out_t *out );
+            virtual void Execute() override;
 
         protected:
             EsOutDestroyCommand();
@@ -114,7 +114,7 @@ namespace adaptive
     {
         friend class CommandsFactory;
         public:
-            virtual void Execute( es_out_t *out );
+            virtual void Execute() override;
 
         protected:
             EsOutControlResetPCRCommand();
@@ -124,11 +124,12 @@ namespace adaptive
     {
         friend class CommandsFactory;
         public:
-            virtual void Execute( es_out_t *out );
+            virtual void Execute() override;
 
         protected:
-            EsOutMetaCommand( int, vlc_meta_t * );
+            EsOutMetaCommand( AbstractFakeEsOut *, int, vlc_meta_t * );
             virtual ~EsOutMetaCommand();
+            AbstractFakeEsOut *out;
             int group;
             vlc_meta_t *p_meta;
     };
@@ -138,14 +139,16 @@ namespace adaptive
     {
         public:
             virtual ~CommandsFactory() {}
-            virtual EsOutSendCommand * createEsOutSendCommand( FakeESOutID *, block_t * ) const;
-            virtual EsOutDelCommand * createEsOutDelCommand( FakeESOutID * ) const;
-            virtual EsOutAddCommand * createEsOutAddCommand( FakeESOutID * ) const;
+            virtual EsOutSendCommand * createEsOutSendCommand( AbstractFakeESOutID *, block_t * ) const;
+            virtual EsOutDelCommand * createEsOutDelCommand( AbstractFakeESOutID * ) const;
+            virtual EsOutAddCommand * createEsOutAddCommand( AbstractFakeESOutID * ) const;
             virtual EsOutControlPCRCommand * createEsOutControlPCRCommand( int, vlc_tick_t ) const;
             virtual EsOutControlResetPCRCommand * creatEsOutControlResetPCRCommand() const;
             virtual EsOutDestroyCommand * createEsOutDestroyCommand() const;
-            virtual EsOutMetaCommand * createEsOutMetaCommand( int, const vlc_meta_t * ) const;
+            virtual EsOutMetaCommand * createEsOutMetaCommand( AbstractFakeEsOut *, int, const vlc_meta_t * ) const;
     };
+
+    using Queueentry = std::pair<uint64_t, AbstractCommand *>;
 
     /* Queuing for doing all the stuff in order */
     class CommandsQueue
@@ -155,7 +158,7 @@ namespace adaptive
             ~CommandsQueue();
             const CommandsFactory * factory() const;
             void Schedule( AbstractCommand * );
-            vlc_tick_t Process( es_out_t *out, vlc_tick_t );
+            vlc_tick_t Process( vlc_tick_t );
             void Abort( bool b_reset );
             void Commit();
             bool isEmpty() const;
@@ -173,13 +176,14 @@ namespace adaptive
             CommandsFactory *commandsFactory;
             void LockedCommit();
             void LockedSetDraining();
-            std::list<AbstractCommand *> incoming;
-            std::list<AbstractCommand *> commands;
+            std::list<Queueentry> incoming;
+            std::list<Queueentry> commands;
             vlc_tick_t bufferinglevel;
             vlc_tick_t pcr;
             bool b_draining;
             bool b_drop;
             bool b_eof;
+            uint64_t nextsequence;
     };
 }
 

@@ -28,7 +28,7 @@
 
 #include "../adaptive/SharedResources.hpp"
 #include "../adaptive/tools/Retrieve.hpp"
-#include "playlist/Parser.hpp"
+#include "playlist/SmoothParser.hpp"
 #include "../adaptive/xml/DOMParser.h"
 #include <vlc_stream.h>
 #include <vlc_demux.h>
@@ -119,19 +119,7 @@ void SmoothManager::scheduleNextUpdate()
 {
     time_t now = time(nullptr);
 
-    vlc_tick_t minbuffer = 0;
-    std::vector<AbstractStream *>::const_iterator it;
-    for(it=streams.begin(); it!=streams.end(); ++it)
-    {
-        const AbstractStream *st = *it;
-        if(!st->isValid() || st->isDisabled() || !st->isSelected())
-            continue;
-        const vlc_tick_t m = st->getMinAheadTime();
-        if(m > 0 && (m < minbuffer || minbuffer == 0))
-            minbuffer = m;
-    }
-
-    minbuffer /= 2;
+    vlc_tick_t minbuffer = getMinAheadTime() / 2;
 
     if(playlist->minUpdatePeriod.Get() > minbuffer)
         minbuffer = playlist->minUpdatePeriod.Get();

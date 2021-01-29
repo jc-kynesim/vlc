@@ -286,6 +286,7 @@ static const struct vlc_playlist_callbacks playlist_callbacks = {
 PlaylistControllerModelPrivate::PlaylistControllerModelPrivate(PlaylistControllerModel* playlistController)
     : q_ptr(playlistController)
 {
+    fillSortKeyTitleList();
 }
 
 PlaylistControllerModelPrivate::~PlaylistControllerModelPrivate()
@@ -461,6 +462,24 @@ void PlaylistControllerModel::sort(PlaylistControllerModel::SortKey key, Playlis
     if(key != SortKey::SORT_KEY_NONE)
         setSortKey(key);
     setSortOrder(order);
+
+    sort();
+}
+
+void PlaylistControllerModel::sort(PlaylistControllerModel::SortKey key)
+{
+    if (key == SortKey::SORT_KEY_NONE)
+        return;
+
+    if (getSortKey() != key)
+    {
+        setSortOrder(SortOrder::SORT_ORDER_ASC);
+        setSortKey(key);
+    }
+    else
+    {
+        switchSortOrder();
+    }
 
     sort();
 }
@@ -787,6 +806,13 @@ bool PlaylistControllerModel::hasPrev() const
 {
     Q_D(const PlaylistControllerModel);
     return d->m_hasPrev;
+}
+
+QVariantList PlaylistControllerModel::getSortKeyTitleList() const
+{
+    Q_D(const PlaylistControllerModel);
+
+    return d->sortKeyTitleList;
 }
 
 

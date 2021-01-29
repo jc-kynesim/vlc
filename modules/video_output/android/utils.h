@@ -76,6 +76,9 @@ struct android_video_context_t
     void *dec_opaque;
     bool (*render)(struct picture_context_t *ctx);
     bool (*render_ts)(struct picture_context_t *ctx, vlc_tick_t ts);
+
+    struct vlc_asurfacetexture *
+        (*get_texture)(struct picture_context_t *ctx);
 };
 
 struct vlc_asurfacetexture
@@ -104,6 +107,9 @@ struct vlc_asurfacetexture_operations
             struct vlc_asurfacetexture *surface,
             const float **pp_transform_mtx);
 
+    void (*release_tex_image)(
+            struct vlc_asurfacetexture *st);
+
     void (*destroy)(
             struct vlc_asurfacetexture *surface);
 };
@@ -125,7 +131,7 @@ JNIEnv *android_getEnv(vlc_object_t *p_obj, const char *psz_thread_name);
  * \return a valid AWindowHandler * or NULL. It must be released with
  * AWindowHandler_destroy.
  */
-AWindowHandler *AWindowHandler_new(vout_window_t *wnd, awh_events_t *p_events);
+AWindowHandler *AWindowHandler_new(vlc_object_t *obj, vout_window_t *wnd, awh_events_t *p_events);
 void AWindowHandler_destroy(AWindowHandler *p_awh);
 
 /**
@@ -197,7 +203,7 @@ SurfaceTexture_detachFromGLContext(struct vlc_asurfacetexture *st);
  * See Android SurfaceTexture
  */
 struct vlc_asurfacetexture *
-vlc_asurfacetexture_New(AWindowHandler *p_awh);
+vlc_asurfacetexture_New(AWindowHandler *p_awh, bool single_buffer);
 
 /**
  * Delete a SurfaceTexture object created with SurfaceTexture_New.
@@ -219,3 +225,6 @@ vlc_asurfacetexture_Delete(struct vlc_asurfacetexture *st)
  */
 int
 SurfaceTexture_updateTexImage(struct vlc_asurfacetexture *st, const float **pp_transform_mtx);
+
+void
+SurfaceTexture_releaseTexImage(struct vlc_asurfacetexture *st);

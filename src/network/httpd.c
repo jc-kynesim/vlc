@@ -96,6 +96,7 @@ struct httpd_host_t
 
     size_t client_count;
     struct vlc_list clients;
+    unsigned timeout_sec;
 
     /* TLS data */
     vlc_tls_server_t *p_tls;
@@ -146,8 +147,7 @@ struct httpd_client_t
     bool    b_stream_mode;
     uint8_t i_state;
 
-    vlc_tick_t i_activity_date;
-    vlc_tick_t i_activity_timeout;
+    vlc_tick_t i_timeout_date;
 
     /* buffer for reading header */
     int     i_buffer_size;
@@ -882,12 +882,13 @@ void httpd_StreamDelete(httpd_stream_t *stream)
  *****************************************************************************/
 static void* httpd_HostThread(void *);
 static httpd_host_t *httpd_HostCreate(vlc_object_t *, const char *,
-                                       const char *, vlc_tls_server_t *);
+                                      const char *, vlc_tls_server_t *,
+                                      unsigned);
 
 /* create a new host */
 httpd_host_t *vlc_http_HostNew(vlc_object_t *p_this)
 {
-    return httpd_HostCreate(p_this, "http-host", "http-port", NULL);
+    return httpd_HostCreate(p_this, "http-host", "http-port", NULL, 10);
 }
 
 httpd_host_t *vlc_https_HostNew(vlc_object_t *obj)
@@ -911,12 +912,13 @@ httpd_host_t *vlc_https_HostNew(vlc_object_t *obj)
     free(key);
     free(cert);
 
-    return httpd_HostCreate(obj, "http-host", "https-port", tls);
+    return httpd_HostCreate(obj, "http-host", "https-port", tls, 10);
 }
 
 httpd_host_t *vlc_rtsp_HostNew(vlc_object_t *p_this)
 {
-    return httpd_HostCreate(p_this, "rtsp-host", "rtsp-port", NULL);
+    unsigned timeout = var_InheritInteger(p_this, "rtsp-timeout");
+    return httpd_HostCreate(p_this, "rtsp-host", "rtsp-port", NULL, timeout);
 }
 
 static struct httpd
@@ -928,7 +930,8 @@ static struct httpd
 static httpd_host_t *httpd_HostCreate(vlc_object_t *p_this,
                                        const char *hostvar,
                                        const char *portvar,
-                                       vlc_tls_server_t *p_tls)
+                                       vlc_tls_server_t *p_tls,
+                                       unsigned timeout_sec)
 {
     httpd_host_t *host;
     unsigned port = var_InheritInteger(p_this, portvar);
@@ -975,6 +978,7 @@ static httpd_host_t *httpd_HostCreate(vlc_object_t *p_this,
     vlc_list_init(&host->urls);
     host->client_count = 0;
     vlc_list_init(&host->clients);
+    host->timeout_sec = timeout_sec;
     host->p_tls    = p_tls;
 
     /* create the thread */
@@ -1201,21 +1205,6 @@ void httpd_MsgAdd(httpd_message_t *msg, const char *name, const char *psz_value,
     msg->i_headers++;
 }
 
-static void httpd_ClientInit(httpd_client_t *cl, vlc_tick_t now)
-{
-    cl->i_state = HTTPD_CLIENT_RECEIVING;
-    cl->i_activity_date = now;
-    cl->i_activity_timeout = VLC_TICK_FROM_SEC(10);
-    cl->i_buffer_size = HTTPD_CL_BUFSIZE;
-    cl->i_buffer = 0;
-    cl->p_buffer = xmalloc(cl->i_buffer_size);
-    cl->i_keyframe_wait_to_pass = -1;
-    cl->b_stream_mode = false;
-
-    httpd_MsgInit(&cl->query);
-    httpd_MsgInit(&cl->answer);
-}
-
 char* httpd_ClientIP(const httpd_client_t *cl, char *ip, int *port)
 {
     return net_GetPeerAddress(vlc_tls_GetFD(cl->sock), ip, port) ? NULL : ip;
@@ -1237,7 +1226,7 @@ static void httpd_ClientDestroy(httpd_client_t *cl)
     free(cl);
 }
 
-static httpd_client_t *httpd_ClientNew(vlc_tls_t *sock, vlc_tick_t now)
+static httpd_client_t *httpd_ClientNew(vlc_tls_t *sock)
 {
     httpd_client_t *cl = malloc(sizeof(httpd_client_t));
 
@@ -1245,8 +1234,15 @@ static httpd_client_t *httpd_ClientNew(vlc_tls_t *sock, vlc_tick_t now)
 
     cl->sock    = sock;
     cl->url     = NULL;
+    cl->i_state = HTTPD_CLIENT_RECEIVING;
+    cl->i_buffer_size = HTTPD_CL_BUFSIZE;
+    cl->i_buffer = 0;
+    cl->p_buffer = xmalloc(cl->i_buffer_size);
+    cl->i_keyframe_wait_to_pass = -1;
+    cl->b_stream_mode = false;
 
-    httpd_ClientInit(cl, now);
+    httpd_MsgInit(&cl->query);
+    httpd_MsgInit(&cl->answer);
     return cl;
 }
 
@@ -1571,10 +1567,6 @@ static int httpd_ClientRecv(httpd_client_t *cl)
         return 0;
     }
 
-    /* XXX: for QT I have to disable timeout. Try to find why */
-    if (cl->query.i_proto == HTTPD_PROTO_RTSP)
-        cl->i_activity_timeout = 0;
-
     return 0;
 }
 
@@ -1744,15 +1736,14 @@ static void httpdLoop(httpd_host_t *host)
         }
 
         if (cl->i_state == HTTPD_CLIENT_DEAD
-         || (cl->i_activity_timeout > 0
-          && cl->i_activity_date + cl->i_activity_timeout < now)) {
+         || (host->timeout_sec > 0 && cl->i_timeout_date < now)) {
             host->client_count--;
             httpd_ClientDestroy(cl);
             continue;
         }
 
         if (val == 0) {
-            cl->i_activity_date = now;
+            cl->i_timeout_date = now + VLC_TICK_FROM_SEC(host->timeout_sec);
             delay = 0;
         }
 
@@ -2042,11 +2033,18 @@ static void httpdLoop(httpd_host_t *host)
             sk = tls;
         }
 
-        cl = httpd_ClientNew(sk, now);
+        cl = httpd_ClientNew(sk);
+
+        if (unlikely(cl == NULL))
+        {
+            vlc_tls_Close(sk);
+            continue;
+        }
 
         if (host->p_tls != NULL)
             cl->i_state = HTTPD_CLIENT_TLS_HS_OUT;
 
+        cl->i_timeout_date = now + VLC_TICK_FROM_SEC(host->timeout_sec);
         host->client_count++;
         vlc_list_append(&cl->node, &host->clients);
     }

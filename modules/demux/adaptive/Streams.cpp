@@ -141,6 +141,37 @@ void AbstractStream::prepareRestart(bool b_discontinuity)
     }
 }
 
+bool AbstractStream::resetForNewPosition(vlc_tick_t seekMediaTime)
+{
+    // clear eof flag before restartDemux() to prevent readNextBlock() fail
+    eof = false;
+    demuxfirstchunk = true;
+    notfound_sequence = 0;
+    if(!demuxer || demuxer->needsRestartOnSeek()) /* needs (re)start */
+    {
+        delete currentChunk;
+        currentChunk = nullptr;
+        needrestart = false;
+
+        fakeEsOut()->resetTimestamps();
+
+        fakeEsOut()->setExpectedTimestamp(seekMediaTime);
+        if( !restartDemux() )
+        {
+            msg_Info(p_realdemux, "Restart demux failed");
+            eof = true;
+            valid = false;
+            return false;
+        }
+        else
+        {
+            fakeEsOut()->commandsQueue()->setEOF(false);
+        }
+    }
+    else fakeEsOut()->commandsQueue()->Abort( true );
+    return true;
+}
+
 void AbstractStream::setLanguage(const std::string &lang)
 {
     language = lang;
@@ -284,6 +315,16 @@ bool AbstractStream::isDisabled() const
 {
     vlc_mutex_locker locker(&lock);
     return disabled;
+}
+
+void AbstractStream::setLivePause(bool b)
+{
+    vlc_mutex_locker locker(&lock);
+    if(!b)
+    {
+        segmentTracker->setPosition(segmentTracker->getStartPosition(),
+                                    !demuxer || demuxer->needsRestartOnSeek());
+    }
 }
 
 bool AbstractStream::decodersDrained()
@@ -434,7 +475,7 @@ AbstractStream::Status AbstractStream::dequeue(vlc_tick_t nz_deadline, vlc_tick_
                  msg_Dbg(p_realdemux, "Stream %s pcr %" PRId64 " dts %" PRId64 " deadline %" PRId64 " [DRAINING]",
                          description.c_str(), pcrvalue, dtsvalue, nz_deadline));
 
-        *pi_pcr = fakeEsOut()->commandsQueue()->Process(p_realdemux->out, VLC_TICK_0 + nz_deadline);
+        *pi_pcr = fakeEsOut()->commandsQueue()->Process(VLC_TICK_0 + nz_deadline);
         if(!fakeEsOut()->commandsQueue()->isEmpty())
             return Status::Demuxed;
 
@@ -460,7 +501,7 @@ AbstractStream::Status AbstractStream::dequeue(vlc_tick_t nz_deadline, vlc_tick_
 
     if(nz_deadline + VLC_TICK_0 <= bufferingLevel) /* demuxed */
     {
-        *pi_pcr = fakeEsOut()->commandsQueue()->Process( p_realdemux->out, VLC_TICK_0 + nz_deadline );
+        *pi_pcr = fakeEsOut()->commandsQueue()->Process( VLC_TICK_0 + nz_deadline );
         return Status::Demuxed;
     }
 
@@ -545,35 +586,6 @@ bool AbstractStream::setPosition(vlc_tick_t time, bool tryonly)
     bool ret = segmentTracker->setPositionByTime(time, b_needs_restart, tryonly);
     if(!tryonly && ret)
     {
-        // clear eof flag before restartDemux() to prevent readNextBlock() fail
-        eof = false;
-        demuxfirstchunk = true;
-        notfound_sequence = 0;
-        if(b_needs_restart)
-        {
-            if(currentChunk)
-                delete currentChunk;
-            currentChunk = nullptr;
-            needrestart = false;
-
-            fakeEsOut()->resetTimestamps();
-
-            vlc_tick_t seekMediaTime = segmentTracker->getPlaybackTime(true);
-            fakeEsOut()->setExpectedTimestamp(seekMediaTime);
-            if( !restartDemux() )
-            {
-                msg_Info(p_realdemux, "Restart demux failed");
-                eof = true;
-                valid = false;
-                ret = false;
-            }
-            else
-            {
-                fakeEsOut()->commandsQueue()->setEOF(false);
-            }
-        }
-        else fakeEsOut()->commandsQueue()->Abort( true );
-
 // in some cases, media time seek != sent dts
 //        es_out_Control(p_realdemux->out, ES_OUT_SET_NEXT_DISPLAY_TIME,
 //                       VLC_TICK_0 + time);
@@ -639,49 +651,61 @@ AbstractDemuxer *AbstractStream::newDemux(vlc_object_t *p_obj, const StreamForma
     return ret;
 }
 
-void AbstractStream::trackerEvent(const SegmentTrackerEvent &event)
+void AbstractStream::trackerEvent(const TrackerEvent &ev)
 {
-    switch(event.type)
+    switch(ev.getType())
     {
-        case SegmentTrackerEvent::Type::Discontinuity:
+        case TrackerEvent::Type::Discontinuity:
             discontinuity = true;
             break;
 
-        case SegmentTrackerEvent::Type::FormatChange:
+        case TrackerEvent::Type::FormatChange:
+        {
+            const FormatChangedEvent &event =
+                    static_cast<const FormatChangedEvent &>(ev);
             /* Check if our current demux is still valid */
-            if(*event.u.format.f != format || format == StreamFormat(StreamFormat::UNKNOWN))
+            if(*event.format != format || format == StreamFormat(StreamFormat::UNKNOWN))
             {
                 /* Format has changed between segments, we need to drain and change demux */
                 msg_Info(p_realdemux, "Changing stream format %s -> %s",
-                         format.str().c_str(), event.u.format.f->str().c_str());
-                format = *event.u.format.f;
+                         format.str().c_str(), event.format->str().c_str());
+                format = *event.format;
 
                 /* This is an implict discontinuity */
                 discontinuity = true;
             }
+        }
             break;
 
-        case SegmentTrackerEvent::Type::RepresentationSwitch:
+        case TrackerEvent::Type::RepresentationSwitch:
+        {
+            const RepresentationSwitchEvent &event =
+                    static_cast<const RepresentationSwitchEvent &>(ev);
             if(demuxer && !inrestart)
             {
                 if(!demuxer->bitstreamSwitchCompatible() ||
-                   (event.u.switching.next &&
-                   !event.u.switching.next->getAdaptationSet()->isBitSwitchable()))
+                   (event.next &&
+                   !event.next->getAdaptationSet()->isBitSwitchable()))
                     needrestart = true;
             }
             AdvDebug(msg_Dbg(p_realdemux, "Stream %s switching %s %s to %s %s",
                     description.c_str(),
-                    event.u.switching.prev ? event.u.switching.prev->getID().str().c_str() : "",
-                    event.u.switching.prev ? event.u.switching.prev->getStreamFormat().str().c_str() : "",
-                    event.u.switching.next ? event.u.switching.next->getID().str().c_str() : "",
-                    event.u.switching.next ? event.u.switching.next->getStreamFormat().str().c_str() : ""));
+                    event.prev ? event.prev->getID().str().c_str() : "",
+                    event.prev ? event.prev->getStreamFormat().str().c_str() : "",
+                    event.next ? event.next->getID().str().c_str() : "",
+                    event.next ? event.next->getStreamFormat().str().c_str() : ""));
+        }
             break;
 
-        case SegmentTrackerEvent::Type::SegmentChange:
+        case TrackerEvent::Type::SegmentChange:
             if(demuxer && demuxer->needsRestartOnEachSegment() && !inrestart)
             {
                 needrestart = true;
             }
+            break;
+
+        case TrackerEvent::Type::PositionChange:
+            resetForNewPosition(segmentTracker->getPlaybackTime(true));
             break;
 
         default:

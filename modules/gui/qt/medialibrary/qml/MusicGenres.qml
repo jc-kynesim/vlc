@@ -72,11 +72,6 @@ Widgets.NavigableFocusScope {
             view.currentItem.positionViewAtIndex(initialIndex, ItemView.Contain)
     }
 
-    Connections {
-        target: medialib
-        onGridViewChanged: loadView()
-    }
-
     MLGenreModel {
         id: genreModel
         ml: medialib
@@ -190,7 +185,7 @@ Widgets.NavigableFocusScope {
                              elide: Text.ElideRight
                              font.pixelSize: VLCStyle.fontSize_large
                              font.weight: Font.DemiBold
-                             text: model.name
+                             text: model.name || i18n.qtr("Unknown genre")
                              color: "white"
                              horizontalAlignment: Text.AlignHCenter
                         }
@@ -281,5 +276,14 @@ Widgets.NavigableFocusScope {
                 view.replace(tableComponent)
             }
         }
+    }
+
+    EmptyLabel {
+        anchors.fill: parent
+        visible: genreModel.count === 0
+        focus: genreModel.count === 0
+        text: i18n.qtr("No genres found\nPlease try adding sources, by going to the Network tab")
+        navigationParent: root
+        cover: VLCStyle.noArtAlbumCover
     }
 }

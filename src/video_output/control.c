@@ -30,13 +30,6 @@
 #include "control.h"
 
 /* */
-void vout_control_cmd_Init(vout_control_cmd_t *cmd, int type)
-{
-    memset(cmd, 0, sizeof(*cmd));
-    cmd->type = type;
-}
-
-/* */
 void vout_control_Init(vout_control_t *ctrl)
 {
     vlc_mutex_init(&ctrl->lock);
@@ -45,8 +38,7 @@ void vout_control_Init(vout_control_t *ctrl)
 
     ctrl->is_held = false;
     ctrl->is_waiting = false;
-    ctrl->is_dead = false;
-    ctrl->can_sleep = true;
+    ctrl->forced_awake = false;
     ARRAY_INIT(ctrl->cmd);
 }
 
@@ -56,37 +48,20 @@ void vout_control_Clean(vout_control_t *ctrl)
     ARRAY_RESET(ctrl->cmd);
 }
 
-void vout_control_Dead(vout_control_t *ctrl)
+void vout_control_PushMouse(vout_control_t *ctrl, const vlc_mouse_t *video_mouse)
 {
     vlc_mutex_lock(&ctrl->lock);
-    ctrl->is_dead = true;
-    vlc_mutex_unlock(&ctrl->lock);
-}
-
-void vout_control_Push(vout_control_t *ctrl, vout_control_cmd_t *cmd)
-{
-    vlc_mutex_lock(&ctrl->lock);
-    if (!ctrl->is_dead) {
-        ARRAY_APPEND(ctrl->cmd, *cmd);
-        vlc_cond_signal(&ctrl->wait_request);
-    }
+    ARRAY_APPEND(ctrl->cmd, *video_mouse);
+    vlc_cond_signal(&ctrl->wait_request);
     vlc_mutex_unlock(&ctrl->lock);
 }
 
 void vout_control_Wake(vout_control_t *ctrl)
 {
     vlc_mutex_lock(&ctrl->lock);
-    ctrl->can_sleep = false;
+    ctrl->forced_awake = true;
     vlc_cond_signal(&ctrl->wait_request);
     vlc_mutex_unlock(&ctrl->lock);
-}
-
-void vout_control_PushVoid(vout_control_t *ctrl, int type)
-{
-    vout_control_cmd_t cmd;
-
-    vout_control_cmd_Init(&cmd, type);
-    vout_control_Push(ctrl, &cmd);
 }
 
 void vout_control_Hold(vout_control_t *ctrl)
@@ -107,14 +82,14 @@ void vout_control_Release(vout_control_t *ctrl)
     vlc_mutex_unlock(&ctrl->lock);
 }
 
-int vout_control_Pop(vout_control_t *ctrl, vout_control_cmd_t *cmd,
-                     vlc_tick_t deadline)
+int vout_control_Pop(vout_control_t *ctrl, vlc_mouse_t *mouse, vlc_tick_t deadline)
 {
+    bool has_cmd = false;
     vlc_mutex_lock(&ctrl->lock);
 
     if (ctrl->cmd.i_size <= 0) {
         /* Spurious wakeups are perfectly fine */
-        if (deadline != VLC_TICK_INVALID && ctrl->can_sleep) {
+        if (deadline != VLC_TICK_INVALID && !ctrl->forced_awake) {
             ctrl->is_waiting = true;
             vlc_cond_signal(&ctrl->wait_available);
             vlc_cond_timedwait(&ctrl->wait_request, &ctrl->lock, deadline);
@@ -125,14 +100,15 @@ int vout_control_Pop(vout_control_t *ctrl, vout_control_cmd_t *cmd,
     while (ctrl->is_held)
         vlc_cond_wait(&ctrl->wait_available, &ctrl->lock);
 
-    bool has_cmd;
     if (ctrl->cmd.i_size > 0) {
         has_cmd = true;
-        *cmd = ARRAY_VAL(ctrl->cmd, 0);
+        *mouse = ARRAY_VAL(ctrl->cmd, 0);
         ARRAY_REMOVE(ctrl->cmd, 0);
+        // keep forced_awake set, if it is, so we report all mouse states we have
+        // after we were awaken when a new picture has been pushed by the decoder
+        // see vout_control_Wake
     } else {
-        has_cmd = false;
-        ctrl->can_sleep = true;
+        ctrl->forced_awake = false;
     }
     vlc_mutex_unlock(&ctrl->lock);
 

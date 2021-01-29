@@ -374,6 +374,16 @@ bool PlaylistManager::setPosition(vlc_tick_t time)
     return ret;
 }
 
+void PlaylistManager::setLivePause(bool b)
+{
+    if(!started())
+        return;
+
+    for(AbstractStream* st : streams)
+        if(st->isValid() && !st->isDisabled())
+            st->setLivePause(b);
+}
+
 bool PlaylistManager::needsUpdate() const
 {
     return playlist->needsUpdates() &&
@@ -403,6 +413,21 @@ vlc_tick_t PlaylistManager::getCurrentDemuxTime() const
 {
     vlc_mutex_locker locker(&demux.lock);
     return demux.i_nzpcr;
+}
+
+vlc_tick_t PlaylistManager::getMinAheadTime() const
+{
+    vlc_tick_t minbuffer = 0;
+    std::for_each(streams.cbegin(), streams.cend(),
+        [&minbuffer](const AbstractStream *st) {
+            if(st->isValid() && !st->isDisabled() && st->isSelected())
+            {
+                const vlc_tick_t m = st->getMinAheadTime();
+                if(m > 0 && (m < minbuffer || minbuffer == 0))
+                    minbuffer = m;
+            }
+        });
+    return minbuffer;
 }
 
 bool PlaylistManager::reactivateStream(AbstractStream *stream)
@@ -526,7 +551,29 @@ int PlaylistManager::doControl(int i_query, va_list args)
         case DEMUX_SET_PAUSE_STATE:
         {
             vlc_mutex_locker locker(&cached.lock);
-            return cached.b_live ? VLC_EGENERIC : VLC_SUCCESS;
+            bool b_pause = (bool)va_arg(args, int);
+            if(playlist->isLive())
+            {
+                setBufferingRunState(false); /* stop downloader first */
+                vlc_tick_t now = vlc_tick_now();
+                if(b_pause)
+                {
+                    setLivePause(true);
+                    pause_start = now;
+                    msg_Dbg(p_demux,"Buffering and playback paused. No timeshift support.");
+                }
+                else
+                {
+                    setLivePause(false);
+                    msg_Dbg(p_demux,"Resuming buffering/playback after %" PRId64 "ms",
+                            MS_FROM_VLC_TICK(now-pause_start));
+                    es_out_Control(p_demux->out, ES_OUT_RESET_PCR);
+                }
+                setBufferingRunState(true);
+                demux.i_nzpcr = VLC_TICK_INVALID;
+                cached.lastupdate = 0;
+            }
+            return VLC_SUCCESS;
         }
 
         case DEMUX_GET_TIME:

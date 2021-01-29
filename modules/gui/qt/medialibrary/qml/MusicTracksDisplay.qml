@@ -28,6 +28,7 @@ Widgets.NavigableFocusScope {
     property alias sortModel: tracklistdisplay_id.sortModel
     property alias model: tracklistdisplay_id.model
     property alias selectionModel: tracklistdisplay_id.selectionDelegateModel
+    readonly property bool isViewMultiView: false
 
     Widgets.DragItem {
         id: trackDragItem
@@ -54,7 +55,7 @@ Widgets.NavigableFocusScope {
         id: tracklistdisplay_id
         anchors.fill: parent
         visible: model.count > 0
-        focus: visible
+        focus: model.count > 0
         dragItem: trackDragItem
         headerTopPadding: VLCStyle.margin_normal
         navigationParent: root
@@ -64,6 +65,7 @@ Widgets.NavigableFocusScope {
             else
                 tracklistdisplay_id.currentIndex = 0;
         }
+        listScrollBar.bottomPadding: footerItem.height
         footer: MainInterface.MiniPlayerBottomMargin {
         }
     }
@@ -71,8 +73,9 @@ Widgets.NavigableFocusScope {
     EmptyLabel {
         anchors.fill: parent
         visible: tracklistdisplay_id.model.count === 0
-        focus: visible
+        focus: tracklistdisplay_id.model.count === 0
         text: i18n.qtr("No tracks found\nPlease try adding sources, by going to the Network tab")
         navigationParent: root
+        cover: VLCStyle.noArtAlbumCover
     }
 }

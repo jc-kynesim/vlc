@@ -35,6 +35,10 @@ Widgets.NavigableFocusScope {
     property var initialIndex: 0
 
     property alias contentModel: videoModel
+    property var sortModel: [
+        { text: i18n.qtr("Alphabetic"),  criteria: "title"},
+        { text: i18n.qtr("Duration"),    criteria: "duration_short" }
+    ]
 
     navigationCancel: function() {
         if (view.currentItem.currentIndex <= 0) {
@@ -282,5 +286,8 @@ Widgets.NavigableFocusScope {
         focus: visible
         text: i18n.qtr("No video found\nPlease try adding sources, by going to the Network tab")
         navigationParent: root
+        cover: VLCStyle.noArtVideoCover
+        coverWidth: VLCStyle.dp(182, VLCStyle.scale)
+        coverHeight: VLCStyle.dp(114, VLCStyle.scale)
     }
 }

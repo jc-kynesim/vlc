@@ -76,6 +76,7 @@ namespace adaptive
             virtual int doControl(int, va_list);
             virtual int doDemux(vlc_tick_t);
 
+            void    setLivePause(bool);
             virtual bool    setPosition(vlc_tick_t);
             vlc_tick_t getResumeTime() const;
             vlc_tick_t getFirstDTS() const;
@@ -83,6 +84,7 @@ namespace adaptive
 
             virtual vlc_tick_t getFirstPlaybackTime() const;
             vlc_tick_t getCurrentDemuxTime() const;
+            vlc_tick_t getMinAheadTime() const;
 
             virtual bool reactivateStream(AbstractStream *);
             bool setupPeriod();
@@ -141,6 +143,7 @@ namespace adaptive
             bool         b_thread;
             bool         b_buffering;
             bool         b_canceled;
+            vlc_tick_t   pause_start;
     };
 
 }

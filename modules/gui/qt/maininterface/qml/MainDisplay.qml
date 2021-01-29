@@ -64,6 +64,9 @@ Widgets.NavigableFocusScope {
         sourcesBanner.sortModel = Qt.binding(function () { return stackView.currentItem.sortModel  })
         sourcesBanner.contentModel = Qt.binding(function () { return stackView.currentItem.contentModel })
         sourcesBanner.extraLocalActions = Qt.binding(function () { return stackView.currentItem.extraLocalActions })
+        sourcesBanner.isViewMultiView = Qt.binding(function () {
+            return stackView.currentItem.isViewMultiView === undefined || stackView.currentItem.isViewMultiView
+        })
         // Restore sourcesBanner state
         sourcesBanner.selectedIndex = pageModel.filter(function (e) {
             return e.listed;
@@ -114,7 +117,7 @@ Widgets.NavigableFocusScope {
             url: "qrc:///main/NoMedialibHome.qml"
         }, {
             listed: true,
-            displayText: i18n.qtr("Network"),
+            displayText: i18n.qtr("Browse"),
             icon: VLCIcons.topbar_network,
             name: "network",
             url: "qrc:///network/NetworkDisplay.qml"
@@ -250,7 +253,7 @@ Widgets.NavigableFocusScope {
                                 PropertyChanges {
                                     target: playlistColumn
                                     width: resizeHandle.clamp(root.width / resizeHandle.widthFactor,
-                                                              VLCStyle.dp(225, VLCStyle.scale),
+                                                              playlist.minimumWidth,
                                                               root.width / 2)
                                     visible: true
                                 }

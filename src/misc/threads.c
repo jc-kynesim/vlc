@@ -157,10 +157,8 @@ bool vlc_mutex_held(const vlc_mutex_t *mtx)
 
 void vlc_mutex_lock(vlc_mutex_t *mtx)
 {
-    unsigned value;
-
     /* This is the Drepper (non-recursive) mutex algorithm
-     * from his "Futexes are tricky" paper. The mutex can value be:
+     * from his "Futexes are tricky" paper. The mutex value can be:
      * - 0: the mutex is free
      * - 1: the mutex is locked and uncontended
      * - 2: the mutex is contended (i.e., unlock needs to wake up a waiter)
@@ -170,8 +168,7 @@ void vlc_mutex_lock(vlc_mutex_t *mtx)
 
     int canc = vlc_savecancel(); /* locking is never a cancellation point */
 
-    while ((value = atomic_exchange_explicit(&mtx->value, 2,
-                                             memory_order_acquire)) != 0)
+    while (atomic_exchange_explicit(&mtx->value, 2, memory_order_acquire))
         vlc_atomic_wait(&mtx->value, 2);
 
     vlc_restorecancel(canc);
@@ -375,10 +372,7 @@ int vlc_cond_timedwait_daytime(vlc_cond_t *cond, vlc_mutex_t *mutex,
     return ret;
 }
 
-#ifdef LIBVLC_NEED_RWLOCK
 /*** Generic read/write locks ***/
-#include <stdlib.h>
-#include <limits.h>
 /* NOTE:
  * lock->state is a signed long integer:
  *  - The sign bit is set when the lock is held for writing.
@@ -395,11 +389,6 @@ void vlc_rwlock_init (vlc_rwlock_t *lock)
     vlc_mutex_init (&lock->mutex);
     vlc_cond_init (&lock->wait);
     lock->state = 0;
-}
-
-void vlc_rwlock_destroy (vlc_rwlock_t *lock)
-{
-    (void) lock;
 }
 
 void vlc_rwlock_rdlock (vlc_rwlock_t *lock)
@@ -447,7 +436,6 @@ void vlc_rwlock_unlock (vlc_rwlock_t *lock)
     }
     vlc_mutex_unlock (&lock->mutex);
 }
-#endif /* LIBVLC_NEED_RWLOCK */
 
 /*** Generic semaphores ***/
 
