@@ -1,6 +1,13 @@
 include $(top_srcdir)/modules/common.am
 mmaldir = $(pluginsdir)/mmal
 
+mmal_LTLIBRARIES =
+
+libdrm_vout_plugin_la_SOURCES = drm_vout.c
+libdrm_vout_plugin_la_CFLAGS = $(AM_CFLAGS) -I/usr/include/libdrm
+libdrm_vout_plugin_la_LDFLAGS = $(AM_LDFLAGS) -ldrm
+mmal_LTLIBRARIES += libdrm_vout_plugin.la
+
 AM_CFLAGS += $(CFLAGS_mmal)
 AM_LDFLAGS += -rpath '$(mmaldir)' $(LDFLAGS_mmal)
 
@@ -9,7 +16,7 @@ libmmal_vout_plugin_la_SOURCES = vout.c subpic.c subpic.h mmal_picture.c mmal_pi
 libmmal_vout_plugin_la_CFLAGS = $(AM_CFLAGS)
 libmmal_vout_plugin_la_LDFLAGS = $(AM_LDFLAGS) -lm
 libmmal_vout_plugin_la_LIBADD = $(LIBS_mmal)
-mmal_LTLIBRARIES = libmmal_vout_plugin.la
+mmal_LTLIBRARIES += libmmal_vout_plugin.la
 
 libmmal_codec_plugin_la_SOURCES = codec.c subpic.c subpic.h mmal_picture.c mmal_picture.h \
   mmal_cma.c mmal_cma.h
@@ -37,3 +44,4 @@ libmmal_device_plugin_la_CFLAGS = $(AM_CFLAGS)
 libmmal_device_plugin_la_LDFLAGS = $(AM_LDFLAGS)
 libmmal_device_plugin_la_LIBADD = $(LIBS_mmal)
 mmal_LTLIBRARIES += libmmal_device_plugin.la
+
