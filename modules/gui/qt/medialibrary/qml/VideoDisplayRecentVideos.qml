@@ -23,6 +23,7 @@ import org.videolan.medialib 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///util/" as Util
+import "qrc:///util/Helpers.js" as Helpers
 import "qrc:///style/"
 
 Widgets.NavigableFocusScope {
@@ -101,7 +102,7 @@ Widgets.NavigableFocusScope {
 
                 image: model.thumbnail || VLCStyle.noArtCover
                 title: model.title || i18n.qtr("Unknown title")
-                subtitle: model.duration || ""
+                subtitle: Helpers.msToString(model.duration) || ""
                 labels: [
                     model.resolution_name || "",
                     model.channel || ""
@@ -112,6 +113,9 @@ Widgets.NavigableFocusScope {
                 playCoverBorder.width: VLCStyle.gridCover_video_border
                 titleMargin: VLCStyle.margin_xxsmall
                 showNewIndicator: true
+                unselectedUnderlay: shadows.unselected
+                selectedUnderlay: shadows.selected
+                
                 onItemDoubleClicked: {
                     if ( model.id !== undefined ) {
                         g_mainDisplay.showPlayer()
@@ -153,6 +157,13 @@ Widgets.NavigableFocusScope {
             onActionAtIndex: {
                 g_mainDisplay.showPlayer()
                 medialib.addAndPlay( model.getIdsForIndexes( recentVideoSelection.selectedIndexes ) )
+            }
+
+            Widgets.GridShadows {
+                id: shadows
+
+                coverWidth: VLCStyle.gridCover_video_width_large
+                coverHeight: VLCStyle.gridCover_video_height_large
             }
         }
     }

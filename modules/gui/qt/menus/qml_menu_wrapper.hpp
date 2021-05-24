@@ -32,6 +32,10 @@ class MLArtistModel;
 class MLAlbumTrackModel;
 class MLUrlModel;
 class MLVideoModel;
+class MLGroupListModel;
+class MLGroupModel;
+class MLPlaylistListModel;
+class MLPlaylistModel;
 class NetworkDeviceModel;
 class NetworkMediaModel;
 class QmlMainContext;
@@ -208,6 +212,53 @@ public:
 
 public slots:
     void popup(const QModelIndexList& selected, QPoint pos, QVariantMap options = {} );
+signals:
+    void showMediaInformation(int index);
+private:
+    QMenu* m_menu = nullptr;
+};
+
+//-------------------------------------------------------------------------------------------------
+// Groups
+//-------------------------------------------------------------------------------------------------
+
+class GroupListContextMenu : public QObject {
+    Q_OBJECT
+    SIMPLE_MENU_PROPERTY(MLGroupListModel *, model, nullptr)
+public:
+    GroupListContextMenu(QObject * parent = nullptr);
+    ~GroupListContextMenu() /* override */;
+
+public slots:
+    void popup(const QModelIndexList & selected, QPoint pos, QVariantMap options = {});
+private:
+    QMenu* m_menu = nullptr;
+};
+
+//-------------------------------------------------------------------------------------------------
+
+class PlaylistListContextMenu : public QObject {
+    Q_OBJECT
+    SIMPLE_MENU_PROPERTY(MLPlaylistListModel *, model, nullptr)
+public:
+    PlaylistListContextMenu(QObject * parent = nullptr);
+    ~PlaylistListContextMenu() /* override */;
+
+public slots:
+    void popup(const QModelIndexList & selected, QPoint pos, QVariantMap options = {});
+private:
+    QMenu* m_menu = nullptr;
+};
+
+class PlaylistMediaContextMenu : public QObject {
+    Q_OBJECT
+    SIMPLE_MENU_PROPERTY(MLPlaylistModel *, model, nullptr)
+public:
+    PlaylistMediaContextMenu(QObject * parent = nullptr);
+    ~PlaylistMediaContextMenu() /* override */;
+
+public slots:
+    void popup(const QModelIndexList & selected, QPoint pos, QVariantMap options = {});
 signals:
     void showMediaInformation(int index);
 private:

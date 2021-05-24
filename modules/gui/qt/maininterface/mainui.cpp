@@ -13,19 +13,29 @@
 #include "medialibrary/mlrecentsmodel.hpp"
 #include "medialibrary/mlrecentsvideomodel.hpp"
 #include "medialibrary/mlfoldersmodel.hpp"
+#include "medialibrary/mlgrouplistmodel.hpp"
+#include "medialibrary/mlplaylistlistmodel.hpp"
+#include "medialibrary/mlplaylistmodel.hpp"
+#include "medialibrary/mlplaylist.hpp"
 
 #include "player/player_controller.hpp"
-#include "player/playercontrolbarmodel.hpp"
+#include "player/player_controlbar_model.hpp"
+#include "player/control_list_model.hpp"
+
+#include "dialogs/toolbar/controlbar_profile_model.hpp"
+#include "dialogs/toolbar/controlbar_profile.hpp"
 
 #include "playlist/playlist_model.hpp"
 #include "playlist/playlist_controller.hpp"
 
 #include "util/qml_main_context.hpp"
 #include "util/qmleventfilter.hpp"
+#include "util/imageluminanceextractor.hpp"
 #include "util/i18n.hpp"
 #include "util/systempalette.hpp"
 #include "util/sortfilterproxymodel.hpp"
 #include "util/navigation_history.hpp"
+#include "util/qmlinputitem.hpp"
 
 #include "dialogs/help/aboutmodel.hpp"
 #include "dialogs/dialogs_provider.hpp"
@@ -98,6 +108,7 @@ bool MainUI::setup(QQmlEngine* engine)
     rootCtx->setContextProperty( "topWindow", m_interfaceWindow);
     rootCtx->setContextProperty( "dialogProvider", DialogsProvider::getInstance());
     rootCtx->setContextProperty( "systemPalette", new SystemPalette(this));
+    rootCtx->setContextProperty( "dialogModel", new DialogModel(m_intf, this));
 
     if (m_mainInterface->hasMediaLibrary())
         rootCtx->setContextProperty( "medialib", m_mainInterface->getMediaLibrary() );
@@ -156,6 +167,8 @@ void MainUI::registerQMLTypes()
     qRegisterMetaType<VLCTick>();
     qmlRegisterUncreatableType<VLCTick>("org.videolan.vlc", 0, 1, "VLCTick", "");
 
+    qRegisterMetaType<QmlInputItem>();
+
     qmlRegisterType<VideoSurface>("org.videolan.vlc", 0, 1, "VideoSurface");
 
     if (m_mainInterface->hasMediaLibrary())
@@ -168,13 +181,16 @@ void MainUI::registerQMLTypes()
         qmlRegisterType<MLUrlModel>( "org.videolan.medialib", 0, 1, "MLUrlModel" );
         qmlRegisterType<MLVideoModel>( "org.videolan.medialib", 0, 1, "MLVideoModel" );
         qmlRegisterType<MLRecentsVideoModel>( "org.videolan.medialib", 0, 1, "MLRecentsVideoModel" );
+        qmlRegisterType<MLGroupListModel>( "org.videolan.medialib", 0, 1, "MLGroupListModel" );
+        qmlRegisterType<MLPlaylistListModel>( "org.videolan.medialib", 0, 1, "MLPlaylistListModel" );
+        qmlRegisterType<MLPlaylistModel>( "org.videolan.medialib", 0, 1, "MLPlaylistModel" );
 
         qRegisterMetaType<NetworkTreeItem>();
         qmlRegisterType<NetworkMediaModel>( "org.videolan.medialib", 0, 1, "NetworkMediaModel");
         qmlRegisterType<NetworkDeviceModel>( "org.videolan.medialib", 0, 1, "NetworkDeviceModel");
         qmlRegisterType<NetworkSourcesModel>( "org.videolan.medialib", 0, 1, "NetworkSourcesModel");
         qmlRegisterType<ServicesDiscoveryModel>( "org.videolan.medialib", 0, 1, "ServicesDiscoveryModel");
-        qmlRegisterType<MlFoldersModel>( "org.videolan.medialib", 0, 1, "MLFolderModel");
+        qmlRegisterType<MLFoldersModel>( "org.videolan.medialib", 0, 1, "MLFolderModel");
         qmlRegisterType<MLRecentsModel>( "org.videolan.medialib", 0, 1, "MLRecentModel" );
 
         //expose base object, they aren't instanciable from QML side
@@ -182,6 +198,7 @@ void MainUI::registerQMLTypes()
         registerAnonymousType<MLArtist>("org.videolan.medialib", 1);
         registerAnonymousType<MLAlbumTrack>("org.videolan.medialib", 1);
         registerAnonymousType<MLGenre>("org.videolan.medialib", 1);
+        registerAnonymousType<MLPlaylist>("org.videolan.medialib", 1);
 
         qmlRegisterType<AlbumContextMenu>( "org.videolan.medialib", 0, 1, "AlbumContextMenu" );
         qmlRegisterType<ArtistContextMenu>( "org.videolan.medialib", 0, 1, "ArtistContextMenu" );
@@ -189,6 +206,9 @@ void MainUI::registerQMLTypes()
         qmlRegisterType<AlbumTrackContextMenu>( "org.videolan.medialib", 0, 1, "AlbumTrackContextMenu" );
         qmlRegisterType<URLContextMenu>( "org.videolan.medialib", 0, 1, "URLContextMenu" );
         qmlRegisterType<VideoContextMenu>( "org.videolan.medialib", 0, 1, "VideoContextMenu" );
+        qmlRegisterType<GroupListContextMenu>( "org.videolan.medialib", 0, 1, "GroupListContextMenu" );
+        qmlRegisterType<PlaylistListContextMenu>( "org.videolan.medialib", 0, 1, "PlaylistListContextMenu" );
+        qmlRegisterType<PlaylistMediaContextMenu>( "org.videolan.medialib", 0, 1, "PlaylistMediaContextMenu" );
     }
 
     qRegisterMetaType<NetworkTreeItem>();
@@ -196,7 +216,8 @@ void MainUI::registerQMLTypes()
     qmlRegisterType<NetworkDeviceModel>( "org.videolan.vlc", 0, 1, "NetworkDeviceModel");
     qmlRegisterType<NetworkSourcesModel>( "org.videolan.vlc", 0, 1, "NetworkSourcesModel");
     qmlRegisterType<ServicesDiscoveryModel>( "org.videolan.vlc", 0, 1, "ServicesDiscoveryModel");
-    qmlRegisterType<MlFoldersModel>( "org.videolan.vlc", 0, 1, "MLFolderModel");
+    qmlRegisterType<MLFoldersModel>( "org.videolan.vlc", 0, 1, "MLFolderModel");
+    qmlRegisterType<ImageLuminanceExtractor>( "org.videolan.vlc", 0, 1, "ImageLuminanceExtractor");
 
     qmlRegisterUncreatableType<NavigationHistory>("org.videolan.vlc", 0, 1, "History", "Type of global variable history" );
 
@@ -214,12 +235,19 @@ void MainUI::registerQMLTypes()
     qmlRegisterType<PlaylistControllerModel>( "org.videolan.vlc", 0, 1, "PlaylistControllerModel" );
 
     qmlRegisterType<AboutModel>( "org.videolan.vlc", 0, 1, "AboutModel" );
+
+    qmlRegisterUncreatableType<DialogModel>("org.videolan.vlc", 0, 1, "DialogModel", "");
+    qmlRegisterUncreatableType<DialogErrorModel>( "org.videolan.vlc", 0, 1, "DialogErrorModel", "");
     qRegisterMetaType<DialogId>();
-    qmlRegisterType<DialogModel>("org.videolan.vlc", 0, 1, "DialogModel");
 
     qmlRegisterType<QmlEventFilter>( "org.videolan.vlc", 0, 1, "EventFilter" );
 
-    qmlRegisterType<PlayerControlBarModel>( "org.videolan.vlc", 0, 1, "PlayerControlBarModel");
+    qRegisterMetaType<ControlbarProfile*>();
+    qRegisterMetaType<ControlbarProfileModel*>();
+    qmlRegisterUncreatableType<ControlbarProfile>("org.videolan.vlc", 0, 1, "ControlbarProfile", "");
+    qmlRegisterUncreatableType<PlayerControlbarModel>("org.videolan.vlc", 0, 1, "PlayerControlbarModel", "");
+    qmlRegisterUncreatableType<ControlListModel>( "org.videolan.vlc", 0, 1, "ControlListModel", "" );
+    qmlRegisterSingletonType("org.videolan.vlc", 0, 1, "PlayerListModel", PlayerControlbarModel::getPlaylistIdentifierListModel);
 
     qRegisterMetaType<QmlMainContext*>();
     qmlRegisterType<QmlGlobalMenu>( "org.videolan.vlc", 0, 1, "QmlGlobalMenu" );
@@ -228,6 +256,8 @@ void MainUI::registerQMLTypes()
     qmlRegisterType<NetworkDeviceContextMenu>( "org.videolan.vlc", 0, 1, "NetworkDeviceContextMenu" );
     qmlRegisterType<PlaylistContextMenu>( "org.videolan.vlc", 0, 1, "PlaylistContextMenu" );
     qmlRegisterType<SortFilterProxyModel>( "org.videolan.vlc", 0, 1, "SortFilterProxyModel" );
+
+    qRegisterMetaType<QList<QQmlError>>("QList<QQmlError>");
 }
 
 void MainUI::onQmlWarning(const QList<QQmlError>& qmlErrors)

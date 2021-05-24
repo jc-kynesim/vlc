@@ -239,21 +239,19 @@ std::ostream& operator<<(std::ostream& ostr, const std::list<AbstractCommand *>&
 }
 #endif
 
-CommandsQueue::CommandsQueue( CommandsFactory *f )
+CommandsQueue::CommandsQueue()
 {
     bufferinglevel = VLC_TICK_INVALID;
     pcr = VLC_TICK_INVALID;
     b_drop = false;
     b_draining = false;
     b_eof = false;
-    commandsFactory = f;
     nextsequence = 0;
 }
 
 CommandsQueue::~CommandsQueue()
 {
     Abort( false );
-    delete commandsFactory;
 }
 
 static bool compareCommands( const Queueentry &a, const Queueentry &b )
@@ -295,11 +293,6 @@ void CommandsQueue::Schedule( AbstractCommand *command )
     {
         incoming.push_back( Queueentry(nextsequence++, command) );
     }
-}
-
-const CommandsFactory * CommandsQueue::factory() const
-{
-    return commandsFactory;
 }
 
 vlc_tick_t CommandsQueue::Process( vlc_tick_t barrier )
@@ -427,8 +420,7 @@ void CommandsQueue::Abort( bool b_reset )
 
 bool CommandsQueue::isEmpty() const
 {
-    bool b_empty = commands.empty() && incoming.empty();
-    return b_empty;
+    return commands.empty() && incoming.empty();
 }
 
 void CommandsQueue::setDrop( bool b )
@@ -443,8 +435,7 @@ void CommandsQueue::setDraining()
 
 bool CommandsQueue::isDraining() const
 {
-    bool b = b_draining;
-    return b;
+    return b_draining;
 }
 
 void CommandsQueue::setEOF( bool b )
@@ -458,25 +449,25 @@ void CommandsQueue::setEOF( bool b )
 
 bool CommandsQueue::isEOF() const
 {
-    bool b = b_eof;
-    return b;
+    return b_eof;
 }
 
 vlc_tick_t CommandsQueue::getDemuxedAmount(vlc_tick_t from) const
 {
-    if( bufferinglevel == VLC_TICK_INVALID || from > bufferinglevel )
+    vlc_tick_t bufferingstart = getFirstDTS();
+    if( bufferinglevel == VLC_TICK_INVALID ||
+        bufferingstart == VLC_TICK_INVALID ||
+        from > bufferinglevel )
         return 0;
-    if( from > getFirstDTS() )
+    if( from > bufferingstart )
         return bufferinglevel - from;
     else
-        return bufferinglevel - getFirstDTS();
+        return bufferinglevel - bufferingstart;
 }
 
 vlc_tick_t CommandsQueue::getBufferingLevel() const
 {
-    vlc_tick_t i_buffer;
-    i_buffer = bufferinglevel;
-    return i_buffer;
+    return bufferinglevel;
 }
 
 vlc_tick_t CommandsQueue::getFirstDTS() const
@@ -504,6 +495,5 @@ void CommandsQueue::LockedSetDraining()
 
 vlc_tick_t CommandsQueue::getPCR() const
 {
-    vlc_tick_t i_pcr = pcr;
-    return i_pcr;
+    return pcr;
 }

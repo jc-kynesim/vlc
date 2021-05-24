@@ -103,23 +103,59 @@ int vout_ChangeSource( vout_thread_t *p_vout, const video_format_t *fmt );
 enum vout_crop_mode {
     VOUT_CROP_NONE, VOUT_CROP_RATIO, VOUT_CROP_WINDOW, VOUT_CROP_BORDER,
 };
-bool GetCropMode(const char *crop_str, enum vout_crop_mode *mode,
-                        unsigned *num, unsigned *den,
-                        unsigned *x, unsigned *y,
-                        unsigned *width, unsigned *height );
+
+struct vout_crop {
+    enum vout_crop_mode mode;
+    union {
+        vlc_rational_t ratio;
+        struct {
+            unsigned x;
+            unsigned y;
+            unsigned width;
+            unsigned height;
+        } window;
+        struct {
+            unsigned left;
+            unsigned right;
+            unsigned top;
+            unsigned bottom;
+        } border;
+    };
+};
+
+static inline bool vout_CropEqual(const struct vout_crop *a,
+                                  const struct vout_crop *b)
+{
+    if (a->mode != b->mode)
+        return false;
+
+    switch (a->mode) {
+        case VOUT_CROP_NONE:
+            return true;
+        case VOUT_CROP_RATIO:
+            return a->ratio.num * b->ratio.den == b->ratio.num * a->ratio.den;
+        case VOUT_CROP_WINDOW:
+            return memcmp(&a->window, &b->window, sizeof (a->window)) == 0;
+        case VOUT_CROP_BORDER:
+            return memcmp(&a->border, &b->border, sizeof (a->border)) == 0;
+        default:
+            vlc_assert_unreachable();
+    }
+}
+
+bool vout_ParseCrop(struct vout_crop *, const char *crop_str);
 bool GetAspectRatio(const char *ar_str, unsigned *num, unsigned *den);
 
 /* TODO to move them to vlc_vout.h */
 void vout_ChangeFullscreen(vout_thread_t *, const char *id);
 void vout_ChangeWindowed(vout_thread_t *);
 void vout_ChangeWindowState(vout_thread_t *, unsigned state);
-void vout_ChangeDisplaySize(vout_thread_t *, unsigned width, unsigned height);
+void vout_ChangeDisplaySize(vout_thread_t *, unsigned width, unsigned height,
+                            void (*ack_cb)(void *), void *opaque);
 void vout_ChangeDisplayFilled(vout_thread_t *, bool is_filled);
 void vout_ChangeZoom(vout_thread_t *, unsigned num, unsigned den);
 void vout_ChangeDisplayAspectRatio(vout_thread_t *, unsigned num, unsigned den);
-void vout_ChangeCropRatio(vout_thread_t *, unsigned num, unsigned den);
-void vout_ChangeCropWindow(vout_thread_t *, int x, int y, int width, int height);
-void vout_ChangeCropBorder(vout_thread_t *, int left, int top, int right, int bottom);
+void vout_ChangeCrop(vout_thread_t *, const struct vout_crop *);
 void vout_ControlChangeFilters(vout_thread_t *, const char *);
 void vout_ControlChangeInterlacing(vout_thread_t *, bool);
 void vout_ControlChangeSubSources(vout_thread_t *, const char *);

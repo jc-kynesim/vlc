@@ -28,6 +28,7 @@
 #include <vlc_common.h>
 #include <vlc_atomic.h>
 #include <vlc_opengl.h>
+#include <vlc_codec.h>
 #include <vlc_vout_display.h>
 #include "libvlc.h"
 #include <vlc_modules.h>
@@ -96,6 +97,65 @@ vlc_gl_t *vlc_gl_Create(const struct vout_display_cfg *restrict cfg,
     return &glpriv->gl;
 }
 
+vlc_gl_t *vlc_gl_CreateOffscreen(vlc_object_t *parent,
+                                 struct vlc_decoder_device *device,
+                                 unsigned width, unsigned height,
+                                 unsigned flags, const char *name)
+{
+    struct vlc_gl_priv_t *glpriv;
+    const char *type;
+
+    enum vlc_gl_api_type api_type;
+
+    switch (flags /*& VLC_OPENGL_API_MASK*/)
+    {
+        case VLC_OPENGL:
+            type = "opengl offscreen";
+            api_type = VLC_OPENGL;
+            break;
+        case VLC_OPENGL_ES2:
+            type = "opengl es2 offscreen";
+            api_type = VLC_OPENGL_ES2;
+            break;
+        default:
+            return NULL;
+    }
+
+    glpriv = vlc_custom_create(parent, sizeof (*glpriv), "gl");
+    if (unlikely(glpriv == NULL))
+        return NULL;
+
+    vlc_gl_t *gl = &glpriv->gl;
+
+    gl->api_type = api_type;
+
+    gl->offscreen_chroma_out = VLC_CODEC_UNKNOWN;
+    gl->offscreen_vflip = false;
+    gl->offscreen_vctx_out = NULL;
+
+    gl->surface = NULL;
+    gl->device = device ? vlc_decoder_device_Hold(device) : NULL;
+    gl->module = vlc_module_load(gl, type, name, true, vlc_gl_start, gl, width,
+                                 height);
+    if (gl->module == NULL)
+    {
+        vlc_object_delete(gl);
+        return NULL;
+    }
+
+    /* The implementation must initialize the output chroma */
+    assert(gl->offscreen_chroma_out != VLC_CODEC_UNKNOWN);
+
+    vlc_atomic_rc_init(&glpriv->rc);
+
+    assert(gl->make_current);
+    assert(gl->release_current);
+    assert(gl->swap_offscreen);
+    assert(gl->get_proc_address);
+
+    return &glpriv->gl;
+}
+
 void vlc_gl_Hold(vlc_gl_t *gl)
 {
     struct vlc_gl_priv_t *glpriv = (struct vlc_gl_priv_t *)gl;
@@ -124,7 +184,8 @@ typedef struct vlc_gl_surface
 } vlc_gl_surface_t;
 
 static void vlc_gl_surface_ResizeNotify(vout_window_t *surface,
-                                        unsigned width, unsigned height)
+                                        unsigned width, unsigned height,
+                                        vout_window_ack_cb cb, void *opaque)
 {
     vlc_gl_surface_t *sys = surface->owner.sys;
 
@@ -133,6 +194,9 @@ static void vlc_gl_surface_ResizeNotify(vout_window_t *surface,
     vlc_mutex_lock(&sys->lock);
     sys->width = width;
     sys->height = height;
+
+    if (cb != NULL)
+        cb(surface, opaque);
     vlc_mutex_unlock(&sys->lock);
 }
 

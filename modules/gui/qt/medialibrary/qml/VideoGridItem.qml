@@ -20,6 +20,7 @@ import QtQuick 2.11
 import org.videolan.medialib 0.1
 
 import "qrc:///widgets/" as Widgets
+import "qrc:///util/Helpers.js" as Helpers
 import "qrc:///style/"
 
 Widgets.GridItem {
@@ -28,7 +29,7 @@ Widgets.GridItem {
 
     image: model.thumbnail || VLCStyle.noArtCover
     title: model.title || i18n.qtr("Unknown title")
-    subtitle: model.duration || ""
+    subtitle: Helpers.msToString(model.duration) || ""
     labels: [
         model.resolution_name || "",
         model.channel || ""
@@ -39,12 +40,6 @@ Widgets.GridItem {
     playCoverBorder.width: VLCStyle.gridCover_video_border
     titleMargin: VLCStyle.margin_xxsmall
     showNewIndicator: true
-    onItemDoubleClicked: {
-        if ( model.id !== undefined ) {
-            g_mainDisplay.showPlayer()
-            medialib.addAndPlay( model.id )
-        }
-    }
     onPlayClicked: {
         if ( model.id !== undefined ) {
             g_mainDisplay.showPlayer()

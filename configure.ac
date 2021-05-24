@@ -53,7 +53,7 @@ AC_PROG_EGREP
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 AM_PROG_AS
-AC_PROG_LEX
+AC_PROG_LEX([noyywrap])
 AC_PROG_YACC
 
 AC_ARG_VAR([DESKTOP_FILE_VALIDATE], [Validator for desktop entry files])
@@ -1936,7 +1936,8 @@ then
 
      AS_IF([test "${have_lua_lib}" != "yes"], [
        AC_CHECK_LIB( lua , luaL_newstate,
-         [LUA_LIBS="-llua"],
+         [LUA_LIBS="-llua"
+          have_lua_lib=yes],
          [ have_lua=no ], [-lm] ) ])
 
      dnl If we found any lib, check that we have the headers too
@@ -3755,6 +3756,8 @@ AM_CONDITIONAL([HAVE_KVA], [test "${have_kva}" = "yes"])
 dnl
 dnl MMAL plugin
 dnl
+MMAL_CFLAGS=""
+MMAL_LIBS=""
 AC_ARG_ENABLE([mmal],
   AS_HELP_STRING([--enable-mmal],
     [Multi-Media Abstraction Layer (MMAL) hardware plugin (default enable)]))
@@ -3765,11 +3768,10 @@ if test "${enable_mmal}" != "no"; then
   AC_CHECK_HEADERS([interface/mmal/mmal.h],
     [ AC_CHECK_LIB([bcm_host], [vc_tv_unregister_callback_full], [
         have_mmal="yes"
-        VLC_ADD_PLUGIN([mmal])
-        VLC_ADD_LDFLAGS([mmal],[ -L/opt/vc/lib ])
-        VLC_ADD_CFLAGS([mmal],[ -isystem /opt/vc/include -isystem /opt/vc/include/interface/vcos/pthreads -isystem /opt/vc/include/interface/vmcs_host/linux ])
-        VLC_ADD_LIBS([mmal],[ -lbcm_host -lmmal -lmmal_core -lmmal_components -lmmal_util -lvchostif -lvcsm -lvchiq_arm ]) ], [
-          AS_IF([test "${enable_mmal}" = "yes"],
+        MMAL_CFLAGS="-isystem /opt/vc/include -isystem /opt/vc/include/interface/vcos/pthreads -isystem /opt/vc/include/interface/vmcs_host/linux"
+        MMAL_LIBS="-L/opt/vc/lib -lbcm_host -lmmal -lmmal_core -lmmal_components -lmmal_util -lvchostif -lvcsm -lvchiq_arm"
+        ],[
+        AS_IF([test "${enable_mmal}" = "yes"],
             [ AC_MSG_ERROR([Cannot find bcm library...]) ],
             [ AC_MSG_WARN([Cannot find bcm library...]) ])
           ],
@@ -3779,6 +3781,8 @@ if test "${enable_mmal}" != "no"; then
       [ AC_MSG_WARN([Cannot find development headers for mmal...]) ]) ])
   VLC_RESTORE_FLAGS
 fi
+AC_SUBST([MMAL_CFLAGS])
+AC_SUBST([MMAL_LIBS])
 AM_CONDITIONAL([HAVE_MMAL], [test "${have_mmal}" = "yes"])
 
 dnl
@@ -4286,8 +4290,7 @@ AM_CONDITIONAL([HAVE_LIRC], [test "${have_lirc}" = "yes"])
 dnl
 dnl  Bitstream
 dnl
-PKG_CHECK_MODULES([BITSTREAM], [bitstream > 1.4],[have_bitstream="yes"], [have_bitstream="no"])
-AM_CONDITIONAL([HAVE_BITSTREAM], [test "${have_bitstream}" = "yes"])
+PKG_HAVE_WITH_MODULES([BITSTREAM], [bitstream > 1.4])
 
 dnl
 dnl  SRT plugin
@@ -4476,6 +4479,11 @@ AS_IF([test "${enable_osx_notifications}" != "no"], [
 ])
 
 dnl
+dnl Check for GBM
+dnl
+PKG_HAVE_WITH_MODULES([GBM], [gbm])
+
+dnl
 dnl Libnotify notification plugin
 dnl
 PKG_ENABLE_MODULES_VLC([NOTIFY], [], [libnotify], [libnotify notification], [auto])
@@ -4653,7 +4661,6 @@ AC_CONFIG_FILES([
   lib/Makefile
   bin/Makefile
   test/Makefile
-  modules/hw/mmal/Makefile
   share/vlc.appdata.xml.in
 ])
 

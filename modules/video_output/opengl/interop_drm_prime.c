@@ -28,7 +28,7 @@
 #include <EGL/eglext.h>
 #include <libavutil/buffer.h>
 #include <libavutil/hwcontext_drm.h>
-#include <drm/drm_fourcc.h>
+#include <libdrm/drm_fourcc.h>
 
 #include <vlc_common.h>
 #include <vlc_vout_window.h>

@@ -44,7 +44,7 @@
  *****************************************************************************/
 static int  Open ( vout_display_t *, const vout_display_cfg_t *,
                    video_format_t *, vlc_video_context * );
-static void Close( vlc_object_t * );
+static void Close( vout_display_t * );
 
 #define KVA_FIXT23_TEXT N_( \
     "Enable a workaround for T23" )
@@ -99,7 +99,6 @@ struct vout_display_sys_t
     HWND               parent;
     unsigned           button_pressed;
     bool               is_mouse_hidden;
-    bool               is_on_top;
     ULONG              cursor_timeout;
 
     int                i_chroma_shift;
@@ -127,8 +126,8 @@ static MRESULT EXPENTRY WndProc       ( HWND, ULONG, MPARAM, MPARAM );
 #define COLOR_KEY 0x0F0F0F
 
 #define WM_VLC_MANAGE               ( WM_USER + 1 )
-#define WM_VLC_FULLSCREEN_CHANGE    ( WM_USER + 2 )
-#define WM_VLC_SIZE_CHANGE          ( WM_USER + 3 )
+#define WM_VLC_SIZE_CHANGE          ( WM_USER + 2 )
+#define WM_VLC_SET_POS              ( WM_USER + 3 )
 
 #define TID_HIDE_MOUSE  0x1010
 
@@ -163,7 +162,6 @@ static void PMThread( void *arg )
     struct open_init *init = ( struct open_init * )arg;
     vout_display_t *vd = init->vd;
     vout_display_sys_t * sys = vd->sys;
-    const vout_display_cfg_t * cfg = init->cfg;
     video_format_t *fmtp = init->fmtp;
     ULONG i_frame_flags;
     QMSG qm;
@@ -277,14 +275,8 @@ static void PMThread( void *arg )
     sys->i_result = VLC_SUCCESS;
     DosPostEventSem( sys->ack_event );
 
-    if( sys->b_fixt23 )
-        WinSetVisibleRegionNotify( sys->frame, TRUE );
-
     while( WinGetMsg( sys->hab, &qm, NULLHANDLE, 0, 0 ))
         WinDispatchMsg( sys->hab, &qm );
-
-    if( sys->b_fixt23 )
-        WinSetVisibleRegionNotify( sys->frame, FALSE );
 
     kvaEnableScreenSaver();
 
@@ -321,7 +313,6 @@ static int Open ( vout_display_t *vd, const vout_display_cfg_t *cfg,
     vout_display_sys_t *sys;
     struct open_init init = {
         .vd   = vd,
-        .cfg  = cfg,
         .fmtp = fmtp,
     };
     VLC_UNUSED(context);
@@ -352,6 +343,10 @@ static int Open ( vout_display_t *vd, const vout_display_cfg_t *cfg,
         return VLC_EGENERIC;
     }
 
+    /* Sometimes WinSetWindowPos() causes locking. To avoid this,
+     * post a message here */
+    WinPostMsg( sys->client, WM_VLC_SET_POS, 0, 0 );
+
     return VLC_SUCCESS;
 }
 
@@ -360,9 +355,8 @@ static int Open ( vout_display_t *vd, const vout_display_cfg_t *cfg,
  *****************************************************************************
  * Terminate an output method created by Open
  *****************************************************************************/
-static void Close ( vlc_object_t *object )
+static void Close ( vout_display_t *vd )
 {
-    vout_display_t * vd = (vout_display_t *)object;
     vout_display_sys_t * sys = vd->sys;
 
     WinPostQueueMsg( sys->hmq, WM_QUIT, 0, 0 );
@@ -400,21 +394,6 @@ static int Control( vout_display_t *vd, int query )
 
     switch (query)
     {
-    case VOUT_DISPLAY_CHANGE_FULLSCREEN:
-    {
-        WinPostMsg( sys->client, WM_VLC_FULLSCREEN_CHANGE, MPFROMLONG(true), 0 );
-        return VLC_SUCCESS;
-    }
-
-    case VOUT_DISPLAY_CHANGE_WINDOW_STATE:
-    {
-        WinSetWindowPos( sys->frame, HWND_TOP, 0, 0, 0, 0, SWP_ZORDER );
-
-        sys->is_on_top = true;
-
-        return VLC_SUCCESS;
-    }
-
     case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
     {
         WinPostMsg( sys->client, WM_VLC_SIZE_CHANGE,
@@ -458,11 +437,6 @@ static int Control( vout_display_t *vd, int query )
 
 /* following functions are local */
 
-static void DestroyPicture( picture_t *pic )
-{
-    free( pic->p_sys );
-}
-
 /*****************************************************************************
  * OpenDisplay: open and initialize KVA device
  *****************************************************************************
@@ -476,7 +450,6 @@ static int OpenDisplay( vout_display_t *vd, video_format_t *fmt )
     bool b_hw_accel = 0;
     FOURCC i_kva_fourcc;
     int i_chroma_shift;
-    RECTL rcl;
     int w, h;
 
     msg_Dbg( vd, "render chroma = %4.4s", ( const char * )&fmt->i_chroma );
@@ -608,16 +581,6 @@ static int OpenDisplay( vout_display_t *vd, video_format_t *fmt )
         sys->client_rect.xRight  = sys->client_rect.xLeft   + w;
         sys->client_rect.yTop    = sys->client_rect.yBottom + h;
     }
-
-    rcl = sys->client_rect;
-
-    WinCalcFrameRect( sys->frame, &rcl, FALSE);
-
-    WinSetWindowPos( sys->frame, HWND_TOP,
-                     rcl.xLeft, rcl.yBottom,
-                     rcl.xRight - rcl.xLeft, rcl.yTop - rcl.yBottom,
-                     SWP_MOVE | SWP_SIZE | SWP_ZORDER | SWP_SHOW |
-                     SWP_ACTIVATE );
 
     return VLC_SUCCESS;
 }
@@ -850,12 +813,6 @@ static MRESULT EXPENTRY MyFrameWndProc( HWND hwnd, ULONG msg, MPARAM mp1,
 
             break;
         }
-
-        //case WM_VRNDISABLED :
-        case WM_VRNENABLED :
-            if( !vd->cfg->is_fullscreen && sys->is_on_top )
-                WinSetWindowPos( hwnd, HWND_TOP, 0, 0, 0, 0, SWP_ZORDER );
-            break;
     }
 
     return sys->p_old_frame( hwnd, msg, mp1, mp2 );
@@ -1040,34 +997,6 @@ static MRESULT EXPENTRY WndProc( HWND hwnd, ULONG msg, MPARAM mp1, MPARAM mp2 )
         case WM_VLC_MANAGE :
             break;
 
-        /* Fullscreen change */
-        case WM_VLC_FULLSCREEN_CHANGE :
-            if( LONGFROMMP( mp1 ))
-            {
-                WinQueryWindowPos( sys->frame, &swp );
-                sys->client_rect.xLeft   = swp.x;
-                sys->client_rect.yBottom = swp.y;
-                sys->client_rect.xRight  = sys->client_rect.xLeft   + swp.cx;
-                sys->client_rect.yTop    = sys->client_rect.yBottom + swp.cy;
-                WinCalcFrameRect( sys->frame, &sys->client_rect, TRUE );
-
-                rcl.xLeft   = 0;
-                rcl.yBottom = 0;
-                rcl.xRight  = sys->i_screen_width;
-                rcl.yTop    = sys->i_screen_height;
-            }
-            else
-                rcl = sys->client_rect;
-
-            WinCalcFrameRect( sys->frame, &rcl, FALSE );
-
-            WinSetWindowPos( sys->frame, HWND_TOP,
-                             rcl.xLeft, rcl.yBottom,
-                             rcl.xRight - rcl.xLeft, rcl.yTop - rcl.yBottom,
-                             SWP_MOVE | SWP_SIZE | SWP_ZORDER | SWP_SHOW |
-                             SWP_ACTIVATE );
-            break;
-
         /* Size change */
         case WM_VLC_SIZE_CHANGE :
             rcl.xLeft   = 0;
@@ -1087,6 +1016,19 @@ static MRESULT EXPENTRY WndProc( HWND hwnd, ULONG msg, MPARAM mp1, MPARAM mp2 )
             sys->client_rect.xRight  = sys->client_rect.xLeft   + swp.cx;
             sys->client_rect.yTop    = sys->client_rect.yBottom + swp.cy;
             WinCalcFrameRect( sys->frame, &sys->client_rect, TRUE );
+            break;
+
+        /* Set position */
+        case WM_VLC_SET_POS :
+            rcl = sys->client_rect;
+
+            WinCalcFrameRect( sys->frame, &rcl, FALSE);
+
+            WinSetWindowPos( sys->frame, HWND_TOP,
+                             rcl.xLeft, rcl.yBottom,
+                             rcl.xRight - rcl.xLeft, rcl.yTop - rcl.yBottom,
+                             SWP_MOVE | SWP_SIZE | SWP_ZORDER | SWP_SHOW |
+                             SWP_ACTIVATE );
             break;
 
         default :

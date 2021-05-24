@@ -510,6 +510,7 @@ typedef struct libvlc_video_setup_device_info_t
     union {
         struct {
             void *device_context; /** ID3D11DeviceContext* */
+            void *context_mutex; /** Windows Mutex HANDLE to protect ID3D11DeviceContext usage */
         } d3d11;
         struct {
             void *device;         /** IDirect3D9* */
@@ -532,12 +533,17 @@ typedef struct libvlc_video_setup_device_info_t
  * \version LibVLC 4.0.0 or later
  *
  * For \ref libvlc_video_engine_d3d9 the output must be a IDirect3D9*.
- * A reference to this object is held until the \ref LIBVLC_VIDEO_DEVICE_CLEANUP is called.
+ * A reference to this object is held until the \ref libvlc_video_output_cleanup_cb is called.
  * the device must be created with D3DPRESENT_PARAMETERS.hDeviceWindow set to 0.
  *
  * For \ref libvlc_video_engine_d3d11 the output must be a ID3D11DeviceContext*.
- * A reference to this object is held until the \ref LIBVLC_VIDEO_DEVICE_CLEANUP is called.
+ * A reference to this object is held until the \ref libvlc_video_output_cleanup_cb is called.
  * The ID3D11Device used to create ID3D11DeviceContext must have multithreading enabled.
+ *
+ * If the ID3D11DeviceContext is used outside of the callbacks called by libvlc, the host
+ * MUST use a mutex to protect the access to the ID3D11DeviceContext of libvlc. This mutex
+ * value is set on d3d11.context_mutex. If the ID3D11DeviceContext is not used outside of
+ * the callbacks, the mutex d3d11.context_mutex may be NULL.
  */
 typedef bool (*libvlc_video_output_setup_cb)(void **opaque,
                                       const libvlc_video_setup_device_cfg_t *cfg,
@@ -710,24 +716,27 @@ typedef void( *libvlc_video_output_set_resize_cb )( void *opaque,
  *
  * \param opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb() [IN]
  * \param plane number of the rendering plane to select
+ * \param output handle of the rendering output for the given plane
  * \return true on success
  * \version LibVLC 4.0.0 or later
  *
  * \note This is only used with \ref libvlc_video_engine_d3d11.
  *
- * The host should call OMSetRenderTargets for Direct3D11. If this callback is
- * not used (set to NULL in @a libvlc_video_set_output_callbacks()) OMSetRenderTargets
- * has to be set during the @a libvlc_video_makeCurrent_cb()
+ * The output parameter receives the ID3D11RenderTargetView* to use for rendering
+ * the plane.
+ *
+ * If this callback is not used (set to NULL in @a libvlc_video_set_output_callbacks())
+ * OMSetRenderTargets has to be set during the @a libvlc_video_makeCurrent_cb()
  * entering call.
  *
  * The number of planes depend on the DXGI_FORMAT returned during the
- * \ref LIBVLC_VIDEO_UPDATE_OUTPUT call. It's usually one plane except for
+ * @a libvlc_video_update_output_cb() call. It's usually one plane except for
  * semi-planar formats like DXGI_FORMAT_NV12 or DXGI_FORMAT_P010.
  *
  * This callback is called between libvlc_video_makeCurrent_cb current/not-current
  * calls.
  */
-typedef bool( *libvlc_video_output_select_plane_cb )( void *opaque, size_t plane );
+typedef bool( *libvlc_video_output_select_plane_cb )( void *opaque, size_t plane, void *output );
 
 /**
  * Set callbacks and data to render decoded video to a custom texture
@@ -747,6 +756,9 @@ typedef bool( *libvlc_video_output_select_plane_cb )( void *opaque, size_t plane
  * \param metadata_cb callback to provide frame metadata (D3D11 only)
  * \param select_plane_cb callback to select different D3D11 rendering targets
  * \param opaque private pointer passed to callbacks
+ *
+ * \note the \param setup_cb and \param cleanup_cb may be called more than once per
+ * playback.
  *
  * \retval true engine selected and callbacks set
  * \retval false engine type unknown, callbacks not set

@@ -59,6 +59,7 @@ class QTimer;
 class StandardPLPanel;
 struct vout_window_t;
 class VideoSurfaceProvider;
+class ControlbarProfileModel;
 
 class WindowStateHolder : public QObject
 {
@@ -158,6 +159,9 @@ class MainInterface : public QVLCMW
     Q_PROPERTY(bool clientSideDecoration READ useClientSideDecoration NOTIFY useClientSideDecorationChanged)
     Q_PROPERTY(bool hasToolbarMenu READ hasToolbarMenu NOTIFY hasToolbarMenuChanged)
     Q_PROPERTY(bool canShowVideoPIP READ canShowVideoPIP CONSTANT)
+    Q_PROPERTY(bool pinVideoControls READ pinVideoControls WRITE setPinVideoControls NOTIFY pinVideoControlsChanged)
+    Q_PROPERTY(ControlbarProfileModel* controlbarProfileModel READ controlbarProfileModel CONSTANT)
+
 
 public:
     /* tors */
@@ -165,6 +169,8 @@ public:
     virtual ~MainInterface();
 
     static const QEvent::Type ToolbarsNeedRebuild;
+    static constexpr float MIN_INTF_USER_SCALE_FACTOR = .3f;
+    static constexpr float MAX_INTF_USER_SCALE_FACTOR = 3.f;
 
 public:
     /* Getters */
@@ -191,6 +197,9 @@ public:
     inline bool isHideAfterCreation() const { return b_hideAfterCreation; }
     inline bool isShowRemainingTime() const  { return m_showRemainingTime; }
     inline float getIntfScaleFactor() const { return m_intfScaleFactor; }
+    inline float getIntfUserScaleFactor() const { return m_intfUserScaleFactor; }
+    inline float getMinIntfUserScaleFactor() const { return MIN_INTF_USER_SCALE_FACTOR; }
+    inline float getMaxIntfUserScaleFactor() const { return MAX_INTF_USER_SCALE_FACTOR; }
     inline bool hasMediaLibrary() const { return b_hasMedialibrary; }
     inline MediaLib* getMediaLibrary() const { return m_medialib; }
     inline bool hasGridView() const { return m_gridView; }
@@ -200,6 +209,8 @@ public:
     inline bool hasToolbarMenu() const { return m_hasToolbarMenu; }
     inline bool canShowVideoPIP() const { return m_canShowVideoPIP; }
     inline void setCanShowVideoPIP(bool canShowVideoPIP) { m_canShowVideoPIP = canShowVideoPIP; }
+    inline bool pinVideoControls() const { return m_pinVideoControls; }
+    inline ControlbarProfileModel* controlbarProfileModel() const { return m_controlbarProfileModel; }
 
     bool hasEmbededVideo() const;
     VideoSurfaceProvider* getVideoSurfaceProvider() const;
@@ -215,6 +226,7 @@ protected:
     void dragMoveEvent( QDragMoveEvent * ) Q_DECL_OVERRIDE;
     void dragLeaveEvent( QDragLeaveEvent * ) Q_DECL_OVERRIDE;
     void closeEvent( QCloseEvent *) Q_DECL_OVERRIDE;
+    virtual void updateClientSideDecorations();
 
 protected:
     /* Systray */
@@ -270,6 +282,7 @@ protected:
     bool                 m_clientSideDecoration = false;
     bool                 m_hasToolbarMenu = false;
     bool                 m_canShowVideoPIP = false;
+    bool                 m_pinVideoControls = false;
 
     /* States */
     bool                 playlistVisible;       ///< Is the playlist visible ?
@@ -280,6 +293,8 @@ protected:
     int i_kc_offset;
 
     VLCVarChoiceModel* m_extraInterfaces;
+
+    ControlbarProfileModel* m_controlbarProfileModel;
 
 public slots:
     void toggleUpdateSystrayMenu();
@@ -293,6 +308,8 @@ public slots:
     void setShowRemainingTime( bool );
     void setGridView( bool );
     void incrementIntfUserScaleFactor( bool increment);
+    void setIntfUserScaleFactor( float );
+    void setPinVideoControls( bool );
 
     void emitBoss();
     void emitRaise();
@@ -330,7 +347,6 @@ signals:
     void interfaceAlwaysOnTopChanged(bool);
     void interfaceFullScreenChanged(bool);
     void hasEmbededVideoChanged(bool);
-    void toolBarConfUpdated();
     void showRemainingTimeChanged(bool);
     void gridViewChanged( bool );
     void colorSchemeChanged( QString );
@@ -343,6 +359,7 @@ signals:
     void requestInterfaceNormal();
 
     void intfScaleFactorChanged();
+    void pinVideoControlsChanged( bool );
 };
 
 #endif

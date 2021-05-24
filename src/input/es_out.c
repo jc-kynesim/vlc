@@ -77,7 +77,7 @@ typedef struct
     /* Clock for this program */
     input_clock_t    *p_input_clock;
     vlc_clock_main_t *p_main_clock;
-    vlc_clock_t      *p_master_clock;
+    const vlc_clock_t *p_master_clock;
 
     vlc_tick_t i_last_pcr;
 
@@ -182,7 +182,7 @@ typedef struct
     struct vlc_list programs;
     es_out_pgrm_t *p_pgrm;  /* Master program */
 
-    enum es_format_category_e i_master_source_cat;
+    enum vlc_clock_master_source clock_source;
 
     /* all es */
     int         i_id;
@@ -263,6 +263,48 @@ static int LanguageArrayIndex( char **ppsz_langs, const char *psz_lang );
 
 static char *EsOutProgramGetMetaName( es_out_pgrm_t *p_pgrm );
 static char *EsInfoCategoryName( es_out_id_t* es );
+
+struct clock_source_mapping
+{
+    char key[sizeof("monotonic")];
+    enum vlc_clock_master_source val;
+};
+
+static int clock_source_mapping_cmp(const void *key, const void *val)
+{
+    const struct clock_source_mapping *entry = val;
+    return strcasecmp( key, entry->key );
+}
+
+static enum vlc_clock_master_source
+clock_source_Inherit(vlc_object_t *obj)
+{
+    static const struct clock_source_mapping clock_source_list[] =
+    {
+        { "0", VLC_CLOCK_MASTER_AUDIO }, /* legacy option */
+        { "1", VLC_CLOCK_MASTER_MONOTONIC }, /* legacy option */
+        { "audio", VLC_CLOCK_MASTER_AUDIO },
+        { "auto", VLC_CLOCK_MASTER_AUTO },
+        { "input", VLC_CLOCK_MASTER_INPUT },
+        { "monotonic", VLC_CLOCK_MASTER_MONOTONIC },
+    };
+
+    char *master_source_str = var_InheritString(obj, "clock-master");
+    if (master_source_str == NULL)
+        goto default_val;
+
+    const struct clock_source_mapping *entry =
+        bsearch(master_source_str, clock_source_list, ARRAY_SIZE(clock_source_list),
+                sizeof (*clock_source_list), clock_source_mapping_cmp);
+    free(master_source_str);
+    if (entry == NULL)
+        goto default_val;
+
+    return entry->val;
+
+default_val:
+    return VLC_CLOCK_MASTER_AUTO;
+}
 
 static inline int EsOutGetClosedCaptionsChannel( const es_format_t *p_fmt )
 {
@@ -516,18 +558,7 @@ es_out_t *input_EsOutNew( input_thread_t *p_input, input_source_t *main_source, 
 
     p_sys->i_group_id = var_GetInteger( p_input, "program" );
 
-    enum vlc_clock_master_source master_source =
-        var_InheritInteger( p_input, "clock-master" );
-    switch( master_source )
-    {
-        case VLC_CLOCK_MASTER_AUDIO:
-            p_sys->i_master_source_cat = AUDIO_ES;
-            break;
-        case VLC_CLOCK_MASTER_MONOTONIC:
-        default:
-            p_sys->i_master_source_cat = UNKNOWN_ES;
-            break;
-    }
+    p_sys->clock_source = clock_source_Inherit( VLC_OBJECT(p_input) );
 
     p_sys->i_pause_date = -1;
 
@@ -1362,6 +1393,7 @@ static es_out_pgrm_t *EsOutProgramAdd( es_out_t *out, input_source_t *source, in
 {
     es_out_sys_t *p_sys = container_of(out, es_out_sys_t, out);
     input_thread_t    *p_input = p_sys->p_input;
+    input_thread_private_t *priv = input_priv(p_input);
 
     /* Sticky groups will be attached to any existing programs, no need to
      * create one. */
@@ -1382,15 +1414,39 @@ static es_out_pgrm_t *EsOutProgramAdd( es_out_t *out, input_source_t *source, in
     p_pgrm->p_meta = NULL;
 
     p_pgrm->p_master_clock = NULL;
-    p_pgrm->p_input_clock = input_clock_New( p_sys->rate );
+
     p_pgrm->p_main_clock = vlc_clock_main_New();
-    if( !p_pgrm->p_input_clock || !p_pgrm->p_main_clock )
+    if( !p_pgrm->p_main_clock )
     {
-        if( p_pgrm->p_input_clock )
-            input_clock_Delete( p_pgrm->p_input_clock );
         free( p_pgrm );
         return NULL;
     }
+
+    vlc_clock_t *p_master_clock = NULL;
+    switch( p_sys->clock_source )
+    {
+        case VLC_CLOCK_MASTER_AUTO:
+            if (priv->b_can_pace_control)
+                break;
+            msg_Dbg( p_input, "The input can't pace, selecting the input (PCR) as the "
+                     "clock source" );
+            /* Fall-through */
+        case VLC_CLOCK_MASTER_INPUT:
+            p_pgrm->p_master_clock = p_master_clock =
+                vlc_clock_main_CreateMaster( p_pgrm->p_main_clock, NULL, NULL );
+            break;
+        default:
+            break;
+    }
+
+    p_pgrm->p_input_clock = input_clock_New( p_master_clock, p_sys->rate );
+    if( !p_pgrm->p_input_clock )
+    {
+        vlc_clock_main_Delete( p_pgrm->p_main_clock );
+        free( p_pgrm );
+        return NULL;
+    }
+
     if( p_sys->b_paused )
         input_clock_ChangePause( p_pgrm->p_input_clock, p_sys->b_paused, p_sys->i_pause_date );
     const vlc_tick_t pts_delay = p_sys->i_pts_delay + p_sys->i_pts_jitter
@@ -1408,8 +1464,7 @@ static es_out_pgrm_t *EsOutProgramAdd( es_out_t *out, input_source_t *source, in
     vlc_list_append(&p_pgrm->node, &p_sys->programs);
 
     /* Update "program" variable */
-    if( EsOutIsProgramVisible( out, source, i_group ) )
-        input_SendEventProgramAdd( p_input, i_group, NULL );
+    input_SendEventProgramAdd( p_input, i_group, NULL );
 
     if( i_group == p_sys->i_group_id || ( !p_sys->p_pgrm && p_sys->i_group_id == 0 ) )
         EsOutProgramSelect( out, p_pgrm );
@@ -2165,8 +2220,23 @@ static void EsOutCreateDecoder( es_out_t *out, es_out_id_t *p_es )
 
     assert( p_es->p_pgrm );
 
+    enum es_format_category_e clock_source_cat;
+    switch( p_sys->clock_source )
+    {
+        case VLC_CLOCK_MASTER_AUTO:
+        case VLC_CLOCK_MASTER_AUDIO:
+            clock_source_cat = AUDIO_ES;
+            break;
+        case VLC_CLOCK_MASTER_MONOTONIC:
+        case VLC_CLOCK_MASTER_INPUT:
+            clock_source_cat = UNKNOWN_ES;
+            break;
+        default:
+            vlc_assert_unreachable();
+    }
+
     if( p_es->fmt.i_cat != UNKNOWN_ES
-     && p_es->fmt.i_cat == p_sys->i_master_source_cat
+     && p_es->fmt.i_cat == clock_source_cat
      && p_es->p_pgrm->p_master_clock == NULL )
     {
         p_es->master = true;
@@ -3285,6 +3355,8 @@ static int EsOutVaControlLocked( es_out_t *out, input_source_t *source,
     {
         int i = va_arg( args, int );
         es_out_pgrm_t *p_pgrm;
+
+        p_sys->i_group_id = i;
 
         vlc_list_foreach(p_pgrm, &p_sys->programs, node)
             if( p_pgrm->i_id == i )

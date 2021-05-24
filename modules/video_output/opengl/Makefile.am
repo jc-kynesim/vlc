@@ -65,6 +65,59 @@ libgl_plugin_la_SOURCES = video_output/opengl/display.c
 libgl_plugin_la_CFLAGS = $(AM_CFLAGS) $(GL_CFLAGS) $(OPENGL_COMMONCFLAGS)
 libgl_plugin_la_LIBADD = libvlc_opengl.la
 
+libglfilter_mock_plugin_la_SOURCES = video_output/opengl/filter_mock.c
+libglfilter_mock_plugin_la_LIBADD = $(LIBM)
+libglfilter_mock_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
+if HAVE_GL
+libglfilter_mock_plugin_la_LIBADD += libvlc_opengl.la $(GL_LIBS)
+noinst_LTLIBRARIES += libglfilter_mock_plugin.la
+endif
+
+if HAVE_IOS
+libglfilter_mock_plugin_la_LIBADD += libvlc_opengles.la $(GLES2_LIBS)
+libglfilter_mock_plugin_la_CFLAGS = -DUSE_OPENGL_ES2=1
+noinst_LTLIBRARIES += libglfilter_mock_plugin.la
+endif
+
+if HAVE_ANDROID
+libglfilter_mock_plugin_la_LIBADD += libvlc_opengles.la $(GLES2_LIBS)
+libglfilter_mock_plugin_la_CFLAGS = -DUSE_OPENGL_ES2=1
+noinst_LTLIBRARIES += libglfilter_mock_plugin.la
+endif
+
 if HAVE_GL
 vout_LTLIBRARIES += libgl_plugin.la
 endif # HAVE_GL
+
+libegl_display_generic_plugin_la_SOURCES = video_output/opengl/egl_display_generic.c
+libegl_display_generic_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(EGL_FLAGS)
+libegl_display_generic_plugin_la_LIBADD = $(EGL_LIBS)
+if HAVE_EGL
+vout_LTLIBRARIES += libegl_display_generic_plugin.la
+endif
+
+libegl_display_gbm_plugin_la_SOURCES = video_output/opengl/egl_display_gbm.c
+libegl_display_gbm_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(EGL_FLAGS) $(GBM_CFLAGS)
+libegl_display_gbm_plugin_la_LIBADD = $(EGL_LIBS) $(GBM_LIBS)
+if HAVE_EGL
+if HAVE_GBM
+vout_LTLIBRARIES += libegl_display_gbm_plugin.la
+endif
+endif
+
+libegl_pbuffer_filter_plugin_la_SOURCES = video_filter/egl_pbuffer.c \
+    video_output/opengl/egl_display.c video_output/opengl/egl_display.h
+libegl_pbuffer_filter_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(EGL_FLAGS)
+libegl_pbuffer_filter_plugin_la_LIBADD = $(EGL_LIBS)
+
+if HAVE_EGL
+if HAVE_GL
+libegl_pbuffer_filter_plugin_la_LIBADD += libvlc_opengl.la $(GL_LIBS)
+vout_LTLIBRARIES += libegl_pbuffer_filter_plugin.la
+endif
+if HAVE_ANDROID
+libegl_pbuffer_filter_plugin_la_LIBADD += libvlc_opengles.la $(GLES2_LIBS)
+libegl_pbuffer_filter_plugin_la_CPPFLAGS += -DUSE_OPENGL_ES2=1
+vout_LTLIBRARIES += libegl_pbuffer_filter_plugin.la
+endif
+endif

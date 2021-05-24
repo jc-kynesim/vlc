@@ -25,6 +25,7 @@ import "qrc:///style/"
 import "qrc:///main/" as Main
 import "qrc:///widgets/" as Widgets
 import "qrc:///util/KeyHelper.js" as KeyHelper
+import "qrc:///util/Helpers.js" as Helpers
 import "qrc:///playlist/" as PL
 import "qrc:///player/" as Player
 
@@ -47,6 +48,7 @@ Widgets.NavigableFocusScope {
     Component.onCompleted: {
         loadView()
         if (medialib)
+            // asynchronous call
             medialib.reload()
     }
 
@@ -252,9 +254,9 @@ Widgets.NavigableFocusScope {
                                 name: "expanded"
                                 PropertyChanges {
                                     target: playlistColumn
-                                    width: resizeHandle.clamp(root.width / resizeHandle.widthFactor,
-                                                              playlist.minimumWidth,
-                                                              root.width / 2)
+                                    width: Helpers.clamp(root.width / resizeHandle.widthFactor,
+                                                         playlist.minimumWidth,
+                                                         root.width / 2)
                                     visible: true
                                 }
                             },

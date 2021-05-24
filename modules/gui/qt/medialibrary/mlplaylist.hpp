@@ -16,40 +16,40 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-#ifndef QVLC_TOOLBAREDITOR_DIALOG_H_
-#define QVLC_TOOLBAREDITOR_DIALOG_H_ 1
+#ifndef MLPLAYLIST_HPP
+#define MLPLAYLIST_HPP
 
-#include "widgets/native/qvlcframe.hpp"                                 /* QVLCDialog */
-#include "util/qml_main_context.hpp"
-#include "dialogs/sout/profile_selector.hpp"
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-#include <QAbstractListModel>
-#include <QVector>
-#include <QQuickWidget>
+// MediaLibrary includes
+#include "mlqmltypes.hpp"
 
-class ToolbarEditorDialog : public QVLCDialog
+// Qt includes
+#include <QObject>
+
+class MLPlaylist : public QObject, public MLItem
 {
     Q_OBJECT
+
 public:
-    ToolbarEditorDialog( QWidget *, intf_thread_t *);
-    virtual ~ToolbarEditorDialog();
+    MLPlaylist(vlc_medialibrary_t * ml,
+               const vlc_ml_playlist_t * data, QObject * parent = nullptr);
 
-public slots:
-    Q_INVOKABLE void close();
-    Q_INVOKABLE void cancel();
+public: // Interface
+    QString getName () const;
+    QString getCover() const;
 
-private slots:
-    void newProfile();
-    void deleteProfile();
-    void changeProfile( int );
+    unsigned int getCount() const;
 
 private:
-    QComboBox *profileCombo;
-    QQuickWidget *editorView;
+    vlc_medialibrary_t * m_ml;
 
-signals:
-    void updatePlayerModel(QString toolbarName,QString config);
-    void saveConfig();
+    QString m_name;
+    QString m_cover;
+
+    unsigned int m_count;
 };
 
 #endif

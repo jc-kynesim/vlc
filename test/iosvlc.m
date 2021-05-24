@@ -32,15 +32,60 @@
 #include <vlc_variables.h>
 #include <vlc_plugin.h>
 
+#include <TargetConditionals.h>
+
 @interface AppDelegate : UIResponder <UIApplicationDelegate> {
     @public
     libvlc_instance_t *_libvlc;
     UIWindow *window;
+    UIView *subview;
+
+#if TARGET_OS_IOS
+    UIPinchGestureRecognizer *_pinchRecognizer;
+#endif
+
+    CGRect _pinchRect;
+    CGPoint _pinchOrigin;
+    CGPoint _pinchPreviousCenter;
 }
 @end
 
 
 @implementation AppDelegate
+#if TARGET_OS_IOS
+- (void)pinchRecognized:(UIPinchGestureRecognizer *)pinchRecognizer
+{
+    UIGestureRecognizerState state = [pinchRecognizer state];
+
+    switch (state)
+    {
+        case UIGestureRecognizerStateBegan:
+            _pinchRect = [subview frame];
+            _pinchOrigin = [pinchRecognizer locationInView:nil];
+            _pinchPreviousCenter = [subview center];
+            return;
+        case UIGestureRecognizerStateEnded:
+            return;
+        case UIGestureRecognizerStateChanged:
+            break;
+        default:
+            return;
+    }
+
+    CGFloat scale = pinchRecognizer.scale;
+    CGRect viewBounds = _pinchRect;
+    if (scale >= 1.0 && (viewBounds.size.width == 0 || viewBounds.size.height == 0))
+            viewBounds.size.width = viewBounds.size.height = 1;
+    viewBounds.size.width *= scale;
+    viewBounds.size.height *= scale;
+    subview.frame = viewBounds;
+    CGPoint newPosition = [pinchRecognizer locationInView:nil];
+    subview.center = CGPointMake(
+            _pinchPreviousCenter.x + newPosition.x - _pinchOrigin.x,
+            _pinchPreviousCenter.y + newPosition.y - _pinchOrigin.y);
+}
+#endif
+
 /* Called after application launch */
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
@@ -69,7 +114,17 @@
     window = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
     window.rootViewController = [UIViewController alloc];
     window.backgroundColor = [UIColor whiteColor];
+
+    subview = [[UIView alloc] initWithFrame:window.bounds];
+    subview.backgroundColor = [UIColor blueColor];
+    [window addSubview:subview];
     [window makeKeyAndVisible];
+
+#if TARGET_OS_IOS
+    _pinchRecognizer = [[UIPinchGestureRecognizer alloc]
+        initWithTarget:self action:@selector(pinchRecognized:)];
+    [window addGestureRecognizer:_pinchRecognizer];
+#endif
 
     /* Start glue interface, see code below */
     libvlc_add_intf(_libvlc, "ios_interface,none");
@@ -91,8 +146,9 @@ int main(int argc, char * argv[]) {
 static int Open(vlc_object_t *obj)
 {
     AppDelegate *d = (AppDelegate *)[[UIApplication sharedApplication] delegate];
-    assert(d != nil && d->window != nil);
-    var_SetAddress(vlc_object_instance(obj), "drawable-nsobject", d->window);
+    assert(d != nil && d->subview != nil);
+    var_SetAddress(vlc_object_instance(obj), "drawable-nsobject",
+                   (__bridge void *)d->subview);
 
     return VLC_SUCCESS;
 }

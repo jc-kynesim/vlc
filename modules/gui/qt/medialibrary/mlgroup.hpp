@@ -1,5 +1,7 @@
 /*****************************************************************************
- * Copyright (C) 2020 VLC authors and VideoLAN
+ * Copyright (C) 2021 VLC authors and VideoLAN
+ *
+ * Authors: Benjamin Arnaud <bunjee@omega.gg>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,17 +17,48 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
-import QtQuick 2.11
 
-Item {
-    id: root
+#ifndef MLGROUP_HPP
+#define MLGROUP_HPP
 
-    function insertIntoPlaylist(index /* <int>: index to insert at*/) {
-        console.assert(false, "parent should reimplement this function")
-    }
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-    function canInsertIntoPlaylist(index) {
-        return true
-    }
-}
+// MediaLibrary includes
+#include "mlqmltypes.hpp"
 
+// Qt includes
+#include <QObject>
+
+class MLGroup : public QObject, public MLItem
+{
+    Q_OBJECT
+
+public:
+    MLGroup(vlc_medialibrary_t * ml, const vlc_ml_group_t * data, QObject * parent = nullptr);
+
+public: // Interface
+    QString getName() const;
+
+    QString getThumbnail();
+
+    int64_t getDuration() const;
+
+    unsigned int getDate() const;
+
+    unsigned int getCount() const;
+
+private:
+    vlc_medialibrary_t * m_ml;
+
+    QString m_name;
+
+    int64_t m_duration;
+
+    unsigned int m_date;
+
+    unsigned int m_count;
+};
+
+#endif

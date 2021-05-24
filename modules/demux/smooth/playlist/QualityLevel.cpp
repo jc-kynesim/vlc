@@ -29,6 +29,16 @@
 
 using namespace smooth::playlist;
 
+SmoothCodecDescription::SmoothCodecDescription(const CodecParameters &params)
+{
+    params.initAndFillEsFmt(&fmt);
+}
+
+SmoothCodecDescription::~SmoothCodecDescription()
+{
+
+}
+
 QualityLevel::QualityLevel  ( BaseAdaptationSet *set ) :
                 BaseRepresentation( set )
 {
@@ -41,6 +51,11 @@ QualityLevel::~QualityLevel ()
 StreamFormat QualityLevel::getStreamFormat() const
 {
     return StreamFormat(StreamFormat::MP4);
+}
+
+CodecDescription * QualityLevel::makeCodecDescription(const std::string &) const
+{
+    return new SmoothCodecDescription(codecParameters);
 }
 
 InitSegment * QualityLevel::getInitSegment() const
@@ -90,4 +105,14 @@ std::string QualityLevel::contextualize(size_t number, const std::string &compon
     }
 
     return ret;
+}
+
+const CodecParameters & QualityLevel::getCodecParameters() const
+{
+    return codecParameters;
+}
+
+void QualityLevel::setCodecParameters(const CodecParameters &c)
+{
+    codecParameters = c;
 }

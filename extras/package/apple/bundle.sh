@@ -4,9 +4,10 @@ set -eu
 
 readonly SCRIPT_DIR="$(cd "${BASH_SOURCE%/*}"; pwd)"
 readonly BUILD_DIR="$(cd "$1"; pwd)"
-
-APP="Payload/vlccore.app"
-IPA="vlccore_unsigned.ipa"
+readonly APP_NAME="$2"
+readonly APP_EXECUTABLE="${3:-${APP_NAME}}"
+readonly APP="Payload/${APP_NAME}.app"
+readonly IPA="${APP_NAME}_unsigned.ipa"
 
 # CONVERT_PLIST <input file> <output file>
 # Convert a plist file into binary1 format in order to put it
@@ -27,16 +28,8 @@ rm -f "$IPA"
 rm -rf "Payload/"
 mkdir -p "$APP"
 
-# Find install_name tool in order to set rpath on executable
-INSTALL_NAME_TOOL=$(which install_name_tool || echo "")
-if [ -z "$INSTALL_NAME_TOOL" ]; then
-    echo "install_name_tool not found, aborting..."
-    exit 1
-fi
-
 # VLC core test binary compiled for iOS
-cp "${BUILD_DIR}/test/.libs/vlc-ios" "$APP/vlccore"
-${INSTALL_NAME_TOOL} "$APP/vlccore" -add_rpath "@executable_path/Frameworks"
+cp "${BUILD_DIR}/test/${APP_EXECUTABLE}" "${APP}/${APP_NAME}"
 
 # Convert Info.plist from XML to binary
 CONVERT_PLIST "${SCRIPT_DIR}/Info.plist" "Payload/vlccore.app/Info.plist"
@@ -49,9 +42,11 @@ echo "APPL????" > "$APP/PkgInfo"
 # Frameworks/ directory, but since it is only designed for development usage
 # we can just put them there without further processing.
 mkdir -p "$APP/Frameworks"
+if [ -f "${BUILD_DIR}/lib/.libs/libvlc.dylib" ]; then
 cp "${BUILD_DIR}/lib/.libs/libvlc.dylib" "$APP/Frameworks"
 cp "${BUILD_DIR}/src/.libs/libvlccore.dylib" "$APP/Frameworks"
 find "${BUILD_DIR}/modules/.libs/" -name "*.dylib" -exec cp {} "$APP/Frameworks" \;
+fi
 
 # Archive the bundle into a .ipa file.
 zip -r "$IPA" Payload

@@ -86,8 +86,8 @@ Widgets.NavigableFocusScope {
           }
         }
 
-        function insertIntoPlaylist(index) {
-            providerModel.insertIntoPlaylist(filterModel.mapIndexesToSource(selectionModel.selectedIndexes), index)
+        function getSelectedInputItem() {
+            return providerModel.getItemsForIndexes(selectionModel.selectedIndexes);
         }
 
         Component {
@@ -190,6 +190,8 @@ Widgets.NavigableFocusScope {
                 subtitle: ""
                 height: VLCStyle.gridCover_network_height + VLCStyle.margin_xsmall + VLCStyle.fontHeight_normal
                 dragItem: networkDragItem
+                unselectedUnderlay: shadows.unselected
+                selectedUnderlay: shadows.selected
 
                 onPlayClicked: playAt(index)
                 onItemClicked : gridView.leftClickOnItem(modifier, index)
@@ -215,6 +217,13 @@ Widgets.NavigableFocusScope {
             navigationUpItem: gridView.headerItem
             navigationCancel: function() {
                 history.previous()
+            }
+
+            Widgets.GridShadows {
+                id: shadows
+
+                coverWidth: VLCStyle.gridCover_network_width
+                coverHeight: VLCStyle.gridCover_network_height
             }
         }
     }
@@ -305,6 +314,7 @@ Widgets.NavigableFocusScope {
             ]
 
             onActionForSelection: _actionAtIndex(selection[0].row)
+            onItemDoubleClicked: _actionAtIndex(index)
             onContextMenuButtonClicked: contextMenu.popup(filterModel.mapIndexesToSource(selectionModel.selectedIndexes), menuParent.mapToGlobal(0,0))
             onRightClick: contextMenu.popup(filterModel.mapIndexesToSource(selectionModel.selectedIndexes), globalMousePos)
         }

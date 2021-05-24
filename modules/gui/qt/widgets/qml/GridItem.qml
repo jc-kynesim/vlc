@@ -38,6 +38,8 @@ FocusScope {
     property alias pictureRadius: picture.radius
     property alias pictureOverlay: picture.imageOverlay
     property bool selected: false
+    property alias unselectedUnderlay: unselectedUnderlayLoader.sourceComponent
+    property alias selectedUnderlay: selectedUnderlayLoader.sourceComponent
 
     property alias progress: picture.progress
     property alias labels: picture.labels
@@ -61,7 +63,7 @@ FocusScope {
     implicitWidth: mouseArea.implicitWidth
     implicitHeight: mouseArea.implicitHeight
 
-    readonly property bool _highlighted: mouseArea.containsMouse || content.activeFocus
+    readonly property bool _highlighted: mouseArea.containsMouse || root.activeFocus
 
     readonly property int selectedBorderWidth: VLCStyle.gridItemSelectedBorder
 
@@ -74,13 +76,13 @@ FocusScope {
             name: "unselected"
 
             PropertyChanges {
-                target: selectedShadow
+                target: selectedUnderlayLoader
                 opacity: 0
                 visible: false
             }
 
             PropertyChanges {
-                target: unselectedShadow
+                target: unselectedUnderlayLoader
                 opacity: 1
                 visible: true
             }
@@ -100,13 +102,13 @@ FocusScope {
             name: "selected"
 
             PropertyChanges {
-                target: selectedShadow
+                target: selectedUnderlayLoader
                 opacity: 1
                 visible: true
             }
 
             PropertyChanges {
-                target: unselectedShadow
+                target: unselectedUnderlayLoader
                 opacity: 0
                 visible: false
             }
@@ -132,7 +134,7 @@ FocusScope {
 
             SequentialAnimation {
                 PropertyAction {
-                    targets: [picture, selectedShadow]
+                    targets: [picture, selectedUnderlayLoader]
                     properties: "playCoverVisible,visible"
                 }
 
@@ -152,7 +154,7 @@ FocusScope {
                 }
 
                 PropertyAction {
-                    target: unselectedShadow
+                    target: unselectedUnderlayLoader
                     property: "visible"
                 }
             }
@@ -164,7 +166,7 @@ FocusScope {
 
             SequentialAnimation {
                 PropertyAction {
-                    target: unselectedShadow
+                    target: unselectedUnderlayLoader
                     property: "visible"
                 }
 
@@ -184,7 +186,7 @@ FocusScope {
                 }
 
                 PropertyAction {
-                    targets: [picture, selectedShadow]
+                    targets: [picture, selectedUnderlayLoader]
                     properties: "playCoverVisible,visible"
                 }
             }
@@ -193,11 +195,11 @@ FocusScope {
 
     MouseArea {
         id: mouseArea
-        hoverEnabled: true
 
+        hoverEnabled: true
         anchors.fill: parent
-        implicitWidth: content.implicitWidth
-        implicitHeight: content.implicitHeight
+        implicitWidth: layout.implicitWidth
+        implicitHeight: layout.implicitHeight
         drag.target: root.dragItem
         drag.axis: Drag.XAndYAxis
         drag.onActiveChanged: {
@@ -237,131 +239,92 @@ FocusScope {
             }
         }
 
-        FocusScope {
-            id: content
+        /* background visible when selected */
+        Rectangle {
+            id: selectionRect
 
-            anchors.fill: parent
-            implicitWidth: layout.implicitWidth
-            implicitHeight: layout.implicitHeight
-            focus: true
+            x: - root.selectedBorderWidth
+            y: - root.selectedBorderWidth
+            width: root.width + ( root.selectedBorderWidth * 2 )
+            height:  root.height + ( root.selectedBorderWidth * 2 )
+            color: VLCStyle.colors.bgHover
+            visible: root.selected || root._highlighted
+        }
 
-            /* background visible when selected */
-            Rectangle {
-                id: selectionRect
+        Loader {
+            id: unselectedUnderlayLoader
 
-                x: - root.selectedBorderWidth
-                y: - root.selectedBorderWidth
-                width: root.width + ( root.selectedBorderWidth * 2 )
-                height:  root.height + ( root.selectedBorderWidth * 2 )
-                color: VLCStyle.colors.bgHover
-                visible: root.selected || root._highlighted
+            asynchronous: true
+        }
+
+        Loader {
+            id: selectedUnderlayLoader
+
+            asynchronous: true
+        }
+
+        Column {
+            id: layout
+
+            anchors.centerIn: parent
+
+            Widgets.MediaCover {
+                id: picture
+
+                width: pictureWidth
+                height: pictureHeight
+                playCoverVisible: root._highlighted
+                onPlayIconClicked: root.playClicked()
+                clip: true
+                radius: VLCStyle.gridCover_radius
+
+                /* new indicator (triangle at top-left of cover)*/
+                Rectangle {
+                    id: newIndicator
+
+                    // consider this Rectangle as a triangle, then following property is its median length
+                    property alias median: root._newIndicatorMedian
+
+                    x: parent.width - median
+                    y: - median
+                    width: 2 * median
+                    height: 2 * median
+                    color: VLCStyle.colors.accent
+                    rotation: 45
+                    visible: root.showNewIndicator && root.progress === 0
+                }
             }
 
-            Rectangle {
-                id: baseRect
+            Widgets.ScrollingText {
+                id: titleTextRect
 
-                x: layout.x + 1 // this rect is set such that it hides behind picture component
-                y: layout.y + 1
-                width: pictureWidth - 2
-                height: pictureHeight - 2
-                radius: picture.radius
-                color: VLCStyle.colors.bg
-            }
+                label: titleLabel
+                scroll: _highlighted
+                height: titleLabel.height
+                width: titleLabel.width
+                visible: root.title !== ""
 
-            // animating shadows properties are expensive and not smooth
-            // thus we use two different shadows for states "selected" and "unselected"
-            // and animate their opacity on state changes to get better animation
-            CoverShadow {
-                id: unselectedShadow
+                Widgets.ListLabel {
+                    id: titleLabel
 
-                anchors.fill: baseRect
-                source: baseRect
-                cached: true
-                secondaryVerticalOffset: VLCStyle.dp(1, VLCStyle.scale)
-                secondaryRadius: VLCStyle.dp(2, VLCStyle.scale)
-                secondarySamples: 1 + VLCStyle.dp(2, VLCStyle.scale) * 2
-                primaryVerticalOffset: VLCStyle.dp(4, VLCStyle.scale)
-                primaryRadius: VLCStyle.dp(9, VLCStyle.scale)
-                primarySamples: 1 + VLCStyle.dp(9, VLCStyle.scale) * 2
-            }
-
-            CoverShadow {
-                id: selectedShadow
-
-                anchors.fill: baseRect
-                source: baseRect
-                cached: true
-                secondaryVerticalOffset: VLCStyle.dp(6, VLCStyle.scale)
-                secondaryRadius: VLCStyle.dp(18, VLCStyle.scale)
-                secondarySamples: 1 + VLCStyle.dp(18, VLCStyle.scale) * 2
-                primaryVerticalOffset: VLCStyle.dp(32, VLCStyle.scale)
-                primaryRadius: VLCStyle.dp(72, VLCStyle.scale)
-                primarySamples: 1 + VLCStyle.dp(72, VLCStyle.scale) * 2
-            }
-
-            Column {
-                id: layout
-
-                anchors.centerIn: parent
-
-                Widgets.MediaCover {
-                    id: picture
-
+                    elide: Text.ElideNone
                     width: pictureWidth
-                    height: pictureHeight
-                    playCoverVisible: root._highlighted
-                    onPlayIconClicked: root.playClicked()
-                    clip: true
-                    radius: VLCStyle.gridCover_radius
-
-                    /* new indicator (triangle at top-left of cover)*/
-                    Rectangle {
-                        id: newIndicator
-
-                        // consider this Rectangle as a triangle, then following property is its median length
-                        property alias median: root._newIndicatorMedian
-
-                        x: parent.width - median
-                        y: - median
-                        width: 2 * median
-                        height: 2 * median
-                        color: VLCStyle.colors.accent
-                        rotation: 45
-                        visible: root.showNewIndicator && root.progress === 0
-                    }
+                    horizontalAlignment: root.textHorizontalAlignment
+                    topPadding: root.titleMargin
+                    color: selectionRect.visible ? VLCStyle.colors.bgHoverText : VLCStyle.colors.text
                 }
+            }
 
-                Widgets.ScrollingText {
-                    id: titleTextRect
+            Widgets.MenuCaption {
+                id: subtitleTxt
 
-                    label: titleLabel
-                    scroll: _highlighted
-                    height: titleLabel.height
-                    width: titleLabel.width
-                    visible: root.title !== ""
-
-                    Widgets.ListLabel {
-                        id: titleLabel
-
-                        elide: Text.ElideNone
-                        width: pictureWidth
-                        horizontalAlignment: root.textHorizontalAlignment
-                        topPadding: root.titleMargin
-                        color: selectionRect.visible ? VLCStyle.colors.bgHoverText : VLCStyle.colors.text
-                    }
-                }
-
-                Widgets.MenuCaption {
-                    id: subtitleTxt
-
-                    visible: text !== ""
-                    text: root.subtitle
-                    width: pictureWidth
-                    topPadding: VLCStyle.margin_xsmall
-                    color: selectionRect.visible
-                           ? VLCStyle.colors.setColorAlpha(VLCStyle.colors.bgHoverText, .6)
-                           : VLCStyle.colors.menuCaption
-                }
+                visible: text !== ""
+                text: root.subtitle
+                width: pictureWidth
+                topPadding: VLCStyle.margin_xsmall
+                color: selectionRect.visible
+                       ? VLCStyle.colors.setColorAlpha(VLCStyle.colors.bgHoverText, .6)
+                       : VLCStyle.colors.menuCaption
             }
         }
     }

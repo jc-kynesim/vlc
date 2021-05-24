@@ -449,22 +449,23 @@ exit:
     free( psz_path );
 }
 
-bool GetCropMode(const char *crop_str, enum vout_crop_mode *mode,
-                        unsigned *num, unsigned *den,
-                        unsigned *x, unsigned *y,
-                        unsigned *width, unsigned *height )
+bool vout_ParseCrop(struct vout_crop *restrict cfg, const char *crop_str)
 {
-    if (sscanf(crop_str, "%u:%u", num, den) == 2) {
-        *mode = VOUT_CROP_RATIO;
+    if (sscanf(crop_str, "%u:%u", &cfg->ratio.num, &cfg->ratio.den) == 2) {
+        if (cfg->ratio.num != 0 && cfg->ratio.den != 0)
+            cfg->mode = VOUT_CROP_RATIO;
+        else
+            cfg->mode = VOUT_CROP_NONE;
     } else if (sscanf(crop_str, "%ux%u+%u+%u",
-                      width, height, x, y) == 4) {
-        *mode = VOUT_CROP_WINDOW;
+                      &cfg->window.width, &cfg->window.height,
+                      &cfg->window.x, &cfg->window.y) == 4) {
+        cfg->mode = VOUT_CROP_WINDOW;
     } else if (sscanf(crop_str, "%u+%u+%u+%u",
-                    x, y, width, height) == 4) {
-        *mode = VOUT_CROP_BORDER;
+                      &cfg->border.left, &cfg->border.top,
+                      &cfg->border.right, &cfg->border.bottom) == 4) {
+        cfg->mode = VOUT_CROP_BORDER;
     } else if (*crop_str == '\0') {
-        *mode = VOUT_CROP_RATIO;
-        *num = *den = 0;
+        cfg->mode = VOUT_CROP_NONE;
     } else {
         return false;
     }
@@ -479,30 +480,13 @@ static int CropCallback( vlc_object_t *object, char const *cmd,
 {
     vout_thread_t *vout = (vout_thread_t *)object;
     VLC_UNUSED(cmd); VLC_UNUSED(oldval); VLC_UNUSED(data);
-    unsigned num, den;
-    unsigned y, x;
-    unsigned width, height;
-    enum vout_crop_mode mode;
+    struct vout_crop crop;
 
-    if (GetCropMode(newval.psz_string, &mode, &num, &den,
-                    &x, &y, &width, &height)) {
-        switch (mode)
-        {
-            case VOUT_CROP_RATIO:
-                vout_ChangeCropRatio(vout, num, den);
-                break;
-            case VOUT_CROP_WINDOW:
-                vout_ChangeCropWindow(vout, x, y, width, height);
-                break;
-            case VOUT_CROP_BORDER:
-                vout_ChangeCropBorder(vout, x, y, width, height);
-                break;
-            case VOUT_CROP_NONE:
-                break;
-        }
-    } else {
+    if (vout_ParseCrop(&crop, newval.psz_string))
+        vout_ChangeCrop(vout, &crop);
+    else
         msg_Err(object, "Unknown crop format (%s)", newval.psz_string);
-    }
+
     return VLC_SUCCESS;
 }
 

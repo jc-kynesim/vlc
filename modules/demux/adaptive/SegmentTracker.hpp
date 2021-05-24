@@ -21,6 +21,7 @@
 #define SEGMENTTRACKER_HPP
 
 #include "StreamFormat.hpp"
+#include "playlist/CodecDescription.hpp"
 #include "playlist/Role.hpp"
 
 #include <vlc_common.h>
@@ -34,6 +35,7 @@ namespace adaptive
     namespace http
     {
         class AbstractConnectionManager;
+        class ChunkInterface;
     }
 
     namespace logic
@@ -131,11 +133,13 @@ namespace adaptive
     {
         public:
             BufferingLevelChangedEvent() = delete;
-            BufferingLevelChangedEvent(const ID &, vlc_tick_t, vlc_tick_t, vlc_tick_t);
+            BufferingLevelChangedEvent(const ID &,
+                                       vlc_tick_t, vlc_tick_t, vlc_tick_t, vlc_tick_t);
             virtual ~BufferingLevelChangedEvent() = default;
 
             const ID *id;
             vlc_tick_t minimum;
+            vlc_tick_t maximum;
             vlc_tick_t current;
             vlc_tick_t target;
     };
@@ -178,26 +182,38 @@ namespace adaptive
             };
 
             StreamFormat getCurrentFormat() const;
-            std::list<std::string> getCurrentCodecs() const;
-            const std::string & getStreamDescription() const;
-            const std::string & getStreamLanguage() const;
+            void getCodecsDesc(CodecDescriptionList *) const;
             const Role & getStreamRole() const;
             void reset();
-            SegmentChunk* getNextChunk(bool, AbstractConnectionManager *);
+            ChunkInterface* getNextChunk(bool, AbstractConnectionManager *);
             bool setPositionByTime(vlc_tick_t, bool, bool);
             void setPosition(const Position &, bool);
             bool setStartPosition();
-            Position getStartPosition();
+            Position getStartPosition() const;
             vlc_tick_t getPlaybackTime(bool = false) const; /* Current segment start time if selected */
             bool getMediaPlaybackRange(vlc_tick_t *, vlc_tick_t *, vlc_tick_t *) const;
             vlc_tick_t getMinAheadTime() const;
             void notifyBufferingState(bool) const;
-            void notifyBufferingLevel(vlc_tick_t, vlc_tick_t, vlc_tick_t) const;
+            void notifyBufferingLevel(vlc_tick_t, vlc_tick_t, vlc_tick_t, vlc_tick_t) const;
             void registerListener(SegmentTrackerListenerInterface *);
             void updateSelected();
             bool bufferingAvailable() const;
 
         private:
+            class ChunkEntry
+            {
+                public:
+                    ChunkEntry();
+                    ChunkEntry(SegmentChunk *c, Position p, vlc_tick_t d);
+                    bool isValid() const;
+                    SegmentChunk *chunk;
+                    Position pos;
+                    vlc_tick_t duration;
+            };
+            std::list<ChunkEntry> chunkssequence;
+            ChunkEntry prepareChunk(bool switch_allowed, Position pos,
+                                    AbstractConnectionManager *connManager) const;
+            void resetChunksSequence();
             void setAdaptationLogic(AbstractAdaptationLogic *);
             void notify(const TrackerEvent &) const;
             bool first;

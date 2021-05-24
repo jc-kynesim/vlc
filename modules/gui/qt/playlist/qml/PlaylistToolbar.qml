@@ -34,7 +34,7 @@ RowLayout {
 
     Item {
         Layout.fillWidth: true
-        implicitHeight: childrenRect.height
+        implicitHeight: loop.height
 
         Widgets.IconToolButton {
             id: loop
@@ -48,16 +48,13 @@ RowLayout {
             checked: mainPlaylistController.repeatMode !== PlaylistControllerModel.PLAYBACK_REPEAT_NONE
             onClicked: mainPlaylistController.toggleRepeatMode()
             focusPolicy: Qt.NoFocus
-
-            color: colors.buttonText
-            colorDisabled: colors.textInactive
         }
     }
 
 
     Item {
         Layout.fillWidth: true
-        implicitHeight: childrenRect.height
+        implicitHeight: shuffle.height
 
         Widgets.IconToolButton {
             id: shuffle
@@ -69,15 +66,12 @@ RowLayout {
             iconText: VLCIcons.shuffle_on
             onClicked: mainPlaylistController.shuffle()
             focusPolicy: Qt.NoFocus
-
-            color: colors.buttonText
-            colorDisabled: colors.textInactive
         }
     }
 
     Item {
         Layout.fillWidth: true
-        implicitHeight: childrenRect.height
+        implicitHeight: sort.height
 
         Widgets.SortControl {
             id: sort
@@ -123,7 +117,7 @@ RowLayout {
 
     Item {
         Layout.fillWidth: true
-        implicitHeight: childrenRect.height
+        implicitHeight: clear.height
 
         Widgets.IconToolButton {
             id: clear
@@ -135,9 +129,6 @@ RowLayout {
             iconText: VLCIcons.playlist_clear
             onClicked: mainPlaylistController.clear()
             focusPolicy: Qt.NoFocus
-
-            color: colors.buttonText
-            colorDisabled: colors.textInactive
         }
     }
 }

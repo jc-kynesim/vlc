@@ -183,7 +183,7 @@ static int assert_staging(filter_t *p_filter, filter_sys_t *sys, DXGI_FORMAT for
         /* failed with the this format, try a different one */
         UINT supportFlags = D3D11_FORMAT_SUPPORT_SHADER_LOAD | D3D11_FORMAT_SUPPORT_VIDEO_PROCESSOR_OUTPUT;
         const d3d_format_t *new_fmt =
-                FindD3D11Format( p_filter, d3d_dev, 0, D3D11_RGB_FORMAT|D3D11_YUV_FORMAT, 0, 0, 0, D3D11_CHROMA_CPU, supportFlags );
+                FindD3D11Format( p_filter, d3d_dev, 0, DXGI_RGB_FORMAT|DXGI_YUV_FORMAT, 0, 0, 0, DXGI_CHROMA_CPU, supportFlags );
         if (new_fmt && texDesc.Format != new_fmt->formatTexture)
         {
             DXGI_FORMAT srcFormat = texDesc.Format;
@@ -615,7 +615,7 @@ static picture_t *AllocateCPUtoGPUTexture(filter_t *p_filter, filter_sys_t *p_sy
     d3d11_video_context_t *vctx_sys = GetD3D11ContextPrivate( p_filter->vctx_out );
 
     const d3d_format_t *cfg = NULL;
-    for (const d3d_format_t *output_format = GetRenderFormatList();
+    for (const d3d_format_t *output_format = DxgiGetRenderFormatList();
             output_format->name != NULL; ++output_format)
     {
         if (output_format->formatTexture == vctx_sys->format &&

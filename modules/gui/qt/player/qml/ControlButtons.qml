@@ -26,82 +26,86 @@ import org.videolan.vlc 0.1
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 import "qrc:///util/KeyHelper.js" as KeyHelper
+import "qrc:///util/Helpers.js" as Helpers
 
 Item{
     id: controlButtons
 
-    property bool isMiniplayer: false
     property var  parentWindow: undefined
 
+    signal requestLockUnlockAutoHide(bool lock, var source)
+
     property var buttonL: [
-        { id:  PlayerControlBarModel.PLAY_BUTTON, label: VLCIcons.play, text: i18n.qtr("Play")},
-        { id:  PlayerControlBarModel.STOP_BUTTON, label: VLCIcons.stop, text: i18n.qtr("Stop")},
-        { id:  PlayerControlBarModel.OPEN_BUTTON, label: VLCIcons.eject, text: i18n.qtr("Open")},
-        { id:  PlayerControlBarModel.PREVIOUS_BUTTON, label: VLCIcons.previous, text: i18n.qtr("Previous")},
-        { id:  PlayerControlBarModel.NEXT_BUTTON, label: VLCIcons.next, text: i18n.qtr("Next")},
-        { id:  PlayerControlBarModel.SLOWER_BUTTON, label: VLCIcons.slower, text: i18n.qtr("Slower")},
-        { id:  PlayerControlBarModel.FASTER_BUTTON, label: VLCIcons.faster, text: i18n.qtr("Faster")},
-        { id:  PlayerControlBarModel.FULLSCREEN_BUTTON, label: VLCIcons.fullscreen, text: i18n.qtr("Fullscreen")},
-        { id:  PlayerControlBarModel.EXTENDED_BUTTON, label: VLCIcons.extended, text: i18n.qtr("Extended panel")},
-        { id:  PlayerControlBarModel.PLAYLIST_BUTTON, label: VLCIcons.playlist, text: i18n.qtr("Playlist")},
-        { id:  PlayerControlBarModel.SNAPSHOT_BUTTON, label: VLCIcons.snapshot, text: i18n.qtr("Snapshot")},
-        { id:  PlayerControlBarModel.RECORD_BUTTON, label: VLCIcons.record, text: i18n.qtr("Record")},
-        { id:  PlayerControlBarModel.ATOB_BUTTON, label: VLCIcons.atob, text: i18n.qtr("A-B Loop")},
-        { id:  PlayerControlBarModel.FRAME_BUTTON, label: VLCIcons.frame_by_frame, text: i18n.qtr("Frame By Frame")},
-        { id:  PlayerControlBarModel.SKIP_BACK_BUTTON, label: VLCIcons.skip_back, text: i18n.qtr("Step backward")},
-        { id:  PlayerControlBarModel.SKIP_FW_BUTTON, label: VLCIcons.skip_for, text: i18n.qtr("Step forward")},
-        { id:  PlayerControlBarModel.QUIT_BUTTON, label: VLCIcons.clear, text: i18n.qtr("Quit")},
-        { id:  PlayerControlBarModel.RANDOM_BUTTON, label: VLCIcons.shuffle_on, text: i18n.qtr("Random")},
-        { id:  PlayerControlBarModel.LOOP_BUTTON, label: VLCIcons.repeat_all, text: i18n.qtr("Loop")},
-        { id:  PlayerControlBarModel.INFO_BUTTON, label: VLCIcons.info, text: i18n.qtr("Information")},
-        { id:  PlayerControlBarModel.LANG_BUTTON, label: VLCIcons.audiosub, text: i18n.qtr("Open subtitles")},
-        { id:  PlayerControlBarModel.MENU_BUTTON, label: VLCIcons.menu, text: i18n.qtr("Menu Button")},
-        { id:  PlayerControlBarModel.BACK_BUTTON, label: VLCIcons.exit, text: i18n.qtr("Back Button")},
-        { id:  PlayerControlBarModel.CHAPTER_PREVIOUS_BUTTON, label: VLCIcons.dvd_prev, text: i18n.qtr("Previous chapter")},
-        { id:  PlayerControlBarModel.CHAPTER_NEXT_BUTTON, label: VLCIcons.dvd_next, text: i18n.qtr("Next chapter")},
-        { id:  PlayerControlBarModel.VOLUME, label: VLCIcons.volume_high, text: i18n.qtr("Volume Widget")},
-        { id:  PlayerControlBarModel.TELETEXT_BUTTONS, label: VLCIcons.tvtelx, text: i18n.qtr("Teletext")},
-        { id:  PlayerControlBarModel.ASPECT_RATIO_COMBOBOX, label: VLCIcons.aspect_ratio, text: i18n.qtr("Aspect Ratio")},
-        { id:  PlayerControlBarModel.WIDGET_SPACER, label: VLCIcons.space, text: i18n.qtr("Spacer")},
-        { id:  PlayerControlBarModel.WIDGET_SPACER_EXTEND, label: VLCIcons.space, text: i18n.qtr("Expanding Spacer")},
-        { id:  PlayerControlBarModel.PLAYER_SWITCH_BUTTON, label: VLCIcons.fullscreen, text: i18n.qtr("Switch Player")},
-        { id:  PlayerControlBarModel.ARTWORK_INFO, label: VLCIcons.info, text: i18n.qtr("Artwork Info")}
+        { id:  ControlListModel.PLAY_BUTTON, label: VLCIcons.play, text: i18n.qtr("Play")},
+        { id:  ControlListModel.STOP_BUTTON, label: VLCIcons.stop, text: i18n.qtr("Stop")},
+        { id:  ControlListModel.OPEN_BUTTON, label: VLCIcons.eject, text: i18n.qtr("Open")},
+        { id:  ControlListModel.PREVIOUS_BUTTON, label: VLCIcons.previous, text: i18n.qtr("Previous")},
+        { id:  ControlListModel.NEXT_BUTTON, label: VLCIcons.next, text: i18n.qtr("Next")},
+        { id:  ControlListModel.SLOWER_BUTTON, label: VLCIcons.slower, text: i18n.qtr("Slower")},
+        { id:  ControlListModel.FASTER_BUTTON, label: VLCIcons.faster, text: i18n.qtr("Faster")},
+        { id:  ControlListModel.FULLSCREEN_BUTTON, label: VLCIcons.fullscreen, text: i18n.qtr("Fullscreen")},
+        { id:  ControlListModel.EXTENDED_BUTTON, label: VLCIcons.extended, text: i18n.qtr("Extended panel")},
+        { id:  ControlListModel.PLAYLIST_BUTTON, label: VLCIcons.playlist, text: i18n.qtr("Playlist")},
+        { id:  ControlListModel.SNAPSHOT_BUTTON, label: VLCIcons.snapshot, text: i18n.qtr("Snapshot")},
+        { id:  ControlListModel.RECORD_BUTTON, label: VLCIcons.record, text: i18n.qtr("Record")},
+        { id:  ControlListModel.ATOB_BUTTON, label: VLCIcons.atob, text: i18n.qtr("A-B Loop")},
+        { id:  ControlListModel.FRAME_BUTTON, label: VLCIcons.frame_by_frame, text: i18n.qtr("Frame By Frame")},
+        { id:  ControlListModel.SKIP_BACK_BUTTON, label: VLCIcons.skip_back, text: i18n.qtr("Step backward")},
+        { id:  ControlListModel.SKIP_FW_BUTTON, label: VLCIcons.skip_for, text: i18n.qtr("Step forward")},
+        { id:  ControlListModel.QUIT_BUTTON, label: VLCIcons.clear, text: i18n.qtr("Quit")},
+        { id:  ControlListModel.RANDOM_BUTTON, label: VLCIcons.shuffle_on, text: i18n.qtr("Random")},
+        { id:  ControlListModel.LOOP_BUTTON, label: VLCIcons.repeat_all, text: i18n.qtr("Loop")},
+        { id:  ControlListModel.INFO_BUTTON, label: VLCIcons.info, text: i18n.qtr("Information")},
+        { id:  ControlListModel.LANG_BUTTON, label: VLCIcons.audiosub, text: i18n.qtr("Open subtitles")},
+        { id:  ControlListModel.MENU_BUTTON, label: VLCIcons.menu, text: i18n.qtr("Menu Button")},
+        { id:  ControlListModel.BACK_BUTTON, label: VLCIcons.exit, text: i18n.qtr("Back Button")},
+        { id:  ControlListModel.CHAPTER_PREVIOUS_BUTTON, label: VLCIcons.dvd_prev, text: i18n.qtr("Previous chapter")},
+        { id:  ControlListModel.CHAPTER_NEXT_BUTTON, label: VLCIcons.dvd_next, text: i18n.qtr("Next chapter")},
+        { id:  ControlListModel.VOLUME, label: VLCIcons.volume_high, text: i18n.qtr("Volume Widget")},
+        { id:  ControlListModel.TELETEXT_BUTTONS, label: VLCIcons.tvtelx, text: i18n.qtr("Teletext")},
+        { id:  ControlListModel.ASPECT_RATIO_COMBOBOX, label: VLCIcons.aspect_ratio, text: i18n.qtr("Aspect Ratio")},
+        { id:  ControlListModel.WIDGET_SPACER, label: VLCIcons.space, text: i18n.qtr("Spacer")},
+        { id:  ControlListModel.WIDGET_SPACER_EXTEND, label: VLCIcons.space, text: i18n.qtr("Expanding Spacer")},
+        { id:  ControlListModel.PLAYER_SWITCH_BUTTON, label: VLCIcons.fullscreen, text: i18n.qtr("Switch Player")},
+        { id:  ControlListModel.ARTWORK_INFO, label: VLCIcons.info, text: i18n.qtr("Artwork Info")},
+        { id:  ControlListModel.PLAYBACK_SPEED_BUTTON, label: "1x", text: i18n.qtr("Playback Speed")}
     ]
 
     function returnbuttondelegate(inpID){
         switch (inpID){
-        case PlayerControlBarModel.RANDOM_BUTTON: return randomBtnDelegate
-        case PlayerControlBarModel.PREVIOUS_BUTTON: return prevBtnDelegate
-        case PlayerControlBarModel.PLAY_BUTTON: return playBtnDelegate
-        case PlayerControlBarModel.NEXT_BUTTON: return nextBtnDelegate
-        case PlayerControlBarModel.LOOP_BUTTON: return repeatBtnDelegate
-        case PlayerControlBarModel.LANG_BUTTON: return langBtnDelegate
-        case PlayerControlBarModel.PLAYLIST_BUTTON:return playlistBtnDelegate
-        case PlayerControlBarModel.MENU_BUTTON:return  menuBtnDelegate
-        case PlayerControlBarModel.CHAPTER_PREVIOUS_BUTTON:return  chapterPreviousBtnDelegate
-        case PlayerControlBarModel.CHAPTER_NEXT_BUTTON:return  chapterNextBtnDelegate
-        case PlayerControlBarModel.BACK_BUTTON:return  backBtnDelegate
-        case PlayerControlBarModel.WIDGET_SPACER:return  spacerDelegate
-        case PlayerControlBarModel.WIDGET_SPACER_EXTEND:return  extendiblespacerDelegate
-        case PlayerControlBarModel.RECORD_BUTTON: return recordBtnDelegate
-        case PlayerControlBarModel.FULLSCREEN_BUTTON: return fullScreenBtnDelegate
-        case PlayerControlBarModel.ATOB_BUTTON: return toggleABloopstateDelegate
-        case PlayerControlBarModel.SNAPSHOT_BUTTON: return snapshotBtnDelegate
-        case PlayerControlBarModel.STOP_BUTTON: return stopBtndelgate
-        case PlayerControlBarModel.INFO_BUTTON: return mediainfoBtnDelegate
-        case PlayerControlBarModel.FRAME_BUTTON: return framebyframeDelegate
-        case PlayerControlBarModel.FASTER_BUTTON: return fasterBtnDelegate
-        case PlayerControlBarModel.SLOWER_BUTTON: return slowerBtnDelegate
-        case PlayerControlBarModel.OPEN_BUTTON: return openmediaBtnDelegate
-        case PlayerControlBarModel.EXTENDED_BUTTON: return extdSettingsBtnDelegate
-        case PlayerControlBarModel.SKIP_FW_BUTTON: return stepFwdBtnDelegate
-        case PlayerControlBarModel.SKIP_BACK_BUTTON: return stepBackBtnDelegate
-        case PlayerControlBarModel.QUIT_BUTTON: return quitBtnDelegate
-        case PlayerControlBarModel.VOLUME: return volumeBtnDelegate
-        case PlayerControlBarModel.ASPECT_RATIO_COMBOBOX: return aspectRatioDelegate
-        case PlayerControlBarModel.TELETEXT_BUTTONS: return teletextdelegate
-        case PlayerControlBarModel.PLAYER_SWITCH_BUTTON: return playerSwitchBtnDelegate
-        case PlayerControlBarModel.ARTWORK_INFO: return artworkInfoDelegate
+        case ControlListModel.RANDOM_BUTTON: return randomBtnDelegate
+        case ControlListModel.PREVIOUS_BUTTON: return prevBtnDelegate
+        case ControlListModel.PLAY_BUTTON: return playBtnDelegate
+        case ControlListModel.NEXT_BUTTON: return nextBtnDelegate
+        case ControlListModel.LOOP_BUTTON: return repeatBtnDelegate
+        case ControlListModel.LANG_BUTTON: return langBtnDelegate
+        case ControlListModel.PLAYLIST_BUTTON:return playlistBtnDelegate
+        case ControlListModel.MENU_BUTTON:return  menuBtnDelegate
+        case ControlListModel.CHAPTER_PREVIOUS_BUTTON:return  chapterPreviousBtnDelegate
+        case ControlListModel.CHAPTER_NEXT_BUTTON:return  chapterNextBtnDelegate
+        case ControlListModel.BACK_BUTTON:return  backBtnDelegate
+        case ControlListModel.WIDGET_SPACER:return  spacerDelegate
+        case ControlListModel.WIDGET_SPACER_EXTEND:return  extendiblespacerDelegate
+        case ControlListModel.RECORD_BUTTON: return recordBtnDelegate
+        case ControlListModel.FULLSCREEN_BUTTON: return fullScreenBtnDelegate
+        case ControlListModel.ATOB_BUTTON: return toggleABloopstateDelegate
+        case ControlListModel.SNAPSHOT_BUTTON: return snapshotBtnDelegate
+        case ControlListModel.STOP_BUTTON: return stopBtndelgate
+        case ControlListModel.INFO_BUTTON: return mediainfoBtnDelegate
+        case ControlListModel.FRAME_BUTTON: return framebyframeDelegate
+        case ControlListModel.FASTER_BUTTON: return fasterBtnDelegate
+        case ControlListModel.SLOWER_BUTTON: return slowerBtnDelegate
+        case ControlListModel.OPEN_BUTTON: return openmediaBtnDelegate
+        case ControlListModel.EXTENDED_BUTTON: return extdSettingsBtnDelegate
+        case ControlListModel.SKIP_FW_BUTTON: return stepFwdBtnDelegate
+        case ControlListModel.SKIP_BACK_BUTTON: return stepBackBtnDelegate
+        case ControlListModel.QUIT_BUTTON: return quitBtnDelegate
+        case ControlListModel.VOLUME: return volumeBtnDelegate
+        case ControlListModel.ASPECT_RATIO_COMBOBOX: return aspectRatioDelegate
+        case ControlListModel.TELETEXT_BUTTONS: return teletextdelegate
+        case ControlListModel.PLAYER_SWITCH_BUTTON: return playerSwitchBtnDelegate
+        case ControlListModel.ARTWORK_INFO: return artworkInfoDelegate
+        case ControlListModel.PLAYBACK_SPEED_BUTTON: return playbackSpeedButtonDelegate
         }
         console.log("button delegate id " + inpID +  " doesn't exists")
         return spacerDelegate
@@ -109,7 +113,7 @@ Item{
 
     Component{
         id: backBtnDelegate
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: backBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.exit
@@ -121,7 +125,7 @@ Item{
 
     Component{
         id: randomBtnDelegate
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: randomBtn
             size: VLCStyle.icon_medium
             checked: mainPlaylistController.random
@@ -134,7 +138,7 @@ Item{
 
     Component{
         id: prevBtnDelegate
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: prevBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.previous
@@ -150,20 +154,21 @@ Item{
 
         ToolButton {
             id: playBtn
+
             width: VLCStyle.icon_medium
             height: width
 
-            // TODO: Bind videoOverlays (set 'true' below) to player property which indicates if video is rendered over player controls
-            property bool videoOverlays: !isMiniplayer && true
+            property bool isOpaque: history.current.view === "player"
 
-            property color color: VLCStyle.colors.buttonText
-            property color colorDisabled: VLCStyle.colors.textInactive
+            property VLCColors colors: VLCStyle.colors
+            property color color: isOpaque ? colors.buttonText : "#303030"
+            property color colorDisabled: isOpaque ? colors.textInactive : "#7f8c8d"
 
             property bool acceptFocus: true
 
             property bool paintOnly: false
 
-            property bool realHovered: false
+            property bool isCursorInside: false
 
             Keys.onPressed: {
                 if (KeyHelper.matchOk(event) ) {
@@ -175,15 +180,52 @@ Item{
                     mainPlaylistController.togglePlayPause()
             }
 
+            states: [
+                State {
+                    name: "hovered"
+                    when: interactionIndicator
+
+                    PropertyChanges {
+                        target: contentLabel
+                        color: "#FF610A"
+                    }
+
+                    PropertyChanges {
+                        target: hoverShadow
+                        radius: VLCStyle.dp(24, VLCStyle.scale)
+                    }
+                },
+                State {
+                    name: "default"
+                    when: !interactionIndicator
+
+                    PropertyChanges {
+                        target: contentLabel
+                        color: enabled ? playBtn.color : playBtn.colorDisabled
+                    }
+
+                    PropertyChanges {
+                        target: hoverShadow
+                        radius: 0
+                    }
+                }
+            ]
+            readonly property bool interactionIndicator: (playBtn.activeFocus || playBtn.isCursorInside || playBtn.highlighted)
+
             contentItem: Label {
                 id: contentLabel
-                color: videoOverlays ? (playBtn.enabled ? playBtn.color : playBtn.colorDisabled)
-                                     : (playBtn.enabled ? "#303030" : "#7f8c8d")
 
                 text: (player.playingState !== PlayerController.PLAYING_STATE_PAUSED
                        && player.playingState !== PlayerController.PLAYING_STATE_STOPPED)
                       ? VLCIcons.pause
                       : VLCIcons.play
+
+                Behavior on color {
+                    ColorAnimation {
+                        duration: 75
+                        easing.type: Easing.InOutSine
+                    }
+                }
 
                 Behavior on text {
                     SequentialAnimation {
@@ -195,6 +237,8 @@ Item{
                             duration: 75
                         }
 
+                        // this blank PropertyAction triggers the
+                        // text (icon) change amidst the size animation
                         PropertyAction { }
 
                         NumberAnimation {
@@ -215,7 +259,6 @@ Item{
             }
 
             background: Item {
-
                 Gradient {
                     id: playBtnGradient
                     GradientStop { position: 0.0; color: "#f89a06" }
@@ -239,29 +282,52 @@ Item{
                     onPositionChanged: {
                         if (distance2D(playBtnMouseArea.mouseX, playBtnMouseArea.mouseY, playBtnMouseArea.width / 2, playBtnMouseArea.height / 2) < radius) {
                             // mouse is inside of the round button
-                            playBtn.realHovered = true
+                            playBtn.isCursorInside = true
                         }
                         else {
                             // mouse is outside
-                            playBtn.realHovered = false
+                            playBtn.isCursorInside = false
                         }
                     }
 
                     onHoveredChanged: {
                         if (!playBtnMouseArea.containsMouse)
-                            playBtn.realHovered = false
+                            playBtn.isCursorInside = false
                     }
 
                     onClicked: {
-                        if (playBtn.realHovered)
-                            mainPlaylistController.togglePlayPause()
+                        if (!playBtn.isCursorInside)
+                            return
+
+                        mainPlaylistController.togglePlayPause()
                     }
 
                     onPressAndHold: {
-                        if (playBtn.realHovered)
-                            mainPlaylistController.stop()
-                    }
+                        if (!playBtn.isCursorInside)
+                            return
 
+                        mainPlaylistController.stop()
+                    }
+                }
+
+                DropShadow {
+                    id: hoverShadow
+
+                    anchors.fill: parent
+
+                    visible: radius > 0
+                    samples: (radius * 2) + 1
+                    // opacity: 0.29 // it looks better without this
+                    color: "#FF610A"
+                    source: opacityMask
+                    antialiasing: true
+
+                    Behavior on radius {
+                        NumberAnimation {
+                            duration: 75
+                            easing.type: Easing.InOutSine
+                        }
+                    }
                 }
 
                 Rectangle {
@@ -270,57 +336,17 @@ Item{
                     anchors.margins: VLCStyle.dp(1, VLCStyle.scale)
 
                     color: VLCStyle.colors.white
-                    opacity: playBtn.videoOverlays ? 0.4 : 1.0
+                    opacity: playBtn.isOpaque ? 0.4 : 1.0
                 }
 
                 Rectangle {
                     id: outerRect
-                    radius: (width * 0.5)
                     anchors.fill: parent
 
+                    radius: (width * 0.5)
                     gradient: playBtnGradient
 
                     visible: false
-
-                    antialiasing: true
-                }
-
-                Rectangle {
-                    id: innerColorRect
-
-                    anchors.fill: parent
-                    radius: (width * 0.5)
-
-                    opacity: 0
-                    gradient: playBtnGradient
-
-                    state: "transparent"
-
-                    readonly property bool stateIndicator: (playBtn.activeFocus || playBtn.realHovered || playBtn.highlighted)
-                    states: [
-                        State {
-                            name: "opaque"
-                            when: innerColorRect.stateIndicator
-                            PropertyChanges {
-                                target: innerColorRect
-                                opacity: 1.0
-                            }
-                        },
-                        State {
-                            name: "transparent"
-                            when: !innerColorRect.stateIndicator
-                            PropertyChanges {
-                                target: innerColorRect
-                                opacity: 0
-                            }
-                        }
-                    ]
-
-                    transitions: Transition {
-                        NumberAnimation { properties: "opacity"; duration: 75; easing.type: Easing.InOutSine }
-                    }
-
-                    antialiasing: true
                 }
 
                 Rectangle {
@@ -341,7 +367,6 @@ Item{
                     source: outerRect
                     maskSource: innerRect
 
-
                     antialiasing: true
                 }
             }
@@ -350,7 +375,7 @@ Item{
 
     Component{
         id: nextBtnDelegate
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: nextBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.next
@@ -363,7 +388,7 @@ Item{
 
     Component{
         id: chapterPreviousBtnDelegate
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: chapterPreviousBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.dvd_prev
@@ -377,7 +402,7 @@ Item{
 
     Component{
         id: chapterNextBtnDelegate
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: chapterNextBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.dvd_next
@@ -391,7 +416,7 @@ Item{
 
     Component{
         id: repeatBtnDelegate
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: repeatBtn
             size: VLCStyle.icon_medium
             checked: mainPlaylistController.repeatMode !== PlaylistControllerModel.PLAYBACK_REPEAT_NONE
@@ -406,32 +431,42 @@ Item{
 
     Component{
         id: langBtnDelegate
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: langBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.audiosub
 
-            onClicked: {
-                root._lockAutoHide += 1
-                langMenu.open()
-            }
+            enabled: langMenuLoader.status === Loader.Ready
+            onClicked: langMenuLoader.item.open()
 
             text: i18n.qtr("Languages and tracks")
 
-            LanguageMenu {
-                id: langMenu
+            Loader {
+                id: langMenuLoader
 
-                parent: rootPlayer
-                focus: true
-                x: 0
-                y: (!!rootPlayer) ? (rootPlayer.positionSliderY - height) : 0
-                z: 1
+                active: (typeof rootPlayer !== 'undefined') && (rootPlayer !== null)
 
-                onOpened: rootPlayer._menu = langMenu
-                onMenuClosed: {
-                    root._lockAutoHide -= 1
-                    langBtn.forceActiveFocus()
-                    rootPlayer._menu = undefined
+                sourceComponent: LanguageMenu {
+                    id: langMenu
+
+                    parent: rootPlayer
+                    focus: true
+                    x: 0
+                    y: (rootPlayer.positionSliderY - height)
+                    z: 1
+
+                    onOpened: {
+                        controlButtons.requestLockUnlockAutoHide(true, controlButtons)
+                        if (!!rootPlayer)
+                            rootPlayer.menu = langMenu
+                    }
+
+                    onClosed: {
+                        controlButtons.requestLockUnlockAutoHide(false, controlButtons)
+                        langBtn.forceActiveFocus()
+                        if (!!rootPlayer)
+                            rootPlayer.menu = undefined
+                    }
                 }
             }
         }
@@ -439,7 +474,7 @@ Item{
 
     Component{
         id:playlistBtnDelegate
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: playlistBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.playlist
@@ -457,7 +492,7 @@ Item{
 
     Component{
         id: menuBtnDelegate
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: menuBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.ellipsis
@@ -531,7 +566,7 @@ Item{
 
     Component{
         id: fullScreenBtnDelegate
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: fullScreenBtn
             size: VLCStyle.icon_medium
             enabled: player.hasVideoOutput
@@ -544,7 +579,7 @@ Item{
 
     Component{
         id: recordBtnDelegate
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: recordBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.record
@@ -558,7 +593,7 @@ Item{
 
     Component{
         id: toggleABloopstateDelegate
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: abBtn
             size: VLCStyle.icon_medium
             checked: player.ABloopState !== PlayerController.ABLOOP_STATE_NONE
@@ -582,7 +617,7 @@ Item{
 
     Component{
         id: snapshotBtnDelegate
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: snapshotBtn
             size: VLCStyle.icon_medium
             enabled: player.isPlaying
@@ -596,7 +631,7 @@ Item{
 
     Component{
         id: stopBtndelgate
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: stopBtn
             size: VLCStyle.icon_medium
             enabled: player.isPlaying
@@ -609,7 +644,7 @@ Item{
 
     Component{
         id: mediainfoBtnDelegate
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: infoBtn
             size: VLCStyle.icon_medium
             enabled: player.isPlaying
@@ -623,7 +658,7 @@ Item{
     Component{
         id: framebyframeDelegate
 
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: frameBtn
             size: VLCStyle.icon_medium
             enabled: player.isPlaying
@@ -637,7 +672,7 @@ Item{
     Component{
         id: fasterBtnDelegate
 
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: fasterBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.faster
@@ -650,7 +685,7 @@ Item{
     Component{
         id: slowerBtnDelegate
 
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: slowerBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.slower
@@ -662,7 +697,7 @@ Item{
 
     Component{
         id: openmediaBtnDelegate
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: openMediaBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.eject
@@ -674,7 +709,7 @@ Item{
 
     Component{
         id: extdSettingsBtnDelegate
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: extdSettingsBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.extended
@@ -686,7 +721,7 @@ Item{
 
     Component{
         id: stepFwdBtnDelegate
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: stepfwdBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.skip_for
@@ -698,7 +733,7 @@ Item{
 
     Component{
         id: stepBackBtnDelegate
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: stepBackBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.skip_back
@@ -710,7 +745,7 @@ Item{
 
     Component{
         id: quitBtnDelegate
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: quitBtn
             size: VLCStyle.icon_medium
             iconText: VLCIcons.clear
@@ -749,17 +784,15 @@ Item{
     Component {
         id: playerSwitchBtnDelegate
 
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             size: VLCStyle.icon_medium
             iconText: VLCIcons.fullscreen
 
             onClicked: {
-                if (isMiniplayer) {
-                    g_mainDisplay.showPlayer()
-                }
-                else {
+                if (history.current.view === "player")
                     history.previous()
-                }
+                else
+                    g_mainDisplay.showPlayer()
             }
 
             property bool acceptFocus: true
@@ -780,8 +813,8 @@ Item{
             readonly property real minimumWidth: cover.width
             property real extraWidth: 0
 
-            implicitWidth: paintOnly ? playingItemInfoRow.width : (minimumWidth + extraWidth)
-
+            width: playingItemInfoRow.width
+            implicitWidth: playingItemInfoRow.implicitWidth
             implicitHeight: playingItemInfoRow.implicitHeight
 
             Keys.onPressed: {
@@ -791,7 +824,7 @@ Item{
             }
             Keys.onReleased: {
                 if (!event.accepted && KeyHelper.matchOk(event))
-		    g_mainDisplay.showPlayer()
+                    g_mainDisplay.showPlayer()
             }
 
             MouseArea {
@@ -804,7 +837,9 @@ Item{
 
             Row {
                 id: playingItemInfoRow
-                width: (coverItem.width + infoColumn.width)
+                width: (coverItem.width + infoColumn.width + spacing)
+
+                spacing: VLCStyle.margin_xsmall
 
                 Item {
                     id: coverItem
@@ -848,18 +883,19 @@ Item{
                 Column {
                     id: infoColumn
                     anchors.verticalCenter: parent.verticalCenter
-                    leftPadding: VLCStyle.margin_xsmall
 
-                    width: (paintOnly ? Math.max(titleLabel.width, artistLabel.width, progressIndicator.width) : implicitWidth) + VLCStyle.margin_xsmall
+                    readonly property real preferredWidth: Math.max(titleLabel.implicitWidth, artistLabel.implicitWidth, progressIndicator.implicitWidth)
+                    width: ((artworkInfoItem.extraWidth > preferredWidth) || (paintOnly)) ? preferredWidth
+                                                                                          : artworkInfoItem.extraWidth
 
-                    visible: paintOnly || artworkInfoItem.extraWidth > 0
+                    visible: width > 0
 
                     ToolTip {
                         text: i18n.qtr("%1\n%2").arg(titleLabel.text).arg(artistLabel.text)
                         visible: (titleLabel.implicitWidth > titleLabel.width || artistLabel.implicitWidth > titleLabel.width)
                                  && (artworkInfoMouseArea.containsMouse || artworkInfoItem.active)
-                        delay: 500 
-                         
+                        delay: 500
+
                         contentItem: Text {
                                   text: i18n.qtr("%1\n%2").arg(titleLabel.text).arg(artistLabel.text)
                                   color: colors.tooltipTextColor
@@ -873,10 +909,7 @@ Item{
                     Widgets.MenuLabel {
                         id: titleLabel
 
-                        width: {
-                            if (!paintOnly)
-                                artworkInfoItem.implicitWidth - titleLabel.mapToItem(artworkInfoItem, titleLabel.x, titleLabel.y).x
-                        }
+                        width: parent.width
 
                         text: {
                             if (paintOnly)
@@ -884,42 +917,102 @@ Item{
                             else
                                 mainPlaylistController.currentItem.title
                         }
-                        visible: text !== ""
                         color: colors.text
                     }
 
                     Widgets.MenuCaption {
                         id: artistLabel
-                        width: {
-                            if (!paintOnly)
-                                artworkInfoItem.implicitWidth - artistLabel.mapToItem(artworkInfoItem, artistLabel.x, artistLabel.y).x
-                        }
+
+                        width: parent.width
+
                         text: {
                             if (paintOnly)
                                 i18n.qtr("Artist")
                             else
                                 mainPlaylistController.currentItem.artist
                         }
-                        visible: text !== ""
                         color: colors.menuCaption
                     }
 
                     Widgets.MenuCaption {
                         id: progressIndicator
-                        width: {
-                            if (!paintOnly)
-                                artworkInfoItem.implicitWidth - progressIndicator.mapToItem(artworkInfoItem, progressIndicator.x, progressIndicator.y).x
-                        }
+
+                        width: parent.width
+
                         text: {
                             if (paintOnly)
                                 " -- / -- "
                             else
                                 player.time.toString() + " / " + player.length.toString()
                         }
-                        visible: text !== ""
                         color: colors.menuCaption
                     }
                 }
+            }
+        }
+    }
+
+    Component {
+        id: playbackSpeedButtonDelegate
+
+        Widgets.IconControlButton {
+            id: playbackSpeedButton
+
+            size: VLCStyle.icon_medium
+            text: i18n.qtr("Playback Speed")
+            color: playbackSpeedPopup.visible ? colors.accent : colors.playerControlBarFg
+
+            onClicked: playbackSpeedPopup.open()
+
+            PlaybackSpeed {
+                id: playbackSpeedPopup
+
+                z: 1
+                colors: playbackSpeedButton.colors
+                focus: true
+                parent: playbackSpeedButton.paintOnly
+                        ? playbackSpeedButton // button is not part of main display (ToolbarEditorDialog)
+                        : (history.current.view === "player") ? rootPlayer : g_mainDisplay
+
+                onOpened: {
+                    // update popup coordinates
+                    //
+                    // mapFromItem is affected by various properties of source and target objects
+                    // which can't be represented in a binding expression so a initial setting in
+                    // object defination (x: clamp(...)) doesn't work, so we set x and y on initial open
+                    x = Qt.binding(function () {
+                        // coords are mapped through playbackSpeedButton.parent so that binding is generated based on playbackSpeedButton.x
+                        var mappedParentCoordinates = parent.mapFromItem(playbackSpeedButton.parent, playbackSpeedButton.x, 0)
+                        return Helpers.clamp(mappedParentCoordinates.x  - ((width - playbackSpeedButton.width) / 2),
+                                             VLCStyle.margin_xxsmall + VLCStyle.applicationHorizontalMargin,
+                                             parent.width - VLCStyle.applicationHorizontalMargin - VLCStyle.margin_xxsmall - width)
+                    })
+
+                    y = Qt.binding(function () {
+                        // coords are mapped through playbackSpeedButton.parent so that binding is generated based on playbackSpeedButton.y
+                        var mappedParentCoordinates = parent.mapFromItem(playbackSpeedButton.parent, 0, playbackSpeedButton.y)
+                        return mappedParentCoordinates.y - playbackSpeedPopup.height - VLCStyle.margin_xxsmall
+                    })
+
+                    // player related --
+                    controlButtons.requestLockUnlockAutoHide(true, controlButtons)
+                    if (!!rootPlayer)
+                        rootPlayer.menu = playbackSpeedPopup
+                }
+
+                onClosed: {
+                    controlButtons.requestLockUnlockAutoHide(false, controlButtons)
+                    playbackSpeedButton.forceActiveFocus()
+                    if (!!rootPlayer)
+                        rootPlayer.menu = undefined
+                }
+            }
+
+            Label {
+                anchors.centerIn: parent
+                font.pixelSize: VLCStyle.fontSize_normal
+                text: !playbackSpeedButton.paintOnly ? i18n.qtr("%1x").arg(+player.rate.toFixed(2)) : i18n.qtr("1x")
+                color: playbackSpeedButton.background.foregroundColor // IconToolButton.background is a FocusBackground
             }
         }
     }

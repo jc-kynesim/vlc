@@ -263,6 +263,15 @@ int vlc_dup (int oldfd)
     return newfd;
 }
 
+int vlc_dup2 (int oldfd, int newfd)
+{
+    int fd = dup2 (oldfd, newfd);
+    if (fd != -1)
+        setmode (fd, O_BINARY);
+
+    return fd;
+}
+
 int vlc_pipe (int fds[2])
 {
     if (vlc_socketpair (AF_LOCAL, SOCK_STREAM, 0, fds, false))
@@ -349,4 +358,20 @@ int vlc_accept (int lfd, struct sockaddr *addr, socklen_t *alen, bool nonblock)
     while (errno == EINTR);
 
     return -1;
+}
+
+ssize_t vlc_send(int fd, const void *buf, size_t len, int flags)
+{
+    return send(fd, buf, len, flags);
+}
+
+ssize_t vlc_sendto(int fd, const void *buf, size_t len, int flags,
+                   const struct sockaddr *dst, socklen_t dstlen)
+{
+    return sendto(fd, buf, len, flags, dst, dstlen);
+}
+
+ssize_t vlc_sendmsg(int fd, const struct msghdr *msg, int flags)
+{
+    return sendmsg(fd, msg, flags);
 }

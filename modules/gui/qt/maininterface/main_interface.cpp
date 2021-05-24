@@ -50,6 +50,8 @@
 
 #include "vlc_media_library.h"
 
+#include "dialogs/toolbar/controlbar_profile_model.hpp"
+
 #include <QCloseEvent>
 #include <QKeyEvent>
 
@@ -69,10 +71,6 @@
 #include <QFileInfo>
 #endif
 
-#if ! HAS_QT510 && defined(QT5_HAS_X11)
-# include <QX11Info>
-# include <X11/Xlib.h>
-#endif
 
 #include <QtGlobal>
 #include <QTimer>
@@ -154,9 +152,13 @@ MainInterface::MainInterface(intf_thread_t *_p_intf , QWidget* parent, Qt::Windo
     m_gridView = getSettings()->value( "MainWindow/grid-view", true).toBool();
     QString currentColorScheme = getSettings()->value( "MainWindow/color-scheme", "system").toString();
     m_showRemainingTime = getSettings()->value( "MainWindow/ShowRemainingTime", false ).toBool();
+    m_pinVideoControls = getSettings()->value("MainWindow/pin-video-controls", false ).toBool();
 
     m_colorScheme = new ColorSchemeModel(this);
     m_colorScheme->setCurrent(currentColorScheme);
+
+    /* Controlbar Profile Model Creation */
+    m_controlbarProfileModel = new ControlbarProfileModel(p_intf, this);
 
     /* Should the UI stays on top of other windows */
     b_interfaceOnTop = var_InheritBool( p_intf, "video-on-top" );
@@ -205,8 +207,6 @@ MainInterface::MainInterface(intf_thread_t *_p_intf , QWidget* parent, Qt::Windo
 
     connect(this, &MainInterface::interfaceFullScreenChanged, this, &MainInterface::useClientSideDecorationChanged);
 
-    connect( THEDP, &DialogsProvider::toolBarConfUpdated, this, &MainInterface::toolBarConfUpdated );
-
     /** END of CONNECTS**/
 
 
@@ -244,6 +244,7 @@ MainInterface::~MainInterface()
     settings->setValue( "pl-dock-status", b_playlistDocked );
     settings->setValue( "ShowRemainingTime", m_showRemainingTime );
     settings->setValue( "interface-scale", m_intfUserScaleFactor );
+    settings->setValue( "pin-video-controls", m_pinVideoControls );
 
     /* Save playlist state */
     settings->setValue( "playlist-visible", playlistVisible );
@@ -297,6 +298,21 @@ void MainInterface::computeMinimumSize()
 void MainInterface::reloadPrefs()
 {
     i_notificationSetting = var_InheritInteger( p_intf, "qt-notification" );
+    
+    if ( m_hasToolbarMenu != var_InheritBool( p_intf, "qt-menubar" ) )
+    {
+        m_hasToolbarMenu = !m_hasToolbarMenu;
+        emit hasToolbarMenuChanged();
+    }
+
+#if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
+    if (m_clientSideDecoration != (! var_InheritBool( p_intf, "qt-titlebar" )))
+    {
+        m_clientSideDecoration = !m_clientSideDecoration;
+        emit useClientSideDecorationChanged();
+        updateClientSideDecorations();
+    }
+#endif
 }
 
 
@@ -346,10 +362,24 @@ void MainInterface::updateIntfScaleFactor()
 void MainInterface::incrementIntfUserScaleFactor(bool increment)
 {
     if (increment)
-        m_intfUserScaleFactor = std::min(m_intfUserScaleFactor + 0.1, 3.0);
+        setIntfUserScaleFactor(m_intfScaleFactor + .1f);
     else
-        m_intfUserScaleFactor = std::max(m_intfUserScaleFactor - 0.1, 0.3);
+        setIntfUserScaleFactor(m_intfScaleFactor - .1f);
+}
+
+void MainInterface::setIntfUserScaleFactor(float newValue)
+{
+    m_intfUserScaleFactor = std::max(std::min(newValue, getMaxIntfUserScaleFactor()), getMinIntfUserScaleFactor());
     updateIntfScaleFactor();
+}
+
+void MainInterface::setPinVideoControls(bool pinVideoControls)
+{
+    if (m_pinVideoControls == pinVideoControls)
+        return;
+
+    m_pinVideoControls = pinVideoControls;
+    emit pinVideoControlsChanged(m_pinVideoControls);
 }
 
 inline void MainInterface::initSystray()
@@ -688,6 +718,13 @@ void MainInterface::closeEvent( QCloseEvent *e )
         /* Accept session quit. Otherwise we break the desktop mamager. */
         e->accept();
     }
+}
+
+void MainInterface::updateClientSideDecorations()
+{
+    hide(); // some window managers don't like to change frame window hint on visible window
+    setWindowFlag(Qt::FramelessWindowHint, useClientSideDecoration());
+    show();
 }
 
 void MainInterface::setInterfaceFullScreen( bool fs )

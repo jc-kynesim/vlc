@@ -36,6 +36,7 @@
 #include "ui_sprefs_video.h"
 #include "ui_sprefs_subtitles.h"
 #include "ui_sprefs_interface.h"
+#include "ui_sprefs_medialibrary.h"
 
 #include <vlc_media_library.h>
 #include <QDialogButtonBox>
@@ -56,6 +57,7 @@ enum {
     SPrefsSubtitles,
     SPrefsInputAndCodecs,
     SPrefsHotkeys,
+    SPrefsMediaLibrary,
     SPrefsMax
 };
 #define SPrefsDefaultCat SPrefsInterface
@@ -113,9 +115,8 @@ private:
     QButtonGroup *radioGroup;
 
     char *lang;
-
-    MlFoldersModel *mlModel;
-    QTableView * mlTableView;
+    MLFoldersModel *mlFoldersModel;
+    MLBannedFoldersModel *mlBannedFoldersModel;
 
 #ifdef _WIN32
     QList<QTreeWidgetItem *> listAsso;
@@ -134,9 +135,10 @@ private slots:
     void updateCheckBoxes( QTreeWidgetItem*, int );
     void saveAsso();
 #endif
-    void MLaddNewEntryPoint( );
-    QWidget * MLgenerateWidget( QModelIndex index , MlFoldersModel *mlf , QWidget *parent );
-    void MLdrawControls( );
+    void MLaddNewFolder( );
+    void MLBanFolder( );
+    QWidget * MLgenerateWidget(QModelIndex index , MLFoldersBaseModel *mlf , QWidget *parent );
+    void MLdrawControls( QTableView *mlView );
 
     void configML();
     void changeStyle( QString );

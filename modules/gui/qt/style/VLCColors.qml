@@ -69,7 +69,7 @@ Item {
     property color buttonText: systemPalette.buttonText;
     property color buttonBorder: blendColors(systemPalette.button, systemPalette.buttonText, 0.8);
 
-    property color icon: blendColors(text, bg, 0.6);
+    property color icon: isThemeDark ? white : "#666666"
 
     property color textActiveSource: "red";
 
@@ -81,10 +81,11 @@ Item {
     property color volhigh: "#ffc70f"
     property color volmax: "#f5271d"
 
-    property color playerFg: "white"
-    property color playerFgInactive: "#888888"
-    property color playerBg: "black"
-    property color playerBorder: "#222222"
+    property color playerFg: text
+    property color playerFgInactive: textInactive
+    property color playerControlBarFg: playerFg
+    property color playerBg: bg
+    property color playerBorder: buttonText
 
     property color separator: blendColors(bg, text, .95)
     
@@ -162,6 +163,8 @@ Item {
                 alert: "#ff0000";
                 separator: "#ededed";
 
+                playerControlBarFg: "#333333"
+
                 isThemeDark: false;
             }
         },
@@ -189,6 +192,8 @@ Item {
                 accent: "#ff950d"
                 alert: "#ff0000"
                 separator: "#2d2d2d"
+                playerControlBarFg: "#ffffff"
+
                 isThemeDark: true
             }
         },
@@ -221,6 +226,8 @@ Item {
                 bannerHover: systemPalette.highlight
 
                 separator: blendColors(bg, text, .95)
+
+                playerControlBarFg: systemPalette.text
 
                 isThemeDark: systemPalette.isDark
             }

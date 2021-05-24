@@ -100,6 +100,11 @@ public:
                                     const QString &filter = QString(),
                                     QString *selectedFilter = NULL );
 
+    Q_INVOKABLE static QVariant getTextDialog(QWidget *parent, const QString& title,
+                                              const QString& label,
+                                              const QString& placeholder,
+                                              bool* ok = nullptr);
+
 protected:
     void customEvent( QEvent *);
 
@@ -123,6 +128,8 @@ private:
     void openDialog( int );
 
 public slots:
+    void playlistsDialog();
+    void playlistsDialog( const QVariantList & listMedia );
     void bookmarksDialog();
     void mediaInfoDialog( void );
     void mediaInfoDialog( const PlaylistItem& pItem );
@@ -142,7 +149,6 @@ public slots:
     void aboutDialog();
     void gotoTimeDialog();
     void podcastConfigureDialog();
-    void toolbarDialog();
     void pluginDialog();
     void epgDialog();
     void setPopupMenu();
@@ -179,8 +185,8 @@ public slots:
     void quit();
 
 signals:
-    void  toolBarConfUpdated();
     void releaseMouseEvents();
+    void showToolbarEditorDialog();
 };
 
 class DialogEvent : public QEvent

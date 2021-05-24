@@ -91,7 +91,9 @@ static void releaseTagsList(std::list<Tag *> &list)
 HLSRepresentation * M3U8Parser::createRepresentation(BaseAdaptationSet *adaptSet, const AttributesTag * tag)
 {
     const Attribute *uriAttr = tag->getAttributeByName("URI");
-    const Attribute *bwAttr = tag->getAttributeByName("BANDWIDTH");
+    const Attribute *bwAttr = tag->getAttributeByName("AVERAGE-BANDWIDTH");
+    if(!bwAttr)
+        bwAttr = tag->getAttributeByName("BANDWIDTH");
     const Attribute *resAttr = tag->getAttributeByName("RESOLUTION");
 
     HLSRepresentation *rep = new (std::nothrow) HLSRepresentation(adaptSet);
@@ -133,6 +135,14 @@ HLSRepresentation * M3U8Parser::createRepresentation(BaseAdaptationSet *adaptSet
                 rep->setHeight(res.second);
             }
         }
+
+        const Attribute *rateAttr = tag->getAttributeByName("FRAME-RATE");
+        if(rateAttr)
+        {
+            unsigned num, den;
+            vlc_ureduce(&num, &den, rateAttr->floatingPoint() * 1000, 1000, 0);
+            rep->setFrameRate(Rate(num, den));
+        }
     }
 
     return rep;
@@ -152,7 +162,7 @@ void M3U8Parser::createAndFillRepresentation(vlc_object_t *p_obj, BaseAdaptation
 
 bool M3U8Parser::appendSegmentsFromPlaylistURI(vlc_object_t *p_obj, HLSRepresentation *rep)
 {
-    block_t *p_block = Retrieve::HTTP(resources, rep->getPlaylistUrl().toString());
+    block_t *p_block = Retrieve::HTTP(resources, ChunkType::Playlist, rep->getPlaylistUrl().toString());
     if(p_block)
     {
         stream_t *substream = vlc_stream_MemoryNew(p_obj, p_block->p_buffer, p_block->i_buffer, true);
@@ -224,6 +234,8 @@ void M3U8Parser::parseSegments(vlc_object_t *, HLSRepresentation *rep, const std
     CommonEncryption encryption;
     const ValuesListTag *ctx_extinf = nullptr;
 
+    std::list<HLSSegment *> segmentstoappend;
+
     std::list<Tag *>::const_iterator it;
     for(it = tagslist.begin(); it != tagslist.end(); ++it)
     {
@@ -278,7 +290,7 @@ void M3U8Parser::parseSegments(vlc_object_t *, HLSRepresentation *rep, const std
                     absReferenceTime += nzDuration;
                 }
 
-                segmentList->addSegment(segment);
+                segmentstoappend.push_back(segment);
 
                 if(ctx_byterange)
                 {
@@ -317,6 +329,20 @@ void M3U8Parser::parseSegments(vlc_object_t *, HLSRepresentation *rep, const std
                 rep->b_consistent = false;
                 absReferenceTime = VLC_TICK_0 +
                         UTCTime(static_cast<const SingleValueTag *>(tag)->getValue().value).mtime();
+                /* Reverse apply UTC timespec from first discont */
+                if(segmentstoappend.size() && segmentstoappend.back()->utcTime == VLC_TICK_INVALID)
+                {
+                    vlc_tick_t tempTime = absReferenceTime;
+                    for(auto it = segmentstoappend.crbegin(); it != segmentstoappend.crend(); ++it)
+                    {
+                        vlc_tick_t duration = timescale.ToTime((*it)->duration.Get());
+                        if( duration < tempTime - VLC_TICK_0 )
+                            tempTime -= duration;
+                        else
+                            tempTime = VLC_TICK_0;
+                        (*it)->utcTime = tempTime;
+                    }
+                }
                 break;
 
             case AttributesTag::EXTXKEY:
@@ -356,6 +382,10 @@ void M3U8Parser::parseSegments(vlc_object_t *, HLSRepresentation *rep, const std
                 break;
         }
     }
+
+    for(HLSSegment *seg : segmentstoappend)
+        segmentList->addSegment(seg);
+    segmentstoappend.clear();
 
     if(rep->isLive())
     {
@@ -574,8 +604,11 @@ M3U8 * M3U8Parser::parse(vlc_object_t *p_object, stream_t *p_stream, const std::
         if(xstartTag->getAttributeByName("TIME-OFFSET"))
         {
             float offset = xstartTag->getAttributeByName("TIME-OFFSET")->floatingPoint();
-            if(offset > 0)
-                playlist->suggestedPresentationDelay.Set(CLOCK_FREQ * offset);
+            if(offset > 0 && (offset * CLOCK_FREQ) <= playlist->duration.Get())
+                playlist->presentationStartOffset.Set(CLOCK_FREQ * offset);
+            else if(offset < 0 && (-offset * CLOCK_FREQ) <= playlist->duration.Get())
+                playlist->presentationStartOffset.Set(playlist->duration.Get() +
+                                                      CLOCK_FREQ * offset);
         }
     }
 

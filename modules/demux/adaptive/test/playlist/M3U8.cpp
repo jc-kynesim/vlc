@@ -79,13 +79,12 @@ int M3U8MasterPlaylist_test()
         Expect(m3u->getFirstPeriod()->getAdaptationSets().size() == 1);
         Expect(m3u->getFirstPeriod()->getAdaptationSets().front()->getRepresentations().size() == 4);
         BaseAdaptationSet *set = m3u->getFirstPeriod()->getAdaptationSets().front();
-        std::vector<BaseRepresentation *> &reps = set->getRepresentations();
-        std::vector<BaseRepresentation *>::iterator it;
-        it = std::find_if(reps.begin(), reps.end(),
+        const std::vector<BaseRepresentation *> &reps = set->getRepresentations();
+        auto it = std::find_if(reps.cbegin(), reps.cend(),
                           [](BaseRepresentation *r) { return r->getBandwidth() == 1280000; });
         Expect(it != reps.end());
         Expect(static_cast<HLSRepresentation *>(*it)->getPlaylistUrl().toString() == "http://example.com/low.m3u8");
-        it = std::find_if(reps.begin(), reps.end(),
+        it = std::find_if(reps.cbegin(), reps.cend(),
                       [](BaseRepresentation *r) { return r->getBandwidth() == 65000; });
         Expect(it != reps.end());
         Expect(static_cast<HLSRepresentation *>(*it)->getPlaylistUrl().toString() == "http://example.com/audio-only.m3u8");
@@ -337,6 +336,43 @@ int M3U8Playlist_test()
         Expect(begin == vlc_tick_from_sec(0));
         Expect(end == vlc_tick_from_sec(34));
         Expect(duration == vlc_tick_from_sec(34));
+
+        delete m3u;
+    }
+    catch (...)
+    {
+        delete m3u;
+        return 1;
+    }
+
+    /* Manifest 4 */
+    const char manifest4[] =
+    "#EXTM3U\n"
+    "#EXT-X-MEDIA-SEQUENCE:10\n"
+    "#EXT-X-START:TIME-OFFSET=-11.5,PRECISE=NO\n"
+    "#EXTINF:10\n"
+    "foobar.ts\n"
+    "#EXTINF:10\n"
+    "foobar.ts\n"
+    "#EXTINF:10\n"
+    "foobar.ts\n"
+    "#EXTINF:10\n"
+    "foobar.ts\n"
+    "#EXTINF:10\n"
+    "foobar.ts\n"
+    "#EXT-X-ENDLIST\n";
+
+    m3u = ParseM3U8(obj, manifest4, sizeof(manifest4));
+    try
+    {
+        Expect(m3u);
+        Expect(m3u->isLive() == false);
+        Expect(m3u->presentationStartOffset.Get() == ((50 - 11.5) * CLOCK_FREQ));
+        BaseRepresentation *rep = m3u->getFirstPeriod()->getAdaptationSets().front()->
+                                  getRepresentations().front();
+        Expect(bufferingLogic.getStartSegmentNumber(rep) == 13);
+        m3u->presentationStartOffset.Set(11.5 * CLOCK_FREQ);
+        Expect(bufferingLogic.getStartSegmentNumber(rep) == 11);
 
         delete m3u;
     }

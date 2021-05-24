@@ -52,8 +52,12 @@ Widgets.NavigableFocusScope {
                 height: VLCStyle.dp(32, VLCStyle.scale)
                 width: VLCStyle.colWidth(Math.max(VLCStyle.gridColumnsForWidth(root.width * .6), 2))
                 placeholderText: i18n.qtr("Paste or write the URL here")
-                color: VLCStyle.colors.text
+                palette.text: VLCStyle.colors.text
+                palette.highlight: VLCStyle.colors.bgHover
+                palette.highlightedText: VLCStyle.colors.bgHoverText
                 font.pixelSize: VLCStyle.fontSize_large
+                selectByMouse: true
+
                 background: Rectangle {
                     color: VLCStyle.colors.bg
                     border.width: VLCStyle.dp(2, VLCStyle.scale)
@@ -63,7 +67,10 @@ Widgets.NavigableFocusScope {
                 }
 
                 onAccepted: {
-                    mainPlaylistController.append([text], true)
+                    if (urlListDisplay.status == Loader.Ready)
+                        urlListDisplay.item.model.addAndPlay(text)
+                    else
+                        mainPlaylistController.append([text], true)
                 }
 
                 Keys.priority: Keys.AfterItem

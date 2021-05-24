@@ -35,9 +35,12 @@ struct vlc_gl_interop;
  * uploaded them to OpenGL textures.
  *
  * \param interop the interop
+ * \param expose_planes if set, vlc_texture() exposes a single plane at a time
+ *                      (selected by vlc_gl_sampler_SetCurrentPlane())
  */
 struct vlc_gl_sampler *
-vlc_gl_sampler_NewFromInterop(struct vlc_gl_interop *interop);
+vlc_gl_sampler_NewFromInterop(struct vlc_gl_interop *interop,
+                              bool expose_planes);
 
 /**
  * Create a new direct sampler
@@ -48,11 +51,13 @@ vlc_gl_sampler_NewFromInterop(struct vlc_gl_interop *interop);
  * \param gl the OpenGL context
  * \param api the OpenGL API
  * \param fmt the input format
+ * \param expose_planes if set, vlc_texture() exposes a single plane at a time
+ *                      (selected by vlc_gl_sampler_SetCurrentPlane())
  */
 struct vlc_gl_sampler *
 vlc_gl_sampler_NewFromTexture2D(struct vlc_gl_t *gl,
                                 const struct vlc_gl_api *api,
-                                const video_format_t *fmt);
+                                const video_format_t *fmt, bool expose_planes);
 
 /**
  * Delete a sampler
@@ -77,17 +82,29 @@ vlc_gl_sampler_UpdatePicture(struct vlc_gl_sampler *sampler,
                              picture_t *picture);
 
 /**
- * Update the input texture
+ * Update the input textures
  *
  * Warning: only call on sampler created by vlc_gl_sampler_NewFromTexture2D().
  *
  * \param sampler the sampler
- * \param texture the new texture, with target GL_TEXTURE_2D
- * \param tex_width the texture width
- * \param tex_height the texture height
+ * \param textures the new textures, with target GL_TEXTURE_2D
+ * \param tex_widths the textures width
+ * \param tex_heights the textures height
  */
 int
-vlc_gl_sampler_UpdateTexture(struct vlc_gl_sampler *sampler, GLuint texture,
-                             GLsizei tex_width, GLsizei tex_height);
+vlc_gl_sampler_UpdateTextures(struct vlc_gl_sampler *sampler, GLuint textures[],
+                              GLsizei tex_widths[], GLsizei tex_heights[]);
+
+/**
+ * Select the plane to expose
+ *
+ * If the sampler exposes planes separately (for plane filters), select the
+ * plane to expose via the GLSL function vlc_texture().
+ *
+ * \param sampler the sampler
+ * \param plane the plane number
+ */
+void
+vlc_gl_sampler_SelectPlane(struct vlc_gl_sampler *sampler, unsigned plane);
 
 #endif

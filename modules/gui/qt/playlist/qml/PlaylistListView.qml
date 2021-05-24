@@ -25,6 +25,7 @@ import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///util/KeyHelper.js" as KeyHelper
+import "qrc:///util/Helpers.js" as Helpers
 import "qrc:///style/"
 
 Widgets.NavigableFocusScope {
@@ -48,32 +49,36 @@ Widgets.NavigableFocusScope {
         Move // Keyboard item move mode, activated through PlaylistOverlayMenu
     }
 
-    function isValidInstanceOf(object, type) {
-        return (!!object && (object instanceof type))
-    }
-
     function isDropAcceptable(drop, index) {
         return drop.hasUrls || // external drop (i.e. from filesystem)
-                (isValidInstanceOf(drop.source, Widgets.DragItem) && drop.source.canInsertIntoPlaylist(index)) // internal drop (inter-view or intra-playlist)
+                (Helpers.isValidInstanceOf(drop.source, Widgets.DragItem)) // internal drop (inter-view or intra-playlist)
     }
 
     function acceptDrop(index, drop) {
-        if (isValidInstanceOf(drop.source, Widgets.DragItem)) {
-            // dropping Medialib view content into playlist or intra-playlist dragging:
-            drop.source.insertIntoPlaylist(index)
-        } else if (drop.hasUrls) {
-            // dropping an external item (i.e. filesystem drag) into playlist:
-            // force conversion to an actual list
-            var urlList = []
-            for ( var url in drop.urls)
-                urlList.push(drop.urls[url])
-            mainPlaylistController.insert(index, urlList, false)
+        var item = drop.source;
 
-            // This is required otherwise backend may handle the drop as well yielding double addition
-            drop.accept(Qt.IgnoreAction)
+        // NOTE: Move implementation.
+        if (dragItem == item) {
+            model.moveItemsPre(model.getSelection(), index);
+
+        // NOTE: Dropping medialibrary content into the queue.
+        } else if (Helpers.isValidInstanceOf(item, Widgets.DragItem)) {
+            mainPlaylistController.insert(index, item.getSelectedInputItem());
+
+        // NOTE: Dropping an external item (i.e. filesystem) into the queue.
+        } else if (drop.hasUrls) {
+            var urlList = [];
+
+            for (var url in drop.urls)
+                urlList.push(drop.urls[url]);
+
+            mainPlaylistController.insert(index, urlList, false);
+
+            // NOTE This is required otherwise backend may handle the drop as well yielding double addition.
+            drop.accept(Qt.IgnoreAction);
         }
 
-        listView.forceActiveFocus()
+        listView.forceActiveFocus();
     }
 
     PlaylistOverlayMenu {
@@ -118,19 +123,11 @@ Widgets.NavigableFocusScope {
                 return ({covers: covers, title: title, count: root.model.selectedCount})
             }
 
-            function insertIntoPlaylist(index) {
-                root.model.moveItemsPre(root.model.getSelection(), index)
+            function getSelectedInputItem(index) {
+                return model.getItemsForIndexes(model.getSelection())
             }
 
-            function canInsertIntoPlaylist(index) {
-                var diff = dragItem.index - index
-                if (diff === 0 || diff === -1)
-                    return false
-                else
-                    return true
-            }
-
-            property point _pos: null
+            property point _pos
             property int _scrollingDirection: 0
 
             function updatePos(pos) {
@@ -360,7 +357,7 @@ Widgets.NavigableFocusScope {
                     property alias firstItemIndicatorVisible: firstItemIndicator.visible
 
                     function setDropIndicatorVisible(visible) {
-                        dropIndicator.visible = visible
+                        dropIndicator.visible = Qt.binding(function() { return (visible || dropArea.containsDragItem); })
                     }
 
                     MouseArea {
@@ -388,7 +385,7 @@ Widgets.NavigableFocusScope {
                         height: VLCStyle.dp(1)
                         anchors.top: parent.top
 
-                        visible: false
+                        visible: dropArea.containsDragItem
                         color: colors.accent
                     }
 
@@ -424,6 +421,8 @@ Widgets.NavigableFocusScope {
 
                         anchors.fill: parent
 
+                        property bool containsDragItem: false
+
                         onEntered: {
                             if(!root.isDropAcceptable(drag, root.model.count))
                                 return
@@ -431,13 +430,13 @@ Widgets.NavigableFocusScope {
                             if (root.model.count === 0)
                                 firstItemIndicator.visible = true
                             else
-                                dropIndicator.visible = true
+                                containsDragItem = true
                         }
                         onExited: {
                             if (root.model.count === 0)
                                 firstItemIndicator.visible = false
                             else
-                                dropIndicator.visible = false
+                                containsDragItem = false
                         }
                         onDropped: {
                             if(!root.isDropAcceptable(drop, root.model.count))
@@ -448,7 +447,7 @@ Widgets.NavigableFocusScope {
                             if (root.model.count === 0)
                                 firstItemIndicator.visible = false
                             else
-                                dropIndicator.visible = false
+                                containsDragItem = false
                         }
                     }
                 }

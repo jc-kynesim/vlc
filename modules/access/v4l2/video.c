@@ -314,7 +314,7 @@ static const struct v4l2_fract zero = { 0, 1 };
  * Finds the highest frame rate up to a specific limit possible with a certain
  * V4L2 format.
  * @param fmt V4L2 capture format [IN]
- * @param min_it minimum frame internal [IN]
+ * @param min_it minimum frame interval [IN]
  * @param it V4L2 frame interval [OUT]
  * @return 0 on success, -1 on error.
  */
@@ -439,7 +439,7 @@ int SetupFormat (vlc_object_t *obj, int fd, uint32_t fourcc,
 
     if (var_InheritURational(obj, &min_it.denominator, &min_it.numerator,
                              CFG_PREFIX"fps") == VLC_SUCCESS)
-        msg_Dbg (obj, " requested frame internal: %"PRIu32"/%"PRIu32,
+        msg_Dbg (obj, " requested frame interval: %"PRIu32"/%"PRIu32,
                  min_it.numerator, min_it.denominator);
     else
         min_it = zero;
@@ -473,6 +473,8 @@ int SetupFormat (vlc_object_t *obj, int fd, uint32_t fourcc,
 
                 msg_Dbg (obj, " frame size %"PRIu32"x%"PRIu32,
                          fse.discrete.width, fse.discrete.height);
+                fmt->fmt.pix.width = fse.discrete.width;
+                fmt->fmt.pix.height = fse.discrete.height;
                 FindMaxRate (obj, fd, fmt, &min_it, &cur_it);
 
                 int64_t c = fcmp (&cur_it, &best_it);
@@ -481,14 +483,16 @@ int SetupFormat (vlc_object_t *obj, int fd, uint32_t fourcc,
                 {
                     best_it = cur_it;
                     best_area = area;
-                    fmt->fmt.pix.width = fse.discrete.width;
-                    fmt->fmt.pix.height = fse.discrete.height;
+                    width = fmt->fmt.pix.width;
+                    height = fmt->fmt.pix.height;
                 }
 
                 fse.index++;
             }
             while (v4l2_ioctl (fd, VIDIOC_ENUM_FRAMESIZES, &fse) >= 0);
 
+            fmt->fmt.pix.width = width;
+            fmt->fmt.pix.height = height;
             msg_Dbg (obj, " best discrete frame size: %"PRIu32"x%"PRIu32,
                      fmt->fmt.pix.width, fmt->fmt.pix.height);
             break;
@@ -504,29 +508,31 @@ int SetupFormat (vlc_object_t *obj, int fd, uint32_t fourcc,
                          fse.stepwise.step_width, fse.stepwise.step_height);
 
             /* FIXME: slow and dumb */
-            for (width =  fse.stepwise.min_width;
-                 width <= fse.stepwise.max_width;
-                 width += fse.stepwise.step_width)
-                for (height =  fse.stepwise.min_height;
-                     height <= fse.stepwise.max_height;
-                     height += fse.stepwise.step_height)
+            for (fmt->fmt.pix.width =  fse.stepwise.min_width;
+                 fmt->fmt.pix.width <= fse.stepwise.max_width;
+                 fmt->fmt.pix.width += fse.stepwise.step_width)
+                for (fmt->fmt.pix.height =  fse.stepwise.min_height;
+                     fmt->fmt.pix.height <= fse.stepwise.max_height;
+                     fmt->fmt.pix.height += fse.stepwise.step_height)
                 {
                     struct v4l2_fract cur_it;
 
                     FindMaxRate (obj, fd, fmt, &min_it, &cur_it);
 
                     int64_t c = fcmp (&cur_it, &best_it);
-                    uint64_t area = width * height;
+                    uint64_t area = fmt->fmt.pix.width * fmt->fmt.pix.height;
 
                     if (c < 0 || (c == 0 && area > best_area))
                     {
                         best_it = cur_it;
                         best_area = area;
-                        fmt->fmt.pix.width = width;
-                        fmt->fmt.pix.height = height;
+                        width = fmt->fmt.pix.width;
+                        height = fmt->fmt.pix.height;
                     }
                 }
 
+            fmt->fmt.pix.width = width;
+            fmt->fmt.pix.height = height;
             msg_Dbg (obj, " best frame size: %"PRIu32"x%"PRIu32,
                      fmt->fmt.pix.width, fmt->fmt.pix.height);
             break;

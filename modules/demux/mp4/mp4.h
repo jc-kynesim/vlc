@@ -37,7 +37,6 @@ typedef struct
     uint32_t     i_sample_description_index; /* index for SampleEntry to use */
     uint32_t     i_sample_count; /* how many samples in this chunk */
     uint32_t     i_sample_first; /* index of the first sample in this chunk */
-    uint32_t     i_sample; /* index of the next sample to read in this chunk */
     uint32_t     i_virtual_run_number; /* chunks interleaving sequence */
 
     /* now provide way to calculate pts, dts, and offset without too
@@ -53,7 +52,7 @@ typedef struct
 
     uint32_t     i_entries_pts;
     uint32_t     *p_sample_count_pts;
-    int32_t      *p_sample_offset_pts;  /* pts-dts */
+    uint32_t     *p_sample_offset_pts;  /* pts-dts */
 
     uint32_t     *p_sample_size;
     /* TODO if needed add pts
@@ -125,10 +124,14 @@ typedef struct
     uint32_t        i_timescale;    /* time scale for this track only */
 
     /* elst */
-    int             i_elst;         /* current elst */
+    uint32_t        i_elst;         /* current elst */
     int64_t         i_elst_time;    /* current elst start time (in movie time scale)*/
     const MP4_Box_t *p_elst;        /* elst (could be NULL) */
 
+    uint32_t         i_start_delta;
+    uint32_t         i_next_delta;
+    stime_t          i_start_dts;
+    stime_t          i_next_dts;
     /* give the next sample to read, i_chunk is to find quickly where
       the sample is located */
     uint32_t         i_sample;       /* next sample to read */

@@ -54,14 +54,14 @@ namespace adaptive
                              AbstractAdaptationLogic::LogicType type );
             virtual ~PlaylistManager    ();
 
-            bool    init();
+            bool    init(bool = false);
             bool    start();
             bool    started() const;
             void    stop();
 
-            AbstractStream::BufferingStatus bufferize(vlc_tick_t, vlc_tick_t, vlc_tick_t);
+            AbstractStream::BufferingStatus bufferize(vlc_tick_t, vlc_tick_t,
+                                                      vlc_tick_t, vlc_tick_t);
             AbstractStream::Status dequeue(vlc_tick_t, vlc_tick_t *);
-            void drain();
 
             virtual bool needsUpdate() const;
             virtual bool updatePlaylist();
@@ -107,9 +107,16 @@ namespace adaptive
             std::vector<AbstractStream *>        streams;
             BasePeriod                          *currentPeriod;
 
+            enum class TimestampSynchronizationPoint
+            {
+                RandomAccess,
+                Discontinuity,
+            };
+
             /* shared with demux/buffering */
             struct
             {
+                TimestampSynchronizationPoint pcr_syncpoint;
                 vlc_tick_t  i_nzpcr;
                 vlc_tick_t  i_firstpcr;
                 mutable vlc_mutex_t lock;
@@ -144,6 +151,7 @@ namespace adaptive
             bool         b_buffering;
             bool         b_canceled;
             vlc_tick_t   pause_start;
+            bool         b_preparsing;
     };
 
 }

@@ -57,6 +57,7 @@ VLC_HOST_ARCH="x86_64"
 # Host platform information
 VLC_HOST_PLATFORM=
 VLC_HOST_TRIPLET=
+VLC_BUILD_TRIPLET=
 # Set to "1" when building for simulator
 VLC_HOST_PLATFORM_SIMULATOR=
 # The host OS name (without the simulator suffix)
@@ -92,7 +93,7 @@ VLC_PREBUILT_CONTRIBS_URL=${VLC_PREBUILT_CONTRIBS_URL:-""}
 # The number of cores to compile on
 CORE_COUNT=$(sysctl -n machdep.cpu.core_count || nproc || echo 0)
 let VLC_USE_NUMBER_OF_CORES=$CORE_COUNT+1
-let VLC_REQUESTED_CORE_COUNT=0
+VLC_REQUESTED_CORE_COUNT=0
 # whether to disable debug mode (the default) or not
 VLC_DISABLE_DEBUG=0
 # whether to compile with bitcode or not
@@ -232,6 +233,18 @@ set_host_triplet()
     VLC_HOST_TRIPLET="${triplet_arch}-apple-darwin"
 }
 
+# Set the VLC_BUILD_TRIPLET based on the architecture
+# that we run on.
+# Globals:
+#   VLC_BUILD_TRIPLET
+# Arguments:
+#   None
+set_build_triplet()
+{
+    local build_arch="$(uname -m | cut -d. -f1)"
+    VLC_BUILD_TRIPLET="$(cc -arch "${build_arch}" -dumpmachine)"
+}
+
 # Take SDK name, verify it exists and populate
 # VLC_HOST_*, VLC_APPLE_SDK_PATH variables based
 # on the SDK and calls the set_deployment_target
@@ -331,6 +344,13 @@ hostenv()
     "$@"
 }
 
+ac_var_to_export_ac_var()
+{
+    for ac_var in "$@"; do
+        echo "export $ac_var"
+    done
+}
+
 # Write config.mak for contribs
 # Globals:
 #   VLC_DEPLOYMENT_TARGET_CFLAG
@@ -372,6 +392,10 @@ write_config_mak()
     printf '%s := %s\n' "STRIP" "${VLC_HOST_STRIP}" >&3
     printf '%s := %s\n' "RANLIB" "${VLC_HOST_RANLIB}" >&3
     printf '%s := %s\n' "NM" "${VLC_HOST_NM}" >&3
+
+    # Add the ac_cv_ var exports in the config.mak for the contribs
+    echo "Appending ac_cv_ vars to config.mak"
+    vlcSetSymbolEnvironment ac_var_to_export_ac_var >&3
 }
 
 # Generate the source file with the needed array for
@@ -490,6 +514,7 @@ validate_architecture "$VLC_HOST_ARCH"
 
 # Set triplet (needs to be called after validating the arch)
 set_host_triplet "$VLC_HOST_ARCH"
+set_build_triplet
 
 # Set pseudo-triplet
 # FIXME: This should match the actual clang triplet and should be used for compiler invocation too!
@@ -574,9 +599,6 @@ else
     echo "Building contribs for $VLC_HOST_ARCH"
 fi
 
-# Set symbol blacklist for autoconf
-vlcSetSymbolEnvironment > /dev/null
-
 # Combine settings from config file
 VLC_CONTRIB_OPTIONS=( "${VLC_CONTRIB_OPTIONS_BASE[@]}" )
 
@@ -603,6 +625,7 @@ write_config_mak "-Werror=partial-availability"
 # Bootstrap contribs
 ../bootstrap \
     --host="$VLC_HOST_TRIPLET" \
+    --build="$VLC_BUILD_TRIPLET" \
     --prefix="$VLC_CONTRIB_INSTALL_DIR" \
     "${VLC_CONTRIB_OPTIONS[@]}" \
 || abort_err "Bootstrapping contribs failed"
@@ -677,9 +700,11 @@ cd "${VLC_BUILD_DIR}/build" || abort_err "Failed cd to VLC build dir"
 # Create VLC install dir if it does not already exist
 mkdir -p "$VLC_INSTALL_DIR"
 
+vlcSetSymbolEnvironment \
 hostenv ../../configure \
     --with-contrib="$VLC_CONTRIB_INSTALL_DIR" \
     --host="$VLC_HOST_TRIPLET" \
+    --build="$VLC_BUILD_TRIPLET" \
     --prefix="$VLC_INSTALL_DIR" \
     "${VLC_CONFIG_OPTIONS[@]}" \
  || abort_err "Configuring VLC failed"

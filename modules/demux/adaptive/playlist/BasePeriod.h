@@ -41,12 +41,12 @@ namespace adaptive
                 virtual ~BasePeriod ();
 
                 const std::vector<BaseAdaptationSet *>& getAdaptationSets   () const;
-                BaseAdaptationSet *                 getAdaptationSetByID(const ID &);
+                BaseAdaptationSet *                 getAdaptationSetByID(const ID &) const;
                 void                                addAdaptationSet    (BaseAdaptationSet *AdaptationSet);
                 void                                debug               (vlc_object_t *,int = 0) const;
 
                 virtual vlc_tick_t getPeriodStart() const override;
-                virtual vlc_tick_t getPeriodDuration() const;
+                virtual vlc_tick_t getPeriodDuration() const override;
                 virtual BasePlaylist *getPlaylist() const override;
 
                 Property<vlc_tick_t> duration;

@@ -99,25 +99,24 @@ int HLSStream::ID3TAG_Parse_Handler(uint32_t i_tag, const uint8_t *p_payload, si
 
 block_t * HLSStream::checkBlock(block_t *p_block, bool b_first)
 {
-    if(b_first && p_block &&
-       p_block->i_buffer >= 10 && ID3TAG_IsTag(p_block->p_buffer, false))
+    if(b_first && p_block)
     {
-        while( p_block->i_buffer )
+        while(p_block->i_buffer >= 10 && ID3TAG_IsTag(p_block->p_buffer, false))
         {
             size_t i_size = ID3TAG_Parse( p_block->p_buffer, p_block->i_buffer,
                                           ID3TAG_Parse_Handler, static_cast<void *>(this) );
+            if(i_size >= p_block->i_buffer || i_size == 0)
+                break;
             /* Skip ID3 for demuxer */
             p_block->p_buffer += i_size;
             p_block->i_buffer -= i_size;
-            if( i_size == 0 )
-                break;
         }
     }
 
     if( b_meta_updated )
     {
         b_meta_updated = false;
-        AbstractCommand *command = fakeEsOut()->commandsQueue()->factory()->createEsOutMetaCommand( fakeesout, -1, p_meta );
+        AbstractCommand *command = fakeEsOut()->commandsFactory()->createEsOutMetaCommand( fakeesout, -1, p_meta );
         if( command )
             fakeEsOut()->commandsQueue()->Schedule( command );
     }
@@ -153,11 +152,8 @@ AbstractDemuxer *HLSStream::newDemux(vlc_object_t *p_obj, const StreamFormat &fo
             break;
 */
 
-        case StreamFormat::UNKNOWN:
-            ret = new MimeDemuxer(p_obj, this, out, source);
-            break;
-
         default:
+        case StreamFormat::UNKNOWN:
         case StreamFormat::UNSUPPORTED:
             break;
     }

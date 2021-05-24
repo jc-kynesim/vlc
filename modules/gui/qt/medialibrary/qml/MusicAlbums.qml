@@ -113,8 +113,8 @@ Widgets.NavigableFocusScope {
           }
         }
 
-        function insertIntoPlaylist(index) {
-            medialib.insertIntoPlaylist(index, albumModelId.getIdsForIndexes(selectionModel.selectedIndexes))
+        function getSelectedInputItem() {
+            return albumModelId.getItemsForIndexes(selectionModel.selectedIndexes);
         }
     }
 
@@ -139,11 +139,20 @@ Widgets.NavigableFocusScope {
             delegateModel: selectionModel
             model: albumModelId
 
+            Widgets.GridShadows {
+                id: shadows
+
+                coverWidth: VLCStyle.gridCover_music_width
+                coverHeight: VLCStyle.gridCover_music_height
+            }
+
             delegate: AudioGridItem {
                 id: audioGridItem
 
                 opacity: gridView_id.expandIndex !== -1 && gridView_id.expandIndex !== audioGridItem.index ? .7 : 1
                 dragItem: albumDragItem
+                unselectedUnderlay: shadows.unselected
+                selectedUnderlay: shadows.selected
 
                 onItemClicked : gridView_id.leftClickOnItem(modifier, index)
 
@@ -218,7 +227,7 @@ Widgets.NavigableFocusScope {
             sortModel:  [
                 { isPrimary: true, criteria: "title", width: VLCStyle.colWidth(2), text: i18n.qtr("Title"), headerDelegate: tableColumns.titleHeaderDelegate, colDelegate: tableColumns.titleDelegate },
                 { criteria: "main_artist", width: VLCStyle.colWidth(Math.max(tableView_id._nbCols - 3, 1)), text: i18n.qtr("Artist") },
-                { criteria: "duration_short", width:VLCStyle.colWidth(1), showSection: "", headerDelegate: tableColumns.timeHeaderDelegate, colDelegate: tableColumns.timeColDelegate },
+                { criteria: "duration", width:VLCStyle.colWidth(1), showSection: "", headerDelegate: tableColumns.timeHeaderDelegate, colDelegate: tableColumns.timeColDelegate },
             ]
 
             navigationCancel: function() {
@@ -230,6 +239,7 @@ Widgets.NavigableFocusScope {
 
             onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes,  menuParent.mapToGlobal(0,0))
             onRightClick: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
+            onItemDoubleClicked: medialib.addAndPlay( model.id )
 
             Widgets.TableColumns {
                 id: tableColumns

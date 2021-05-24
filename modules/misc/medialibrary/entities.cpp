@@ -34,6 +34,7 @@
 #include <medialibrary/IAlbumTrack.h>
 #include <medialibrary/IGenre.h>
 #include <medialibrary/ILabel.h>
+#include <medialibrary/IMediaGroup.h>
 #include <medialibrary/IPlaylist.h>
 #include <medialibrary/IAudioTrack.h>
 #include <medialibrary/IVideoTrack.h>
@@ -406,13 +407,40 @@ bool Convert( const medialibrary::ILabel* input, vlc_ml_label_t& output )
     return strdup_helper( input->name(), output.psz_name );
 }
 
+bool Convert( const medialibrary::IMediaGroup* input, vlc_ml_group_t& output )
+{
+    output.i_id = input->id();
+
+    output.i_nb_total_media = input->nbTotalMedia();
+
+    output.i_duration = input->duration();
+
+    output.i_creation_date = input->creationDate();
+
+    if( strdup_helper( input->name(), output.psz_name ) == false )
+        return false;
+
+    return true;
+}
+
 bool Convert( const medialibrary::IPlaylist* input, vlc_ml_playlist_t& output )
 {
     output.i_id = input->id();
 
+    output.i_creation_date = input->creationDate();
+
+    output.b_is_read_only = input->isReadOnly();
+
     if( !strdup_helper( input->name(), output.psz_name ) ||
         !strdup_helper( input->artworkMrl(), output.psz_artwork_mrl ) )
         return false;
+
+    // NOTE: mrl() must only be called when isReadOnly() is true.
+    if( output.b_is_read_only && !strdup_helper( input->mrl(), output.psz_mrl ) )
+        return false;
+    else
+        output.psz_mrl = nullptr;
+
     return true;
 }
 

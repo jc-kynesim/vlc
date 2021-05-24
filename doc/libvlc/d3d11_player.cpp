@@ -463,11 +463,14 @@ static bool StartRendering_cb( void *opaque, bool enter )
     return true;
 }
 
-static bool SelectPlane_cb( void *opaque, size_t plane )
+static bool SelectPlane_cb( void *opaque, size_t plane, void *out )
 {
+    ID3D11RenderTargetView **output = static_cast<ID3D11RenderTargetView**>( out );
     struct render_context *ctx = static_cast<struct render_context *>( opaque );
     if ( plane != 0 ) // we only support one packed RGBA plane (DXGI_FORMAT_R8G8B8A8_UNORM)
         return false;
+    // we don't really need to return it as we already do the OMSetRenderTargets().
+    *output = ctx->resized.textureRenderTarget;
     return true;
 }
 
@@ -475,9 +478,8 @@ static bool Setup_cb( void **opaque, const libvlc_video_setup_device_cfg_t *cfg,
 {
     struct render_context *ctx = static_cast<struct render_context *>(*opaque);
 
-    init_direct3d(ctx);
-
     out->d3d11.device_context = ctx->d3dctxVLC;
+    ctx->d3dctxVLC->AddRef();
     return true;
 }
 
@@ -485,7 +487,7 @@ static void Cleanup_cb( void *opaque )
 {
     // here we can release all things Direct3D11 for good (if playing only one file)
     struct render_context *ctx = static_cast<struct render_context *>( opaque );
-    release_direct3d(ctx);
+    ctx->d3dctxVLC->Release();
 }
 
 static void Resize_cb( void *opaque,
@@ -635,6 +637,8 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
     ShowWindow(Context.hWnd, nCmdShow);
 
+    init_direct3d(&Context);
+
     // DON'T use with callbacks libvlc_media_player_set_hwnd(p_mp, hWnd);
 
     /* Tell VLC to render into our D3D11 environment */
@@ -663,6 +667,9 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
     libvlc_media_player_release( Context.p_mp );
     libvlc_media_release( p_media );
+
+    release_direct3d(&Context);
+
     libvlc_release( p_libvlc );
 
     DeleteCriticalSection(&Context.sizeLock);

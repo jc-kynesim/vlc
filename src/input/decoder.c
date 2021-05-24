@@ -312,8 +312,8 @@ static bool aout_replaygain_changed( const audio_replay_gain_t *a,
     {
         if( a->pb_gain[i] != b->pb_gain[i] ||
             a->pb_peak[i] != b->pb_peak[i] ||
-            a->pb_gain[i] != b->pb_gain[i] ||
-            a->pb_peak[i] != b->pb_peak[i] )
+            (a->pb_gain[i] && a->pf_gain[i] != b->pf_gain[i]) ||
+            (a->pb_peak[i] && a->pf_peak[i] != b->pf_peak[i]) )
             return true;
     }
     return false;
@@ -483,12 +483,14 @@ static int ModuleThread_UpdateVideoFormat( decoder_t *p_dec, vlc_video_context *
         p_owner->vout_started = true;
         vlc_mutex_unlock( &p_owner->lock );
 
-        vlc_fifo_Lock( p_owner->p_fifo );
-        p_owner->reset_out_state = true;
-        vlc_fifo_Unlock( p_owner->p_fifo );
-
         if (has_started)
+        {
+            vlc_fifo_Lock( p_owner->p_fifo );
+            p_owner->reset_out_state = true;
+            vlc_fifo_Unlock( p_owner->p_fifo );
+
             decoder_Notify(p_owner, on_vout_started, p_vout, p_owner->vout_order);
+        }
         return 0;
     }
 

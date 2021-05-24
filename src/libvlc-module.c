@@ -537,12 +537,22 @@ static const char *const screensaver_texts[] = {
     "algorithms should try to compensate (in milliseconds)." )
 
 #define CLOCK_MASTER_TEXT N_("Clock master source")
+#define CLOCK_MASTER_LONGTEXT N_( "Select the clock master source:\n" \
+    "auto: best clock source, input if the access can't be paced " \
+    "(when playing live content), or audio otherwise (most likely).\n" \
+    "input: all tracks are driven by the input clock, via PCR updates " \
+    "from the demuxer. This restore the VLC 3.0 clock behavior where both audio " \
+    "and video tracks can be altered to catch up with the input.\n" \
+    "audio: if an audio track is playing, the audio output will drive the " \
+    "clock (Fallback to Monotonic if there is no audio tracks).\n" \
+    "monotonic: all tracks are driven by the monotonic clock of the system.")
 
-static const int pi_clock_master_values[] = {
-    VLC_CLOCK_MASTER_AUDIO,
-    VLC_CLOCK_MASTER_MONOTONIC,
+static const char *const ppsz_clock_master_values[] = {
+    "auto", "input", "audio", "monotonic",
 };
 static const char *const ppsz_clock_master_descriptions[] = {
+    N_("Auto"),
+    N_("Input (PCR)"),
     N_("Audio"),
     N_("Monotonic")
 };
@@ -1977,9 +1987,9 @@ vlc_module_begin ()
     add_integer( "clock-jitter", 5000, CLOCK_JITTER_TEXT,
               CLOCK_JITTER_LONGTEXT, true )
         change_safe()
-    add_integer( "clock-master", VLC_CLOCK_MASTER_DEFAULT,
-                 CLOCK_MASTER_TEXT, NULL, true )
-        change_integer_list( pi_clock_master_values, ppsz_clock_master_descriptions )
+    add_string( "clock-master", "auto",
+                 CLOCK_MASTER_TEXT, CLOCK_MASTER_LONGTEXT, true )
+        change_string_list( ppsz_clock_master_values, ppsz_clock_master_descriptions )
 
     add_directory("input-record-path", NULL,
                   INPUT_RECORD_PATH_TEXT, INPUT_RECORD_PATH_LONGTEXT)

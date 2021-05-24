@@ -92,9 +92,6 @@ typedef struct vlc_video_align {
  */
 typedef struct vout_display_cfg {
     struct vout_window_t *window; /**< Window */
-#if defined(__OS2__)
-    bool is_fullscreen VLC_DEPRECATED;  /* Is the display fullscreen */
-#endif
 
     /** Display properties */
     struct {
@@ -122,10 +119,7 @@ typedef struct vout_display_cfg {
     bool is_display_filled;
 
     /** Zoom ratio */
-    struct {
-        unsigned num;
-        unsigned den;
-    } zoom;
+    vlc_rational_t zoom;
 
     vlc_viewpoint_t viewpoint;
 } vout_display_cfg_t;
@@ -146,14 +140,6 @@ typedef struct {
  * Control query for vout_display_t
  */
 enum vout_display_query {
-#if defined(__OS2__)
-    /* Ask the module to acknowledge/refuse the fullscreen state change after
-     * being requested (externally or by VOUT_DISPLAY_EVENT_FULLSCREEN */
-    VOUT_DISPLAY_CHANGE_FULLSCREEN VLC_DEPRECATED_ENUM,
-    /* Ask the module to acknowledge/refuse the window management state change
-     * after being requested externally or by VOUT_DISPLAY_WINDOW_STATE */
-    VOUT_DISPLAY_CHANGE_WINDOW_STATE VLC_DEPRECATED_ENUM,
-#endif
     /**
      * Notifies a change in display size.
      *
@@ -261,8 +247,9 @@ struct vlc_display_operations
      * or upload the picture to video memory. If supported, this can also
      * queue the picture to be shown asynchronously at the given date.
      *
-     * If prepare is not \c NULL, there is an implicit guarantee that display
-     * will be invoked with the exact same picture afterwards:
+     *
+     * If prepare and display are not \c NULL, there is an implicit guarantee
+     * that display will be invoked with the exact same picture afterwards:
      * prepare 1st picture, display 1st picture, prepare 2nd picture, display
      * 2nd picture, and so on.
      *
@@ -282,6 +269,9 @@ struct vlc_display_operations
      *
      * This callback is invoked at the time when the picture should be shown.
      * The picture must be displayed as soon as possible.
+     *
+     * If NULL, prepare must be valid. In that case, the plugin can handle
+     * asynchronous display at the time given by the prepare call.
      *
      * \note The picture buffers may have multiple references.
      * Therefore the pixel content of the picture or of the subpicture

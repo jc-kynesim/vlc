@@ -50,16 +50,17 @@
 #include "dialogs/help/help.hpp"
 #include "dialogs/gototime/gototime.hpp"
 #include "dialogs/podcast/podcast_configuration.hpp"
-#include "dialogs/toolbar/toolbareditor.hpp"
 #include "dialogs/plugins/plugins.hpp"
 #include "dialogs/epg/epg.hpp"
 #include "dialogs/errors/errors.hpp"
+#include "dialogs/playlists/playlists.hpp"
 
 #include <QEvent>
 #include <QApplication>
 #include <QSignalMapper>
 #include <QFileDialog>
 #include <QUrl>
+#include <QInputDialog>
 
 #define I_OP_DIR_WINTITLE I_DIR_OR_FOLDER( N_("Open Directory"), \
                                            N_("Open Folder") )
@@ -90,6 +91,7 @@ DialogsProvider::~DialogsProvider()
 #endif
     PluginDialog::killInstance();
     EpgDialog::killInstance();
+    PlaylistsDialog::killInstance();
 
     delete popupMenu;
     delete videoPopupMenu;
@@ -108,6 +110,36 @@ QString DialogsProvider::getSaveFileName( QWidget *parent,
 {
     const QStringList schemes = QStringList(QStringLiteral("file"));
     return QFileDialog::getSaveFileUrl( parent, caption, dir, filter, selectedFilter, QFileDialog::Options(), schemes).toLocalFile();
+}
+
+QVariant DialogsProvider::getTextDialog(QWidget *parent,
+                                        const QString &title,
+                                        const QString &label,
+                                        const QString &placeholder,
+                                        bool *ok)
+{
+    bool _ok = false;
+    QString ret = QInputDialog::getText(parent,
+                                        title,
+                                        label,
+                                        QLineEdit::Normal,
+                                        placeholder,
+                                        ok ? ok : &_ok);
+
+    if (!ok)
+    {
+        // When this function is called from the QML side, instead of setting `ok` parameter
+        // a QVariantMap with key `ok` and `text` is returned instead
+
+        QVariantMap map;
+        map["text"] = ret;
+        map["ok"] = _ok;
+        return map;
+    }
+    else
+    {
+        return ret;
+    }
 }
 
 void DialogsProvider::quit()
@@ -141,6 +173,8 @@ void DialogsProvider::customEvent( QEvent *event )
             //FIXME
             //playlistDialog(); break;
             break;
+        case INTF_DIALOG_PLAYLISTS:
+            playlistsDialog(); break;
         case INTF_DIALOG_MESSAGES:
             messagesDialog(); break;
         case INTF_DIALOG_FILEINFO:
@@ -314,6 +348,23 @@ void DialogsProvider::mediaCodecDialog()
         dialog->hide();
 }
 
+void DialogsProvider::playlistsDialog()
+{
+    PlaylistsDialog::getInstance( p_intf )->toggleVisible();
+}
+
+void DialogsProvider::playlistsDialog( const QVariantList & medias )
+{
+    PlaylistsDialog * dialog = PlaylistsDialog::getInstance( p_intf );
+
+    dialog->setMedias(medias);
+
+    dialog->show();
+
+    // FIXME: We shouldn't have to call this on here.
+    dialog->getInstance( p_intf )->activateWindow();
+}
+
 void DialogsProvider::bookmarksDialog()
 {
     BookmarksDialog::getInstance( p_intf )->toggleVisible();
@@ -322,14 +373,6 @@ void DialogsProvider::bookmarksDialog()
 void DialogsProvider::podcastConfigureDialog()
 {
     PodcastConfigDialog::getInstance( p_intf )->toggleVisible();
-}
-
-void DialogsProvider::toolbarDialog()
-{
-    ToolbarEditorDialog *toolbarEditor = new ToolbarEditorDialog( (QWidget *)p_intf->p_sys->p_mi, p_intf);
-    if( toolbarEditor->exec() == QDialog::Accepted )
-        emit toolBarConfUpdated();
-    delete toolbarEditor;
 }
 
 void DialogsProvider::pluginDialog()

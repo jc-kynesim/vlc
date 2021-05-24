@@ -58,17 +58,16 @@ Item {
 
     property var backgroundItem: undefined
 
-    property bool _active: false
-    visible: _active
+    visible: false
 
     function open() {
         listView.currentModel = root.model
-        _active = true
+        visible = true
         listView.forceActiveFocus()
     }
 
     function close() {
-        _active = false
+        visible = false
         backgroundItem.forceActiveFocus()
     }
 
@@ -280,18 +279,22 @@ Item {
                         color: colors.text
                     }
 
-                    ListLabel {
-                        visible: modelData.marking.length >= 1
+                    Loader {
+                        active: (button.yieldsAnotherModel ||
+                                 ( (!!modelData.marking) && (modelData.marking.length >= 1) ))
 
-                        Layout.alignment: Qt.AlignHCenter
+                        sourceComponent: ListLabel {
+                            Layout.alignment: Qt.AlignHCenter
 
-                        text: {
-                            if (button.yieldsAnotherModel)
-                                "⮕"
-                            else if (!!modelData.marking)
-                                modelData.marking
+                            text: {
+                                if (button.yieldsAnotherModel)
+                                    "⮕"
+                                else if (!!modelData.marking)
+                                    modelData.marking
+                            }
+
+                            color: colors.text
                         }
-                        color: colors.text
                     }
                 }
 
@@ -307,7 +310,7 @@ Item {
     states: [
         State {
             name: "visible"
-            when: _active
+            when: visible
 
             PropertyChanges {
                 target: parentItem
@@ -316,7 +319,7 @@ Item {
         },
         State {
             name: "hidden"
-            when: !_active
+            when: !visible
 
             PropertyChanges {
                 target: parentItem
@@ -327,7 +330,7 @@ Item {
 
     transitions: [
         Transition {
-            from: "hidden"
+            from: "*"
             to: "visible"
 
             NumberAnimation {

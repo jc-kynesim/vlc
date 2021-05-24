@@ -27,6 +27,7 @@ import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
 import "qrc:///menus/" as Menus
 import "qrc:///util/KeyHelper.js" as KeyHelper
+import "qrc:///util/Helpers.js" as Helpers
 
 Widgets.NavigableFocusScope {
     id: root
@@ -176,11 +177,24 @@ Widgets.NavigableFocusScope {
                 }
             }
 
-            Item {
+            Widgets.NavigableFocusScope {
                 id: localToolbar
 
                 width: parent.width
                 height: VLCStyle.localToolbar_height
+
+                onActiveFocusChanged: {
+                    if (activeFocus) {
+                        // sometimes when view changes, one of the "focusable" object will become disabled
+                        // but because of focus chainning, FocusScope still tries to force active focus on the object
+                        // but that will fail, manually assign focus in such cases
+                        var focusable = [localContextGroup, localMenuGroup, playlistGroup]
+                        if (!focusable.some(function (obj) { return obj.activeFocus; })) {
+                            // no object has focus
+                            localToolbar.nextItemInFocusChain(true).forceActiveFocus()
+                        }
+                    }
+                }
 
                 Rectangle {
                     id: localToolbarBg
@@ -309,16 +323,13 @@ Widgets.NavigableFocusScope {
 
                         focus: !!item && item.focus && item.visible
                         visible: !!item
+                        enabled: status === Loader.Ready
                         y: (VLCStyle.localToolbar_height - item.height) / 2
                         width: !!item
-                               ? clamp(localMenuView.availableWidth
-                                       , localMenuGroup.item.minimumWidth || localMenuGroup.item.implicitWidth
-                                       , localMenuGroup.item.maximumWidth || localMenuGroup.item.implicitWidth)
+                               ? Helpers.clamp(localMenuView.availableWidth,
+                                               localMenuGroup.item.minimumWidth || localMenuGroup.item.implicitWidth,
+                                               localMenuGroup.item.maximumWidth || localMenuGroup.item.implicitWidth)
                                : 0
-
-                        function clamp(num, min, max) {
-                          return num <= min ? min : num >= max ? max : num;
-                        }
 
                         onVisibleChanged: {
                             //reset the focus on the global group when the local group is hidden,

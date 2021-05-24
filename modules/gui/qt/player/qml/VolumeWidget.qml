@@ -51,11 +51,15 @@ FocusScope{
         id: volumeWidget
         Widgets.IconToolButton{
             id: volumeBtn
+
+            focus: true
             paintOnly: widgetfscope.paintOnly
             size: VLCStyle.icon_normal
             iconText:
                 if( player.muted )
                     VLCIcons.volume_muted
+                else if ( player.volume == 0 )
+                    VLCIcons.volume_zero
                 else if ( player.volume < .33 )
                     VLCIcons.volume_low
                 else if( player.volume <= .66 )
@@ -66,6 +70,17 @@ FocusScope{
             color: widgetfscope.color
             onClicked: player.muted = !player.muted
             KeyNavigation.right: volControl
+
+            Keys.onLeftPressed: {
+                var left = widgetfscope.KeyNavigation.left
+                while (left && (!left.enabled || !left.visible)) {
+                    left = left.KeyNavigation ? left.KeyNavigation.left : undefined
+                }
+                if (left)
+                    left.forceActiveFocus()
+                else if (!!navigationLeft)
+                    navigationLeft()
+            }
         }
 
         Slider
@@ -80,7 +95,6 @@ FocusScope{
             stepSize: 0.05
             value: player.volume
             opacity: player.muted ? 0.5 : 1
-            focus: true
 
             Accessible.name: i18n.qtr("Volume")
 
@@ -124,22 +138,17 @@ FocusScope{
             Keys.onRightPressed: {
                 var right = widgetfscope.KeyNavigation.right
                 while (right && (!right.enabled || !right.visible)) {
-                    right = right.KeyNavigation ? right.KeyNavigation.left : undefined
+                    right = right.KeyNavigation ? right.KeyNavigation.right : undefined
                 }
                 if (right)
                     right.forceActiveFocus()
                 else if (!!navigationRight)
                     navigationRight()
             }
+
             Keys.onLeftPressed: {
-                var left = widgetfscope.KeyNavigation.left
-                while (left && (!left.enabled || !left.visible)) {
-                    left = left.KeyNavigation ? left.KeyNavigation.left : undefined
-                }
-                if (left)
-                    left.forceActiveFocus()
-                else if (!!navigationLeft)
-                    navigationLeft()
+                volumeBtn.forceActiveFocus()
+                event.accepted = true
             }
 
             property color sliderColor: (volControl.position > fullvolpos) ? colors.volmax : widgetfscope.color
@@ -196,19 +205,20 @@ FocusScope{
 
                     onPositionChanged: function (event) {
                         if (sliderMouseArea.pressedButtons === Qt.RightButton) {
-                            if (sliderMouseArea.mouseX < sliderMouseArea.width * volControl.fullvolpos / 4)
+                            var pos = sliderMouseArea.mouseX * volControl.maxvolpos / sliderMouseArea.width
+                            if (pos < 0.25)
                                 volControl.value = 0
-                            else if (sliderMouseArea.mouseX < sliderMouseArea.width * volControl.fullvolpos * 3 / 4)
+                            else if (pos < 0.75)
                                 volControl.value = 0.5
-                            else if (sliderMouseArea.mouseX >= sliderMouseArea.width)
-                                volControl.value = 1.25
-                            else
+                            else if (pos < 1.125)
                                 volControl.value = 1
+                            else
+                                volControl.value = 1.25
                             return
                         }
 
                         if(pressed)
-                            volControl.value = volControl.maxvolpos * event.x / (volControl.width)
+                            volControl.value = volControl.maxvolpos * (event.x - handle.width / 2) / (sliderMouseArea.width - handle.width)
                     }
 
                     onWheel: {

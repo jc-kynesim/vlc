@@ -178,10 +178,10 @@
                </property>
               </widget>
              </item>
-             <item row="5" column="2" colspan="2">
+             <item row="6" column="2" colspan="2">
               <widget class="QComboBox" name="notificationCombo"/>
              </item>
-             <item row="9" column="2" colspan="2">
+             <item row="10" column="2" colspan="2">
               <widget class="QComboBox" name="stylesCombo"/>
              </item>
              <item row="0" column="0" colspan="5">
@@ -198,7 +198,7 @@
                </property>
               </widget>
              </item>
-             <item row="5" column="0">
+             <item row="6" column="0">
               <widget class="QLabel" name="notificationComboLabel">
                <property name="text">
                 <string>Show media change popup:</string>
@@ -215,7 +215,7 @@
                </property>
               </widget>
              </item>
-             <item row="9" column="0">
+             <item row="10" column="0">
               <widget class="QLabel" name="stylesLabel">
                <property name="sizePolicy">
                 <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
@@ -271,7 +271,7 @@
                </property>
               </widget>
              </item>
-             <item row="11" column="0">
+             <item row="12" column="0">
               <widget class="QLabel" name="autoRaiseLabel">
                <property name="text">
                 <string>Auto raising the interface:</string>
@@ -281,8 +281,75 @@
                </property>
               </widget>
              </item>
-             <item row="11" column="2" colspan="2">
+             <item row="12" column="2" colspan="2">
               <widget class="QComboBox" name="autoRaiseComboBox"/>
+             </item>
+             <item row="13" column="0">
+              <widget class="QLabel" name="colorSchemeLabel">
+               <property name="text">
+                <string>Color Scheme:</string>
+               </property>
+               <property name="buddy">
+                <cstring>colorSchemeComboBox</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="13" column="2" colspan="2">
+              <widget class="QComboBox" name="colorSchemeComboBox"/>
+             </item>
+             <item row="4" column="2">
+              <widget class="QCheckBox" name="menuBarCheck">
+               <property name="text">
+                <string>Show the menu bar</string>
+               </property>
+              </widget>
+             </item>
+             <item row="14" column="0">
+              <widget class="QLabel" name="scaleFactorLabel">
+               <property name="text">
+                <string>Interface scale factor:</string>
+               </property>
+               <property name="buddy">
+                <cstring>intfScaleFactorSlider</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="14" column="2">
+              <widget class="QSlider" name="intfScaleFactorSlider">
+               <property name="tracking">
+                <bool>false</bool>
+               </property>
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+              </widget>
+             </item>
+             <item row="14" column="3">
+              <widget class="QSpinBox" name="intfScaleFactorSpinBox">
+               <property name="suffix">
+                <string> %</string>
+               </property>
+               <property name="singleStep">
+                <number>5</number>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0" colspan="2">
+              <widget class="QCheckBox" name="pinVideoControlsCheckbox">
+               <property name="toolTip">
+                <string>Disables autohiding of controls when playing videos</string>
+               </property>
+               <property name="text">
+                <string>Pin video controls</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="2">
+              <widget class="QCheckBox" name="titleBarCheckBox">
+               <property name="text">
+                <string>Enable window titlebar</string>
+               </property>
+              </widget>
              </item>
             </layout>
            </widget>
@@ -626,67 +693,6 @@
          </size>
         </property>
        </spacer>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="QGroupBox" name="mlGroupBox">
-     <property name="title">
-      <string>Media Library</string>
-     </property>
-     <layout class="QGridLayout" name="gridLayout_5">
-      <item row="0" column="2">
-       <widget class="QPushButton" name="addButton">
-        <property name="maximumSize">
-         <size>
-          <width>16</width>
-          <height>16</height>
-         </size>
-        </property>
-        <property name="text">
-         <string>+</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <spacer name="horizontalSpacer_2">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="3" column="0" colspan="3">
-       <widget class="QTableView" name="entryPointsTV">
-        <property name="editTriggers">
-         <set>QAbstractItemView::AllEditTriggers</set>
-        </property>
-        <property name="alternatingRowColors">
-         <bool>true</bool>
-        </property>
-        <property name="showGrid">
-         <bool>false</bool>
-        </property>
-        <attribute name="horizontalHeaderVisible">
-         <bool>true</bool>
-        </attribute>
-        <attribute name="verticalHeaderVisible">
-         <bool>false</bool>
-        </attribute>
-       </widget>
-      </item>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_2">
-        <property name="text">
-         <string>Folders scanned by the Media Library:</string>
-        </property>
-       </widget>
       </item>
      </layout>
     </widget>

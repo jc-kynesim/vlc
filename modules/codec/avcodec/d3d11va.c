@@ -93,7 +93,7 @@ struct vlc_va_sys_t
     /* pool */
     va_pool_t                     *va_pool;
     ID3D11VideoDecoderOutputView  *hw_surface[MAX_SURFACE_COUNT];
-    ID3D11ShaderResourceView      *renderSrc[MAX_SURFACE_COUNT * D3D11_MAX_SHADER_VIEW];
+    ID3D11ShaderResourceView      *renderSrc[MAX_SURFACE_COUNT * DXGI_MAX_SHADER_VIEW];
 };
 
 /* */
@@ -135,7 +135,7 @@ static picture_context_t *d3d11va_pic_context_copy(picture_context_t *ctx)
     *pic_ctx = *src_ctx;
     vlc_video_context_Hold(pic_ctx->ctx.s.vctx);
     va_surface_AddRef(pic_ctx->va_surface);
-    for (int i=0;i<D3D11_MAX_SHADER_VIEW; i++)
+    for (int i=0;i<DXGI_MAX_SHADER_VIEW; i++)
     {
         pic_ctx->ctx.picsys.resource[i]  = src_ctx->ctx.picsys.resource[i];
         pic_ctx->ctx.picsys.renderSrc[i] = src_ctx->ctx.picsys.renderSrc[i];
@@ -146,7 +146,7 @@ static picture_context_t *d3d11va_pic_context_copy(picture_context_t *ctx)
 
 static struct d3d11va_pic_context *CreatePicContext(
                                                   UINT slice,
-                                                  ID3D11ShaderResourceView *renderSrc[D3D11_MAX_SHADER_VIEW],
+                                                  ID3D11ShaderResourceView *renderSrc[DXGI_MAX_SHADER_VIEW],
                                                   vlc_video_context *vctx)
 {
     struct d3d11va_pic_context *pic_ctx = calloc(1, sizeof(*pic_ctx));
@@ -160,11 +160,8 @@ static struct d3d11va_pic_context *CreatePicContext(
     ID3D11Resource *p_resource;
     ID3D11ShaderResourceView_GetResource(renderSrc[0], &p_resource);
 
-    D3D11_TEXTURE2D_DESC txDesc;
-    ID3D11Texture2D_GetDesc((ID3D11Texture2D*)p_resource, &txDesc);
-
     pic_ctx->ctx.picsys.slice_index = slice;
-    for (int i=0;i<D3D11_MAX_SHADER_VIEW; i++)
+    for (int i=0;i<DXGI_MAX_SHADER_VIEW; i++)
     {
         pic_ctx->ctx.picsys.resource[i] = p_resource;
         pic_ctx->ctx.picsys.renderSrc[i] = renderSrc[i];
@@ -178,13 +175,13 @@ static picture_context_t* NewSurfacePicContext(vlc_va_t *va, vlc_va_surface_t *v
 {
     vlc_va_sys_t *sys = va->sys;
     ID3D11VideoDecoderOutputView *surface = sys->hw_surface[va_surface_GetIndex(va_surface)];
-    ID3D11ShaderResourceView *resourceView[D3D11_MAX_SHADER_VIEW];
+    ID3D11ShaderResourceView *resourceView[DXGI_MAX_SHADER_VIEW];
 
     D3D11_VIDEO_DECODER_OUTPUT_VIEW_DESC viewDesc;
     ID3D11VideoDecoderOutputView_GetDesc(surface, &viewDesc);
 
-    for (size_t i=0; i<D3D11_MAX_SHADER_VIEW; i++)
-        resourceView[i] = sys->renderSrc[viewDesc.Texture2D.ArraySlice*D3D11_MAX_SHADER_VIEW + i];
+    for (size_t i=0; i<DXGI_MAX_SHADER_VIEW; i++)
+        resourceView[i] = sys->renderSrc[viewDesc.Texture2D.ArraySlice*DXGI_MAX_SHADER_VIEW + i];
 
     struct d3d11va_pic_context *pic_ctx = CreatePicContext(
                                                   viewDesc.Texture2D.ArraySlice,
@@ -205,7 +202,7 @@ static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
     if (unlikely(pic->context == NULL))
     {
         va_surface_Release(va_surface);
-        return VLC_ENOITEM;
+        return VLC_ENOMEM;
     }
     data[3] = (uint8_t*)sys->hw_surface[va_surface_GetIndex(va_surface)];
     return VLC_SUCCESS;
@@ -366,7 +363,7 @@ static int DxGetInputList(vlc_va_t *va, input_list_t *p_list)
 
 static const d3d_format_t *D3D11_FindDXGIFormat(DXGI_FORMAT dxgi)
 {
-    for (const d3d_format_t *output_format = GetRenderFormatList();
+    for (const d3d_format_t *output_format = DxgiGetRenderFormatList();
          output_format->name != NULL; ++output_format)
     {
         if (output_format->formatTexture == dxgi &&
@@ -403,18 +400,18 @@ static int DxSetupOutput(vlc_va_t *va, const directx_va_mode_t *mode, const vide
     int idx = 0;
     const d3d_format_t *decoder_format;
     UINT supportFlags = D3D11_FORMAT_SUPPORT_DECODER_OUTPUT | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
-    decoder_format = FindD3D11Format( va, va->sys->d3d_dev, 0, D3D11_RGB_FORMAT|D3D11_YUV_FORMAT,
+    decoder_format = FindD3D11Format( va, va->sys->d3d_dev, 0, DXGI_RGB_FORMAT|DXGI_YUV_FORMAT,
                                       mode->bit_depth, mode->log2_chroma_h+1, mode->log2_chroma_w+1,
-                                      D3D11_CHROMA_GPU, supportFlags );
+                                      DXGI_CHROMA_GPU, supportFlags );
     if (decoder_format == NULL)
-        decoder_format = FindD3D11Format( va, va->sys->d3d_dev, 0, D3D11_RGB_FORMAT|D3D11_YUV_FORMAT,
-                                        mode->bit_depth, 0, 0, D3D11_CHROMA_GPU, supportFlags );
+        decoder_format = FindD3D11Format( va, va->sys->d3d_dev, 0, DXGI_RGB_FORMAT|DXGI_YUV_FORMAT,
+                                        mode->bit_depth, 0, 0, DXGI_CHROMA_GPU, supportFlags );
     if (decoder_format == NULL && mode->bit_depth > 10)
-        decoder_format = FindD3D11Format( va, va->sys->d3d_dev, 0, D3D11_RGB_FORMAT|D3D11_YUV_FORMAT,
-                                        10, 0, 0, D3D11_CHROMA_GPU, supportFlags );
+        decoder_format = FindD3D11Format( va, va->sys->d3d_dev, 0, DXGI_RGB_FORMAT|DXGI_YUV_FORMAT,
+                                        10, 0, 0, DXGI_CHROMA_GPU, supportFlags );
     if (decoder_format == NULL)
-        decoder_format = FindD3D11Format( va, va->sys->d3d_dev, 0, D3D11_RGB_FORMAT|D3D11_YUV_FORMAT,
-                                        0, 0, 0, D3D11_CHROMA_GPU, supportFlags );
+        decoder_format = FindD3D11Format( va, va->sys->d3d_dev, 0, DXGI_RGB_FORMAT|DXGI_YUV_FORMAT,
+                                        0, 0, 0, DXGI_CHROMA_GPU, supportFlags );
     if (decoder_format != NULL)
     {
         msg_Dbg(va, "favor decoder format %s", decoder_format->name);
@@ -441,14 +438,14 @@ static int DxSetupOutput(vlc_va_t *va, const directx_va_mode_t *mode, const vide
 
        // check if we can create render texture of that format
        // check the decoder can output to that format
-       if ( !DeviceSupportsFormat(sys->d3d_dev->d3ddevice, processorInput[idx]->formatTexture,
+       if ( !D3D11_DeviceSupportsFormat(sys->d3d_dev, processorInput[idx]->formatTexture,
                                   D3D11_FORMAT_SUPPORT_SHADER_LOAD) )
        {
 #ifndef ID3D11VideoContext_VideoProcessorBlt
            msg_Dbg(va, "Format %s needs a processor but is not supported",
                    DxgiFormatToStr(processorInput[idx]->formatTexture));
 #else
-           if ( !DeviceSupportsFormat(sys->d3d_dev->d3ddevice, processorInput[idx]->formatTexture,
+           if ( !D3D11_DeviceSupportsFormat(sys->d3d_dev, processorInput[idx]->formatTexture,
                                       D3D11_FORMAT_SUPPORT_VIDEO_PROCESSOR_INPUT) )
            {
                msg_Dbg(va, "Format %s needs a processor but is not available",
@@ -541,7 +538,7 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id,
     texDesc.BindFlags = D3D11_BIND_DECODER;
     texDesc.CPUAccessFlags = 0;
 
-    if (DeviceSupportsFormat(sys->d3d_dev->d3ddevice, texDesc.Format, D3D11_FORMAT_SUPPORT_SHADER_LOAD))
+    if (D3D11_DeviceSupportsFormat(sys->d3d_dev, texDesc.Format, D3D11_FORMAT_SUPPORT_SHADER_LOAD))
         texDesc.BindFlags |= D3D11_BIND_SHADER_RESOURCE;
 
     ID3D11Texture2D *p_texture;
@@ -567,9 +564,9 @@ static int DxCreateDecoderSurfaces(vlc_va_t *va, int codec_id,
 
         if (texDesc.BindFlags & D3D11_BIND_SHADER_RESOURCE)
         {
-            ID3D11Texture2D *textures[D3D11_MAX_SHADER_VIEW] = {p_texture, p_texture, p_texture};
+            ID3D11Texture2D *textures[DXGI_MAX_SHADER_VIEW] = {p_texture, p_texture, p_texture};
             D3D11_AllocateResourceView(va, sys->d3d_dev->d3ddevice, sys->render_fmt, textures, surface_idx,
-                                &sys->renderSrc[surface_idx * D3D11_MAX_SHADER_VIEW]);
+                                &sys->renderSrc[surface_idx * DXGI_MAX_SHADER_VIEW]);
         }
     }
     ID3D11Texture2D_Release(p_texture);
@@ -654,10 +651,10 @@ static void DxDestroySurfaces(void *opaque)
     if (sys->hw_surface[0]) {
         for (unsigned i = 0; i < sys->hw.surface_count; i++)
         {
-            for (int j = 0; j < D3D11_MAX_SHADER_VIEW; j++)
+            for (int j = 0; j < DXGI_MAX_SHADER_VIEW; j++)
             {
-                if (sys->renderSrc[i*D3D11_MAX_SHADER_VIEW + j])
-                    ID3D11ShaderResourceView_Release(sys->renderSrc[i*D3D11_MAX_SHADER_VIEW + j]);
+                if (sys->renderSrc[i*DXGI_MAX_SHADER_VIEW + j])
+                    ID3D11ShaderResourceView_Release(sys->renderSrc[i*DXGI_MAX_SHADER_VIEW + j]);
             }
             ID3D11VideoDecoderOutputView_Release( sys->hw_surface[i] );
         }

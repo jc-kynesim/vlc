@@ -16,6 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 import QtQuick 2.11
+import QtQuick.Controls 2.4
 import QtGraphicalEffects 1.0
 
 import "qrc:///style/"
@@ -26,7 +27,7 @@ Item {
     // set parentWindow if you want to let tooltip not exceed window boundaries
     // if it is not set, tooltip will use mouseArea as the bounding rect.
     // Note that for now it only works with x axis.
-    property var parentWindow: undefined
+    property var parentWindow: g_root
 
     property var mouseArea: undefined
 
@@ -47,7 +48,6 @@ Item {
     function getX() {
         var x = xPos - (pointingTooltip.width / 2)
         var diff = (x + pointingTooltip.width)
-
         var windowMappedX = !!parentWindow ? parentWindow.mapFromItem(mouseArea, mouseArea.x, mouseArea.y).x : undefined
 
         var sliderRealX = 0
@@ -55,9 +55,9 @@ Item {
         if (!!parentWindow) {
             diff -= parentWindow.width - windowMappedX
             sliderRealX = windowMappedX
-        }
-        else
+        } else {
             diff -= mouseArea.width
+        }
 
         if (x < -sliderRealX) {
             if (!!parentWindow)
@@ -65,12 +65,10 @@ Item {
             else
                 arrow.diff = x
             x = -sliderRealX
-        }
-        else if (diff > 0) {
+        } else if (diff > 0) {
             arrow.diff = diff
             x -= (diff)
-        }
-        else {
+        } else {
             arrow.diff = 0
         }
 
@@ -132,16 +130,18 @@ Item {
             color: colors.glowColor
         }
 
-        Text {
+        Label {
             anchors.fill: parent
             text: timeMetrics.text
             color: colors.text
+            font: timeMetrics.font
 
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
 
             TextMetrics {
                 id: timeMetrics
+                font.pixelSize: VLCStyle.fontSize_normal
             }
         }
     }

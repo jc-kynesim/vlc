@@ -120,6 +120,11 @@
     _tapRecognizer = [[UITapGestureRecognizer alloc]
         initWithTarget:self action:@selector(tapRecognized:)];
 
+    CGSize size = _viewContainer.bounds.size;
+    [self reportEvent:^{
+        vout_window_ReportSize(_wnd, size.width, size.height);
+    }];
+
     return self;
 }
 
@@ -159,6 +164,20 @@
         msg_Err(_wnd, "Handling the view container failed due to an Obj-C exception (%s, %s", [exception.name UTF8String], [exception.reason UTF8String]);
         return NO;
     }
+}
+
+- (void)reportEvent:(void(^)())eventBlock
+{
+    CFStringRef mode = CFSTR("org.videolan.vlccore.window");
+    CFRunLoopRef runloop = CFRunLoopGetCurrent();
+    CFRunLoopPerformBlock(runloop, mode, ^{
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            (eventBlock)();
+            CFRunLoopStop(runloop);
+        });
+    });
+    CFRunLoopWakeUp(runloop);
+    CFRunLoopRunInMode(mode, 0, NO);
 }
 
 - (void)detachFromParent
@@ -263,11 +282,16 @@
     /* We need to lock to ensure _wnd is still valid, see detachFromParent. */
     vlc_mutex_lock(&_mutex);
     if (_wnd == NULL)
-        goto end;
-    vout_window_ReportSize(_wnd,
-            viewSize.width * scaleFactor,
-            viewSize.height * scaleFactor);
-end:
+    {
+        vlc_mutex_unlock(&_mutex);
+        return;
+    }
+
+    [self reportEvent:^{
+        vout_window_ReportSize(_wnd,
+                viewSize.width * scaleFactor,
+                viewSize.height * scaleFactor);
+    }];
     vlc_mutex_unlock(&_mutex);
 }
 
@@ -280,12 +304,17 @@ end:
     /* We need to lock to ensure _wnd is still valid, see detachFromParent. */
     vlc_mutex_lock(&_mutex);
     if (_wnd == NULL)
-        goto end;
-    vout_window_ReportMouseMoved(_wnd,
-            (int)touchPoint.x * scaleFactor, (int)touchPoint.y * scaleFactor);
-    vout_window_ReportMousePressed(_wnd, MOUSE_BUTTON_LEFT);
-    vout_window_ReportMouseReleased(_wnd, MOUSE_BUTTON_LEFT);
-end:
+    {
+        vlc_mutex_unlock(&_mutex);
+        return;
+    }
+
+    [self reportEvent:^{
+        vout_window_ReportMouseMoved(_wnd,
+                (int)touchPoint.x * scaleFactor, (int)touchPoint.y * scaleFactor);
+        vout_window_ReportMousePressed(_wnd, MOUSE_BUTTON_LEFT);
+        vout_window_ReportMouseReleased(_wnd, MOUSE_BUTTON_LEFT);
+    }];
     vlc_mutex_unlock(&_mutex);
 }
 

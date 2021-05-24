@@ -86,13 +86,11 @@ Rectangle {
 
         onSetItemDropIndicatorVisible: {
             if (index === model.index) {
-                // show top drop indicator bar
-                topDropIndicator.visible = visible
+                topDropIndicator.visible = Qt.binding(function() { return visible || higherDropArea.containsDragItem; })
             }
         }
     }
 
-    // top drop indicator bar
     Rectangle {
         id: topDropIndicator
 
@@ -102,7 +100,7 @@ Rectangle {
         height: VLCStyle.dp(1)
         anchors.top: parent.top
 
-        visible: false
+        visible: higherDropArea.containsDragItem
         color: colors.accent
     }
 
@@ -114,7 +112,7 @@ Rectangle {
 
         hoverEnabled: true
 
-        acceptedButtons: acceptedButtons | Qt.RightButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
 
         onContainsMouseChanged: {
             if (containsMouse) {
@@ -290,14 +288,16 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
+                property bool containsDragItem: false
+
                 onEntered: {
                     if (!isDropAcceptable(drag, index))
                         return
 
-                    topDropIndicator.visible = true
+                    containsDragItem = true
                 }
                 onExited: {
-                    topDropIndicator.visible = false
+                    containsDragItem = false
                 }
                 onDropped: {
                     if (!isDropAcceptable(drop, index))
@@ -305,7 +305,7 @@ Rectangle {
 
                     root.acceptDrop(index, drop)
 
-                    topDropIndicator.visible = false
+                    containsDragItem = false
                 }
             }
 

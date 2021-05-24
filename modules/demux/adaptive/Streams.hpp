@@ -39,6 +39,7 @@ namespace adaptive
     namespace http
     {
         class AbstractConnectionManager;
+        class ChunkInterface;
     }
 
     namespace playlist
@@ -83,7 +84,8 @@ namespace adaptive
             Ongoing,
             Lessthanmin,
         };
-        BufferingStatus bufferize(vlc_tick_t, vlc_tick_t, vlc_tick_t, bool = false);
+        BufferingStatus bufferize(vlc_tick_t, vlc_tick_t, vlc_tick_t,
+                                  vlc_tick_t, bool = false);
         BufferingStatus getLastBufferStatus() const;
         vlc_tick_t getDemuxedAmount(vlc_tick_t) const;
         Status dequeue(vlc_tick_t, vlc_tick_t *);
@@ -94,7 +96,6 @@ namespace adaptive
         void runUpdates();
 
         /* Used by demuxers fake streams */
-        virtual std::string getContentType() override;
         virtual block_t *readNextBlock() override;
 
         /**/
@@ -125,7 +126,8 @@ namespace adaptive
         AbstractConnectionManager *connManager; /* not owned */
         SegmentTracker *segmentTracker;
 
-        SegmentChunk *currentChunk;
+        ChunkInterface * getNextChunk() const;
+        ChunkInterface *currentChunk;
         bool eof;
         std::string language;
         std::string description;
@@ -139,7 +141,8 @@ namespace adaptive
 
     private:
         void declaredCodecs();
-        BufferingStatus doBufferize(vlc_tick_t, vlc_tick_t, vlc_tick_t, bool);
+        BufferingStatus doBufferize(vlc_tick_t, vlc_tick_t, vlc_tick_t,
+                                    vlc_tick_t, bool);
         BufferingStatus last_buffer_status;
         bool valid;
         bool disabled;

@@ -18,6 +18,7 @@
 
 import QtQuick 2.11
 import QtQuick.Layouts 1.3
+import QtQuick.Controls 2.4
 
 import org.videolan.vlc 0.1
 
@@ -26,6 +27,8 @@ import "qrc:///widgets/" as Widgets
 
 Widgets.NavigableFocusScope {
     id: resumePanel
+
+    property VLCColors colors: VLCStyle.colors
 
     implicitWidth: layout.implicitWidth
     implicitHeight: layout.implicitHeight
@@ -82,67 +85,77 @@ Widgets.NavigableFocusScope {
         hideResumePanel()
     }
 
-    Rectangle {
+    //drag and dbl click the titlebar in CSD mode
+    Loader {
         anchors.fill: parent
-        color: VLCStyle.colors.setColorAlpha(VLCStyle.colors.playerBg, 0.8)
+        active: mainInterface.clientSideDecoration
+        source: "qrc:///widgets/CSDTitlebarTapNDrapHandler.qml"
+    }
 
-        //drag and dbl click the titlebar in CSD mode
-        Loader {
-            anchors.fill: parent
-            active: mainInterface.clientSideDecoration
-            source: "qrc:///widgets/CSDTitlebarTapNDrapHandler.qml"
+    RowLayout {
+        id: layout
+
+        anchors.fill: parent
+        anchors.leftMargin: VLCStyle.margin_small
+        spacing: VLCStyle.margin_small
+
+        Label {
+            Layout.preferredHeight: implicitHeight
+            Layout.preferredWidth: implicitWidth
+
+            color: resumePanel.colors.playerFg
+            font.pixelSize: VLCStyle.fontSize_normal
+            font.bold: true
+
+            text: i18n.qtr("Do you want to restart the playback where you left off?")
         }
 
-        RowLayout {
-            id: layout
-            anchors.fill: parent
-            anchors.topMargin: VLCStyle.applicationVerticalMargin
-            anchors.leftMargin: VLCStyle.applicationHorizontalMargin + VLCStyle.margin_small
-            anchors.rightMargin: VLCStyle.applicationHorizontalMargin
-
-            spacing: VLCStyle.margin_small
-
-            Text {
-                Layout.preferredHeight: implicitHeight
-                Layout.preferredWidth: implicitWidth
-
-                color: VLCStyle.colors.playerFg
-                font.pixelSize: VLCStyle.fontSize_normal
-                font.bold: true
-
-                text: i18n.qtr("Do you want to restart the playback where you left off?")
+        Widgets.TabButtonExt {
+            id: continueBtn
+            Layout.preferredHeight: implicitHeight
+            Layout.preferredWidth: implicitWidth
+            text: i18n.qtr("Continue")
+            font.bold: true
+            color: resumePanel.colors.playerFg
+            focus: true
+            onClicked: {
+                player.restorePlaybackPos()
+                hideResumePanel()
             }
 
-            Widgets.TabButtonExt {
-                id: continueBtn
-                Layout.preferredHeight: implicitHeight
-                Layout.preferredWidth: implicitWidth
-                text: i18n.qtr("Continue")
-                font.bold: true
-                color: VLCStyle.colors.playerFg
-                focus: true
-                onClicked: {
-                    player.restorePlaybackPos()
-                    hideResumePanel()
-                }
+            KeyNavigation.right: closeBtn
+        }
 
-                KeyNavigation.right: closeBtn
-            }
+        Widgets.TabButtonExt {
+            id: closeBtn
+            Layout.preferredHeight: implicitHeight
+            Layout.preferredWidth: implicitWidth
+            text: i18n.qtr("Dismiss")
+            font.bold: true
+            color: resumePanel.colors.playerFg
+            onClicked: hideResumePanel()
 
-            Widgets.TabButtonExt {
-                id: closeBtn
-                Layout.preferredHeight: implicitHeight
-                Layout.preferredWidth: implicitWidth
-                text: i18n.qtr("Dismiss")
-                font.bold: true
-                color: VLCStyle.colors.playerFg
-                onClicked: hideResumePanel()
+            KeyNavigation.left: continueBtn
+        }
 
-                KeyNavigation.left: continueBtn
-            }
+        Item {
+            Layout.fillWidth: true
+        }
 
-            Item {
-                Layout.fillWidth: true
+        Loader {
+            id: csdDecorations
+
+            Layout.alignment: Qt.AlignTop | Qt.AlignRight
+
+            focus: false
+            height: VLCStyle.icon_normal
+            active: mainInterface.clientSideDecoration
+            enabled: mainInterface.clientSideDecoration
+            visible: mainInterface.clientSideDecoration
+            source: "qrc:///widgets/CSDWindowButtonSet.qml"
+            onLoaded: {
+                item.color = Qt.binding(function() { return resumePanel.colors.playerFg })
+                item.hoverColor = Qt.binding(function() { return resumePanel.colors.windowCSDButtonDarkBg })
             }
         }
     }

@@ -23,18 +23,19 @@ import QtQuick.Layouts 1.3
 import org.videolan.vlc 0.1
 
 import "qrc:///style/"
+import "qrc:///widgets/" as Widgets
 
 GridView{
     id: allButtonsView
     clip: true
 
-    highlight: Rectangle{
-        color: VLCStyle.colors.bgHover
-    }
-    ScrollBar.vertical: ScrollBar {}
+    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }
     model: controlButtons.buttonL.length
 
-    highlightMoveDuration: 0 //ms
+    highlightFollowsCurrentItem: false
+
+    cellWidth: VLCStyle.cover_small
+    cellHeight: cellWidth
 
     property alias removeInfoRectVisible: removeInfoRect.visible
 
@@ -105,8 +106,8 @@ GridView{
         id:dragArea
         objectName: "buttonsList"
         hoverEnabled: true
-        width: VLCStyle.cover_small
-        height: width
+        width: cellWidth
+        height: cellHeight
 
         property bool held: false
         property int mIndex: controlButtons.buttonL[model.index].id
@@ -135,6 +136,15 @@ GridView{
 
         onEntered: allButtonsView.currentIndex = index
 
+        Loader {
+            active: allButtonsView.currentIndex === index
+            anchors.fill: parent
+
+            sourceComponent: Rectangle {
+                color: VLCStyle.colors.bgHover
+            }
+        }
+
         ColumnLayout{
             id: listelemlayout
             anchors.fill: parent
@@ -146,15 +156,15 @@ GridView{
                 Layout.alignment: Qt.AlignHCenter
                 text: controlButtons.buttonL[model.index].label
             }
-            Text {
+
+            Widgets.ListSubtitleLabel {
                 id: buttonName
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+
+                elide: Text.ElideNone
                 text: controlButtons.buttonL[model.index].text
-                font.pointSize: VLCStyle.fontHeight_xsmall
-                color: VLCStyle.colors.buttonText
                 wrapMode: Text.WordWrap
-                verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignHCenter
             }
         }

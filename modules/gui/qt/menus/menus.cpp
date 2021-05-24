@@ -295,7 +295,7 @@ QMenu *VLCMenuBar::ToolsMenu( intf_thread_t *p_intf, QMenu *menu )
 
     if( !p_intf->p_sys->b_isDialogProvider )
         addDPStaticEntry( menu, qtr( "Customi&ze Interface..." ),
-            ":/menu/preferences.svg", &DialogsProvider::toolbarDialog);
+            ":/menu/preferences.svg", &DialogsProvider::showToolbarEditorDialog);
 
     addDPStaticEntry( menu, qtr( "&Preferences" ),
         ":/menu/preferences.svg", &DialogsProvider::prefsDialog, "Ctrl+P", QAction::PreferencesRole );

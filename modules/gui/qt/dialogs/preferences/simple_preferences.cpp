@@ -28,6 +28,9 @@
 
 #include "simple_preferences.hpp"
 #include "preferences_widgets.hpp"
+#include "maininterface/main_interface.hpp"
+#include "util/color_scheme_model.hpp"
+#include "util/proxycolumnmodel.hpp"
 
 #include <vlc_config_cat.h>
 #include <vlc_configuration.h>
@@ -208,11 +211,7 @@ SPrefsCatList::SPrefsCatList( intf_thread_t *_p_intf, QWidget *_parent ) :
     CONNECT( mapper, mapped(int), this, switchPanel(int) );
 
     QPixmap scaled;
-#if HAS_QT56
     qreal dpr = devicePixelRatioF();
-#else
-    qreal dpr = devicePixelRatio();
-#endif
 
 #define ADD_CATEGORY( button, label, ltooltip, icon, numb )                 \
     QToolButton * button = new QToolButton( this );                         \
@@ -247,6 +246,8 @@ SPrefsCatList::SPrefsCatList( intf_thread_t *_p_intf, QWidget *_parent ) :
                   cone_input_64, 4 );
     ADD_CATEGORY( SPrefsHotkeys, qtr("Hotkeys"), qtr("Configure Hotkeys"),
                   cone_hotkeys_64, 5 );
+    ADD_CATEGORY( SPrefsMediaLibrary, qtr("Media Library"), qtr("Configure Media Library"),
+                  cone_medialibrary_64, 6 );
 
 #undef ADD_CATEGORY
 
@@ -596,7 +597,14 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                      setEnabled( bool ) );
 
             char* psz = config_GetPsz( "audio-filter" );
-            qs_filter = qfu( psz ).split( ':', QString::SkipEmptyParts );
+            qs_filter = qfu( psz ).split( ':',
+                                          #if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+                                              Qt::SkipEmptyParts
+                                          #else
+                                              QString::SkipEmptyParts
+                                          #endif
+                                        );
+
             free( psz );
 
             bool b_enabled = ( qs_filter.contains( "normvol" ) );
@@ -732,25 +740,6 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                     + qtr( "VLC skins website" )+ QString( "</a>." ) );
             ui.skinsLabel->setFont( italicFont );
 
-            if ( vlc_ml_instance_get( p_intf ) != NULL )
-            {
-                mlModel = new MlFoldersModel( this );
-                mlModel->setMl( vlc_ml_instance_get( p_intf ) );
-
-                mlTableView = ui.entryPointsTV;
-
-                mlTableView->setModel( mlModel );
-
-                connect( mlModel , &QAbstractItemModel::modelReset , this , &SPrefsPanel::MLdrawControls );
-
-                BUTTONACT( ui.addButton , MLaddNewEntryPoint() );
-
-                MLdrawControls( );
-
-            }else {
-                ui.mlGroupBox->hide( );
-            }
-
 #ifdef _WIN32
             BUTTONACT( ui.assoButton, assoDialog() );
 #else
@@ -819,6 +808,47 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                                  ui.fileSkin, ui.skinBrowse );
 
             CONFIG_BOOL( "metadata-network-access", MetadataNetworkAccessMode );
+            CONFIG_BOOL( "qt-menubar", menuBarCheck );
+
+            ui.pinVideoControlsCheckbox->setChecked( p_intf->p_sys->p_mi->pinVideoControls() );
+            QObject::connect( ui.pinVideoControlsCheckbox, &QCheckBox::stateChanged, p_intf->p_sys->p_mi, &MainInterface::setPinVideoControls );
+
+            ui.colorSchemeComboBox->insertItems(0, p_intf->p_sys->p_mi->getColorScheme()->stringList());
+            QObject::connect( ui.colorSchemeComboBox, &QComboBox::currentTextChanged, p_intf->p_sys->p_mi->getColorScheme(), &ColorSchemeModel::setCurrent );
+
+            const float intfScaleFloatFactor = 100.f;
+            const auto updateIntfUserScaleFactorFromControls =
+                    [this, slider = ui.intfScaleFactorSlider, spinBox = ui.intfScaleFactorSpinBox, intfScaleFloatFactor](const int value)
+            {
+                if (slider->value() != value)
+                {
+                    QSignalBlocker s( slider );
+                    slider->setValue( value );
+                }
+                if (spinBox->value() != value)
+                {
+                    QSignalBlocker s( spinBox );
+                    spinBox->setValue( value );
+                }
+                p_intf->p_sys->p_mi->setIntfUserScaleFactor( value / intfScaleFloatFactor );
+            };
+
+            ui.intfScaleFactorSlider->setRange( p_intf->p_sys->p_mi->getMinIntfUserScaleFactor() * intfScaleFloatFactor
+                                                 , p_intf->p_sys->p_mi->getMaxIntfUserScaleFactor() * intfScaleFloatFactor);
+            ui.intfScaleFactorSpinBox->setRange( p_intf->p_sys->p_mi->getMinIntfUserScaleFactor() * intfScaleFloatFactor
+                                                 , p_intf->p_sys->p_mi->getMaxIntfUserScaleFactor() * intfScaleFloatFactor);
+
+            updateIntfUserScaleFactorFromControls( p_intf->p_sys->p_mi->getIntfUserScaleFactor() * intfScaleFloatFactor );
+            QObject::connect( ui.intfScaleFactorSlider, QOverload<int>::of(&QSlider::valueChanged)
+                              , p_intf->p_sys->p_mi , updateIntfUserScaleFactorFromControls );
+            QObject::connect( ui.intfScaleFactorSpinBox, QOverload<int>::of(&QSpinBox::valueChanged)
+                              , p_intf->p_sys->p_mi , updateIntfUserScaleFactorFromControls );
+
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+            CONFIG_BOOL( "qt-titlebar", titleBarCheckBox );
+#else
+            ui.titleBarCheckBox->hide();
+#endif
 
             /* UPDATE options */
 #ifdef UPDATE_CHECK
@@ -943,9 +973,35 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             control->insertIntoExistingGrid( gLayout, line );
             controls.append( control );
 #endif
-
             break;
         }
+
+            START_SPREFS_CAT( MediaLibrary , qtr("Media Library Settings") );
+
+                if ( vlc_ml_instance_get( p_intf ) != NULL )
+                {
+                    mlFoldersModel = new ProxyColumnModel<MLFoldersModel>(1, {{0, qtr("Path")}, {1, qtr("Remove")}}, this );
+                    mlFoldersModel->setMl( vlc_ml_instance_get( p_intf ) );
+                    ui.entryPoints->setModel( mlFoldersModel );
+                    connect( mlFoldersModel , &QAbstractItemModel::modelReset , this, [this, view = ui.entryPoints]() { MLdrawControls( view ); } );
+
+                    mlBannedFoldersModel = new ProxyColumnModel<MLBannedFoldersModel>(1, {{0, qtr("Path")}, {1, qtr("Remove")}}, this );
+                    mlBannedFoldersModel->setMl( vlc_ml_instance_get( p_intf ));
+                    ui.bannedEntryPoints->setModel( mlBannedFoldersModel );
+                    connect( mlBannedFoldersModel , &QAbstractItemModel::modelReset , this, [this, view = ui.bannedEntryPoints]() { MLdrawControls( view ); } );
+
+                    BUTTONACT( ui.addButton , MLaddNewFolder() );
+                    BUTTONACT( ui.banButton , MLBanFolder() );
+
+                    MLdrawControls( ui.entryPoints );
+                    MLdrawControls( ui.bannedEntryPoints );
+                }
+                else
+                {
+                    ui.mlGroupBox->hide( );
+                }
+
+            END_SPREFS_CAT;
     }
 
     panel_layout->addWidget( panel_label );
@@ -1507,36 +1563,24 @@ void SPrefsPanel::saveAsso()
 
 #endif /* _WIN32 */
 
-void SPrefsPanel::MLaddNewEntryPoint( ){
+void SPrefsPanel::MLaddNewFolder() {
     QUrl newEntryPoints = QFileDialog::getExistingDirectoryUrl( this , qtr("Please choose an entry point folder") ,
                                              QUrl( QDir::homePath( ) ) );
 
     if(! newEntryPoints.isEmpty() )
-        mlModel->add( newEntryPoints );
+        mlFoldersModel->add( newEntryPoints );
 }
 
-QWidget *SPrefsPanel::MLgenerateWidget( QModelIndex index , MlFoldersModel *mlf , QWidget *parent){
-    if ( index.column() == 0 ){
+void SPrefsPanel::MLBanFolder( ) {
+    QUrl newEntryPoints = QFileDialog::getExistingDirectoryUrl( this , qtr("Please choose an entry point folder") ,
+                                             QUrl( QDir::homePath( ) ) );
 
-        QWidget *wid = new QWidget( parent );
+    if(! newEntryPoints.isEmpty() )
+        mlBannedFoldersModel->add( newEntryPoints );
+}
 
-        QBoxLayout* layout = new QBoxLayout( QBoxLayout::LeftToRight , wid );
-
-        QCheckBox*cb = new QCheckBox( wid );
-        cb->setFixedSize( 16 , 16 );
-
-        //cb->setChecked(mlf->data(index, MlFoldersModel::CustomCheckBoxRole).toBool()); //TODO: disable banning till un-banning works
-        cb->setEnabled( false );
-
-        layout->addWidget( cb , Qt::AlignCenter );
-        wid->setLayout( layout );
-
-        connect( cb , &QPushButton::clicked, [=]( ) {
-            mlf->setData( index , cb->isChecked() , MlFoldersModel::Banned);
-        } );
-        return wid;
-    }
-    else if ( index.column( ) == 2 ){
+QWidget *SPrefsPanel::MLgenerateWidget( QModelIndex index , MLFoldersBaseModel *mlf , QWidget *parent){
+    if ( index.column( ) == 1 ){
         QWidget *wid = new QWidget( parent );
 
         QBoxLayout* layout = new QBoxLayout( QBoxLayout::LeftToRight , wid );
@@ -1558,18 +1602,21 @@ QWidget *SPrefsPanel::MLgenerateWidget( QModelIndex index , MlFoldersModel *mlf 
     return nullptr;
 }
 
-void SPrefsPanel::MLdrawControls( ) {
-  for ( int col = 0 ; col < mlModel->columnCount( ) ; col++ )
-    for (int row = 0 ; row < mlModel->rowCount() ; row++ )
-      {
-    QModelIndex index = mlModel->index ( row , col );
-    mlTableView->setIndexWidget ( index, MLgenerateWidget ( index, mlModel,
-                               mlTableView ) );
-      }
+void SPrefsPanel::MLdrawControls(QTableView *mlTableView) {
+    const auto model = mlTableView->model();
+    for ( int col = 0 ; col < model->columnCount( model->index(0, 0) ) ; col++ )
+    {
+        for (int row = 0 ; row < model->rowCount() ; row++ )
+        {
+            QModelIndex index = model->index ( row , col );
+            mlTableView->setIndexWidget( index, MLgenerateWidget ( index, qobject_cast<MLFoldersBaseModel *>(model),
+                                       mlTableView ) );
+        }
+    }
 
   mlTableView->resizeColumnsToContents( );
   mlTableView->horizontalHeader()->setMinimumSectionSize( 100 );
-  mlTableView->horizontalHeader()->setSectionResizeMode( 1 , QHeaderView::Stretch );
+  mlTableView->horizontalHeader()->setSectionResizeMode( 0 , QHeaderView::Stretch );
 
   mlTableView->horizontalHeader()->setFixedHeight( 24 );
 }

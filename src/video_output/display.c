@@ -42,6 +42,7 @@
 
 #include "display.h"
 #include "window.h"
+#include "vout_internal.h"
 
 /*****************************************************************************
  * FIXME/TODO see how to have direct rendering here (interact with vout.c)
@@ -262,15 +263,7 @@ typedef struct {
 
     /* */
     vout_display_cfg_t cfg;
-
-    struct {
-        int      left;
-        int      top;
-        int      right;
-        int      bottom;
-        unsigned num;
-        unsigned den;
-    } crop;
+    struct vout_crop crop;
 
     /* */
     video_format_t source;
@@ -456,35 +449,51 @@ static int vout_UpdateSourceCrop(vout_display_t *vd)
 {
     vout_display_priv_t *osys = container_of(vd, vout_display_priv_t, display);
     video_format_t fmt = osys->source;
-    unsigned crop_num = osys->crop.num;
-    unsigned crop_den = osys->crop.den;
+    int left, top, right, bottom;
 
-    if (crop_num != 0 && crop_den != 0) {
-        VoutDisplayCropRatio(&osys->crop.left,  &osys->crop.top,
-                             &osys->crop.right, &osys->crop.bottom,
-                             &osys->source, crop_num, crop_den);
+    switch (osys->crop.mode) {
+        case VOUT_CROP_NONE:
+            left = top = right = bottom = 0;
+            break;
+        case VOUT_CROP_RATIO:
+            VoutDisplayCropRatio(&left, &top, &right, &bottom, &osys->source,
+                                 osys->crop.ratio.num, osys->crop.ratio.den);
+            break;
+        case VOUT_CROP_WINDOW:
+            left = osys->crop.window.x;
+            top = osys->crop.window.y;
+            right = osys->crop.window.width;
+            bottom = osys->crop.window.height;
+            break;
+        case VOUT_CROP_BORDER:
+            left = osys->crop.border.left;
+            top = osys->crop.border.top;
+            right = -(int)osys->crop.border.right;
+            bottom = -(int)osys->crop.border.bottom;
+            break;
+        default:
+            /* left/top/right/bottom must be initialized */
+            vlc_assert_unreachable();
     }
 
     const int right_max  = osys->source.i_x_offset
                            + osys->source.i_visible_width;
     const int bottom_max = osys->source.i_y_offset
                            + osys->source.i_visible_height;
-    int left = VLC_CLIP((int)osys->source.i_x_offset + osys->crop.left,
-                          0, right_max - 1);
-    int top  = VLC_CLIP((int)osys->source.i_y_offset + osys->crop.top,
-                        0, bottom_max - 1);
-    int right, bottom;
 
-    if (osys->crop.right <= 0)
-        right = (int)(osys->source.i_x_offset + osys->source.i_visible_width) + osys->crop.right;
+    left = VLC_CLIP((int)osys->source.i_x_offset + left, 0, right_max - 1);
+    top  = VLC_CLIP((int)osys->source.i_y_offset + top, 0, bottom_max - 1);
+
+    if (right <= 0)
+        right = (int)(osys->source.i_x_offset + osys->source.i_visible_width) + right;
     else
-        right = (int)osys->source.i_x_offset + osys->crop.right;
+        right = (int)osys->source.i_x_offset + right;
     right = VLC_CLIP(right, left + 1, right_max);
 
-    if (osys->crop.bottom <= 0)
-        bottom = (int)(osys->source.i_y_offset + osys->source.i_visible_height) + osys->crop.bottom;
+    if (bottom <= 0)
+        bottom = (int)(osys->source.i_y_offset + osys->source.i_visible_height) + bottom;
     else
-        bottom = (int)osys->source.i_y_offset + osys->crop.bottom;
+        bottom = (int)osys->source.i_y_offset + bottom;
     bottom = VLC_CLIP(bottom, top + 1, bottom_max);
 
     osys->source.i_x_offset       = left;
@@ -494,17 +503,7 @@ static int vout_UpdateSourceCrop(vout_display_t *vd)
     video_format_Print(VLC_OBJECT(vd), "SOURCE ", &fmt);
     video_format_Print(VLC_OBJECT(vd), "CROPPED ", &osys->source);
 
-    int ret = vout_display_Control(vd, VOUT_DISPLAY_CHANGE_SOURCE_CROP);
-    osys->crop.left   = left - osys->source.i_x_offset;
-    osys->crop.top    = top  - osys->source.i_y_offset;
-    /* FIXME for right/bottom we should keep the 'type' border vs window */
-    osys->crop.right  = right -
-                        (osys->source.i_x_offset + osys->source.i_visible_width);
-    osys->crop.bottom = bottom -
-                        (osys->source.i_y_offset + osys->source.i_visible_height);
-    osys->crop.num    = crop_num;
-    osys->crop.den    = crop_den;
-    return ret;
+    return vout_display_Control(vd, VOUT_DISPLAY_CHANGE_SOURCE_CROP);
 }
 
 static int vout_SetSourceAspect(vout_display_t *vd,
@@ -522,8 +521,7 @@ static int vout_SetSourceAspect(vout_display_t *vd,
         ret = -1;
 
     /* If a crop ratio is requested, recompute the parameters */
-    if (osys->crop.num != 0 && osys->crop.den != 0
-     && vout_UpdateSourceCrop(vd))
+    if (osys->crop.mode != VOUT_CROP_NONE && vout_UpdateSourceCrop(vd))
         ret = -1;
 
     return ret;
@@ -628,22 +626,12 @@ void vout_SetDisplayAspect(vout_display_t *vd, unsigned dar_num, unsigned dar_de
 }
 
 void vout_SetDisplayCrop(vout_display_t *vd,
-                         unsigned crop_num, unsigned crop_den,
-                         unsigned left, unsigned top, int right, int bottom)
+                         const struct vout_crop *restrict crop)
 {
     vout_display_priv_t *osys = container_of(vd, vout_display_priv_t, display);
 
-    if (osys->crop.left  != (int)left  || osys->crop.top != (int)top ||
-        osys->crop.right != right || osys->crop.bottom != bottom ||
-        (crop_num != 0 && crop_den != 0 &&
-         (crop_num != osys->crop.num || crop_den != osys->crop.den))) {
-
-        osys->crop.left   = left;
-        osys->crop.top    = top;
-        osys->crop.right  = right;
-        osys->crop.bottom = bottom;
-        osys->crop.num    = crop_num;
-        osys->crop.den    = crop_den;
+    if (!vout_CropEqual(crop, &osys->crop)) {
+        osys->crop = *crop;
 
         if (vout_UpdateSourceCrop(vd))
             vout_display_Reset(vd);
@@ -699,12 +687,7 @@ vout_display_t *vout_display_New(vlc_object_t *parent,
     osys->pool = NULL;
 
     video_format_Copy(&osys->source, source);
-    osys->crop.left   = 0;
-    osys->crop.top    = 0;
-    osys->crop.right  = 0;
-    osys->crop.bottom = 0;
-    osys->crop.num = 0;
-    osys->crop.den = 0;
+    osys->crop.mode = VOUT_CROP_NONE;
 
     osys->src_vctx = vctx ? vlc_video_context_Hold( vctx ) : NULL;
 
@@ -722,16 +705,6 @@ vout_display_t *vout_display_New(vlc_object_t *parent,
     if (vlc_module_load(vd, "vout display", module, module && *module != '\0',
                         vout_display_start, osys) == NULL)
         goto error;
-
-#if defined(__OS2__)
-    if ((var_GetBool(parent, "fullscreen")
-      || var_GetBool(parent, "video-wallpaper"))
-     && vout_display_Control(vd, VOUT_DISPLAY_CHANGE_FULLSCREEN) == VLC_SUCCESS)
-        osys->cfg.is_fullscreen = true;
-
-    if (var_InheritBool(parent, "video-on-top"))
-        vout_display_Control(vd, VOUT_DISPLAY_CHANGE_WINDOW_STATE);
-#endif
 
     if (VoutDisplayCreateRender(vd)) {
         if (vd->ops->close != NULL)

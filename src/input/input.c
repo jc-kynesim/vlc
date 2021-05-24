@@ -984,8 +984,28 @@ static void GetVarSlaves( input_thread_t *p_input,
         if( uri == NULL )
             continue;
 
+        vlc_url_t parsed_uri;
+        if ( vlc_UrlParse( &parsed_uri, uri ) != VLC_SUCCESS )
+        {
+            msg_Err( p_input,
+                    "Invalid url passed to the \"input-slave\" option" );
+            vlc_UrlClean( &parsed_uri );
+            free( uri );
+            continue;
+        }
+
+        enum slave_type i_type;
+        if ( !input_item_slave_GetType( parsed_uri.psz_path, &i_type ) )
+        {
+            msg_Warn( p_input,
+                     "Can't deduce slave type of `%s\" with file extension.",
+                     uri );
+            i_type = SLAVE_TYPE_AUDIO;
+        }
         input_item_slave_t *p_slave =
-            input_item_slave_New( uri, SLAVE_TYPE_AUDIO, SLAVE_PRIORITY_USER );
+            input_item_slave_New( uri, i_type, SLAVE_PRIORITY_USER );
+
+        vlc_UrlClean( &parsed_uri );
         free( uri );
 
         if( unlikely( p_slave == NULL ) )
@@ -1814,6 +1834,23 @@ static void ControlInsertDemuxFilter( input_thread_t* p_input, const char* psz_d
         msg_Dbg(p_input, "Failed to create demux filter %s", psz_demux_chain);
 }
 
+void input_SetProgramId(input_thread_t *input, int group_id)
+
+{
+    input_thread_private_t *sys = input_priv(input);
+
+    if (!sys->is_running && !sys->is_stopped)
+    {
+        /* Not running, send the control synchronously since we are sure that
+         * it won't block */
+        es_out_Control(sys->p_es_out_display, ES_OUT_SET_GROUP, group_id);
+    }
+    else
+    {
+        input_ControlPushHelper(input, INPUT_CONTROL_SET_PROGRAM,
+                                &(vlc_value_t) { .i_int = group_id });
+    }
+}
 
 void input_SetEsCatIds(input_thread_t *input, enum es_format_category_e cat,
                        const char *str_ids)

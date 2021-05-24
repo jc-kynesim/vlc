@@ -142,7 +142,10 @@ endif
 libdirect3d11_plugin_la_SOURCES = video_output/win32/direct3d11.c \
  video_output/win32/d3d11_quad.c video_output/win32/d3d11_quad.h \
  video_output/win32/d3d11_shaders.c video_output/win32/d3d11_shaders.h \
+ video_output/win32/d3d_shaders.c video_output/win32/d3d_shaders.h \
+ video_output/win32/d3d_dynamic_shader.c video_output/win32/d3d_dynamic_shader.h \
  video_output/win32/d3d11_swapchain.c video_output/win32/d3d11_swapchain.h \
+ video_output/win32/dxgi_swapchain.c video_output/win32/dxgi_swapchain.h \
  video_output/win32/common.c video_output/win32/common.h
 libdirect3d11_plugin_la_LIBADD = libchroma_copy.la libd3d11_common.la $(LIBCOM) -luuid
 if HAVE_DCOMP
@@ -220,8 +223,14 @@ endif
 
 
 ### OS/2 ###
+libdrawable_os2_plugin_la_SOURCES = video_output/drawable_os2.c
 if HAVE_OS2
-vout_LTLIBRARIES += libdrawable_plugin.la
+vout_LTLIBRARIES += libdrawable_os2_plugin.la
+endif
+
+libwindow_os2_plugin_la_SOURCES = video_output/window_os2.c
+if HAVE_OS2
+vout_LTLIBRARIES += libwindow_os2_plugin.la
 endif
 
 libkva_plugin_la_SOURCES = video_output/kva.c
@@ -232,20 +241,24 @@ endif
 
 
 ### Android ###
+libandroid_utils_la_SOURCES = video_output/android/utils.c video_output/android/utils.h
+libandroid_utils_la_CFLAGS = $(AM_CFLAGS) $(GLES2_CFLAGS) $(EGL_CFLAGS)
+libandroid_utils_la_LIBADD = $(GLES2_LIBS) $(EGL_LIBS)
+if HAVE_ANDROID
+noinst_LTLIBRARIES += libandroid_utils.la
+endif
 
 libegl_android_plugin_la_SOURCES = video_output/opengl/egl.c
 libegl_android_plugin_la_CFLAGS = $(AM_CFLAGS) $(EGL_CFLAGS) -DUSE_PLATFORM_ANDROID=1
 libegl_android_plugin_la_LIBADD = $(EGL_LIBS)
 
-libandroid_window_plugin_la_SOURCES = video_output/android/window.c \
-	video_output/android/utils.c video_output/android/utils.h
+libandroid_window_plugin_la_SOURCES = video_output/android/window.c
 libandroid_window_plugin_la_CFLAGS = $(AM_CFLAGS)
-libandroid_window_plugin_la_LIBADD = $(LIBDL)
+libandroid_window_plugin_la_LIBADD = libandroid_utils.la $(LIBDL)
 
-libandroid_display_plugin_la_SOURCES = video_output/android/display.c \
-	video_output/android/utils.c video_output/android/utils.h
+libandroid_display_plugin_la_SOURCES = video_output/android/display.c
 libandroid_display_plugin_la_CFLAGS = $(AM_CFLAGS)
-libandroid_display_plugin_la_LIBADD = $(LIBDL)
+libandroid_display_plugin_la_LIBADD = libandroid_utils.la $(LIBDL)
 
 libglinterop_android_plugin_la_SOURCES = video_output/opengl/interop_android.c \
 	video_output/opengl/interop.h

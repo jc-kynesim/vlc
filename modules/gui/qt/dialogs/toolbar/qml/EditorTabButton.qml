@@ -19,20 +19,27 @@ import QtQuick 2.11
 import QtQuick.Controls 2.4
 
 import "qrc:///style/"
+import "qrc:///widgets/" as Widgets
 
 TabButton {
     id: mainPlayerControl
 
-    property int index: 0
     property bool active: index == bar.currentIndex
 
     implicitWidth: VLCStyle.button_width_large
 
-    contentItem: Text {
-        text: mainPlayerControl.text
-        color: VLCStyle.colors.buttonText
+    contentItem: Widgets.ListLabel {
+        text: {
+            var text = mainPlayerControl.text
+
+            if (!!mainInterface.controlbarProfileModel.currentModel &&
+                    mainInterface.controlbarProfileModel.currentModel.getModel(mainPlayerControl.identifier).dirty)
+                return _markDirty(text)
+            else
+                return text
+        }
+
         horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
     }
 
     background: Rectangle {

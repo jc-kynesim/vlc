@@ -32,7 +32,7 @@ NavigableFocusScope {
     signal actionForSelection( var selection )
     signal contextMenuButtonClicked(Item menuParent, var menuModel)
     signal rightClick(Item menuParent, var menuModel, var globalMousePos)
-    signal itemDoubleClicked(var model)
+    signal itemDoubleClicked(var index, var model)
 
     property var sortModel: []
     property Component colDelegate: Widgets.ListLabel {
@@ -49,6 +49,9 @@ NavigableFocusScope {
 
     property alias model: view.model
 
+    property alias delegate: view.delegate
+
+    property alias contentY     : view.contentY
     property alias contentHeight: view.contentHeight
 
     property alias interactive: view.interactive
@@ -71,11 +74,11 @@ NavigableFocusScope {
     property var selectionDelegateModel
     property real rowHeight: VLCStyle.tableRow_height
     readonly property int _contextButtonHorizontalSpace: VLCStyle.icon_normal + VLCStyle.margin_xxsmall * 2
-    readonly property real availableRowWidth: width
-                                              - ( !!section.property ? VLCStyle.table_section_width * 2 : 0 )
-                                              - _contextButtonHorizontalSpace
     property alias spacing: view.spacing
     property int horizontalSpacing: VLCStyle.column_margin_width
+
+    property real availableRowWidth: 0
+    property real _availabeRowWidthLastUpdateTime: Date.now()
 
     property alias fadeColor:             view.fadeColor
     property alias fadeRectBottomHovered: view.fadeRectBottomHovered
@@ -91,6 +94,45 @@ NavigableFocusScope {
 
     function positionViewAtIndex(index, mode) {
         view.positionViewAtIndex(index, mode)
+    }
+
+    Timer {
+        id: availableRowWidthUpdater
+
+        interval: 100
+        triggeredOnStart: false
+        repeat: false
+        onTriggered: {
+            _update()
+        }
+
+        function _update() {
+            root.availableRowWidth = root.width
+                    - ( !!section.property ? VLCStyle.table_section_width * 2 : 0 )
+                    - _contextButtonHorizontalSpace
+            root._availabeRowWidthLastUpdateTime = Date.now()
+        }
+
+        function enqueueUpdate() {
+            // updating availableRowWidth is expensive because of property bindings in sortModel
+            // and availableRowWidth is dependent on root.width which can update in a burst
+            // so try to maintain a minimum time gap between subsequent availableRowWidth updates
+            var sinceLastUpdate = Date.now() - root._availabeRowWidthLastUpdateTime
+            if ((root.availableRowWidth === 0) || (sinceLastUpdate > 128 && !availableRowWidthUpdater.running)) {
+                _update()
+            } else if (!availableRowWidthUpdater.running) {
+                availableRowWidthUpdater.interval = Math.max(128 - sinceLastUpdate, 32)
+                availableRowWidthUpdater.start()
+            }
+        }
+    }
+
+    onWidthChanged: {
+        availableRowWidthUpdater.enqueueUpdate()
+    }
+
+    onSectionChanged: {
+        availableRowWidthUpdater.enqueueUpdate()
     }
 
     KeyNavigableListView {
@@ -122,8 +164,10 @@ NavigableFocusScope {
                 leftPadding: VLCStyle.table_section_text_margin
                 text: view.currentSection
                 color: VLCStyle.colors.accent
-                visible: text !== "" && view.contentY > (row.height - col.height - row.topPadding)
                 verticalAlignment: Text.AlignTop
+                visible: view.headerPositioning === ListView.OverlayHeader
+                         && text !== ""
+                         && view.contentY > (row.height - col.height - row.topPadding)
             }
 
             Column {
@@ -197,130 +241,7 @@ NavigableFocusScope {
             color: VLCStyle.colors.accent
         }
 
-        delegate:Rectangle {
-            id: lineView
-
-            property var rowModel: model
-            property bool selected: selectionDelegateModel.isSelected(root.model.index(index, 0))
-            readonly property bool highlighted: selected || hoverArea.containsMouse || activeFocus
-            readonly property color foregroundColor: highlighted ? VLCStyle.colors.bgHoverText : VLCStyle.colors.text
-            readonly property int _index: index
-            property int _modifiersOnLastPress: Qt.NoModifier
-
-            width: view.width
-            height: root.rowHeight
-            color: highlighted ? VLCStyle.colors.bgHover : "transparent"
-
-            Connections {
-                target: selectionDelegateModel
-                onSelectionChanged: lineView.selected = selectionDelegateModel.isSelected(root.model.index(index, 0))
-            }
-
-            MouseArea {
-                id: hoverArea
-                anchors.fill: parent
-                hoverEnabled: true
-                Keys.onMenuPressed: root.contextMenuButtonClicked(contextButton,rowModel)
-                acceptedButtons: Qt.RightButton | Qt.LeftButton
-                drag.target: root.dragItem
-                drag.axis: Drag.XAndYAxis
-                drag.onActiveChanged: {
-                    // perform the "click" action because the click action is only executed on mouse release (we are in the pressed state)
-                    // but we will need the updated list on drop
-                    if (drag.active && !selectionDelegateModel.isSelected(root.model.index(index, 0))) {
-                        selectionDelegateModel.updateSelection(_modifiersOnLastPress , view.currentIndex, index)
-                    } else if (root.dragItem) {
-                        root.dragItem.Drag.drop()
-                    }
-                    root.dragItem.Drag.active = drag.active
-                }
-
-                onPressed: _modifiersOnLastPress = mouse.modifiers
-
-                onClicked: {
-                    if (mouse.button === Qt.LeftButton || !selectionDelegateModel.isSelected(root.model.index(index, 0))) {
-                        selectionDelegateModel.updateSelection( mouse.modifiers , view.currentIndex, index)
-                        view.currentIndex = rowModel.index
-                        lineView.forceActiveFocus()
-                    }
-
-                    if (mouse.button === Qt.RightButton){
-                        root.rightClick(lineView,rowModel, hoverArea.mapToGlobal(mouse.x,mouse.y) )
-                    }
-                }
-
-                onPositionChanged: {
-                    if (drag.active) {
-                        var pos = drag.target.parent.mapFromItem(hoverArea, mouseX, mouseY)
-                        drag.target.x = pos.x + 12
-                        drag.target.y = pos.y + 12
-                    }
-                }
-
-                onDoubleClicked: {
-                    actionForSelection(selectionDelegateModel.selectedIndexes)
-                    root.itemDoubleClicked(model)
-                }
-
-                Row {
-                    id: content
-
-                    anchors {
-                        topMargin: VLCStyle.margin_xxsmall
-                        bottomMargin: VLCStyle.margin_xxsmall
-                        leftMargin: VLCStyle.margin_xxxsmall
-                        rightMargin: VLCStyle.margin_xxxsmall
-                        horizontalCenter: parent.horizontalCenter
-                        horizontalCenterOffset: - root._contextButtonHorizontalSpace / 2
-                        top: parent.top
-                        bottom: parent.bottom
-                    }
-
-                    spacing: root.horizontalSpacing
-
-                    Repeater {
-                        model: sortModel
-
-                        Item {
-                            height: parent.height
-                            width: modelData.width || 1
-                            Layout.alignment: Qt.AlignVCenter
-
-                            SmoothedAnimation on width {
-                                duration: 256
-                                easing.type: Easing.OutCubic
-                            }
-
-                            Loader{
-                                property var rowModel: lineView.rowModel
-                                property var colModel: modelData
-                                readonly property bool currentlyFocused: lineView.activeFocus
-                                readonly property bool containsMouse: hoverArea.containsMouse
-                                readonly property color foregroundColor: lineView.foregroundColor
-                                readonly property int index: lineView._index
-
-                                anchors.fill: parent
-                                sourceComponent: colModel.colDelegate || root.colDelegate
-
-                            }
-                        }
-                    }
-                }
-
-                Widgets.ContextButton {
-                    anchors.left: content.right
-                    anchors.leftMargin: VLCStyle.margin_xxsmall
-                    anchors.verticalCenter: content.verticalCenter
-                    color: lineView.foregroundColor
-                    backgroundColor: hovered || activeFocus ?
-                                         VLCStyle.colors.getBgColor( lineView.selected, hovered,
-                                                                     activeFocus ) : "transparent"
-
-                    onClicked: root.contextMenuButtonClicked(this,  lineView.rowModel)
-                    visible: hoverArea.containsMouse
-                }
-            }
-        }
+        delegate: TableViewDelegate {}
 
         onSelectAll: selectionDelegateModel.selectAll()
         onSelectionUpdated: selectionDelegateModel.updateSelection( keyModifiers, oldIndex, newIndex )

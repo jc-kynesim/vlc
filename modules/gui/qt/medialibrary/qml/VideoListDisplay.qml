@@ -29,13 +29,52 @@ import "qrc:///style/"
 MainInterface.MainTableView {
     id: listView_id
 
+    //---------------------------------------------------------------------------------------------
+    // Properties
+    //---------------------------------------------------------------------------------------------
+
+    // NOTE: This is useful for groups because our main criteria is 'name' instead of 'title'.
+    property string mainCriteria: "title"
+
+    //---------------------------------------------------------------------------------------------
+    // Private
+
     readonly property int _nbCols: VLCStyle.gridColumnsForWidth(listView_id.availableRowWidth)
 
-    sortModel: [
-        { type: "image", criteria: "thumbnail", width: VLCStyle.colWidth(1), showSection: "", colDelegate: tableColumns.titleDelegate, headerDelegate: tableColumns.titleHeaderDelegate },
-        { isPrimary: true, criteria: "title",   width: VLCStyle.colWidth(Math.max(listView_id._nbCols - 2, 1)), text: i18n.qtr("Title"),    showSection: "title" },
-        { criteria: "duration_short",            width: VLCStyle.colWidth(1), showSection: "", colDelegate: tableColumns.timeColDelegate, headerDelegate: tableColumns.timeHeaderDelegate, showContextButton: true },
-    ]
+    //---------------------------------------------------------------------------------------------
+    // Settings
+    //---------------------------------------------------------------------------------------------
+
+    sortModel: [{
+        type: "image",
+
+        criteria: "thumbnail",
+
+        width: VLCStyle.colWidth(1),
+
+        showSection: "",
+
+        headerDelegate: tableColumns.titleHeaderDelegate,
+        colDelegate   : tableColumns.titleDelegate,
+    }, {
+        isPrimary: true,
+        criteria: mainCriteria,
+
+        width: VLCStyle.colWidth(Math.max(listView_id._nbCols - 2, 1)),
+
+        showSection: "title",
+
+        text: i18n.qtr("Title")
+    }, {
+        criteria: "duration_short",
+
+        width: VLCStyle.colWidth(1),
+
+        showSection: "",
+
+        headerDelegate: tableColumns.timeHeaderDelegate, showContextButton: true,
+        colDelegate   : tableColumns.timeColDelegate
+    }]
 
     section.property: "title_first_symbol"
 
@@ -43,22 +82,9 @@ MainInterface.MainTableView {
 
     headerColor: VLCStyle.colors.bg
 
-    onActionForSelection: medialib.addAndPlay(model.getIdsForIndexes( selection ))
-
-    Widgets.TableColumns {
-        id: tableColumns
-
-        showTitleText: false
-        titleCover_height: VLCStyle.listAlbumCover_height
-        titleCover_width: VLCStyle.listAlbumCover_width
-        titleCover_radius: VLCStyle.listAlbumCover_radius
-
-        function titlecoverLabels(model) {
-            return [!model ? "" : model.resolution_name
-                    , model ? "" : model.channel
-                    ].filter(function(a) { return a !== "" })
-        }
-    }
+    //---------------------------------------------------------------------------------------------
+    // Connections
+    //---------------------------------------------------------------------------------------------
 
     Connections {
         target: model
@@ -70,6 +96,39 @@ MainInterface.MainTableView {
             default:
                 listView_id.section.property = ""
             }
+        }
+    }
+
+    //---------------------------------------------------------------------------------------------
+    // Functions
+    //---------------------------------------------------------------------------------------------
+    // Events
+
+    function onLabels(model)
+    {
+        if (model === null)
+            return [];
+
+        return [
+            model.resolution_name || "",
+            model.channel         || ""
+        ].filter(function(a) { return a !== "" });
+    }
+
+    //---------------------------------------------------------------------------------------------
+    // Childs
+    //---------------------------------------------------------------------------------------------
+
+    Widgets.TableColumns {
+        id: tableColumns
+
+        showTitleText: false
+        titleCover_height: VLCStyle.listAlbumCover_height
+        titleCover_width: VLCStyle.listAlbumCover_width
+        titleCover_radius: VLCStyle.listAlbumCover_radius
+
+        function titlecoverLabels(model) {
+            return listView_id.onLabels(model);
         }
     }
 }
