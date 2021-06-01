@@ -35,11 +35,17 @@
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
 
+#include <libavutil/buffer.h>
+#include <libavutil/hwcontext_drm.h>
 #include <libdrm/drm.h>
 #include <libdrm/drm_mode.h>
+#include <libdrm/drm_fourcc.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
+#include "../codec/avcodec/drm_pic.h"
+
+#define TRACE_ALL 0
 
 #define DRM_MODULE "vc4"
 #define ERRSTR strerror(errno)
@@ -55,15 +61,38 @@ struct drm_setup {
     } compose;
 };
 
+#define HOLD_SIZE 3
+
 struct vout_display_sys_t {
     vlc_decoder_device *dec_dev;
 
     int drm_fd;
     uint32_t con_id;
     struct drm_setup setup;
+
+    unsigned int hold_n;
+    struct display_hold_s {
+        unsigned int fb_handle;
+        picture_t * pic;
+    } hold[HOLD_SIZE];
 };
 
 static const vlc_fourcc_t drm_subpicture_chromas[] = { VLC_CODEC_RGBA, VLC_CODEC_BGRA, VLC_CODEC_ARGB, 0 };
+
+static void hold_uninit(vout_display_sys_t *const de, struct display_hold_s * const dh)
+{
+    if (dh->fb_handle != 0)
+    {
+        drmModeRmFB(de->drm_fd, dh->fb_handle);
+        dh->fb_handle = 0;
+    }
+
+    if (dh->pic != NULL) {
+        picture_Release(dh->pic);
+        dh->pic = NULL;
+    }
+}
+
 
 static int find_crtc(vout_display_t *const vd, const int drmfd,
                      struct drm_setup *const s, uint32_t *const pConId)
@@ -172,7 +201,8 @@ fail_res:
     return ret;
 }
 
-static int find_plane(vout_display_t *const vd, int drmfd, struct drm_setup *s)
+// *** Defer this
+static int find_plane(vout_display_t *const vd, int drmfd, struct drm_setup *s, const uint32_t req_format)
 {
     drmModePlaneResPtr planes;
     drmModePlanePtr plane;
@@ -199,7 +229,9 @@ static int find_plane(vout_display_t *const vd, int drmfd, struct drm_setup *s)
         }
 
         for (j = 0; j < plane->count_formats; ++j) {
-            if (plane->formats[j] == s->out_fourcc)
+            char tbuf[5];
+            msg_Info(vd, "Plane %d: %s", j, str_fourcc(tbuf, plane->formats[j]));
+            if (plane->formats[j] == req_format)
                 break;
         }
 
@@ -209,6 +241,7 @@ static int find_plane(vout_display_t *const vd, int drmfd, struct drm_setup *s)
         }
 
         s->planeId = plane->plane_id;
+        s->out_fourcc = req_format;
         drmModeFreePlane(plane);
         break;
     }
@@ -231,8 +264,136 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
 
 static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
 {
-    VLC_UNUSED(vd);
-    VLC_UNUSED(p_pic);
+    const AVDRMFrameDescriptor * const desc = drm_prime_get_desc(p_pic);
+    vout_display_sys_t *const de = vd->sys;
+    struct display_hold_s *const dh = de->hold + de->hold_n;
+    const uint32_t format = desc->layers[0].format;
+    unsigned int fb_handle = 0;
+    int ret = 0;
+
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s: fd=%d", __func__, desc->objects[0].fd);
+#endif
+
+    if (de->setup.out_fourcc != format)
+    {
+        if (find_plane(vd, de->drm_fd, &de->setup, format))
+        {
+            msg_Warn(vd, "No plane for format: %s", fourcc2str(format));
+            return;
+        }
+    }
+
+#if 0
+    {
+        drmVBlank vbl = {
+            .request = {
+                .type = DRM_VBLANK_RELATIVE,
+                .sequence = 1
+            }
+        };
+
+        while (drmWaitVBlank(de->drm_fd, &vbl))
+        {
+            if (errno != EINTR)
+            {
+                av_log(s, AV_LOG_WARNING, "drmWaitVBlank failed: %s\n", ERRSTR);
+                break;
+            }
+        }
+    }
+#endif
+
+    {
+        uint32_t pitches[4] = { 0 };
+        uint32_t offsets[4] = { 0 };
+        uint64_t modifiers[4] = { 0 };
+        uint32_t bo_object_handles[4] = { 0 };
+        uint32_t bo_handles[4] = { 0 };
+        int i, j, n;
+
+        for (i = 0; i < desc->nb_objects; ++i)
+        {
+            if (drmPrimeFDToHandle(de->drm_fd, desc->objects[i].fd, bo_object_handles + i) != 0)
+            {
+                msg_Warn(vd, "drmPrimeFDToHandle[%d](%d) failed: %s", i, desc->objects[i].fd, ERRSTR);
+                return;
+            }
+        }
+
+        n = 0;
+        for (i = 0; i < desc->nb_layers; ++i)
+        {
+            for (j = 0; j < desc->layers[i].nb_planes; ++j)
+            {
+                const AVDRMPlaneDescriptor *const p = desc->layers[i].planes + j;
+                const AVDRMObjectDescriptor *const obj = desc->objects + p->object_index;
+                pitches[n] = p->pitch;
+                offsets[n] = p->offset;
+                modifiers[n] = obj->format_modifier;
+                bo_handles[n] = bo_object_handles[p->object_index];
+                ++n;
+            }
+        }
+
+#if 0
+        av_log(s, AV_LOG_DEBUG, "%dx%d, fmt: %x, boh=%d,%d,%d,%d, pitch=%d,%d,%d,%d,"
+               " offset=%d,%d,%d,%d, mod=%llx,%llx,%llx,%llx\n",
+               av_frame_cropped_width(frame),
+               av_frame_cropped_height(frame),
+               desc->layers[0].format,
+               bo_handles[0],
+               bo_handles[1],
+               bo_handles[2],
+               bo_handles[3],
+               pitches[0],
+               pitches[1],
+               pitches[2],
+               pitches[3],
+               offsets[0],
+               offsets[1],
+               offsets[2],
+               offsets[3],
+               (long long)modifiers[0],
+               (long long)modifiers[1],
+               (long long)modifiers[2],
+               (long long)modifiers[3]
+              );
+#endif
+
+        if (drmModeAddFB2WithModifiers(de->drm_fd,
+                                       p_pic->format.i_visible_width,
+                                       p_pic->format.i_visible_height,
+                                       desc->layers[0].format, bo_handles,
+                                       pitches, offsets, modifiers,
+                                       &fb_handle, DRM_MODE_FB_MODIFIERS /** 0 if no mods */) != 0)
+        {
+            msg_Err(vd, "drmModeAddFB2WithModifiers failed: %s\n", ERRSTR);
+            return;
+        }
+    }
+
+    ret = drmModeSetPlane(de->drm_fd, de->setup.planeId, de->setup.crtcId,
+                          fb_handle, 0,
+                          de->setup.compose.x, de->setup.compose.y,
+                          de->setup.compose.width,
+                          de->setup.compose.height,
+                          0, 0,
+                          p_pic->format.i_visible_width << 16,
+                          p_pic->format.i_visible_height << 16);
+
+    if (ret != 0)
+    {
+        msg_Err(vd, "drmModeSetPlane failed: %s", ERRSTR);
+    }
+
+
+    hold_uninit(de, dh);
+    dh->fb_handle = fb_handle;
+    dh->pic = picture_Hold(p_pic);
+    de->hold_n = de->hold_n + 1 >= HOLD_SIZE ? 0 : de->hold_n + 1;
+
+    return;
 }
 
 static int vd_drm_control(vout_display_t *vd, int query)
@@ -252,14 +413,24 @@ static int vd_drm_reset_pictures(vout_display_t *vd, video_format_t *fmt)
 static void CloseDrmVout(vout_display_t *vd)
 {
     vout_display_sys_t *const sys = vd->sys;
+    unsigned int i;
 
-    if (sys->dec_dev) vlc_decoder_device_Release(sys->dec_dev);
+    for (i = 0; i != HOLD_SIZE; ++i)
+        hold_uninit(sys, sys->hold + i);
+
+    if (sys->dec_dev)
+        vlc_decoder_device_Release(sys->dec_dev);
 
     free(sys);
 }
 
 static const struct vlc_display_operations ops = {
-    CloseDrmVout, vd_drm_prepare, vd_drm_display, vd_drm_control, vd_drm_reset_pictures, NULL,
+    .close =            CloseDrmVout,
+    .prepare =          vd_drm_prepare,
+    .display =          vd_drm_display,
+    .control =          vd_drm_control,
+    .reset_pictures =   vd_drm_reset_pictures,
+    .set_viewpoint =    NULL,
 };
 
 static int OpenDrmVout(vout_display_t *vd, const vout_display_cfg_t *cfg,
@@ -272,7 +443,8 @@ static int OpenDrmVout(vout_display_t *vd, const vout_display_cfg_t *cfg,
              (const char *)&vd->fmt->i_chroma, (const char *)&fmtp->i_chroma);
 
     sys = calloc(1, sizeof(*sys));
-    if (!sys) return VLC_ENOMEM;
+    if (!sys)
+        return VLC_ENOMEM;
     vd->sys = sys;
 
     if (vctx) {
@@ -283,12 +455,12 @@ static int OpenDrmVout(vout_display_t *vd, const vout_display_cfg_t *cfg,
         }
     }
 
-    if (sys->dec_dev == NULL) sys->dec_dev = vlc_decoder_device_Create(VLC_OBJECT(vd), cfg->window);
+    if (sys->dec_dev == NULL)
+        sys->dec_dev = vlc_decoder_device_Create(VLC_OBJECT(vd), cfg->window);
     if (sys->dec_dev == NULL || sys->dec_dev->type != VLC_DECODER_DEVICE_DRM_PRIME) {
         msg_Err(vd, "Missing decoder device");
         goto fail;
     }
-
 
     if ((sys->drm_fd = drmOpen(DRM_MODULE, NULL)) < 0) {
         msg_Err(vd, "Failed to drmOpen %s", DRM_MODULE);
@@ -300,11 +472,10 @@ static int OpenDrmVout(vout_display_t *vd, const vout_display_cfg_t *cfg,
         return -1;
     }
 
-    if (find_plane(vd, sys->drm_fd, &sys->setup) != 0) {
+    if (find_plane(vd, sys->drm_fd, &sys->setup, DRM_FORMAT_NV12) != 0) {
         msg_Err(vd, "failed to find compatible plane");
         return -1;
     }
-
 
     vd->info = (vout_display_info_t) {
         .subpicture_chromas = drm_subpicture_chromas

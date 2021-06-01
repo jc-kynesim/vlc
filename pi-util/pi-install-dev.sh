@@ -41,7 +41,7 @@ libexif-dev \
 libffi-dev \
 libgconf2-dev \
 libgl1-mesa-dev \
-libgnome-keyring-dev \
+#libgnome-keyring-dev \
 libgnutls28-dev \
 libidn11-dev \
 libjpeg-dev \

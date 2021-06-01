@@ -12,7 +12,7 @@ libmmal_vout_plugin_la_LIBADD = $(LIBM) libvlc_mmal.la
 
 libdrm_vout_plugin_la_SOURCES = hw/mmal/drm_vout.c
 libdrm_vout_plugin_la_CFLAGS = $(AM_CFLAGS) -I/usr/include/libdrm
-libdrm_vout_plugin_la_LIBADD = drm
+libdrm_vout_plugin_la_LIBADD = -ldrm
 
 libmmal_codec_plugin_la_SOURCES = hw/mmal/codec.c
 libmmal_codec_plugin_la_CFLAGS = $(AM_CFLAGS) $(MMAL_CFLAGS)
@@ -37,5 +37,6 @@ mmal_LTLIBRARIES = \
 	libmmal_deinterlace_plugin.la \
 	libmmal_converter_plugin.la \
 	libmmal_codec_plugin.la \
-	libmmal_vout_plugin.la
+	libmmal_vout_plugin.la \
+	libdrm_vout_plugin.la
 endif

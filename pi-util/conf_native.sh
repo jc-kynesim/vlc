@@ -10,7 +10,7 @@ else
   echo "Unkown machine name: $MC"
   exit 1
 fi
-OUT=$BASE/out/$ARM-rel
+OUT=$BASE/out/$ARM-`lsb_release -sc`-rel
 
 echo "Configuring in $OUT"
 mkdir -p $OUT

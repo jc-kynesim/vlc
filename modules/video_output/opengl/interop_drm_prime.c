@@ -67,16 +67,6 @@ vlc_drm_prime_IsChromaOpaque(const int i_vlc_chroma)
     return i_vlc_chroma == VLC_CODEC_DRM_PRIME_OPAQUE;
 }
 
-static const AVDRMFrameDescriptor *
-drm_prime_get_desc(picture_t *pic)
-{
-    const drm_prime_video_sys_t * const vsys =
-        vlc_video_context_GetPrivate(pic->context->vctx, VLC_VIDEO_CONTEXT_DRM_PRIME);
-    if (!vsys)
-        return NULL;
-    return (const AVDRMFrameDescriptor *)vsys->buf->data;
-}
-
 static void destroy_images(const struct vlc_gl_interop *interop, EGLImageKHR imgs[IMAGES_MAX])
 {
     unsigned int i;
@@ -279,7 +269,7 @@ Open(vlc_object_t *obj)
 {
     struct vlc_gl_interop *interop = (void *) obj;
 
-    msg_Info(obj, "Try DRM_PRIME: Chroma=%#x", interop->fmt_in.i_chroma);
+    msg_Info(obj, "Try DRM_PRIME: Chroma=%s", fourcc2str(interop->fmt_in.i_chroma));
 
     if (!interop->gl->egl.debugMessageControlKHR)
     {
@@ -315,16 +305,24 @@ Open(vlc_object_t *obj)
 
     if (!vlc_gl_StrHasToken(interop->api->extensions, "GL_OES_EGL_image"))
     {
+        msg_Err(obj, "GL missing GL_OES_EGL_image");
         vlc_decoder_device_Release(dec_device);
         return VLC_EGENERIC;
     }
 
+#if 1
     const char *eglexts = interop->gl->egl.queryString(interop->gl, EGL_EXTENSIONS);
     if (eglexts == NULL || !vlc_gl_StrHasToken(eglexts, "EGL_EXT_image_dma_buf_import"))
     {
+        if (eglexts == NULL)
+            msg_Err(obj, "No EGL extensions");
+        else
+            msg_Err(obj, "GL missing EGL_EXT_image_dma_buf_import");
+
         vlc_decoder_device_Release(dec_device);
         return VLC_EGENERIC;
     }
+#endif
 
     msg_Info(obj, "DRM_PRIME looks good");
 
