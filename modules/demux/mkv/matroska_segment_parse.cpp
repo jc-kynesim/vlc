@@ -2127,13 +2127,14 @@ bool matroska_segment_c::TrackInit( mkv_track_t * p_tk )
         }
         S_CASE("D_WEBVTT/SUBTITLES") {
             ONLY_FMT(SPU);
-            vars.p_fmt->i_codec = VLC_CODEC_SUBT;
+            vars.p_fmt->i_codec = VLC_CODEC_WEBVTT;
             vars.p_fmt->subs.psz_encoding = strdup( "UTF-8");
         }
         S_CASE("S_TEXT/WEBVTT") {
             ONLY_FMT(SPU);
             vars.p_fmt->i_codec = VLC_CODEC_WEBVTT;
             vars.p_fmt->subs.psz_encoding = strdup( "UTF-8");
+            fill_extra_data( vars.p_tk, 0 );
         }
         S_CASE("B_VOBBTN") {
             vars.p_fmt->i_cat = DATA_ES;
