@@ -165,8 +165,10 @@ static bool srt_schedule_reconnect(stream_t *p_stream)
 
     /* Set latency */
     i_latency = var_InheritInteger( p_stream, "latency" );
+#ifdef SRTO_TSBPDDELAY
     srt_setsockopt( p_sys->sock, 0, SRTO_TSBPDDELAY,
         &i_latency, sizeof( int ) );
+#endif
 
     psz_passphrase = var_InheritString( p_stream, "passphrase" );
     if ( psz_passphrase != NULL && psz_passphrase[0] != '\0')
