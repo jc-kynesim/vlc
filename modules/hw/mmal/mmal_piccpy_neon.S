@@ -1,22 +1,12 @@
-// Copy pix
-
-        .syntax unified
-        .arm
-//      .thumb
-        .text
+#include "../../arm_neon/asm.S"
         .align 16
         .arch armv7-a
+        .syntax unified
+#if HAVE_AS_FPU_DIRECTIVE
         .fpu neon-vfpv4
-
-
-.macro  function name
-        .global  \name
-#ifdef __ELF__
-        .type    \name, %function
 #endif
-\name:
-.endm
 
+// Copy pix
 
 .macro  piccpy_to_8, bit_depth
         subs     r2, #128

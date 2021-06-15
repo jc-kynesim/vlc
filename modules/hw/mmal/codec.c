@@ -29,6 +29,7 @@
 #include <stdatomic.h>
 
 #include <vlc_common.h>
+#include <vlc_cpu.h>
 #include <vlc_plugin.h>
 #include <vlc_codec.h>
 #include <vlc_filter.h>
@@ -1840,7 +1841,7 @@ static int OpenConverter(vlc_object_t * obj)
     filter_t * const p_filter = (filter_t *)obj;
     int ret = VLC_EGENERIC;
     filter_sys_t *sys;
-    MMAL_STATUS_T status;
+    MMAL_STATUS_T status = 0;
     MMAL_FOURCC_T enc_out = filter_enc_out(&p_filter->fmt_out.video);
     const MMAL_FOURCC_T enc_in = filter_enc_in(&p_filter->fmt_in.video);
     bool use_resizer;
@@ -2420,6 +2421,10 @@ static int OpenBlendNeon(vlc_object_t *object)
     MMAL_FOURCC_T mfcc_src = vlc_to_mmal_video_fourcc(&p_filter->fmt_in.video);
     MMAL_FOURCC_T mfcc_dst = vlc_to_mmal_video_fourcc(&p_filter->fmt_out.video);
     blend_neon_fn * blend_fn = (blend_neon_fn *)0;
+
+    // Obviously can't use this if we have no neon
+    if (!vlc_CPU_ARM_NEON())
+        return VLC_EGENERIC;
 
     // Non-alpha RGB only for dest
     if (vfcc_dst != VLC_CODEC_RGB32)

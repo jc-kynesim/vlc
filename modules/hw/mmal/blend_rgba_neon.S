@@ -1,10 +1,10 @@
-        .syntax unified
-        .arm
-//      .thumb
-        .text
+#include "../../arm_neon/asm.S"
         .align 16
         .arch armv7-a
+        .syntax unified
+#if HAVE_AS_FPU_DIRECTIVE
         .fpu neon-vfpv4
+#endif
 
 @ blend_rgbx_rgba_neon
 
@@ -173,11 +173,7 @@
 @ r2   plane alpha
 @ r3   count (pixels)
         .align  16
-        .global blend_rgbx_rgba_neon
-#ifdef __ELF__
-        .type   blend_rgbx_rgba_neon, %function
-#endif
-blend_rgbx_rgba_neon:
+function blend_rgbx_rgba_neon
         blend_main d16, d17, d18, d19, d20, d21, d22, d23
 
 
@@ -186,11 +182,7 @@ blend_rgbx_rgba_neon:
 @ r2   plane alpha
 @ r3   count (pixels)
         .align  16
-        .global blend_bgrx_rgba_neon
-#ifdef __ELF__
-        .type   blend_bgrx_rgba_neon, %function
-#endif
-blend_bgrx_rgba_neon:
+function blend_bgrx_rgba_neon
         blend_main d18, d17, d16, d19, d20, d21, d22, d23
 
 
