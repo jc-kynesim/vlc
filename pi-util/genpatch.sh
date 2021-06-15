@@ -1,9 +1,9 @@
 set -e
 
-NOPATCH=
+NOTAG=
 if [ "$1" == "--notag" ]; then
   shift
-  NOPATCH=1
+  NOTAG=1
 fi
 
 if [ "$1" == "" ]; then
@@ -18,9 +18,9 @@ if [ "$VERSION" == "" ]; then
   exit 1
 fi
 
-PATCHFILE=../vlc-$VERSION-$1.patch
+PATCHFILE=../vlc-$VERSION-$1-001.patch
 
-if [ $NOPATCH ]; then
+if [ $NOTAG ]; then
   echo Not tagged
 else
   # Only continue if we are all comitted
@@ -31,10 +31,16 @@ else
 
   git tag $PATCHTAG
 fi
+
+# We seem to sometimes gain add
 echo Generating patch: $PATCHFILE
-git diff $VERSION -- modules/hw/mmal modules/video_output/opengl src/misc include src/video_output src/input configure.ac > $PATCHFILE
-git diff $VERSION -- modules/video_chroma/chain.c > ../vlc-$VERSION-$1-chain.patch
-git diff $VERSION -- bin/vlc.c > ../vlc-$VERSION-$1-vlc.patch
+git diff $VERSION -- modules/hw/mmal modules/video_output/opengl\
+ modules/gui/qt/qt.cpp\
+ src/misc include src/video_output src/input\
+ configure.ac > $PATCHFILE
+git diff $VERSION -- modules/video_chroma/chain.c > ../vlc-$VERSION-$1-002-chain.patch
+git diff $VERSION -- bin/vlc.c > ../vlc-$VERSION-$1-003-vlc.patch
+git diff $VERSION -- modules/access/srt.c modules/access_output/srt.c > ../vlc-$VERSION-$1-004-srt.patch
 
 #echo Copying patch to arm-build
 #scp $PATCHFILE john@arm-build:patches/0002-vlc-3.0.6-mmal_test_4.patch
