@@ -662,7 +662,7 @@ ZcFfmpeg_AllocContext( decoder_t *p_dec,
             p_codec = avcodec_find_decoder(i_codec_id);
         else
         {
-            psz_namecodec = rpi_is_model_pi4() ? "hevc" : "hevc_rpi";
+            psz_namecodec = rpi_use_pi3_hevc() ? "hevc_rpi" : "hevc" ;
             msg_Info(p_dec, "Looking for HEVC decoder '%s'", psz_namecodec);
             p_codec = avcodec_find_decoder_by_name(psz_namecodec);
         }

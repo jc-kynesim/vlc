@@ -1487,9 +1487,45 @@ cma_buf_t * cma_buf_pic_get(picture_t * const pic)
 
 /* Returns the type of the Pi being used
 */
-bool rpi_is_model_pi4(void) {
+bool rpi_is_model_pi4(void)
+{
     return bcm_host_is_model_pi4();
 }
+
+// Board types that support PI3 hybrid HEVC accel
+bool rpi_use_pi3_hevc(void)
+{
+    const int t = bcm_host_get_model_type();
+    return
+        t == BCM_HOST_BOARD_TYPE_PI3MODELB ||
+        t == BCM_HOST_BOARD_TYPE_CM3 ||
+        t == BCM_HOST_BOARD_TYPE_PI3MODELBPLUS ||
+        t == BCM_HOST_BOARD_TYPE_PI3MODELBPLUS ||
+        t == BCM_HOST_BOARD_TYPE_PI3MODELAPLUS ||
+        t == BCM_HOST_BOARD_TYPE_CM3PLUS;
+}
+
+// Board types that support qpu adv deinterlace
+bool rpi_use_qpu_deinterlace(void)
+{
+    const int t = bcm_host_get_model_type();
+    return
+        t == BCM_HOST_BOARD_TYPE_MODELA ||
+        t == BCM_HOST_BOARD_TYPE_MODELB ||
+        t == BCM_HOST_BOARD_TYPE_MODELAPLUS ||
+        t == BCM_HOST_BOARD_TYPE_MODELBPLUS ||
+        t == BCM_HOST_BOARD_TYPE_PI2MODELB ||
+        t == BCM_HOST_BOARD_TYPE_CM ||
+        t == BCM_HOST_BOARD_TYPE_CM2 ||
+        t == BCM_HOST_BOARD_TYPE_PI3MODELB ||
+        t == BCM_HOST_BOARD_TYPE_PI0 ||
+        t == BCM_HOST_BOARD_TYPE_CM3 ||
+        t == BCM_HOST_BOARD_TYPE_PI0W ||
+        t == BCM_HOST_BOARD_TYPE_PI3MODELBPLUS ||
+        t == BCM_HOST_BOARD_TYPE_PI3MODELAPLUS ||
+        t == BCM_HOST_BOARD_TYPE_CM3PLUS;
+}
+
 
 // Preferred mode - none->cma on Pi4 otherwise legacy
 static volatile vcsm_init_type_t last_vcsm_type = VCSM_INIT_NONE;

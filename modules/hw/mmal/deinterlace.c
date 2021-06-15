@@ -612,7 +612,7 @@ static int OpenMmalDeinterlace(filter_t *filter)
         goto fail;
     }
 
-    if (rpi_is_model_pi4())
+    if (!rpi_use_qpu_deinterlace())
     {
         sys->half_rate = true;
         sys->use_qpu = false;

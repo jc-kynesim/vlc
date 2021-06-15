@@ -297,6 +297,8 @@ static inline bool is_cma_buf_pic_chroma(const uint32_t chroma)
 
 int rpi_get_model_type(void);
 bool rpi_is_model_pi4(void);
+bool rpi_use_pi3_hevc(void);
+bool rpi_use_qpu_deinterlace(void);
 bool rpi_is_fkms_active(void);
 
 typedef enum vcsm_init_type_e {
