@@ -32,11 +32,17 @@
 #include <vlc_avcodec.h>
 #include <vlc_cpu.h>
 #include <vlc_atomic.h>
+
 #include <assert.h>
+
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <libavcodec/avcodec.h>
 #include <libavutil/mem.h>
 #include <libavutil/pixdesc.h>
+#include <libavutil/hwcontext_drm.h>
 #if (LIBAVUTIL_VERSION_MICRO >= 100 && LIBAVUTIL_VERSION_INT >= AV_VERSION_INT( 55, 16, 101 ) )
 #include <libavutil/mastering_display_metadata.h>
 #endif
@@ -50,6 +56,7 @@
 #include "../../codec/cc.h"
 #include "../../codec/avcodec/avcommon.h"  // ??? Beware over inclusion
 #include "mmal_cma.h"
+#include "mmal_cma_drmprime.h"
 #include "mmal_picture.h"
 
 #define TRACE_ALL 0
@@ -118,15 +125,21 @@ struct decoder_sys_t
     bool pool_alloc_1;
     vcsm_init_type_t vcsm_init_type;
     int cma_in_flight_max;
+    bool use_drm;
     // Debug
     decoder_t * p_dec;
 };
 
 
 static vlc_fourcc_t
-ZcFindVlcChroma(const int i_ffmpeg_chroma)
+ZcFindVlcChroma(const int i_ffmpeg_chroma, const int i_ffmpeg_sw_chroma)
 {
-    switch (i_ffmpeg_chroma)
+    int c = i_ffmpeg_chroma;
+
+    if (c == AV_PIX_FMT_DRM_PRIME)
+        c = i_ffmpeg_sw_chroma;
+
+    switch (c)
     {
         // This is all we claim to deal with
         // In theory RGB should be doable within our current framework
@@ -148,12 +161,12 @@ ZcFindVlcChroma(const int i_ffmpeg_chroma)
 // Pix Fmt conv for MMal
 // video_fromat from ffmpeg pic_fmt
 static int
-ZcGetVlcChroma( video_format_t *fmt, int i_ffmpeg_chroma )
+ZcGetVlcChroma( video_format_t *fmt, int i_ffmpeg_chroma, const int i_ffmpeg_sw_chroma)
 {
     fmt->i_rmask = 0;
     fmt->i_gmask = 0;
     fmt->i_bmask = 0;
-    fmt->i_chroma = ZcFindVlcChroma(i_ffmpeg_chroma);
+    fmt->i_chroma = ZcFindVlcChroma(i_ffmpeg_chroma, i_ffmpeg_sw_chroma);
 
     return fmt->i_chroma == 0 ? -1 : 0;
 }
@@ -164,9 +177,16 @@ static enum PixelFormat
 ZcGetFormat(AVCodecContext *p_context, const enum PixelFormat *pi_fmt)
 {
     enum PixelFormat swfmt = avcodec_default_get_format(p_context, pi_fmt);
+    decoder_t * const p_dec = av_rpi_zc_in_use(p_context) ? NULL : p_context->opaque;
+    const bool use_drm = (p_dec != NULL) && p_dec->p_sys->use_drm;
+
     for (size_t i = 0; pi_fmt[i] != AV_PIX_FMT_NONE; i++)
     {
-        if (ZcFindVlcChroma(pi_fmt[i]) != 0)
+        if (use_drm  && pi_fmt[i] == AV_PIX_FMT_DRM_PRIME)
+            return pi_fmt[i];
+
+        if (!use_drm && pi_fmt[i] != AV_PIX_FMT_DRM_PRIME &&
+            ZcFindVlcChroma(pi_fmt[i], p_context->sw_pix_fmt) != 0)
             return pi_fmt[i];
     }
     return swfmt;
@@ -302,20 +322,59 @@ static int set_pic_from_frame(picture_t * const pic, const AVFrame * const frame
         return VLC_ENOMEM;
     }
 
-    uint8_t * frame_end = frame->data[0] + cma_buf_size(cb);
-    for (int i = 0; i != pic->i_planes; ++i) {
+    if (frame->format == AV_PIX_FMT_DRM_PRIME)
+    {
+        const AVDRMFrameDescriptor * const desc = (AVDRMFrameDescriptor*)frame->data[0];
+        const AVDRMLayerDescriptor * layer = desc->layers + 0;
+        const AVDRMPlaneDescriptor * plane = layer->planes + 0;
+        int nb_plane = 0;
+
+        if (desc->nb_objects != 1)
+            return VLC_EGENERIC;
+
+        for (int i = 0; i != pic->i_planes; ++i)
+        {
+            if (nb_plane >= layer->nb_planes)
+            {
+                ++layer;
+                plane = layer->planes + 0;
+                nb_plane = 0;
+            }
+
+            pic->p[i] = (plane_t){
+                .p_pixels = data + plane->offset,
+                .i_lines = frame->height >> hs[i],
+                .i_pitch = plane->pitch,
+                .i_pixel_pitch = pb[i],
+                .i_visible_lines = av_frame_cropped_height(frame) >> hs[i],
+                .i_visible_pitch = av_frame_cropped_width(frame) >> ws[i]
+            };
+
+            ++nb_plane;
+        }
+
         // Calculate lines from gap between planes
         // This will give us an accurate "height" for later use by MMAL
-        const int lines = ((i + 1 == pic->i_planes ? frame_end : frame->data[i + 1]) -
-                           frame->data[i]) / frame->linesize[i];
-        pic->p[i] = (plane_t){
-            .p_pixels = data + (frame->data[i] - frame->data[0]),
-            .i_lines = lines,
-            .i_pitch = frame->linesize[i],
-            .i_pixel_pitch = pb[i],
-            .i_visible_lines = av_frame_cropped_height(frame) >> hs[i],
-            .i_visible_pitch = av_frame_cropped_width(frame) >> ws[i]
-        };
+        for (int i = 0; i + 1 < pic->i_planes; ++i)
+            pic->p[i].i_lines = (pic->p[i + 1].p_pixels - pic->p[i].p_pixels) / pic->p[i].i_pitch;
+    }
+    else
+    {
+        uint8_t * frame_end = frame->data[0] + cma_buf_size(cb);
+        for (int i = 0; i != pic->i_planes; ++i) {
+            // Calculate lines from gap between planes
+            // This will give us an accurate "height" for later use by MMAL
+            const int lines = ((i + 1 == pic->i_planes ? frame_end : frame->data[i + 1]) -
+                               frame->data[i]) / frame->linesize[i];
+            pic->p[i] = (plane_t){
+                .p_pixels = data + (frame->data[i] - frame->data[0]),
+                .i_lines = lines,
+                .i_pitch = frame->linesize[i],
+                .i_pixel_pitch = pb[i],
+                .i_visible_lines = av_frame_cropped_height(frame) >> hs[i],
+                .i_visible_pitch = av_frame_cropped_width(frame) >> ws[i]
+            };
+        }
     }
     return 0;
 }
@@ -703,7 +762,8 @@ ZcFfmpeg_OpenCodec( decoder_t *p_dec, AVCodecContext *ctx,
         free(psz_opts);
     }
 
-    if (av_rpi_zc_init2(ctx, p_dec, zc_alloc_buf, zc_free_pool) != 0)
+    if (!p_dec->p_sys->use_drm &&
+        av_rpi_zc_init2(ctx, p_dec, zc_alloc_buf, zc_free_pool) != 0)
     {
         msg_Err(p_dec, "Failed to init AV ZC");
         return VLC_EGENERIC;
@@ -784,9 +844,10 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
     video_format_Init(fmt, 0);
 
 #if 1
-    VLC_UNUSED(sw_pix_fmt);
-    if ((fmt->i_chroma = ZcFindVlcChroma(pix_fmt)) == 0)
+    if ((fmt->i_chroma = ZcFindVlcChroma(pix_fmt, sw_pix_fmt)) == 0) {
+        msg_Info(dec, "Find chroma fail");
         return -1;
+    }
 #else
     if (pix_fmt == sw_pix_fmt)
     {   /* software decoding */
@@ -1083,10 +1144,27 @@ static int OpenVideoCodec( decoder_t *p_dec )
  * the ffmpeg codec will be opened, some memory allocated. The vout is not yet
  * opened (done after the first decoded frame).
  *****************************************************************************/
+
+static bool has_legacy_rpivid()
+{
+    static int cached_state = 0;
+
+    if (cached_state == 0)
+    {
+        struct stat buf;
+        cached_state = stat("/dev/rpivid-intcmem", &buf) != 0 ? -1 : 1;
+    }
+    return cached_state > 0;
+}
+
+
 static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
 {
     decoder_t *p_dec = (decoder_t *)obj;
     const AVCodec *p_codec;
+    bool use_zc;
+    bool use_drm;
+    AVBufferRef * hw_dev_ctx = NULL;
 
     int extra_buffers = var_InheritInteger(p_dec, MMAL_AVCODEC_BUFFERS);
 
@@ -1102,8 +1180,10 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
         return VLC_EGENERIC;
     }
 
-    const vcsm_init_type_t vcsm_type = cma_vcsm_init();
-    const int vcsm_size =
+    use_zc = has_legacy_rpivid();
+    use_drm = !use_zc;  // ** At least for the moment
+    const vcsm_init_type_t vcsm_type = use_zc ? cma_vcsm_init() : VCSM_INIT_NONE;
+    const int vcsm_size = vcsm_type == VCSM_INIT_NONE ? 0 :
         vcsm_type == VCSM_INIT_LEGACY ? hw_mmal_get_gpu_mem() : 512 << 20;
 
 #if 1
@@ -1123,13 +1203,28 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     }
 #endif
 
-    if( vcsm_type == VCSM_INIT_NONE )
+    if (vcsm_type == VCSM_INIT_NONE && !use_drm)
         return VLC_EGENERIC;
+
+    if (use_drm)
+    {
+        int dev_type = av_hwdevice_find_type_by_name("drm");
+
+        if (dev_type == AV_HWDEVICE_TYPE_NONE ||
+            av_hwdevice_ctx_create(&hw_dev_ctx, dev_type, NULL, NULL, 0))
+        {
+            msg_Warn(p_dec, "Failed to create drm hw device context");
+            use_drm = false;
+        }
+    }
+
+
 #if 1
-    if( (p_dec->fmt_in.i_codec != VLC_CODEC_HEVC &&
-         (vcsm_type == VCSM_INIT_CMA || vcsm_size < (96 << 20))) ||
-        (p_dec->fmt_in.i_codec == VLC_CODEC_HEVC &&
-         vcsm_size < (128 << 20)))
+    if (use_zc &&
+        ((p_dec->fmt_in.i_codec != VLC_CODEC_HEVC &&
+          (vcsm_type == VCSM_INIT_CMA || vcsm_size < (96 << 20))) ||
+         (p_dec->fmt_in.i_codec == VLC_CODEC_HEVC &&
+          vcsm_size < (128 << 20))))
     {
         cma_vcsm_exit(vcsm_type);
         return VLC_EGENERIC;
@@ -1139,9 +1234,12 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     AVCodecContext *p_context = ZcFfmpeg_AllocContext( p_dec, &p_codec );
     if( p_context == NULL )
     {
+        av_buffer_unref(&hw_dev_ctx);
         cma_vcsm_exit(vcsm_type);
         return VLC_EGENERIC;
     }
+    p_context->hw_device_ctx = hw_dev_ctx;
+    hw_dev_ctx = NULL;
 
     int i_val;
 
@@ -1161,6 +1259,7 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
 //    p_sys->p_va = NULL;
     p_sys->cma_in_flight_max = extra_buffers;
     p_sys->vcsm_init_type = vcsm_type;
+    p_sys->use_drm = use_drm;
     vlc_sem_init( &p_sys->sem_mt, 0 );
 
     /* ***** Fill p_context with init values ***** */
@@ -1292,7 +1391,7 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     p_sys->b_from_preroll = false;
 
     /* Set output properties */
-    if( ZcGetVlcChroma( &p_dec->fmt_out.video, p_context->pix_fmt ) != VLC_SUCCESS )
+    if (ZcGetVlcChroma(&p_dec->fmt_out.video, p_context->pix_fmt, p_context->sw_pix_fmt) != VLC_SUCCESS)
     {
         /* we are doomed. but not really, because most codecs set their pix_fmt later on */
 //        p_dec->fmt_out.i_codec = VLC_CODEC_I420;
@@ -1310,7 +1409,12 @@ static int MmalAvcodecOpenDecoder( vlc_object_t *obj )
     } else
         p_sys->palette_sent = true;
 
-    if ((p_sys->cma_pool = cma_buf_pool_new(p_sys->cma_in_flight_max, p_sys->cma_in_flight_max, false, "mmal_avcodec")) == NULL)
+    if (use_drm)
+        p_sys->cma_pool = cma_drmprime_pool_new(p_sys->cma_in_flight_max, p_sys->cma_in_flight_max, false, "drm_avcodec");
+    else if (use_zc)
+        p_sys->cma_pool = cma_buf_pool_new(p_sys->cma_in_flight_max, p_sys->cma_in_flight_max, false, "mmal_avcodec");
+
+    if (p_sys->cma_pool == NULL)
     {
         msg_Err(p_dec, "CMA pool alloc failure");
         goto fail;
@@ -1660,6 +1764,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
     mtime_t current_time;
     picture_t *p_pic = NULL;
     AVFrame *frame = NULL;
+    cma_buf_t * cb = NULL;
 
     // By default we are OK
     *error = false;
@@ -1866,7 +1971,7 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
 
         if( !b_need_output_picture ||
 //            ( !p_sys->p_va && !frame->linesize[0] ) ||
-           ( !frame->linesize[0] ) ||
+           (frame->format != AV_PIX_FMT_DRM_PRIME && !frame->linesize[0] ) ||
            ( p_dec->b_frame_drop_allowed && (frame->flags & AV_FRAME_FLAG_CORRUPT) &&
              !p_sys->b_show_corrupted ) )
         {
@@ -1906,39 +2011,49 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         }
 
 #if 1
+        if (lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
+                                   p_context->sw_pix_fmt) != 0)
         {
-            cma_buf_t * const cb = av_rpi_zc_buf_v(frame->buf[0]);
+            msg_Err(p_dec, "Failed to update format");
+            goto fail;
+        }
 
+        if ((p_pic = decoder_NewPicture(p_dec)) == NULL)
+        {
+            msg_Err(p_dec, "Failed to allocate pic");
+            goto fail;
+        }
+
+        if (p_sys->use_drm)
+        {
+            cb = cma_drmprime_pool_alloc_buf(p_sys->cma_pool, frame);
+            if (cb == NULL)
+            {
+                msg_Err(p_dec, "Failed to alloc CMA buf from DRM_PRIME");
+                goto fail;
+            }
+        }
+        else
+        {
+            cb = cma_buf_ref(av_rpi_zc_buf_v(frame->buf[0]));
             if (cb == NULL)
             {
                 msg_Err(p_dec, "Frame has no attached CMA buffer");
                 goto fail;
             }
-
-            if (lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
-                                       p_context->pix_fmt) != 0)
-            {
-                msg_Err(p_dec, "Failed to update format");
-                goto fail;
-            }
-
-            if ((p_pic = decoder_NewPicture(p_dec)) == NULL)
-            {
-                msg_Err(p_dec, "Failed to allocate pic");
-                goto fail;
-            }
-
-            if (cma_buf_pic_attach(cma_buf_ref(cb), p_pic) != 0)
-            {
-                cma_buf_unref(cb);  // Undo the in_flight
-                char dbuf0[5];
-                msg_Err(p_dec, "Failed to attach bufs to pic: fmt=%s", str_fourcc(dbuf0, p_pic->format.i_chroma));
-                goto fail;
-            }
-
-            // ****** Set planes etc.
-            set_pic_from_frame(p_pic, frame);
         }
+
+        if (cma_buf_pic_attach(cb, p_pic) != 0)
+        {
+            cma_buf_unref(cb);  // Undo the in_flight
+            char dbuf0[5];
+            msg_Err(p_dec, "Failed to attach bufs to pic: fmt=%s", str_fourcc(dbuf0, p_pic->format.i_chroma));
+            goto fail;
+        }
+        cb = NULL; // Now attached to pic
+
+        // ****** Set planes etc.
+        set_pic_from_frame(p_pic, frame);
 #else
         picture_t *p_pic = frame->opaque;
         if( p_pic == NULL )
@@ -2077,7 +2192,8 @@ static void MmalAvcodecCloseDecoder( vlc_object_t *obj )
     if( avcodec_is_open( ctx ) )
         avcodec_flush_buffers( ctx );
 
-    av_rpi_zc_uninit2(ctx);
+    if (!p_sys->use_drm)
+        av_rpi_zc_uninit2(ctx);
 
     wait_mt( p_sys );
 

@@ -1223,7 +1223,7 @@ static void adjust_refresh_rate(vout_display_t *vd, const video_format_t *fmt)
     int num_modes;
     double frame_rate = (double)fmt->i_frame_rate / fmt->i_frame_rate_base;
     int best_id = -1;
-    double best_score, score;
+    double best_score = 0.0, score;
     int i;
 
     vc_tv_get_display_state_id(sys->display_id, &display_state);

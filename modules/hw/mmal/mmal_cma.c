@@ -14,6 +14,7 @@
 #include <vlc_picture.h>
 
 #include "mmal_cma.h"
+#include "mmal_cma_int.h"
 #include "mmal_picture.h"
 
 #include <assert.h>
@@ -54,6 +55,7 @@ struct cma_pool_fixed_s
     void * alloc_v;
     cma_pool_alloc_fn * el_alloc_fn;
     cma_pool_free_fn * el_free_fn;
+    cma_pool_on_put_fn * on_put_fn;
     cma_pool_on_delete_fn * on_delete_fn;
 
     const char * name;
@@ -61,6 +63,11 @@ struct cma_pool_fixed_s
     int seq;
 #endif
 };
+
+static void cma_pool_fixed_on_put_null_cb(void * v)
+{
+    VLC_UNUSED(v);
+}
 
 static inline unsigned int inc_mod(const unsigned int n, const unsigned int m)
 {
@@ -198,6 +205,8 @@ static void * cma_pool_fixed_get(cma_pool_fixed_t * const p, const size_t req_el
 
 static void cma_pool_fixed_put(cma_pool_fixed_t * const p, void * v, const size_t el_size, const bool was_in_flight)
 {
+    p->on_put_fn(v);
+
     vlc_mutex_lock(&p->lock);
 
     if (el_size == p->el_size && (p->pool == NULL || p->pool[p->n_out] == NULL))
@@ -316,12 +325,12 @@ static void cma_pool_fixed_kill(cma_pool_fixed_t * const p)
 }
 
 // Create a new pool
-static cma_pool_fixed_t*
+cma_pool_fixed_t*
 cma_pool_fixed_new(const unsigned int pool_size,
                    const int flight_size,
                    void * const alloc_v,
                    cma_pool_alloc_fn * const alloc_fn, cma_pool_free_fn * const free_fn,
-                   cma_pool_on_delete_fn * const on_delete_fn,
+                   cma_pool_on_put_fn * const on_put_fn, cma_pool_on_delete_fn * const on_delete_fn,
                    const char * const name)
 {
     cma_pool_fixed_t* const p = calloc(1, sizeof(cma_pool_fixed_t));
@@ -339,6 +348,7 @@ cma_pool_fixed_new(const unsigned int pool_size,
     p->alloc_v = alloc_v;
     p->el_alloc_fn = alloc_fn;
     p->el_free_fn = free_fn;
+    p->on_put_fn = on_put_fn;
     p->on_delete_fn = on_delete_fn;
     p->name = name == NULL ? NULL : strdup(name);
 #if TRACE_ALL
@@ -352,31 +362,7 @@ cma_pool_fixed_new(const unsigned int pool_size,
 //
 // CMA buffer functions - uses cma_pool_fixed for pooling
 
-struct cma_buf_pool_s {
-    cma_pool_fixed_t * pool;
-    vcsm_init_type_t init_type;
-
-    bool all_in_flight;
-#if TRACE_ALL
-    size_t alloc_n;
-    size_t alloc_size;
-#endif
-};
-
-typedef struct cma_buf_s {
-    atomic_int ref_count;
-    cma_buf_pool_t * cbp;
-    bool in_flight;
-    size_t size;
-    unsigned int vcsm_h;   // VCSM handle from initial alloc
-    unsigned int vc_h;     // VC handle for ZC mmal buffers
-    unsigned int vc_addr;  // VC addr - unused by us but wanted by FFmpeg
-    int fd;                // dmabuf handle for GL
-    void * mmap;           // ARM mapped address
-    picture_context_t *ctx2;
-} cma_buf_t;
-
-static void cma_pool_delete(cma_buf_t * const cb)
+void cma_pool_delete(cma_buf_t * const cb)
 {
     assert(atomic_load(&cb->ref_count) == 0);
 #if TRACE_ALL
@@ -390,7 +376,7 @@ static void cma_pool_delete(cma_buf_t * const cb)
 
     if (cb->mmap != MAP_FAILED)
     {
-        if (cb->cbp->init_type == VCSM_INIT_CMA)
+        if (cb->cbp->buf_type != CMA_BUF_TYPE_VCSM)
             munmap(cb->mmap, cb->size);
         else
             vcsm_unlock_hdl(cb->vcsm_h);
@@ -453,7 +439,7 @@ static void * cma_pool_alloc_cb(void * v, size_t size)
         goto fail;
     }
 
-    if (cbp->init_type == VCSM_INIT_CMA)
+    if (cbp->buf_type == CMA_BUF_TYPE_CMA)
     {
         if ((cb->fd = vcsm_export_dmabuf(cb->vcsm_h)) == -1)
         {
@@ -493,7 +479,17 @@ static void cma_buf_pool_on_delete_cb(void * v)
 {
     cma_buf_pool_t * const cbp = v;
 
-    cma_vcsm_exit(cbp->init_type);
+    switch (cbp->buf_type)
+    {
+        case CMA_BUF_TYPE_CMA:
+            cma_vcsm_exit(VCSM_INIT_CMA);
+            break;
+        case CMA_BUF_TYPE_VCSM:
+            cma_vcsm_exit(VCSM_INIT_LEGACY);
+            break;
+        default:
+            break;
+    }
     free(cbp);
 }
 
@@ -553,10 +549,13 @@ cma_buf_pool_t * cma_buf_pool_new(const unsigned int pool_size, const unsigned i
     if (cbp == NULL)
         return NULL;
 
-    cbp->init_type = init_type;
+    cbp->buf_type = (init_type == VCSM_INIT_CMA) ? CMA_BUF_TYPE_CMA : CMA_BUF_TYPE_VCSM;
     cbp->all_in_flight = all_in_flight;
 
-    if ((cbp->pool = cma_pool_fixed_new(pool_size, flight_size, cbp, cma_pool_alloc_cb, cma_pool_free_cb, cma_buf_pool_on_delete_cb, name)) == NULL)
+    if ((cbp->pool = cma_pool_fixed_new(pool_size, flight_size, cbp,
+                                        cma_pool_alloc_cb, cma_pool_free_cb,
+                                        cma_pool_fixed_on_put_null_cb, cma_buf_pool_on_delete_cb,
+                                        name)) == NULL)
         goto fail;
     return cbp;
 
@@ -587,8 +586,10 @@ void cma_buf_end_flight(cma_buf_t * const cb)
 
 
 // Return vcsm handle
-unsigned int cma_buf_vcsm_handle(const cma_buf_t * const cb)
+unsigned int cma_buf_vcsm_handle(cma_buf_t * const cb)
 {
+    if (cb->vcsm_h == 0 && cb->fd != -1)
+        cb->vcsm_h = vcsm_import_dmabuf(cb->fd, "vlc-drmprime");
     return cb->vcsm_h;
 }
 
@@ -606,8 +607,14 @@ int cma_buf_add_context2(cma_buf_t *const cb, picture_context_t * const ctx2)
     return VLC_SUCCESS;
 }
 
-unsigned int cma_buf_vc_handle(const cma_buf_t *const cb)
+unsigned int cma_buf_vc_handle(cma_buf_t *const cb)
 {
+    if (cb->vc_h == 0)
+    {
+        const int vcsm_h = cma_buf_vcsm_handle(cb);
+        if (vcsm_h != 0)
+            cb->vc_h = vcsm_vc_hdl_from_hdl(vcsm_h);
+    }
     return cb->vc_h;
 }
 
@@ -621,8 +628,14 @@ void * cma_buf_addr(const cma_buf_t *const cb)
     return cb->mmap;
 }
 
-unsigned int cma_buf_vc_addr(const cma_buf_t *const cb)
+unsigned int cma_buf_vc_addr(cma_buf_t *const cb)
 {
+    if (cb->vc_addr == 0)
+    {
+        const int vcsm_h = cma_buf_vcsm_handle(cb);
+        if (vcsm_h != 0)
+            cb->vc_addr = vcsm_vc_addr_from_hdl(vcsm_h);
+    }
     return cb->vc_addr;
 }
 
@@ -660,6 +673,7 @@ cma_buf_t * cma_buf_pool_alloc_buf(cma_buf_pool_t * const cbp, const size_t size
     if (cb == NULL)
         return NULL;
 
+    cb->type = CMA_BUF_TYPE_CMA;
     cb->in_flight = cbp->all_in_flight;
     // When 1st allocated or retrieved from the pool the block will have a
     // ref count of 0 so ref here
