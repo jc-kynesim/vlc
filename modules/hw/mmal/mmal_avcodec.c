@@ -293,6 +293,7 @@ static int set_pic_from_frame(picture_t * const pic, const AVFrame * const frame
     const uint8_t * hs = shift_01;
     const uint8_t * ws = shift_01;
     const uint8_t * pb = pb_1;
+    int set_pitch = 0;
 
     switch (pic->format.i_chroma)
     {
@@ -306,11 +307,13 @@ static int set_pic_from_frame(picture_t * const pic, const AVFrame * const frame
         case VLC_CODEC_MMAL_ZC_SAND8:
             pic->i_planes = 2;
             pb = pb_12;
+            set_pitch = 128;
             break;
         case VLC_CODEC_MMAL_ZC_SAND10:
         case VLC_CODEC_MMAL_ZC_SAND30:  // Lies: SAND30 is "special"
             pic->i_planes = 2;
             pb = pb_24;
+            set_pitch = 128;
             break;
         default:
             return VLC_EGENERIC;
@@ -344,12 +347,13 @@ static int set_pic_from_frame(picture_t * const pic, const AVFrame * const frame
             pic->p[i] = (plane_t){
                 .p_pixels = data + plane->offset,
                 .i_lines = frame->height >> hs[i],
-                .i_pitch = plane->pitch,
+                .i_pitch = set_pitch != 0 ? set_pitch : plane->pitch,
                 .i_pixel_pitch = pb[i],
                 .i_visible_lines = av_frame_cropped_height(frame) >> hs[i],
                 .i_visible_pitch = av_frame_cropped_width(frame) >> ws[i]
             };
 
+            ++plane;
             ++nb_plane;
         }
 
