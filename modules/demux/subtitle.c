@@ -55,7 +55,7 @@ static void Close( vlc_object_t *p_this );
     N_("Override the normal frames per second settings. " \
     "This will only work with MicroDVD and SubRIP (SRT) subtitles.")
 #define SUB_TYPE_LONGTEXT \
-    N_("Force the subtiles format. Selecting \"auto\" means autodetection and should always work.")
+    N_("Force the subtitles format. Selecting \"auto\" means autodetection and should always work.")
 #define SUB_DESCRIPTION_LONGTEXT \
     N_("Override the default track description.")
 
@@ -1619,18 +1619,16 @@ static int ParseAQT(vlc_object_t *p_obj, subs_properties_t *p_props, text_t *txt
         /* Data Lines */
         if( sscanf (s, "-->> %d", &t) == 1)
         {
-            p_subtitle->i_start = (int64_t)t; /* * FPS*/
-            p_subtitle->i_stop  = -1;
-
             /* Starting of a subtitle */
             if( i_firstline )
             {
+                p_subtitle->i_start = t * p_props->i_microsecperframe;
                 i_firstline = 0;
             }
             /* We have been too far: end of the subtitle, begin of next */
             else
             {
-                TextPreviousLine( txt );
+                p_subtitle->i_stop  = t * p_props->i_microsecperframe;
                 break;
             }
         }
