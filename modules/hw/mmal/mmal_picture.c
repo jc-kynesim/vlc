@@ -1542,7 +1542,8 @@ vcsm_init_type_t cma_vcsm_init(void)
     vcsm_init_type_t try_type = last_vcsm_type;
 
     if (try_type == VCSM_INIT_NONE) {
-        if (bcm_host_is_fkms_active())
+        if (bcm_host_is_fkms_active() ||
+            bcm_host_is_kms_active())
             try_type = VCSM_INIT_CMA;
         else
             try_type = VCSM_INIT_LEGACY;
