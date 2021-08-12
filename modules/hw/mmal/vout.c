@@ -1536,6 +1536,11 @@ static int OpenMmalVout(vlc_object_t *object)
     msg_Dbg(vd, "<<< %s: o:%d", __func__, (int)vd->fmt.orientation);
 #endif
 
+    if (bcm_host_is_kms_active()) {
+        msg_Dbg(vd, "KMS active - mmal vout disabled");
+        return VLC_EGENERIC;
+    }
+
     get_xrandr_rotation(vd);
 
     sys = calloc(1, sizeof(struct vout_display_sys_t));
