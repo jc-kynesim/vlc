@@ -26,8 +26,9 @@
 
 #import <IOKit/pwr_mgt/IOPMLib.h>           /* for sleep prevention */
 
-
 @class VLCMain;
+
+extern NSString *VLCPlayerRateChanged;
 
 @interface VLCInputManager : NSObject
 
