@@ -74,7 +74,7 @@
 static QPixmap *loadPixmapFromData( char *, int size );
 
 
-PluginDialog::PluginDialog( intf_thread_t *_p_intf ) : QVLCFrame( _p_intf )
+PluginDialog::PluginDialog( qt_intf_t *_p_intf ) : QVLCFrame( _p_intf )
 {
     setWindowTitle( qtr( "Plugins and extensions" ) );
     setWindowRole( "vlc-plugins" );
@@ -107,7 +107,7 @@ PluginDialog::~PluginDialog()
 
 /* Plugins tab */
 
-PluginTab::PluginTab( intf_thread_t *p_intf_ )
+PluginTab::PluginTab( qt_intf_t *p_intf_ )
         : QVLCFrame( p_intf_ )
 {
     QGridLayout *layout = new QGridLayout( this );
@@ -160,7 +160,7 @@ inline void PluginTab::FillTree()
         module_t *p_module = p_list[i];
 
         QStringList qs_item;
-        qs_item << qfu( module_get_name( p_module, true ) )
+        qs_item << qfu( module_GetLongName( p_module ) )
                 << qfu( module_get_capability( p_module ) )
                 << QString::number( module_get_score( p_module ) );
 #ifndef DEBUG
@@ -218,7 +218,7 @@ bool PluginTreeItem::operator< ( const QTreeWidgetItem & other ) const
 }
 
 /* Extensions tab */
-ExtensionTab::ExtensionTab( intf_thread_t *p_intf_ )
+ExtensionTab::ExtensionTab( qt_intf_t *p_intf_ )
         : QVLCFrame( p_intf_ )
 {
     // Layout
@@ -297,7 +297,7 @@ void ExtensionTab::moreInformation()
     if( !index.isValid() )
         return;
 
-    ExtensionInfoDialog dlg( index, p_intf, this );
+    ExtensionInfoDialog dlg( index, p_intf, windowHandle() );
     dlg.exec();
 }
 
@@ -324,7 +324,7 @@ static QIcon iconFromCategory( int type )
 }
 
 /* Add-ons tab */
-AddonsTab::AddonsTab( intf_thread_t *p_intf_ ) : QVLCFrame( p_intf_ )
+AddonsTab::AddonsTab( qt_intf_t *p_intf_ ) : QVLCFrame( p_intf_ )
 {
     b_localdone = false;
     QSplitter *splitter = new QSplitter( this );
@@ -592,7 +592,7 @@ void AddonsTab::moreInformation()
 {
     QModelIndex index = addonsView->selectionModel()->selectedIndexes().first();
     if( !index.isValid() ) return;
-    AddonInfoDialog dlg( index, p_intf, this );
+    AddonInfoDialog dlg( index, p_intf, windowHandle() );
     dlg.exec();
 }
 
@@ -1354,8 +1354,8 @@ void AddonItemDelegate::editButtonClicked()
 /* "More information" dialog */
 
 ExtensionInfoDialog::ExtensionInfoDialog( const QModelIndex &index,
-                                          intf_thread_t *p_intf,
-                                          QWidget *parent )
+                                          qt_intf_t *p_intf,
+                                          QWindow *parent )
        : QVLCDialog( parent, p_intf )
 {
     // Let's be a modal dialog
@@ -1438,7 +1438,7 @@ ExtensionInfoDialog::ExtensionInfoDialog( const QModelIndex &index,
 
 
 AddonInfoDialog::AddonInfoDialog( const QModelIndex &index,
-                                  intf_thread_t *p_intf, QWidget *parent )
+                                  qt_intf_t *p_intf, QWindow *parent )
        : QVLCDialog( parent, p_intf )
 {
     // Let's be a modal dialog

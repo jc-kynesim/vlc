@@ -24,6 +24,64 @@
 
 #include "medialibrary.h"
 
+#include <vlc_image.h>
+#include <vlc_hash.h>
+#include <vlc_fs.h>
+
+EmbeddedThumbnail::EmbeddedThumbnail( input_attachment_t* a, vlc_fourcc_t fcc )
+    : m_attachment( vlc_input_attachment_Hold( a ) )
+    , m_fcc( fcc )
+{
+}
+
+EmbeddedThumbnail::~EmbeddedThumbnail()
+{
+    vlc_input_attachment_Release( m_attachment );
+}
+
+bool EmbeddedThumbnail::save( const std::string& path )
+{
+    std::unique_ptr<FILE, decltype(&fclose)> f{ vlc_fopen( path.c_str(), "wb" ),
+                                                &fclose };
+    if ( f == nullptr )
+        return false;
+    auto res = fwrite( m_attachment->p_data, m_attachment->i_data, 1, f.get() );
+    return res == 1;
+}
+
+size_t EmbeddedThumbnail::size() const
+{
+    return m_attachment->i_data;
+}
+
+std::string EmbeddedThumbnail::hash() const
+{
+    vlc_hash_md5_t md5;
+    vlc_hash_md5_Init( &md5 );
+    vlc_hash_md5_Update( &md5, m_attachment->p_data, m_attachment->i_data );
+    uint8_t bytes[VLC_HASH_MD5_DIGEST_SIZE];
+    vlc_hash_md5_Finish( &md5, bytes, sizeof(bytes) );
+    std::string res;
+    res.reserve( VLC_HASH_MD5_DIGEST_HEX_SIZE );
+    const char* hex = "0123456789ABCDEF";
+    for ( auto i = 0u; i < VLC_HASH_MD5_DIGEST_SIZE; ++i )
+        res.append( { hex[bytes[i] >> 4], hex[bytes[i] & 0xF] } );
+    return res;
+}
+
+std::string EmbeddedThumbnail::extension() const
+{
+    switch ( m_fcc )
+    {
+    case VLC_CODEC_JPEG:
+        return "jpg";
+    case VLC_CODEC_PNG:
+        return "png";
+    default:
+        vlc_assert_unreachable();
+    }
+}
+
 MetadataExtractor::MetadataExtractor( vlc_object_t* parent )
     : m_currentCtx( nullptr )
     , m_obj( parent )
@@ -126,6 +184,19 @@ void MetadataExtractor::onParserSubtreeAdded( input_item_t *,
     ctx->mde->addSubtree( *ctx, subtree );
 }
 
+void MetadataExtractor::onAttachmentFound( const vlc_event_t* p_event, void* data )
+{
+    auto ctx = static_cast<ParseContext*>( data );
+    for ( auto i = 0u; i < p_event->u.input_item_attachments_found.count; ++i )
+    {
+        auto a = p_event->u.input_item_attachments_found.attachments[i];
+        auto fcc = image_Mime2Fourcc( a->psz_mime );
+        if ( fcc != VLC_CODEC_PNG && fcc != VLC_CODEC_JPEG )
+            continue;
+        ctx->item.addEmbeddedThumbnail( std::make_shared<EmbeddedThumbnail>( a, fcc ) );
+    }
+}
+
 void MetadataExtractor::addSubtree( ParseContext& ctx, input_item_node_t *root )
 {
     for ( auto i = 0; i < root->i_children; ++i )
@@ -148,6 +219,10 @@ medialibrary::parser::Status MetadataExtractor::run( medialibrary::parser::IItem
     if ( ctx.inputItem == nullptr )
         return medialibrary::parser::Status::Fatal;
 
+    if ( vlc_event_attach( &ctx.inputItem->event_manager, vlc_InputItemAttachmentsFound,
+                      &MetadataExtractor::onAttachmentFound, &ctx ) != VLC_SUCCESS )
+        return medialibrary::parser::Status::Fatal;
+
     const input_item_parser_cbs_t cbs = {
         &MetadataExtractor::onParserEnded,
         &MetadataExtractor::onParserSubtreeAdded,
@@ -161,6 +236,8 @@ medialibrary::parser::Status MetadataExtractor::run( medialibrary::parser::IItem
     };
     if ( ctx.inputParser == nullptr )
     {
+        vlc_event_detach( &ctx.inputItem->event_manager, vlc_InputItemAttachmentsFound,
+                          &MetadataExtractor::onAttachmentFound, &ctx );
         m_currentCtx = nullptr;
         return medialibrary::parser::Status::Fatal;
     }
@@ -180,6 +257,8 @@ medialibrary::parser::Status MetadataExtractor::run( medialibrary::parser::IItem
         }
         m_currentCtx = nullptr;
     }
+    vlc_event_detach( &ctx.inputItem->event_manager, vlc_InputItemAttachmentsFound,
+                      &MetadataExtractor::onAttachmentFound, &ctx );
 
     if ( !ctx.success || ctx.inputParser == nullptr )
         return medialibrary::parser::Status::Fatal;

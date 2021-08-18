@@ -38,9 +38,9 @@
     "format instead of trying to improve performances by using the most " \
     "efficient one.")
 
-static int OpenDummy(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int OpenDummy(vout_display_t *vd,
                      video_format_t *fmtp, vlc_video_context *context);
-static int OpenStats(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int OpenStats(vout_display_t *vd,
                      video_format_t *fmtp, vlc_video_context *context);
 
 vlc_module_begin ()
@@ -51,7 +51,7 @@ vlc_module_begin ()
 
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VOUT )
-    add_string( "dummy-chroma", NULL, CHROMA_TEXT, CHROMA_LONGTEXT, true )
+    add_string( "dummy-chroma", NULL, CHROMA_TEXT, CHROMA_LONGTEXT )
 
     add_submodule ()
     set_description( N_("Statistics video output") )
@@ -85,26 +85,27 @@ static void Open(vout_display_t *vd, video_format_t *fmt)
 }
 
 static const struct vlc_display_operations ops_dummy = {
-    NULL, NULL, NULL, Control, NULL, NULL,
+    .control = Control,
 };
 
-static int OpenDummy(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int OpenDummy(vout_display_t *vd,
                      video_format_t *fmtp, vlc_video_context *context)
 {
-    (void) cfg; (void) context;
+    (void) context;
     Open(vd, fmtp);
     vd->ops = &ops_dummy;
     return VLC_SUCCESS;
 }
 
 static const struct vlc_display_operations ops_stats = {
-    NULL, NULL, DisplayStat, Control, NULL, NULL,
+    .display = DisplayStat,
+    .control = Control,
 };
 
-static int OpenStats(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int OpenStats(vout_display_t *vd,
                      video_format_t *fmtp, vlc_video_context *context)
 {
-    (void) cfg; (void) context;
+    (void) context;
     Open(vd, fmtp);
     vd->ops = &ops_stats;
     return VLC_SUCCESS;

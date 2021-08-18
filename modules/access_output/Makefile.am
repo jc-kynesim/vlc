@@ -41,9 +41,10 @@ access_out_LTLIBRARIES += $(LTLIBaccess_output_srt)
 EXTRA_LTLIBRARIES += libaccess_output_srt_plugin.la
 
 ### RIST ###
-libaccess_output_rist_plugin_la_SOURCES = access_output/rist.c access/rist.h
-libaccess_output_rist_plugin_la_CFLAGS = $(AM_CFLAGS) $(BITSTREAM_CFLAGS)
-libaccess_output_rist_plugin_la_LIBADD = $(SOCKET_LIBS)
-if HAVE_BITSTREAM
-access_out_LTLIBRARIES += libaccess_output_rist_plugin.la
-endif
+
+libaccess_output_rist_plugin_la_SOURCES = access_output/rist.c
+libaccess_output_rist_plugin_la_CFLAGS = $(AM_CFLAGS) $(RIST_CFLAGS)
+libaccess_output_rist_plugin_la_LIBADD = $(RIST_LIBS) $(SOCKET_LIBS) $(LIBPTHREAD)
+libaccess_output_rist_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(access_outdir)'
+access_out_LTLIBRARIES += $(LTLIBaccess_output_rist)
+EXTRA_LTLIBRARIES += libaccess_output_rist_plugin.la

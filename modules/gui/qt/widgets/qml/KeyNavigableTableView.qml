@@ -18,14 +18,15 @@
 import QtQuick 2.11
 import QtQuick.Controls 2.4
 import QtQml.Models 2.2
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtGraphicalEffects 1.0
+import org.videolan.vlc 0.1
 
 import "qrc:///util/" as Util
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-NavigableFocusScope {
+FocusScope {
     id: root
 
     //forwarded from subview
@@ -89,11 +90,47 @@ NavigableFocusScope {
     property Item dragItem
 
     property alias listScrollBar: view.listScrollBar
+    property alias listView: view.listView
+
+    property alias displayMarginEnd: view.displayMarginEnd
 
     Accessible.role: Accessible.Table
 
+    function _qtAvoidSectionUpdate() {
+        // Qt SEG. FAULT WORKAROUND
+
+        // There exists a Qt bug that tries to access null
+        // pointer while updating sections. Qt does not
+        // check if `QQmlEngine::contextForObject(sectionItem)->parentContext()`
+        // is null and when it's null which might be the case for
+        // views during destruction it causes segmentation fault.
+
+        // As a workaround, when section delegate is set to null
+        // during destruction, Qt does not proceed with updating
+        // the sections so null pointer access is avoided. Updating
+        // sections during destruction should not make sense anyway.
+
+        // Setting section delegate to null seems to has no
+        // negative impact and safely could be used as a fix.
+        // However, the problem lying beneath prevails and
+        // should be taken care of sooner than later.
+
+        // Affected Qt versions are 5.11.3, and 5.15.2 (not
+        // limited).
+
+        section.delegate = null
+    }
+
+    Component.onDestruction: {
+        _qtAvoidSectionUpdate()
+    }
+
     function positionViewAtIndex(index, mode) {
         view.positionViewAtIndex(index, mode)
+    }
+
+    function positionViewAtBeginning() {
+        view.listView.positionViewAtBeginning()
     }
 
     Timer {
@@ -155,6 +192,12 @@ NavigableFocusScope {
             color: headerColor
             visible: view.modelCount > 0
             z: 3
+
+            // with inline header positioning and for `root.header` which changes it's height after loading,
+            // in such cases after `root.header` completes, the ListView will try to maintain the relative contentY,
+            // and hide the completed `root.header`, try to show the `root.header` in such cases by manually
+            // positiing view at beginning
+            onHeightChanged: if (root.contentY < 0) root.positionViewAtBeginning()
 
             Widgets.ListLabel {
                 x: contentX - VLCStyle.table_section_width
@@ -247,7 +290,7 @@ NavigableFocusScope {
         onSelectionUpdated: selectionDelegateModel.updateSelection( keyModifiers, oldIndex, newIndex )
         onActionAtIndex: root.actionForSelection( selectionDelegateModel.selectedIndexes )
 
-        navigationParent: root
+        Navigation.parentItem: root
     }
 
     /*

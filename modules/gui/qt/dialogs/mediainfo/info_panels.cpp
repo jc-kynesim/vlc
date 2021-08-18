@@ -56,7 +56,7 @@
  * All the usual MetaData are displayed and can be changed.
  **/
 MetaPanel::MetaPanel( QWidget *parent,
-                      intf_thread_t *_p_intf )
+                      qt_intf_t *_p_intf )
                       : QWidget( parent ), p_intf( _p_intf )
 {
     QGridLayout *metaLayout = new QGridLayout( this );
@@ -150,7 +150,7 @@ MetaPanel::MetaPanel( QWidget *parent,
 
     ADD_META( VLC_META_ENCODED_BY, encodedby_text, 0, 7 ); line++;
 
-    label = new QLabel( qtr( N_("Comments") ) ); label->setFont( smallFont );
+    label = new QLabel( qtr( "Comments" ) ); label->setFont( smallFont );
     label->setContentsMargins( 3, 2, 0, 0 );
     metaLayout->addWidget( label, line++, 0, 1, 7 );
     description_text = new QTextEdit;
@@ -346,6 +346,7 @@ void MetaPanel::clear()
     encodedby_text->clear();
     art_cover->clear();
     fingerprintButton->setVisible( false );
+    lblURL->clear();
 
     setEditMode( false );
     emit uriSet( "" );

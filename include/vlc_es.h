@@ -41,7 +41,7 @@
 
 struct video_palette_t
 {
-    int i_entries;      /**< to keep the compatibility with libavcodec's palette */
+    int i_entries;                         /**< number of in-use palette entries */
     uint8_t palette[VIDEO_PALETTE_COLORS_MAX][4];  /**< 4-byte RGBA/YUVA palette */
 };
 
@@ -170,6 +170,7 @@ static const uint16_t vlc_chan_maps[] =
 /* Values available for i_chan_mode only */
 #define AOUT_CHANMODE_DUALMONO    0x1
 #define AOUT_CHANMODE_DOLBYSTEREO 0x2
+#define AOUT_CHANMODE_BINAURAL    0x4
 
 /**
  * Picture orientation.
@@ -288,7 +289,7 @@ typedef enum video_transfer_func_t
 {
     TRANSFER_FUNC_UNDEF,
     TRANSFER_FUNC_LINEAR,
-    TRANSFER_FUNC_SRGB /*< Gamma 2.2 */,
+    TRANSFER_FUNC_SRGB /**< Gamma 2.2 */,
     TRANSFER_FUNC_BT470_BG,
     TRANSFER_FUNC_BT470_M,
     TRANSFER_FUNC_BT709,
@@ -325,8 +326,8 @@ typedef enum video_color_space_t
 typedef enum video_chroma_location_t
 {
     CHROMA_LOCATION_UNDEF,
-    CHROMA_LOCATION_LEFT,   /*< Most common in MPEG-2 Video, H.264/265 */
-    CHROMA_LOCATION_CENTER, /*< Most common in MPEG-1 Video, JPEG */
+    CHROMA_LOCATION_LEFT,   /**< Most common in MPEG-2 Video, H.264/265 */
+    CHROMA_LOCATION_CENTER, /**< Most common in MPEG-1 Video, JPEG */
     CHROMA_LOCATION_TOP_LEFT,
     CHROMA_LOCATION_TOP_CENTER,
     CHROMA_LOCATION_BOTTOM_LEFT,
@@ -640,7 +641,7 @@ struct es_format_t
     union {
         struct {
             audio_format_t  audio;    /**< description of audio format */
-            audio_replay_gain_t audio_replay_gain; /*< audio replay gain information */
+            audio_replay_gain_t audio_replay_gain; /**< audio replay gain information */
         };
         video_format_t video;     /**< description of video format */
         subs_format_t  subs;      /**< description of subtitle format */
@@ -706,7 +707,7 @@ static inline void es_format_Change( es_format_t *fmt, int i_cat, vlc_fourcc_t i
  *
  * Any held ES tracks must be released with vlc_es_id_Release().
  *
- * @param id pointer to the ES id
+ * @param es pointer to the ES id
  * @return the same ES pointer, for convenience
  */
 VLC_API vlc_es_id_t *

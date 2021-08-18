@@ -408,15 +408,8 @@ Pause (audio_output_t *p_aout, bool pause, vlc_tick_t date)
 static int
 MuteSet(audio_output_t *p_aout, bool mute)
 {
-    aout_sys_t * p_sys = p_aout->sys;
-
-    p_sys->b_muted = mute;
-    if (p_sys->au_unit != NULL)
-    {
-        Pause(p_aout, mute, 0);
-        if (mute)
-            ca_Flush(p_aout);
-    }
+    ca_MuteSet(p_aout, mute);
+    aout_MuteReport(p_aout, mute);
 
     return VLC_SUCCESS;
 }
@@ -555,7 +548,6 @@ Start(audio_output_t *p_aout, audio_sample_format_t *restrict fmt)
 
     free(layout);
     fmt->channel_type = AUDIO_CHANNEL_TYPE_BITMAP;
-    p_aout->mute_set  = MuteSet;
     p_aout->pause = Pause;
 
     aout_SoftVolumeStart( p_aout );
@@ -644,6 +636,7 @@ Open(vlc_object_t *obj)
     sys->au_dev = var_InheritBool(aout, "spdif") ? AU_DEV_ENCODED : AU_DEV_PCM;
     aout->start = Start;
     aout->stop = Stop;
+    aout->mute_set  = MuteSet;
     aout->device_select = DeviceSelect;
 
     aout_SoftVolumeInit( aout );

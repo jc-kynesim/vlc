@@ -37,8 +37,7 @@
 #include "vlc_vdpau.h"
 #include "events.h"
 
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
-                video_format_t *fmtp, vlc_video_context *context);
+static int Open(vout_display_t *vd, video_format_t *fmtp, vlc_video_context *context);
 static void Close(vout_display_t *vd);
 
 vlc_module_begin()
@@ -51,7 +50,7 @@ vlc_module_begin()
     add_shortcut("vdpau")
 vlc_module_end()
 
-struct vout_display_sys_t
+typedef struct vout_display_sys_t
 {
     xcb_connection_t *conn; /**< XCB connection */
     vdp_t *vdp; /**< VDPAU back-end */
@@ -64,7 +63,7 @@ struct vout_display_sys_t
 
     unsigned width;
     unsigned height;
-};
+} vout_display_sys_t;
 
 static void RenderRegion(vout_display_t *vd, VdpOutputSurface target,
                          const subpicture_t *subpic,
@@ -286,10 +285,14 @@ static int Control(vout_display_t *vd, int query)
 }
 
 static const struct vlc_display_operations ops = {
-    Close, Queue, Wait, Control, ResetPictures, NULL,
+    .close = Close,
+    .prepare = Queue,
+    .display = Wait,
+    .control = Control,
+    .reset_pictures = ResetPictures,
 };
 
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
 {
     vout_display_sys_t *sys = malloc(sizeof (*sys));
@@ -297,7 +300,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
         return VLC_ENOMEM;
 
     const xcb_screen_t *screen;
-    if (vlc_xcb_parent_Create(vd, cfg->window, &sys->conn, &screen) != VLC_SUCCESS)
+    if (vlc_xcb_parent_Create(vd, vd->cfg->window, &sys->conn, &screen) != VLC_SUCCESS)
     {
         free(sys);
         return VLC_EGENERIC;
@@ -431,12 +434,12 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
         };
         vout_display_place_t place;
 
-        vout_display_PlacePicture(&place, vd->source, cfg);
+        vout_display_PlacePicture(&place, vd->source, vd->cfg);
         sys->window = xcb_generate_id(sys->conn);
 
         xcb_void_cookie_t c =
             xcb_create_window_checked(sys->conn, screen->root_depth,
-                sys->window, cfg->window->handle.xid, place.x, place.y,
+                sys->window, vd->cfg->window->handle.xid, place.x, place.y,
                 place.width, place.height, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT,
                 screen->root_visual, mask, values);
         if (vlc_xcb_error_Check(vd, sys->conn, "window creation failure", c))

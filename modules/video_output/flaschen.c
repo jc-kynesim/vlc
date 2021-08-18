@@ -49,12 +49,12 @@
     "Something like ft.noise or ftkleine.noise")
 
 #define T_WIDTH N_("Width")
-#define LT_WIDTH N_("Video width")
+#define LT_WIDTH NULL
 
 #define T_HEIGHT N_("Height")
-#define LT_HEIGHT N_("Video height")
+#define LT_HEIGHT NULL
 
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context);
 static void Close(vout_display_t *vd);
 
@@ -66,29 +66,31 @@ vlc_module_begin ()
 
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VOUT )
-    add_string( "flaschen-display", NULL, T_FLDISPLAY, LT_FLDISPLAY, true )
-    add_integer("flaschen-width", 25, T_WIDTH, LT_WIDTH, false)
-    add_integer("flaschen-height", 20, T_HEIGHT, LT_HEIGHT, false)
+    add_string( "flaschen-display", NULL, T_FLDISPLAY, LT_FLDISPLAY )
+    add_integer("flaschen-width", 25, T_WIDTH, LT_WIDTH)
+    add_integer("flaschen-height", 20, T_HEIGHT, LT_HEIGHT)
 vlc_module_end ()
 
 
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-struct vout_display_sys_t {
+typedef struct vout_display_sys_t {
     int             fd;
-};
+} vout_display_sys_t;
 static void            Display(vout_display_t *, picture_t *);
 static int             Control(vout_display_t *, int);
 
 static const struct vlc_display_operations ops = {
-    Close, NULL, Display, Control, NULL, NULL,
+    .close = Close,
+    .display = Display,
+    .control = Control,
 };
 
 /*****************************************************************************
  * Open: activates flaschen vout display method
  *****************************************************************************/
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
 {
     vout_display_sys_t *sys;
@@ -144,7 +146,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     vd->ops = &ops;
 
-    (void) cfg; (void) context;
+    (void) context;
     return VLC_SUCCESS;
 }
 

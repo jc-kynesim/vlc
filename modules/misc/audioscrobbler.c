@@ -134,10 +134,10 @@ vlc_module_begin ()
     set_shortname(N_("Audioscrobbler"))
     set_description(N_("Submission of played songs to last.fm"))
     add_string("lastfm-username", "",
-                USERNAME_TEXT, USERNAME_LONGTEXT, false)
+                USERNAME_TEXT, USERNAME_LONGTEXT)
     add_password("lastfm-password", "", PASSWORD_TEXT, PASSWORD_LONGTEXT)
     add_string("scrobbler-url", "post.audioscrobbler.com",
-                URL_TEXT, URL_LONGTEXT, false)
+                URL_TEXT, URL_LONGTEXT)
     set_capability("interface", 0)
     set_callbacks(Open, Close)
 vlc_module_end ()
@@ -493,7 +493,7 @@ static int Handshake(intf_thread_t *p_this)
     {
         free(psz_username);
         free(psz_password);
-        return VLC_EBADVAR;
+        return VLC_EINVAL;
     }
 
     time(&timestamp);
@@ -713,7 +713,7 @@ static void *Run(void *data)
                 case VLC_ENOMEM:
                     goto out;
 
-                case VLC_EBADVAR:
+                case VLC_EINVAL:
                     /* username not set */
                     vlc_dialog_display_error(p_intf,
                         _("Last.fm username not set"),

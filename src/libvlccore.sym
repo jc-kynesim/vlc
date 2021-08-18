@@ -127,9 +127,7 @@ filter_ConfigureBlend
 filter_DeleteBlend
 filter_NewBlend
 FromCharset
-GetLang_1
-GetLang_2B
-GetLang_2T
+vlc_find_iso639
 vlc_http_auth_Init
 vlc_http_auth_Deinit
 vlc_http_auth_ParseWwwAuthenticateHeader
@@ -254,7 +252,6 @@ vlc_uri_fixup
 vlc_tick_now
 module_config_free
 module_config_get
-module_exists
 module_find
 module_get_capability
 module_get_help
@@ -584,6 +581,7 @@ vlc_ml_media_release
 vlc_ml_album_release
 vlc_ml_group_release
 vlc_ml_playlist_release
+vlc_ml_folder_release
 vlc_ml_label_list_release
 vlc_ml_file_list_release
 vlc_ml_artist_list_release
@@ -593,7 +591,7 @@ vlc_ml_show_list_release
 vlc_ml_genre_list_release
 vlc_ml_group_list_release
 vlc_ml_playlist_list_release
-vlc_ml_entry_point_list_release
+vlc_ml_folder_list_release
 vlc_ml_bookmark_release
 vlc_ml_bookmark_list_release
 vlc_poll_i11e

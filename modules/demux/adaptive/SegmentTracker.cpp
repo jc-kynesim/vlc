@@ -73,11 +73,14 @@ FormatChangedEvent::FormatChangedEvent(const StreamFormat *f)
     this->format = f;
 }
 
-SegmentChangedEvent::SegmentChangedEvent(const ID &id, vlc_tick_t duration)
+SegmentChangedEvent::SegmentChangedEvent(const ID &id, vlc_tick_t starttime,
+                                         vlc_tick_t duration, vlc_tick_t displaytime)
     : TrackerEvent(Type::SegmentChange)
 {
     this->id = &id;
     this->duration = duration;
+    this->starttime = starttime;
+    this->displaytime = displaytime;
 }
 
 BufferingStateUpdatedEvent::BufferingStateUpdatedEvent(const ID &id, bool enabled)
@@ -116,7 +119,7 @@ SegmentTracker::SegmentTracker(SharedResources *res,
     bufferingLogic = bl;
     setAdaptationLogic(logic_);
     adaptationSet = adaptSet;
-    format = StreamFormat::UNKNOWN;
+    format = StreamFormat::Type::Unknown;
 }
 
 SegmentTracker::~SegmentTracker()
@@ -217,7 +220,7 @@ void SegmentTracker::reset()
     next = Position();
     resetChunksSequence();
     initializing = true;
-    format = StreamFormat::UNKNOWN;
+    format = StreamFormat::Type::Unknown;
 }
 
 SegmentTracker::ChunkEntry::ChunkEntry()
@@ -225,11 +228,13 @@ SegmentTracker::ChunkEntry::ChunkEntry()
     chunk = nullptr;
 }
 
-SegmentTracker::ChunkEntry::ChunkEntry(SegmentChunk *c, Position p, vlc_tick_t d)
+SegmentTracker::ChunkEntry::ChunkEntry(SegmentChunk *c, Position p, vlc_tick_t s, vlc_tick_t d, vlc_tick_t dt)
 {
     chunk = c;
     pos = p;
     duration = d;
+    starttime = s;
+    displaytime = dt;
 }
 
 bool SegmentTracker::ChunkEntry::isValid() const
@@ -311,7 +316,8 @@ SegmentTracker::prepareChunk(bool switch_allowed, Position pos,
         return ChunkEntry();
 
     const Timescale timescale = pos.rep->inheritTimescale();
-    return ChunkEntry(segmentChunk, pos, timescale.ToTime(segment->duration.Get()));
+    return ChunkEntry(segmentChunk, pos, VLC_TICK_0 + timescale.ToTime(segment->startTime.Get()),
+                      timescale.ToTime(segment->duration.Get()), segment->getDisplayTime());
 }
 
 void SegmentTracker::resetChunksSequence()
@@ -357,19 +363,22 @@ ChunkInterface * SegmentTracker::getNextChunk(bool switch_allowed,
     /* advance or don't trigger duplicate events */
     next = current = chunk.pos;
 
+    if(format == StreamFormat(StreamFormat::Type::Unsupported))
+        return nullptr; /* Can't return chunk because no demux will be created */
+
     /* From this point chunk must be returned */
     ChunkInterface *returnedChunk;
     StreamFormat chunkformat = chunk.chunk->getStreamFormat();
 
     /* Wrap and probe format */
-    if(chunkformat == StreamFormat(StreamFormat::UNKNOWN))
+    if(chunkformat == StreamFormat(StreamFormat::Type::Unknown))
     {
         ProbeableChunk *wrappedck = new ProbeableChunk(chunk.chunk);
         const uint8_t *p_peek;
         size_t i_peek = wrappedck->peek(&p_peek);
         chunkformat = StreamFormat(p_peek, i_peek);
         /* fallback on Mime type */
-        if(chunkformat == StreamFormat(StreamFormat::UNKNOWN))
+        if(chunkformat == StreamFormat(StreamFormat::Type::Unknown))
             format = StreamFormat(chunk.chunk->getContentType());
         chunk.chunk->setStreamFormat(chunkformat);
         returnedChunk = wrappedck;
@@ -377,7 +386,7 @@ ChunkInterface * SegmentTracker::getNextChunk(bool switch_allowed,
     else returnedChunk = chunk.chunk;
 
     if(chunkformat != format &&
-       chunkformat != StreamFormat(StreamFormat::UNKNOWN))
+       chunkformat != StreamFormat(StreamFormat::Type::Unknown))
     {
         format = chunkformat;
         notify(FormatChangedEvent(&format));
@@ -396,7 +405,7 @@ ChunkInterface * SegmentTracker::getNextChunk(bool switch_allowed,
 
     /* Notify new segment length for stats / logic */
     if(chunk.pos.init_sent && chunk.pos.index_sent)
-        notify(SegmentChangedEvent(adaptationSet->getID(), chunk.duration));
+        notify(SegmentChangedEvent(adaptationSet->getID(), chunk.starttime, chunk.duration, chunk.displaytime));
 
     /* Handle both implicit and explicit discontinuities */
     if(b_gap || b_discontinuity)

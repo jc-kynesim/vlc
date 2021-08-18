@@ -22,8 +22,8 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-#import "coreaudio_common.h"
-#import <CoreAudio/CoreAudioTypes.h>
+#include "coreaudio_common.h"
+#include <CoreAudio/CoreAudioTypes.h>
 
 static inline uint64_t
 BytesToFrames(struct aout_sys_common *p_sys, size_t i_bytes)
@@ -32,7 +32,7 @@ BytesToFrames(struct aout_sys_common *p_sys, size_t i_bytes)
 }
 
 static inline vlc_tick_t
-FramesToUs(struct aout_sys_common *p_sys, uint64_t i_nb_frames)
+FramesToTicks(struct aout_sys_common *p_sys, int64_t i_nb_frames)
 {
     return vlc_tick_from_samples(i_nb_frames, p_sys->i_rate);
 }
@@ -43,23 +43,37 @@ FramesToBytes(struct aout_sys_common *p_sys, uint64_t i_frames)
     return i_frames * p_sys->i_bytes_per_frame / p_sys->i_frame_length;
 }
 
-static inline uint64_t
-UsToFrames(struct aout_sys_common *p_sys, vlc_tick_t i_us)
+static inline int64_t
+TicksToFrames(struct aout_sys_common *p_sys, vlc_tick_t i_ticks)
 {
-    assert(i_us > 0);
-    return samples_from_vlc_tick(i_us, p_sys->i_rate);
+    assert(i_ticks != VLC_TICK_INVALID);
+    return samples_from_vlc_tick(i_ticks, p_sys->i_rate);
 }
 
+/**
+ * Convert a relative audio host time to vlc_ticks
+ *
+ * \warning  This function may only be used to convert relative
+ *           host times to ticks, as vlc_ticks do not have the
+ *           same clock origin as the audio host clock!
+ */
 static inline vlc_tick_t
 HostTimeToTick(struct aout_sys_common *p_sys, int64_t i_host_time)
 {
     return VLC_TICK_FROM_NS(i_host_time * p_sys->tinfo.numer / p_sys->tinfo.denom);
 }
 
+/**
+ * Convert relative vlc_ticks to an audio host time
+ *
+ * \warning  This function may only be used to convert relative
+ *           vlc_ticks, as vlc_ticks do not have the same origin
+ *           as the audio host clock!
+ */
 static inline int64_t
-TickToHostTime(struct aout_sys_common *p_sys, vlc_tick_t i_us)
+TickToHostTime(struct aout_sys_common *p_sys, vlc_tick_t i_ticks)
 {
-    return NS_FROM_VLC_TICK(i_us * p_sys->tinfo.denom / p_sys->tinfo.numer);
+    return NS_FROM_VLC_TICK(i_ticks * p_sys->tinfo.denom / p_sys->tinfo.numer);
 }
 
 static void
@@ -114,6 +128,7 @@ ca_Open(audio_output_t *p_aout)
     vlc_sem_init(&p_sys->flush_sem, 0);
     lock_init(p_sys);
     p_sys->p_out_chain = NULL;
+    p_sys->chans_to_reorder = 0;
 
     p_aout->play = ca_Play;
     p_aout->pause = ca_Pause;
@@ -126,7 +141,7 @@ ca_Open(audio_output_t *p_aout)
 /* Called from render callbacks. No lock, wait, and IO here */
 void
 ca_Render(audio_output_t *p_aout, uint32_t i_frames, uint64_t i_host_time,
-          uint8_t *p_output, size_t i_requested)
+          uint8_t *p_output, size_t i_requested, bool *is_silence)
 {
     struct aout_sys_common *p_sys = (struct aout_sys_common *) p_aout->sys;
 
@@ -156,10 +171,10 @@ ca_Render(audio_output_t *p_aout, uint32_t i_frames, uint64_t i_host_time,
         /* Convert the requested bytes into host time and check that it does
          * not overlap between the first_render host time and the current one.
          * */
-        const size_t i_requested_us =
-            FramesToUs(p_sys, BytesToFrames(p_sys, i_requested));
+        const vlc_tick_t i_requested_ticks =
+            FramesToTicks(p_sys, BytesToFrames(p_sys, i_requested));
         const int64_t i_requested_host_time =
-            TickToHostTime(p_sys, i_requested_us);
+            TickToHostTime(p_sys, i_requested_ticks);
         if (p_sys->i_first_render_host_time >= i_host_time + i_requested_host_time)
         {
             /* Fill the buffer with silence */
@@ -167,11 +182,11 @@ ca_Render(audio_output_t *p_aout, uint32_t i_frames, uint64_t i_host_time,
         }
 
         /* Write silence to reach the first_render host time */
-        const vlc_tick_t i_silence_us =
+        const vlc_tick_t i_silence_ticks =
             HostTimeToTick(p_sys, p_sys->i_first_render_host_time - i_host_time);
 
         const size_t i_silence_bytes =
-            FramesToBytes(p_sys, UsToFrames(p_sys, i_silence_us));
+            FramesToBytes(p_sys, TicksToFrames(p_sys, i_silence_ticks));
         assert(i_silence_bytes <= i_requested);
         memset(p_output, 0, i_silence_bytes);
 
@@ -189,7 +204,10 @@ ca_Render(audio_output_t *p_aout, uint32_t i_frames, uint64_t i_host_time,
     while (p_block != NULL && i_requested != 0)
     {
         size_t i_tocopy = __MIN(i_requested, p_block->i_buffer);
-        memcpy(p_output, p_block->p_buffer, i_tocopy);
+        if (unlikely(p_sys->b_muted))
+            memset(p_output, 0, i_tocopy);
+        else
+            memcpy(p_output, p_block->p_buffer, i_tocopy);
         i_requested -= i_tocopy;
         i_copied += i_tocopy;
         p_output += i_tocopy;
@@ -221,11 +239,15 @@ ca_Render(audio_output_t *p_aout, uint32_t i_frames, uint64_t i_host_time,
         memset(p_output, 0, i_requested);
     }
 
+    if (is_silence != NULL)
+        *is_silence = p_sys->b_muted;
     lock_unlock(p_sys);
     return;
 
 drop:
     memset(p_output, 0, i_requested);
+    if (is_silence != NULL)
+        *is_silence = true;
     lock_unlock(p_sys);
 }
 
@@ -235,8 +257,8 @@ ca_GetLatencyLocked(audio_output_t *p_aout)
     struct aout_sys_common *p_sys = (struct aout_sys_common *) p_aout->sys;
 
     const int64_t i_out_frames = BytesToFrames(p_sys, p_sys->i_out_size);
-    return FramesToUs(p_sys, i_out_frames + p_sys->i_render_frames)
-           + p_sys->i_dev_latency_us;
+    return FramesToTicks(p_sys, i_out_frames + p_sys->i_render_frames)
+           + p_sys->i_dev_latency_ticks;
 }
 
 int
@@ -296,6 +318,16 @@ ca_Pause(audio_output_t * p_aout, bool pause, vlc_tick_t date)
 
     lock_lock(p_sys);
     p_sys->b_paused = pause;
+    lock_unlock(p_sys);
+}
+
+void
+ca_MuteSet(audio_output_t * p_aout, bool muted)
+{
+    struct aout_sys_common *p_sys = (struct aout_sys_common *) p_aout->sys;
+
+    lock_lock(p_sys);
+    p_sys->b_muted = muted;
     lock_unlock(p_sys);
 }
 
@@ -363,12 +395,13 @@ ca_Play(audio_output_t * p_aout, block_t * p_block, vlc_tick_t date)
                 return;
             }
 
-            const vlc_tick_t i_frame_us =
-                FramesToUs(p_sys, BytesToFrames(p_sys, p_block->i_buffer));
+            /* The render buffer is full, Wait for the renderer to play half
+             * the data. */
+            const vlc_tick_t i_sleep_ticks =
+                FramesToTicks(p_sys, BytesToFrames(p_sys, p_sys->i_out_max_size)) / 2;
 
-            /* Wait for the render buffer to play the remaining data */
             lock_unlock(p_sys);
-            vlc_tick_sleep(i_frame_us);
+            vlc_tick_sleep(i_sleep_ticks);
             lock_lock(p_sys);
         }
         else
@@ -394,21 +427,21 @@ ca_Play(audio_output_t * p_aout, block_t * p_block, vlc_tick_t date)
 
 int
 ca_Initialize(audio_output_t *p_aout, const audio_sample_format_t *fmt,
-              vlc_tick_t i_dev_latency_us)
+              vlc_tick_t i_dev_latency_ticks)
 {
     struct aout_sys_common *p_sys = (struct aout_sys_common *) p_aout->sys;
 
     p_sys->i_underrun_size = 0;
     p_sys->b_paused = false;
+    p_sys->b_muted = false;
     p_sys->i_render_host_time = p_sys->i_first_render_host_time = 0;
     p_sys->i_render_frames = 0;
 
     p_sys->i_rate = fmt->i_rate;
     p_sys->i_bytes_per_frame = fmt->i_bytes_per_frame;
     p_sys->i_frame_length = fmt->i_frame_length;
-    p_sys->chans_to_reorder = 0;
 
-    p_sys->i_dev_latency_us = i_dev_latency_us;
+    p_sys->i_dev_latency_ticks = i_dev_latency_ticks;
 
     /* setup circular buffer */
     size_t i_audiobuffer_size = fmt->i_rate * fmt->i_bytes_per_frame
@@ -437,6 +470,7 @@ ca_Uninitialize(audio_output_t *p_aout)
     struct aout_sys_common *p_sys = (struct aout_sys_common *) p_aout->sys;
     ca_ClearOutBuffers(p_aout);
     p_sys->i_out_max_size = 0;
+    p_sys->chans_to_reorder = 0;
 }
 
 void
@@ -462,12 +496,12 @@ ca_SetAliveState(audio_output_t *p_aout, bool alive)
         vlc_sem_post(&p_sys->flush_sem);
 }
 
-void ca_SetDeviceLatency(audio_output_t *p_aout, vlc_tick_t i_dev_latency_us)
+void ca_SetDeviceLatency(audio_output_t *p_aout, vlc_tick_t i_dev_latency_ticks)
 {
     struct aout_sys_common *p_sys = (struct aout_sys_common *) p_aout->sys;
 
     lock_lock(p_sys);
-    p_sys->i_dev_latency_us = i_dev_latency_us;
+    p_sys->i_dev_latency_ticks = i_dev_latency_ticks;
     lock_unlock(p_sys);
 }
 
@@ -518,8 +552,11 @@ RenderCallback(void *p_data, AudioUnitRenderActionFlags *ioActionFlags,
     uint64_t i_host_time = (inTimeStamp->mFlags & kAudioTimeStampHostTimeValid)
                          ? inTimeStamp->mHostTime : 0;
 
+    bool is_silence;
     ca_Render(p_data, inNumberFrames, i_host_time, ioData->mBuffers[0].mData,
-              ioData->mBuffers[0].mDataByteSize);
+              ioData->mBuffers[0].mDataByteSize, &is_silence);
+    if (is_silence)
+        *ioActionFlags |= kAudioUnitRenderAction_OutputIsSilence;
 
     return noErr;
 }
@@ -843,7 +880,7 @@ SetupInputLayout(audio_output_t *p_aout, const audio_sample_format_t *fmt,
 
 int
 au_Initialize(audio_output_t *p_aout, AudioUnit au, audio_sample_format_t *fmt,
-              const AudioChannelLayout *outlayout, vlc_tick_t i_dev_latency_us,
+              const AudioChannelLayout *outlayout, vlc_tick_t i_dev_latency_ticks,
               bool *warn_configuration)
 {
     int ret;
@@ -951,7 +988,7 @@ au_Initialize(audio_output_t *p_aout, AudioUnit au, audio_sample_format_t *fmt,
         return VLC_EGENERIC;
     }
 
-    ret = ca_Initialize(p_aout, fmt, i_dev_latency_us);
+    ret = ca_Initialize(p_aout, fmt, i_dev_latency_ticks);
     if (ret != VLC_SUCCESS)
     {
         AudioUnitUninitialize(au);

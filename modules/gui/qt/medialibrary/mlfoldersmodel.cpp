@@ -29,7 +29,7 @@ MLFoldersBaseModel::MLFoldersBaseModel( QObject *parent )
     connect( this , &MLFoldersBaseModel::onMLEntryPointModified , this , &MLFoldersBaseModel::update );
 }
 
-MLFoldersBaseModel::EntryPoint::EntryPoint( const vlc_ml_entry_point_t& entryPoint)
+MLFoldersBaseModel::EntryPoint::EntryPoint( const vlc_ml_folder_t& entryPoint)
     : mrl(entryPoint.psz_mrl)
     , banned(entryPoint.b_banned)
 {
@@ -97,6 +97,15 @@ QHash<int, QByteArray> MLFoldersBaseModel::roleNames() const
     };
 }
 
+void MLFoldersBaseModel::removeAt(int index)
+{
+    assert(index < rowCount());
+    const QModelIndex idx = this->index( index, 0 );
+    if (idx.isValid())
+        remove( data( idx,  MRL ).toUrl() );
+
+}
+
 void MLFoldersBaseModel::update()
 {
     beginResetModel();
@@ -110,7 +119,8 @@ void MLFoldersBaseModel::onMlEvent( void* data , const vlc_ml_event_t* event )
     if ( event->i_type == VLC_ML_EVENT_ENTRY_POINT_ADDED || event->i_type == VLC_ML_EVENT_ENTRY_POINT_REMOVED ||
          event->i_type == VLC_ML_EVENT_ENTRY_POINT_UNBANNED || event->i_type == VLC_ML_EVENT_ENTRY_POINT_BANNED  )
     {
-        emit self->onMLEntryPointModified( QPrivateSignal() );
+        if (!self->failed( event ))
+            emit self->onMLEntryPointModified( QPrivateSignal() );
     }
 }
 
@@ -118,52 +128,80 @@ std::vector<MLFoldersBaseModel::EntryPoint> MLFoldersModel::entryPoints() const
 {
     std::vector<MLFoldersBaseModel::EntryPoint> r;
 
-    vlc_ml_entry_point_list_t * entrypoints = nullptr;
-    vlc_ml_list_folder( ml() , &entrypoints );
-    for ( unsigned int i=0 ; i<entrypoints->i_nb_items ; i++ )
-        r.emplace_back( entrypoints->p_items[i] );
-    vlc_ml_release(entrypoints);
+    vlc_ml_folder_list_t* entrypoints = vlc_ml_list_entry_points( ml(), nullptr );
+    if ( entrypoints != nullptr )
+    {
+        for ( unsigned int i = 0; entrypoints && i < entrypoints->i_nb_items; i++ )
+            r.emplace_back( entrypoints->p_items[i] );
+        vlc_ml_release( entrypoints );
+    }
 
     return r;
 }
 
-void MLFoldersModel::removeAt( int index )
+bool MLFoldersModel::failed(const vlc_ml_event_t *event) const
 {
-    assert(index < rowCount());
-    const QModelIndex idx = this->index( index, 0 );
-    if (idx.isValid())
-        vlc_ml_remove_folder( ml() , qtu( data( idx, MLFoldersBaseModel::MRL ).value<QString>() ) );
+    if ( event->i_type == VLC_ML_EVENT_ENTRY_POINT_ADDED && !event->entry_point_added.b_success )
+    {
+        emit operationFailed( Add, QUrl::fromEncoded( event->entry_point_added.psz_entry_point ) );
+        return true;
+    }
+    else if ( event->i_type == VLC_ML_EVENT_ENTRY_POINT_REMOVED && !event->entry_point_removed.b_success )
+    {
+        emit operationFailed( Remove, QUrl::fromEncoded( event->entry_point_removed.psz_entry_point ) );
+        return true;
+    }
+
+    return false;
+}
+
+void MLFoldersModel::remove( const QUrl &mrl )
+{
+    vlc_ml_remove_folder( ml() , qtu( mrl.toString( QUrl::FullyEncoded ) ) );
 }
 
 void MLFoldersModel::add(const QUrl &mrl )
 {
-    vlc_ml_add_folder( ml() , qtu( mrl.toString( QUrl::None ) ) );
+    vlc_ml_add_folder( ml() , qtu( mrl.toString( QUrl::FullyEncoded ) ) );
 }
 
-void MLBannedFoldersModel::removeAt(int index)
+void MLBannedFoldersModel::remove(const QUrl &mrl)
 {
-    assert(index < rowCount());
-    const QModelIndex idx = this->index( index, 0 );
-    if (idx.isValid())
-    {
-        vlc_ml_unban_folder( ml() , qtu( data( idx, MLFoldersBaseModel::MRL ).value<QString>() ) );
-    }
+    vlc_ml_unban_folder( ml() , qtu( mrl.toString( QUrl::FullyEncoded ) ) );
 }
 
 void MLBannedFoldersModel::add(const QUrl &mrl)
 {
-    vlc_ml_ban_folder( ml() , qtu( mrl.toString( QUrl::None ) ) );
+    vlc_ml_ban_folder( ml() , qtu( mrl.toString( QUrl::FullyEncoded ) ) );
 }
 
 std::vector<MLFoldersBaseModel::EntryPoint> MLBannedFoldersModel::entryPoints() const
 {
     std::vector<MLFoldersBaseModel::EntryPoint> r;
 
-    vlc_ml_entry_point_list_t * entrypoints = nullptr;
-    vlc_ml_list_banned_folder( ml() , &entrypoints );
-    for ( unsigned int i=0 ; i<entrypoints->i_nb_items ; i++ )
-        r.emplace_back( entrypoints->p_items[i] );
-    vlc_ml_release(entrypoints);
+    vlc_ml_folder_list_t* entrypoints = vlc_ml_list_banned_entry_points( ml(), nullptr );
+    if ( entrypoints != nullptr )
+    {
+        for ( unsigned int i = 0; entrypoints && i < entrypoints->i_nb_items; i++ )
+            r.emplace_back( entrypoints->p_items[i] );
+        vlc_ml_release( entrypoints );
+    }
 
     return r;
+}
+
+bool MLBannedFoldersModel::failed(const vlc_ml_event_t *event) const
+{
+    if ( event->i_type == VLC_ML_EVENT_ENTRY_POINT_BANNED && !event->entry_point_banned.b_success )
+    {
+        emit operationFailed( Ban, QUrl::fromEncoded( event->entry_point_banned.psz_entry_point ) );
+        return true;
+    }
+    else if ( event->i_type == VLC_ML_EVENT_ENTRY_POINT_UNBANNED && !event->entry_point_unbanned.b_success )
+    {
+        emit operationFailed( Unban, QUrl::fromEncoded( event->entry_point_unbanned.psz_entry_point ) );
+        return true;
+    }
+
+    return false;
 }

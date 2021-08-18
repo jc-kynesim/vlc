@@ -220,7 +220,7 @@ void M3U8Parser::parseSegments(vlc_object_t *, HLSRepresentation *rep, const std
 {
     SegmentList *segmentList = new (std::nothrow) SegmentList(rep);
 
-    Timescale timescale(100);
+    Timescale timescale(1000000);
     rep->addAttribute(new TimescaleAttr(timescale));
     rep->b_loaded = true;
 
@@ -286,7 +286,7 @@ void M3U8Parser::parseSegments(vlc_object_t *, HLSRepresentation *rep, const std
                 totalduration += nzDuration;
                 if(absReferenceTime != VLC_TICK_INVALID)
                 {
-                    segment->utcTime = absReferenceTime;
+                    segment->setDisplayTime(absReferenceTime);
                     absReferenceTime += nzDuration;
                 }
 
@@ -330,7 +330,7 @@ void M3U8Parser::parseSegments(vlc_object_t *, HLSRepresentation *rep, const std
                 absReferenceTime = VLC_TICK_0 +
                         UTCTime(static_cast<const SingleValueTag *>(tag)->getValue().value).mtime();
                 /* Reverse apply UTC timespec from first discont */
-                if(segmentstoappend.size() && segmentstoappend.back()->utcTime == VLC_TICK_INVALID)
+                if(segmentstoappend.size() && segmentstoappend.back()->getDisplayTime() == VLC_TICK_INVALID)
                 {
                     vlc_tick_t tempTime = absReferenceTime;
                     for(auto it = segmentstoappend.crbegin(); it != segmentstoappend.crend(); ++it)
@@ -340,7 +340,7 @@ void M3U8Parser::parseSegments(vlc_object_t *, HLSRepresentation *rep, const std
                             tempTime -= duration;
                         else
                             tempTime = VLC_TICK_0;
-                        (*it)->utcTime = tempTime;
+                        (*it)->setDisplayTime(tempTime);
                     }
                 }
                 break;
@@ -556,11 +556,11 @@ M3U8 * M3U8Parser::parse(vlc_object_t *p_object, stream_t *p_stream, const std::
                 if(typeattr->value == "SUBTITLES")
                 {
                     altAdaptSet->setRole(Role(Role::ROLE_SUBTITLE));
-                    rep->streamFormat = StreamFormat(StreamFormat::UNSUPPORTED);
+                    rep->streamFormat = StreamFormat(StreamFormat::Type::Unsupported);
                 }
                 else if(typeattr->value != "AUDIO" && typeattr->value != "VIDEO")
                 {
-                    rep->streamFormat = StreamFormat(StreamFormat::UNSUPPORTED);
+                    rep->streamFormat = StreamFormat(StreamFormat::Type::Unsupported);
                 }
 
                 if(pair.second->getAttributeByName("LANGUAGE"))

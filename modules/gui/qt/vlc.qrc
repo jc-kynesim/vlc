@@ -25,7 +25,6 @@
         <file alias="wait3.svg">pixmaps/util/wait3.svg</file>
         <file alias="wait4.svg">pixmaps/util/wait4.svg</file>
         <file alias="SelectableDelegateModel.qml">util/qml/SelectableDelegateModel.qml</file>
-        <file alias="KeyHelper.js">util/qml/KeyHelper.js</file>
         <file alias="Helpers.js">util/qml/Helpers.js</file>
     </qresource>
     <qresource prefix="/toolbar">
@@ -190,11 +189,15 @@
         <file alias="MiniPlayerBottomMargin.qml">maininterface/qml/MiniPlayerBottomMargin.qml</file>
     </qresource>
     <qresource prefix="/widgets">
+        <file alias="ActionButtonOverlay.qml">widgets/qml/ActionButtonOverlay.qml</file>
+        <file alias="ActionButtonPrimary.qml">widgets/qml/ActionButtonPrimary.qml</file>
         <file alias="BannerTabButton.qml">widgets/qml/BannerTabButton.qml</file>
         <file alias="BusyIndicatorExt.qml">widgets/qml/BusyIndicatorExt.qml</file>
+        <file alias="AnimatedBackground.qml">widgets/qml/AnimatedBackground.qml</file>
         <file alias="CSDWindowButton.qml">widgets/qml/CSDWindowButton.qml</file>
         <file alias="CSDWindowButtonSet.qml">widgets/qml/CSDWindowButtonSet.qml</file>
         <file alias="CSDTitlebarTapNDrapHandler.qml">widgets/qml/CSDTitlebarTapNDrapHandler.qml</file>
+        <file alias="CSDMouseStealer.qml">widgets/qml/CSDMouseStealer.qml</file>
         <file alias="CurrentIndicator.qml">widgets/qml/CurrentIndicator.qml</file>
         <file alias="GridItem.qml">widgets/qml/GridItem.qml</file>
         <file alias="ListItem.qml">widgets/qml/ListItem.qml</file>
@@ -206,11 +209,10 @@
         <file alias="TableViewDelegate.qml">widgets/qml/TableViewDelegate.qml</file>
         <file alias="TableColumns.qml">widgets/qml/TableColumns.qml</file>
         <file alias="TransparentSpinBox.qml">widgets/qml/TransparentSpinBox.qml</file>
-        <file alias="NavigableFocusScope.qml">widgets/qml/NavigableFocusScope.qml</file>
-        <file alias="FocusBackground.qml">widgets/qml/FocusBackground.qml</file>
         <file alias="ImageToolButton.qml">widgets/qml/ImageToolButton.qml</file>
         <file alias="TextToolButton.qml">widgets/qml/TextToolButton.qml</file>
         <file alias="IconToolButton.qml">widgets/qml/IconToolButton.qml</file>
+        <file alias="IconTrackButton.qml">widgets/qml/IconTrackButton.qml</file>
         <file alias="StackViewExt.qml">widgets/qml/StackViewExt.qml</file>
         <file alias="ComboBoxExt.qml">widgets/qml/ComboBoxExt.qml</file>
         <file alias="SpinBoxExt.qml">widgets/qml/SpinBoxExt.qml</file>
@@ -223,8 +225,7 @@
         <file alias="RoundButton.qml">widgets/qml/RoundButton.qml</file>
         <file alias="LabelSeparator.qml">widgets/qml/LabelSeparator.qml</file>
         <file alias="ContextButton.qml">widgets/qml/ContextButton.qml</file>
-        <file alias="RoundImage.qml">widgets/qml/RoundImage.qml</file>
-        <file alias="VideoQualityLabel.qml">widgets/qml/VideoQualityLabel.qml</file>
+        <file alias="VideoQualityLabels.qml">widgets/qml/VideoQualityLabels.qml</file>
         <file alias="VideoProgressBar.qml">widgets/qml/VideoProgressBar.qml</file>
         <file alias="NavigableCol.qml">widgets/qml/NavigableCol.qml</file>
         <file alias="NavigableRow.qml">widgets/qml/NavigableRow.qml</file>
@@ -289,6 +290,7 @@
         <file alias="MusicAlbumsGridExpandDelegate.qml">medialibrary/qml/MusicAlbumsGridExpandDelegate.qml</file>
         <file alias="MusicArtist.qml">medialibrary/qml/MusicArtist.qml</file>
         <file alias="MusicArtistsAlbums.qml">medialibrary/qml/MusicArtistsAlbums.qml</file>
+        <file alias="MusicAllArtists.qml">medialibrary/qml/MusicAllArtists.qml</file>
         <file alias="MusicArtistsDisplay.qml">medialibrary/qml/MusicArtistsDisplay.qml</file>
         <file alias="MusicGenresDisplay.qml">medialibrary/qml/MusicGenresDisplay.qml</file>
         <file alias="MusicPlaylistsDisplay.qml">medialibrary/qml/MusicPlaylistsDisplay.qml</file>

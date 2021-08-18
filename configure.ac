@@ -696,7 +696,7 @@ dnl Check for system libs needed
 need_libc=false
 
 dnl Check for usual libc functions
-AC_CHECK_FUNCS([accept4 dup3 fcntl flock fstatat fstatvfs fork getmntent_r getenv getpwuid_r isatty memalign mkostemp mmap open_memstream newlocale pipe2 pread posix_fadvise posix_madvise setlocale stricmp strnicmp strptime uselocale wordexp])
+AC_CHECK_FUNCS([accept4 dup3 fcntl flock fstatat fstatvfs fork getmntent_r getenv getpwuid_r isatty memalign mkostemp mmap open_memstream newlocale pipe2 posix_fadvise setlocale stricmp uselocale wordexp])
 AC_REPLACE_FUNCS([aligned_alloc atof atoll dirfd fdopendir flockfile fsync getdelim getpid lfind lldiv memrchr nrand48 poll posix_memalign recvmsg rewind sendmsg setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy tfind timegm timespec_get strverscmp pathconf])
 AC_REPLACE_FUNCS([gettimeofday])
 AC_CHECK_FUNC(fdatasync,,
@@ -1183,14 +1183,6 @@ AS_VAR_IF(with_sanitizer, no, [], [
        AX_APPEND_COMPILE_FLAGS([-fsanitize-address-use-after-scope -fno-omit-frame-pointer -fsanitize=pointer-compare -fsanitize=pointer-subtract])
        AX_APPEND_COMPILE_FLAGS([-fsanitize-address-use-after-scope -fno-omit-frame-pointer -fsanitize=pointer-compare -fsanitize=pointer-subtract], [CXXFLAGS])
     ])
-    AS_IF([test -z "${with_sanitizer##*memory*}" ], [
-        AX_APPEND_COMPILE_FLAGS([-fPIE -pie])
-        AX_APPEND_COMPILE_FLAGS([-fPIE -pie], [CXXFLAGS])
-    ])
-    AS_IF([test -z "${with_sanitizer##*thread*}" ], [
-        AX_APPEND_COMPILE_FLAGS([-fPIE -pie])
-        AX_APPEND_COMPILE_FLAGS([-fPIE -pie], [CXXFLAGS])
-    ])
 ])
 
 dnl
@@ -1362,91 +1354,7 @@ dnl
 dnl  Accelerated modules
 dnl
 
-dnl  Check for fully working MMX intrinsics
-dnl  We need support for -mmmx, we need <mmintrin.h>, and we also need a
-dnl  working compiler (http://gcc.gnu.org/bugzilla/show_bug.cgi?id=23963)
-AC_ARG_ENABLE([mmx],
-  AS_HELP_STRING([--disable-mmx],
-    [disable MMX optimizations (default auto)]),,[
-  case "${host_cpu}" in
-    i?86|x86_64)
-      enable_mmx="yes"
-      ;;
-    *)
-      enable_mmx="no"
-      ;;
-  esac
-])
-have_mmx="no"
-have_mmxext="no"
-AS_IF([test "${enable_mmx}" != "no"], [
-  ARCH="${ARCH} mmx"
-  VLC_SAVE_FLAGS
-  CFLAGS="${CFLAGS} -mmmx"
-  AC_CACHE_CHECK([if $CC groks MMX intrinsics], [ac_cv_c_mmx_intrinsics], [
-    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
-[#include <mmintrin.h>
-#include <stdint.h>
-uint64_t frobzor;]], [
-[__m64 a, b, c;
-a = b = c = (__m64)frobzor;
-a = _mm_slli_pi16(a, 3);
-a = _mm_adds_pi16(a, b);
-c = _mm_srli_pi16(c, 8);
-c = _mm_slli_pi16(c, 3);
-b = _mm_adds_pi16(b, c);
-a = _mm_unpacklo_pi8(a, b);
-frobzor = (uint64_t)a;]])], [
-      ac_cv_c_mmx_intrinsics=yes
-    ], [
-      ac_cv_c_mmx_intrinsics=no
-    ])
-  ])
-  VLC_RESTORE_FLAGS
-  AS_IF([test "${ac_cv_c_mmx_intrinsics}" != "no"], [
-    AC_DEFINE(HAVE_MMX_INTRINSICS, 1, [Define to 1 if MMX intrinsics are available.])
-  ])
-
-  VLC_SAVE_FLAGS
-  CFLAGS="${CFLAGS} -mmmx"
-  AC_CACHE_CHECK([if $CC groks MMX inline assembly], [ac_cv_mmx_inline], [
-    AC_COMPILE_IFELSE([AC_LANG_PROGRAM(,[[
-void *p;
-asm volatile("packuswb %%mm1,%%mm2"::"r"(p):"mm1", "mm2");
-]])
-    ], [
-      ac_cv_mmx_inline=yes
-    ], [
-      ac_cv_mmx_inline=no
-    ])
-  ])
-  AS_IF([test "${ac_cv_mmx_inline}" != "no"], [
-    AC_DEFINE(CAN_COMPILE_MMX, 1, [Define to 1 inline MMX assembly is available.])
-    have_mmx="yes"
-  ])
-
-  AC_CACHE_CHECK([if $CC groks MMX EXT inline assembly],
-                 [ac_cv_mmxext_inline], [
-    AC_COMPILE_IFELSE([AC_LANG_PROGRAM(,[[
-void *p;
-asm volatile("maskmovq %%mm1,%%mm2"::"r"(p):"mm1", "mm2");
-]])
-    ], [
-      ac_cv_mmxext_inline=yes
-    ], [
-      ac_cv_mmxext_inline=no
-    ])
-  ])
-  VLC_RESTORE_FLAGS
-  AS_IF([test "${ac_cv_mmxext_inline}" != "no"], [
-    AC_DEFINE(CAN_COMPILE_MMXEXT, 1, [Define to 1 if MMX EXT inline assembly is available.])
-    have_mmxext="yes"
-  ])
-])
-AM_CONDITIONAL([HAVE_MMX], [test "${have_mmx}" = "yes"])
-AM_CONDITIONAL([HAVE_MMXEXT], [test "${have_mmxext}" = "yes"])
-
-dnl  Check for fully workin SSE2 intrinsics
+dnl  Check for fully working SSE2 intrinsics
 dnl  We need support for -msse[2], we need <emmintrin.h>, and we also need a
 dnl  working compiler (http://gcc.gnu.org/bugzilla/show_bug.cgi?id=23963)
 AC_ARG_ENABLE([sse],
@@ -1609,7 +1517,7 @@ asm volatile("insertq %%xmm1,%%xmm0"::"r"(p):"xmm0", "xmm1");
 ])
 AM_CONDITIONAL([HAVE_SSE2], [test "$have_sse2" = "yes"])
 
-dnl  Check for fully workin AVX2 intrinsics
+dnl  Check for fully working AVX2 intrinsics
 dnl  We need support for -mavx[2], we need <immintrin.h>, and we also need a
 dnl  working compiler (http://gcc.gnu.org/bugzilla/show_bug.cgi?id=23963)
 AC_ARG_ENABLE([avx],
@@ -1659,7 +1567,7 @@ frobzor = (uint64_t)_mm256_extract_epi64(a, 0);]])], [
   AC_CACHE_CHECK([if $CC groks AVX inline assembly], [ac_cv_avx_inline], [
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM(,[[
 void *p;
-asm volatile("xorps256 %%ymm1,%%ymm2"::"r"(p):"ymm1", "ymm2");
+asm volatile("vxorps %%ymm1,%%ymm2,%%ymm3"::"r"(p):"ymm1", "ymm2", "ymm3");
 ]])
     ], [
       ac_cv_avx_inline=yes
@@ -1675,7 +1583,7 @@ asm volatile("xorps256 %%ymm1,%%ymm2"::"r"(p):"ymm1", "ymm2");
   AC_CACHE_CHECK([if $CC groks AVX2 inline assembly], [ac_cv_avx2_inline], [
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM(,[[
 void *p;
-asm volatile("punpckhqdq256 %%ymm1,%%ymm2"::"r"(p):"ymm1", "ymm2");
+asm volatile("vpunpckhqdq %%ymm1,%%ymm2,%%ymm3"::"r"(p):"ymm1", "ymm2", "ymm3");
 ]])
     ], [
       ac_cv_avx2_inline=yes
@@ -1690,28 +1598,6 @@ asm volatile("punpckhqdq256 %%ymm1,%%ymm2"::"r"(p):"ymm1", "ymm2");
   ])
 ])
 AM_CONDITIONAL([HAVE_AVX2], [test "$have_avx2" = "yes"])
-
-VLC_SAVE_FLAGS
-CFLAGS="${CFLAGS} -mmmx"
-have_3dnow="no"
-AC_CACHE_CHECK([if $CC groks 3D Now! inline assembly], [ac_cv_3dnow_inline], [
-  AC_COMPILE_IFELSE([AC_LANG_PROGRAM(,[[
-void *p;
-asm volatile("pfadd %%mm1,%%mm2"::"r"(p):"mm1", "mm2");
-]])
-  ], [
-    ac_cv_3dnow_inline=yes
-  ], [
-    ac_cv_3dnow_inline=no
-  ])
-])
-VLC_RESTORE_FLAGS
-AS_IF([test "${ac_cv_3dnow_inline}" != "no"], [
-  AC_DEFINE([CAN_COMPILE_3DNOW], 1,
-            [Define to 1 if 3D Now! inline assembly is available.])
-  have_3dnow="yes"
-])
-AM_CONDITIONAL([HAVE_3DNOW], [test "$have_3dnow" = "yes"])
 
 
 AC_ARG_ENABLE([neon],
@@ -2606,12 +2492,6 @@ AS_IF([test "${enable_avcodec}" != "no"], [
     *) AC_MSG_ERROR([Missing libav or FFmpeg. Pass --disable-avcodec to ignore this error.])
   esac
   PKG_CHECK_MODULES(AVCODEC,[libavcodec >= ${av_codec_ver} libavutil >= 55.9.0], [
-    VLC_SAVE_FLAGS
-    CPPFLAGS="${CPPFLAGS} ${AVCODEC_CFLAGS}"
-    CFLAGS="${CFLAGS} ${AVCODEC_CFLAGS}"
-    AC_CHECK_HEADERS([libavcodec/avcodec.h])
-    AC_CHECK_HEADERS([libavutil/avutil.h])
-    VLC_RESTORE_FLAGS
     have_avcodec="yes"
   ],[
     AC_MSG_ERROR([${AVCODEC_PKG_ERRORS}. Pass --disable-avcodec to ignore this error.])
@@ -2805,8 +2685,6 @@ AS_IF([test "${enable_avformat}" != "no"], [
       CPPFLAGS="${CPPFLAGS} ${AVFORMAT_CFLAGS}"
       CFLAGS="${CFLAGS} ${AVFORMAT_CFLAGS}"
       AC_CHECK_HEADERS([libavformat/avformat.h libavformat/avio.h])
-      AC_CHECK_HEADERS([libavcodec/avcodec.h])
-      AC_CHECK_HEADERS([libavutil/avutil.h])
       AS_IF([test "$enable_merge_ffmpeg" = "no"], [
         have_avformat="no"
       ])
@@ -3288,10 +3166,13 @@ AC_ARG_ENABLE([libplacebo],
       [disable libplacebo support (default auto)]))
 
 AS_IF([test "$enable_libplacebo" != "no"], [
-  PKG_CHECK_MODULES([LIBPLACEBO], [libplacebo >= 0.5], [
+  PKG_CHECK_MODULES([LIBPLACEBO], [libplacebo >= 1.7], [
     AC_DEFINE([HAVE_LIBPLACEBO], [1], [Define to 1 if libplacebo is enabled.])
-    PKG_CHECK_MODULES([LIBPLACEBO], [libplacebo >= 1.7],
-      [have_libplacebo_vk="yes"], [have_libplacebo_vk="no"])
+    AC_CHECK_HEADER([libplacebo/vulkan.h], [VLC_ADD_PLUGIN([placebo_vk])])
+    AC_CHECK_HEADER([libplacebo/opengl.h], [
+        VLC_ADD_PLUGIN([placebo_gl])
+        VLC_ADD_PLUGIN([placebo_gles2])
+    ])
   ], [
     AS_IF([test -n "${enable_libplacebo}"], [
       AC_MSG_ERROR([${LIBPLACEBO_PKG_ERRORS}.])
@@ -3357,18 +3238,11 @@ AC_ARG_ENABLE(vulkan,
       [disable Vulkan support (default auto)])])
 
 AS_IF([test "$enable_vulkan" != "no"], [
-  AS_IF([test "$have_libplacebo_vk" = "yes"], [
-    PKG_CHECK_MODULES([VULKAN], [vulkan >= 1.0.26], [
-      AC_DEFINE([HAVE_VULKAN], [1], [Define to 1 if vulkan is enabled.])
-    ], [
-      AS_IF([test -n "${enable_vulkan}"], [
-        AC_MSG_ERROR([${VULKAN_PKG_ERRORS}.])
-      ])
-      enable_vulkan="no"
-    ])
+  PKG_CHECK_MODULES([VULKAN], [vulkan >= 1.0.26], [
+    AC_DEFINE([HAVE_VULKAN], [1], [Define to 1 if vulkan is enabled.])
   ], [
     AS_IF([test -n "${enable_vulkan}"], [
-      AC_MSG_ERROR([Vulkan support requires libplacebo 1.7 as well. Do not use --disable-libplacebo.])
+      AC_MSG_ERROR([${VULKAN_PKG_ERRORS}.])
     ])
     enable_vulkan="no"
   ])
@@ -4297,6 +4171,11 @@ dnl  SRT plugin
 dnl
 PKG_ENABLE_MODULES_VLC([SRT], [access_srt access_output_srt], [srt >= 1.3.0], [SRT input/output plugin], [auto], [], [], [-DENABLE_SRT])
 
+dnl
+dnl  RIST plugin
+dnl
+PKG_ENABLE_MODULES_VLC([RIST], [rist access_output_rist], [librist], [RIST input/output plugin (default auto)])
+
 EXTEND_HELP_STRING([Visualisations and Video filter plugins:])
 dnl
 dnl  goom visualization plugin
@@ -4488,7 +4367,7 @@ dnl Libnotify notification plugin
 dnl
 PKG_ENABLE_MODULES_VLC([NOTIFY], [], [libnotify], [libnotify notification], [auto])
 
-PKG_ENABLE_MODULES_VLC([MEDIALIBRARY], [medialibrary], [medialibrary >= 0.9.1], (medialibrary support), [auto])
+PKG_ENABLE_MODULES_VLC([MEDIALIBRARY], [medialibrary], [medialibrary >= 0.9.2], (medialibrary support), [auto])
 
 dnl
 dnl  Endianness check

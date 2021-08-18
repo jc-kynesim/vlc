@@ -304,7 +304,6 @@ static input_thread_t *Create( vlc_object_t *p_parent,
     priv->events_data = events_data;
     priv->b_preparsing = option == INPUT_CREATE_OPTION_PREPARSING;
     priv->b_thumbnailing = option == INPUT_CREATE_OPTION_THUMBNAILING;
-    priv->b_can_pace_control = true;
     priv->i_start = 0;
     priv->i_stop  = 0;
     priv->i_title_offset = input_priv(p_input)->i_seekpoint_offset = 0;
@@ -466,7 +465,7 @@ static void *Run( void *data )
 
     if( !Init( p_input ) )
     {
-        if( priv->b_can_pace_control && priv->b_out_pace_control )
+        if( priv->master->b_can_pace_control && priv->b_out_pace_control )
         {
             /* We don't want a high input priority here or we'll
              * end-up sucking up all the CPU time */
@@ -704,7 +703,7 @@ static void MainLoop( input_thread_t *p_input, bool b_interactive )
             }
             /* Pause after eof only if the input is pausable.
              * This way we won't trigger timeshifting for nothing */
-            else if( b_pause_after_eof && input_priv(p_input)->b_can_pause )
+            else if( b_pause_after_eof && input_priv(p_input)->master->b_can_pause )
             {
                 if( b_paused_at_eof )
                     break;
@@ -826,6 +825,55 @@ static int InitSout( input_thread_t * p_input )
 }
 #endif
 
+static void InitProperties( input_thread_t *input )
+{
+    input_thread_private_t *priv = input_priv(input);
+    input_source_t *master = priv->master;
+    assert(master);
+
+    int capabilites = 0;
+    bool b_can_seek;
+
+    if( demux_Control( master->p_demux, DEMUX_CAN_SEEK, &b_can_seek ) )
+        b_can_seek = false;
+    if( b_can_seek )
+        capabilites |= VLC_INPUT_CAPABILITIES_SEEKABLE;
+
+    if( master->b_can_pause || !master->b_can_pace_control )
+        capabilites |= VLC_INPUT_CAPABILITIES_PAUSEABLE;
+    if( !master->b_can_pace_control || master->b_can_rate_control )
+        capabilites |= VLC_INPUT_CAPABILITIES_CHANGE_RATE;
+    if( !master->b_rescale_ts && !master->b_can_pace_control && master->b_can_rate_control )
+        capabilites |= VLC_INPUT_CAPABILITIES_REWINDABLE;
+
+#ifdef ENABLE_SOUT
+    capabilites |= VLC_INPUT_CAPABILITIES_RECORDABLE;
+#else
+    if( master->b_can_stream_record )
+        capabilites |= VLC_INPUT_CAPABILITIES_RECORDABLE;
+#endif
+
+    input_SendEventCapabilities( input, capabilites );
+
+    int i_attachment;
+    input_attachment_t **attachment;
+    if( !demux_Control( master->p_demux, DEMUX_GET_ATTACHMENTS,
+                        &attachment, &i_attachment ) )
+    {
+        vlc_mutex_lock( &priv->p_item->lock );
+        AppendAttachment( input, i_attachment, attachment );
+        vlc_mutex_unlock( &priv->p_item->lock );
+    }
+
+    int input_type;
+    if( !demux_Control( master->p_demux, DEMUX_GET_TYPE, &input_type ) )
+    {
+        vlc_mutex_lock( &priv->p_item->lock );
+        priv->p_item->i_type = input_type;
+        vlc_mutex_unlock( &priv->p_item->lock );
+    }
+}
+
 static void InitTitle( input_thread_t * p_input, bool had_titles )
 {
     input_thread_private_t *priv = input_priv(p_input);
@@ -837,11 +885,6 @@ static void InitTitle( input_thread_t * p_input, bool had_titles )
     vlc_mutex_lock( &priv->p_item->lock );
     priv->i_title_offset = p_master->i_title_offset;
     priv->i_seekpoint_offset = p_master->i_seekpoint_offset;
-
-    /* Global flag */
-    priv->b_can_pace_control = p_master->b_can_pace_control;
-    priv->b_can_pause        = p_master->b_can_pause;
-    priv->b_can_rate_control = p_master->b_can_rate_control;
     vlc_mutex_unlock( &priv->p_item->lock );
 
     /* Send event only if the count is valid or if titles are gone */
@@ -1000,7 +1043,7 @@ static void GetVarSlaves( input_thread_t *p_input,
             msg_Warn( p_input,
                      "Can't deduce slave type of `%s\" with file extension.",
                      uri );
-            i_type = SLAVE_TYPE_AUDIO;
+            i_type = SLAVE_TYPE_GENERIC;
         }
         input_item_slave_t *p_slave =
             input_item_slave_New( uri, i_type, SLAVE_PRIORITY_USER );
@@ -1074,6 +1117,9 @@ static void LoadSlaves( input_thread_t *p_input )
         free( psz_autopath );
     }
 
+    /* Add slaves from the "input-slave" option */
+    GetVarSlaves( p_input, &pp_slaves, &i_slaves );
+
     /* Add slaves found by the directory demuxer or via libvlc */
     input_item_t *p_item = input_priv(p_input)->p_item;
     vlc_mutex_lock( &p_item->lock );
@@ -1091,16 +1137,12 @@ static void LoadSlaves( input_thread_t *p_input )
     TAB_CLEAN( p_item->i_slaves, p_item->pp_slaves );
     vlc_mutex_unlock( &p_item->lock );
 
-    /* Add slaves from the "input-slave" option */
-    GetVarSlaves( p_input, &pp_slaves, &i_slaves );
-
-    if( i_slaves > 0 )
+    if( i_slaves > 0 ) /* Sort by priority */
         qsort( pp_slaves, i_slaves, sizeof (input_item_slave_t*),
                SlaveCompare );
 
     /* add all detected slaves */
-    bool p_forced[2] = { false, false };
-    static_assert( SLAVE_TYPE_AUDIO <= 1 && SLAVE_TYPE_SPU <= 1,
+    static_assert( SLAVE_TYPE_GENERIC <= 1 && SLAVE_TYPE_SPU <= 1,
                    "slave type size mismatch");
     for( int i = 0; i < i_slaves && pp_slaves[i] != NULL; i++ )
     {
@@ -1108,24 +1150,15 @@ static void LoadSlaves( input_thread_t *p_input )
         /* Slaves added via options should not fail */
         unsigned i_flags = p_slave->i_priority != SLAVE_PRIORITY_USER
                            ? SLAVE_ADD_CANFAIL : SLAVE_ADD_NOFLAG;
-        bool b_forced = false;
 
         /* Force the first subtitle with the highest priority or with the
          * forced flag */
-        if( !p_forced[p_slave->i_type]
-         && ( p_slave->b_forced || p_slave->i_priority == SLAVE_PRIORITY_USER ) )
-        {
+        if ( p_slave->b_forced || p_slave->i_priority >= SLAVE_PRIORITY_MATCH_ALL )
             i_flags |= SLAVE_ADD_FORCED;
-            b_forced = true;
-        }
 
         if( input_SlaveSourceAdd( p_input, p_slave->i_type, p_slave->psz_uri,
                                   i_flags ) == VLC_SUCCESS )
-        {
             input_item_AddSlave( input_priv(p_input)->p_item, p_slave );
-            if( b_forced )
-                p_forced[p_slave->i_type] = true;
-        }
         else
             input_item_slave_Delete( p_slave );
     }
@@ -1161,10 +1194,8 @@ static void LoadSlaves( input_thread_t *p_input )
 
             /* Force the first subtitle from attachment if there is no
              * subtitles already forced */
-            if( input_SlaveSourceAdd( p_input, SLAVE_TYPE_SPU, psz_mrl,
-                                      p_forced[ SLAVE_TYPE_SPU ] ?
-                                      SLAVE_ADD_NOFLAG : SLAVE_ADD_FORCED ) == VLC_SUCCESS )
-                p_forced[ SLAVE_TYPE_SPU ] = true;
+            input_SlaveSourceAdd( p_input, SLAVE_TYPE_SPU, psz_mrl,
+                                  SLAVE_ADD_FORCED );
 
             free( psz_mrl );
             /* Don't update item slaves for attachements */
@@ -1302,6 +1333,8 @@ static int Init( input_thread_t * p_input )
         goto error;
     }
 
+    InitProperties( p_input );
+
     InitTitle( p_input, false );
 
     /* Load master infos */
@@ -1333,7 +1366,7 @@ static int Init( input_thread_t * p_input )
 #ifdef ENABLE_SOUT
     if( !priv->b_preparsing && priv->p_sout )
     {
-        priv->b_out_pace_control = !sout_instance_ControlsPace(priv->p_sout);
+        priv->b_out_pace_control = sout_StreamIsSynchronous(priv->p_sout);
         msg_Dbg( p_input, "starting in %ssync mode",
                  priv->b_out_pace_control ? "a" : "" );
     }
@@ -1646,7 +1679,7 @@ static void ControlPause( input_thread_t *p_input, vlc_tick_t i_control_date )
 {
     int i_state = PAUSE_S;
 
-    if( input_priv(p_input)->b_can_pause )
+    if( input_priv(p_input)->master->b_can_pause )
     {
         demux_t *p_demux = input_priv(p_input)->master->p_demux;
 
@@ -1658,7 +1691,8 @@ static void ControlPause( input_thread_t *p_input, vlc_tick_t i_control_date )
     }
 
     /* */
-    if( es_out_SetPauseState( input_priv(p_input)->p_es_out, input_priv(p_input)->b_can_pause,
+    if( es_out_SetPauseState( input_priv(p_input)->p_es_out,
+                              input_priv(p_input)->master->b_can_pause,
                               true, i_control_date ) )
     {
         msg_Warn( p_input, "cannot set pause state at es_out level" );
@@ -1671,7 +1705,7 @@ static void ControlPause( input_thread_t *p_input, vlc_tick_t i_control_date )
 
 static void ControlUnpause( input_thread_t *p_input, vlc_tick_t i_control_date )
 {
-    if( input_priv(p_input)->b_can_pause )
+    if( input_priv(p_input)->master->b_can_pause )
     {
         demux_t *p_demux = input_priv(p_input)->master->p_demux;
 
@@ -2073,14 +2107,14 @@ static bool Control( input_thread_t *p_input,
             }
 
             if( rate != 1.f &&
-                ( ( !priv->b_can_rate_control && !priv->master->b_rescale_ts ) ||
+                ( ( !priv->master->b_can_rate_control && !priv->master->b_rescale_ts ) ||
                   ( priv->p_sout && !priv->b_out_pace_control ) ) )
             {
                 msg_Dbg( p_input, "cannot change rate" );
                 rate = 1.f;
             }
             if( rate != priv->rate &&
-                !priv->b_can_pace_control && priv->b_can_rate_control )
+                !priv->master->b_can_pace_control && priv->master->b_can_rate_control )
             {
                 if( !priv->master->b_rescale_ts )
                     es_out_Control( priv->p_es_out, ES_OUT_RESET_PCR );
@@ -2101,7 +2135,8 @@ static bool Control( input_thread_t *p_input,
 
                 if( priv->master->b_rescale_ts )
                 {
-                    const float rate_source = (priv->b_can_pace_control || priv->b_can_rate_control ) ? rate : 1.f;
+                    const float rate_source = (priv->master->b_can_pace_control ||
+                        priv->master->b_can_rate_control ) ? rate : 1.f;
                     es_out_SetRate( priv->p_es_out, rate_source, rate );
                 }
 
@@ -2733,13 +2768,6 @@ static int InputSourceInit( input_source_t *in, input_thread_t *p_input,
     }
 
     /* Get infos from (access_)demux */
-    int capabilites = 0;
-    bool b_can_seek;
-    if( demux_Control( in->p_demux, DEMUX_CAN_SEEK, &b_can_seek ) )
-        b_can_seek = false;
-    if( b_can_seek )
-        capabilites |= VLC_INPUT_CAPABILITIES_SEEKABLE;
-
     if( demux_Control( in->p_demux, DEMUX_CAN_CONTROL_PACE,
                        &in->b_can_pace_control ) )
         in->b_can_pace_control = false;
@@ -2764,28 +2792,15 @@ static int InputSourceInit( input_source_t *in, input_thread_t *p_input,
         in->b_rescale_ts = true;
     }
 
-    demux_Control( in->p_demux, DEMUX_CAN_PAUSE, &in->b_can_pause );
-
-    if( in->b_can_pause || !in->b_can_pace_control )
-        capabilites |= VLC_INPUT_CAPABILITIES_PAUSEABLE;
-    if( !in->b_can_pace_control || in->b_can_rate_control )
-        capabilites |= VLC_INPUT_CAPABILITIES_CHANGE_RATE;
-    if( !in->b_rescale_ts && !in->b_can_pace_control && in->b_can_rate_control )
-        capabilites |= VLC_INPUT_CAPABILITIES_REWINDABLE;
-
     /* Set record capabilities */
     if( demux_Control( in->p_demux, DEMUX_CAN_RECORD, &in->b_can_stream_record ) )
         in->b_can_stream_record = false;
 #ifdef ENABLE_SOUT
     if( !var_GetBool( p_input, "input-record-native" ) )
         in->b_can_stream_record = false;
-    capabilites |= VLC_INPUT_CAPABILITIES_RECORDABLE;
-#else
-    if( in->b_can_stream_record )
-        capabilites |= VLC_INPUT_CAPABILITIES_RECORDABLE;
 #endif
 
-    input_SendEventCapabilities( p_input, capabilites );
+    demux_Control( in->p_demux, DEMUX_CAN_PAUSE, &in->b_can_pause );
 
     /* get attachment
      * FIXME improve for b_preparsing: move it after GET_META and check psz_arturl */
@@ -2809,26 +2824,8 @@ static int InputSourceInit( input_source_t *in, input_thread_t *p_input,
             in->i_pts_delay = 0;
     }
 
-    int i_attachment;
-    input_attachment_t **attachment;
-    if( !demux_Control( in->p_demux, DEMUX_GET_ATTACHMENTS,
-                         &attachment, &i_attachment ) )
-    {
-        vlc_mutex_lock( &input_priv(p_input)->p_item->lock );
-        AppendAttachment( p_input, i_attachment, attachment );
-        vlc_mutex_unlock( &input_priv(p_input)->p_item->lock );
-    }
-
     if( demux_Control( in->p_demux, DEMUX_GET_FPS, &in->f_fps ) )
         in->f_fps = 0.f;
-
-    int input_type;
-    if( !demux_Control( in->p_demux, DEMUX_GET_TYPE, &input_type ) )
-    {
-        vlc_mutex_lock( &input_priv(p_input)->p_item->lock );
-        input_priv(p_input)->p_item->i_type = input_type;
-        vlc_mutex_unlock( &input_priv(p_input)->p_item->lock );
-    }
 
     if( var_GetInteger( p_input, "clock-synchro" ) != -1 )
         in->b_can_pace_control = !var_GetInteger( p_input, "clock-synchro" );
@@ -2861,10 +2858,9 @@ int input_source_GetNewAutoId( input_source_t *in )
     return in->auto_id++;
 }
 
-bool input_source_IsCatAutoselected( input_source_t *in,
-                                     enum es_format_category_e cat )
+bool input_source_IsAutoSelected( input_source_t *in )
 {
-    return in->autoselect_cats[cat];
+    return in->autoselected;
 }
 
 /*****************************************************************************
@@ -3398,31 +3394,28 @@ static int input_SlaveSourceAdd( input_thread_t *p_input,
     const bool b_can_fail = i_flags & SLAVE_ADD_CANFAIL;
     const bool b_forced = i_flags & SLAVE_ADD_FORCED;
     const bool b_set_time = i_flags & SLAVE_ADD_SET_TIME;
-    enum es_format_category_e i_cat;
 
     switch( i_type )
     {
     case SLAVE_TYPE_SPU:
         psz_forced_demux = "subtitle";
-        i_cat = SPU_ES;
         break;
-    case SLAVE_TYPE_AUDIO:
+    case SLAVE_TYPE_GENERIC:
         psz_forced_demux = NULL;
-        i_cat = AUDIO_ES;
         break;
     default:
         vlc_assert_unreachable();
     }
 
     msg_Dbg( p_input, "loading %s slave: %s (forced: %d)",
-             i_cat == SPU_ES ? "spu" : "audio", psz_uri, b_forced );
+             i_type == SLAVE_TYPE_SPU ? "spu" : "generic", psz_uri, b_forced );
 
     input_source_t *p_source = InputSourceNew( psz_uri );
     if( !p_source )
         return VLC_EGENERIC;
 
     if( b_forced )
-        p_source->autoselect_cats[i_cat] = true;
+        p_source->autoselected = true;
 
     int ret = InputSourceInit( p_source, p_input, psz_uri,
                                psz_forced_demux,
@@ -3437,7 +3430,7 @@ static int input_SlaveSourceAdd( input_thread_t *p_input,
         return VLC_EGENERIC;
     }
 
-    if( i_type == SLAVE_TYPE_AUDIO )
+    if( i_type == SLAVE_TYPE_GENERIC )
     {
         if( b_set_time )
         {
@@ -3549,4 +3542,10 @@ input_attachment_t *input_GetAttachment(input_thread_t *input, const char *name)
     }
     vlc_mutex_unlock( &priv->p_item->lock );
     return NULL;
+}
+
+bool input_CanPaceControl(input_thread_t *input)
+{
+    input_thread_private_t *priv = input_priv(input);
+    return priv->master->b_can_pace_control;
 }

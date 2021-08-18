@@ -143,9 +143,9 @@ static NSString *VLCPlaylistCellIdentifier = @"VLCPlaylistCellIdentifier";
         NSUInteger mediaCount = [mediaPaths count];
         if (mediaCount > 0) {
             NSMutableArray *metadataArray = [NSMutableArray arrayWithCapacity:mediaCount];
-            for (NSUInteger i = 0; i < mediaCount; i++) {
+            for (NSString *mediaPath in mediaPaths) {
                 VLCOpenInputMetadata *inputMetadata;
-                NSURL *url = [NSURL fileURLWithPath:mediaPaths[i] isDirectory:NO];
+                NSURL *url = [NSURL fileURLWithPath:mediaPath isDirectory:NO];
                 if (!url) {
                     continue;
                 }
@@ -161,14 +161,19 @@ static NSString *VLCPlaylistCellIdentifier = @"VLCPlaylistCellIdentifier";
     }
 
     /* it is a media library item, so unarchive it and add it to the playlist */
-    NSArray *array = [NSKeyedUnarchiver unarchiveObjectWithData:data];
-    if (!data) {
-        return NO;
+    NSArray *array = nil;
+    @try {
+        array = [NSKeyedUnarchiver unarchiveObjectWithData:data];
+    } @catch (NSException *exception) {
+        if ([exception.name isEqualToString:NSInvalidArgumentException]) {
+            msg_Err(getIntf(), "Failed to unarchive MediaLibrary Item: %s",
+                    [[exception reason] UTF8String]);
+            return NO;
+        }
+        @throw;
     }
-    NSUInteger arrayCount = array.count;
 
-    for (NSUInteger x = 0; x < arrayCount; x++) {
-        VLCMediaLibraryMediaItem *mediaItem = array[x];
+    for (VLCMediaLibraryMediaItem *mediaItem in array) {
         [_playlistController addInputItem:mediaItem.inputItem.vlcInputItem atPosition:row startPlayback:NO];
     }
 

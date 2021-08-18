@@ -142,7 +142,7 @@ enum input_item_net_type
 enum slave_type
 {
     SLAVE_TYPE_SPU,
-    SLAVE_TYPE_AUDIO,
+    SLAVE_TYPE_GENERIC, /* audio, video or subtitle not matched in SLAVE_SPU_EXTENSIONS */
 };
 
 enum slave_priority
@@ -446,7 +446,7 @@ input_item_Parse(input_item_t *item, vlc_object_t *parent,
  * afterward.
  * @note Calling this function will cause the on_ended callback to be invoked.
  *
- * @param the parser to interrupt
+ * @param parser the parser to interrupt
  */
 VLC_API void
 input_item_parser_id_Interrupt(input_item_parser_id_t *parser);

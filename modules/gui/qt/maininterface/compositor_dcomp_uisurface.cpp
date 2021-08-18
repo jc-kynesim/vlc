@@ -138,7 +138,7 @@ private:
     HINSTANCE                 m_compiler_dll = nullptr;
 };
 
-CompositorDCompositionUISurface::CompositorDCompositionUISurface(intf_thread_t* p_intf,
+CompositorDCompositionUISurface::CompositorDCompositionUISurface(qt_intf_t* p_intf,
                                                                  QWindow* window,
                                                                  Microsoft::WRL::ComPtr<IDCompositionVisual> dcVisual,
                                                                  QObject* parent)
@@ -662,7 +662,14 @@ bool CompositorDCompositionUISurface::eventFilter(QObject* object, QEvent* event
     case QEvent::DragLeave:
     case QEvent::DragResponse:
     case QEvent::Drop:
-        return QCoreApplication::sendEvent(m_uiWindow, event);
+
+    case QEvent::TouchBegin:
+    case QEvent::TouchEnd:
+    case QEvent::TouchCancel:
+    case QEvent::TouchUpdate:
+
+        return QCoreApplication::sendEvent(m_uiWindow, event) || event->isAccepted();
+
 
     case QEvent::KeyPress:
     case QEvent::KeyRelease:

@@ -23,17 +23,17 @@
  *****************************************************************************/
 
 #ifdef HAVE_CONFIG_H
-# import "config.h"
+# include "config.h"
 #endif
 
-#import <vlc_common.h>
-#import <vlc_aout.h>
-#import <vlc_threads.h>
+#include <vlc_common.h>
+#include <vlc_aout.h>
+#include <vlc_threads.h>
 
-#import <AudioUnit/AudioUnit.h>
-#import <AudioToolbox/AudioToolbox.h>
-#import <os/lock.h>
-#import <mach/mach_time.h>
+#include <AudioUnit/AudioUnit.h>
+#include <AudioToolbox/AudioToolbox.h>
+#include <os/lock.h>
+#include <mach/mach_time.h>
 
 #define STREAM_FORMAT_MSG(pre, sfm) \
     pre "[%f][%4.4s][%u][%u][%u][%u][%u][%u]", \
@@ -53,6 +53,7 @@ struct aout_sys_common
 
     size_t              i_underrun_size;
     bool                b_paused;
+    bool                b_muted;
     bool                b_do_flush;
 
     size_t              i_out_max_size;
@@ -80,14 +81,14 @@ struct aout_sys_common
     unsigned int        i_frame_length;
     uint8_t             chans_to_reorder;
     uint8_t             chan_table[AOUT_CHAN_MAX];
-    /* ca_TimeGet extra latency, in micro-seconds */
-    vlc_tick_t          i_dev_latency_us;
+    /* ca_TimeGet extra latency, in vlc ticks */
+    vlc_tick_t          i_dev_latency_ticks;
 };
 
 int ca_Open(audio_output_t *p_aout);
 
 void ca_Render(audio_output_t *p_aout, uint32_t i_nb_samples, uint64_t i_host_time,
-               uint8_t *p_output, size_t i_requested);
+               uint8_t *p_output, size_t i_requested, bool *is_silence);
 
 int  ca_TimeGet(audio_output_t *p_aout, vlc_tick_t *delay);
 
@@ -95,22 +96,26 @@ void ca_Flush(audio_output_t *p_aout);
 
 void ca_Pause(audio_output_t * p_aout, bool pause, vlc_tick_t date);
 
+void ca_MuteSet(audio_output_t * p_aout, bool mute);
+
 void ca_Play(audio_output_t * p_aout, block_t * p_block, vlc_tick_t date);
 
 int  ca_Initialize(audio_output_t *p_aout, const audio_sample_format_t *fmt,
-                   vlc_tick_t i_dev_latency_us);
+                   vlc_tick_t i_dev_latency_ticks);
 
 void ca_Uninitialize(audio_output_t *p_aout);
 
 void ca_SetAliveState(audio_output_t *p_aout, bool alive);
 
-void ca_SetDeviceLatency(audio_output_t *p_aout, vlc_tick_t i_dev_latency_us);
+void ca_SetDeviceLatency(audio_output_t *p_aout, vlc_tick_t i_dev_latency_ticks);
 
 AudioUnit au_NewOutputInstance(audio_output_t *p_aout, OSType comp_sub_type);
 
 int  au_Initialize(audio_output_t *p_aout, AudioUnit au,
                    audio_sample_format_t *fmt,
-                   const AudioChannelLayout *outlayout, vlc_tick_t i_dev_latency_us,
+                   const AudioChannelLayout *outlayout, vlc_tick_t i_dev_latency_ticks,
                    bool *warn_configuration);
 
 void au_Uninitialize(audio_output_t *p_aout, AudioUnit au);
+
+void au_VolumeSet(audio_output_t *p_aout);

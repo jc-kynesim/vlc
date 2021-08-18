@@ -60,7 +60,7 @@ SDFileSystemFactory::createDirectory(const std::string &mrl)
 std::shared_ptr<fs::IFile>
 SDFileSystemFactory::createFile(const std::string& mrl)
 {
-    auto dir = createDirectory(mrl);
+    auto dir = createDirectory(utils::directory(mrl));
     assert(dir != nullptr);
     return dir->file(mrl);
 }
@@ -149,7 +149,6 @@ void SDFileSystemFactory::onDeviceMounted(const std::string& uuid,
         }
         device->addMountpoint(mountpoint);
     }
-    fprintf(stderr, "device mounted: %s %s\n", uuid.c_str(), mountpoint.c_str());
     m_callbacks->onDeviceMounted( *device, mountpoint );
 }
 

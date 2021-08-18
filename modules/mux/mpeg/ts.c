@@ -153,12 +153,6 @@ static const char *const ts_standards_list_text[] =
   "PCRs (Program Clock Reference) will be sent (in milliseconds). " \
   "This value should be below 100ms. (default is 70ms).")
 
-#define BMIN_TEXT N_( "Minimum B (deprecated)")
-#define BMIN_LONGTEXT N_( "This setting is deprecated and not used anymore" )
-
-#define BMAX_TEXT N_( "Maximum B (deprecated)")
-#define BMAX_LONGTEXT N_( "This setting is deprecated and not used anymore")
-
 #define DTS_TEXT N_("DTS delay (ms)")
 #define DTS_LONGTEXT N_("Delay the DTS (decoding time " \
   "stamps) and PTS (presentation timestamps) of the data in the " \
@@ -204,38 +198,39 @@ vlc_module_begin ()
     set_capability( "sout mux", 120 )
     add_shortcut( "ts" )
 
-    add_string( SOUT_CFG_PREFIX "standard", "dvb", STANDARD_TEXT, NULL, true )
+    add_string( SOUT_CFG_PREFIX "standard", "dvb", STANDARD_TEXT, NULL )
         change_string_list( ts_standards_list, ts_standards_list_text )
-    add_integer(SOUT_CFG_PREFIX "pid-video", 100, VPID_TEXT, VPID_LONGTEXT, true)
+    add_integer(SOUT_CFG_PREFIX "pid-video", 100, VPID_TEXT, VPID_LONGTEXT)
         change_integer_range( 32, 8190 )
-    add_integer(SOUT_CFG_PREFIX "pid-audio", 200, APID_TEXT, APID_LONGTEXT, true)
+    add_integer(SOUT_CFG_PREFIX "pid-audio", 200, APID_TEXT, APID_LONGTEXT)
         change_integer_range( 32, 8190 )
-    add_integer(SOUT_CFG_PREFIX "pid-spu",   300, SPUPID_TEXT, SPUPID_LONGTEXT, true)
+    add_integer(SOUT_CFG_PREFIX "pid-spu",   300, SPUPID_TEXT, SPUPID_LONGTEXT)
         change_integer_range( 32, 8190 )
-    add_integer(SOUT_CFG_PREFIX "pid-pmt", 32, PMTPID_TEXT, PMTPID_LONGTEXT, true)
+    add_integer(SOUT_CFG_PREFIX "pid-pmt", 32, PMTPID_TEXT, PMTPID_LONGTEXT)
         change_integer_range( 32, 8190 )
-    add_integer(SOUT_CFG_PREFIX "tsid",  0, TSID_TEXT, TSID_LONGTEXT, true)
-    add_integer(SOUT_CFG_PREFIX "netid", 0, NETID_TEXT, NETID_LONGTEXT, true)
-    add_string(SOUT_CFG_PREFIX "program-pmt", NULL, PMTPROG_TEXT, PMTPROG_LONGTEXT, true)
-    add_bool(SOUT_CFG_PREFIX "es-id-pid", false, PID_TEXT, PID_LONGTEXT, true)
-    add_string(SOUT_CFG_PREFIX "muxpmt",  NULL, MUXPMT_TEXT, MUXPMT_LONGTEXT, true)
-    add_string(SOUT_CFG_PREFIX "sdtdesc", NULL, SDTDESC_TEXT, SDTDESC_LONGTEXT, true)
-    add_bool(SOUT_CFG_PREFIX "alignment", true, ALIGNMENT_TEXT, ALIGNMENT_LONGTEXT, true)
+    add_integer(SOUT_CFG_PREFIX "tsid",  0, TSID_TEXT, TSID_LONGTEXT)
+    add_integer(SOUT_CFG_PREFIX "netid", 0, NETID_TEXT, NETID_LONGTEXT)
+    add_string(SOUT_CFG_PREFIX "program-pmt", NULL, PMTPROG_TEXT, PMTPROG_LONGTEXT)
+    add_bool(SOUT_CFG_PREFIX "es-id-pid", false, PID_TEXT, PID_LONGTEXT)
+    add_string(SOUT_CFG_PREFIX "muxpmt",  NULL, MUXPMT_TEXT, MUXPMT_LONGTEXT)
+    add_string(SOUT_CFG_PREFIX "sdtdesc", NULL, SDTDESC_TEXT, SDTDESC_LONGTEXT)
+    add_bool(SOUT_CFG_PREFIX "alignment", true, ALIGNMENT_TEXT, ALIGNMENT_LONGTEXT)
 
-    add_integer(SOUT_CFG_PREFIX "shaping", 200, SHAPING_TEXT, SHAPING_LONGTEXT, true)
-    add_bool(SOUT_CFG_PREFIX "use-key-frames", false, KEYF_TEXT, KEYF_LONGTEXT, true)
+    add_integer(SOUT_CFG_PREFIX "shaping", 200, SHAPING_TEXT, SHAPING_LONGTEXT)
+    add_bool(SOUT_CFG_PREFIX "use-key-frames", false, KEYF_TEXT, KEYF_LONGTEXT)
 
-    add_integer( SOUT_CFG_PREFIX "pcr", 70, PCR_TEXT, PCR_LONGTEXT, true)
-    add_integer( SOUT_CFG_PREFIX "bmin", 0, BMIN_TEXT, BMIN_LONGTEXT, true)
-    add_integer( SOUT_CFG_PREFIX "bmax", 0, BMAX_TEXT, BMAX_LONGTEXT, true)
-    add_integer( SOUT_CFG_PREFIX "dts-delay", 400, DTS_TEXT, DTS_LONGTEXT, true)
+    add_integer( SOUT_CFG_PREFIX "pcr", 70, PCR_TEXT, PCR_LONGTEXT)
+    add_integer( SOUT_CFG_PREFIX "dts-delay", 400, DTS_TEXT, DTS_LONGTEXT)
 
-    add_bool( SOUT_CFG_PREFIX "crypt-audio", true, ACRYPT_TEXT, ACRYPT_LONGTEXT, true)
-    add_bool( SOUT_CFG_PREFIX "crypt-video", true, VCRYPT_TEXT, VCRYPT_LONGTEXT, true)
-    add_string( SOUT_CFG_PREFIX "csa-ck",  NULL, CK_TEXT,   CK_LONGTEXT,   true)
-    add_string( SOUT_CFG_PREFIX "csa2-ck", NULL, CK2_TEXT,  CK2_LONGTEXT,  true)
-    add_string( SOUT_CFG_PREFIX "csa-use", "1",  CU_TEXT,   CU_LONGTEXT,   true)
-    add_integer(SOUT_CFG_PREFIX "csa-pkt", 188,  CPKT_TEXT, CPKT_LONGTEXT, true)
+    add_obsolete_integer( "sout-ts-bmin" ) /* since 4.0.0 */
+    add_obsolete_integer( "sout-ts-bmax" ) /* since 4.0.0 */
+
+    add_bool( SOUT_CFG_PREFIX "crypt-audio", true, ACRYPT_TEXT, ACRYPT_LONGTEXT)
+    add_bool( SOUT_CFG_PREFIX "crypt-video", true, VCRYPT_TEXT, VCRYPT_LONGTEXT)
+    add_string( SOUT_CFG_PREFIX "csa-ck",  NULL, CK_TEXT,   CK_LONGTEXT)
+    add_string( SOUT_CFG_PREFIX "csa2-ck", NULL, CK2_TEXT,  CK2_LONGTEXT)
+    add_string( SOUT_CFG_PREFIX "csa-use", "1",  CU_TEXT,   CU_LONGTEXT)
+    add_integer(SOUT_CFG_PREFIX "csa-pkt", 188,  CPKT_TEXT, CPKT_LONGTEXT)
 
     set_callbacks( Open, Close )
 vlc_module_end ()
@@ -247,7 +242,7 @@ static const char *const ppsz_sout_options[] = {
     "standard",
     "pid-video", "pid-audio", "pid-spu", "pid-pmt", "tsid",
     "netid", "sdtdesc",
-    "es-id-pid", "shaping", "pcr", "bmin", "bmax", "use-key-frames",
+    "es-id-pid", "shaping", "pcr", "use-key-frames",
     "dts-delay", "csa-ck", "csa2-ck", "csa-use", "csa-pkt", "crypt-audio", "crypt-video",
     "muxpmt", "program-pmt", "alignment",
     NULL
@@ -368,9 +363,6 @@ typedef struct
     ts_mux_standard standard;
 
     /* for TS building */
-    int64_t         i_bitrate_min;
-    int64_t         i_bitrate_max;
-
     vlc_tick_t      i_shaping_delay;
     vlc_tick_t      i_pcr_delay;
 
@@ -690,25 +682,6 @@ static int Open( vlc_object_t *p_this )
     p_sys->i_pid_audio = var_GetInteger( p_mux, SOUT_CFG_PREFIX "pid-audio" );
     p_sys->i_pid_spu = var_GetInteger( p_mux, SOUT_CFG_PREFIX "pid-spu" );
 
-    /* Allow to create constrained stream */
-    p_sys->i_bitrate_min = var_GetInteger( p_mux, SOUT_CFG_PREFIX "bmin" );
-
-    p_sys->i_bitrate_max = var_GetInteger( p_mux, SOUT_CFG_PREFIX "bmax" );
-
-    if( p_sys->i_bitrate_min > 0 && p_sys->i_bitrate_max > 0 &&
-        p_sys->i_bitrate_min > p_sys->i_bitrate_max )
-    {
-        msg_Err( p_mux, "incompatible minimum and maximum bitrate, "
-                 "disabling bitrate control" );
-        p_sys->i_bitrate_min = 0;
-        p_sys->i_bitrate_max = 0;
-    }
-    if( p_sys->i_bitrate_min > 0 || p_sys->i_bitrate_max > 0 )
-    {
-        msg_Err( p_mux, "bmin and bmax no more supported "
-                 "(if you need them report it)" );
-    }
-
     var_Get( p_mux, SOUT_CFG_PREFIX "shaping", &val );
     if( val.i_int <= 0 )
     {
@@ -828,7 +801,7 @@ static int ActiveKeyCallback( vlc_object_t *p_this, char const *psz_cmd,
     }
 
     if (use_odd < 0)
-        return VLC_EBADVAR;
+        return VLC_EINVAL;
 
     vlc_mutex_lock( &p_sys->csa_lock );
     csa_UseKey( p_this, p_sys->csa, use_odd );
@@ -861,26 +834,6 @@ static int Control( sout_mux_t *p_mux, int i_query, va_list args )
     default:
         return VLC_EGENERIC;
     }
-}
-
-/* returns a pointer to a valid string, with length 0 or 3 */
-static const char *GetIso639_2LangCode(const char *lang)
-{
-    const iso639_lang_t *pl;
-
-    if (strlen(lang) == 2)
-    {
-        pl = GetLang_1(lang);
-    }
-    else
-    {
-        pl = GetLang_2B(lang);      /* try native code first */
-        if (!*pl->psz_iso639_2T)
-            pl = GetLang_2T(lang);  /* else fallback to english code */
-
-    }
-
-    return pl->psz_iso639_2T;   /* returns the english code */
 }
 
 static void SelectPCRStream( sout_mux_t *p_mux, sout_input_t *p_removed_pcr_input )
@@ -963,12 +916,12 @@ static int AddStream( sout_mux_t *p_mux, sout_input_t *p_input )
         if (!lang)
             continue;
 
-        const char *code = GetIso639_2LangCode(lang);
-        if (*code)
+        const iso639_lang_t *pl = vlc_find_iso639(lang, false);
+        if (pl)
         {
-            memcpy(&p_stream->pes.lang[i*4], code, 3);
+            memcpy(&p_stream->pes.lang[i*4], pl->psz_iso639_2T, 3);
             p_stream->pes.lang[i*4+3] = 0x00; /* audio type: 0x00 undefined */
-            msg_Dbg( p_mux, "    - lang=%3.3s", &p_stream->pes.lang[i*4] );
+            msg_Dbg( p_mux, "    - lang=%3.3s", pl->psz_iso639_2T );
         }
     }
 
@@ -1767,19 +1720,7 @@ static void TSDate( sout_mux_t *p_mux, sout_buffer_chain_t *p_chain_ts,
     sout_mux_sys_t  *p_sys = p_mux->p_sys;
     int i_packet_count = p_chain_ts->i_depth;
 
-    if ( likely(i_pcr_length / 1000 > 0) )
-    {
-        int i_bitrate = ((uint64_t)i_packet_count * 188 * 8000)
-                          / MS_FROM_VLC_TICK(i_pcr_length);
-        if ( p_sys->i_bitrate_max && p_sys->i_bitrate_max < i_bitrate )
-        {
-            msg_Warn( p_mux, "max bitrate exceeded at %"PRId64
-                      " (%d bi/s for %d pkt in %"PRId64" us)",
-                      i_pcr_dts + p_sys->i_shaping_delay * 3 / 2 - vlc_tick_now(),
-                      i_bitrate, i_packet_count, i_pcr_length);
-        }
-    }
-    else
+    if ( unlikely(i_pcr_length / 1000 <= 0) )
     {
         /* This shouldn't happen, but happens in some rare heavy load
          * and packet losses conditions. */

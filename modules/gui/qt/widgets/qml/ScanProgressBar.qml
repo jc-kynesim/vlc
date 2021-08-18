@@ -89,27 +89,28 @@ T.ProgressBar {
                     id: loadingAnim
 
                     loops: Animation.Infinite
+                    running: control.indeterminate
 
                     NumberAnimation {
                         from: - 1
                         to: 1
-                        duration: 2000
+                        duration: VLCStyle.ms2000
                         easing.type: Easing.OutBounce
                     }
 
                     PauseAnimation {
-                        duration: 500
+                        duration: VLCStyle.ms500
                     }
 
                     NumberAnimation {
                         to: - 1
                         from: 1
-                        duration: 2000
+                        duration: VLCStyle.ms2000
                         easing.type: Easing.OutBounce
                     }
 
                     PauseAnimation {
-                        duration: 500
+                        duration: VLCStyle.ms500
                     }
                 }
             }

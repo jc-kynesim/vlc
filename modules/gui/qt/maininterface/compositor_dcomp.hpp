@@ -35,6 +35,7 @@
 #include <QOpenGLContext>
 
 class MainInterface;
+class WinTaskbarWidget;
 
 namespace vlc {
 
@@ -42,15 +43,20 @@ class CompositorDirectComposition : public QObject, public Compositor
 {
     Q_OBJECT
 public:
-    CompositorDirectComposition(intf_thread_t *p_intf, QObject* parent = nullptr);
+    CompositorDirectComposition(qt_intf_t *p_intf, QObject* parent = nullptr);
     ~CompositorDirectComposition();
 
-    bool init();
+    static bool preInit(qt_intf_t *);
+    bool init() override;
 
     MainInterface *makeMainInterface() override;
     void destroyMainInterface() override;
+    void unloadGUI() override;
 
-    bool setupVoutWindow(vout_window_t *p_wnd) override;
+    bool setupVoutWindow(vout_window_t *p_wnd, VoutDestroyCb destroyCb) override;
+    virtual QWindow* interfaceMainWindow() const override;
+
+    Type type() const override;
 
 private slots:
     void onSurfacePositionChanged(QPointF position);
@@ -64,9 +70,12 @@ private:
     static void window_unset_fullscreen(struct vout_window_t *);
     static void window_set_fullscreen(struct vout_window_t *, const char *id);
 
-    intf_thread_t *m_intf = nullptr;
+    qt_intf_t *m_intf = nullptr;
 
-    MainInterface* m_rootWindow = nullptr;
+    MainInterface* m_mainInterface = nullptr;
+    QWindow* m_rootWindow = nullptr;
+    std::unique_ptr<WinTaskbarWidget> m_taskbarWidget;
+
     std::unique_ptr<CompositorDCompositionUISurface> m_uiSurface;
     vout_window_t *m_window = nullptr;
     std::unique_ptr<MainUI> m_ui;

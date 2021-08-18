@@ -18,56 +18,35 @@
 import QtQuick 2.11
 import QtQuick.Controls 2.4
 import org.videolan.medialib 0.1
+import org.videolan.vlc 0.1
 
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
 import "qrc:///main/" as MainInterface
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: root
+
     property alias sortModel: tracklistdisplay_id.sortModel
     property alias model: tracklistdisplay_id.model
     property alias selectionModel: tracklistdisplay_id.selectionDelegateModel
     readonly property bool isViewMultiView: false
 
-    Widgets.DragItem {
-        id: trackDragItem
-
-        function updateComponents(maxCovers) {
-          var items = selectionModel.selectedIndexes.slice(0, maxCovers).map(function (x){
-            return model.getDataAt(x.row)
-          })
-          var title = items.map(function (item){ return item.title}).join(", ")
-          var covers = items.map(function (item) { return {artwork: item.cover || VLCStyle.noArtCover}})
-          return {
-            covers: covers,
-            title: title,
-            count: selectionModel.selectedIndexes.length
-          }
-        }
-
-        function getSelectedInputItem() {
-            return model.getItemsForIndexes(selectionModel.selectedIndexes);
-        }
-    }
-
     MusicTrackListDisplay {
         id: tracklistdisplay_id
+
         anchors.fill: parent
         visible: model.count > 0
         focus: model.count > 0
-        dragItem: trackDragItem
         headerTopPadding: VLCStyle.margin_normal
-        navigationParent: root
-        navigationCancel: function() {
+        Navigation.parentItem: root
+        Navigation.cancelAction: function() {
             if (tracklistdisplay_id.currentIndex <= 0)
-                defaultNavigationCancel()
+                root.Navigation.defaultNavigationCancel()
             else
                 tracklistdisplay_id.currentIndex = 0;
         }
-        listScrollBar.bottomPadding: footerItem.height
-        footer: MainInterface.MiniPlayerBottomMargin {
-        }
+        displayMarginEnd: miniPlayer.height // to get blur effect while scrolling in mainview
     }
 
     EmptyLabel {
@@ -75,7 +54,7 @@ Widgets.NavigableFocusScope {
         visible: tracklistdisplay_id.model.count === 0
         focus: tracklistdisplay_id.model.count === 0
         text: i18n.qtr("No tracks found\nPlease try adding sources, by going to the Network tab")
-        navigationParent: root
+        Navigation.parentItem: root
         cover: VLCStyle.noArtAlbumCover
     }
 }

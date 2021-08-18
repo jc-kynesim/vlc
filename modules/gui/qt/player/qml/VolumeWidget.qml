@@ -16,13 +16,13 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 import QtQuick 2.11
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtQuick.Controls 2.4
 import QtGraphicalEffects 1.0
+import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
-import "qrc:///util/KeyHelper.js" as KeyHelper
 
 FocusScope{
     id: widgetfscope
@@ -33,17 +33,11 @@ FocusScope{
     property bool paintOnly: true
     enabled: !paintOnly
 
-    property bool acceptFocus: true
     Component.onCompleted: paintOnly = false
 
     property color color: colors.buttonText
 
     property alias parentWindow: volumeTooltip.parentWindow
-
-    // these are uninitialized because they will be set by button loader
-    // not 'undefined' because the loader must know if they exist
-    property var navigationLeft: null
-    property var navigationRight: null
 
     property VLCColors colors: VLCStyle.colors
 
@@ -68,19 +62,12 @@ FocusScope{
                     VLCIcons.volume_high
             text: i18n.qtr("Mute")
             color: widgetfscope.color
+            colorHover: colors.buttonTextHover
+            colorFocus: colors.bgFocus
             onClicked: player.muted = !player.muted
-            KeyNavigation.right: volControl
 
-            Keys.onLeftPressed: {
-                var left = widgetfscope.KeyNavigation.left
-                while (left && (!left.enabled || !left.visible)) {
-                    left = left.KeyNavigation ? left.KeyNavigation.left : undefined
-                }
-                if (left)
-                    left.forceActiveFocus()
-                else if (!!navigationLeft)
-                    navigationLeft()
-            }
+            Navigation.parentItem: widgetfscope
+            Navigation.rightItem: volControl
         }
 
         Slider
@@ -101,6 +88,8 @@ FocusScope{
             Keys.onPressed: {
                 if (KeyHelper.matchOk(event)) {
                     event.accepted = true
+                } else {
+                    Navigation.defaultKeyAction(event)
                 }
             }
 
@@ -125,6 +114,9 @@ FocusScope{
                 }
             }
 
+            Navigation.leftItem: volumeBtn
+            Navigation.parentItem: widgetfscope
+
             Keys.onUpPressed: {
                 volControl.increase()
                 tooltipShower.restart()
@@ -135,21 +127,7 @@ FocusScope{
                 tooltipShower.restart()
             }
 
-            Keys.onRightPressed: {
-                var right = widgetfscope.KeyNavigation.right
-                while (right && (!right.enabled || !right.visible)) {
-                    right = right.KeyNavigation ? right.KeyNavigation.right : undefined
-                }
-                if (right)
-                    right.forceActiveFocus()
-                else if (!!navigationRight)
-                    navigationRight()
-            }
-
-            Keys.onLeftPressed: {
-                volumeBtn.forceActiveFocus()
-                event.accepted = true
-            }
+            Keys.priority: Keys.BeforeItem
 
             property color sliderColor: (volControl.position > fullvolpos) ? colors.volmax : widgetfscope.color
             property int maxvol: 125

@@ -335,8 +335,8 @@ typedef NS_ENUM(NSInteger, VLCObjectType) {
 - (void)initStrings
 {
     /* main menu */
-    [_about setTitle: [_NS("About VLC media player") stringByAppendingString: @"..."]];
-    [_checkForUpdate setTitle: _NS("Check for Update...")];
+    [_about setTitle: _NS("About VLC media player...")];
+    [_checkForUpdate setTitle: _NS("Check for Updates...")];
     [_prefs setTitle: _NS("Preferences...")];
     [_extensions setTitle: _NS("Extensions")];
     [_extensionsMenu setTitle: _NS("Extensions")];
@@ -352,7 +352,8 @@ typedef NS_ENUM(NSInteger, VLCObjectType) {
     /* this special case is needed to due to archiac legacy translations of the File menu
      * on the Mac to the German translation which resulted in 'Ablage' instead of 'Datei'.
      * This remains until the present day and does not affect the Windows world. */
-    [_fileMenu setTitle: _ANS("1:File")];
+     /* xgettext: Label for the macOS main "File" menu */
+    [_fileMenu setTitle: _PNS("macOS MainMenu", "File")];
     [_open_generic setTitle: _NS("Advanced Open File...")];
     [_open_file setTitle: _NS("Open File...")];
     [_open_disc setTitle: _NS("Open Disc...")];
@@ -980,8 +981,7 @@ typedef NS_ENUM(NSInteger, VLCObjectType) {
     [menuItem setEnabled:YES];
     [menu addItem:menuItem];
 
-    for (NSUInteger x = 0; x < count; x++) {
-        VLCTrackMetaData *metaDataItem = metadataArray[x];
+    for (VLCTrackMetaData *metaDataItem in metadataArray) {
         menuItem = [[NSMenuItem alloc] initWithTitle:metaDataItem.name
                                               action:@selector(selectTrack:)
                                        keyEquivalent:@""];
@@ -1256,10 +1256,7 @@ typedef NS_ENUM(NSInteger, VLCObjectType) {
     i_returnValue = [openPanel runModal];
 
     if (i_returnValue == NSModalResponseOK) {
-        NSArray *URLs = [openPanel URLs];
-        NSUInteger count = [URLs count];
-        for (int i = 0; i < count ; i++) {
-            NSURL *url = URLs[i];
+        for (NSURL *url in [openPanel URLs]) {
             [_playerController addAssociatedMediaToCurrentFromURL:url
                                                        ofCategory:SPU_ES
                                                  shallSelectTrack:YES

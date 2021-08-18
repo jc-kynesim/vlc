@@ -17,7 +17,7 @@
  *****************************************************************************/
 
 import QtQuick 2.11
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtQuick.Controls 2.4
 import org.videolan.vlc 0.1
 
@@ -93,15 +93,14 @@ Rectangle {
 
     function setInitialView() {
         //set the initial view
-        if (!mainPlaylistController.empty)
-            history.push(["player"])
+        var loadPlayer = !mainPlaylistController.empty;
+        if (medialib)
+            history.push(["mc", "video"], loadPlayer ? History.Stay : History.Go)
         else
-        {
-            if (medialib)
-                history.push(["mc", "video"])
-            else
-                history.push(["mc", "home"])
-        }
+            history.push(["mc", "home"], loadPlayer ? History.Stay : History.Go)
+
+        if (loadPlayer)
+            history.push(["player"])
     }
 
 
@@ -173,5 +172,10 @@ Rectangle {
         onRestoreFocus: {
             stackView.focus = true
         }
+    }
+
+    Loader {
+        active: mainInterface.clientSideDecoration
+        source: "qrc:///widgets/CSDMouseStealer.qml"
     }
 }

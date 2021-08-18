@@ -188,7 +188,7 @@ VLC_API int var_GetChecked( vlc_object_t *, const char *, int, vlc_value_t * );
  *           (see \ref vlc_var_atomic_op)
  * \param value value of the variable after the modification
  * \retval VLC_SUCCESS Operation successful
- * \retval VLC_ENOVAR Variable not found
+ * \retval VLC_ENOENT Variable not found
  *
  * \bug The modified value is returned rather than the original value.
  * As such, the original value cannot be known in the case of non-reversible
@@ -760,11 +760,11 @@ VLC_API int var_InheritURational(vlc_object_t *obj, unsigned *num,
  *
  * @param obj VLC object on which to set variables (and emit error messages)
  * @param mrl string to parse
- * @param pref prefix to prepend to option names in the string
+ * @param prefix prefix to prepend to option names in the string
  *
  * @return VLC_ENOMEM on error, VLC_SUCCESS on success.
  */
-VLC_API int var_LocationParse(vlc_object_t *, const char *mrl, const char *prefix);
+VLC_API int var_LocationParse(vlc_object_t *obj, const char *mrl, const char *prefix);
 
 #ifndef DOC
 #define var_Create(a,b,c) var_Create(VLC_OBJECT(a), b, c)

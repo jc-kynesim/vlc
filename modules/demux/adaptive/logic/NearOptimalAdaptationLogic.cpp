@@ -92,6 +92,9 @@ BaseRepresentation *NearOptimalAdaptationLogic::getNextRepresentation(BaseAdapta
     if(lowest == nullptr || highest == nullptr)
         return nullptr;
 
+    if(lowest == highest)
+        return lowest;
+
     const float umin = getUtility(lowest);
     const float umax = getUtility(highest);
 
@@ -116,6 +119,13 @@ BaseRepresentation *NearOptimalAdaptationLogic::getNextRepresentation(BaseAdapta
     if(prevRep == nullptr) /* Starting */
     {
         m = selector.select(adaptSet, bps);
+        if(m == lowest)
+        {
+            /* Handle HLS specific cases where the lowest is audio only. Try to pick first A+V */
+            BaseRepresentation *n = selector.higher(adaptSet, m);
+            if(m != n  && m->getCodecs().size() == 1 && n->getCodecs().size() > 1)
+                m = n;
+        }
     }
     else
     {

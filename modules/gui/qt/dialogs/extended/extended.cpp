@@ -28,7 +28,7 @@
 
 #include "extended.hpp"
 
-#include "maininterface/main_interface.hpp" /* Needed for external MI size */
+#include "maininterface/compositor.hpp" /* Needed for external MI size */
 #include "player/player_controller.hpp"
 
 #include <QTabWidget>
@@ -37,8 +37,8 @@
 #include <QPushButton>
 #include <vlc_modules.h>
 
-ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
-               : QVLCDialog( (QWidget*)_p_intf->p_sys->p_mi, _p_intf )
+ExtendedDialog::ExtendedDialog( qt_intf_t *_p_intf )
+               : QVLCDialog( nullptr, _p_intf )
 {
 #ifdef __APPLE__
     setWindowFlags( Qt::Drawer );
@@ -85,8 +85,12 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     PitchShifter *pitchshifter = new PitchShifter( p_intf, audioTab );
     CONNECT( pitchshifter, configChanged(QString, QVariant), this, putAudioConfig(QString, QVariant) );
 
-    advancedTabLayout->setColumnStretch( 1, 10 );
+    StereoPanner *stereopanner = new StereoPanner( p_intf, audioTab );
+    CONNECT( stereopanner, configChanged(QString, QVariant), this, putAudioConfig(QString, QVariant) );
+
+    advancedTabLayout->setColumnStretch( 2, 10 );
     advancedTabLayout->addWidget( pitchshifter );
+    advancedTabLayout->addWidget( stereopanner );
 
     advancedTab->setLayout( advancedTabLayout );
     audioTab->addTab( advancedTab, qtr( "Advanced" ) );
@@ -137,9 +141,9 @@ ExtendedDialog::ExtendedDialog( intf_thread_t *_p_intf )
     {
         resize( QSize( 400, 280 ) );
 
-        MainInterface *p_mi = p_intf->p_sys->p_mi;
-        if( p_mi && p_mi->x() > 50 )
-            move( ( p_mi->x() - frameGeometry().width() - 10 ), p_mi->y() );
+        QWindow *window = p_intf->p_compositor->interfaceMainWindow();
+        if( window && window->x() > 50 )
+            move( ( window->x() - frameGeometry().width() - 10 ), window->y() );
         else
             move ( 450 , 0 );
     }

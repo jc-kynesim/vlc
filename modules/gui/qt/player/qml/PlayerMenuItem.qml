@@ -20,14 +20,13 @@ import QtQuick 2.11
 import QtQuick.Controls 2.4
 import QtQuick.Controls.impl 2.4
 import QtQuick.Templates 2.4 as T
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtQml.Models 2.11
 
 import org.videolan.vlc 0.1
 
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
-import "qrc:///util/KeyHelper.js" as KeyHelper
 
 T.MenuItem {
     id: control
@@ -104,9 +103,11 @@ T.MenuItem {
     }
 
 
-    background: Widgets.FocusBackground {
+    background: Widgets.AnimatedBackground {
         implicitHeight: VLCStyle.fontHeight_normal
-        active: control.highlighted
+
+        backgroundColor: control.highlighted ? VLCStyle.colors.buttonHover
+                                             : VLCStyle.colors.setColorAlpha(VLCStyle.colors.buttonHover, 0)
     }
 
     //hack around QTBUG-79115

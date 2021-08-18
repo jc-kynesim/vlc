@@ -49,8 +49,7 @@
 /*****************************************************************************
  * Vout interface
  *****************************************************************************/
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
-                video_format_t *fmt, vlc_video_context *context);
+static int Open(vout_display_t *vd, video_format_t *fmt, vlc_video_context *context);
 static void Close(vout_display_t *vd);
 
 vlc_module_begin()
@@ -87,7 +86,7 @@ static void OpenglSwap         (vlc_gl_t *gl);
 @end
 
 
-struct vout_display_sys_t {
+typedef struct vout_display_sys_t {
 
     CALayer <VLCCoreAnimationVideoLayerEmbedding> *container;
     vout_window_t *embed;
@@ -99,7 +98,7 @@ struct vout_display_sys_t {
     vout_display_place_t place;
 
     bool  b_frame_available;
-};
+} vout_display_sys_t;
 
 struct gl_sys
 {
@@ -125,12 +124,12 @@ static const struct vlc_display_operations ops = {
 /*****************************************************************************
  * Open: This function allocates and initializes the OpenGL vout method.
  *****************************************************************************/
-static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open (vout_display_t *vd,
                  video_format_t *fmt, vlc_video_context *context)
 {
     vout_display_sys_t *sys;
 
-    if (cfg->window->type != VOUT_WINDOW_TYPE_NSOBJECT)
+    if (vd->cfg->window->type != VOUT_WINDOW_TYPE_NSOBJECT)
         return VLC_EGENERIC;
 
     /* Allocate structure */
@@ -141,7 +140,7 @@ static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
     @autoreleasepool {
         id container = var_CreateGetAddress(vd, "drawable-nsobject");
         if (!container) {
-            sys->embed = cfg->window;
+            sys->embed = vd->cfg->window;
             container = sys->embed->handle.nsobject;
 
             if (!container) {
@@ -202,7 +201,7 @@ static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
         const vlc_fourcc_t *subpicture_chromas;
         if (!OpenglLock(sys->gl)) {
             sys->vgl = vout_display_opengl_New(fmt, &subpicture_chromas,
-                                               sys->gl, &cfg->viewpoint, context);
+                                               sys->gl, &vd->cfg->viewpoint, context);
             OpenglUnlock(sys->gl);
         } else
             sys->vgl = NULL;
@@ -449,7 +448,9 @@ static void *OurGetProcAddress (vlc_gl_t *gl, const char *name)
     if (!_voutDisplay)
         return false;
 
-    return _voutDisplay->sys->b_frame_available;
+    vout_display_sys_t *sys = _voutDisplay->sys;
+
+    return sys->b_frame_available;
 }
 
 - (void)drawInCGLContext:(CGLContextObj)glContext pixelFormat:(CGLPixelFormatObj)pixelFormat forLayerTime:(CFTimeInterval)timeInterval displayTime:(const CVTimeStamp *)timeStamp

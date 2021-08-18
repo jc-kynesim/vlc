@@ -36,7 +36,7 @@ SHA512SUM = $(error SHA-512 checksumming not found!)
 endif
 
 download_pkg = $(call download,$(VIDEOLAN)/$(2)/$(lastword $(subst /, ,$(@)))) || \
-	( $(call download,$(1)) && echo "Please upload package $(lastword $(subst /, ,$(@))) to our FTP" )  \
+	( $(call download,$(1)) && echo "Please upload this package $(lastword $(subst /, ,$(@))) to our FTP" )  \
 	&& grep $(@) $(TOOLS)/SHA512SUMS| $(SHA512SUM)
 
 UNPACK = $(RM) -R $@ \
@@ -116,6 +116,7 @@ libtool: libtool-$(LIBTOOL_VERSION).tar.gz
 	$(APPLY) $(TOOLS)/libtool-2.4.6-san.patch
 	$(APPLY) $(TOOLS)/libtool-2.4.6-clang-libs.patch
 	$(APPLY) $(TOOLS)/libtool-2.4.6-response-files.patch
+	$(APPLY) $(TOOLS)/libtool-2.4.6-lpthread.patch
 	$(MOVE)
 
 .buildlibtool: libtool .automake .help2man

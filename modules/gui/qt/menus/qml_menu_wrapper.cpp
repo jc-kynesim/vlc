@@ -38,10 +38,106 @@
 
 #include <QSignalMapper>
 
+namespace
+{
+    QIcon sortIcon(QWidget *widget, int order)
+    {
+        assert(order == Qt::AscendingOrder || order == Qt::DescendingOrder);
+
+        QStyleOptionHeader headerOption;
+        headerOption.init(widget);
+        headerOption.sortIndicator = (order == Qt::AscendingOrder)
+                ? QStyleOptionHeader::SortDown
+                : QStyleOptionHeader::SortUp;
+
+        QStyle *style = qApp->style();
+        int arrowsize = style->pixelMetric(QStyle::PM_HeaderMarkSize, &headerOption, widget);
+        if (arrowsize <= 0)
+            arrowsize = 32;
+
+        headerOption.rect = QRect(0, 0, arrowsize, arrowsize);
+        QPixmap arrow(arrowsize, arrowsize);
+        arrow.fill(Qt::transparent);
+
+        {
+            QPainter arrowPainter(&arrow);
+            style->drawPrimitive(QStyle::PE_IndicatorHeaderArrow, &headerOption, &arrowPainter, widget);
+        }
+
+        return QIcon(arrow);
+    }
+}
 
 static inline void addSubMenu( QMenu *func, QString title, QMenu *bar ) {
     func->setTitle( title );
     bar->addMenu( func);
+}
+
+
+void StringListMenu::popup(const QPoint &point, const QVariantList &stringList)
+{
+    QMenu *m = new QMenu;
+    m->setAttribute(Qt::WA_DeleteOnClose);
+
+    for (int i = 0; i != stringList.size(); ++i)
+    {
+        const auto str = stringList[i].toString();
+        m->addAction(str, this, [this, i, str]()
+        {
+            emit selected(i, str);
+        });
+    }
+
+    m->popup(point);
+}
+
+SortMenu::~SortMenu()
+{
+    if (m_menu)
+        delete m_menu;
+}
+
+void SortMenu::popup(const QPoint &point, const bool popupAbovePoint, const QVariantList &model)
+{
+    if (m_menu)
+        delete m_menu;
+
+    m_menu = new QMenu;
+
+    // model => [{text: "", checked: <bool>, order: <sort order> if checked else <invalid>}...]
+    for (int i = 0; i != model.size(); ++i)
+    {
+        const auto obj = model[i].toMap();
+
+        auto action = m_menu->addAction(obj.value("text").toString());
+        action->setCheckable(true);
+
+        const bool checked = obj.value("checked").toBool();
+        action->setChecked(checked);
+
+        if (checked)
+            action->setIcon(sortIcon(m_menu, obj.value("order").toInt()));
+
+        connect(action, &QAction::triggered, this, [this, i]()
+        {
+            emit selected(i);
+        });
+    }
+
+    // m_menu->height() returns invalid height until initial popup call
+    // so in case of 'popupAbovePoint', first show the menu and then reposition it
+    m_menu->popup(point);
+    if (popupAbovePoint)
+    {
+        // use 'popup' instead of 'move' so that menu can reposition itself if it's parts are hidden
+        m_menu->popup(QPoint(point.x(), point.y() - m_menu->height()));
+    }
+}
+
+void SortMenu::close()
+{
+    if (m_menu)
+        m_menu->close();
 }
 
 QmlGlobalMenu::QmlGlobalMenu(QObject *parent)
@@ -60,7 +156,7 @@ void QmlGlobalMenu::popup(QPoint pos)
     if (!m_ctx)
         return;
 
-    intf_thread_t* p_intf = m_ctx->getIntf();
+    qt_intf_t* p_intf = m_ctx->getIntf();
     if (!p_intf)
         return;
 
@@ -70,8 +166,11 @@ void QmlGlobalMenu::popup(QPoint pos)
     m_menu = new QMenu();
     QMenu* submenu;
 
+    connect( m_menu, &QMenu::aboutToShow, this, &QmlGlobalMenu::aboutToShow );
+    connect( m_menu, &QMenu::aboutToHide, this, &QmlGlobalMenu::aboutToHide );
+
     submenu = m_menu->addMenu(qtr( "&Media" ));
-    FileMenu( p_intf, submenu, p_intf->p_sys->p_mi );
+    FileMenu( p_intf, submenu );
 
     /* Dynamic menus, rebuilt before being showed */
     submenu = m_menu->addMenu(qtr( "P&layback" ));
@@ -91,7 +190,7 @@ void QmlGlobalMenu::popup(QPoint pos)
 
     /* View menu, a bit different */
     submenu = m_menu->addMenu(qtr( "V&iew" ));
-    ViewMenu( p_intf, submenu, p_intf->p_sys->p_mi );
+    ViewMenu( p_intf, submenu );
 
     submenu = m_menu->addMenu(qtr( "&Help" ));
     HelpMenu(submenu);
@@ -153,7 +252,7 @@ void QmlMenuBar::popupMenuCommon( QQuickItem* button, std::function<void(QMenu*)
     if (!m_ctx || !m_menubar || !button)
         return;
 
-    intf_thread_t* p_intf = m_ctx->getIntf();
+    qt_intf_t* p_intf = m_ctx->getIntf();
     if (!p_intf)
         return;
 
@@ -172,8 +271,8 @@ void QmlMenuBar::popupMenuCommon( QQuickItem* button, std::function<void(QMenu*)
 void QmlMenuBar::popupMediaMenu( QQuickItem* button )
 {
     popupMenuCommon(button, [this](QMenu* menu) {
-        intf_thread_t* p_intf = m_ctx->getIntf();
-        FileMenu( p_intf, menu , p_intf->p_sys->p_mi );
+        qt_intf_t* p_intf = m_ctx->getIntf();
+        FileMenu( p_intf, menu );
     });
 }
 
@@ -216,8 +315,8 @@ void QmlMenuBar::popupToolsMenu( QQuickItem* button )
 void QmlMenuBar::popupViewMenu( QQuickItem* button )
 {
     popupMenuCommon(button, [this](QMenu* menu) {
-        intf_thread_t* p_intf = m_ctx->getIntf();
-        ViewMenu( p_intf, menu, p_intf->p_sys->p_mi );
+        qt_intf_t* p_intf = m_ctx->getIntf();
+        ViewMenu( p_intf, menu );
     });
 }
 
@@ -374,8 +473,7 @@ void VideoContextMenu::popup(const QModelIndexList& selected, QPoint pos, QVaria
 
     action = m_menu->addAction( qtr("Play as audio") );
     connect(action, &QAction::triggered, [ml, itemIdList]( ) {
-        QStringList options({":no-video"});
-        ml->addAndPlay(itemIdList, &options);
+        ml->addAndPlay(itemIdList, {":no-video"});
     });
 
     if (options.contains("information") && options["information"].type() == QVariant::Int) {
@@ -540,8 +638,7 @@ void PlaylistMediaContextMenu::popup(const QModelIndexList & selected, QPoint po
     action = m_menu->addAction(qtr("Play as audio"));
 
     connect(action, &QAction::triggered, [ml, ids]() {
-        QStringList options({":no-video"});
-        ml->addAndPlay(ids, &options);
+        ml->addAndPlay(ids, {":no-video"});
     });
 
     if (options.contains("information") && options["information"].type() == QVariant::Int) {
@@ -739,8 +836,8 @@ void PlaylistContextMenu::popup(int currentIndex, QPoint pos )
 
         action = m_menu->addAction( qtr("Show Containing Directory...") );
         action->setIcon(QIcon(":/type/folder-grey.svg"));
-        connect(action, &QAction::triggered, [currentItem]( ) {
-            DialogsProvider::getInstance()->mediaInfoDialog(currentItem);
+        connect(action, &QAction::triggered, [this, currentItem]( ) {
+            m_controler->explore(currentItem);
         });
 
         m_menu->addSeparator();

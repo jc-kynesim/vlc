@@ -51,7 +51,7 @@
 #define LT_CHROMA N_("Output chroma for the memory image as a 4-character " \
                       "string, eg. \"RV32\".")
 
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context);
 static void Close(vout_display_t *vd);
 
@@ -62,17 +62,14 @@ vlc_module_begin()
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
 
-    add_integer("vmem-width", 320, T_WIDTH, LT_WIDTH, false)
+    add_integer("vmem-width", 320, T_WIDTH, LT_WIDTH)
         change_private()
-    add_integer("vmem-height", 200, T_HEIGHT, LT_HEIGHT, false)
+    add_integer("vmem-height", 200, T_HEIGHT, LT_HEIGHT)
         change_private()
-    add_integer("vmem-pitch", 640, T_PITCH, LT_PITCH, false)
+    add_integer("vmem-pitch", 640, T_PITCH, LT_PITCH)
         change_private()
-    add_string("vmem-chroma", "RV16", T_CHROMA, LT_CHROMA, true)
+    add_string("vmem-chroma", "RV16", T_CHROMA, LT_CHROMA)
         change_private()
-    add_obsolete_string("vmem-lock") /* obsoleted since 1.1.1 */
-    add_obsolete_string("vmem-unlock") /* obsoleted since 1.1.1 */
-    add_obsolete_string("vmem-data") /* obsoleted since 1.1.1 */
 
     set_callback_display(Open, 0)
 vlc_module_end()
@@ -86,7 +83,7 @@ typedef struct
 } picture_sys_t;
 
 /* NOTE: the callback prototypes must match those of LibVLC */
-struct vout_display_sys_t {
+typedef struct vout_display_sys_t {
     void *opaque;
     void *pic_opaque;
     void *(*lock)(void *sys, void **plane);
@@ -96,7 +93,7 @@ struct vout_display_sys_t {
 
     unsigned pitches[PICTURE_PLANE_MAX];
     unsigned lines[PICTURE_PLANE_MAX];
-};
+} vout_display_sys_t;
 
 typedef unsigned (*vlc_format_cb)(void **, char *, unsigned *, unsigned *,
                                   unsigned *, unsigned *);
@@ -106,7 +103,10 @@ static void           Display(vout_display_t *, picture_t *);
 static int            Control(vout_display_t *, int);
 
 static const struct vlc_display_operations ops = {
-    Close, Prepare, Display, Control, NULL, NULL,
+    .close = Close,
+    .prepare = Prepare,
+    .display = Display,
+    .control = Control,
 };
 
 /*****************************************************************************
@@ -114,7 +114,7 @@ static const struct vlc_display_operations ops = {
  *****************************************************************************
  * This function allocates and initializes a vout method.
  *****************************************************************************/
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
 {
     vout_display_sys_t *sys = malloc(sizeof(*sys));
@@ -222,7 +222,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     vd->sys     = sys;
     vd->ops     = &ops;
 
-    (void) cfg; (void) context;
+    (void) context;
     return VLC_SUCCESS;
 }
 

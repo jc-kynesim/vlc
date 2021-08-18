@@ -44,7 +44,7 @@
 
 #define MAX_PICTURES 4
 
-struct vout_display_sys_t
+typedef struct vout_display_sys_t
 {
     vout_window_t *embed; /* VLC window */
     struct wl_event_queue *eventq;
@@ -53,10 +53,7 @@ struct vout_display_sys_t
     struct wp_viewport *viewport;
 
     size_t active_buffers;
-
-    unsigned display_width;
-    unsigned display_height;
-};
+} vout_display_sys_t;
 
 struct buffer_data
 {
@@ -132,7 +129,7 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic,
 
     wl_buffer_add_listener(buf, &buffer_cbs, d);
     wl_surface_attach(surface, buf, 0, 0);
-    wl_surface_damage(surface, 0, 0, sys->display_width, sys->display_height);
+    wl_surface_damage(surface, 0, 0, vd->cfg->display.width, vd->cfg->display.height);
     wl_display_flush(display);
 
     sys->active_buffers++;
@@ -187,9 +184,6 @@ static int Control(vout_display_t *vd, int query)
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
         {
-            sys->display_width = vd->cfg->display.width;
-            sys->display_height = vd->cfg->display.height;
-
             if (sys->viewport != NULL)
             {
                 video_format_t fmt;
@@ -263,13 +257,17 @@ static void Close(vout_display_t *vd)
 }
 
 static const struct vlc_display_operations ops = {
-    Close, Prepare, Display, Control, ResetPictures, NULL,
+    .close = Close,
+    .prepare = Prepare,
+    .display = Display,
+    .control = Control,
+    .reset_pictures = ResetPictures,
 };
 
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
 {
-    if (cfg->window->type != VOUT_WINDOW_TYPE_WAYLAND)
+    if (vd->cfg->window->type != VOUT_WINDOW_TYPE_WAYLAND)
         return VLC_EGENERIC;
 
     vout_display_sys_t *sys = malloc(sizeof (*sys));
@@ -281,11 +279,9 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     sys->eventq = NULL;
     sys->shm = NULL;
     sys->active_buffers = 0;
-    sys->display_width = cfg->display.width;
-    sys->display_height = cfg->display.height;
 
     /* Get window */
-    sys->embed = cfg->window;
+    sys->embed = vd->cfg->window;
     assert(sys->embed != NULL);
 
     struct wl_display *display = sys->embed->display.wl;

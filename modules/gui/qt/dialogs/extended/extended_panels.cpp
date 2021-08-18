@@ -47,6 +47,7 @@
 #include "extended_panels.hpp"
 #include "dialogs/preferences/preferences.hpp"
 #include "qt.hpp"
+#include "maininterface/main_interface.hpp"
 #include "player/player_controller.hpp"
 #include "util/qt_dirs.hpp"
 #include "widgets/native/customwidgets.hpp"
@@ -75,7 +76,7 @@ static bool filterIsPresent( const QString &filters, const QString &filter )
     return false;
 }
 
-static const char* GetVFilterType( struct intf_thread_t *p_intf, const char *psz_name )
+static const char* GetVFilterType( qt_intf_t *p_intf, const char *psz_name )
 {
     module_t *p_obj = module_find( psz_name );
     if( !p_obj )
@@ -113,7 +114,7 @@ static QString OptionFromWidgetName( QObject *obj )
         .toLower();
 }
 
-static inline void setup_vfilter( intf_thread_t *p_intf, const char* psz_name, QWidget *widget )
+static inline void setup_vfilter( qt_intf_t *p_intf, const char* psz_name, QWidget *widget )
 {
     const char *psz_filter_type = GetVFilterType( p_intf, psz_name );
     if( psz_filter_type == NULL )
@@ -147,7 +148,7 @@ static inline void setup_vfilter( intf_thread_t *p_intf, const char* psz_name, Q
     setWidgetValue( ui.widget ); \
     CONNECT( ui.widget, signal, this, updateFilterOptions() );
 
-ExtVideo::ExtVideo( intf_thread_t *_p_intf, QTabWidget *_parent ) :
+ExtVideo::ExtVideo( qt_intf_t *_p_intf, QTabWidget *_parent ) :
             QObject( _parent ), p_intf( _p_intf )
 {
     ui.setupUi( _parent );
@@ -296,7 +297,7 @@ void ExtVideo::clean()
     ui.cropRightPx->setValue( 0 );
 }
 
-static QString ChangeFiltersString( struct intf_thread_t *p_intf, const char *psz_filter_type, const char *psz_name, bool b_add )
+static QString ChangeFiltersString( qt_intf_t *p_intf, const char *psz_filter_type, const char *psz_name, bool b_add )
 {
     char* psz_chain = var_GetString( p_intf, psz_filter_type );
 
@@ -319,7 +320,7 @@ static QString ChangeFiltersString( struct intf_thread_t *p_intf, const char *ps
     return list.join( ":" );
 }
 
-static void UpdateVFiltersString( struct intf_thread_t *p_intf,
+static void UpdateVFiltersString( qt_intf_t *p_intf,
                                   const char *psz_filter_type, const char *value )
 {
     /* Try to set non splitter filters on the fly */
@@ -366,10 +367,10 @@ void ExtVideo::browseLogo()
 {
     const QStringList schemes = QStringList(QStringLiteral("file"));
     QString filter = QString( "%1 (*.png *.jpg);;%2 (*)" )
-                        .arg( qtr("Image Files") )
+                        .arg( TITLE_EXTENSIONS_IMAGE )
                         .arg( TITLE_EXTENSIONS_ALL );
     QString file = QFileDialog::getOpenFileUrl( NULL, qtr( "Logo filenames" ),
-                   p_intf->p_sys->filepath, filter,
+                   p_intf->p_mi->getDialogFilePath(), filter,
                    NULL, QFileDialog::Options(), schemes ).toLocalFile();
 
     UPDATE_AND_APPLY_TEXT( logoFileText, file );
@@ -379,10 +380,10 @@ void ExtVideo::browseEraseFile()
 {
     const QStringList schemes = QStringList(QStringLiteral("file"));
     QString filter = QString( "%1 (*.png *.jpg);;%2 (*)" )
-                        .arg( qtr("Image Files") )
+                        .arg( TITLE_EXTENSIONS_IMAGE )
                         .arg( TITLE_EXTENSIONS_ALL );
     QString file = QFileDialog::getOpenFileUrl( NULL, qtr( "Image mask" ),
-                   p_intf->p_sys->filepath, filter,
+                   p_intf->p_mi->getDialogFilePath(), filter,
                    NULL, QFileDialog::Options(), schemes ).toLocalFile();
 
     UPDATE_AND_APPLY_TEXT( eraseMaskText, file );
@@ -411,7 +412,7 @@ void ExtVideo::initComboBoxItems( QObject *widget )
         ssize_t count = config_GetIntChoices( qtu( option ), &values, &texts );
         for( ssize_t i = 0; i < count; i++ )
         {
-            combobox->addItem( qtr( texts[i] ), qlonglong(values[i]) );
+            combobox->addItem( qfut( texts[i] ), qlonglong(values[i]) );
             free( texts[i] );
         }
         free( texts );
@@ -424,7 +425,7 @@ void ExtVideo::initComboBoxItems( QObject *widget )
         ssize_t count = config_GetPszChoices( qtu( option ), &values, &texts );
         for( ssize_t i = 0; i < count; i++ )
         {
-            combobox->addItem( qtr( texts[i] ), qfu(values[i]) );
+            combobox->addItem( qfut( texts[i] ), qfu(values[i]) );
             free( texts[i] );
             free( values[i] );
         }
@@ -601,7 +602,7 @@ void ExtVideo::updateFilterOptions()
  * v4l2 controls
  **********************************************************************/
 
-ExtV4l2::ExtV4l2( intf_thread_t *_p_intf, QWidget *_parent )
+ExtV4l2::ExtV4l2( qt_intf_t *_p_intf, QWidget *_parent )
     : QWidget( _parent ), p_intf( _p_intf ), box( NULL )
 {
     QVBoxLayout *layout = new QVBoxLayout( this );
@@ -623,8 +624,8 @@ void ExtV4l2::showEvent( QShowEvent *event )
 
 void ExtV4l2::Refresh( void )
 {
-    vlc_player_Lock(p_intf->p_sys->p_player);
-    vlc_object_t *p_obj = vlc_player_GetV4l2Object(p_intf->p_sys->p_player);
+    vlc_player_Lock(p_intf->p_player);
+    vlc_object_t *p_obj = vlc_player_GetV4l2Object(p_intf->p_player);
     help->hide();
     if( box )
     {
@@ -660,7 +661,7 @@ void ExtV4l2::Refresh( void )
 
             if( !var_Change( p_obj, psz_var, VLC_VAR_GETTEXT, &vartext ) )
             {
-                name = qtr(vartext);
+                name = qfut(vartext);
                 free(vartext);
             }
             else
@@ -774,7 +775,7 @@ void ExtV4l2::Refresh( void )
         if ( isVisible() )
             QTimer::singleShot( 2000, this, SLOT(Refresh()) );
     }
-    vlc_player_Unlock(p_intf->p_sys->p_player);
+    vlc_player_Unlock(p_intf->p_player);
 }
 
 void ExtV4l2::ValueChange( bool value )
@@ -785,8 +786,8 @@ void ExtV4l2::ValueChange( bool value )
 void ExtV4l2::ValueChange( int value )
 {
     QObject *s = sender();
-    vlc_player_Lock(p_intf->p_sys->p_player);
-    vlc_object_t *p_obj = vlc_player_GetV4l2Object(p_intf->p_sys->p_player);
+    vlc_player_Lock(p_intf->p_player);
+    vlc_object_t *p_obj = vlc_player_GetV4l2Object(p_intf->p_player);
     if( p_obj )
     {
         QString var = s->objectName();
@@ -808,11 +809,11 @@ void ExtV4l2::ValueChange( int value )
                 var_TriggerCallback( p_obj, qtu( var ) );
                 break;
         }
-        vlc_player_Unlock(p_intf->p_sys->p_player);
+        vlc_player_Unlock(p_intf->p_player);
     }
     else
     {
-        vlc_player_Unlock(p_intf->p_sys->p_player);
+        vlc_player_Unlock(p_intf->p_player);
         msg_Warn( p_intf, "Oops, v4l2 object isn't available anymore" );
         Refresh();
     }
@@ -828,7 +829,7 @@ FilterSliderData::FilterSliderData( QObject *parent, QSlider *_slider ) :
 }
 
 FilterSliderData::FilterSliderData( QObject *parent,
-                                    intf_thread_t *_p_intf,
+                                    qt_intf_t *_p_intf,
                                     QSlider *_slider,
                                     QLabel *_label, QLabel *_nameLabel,
                                     const slider_data_t *_p_data ):
@@ -896,7 +897,7 @@ void FilterSliderData::writeToConfig()
 }
 
 AudioFilterControlWidget::AudioFilterControlWidget
-( intf_thread_t *_p_intf, QWidget *parent, const char *_name ) :
+( qt_intf_t *_p_intf, QWidget *parent, const char *_name ) :
     QWidget( parent ), slidersBox( NULL ), p_intf( _p_intf ), name( _name ),
     i_smallfont(0)
 {}
@@ -963,14 +964,14 @@ void AudioFilterControlWidget::enable( bool b_enable )
     QString result = ChangeFiltersString( p_intf, "audio-filter", qtu(name),
                                           b_enable );
     emit configChanged( qfu("audio-filter"), result );
-    vlc_player_aout_EnableFilter( p_intf->p_sys->p_player, qtu(name), b_enable );
+    vlc_player_aout_EnableFilter( p_intf->p_player, qtu(name), b_enable );
 }
 
 /**********************************************************************
  * Equalizer
  **********************************************************************/
 
-EqualizerSliderData::EqualizerSliderData( QObject *parent, intf_thread_t *_p_intf,
+EqualizerSliderData::EqualizerSliderData( QObject *parent, qt_intf_t *_p_intf,
                                           QSlider *slider, QLabel *_label,
                                           QLabel *_nameLabel, const slider_data_t *_p_data,
                                           int _index )
@@ -1073,7 +1074,7 @@ void EqualizerSliderData::writeToConfig()
     }
 }
 
-Equalizer::Equalizer( intf_thread_t *p_intf, QWidget *parent )
+Equalizer::Equalizer( qt_intf_t *p_intf, QWidget *parent )
     : AudioFilterControlWidget( p_intf, parent, "equalizer" )
 {
     i_smallfont = -3;
@@ -1176,7 +1177,7 @@ void Equalizer::build()
                        palette().color( QPalette::WindowText ) );
         scene.setSceneRect( 0.0, 0.0, eqz_preset_10b[i].i_band , 40.0 );
         scene.render( &painter, icon.rect(), scene.sceneRect(), Qt::IgnoreAspectRatio );
-        ui.presetsCombo->addItem( icon, qtr( preset_list_text[i] ),
+        ui.presetsCombo->addItem( icon, qfut( preset_list_text[i] ),
                                      QVariant( preset_list[i] ) );
     }
     CONNECT( ui.presetsCombo, activated(int), this, setCorePreset(int) );
@@ -1255,7 +1256,7 @@ void Equalizer::enable2Pass( bool b_enable )
  * Dynamic range compressor
  **********************************************************************/
 
-Compressor::Compressor( intf_thread_t *p_intf, QWidget *parent )
+Compressor::Compressor( qt_intf_t *p_intf, QWidget *parent )
     : AudioFilterControlWidget( p_intf, parent, "compressor" )
 {
     i_smallfont = -2;
@@ -1277,7 +1278,7 @@ Compressor::Compressor( intf_thread_t *p_intf, QWidget *parent )
  * Spatializer
  **********************************************************************/
 
-Spatializer::Spatializer( intf_thread_t *p_intf, QWidget *parent )
+Spatializer::Spatializer( qt_intf_t *p_intf, QWidget *parent )
     : AudioFilterControlWidget( p_intf, parent, "spatializer" )
 {
     i_smallfont = -1;
@@ -1297,7 +1298,7 @@ Spatializer::Spatializer( intf_thread_t *p_intf, QWidget *parent )
  * Spatializer
  **********************************************************************/
 
-StereoWidener::StereoWidener( intf_thread_t *p_intf, QWidget *parent )
+StereoWidener::StereoWidener( qt_intf_t *p_intf, QWidget *parent )
     : AudioFilterControlWidget( p_intf, parent, "stereo_widen" )
 {
     i_smallfont = -1;
@@ -1316,12 +1317,21 @@ StereoWidener::StereoWidener( intf_thread_t *p_intf, QWidget *parent )
  * Advanced
  **********************************************************************/
 
-PitchShifter::PitchShifter( intf_thread_t *p_intf, QWidget *parent )
+PitchShifter::PitchShifter( qt_intf_t *p_intf, QWidget *parent )
     : AudioFilterControlWidget( p_intf, parent, "scaletempo_pitch" )
 {
     i_smallfont = -1;
     controls.append( { "pitch-shift", qtr("Adjust pitch"), "semitones",
                         -12.0, 12.0, 0.0, 0.25, 1.0 } );
+    build();
+}
+
+StereoPanner::StereoPanner( qt_intf_t *p_intf, QWidget *parent )
+    : AudioFilterControlWidget( p_intf, parent, "stereo_pan" )
+{
+    i_smallfont = -1;
+    controls.append( { "pan-control", qtr("Adjust pan"), "", 0.0, 1.0,
+            0.5, 0.1, 1.0 } );
     build();
 }
 
@@ -1367,10 +1377,10 @@ void SyncWidget::setValue( double d )
     spinBox.setValue( d );
 }
 
-SyncControls::SyncControls( intf_thread_t *_p_intf, QWidget *_parent )
+SyncControls::SyncControls( qt_intf_t *_p_intf, QWidget *_parent )
     : QWidget( _parent )
     , p_intf( _p_intf )
-    , m_SubsDelayCfgFactor(p_intf, SUBSDELAY_CFG_FACTOR)
+    , m_SubsDelayCfgFactor(VLC_OBJECT(p_intf->intf), SUBSDELAY_CFG_FACTOR)
 {
     QGroupBox *AVBox, *subsBox;
     QToolButton *updateButton;

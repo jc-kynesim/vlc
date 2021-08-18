@@ -64,8 +64,8 @@ vlc_module_begin ()
     set_capability( "access", 0 )
     set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACCESS )
-    add_integer( "sftp-port", 22, PORT_TEXT, PORT_LONGTEXT, true )
-    add_string( "sftp-user", NULL, USER_TEXT, USER_LONGTEXT, false )
+    add_integer( "sftp-port", 22, PORT_TEXT, PORT_LONGTEXT )
+    add_string( "sftp-user", NULL, USER_TEXT, USER_LONGTEXT )
     add_password("sftp-pwd", NULL, PASS_TEXT, PASS_LONGTEXT)
     add_shortcut( "sftp" )
     set_callbacks( Open, Close )
@@ -199,7 +199,7 @@ static int SSHSessionInit( stream_t *p_access, const char *psz_host, int i_port 
     if( p_sys->i_socket < 0 )
         goto error;
 
-    /* Create the ssh connexion and wait until the server answer */
+    /* Create the ssh connection and wait until the server answer */
     p_sys->ssh_session = libssh2_session_init();
     if( p_sys->ssh_session == NULL )
         goto error;
@@ -275,7 +275,7 @@ static int Open( vlc_object_t* p_this )
     else
         i_port = url.i_port;
 
-    /* Create the ssh connexion and wait until the server answer */
+    /* Create the ssh connection and wait until the server answer */
     if( SSHSessionInit( p_access, url.psz_host, i_port ) != VLC_SUCCESS )
         goto error;
 
@@ -420,7 +420,7 @@ static int Open( vlc_object_t* p_this )
     } while( vlc_credential_get( &credential, p_access, "sftp-user", "sftp-pwd",
                                 _("SFTP authentication"),
                                 _("Please enter a valid login and password for "
-                                "the sftp connexion to %s"), url.psz_host ) );
+                                "the SFTP connection to %s"), url.psz_host ) );
 
     /* Create the sftp session */
     p_sys->sftp_session = libssh2_sftp_init( p_sys->ssh_session );

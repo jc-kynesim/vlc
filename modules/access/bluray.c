@@ -54,10 +54,6 @@
 #include "../demux/mpeg/timestamps.h"
 #include "../demux/timestamps_filter.h"
 
-/* FIXME we should find a better way than including that */
-#include "../../src/text/iso-639_def.h"
-
-
 #include <libbluray/bluray.h>
 #include <libbluray/bluray-version.h>
 #include <libbluray/keys.h>
@@ -248,8 +244,8 @@ vlc_module_begin ()
     set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_ACCESS)
     set_capability("access", 500)
-    add_bool("bluray-menu", true, BD_MENU_TEXT, BD_MENU_LONGTEXT, false)
-    add_string("bluray-region", ppsz_region_code[REGION_DEFAULT], BD_REGION_TEXT, BD_REGION_LONGTEXT, false)
+    add_bool("bluray-menu", true, BD_MENU_TEXT, BD_MENU_LONGTEXT)
+    add_string("bluray-region", ppsz_region_code[REGION_DEFAULT], BD_REGION_TEXT, BD_REGION_LONGTEXT)
         change_string_list(ppsz_region_code, ppsz_region_code_text)
 
     add_shortcut("bluray", "file")
@@ -498,20 +494,11 @@ static const char *DemuxGetLanguageCode( demux_t *p_demux, const char *psz_var )
     if( ( p = strchr( psz_lang, ',' ) ) )
         *p = '\0';
 
-    for( pl = p_languages; pl->psz_eng_name != NULL; pl++ )
-    {
-        if( *psz_lang == '\0' )
-            continue;
-        if( !strcasecmp( pl->psz_eng_name, psz_lang ) ||
-            !strcasecmp( pl->psz_iso639_1, psz_lang ) ||
-            !strcasecmp( pl->psz_iso639_2T, psz_lang ) ||
-            !strcasecmp( pl->psz_iso639_2B, psz_lang ) )
-            break;
-    }
+    pl = vlc_find_iso639( psz_lang, true );
 
     free( psz_lang );
 
-    if( pl->psz_eng_name != NULL )
+    if( pl != NULL )
         return pl->psz_iso639_2T;
 
     return LANGUAGE_DEFAULT;

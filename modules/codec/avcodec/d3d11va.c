@@ -61,7 +61,7 @@ struct d3d11va_pic_context
 
 #include "directx_va.h"
 
-static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat hwfmt, const AVPixFmtDescriptor *,
+static int Open(vlc_va_t *, AVCodecContext *, enum AVPixelFormat hwfmt, const AVPixFmtDescriptor *,
                 const es_format_t *, vlc_decoder_device *, video_format_t *, vlc_video_context **);
 
 vlc_module_begin()
@@ -74,7 +74,7 @@ vlc_module_end()
 #include <initguid.h> /* must be last included to not redefine existing GUIDs */
 DEFINE_GUID(DXVA2_NoEncrypt,                        0x1b81bed0, 0xa0c7, 0x11d3, 0xb9, 0x84, 0x00, 0xc0, 0x4f, 0x2e, 0x73, 0xc5);
 
-struct vlc_va_sys_t
+typedef struct
 {
     d3d11_device_t               *d3d_dev;
 
@@ -94,7 +94,7 @@ struct vlc_va_sys_t
     va_pool_t                     *va_pool;
     ID3D11VideoDecoderOutputView  *hw_surface[MAX_SURFACE_COUNT];
     ID3D11ShaderResourceView      *renderSrc[MAX_SURFACE_COUNT * DXGI_MAX_SHADER_VIEW];
-};
+} vlc_va_sys_t;
 
 /* */
 static int D3dCreateDevice(vlc_va_t *);
@@ -192,19 +192,21 @@ static picture_context_t* NewSurfacePicContext(vlc_va_t *va, vlc_va_surface_t *v
     return &pic_ctx->ctx.s;
 }
 
-static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
+static int Get(vlc_va_t *va, picture_t *pic, AVCodecContext *ctx, AVFrame *frame)
 {
+    (void) ctx;
+
     vlc_va_sys_t *sys = va->sys;
     vlc_va_surface_t *va_surface = va_pool_Get(sys->va_pool);
     if (unlikely(va_surface == NULL))
-        return VLC_ENOITEM;
+        return VLC_ENOENT;
     pic->context = NewSurfacePicContext(va, va_surface);
     if (unlikely(pic->context == NULL))
     {
         va_surface_Release(va_surface);
         return VLC_ENOMEM;
     }
-    data[3] = (uint8_t*)sys->hw_surface[va_surface_GetIndex(va_surface)];
+    frame->data[3] = (uint8_t*)sys->hw_surface[va_surface_GetIndex(va_surface)];
     return VLC_SUCCESS;
 }
 
@@ -221,7 +223,7 @@ static void Close(vlc_va_t *va)
 
 static const struct vlc_va_operations ops = { Get, Close, };
 
-static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat hwfmt, const AVPixFmtDescriptor *desc,
+static int Open(vlc_va_t *va, AVCodecContext *ctx, enum AVPixelFormat hwfmt, const AVPixFmtDescriptor *desc,
                 const es_format_t *fmt_in, vlc_decoder_device *dec_device,
                 video_format_t *fmt_out, vlc_video_context **vtcx_out)
 {
@@ -400,17 +402,17 @@ static int DxSetupOutput(vlc_va_t *va, const directx_va_mode_t *mode, const vide
     int idx = 0;
     const d3d_format_t *decoder_format;
     UINT supportFlags = D3D11_FORMAT_SUPPORT_DECODER_OUTPUT | D3D11_FORMAT_SUPPORT_SHADER_LOAD;
-    decoder_format = FindD3D11Format( va, va->sys->d3d_dev, 0, DXGI_RGB_FORMAT|DXGI_YUV_FORMAT,
+    decoder_format = FindD3D11Format( va, sys->d3d_dev, 0, DXGI_RGB_FORMAT|DXGI_YUV_FORMAT,
                                       mode->bit_depth, mode->log2_chroma_h+1, mode->log2_chroma_w+1,
                                       DXGI_CHROMA_GPU, supportFlags );
     if (decoder_format == NULL)
-        decoder_format = FindD3D11Format( va, va->sys->d3d_dev, 0, DXGI_RGB_FORMAT|DXGI_YUV_FORMAT,
+        decoder_format = FindD3D11Format( va, sys->d3d_dev, 0, DXGI_RGB_FORMAT|DXGI_YUV_FORMAT,
                                         mode->bit_depth, 0, 0, DXGI_CHROMA_GPU, supportFlags );
     if (decoder_format == NULL && mode->bit_depth > 10)
-        decoder_format = FindD3D11Format( va, va->sys->d3d_dev, 0, DXGI_RGB_FORMAT|DXGI_YUV_FORMAT,
+        decoder_format = FindD3D11Format( va, sys->d3d_dev, 0, DXGI_RGB_FORMAT|DXGI_YUV_FORMAT,
                                         10, 0, 0, DXGI_CHROMA_GPU, supportFlags );
     if (decoder_format == NULL)
-        decoder_format = FindD3D11Format( va, va->sys->d3d_dev, 0, DXGI_RGB_FORMAT|DXGI_YUV_FORMAT,
+        decoder_format = FindD3D11Format( va, sys->d3d_dev, 0, DXGI_RGB_FORMAT|DXGI_YUV_FORMAT,
                                         0, 0, 0, DXGI_CHROMA_GPU, supportFlags );
     if (decoder_format != NULL)
     {

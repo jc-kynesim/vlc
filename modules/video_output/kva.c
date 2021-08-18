@@ -42,7 +42,7 @@
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
-static int  Open ( vout_display_t *, const vout_display_cfg_t *,
+static int  Open ( vout_display_t *,
                    video_format_t *, vlc_video_context * );
 static void Close( vout_display_t * );
 
@@ -66,9 +66,9 @@ vlc_module_begin ()
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VOUT )
     add_string( "kva-video-mode", ppsz_kva_video_mode[0], KVA_VIDEO_MODE_TEXT,
-                KVA_VIDEO_MODE_LONGTEXT, false )
+                KVA_VIDEO_MODE_LONGTEXT )
         change_string_list( ppsz_kva_video_mode, ppsz_kva_video_mode_text )
-    add_bool( "kva-fixt23", false, KVA_FIXT23_TEXT, KVA_FIXT23_LONGTEXT, true )
+    add_bool( "kva-fixt23", false, KVA_FIXT23_TEXT, KVA_FIXT23_LONGTEXT )
     set_description( N_("K Video Acceleration video output") )
     add_shortcut( "kva" )
     set_callback_display( Open, 100 )
@@ -80,7 +80,7 @@ vlc_module_end ()
  * This structure is part of the video output thread descriptor.
  * It describes the module specific properties of an output thread.
  *****************************************************************************/
-struct vout_display_sys_t
+typedef struct vout_display_sys_t
 {
     TID                tid;
     HEV                ack_event;
@@ -102,7 +102,7 @@ struct vout_display_sys_t
     ULONG              cursor_timeout;
 
     int                i_chroma_shift;
-};
+} vout_display_sys_t;
 
 /*****************************************************************************
  * Local prototypes
@@ -123,7 +123,7 @@ static MRESULT EXPENTRY WndProc       ( HWND, ULONG, MPARAM, MPARAM );
 
 #define WC_VLC_KVA "WC_VLC_KVA"
 
-#define COLOR_KEY 0x0F0F0F
+#define COLOR_KEY 0x000001
 
 #define WM_VLC_MANAGE               ( WM_USER + 1 )
 #define WM_VLC_SIZE_CHANGE          ( WM_USER + 2 )
@@ -154,7 +154,10 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic, vl
 }
 
 static const struct vlc_display_operations ops = {
-    Close, Prepare, Display, Control, NULL, NULL,
+    .close = Close,
+    .prepare = Prepare,
+    .display = Display,
+    .control = Control,
 };
 
 static void PMThread( void *arg )
@@ -307,7 +310,7 @@ exit_frame :
 /**
  * This function initializes KVA vout method.
  */
-static int Open ( vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open ( vout_display_t *vd,
                   video_format_t *fmtp, vlc_video_context *context )
 {
     vout_display_sys_t *sys;
@@ -323,10 +326,10 @@ static int Open ( vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     sys->b_fixt23 = var_CreateGetBool( vd, "kva-fixt23");
 
-    if( !sys->b_fixt23 && cfg->window->type != VOUT_WINDOW_TYPE_HWND )
+    if( !sys->b_fixt23 && vd->cfg->window->type != VOUT_WINDOW_TYPE_HWND )
     {
         free( sys );
-        return VLC_EBADVAR;
+        return VLC_ENOTSUP;
     }
 
     DosCreateEventSem( NULL, &sys->ack_event, 0, FALSE );
@@ -820,21 +823,25 @@ static MRESULT EXPENTRY MyFrameWndProc( HWND hwnd, ULONG msg, MPARAM mp1,
 
 static void MousePressed( vout_display_t *vd, HWND hwnd, unsigned button )
 {
+    vout_display_sys_t *sys = vd->sys;
+
     if( WinQueryFocus( HWND_DESKTOP ) != hwnd )
         WinSetFocus( HWND_DESKTOP, hwnd );
 
-    if( !vd->sys->button_pressed )
+    if( !sys->button_pressed )
         WinSetCapture( HWND_DESKTOP, hwnd );
 
-    vd->sys->button_pressed |= 1 << button;
+    sys->button_pressed |= 1 << button;
 
     vout_window_ReportMousePressed( vd->cfg->window, button );
 }
 
 static void MouseReleased( vout_display_t *vd, unsigned button )
 {
-    vd->sys->button_pressed &= ~(1 << button);
-    if( !vd->sys->button_pressed )
+    vout_display_sys_t *sys = vd->sys;
+
+    sys->button_pressed &= ~(1 << button);
+    if( !sys->button_pressed )
         WinSetCapture( HWND_DESKTOP, NULLHANDLE );
 
     vout_window_ReportMouseReleased( vd->cfg->window, button );

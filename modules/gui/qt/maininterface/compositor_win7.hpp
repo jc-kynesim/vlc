@@ -42,15 +42,20 @@ class CompositorWin7 : public QObject, public Compositor
 {
     Q_OBJECT
 public:
-    CompositorWin7(intf_thread_t *p_intf, QObject* parent = nullptr);
+    CompositorWin7(qt_intf_t *p_intf, QObject* parent = nullptr);
 
     virtual ~CompositorWin7();
 
-    bool init();
+    static bool preInit(qt_intf_t *p_intf);
+    virtual bool init() override;
 
     virtual MainInterface *makeMainInterface() override;
     virtual void destroyMainInterface() override;
-    virtual bool setupVoutWindow(vout_window_t*) override;
+    virtual void unloadGUI() override;
+    virtual bool setupVoutWindow(vout_window_t*, VoutDestroyCb destroyCb) override;
+    virtual QWindow* interfaceMainWindow() const override;
+
+    Type type() const override;
 
 protected:
     bool eventFilter(QObject *obj, QEvent *ev) override;
@@ -70,16 +75,16 @@ private slots:
     void onSurfaceSizeChanged(QSizeF size);
 
 private:
-    intf_thread_t *m_intf = nullptr;
+    qt_intf_t *m_intf = nullptr;
 
-    MainInterface* m_rootWindow = nullptr;
+    MainInterface* m_mainInterface = nullptr;
     QWidget* m_videoWidget = nullptr;
     QWidget* m_stable = nullptr;
     std::unique_ptr<QQuickView> m_qmlView;
     std::unique_ptr<VideoWindowHandler> m_videoWindowHandler;
     std::unique_ptr<VideoSurfaceProvider> m_videoSurfaceProvider;
-    WinTaskbarWidget* m_taskbarWidget = nullptr;
-    Win7NativeEventFilter* m_nativeEventFilter = nullptr;
+    std::unique_ptr<WinTaskbarWidget> m_taskbarWidget;
+    std::unique_ptr<Win7NativeEventFilter> m_nativeEventFilter;
 
     HWND m_qmlWindowHWND = nullptr;
     HWND m_videoWindowHWND = nullptr;

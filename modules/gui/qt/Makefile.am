@@ -163,6 +163,8 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlgrouplistmodel.hpp \
 	gui/qt/medialibrary/mlhelper.cpp \
 	gui/qt/medialibrary/mlhelper.hpp \
+	gui/qt/medialibrary/mlitemcover.cpp \
+	gui/qt/medialibrary/mlitemcover.hpp \
 	gui/qt/medialibrary/mlqmltypes.hpp \
 	gui/qt/medialibrary/mlqueryparams.cpp \
 	gui/qt/medialibrary/mlqueryparams.hpp \
@@ -218,9 +220,12 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/audio_device_model.cpp  \
 	gui/qt/util/audio_device_model.hpp \
 	gui/qt/util/color_scheme_model.cpp gui/qt/util/color_scheme_model.hpp \
+	gui/qt/util/covergenerator.cpp \
+	gui/qt/util/covergenerator.hpp \
 	gui/qt/util/imageluminanceextractor.cpp gui/qt/util/imageluminanceextractor.hpp \
 	gui/qt/util/imagehelper.cpp gui/qt/util/imagehelper.hpp \
 	gui/qt/util/i18n.cpp gui/qt/util/i18n.hpp \
+	gui/qt/util/keyhelper.cpp gui/qt/util/keyhelper.hpp \
 	gui/qt/util/listcache.hpp \
 	gui/qt/util/listcacheloader.hpp \
 	gui/qt/util/navigation_history.cpp gui/qt/util/navigation_history.hpp \
@@ -252,8 +257,13 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/widgets/native/customwidgets.cpp gui/qt/widgets/native/customwidgets.hpp \
 	gui/qt/widgets/native/interface_widgets.cpp \
 	gui/qt/widgets/native/interface_widgets.hpp \
+	gui/qt/widgets/native/navigation_attached.cpp \
+	gui/qt/widgets/native/navigation_attached.hpp \
+	gui/qt/widgets/native/mlfolderseditor.cpp \
+	gui/qt/widgets/native/mlfolderseditor.hpp \
 	gui/qt/widgets/native/qvlcframe.cpp \
 	gui/qt/widgets/native/qvlcframe.hpp \
+	gui/qt/widgets/native/roundimage.cpp gui/qt/widgets/native/roundimage.hpp \
 	gui/qt/widgets/native/searchlineedit.cpp gui/qt/widgets/native/searchlineedit.hpp
 if HAVE_WIN32
 libqt_plugin_la_SOURCES += \
@@ -342,9 +352,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlartistmodel.moc.cpp \
 	gui/qt/medialibrary/mlbasemodel.moc.cpp \
 	gui/qt/medialibrary/mlfoldersmodel.moc.cpp \
-	gui/qt/medialibrary/mlgenre.moc.cpp \
 	gui/qt/medialibrary/mlgenremodel.moc.cpp \
-	gui/qt/medialibrary/mlgroup.moc.cpp \
 	gui/qt/medialibrary/mlgrouplistmodel.moc.cpp \
 	gui/qt/medialibrary/mlqmltypes.moc.cpp \
 	gui/qt/medialibrary/mlrecentsmodel.moc.cpp \
@@ -352,7 +360,6 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlurlmodel.moc.cpp \
 	gui/qt/medialibrary/mlvideo.moc.cpp \
 	gui/qt/medialibrary/mlvideomodel.moc.cpp \
-	gui/qt/medialibrary/mlplaylist.moc.cpp \
 	gui/qt/medialibrary/mlplaylistlistmodel.moc.cpp \
 	gui/qt/medialibrary/mlplaylistmodel.moc.cpp \
 	gui/qt/menus/custom_menus.moc.cpp \
@@ -373,8 +380,10 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/util/asynctask.moc.cpp \
 	gui/qt/util/audio_device_model.moc.cpp \
 	gui/qt/util/color_scheme_model.moc.cpp \
+	gui/qt/util/covergenerator.moc.cpp \
 	gui/qt/util/imageluminanceextractor.moc.cpp \
 	gui/qt/util/i18n.moc.cpp \
+	gui/qt/util/keyhelper.moc.cpp \
 	gui/qt/util/listcache.moc.cpp \
 	gui/qt/util/navigation_history.moc.cpp \
 	gui/qt/util/qml_main_context.moc.cpp \
@@ -392,6 +401,9 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/widgets/native/animators.moc.cpp \
 	gui/qt/widgets/native/customwidgets.moc.cpp \
 	gui/qt/widgets/native/interface_widgets.moc.cpp \
+	gui/qt/widgets/native/navigation_attached.moc.cpp \
+	gui/qt/widgets/native/mlfolderseditor.moc.cpp \
+	gui/qt/widgets/native/roundimage.moc.cpp \
 	gui/qt/widgets/native/searchlineedit.moc.cpp
 
 if HAVE_WIN32
@@ -678,6 +690,7 @@ libqt_plugin_la_QML = \
 	gui/qt/medialibrary/qml/MusicAlbumsGridExpandDelegate.qml \
 	gui/qt/medialibrary/qml/MusicArtist.qml \
 	gui/qt/medialibrary/qml/MusicArtistsAlbums.qml \
+	gui/qt/medialibrary/qml/MusicAllArtists.qml \
 	gui/qt/medialibrary/qml/MusicArtistsDisplay.qml \
 	gui/qt/medialibrary/qml/MusicDisplay.qml \
 	gui/qt/medialibrary/qml/MusicGenres.qml \
@@ -742,23 +755,25 @@ libqt_plugin_la_QML = \
 	gui/qt/style/VLCStyle.qml \
 	gui/qt/style/qmldir \
 	gui/qt/util/qml/Helpers.js \
-	gui/qt/util/qml/KeyHelper.js \
 	gui/qt/util/qml/SelectableDelegateModel.qml \
+	gui/qt/widgets/qml/ActionButtonOverlay.qml \
+	gui/qt/widgets/qml/ActionButtonPrimary.qml \
 	gui/qt/widgets/qml/BannerTabButton.qml \
 	gui/qt/widgets/qml/BusyIndicatorExt.qml \
 	gui/qt/widgets/qml/CaptionLabel.qml \
 	gui/qt/widgets/qml/CheckedDelegate.qml \
 	gui/qt/widgets/qml/ComboBoxExt.qml \
 	gui/qt/widgets/qml/ContextButton.qml \
+	gui/qt/widgets/qml/AnimatedBackground.qml \
 	gui/qt/widgets/qml/CoverShadow.qml \
 	gui/qt/widgets/qml/CSDWindowButton.qml \
 	gui/qt/widgets/qml/CSDWindowButtonSet.qml \
 	gui/qt/widgets/qml/CSDTitlebarTapNDrapHandler.qml \
+	gui/qt/widgets/qml/CSDMouseStealer.qml \
 	gui/qt/widgets/qml/CurrentIndicator.qml \
 	gui/qt/widgets/qml/DragItem.qml \
 	gui/qt/widgets/qml/DrawerExt.qml \
 	gui/qt/widgets/qml/ExpandGridView.qml \
-	gui/qt/widgets/qml/FocusBackground.qml \
 	gui/qt/widgets/qml/GridItem.qml \
 	gui/qt/widgets/qml/GridShadows.qml \
 	gui/qt/widgets/qml/HorizontalResizeHandle.qml \
@@ -766,6 +781,7 @@ libqt_plugin_la_QML = \
 	gui/qt/widgets/qml/IconButton.qml \
 	gui/qt/widgets/qml/IconControlButton.qml \
 	gui/qt/widgets/qml/IconToolButton.qml \
+	gui/qt/widgets/qml/IconTrackButton.qml \
 	gui/qt/widgets/qml/ImageToolButton.qml \
 	gui/qt/widgets/qml/KeyNavigableGridView.qml \
 	gui/qt/widgets/qml/KeyNavigableListView.qml \
@@ -783,11 +799,9 @@ libqt_plugin_la_QML = \
 	gui/qt/widgets/qml/MenuItemExt.qml \
 	gui/qt/widgets/qml/MenuLabel.qml \
 	gui/qt/widgets/qml/NavigableCol.qml \
-	gui/qt/widgets/qml/NavigableFocusScope.qml \
 	gui/qt/widgets/qml/NavigableRow.qml \
 	gui/qt/widgets/qml/PlayCover.qml \
 	gui/qt/widgets/qml/RoundButton.qml \
-	gui/qt/widgets/qml/RoundImage.qml \
 	gui/qt/widgets/qml/ScanProgressBar.qml \
 	gui/qt/widgets/qml/ScrollingText.qml \
 	gui/qt/widgets/qml/SearchBox.qml \
@@ -802,7 +816,7 @@ libqt_plugin_la_QML = \
 	gui/qt/widgets/qml/TextToolButton.qml \
 	gui/qt/widgets/qml/ToolTipArea.qml \
 	gui/qt/widgets/qml/VideoProgressBar.qml \
-	gui/qt/widgets/qml/VideoQualityLabel.qml \
+	gui/qt/widgets/qml/VideoQualityLabels.qml \
 	gui/qt/widgets/qml/ListSubtitleLabel.qml \
 	gui/qt/widgets/qml/PointingTooltip.qml \
 	gui/qt/widgets/qml/FrostedGlassEffect.qml \

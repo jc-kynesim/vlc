@@ -17,7 +17,7 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.4
+import QtQuick.Layouts 1.11
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///util/Helpers.js" as Helpers
@@ -59,12 +59,27 @@ Item {
 
                 anchors.fill: parent
                 source: (rowModel ? (root.showTitleText ? rowModel.cover : rowModel[model.criteria]) : VLCStyle.noArtCover) || VLCStyle.noArtCover
-                mipmap: true // this widget can down scale the source a lot, so for better visuals we use mipmap
                 playCoverVisible: currentlyFocused || containsMouse
                 playIconSize: VLCStyle.play_cover_small
-                onPlayIconClicked: medialib.addAndPlay( rowModel.id )
+                onPlayIconClicked: g_mainDisplay.play(medialib, rowModel.id)
                 radius: root.titleCover_radius
-                labels: root.titlecoverLabels(rowModel)
+
+                imageOverlay: Item {
+                    width: cover.width
+                    height: cover.height
+
+                    Widgets.VideoQualityLabels {
+                        anchors {
+                            top: parent.top
+                            right: parent.right
+                            topMargin: VLCStyle.margin_xxsmall
+                            leftMargin: VLCStyle.margin_xxsmall
+                            rightMargin: VLCStyle.margin_xxsmall
+                        }
+
+                        labels: root.titlecoverLabels(rowModel)
+                    }
+                }
             }
         }
 

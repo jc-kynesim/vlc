@@ -71,7 +71,7 @@
 #define CHROMA_TEXT N_("Image format (default RGB)")
 #define CHROMA_LONGTEXT N_("Chroma fourcc used by the framebuffer. Default is RGB since the fb device has no way to report its chroma.")
 
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context);
 static void Close(vout_display_t *vd);
 
@@ -80,11 +80,9 @@ vlc_module_begin ()
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     add_loadfile(FB_DEV_VAR, "/dev/fb0", DEVICE_TEXT, DEVICE_LONGTEXT)
-    add_bool("fb-tty", true, TTY_TEXT, TTY_LONGTEXT, true)
-    add_string( "fb-chroma", NULL, CHROMA_TEXT, CHROMA_LONGTEXT, true )
-    add_obsolete_string("fb-aspect-ratio")
-    add_integer("fb-mode", 4, FB_MODE_TEXT, FB_MODE_LONGTEXT,
-                 true)
+    add_bool("fb-tty", true, TTY_TEXT, TTY_LONGTEXT)
+    add_string( "fb-chroma", NULL, CHROMA_TEXT, CHROMA_LONGTEXT )
+    add_integer("fb-mode", 4, FB_MODE_TEXT, FB_MODE_LONGTEXT)
     add_obsolete_bool("fb-hw-accel") /* since 4.0.0 */
     set_description(N_("GNU/Linux framebuffer video output"))
     set_callback_display(Open, 30)
@@ -109,7 +107,7 @@ static int  TtyInit(vout_display_t *);
 static void TtyExit(vout_display_t *);
 
 /* */
-struct vout_display_sys_t {
+typedef struct vout_display_sys_t {
     /* System information */
     int                 tty;                          /* tty device handle */
     bool                is_tty;
@@ -142,7 +140,7 @@ struct vout_display_sys_t {
     size_t      video_size;                                    /* page size */
 
     picture_t       *picture;
-};
+} vout_display_sys_t;
 
 
 static void ClearScreen(vout_display_sys_t *sys)
@@ -162,18 +160,20 @@ static void ClearScreen(vout_display_sys_t *sys)
 }
 
 static const struct vlc_display_operations ops = {
-    Close, NULL, Display, Control, NULL, NULL,
+    .close = Close,
+    .display = Display,
+    .control = Control,
 };
 
 /**
  * This function allocates and initializes a FB vout method.
  */
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
 {
     vout_display_sys_t *sys;
 
-    if (vout_display_cfg_IsWindowed(cfg))
+    if (vout_display_cfg_IsWindowed(vd->cfg))
         return VLC_EGENERIC;
 
     /* Allocate instance and initialize some members */
@@ -328,7 +328,7 @@ static void Display(vout_display_t *vd, picture_t *picture)
     /* swap the two Y offsets if the drivers supports panning */
     if (sys->has_pan) {
         sys->var_info.yoffset = 0;
-        /*vd->sys->var_info.yoffset = vd->sys->var_info.yres; */
+        /*sys->var_info.yoffset = sys->var_info.yres; */
 
         /* the X offset should be 0, but who knows ...
          * some other app might have played with the framebuffer */

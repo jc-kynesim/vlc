@@ -73,6 +73,7 @@ static int DeinterlaceCallback(vlc_object_t *object, char const *cmd,
     const bool is_needed         = var_GetBool(vout,    "deinterlace-needed");
     if (!mode || !DeinterlaceIsModeValid(mode))
     {
+        msg_Err(vout, "unknown deinterlace mode %s", mode);
         free(mode);
         return VLC_EGENERIC;
     }
@@ -155,12 +156,14 @@ void vout_ReinitInterlacingSupport(vout_thread_t *vout, vout_thread_private_t *s
 
 void vout_SetInterlacingState(vout_thread_t *vout, vout_thread_private_t *sys, bool is_interlaced)
 {
+    const bool interlacing_change =
+        is_interlaced != sys->interlacing.is_interlaced;
+
     /* Wait 30s before quiting interlacing mode */
-    const int interlacing_change = (!!is_interlaced)
-                                 - (!!sys->interlacing.is_interlaced);
-    if (interlacing_change == 1 ||
-        (interlacing_change == -1 &&
-        sys->interlacing.date + VLC_TICK_FROM_SEC(30) < vlc_tick_now()))
+    const bool is_after_deadline =
+        sys->interlacing.date + VLC_TICK_FROM_SEC(30) < vlc_tick_now();
+
+    if (interlacing_change && (is_interlaced || is_after_deadline))
     {
         msg_Dbg(vout, "Detected %s video",
                  is_interlaced ? "interlaced" : "progressive");

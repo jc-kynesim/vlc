@@ -17,10 +17,10 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import "qrc:///util/KeyHelper.js" as KeyHelper
 
+import org.videolan.vlc 0.1
 
-NavigableFocusScope {
+FocusScope {
     id: gridview_id
 
     property int modelCount: view.count
@@ -107,7 +107,7 @@ NavigableFocusScope {
             }
 
             if (!event.accepted)
-                defaultKeyAction(event, currentIndex)
+                gridview_id.Navigation.defaultKeyAction(event)
         }
 
         Keys.onReleased: {

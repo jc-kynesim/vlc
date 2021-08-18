@@ -53,10 +53,6 @@
 #include <vlc_dialog.h>
 #include <vlc_iso_lang.h>
 
-/* FIXME we should find a better way than including that */
-#include "../../src/text/iso-639_def.h"
-
-
 #include <dvdnav/dvdnav.h>
 /* Expose without patching headers */
 dvdnav_status_t dvdnav_jump_to_sector_by_time(dvdnav_t *, uint64_t, int32_t);
@@ -92,9 +88,9 @@ vlc_module_begin ()
     set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACCESS )
     add_integer( "dvdnav-angle", 1, ANGLE_TEXT,
-        ANGLE_LONGTEXT, false )
+        ANGLE_LONGTEXT )
     add_bool( "dvdnav-menu", true,
-        MENU_TEXT, MENU_LONGTEXT, false )
+        MENU_TEXT, MENU_LONGTEXT )
     set_capability( "access", 305 )
     add_shortcut( "dvd", "dvdnav", "file" )
     set_callbacks( AccessDemuxOpen, Close )
@@ -420,7 +416,14 @@ static int AccessDemuxOpen ( vlc_object_t *p_this )
         goto bailout;
 
     /* Open dvdnav */
+#if DVDREAD_VERSION < DVDREAD_VERSION_CODE(6, 1, 2)
+    /* In libdvdread prior to 6.1.2, UTF8 is not supported for windows and
+     * requires a prior conversion.
+     * For non win32/os2 platforms, this is just a no-op */
     psz_path = ToLocale( psz_file );
+#else
+    psz_path = psz_file;
+#endif
 #if DVDNAV_VERSION >= 60100
     dvdnav_logger_cb cbs = { .pf_log = DvdNavLog };
     if( dvdnav_open2( &p_dvdnav, p_demux, &cbs, psz_path  ) != DVDNAV_STATUS_OK )
@@ -438,8 +441,10 @@ static int AccessDemuxOpen ( vlc_object_t *p_this )
 
 bailout:
     free( psz_file );
+#if DVDREAD_VERSION < DVDREAD_VERSION_CODE(6, 1, 2)
     if( psz_path )
         LocaleFree( psz_path );
+#endif
     return i_ret;
 }
 
@@ -1239,20 +1244,11 @@ static char *DemuxGetLanguageCode( demux_t *p_demux, const char *psz_var )
     if( ( p = strchr( psz_lang, ',' ) ) )
         *p = '\0';
 
-    for( pl = p_languages; pl->psz_eng_name != NULL; pl++ )
-    {
-        if( *psz_lang == '\0' )
-            continue;
-        if( !strcasecmp( pl->psz_eng_name, psz_lang ) ||
-            !strcasecmp( pl->psz_iso639_1, psz_lang ) ||
-            !strcasecmp( pl->psz_iso639_2T, psz_lang ) ||
-            !strcasecmp( pl->psz_iso639_2B, psz_lang ) )
-            break;
-    }
+    pl = vlc_find_iso639( psz_lang, true );
 
     free( psz_lang );
 
-    if( pl->psz_eng_name != NULL )
+    if( pl != NULL )
         return strdup( pl->psz_iso639_1 );
 
     return strdup(LANGUAGE_DEFAULT);

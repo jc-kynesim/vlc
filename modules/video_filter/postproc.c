@@ -46,8 +46,8 @@
 #   include <libpostproc/postprocess.h>
 #endif
 
-#ifndef PP_CPU_CAPS_ALTIVEC
-#   define PP_CPU_CAPS_ALTIVEC 0
+#ifndef PP_CPU_CAPS_AUTO
+#   define PP_CPU_CAPS_AUTO 0
 #endif
 
 /*****************************************************************************
@@ -70,7 +70,6 @@ static int PPNameCallback( vlc_object_t *, char const *,
     "1: hb, 2-4: hb+vb, 5-6: hb+vb+dr" )
 
 #define NAME_TEXT N_("FFmpeg post processing filter chains")
-#define NAME_LONGTEXT NAME_TEXT
 
 #define FILTER_PREFIX "postproc-"
 
@@ -87,10 +86,10 @@ vlc_module_begin ()
     set_callback_video_filter( OpenPostproc )
 
     add_integer_with_range( FILTER_PREFIX "q", PP_QUALITY_MAX, 0,
-                            PP_QUALITY_MAX, Q_TEXT, Q_LONGTEXT, false )
+                            PP_QUALITY_MAX, Q_TEXT, Q_LONGTEXT )
         change_safe()
     add_string( FILTER_PREFIX "name", "default", NAME_TEXT,
-                NAME_LONGTEXT, true )
+                NULL )
 vlc_module_end ()
 
 static const char *const ppsz_filter_options[] = {
@@ -121,7 +120,7 @@ static int OpenPostproc( filter_t *p_filter )
     filter_sys_t *p_sys;
     vlc_value_t val, val_orig;
     const char *desc;
-    int i_flags = 0;
+    int i_flags = PP_CPU_CAPS_AUTO;
 
     if( p_filter->fmt_in.video.i_chroma != p_filter->fmt_out.video.i_chroma ||
         p_filter->fmt_in.video.i_height != p_filter->fmt_out.video.i_height ||
@@ -130,19 +129,6 @@ static int OpenPostproc( filter_t *p_filter )
         msg_Err( p_filter, "Filter input and output formats must be identical" );
         return VLC_EGENERIC;
     }
-
-    /* Set CPU capabilities */
-#if defined(__i386__) || defined(__x86_64__)
-    if( vlc_CPU_MMX() )
-        i_flags |= PP_CPU_CAPS_MMX;
-    if( vlc_CPU_MMXEXT() )
-        i_flags |= PP_CPU_CAPS_MMX2;
-    if( vlc_CPU_3dNOW() )
-        i_flags |= PP_CPU_CAPS_3DNOW;
-#elif defined(__ppc__) || defined(__ppc64__) || defined(__powerpc__)
-    if( vlc_CPU_ALTIVEC() )
-        i_flags |= PP_CPU_CAPS_ALTIVEC;
-#endif
 
     switch( p_filter->fmt_in.video.i_chroma )
     {

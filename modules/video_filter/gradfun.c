@@ -60,9 +60,9 @@ vlc_module_begin()
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
     add_integer_with_range(CFG_PREFIX "radius", 16, RADIUS_MIN, RADIUS_MAX,
-                           RADIUS_TEXT, RADIUS_LONGTEXT, false)
+                           RADIUS_TEXT, RADIUS_LONGTEXT)
     add_float_with_range(CFG_PREFIX "strength", 1.2, STRENGTH_MIN, STRENGTH_MAX,
-                         STRENGTH_TEXT, STRENGTH_LONGTEXT, false)
+                         STRENGTH_TEXT, STRENGTH_LONGTEXT)
 
     set_callback_video_filter(Open)
 vlc_module_end()
@@ -71,11 +71,6 @@ vlc_module_end()
  * Local prototypes
  *****************************************************************************/
 #define FFMAX(a,b) __MAX(a,b)
-#ifdef CAN_COMPILE_MMXEXT
-#   define HAVE_MMX2 1
-#else
-#   define HAVE_MMX2 0
-#endif
 #ifdef CAN_COMPILE_SSE2
 #   define HAVE_SSE2 1
 #else
@@ -144,11 +139,6 @@ static int Open(filter_t *filter)
 #if HAVE_SSSE3
     if (vlc_CPU_SSSE3())
         cfg->filter_line = filter_line_ssse3;
-    else
-#endif
-#if HAVE_MMX2
-    if (vlc_CPU_MMXEXT())
-        cfg->filter_line = filter_line_mmx2;
     else
 #endif
         cfg->filter_line = filter_line_c;

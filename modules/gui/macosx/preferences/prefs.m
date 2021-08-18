@@ -456,19 +456,6 @@
     return nil;
 }
 
-- (bool)isSubCategoryGeneral:(int)category
-{
-    if (category == SUBCAT_VIDEO_GENERAL ||
-          category == SUBCAT_INPUT_GENERAL ||
-          category == SUBCAT_INTERFACE_GENERAL ||
-          category == SUBCAT_SOUT_GENERAL||
-          category == SUBCAT_PLAYLIST_GENERAL||
-          category == SUBCAT_AUDIO_GENERAL) {
-        return true;
-    }
-    return false;
-}
-
 /* Creates and returns the array of children
  * Loads children incrementally */
 - (NSMutableArray *)children
@@ -488,7 +475,7 @@
         VLCTreeSubCategoryItem * subCategoryItem = nil;
         VLCTreePluginItem * pluginItem = nil;
         module_config_t *p_configs = NULL;
-        int lastsubcat = 0;
+        int lastsubcat = SUBCAT_UNKNOWN;
         unsigned int confsize;
 
         module_t * p_module = modules[i];
@@ -510,7 +497,7 @@
             int configType = p_configs[j].i_type;
 
             if (configType == CONFIG_CATEGORY) {
-                if( p_configs[j].value.i == -1 ) {
+                if( p_configs[j].value.i == CAT_HIDDEN ) {
                     categoryItem = nil;
                     continue;
                 }
@@ -525,11 +512,11 @@
 
             if (configType == CONFIG_SUBCATEGORY) {
                 lastsubcat = (int)p_configs[j].value.i;
-                if( lastsubcat == -1 ) {
+                if( lastsubcat == SUBCAT_HIDDEN ) {
                     subCategoryItem = nil;
                     continue;
                 }
-                if (categoryItem && ![self isSubCategoryGeneral:lastsubcat]) {
+                if (categoryItem && !vlc_config_subcat_IsGeneral(lastsubcat)) {
                     subCategoryItem = [categoryItem itemRepresentingSubCategory:lastsubcat];
                     if (!subCategoryItem) {
                         subCategoryItem = [VLCTreeSubCategoryItem subCategoryTreeItemWithSubCategory:lastsubcat];
@@ -544,7 +531,7 @@
                 continue;
 
             if (mod_is_main) {
-                if (categoryItem && [self isSubCategoryGeneral:lastsubcat]) {
+                if (categoryItem && vlc_config_subcat_IsGeneral(lastsubcat)) {
                     [[categoryItem options] addObject:[[VLCTreeLeafItem alloc] initWithConfigItem:&p_configs[j]]];
                 } else if (subCategoryItem) {
                     [[subCategoryItem options] addObject:[[VLCTreeLeafItem alloc] initWithConfigItem:&p_configs[j]]];
@@ -636,7 +623,7 @@
 @implementation VLCTreePluginItem
 - (id)initWithPlugin:(module_t *)plugin
 {
-    NSString * name = _NS(module_get_name(plugin, false));
+    NSString * name = _NS(module_GetShortName(plugin));
     if (self = [super initWithName:name]) {
         _configItems = module_config_get(plugin, &_configSize);
         //_plugin = plugin;

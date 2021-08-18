@@ -42,6 +42,7 @@
 #define TITLE_EXTENSIONS_MEDIA qtr( "Media Files" )
 #define TITLE_EXTENSIONS_VIDEO qtr( "Video Files" )
 #define TITLE_EXTENSIONS_AUDIO qtr( "Audio Files" )
+#define TITLE_EXTENSIONS_IMAGE qtr( "Image Files" )
 #define TITLE_EXTENSIONS_PLAYLIST qtr( "Playlist Files" )
 #define TITLE_EXTENSIONS_SUBTITLE qtr( "Subtitle Files" )
 #define TITLE_EXTENSIONS_ALL qtr( "All Files" )
@@ -74,7 +75,7 @@ public:
         assert( instance );
         return instance;
     }
-    static DialogsProvider *getInstance( intf_thread_t *p_intf )
+    static DialogsProvider *getInstance( qt_intf_t *p_intf )
     {
         if( !instance )
             instance = new DialogsProvider( p_intf );
@@ -92,7 +93,7 @@ public:
                                 EXT_FILTER_PLAYLIST,
                                 const QUrl& path = QUrl() );
     bool isDying() { return b_isDying; }
-    static QString getDirectoryDialog( intf_thread_t *p_intf);
+    static QString getDirectoryDialog( qt_intf_t *p_intf);
 
     static QString getSaveFileName(QWidget *parent = NULL,
                                     const QString &caption = QString(),
@@ -109,13 +110,13 @@ protected:
     void customEvent( QEvent *);
 
 private:
-    DialogsProvider( intf_thread_t *);
+    DialogsProvider( qt_intf_t *);
     virtual ~DialogsProvider();
     static DialogsProvider *instance;
 
     void loadMediaFile( es_format_category_e category, int filter, const QString& dialogTitle );
 
-    intf_thread_t *p_intf;
+    qt_intf_t *p_intf;
 
     QMenu* popupMenu;
     QMenu* videoPopupMenu;
@@ -170,7 +171,7 @@ public slots:
     void PLOpenDir();
     void PLAppendDir();
 
-    void streamingDialog( QWidget *parent, const QStringList& mrls, bool b_stream = true,
+    void streamingDialog( QWindow *parent, const QStringList& mrls, bool b_stream = true,
                           QStringList options = QStringList("") );
     void streamingDialog( const QList<QUrl>& urls, bool b_stream = true );
     void openAndStreamingDialogs();

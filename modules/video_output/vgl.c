@@ -38,7 +38,7 @@
 #define GL_RGBA 0x1908
 #endif
 
-struct vout_display_sys_t
+typedef struct vout_display_sys_t
 {
     libvlc_video_output_cleanup_cb cleanupCb;
     libvlc_video_output_setup_cb setupCb;
@@ -50,7 +50,7 @@ struct vout_display_sys_t
     void* opaque;
     unsigned width;
     unsigned height;
-};
+} vout_display_sys_t;
 
 
 static void *OurGetProcAddress(vlc_gl_t *gl, const char *name)
@@ -126,7 +126,7 @@ static int Open(vlc_gl_t *gl, unsigned width, unsigned height)
     libvlc_video_engine_t engineType = var_InheritInteger( gl, "vout-cb-type" );
     if ( engineType != libvlc_video_engine_opengl &&
          engineType != libvlc_video_engine_gles2 )
-        return VLC_EBADVAR;
+        return VLC_ENOTSUP;
 
     /* Allocate structure */
     gl->sys = sys = vlc_obj_calloc(VLC_OBJECT(gl), 1, sizeof(*sys));

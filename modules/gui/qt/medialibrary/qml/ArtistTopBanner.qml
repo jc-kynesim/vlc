@@ -17,16 +17,18 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtQml.Models 2.11
 import QtGraphicalEffects 1.0
 
 import org.videolan.medialib 0.1
+import org.videolan.controls 0.1
+import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: root
 
     property var artist: ({})
@@ -73,12 +75,11 @@ Widgets.NavigableFocusScope {
             Layout.preferredHeight: VLCStyle.cover_normal
             Layout.preferredWidth: VLCStyle.cover_normal
 
-            Widgets.RoundImage {
+            RoundImage {
                 source: artist.cover || VLCStyle.noArtArtist
                 height: VLCStyle.cover_normal
                 width: VLCStyle.cover_normal
                 radius: VLCStyle.cover_normal
-
             }
 
             Rectangle {
@@ -114,27 +115,25 @@ Widgets.NavigableFocusScope {
                 id: actionButtons
 
                 focus: true
-                navigationParent: root
+                Navigation.parentItem: root
                 spacing: VLCStyle.margin_large
 
                 Layout.fillWidth: true
                 Layout.topMargin: VLCStyle.margin_large
 
                 model: ObjectModel {
-                    Widgets.TabButtonExt {
+                    Widgets.ActionButtonPrimary {
                         id: playActionBtn
                         iconTxt: VLCIcons.play
                         text: i18n.qtr("Play all")
-                        color: "white"
                         focus: true
                         onClicked: medialib.addAndPlay( artist.id )
                     }
 
-                    Widgets.TabButtonExt {
+                    Widgets.ActionButtonOverlay {
                         id: enqueueActionBtn
                         iconTxt: VLCIcons.enqueue
                         text: i18n.qtr("Enqueue all")
-                        color: "white"
                         onClicked: medialib.addToPlaylist( artist.id )
                     }
                 }

@@ -67,7 +67,7 @@
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
-static int  Open(vout_display_t *, const vout_display_cfg_t *,
+static int  Open(vout_display_t *,
                  video_format_t *, vlc_video_context *);
 static void Close(vout_display_t *);
 
@@ -99,14 +99,14 @@ vlc_module_begin ()
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
 
-    add_bool("direct3d9-hw-blending", true, HW_BLENDING_TEXT, HW_BLENDING_LONGTEXT, true)
-    add_bool("directx-hw-yuv", true, HW_YUV_TEXT, HW_YUV_LONGTEXT, true)
+    add_bool("direct3d9-hw-blending", true, HW_BLENDING_TEXT, HW_BLENDING_LONGTEXT)
+    add_bool("directx-hw-yuv", true, HW_YUV_TEXT, HW_YUV_LONGTEXT)
 
-    add_string("direct3d9-shader", "", PIXEL_SHADER_TEXT, PIXEL_SHADER_LONGTEXT, true)
+    add_string("direct3d9-shader", "", PIXEL_SHADER_TEXT, PIXEL_SHADER_LONGTEXT)
     add_loadfile("direct3d9-shader-file", NULL,
                  PIXEL_SHADER_FILE_TEXT, PIXEL_SHADER_FILE_LONGTEXT)
 
-    add_bool("direct3d9-dxvahd", true, DXVAHD_TEXT, DXVAHD_LONGTEXT, true)
+    add_bool("direct3d9-dxvahd", true, DXVAHD_TEXT, NULL)
 
     add_shortcut("direct3d9", "direct3d")
     set_callback_display(Open, 280)
@@ -130,7 +130,7 @@ typedef struct
     uint32_t     bmask;
 } d3d9_format_t;
 
-struct vout_display_sys_t
+typedef struct vout_display_sys_t
 {
     vout_display_sys_win32_t sys;       /* only use if sys.event is not NULL */
     display_win32_area_t     area;
@@ -172,7 +172,7 @@ struct vout_display_sys_t
         HMODULE                 dll;
         IDXVAHD_VideoProcessor *proc;
     } processor;
-};
+} vout_display_sys_t;
 
 /* */
 typedef struct
@@ -485,11 +485,13 @@ static void Direct3D9DestroyShaders(vout_display_t *vd)
  */
 static void Direct3D9DestroyResources(vout_display_t *vd)
 {
+    vout_display_sys_t *sys = vd->sys;
+
     Direct3D9DestroyScene(vd);
-    if (vd->sys->dx_render)
+    if (sys->dx_render)
     {
-        IDirect3DSurface9_Release(vd->sys->dx_render);
-        vd->sys->dx_render = NULL;
+        IDirect3DSurface9_Release(sys->dx_render);
+        sys->dx_render = NULL;
     }
     Direct3D9DestroyShaders(vd);
 }
@@ -1019,7 +1021,7 @@ static int Direct3D9RenderRegion(vout_display_t *vd,
 {
     vout_display_sys_t *sys = vd->sys;
 
-    IDirect3DDevice9 *d3ddev = vd->sys->d3d9_device->d3ddev.dev;
+    IDirect3DDevice9 *d3ddev = sys->d3d9_device->d3ddev.dev;
 
     HRESULT hr;
 
@@ -1201,7 +1203,7 @@ static void Prepare(vout_display_t *vd, picture_t *picture,
     {
         D3DLOCKED_RECT d3drect;
         surface = sys->dx_render;
-        HRESULT hr = IDirect3DSurface9_LockRect(surface, &d3drect, NULL, 0);
+        hr = IDirect3DSurface9_LockRect(surface, &d3drect, NULL, 0);
         if (unlikely(FAILED(hr))) {
             msg_Err(vd, "failed to lock surface");
             return;
@@ -1225,7 +1227,6 @@ static void Prepare(vout_display_t *vd, picture_t *picture,
                 surface = picsys->surface;
             else
             {
-                HRESULT hr;
                 RECT visibleSource;
                 visibleSource.left = 0;
                 visibleSource.top = 0;
@@ -1588,6 +1589,9 @@ static int InitRangeProcessor(vout_display_t *vd, const d3d9_format_t *d3dfmt,
         msg_Dbg(vd, "Failed to create the processor (error 0x%lX)", hr);
         goto error;
     }
+
+    free(capsList);
+    free(formatsList);
     IDXVAHD_Device_Release( hd_device );
 
     SetupProcessorInput(vd, vd->source, d3dfmt);
@@ -1761,13 +1765,16 @@ static void LocalSwapchainSwap( void *opaque )
 }
 
 static const struct vlc_display_operations ops = {
-    Close, Prepare, Display, Control, NULL, NULL,
+    .close = Close,
+    .prepare = Prepare,
+    .display = Display,
+    .control = Control,
 };
 
 /**
  * It creates a Direct3D vout display.
  */
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
 {
     vout_display_sys_t *sys;
@@ -1877,7 +1884,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     vd->ops = &ops;
 
     /* Change the window title bar text */
-    vout_window_SetTitle(cfg->window, VOUT_TITLE " (Direct3D9 output)");
+    vout_window_SetTitle(vd->cfg->window, VOUT_TITLE " (Direct3D9 output)");
 
     return VLC_SUCCESS;
 error:
@@ -1893,11 +1900,13 @@ error:
  */
 static void Close(vout_display_t *vd)
 {
+    vout_display_sys_t *sys = vd->sys;
+
     Direct3D9Close(vd);
 
-    CommonWindowClean(&vd->sys->sys);
+    CommonWindowClean(&sys->sys);
 
-    Direct3D9Destroy(vd->sys);
+    Direct3D9Destroy(sys);
 
-    free(vd->sys);
+    free(sys);
 }

@@ -603,6 +603,8 @@ static int BossCallback(vlc_object_t *p_this,
         _playerVoutListenerID = vlc_player_vout_AddListener(_p_player,
                                                             &player_vout_callbacks,
                                                             (__bridge void *)self);
+        
+        _volume = VLCVolumeDefault;
 
         libvlc_int_t *libvlc = vlc_object_instance(getIntf());
         var_AddCallback(libvlc, "intf-boss", BossCallback, (__bridge void *)self);
@@ -744,7 +746,7 @@ static int BossCallback(vlc_object_t *p_this,
 - (int)setCurrentMedia:(VLCInputItem *)currentMedia
 {
     if (currentMedia == NULL) {
-        return VLC_ENOITEM;
+        return VLC_ENOENT;
     }
     vlc_player_Lock(_p_player);
     int ret = vlc_player_SetCurrentMedia(_p_player, currentMedia.vlcInputItem);
@@ -1716,7 +1718,7 @@ static int BossCallback(vlc_object_t *p_this,
 - (int)enableAudioFilterWithName:(NSString *)name state:(BOOL)state
 {
     if (name == nil || name.length == 0) {
-        return VLC_EBADVAR;
+        return VLC_EINVAL;
     }
 
     return vlc_player_aout_EnableFilter(_p_player, [name UTF8String], state);

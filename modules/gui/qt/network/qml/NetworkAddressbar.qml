@@ -18,11 +18,15 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtQml.Models 2.11
+
+import org.videolan.vlc 0.1
 
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
+
+import org.videolan.vlc 0.1
 
 Control {
     id: control
@@ -45,7 +49,6 @@ Control {
                               contentItem.forceActiveFocus()
 
     function changeTree(newTree) {
-        popup.close()
         history.push(["mc", "network", {
                           "tree": newTree
                       }])
@@ -88,37 +91,41 @@ Control {
         AddressbarButton {
             id: homeButton
 
-            Layout.fillHeight: true
             text: VLCIcons.home
 
-            onClicked: control.homeButtonClicked()
-            Keys.onPressed: {
-                if (event.accepted || event.key !== Qt.Key_Right)
-                    return
+            Layout.fillHeight: true
+
+            Navigation.parentItem: control
+            Navigation.rightAction: function () {
                 if (menuButton.visible)
-                    menuButton.forceActiveFocus()
+                        menuButton.forceActiveFocus()
                 else
                     contentRepeater.itemAt(0).forceActiveFocus()
-                event.accepted = true
             }
+            Keys.priority: Keys.AfterItem
+            Keys.onPressed: Navigation.defaultKeyAction(event)
+
+            onClicked: control.homeButtonClicked()
         }
 
         AddressbarButton {
             id: menuButton
 
-            Layout.fillHeight: true
             visible: !!control._menuModel && control._menuModel.length > 0
             text: VLCIcons.back + VLCIcons.back
             font.pixelSize: VLCIcons.pixelSize(VLCStyle.icon_small)
-            KeyNavigation.left: homeButton
 
-            onClicked: popup.open()
-            Keys.onPressed: {
-                if (event.accepted || event.key !== Qt.Key_Right)
-                    return
+            Layout.fillHeight: true
+
+            Navigation.parentItem: control
+            Navigation.leftItem: homeButton
+            Navigation.rightAction: function () {
                 contentRepeater.itemAt(0).forceActiveFocus()
-                event.accepted = true
             }
+            Keys.priority: Keys.AfterItem
+            Keys.onPressed: Navigation.defaultKeyAction(event)
+
+            onClicked: popup.show()
         }
 
         Repeater {
@@ -131,26 +138,30 @@ Control {
                 Layout.maximumWidth: implicitWidth
                 focus: true
                 spacing: VLCStyle.margin_xxxsmall
-                onActiveFocusChanged: if (activeFocus)
-                                          btn.forceActiveFocus()
-                Keys.onPressed: {
-                    if (event.accepted)
-                        return
-                    if (event.key === Qt.Key_Right
-                            && index !== contentRepeater.count - 1) {
-                        contentRepeater.itemAt(index + 1).forceActiveFocus()
-                        event.accepted = true
-                    }
-                    else if (event.key === Qt.Key_Left) {
-                        if (index !== 0)
-                            contentRepeater.itemAt(index - 1).forceActiveFocus()
-                        else if (menuButton.visible)
-                            menuButton.forceActiveFocus()
-                        else
-                            homeButton.forceActiveFocus()
-                        event.accepted = true
-                    }
+                onActiveFocusChanged: {
+                    if (activeFocus)
+                                btn.forceActiveFocus()
                 }
+
+                Navigation.parentItem: control
+                Navigation.leftAction: function() {
+                    if (index !== 0)
+                        contentRepeater.itemAt(index - 1).forceActiveFocus()
+                    else if (menuButton.visible)
+                        menuButton.forceActiveFocus()
+                    else
+                        homeButton.forceActiveFocus()
+                }
+
+                Navigation.rightAction: function () {
+                    if (index !== contentRepeater.count - 1)
+                        contentRepeater.itemAt(index + 1).forceActiveFocus()
+                    else
+                        control.Navigation.defaultNavigationRight()
+                }
+
+                Keys.priority: Keys.AfterItem
+                Keys.onPressed: Navigation.defaultKeyAction(event)
 
                 AddressbarButton {
                     id: btn
@@ -196,110 +207,21 @@ Control {
         }
     }
 
-    Popup {
+    StringListMenu {
         id: popup
 
-        y: menuButton.height + VLCStyle.margin_xxsmall
-        closePolicy: Popup.CloseOnPressOutside | Popup.CloseOnEscape
-        width: VLCStyle.dp(150, VLCStyle.scale)
-        implicitHeight: contentItem.implicitHeight + padding * 2
-        leftPadding: 0
-        rightPadding: 0
+        function show() {
+            var model = control._menuModel.map(function (modelData) {
+                return modelData.display
+            })
 
-        onOpened: {
-            updateBgRect()
+            var point = control.mapToGlobal(0, menuButton.height + VLCStyle.margin_xxsmall)
 
-            menuButton.KeyNavigation.down = optionList
-            menuButton.highlighted = true
-            optionList.forceActiveFocus()
+            popup.popup(point, model)
         }
 
-        onClosed: {
-            menuButton.KeyNavigation.down = null
-            menuButton.highlighted = false
-            menuButton.forceActiveFocus()
-        }
-
-        contentItem: ListView {
-            id: optionList
-
-            implicitHeight: contentHeight
-            model: control._menuModel
-            spacing: VLCStyle.margin_xxxsmall
-            delegate: ItemDelegate {
-                id: delegate
-
-                text: modelData.display
-                width: parent.width
-                background: Rectangle {
-                    color: VLCStyle.colors.accent
-                    visible: parent.hovered || parent.activeFocus
-                }
-
-                contentItem: Widgets.ListLabel {
-                    text: delegate.text
-                }
-
-                onClicked: {
-                    changeTree(modelData.tree)
-                }
-            }
-        }
-
-        function updateBgRect() {
-            glassEffect.popupGlobalPos = g_root.mapFromItem(control, popup.x, popup.y)
-        }
-
-        background: Rectangle {
-            border.width: VLCStyle.dp(1)
-            border.color: VLCStyle.colors.accent
-
-            Widgets.FrostedGlassEffect {
-                id: glassEffect
-                source: g_root
-
-                anchors.fill: parent
-                anchors.margins: VLCStyle.dp(1)
-
-                property point popupGlobalPos
-                sourceRect: Qt.rect(popupGlobalPos.x, popupGlobalPos.y,
-                                    glassEffect.width, glassEffect.height)
-
-                tint: VLCStyle.colors.bg
-                tintStrength: 0.3
-            }
-        }
-
-        Connections {
-            target: mainInterfaceRect
-
-            enabled: popup.visible
-
-            onWidthChanged: {
-                popup.updateBgRect()
-            }
-
-            onHeightChanged: {
-                popup.updateBgRect()
-            }
-        }
-
-        Connections {
-            target: mainInterface
-
-            enabled: popup.visible
-
-            onIntfScaleFactorChanged: {
-                popup.updateBgRect()
-            }
-        }
-
-        Connections {
-            target: playlistColumn
-
-            onWidthChanged: {
-                popup.updateBgRect()
-            }
+        onSelected: {
+            changeTree(control._menuModel[index].tree)
         }
     }
 }

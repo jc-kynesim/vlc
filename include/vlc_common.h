@@ -395,8 +395,6 @@ typedef struct subpicture_region_t subpicture_region_t;
 typedef struct image_handler_t image_handler_t;
 
 /* Stream output */
-typedef struct sout_instance_t sout_instance_t;
-
 typedef struct sout_input_t sout_input_t;
 typedef struct sout_packetizer_input_t sout_packetizer_input_t;
 
@@ -476,16 +474,14 @@ typedef union
 #define VLC_ENOMEM         (-2)
 /** Timeout */
 #define VLC_ETIMEOUT       (-3)
-/** Module not found */
-#define VLC_ENOMOD         (-4)
-/** Object not found */
-#define VLC_ENOOBJ         (-5)
-/** Variable not found */
-#define VLC_ENOVAR         (-6)
+/** Not found */
+#define VLC_ENOENT         (-4)
 /** Bad variable value */
-#define VLC_EBADVAR        (-7)
-/** Item not found */
-#define VLC_ENOITEM        (-8)
+#define VLC_EINVAL         (-7)
+/** Operation forbidden */
+#define VLC_EACCES         (-9)
+/** Operation not supported */
+#define VLC_ENOTSUP        (-10)
 
 /*****************************************************************************
  * Variable callbacks: called when the value is modified
@@ -1229,5 +1225,11 @@ VLC_API const char * VLC_Compiler( void ) VLC_USED;
     "law.\nYou may redistribute it under the terms of the GNU General " \
     "Public License;\nsee the file named COPYING for details.\n" \
     "Written by the VideoLAN team; see the AUTHORS file.\n")
+
+#if defined(__cplusplus) || defined(_MSC_VER)
+#define ARRAY_STATIC_SIZE
+#else
+#define ARRAY_STATIC_SIZE  static
+#endif
 
 #endif /* !VLC_COMMON_H */

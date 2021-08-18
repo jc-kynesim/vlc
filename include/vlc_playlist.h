@@ -55,7 +55,7 @@ extern "C" {
  * The API directly exposes what list models require.
  *
  * The core playlist may be modified from any thread, so it may not be used as
- * a direct data source for a list model. In other word, the functions of a
+ * a direct data source for a list model. In other words, the functions of a
  * list model must not delegate the calls to the playlist. This would require
  * locking the playlist individually for each call to get the count and
  * retrieve each item (which is, in itself, not a good idea for UI
@@ -68,29 +68,29 @@ extern "C" {
  * out-of-sync view of the core playlist. This implies that the UI needs to
  * keep a copy of the playlist content.
  *
- * Note that the copy must not limited to the list of playlist items (pointers)
- * themselves, but also to the items content which is displayed and susceptible
- * to change asynchronously (e.g. media metadata, like title or duration). The
- * UI should never lock a media (input item) for rendering a playlist item;
- * otherwise, the content could be changed (and exposed) before the list model
- * notified the view of this change (which, again, would break the list model
- * expected behavior).
+ * Note that the copy must not be limited to the list of playlist items
+ * (pointers) themselves, but also to the item's content which is displayed and
+ * susceptible to change asynchronously (e.g. media metadata, like title or
+ * duration). The UI should never lock a media (input item) for rendering a
+ * playlist item; otherwise, the content could be changed (and exposed) before
+ * the list model notified the view of this change (which, again, would break
+ * the list model expected behavior).
  *
- * It is very important that the copy hold by the UI is only modified through
+ * It is very important that the copy held by the UI is only modified through
  * the core playlist callbacks, to guarantee that the indexes notified are
  * valid in the context of the list model. In other words, from the client, the
  * playlist copy is a read-only "desynchronized" view of the core playlist.
  *
  * Moreover, the events triggered by the playlist must be kept in order until
  * they are handled. The callbacks may be called from any thread, with lock
- * held (in practice, the thread from which a change is requested). An UI will
+ * held (in practice, the thread from which a change is requested). A UI will
  * typically need to handle the events in the UI thread, so it will usually
- * post the events in an even loop, to handle them from the UI thread. In that
+ * post the events in an event loop, to handle them from the UI thread. In that
  * case, be careful to always post the events in the event loop, even if the
  * current thread is already the UI thread, not to break the order of events.
  *
  * The playlist also handles the playback order and the repeat mode. It also
- * manages a cursor to the "current" item, and expose whether a previous and
+ * manages a cursor to the "current" item, and exposes whether previous and
  * next items (which depend on the playback order and repeat mode) are
  * available.
  *
@@ -98,7 +98,7 @@ extern "C" {
  * item, before the core playlist lock is successfully acquired, another client
  * may have changed the list. Therefore, vlc_playlist_Request*() functions are
  * exposed to resolve potential conflicts and apply the changes. The actual
- * changes applied are notified through the callbacks
+ * changes applied are notified through the callbacks.
  *
  * @{
  */
@@ -396,7 +396,8 @@ vlc_playlist_AddListener(vlc_playlist_t *playlist,
  *                 vlc_playlist_AddListener()
  */
 VLC_API void
-vlc_playlist_RemoveListener(vlc_playlist_t *, vlc_playlist_listener_id *);
+vlc_playlist_RemoveListener(vlc_playlist_t *playlist,
+                            vlc_playlist_listener_id *id);
 
 /**
  * Return the number of items.
@@ -687,7 +688,7 @@ vlc_playlist_GetPlaybackRepeat(vlc_playlist_t *playlist);
  * \return the playback order
  */
 VLC_API enum vlc_playlist_playback_order
-vlc_playlist_GetPlaybackOrder(vlc_playlist_t *);
+vlc_playlist_GetPlaybackOrder(vlc_playlist_t *playlist);
 
 /**
  * Change the playback "repeat" mode.
@@ -703,7 +704,7 @@ vlc_playlist_SetPlaybackRepeat(vlc_playlist_t *playlist,
  * Change the playback order
  *
  * \param playlist the playlist, locked
- * \param repeat the new playback order
+ * \param order the new playback order
  */
 VLC_API void
 vlc_playlist_SetPlaybackOrder(vlc_playlist_t *playlist,
@@ -777,7 +778,7 @@ vlc_playlist_GoTo(vlc_playlist_t *playlist, ssize_t index);
  *
  * If the index is known, use vlc_playlist_GoTo() instead.
  *
- * This is an helper to apply a desynchronized "go to" request, i.e. the
+ * This is a helper to apply a desynchronized "go to" request, i.e. the
  * playlist content may have changed since the request had been submitted.
  * This is typically the case for user requests (e.g. from UI), because the
  * playlist lock has to be acquired *after* the user requested the change.
@@ -818,7 +819,6 @@ vlc_playlist_Start(vlc_playlist_t *playlist);
  * Stop the player.
  *
  * \param playlist the playlist, locked
- * \return VLC_SUCCESS on success, another value on error
  */
 VLC_API void
 vlc_playlist_Stop(vlc_playlist_t *playlist);
@@ -827,7 +827,6 @@ vlc_playlist_Stop(vlc_playlist_t *playlist);
  * Pause the player.
  *
  * \param playlist the playlist, locked
- * \return VLC_SUCCESS on success, another value on error
  */
 VLC_API void
 vlc_playlist_Pause(vlc_playlist_t *playlist);
@@ -836,7 +835,6 @@ vlc_playlist_Pause(vlc_playlist_t *playlist);
  * Resume the player.
  *
  * \param playlist the playlist, locked
- * \return VLC_SUCCESS on success, another value on error
  */
 VLC_API void
 vlc_playlist_Resume(vlc_playlist_t *playlist);
@@ -861,7 +859,6 @@ vlc_playlist_PlayAt(vlc_playlist_t *playlist, size_t index)
  * Preparse a media, and expand it in the playlist on subitems added.
  *
  * \param playlist the playlist (not necessarily locked)
- * \param libvlc the libvlc instance
  * \param media the media to preparse
  */
 VLC_API void

@@ -29,7 +29,10 @@
 # include "config.h"
 #endif
 
+#include <assert.h>
+
 #include "qt.hpp"
+#include "maininterface/main_interface.hpp"
 #include "open_panels.hpp"
 #include "dialogs/open/open.hpp"
 #include "dialogs/dialogs_provider.hpp" /* Open Subtitle file */
@@ -76,7 +79,7 @@ static const char psz_devModule[][8] = { "v4l2", "pvr", "dtv",
 /**************************************************************************
  * Open Files and subtitles                                               *
  **************************************************************************/
-FileOpenPanel::FileOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
+FileOpenPanel::FileOpenPanel( QWidget *_parent, qt_intf_t *_p_intf ) :
                                 OpenPanel( _parent, _p_intf ), dialogBox( NULL )
 {
     /* Classic UI Setup */
@@ -130,7 +133,7 @@ inline void FileOpenPanel::BuildOldPanel()
 
     /* Make this QFileDialog a child of tempWidget from the ui. */
     dialogBox = new FileOpenBox( ui.tempWidget, NULL,
-                                 p_intf->p_sys->filepath, "" );
+                                 p_intf->p_mi->getDialogFilePath(), "" );
 
     dialogBox->setFileMode( QFileDialog::ExistingFiles );
     dialogBox->setAcceptMode( QFileDialog::AcceptOpen );
@@ -245,7 +248,7 @@ void FileOpenPanel::browseFile()
             );
         item->setFlags( Qt::ItemIsEnabled );
         ui.fileListWidg->addItem( item );
-        p_intf->p_sys->filepath = url;
+        p_intf->p_mi->setDialogFilePath(url);
     }
     updateButtons();
     updateMRL();
@@ -269,7 +272,7 @@ void FileOpenPanel::removeFile()
 void FileOpenPanel::browseFileSub()
 {
     QStringList urls = THEDP->showSimpleOpen( qtr("Open subtitle file"),
-                           EXT_FILTER_SUBTITLE, p_intf->p_sys->filepath );
+                           EXT_FILTER_SUBTITLE, p_intf->p_mi->getDialogFilePath() );
 
     if( urls.isEmpty() ) {
         return;
@@ -310,7 +313,7 @@ void FileOpenPanel::updateMRL()
 void FileOpenPanel::accept()
 {
     if( dialogBox )
-        p_intf->p_sys->filepath = dialogBox->directory().absolutePath();
+        p_intf->p_mi->setDialogFilePath(dialogBox->directory().absolutePath());
     ui.fileListWidg->clear();
     urlList.clear();
 }
@@ -335,7 +338,7 @@ void FileOpenPanel::updateButtons()
 /**************************************************************************
  * Open Discs ( DVD, CD, VCD and similar devices )                        *
  **************************************************************************/
-DiscOpenPanel::DiscOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
+DiscOpenPanel::DiscOpenPanel( QWidget *_parent, qt_intf_t *_p_intf ) :
                                 OpenPanel( _parent, _p_intf )
 {
     ui.setupUi( this );
@@ -349,8 +352,8 @@ DiscOpenPanel::DiscOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
     /* State to avoid overwritting the users changes with the configuration */
     m_discType = None;
 
-    ui.browseDiscButton->setToolTip( qtr( I_DEVICE_TOOLTIP ));
-    ui.deviceCombo->setToolTip( qtr(I_DEVICE_TOOLTIP) );
+    ui.browseDiscButton->setToolTip( qfut( I_DEVICE_TOOLTIP ));
+    ui.deviceCombo->setToolTip( qfut( I_DEVICE_TOOLTIP ) );
     ui.deviceCombo->setInsertPolicy( QComboBox::InsertAtTop );
 
 #if !defined( _WIN32 ) && !defined( __OS2__ )
@@ -649,7 +652,7 @@ void DiscOpenPanel::browseDevice()
 {
     const QStringList schemes = QStringList(QStringLiteral("file"));
     QString dir = QFileDialog::getExistingDirectoryUrl( this,
-            qtr( I_DEVICE_TOOLTIP ), p_intf->p_sys->filepath,
+            qfut( I_DEVICE_TOOLTIP ), p_intf->p_mi->getDialogFilePath(),
             QFileDialog::ShowDirsOnly, schemes ).toLocalFile();
     if( !dir.isEmpty() )
     {
@@ -671,7 +674,7 @@ void DiscOpenPanel::accept()
 /**************************************************************************
  * Open Network streams and URL pages                                     *
  **************************************************************************/
-NetOpenPanel::NetOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
+NetOpenPanel::NetOpenPanel( QWidget *_parent, qt_intf_t *_p_intf ) :
                                 OpenPanel( _parent, _p_intf )
 {
     ui.setupUi( this );
@@ -748,7 +751,7 @@ void NetOpenPanel::updateMRL()
 /**************************************************************************
  * Open Capture device ( DVB, PVR, V4L, and similar )                     *
  **************************************************************************/
-CaptureOpenPanel::CaptureOpenPanel( QWidget *_parent, intf_thread_t *_p_intf ) :
+CaptureOpenPanel::CaptureOpenPanel( QWidget *_parent, qt_intf_t *_p_intf ) :
                                 OpenPanel( _parent, _p_intf )
 {
     isInitialized = false;
@@ -786,7 +789,7 @@ void CaptureOpenPanel::initialize()
     layout * name ## PropLayout = new layout;               \
     name ## DevPage->setLayout( name ## DevLayout );                  \
     name ## PropPage->setLayout( name ## PropLayout );                \
-    ui.deviceCombo->addItem( qtr( label ), QVariant( number ) );
+    ui.deviceCombo->addItem( qfut( label ), QVariant( number ) );
 
 #define CuMRL( widget, slot ) CONNECT( widget , slot , this, updateMRL() );
 
@@ -800,14 +803,12 @@ void CaptureOpenPanel::initialize()
     /* dshow Main */
     int line = 0;
     module_config_t *p_config = config_FindConfig( "dshow-vdev" );
-    vdevDshowW = new StringListConfigControl(
-        VLC_OBJECT(p_intf), p_config, this );
+    vdevDshowW = new StringListConfigControl( p_config, this );
     vdevDshowW->insertIntoExistingGrid( dshowDevLayout, line );
     line++;
 
     p_config = config_FindConfig( "dshow-adev" );
-    adevDshowW = new StringListConfigControl(
-        VLC_OBJECT(p_intf), p_config, this );
+    adevDshowW = new StringListConfigControl( p_config, this );
     adevDshowW->insertIntoExistingGrid( dshowDevLayout, line );
     line++;
 
@@ -834,7 +835,7 @@ void CaptureOpenPanel::initialize()
         "video*"
     };
     if( module_exists( "v4l2" ) ){
-    addModuleAndLayouts( V4L2_DEVICE, v4l2, "Video camera", QGridLayout );
+    addModuleAndLayouts( V4L2_DEVICE, v4l2, N_("Video camera"), QGridLayout );
 
     /* V4L2 main panel */
     QLabel *v4l2VideoDeviceLabel = new QLabel( qtr( "Video device name" ) );
@@ -887,7 +888,7 @@ void CaptureOpenPanel::initialize()
      * JACK *
      *******/
     if( module_exists( "jack" ) ){
-    addModuleAndLayouts( JACK_DEVICE, jack, "JACK Audio Connection Kit",
+    addModuleAndLayouts( JACK_DEVICE, jack, N_("JACK Audio Connection Kit"),
                          QGridLayout);
 
     /* Jack Main panel */
@@ -1116,7 +1117,7 @@ void CaptureOpenPanel::initialize()
     /**********
      * Screen *
      **********/
-    addModuleAndLayouts( SCREEN_DEVICE, screen, "Desktop", QGridLayout );
+    addModuleAndLayouts( SCREEN_DEVICE, screen, N_("Desktop"), QGridLayout );
     QLabel *screenLabel = new QLabel( qtr( "Your display will be "
             "opened and played in order to stream or save it." ) );
     screenLabel->setWordWrap( true );
@@ -1372,7 +1373,7 @@ void CaptureOpenPanel::advancedDialog()
 
         msg_Dbg( p_intf, "item %s", p_item->psz_name);
         ConfigControl *config = ConfigControl::createControl(
-                        VLC_OBJECT( p_intf ), p_item, advFrame, gLayout, n );
+                                    p_item, advFrame, gLayout, n );
         if( config )
             controls.append( config );
     }
@@ -1400,19 +1401,20 @@ void CaptureOpenPanel::advancedDialog()
 
             tempMRL += (i ? " :" : ":");
 
-            if( control->getType() == CONFIG_ITEM_BOOL )
+            int ctrl_type = control->getType();
+            assert(ctrl_type != -1);
+
+            ctrl_type = CONFIG_CLASS(ctrl_type);
+
+            if( ctrl_type == CONFIG_ITEM_BOOL )
                 if( !(qobject_cast<VIntConfigControl *>(control)->getValue() ) )
                     tempMRL += "no-";
 
             tempMRL += control->getName();
 
-            switch( control->getType() )
+            switch( ctrl_type )
             {
                 case CONFIG_ITEM_STRING:
-                case CONFIG_ITEM_LOADFILE:
-                case CONFIG_ITEM_SAVEFILE:
-                case CONFIG_ITEM_DIRECTORY:
-                case CONFIG_ITEM_MODULE:
                     tempMRL += colon_escape( QString("=%1").arg( qobject_cast<VStringConfigControl *>(control)->getValue() ) );
                     break;
                 case CONFIG_ITEM_INTEGER:

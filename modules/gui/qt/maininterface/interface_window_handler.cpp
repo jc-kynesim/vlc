@@ -19,8 +19,9 @@
 #include "main_interface.hpp"
 #include <player/player_controller.hpp>
 #include <playlist/playlist_controller.hpp>
+#include <QScreen>
 
-InterfaceWindowHandler::InterfaceWindowHandler(intf_thread_t *_p_intf, MainInterface* mainInterface, QWindow* window, QObject *parent)
+InterfaceWindowHandler::InterfaceWindowHandler(qt_intf_t *_p_intf, MainInterface* mainInterface, QWindow* window, QObject *parent)
     : QObject(parent)
     , p_intf(_p_intf)
     , m_window(window)
@@ -35,8 +36,14 @@ InterfaceWindowHandler::InterfaceWindowHandler(intf_thread_t *_p_intf, MainInter
     m_window->setIcon( QApplication::windowIcon() );
     m_window->setOpacity( var_InheritFloat( p_intf, "qt-opacity" ) );
 
+    m_window->setMinimumWidth( 450 );
+    m_window->setMinimumHeight( 300 );
+
+    QVLCTools::restoreWindowPosition( getSettings(), m_window, QSize(600, 420) );
+
     WindowStateHolder::holdOnTop( m_window,  WindowStateHolder::INTERFACE, m_mainInterface->isInterfaceAlwaysOnTop() );
-    WindowStateHolder::holdFullscreen( m_window,  WindowStateHolder::INTERFACE, m_mainInterface->isInterfaceFullScreen() );
+    WindowStateHolder::holdFullscreen( m_window,  WindowStateHolder::INTERFACE, m_window->visibility() == QWindow::FullScreen );
+
 
     if (m_mainInterface->isHideAfterCreation())
     {
@@ -55,6 +62,13 @@ InterfaceWindowHandler::InterfaceWindowHandler(intf_thread_t *_p_intf, MainInter
         connect( THEMIM, &PlayerController::nameChanged, m_window, &QWindow::setTitle );
     }
 
+    connect( m_window, &QWindow::screenChanged, m_mainInterface, &MainInterface::updateIntfScaleFactor);
+    m_mainInterface->updateIntfScaleFactor();
+
+    m_mainInterface->onWindowVisibilityChanged(m_window->visibility());
+    connect( m_window, &QWindow::visibilityChanged,
+             m_mainInterface, &MainInterface::onWindowVisibilityChanged);
+
     connect( m_mainInterface, &MainInterface::askBoss,
              this, &InterfaceWindowHandler::setBoss, Qt::QueuedConnection  );
     connect( m_mainInterface, &MainInterface::askRaise,
@@ -63,7 +77,7 @@ InterfaceWindowHandler::InterfaceWindowHandler(intf_thread_t *_p_intf, MainInter
     connect( m_mainInterface, &MainInterface::interfaceAlwaysOnTopChanged,
              this, &InterfaceWindowHandler::setInterfaceAlwaysOnTop);
 
-    connect( m_mainInterface, &MainInterface::interfaceFullScreenChanged,
+    connect( m_mainInterface, &MainInterface::setInterfaceFullScreen,
              this, &InterfaceWindowHandler::setInterfaceFullScreen);
 
     connect( m_mainInterface, &MainInterface::toggleWindowVisibility,
@@ -75,6 +89,17 @@ InterfaceWindowHandler::InterfaceWindowHandler(intf_thread_t *_p_intf, MainInter
     connect(this, &InterfaceWindowHandler::incrementIntfUserScaleFactor,
             m_mainInterface, &MainInterface::incrementIntfUserScaleFactor);
 
+#if QT_CLIENT_SIDE_DECORATION_AVAILABLE
+    connect( m_mainInterface, &MainInterface::useClientSideDecorationChanged,
+             this, &InterfaceWindowHandler::updateCSDWindowSettings );
+#endif
+
+    connect(m_mainInterface, &MainInterface::requestInterfaceMaximized,
+            m_window, &QWindow::showMaximized);
+
+    connect(m_mainInterface, &MainInterface::requestInterfaceNormal,
+            m_window, &QWindow::showNormal);
+
     m_window->installEventFilter(this);
 }
 
@@ -83,9 +108,11 @@ InterfaceWindowHandler::~InterfaceWindowHandler()
     m_window->removeEventFilter(this);
     WindowStateHolder::holdOnTop( m_window,  WindowStateHolder::INTERFACE, false );
     WindowStateHolder::holdFullscreen( m_window,  WindowStateHolder::INTERFACE, false );
+    /* Save this size */
+    QVLCTools::saveWindowPosition(getSettings(), m_window);
 }
 
-#if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
+#if QT_CLIENT_SIDE_DECORATION_AVAILABLE
 bool InterfaceWindowHandler::CSDSetCursor(QMouseEvent* mouseEvent)
 {
     if (!m_mainInterface->useClientSideDecoration())
@@ -97,7 +124,7 @@ bool InterfaceWindowHandler::CSDSetCursor(QMouseEvent* mouseEvent)
     const int y = mouseEvent->y();
     const int winHeight = m_window->height();
     const int winWidth = m_window->width();
-    const int b = 5 * m_mainInterface->getIntfScaleFactor();
+    const int b = m_mainInterface->CSDBorderSize();
 
     if (x < b && y < b) shape = Qt::SizeFDiagCursor;
     else if (x >= winWidth - b && y >= winHeight - b) shape = Qt::SizeFDiagCursor;
@@ -121,7 +148,7 @@ bool InterfaceWindowHandler::CSDHandleClick(QMouseEvent* mouseEvent)
 {
     if (!m_mainInterface->useClientSideDecoration())
         return false;
-    const int b = 5 * m_mainInterface->getIntfScaleFactor();
+    const int b = m_mainInterface->CSDBorderSize();
     if( mouseEvent->buttons() != Qt::LeftButton)
         return false;
     if ((m_window->visibility() & QWindow::Maximized) != 0)
@@ -136,6 +163,13 @@ bool InterfaceWindowHandler::CSDHandleClick(QMouseEvent* mouseEvent)
         return true;
     }
     return false;
+}
+
+void InterfaceWindowHandler::updateCSDWindowSettings()
+{
+    m_window->hide(); // some window managers don't like to change frame window hint on visible window
+    m_window->setFlag(Qt::FramelessWindowHint, m_mainInterface->useClientSideDecoration());
+    m_window->show();
 }
 #endif
 
@@ -206,7 +240,45 @@ bool InterfaceWindowHandler::eventFilter(QObject*, QEvent* event)
         }
         break;
     }
-#if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
+    case QEvent::DragEnter:
+    {
+        auto enterEvent = static_cast<QDragEnterEvent*>(event);
+        enterEvent->acceptProposedAction();
+        return true;
+    }
+    case QEvent::DragMove:
+    {
+        auto moveEvent = static_cast<QDragMoveEvent*>(event);
+        moveEvent->acceptProposedAction();
+        return true;
+    }
+    case QEvent::DragLeave:
+    {
+        event->accept();
+        return true;
+    }
+    case QEvent::Drop:
+    {
+        auto dropEvent = static_cast<QDropEvent*>(event);
+        m_mainInterface->dropEventPlay(dropEvent, true);
+        return true;
+    }
+    case QEvent::Close:
+    {
+        bool ret = m_mainInterface->onWindowClose(m_window);
+        if (ret)
+        {
+            /* Accept session quit. Otherwise we break the desktop mamager. */
+            event->accept();
+            return false;
+        }
+        else
+        {
+            event->ignore();
+            return true;
+        }
+    }
+#if QT_CLIENT_SIDE_DECORATION_AVAILABLE
     //Handle CSD edge behaviors
     case QEvent::MouseMove:
     {

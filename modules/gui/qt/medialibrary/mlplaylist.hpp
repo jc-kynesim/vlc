@@ -24,22 +24,17 @@
 #endif
 
 // MediaLibrary includes
-#include "mlqmltypes.hpp"
+#include "mlitemcover.hpp"
 
-// Qt includes
-#include <QObject>
-
-class MLPlaylist : public QObject, public MLItem
+class MLPlaylist : public MLItemCover
 {
-    Q_OBJECT
-
 public:
-    MLPlaylist(vlc_medialibrary_t * ml,
-               const vlc_ml_playlist_t * data, QObject * parent = nullptr);
+    MLPlaylist(vlc_medialibrary_t * ml, const vlc_ml_playlist_t * data);
 
 public: // Interface
-    QString getName () const;
-    QString getCover() const;
+    QString getName() const;
+
+    int64_t getDuration() const;
 
     unsigned int getCount() const;
 
@@ -47,7 +42,8 @@ private:
     vlc_medialibrary_t * m_ml;
 
     QString m_name;
-    QString m_cover;
+
+    int64_t m_duration;
 
     unsigned int m_count;
 };

@@ -38,7 +38,7 @@
 #include "pictures.h"
 #include "events.h"
 
-struct vout_display_sys_t
+typedef struct vout_display_sys_t
 {
     xcb_connection_t *conn;
 
@@ -48,7 +48,7 @@ struct vout_display_sys_t
     bool attached;
     uint8_t depth; /* useful bits per pixel */
     video_format_t fmt;
-};
+} vout_display_sys_t;
 
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic,
                     vlc_tick_t date)
@@ -251,13 +251,17 @@ static xcb_visualid_t ScreenToFormat(const xcb_setup_t *setup,
 }
 
 static const struct vlc_display_operations ops = {
-    Close, Prepare, Display, Control, ResetPictures, NULL,
+    .close = Close,
+    .prepare = Prepare,
+    .display = Display,
+    .control = Control,
+    .reset_pictures = ResetPictures,
 };
 
 /**
  * Probe the X server.
  */
-static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open (vout_display_t *vd,
                  video_format_t *fmtp, vlc_video_context *context)
 {
     vout_display_sys_t *sys = malloc (sizeof (*sys));
@@ -269,7 +273,7 @@ static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
     /* Get window, connect to X server */
     xcb_connection_t *conn;
     const xcb_screen_t *scr;
-    if (vlc_xcb_parent_Create(vd, cfg->window, &conn, &scr) != VLC_SUCCESS)
+    if (vlc_xcb_parent_Create(vd, vd->cfg->window, &conn, &scr) != VLC_SUCCESS)
     {
         free (sys);
         return VLC_EGENERIC;
@@ -317,11 +321,11 @@ static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
     };
     vout_display_place_t place;
 
-    vout_display_PlacePicture(&place, vd->source, cfg);
+    vout_display_PlacePicture(&place, vd->source, vd->cfg);
     sys->window = xcb_generate_id (conn);
     sys->gc = xcb_generate_id (conn);
 
-    xcb_create_window(conn, sys->depth, sys->window, cfg->window->handle.xid,
+    xcb_create_window(conn, sys->depth, sys->window, vd->cfg->window->handle.xid,
         place.x, place.y, place.width, place.height, 0,
         XCB_WINDOW_CLASS_INPUT_OUTPUT, vid, mask, values);
     xcb_map_window(conn, sys->window);
@@ -358,6 +362,4 @@ vlc_module_begin()
     set_subcategory(SUBCAT_VIDEO_VOUT)
     set_callback_display(Open, 100)
     add_shortcut("xcb-x11", "x11")
-
-    add_obsolete_bool("x11-shm") /* obsoleted since 2.0.0 */
 vlc_module_end()

@@ -201,13 +201,13 @@ vlc_module_begin ()
     set_subcategory(SUBCAT_INPUT_VCODEC)
     set_section(N_("Decoding"), NULL)
     set_capability("video decoder", 800)
-    add_bool("mediacodec", true, MEDIACODEC_ENABLE_TEXT, NULL, false)
+    add_bool("mediacodec", true, MEDIACODEC_ENABLE_TEXT, NULL)
     add_bool(CFG_PREFIX "dr", true,
-             DIRECTRENDERING_TEXT, DIRECTRENDERING_LONGTEXT, true)
+             DIRECTRENDERING_TEXT, DIRECTRENDERING_LONGTEXT)
     add_bool(CFG_PREFIX "audio", false,
-             MEDIACODEC_AUDIO_TEXT, MEDIACODEC_AUDIO_LONGTEXT, true)
+             MEDIACODEC_AUDIO_TEXT, MEDIACODEC_AUDIO_LONGTEXT)
     add_bool(CFG_PREFIX "tunneled-playback", false,
-             MEDIACODEC_TUNNELEDPLAYBACK_TEXT, NULL, true)
+             MEDIACODEC_TUNNELEDPLAYBACK_TEXT, NULL)
     set_callbacks(OpenDecoderNdk, CloseDecoder)
     add_shortcut("mediacodec_ndk")
     add_submodule ()
@@ -1457,6 +1457,12 @@ static void *OutThread(void *data)
                 continue;
         }
 
+        if (i_index == MC_API_ERROR)
+        {
+            msg_Warn(p_dec, "Failure in MediaCodec.dequeueOutputBuffer");
+            break;
+        }
+
         /* Process output returned by dequeue_out */
         if (i_index >= 0 || i_index == MC_API_INFO_OUTPUT_FORMAT_CHANGED
          || i_index == MC_API_INFO_OUTPUT_BUFFERS_CHANGED)
@@ -1495,7 +1501,8 @@ static void *OutThread(void *data)
         else
             break;
     }
-    msg_Warn(p_dec, "OutThread stopped");
+    if (!p_sys->b_decoder_dead)
+        msg_Warn(p_dec, "OutThread stopped");
 
     /* Signal DecoderFlush that the output thread aborted */
     p_sys->b_aborted = true;

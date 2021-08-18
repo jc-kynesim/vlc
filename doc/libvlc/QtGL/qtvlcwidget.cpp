@@ -7,9 +7,8 @@
 #include <QOffscreenSurface>
 #include <QThread>
 #include <QSemaphore>
+#include <QMutex>
 #include <cmath>
-
-#include <mutex>
 
 #include <vlc/vlc.h>
 
@@ -58,7 +57,7 @@ public:
     /// return the texture to be displayed
     QOpenGLFramebufferObject *getVideoFrame()
     {
-        std::lock_guard<std::mutex> lock(m_text_lock);
+        QMutexLocker locker(&m_text_lock);
         if (m_updated) {
             std::swap(m_idx_swap, m_idx_display);
             m_updated = false;
@@ -134,7 +133,7 @@ public:
     static void swap(void* data)
     {
         VLCVideo* that = static_cast<VLCVideo*>(data);
-        std::lock_guard<std::mutex> lock(that->m_text_lock);
+        QMutexLocker locker(&that->m_text_lock);
         that->m_updated = true;
         that->mWidget->update();
         std::swap(that->m_idx_swap, that->m_idx_render);
@@ -176,10 +175,8 @@ private:
     //FBO data
     unsigned m_width = 0;
     unsigned m_height = 0;
-    std::mutex m_text_lock;
+    QMutex m_text_lock;
     QOpenGLFramebufferObject *mBuffers[3];
-    GLuint m_tex[3];
-    GLuint m_fbo[3];
     size_t m_idx_render = 0;
     size_t m_idx_swap = 1;
     size_t m_idx_display = 2;
@@ -287,6 +284,20 @@ static const char *vertexShaderSource =
     "}\n";
 
 static const char *fragmentShaderSource =
+    /* Precision is available but no-op on GLSL 130 (see [3], section 4.5.2)
+     * and mandatory for OpenGL ES. It was first reserved on GLSL 120 and
+     * didn't exist in GLSL <= 110 (= OpenGL 2.0). Since it's a no-op, the
+     * easiest solution is to never use it for OpenGL code.
+     *
+     * [1]: https://www.khronos.org/registry/OpenGL/specs/gl/GLSLangSpec.1.10.pdf
+     * [2]: https://www.khronos.org/registry/OpenGL/specs/gl/GLSLangSpec.1.20.pdf
+     * [3]: https://www.khronos.org/registry/OpenGL/specs/gl/GLSLangSpec.1.30.pdf
+     */
+    "#ifdef GL_ES\n"
+    "precision highp float;\n"
+    "#endif\n"
+
+    "\n"
     "uniform sampler2D texture;\n"
     "\n"
     "varying vec2 texcoord;\n"
@@ -340,15 +351,16 @@ void QtVLCWidget::initializeGL()
 
 void QtVLCWidget::paintGL()
 {
+    QOpenGLFunctions *GL = context()->functions();
     QOpenGLFramebufferObject *fbo = mVLC->getVideoFrame();
-    if (fbo != NULL)
+    if (fbo != NULL && GL != NULL)
     {
         m_program->bind();
 
-        glClearColor(1.0, 0.5, 0.0, 1.0);
+        GL->glClearColor(1.0, 0.5, 0.0, 1.0);
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, fbo->takeTexture());
+        GL->glActiveTexture(GL_TEXTURE0);
+        GL->glBindTexture(GL_TEXTURE_2D, fbo->takeTexture());
 
         vertexBuffer.bind();
         m_program->setAttributeArray("position", (const QVector2D *)nullptr, sizeof(GLfloat)*2);
@@ -357,7 +369,7 @@ void QtVLCWidget::paintGL()
         m_program->enableAttributeArray("position");
 
         vertexIndexBuffer.bind();
-        glDrawElements(
+        GL->glDrawElements(
             GL_TRIANGLE_STRIP,  /* mode */
             4,                  /* count */
             GL_UNSIGNED_SHORT,  /* type */

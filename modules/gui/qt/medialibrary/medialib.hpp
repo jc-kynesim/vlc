@@ -39,24 +39,24 @@ class MediaLib : public QObject
 {
     Q_OBJECT
 
-    Q_PROPERTY(bool discoveryPending READ discoveryPending NOTIFY discoveryPendingChanged)
-    Q_PROPERTY(int  parsingProgress READ parsingProgress NOTIFY parsingProgressChanged)
-    Q_PROPERTY(QString discoveryEntryPoint READ discoveryEntryPoint NOTIFY discoveryEntryPointChanged)
-    Q_PROPERTY(bool idle READ idle NOTIFY idleChanged)
+    Q_PROPERTY(bool discoveryPending READ discoveryPending NOTIFY discoveryPendingChanged FINAL)
+    Q_PROPERTY(int  parsingProgress READ parsingProgress NOTIFY parsingProgressChanged FINAL)
+    Q_PROPERTY(QString discoveryEntryPoint READ discoveryEntryPoint NOTIFY discoveryEntryPointChanged FINAL)
+    Q_PROPERTY(bool idle READ idle NOTIFY idleChanged FINAL)
 
 public:
-    MediaLib(intf_thread_t* _intf, QObject* _parent = nullptr );
+    MediaLib(qt_intf_t* _intf, QObject* _parent = nullptr );
 
-    Q_INVOKABLE void addToPlaylist(const MLItemId &itemId, const QStringList* options = nullptr);
-    Q_INVOKABLE void addToPlaylist(const QString& mrl, const QStringList* options = nullptr);
-    Q_INVOKABLE void addToPlaylist(const QUrl& mrl, const QStringList* options = nullptr);
-    Q_INVOKABLE void addToPlaylist(const QVariantList& itemIdList, const QStringList* options = nullptr);
+    Q_INVOKABLE void addToPlaylist(const MLItemId &itemId, const QStringList &options = {});
+    Q_INVOKABLE void addToPlaylist(const QString& mrl, const QStringList &options = {});
+    Q_INVOKABLE void addToPlaylist(const QUrl& mrl, const QStringList &options = {});
+    Q_INVOKABLE void addToPlaylist(const QVariantList& itemIdList, const QStringList &options = {});
 
-    Q_INVOKABLE void addAndPlay(const MLItemId &itemId, const QStringList* options = nullptr);
-    Q_INVOKABLE void addAndPlay(const QString& mrl, const QStringList* options = nullptr);
-    Q_INVOKABLE void addAndPlay(const QUrl& mrl, const QStringList* options = nullptr);
-    Q_INVOKABLE void addAndPlay(const QVariantList&itemIdList, const QStringList* options = nullptr);
-    Q_INVOKABLE void insertIntoPlaylist(size_t index, const QVariantList &itemIds /*QList<MLParentId>*/, const QStringList *options = nullptr);
+    Q_INVOKABLE void addAndPlay(const MLItemId &itemId, const QStringList &options = {});
+    Q_INVOKABLE void addAndPlay(const QString& mrl, const QStringList &options = {});
+    Q_INVOKABLE void addAndPlay(const QUrl& mrl, const QStringList &options = {});
+    Q_INVOKABLE void addAndPlay(const QVariantList&itemIdList, const QStringList &options = {});
+    Q_INVOKABLE void insertIntoPlaylist(size_t index, const QVariantList &itemIds /*QList<MLParentId>*/, const QStringList &options = {});
 
     Q_INVOKABLE void reload();
 
@@ -70,8 +70,6 @@ public:
     QThreadPool &threadPool() { return m_threadPool; }
 
 signals:
-    void reloadStarted();
-    void reloadCompleted();
     void discoveryStarted();
     void discoveryCompleted();
     void parsingProgressChanged( quint32 percent );
@@ -83,7 +81,7 @@ private:
     static void onMediaLibraryEvent( void* data, const vlc_ml_event_t* event );
 
 private:
-    intf_thread_t* m_intf;
+    qt_intf_t* m_intf;
 
     bool m_idle = false;
     bool m_discoveryPending = false;

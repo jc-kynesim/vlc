@@ -45,7 +45,9 @@
 
 #include "sdiout.hpp"
 
+#ifdef HAVE_ARPA_INET_H
 #include <arpa/inet.h>
+#endif
 
 #define DECKLINK_CARD_BUFFER (CLOCK_FREQ)
 #define DECKLINK_PREROLL (CLOCK_FREQ*3/4)
@@ -649,7 +651,7 @@ int DBMSDIOutput::doSchedule()
         StartPlayback();
     }
 
-    return (bufferedFramesCount < bufferedFramesTarget) ? VLC_ENOITEM : VLC_SUCCESS;
+    return (bufferedFramesCount < bufferedFramesTarget) ? VLC_EGENERIC : VLC_SUCCESS;
 }
 
 int DBMSDIOutput::ProcessAudio(block_t *p_block)

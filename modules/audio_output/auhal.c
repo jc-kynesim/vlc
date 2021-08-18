@@ -24,14 +24,16 @@
 
 #pragma mark includes
 
-#import "coreaudio_common.h"
+#include "coreaudio_common.h"
 
-#import <vlc_plugin.h>
-#import <vlc_dialog.h>                      // vlc_dialog_display_error
-#import <vlc_charset.h>                     // FromCFString
+#include <vlc_plugin.h>
+#include <vlc_dialog.h>                      // vlc_dialog_display_error
+#include <vlc_charset.h>                     // FromCFString
 
-#import <CoreAudio/CoreAudio.h>             // AudioDeviceID
-#import <CoreServices/CoreServices.h>
+#include <CoreAudio/CoreAudio.h>             // AudioDeviceID
+#include <CoreServices/CoreServices.h>
+
+#include <IOKit/audio/IOAudioTypes.h>
 
 #pragma mark -
 #pragma mark local prototypes & module descriptor
@@ -41,10 +43,7 @@
 #define AOUT_VOLUME_MAX                 512
 
 #define VOLUME_TEXT N_("Audio volume")
-#define VOLUME_LONGTEXT VOLUME_TEXT
-
 #define DEVICE_TEXT N_("Last audio device")
-#define DEVICE_LONGTEXT DEVICE_TEXT
 
 static int      Open                    (vlc_object_t *);
 static void     Close                   (vlc_object_t *);
@@ -57,12 +56,11 @@ vlc_module_begin ()
     set_subcategory(SUBCAT_AUDIO_AOUT)
     set_callbacks(Open, Close)
     add_integer("auhal-volume", AOUT_VOLUME_DEFAULT,
-                VOLUME_TEXT, VOLUME_LONGTEXT, true)
+                VOLUME_TEXT, NULL)
     change_integer_range(0, AOUT_VOLUME_MAX)
-    add_string("auhal-audio-device", "", DEVICE_TEXT, DEVICE_LONGTEXT, true)
-    add_string("auhal-warned-devices", "", NULL, NULL, true)
+    add_string("auhal-audio-device", "", DEVICE_TEXT, NULL)
+    add_string("auhal-warned-devices", "", NULL, NULL)
     change_private()
-    add_obsolete_integer("macosx-audio-device") /* since 2.1.0 */
 vlc_module_end ()
 
 #pragma mark -
@@ -120,7 +118,6 @@ typedef struct
     vlc_mutex_t                 selected_device_lock;
 
     float                       f_volume;
-    bool                        b_mute;
 
     bool                        b_ignore_streams_changed_callback;
 } aout_sys_t;
@@ -431,13 +428,13 @@ AudioDeviceIsAHeadphone(audio_output_t *p_aout, AudioDeviceID i_dev_id)
     AudioObjectGetPropertyData(i_dev_id, &property, 0, NULL, &size, &data);
 
     /*
-     'hdpn' == headphone
-     'ispk' == internal speaker
+     'hdpn' == headphone (kIOAudioOutputPortSubTypeHeadphones)
+     'ispk' == internal speaker (kIOAudioOutputPortSubTypeInternalSpeaker)
      '61pd' == HDMI
      '    ' == Bluetooth accessory or AirPlay
     */
 
-    return data == 'hdpn';
+    return data == kIOAudioOutputPortSubTypeHeadphones;
 }
 
 /*
@@ -889,12 +886,7 @@ SwitchAudioDevice(audio_output_t *p_aout, const char *name)
 {
     aout_sys_t *p_sys = p_aout->sys;
 
-    if (name)
-        p_sys->i_new_selected_dev = atoi(name);
-    else
-        p_sys->i_new_selected_dev = 0;
-
-    p_sys->i_new_selected_dev = p_sys->i_new_selected_dev;
+    p_sys->i_new_selected_dev = (name) ? atoi(name) : 0;
 
     aout_DeviceReport(p_aout, name);
     aout_RestartRequest(p_aout, AOUT_RESTART_OUTPUT);
@@ -906,7 +898,7 @@ static int
 VolumeSet(audio_output_t * p_aout, float volume)
 {
     aout_sys_t *p_sys = p_aout->sys;
-    OSStatus ostatus = 0;
+    OSStatus err;
 
     if (p_sys->b_digital)
         return VLC_EGENERIC;
@@ -915,43 +907,26 @@ VolumeSet(audio_output_t * p_aout, float volume)
     aout_VolumeReport(p_aout, volume);
 
     /* Set volume for output unit */
-    if (!p_sys->b_mute)
-    {
-        ostatus = AudioUnitSetParameter(p_sys->au_unit,
-                                        kHALOutputParam_Volume,
-                                        kAudioUnitScope_Global,
-                                        0,
-                                        volume * volume * volume,
-                                        0);
-    }
+    err = AudioUnitSetParameter(p_sys->au_unit,
+                                kHALOutputParam_Volume,
+                                kAudioUnitScope_Global,
+                                0,
+                                volume * volume * volume,
+                                0);
 
     if (var_InheritBool(p_aout, "volume-save"))
         config_PutInt("auhal-volume", lroundf(volume * AOUT_VOLUME_DEFAULT));
 
-    return ostatus;
+    return (err == noErr) ? VLC_SUCCESS : VLC_EGENERIC;
 }
 
 static int
 MuteSet(audio_output_t * p_aout, bool mute)
 {
-    aout_sys_t *p_sys = p_aout->sys;
-
-    if(p_sys->b_digital)
-        return VLC_EGENERIC;
-
-    p_sys->b_mute = mute;
+    ca_MuteSet(p_aout, mute);
     aout_MuteReport(p_aout, mute);
 
-    float volume = .0;
-    if (!mute)
-        volume = p_sys->f_volume;
-
-    OSStatus err =
-        AudioUnitSetParameter(p_sys->au_unit, kHALOutputParam_Volume,
-                              kAudioUnitScope_Global, 0,
-                              volume * volume * volume, 0);
-
-    return err == noErr ? VLC_SUCCESS : VLC_EGENERIC;
+    return VLC_SUCCESS;
 }
 
 #pragma mark -
@@ -981,7 +956,7 @@ RenderCallbackSPDIF(AudioDeviceID inDevice, const AudioTimeStamp * inNow,
     uint64_t i_host_time = (inOutputTime->mFlags & kAudioTimeStampHostTimeValid)
                          ? inOutputTime->mHostTime : 0;
 
-    ca_Render(p_aout, 0, i_host_time, p_output, i_size);
+    ca_Render(p_aout, 0, i_host_time, p_output, i_size, NULL);
 
     return noErr;
 }
@@ -1127,7 +1102,6 @@ StartAnalog(audio_output_t *p_aout, audio_sample_format_t *fmt)
 
     /* Set volume for output unit */
     VolumeSet(p_aout, p_sys->f_volume);
-    MuteSet(p_aout, p_sys->b_mute);
 
     free(layout);
 
@@ -1137,6 +1111,7 @@ StartAnalog(audio_output_t *p_aout, audio_sample_format_t *fmt)
     return VLC_SUCCESS;
 error:
     AudioComponentInstanceDispose(p_sys->au_unit);
+    p_sys->au_unit = NULL;
     free(layout);
     return VLC_EGENERIC;
 }
@@ -1423,6 +1398,7 @@ Stop(audio_output_t *p_aout)
         AudioOutputUnitStop(p_sys->au_unit);
         au_Uninitialize(p_aout, p_sys->au_unit);
         AudioComponentInstanceDispose(p_sys->au_unit);
+        p_sys->au_unit = NULL;
     }
     else
     {
@@ -1510,8 +1486,6 @@ Start(audio_output_t *p_aout, audio_sample_format_t *restrict fmt)
         return VLC_EGENERIC;
 
     p_sys = p_aout->sys;
-    p_sys->b_digital = false;
-    p_sys->au_unit = NULL;
     p_sys->i_stream_index = -1;
     p_sys->b_revert = false;
     p_sys->b_changed_mixing = false;
@@ -1706,6 +1680,7 @@ static int Open(vlc_object_t *obj)
     vlc_mutex_init(&p_sys->device_list_lock);
     vlc_mutex_init(&p_sys->selected_device_lock);
     p_sys->b_digital = false;
+    p_sys->au_unit = NULL;
     p_sys->b_ignore_streams_changed_callback = false;
     p_sys->b_selected_dev_is_default = false;
     memset(&p_sys->sfmt_revert, 0, sizeof(p_sys->sfmt_revert));
@@ -1770,8 +1745,7 @@ static int Open(vlc_object_t *obj)
     p_sys->f_volume = var_InheritInteger(p_aout, "auhal-volume")
                     / (float)AOUT_VOLUME_DEFAULT;
     aout_VolumeReport(p_aout, p_sys->f_volume);
-    p_sys->b_mute = var_InheritBool(p_aout, "mute");
-    aout_MuteReport(p_aout, p_sys->b_mute);
+    MuteSet(p_aout, var_InheritBool(p_aout, "mute"));
 
     return VLC_SUCCESS;
 }

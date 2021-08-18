@@ -66,10 +66,10 @@ vlc_module_begin ()
     set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_DEMUX )
     add_string( "sub-type", "auto", N_("Subtitle format"),
-                SUB_TYPE_LONGTEXT, true )
+                SUB_TYPE_LONGTEXT )
         change_string_list( ppsz_sub_type, ppsz_sub_type )
     add_string( "sub-description", NULL, N_("Subtitle description"),
-                SUB_DESCRIPTION_LONGTEXT, true )
+                SUB_DESCRIPTION_LONGTEXT )
     set_callbacks( Open, Close )
 
     add_shortcut( "subtitle" )
@@ -128,6 +128,7 @@ typedef struct
     vlc_tick_t  i_microsecperframe;
 
     char        *psz_header; /* SSA */
+    char        *psz_lang;
 
     struct
     {
@@ -318,6 +319,7 @@ static int Open ( vlc_object_t *p_this )
     p_sys->subtitles.p_array  = NULL;
 
     p_sys->props.psz_header         = NULL;
+    p_sys->props.psz_lang           = NULL;
     p_sys->props.i_microsecperframe = VLC_TICK_FROM_MS(40);
     p_sys->props.jss.b_inited       = false;
     p_sys->props.mpsub.b_inited     = false;
@@ -686,14 +688,19 @@ static int Open ( vlc_object_t *p_this )
     if( p_sys->subtitles.i_count > 0 )
         p_sys->i_length = p_sys->subtitles.p_array[p_sys->subtitles.i_count-1].i_stop;
 
-    /* Stupid language detection in the filename */
-    char * psz_language = get_language_from_filename( p_demux->psz_filepath );
-
-    if( psz_language )
+    if( p_sys->props.psz_lang )
     {
-        fmt.psz_language = psz_language;
-        msg_Dbg( p_demux, "detected language %s of subtitle: %s", psz_language,
+        fmt.psz_language = p_sys->props.psz_lang;
+        p_sys->props.psz_lang = NULL;
+        msg_Dbg( p_demux, "detected language '%s' of subtitle: %s", fmt.psz_language,
                  p_demux->psz_location );
+    }
+    else
+    {
+        fmt.psz_language = get_language_from_filename( p_demux->psz_filepath );
+        if( fmt.psz_language )
+            msg_Dbg( p_demux, "selected '%s' as possible filename language substring of subtitle: %s",
+                     fmt.psz_language, p_demux->psz_location );
     }
 
     char *psz_description = var_InheritString( p_demux, "sub-description" );
@@ -1232,12 +1239,25 @@ static int  ParseSSA( vlc_object_t *p_obj, subs_properties_t *p_props,
          * Dialogue: Layer#,0:02:40.65,0:02:41.79,Wolf main,Cher,0000,0000,0000,,Et les enregistrements de ses ondes delta ?
          */
 
-        /* The output text is - at least, not removing numbers - 18 chars shorter than the input text. */
-        psz_text = malloc( strlen(s) );
-        if( !psz_text )
-            return VLC_ENOMEM;
+        psz_text = NULL;
+        if( s[0] == 'D' || s[0] == 'L' )
+        {
+            /* The output text is always shorter than the input text. */
+            psz_text = malloc( strlen(s) );
+            if( !psz_text )
+                return VLC_ENOMEM;
+        }
 
-        if( sscanf( s,
+        /* Try to capture the language property */
+        if( s[0] == 'L' &&
+            sscanf( s, "Language: %[^\r\n]", psz_text ) == 1 )
+        {
+            free( p_props->psz_lang ); /* just in case of multiple instances */
+            p_props->psz_lang = psz_text;
+            psz_text = NULL;
+        }
+        else if( s[0] == 'D' &&
+            sscanf( s,
                     "Dialogue: %15[^,],%d:%d:%d.%d,%d:%d:%d.%d,%[^\r\n]",
                     temp,
                     &h1, &m1, &s1, &c1,
@@ -2416,24 +2436,37 @@ static int ParseSCC( vlc_object_t *p_obj, subs_properties_t *p_props,
     return VLC_SUCCESS;
 }
 
-/* Matches filename.xx.srt */
+/* Tries to extract language from common filename patterns PATH/filename.LANG.ext
+   and PATH/Subs/x_LANG.ext (where 'x' is an integer). */
 static char * get_language_from_filename( const char * psz_sub_file )
 {
     char *psz_ret = NULL;
-    char *psz_tmp, *psz_language_begin;
+    char *psz_tmp;
 
-    if( !psz_sub_file ) return NULL;
-    char *psz_work = strdup( psz_sub_file );
+    if( !psz_sub_file )
+        return NULL;
 
-    /* Removing extension, but leaving the dot */
-    psz_tmp = strrchr( psz_work, '.' );
+    /* Remove path */
+    const char *psz_fname = strrchr( psz_sub_file, DIR_SEP_CHAR );
+    psz_fname = (psz_fname == NULL) ? psz_sub_file : psz_fname + 1;
+
+    char *psz_work = strdup( psz_fname );
+    if( !psz_work )
+        return NULL;
+
+    psz_tmp = strrchr( psz_work, '.' ); /* Find extension */
     if( psz_tmp )
     {
-        psz_tmp[0] = '\0';
-        psz_language_begin = strrchr( psz_work, '.' );
-        if( psz_language_begin )
-            psz_ret = strdup(++psz_language_begin);
-        psz_tmp[0] = '.';
+        psz_tmp[0] = '\0'; /* Remove it */
+
+        /* Get substr after next last period - hopefully our language string */
+        psz_tmp = strrchr( psz_work, '.' );
+        /* Otherwise try substr after last underscore for alternate pattern */
+        if( !psz_tmp )
+            psz_tmp = strchr( psz_work, '_' );
+
+        if( psz_tmp )
+            psz_ret = strdup(++psz_tmp);
     }
 
     free( psz_work );

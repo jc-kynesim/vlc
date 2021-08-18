@@ -17,7 +17,7 @@
  *****************************************************************************/
 
 import QtQuick 2.11
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import org.videolan.vlc 0.1
 
 import "qrc:///style/"
@@ -78,7 +78,7 @@ ModalDialog {
         implicitHeight: VLCStyle.icon_normal
 
         Rectangle {
-            color: VLCStyle.colors.banner
+            color: VLCStyle.colors.topBanner
             anchors.fill: parent
             anchors.leftMargin: VLCStyle.margin_xxsmall
             anchors.rightMargin: VLCStyle.margin_xxsmall
@@ -91,15 +91,24 @@ ModalDialog {
                     Layout.fillWidth: true
                     focus: true
                     visible: cancelBtn.text !== ""
-                    KeyNavigation.right: okBtn
+
                     onClicked: root.reject()
+
+                    Navigation.rightItem: okBtn
+                    Keys.priority: Keys.AfterItem
+                    Keys.onPressed: okBtn.Navigation.defaultKeyAction(event)
                 }
 
                 Widgets.TextToolButton {
                     id: okBtn
                     Layout.fillWidth: true
                     visible: okBtn.text !== ""
+
                     onClicked: root.accept()
+
+                    Navigation.leftItem: cancelBtn
+                    Keys.priority: Keys.AfterItem
+                    Keys.onPressed: cancelBtn.Navigation.defaultKeyAction(event)
                 }
             }
         }

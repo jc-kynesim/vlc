@@ -53,7 +53,7 @@
 /**
  * Forward declarations
  */
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmt, vlc_video_context *context);
 static void Close(vout_display_t *vd);
 
@@ -103,7 +103,7 @@ vlc_module_end ()
 @end
 
 
-struct vout_display_sys_t
+typedef struct vout_display_sys_t
 {
     VLCOpenGLVideoView *glView;
     id<VLCVideoViewEmbedding> container;
@@ -116,7 +116,7 @@ struct vout_display_sys_t
     bool has_first_frame;
 
     vout_display_cfg_t cfg;
-};
+} vout_display_sys_t;
 
 struct gl_sys
 {
@@ -141,17 +141,17 @@ static const struct vlc_display_operations ops = {
     Close, PictureRender, PictureDisplay, Control, NULL, SetViewpoint,
 };
 
-static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open (vout_display_t *vd,
                  video_format_t *fmt, vlc_video_context *context)
 {
     vout_display_sys_t *sys = calloc (1, sizeof(*sys));
 
-    if (cfg->window->type != VOUT_WINDOW_TYPE_NSOBJECT)
+    if (vd->cfg->window->type != VOUT_WINDOW_TYPE_NSOBJECT)
         return VLC_EGENERIC;
 
     if (!sys)
         return VLC_ENOMEM;
-    sys->cfg = *cfg;
+    sys->cfg = *vd->cfg;
 
     @autoreleasepool {
         if (!CGDisplayUsesOpenGLAcceleration (kCGDirectMainDisplay))
@@ -165,7 +165,7 @@ static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
         /* Get the drawable object */
         id container = var_CreateGetAddress (vd, "drawable-nsobject");
         if (!container) {
-            sys->embed = cfg->window;
+            sys->embed = vd->cfg->window;
             container = sys->embed->handle.nsobject;
 
             if (!container) {
@@ -237,7 +237,7 @@ static int Open (vout_display_t *vd, const vout_display_cfg_t *cfg,
             goto error;
         }
         sys->vgl = vout_display_opengl_New (fmt, &subpicture_chromas, sys->gl,
-                                            &cfg->viewpoint, context);
+                                            &vd->cfg->viewpoint, context);
         vlc_gl_ReleaseCurrent(sys->gl);
         if (!sys->vgl) {
             msg_Err(vd, "Error while initializing opengl display.");
@@ -329,7 +329,7 @@ static void PictureDisplay (vout_display_t *vd, picture_t *pic)
         if (@available(macOS 10.14, *)) {
             vout_display_place_t place;
             vout_display_PlacePicture(&place, vd->source, &sys->cfg);
-            vout_display_opengl_Viewport(vd->sys->vgl, place.x,
+            vout_display_opengl_Viewport(sys->vgl, place.x,
                                          sys->cfg.display.height - (place.y + place.height),
                                          place.width, place.height);
         }
@@ -555,8 +555,10 @@ static void OpenglSwap (vlc_gl_t *gl)
     VLCAssertMainThread();
 
     @synchronized(self) {
-        BOOL hasFirstFrame = vd && vd->sys->has_first_frame;
-        return !_hasPendingReshape && hasFirstFrame;
+        if (!vd)
+            return false;
+        vout_display_sys_t *sys = vd->sys;
+        return !_hasPendingReshape && sys->has_first_frame;
     }
 }
 
@@ -596,14 +598,17 @@ static void OpenglSwap (vlc_gl_t *gl)
     if ([self canSkipRendering])
         return;
 
+    vout_display_sys_t *sys;
+
     BOOL hasFirstFrame;
     @synchronized(self) { // vd can be accessed from multiple threads
-        hasFirstFrame = vd && vd->sys->has_first_frame;
+        sys = vd ? vd->sys : NULL;
+        hasFirstFrame = sys && sys->has_first_frame;
     }
 
     if (hasFirstFrame)
         // This will lock gl.
-        vout_display_opengl_Display(vd->sys->vgl);
+        vout_display_opengl_Display(sys->vgl);
     else
         glClear (GL_COLOR_BUFFER_BIT);
 }
@@ -711,91 +716,7 @@ static void OpenglSwap (vlc_gl_t *gl)
 #pragma mark -
 #pragma mark Mouse handling
 
-- (void)mouseDown:(NSEvent *)o_event
-{
-    @synchronized (self) {
-        if (vd) {
-            if ([o_event type] == NSLeftMouseDown && !([o_event modifierFlags] &  NSControlKeyMask)) {
-                if ([o_event clickCount] <= 1)
-                    vout_display_SendEventMousePressed (vd, MOUSE_BUTTON_LEFT);
-            }
-        }
-    }
-
-    [super mouseDown:o_event];
-}
-
-- (void)otherMouseDown:(NSEvent *)o_event
-{
-    @synchronized (self) {
-        if (vd)
-            vout_display_SendEventMousePressed (vd, MOUSE_BUTTON_CENTER);
-    }
-
-    [super otherMouseDown: o_event];
-}
-
-- (void)mouseUp:(NSEvent *)o_event
-{
-    @synchronized (self) {
-        if (vd) {
-            if ([o_event type] == NSLeftMouseUp)
-                vout_display_SendEventMouseReleased (vd, MOUSE_BUTTON_LEFT);
-        }
-    }
-
-    [super mouseUp: o_event];
-}
-
-- (void)otherMouseUp:(NSEvent *)o_event
-{
-    @synchronized (self) {
-        if (vd)
-            vout_display_SendEventMouseReleased (vd, MOUSE_BUTTON_CENTER);
-    }
-
-    [super otherMouseUp: o_event];
-}
-
-- (void)mouseMoved:(NSEvent *)o_event
-{
-    /* on HiDPI displays, the point bounds don't equal the actual pixel based bounds */
-    NSPoint ml = [self convertPoint: [o_event locationInWindow] fromView: nil];
-    NSRect videoRect = [self bounds];
-    BOOL b_inside = [self mouse: ml inRect: videoRect];
-
-    ml = [self convertPointToBacking: ml];
-    videoRect = [self convertRectToBacking: videoRect];
-
-    if (b_inside) {
-        @synchronized (self) {
-            if (vd) {
-                vout_display_SendMouseMovedDisplayCoordinates(vd,
-                                                              (int)ml.x, videoRect.size.height - (int)ml.y);
-            }
-        }
-    }
-
-    [super mouseMoved: o_event];
-}
-
-- (void)mouseDragged:(NSEvent *)o_event
-{
-    [self mouseMoved: o_event];
-    [super mouseDragged: o_event];
-}
-
-- (void)otherMouseDragged:(NSEvent *)o_event
-{
-    [self mouseMoved: o_event];
-    [super otherMouseDragged: o_event];
-}
-
-- (void)rightMouseDragged:(NSEvent *)o_event
-{
-    [self mouseMoved: o_event];
-    [super rightMouseDragged: o_event];
-}
+#warning Missing mouse handling, must be implemented in Vout Window
 
 - (BOOL)acceptsFirstResponder
 {

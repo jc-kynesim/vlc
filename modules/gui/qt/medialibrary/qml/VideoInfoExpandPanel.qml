@@ -18,16 +18,18 @@
 import QtQuick 2.11
 import QtQuick.Controls 2.4
 import QtQml.Models 2.11
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 
 import org.videolan.medialib 0.1
+import org.videolan.controls 0.1
+
+import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
-import "qrc:///util/KeyHelper.js" as KeyHelper
 import "qrc:///util/Helpers.js" as Helpers
 import "qrc:///style/"
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: expandRect
 
     property int currentId: -1
@@ -42,7 +44,7 @@ Widgets.NavigableFocusScope {
 
         implicitHeight: contentLayout.implicitHeight + ( VLCStyle.margin_normal * 2 )
         width: parent.width
-        color: VLCStyle.colors.bgAlt
+        color: VLCStyle.colors.expandDelegate
 
         Rectangle {
             anchors {
@@ -50,7 +52,7 @@ Widgets.NavigableFocusScope {
                 left: parent.left
                 right: parent.right
             }
-            color: VLCStyle.colors.buttonBorder
+            color: VLCStyle.colors.border
             height: VLCStyle.expandDelegate_border
         }
 
@@ -60,7 +62,7 @@ Widgets.NavigableFocusScope {
                 left: parent.left
                 right: parent.right
             }
-            color: VLCStyle.colors.buttonBorder
+            color: VLCStyle.colors.border
             height: VLCStyle.expandDelegate_border
         }
 
@@ -94,14 +96,11 @@ Widgets.NavigableFocusScope {
                         width: VLCStyle.gridCover_video_width
 
                         /* A bigger cover for the album */
-                        Widgets.RoundImage {
+                        RoundImage {
                             id: expand_cover_id
 
                             anchors.fill: parent
-                            asynchronous: true
                             source: model.thumbnail || VLCStyle.noArtCover
-                            sourceSize: Qt.size(width, height)
-                            fillMode: Image.PreserveAspectFit
                             radius: VLCStyle.gridCover_radius
                         }
 
@@ -118,7 +117,7 @@ Widgets.NavigableFocusScope {
                         spacing: VLCStyle.margin_large
 
                         model: ObjectModel {
-                            Widgets.TabButtonExt {
+                            Widgets.ActionButtonPrimary {
                                 id: playActionBtn
 
                                 iconTxt: VLCIcons.play_outline
@@ -135,8 +134,7 @@ Widgets.NavigableFocusScope {
                             }
                         }
 
-                        navigationParent: expandRect
-                        navigationRightItem: infoPannelScrollView
+                        Navigation.parentItem: expandRect
                     }
                 }
             }
@@ -210,7 +208,7 @@ Widgets.NavigableFocusScope {
 
                                     Behavior on rotation {
                                         NumberAnimation {
-                                            duration: 100
+                                            duration: VLCStyle.duration_faster
                                         }
                                     }
                                 }
@@ -229,7 +227,7 @@ Widgets.NavigableFocusScope {
 
                             Behavior on opacity {
                                 NumberAnimation {
-                                    duration: 100
+                                    duration: VLCStyle.duration_faster
                                 }
                             }
 
@@ -267,7 +265,7 @@ Widgets.NavigableFocusScope {
 
                         Behavior on opacity {
                             NumberAnimation {
-                                duration: 100
+                                duration: VLCStyle.duration_faster
                             }
                         }
 

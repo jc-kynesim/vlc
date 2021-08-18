@@ -151,6 +151,14 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
                              object:nil];
     [notificationCenter addObserver:self
                            selector:@selector(updateLibraryRepresentation:)
+                               name:VLCLibraryModelArtistListUpdated
+                             object:nil];
+    [notificationCenter addObserver:self
+                           selector:@selector(updateLibraryRepresentation:)
+                               name:VLCLibraryModelAlbumListUpdated
+                             object:nil];
+    [notificationCenter addObserver:self
+                           selector:@selector(updateLibraryRepresentation:)
                                name:VLCLibraryModelVideoMediaListUpdated
                              object:nil];
     [notificationCenter addObserver:self
@@ -223,7 +231,11 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
     _recentVideoLibraryCollectionView.dataSource = _libraryVideoDataSource;
     _recentVideoLibraryCollectionView.delegate = _libraryVideoDataSource;
     [_recentVideoLibraryCollectionView registerClass:[VLCLibraryCollectionViewItem class] forItemWithIdentifier:VLCLibraryCellIdentifier];
-    [_videoLibraryCollectionView setDraggingSourceOperationMask:NSDragOperationCopy forLocal:NO];
+    [_recentVideoLibraryCollectionView registerClass:[VLCLibraryCollectionViewSupplementaryElementView class]
+               forSupplementaryViewOfKind:NSCollectionElementKindSectionHeader
+                           withIdentifier:VLCLibrarySupplementaryElementViewIdentifier];
+    [(NSCollectionViewFlowLayout *)_recentVideoLibraryCollectionView.collectionViewLayout setHeaderReferenceSize:[VLCLibraryCollectionViewSupplementaryElementView defaultHeaderSize]];
+    [_recentVideoLibraryCollectionView setDraggingSourceOperationMask:NSDragOperationCopy forLocal:NO];
 
     _libraryAudioDataSource = [[VLCLibraryAudioDataSource alloc] init];
     _libraryAudioDataSource.libraryModel = mainInstance.libraryController.libraryModel;
@@ -498,14 +510,13 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
     if (valueCount > 0) {
         NSMutableArray *metadataArray = [NSMutableArray arrayWithCapacity:valueCount];
 
-        for (NSUInteger i = 0; i < valueCount; i++) {
+        for (NSString *filepath in values) {
             VLCOpenInputMetadata *inputMetadata;
-            char *psz_uri = vlc_path2uri([values[i] UTF8String], "file");
-            if (!psz_uri)
+
+            inputMetadata = [VLCOpenInputMetadata inputMetaWithPath:filepath];
+            if (!inputMetadata)
                 continue;
-            inputMetadata = [[VLCOpenInputMetadata alloc] init];
-            inputMetadata.MRLString = toNSStr(psz_uri);
-            free(psz_uri);
+
             [metadataArray addObject:inputMetadata];
         }
         [_playlistController addPlaylistItems:metadataArray];
@@ -632,8 +643,12 @@ static int ShowController(vlc_object_t *p_this, const char *psz_variable,
 #pragma mark - library representation and interaction
 - (void)updateLibraryRepresentation:(NSNotification *)aNotification
 {
-    [_videoLibraryCollectionView reloadData];
-    [_recentVideoLibraryCollectionView reloadData];
+    if (_videoLibraryStackView.superview != nil) {
+        [_videoLibraryCollectionView reloadData];
+        [_recentVideoLibraryCollectionView reloadData];
+    } else if (_audioLibraryView.superview != nil) {
+        [_libraryAudioDataSource reloadAppearance];
+    }
 }
 
 #pragma mark -

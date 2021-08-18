@@ -17,6 +17,8 @@
  *****************************************************************************/
 import QtQuick 2.11
 
+import org.videolan.vlc 0.1
+
 Item {
     id: colors_id
 
@@ -65,16 +67,71 @@ Item {
     property color bgHoverInactive: systemPalette.highlightInactive;
     property color bgHoverTextInactive: systemPalette.highlightTextInactive;
 
-    property color button: systemPalette.button;
-    property color buttonText: systemPalette.buttonText;
-    property color buttonBorder: blendColors(systemPalette.button, systemPalette.buttonText, 0.8);
+    property color bgFocus: (isThemeDark) ? white : black
 
-    property color icon: isThemeDark ? white : "#666666"
+    // Banner
+
+    property color border: (isThemeDark) ? "#303030" : "#e0e0e0"
+
+    // Button
+
+    property color button: systemPalette.button
+
+    property color buttonHover: (isThemeDark) ? "#303030" : "#f2f2f2"
+
+    property color buttonText: systemPalette.buttonText
+    property color buttonTextHover: bgFocus
+
+    property color buttonBorder: blendColors(systemPalette.button, systemPalette.buttonText, 0.8)
+
+    // ButtonBanner (BannerTabButton)
+
+    property color buttonBannerDark: "#a6a6a6"
+
+    property color buttonBanner: (isThemeDark) ? buttonBannerDark : "#666666"
+
+    // ButtonPrimary (ActionButtonPrimary)
+
+    property color buttonPrimaryHover: (isThemeDark) ? "#e67A00" : "#e65609"
+
+    // ButtonPlayer (IconControlButton)
+
+    property color buttonPlayer: (isThemeDark) ? "#e5e5e5" : "#484848"
+
+    // ButtonPlay (ControlButtons)
+
+    property color buttonPlayA: "#f89a06"
+    property color buttonPlayB: "#e25b01"
+
+    property color buttonPlayIcon: "#333333"
+
+    // GridItem
+
+    property color gridSelect: (isThemeDark) ? "#303030" : "#e5e5e5"
+
+    // ListItem
+
+    property color listHover: (isThemeDark) ? "#272727" : "#e9e9e9"
+
+    // TrackItem (CheckedDelegate)
+
+    property color trackItem: "#303030"
+    property color trackItemHover: "#2a2a2a"
+
+    // TextField
+
+    property color textField: (isThemeDark) ? "#6f6f6f" : "#999999"
+    property color textFieldHover: (isThemeDark) ? "#b7b7b7" : "#4c4c4c"
+
+    property color icon: isThemeDark ? white : "#616161"
 
     property color textActiveSource: "red";
 
-    property color banner: systemPalette.window;
-    property color bannerHover: systemPalette.highlight;
+    property color topBanner: systemPalette.window
+    property color topBannerHover: systemPalette.highlight
+
+    property color lowerBanner: bg
+
     property color volsliderbg: "#bdbebf"
     property color volbelowmid: "#99d299"
     property color volabovemid: "#14d214"
@@ -92,7 +149,7 @@ Item {
     property color roundPlayCoverBorder: "#979797"
 
     // playlist
-    property color plItemHovered:  bannerHover
+    property color plItemHovered:  topBannerHover
     property color plItemSelected: blendColors(plItemHovered, plItemFocused, 0.5)
     property color plItemFocused: isThemeDark ? "#1E1E1E" : "#EDEDED"
 
@@ -102,7 +159,7 @@ Item {
 
     // glow colors:
     property color glowColor: setColorAlpha(blendColors(bg, black, 0.8), 0.35)
-    property color glowColorBanner: setColorAlpha(blendColors(banner, black, isThemeDark ? 0.25 : 0.35), 0.25)
+    property color glowColorBanner: setColorAlpha(blendColors(topBanner, black, isThemeDark ? 0.25 : 0.35), 0.25)
 
     property color sliderBarMiniplayerBgColor: isThemeDark ? "#FF929292" : "#FFEEEEEE"
 
@@ -110,7 +167,8 @@ Item {
     property color tooltipColor: systemPalette.tooltip
 
     //vlc orange
-    property color accent: "#FFFF950D";
+    property color accent: (isThemeDark) ? "#ff8800" : "#ff610a"
+
     property color accentText: "#ffffff";
 
     property color alert: "red";
@@ -119,16 +177,25 @@ Item {
 
     property color seekpoint: "red";
 
-    property var colorSchemes: mainInterface.colorScheme
-    Component.onCompleted:  {
-        mainInterface.colorScheme.setAvailableColorSchemes(["system", "day", "night"])
-    }
-
     property color windowCSDButtonDarkBg:  "#80484848"
     property color windowCSDButtonLightBg: "#80DADADA"
     property color windowCSDButtonBg: isThemeDark ? windowCSDButtonDarkBg : windowCSDButtonLightBg
 
-    state: mainInterface.colorScheme.current
+    property color expandDelegate
+
+    state: {
+        switch (mainInterface.colorScheme.scheme) {
+        case ColorSchemeModel.System:
+            return "system"
+        case ColorSchemeModel.Day:
+            return "day"
+        case ColorSchemeModel.Night:
+            return "night"
+        default:
+            console.assert(false, "Unknown color scheme")
+        }
+    }
+
     states: [
         //other styles are provided for testing purpose
         State {
@@ -142,13 +209,14 @@ Item {
                 bg: "#fcfdfc"
                 bgInactive: "#fcfdfc"
 
-                bgAlt: "#eff0f1"
-                bgAltInactive: "#eff0f1"
+                bgAlt: "#ededed"
+                bgAltInactive: "#ededed"
 
                 bgHover: "#ededed"
                 bgHoverText: text
                 bgHoverInactive: "#3daee9"
                 bgHoverTextInactive: text
+                bgFocus: "black"
 
                 button: "#eff0f1";
                 buttonText: "#232627";
@@ -156,14 +224,17 @@ Item {
 
                 textActiveSource: "#ff950d";
 
-                banner: "#d8d8d8";
-                bannerHover: "#DDDDDD";
+                topBanner: "#ededed"
+                topBannerHover: "#f2f2f2"
+                lowerBanner: "#ffffff"
 
-                accent: "#ff950d";
+                accent: "#ff610a";
                 alert: "#ff0000";
                 separator: "#ededed";
 
                 playerControlBarFg: "#333333"
+
+                expandDelegate: "#ffffff"
 
                 isThemeDark: false;
             }
@@ -175,24 +246,28 @@ Item {
 
                 text: "#eff0f1"
                 textInactive: "#bdc3c7"
-                bg: "#232629"
+                bg: "#1a1a1a"
                 bgInactive: "#232629"
-                bgAlt: "#31363b"
-                bgAltInactive: "#31363b"
-                bgHover: "#2d2d2d"
+                bgAlt: "#242424"
+                bgAltInactive: "#212121"
+                bgHover: "#303030"
                 bgHoverText: text
                 bgHoverInactive: "#3daee9"
                 bgHoverTextInactive: text
+                bgFocus: "white"
                 button: "#31363b"
                 buttonText: "#eff0f1"
                 buttonBorder: "#575b5f"
                 textActiveSource: "#ff950d"
-                banner: "#31363b"
-                bannerHover: "#272727"
-                accent: "#ff950d"
+                topBanner: "#242424"
+                topBannerHover: "#272727"
+                lowerBanner: "#000000"
+                accent: "#ff8800"
                 alert: "#ff0000"
                 separator: "#2d2d2d"
                 playerControlBarFg: "#ffffff"
+
+                expandDelegate: "#000000"
 
                 isThemeDark: true
             }
@@ -222,12 +297,16 @@ Item {
                 buttonBorder: blendColors(button, buttonText, 0.8)
 
                 textActiveSource: accent
-                banner: systemPalette.window
-                bannerHover: systemPalette.highlight
+
+                topBanner: systemPalette.window
+                topBannerHover: systemPalette.highlight
+                lowerBanner: systemPalette.base
 
                 separator: blendColors(bg, text, .95)
 
                 playerControlBarFg: systemPalette.text
+
+                expandDelegate: bg
 
                 isThemeDark: systemPalette.isDark
             }

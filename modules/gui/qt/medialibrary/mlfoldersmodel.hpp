@@ -37,7 +37,7 @@
 class MLFoldersBaseModel : public QAbstractListModel
 {
     Q_OBJECT
-    Q_PROPERTY(QmlMainContext* ctx READ getCtx WRITE setCtx NOTIFY ctxChanged)
+    Q_PROPERTY(QmlMainContext* ctx READ getCtx WRITE setCtx NOTIFY ctxChanged FINAL)
 
 public:
     enum Roles
@@ -45,6 +45,14 @@ public:
         Banned = Qt::UserRole + 1,
         DisplayUrl,
         MRL
+    };
+
+    enum Operation
+    {
+        Add,
+        Remove,
+        Ban,
+        Unban
     };
 
     MLFoldersBaseModel( QObject *parent = nullptr );
@@ -59,22 +67,25 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
 public slots:
-    virtual void removeAt( int index ) = 0;
+    virtual void remove( const QUrl &mrl ) = 0;
     virtual void add( const QUrl &mrl ) = 0;
+    void removeAt( int index );
 
 signals:
     void ctxChanged();
+    void operationFailed( int op, QUrl url ) const;
     void onMLEntryPointModified(QPrivateSignal);
 
 protected:
     struct EntryPoint
     {
-        EntryPoint(const vlc_ml_entry_point_t &entryPoint );
+        EntryPoint(const vlc_ml_folder_t &entryPoint );
         QString mrl;
         bool banned;
     };
 
     virtual std::vector<EntryPoint> entryPoints() const = 0;
+    virtual bool failed( const vlc_ml_event_t* event ) const = 0; // will be called outside the main thread
 
 private:
     static void onMlEvent( void* data , const vlc_ml_event_t* event );
@@ -93,11 +104,12 @@ class MLFoldersModel : public MLFoldersBaseModel
 public:
     using MLFoldersBaseModel::MLFoldersBaseModel;
 
-    void removeAt( int index ) override;
+    void remove( const QUrl &mrl ) override;
     void add( const QUrl &mrl ) override;
 
 private:
     std::vector<EntryPoint> entryPoints() const final;
+    bool failed( const vlc_ml_event_t* event ) const override;
 };
 
 class MLBannedFoldersModel : public MLFoldersBaseModel
@@ -105,11 +117,12 @@ class MLBannedFoldersModel : public MLFoldersBaseModel
 public:
     using MLFoldersBaseModel::MLFoldersBaseModel;
 
-    void removeAt( int index ) override;
+    void remove( const QUrl &mrl ) override;
     void add( const QUrl &mrl ) override;
 
 private:
     std::vector<EntryPoint> entryPoints() const final;
+    bool failed( const vlc_ml_event_t* event ) const override;
 };
 
 #endif // ML_FOLDERS_MODEL_HPP

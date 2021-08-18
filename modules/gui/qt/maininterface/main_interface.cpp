@@ -29,6 +29,7 @@
 #include "qt.hpp"
 
 #include "maininterface/main_interface.hpp"
+#include "compositor.hpp"
 #include "player/player_controller.hpp"                    // Creation
 #include "util/renderer_manager.hpp"
 
@@ -98,19 +99,16 @@ static int IntfRaiseMainCB( vlc_object_t *p_this, const char *psz_variable,
 const QEvent::Type MainInterface::ToolbarsNeedRebuild =
         (QEvent::Type)QEvent::registerEventType();
 
-MainInterface::MainInterface(intf_thread_t *_p_intf , QWidget* parent, Qt::WindowFlags flags)
-    : QVLCMW( _p_intf, parent, flags )
+MainInterface::MainInterface(qt_intf_t *_p_intf)
+    : p_intf(_p_intf)
 {
     /* Variables initialisation */
     lastWinScreen        = NULL;
     sysTray              = NULL;
-    cryptedLabel         = NULL;
 
     b_hideAfterCreation  = false; // --qt-start-minimized
     playlistVisible      = false;
     playlistWidthFactor  = 4.0;
-    b_interfaceFullScreen= false;
-    i_kc_offset          = false;
 
     /**
      *  Configuration and settings
@@ -127,14 +125,9 @@ MainInterface::MainInterface(intf_thread_t *_p_intf , QWidget* parent, Qt::Windo
     m_intfUserScaleFactor = var_InheritFloat(p_intf, "qt-interface-scale");
     if (m_intfUserScaleFactor == -1)
         m_intfUserScaleFactor = getSettings()->value( "MainWindow/interface-scale", 1.0).toFloat();
-    winId(); //force window creation
-    QWindow* window = windowHandle();
-    if (window)
-        connect(window, &QWindow::screenChanged, this, &MainInterface::updateIntfScaleFactor);
-    updateIntfScaleFactor();
 
     /* Get the available interfaces */
-    m_extraInterfaces = new VLCVarChoiceModel(p_intf, "intf-add", this);
+    m_extraInterfaces = new VLCVarChoiceModel(VLC_OBJECT(p_intf->intf), "intf-add", this);
 
     vlc_medialibrary_t* ml = vlc_ml_instance_get( p_intf );
     b_hasMedialibrary = (ml != NULL);
@@ -150,12 +143,12 @@ MainInterface::MainInterface(intf_thread_t *_p_intf , QWidget* parent, Qt::Windo
     playlistVisible  = getSettings()->value( "MainWindow/playlist-visible", false ).toBool();
     playlistWidthFactor = getSettings()->value( "MainWindow/playlist-width-factor", 4.0 ).toDouble();
     m_gridView = getSettings()->value( "MainWindow/grid-view", true).toBool();
-    QString currentColorScheme = getSettings()->value( "MainWindow/color-scheme", "system").toString();
     m_showRemainingTime = getSettings()->value( "MainWindow/ShowRemainingTime", false ).toBool();
     m_pinVideoControls = getSettings()->value("MainWindow/pin-video-controls", false ).toBool();
 
     m_colorScheme = new ColorSchemeModel(this);
-    m_colorScheme->setCurrent(currentColorScheme);
+    const auto currentColorScheme = static_cast<ColorSchemeModel::ColorScheme>(getSettings()->value( "MainWindow/color-scheme", ColorSchemeModel::System ).toInt());
+    m_colorScheme->setCurrentScheme(currentColorScheme);
 
     /* Controlbar Profile Model Creation */
     m_controlbarProfileModel = new ControlbarProfileModel(p_intf, this);
@@ -163,24 +156,18 @@ MainInterface::MainInterface(intf_thread_t *_p_intf , QWidget* parent, Qt::Windo
     /* Should the UI stays on top of other windows */
     b_interfaceOnTop = var_InheritBool( p_intf, "video-on-top" );
 
-#if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
+#if QT_CLIENT_SIDE_DECORATION_AVAILABLE
     m_clientSideDecoration = ! var_InheritBool( p_intf, "qt-titlebar" );
 #endif
     m_hasToolbarMenu = var_InheritBool( p_intf, "qt-menubar" );
+
+    m_dialogFilepath = getSettings()->value( "filedialog-path", QVLCUserDir( VLC_HOME_DIR ) ).toString();
 
     QString platformName = QGuiApplication::platformName();
 
 #ifdef QT5_HAS_WAYLAND
     b_hasWayland = platformName.startsWith(QLatin1String("wayland"), Qt::CaseInsensitive);
 #endif
-
-    /**************************
-     *  UI and Widgets design
-     **************************/
-
-    /* Main settings */
-    setFocusPolicy( Qt::StrongFocus );
-    setAcceptDrops( true );
 
     /*********************************
      * Create the Systray Management *
@@ -220,18 +207,6 @@ MainInterface::MainInterface(intf_thread_t *_p_intf , QWidget* parent, Qt::Windo
 
     /* Register callback for the intf-popupmenu variable */
     var_AddCallback( libvlc, "intf-popupmenu", PopupMenuCB, p_intf );
-
-
-    QVLCTools::restoreWidgetPosition( settings, this, QSize(600, 420) );
-
-    b_interfaceFullScreen = isFullScreen();
-
-    //add a dummy transparent widget
-    QWidget* widget = new QWidget(this);
-    widget->setStyleSheet("background-color: transparent");
-    setCentralWidget(widget);
-
-    computeMinimumSize();
 }
 
 MainInterface::~MainInterface()
@@ -251,12 +226,14 @@ MainInterface::~MainInterface()
     settings->setValue( "playlist-width-factor", playlistWidthFactor);
 
     settings->setValue( "grid-view", m_gridView );
-    settings->setValue( "color-scheme", m_colorScheme->getCurrent() );
+    settings->setValue( "color-scheme", m_colorScheme->currentScheme() );
     /* Save the stackCentralW sizes */
     settings->endGroup();
 
-    /* Save this size */
-    QVLCTools::saveWidgetPosition(settings, this);
+    if( var_InheritBool( p_intf, "qt-recentplay" ) )
+        getSettings()->setValue( "filedialog-path", m_dialogFilepath );
+    else
+        getSettings()->remove( "filedialog-path" );
 
     /* Unregister callbacks */
     libvlc_int_t* libvlc = vlc_object_instance(p_intf);
@@ -265,7 +242,7 @@ MainInterface::~MainInterface()
     var_DelCallback( libvlc, "intf-toggle-fscontrol", IntfShowCB, p_intf );
     var_DelCallback( libvlc, "intf-popupmenu", PopupMenuCB, p_intf );
 
-    p_intf->p_sys->p_mi = NULL;
+    p_intf->p_mi = NULL;
 }
 
 bool MainInterface::hasVLM() const {
@@ -279,17 +256,8 @@ bool MainInterface::hasVLM() const {
 bool MainInterface::useClientSideDecoration() const
 {
     //don't show CSD when interface is fullscreen
-    return m_clientSideDecoration && !b_interfaceFullScreen;
+    return m_clientSideDecoration && m_windowVisibility != QWindow::FullScreen;
 }
-
-void MainInterface::computeMinimumSize()
-{
-    int minWidth = 450;
-    int minHeight = 300;
-    setMinimumWidth( minWidth );
-    setMinimumHeight( minHeight );
-}
-
 
 /*****************************
  *   Main UI handling        *
@@ -298,19 +266,18 @@ void MainInterface::computeMinimumSize()
 void MainInterface::reloadPrefs()
 {
     i_notificationSetting = var_InheritInteger( p_intf, "qt-notification" );
-    
+
     if ( m_hasToolbarMenu != var_InheritBool( p_intf, "qt-menubar" ) )
     {
         m_hasToolbarMenu = !m_hasToolbarMenu;
         emit hasToolbarMenuChanged();
     }
 
-#if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
+#if QT_CLIENT_SIDE_DECORATION_AVAILABLE
     if (m_clientSideDecoration != (! var_InheritBool( p_intf, "qt-titlebar" )))
     {
         m_clientSideDecoration = !m_clientSideDecoration;
         emit useClientSideDecorationChanged();
-        updateClientSideDecorations();
     }
 #endif
 }
@@ -345,7 +312,7 @@ void MainInterface::sendHotkey(Qt::Key key , Qt::KeyboardModifiers modifiers)
 
 void MainInterface::updateIntfScaleFactor()
 {
-    QWindow* window = windowHandle();
+    QWindow* window = p_intf->p_compositor->interfaceMainWindow();
     m_intfScaleFactor = m_intfUserScaleFactor;
     if (window)
     {
@@ -357,6 +324,11 @@ void MainInterface::updateIntfScaleFactor()
         }
     }
     emit intfScaleFactorChanged();
+}
+
+void MainInterface::onWindowVisibilityChanged(QWindow::Visibility visibility)
+{
+    m_windowVisibility = visibility;
 }
 
 void MainInterface::incrementIntfUserScaleFactor(bool increment)
@@ -466,21 +438,6 @@ VideoSurfaceProvider* MainInterface::getVideoSurfaceProvider() const
     return m_videoSurfaceProvider;
 }
 
-const Qt::Key MainInterface::kc[10] =
-{
-    Qt::Key_Up, Qt::Key_Up,
-    Qt::Key_Down, Qt::Key_Down,
-    Qt::Key_Left, Qt::Key_Right, Qt::Key_Left, Qt::Key_Right,
-    Qt::Key_B, Qt::Key_A
-};
-
-
-void MainInterface::showBuffering( float f_cache )
-{
-    QString amount = QString("Buffering: %1%").arg( (int)(100*f_cache) );
-    statusBar()->showMessage( amount, 1000 );
-}
-
 /*****************************************************************************
  * Systray Icon and Systray Menu
  *****************************************************************************/
@@ -498,7 +455,7 @@ void MainInterface::createSystray()
     sysTray = new QSystemTrayIcon( iconVLC, this );
     sysTray->setToolTip( qtr( "VLC media player" ));
 
-    systrayMenu = new QMenu( qtr( "VLC media player" ), this );
+    systrayMenu.reset(new QMenu( qtr( "VLC media player") ));
     systrayMenu->setIcon( iconVLC );
 
     VLCMenuBar::updateSystrayMenu( this, p_intf, true );
@@ -577,7 +534,7 @@ void MainInterface::updateSystrayTooltipName( const QString& name )
     {
         sysTray->setToolTip( name );
         if( ( i_notificationSetting == NOTIFICATION_ALWAYS ) ||
-            ( i_notificationSetting == NOTIFICATION_MINIMIZED && (isMinimized() || isHidden()) ) )
+            ( i_notificationSetting == NOTIFICATION_MINIMIZED && (m_windowVisibility == QWindow::Hidden || m_windowVisibility == QWindow::Minimized)))
         {
             sysTray->showMessage( qtr( "VLC media player" ), name,
                     QSystemTrayIcon::NoIcon, 3000 );
@@ -600,10 +557,6 @@ void MainInterface::updateSystrayTooltipStatus( PlayerController::PlayingState )
 /************************************************************************
  * D&D Events
  ************************************************************************/
-void MainInterface::dropEvent(QDropEvent *event)
-{
-    dropEventPlay( event, true );
-}
 
 /**
  * dropEventPlay
@@ -656,7 +609,7 @@ void MainInterface::dropEventPlay( QDropEvent *event, bool b_play )
             }
 #endif
             if( mrl.length() > 0 )
-                medias.push_back( vlc::playlist::Media{ mrl, nullptr, nullptr });
+                medias.push_back( vlc::playlist::Media{ mrl, QString {} });
         }
     }
 
@@ -667,33 +620,21 @@ void MainInterface::dropEventPlay( QDropEvent *event, bool b_play )
         QUrl(mimeData->text()).isValid() )
     {
         QString mrl = toURI( mimeData->text() );
-        medias.push_back( vlc::playlist::Media{ mrl, nullptr, nullptr });
+        medias.push_back( vlc::playlist::Media{ mrl, QString {} });
     }
     if (!medias.empty())
         THEMPL->append(medias, b_play);
     event->accept();
-}
-void MainInterface::dragEnterEvent(QDragEnterEvent *event)
-{
-     event->acceptProposedAction();
-}
-void MainInterface::dragMoveEvent(QDragMoveEvent *event)
-{
-     event->acceptProposedAction();
-}
-void MainInterface::dragLeaveEvent(QDragLeaveEvent *event)
-{
-     event->accept();
 }
 
 /************************************************************************
  * Events stuff
  ************************************************************************/
 
-void MainInterface::closeEvent( QCloseEvent *e )
+bool MainInterface::onWindowClose( QWindow* )
 {
-    PlaylistControllerModel* playlistController = p_intf->p_sys->p_mainPlaylistController;
-    PlayerController* playerController = p_intf->p_sys->p_mainPlayerController;
+    PlaylistControllerModel* playlistController = p_intf->p_mainPlaylistController;
+    PlayerController* playerController = p_intf->p_mainPlayerController;
 
     if (m_videoSurfaceProvider)
         m_videoSurfaceProvider->onWindowClosed();
@@ -701,42 +642,25 @@ void MainInterface::closeEvent( QCloseEvent *e )
     //after the main interface, and it requires (at least with OpenGL) that the OpenGL context
     //from the main window is still valid.
     //vout_window_ReportClose is currently stubbed
-    if (playerController->hasVideoOutput()) {
-
+    if (playerController && playerController->hasVideoOutput()) {
         connect(playerController, &PlayerController::playingStateChanged, [this](PlayerController::PlayingState state){
             if (state == PlayerController::PLAYING_STATE_STOPPED) {
-                QMetaObject::invokeMethod(this, &MainInterface::close, Qt::QueuedConnection, nullptr);
+                emit askToQuit();
             }
         });
         playlistController->stop();
-
-        e->ignore();
+        return false;
     }
     else
     {
         emit askToQuit(); /* ask THEDP to quit, so we have a unique method */
-        /* Accept session quit. Otherwise we break the desktop mamager. */
-        e->accept();
+        return true;
     }
-}
-
-void MainInterface::updateClientSideDecorations()
-{
-    hide(); // some window managers don't like to change frame window hint on visible window
-    setWindowFlag(Qt::FramelessWindowHint, useClientSideDecoration());
-    show();
-}
-
-void MainInterface::setInterfaceFullScreen( bool fs )
-{
-    b_interfaceFullScreen = fs;
-    emit interfaceFullScreenChanged( fs );
 }
 
 void MainInterface::toggleInterfaceFullScreen()
 {
-    setInterfaceFullScreen( !b_interfaceFullScreen );
-    emit fullscreenInterfaceToggled( b_interfaceFullScreen );
+    emit setInterfaceFullScreen( m_windowVisibility != QWindow::FullScreen );
 }
 
 void MainInterface::emitBoss()
@@ -767,11 +691,11 @@ VLCVarChoiceModel* MainInterface::getExtraInterfaces()
 static int PopupMenuCB( vlc_object_t *, const char *,
                         vlc_value_t, vlc_value_t new_val, void *param )
 {
-    intf_thread_t *p_intf = (intf_thread_t *)param;
+    qt_intf_t *p_intf = (qt_intf_t *)param;
 
     if( p_intf->pf_show_dialog )
     {
-        p_intf->pf_show_dialog( p_intf, INTF_DIALOG_POPUPMENU,
+        p_intf->pf_show_dialog( p_intf->intf, INTF_DIALOG_POPUPMENU,
                                 new_val.b_bool, NULL );
     }
 
@@ -784,8 +708,8 @@ static int PopupMenuCB( vlc_object_t *, const char *,
 static int IntfShowCB( vlc_object_t *, const char *,
                        vlc_value_t, vlc_value_t, void *param )
 {
-    intf_thread_t *p_intf = (intf_thread_t *)param;
-    p_intf->p_sys->p_mi->emitShow();
+    qt_intf_t *p_intf = (qt_intf_t *)param;
+    p_intf->p_mi->emitShow();
 
     return VLC_SUCCESS;
 }
@@ -796,8 +720,8 @@ static int IntfShowCB( vlc_object_t *, const char *,
 static int IntfRaiseMainCB( vlc_object_t *, const char *,
                             vlc_value_t, vlc_value_t, void *param )
 {
-    intf_thread_t *p_intf = (intf_thread_t *)param;
-    p_intf->p_sys->p_mi->emitRaise();
+    qt_intf_t *p_intf = (qt_intf_t *)param;
+    p_intf->p_mi->emitRaise();
 
     return VLC_SUCCESS;
 }
@@ -808,8 +732,8 @@ static int IntfRaiseMainCB( vlc_object_t *, const char *,
 static int IntfBossCB( vlc_object_t *, const char *,
                        vlc_value_t, vlc_value_t, void *param )
 {
-    intf_thread_t *p_intf = (intf_thread_t *)param;
-    p_intf->p_sys->p_mi->emitBoss();
+    qt_intf_t *p_intf = (qt_intf_t *)param;
+    p_intf->p_mi->emitBoss();
 
     return VLC_SUCCESS;
 }

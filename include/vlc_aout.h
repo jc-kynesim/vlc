@@ -97,8 +97,15 @@
 #define AOUT_VAR_CHAN_LEFT          3
 #define AOUT_VAR_CHAN_RIGHT         4
 #define AOUT_VAR_CHAN_DOLBYS        5
-#define AOUT_VAR_CHAN_HEADPHONES    6
+/* deprecated: AOUT_VAR_CHAN_HEADPHONES 6, use AOUT_MIX_MODE_BINAURAL */
 #define AOUT_VAR_CHAN_MONO          7
+
+#define AOUT_MIX_MODE_UNSET         0
+#define AOUT_MIX_MODE_STEREO        1
+#define AOUT_MIX_MODE_BINAURAL      2
+#define AOUT_MIX_MODE_4_0           3
+#define AOUT_MIX_MODE_5_1           4
+#define AOUT_MIX_MODE_7_1           5
 
 /*****************************************************************************
  * Main audio output structures
@@ -540,6 +547,7 @@ static inline int aout_TimeGet(audio_output_t *aout, vlc_tick_t *delay)
 
 /**
  * @defgroup audio_output__meter Audio meter API
+ * @{
  */
 
 /**
@@ -654,9 +662,8 @@ vlc_audio_meter_Reset(struct vlc_audio_meter *meter, const audio_sample_format_t
  * @param meter audio meter structure
  * @param chain name of the module, can contain specific module options using
  * the following chain convention:"name{option1=a,option2=b}"
- * @param cbs pointer to a vlc_audio_meter_events structure, the
+ * @param owner pointer to a vlc_audio_meter_plugin_owner  structure, the
  * structure must stay valid during the lifetime of the plugin
- * @param cbs_data opaque pointer used by the callbacks
  * @return a valid audio meter plugin, or NULL in case of error
  */
 VLC_API vlc_audio_meter_plugin *

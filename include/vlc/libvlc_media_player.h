@@ -757,7 +757,7 @@ typedef bool( *libvlc_video_output_select_plane_cb )( void *opaque, size_t plane
  * \param select_plane_cb callback to select different D3D11 rendering targets
  * \param opaque private pointer passed to callbacks
  *
- * \note the \param setup_cb and \param cleanup_cb may be called more than once per
+ * \note the \p setup_cb and \p cleanup_cb may be called more than once per
  * playback.
  *
  * \retval true engine selected and callbacks set
@@ -1050,7 +1050,7 @@ typedef int (*libvlc_audio_setup_cb)(void **opaque, char *format, unsigned *rate
  * This is called when the media player no longer needs an audio output.
  * \param opaque data pointer as passed to libvlc_audio_set_callbacks() [IN]
  */
-typedef void (*libvlc_audio_cleanup_cb)(void *data);
+typedef void (*libvlc_audio_cleanup_cb)(void *opaque);
 
 /**
  * Sets decoded audio format via callbacks.
@@ -1533,9 +1533,10 @@ libvlc_player_programlist_at( libvlc_player_programlist_t *list, size_t index );
 /**
  * Release a programlist
  *
+ * \note program structs from the list are also deleted.
+ *
  * \version LibVLC 4.0.0 and later.
  *
- * \see libvlc_media_get_programlist
  * \see libvlc_media_player_get_programlist
  *
  * \param list valid programlist
@@ -1552,9 +1553,9 @@ libvlc_player_programlist_delete( libvlc_player_programlist_t *list );
  * \version LibVLC 4.0.0 or later
  *
  * \param p_mi opaque media player handle
- * \param program_id
+ * \param i_group_id program id
  */
-LIBVLC_API void libvlc_media_player_select_program_id( libvlc_media_player_t *p_mi, int program_id);
+LIBVLC_API void libvlc_media_player_select_program_id( libvlc_media_player_t *p_mi, int i_group_id);
 
 /**
  * Get the selected program
@@ -1577,7 +1578,7 @@ libvlc_media_player_get_selected_program( libvlc_media_player_t *p_mi);
  * \param p_mi opaque media player handle
  * \param i_group_id program id
  *
- * \return a valid program struct or NULL if the group_id is not found. The
+ * \return a valid program struct or NULL if the i_group_id is not found. The
  * program need to be freed with libvlc_player_program_delete().
  */
 LIBVLC_API libvlc_player_program_t *
@@ -1595,7 +1596,6 @@ libvlc_media_player_get_program_from_id( libvlc_media_player_t *p_mi, int i_grou
  * specific programs.
  *
  * \param p_mi the media player
- * \param type type of the program list to request
  *
  * \return a valid libvlc_media_programlist_t or NULL in case of error or empty
  * list, delete with libvlc_media_programlist_delete()
@@ -2304,9 +2304,12 @@ LIBVLC_API void libvlc_audio_output_device_list_release(
  * \param mp media player
  * \param module If NULL, current audio output module.
  *               if non-NULL, name of audio output module
-                 (\see libvlc_audio_output_t)
+                 (see \ref libvlc_audio_output_t::psz_name)
  * \param device_id device identifier string
- * \return Nothing. Errors are ignored (this is a design bug).
+ *               (see \ref libvlc_audio_output_device_t::psz_device)
+ *
+ * \bug This function returns nothing. Errors are ignored (this is a
+ * design bug).
  */
 LIBVLC_API void libvlc_audio_output_device_set( libvlc_media_player_t *mp,
                                                 const char *module,

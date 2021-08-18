@@ -30,6 +30,8 @@
 #endif
 #include <assert.h>
 
+#include "common.h"
+
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_filter.h>
@@ -49,35 +51,22 @@
 #define FILE_LONGTEXT N_("Full path of the image files to use. Format is " \
 "<image>[,<delay in ms>[,<alpha>]][;<image>[,<delay>[,<alpha>]]][;...]. " \
 "If you only have one file, simply enter its filename.")
-#define REPEAT_TEXT N_("Logo animation # of loops")
+#define REPEAT_TEXT N_("Animation loops")
 #define REPEAT_LONGTEXT N_("Number of loops for the logo animation. " \
         "-1 = continuous, 0 = disabled")
-#define DELAY_TEXT N_("Logo individual image time in ms")
+#define DELAY_TEXT N_("Display time in ms")
 #define DELAY_LONGTEXT N_("Individual image display time of 0 - 60000 ms.")
 
-#define POSX_TEXT N_("X coordinate")
-#define POSX_LONGTEXT N_("X coordinate of the logo. You can move the logo " \
-                "by left-clicking it." )
-#define POSY_TEXT N_("Y coordinate")
-#define POSY_LONGTEXT N_("Y coordinate of the logo. You can move the logo " \
-                "by left-clicking it." )
-#define OPACITY_TEXT N_("Opacity of the logo")
-#define OPACITY_LONGTEXT N_("Logo opacity value " \
-  "(from 0 for full transparency to 255 for full opacity)." )
-#define POS_TEXT N_("Logo position")
-#define POS_LONGTEXT N_( \
-  "Enforce the logo position on the video " \
-  "(0=center, 1=left, 2=right, 4=top, 8=bottom, you can " \
-  "also use combinations of these values, eg 6 = top-right).")
+#undef POSX_LONGTEXT
+#undef POSY_LONGTEXT
+#define POSX_LONGTEXT N_("X offset, from top-left, or from relative position. " \
+                         "You can move the logo by left-clicking it." )
+#define POSY_LONGTEXT N_("Y offset, from top-left, or from relative position. " \
+                         "You can move the logo by left-clicking it." )
 
 #define LOGO_HELP N_("Use a local picture as logo on the video")
 
 #define CFG_PREFIX "logo-"
-
-static const int pi_pos_values[] = { 0, 1, 2, 4, 8, 5, 6, 9, 10 };
-static const char *const ppsz_pos_descriptions[] =
-{ N_("Center"), N_("Left"), N_("Right"), N_("Top"), N_("Bottom"),
-  N_("Top-Left"), N_("Top-Right"), N_("Bottom-Left"), N_("Bottom-Right") };
 
 static int  OpenSub  ( filter_t * );
 static int  OpenVideo( filter_t * );
@@ -93,14 +82,14 @@ vlc_module_begin ()
     add_shortcut( "logo" )
 
     add_loadfile(CFG_PREFIX "file", NULL, FILE_TEXT, FILE_LONGTEXT)
-    add_integer( CFG_PREFIX "x", -1, POSX_TEXT, POSX_LONGTEXT, true )
-    add_integer( CFG_PREFIX "y", -1, POSY_TEXT, POSY_LONGTEXT, true )
+    add_integer( CFG_PREFIX "x", -1, POSX_TEXT, POSX_LONGTEXT )
+    add_integer( CFG_PREFIX "y", -1, POSY_TEXT, POSY_LONGTEXT )
     /* default to 1000 ms per image, continuously cycle through them */
-    add_integer( CFG_PREFIX "delay", 1000, DELAY_TEXT, DELAY_LONGTEXT, true )
-    add_integer( CFG_PREFIX "repeat", -1, REPEAT_TEXT, REPEAT_LONGTEXT, true )
+    add_integer( CFG_PREFIX "delay", 1000, DELAY_TEXT, DELAY_LONGTEXT )
+    add_integer( CFG_PREFIX "repeat", -1, REPEAT_TEXT, REPEAT_LONGTEXT )
     add_integer_with_range( CFG_PREFIX "opacity", 255, 0, 255,
-        OPACITY_TEXT, OPACITY_LONGTEXT, false )
-    add_integer( CFG_PREFIX "position", -1, POS_TEXT, POS_LONGTEXT, false )
+        OPACITY_TEXT, OPACITY_LONGTEXT )
+    add_integer( CFG_PREFIX "position", -1, POS_TEXT, POS_LONGTEXT )
         change_integer_list( pi_pos_values, ppsz_pos_descriptions )
 
     /* video output filter submodule */
@@ -159,7 +148,6 @@ typedef struct
     int i_pos;
     int i_pos_x;
     int i_pos_y;
-    bool b_absolute;
 
     /* On the fly control variable */
     bool b_spu_update;
@@ -283,11 +271,10 @@ static int OpenCommon( filter_t *p_filter, bool b_sub )
     p_sys->i_pos = var_CreateGetIntegerCommand( p_filter, "logo-position" );
     p_sys->i_pos_x = var_CreateGetIntegerCommand( p_filter, "logo-x" );
     p_sys->i_pos_y = var_CreateGetIntegerCommand( p_filter, "logo-y" );
-    p_sys->b_absolute = (p_sys->i_pos < 0);
 
     /* Ignore aligment if a position is given for video filter */
     if( !b_sub && p_sys->i_pos_x >= 0 && p_sys->i_pos_y >= 0 )
-        p_sys->i_pos = 0;
+        p_sys->i_pos = -1;
 
     vlc_mutex_init( &p_sys->lock );
     LogoListLoad( VLC_OBJECT(p_filter), p_list, psz_filename );
@@ -363,7 +350,6 @@ static subpicture_t *FilterSub( filter_t *p_filter, vlc_tick_t date )
     if( !p_spu )
         goto exit;
 
-    p_spu->b_absolute = p_sys->b_absolute;
     p_spu->i_start = date;
     p_spu->i_stop = 0;
     p_spu->b_ephemer = true;
@@ -404,7 +390,7 @@ static subpicture_t *FilterSub( filter_t *p_filter, vlc_tick_t date )
     /*  where to locate the logo: */
     if( p_sys->i_pos < 0 )
     {   /*  set to an absolute xy */
-        p_region->i_align = SUBPICTURE_ALIGN_RIGHT | SUBPICTURE_ALIGN_TOP;
+        p_region->i_align = SUBPICTURE_ALIGN_LEFT | SUBPICTURE_ALIGN_TOP;
         p_spu->b_absolute = true;
     }
     else
@@ -458,33 +444,21 @@ static picture_t *FilterVideo( filter_t *p_filter, picture_t *p_src )
         const int i_dst_w = p_filter->fmt_out.video.i_visible_width;
         const int i_dst_h = p_filter->fmt_out.video.i_visible_height;
 
-        if( p_sys->i_pos )
+        if( p_sys->i_pos >= 0 )
         {
-            if( p_sys->i_pos & SUBPICTURE_ALIGN_BOTTOM )
-            {
-                p_sys->i_pos_y = i_dst_h - p_fmt->i_visible_height;
-            }
-            else if ( !(p_sys->i_pos & SUBPICTURE_ALIGN_TOP) )
-            {
-                p_sys->i_pos_y = ( i_dst_h - p_fmt->i_visible_height ) / 2;
-            }
-            else
-            {
+            if( p_sys->i_pos & SUBPICTURE_ALIGN_TOP )
                 p_sys->i_pos_y = 0;
-            }
-
-            if( p_sys->i_pos & SUBPICTURE_ALIGN_RIGHT )
-            {
-                p_sys->i_pos_x = i_dst_w - p_fmt->i_visible_width;
-            }
-            else if ( !(p_sys->i_pos & SUBPICTURE_ALIGN_LEFT) )
-            {
-                p_sys->i_pos_x = ( i_dst_w - p_fmt->i_visible_width ) / 2;
-            }
+            else if( p_sys->i_pos & SUBPICTURE_ALIGN_BOTTOM )
+                p_sys->i_pos_y = i_dst_h - p_fmt->i_visible_height;
             else
-            {
+                p_sys->i_pos_y = ( i_dst_h - p_fmt->i_visible_height ) / 2;
+
+            if( p_sys->i_pos & SUBPICTURE_ALIGN_LEFT )
                 p_sys->i_pos_x = 0;
-            }
+            else if( p_sys->i_pos & SUBPICTURE_ALIGN_RIGHT )
+                p_sys->i_pos_x = i_dst_w - p_fmt->i_visible_width;
+            else
+                p_sys->i_pos_x = ( i_dst_w - p_fmt->i_visible_width ) / 2;
         }
 
         if( p_sys->i_pos_x < 0 || p_sys->i_pos_y < 0 )

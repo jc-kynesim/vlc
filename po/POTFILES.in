@@ -777,6 +777,8 @@ modules/gui/qt/medialibrary/mlgroup.cpp
 modules/gui/qt/medialibrary/mlgroup.hpp
 modules/gui/qt/medialibrary/mlgrouplistmodel.cpp
 modules/gui/qt/medialibrary/mlgrouplistmodel.hpp
+modules/gui/qt/medialibrary/mlitemcover.cpp
+modules/gui/qt/medialibrary/mlitemcover.hpp
 modules/gui/qt/medialibrary/mlplaylistlistmodel.cpp
 modules/gui/qt/medialibrary/mlplaylistlistmodel.hpp
 modules/gui/qt/medialibrary/mlplaylistmedia.cpp
@@ -791,6 +793,8 @@ modules/gui/qt/widgets/native/animators.cpp
 modules/gui/qt/widgets/native/animators.hpp
 modules/gui/qt/widgets/native/customwidgets.cpp
 modules/gui/qt/widgets/native/customwidgets.hpp
+modules/gui/qt/util/covergenerator.cpp
+modules/gui/qt/util/covergenerator.hpp
 modules/gui/qt/util/imagehelper.cpp
 modules/gui/qt/util/imagehelper.hpp
 modules/gui/qt/util/qt_dirs.cpp
@@ -824,6 +828,7 @@ modules/gui/qt/medialibrary/qml/MusicAlbums.qml
 modules/gui/qt/medialibrary/qml/MusicAlbumsDisplay.qml
 modules/gui/qt/medialibrary/qml/MusicAlbumsGridExpandDelegate.qml
 modules/gui/qt/medialibrary/qml/MusicArtist.qml
+modules/gui/qt/medialibrary/qml/MusicAllArtists.qml
 modules/gui/qt/medialibrary/qml/MusicArtistsAlbums.qml
 modules/gui/qt/medialibrary/qml/MusicArtistsDisplay.qml
 modules/gui/qt/medialibrary/qml/MusicDisplay.qml
@@ -1174,6 +1179,7 @@ modules/services_discovery/upnp.cpp
 modules/services_discovery/windrive.c
 modules/services_discovery/xcb_apps.c
 modules/spu/audiobargraph_v.c
+modules/spu/common.h
 modules/spu/dynamicoverlay/dynamicoverlay.c
 modules/spu/logo.c
 modules/spu/marq.c
@@ -1297,13 +1303,15 @@ modules/video_output/decklink.cpp
 modules/video_output/fb.c
 modules/video_output/glx.c
 modules/video_output/kva.c
+modules/video_output/libplacebo/display.c
+modules/video_output/libplacebo/instance_opengl.c
+modules/video_output/libplacebo/instance_vulkan.c
 modules/video_output/macosx.m
 modules/video_output/opengl/display.c
 modules/video_output/opengl/egl.c
 modules/video_output/opengl/vout_helper.h
-modules/video_output/vulkan/display.c
 modules/video_output/win32/direct3d9.c
-modules/video_output/win32/direct3d11.c
+modules/video_output/win32/direct3d11.cpp
 modules/video_output/win32/drawable.c
 modules/video_output/win32/events.c
 modules/video_output/win32/glwin32.c

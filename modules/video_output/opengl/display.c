@@ -37,7 +37,7 @@
 #include "renderer.h"
 
 /* Plugin callbacks */
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context);
 static void Close(vout_display_t *vd);
 
@@ -73,13 +73,13 @@ vlc_module_begin ()
     add_opengl_submodule_draw()
 vlc_module_end ()
 
-struct vout_display_sys_t
+typedef struct vout_display_sys_t
 {
     vout_display_opengl_t *vgl;
     vlc_gl_t *gl;
     vout_display_place_t place;
     bool place_changed;
-};
+} vout_display_sys_t;
 
 /* Display callbacks */
 static void PictureRender (vout_display_t *, picture_t *, subpicture_t *, vlc_tick_t);
@@ -93,7 +93,11 @@ static int SetViewpoint(vout_display_t *vd, const vlc_viewpoint_t *vp)
 }
 
 static const struct vlc_display_operations ops = {
-    Close, PictureRender, PictureDisplay, Control, NULL, SetViewpoint,
+    .close = Close,
+    .prepare = PictureRender,
+    .display = PictureDisplay,
+    .control = Control,
+    .set_viewpoint = SetViewpoint,
 };
 
 static void
@@ -109,7 +113,7 @@ FlipVerticalAlign(vout_display_cfg_t *cfg)
 /**
  * Allocates a surface and an OpenGL context for video output.
  */
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmt, vlc_video_context *context)
 {
     vout_display_sys_t *sys = malloc (sizeof (*sys));
@@ -118,7 +122,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     sys->gl = NULL;
 
-    vout_window_t *surface = cfg->window;
+    vout_window_t *surface = vd->cfg->window;
     char *gl_name = var_InheritString(surface, MODULE_VARNAME);
 
     /* VDPAU GL interop works only with GLX. Override the "gl" option to force
@@ -147,17 +151,17 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     }
 #endif
 
-    sys->gl = vlc_gl_Create(cfg, API, gl_name);
+    sys->gl = vlc_gl_Create(vd->cfg, API, gl_name);
     free(gl_name);
     if (sys->gl == NULL)
         goto error;
 
 
-    vout_display_cfg_t flipped_cfg = *cfg;
+    vout_display_cfg_t flipped_cfg = *vd->cfg;
     FlipVerticalAlign(&flipped_cfg);
     vout_display_PlacePicture(&sys->place, vd->source, &flipped_cfg);
     sys->place_changed = true;
-    vlc_gl_Resize (sys->gl, cfg->display.width, cfg->display.height);
+    vlc_gl_Resize (sys->gl, vd->cfg->display.width, vd->cfg->display.height);
 
     /* Initialize video display */
     const vlc_fourcc_t *spu_chromas;
@@ -166,7 +170,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
         goto error;
 
     sys->vgl = vout_display_opengl_New (fmt, &spu_chromas, sys->gl,
-                                        &cfg->viewpoint, context);
+                                        &vd->cfg->viewpoint, context);
     vlc_gl_ReleaseCurrent (sys->gl);
 
     if (sys->vgl == NULL)

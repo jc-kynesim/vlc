@@ -1218,8 +1218,8 @@ int libvlc_media_slaves_add( libvlc_media_t *p_md,
     case libvlc_media_slave_type_subtitle:
         i_input_slave_type = SLAVE_TYPE_SPU;
         break;
-    case libvlc_media_slave_type_audio:
-        i_input_slave_type = SLAVE_TYPE_AUDIO;
+    case libvlc_media_slave_type_generic:
+        i_input_slave_type = SLAVE_TYPE_GENERIC;
         break;
     default:
         vlc_assert_unreachable();
@@ -1308,8 +1308,8 @@ unsigned int libvlc_media_slaves_get( libvlc_media_t *p_md,
         case SLAVE_TYPE_SPU:
             p_slave->i_type = libvlc_media_slave_type_subtitle;
             break;
-        case SLAVE_TYPE_AUDIO:
-            p_slave->i_type = libvlc_media_slave_type_audio;
+        case SLAVE_TYPE_GENERIC:
+            p_slave->i_type = libvlc_media_slave_type_generic;
             break;
         default:
             vlc_assert_unreachable();

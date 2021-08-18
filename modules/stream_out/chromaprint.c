@@ -62,7 +62,7 @@ vlc_module_begin ()
     add_shortcut( "chromaprint" )
     set_category( CAT_SOUT )
     set_subcategory( SUBCAT_SOUT_STREAM )
-    add_integer( "duration", 90, DURATION_TEXT, DURATION_LONGTEXT, true )
+    add_integer( "duration", 90, DURATION_TEXT, DURATION_LONGTEXT )
     set_callbacks( Open, Close )
 vlc_module_end ()
 
@@ -112,7 +112,7 @@ static int Open( vlc_object_t *p_this )
     {
         msg_Err( p_stream, "Fingerprint data holder not set" );
         free( p_sys );
-        return VLC_ENOVAR;
+        return VLC_EINVAL;
     }
     msg_Dbg( p_stream, "chromaprint version %s", chromaprint_get_version() );
     p_sys->p_chromaprint_ctx = chromaprint_new( CHROMAPRINT_ALGORITHM_DEFAULT );

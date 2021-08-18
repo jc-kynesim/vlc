@@ -18,7 +18,7 @@
 
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 
 import QtGraphicalEffects 1.0
 
@@ -38,26 +38,20 @@ Rectangle {
 
     property alias hovered: mouseArea.containsMouse
 
-    border.width: VLCStyle.dp(1)
-    border.color: {
-        if (activeFocus && (listView.mode === PlaylistListView.Mode.Select))
-            colors.caption
-        else
-            "transparent"
-    }
+    height: artworkItem.height * 1.5
 
     color: {
-        if ((activeFocus && listView.mode !== PlaylistListView.Mode.Select) || (hovered && selected))
-            colors.plItemFocused
+        if (selected)
+            return colors.gridSelect;
         else if (hovered)
-            colors.plItemHovered
-        else if (selected)
-            colors.plItemSelected
+            return colors.listHover;
         else
-            "transparent"
+            return "transparent";
     }
 
-    height: artworkItem.height * 1.5
+    border.width: (activeFocus) ? VLCStyle.focus_border : 0
+
+    border.color: VLCStyle.colors.bgFocus
 
     onHoveredChanged: {
         if(hovered)
@@ -77,7 +71,7 @@ Rectangle {
             plInfoTooltip.timeout = 2000
         else
             plInfoTooltip.timeout = 0
-        plInfoTooltip.visible = Qt.binding(function() { return ( (selectAction ? selected : hovered) && !overlayMenu.visible && mainInterface.playlistVisible &&
+        plInfoTooltip.visible = Qt.binding(function() { return ( (selectAction ? selected : hovered) && !overlayMenu.shown && mainInterface.playlistVisible &&
                                                                 (textInfo.implicitWidth > textInfo.width || textArtist.implicitWidth > textArtist.width)); })
     }
 

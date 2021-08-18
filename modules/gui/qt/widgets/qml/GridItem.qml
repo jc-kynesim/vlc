@@ -17,7 +17,7 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtQml.Models 2.2
 import QtGraphicalEffects 1.0
 import org.videolan.vlc 0.1
@@ -25,29 +25,35 @@ import org.videolan.vlc 0.1
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-FocusScope {
+MouseArea {
     id: root
 
     property alias image: picture.source
     property alias title: titleLabel.text
     property alias subtitle: subtitleTxt.text
-    property alias textHorizontalAlignment: subtitleTxt.horizontalAlignment
-    property alias playCoverBorder: picture.playCoverBorder
+    property alias playCoverBorderWidth: picture.playCoverBorderWidth
     property alias playCoverOnlyBorders: picture.playCoverOnlyBorders
     property alias playIconSize: picture.playIconSize
     property alias pictureRadius: picture.radius
     property alias pictureOverlay: picture.imageOverlay
-    property bool selected: false
     property alias unselectedUnderlay: unselectedUnderlayLoader.sourceComponent
     property alias selectedUnderlay: selectedUnderlayLoader.sourceComponent
 
-    property alias progress: picture.progress
-    property alias labels: picture.labels
-    property bool showNewIndicator: false
     property real pictureWidth: VLCStyle.colWidth(1)
     property real pictureHeight: pictureWidth
     property int titleMargin: VLCStyle.margin_xsmall
-    property Item dragItem
+    property Item dragItem: null
+
+    readonly property bool highlighted: root.containsMouse || root.activeFocus
+    readonly property int selectedBorderWidth: VLCStyle.gridItemSelectedBorder
+
+    property int _modifiersOnLastPress: Qt.NoModifier
+
+    // if true, texts are horizontally centered, provided it can fit in pictureWidth
+    property bool textAlignHCenter: false
+
+    // if the item is selected
+    property bool selected: false
 
     signal playClicked
     signal addToPlaylistClicked
@@ -55,51 +61,19 @@ FocusScope {
     signal itemDoubleClicked(Item menuParent, int keys, int modifier)
     signal contextMenuButtonClicked(Item menuParent, var globalMousePos)
 
+    acceptedButtons: Qt.RightButton | Qt.LeftButton
+    hoverEnabled: true
+    implicitWidth: layout.implicitWidth
+    implicitHeight: layout.implicitHeight
     Keys.onMenuPressed: root.contextMenuButtonClicked(picture, root.mapToGlobal(0,0))
 
     Accessible.role: Accessible.Cell
     Accessible.name: title
 
-    implicitWidth: mouseArea.implicitWidth
-    implicitHeight: mouseArea.implicitHeight
-
-    readonly property bool _highlighted: mouseArea.containsMouse || root.activeFocus
-
-    readonly property int selectedBorderWidth: VLCStyle.gridItemSelectedBorder
-
-    property int _newIndicatorMedian: VLCStyle.margin_xsmall
-    property int _modifiersOnLastPress: Qt.NoModifier
-
-    state: _highlighted ? "selected" : "unselected"
     states: [
         State {
-            name: "unselected"
-
-            PropertyChanges {
-                target: selectedUnderlayLoader
-                opacity: 0
-                visible: false
-            }
-
-            PropertyChanges {
-                target: unselectedUnderlayLoader
-                opacity: 1
-                visible: true
-            }
-
-            PropertyChanges {
-                target: picture
-                playCoverOpacity: 0
-                playCoverVisible: false
-            }
-
-            PropertyChanges {
-                target: root
-                _newIndicatorMedian: VLCStyle.margin_xsmall
-            }
-        },
-        State {
-            name: "selected"
+            name: "highlighted"
+            when: highlighted
 
             PropertyChanges {
                 target: selectedUnderlayLoader
@@ -118,18 +92,13 @@ FocusScope {
                 playCoverOpacity: 1
                 playCoverVisible: true
             }
-
-            PropertyChanges {
-                target: root
-                _newIndicatorMedian: VLCStyle.margin_small
-            }
         }
     ]
 
     transitions: [
         Transition {
-            from: "unselected"
-            to: "selected"
+            from: ""
+            to: "highlighted"
             // reversible: true // doesn't work
 
             SequentialAnimation {
@@ -138,19 +107,10 @@ FocusScope {
                     properties: "playCoverVisible,visible"
                 }
 
-                ParallelAnimation {
-                    NumberAnimation {
-                        properties: "opacity,playCoverOpacity"
-                        duration: 240
-                        easing.type: Easing.InSine
-                    }
-
-                    SmoothedAnimation {
-                        target: root
-                        property: "_newIndicatorMedian"
-                        duration: 240
-                        easing.type: Easing.InSine
-                    }
+                NumberAnimation {
+                    properties: "opacity,playCoverOpacity"
+                    duration: VLCStyle.duration_slow
+                    easing.type: Easing.InSine
                 }
 
                 PropertyAction {
@@ -161,8 +121,8 @@ FocusScope {
         },
 
         Transition {
-            from: "selected"
-            to: "unselected"
+            from: "highlighted"
+            to: ""
 
             SequentialAnimation {
                 PropertyAction {
@@ -170,19 +130,10 @@ FocusScope {
                     property: "visible"
                 }
 
-                ParallelAnimation {
-                    NumberAnimation {
-                        properties: "opacity,playCoverOpacity"
-                        duration: 200
-                        easing.type: Easing.OutSine
-                    }
-
-                    SmoothedAnimation {
-                        target: root
-                        duration: 200
-                        property: "_newIndicatorMedian"
-                        easing.type: Easing.OutSine
-                    }
+                NumberAnimation {
+                    properties: "opacity,playCoverOpacity"
+                    duration: VLCStyle.duration_normal
+                    easing.type: Easing.OutSine
                 }
 
                 PropertyAction {
@@ -193,139 +144,130 @@ FocusScope {
         }
     ]
 
-    MouseArea {
-        id: mouseArea
+    drag.target: root.dragItem
+    drag.axis: Drag.XAndYAxis
+    drag.onActiveChanged: {
+        // perform the "click" action because the click action is only executed on mouse release (we are in the pressed state)
+        // but we will need the updated list on drop
+        if (drag.active && !selected) {
+            root.itemClicked(picture, Qt.LeftButton, root._modifiersOnLastPress)
+        } else if (root.dragItem) {
+            root.dragItem.Drag.drop()
+        }
+        root.dragItem.Drag.active = drag.active
+    }
 
-        hoverEnabled: true
-        anchors.fill: parent
-        implicitWidth: layout.implicitWidth
-        implicitHeight: layout.implicitHeight
-        drag.target: root.dragItem
-        drag.axis: Drag.XAndYAxis
-        drag.onActiveChanged: {
-            // perform the "click" action because the click action is only executed on mouse release (we are in the pressed state)
-            // but we will need the updated list on drop
-            if (drag.active && !selected) {
-                root.itemClicked(picture, Qt.LeftButton, root._modifiersOnLastPress)
-            } else if (root.dragItem) {
-                root.dragItem.Drag.drop()
-            }
-            root.dragItem.Drag.active = drag.active
+    onClicked: {
+        if (mouse.button === Qt.RightButton)
+            contextMenuButtonClicked(picture, root.mapToGlobal(mouse.x,mouse.y));
+        else {
+            root.itemClicked(picture, mouse.button, mouse.modifiers);
+        }
+    }
+
+    onDoubleClicked: {
+        if (mouse.button === Qt.LeftButton)
+            root.itemDoubleClicked(picture,mouse.buttons, mouse.modifiers)
+    }
+
+    onPressed: _modifiersOnLastPress = mouse.modifiers
+
+    onPositionChanged: {
+        if (drag.active) {
+            var pos = drag.target.parent.mapFromItem(root, mouseX, mouseY)
+            drag.target.x = pos.x + 12
+            drag.target.y = pos.y + 12
+        }
+    }
+
+    Widgets.AnimatedBackground {
+        id: background
+
+        x: - root.selectedBorderWidth
+        y: - root.selectedBorderWidth
+        width: root.width + ( root.selectedBorderWidth * 2 )
+        height:  root.height + ( root.selectedBorderWidth * 2 )
+
+        active: root.activeFocus
+
+        backgroundColor: root.selected
+                         ? VLCStyle.colors.gridSelect
+                         : VLCStyle.colors.setColorAlpha(VLCStyle.colors.gridSelect, 0)
+
+        visible: backgroundAnimationRunning || borderColorAnimationRunning || background.active || root.selected
+    }
+
+    Loader {
+        id: unselectedUnderlayLoader
+
+        asynchronous: true
+    }
+
+    Loader {
+        id: selectedUnderlayLoader
+
+        asynchronous: true
+        active: false
+        visible: false
+        opacity: 0
+
+        onVisibleChanged: {
+            if (visible && !active)
+                active = true
+        }
+    }
+
+    Column {
+        id: layout
+
+        anchors.centerIn: parent
+
+        Widgets.MediaCover {
+            id: picture
+
+            width: pictureWidth
+            height: pictureHeight
+            playCoverVisible: false
+            playCoverOpacity: 0
+            radius: VLCStyle.gridCover_radius
+
+            onPlayIconClicked: root.playClicked()
         }
 
-        acceptedButtons: Qt.RightButton | Qt.LeftButton
-        Keys.onMenuPressed: root.contextMenuButtonClicked(picture, root.mapToGlobal(0,0))
+        Widgets.ScrollingText {
+            id: titleTextRect
 
-        onClicked: {
-            if (mouse.button === Qt.RightButton)
-                contextMenuButtonClicked(picture, mouseArea.mapToGlobal(mouse.x,mouse.y));
-            else {
-                root.itemClicked(picture, mouse.button, mouse.modifiers);
-            }
-        }
+            label: titleLabel
+            scroll: highlighted
+            height: titleLabel.height
+            width: titleLabel.width
+            visible: root.title !== ""
 
-        onDoubleClicked: {
-            if (mouse.button === Qt.LeftButton)
-                root.itemDoubleClicked(picture,mouse.buttons, mouse.modifiers)
-        }
+            Widgets.ListLabel {
+                id: titleLabel
 
-        onPressed: _modifiersOnLastPress = mouse.modifiers
-
-        onPositionChanged: {
-            if (drag.active) {
-                var pos = drag.target.parent.mapFromItem(mouseArea, mouseX, mouseY)
-                drag.target.x = pos.x + 12
-                drag.target.y = pos.y + 12
-            }
-        }
-
-        /* background visible when selected */
-        Rectangle {
-            id: selectionRect
-
-            x: - root.selectedBorderWidth
-            y: - root.selectedBorderWidth
-            width: root.width + ( root.selectedBorderWidth * 2 )
-            height:  root.height + ( root.selectedBorderWidth * 2 )
-            color: VLCStyle.colors.bgHover
-            visible: root.selected || root._highlighted
-        }
-
-        Loader {
-            id: unselectedUnderlayLoader
-
-            asynchronous: true
-        }
-
-        Loader {
-            id: selectedUnderlayLoader
-
-            asynchronous: true
-        }
-
-        Column {
-            id: layout
-
-            anchors.centerIn: parent
-
-            Widgets.MediaCover {
-                id: picture
-
+                elide: titleTextRect.scroll ?  Text.ElideNone : Text.ElideRight
                 width: pictureWidth
-                height: pictureHeight
-                playCoverVisible: root._highlighted
-                onPlayIconClicked: root.playClicked()
-                clip: true
-                radius: VLCStyle.gridCover_radius
-
-                /* new indicator (triangle at top-left of cover)*/
-                Rectangle {
-                    id: newIndicator
-
-                    // consider this Rectangle as a triangle, then following property is its median length
-                    property alias median: root._newIndicatorMedian
-
-                    x: parent.width - median
-                    y: - median
-                    width: 2 * median
-                    height: 2 * median
-                    color: VLCStyle.colors.accent
-                    rotation: 45
-                    visible: root.showNewIndicator && root.progress === 0
-                }
+                horizontalAlignment: root.textAlignHCenter && titleLabel.contentWidth <= titleLabel.width ? Text.AlignHCenter : Text.AlignLeft
+                topPadding: root.titleMargin
+                color: background.foregroundColor
             }
+        }
 
-            Widgets.ScrollingText {
-                id: titleTextRect
+        Widgets.MenuCaption {
+            id: subtitleTxt
 
-                label: titleLabel
-                scroll: _highlighted
-                height: titleLabel.height
-                width: titleLabel.width
-                visible: root.title !== ""
+            visible: text !== ""
+            text: root.subtitle
+            width: pictureWidth
+            topPadding: VLCStyle.margin_xsmall              
+            elide: Text.ElideRight
+            horizontalAlignment: root.textAlignHCenter && subtitleTxt.contentWidth <= subtitleTxt.width ? Text.AlignHCenter : Text.AlignLeft
+            color: background.foregroundColor
 
-                Widgets.ListLabel {
-                    id: titleLabel
-
-                    elide: Text.ElideNone
-                    width: pictureWidth
-                    horizontalAlignment: root.textHorizontalAlignment
-                    topPadding: root.titleMargin
-                    color: selectionRect.visible ? VLCStyle.colors.bgHoverText : VLCStyle.colors.text
-                }
-            }
-
-            Widgets.MenuCaption {
-                id: subtitleTxt
-
-                visible: text !== ""
-                text: root.subtitle
-                width: pictureWidth
-                topPadding: VLCStyle.margin_xsmall
-                color: selectionRect.visible
-                       ? VLCStyle.colors.setColorAlpha(VLCStyle.colors.bgHoverText, .6)
-                       : VLCStyle.colors.menuCaption
-            }
+            // this is based on that MenuCaption.color.a == .6, color of this component is animated (via binding with background.foregroundColor),
+            // to save operation during animation, directly set the opacity
+            opacity: .6
         }
     }
 }

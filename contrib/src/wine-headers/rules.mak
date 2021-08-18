@@ -10,7 +10,7 @@ endif
 WINE_EXTRA_HEADERS = dxva.h
 WINE_IDL_HEADERS = \
 	d3d11.idl \
-	d3d11_1.idl d3d11_2.idl d3d11_3.idl \
+	d3d11_1.idl d3d11_2.idl d3d11_3.idl d3d11_4.idl \
 	dxgicommon.idl dxgitype.idl dxgiformat.idl \
 	dxgidebug.idl \
 	dxgi.idl dxgi1_2.idl dxgi1_3.idl dxgi1_4.idl dxgi1_5.idl dxgi1_6.idl \
@@ -28,6 +28,7 @@ $(TARBALLS)/wine-$(WINE_VERSION).tar.xz:
 wine-headers: wine-$(WINE_VERSION).tar.xz .sum-wine-headers
 	$(UNPACK)
 	$(APPLY) $(SRC)/wine-headers/0001-include-add-HEVC-and-VP8-VP9-support-to-dxva.h.patch
+	$(APPLY) $(SRC)/wine-headers/0001-include-add-AV1-support-to-dxva.h.patch
 	$(MOVE)
 
 wine_widl = echo "GEN $(1)" && \

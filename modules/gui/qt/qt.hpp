@@ -29,9 +29,7 @@
 #endif
 
 #include <vlc_common.h>
-#include <vlc_interface.h> /* intf_thread_t */
-#include <vlc_playlist.h>  /* vlc_playlist_t */
-#include <vlc_player.h>  /* vlc_player_t */
+#include <vlc_player.h>
 
 #include <qconfig.h>
 
@@ -59,6 +57,13 @@ enum{
     NOTIFICATION_ALWAYS = 2,
 };
 
+///// forward declaration
+
+extern "C" {
+typedef struct intf_dialog_args_t intf_dialog_args_t;
+typedef struct vlc_playlist vlc_playlist_t;
+}
+
 namespace vlc {
 class Compositor;
 
@@ -68,15 +73,25 @@ class PlaylistControllerModel;
 
 }
 class PlayerController;
-struct intf_sys_t
+
+///// module internal
+
+struct qt_intf_t
 {
+    struct vlc_object_t obj;
+
+    /** pointer to the actual intf module */
+    intf_thread_t* intf;
+
+    /** Specific for dialogs providers */
+    void ( *pf_show_dialog ) ( struct intf_thread_t *, int, int,
+                               intf_dialog_args_t * );
+
     vlc_thread_t thread;
 
     class QVLCApp *p_app;          /* Main Qt Application */
     class MainInterface *p_mi;     /* Main Interface, NULL if DialogProvider Mode */
     class QSettings *mainSettings; /* Qt State settings not messing main VLC ones */
-
-    QUrl filepath;        /* Last path used in dialogs */
 
     unsigned voutWindowType; /* Type of vout_window_t provided */
     bool b_isDialogProvider; /* Qt mode or Skins mode */
@@ -90,7 +105,12 @@ struct intf_sys_t
 #ifdef _WIN32
     bool disable_volume_keys;
 #endif
+
+    int refCount;
+    bool isShuttingDown;
 };
+
+vlc_object_cast(qt_intf_t)
 
 /**
  * This class may be used for scope-bound locking/unlocking
@@ -115,13 +135,16 @@ struct vlc_player_locker {
 };
 
 #define THEDP DialogsProvider::getInstance()
-#define THEMIM p_intf->p_sys->p_mainPlayerController
-#define THEMPL p_intf->p_sys->p_mainPlaylistController
+#define THEMIM p_intf->p_mainPlayerController
+#define THEMPL p_intf->p_mainPlaylistController
 
 #define qfu( i ) QString::fromUtf8( i )
 #define qfue( i ) QString::fromUtf8( i ).replace( "&", "&&" ) /* for actions/buttons */
-#define qtr( i ) QString::fromUtf8( vlc_gettext(i) )
+#define qfut( i ) QString::fromUtf8( vlc_gettext(i) )
 #define qtu( i ) ((i).toUtf8().constData())
+
+/* For marking translatable static strings (like `_()`) */
+#define qtr( i ) qfut( i )
 
 #define CONNECT( a, b, c, d ) \
         connect( a, SIGNAL(b), c, SLOT(d) )
@@ -148,7 +171,7 @@ struct vlc_player_locker {
 /* for widgets which must not follow the RTL auto layout changes */
 #define RTL_UNAFFECTED_WIDGET setLayoutDirection( Qt::LeftToRight );
 
-#define getSettings() p_intf->p_sys->mainSettings
+#define getSettings() p_intf->mainSettings
 
 static inline QString QVLCUserDir( vlc_userdir_t type )
 {
@@ -165,5 +188,7 @@ static inline QString QVLCUserDir( vlc_userdir_t type )
  * Note this icon doesn't represent an endorsment of Coca-Cola company.
  */
 #define QT_XMAS_JOKE_DAY 354
+
+#define QT_CLIENT_SIDE_DECORATION_AVAILABLE (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
 
 #endif

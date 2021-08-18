@@ -42,36 +42,35 @@ class PrefsDialog : public QVLCDialog
 {
     Q_OBJECT
 public:
-    PrefsDialog( QWidget *, intf_thread_t * );
+    PrefsDialog( QWindow *, qt_intf_t * );
     virtual ~PrefsDialog();
-#if 0
-    /*Called from extended settings, is not used anymore, but could be useful one day*/
-    void showModulePrefs( char* );
-#endif
 
 private:
-    enum { SIMPLE, ADVANCED };
+    size_t count;
+    module_t **p_list;
+
+    /* View stack */
     QStackedWidget *stack;
 
-    QWidget *simple_split_widget;
-    QSplitter *advanced_split_widget;
+    /* View selection */
+    enum { SIMPLE, ADVANCED };
+    QGroupBox *types;
+    QRadioButton *simple, *all;
 
-    QStackedWidget *advanced_panels_stack;
+    /* Simple view components */
+    QWidget *simple_split_widget;
+    QWidget *simple_tree_panel;
+    SPrefsCatList *simple_tree;
     QStackedWidget *simple_panels_stack;
     SPrefsPanel *simple_panels[SPrefsMax];
 
-    QWidget *simple_tree_panel;
+    /* Advanced view components */
+    QSplitter *advanced_split_widget;
     QWidget *advanced_tree_panel;
-
-    SPrefsCatList *simple_tree;
-    PrefsTree *advanced_tree;
-    size_t count;
-    module_t **p_list;
     SearchLineEdit *tree_filter;
     QCheckBox *current_filter;
-
-    QGroupBox *types;
-    QRadioButton *simple,*all;
+    PrefsTree *advanced_tree;
+    QStackedWidget *advanced_panels_stack;
 
 private slots:
     void setAdvanced();
@@ -85,7 +84,7 @@ private slots:
     void save();
     void cancel();
     void reset();
-    void close() { save(); };
+    void close() { save(); }
 };
 
 #endif

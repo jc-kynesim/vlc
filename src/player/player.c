@@ -1060,14 +1060,12 @@ vlc_player_AddAssociatedMedia(vlc_player_t *player,
     enum slave_type type;
     switch (cat)
     {
-        case AUDIO_ES:
-            type = SLAVE_TYPE_AUDIO;
-            break;
         case SPU_ES:
             type = SLAVE_TYPE_SPU;
             break;
         default:
-            return VLC_EGENERIC;
+            type = SLAVE_TYPE_GENERIC;
+            break;
     }
 
     if (check_ext && type == SLAVE_TYPE_SPU && !subtitles_Filter(uri))
@@ -1089,13 +1087,13 @@ vlc_player_AddAssociatedMedia(vlc_player_t *player,
     {
         switch( type )
         {
-            case SLAVE_TYPE_AUDIO:
+            case SLAVE_TYPE_GENERIC:
                 vlc_player_osd_Message(player, "%s",
-                                       vlc_gettext("Audio track added"));
+                                       vlc_gettext("Slave added"));
                 break;
             case SLAVE_TYPE_SPU:
                 vlc_player_osd_Message(player, "%s",
-                                       vlc_gettext("Subtitle track added"));
+                                       vlc_gettext("Subtitle slave added"));
                 break;
         }
     }
@@ -1697,7 +1695,7 @@ vlc_player_SetEsIdDelay(vlc_player_t *player, vlc_es_id_t *es_id,
         trackpriv->delay = delay;
     else
     {
-        if (trackpriv->delay == INT64_MAX)
+        if (trackpriv->delay == VLC_TICK_MAX)
             trackpriv->delay = 0;
         trackpriv->delay += delay;
         delay = trackpriv->delay;
@@ -1708,7 +1706,7 @@ vlc_player_SetEsIdDelay(vlc_player_t *player, vlc_es_id_t *es_id,
                                 &param);
     if (ret == VLC_SUCCESS)
     {
-        if (delay != INT64_MAX)
+        if (delay != VLC_TICK_MAX)
             vlc_player_osd_Message(player, _("%s delay: %i ms"),
                                    trackpriv->t.name,
                                    (int)MS_FROM_VLC_TICK(delay));
@@ -1727,7 +1725,7 @@ vlc_player_GetEsIdDelay(vlc_player_t *player, vlc_es_id_t *es_id)
 
     struct vlc_player_track_priv *trackpriv =
         vlc_player_input_FindTrackById(input, es_id, NULL);
-    return trackpriv ? trackpriv->delay : INT64_MAX;
+    return trackpriv ? trackpriv->delay : VLC_TICK_MAX;
 }
 
 static struct {

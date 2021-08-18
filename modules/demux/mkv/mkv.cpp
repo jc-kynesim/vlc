@@ -60,27 +60,27 @@ vlc_module_begin ()
 
     add_bool( "mkv-use-ordered-chapters", true,
             N_("Respect ordered chapters"),
-            N_("Play chapters in the order specified in the segment."), false );
+            N_("Play chapters in the order specified in the segment.") );
 
     add_bool( "mkv-use-chapter-codec", true,
             N_("Chapter codecs"),
-            N_("Use chapter codecs found in the segment."), true );
+            N_("Use chapter codecs found in the segment.") );
 
     add_bool( "mkv-preload-local-dir", true,
             N_("Preload MKV files in the same directory"),
-            N_("Preload matroska files in the same directory to find linked segments (not good for broken files)."), false );
+            N_("Preload matroska files in the same directory to find linked segments (not good for broken files).") );
 
     add_bool( "mkv-seek-percent", false,
             N_("Seek based on percent not time"),
-            N_("Seek based on percent not time."), true );
+            nullptr );
 
     add_bool( "mkv-use-dummy", false,
             N_("Dummy Elements"),
-            N_("Read and discard unknown EBML elements (not good for broken files)."), true );
+            N_("Read and discard unknown EBML elements (not good for broken files).") );
 
     add_bool( "mkv-preload-clusters", false,
             N_("Preload clusters"),
-            N_("Find all cluster positions by jumping cluster-to-cluster before playback"), true );
+            N_("Find all cluster positions by jumping cluster-to-cluster before playback") );
 
     add_shortcut( "mka", "mkv" )
     add_file_extension("mka")
@@ -210,7 +210,6 @@ static int OpenInternal( demux_t *p_demux, bool trust_cues )
                             !strcasecmp(s_filename.c_str() + s_filename.length() - 4, ".mka"))
                         {
                             // test whether this file belongs to our family
-                            const uint8_t *p_peek;
                             bool          file_ok = false;
                             char          *psz_url = vlc_path2uri( s_filename.c_str(), "file" );
                             stream_t      *p_file_stream = vlc_stream_NewURL(
@@ -224,16 +223,16 @@ static int OpenInternal( demux_t *p_demux, bool trust_cues )
 
                             if ( file_ok )
                             {
-                                matroska_stream_c *p_stream = new matroska_stream_c( p_file_stream, true );
+                                matroska_stream_c *p_preload_stream = new matroska_stream_c( p_file_stream, true );
 
-                                if ( !p_sys->AnalyseAllSegmentsFound( p_demux, p_stream ) )
+                                if ( !p_sys->AnalyseAllSegmentsFound( p_demux, p_preload_stream ) )
                                 {
                                     msg_Dbg( p_demux, "the file '%s' will not be used", s_filename.c_str() );
-                                    delete p_stream;
+                                    delete p_preload_stream;
                                 }
                                 else
                                 {
-                                    p_sys->streams.push_back( p_stream );
+                                    p_sys->streams.push_back( p_preload_stream );
                                 }
                             }
                             else
@@ -382,7 +381,7 @@ static int Control( demux_t *p_demux, int i_query, va_list args )
             if( p_sys->titles.size() > 1 || ( p_sys->titles.size() == 1 && p_sys->titles[0]->i_seekpoint > 0 ) )
             {
                 input_title_t ***ppp_title = va_arg( args, input_title_t*** );
-                int *pi_int = va_arg( args, int* );
+                pi_int = va_arg( args, int* );
 
                 *pi_int = p_sys->titles.size();
                 *ppp_title = static_cast<input_title_t**>( vlc_alloc( p_sys->titles.size(), sizeof( input_title_t* ) ) );

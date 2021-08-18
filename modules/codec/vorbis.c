@@ -41,7 +41,7 @@
 
 #include <ogg/ogg.h>
 
-#ifdef MODULE_NAME_IS_tremor
+#ifdef PLUGIN_TREMOR
 # include <tremor/ivorbiscodec.h>
 # define INTERLEAVE_TYPE int32_t
 
@@ -186,7 +186,7 @@ static block_t *Encode   ( encoder_t *, block_t * );
 vlc_module_begin ()
     set_shortname( "Vorbis" )
     set_description( N_("Vorbis audio decoder") )
-#ifdef MODULE_NAME_IS_tremor
+#ifdef PLUGIN_TREMOR
     set_capability( "audio decoder", 90 )
 #else
     set_capability( "audio decoder", 100 )
@@ -208,14 +208,14 @@ vlc_module_begin ()
     set_callbacks( OpenEncoder, CloseEncoder )
 
     add_integer( ENC_CFG_PREFIX "quality", 0, ENC_QUALITY_TEXT,
-                 ENC_QUALITY_LONGTEXT, false )
+                 ENC_QUALITY_LONGTEXT )
         change_integer_range( 0, 10 )
     add_integer( ENC_CFG_PREFIX "max-bitrate", 0, ENC_MAXBR_TEXT,
-                 ENC_MAXBR_LONGTEXT, false )
+                 ENC_MAXBR_LONGTEXT )
     add_integer( ENC_CFG_PREFIX "min-bitrate", 0, ENC_MINBR_TEXT,
-                 ENC_MINBR_LONGTEXT, false )
+                 ENC_MINBR_LONGTEXT )
     add_bool( ENC_CFG_PREFIX "cbr", false, ENC_CBR_TEXT,
-                 ENC_CBR_LONGTEXT, false )
+                 ENC_CBR_LONGTEXT )
 #endif
 
 vlc_module_end ()
@@ -256,7 +256,7 @@ static int OpenCommon( vlc_object_t *p_this, bool b_packetizer )
     }
     else
     {
-#ifdef MODULE_NAME_IS_tremor
+#ifdef PLUGIN_TREMOR
         p_dec->fmt_out.i_codec = VLC_CODEC_S32N;
 #else
         p_dec->fmt_out.i_codec = VLC_CODEC_FL32;
@@ -513,7 +513,7 @@ static void Interleave( INTERLEAVE_TYPE *p_out, const INTERLEAVE_TYPE **pp_in,
     for( int j = 0; j < i_samples; j++ )
         for( int i = 0; i < i_nb_channels; i++ )
         {
-#ifdef MODULE_NAME_IS_tremor
+#ifdef PLUGIN_TREMOR
             union { int32_t i; uint32_t u;} spl;
 
             spl.u = ((uint32_t)pp_in[i][j]) << 8;

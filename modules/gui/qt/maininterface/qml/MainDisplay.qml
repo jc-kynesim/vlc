@@ -17,19 +17,19 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtGraphicalEffects 1.0
 import org.videolan.vlc 0.1
 
 import "qrc:///style/"
 import "qrc:///main/" as Main
 import "qrc:///widgets/" as Widgets
-import "qrc:///util/KeyHelper.js" as KeyHelper
-import "qrc:///util/Helpers.js" as Helpers
 import "qrc:///playlist/" as PL
 import "qrc:///player/" as Player
 
-Widgets.NavigableFocusScope {
+import "qrc:///util/Helpers.js" as Helpers
+
+FocusScope {
     id: root
 
     //name and properties of the tab to be initially loaded
@@ -39,9 +39,10 @@ Widgets.NavigableFocusScope {
     property alias g_mainDisplay: root
     property bool _inhibitMiniPlayer: false
     property bool _showMiniPlayer: false
+    property var _defaultPages: ({}) // saves last page of view
 
     onViewChanged: {
-        viewProperties = ({})
+        viewProperties = _defaultPages[root.view] !== undefined ? ({"defaultPage": _defaultPages[root.view]}) : ({})
         loadView()
     }
     onViewPropertiesChanged: loadView()
@@ -54,11 +55,13 @@ Widgets.NavigableFocusScope {
 
     function loadView() {
         var found = stackView.loadView(root.pageModel, root.view, root.viewProperties)
+        if (stackView.currentItem.view !== undefined)
+            _defaultPages[root.view] = stackView.currentItem.view
 
-        stackView.currentItem.navigationParent = medialibId
-        stackView.currentItem.navigationUpItem = sourcesBanner
-        stackView.currentItem.navigationRightItem = playlistColumn
-        stackView.currentItem.navigationDownItem = Qt.binding(function() {
+        stackView.currentItem.Navigation.parentItem = medialibId
+        stackView.currentItem.Navigation.upItem = sourcesBanner
+        stackView.currentItem.Navigation.rightItem = playlistColumn
+        stackView.currentItem.Navigation.downItem = Qt.binding(function() {
             return miniPlayer.expanded ? miniPlayer : medialibId
         })
 
@@ -84,7 +87,7 @@ Widgets.NavigableFocusScope {
             _showMiniPlayer = true
     }
 
-    navigationCancel: function() {
+    Navigation.cancelAction: function() {
         history.previous()
     }
 
@@ -158,16 +161,22 @@ Widgets.NavigableFocusScope {
         history.push(["player"])
     }
 
+    function play(backend, ids) {
+        showPlayer();
+
+        backend.addAndPlay(ids);
+    }
+
     Rectangle {
         color: VLCStyle.colors.bg
         anchors.fill: parent
 
-        Widgets.NavigableFocusScope {
+        FocusScope {
             focus: true
             id: medialibId
             anchors.fill: parent
 
-            navigationParent: root
+            Navigation.parentItem: root
 
             ColumnLayout {
                 id: mainColumn
@@ -194,8 +203,8 @@ Widgets.NavigableFocusScope {
                         history.push(["mc", name])
                     }
 
-                    navigationParent: medialibId
-                    navigationDownItem: stackView
+                    Navigation.parentItem: medialibId
+                    Navigation.downItem: stackView
                 }
 
                 Item {
@@ -212,6 +221,7 @@ Widgets.NavigableFocusScope {
                             top: parent.top
                             left: parent.left
                             bottom: parent.bottom
+                            bottomMargin: miniPlayer.height
                             right: playlistColumn.visible ? playlistColumn.left : playlistColumn.right
                             rightMargin: (mainInterface.playlistDocked && mainInterface.playlistVisible)
                                          ? 0
@@ -230,12 +240,12 @@ Widgets.NavigableFocusScope {
                                 topMargin: VLCStyle.dp(10, VLCStyle.scale)
                                 bottomMargin: VLCStyle.dp(10, VLCStyle.scale)
                             }
-                            active: !!medialib
+                            active: !!medialib && !medialib.idle
                             source: "qrc:///widgets/ScanProgressBar.qml"
                         }
                     }
 
-                    Widgets.NavigableFocusScope {
+                    FocusScope {
                         id: playlistColumn
                         anchors {
                             top: parent.top
@@ -276,7 +286,13 @@ Widgets.NavigableFocusScope {
                                 to: "collapsed"
 
                                 SequentialAnimation {
-                                    SmoothedAnimation { target: playlistColumn; property: "width"; easing.type: Easing.OutSine; duration: 150; }
+                                    SmoothedAnimation {
+                                        target: playlistColumn; property: "width"
+
+                                        duration: VLCStyle.duration_fast
+                                        easing.type: Easing.OutSine
+                                    }
+
                                     PropertyAction { target: playlistColumn; property: "visible" }
                                 }
                             },
@@ -287,7 +303,13 @@ Widgets.NavigableFocusScope {
 
                                 SequentialAnimation {
                                     PropertyAction { target: playlistColumn; property: "visible" }
-                                    SmoothedAnimation { target: playlistColumn; property: "width"; easing.type: Easing.InSine; duration: 150; }
+
+                                    SmoothedAnimation {
+                                        target: playlistColumn; property: "width"
+
+                                        duration: VLCStyle.duration_fast
+                                        easing.type: Easing.InSine
+                                    }
                                 }
                             }
                         ]
@@ -301,15 +323,25 @@ Widgets.NavigableFocusScope {
 
                             rightPadding: VLCStyle.applicationHorizontalMargin
 
-                            navigationParent: medialibId
-                            navigationLeftItem: stackView
-                            navigationUpItem: sourcesBanner
-                            navigationDownItem: miniPlayer.expanded ? miniPlayer : undefined
-                            navigationCancel: function() {
+                            Navigation.parentItem: medialibId
+                            Navigation.leftItem: stackView
+                            Navigation.upItem: sourcesBanner
+                            Navigation.downItem: miniPlayer.expanded ? miniPlayer : null
+                            Navigation.cancelAction: function() {
                                 mainInterface.playlistVisible = false
                                 stackView.forceActiveFocus()
                             }
 
+                            Rectangle {
+                                // id: playlistLeftBorder
+
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                anchors.left: parent.left
+
+                                width: VLCStyle.border
+                                color: VLCStyle.colors.border
+                            }
 
                             Widgets.HorizontalResizeHandle {
                                 id: resizeHandle
@@ -381,9 +413,9 @@ Widgets.NavigableFocusScope {
                 anchors.bottom: parent.bottom
 
                 z: 3
-                navigationParent: medialibId
-                navigationUpItem: stackView
-                navigationCancelItem:sourcesBanner
+                Navigation.parentItem: medialibId
+                Navigation.upItem: stackView
+                Navigation.cancelItem:sourcesBanner
                 onExpandedChanged: {
                     if (!expanded && miniPlayer.activeFocus)
                         stackView.forceActiveFocus()
@@ -396,7 +428,8 @@ Widgets.NavigableFocusScope {
                 target: player
                 onHasVideoOutputChanged: {
                     if (player.hasVideoOutput && mainInterface.hasEmbededVideo) {
-                        g_mainDisplay.showPlayer()
+                        if (history.current.view !== "player")
+                            g_mainDisplay.showPlayer()
                     } else {
                         _showMiniPlayer = false;
                     }

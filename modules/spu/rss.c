@@ -36,6 +36,8 @@
 
 #include <time.h>
 
+#include "common.h"
+
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_filter.h>
@@ -103,8 +105,9 @@ typedef struct
     vlc_timer_t timer;  /* Timer to refresh the rss feeds */
     bool b_fetched;
 
-    int i_xoff, i_yoff;  /* offsets for the display string in the video window */
-    int i_pos; /* permit relative positioning (top, bottom, left, right, center) */
+    int i_xoff, i_yoff; /* positioning offsets */
+    int i_pos; /* positioning: absolute, or relative location (top, bottom, left, right, center) */
+
     vlc_tick_t i_speed;
     int i_length;
 
@@ -138,14 +141,6 @@ typedef struct
 #define IMAGE_TEXT N_("Feed images")
 #define IMAGE_LONGTEXT N_("Display feed images if available.")
 
-#define POSX_TEXT N_("X offset")
-#define POSX_LONGTEXT N_("X offset, from the left screen edge." )
-#define POSY_TEXT N_("Y offset")
-#define POSY_LONGTEXT N_("Y offset, down from the top." )
-#define OPACITY_TEXT N_("Opacity")
-#define OPACITY_LONGTEXT N_("Opacity (inverse of transparency) of " \
-    "overlay text. 0 = transparent, 255 = totally opaque." )
-
 #define SIZE_TEXT N_("Font size, pixels")
 #define SIZE_LONGTEXT N_("Font size, in pixels. Default is 0 (use default " \
     "font size)." )
@@ -156,21 +151,10 @@ typedef struct
     "chars are for red, then green, then blue. #000000 = black, #FF0000 = red,"\
     " #00FF00 = green, #FFFF00 = yellow (red + green), #FFFFFF = white" )
 
-#define POS_TEXT N_("Text position")
-#define POS_LONGTEXT N_( \
-  "You can enforce the text position on the video " \
-  "(0=center, 1=left, 2=right, 4=top, 8=bottom; you can " \
-  "also use combinations of these values, eg 6 = top-right).")
-
 #define TITLE_TEXT N_("Title display mode")
 #define TITLE_LONGTEXT N_("Title display mode. Default is 0 (hidden) if the feed has an image and feed images are enabled, 1 otherwise.")
 
 #define RSS_HELP N_("Display a RSS or ATOM Feed on your video")
-
-static const int pi_pos_values[] = { 0, 1, 2, 4, 8, 5, 6, 9, 10 };
-static const char *const ppsz_pos_descriptions[] =
-     { N_("Center"), N_("Left"), N_("Right"), N_("Top"), N_("Bottom"),
-     N_("Top-Left"), N_("Top-Right"), N_("Bottom-Left"), N_("Bottom-Right") };
 
 enum title_modes {
     default_title=-1,
@@ -193,32 +177,29 @@ vlc_module_begin ()
     set_callback_sub_source( CreateFilter, 1 )
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_SUBPIC )
-    add_string( CFG_PREFIX "urls", NULL, MSG_TEXT, MSG_LONGTEXT, false )
+    add_string( CFG_PREFIX "urls", NULL, MSG_TEXT, MSG_LONGTEXT )
 
     set_section( N_("Position"), NULL )
-    add_integer( CFG_PREFIX "x", 0, POSX_TEXT, POSX_LONGTEXT, true )
-    add_integer( CFG_PREFIX "y", 0, POSY_TEXT, POSY_LONGTEXT, true )
-    add_integer( CFG_PREFIX "position", -1, POS_TEXT, POS_LONGTEXT, false )
+    add_integer( CFG_PREFIX "x", 0, POSX_TEXT, POSX_LONGTEXT )
+    add_integer( CFG_PREFIX "y", 0, POSY_TEXT, POSY_LONGTEXT )
+    add_integer( CFG_PREFIX "position", -1, POS_TEXT, POS_LONGTEXT )
         change_integer_list( pi_pos_values, ppsz_pos_descriptions )
 
     set_section( N_("Font"), NULL )
     /* 5 sets the default to top [1] left [4] */
     add_integer_with_range( CFG_PREFIX "opacity", 255, 0, 255,
-        OPACITY_TEXT, OPACITY_LONGTEXT, false )
+        OPACITY_TEXT, OPACITY_LONGTEXT )
     add_rgb(CFG_PREFIX "color", 0xFFFFFF, COLOR_TEXT, COLOR_LONGTEXT)
         change_integer_list( pi_color_values, ppsz_color_descriptions )
-    add_integer( CFG_PREFIX "size", 0, SIZE_TEXT, SIZE_LONGTEXT, false )
+    add_integer( CFG_PREFIX "size", 0, SIZE_TEXT, SIZE_LONGTEXT )
         change_integer_range( 0, 4096)
 
     set_section( N_("Misc"), NULL )
-    add_integer( CFG_PREFIX "speed", 100000, SPEED_TEXT, SPEED_LONGTEXT,
-                 false )
-    add_integer( CFG_PREFIX "length", 60, LENGTH_TEXT, LENGTH_LONGTEXT,
-                 false )
-    add_integer( CFG_PREFIX "ttl", 1800, TTL_TEXT, TTL_LONGTEXT, false )
-    add_bool( CFG_PREFIX "images", true, IMAGE_TEXT, IMAGE_LONGTEXT, false )
-    add_integer( CFG_PREFIX "title", default_title, TITLE_TEXT, TITLE_LONGTEXT,
-                 false )
+    add_integer( CFG_PREFIX "speed", 100000, SPEED_TEXT, SPEED_LONGTEXT )
+    add_integer( CFG_PREFIX "length", 60, LENGTH_TEXT, LENGTH_LONGTEXT )
+    add_integer( CFG_PREFIX "ttl", 1800, TTL_TEXT, TTL_LONGTEXT )
+    add_bool( CFG_PREFIX "images", true, IMAGE_TEXT, IMAGE_LONGTEXT )
+    add_integer( CFG_PREFIX "title", default_title, TITLE_TEXT, TITLE_LONGTEXT )
         change_integer_list( pi_title_modes, ppsz_title_modes )
 
     set_description( N_("RSS and Atom feed display") )

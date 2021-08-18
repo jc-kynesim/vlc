@@ -23,12 +23,13 @@ OPENGL_COMMONSOURCES = video_output/opengl/vout_helper.c \
        video_output/opengl/sampler_priv.h \
        video_output/opengl/sub_renderer.c \
        video_output/opengl/sub_renderer.h
-if HAVE_LIBPLACEBO
-OPENGL_COMMONSOURCES += video_output/placebo_utils.c video_output/placebo_utils.h
-endif
 
 OPENGL_COMMONCFLAGS = $(LIBPLACEBO_CFLAGS)
 OPENGL_COMMONLIBS = $(LIBPLACEBO_LIBS)
+
+if HAVE_LIBPLACEBO
+OPENGL_COMMONLIBS += libplacebo_utils.la
+endif
 
 # Convenience library for OpenGL components -- OpenGL only
 libvlc_opengl_la_SOURCES = $(OPENGL_COMMONSOURCES)
@@ -119,5 +120,15 @@ if HAVE_ANDROID
 libegl_pbuffer_filter_plugin_la_LIBADD += libvlc_opengles.la $(GLES2_LIBS)
 libegl_pbuffer_filter_plugin_la_CPPFLAGS += -DUSE_OPENGL_ES2=1
 vout_LTLIBRARIES += libegl_pbuffer_filter_plugin.la
+endif
+endif
+
+libegl_surfacetexture_plugin_la_SOURCES = video_filter/egl_surfacetexture.c
+libegl_surfacetexture_plugin_la_CFLAGS = $(AM_CFLAGS) $(EGL_CFLAGS) -DUSE_OPENGL_ES2
+libegl_surfacetexture_plugin_la_LIBADD = $(EGL_LIBS) libandroid_utils.la libvlc_opengles.la
+
+if HAVE_ANDROID
+if HAVE_EGL
+vout_LTLIBRARIES += libegl_surfacetexture_plugin.la
 endif
 endif

@@ -379,7 +379,7 @@ struct input_source_t
 
     char *str_id;
     int auto_id;
-    bool autoselect_cats[ES_CATEGORY_COUNT];
+    bool autoselected;
 
     /* Title infos for that input */
     bool         b_title_demux; /* Titles/Seekpoints provided by demux */
@@ -471,9 +471,6 @@ typedef struct input_thread_private_t
 
     /* Global properties */
     bool        b_preparsing;
-    bool        b_can_pause;
-    bool        b_can_rate_control;
-    bool        b_can_pace_control;
 
     /* Current state */
     int         i_state;
@@ -494,7 +491,7 @@ typedef struct input_thread_private_t
 
     /* Output */
     bool            b_out_pace_control; /* XXX Move it ot es_sout ? */
-    sout_instance_t *p_sout;            /* Idem ? */
+    sout_stream_t   *p_sout;            /* Idem ? */
     es_out_t        *p_es_out;
     es_out_t        *p_es_out_display;
     vlc_viewpoint_t viewpoint;
@@ -658,6 +655,8 @@ int input_GetAttachments(input_thread_t *input, input_attachment_t ***attachment
 
 input_attachment_t *input_GetAttachment(input_thread_t *input, const char *name);
 
+bool input_CanPaceControl(input_thread_t *input);
+
 /**
  * Hold the input_source_t
  */
@@ -685,10 +684,9 @@ const char *input_source_GetStrId( input_source_t *in );
 int input_source_GetNewAutoId( input_source_t *in );
 
 /**
- * Returns true if a category should be auto-selected for a given source
+ * Returns true if a given source should be auto-selected
  */
-bool input_source_IsCatAutoselected( input_source_t *in,
-                                     enum es_format_category_e cat );
+bool input_source_IsAutoSelected( input_source_t *in );
 
 /* Bound pts_delay */
 #define INPUT_PTS_DELAY_MAX VLC_TICK_FROM_SEC(60)

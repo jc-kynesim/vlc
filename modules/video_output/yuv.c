@@ -49,7 +49,7 @@
 
 #define CFG_PREFIX "yuv-"
 
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context);
 static void Close(vout_display_t *vd);
 
@@ -60,11 +60,11 @@ vlc_module_begin()
     set_subcategory(SUBCAT_VIDEO_VOUT)
 
     add_string(CFG_PREFIX "file", "stream.yuv",
-                YUV_FILE_TEXT, YUV_FILE_LONGTEXT, false)
+                YUV_FILE_TEXT, YUV_FILE_LONGTEXT)
     add_string(CFG_PREFIX "chroma", NULL,
-                CHROMA_TEXT, CHROMA_LONGTEXT, true)
+                CHROMA_TEXT, CHROMA_LONGTEXT)
     add_bool  (CFG_PREFIX "yuv4mpeg2", false,
-                YUV4MPEG2_TEXT, YUV4MPEG2_LONGTEXT, true)
+                YUV4MPEG2_TEXT, YUV4MPEG2_LONGTEXT)
 
     set_callback_display(Open, 0)
 vlc_module_end()
@@ -80,18 +80,20 @@ static int            Control(vout_display_t *, int);
 /*****************************************************************************
  * vout_display_sys_t: video output descriptor
  *****************************************************************************/
-struct vout_display_sys_t {
+typedef struct vout_display_sys_t {
     FILE *f;
     bool  is_first;
     bool  is_yuv4mpeg2;
-};
+} vout_display_sys_t;
 
 static const struct vlc_display_operations ops = {
-    Close, NULL, Display, Control, NULL, NULL,
+    .close = Close,
+    .display = Display,
+    .control = Control,
 };
 
 /* */
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
 {
     vout_display_sys_t *sys;
@@ -155,7 +157,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     *fmtp = fmt;
     vd->ops = &ops;
 
-    (void) cfg; (void) context;
+    (void) context;
     return VLC_SUCCESS;
 }
 

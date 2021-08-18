@@ -109,7 +109,6 @@ enum vlc_module_properties
 
 /* Configuration hint types */
 #define CONFIG_HINT_CATEGORY                0x02  /* Start of new category */
-#define CONFIG_HINT_USAGE                   0x05  /* Usage information */
 
 #define CONFIG_CATEGORY                     0x06 /* Set category */
 #define CONFIG_SUBCATEGORY                  0x07 /* Set subcategory */
@@ -132,7 +131,28 @@ enum vlc_module_properties
 #define CONFIG_ITEM_DIRECTORY               0x8E  /* Directory option */
 #define CONFIG_ITEM_FONT                    0x8F  /* Font option */
 
+/* reduce specific type to type class */
+#define CONFIG_CLASS(x) ((x) & ~0x1F)
+
+/* is proper option, not a special hint type? */
 #define CONFIG_ITEM(x) (((x) & ~0xF) != 0)
+
+#define IsConfigStringType(type) \
+    (((type) & CONFIG_ITEM_STRING) != 0)
+#define IsConfigIntegerType(type) \
+    (((type) & CONFIG_ITEM_INTEGER) != 0)
+#define IsConfigFloatType(type) \
+    ((type) == CONFIG_ITEM_FLOAT)
+
+/* Hidden categories and subcategories */
+/* Any options under this will be hidden in the GUI preferences, but will be
+   listed in cmdline help output. */
+#define CAT_HIDDEN -1
+#define SUBCAT_HIDDEN -1
+
+/* Unknown/unset/invalid */
+#define CAT_UNKNOWN 0
+#define SUBCAT_UNKNOWN 0
 
 /* Categories and subcategories */
 #define CAT_INTERFACE 1
@@ -186,7 +206,7 @@ enum vlc_module_properties
 /**
  * Current plugin ABI version
  */
-#define VLC_API_VERSION_STRING "4.0.4"
+#define VLC_API_VERSION_STRING "4.0.5"
 
 /*****************************************************************************
  * Add a few defines. You do not want to read this section. Really.
@@ -369,13 +389,12 @@ VLC_METADATA_EXPORTS
 #define set_section( text, longtext ) \
     add_typedesc_inner( CONFIG_SECTION, text, longtext )
 
+#ifndef __PLUGIN__
 #define add_category_hint(text, longtext) \
     add_typedesc_inner( CONFIG_HINT_CATEGORY, text, longtext )
+#endif
 
-#define add_usage_hint( text ) \
-    add_typedesc_inner( CONFIG_HINT_USAGE, text, NULL )
-
-#define add_string( name, value, text, longtext, advc ) \
+#define add_string( name, value, text, longtext ) \
     add_string_inner(CONFIG_ITEM_STRING, name, text, longtext, value)
 
 #define add_password(name, value, text, longtext) \
@@ -412,7 +431,7 @@ VLC_METADATA_EXPORTS
     change_integer_range (i_subcategory /* gruik */, 0);
 #endif
 
-#define add_integer( name, value, text, longtext, advc ) \
+#define add_integer( name, value, text, longtext ) \
     add_int_inner(CONFIG_ITEM_INTEGER, name, text, longtext, value)
 
 #define add_rgb(name, value, text, longtext) \
@@ -424,19 +443,19 @@ VLC_METADATA_EXPORTS
                      KEY_UNSET) \
     add_string_inner(CONFIG_ITEM_KEY, name, text, longtext, value)
 
-#define add_integer_with_range( name, value, i_min, i_max, text, longtext, advc ) \
-    add_integer( name, value, text, longtext, advc ) \
+#define add_integer_with_range( name, value, i_min, i_max, text, longtext ) \
+    add_integer( name, value, text, longtext ) \
     change_integer_range( i_min, i_max )
 
-#define add_float( name, v, text, longtext, advc ) \
+#define add_float( name, v, text, longtext ) \
     add_typename_inner(CONFIG_ITEM_FLOAT, name, text, longtext) \
     vlc_config_set (VLC_CONFIG_VALUE, (double)(v));
 
-#define add_float_with_range( name, value, f_min, f_max, text, longtext, advc ) \
-    add_float( name, value, text, longtext, advc ) \
+#define add_float_with_range( name, value, f_min, f_max, text, longtext ) \
+    add_float( name, value, text, longtext ) \
     change_float_range( f_min, f_max )
 
-#define add_bool( name, v, text, longtext, advc ) \
+#define add_bool( name, v, text, longtext ) \
     add_typename_inner(CONFIG_ITEM_BOOL, name, text, longtext) \
     if (v) vlc_config_set (VLC_CONFIG_VALUE, (int64_t)true);
 

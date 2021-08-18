@@ -150,10 +150,7 @@ Widgets.PageLoader {
             leftMargin: VLCStyle.margin_large
             rightMargin: VLCStyle.margin_large
             spacing: VLCStyle.margin_xsmall
-
-            footer: MainInterface.MiniPlayerBottomMargin {
-                width: servicesView.width
-            }
+            displayMarginEnd: miniPlayer.height // to get blur effect while scrolling in mainview
 
             delegate: Rectangle {
                 width: servicesView.width - VLCStyle.margin_large * 2
@@ -302,7 +299,7 @@ Widgets.PageLoader {
                 pictureWidth: VLCStyle.colWidth(1)
                 pictureHeight: VLCStyle.gridCover_network_height
                 height: VLCStyle.gridCover_network_height + VLCStyle.margin_xsmall + VLCStyle.fontHeight_normal
-                playCoverBorder.width: VLCStyle.gridCover_network_border
+                playCoverBorderWidth: VLCStyle.gridCover_network_border
                 playCoverOnlyBorders: true
                 pictureOverlay: overlay
                 unselectedUnderlay: shadows.unselected
@@ -387,8 +384,8 @@ Widgets.PageLoader {
                     history.push(["mc", "discover", "services", "source_root", { source_name: itemData.name } ])
             }
 
-            navigationParent: root
-            navigationCancel: function() {
+            Navigation.parentItem: root
+            Navigation.cancelAction: function() {
                 history.previous()
             }
 

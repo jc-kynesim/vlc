@@ -18,15 +18,15 @@
 #ifndef VLC_COMPOSITOR_DUMMY
 #define VLC_COMPOSITOR_DUMMY
 
-
 #ifdef HAVE_CONFIG_H
 # include "config.h"
 #endif
 
+#include <memory>
 #include "compositor.hpp"
 
 class MainInterface;
-class QQuickWidget;
+class QQuickView;
 
 namespace vlc {
 
@@ -34,19 +34,37 @@ class CompositorDummy : public QObject, public Compositor
 {
     Q_OBJECT
 public:
-    CompositorDummy(intf_thread_t *p_intf, QObject* parent = nullptr);
-    virtual ~CompositorDummy() = default;
+    CompositorDummy(qt_intf_t *p_intf, QObject* parent = nullptr);
+    virtual ~CompositorDummy();
+
+    static bool preInit(qt_intf_t*);
+    virtual bool init() override;
 
     virtual MainInterface *makeMainInterface() override;
+
+    /**
+     * @brief release all resources used by the compositor.
+     * this includes the GUI and the video surfaces.
+     */
     virtual void destroyMainInterface() override;
 
-    bool setupVoutWindow(vout_window_t *p_wnd) override;
+    /**
+     * @brief unloadGUI unload the UI view from the composition
+     * video view might still be active
+     */
+    virtual void unloadGUI() override;
+
+    bool setupVoutWindow(vout_window_t *p_wnd, VoutDestroyCb destroyCb) override;
+
+    QWindow* interfaceMainWindow() const override;
+
+    Type type() const override;
 
 protected:
-    intf_thread_t *m_intf;
+    qt_intf_t *m_intf;
 
-    MainInterface* m_rootWindow = nullptr;
-    QQuickWidget* m_qmlWidget = nullptr;
+    std::unique_ptr<MainInterface> m_mainInterface;
+    std::unique_ptr<QQuickView> m_qmlWidget;
 };
 
 }

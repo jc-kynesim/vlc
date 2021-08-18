@@ -18,26 +18,40 @@
 import QtQuick.Controls 2.4
 import QtQuick 2.11
 import QtQml.Models 2.2
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 
 import org.videolan.medialib 0.1
+import org.videolan.vlc 0.1
 
 import "qrc:///util/" as Util
 import "qrc:///widgets/" as Widgets
 import "qrc:///main/" as MainInterface
 import "qrc:///style/"
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: root
 
     property var artist: ({})
-    readonly property var currentIndex: headerItem.albumsListView.currentIndex || view.currentItem.currentIndex
-    property Item headerItem: view.currentItem.headerItem
+
     //the index to "go to" when the view is loaded
     property var initialIndex: 0
 
+    property Item headerItem: view.currentItem ? view.currentItem.headerItem : null
+
+    // current index of album model
+    readonly property int currentIndex: {
+        if (!view.currentItem)
+           return -1
+        else if (mainInterface.gridView)
+           return view.currentItem.currentIndex
+        else
+           return headerItem.albumsListView.currentIndex
+    }
+
     property Component header: FocusScope {
-        property Item albumsListView: albumsLoader.item.albumsListView
+        id: headerFs
+
+        property Item albumsListView: albumsLoader.status === Loader.Ready ? albumsLoader.item.albumsListView: null
         property Item focusItem: albumsLoader.active ? albumsLoader.item.albumsListView : artistBanner
 
         focus: true
@@ -47,8 +61,9 @@ Widgets.NavigableFocusScope {
         Column {
             id: col
 
-            height: childrenRect.height + VLCStyle.margin_normal
+            height: implicitHeight
             width: root.width
+            bottomPadding: VLCStyle.margin_normal
 
             ArtistTopBanner {
                 id: artistBanner
@@ -56,10 +71,9 @@ Widgets.NavigableFocusScope {
                 focus: true
                 width: root.width
                 artist: root.artist
-                navigationParent: root.navigationParent
-                navigationLeftItem: root.navigationLeftItem
-                navigationDown: function() {
-                    artistBanner.focus = false
+                Navigation.parentItem: root
+                Navigation.downAction: function() {
+                    headerFs.focus = false
                     if (albumsListView)
                         albumsListView.forceActiveFocus()
                     else
@@ -77,7 +91,7 @@ Widgets.NavigableFocusScope {
                     property alias albumsListView: albumsList
 
                     width: root.width
-                    height: childrenRect.height
+                    height: implicitHeight
 
                     Widgets.SubtitleLabel {
                         id: albumsText
@@ -100,10 +114,11 @@ Widgets.NavigableFocusScope {
                         model: albumModel
                         orientation: ListView.Horizontal
                         spacing: VLCStyle.column_margin_width
-                        navigationLeftItem: root.navigationLeftItem
-                        navigationUpItem: artistBanner
-                        navigationDown: function() {
-                            albumsList.focus = false
+
+                        Navigation.parentItem: root
+                        Navigation.upItem: artistBanner
+                        Navigation.downAction: function() {
+                            headerFs.focus = false
                             view.currentItem.setCurrentItemFocus()
                         }
 
@@ -111,12 +126,12 @@ Widgets.NavigableFocusScope {
                             image: model.cover || VLCStyle.noArtAlbum
                             title: model.title || i18n.qtr("Unknown title")
                             subtitle: model.release_year || ""
-                            textHorizontalAlignment: Text.AlignHCenter
+                            textAlignHCenter: true
                             x: selectedBorderWidth
                             y: selectedBorderWidth
                             pictureWidth: VLCStyle.gridCover_music_width
                             pictureHeight: VLCStyle.gridCover_music_height
-                            playCoverBorder.width: VLCStyle.gridCover_music_border
+                            playCoverBorderWidth: VLCStyle.gridCover_music_border
                             dragItem: albumDragItem
                             unselectedUnderlay: shadows.unselected
                             selectedUnderlay: shadows.selected
@@ -168,7 +183,6 @@ Widgets.NavigableFocusScope {
     }
 
     focus: true
-    navigationUpItem: headerItem.focusItem
 
     onInitialIndexChanged: resetFocus()
     onActiveFocusChanged: {
@@ -203,6 +217,20 @@ Widgets.NavigableFocusScope {
         } else {
             medialib.addAndPlay( model.getIdForIndex(index) )
         }
+    }
+
+    function _onNavigationCancel() {
+        if (view.currentItem.currentIndex <= 0) {
+            root.Navigation.defaultNavigationCancel()
+        } else {
+            view.currentItem.currentIndex = 0;
+            view.currentItem.positionViewAtIndex(0, ItemView.Contain)
+        }
+
+        if (tableView_id.currentIndex <= 0)
+            root.Navigation.defaultNavigationCancel()
+        else
+            tableView_id.currentIndex = 0;
     }
 
     MLAlbumModel {
@@ -249,12 +277,6 @@ Widgets.NavigableFocusScope {
 
         ml: medialib
         parentId: albumModel.parentId
-
-        onCountChanged: {
-            if (trackModel.count > 0) {
-                root.resetFocus()
-            }
-        }
     }
 
     AlbumContextMenu {
@@ -282,7 +304,7 @@ Widgets.NavigableFocusScope {
             model: albumModel
 
             Connections {
-                target: root
+                target: albumModel
                 // selectionModel updates but doesn't trigger any signal, this forces selection update in view
                 onParentIdChanged: currentIndex = -1
             }
@@ -308,7 +330,7 @@ Widgets.NavigableFocusScope {
 
                 Behavior on opacity {
                     NumberAnimation {
-                        duration: 100
+                        duration: VLCStyle.duration_faster
                     }
                 }
             }
@@ -319,10 +341,10 @@ Widgets.NavigableFocusScope {
                 x: 0
                 width: gridView_id.width
                 onRetract: gridView_id.retract()
-                navigationParent: root
-                navigationCancel:  function() {  gridView_id.retract() }
-                navigationUp: function() {  gridView_id.retract() }
-                navigationDown: function() {}
+                Navigation.parentItem: root
+                Navigation.cancelAction:  function() {  gridView_id.retract() }
+                Navigation.upAction: function() {  gridView_id.retract() }
+                Navigation.downAction: function() {}
             }
 
             onActionAtIndex: {
@@ -335,7 +357,9 @@ Widgets.NavigableFocusScope {
 
             onSelectAll: albumSelectionModel.selectAll()
             onSelectionUpdated: albumSelectionModel.updateSelection( keyModifiers, oldIndex, newIndex )
-            navigationParent: root
+            Navigation.parentItem: root
+            Navigation.upItem: headerItem
+            Navigation.cancelAction: root._onNavigationCancel
 
             Connections {
                 target: contextMenu
@@ -366,7 +390,7 @@ Widgets.NavigableFocusScope {
             onActionForSelection: {
                 medialib.addAndPlay( model.getIdsForIndexes( selection ) )
             }
-            navigationParent: root
+
             header: root.header
             headerPositioning: ListView.InlineHeader
             rowHeight: VLCStyle.tableCoverRow_height
@@ -377,12 +401,9 @@ Widgets.NavigableFocusScope {
                 { criteria: "duration", width:VLCStyle.colWidth(1), showSection: "", headerDelegate: tableColumns.timeHeaderDelegate, colDelegate: tableColumns.timeColDelegate },
             ]
 
-            navigationCancel: function() {
-                if (tableView_id.currentIndex <= 0)
-                    defaultNavigationCancel()
-                else
-                    tableView_id.currentIndex = 0;
-            }
+            Navigation.parentItem: root
+            Navigation.upItem: headerItem
+            Navigation.cancelAction: root._onNavigationCancel
 
             onItemDoubleClicked: medialib.addAndPlay(model.id)
             onContextMenuButtonClicked: trackContextMenu.popup(trackSelectionModel.selectedIndexes, menuParent.mapToGlobal(0,0))

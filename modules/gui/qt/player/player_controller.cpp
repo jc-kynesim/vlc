@@ -296,6 +296,7 @@ static void on_player_state_changed(vlc_player_t *, enum vlc_player_state state,
             msg_Dbg( that->p_intf, "on_player_state_changed VLC_PLAYER_STATE_PLAYING");
             PlayerController::AoutPtr aout = q->getAout();
             that->m_audioStereoMode.resetObject( aout.get() );
+            that->m_audioMixMode.resetObject( aout.get() );
             that->m_audioVisualization.resetObject( aout.get() );
             break;
         }
@@ -310,6 +311,7 @@ static void on_player_state_changed(vlc_player_t *, enum vlc_player_state state,
             msg_Dbg( that->p_intf, "on_player_state_changed VLC_PLAYER_STATE_STOPPED");
 
             that->m_audioStereoMode.resetObject((audio_output_t*)nullptr);
+            that->m_audioMixMode.resetObject((audio_output_t*)nullptr);
             that->m_audioVisualization.resetObject((audio_output_t*)nullptr);
 
             /* reset the state on stop */
@@ -905,7 +907,7 @@ static void on_player_timer_update(const struct vlc_player_timer_point *point,
             {
                 q->updatePosition();
 
-                if (that->m_player_time.system_date != INT64_MAX)
+                if (that->m_player_time.system_date != VLC_TICK_MAX)
                 {
                     // Setup the position update interval, depending on media
                     // length and rate.  XXX: VLC_TICK_FROM_MS(1) is an educated
@@ -986,26 +988,31 @@ static const struct vlc_player_cbs player_cbs = {
     on_player_playback_restore_queried
 };
 
-static const struct vlc_player_vout_cbs player_vout_cbs = {
-    on_player_vout_fullscreen_changed,
-    on_player_vout_wallpaper_mode_changed
-};
+static const vlc_player_vout_cbs player_vout_cbs = []{
+    struct vlc_player_vout_cbs cbs{};
+    cbs.on_fullscreen_changed = on_player_vout_fullscreen_changed;
+    cbs.on_wallpaper_mode_changed = on_player_vout_wallpaper_mode_changed;
+    return cbs;
+}();
 
-static const struct vlc_player_aout_cbs player_aout_cbs = {
-    on_player_aout_volume_changed,
-    on_player_aout_mute_changed,
-    nullptr
-};
+static const vlc_player_aout_cbs player_aout_cbs = []{
+    struct vlc_player_aout_cbs cbs{};
+    cbs.on_volume_changed = on_player_aout_volume_changed;
+    cbs.on_mute_changed = on_player_aout_mute_changed;
+    return cbs;
+}();
 
-static const struct vlc_player_timer_cbs player_timer_cbs = {
-    on_player_timer_update,
-    on_player_timer_discontinuity,
-};
+static const vlc_player_timer_cbs player_timer_cbs = []{
+    struct vlc_player_timer_cbs cbs {};
+    cbs.on_update = on_player_timer_update;
+    cbs.on_discontinuity = on_player_timer_discontinuity;
+    return cbs;
+}();
 
-PlayerControllerPrivate::PlayerControllerPrivate(PlayerController *playercontroller, intf_thread_t *p_intf)
+PlayerControllerPrivate::PlayerControllerPrivate(PlayerController *playercontroller, qt_intf_t *p_intf)
     : q_ptr(playercontroller)
     , p_intf(p_intf)
-    , m_player(p_intf->p_sys->p_player)
+    , m_player(p_intf->p_player)
     , m_videoTracks(m_player)
     , m_audioTracks(m_player)
     , m_subtitleTracks(m_player)
@@ -1019,6 +1026,7 @@ PlayerControllerPrivate::PlayerControllerPrivate(PlayerController *playercontrol
     , m_deinterlaceMode((vout_thread_t*)nullptr, "deinterlace-mode")
     , m_autoscale((vout_thread_t*)nullptr, "autoscale")
     , m_audioStereoMode((audio_output_t*)nullptr, "stereo-mode")
+    , m_audioMixMode((audio_output_t*)nullptr, "mix-mode")
     , m_audioDeviceList(m_player)
     , m_audioVisualization((audio_output_t*)nullptr, "visual")
 {
@@ -1040,7 +1048,7 @@ PlayerControllerPrivate::PlayerControllerPrivate(PlayerController *playercontrol
     m_fullscreen = vlc_player_vout_IsFullscreen( m_player );
 }
 
-PlayerController::PlayerController( intf_thread_t *_p_intf )
+PlayerController::PlayerController( qt_intf_t *_p_intf )
     : QObject(NULL)
     , d_ptr( new PlayerControllerPrivate(this, _p_intf) )
 {
@@ -1572,7 +1580,7 @@ void PlayerController::updateTime(vlc_tick_t system_now, bool forceUpdate)
         d->m_remainingTime = VLC_TICK_INVALID;
     emit remainingTimeChanged(d->m_remainingTime);
 
-    if (d->m_player_time.system_date != INT64_MAX
+    if (d->m_player_time.system_date != VLC_TICK_MAX
      && (forceUpdate || !d->m_time_timer.isActive()))
     {
         // Tell the timer to wait until the next second is reached.
@@ -1826,6 +1834,7 @@ QABSTRACTLIST_GETTER( VLCVarChoiceModel, getCrop, m_crop)
 QABSTRACTLIST_GETTER( VLCVarChoiceModel, getDeinterlace, m_deinterlace)
 QABSTRACTLIST_GETTER( VLCVarChoiceModel, getDeinterlaceMode, m_deinterlaceMode)
 QABSTRACTLIST_GETTER( VLCVarChoiceModel, getAudioStereoMode, m_audioStereoMode)
+QABSTRACTLIST_GETTER( VLCVarChoiceModel, getAudioMixMode, m_audioMixMode)
 QABSTRACTLIST_GETTER( VLCVarChoiceModel, getAudioVisualizations, m_audioVisualization)
 
 

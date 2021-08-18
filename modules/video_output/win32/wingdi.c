@@ -42,7 +42,7 @@
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
-static int  Open (vout_display_t *, const vout_display_cfg_t *,
+static int  Open (vout_display_t *,
                   video_format_t *, vlc_video_context *);
 static void Close(vout_display_t *);
 
@@ -58,7 +58,7 @@ vlc_module_end ()
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-struct vout_display_sys_t
+typedef struct vout_display_sys_t
 {
     vout_display_sys_win32_t sys;
     display_win32_area_t     area;
@@ -79,7 +79,7 @@ struct vout_display_sys_t
         RGBQUAD    green;
         RGBQUAD    blue;
     };
-};
+} vout_display_sys_t;
 
 static void           Display(vout_display_t *, picture_t *);
 
@@ -104,11 +104,14 @@ static int Control(vout_display_t *vd, int query)
 }
 
 static const struct vlc_display_operations ops = {
-    Close, Prepare, Display, Control, NULL, NULL,
+    .close = Close,
+    .prepare = Prepare,
+    .display = Display,
+    .control = Control,
 };
 
 /* */
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
 {
     VLC_UNUSED(context);
@@ -129,7 +132,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     if (Init(vd, fmtp))
         goto error;
 
-    vout_window_SetTitle(cfg->window, VOUT_TITLE " (WinGDI output)");
+    vout_window_SetTitle(vd->cfg->window, VOUT_TITLE " (WinGDI output)");
 
     /* */
     vd->ops = &ops;
@@ -143,9 +146,11 @@ error:
 /* */
 static void Close(vout_display_t *vd)
 {
+    vout_display_sys_t *sys = vd->sys;
+
     Clean(vd);
 
-    CommonWindowClean(&vd->sys->sys);
+    CommonWindowClean(&sys->sys);
 
     free(vd->sys);
 }

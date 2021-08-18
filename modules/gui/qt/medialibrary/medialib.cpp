@@ -25,7 +25,7 @@
 #include "playlist/playlist_controller.hpp"
 #include <QSettings>
 
-MediaLib::MediaLib(intf_thread_t *_intf, QObject *_parent)
+MediaLib::MediaLib(qt_intf_t *_intf, QObject *_parent)
     : QObject( _parent )
     , m_intf( _intf )
     , m_ml( vlcMl() )
@@ -40,20 +40,20 @@ MediaLib::MediaLib(intf_thread_t *_intf, QObject *_parent)
     m_threadPool.setMaxThreadCount(4);
 }
 
-void MediaLib::addToPlaylist(const QString& mrl, const QStringList* options)
+void MediaLib::addToPlaylist(const QString& mrl, const QStringList &options)
 {
     vlc::playlist::Media media{ mrl, mrl, options };
-    m_intf->p_sys->p_mainPlaylistController->append( {media}, false );
+    m_intf->p_mainPlaylistController->append( {media}, false );
 }
 
-void MediaLib::addToPlaylist(const QUrl& mrl, const QStringList* options)
+void MediaLib::addToPlaylist(const QUrl& mrl, const QStringList &options)
 {
     vlc::playlist::Media media{ mrl.toString(QUrl::None), mrl.fileName(), options };
-    m_intf->p_sys->p_mainPlaylistController->append( {media} , false );
+    m_intf->p_mainPlaylistController->append( {media} , false );
 }
 
 // A specific item has been asked to be added to the playlist
-void MediaLib::addToPlaylist(const MLItemId & itemId, const QStringList* options)
+void MediaLib::addToPlaylist(const MLItemId & itemId, const QStringList &options)
 {
     //invalid item
     if (itemId.id == 0)
@@ -64,7 +64,7 @@ void MediaLib::addToPlaylist(const MLItemId & itemId, const QStringList* options
         vlc::playlist::InputItemPtr item( vlc_ml_get_input_item( m_ml, itemId.id ), false );
         if (item) {
             QVector<vlc::playlist::Media> medias = { vlc::playlist::Media(item.get(), options) };
-            m_intf->p_sys->p_mainPlaylistController->append(medias, false);
+            m_intf->p_mainPlaylistController->append(medias, false);
         }
     }
     else
@@ -81,11 +81,11 @@ void MediaLib::addToPlaylist(const MLItemId & itemId, const QStringList* options
             vlc::playlist::InputItemPtr item(vlc_ml_get_input_item( m_ml, m.i_id ), false);
             return vlc::playlist::Media(item.get(), options);
         });
-        m_intf->p_sys->p_mainPlaylistController->append(medias, false);
+        m_intf->p_mainPlaylistController->append(medias, false);
     }
 }
 
-void MediaLib::addToPlaylist(const QVariantList& itemIdList, const QStringList* options)
+void MediaLib::addToPlaylist(const QVariantList& itemIdList, const QStringList &options)
 {
     for (const QVariant& varValue: itemIdList)
     {
@@ -109,7 +109,7 @@ void MediaLib::addToPlaylist(const QVariantList& itemIdList, const QStringList* 
 
 // A specific item has been asked to be played,
 // so it's added to the playlist and played
-void MediaLib::addAndPlay(const MLItemId & itemId, const QStringList* options )
+void MediaLib::addAndPlay(const MLItemId & itemId, const QStringList &options )
 {
     if (itemId.id == 0)
         return;
@@ -118,7 +118,7 @@ void MediaLib::addAndPlay(const MLItemId & itemId, const QStringList* options )
         vlc::playlist::InputItemPtr item(vlc_ml_get_input_item( m_ml, itemId.id ), false);
         if (item) {
             QVector<vlc::playlist::Media> medias = { vlc::playlist::Media(item.get(), options) };
-            m_intf->p_sys->p_mainPlaylistController->append(medias, true);
+            m_intf->p_mainPlaylistController->append(medias, true);
         }
     }
     else
@@ -135,24 +135,24 @@ void MediaLib::addAndPlay(const MLItemId & itemId, const QStringList* options )
             vlc::playlist::InputItemPtr item(vlc_ml_get_input_item( m_ml, m.i_id ), false);
             return vlc::playlist::Media(item.get(), options);
         });
-        m_intf->p_sys->p_mainPlaylistController->append(medias, true);
+        m_intf->p_mainPlaylistController->append(medias, true);
     }
 }
 
-void MediaLib::addAndPlay(const QString& mrl, const QStringList* options)
+void MediaLib::addAndPlay(const QString& mrl, const QStringList &options)
 {
     vlc::playlist::Media media{ mrl, mrl, options };
-    m_intf->p_sys->p_mainPlaylistController->append( {media}, true );
+    m_intf->p_mainPlaylistController->append( {media}, true );
 }
 
-void MediaLib::addAndPlay(const QUrl& mrl, const QStringList* options)
+void MediaLib::addAndPlay(const QUrl& mrl, const QStringList &options)
 {
     vlc::playlist::Media media{ mrl.toString(QUrl::None), mrl.fileName(), options };
-    m_intf->p_sys->p_mainPlaylistController->append( {media}, true );
+    m_intf->p_mainPlaylistController->append( {media}, true );
 }
 
 
-void MediaLib::addAndPlay(const QVariantList& itemIdList, const QStringList* options)
+void MediaLib::addAndPlay(const QVariantList& itemIdList, const QStringList &options)
 {
     bool b_start = true;
     for (const QVariant& varValue: itemIdList)
@@ -187,7 +187,7 @@ void MediaLib::addAndPlay(const QVariantList& itemIdList, const QStringList* opt
     }
 }
 
-void MediaLib::insertIntoPlaylist(const size_t index, const QVariantList &itemIds, const QStringList *options)
+void MediaLib::insertIntoPlaylist(const size_t index, const QVariantList &itemIds, const QStringList &options)
 {
     QVector<vlc::playlist::Media> medias;
     for ( const auto &id : itemIds )
@@ -220,7 +220,7 @@ void MediaLib::insertIntoPlaylist(const size_t index, const QVariantList &itemId
         }
     }
     if (!medias.isEmpty())
-        m_intf->p_sys->p_mainPlaylistController->insert( index, medias );
+        m_intf->p_mainPlaylistController->insert( index, medias );
 }
 
 void MediaLib::reload()
@@ -282,24 +282,6 @@ void MediaLib::onMediaLibraryEvent( void* data, const vlc_ml_event_t* event )
                 self->m_discoveryPending = false;
                 self->emit discoveryPendingChanged(self->m_discoveryPending);
                 self->emit discoveryCompleted();
-            });
-            break;
-        }
-        case VLC_ML_EVENT_RELOAD_STARTED:
-        {
-            QMetaObject::invokeMethod(self, [self]() {
-                self->m_discoveryPending = true;
-                self->emit discoveryPendingChanged(self->m_discoveryPending);
-                self->emit reloadStarted();
-            });
-            break;
-        }
-        case VLC_ML_EVENT_RELOAD_COMPLETED:
-        {
-            QMetaObject::invokeMethod(self, [self]() {
-                self->m_discoveryPending = false;
-                self->emit discoveryPendingChanged(self->m_discoveryPending);
-                self->emit reloadCompleted();
             });
             break;
         }

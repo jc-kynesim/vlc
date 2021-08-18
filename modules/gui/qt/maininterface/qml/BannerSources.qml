@@ -18,7 +18,7 @@
 
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtGraphicalEffects 1.0
 import org.videolan.vlc 0.1
 import QtQml.Models 2.11
@@ -26,10 +26,9 @@ import QtQml.Models 2.11
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
 import "qrc:///menus/" as Menus
-import "qrc:///util/KeyHelper.js" as KeyHelper
 import "qrc:///util/Helpers.js" as Helpers
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: root
 
     height: VLCStyle.applicationVerticalMargin
@@ -65,10 +64,11 @@ Widgets.NavigableFocusScope {
     Rectangle {
         id: pLBannerSources
 
+        property alias model: globalMenuGroup.model
+
         anchors.fill: parent
 
-        color: VLCStyle.colors.banner
-        property alias model: globalMenuGroup.model
+        color: VLCStyle.colors.topBanner
 
         Column {
             id: col
@@ -127,6 +127,10 @@ Widgets.NavigableFocusScope {
                                  colorDisabled: VLCStyle.colors.textDisabled
                                  onClicked: history.previous()
                                  enabled: !history.previousEmpty
+
+                                 Navigation.parentItem: root
+                                 Navigation.rightItem: globalMenuGroup
+                                 Navigation.downItem: localMenuGroup.visible ? localMenuGroup : localToolbarBg
                              }
 
                             Image {
@@ -150,8 +154,9 @@ Widgets.NavigableFocusScope {
 
                             focus: true
 
-                            navigationParent: root
-                            navigationDownItem: localMenuGroup.visible ?  localMenuGroup : playlistGroup
+                            Navigation.parentItem: root
+                            Navigation.leftItem: history_back.enabled ? history_back : null
+                            Navigation.downItem: localMenuGroup.visible ?  localMenuGroup : playlistGroup
 
                             delegate: Widgets.BannerTabButton {
                                 iconTxt: model.icon
@@ -177,7 +182,7 @@ Widgets.NavigableFocusScope {
                 }
             }
 
-            Widgets.NavigableFocusScope {
+            FocusScope {
                 id: localToolbar
 
                 width: parent.width
@@ -198,17 +203,19 @@ Widgets.NavigableFocusScope {
 
                 Rectangle {
                     id: localToolbarBg
-                    color: VLCStyle.colors.bg
+
                     anchors.fill: parent
+                    color: VLCStyle.colors.lowerBanner
                 }
 
-                Widgets.CoverShadow {
-                    anchors.fill: localToolbarBg
-                    source: localToolbarBg
-                    primaryVerticalOffset: VLCStyle.dp(1)
-                    primaryRadius: VLCStyle.dp(9)
-                    secondaryVerticalOffset: VLCStyle.dp(0)
-                    secondaryRadius: VLCStyle.dp(2)
+                Rectangle {
+                    anchors.left : localToolbarBg.left
+                    anchors.right: localToolbarBg.right
+                    anchors.top  : localToolbarBg.bottom
+
+                    height: VLCStyle.border
+
+                    color: VLCStyle.colors.border
                 }
 
                 Widgets.NavigableRow {
@@ -247,8 +254,6 @@ Widgets.NavigableFocusScope {
                             height: VLCStyle.bannerButton_height
                             iconSize: VLCStyle.banner_icon_size
 
-                            popupAlignment: Qt.AlignLeft | Qt.AlignBottom
-
                             visible: root.sortModel !== undefined && root.sortModel.length > 1
                             enabled: visible
 
@@ -286,9 +291,9 @@ Widgets.NavigableFocusScope {
                         }
                     }
 
-                    navigationParent: root
-                    navigationRightItem: localMenuGroup.visible ? localMenuGroup : playlistGroup
-                    navigationUpItem: globalMenuGroup
+                    Navigation.parentItem: root
+                    Navigation.rightItem: localMenuGroup.visible ? localMenuGroup : playlistGroup
+                    Navigation.upItem: globalMenuGroup
                 }
 
                 Flickable {
@@ -299,7 +304,7 @@ Widgets.NavigableFocusScope {
                                                           - (VLCStyle.applicationHorizontalMargin * 2)
                                                           - (VLCStyle.margin_xsmall * 2)
                                                           - (VLCStyle.margin_xxsmall * 2)
-                    readonly property bool _alignHCenter: ((localToolbar.width - width) / 2) + width < playlistGroup.x
+                    readonly property bool _alignHCenter: ((localToolbar.width - contentWidth) / 2) + contentWidth < playlistGroup.x
 
                     width: Math.min(contentWidth, availableWidth)
                     height: VLCStyle.localToolbar_height
@@ -324,7 +329,7 @@ Widgets.NavigableFocusScope {
                         focus: !!item && item.focus && item.visible
                         visible: !!item
                         enabled: status === Loader.Ready
-                        y: (VLCStyle.localToolbar_height - item.height) / 2
+                        y: status === Loader.Ready ? (VLCStyle.localToolbar_height - item.height) / 2 : 0
                         width: !!item
                                ? Helpers.clamp(localMenuView.availableWidth,
                                                localMenuGroup.item.minimumWidth || localMenuGroup.item.implicitWidth,
@@ -343,26 +348,11 @@ Widgets.NavigableFocusScope {
                         onItemChanged: {
                             if (!item)
                                 return
-                            if (item.hasOwnProperty("navigationParent")) {
-                                item.navigationParent = root
-                                item.navigationLeftItem = localContextGroup.enabled ? localContextGroup : undefined
-                                item.navigationRightItem = playlistGroup.enabled ? playlistGroup : undefined
-                                item.navigationUpItem = globalMenuGroup
-                            } else {
-                                item.KeyNavigation.left = localContextGroup.enabled ? localContextGroup : undefined
-                                item.KeyNavigation.right = playlistGroup.enabled ? playlistGroup : undefined
-                                item.KeyNavigation.up = globalMenuGroup
-                                item.Keys.pressed.connect(function (event) {
-                                    if (event.accepted)
-                                        return
-                                    if (KeyHelper.matchDown(event)) {
-                                        root.navigationDown()
-                                        event.accepted = true
-                                    }
-                                })
-                            }
+                            item.Navigation.parentItem = root
+                            item.Navigation.leftItem = Qt.binding(function(){ return localContextGroup.enabled ? localContextGroup : null})
+                            item.Navigation.rightItem = Qt.binding(function(){ return playlistGroup.enabled ? playlistGroup : null})
+                            item.Navigation.upItem = globalMenuGroup
                         }
-
                     }
                 }
 
@@ -417,17 +407,14 @@ Widgets.NavigableFocusScope {
                         }
                     }
 
-                    navigationParent: root
-                    navigationLeftItem: localMenuGroup.visible ? localMenuGroup : localContextGroup
-                    navigationUpItem: globalMenuGroup
+                    Navigation.parentItem: root
+                    Navigation.leftItem: localMenuGroup.visible ? localMenuGroup : localContextGroup
+                    Navigation.upItem: globalMenuGroup
                 }
             }
         }
 
         Keys.priority: Keys.AfterItem
-        Keys.onPressed: {
-            if (!event.accepted)
-                defaultKeyAction(event, 0)
-        }
+        Keys.onPressed: root.Navigation.defaultKeyAction(event)
     }
 }

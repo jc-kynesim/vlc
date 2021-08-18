@@ -17,18 +17,17 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtQml.Models 2.2
 import QtGraphicalEffects 1.0
 
 import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
-import "qrc:///util/KeyHelper.js" as KeyHelper
 import "qrc:///util/Helpers.js" as Helpers
 import "qrc:///style/"
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: root
 
     property alias model: listView.model
@@ -81,20 +80,30 @@ Widgets.NavigableFocusScope {
         listView.forceActiveFocus();
     }
 
-    PlaylistOverlayMenu {
+    Loader {
         id: overlayMenu
         anchors.fill: parent
         z: 1
 
-        colors: root.colors
-        backgroundItem: parentRect
+        active: mainInterface.playlistDocked
+
+        readonly property bool shown: (status === Loader.Ready) ? item.visible : false
+
+        function open() {
+            if (status === Loader.Ready)
+                item.open()
+        }
+
+        sourceComponent: PlaylistOverlayMenu {
+            colors: root.colors
+            backgroundItem: parentRect
+        }
     }
 
     Rectangle {
         id: parentRect
         anchors.fill: parent
-        color: colors.banner
-
+        color: colors.topBanner
         onActiveFocusChanged: {
             if (activeFocus)
                 listView.forceActiveFocus()
@@ -102,6 +111,8 @@ Widgets.NavigableFocusScope {
 
         Widgets.DragItem {
             id: dragItem
+
+            parent: (typeof g_mainDisplay !== 'undefined') ? g_mainDisplay : root
 
             property int index: -1
 
@@ -305,6 +316,8 @@ Widgets.NavigableFocusScope {
 
                 focus: true
 
+                clip: true // else out of view items will overlap with surronding items
+
                 model: PlaylistListModel {
                     playlistId: mainctx.playlist
                 }
@@ -467,11 +480,20 @@ Widgets.NavigableFocusScope {
                 }
 
                 add: Transition {
-                    NumberAnimation { property: "opacity"; from: 0; to: 1.0; duration: 200 }
+                    NumberAnimation {
+                        property: "opacity"; from: 0; to: 1.0
+
+                        duration: VLCStyle.duration_normal
+                    }
                 }
 
                 displaced: Transition {
-                    NumberAnimation { properties: "x,y"; duration: 200; easing.type: Easing.OutSine }
+                    NumberAnimation {
+                        properties: "x,y"
+
+                        duration: VLCStyle.duration_normal; easing.type: Easing.OutSine
+                    }
+
                     NumberAnimation { property: "opacity"; to: 1.0 }
                 }
 
@@ -504,33 +526,33 @@ Widgets.NavigableFocusScope {
                 Keys.onDeletePressed: onDelete()
                 Keys.onMenuPressed: overlayMenu.open()
 
-                navigationParent: root
-                navigationRight: function(index) {
+                Navigation.parentItem: root
+                Navigation.rightAction: function() {
                     overlayMenu.open()
                 }
-                navigationLeft: function(index) {
+                Navigation.leftAction: function() {
                     if (mode === PlaylistListView.Mode.Normal) {
-                        root.navigationLeft(index)
+                        root.Navigation.defaultNavigationLeft()
                     } else {
                         mode = PlaylistListView.Mode.Normal
                     }
                 }
-                navigationCancel: function(index) {
+                Navigation.cancelAction: function() {
                     if (mode === PlaylistListView.Mode.Normal) {
-                        root.navigationCancel(index)
+                        root.Navigation.defaultNavigationCancel()
                     } else {
                         mode = PlaylistListView.Mode.Normal
                     }
                 }
 
-                navigationUp: function(index) {
+                Navigation.upAction: function() {
                     if (mode === PlaylistListView.Mode.Normal)
-                        root.navigationUp(index)
+                        root.Navigation.defaultNavigationUp()
                 }
 
-                navigationDown: function(index) {
+                Navigation.downAction: function() {
                     if (mode === PlaylistListView.Mode.Normal)
-                        root.navigationDown(index)
+                        root.Navigation.defaultNavigationDown()
                 }
 
                 onActionAtIndex: {
@@ -642,5 +664,5 @@ Widgets.NavigableFocusScope {
 
     Keys.priority: Keys.AfterItem
     Keys.forwardTo: listView
-    Keys.onPressed: defaultKeyAction(event, 0)
+    Keys.onPressed: root.Navigation.defaultKeyAction(event)
 }

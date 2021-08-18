@@ -73,15 +73,15 @@ vlc_module_begin ()
     set_subcategory (SUBCAT_INPUT_ACODEC)
     set_callbacks (Open, Close)
     add_loadfile("soundfont", "", SOUNDFONT_TEXT, SOUNDFONT_LONGTEXT)
-    add_bool ("synth-chorus", true, CHORUS_TEXT, CHORUS_TEXT, false)
-    add_float ("synth-gain", .5, GAIN_TEXT, GAIN_LONGTEXT, false)
+    add_bool ("synth-chorus", true, CHORUS_TEXT, NULL)
+    add_float ("synth-gain", .5, GAIN_TEXT, GAIN_LONGTEXT)
         change_float_range (0., 10.)
     add_integer ("synth-polyphony", 256,
-                 POLYPHONY_TEXT, POLYPHONY_LONGTEXT, false)
+                 POLYPHONY_TEXT, POLYPHONY_LONGTEXT)
         change_integer_range (1, 65535)
-    add_bool ("synth-reverb", true, REVERB_TEXT, REVERB_TEXT, true)
+    add_bool ("synth-reverb", true, REVERB_TEXT, NULL)
     add_integer ("synth-sample-rate", 44100,
-                 SAMPLE_RATE_TEXT, SAMPLE_RATE_TEXT, true)
+                 SAMPLE_RATE_TEXT, NULL)
         change_integer_range (22050, 96000)
 vlc_module_end ()
 
@@ -110,6 +110,8 @@ static int Open (vlc_object_t *p_this)
         return VLC_ENOMEM;
 
     p_sys->settings = new_fluid_settings ();
+    fluid_settings_setnum(p_sys->settings, "synth.sample-rate",
+                          p_dec->fmt_out.audio.i_rate);
     p_sys->synth = new_fluid_synth (p_sys->settings);
     p_sys->soundfont = -1;
 
@@ -170,7 +172,6 @@ static int Open (vlc_object_t *p_this)
 
     p_dec->fmt_out.audio.i_rate =
         var_InheritInteger (p_this, "synth-sample-rate");;
-    fluid_synth_set_sample_rate (p_sys->synth, p_dec->fmt_out.audio.i_rate);
     p_dec->fmt_out.audio.i_channels = 2;
     p_dec->fmt_out.audio.i_physical_channels = AOUT_CHAN_LEFT | AOUT_CHAN_RIGHT;
     p_dec->fmt_out.i_codec = VLC_CODEC_FL32;

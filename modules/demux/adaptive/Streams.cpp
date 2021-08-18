@@ -42,7 +42,7 @@ using namespace adaptive::http;
 AbstractStream::AbstractStream(demux_t * demux_)
 {
     p_realdemux = demux_;
-    format = StreamFormat::UNKNOWN;
+    format = StreamFormat::Type::Unknown;
     currentChunk = nullptr;
     eof = false;
     valid = true;
@@ -63,14 +63,14 @@ AbstractStream::AbstractStream(demux_t * demux_)
 bool AbstractStream::init(const StreamFormat &format_, SegmentTracker *tracker, AbstractConnectionManager *conn)
 {
     /* Don't even try if not supported or already init */
-    if((unsigned)format_ == StreamFormat::UNSUPPORTED || demuxersource)
+    if(format_ == StreamFormat::Type::Unsupported || demuxersource)
         return false;
 
     demuxersource = new (std::nothrow) BufferedChunksSourceStream( VLC_OBJECT(p_realdemux), this );
     if(demuxersource)
     {
         CommandsFactory *factory = new (std::nothrow) CommandsFactory();
-        CommandsQueue *commandsqueue = new (std::nothrow) CommandsQueue();
+        AbstractCommandsQueue *commandsqueue = new (std::nothrow) CommandsQueue();
         if(factory && commandsqueue)
         {
             fakeesout = new (std::nothrow) FakeESOut(p_realdemux->out,
@@ -173,14 +173,6 @@ void AbstractStream::setLanguage(const std::string &lang)
 void AbstractStream::setDescription(const std::string &desc)
 {
     description = desc;
-}
-
-vlc_tick_t AbstractStream::getPCR() const
-{
-    vlc_mutex_locker locker(&lock);
-    if(!valid || disabled)
-        return VLC_TICK_INVALID;
-    return fakeEsOut()->commandsQueue()->getPCR();
 }
 
 vlc_tick_t AbstractStream::getMinAheadTime() const
@@ -411,17 +403,18 @@ AbstractStream::BufferingStatus AbstractStream::doBufferize(vlc_tick_t nz_deadli
     {
         vlc_tick_t nz_extdeadline = fakeEsOut()->commandsQueue()->getBufferingLevel() +
                                     (i_max_buffering - i_demuxed) / 4;
-        nz_deadline = std::max(nz_deadline, nz_extdeadline);
+        nz_deadline = std::min(nz_extdeadline, nz_deadline + VLC_TICK_FROM_SEC(1));
 
         /* need to read, demuxer still buffering, ... */
         vlc_mutex_unlock(&lock);
         Demuxer::Status demuxStatus = demuxer->demux(nz_deadline);
+        fakeEsOut()->scheduleNecessaryMilestone();
         vlc_mutex_lock(&lock);
         if(demuxStatus != Demuxer::Status::Success)
         {
             if(discontinuity || needrestart)
             {
-                msg_Dbg(p_realdemux, "Restarting demuxer");
+                msg_Dbg(p_realdemux, "Restarting demuxer %d %d", needrestart, discontinuity);
                 prepareRestart(discontinuity);
                 if(discontinuity)
                 {
@@ -620,18 +613,18 @@ AbstractDemuxer *AbstractStream::newDemux(vlc_object_t *p_obj, const StreamForma
                                           es_out_t *out, AbstractSourceStream *source) const
 {
     AbstractDemuxer *ret = nullptr;
-    switch((unsigned)format)
+    switch(format)
     {
-        case StreamFormat::MP4:
+        case StreamFormat::Type::MP4:
             ret = new Demuxer(p_obj, "mp4", out, source);
             break;
 
-        case StreamFormat::MPEG2TS:
+        case StreamFormat::Type::MPEG2TS:
             ret = new Demuxer(p_obj, "ts", out, source);
             break;
 
         default:
-        case StreamFormat::UNSUPPORTED:
+        case StreamFormat::Type::Unsupported:
             break;
     }
     return ret;
@@ -669,7 +662,7 @@ void AbstractStream::trackerEvent(const TrackerEvent &ev)
             {
                 if(!demuxer->bitstreamSwitchCompatible() ||
                    /* HLS variants can move from TS to Raw AAC */
-                   format == StreamFormat(StreamFormat::UNKNOWN) ||
+                   format == StreamFormat(StreamFormat::Type::Unknown) ||
                    (event.next &&
                    !event.next->getAdaptationSet()->isBitSwitchable()))
                     needrestart = true;

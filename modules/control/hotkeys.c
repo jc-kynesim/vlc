@@ -937,14 +937,14 @@ VOUT_ACTION_HANDLER(SubtitleDisplay)
         default:
         {
             // FIXME all vouts
-            char const *varname = "sub-text-scale";
+            vlc_player_t *player = vlc_playlist_GetPlayer(sys->playlist);
             int scale;
             if (action_id == ACTIONID_SUBTITLE_TEXT_SCALE_NORMAL)
                 scale = 100;
             else
             {
-                scale = var_GetInteger(vout, varname);
-                unsigned delta = (scale > 100 ? scale - 100 : 100 - scale) / 25;
+                scale = vlc_player_GetSubtitleTextScale(player);
+                int delta = (scale > 100 ? scale - 100 : 100 - scale) / 25;
                 delta = delta <= 1 ? 10 : 25;
                 if (action_id == ACTIONID_SUBTITLE_TEXT_SCALE_DOWN)
                     delta = -delta;
@@ -952,7 +952,7 @@ VOUT_ACTION_HANDLER(SubtitleDisplay)
                 scale -= scale % delta;
                 scale = VLC_CLIP(scale, 25, 500);
             }
-            var_SetInteger(vout, varname, scale);
+            vlc_player_SetSubtitleTextScale(player, scale);
             break;
         }
     }

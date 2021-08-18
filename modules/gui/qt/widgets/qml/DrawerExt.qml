@@ -18,7 +18,9 @@
 import QtQuick 2.11
 import QtQuick.Controls 2.4
 
-NavigableFocusScope {
+import "qrc:///style/"
+
+FocusScope {
     id: root
 
     property Component component: Item {}
@@ -92,15 +94,25 @@ NavigableFocusScope {
         Transition {
             to: "hidden"
             SequentialAnimation {
-                NumberAnimation { target: container; property: toChange; duration: 150; easing.type: Easing.InSine}
+                NumberAnimation {
+                    target: container; property: toChange
+
+                    duration: VLCStyle.duration_fast; easing.type: Easing.InSine
+                }
+
                 PropertyAction{ target: container; property: "visible" }
             }
         },
         Transition {
             to: "visible"
             SequentialAnimation {
-                PropertyAction{ target: container; property: "visible" }
-                NumberAnimation { target: container; property: toChange; duration: 150; easing.type: Easing.OutSine}
+                PropertyAction { target: container; property: "visible" }
+
+                NumberAnimation {
+                    target: container; property: toChange
+
+                    duration: VLCStyle.duration_fast; easing.type: Easing.OutSine
+                }
             }
         }
     ]

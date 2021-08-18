@@ -1,7 +1,7 @@
 # HARFBUZZ
 
-HARFBUZZ_VERSION := 2.6.4
-HARFBUZZ_URL := http://www.freedesktop.org/software/harfbuzz/release/harfbuzz-$(HARFBUZZ_VERSION).tar.xz
+HARFBUZZ_VERSION := 2.7.4
+HARFBUZZ_URL := https://github.com/harfbuzz/harfbuzz/releases/download/$(HARFBUZZ_VERSION)/harfbuzz-$(HARFBUZZ_VERSION).tar.xz
 PKGS += harfbuzz
 ifeq ($(call need_pkg,"harfbuzz"),)
 PKGS_FOUND += harfbuzz
@@ -16,7 +16,7 @@ harfbuzz: harfbuzz-$(HARFBUZZ_VERSION).tar.xz .sum-harfbuzz
 	$(UNPACK)
 	$(APPLY) $(SRC)/harfbuzz/0001-fix-OSAtomic-calls-for-AArch64.patch
 	$(APPLY) $(SRC)/harfbuzz/0002-Update-the-bundled-ax_pthread.m4.patch
-	$(APPLY) $(SRC)/harfbuzz/0003-Fix-winstore-app-detection-with-mingw64.patch
+	$(APPLY) $(SRC)/harfbuzz/0003-Removed-unused-variable-supp_size-from-plan_subset_e.patch
 	$(MOVE)
 
 DEPS_harfbuzz = freetype2 $(DEPS_freetype2)

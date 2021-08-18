@@ -1,15 +1,14 @@
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtGraphicalEffects 1.0
 
 import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
-import "qrc:///util/KeyHelper.js" as KeyHelper
 import "qrc:///style/"
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: root
 
     readonly property bool expanded: root.implicitHeight === VLCStyle.miniPlayerHeight
@@ -35,7 +34,7 @@ Widgets.NavigableFocusScope {
         id: animateExpand;
         target: root;
         properties: "implicitHeight"
-        duration: 200
+        duration: VLCStyle.duration_normal
         easing.type: Easing.InSine
         to: VLCStyle.miniPlayerHeight
         onStopped: {
@@ -47,7 +46,7 @@ Widgets.NavigableFocusScope {
         id: animateRetract;
         target: root;
         properties: "implicitHeight"
-        duration: 200
+        duration: VLCStyle.duration_normal
         easing.type: Easing.OutSine
         to: 0
         onStopped: {
@@ -68,7 +67,7 @@ Widgets.NavigableFocusScope {
         source: mainContent
         sourceRect: Qt.rect(root.x, root.y, root.width, root.height)
 
-        tint: VLCStyle.colors.blendColors(VLCStyle.colors.bg, VLCStyle.colors.banner, 0.85)
+        tint: VLCStyle.colors.lowerBanner
     }
 
     ControlBar {
@@ -84,13 +83,14 @@ Widgets.NavigableFocusScope {
         sliderBackgroundColor: colors.sliderBarMiniplayerBgColor
         sliderProgressColor: colors.accent
         identifier: PlayerControlbarModel.Miniplayer
-        navigationParent: root
+        Navigation.parentItem: root
 
         Keys.onPressed: {
-            if (!event.accepted)
-                defaultKeyAction(event, 0)
-            if (!event.accepted)
-                mainInterface.sendHotkey(event.key, event.modifiers);
+            controlBar.Navigation.defaultKeyAction(event)
+
+            if (!event.accepted) {
+                mainInterface.sendHotkey(event.key, event.modifiers)
+            }
         }
     }
 }

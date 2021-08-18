@@ -18,6 +18,8 @@
 import QtQuick 2.11
 import QtQuick.Controls 2.4
 
+import "qrc:///style/"
+
 Item {
     id: control
 
@@ -39,35 +41,21 @@ Item {
         }
 
         PauseAnimation {
-            duration: 1000
+            duration: VLCStyle.ms1000
         }
 
         SmoothedAnimation {
             target: label
             property: "x"
             from: 0
-            to: (label.horizontalAlignment == Text.AlignHCenter) ? (label.width - label.contentWidth) / 2 : label.width - label.contentWidth
+            to: label.width - label.contentWidth
 
             maximumEasingTime: 0
             velocity: 20
         }
 
         PauseAnimation {
-            duration: 1000
-        }
-
-        SmoothedAnimation {
-            target: label
-            property: "x"
-            to: (label.horizontalAlignment == Text.AlignHCenter) ? (label.contentWidth - label.width) / 2 : label.width - label.contentWidth
-            duration: (label.horizontalAlignment == Text.AlignHCenter) ? -1 : 1
-
-            maximumEasingTime: 0
-            velocity: 20
-        }
-
-        PauseAnimation {
-            duration: 1000
+            duration: VLCStyle.ms1000
         }
 
         PropertyAction {

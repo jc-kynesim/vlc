@@ -125,21 +125,24 @@ VLC_API void module_unneed( vlc_object_t *, module_t * );
 #define module_unneed(a,b) module_unneed(VLC_OBJECT(a),b)
 
 /**
- * Checks if a module exists.
- *
- * \param name name of the module
- * \retval true if the module exists
- * \retval false if the module does not exist (in the running installation)
- */
-VLC_API bool module_exists(const char *) VLC_USED;
-
-/**
  * Get a pointer to a module_t given it's name.
  *
  * \param name the name of the module
  * \return a pointer to the module or NULL in case of a failure
  */
 VLC_API module_t *module_find(const char *name) VLC_USED;
+
+/**
+ * Checks if a module exists.
+ *
+ * \param name name of the module
+ * \retval true if the module exists
+ * \retval false if the module does not exist (in the running installation)
+ */
+VLC_USED static inline bool module_exists(const char * name)
+{
+    return module_find(name) != NULL;
+}
 
 /**
  * Gets the table of module configuration items.
@@ -154,13 +157,26 @@ VLC_API module_config_t *module_config_get(const module_t *module,
                                            unsigned *restrict psize) VLC_USED;
 
 /**
- * Releases the configuration items table.
+ * Releases a configuration items table.
  *
  * \param tab base address of a table returned by module_config_get()
  */
 VLC_API void module_config_free( module_config_t *tab);
 
+/**
+ * Frees a flat list of VLC modules.
+ *
+ * \param list list obtained by module_list_get()
+ */
 VLC_API void module_list_free(module_t **);
+
+/**
+ * Gets the flat list of VLC modules.
+ *
+ * \param n [OUT] pointer to the number of modules
+ * \return table of module pointers (release with module_list_free()),
+ *         or NULL in case of error (in that case, *n is zeroed).
+ */
 VLC_API module_t ** module_list_get(size_t *n) VLC_USED;
 
 /**
@@ -189,6 +205,7 @@ VLC_API const char * module_get_object(const module_t *m) VLC_USED;
  * \return the short or long name of the module
  */
 VLC_API const char *module_get_name(const module_t *m, bool longname) VLC_USED;
+#define module_GetShortName( m ) module_get_name( m, false )
 #define module_GetLongName( m ) module_get_name( m, true )
 
 /**
@@ -228,7 +245,6 @@ VLC_USED static inline module_t *module_get_main (void)
 {
     return module_find ("core");
 }
-#define module_get_main(a) module_get_main()
 
 VLC_USED static inline bool module_is_main( const module_t * p_module )
 {

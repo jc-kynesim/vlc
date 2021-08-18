@@ -18,7 +18,7 @@
 
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtQml.Models 2.11
 
 import org.videolan.vlc 0.1
@@ -28,7 +28,7 @@ import "qrc:///widgets/" as Widgets
 import "qrc:///playlist/" as PL
 
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: root
 
     enum TimeTextPosition {
@@ -47,9 +47,13 @@ Widgets.NavigableFocusScope {
 
     signal requestLockUnlockAutoHide(bool lock, var source)
 
+    function showChapterMarks() {
+        trackPositionSlider.showChapterMarks()
+    }
+
     Keys.priority: Keys.AfterItem
-    Keys.onPressed: defaultKeyAction(event, 0)
-    onActionCancel: history.previous()
+    Keys.onPressed: root.Navigation.defaultKeyAction(event)
+    Navigation.cancelAction: function() { history.previous() }
 
     onActiveFocusChanged: if (activeFocus) trackPositionSlider.forceActiveFocus()
 
@@ -145,7 +149,7 @@ Widgets.NavigableFocusScope {
                     bottomMargin: VLCStyle.applicationVerticalMargin
                 }
 
-                navigationUpItem: trackPositionSlider.enabled ? trackPositionSlider : root.navigationUpItem
+                Navigation.upItem: trackPositionSlider.enabled ? trackPositionSlider : root.Navigation.upItem
 
                 colors: root.colors
 
@@ -190,6 +194,11 @@ Widgets.NavigableFocusScope {
         parentWindow: g_root
         colors: root.colors
 
-        Keys.onDownPressed: playerButtonsLayout.focus = true
+        Navigation.parentItem: root
+        Navigation.downItem: playerButtonsLayout
+
+        Keys.onPressed: {
+            Navigation.defaultKeyAction(event)
+        }
     }
 }

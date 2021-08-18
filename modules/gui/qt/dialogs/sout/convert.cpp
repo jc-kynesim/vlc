@@ -27,6 +27,7 @@
 #include "dialogs/sout/sout.hpp"
 #include "dialogs/sout/convert.hpp"
 #include "dialogs/sout/sout_widgets.hpp"
+#include "maininterface/main_interface.hpp"
 
 #include "util/qt_dirs.hpp"
 
@@ -39,7 +40,7 @@
 #define urlToDisplayString(filestr) toNativeSeparators(QUrl(filestr).toDisplayString(\
     QUrl::RemovePassword | QUrl::PreferLocalFile | QUrl::NormalizePathSegments ))
 
-ConvertDialog::ConvertDialog( QWidget *parent, intf_thread_t *_p_intf,
+ConvertDialog::ConvertDialog( QWindow *parent, qt_intf_t *_p_intf,
                               const QStringList& inputMRLs )
               : QVLCDialog( parent, _p_intf ),
                 singleFileSelected( inputMRLs.length() == 1 )
@@ -158,7 +159,7 @@ void ConvertDialog::fileBrowse()
     QString fileExtension = ( ! profile->isEnabled() ) ? ".*" : "." + profile->getMux();
 
     outgoingMRL = QFileDialog::getSaveFileUrl( this, qtr( "Save file..." ),
-        p_intf->p_sys->filepath,
+        p_intf->p_mi->getDialogFilePath(),
         QString( "%1 (*%2);;%3 (*.*)" ).arg( qtr( "Containers" ) )
             .arg( fileExtension ).arg( qtr("All") ), 0, QFileDialog::DontConfirmOverwrite );
     fileLine->setText( urlToDisplayString( outgoingMRL ) );

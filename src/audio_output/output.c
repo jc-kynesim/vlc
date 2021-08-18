@@ -193,6 +193,21 @@ static int StereoModeCallback (vlc_object_t *obj, const char *varname,
     return 0;
 }
 
+static int MixModeCallback (vlc_object_t *obj, const char *varname,
+                               vlc_value_t oldval, vlc_value_t newval, void *data)
+{
+    audio_output_t *aout = (audio_output_t *)obj;
+    (void)varname; (void)oldval; (void)newval; (void)data;
+
+    aout_owner_t *owner = aout_owner (aout);
+    vlc_mutex_lock (&owner->lock);
+    owner->requested_mix_mode = newval.i_int;
+    vlc_mutex_unlock (&owner->lock);
+
+    aout_RestartRequest (aout, AOUT_RESTART_STEREOMODE);
+    return 0;
+}
+
 static void aout_ChangeViewpoint(audio_output_t *, const vlc_viewpoint_t *);
 
 static int ViewpointCallback (vlc_object_t *obj, const char *var,
@@ -335,6 +350,12 @@ audio_output_t *aout_New (vlc_object_t *parent)
     var_AddCallback (aout, "stereo-mode", StereoModeCallback, NULL);
     var_Change(aout, "stereo-mode", VLC_VAR_SETTEXT, _("Stereo audio mode"));
 
+    /* Mix mode */
+    var_Create (aout, "mix-mode", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
+    owner->requested_mix_mode = var_GetInteger (aout, "mix-mode");
+    var_AddCallback (aout, "mix-mode", MixModeCallback, NULL);
+    var_Change(aout, "mix-mode", VLC_VAR_SETTEXT, _("Audio mix mode"));
+
     /* Equalizer */
     var_Create (aout, "equalizer-preamp", VLC_VAR_FLOAT | VLC_VAR_DOINHERIT);
     var_Create (aout, "equalizer-bands", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
@@ -376,6 +397,7 @@ void aout_Destroy (audio_output_t *aout)
     var_SetFloat (aout, "volume", -1.f);
     var_DelCallback(aout, "volume", var_Copy, vlc_object_parent(aout));
     var_DelCallback (aout, "stereo-mode", StereoModeCallback, NULL);
+    var_DelCallback (aout, "mix-mode", MixModeCallback, NULL);
     aout_Release(aout);
 }
 
@@ -397,34 +419,24 @@ void aout_Release(audio_output_t *aout)
     vlc_object_delete(VLC_OBJECT(aout));
 }
 
-static void aout_PrepareStereoMode (audio_output_t *aout,
-                                    audio_sample_format_t *restrict fmt,
-                                    aout_filters_cfg_t *filters_cfg,
-                                    audio_channel_type_t input_chan_type,
-                                    unsigned i_nb_input_channels)
+static int aout_PrepareStereoMode(audio_output_t *aout,
+                                  const audio_sample_format_t *restrict fmt)
 {
     aout_owner_t *owner = aout_owner (aout);
 
     /* Fill Stereo mode choices */
-    var_Change(aout, "stereo-mode", VLC_VAR_CLEARCHOICES);
     vlc_value_t val;
     const char *txt;
     val.i_int = 0;
 
-    if (!AOUT_FMT_LINEAR(fmt) || i_nb_input_channels == 1)
-        return;
+    if (!AOUT_FMT_LINEAR(fmt) || fmt->i_channels != 2)
+        return AOUT_VAR_CHAN_UNSET;
 
-    int i_output_mode = owner->requested_stereo_mode;
-    int i_default_mode = AOUT_VAR_CHAN_UNSET;
+    int i_default_mode = owner->requested_stereo_mode;
 
     val.i_int = AOUT_VAR_CHAN_MONO;
     var_Change(aout, "stereo-mode", VLC_VAR_ADDCHOICE, val, _("Mono"));
 
-    if (i_nb_input_channels != 2)
-    {
-        val.i_int = AOUT_VAR_CHAN_UNSET;
-        var_Change(aout, "stereo-mode", VLC_VAR_ADDCHOICE, val, _("Original"));
-    }
     if (fmt->i_chan_mode & AOUT_CHANMODE_DOLBYSTEREO)
     {
         val.i_int = AOUT_VAR_CHAN_DOLBYS;
@@ -437,53 +449,29 @@ static void aout_PrepareStereoMode (audio_output_t *aout,
     }
     var_Change(aout, "stereo-mode", VLC_VAR_ADDCHOICE, val, txt);
 
-    if (i_nb_input_channels == 2)
-    {
-        if (fmt->i_chan_mode & AOUT_CHANMODE_DUALMONO)
-            i_default_mode = AOUT_VAR_CHAN_LEFT;
-        else
-            i_default_mode = val.i_int; /* Stereo or Dolby Surround */
+    if (fmt->i_chan_mode & AOUT_CHANMODE_DUALMONO)
+        i_default_mode = AOUT_VAR_CHAN_LEFT;
+    else
+        i_default_mode = val.i_int; /* Stereo or Dolby Surround */
 
-        val.i_int = AOUT_VAR_CHAN_LEFT;
-        var_Change(aout, "stereo-mode", VLC_VAR_ADDCHOICE, val, _("Left"));
-        val.i_int = AOUT_VAR_CHAN_RIGHT;
-        var_Change(aout, "stereo-mode", VLC_VAR_ADDCHOICE, val, _("Right"));
+    val.i_int = AOUT_VAR_CHAN_LEFT;
+    var_Change(aout, "stereo-mode", VLC_VAR_ADDCHOICE, val, _("Left"));
+    val.i_int = AOUT_VAR_CHAN_RIGHT;
+    var_Change(aout, "stereo-mode", VLC_VAR_ADDCHOICE, val, _("Right"));
 
-        val.i_int = AOUT_VAR_CHAN_RSTEREO;
-        var_Change(aout, "stereo-mode", VLC_VAR_ADDCHOICE, val,
-                   _("Reverse stereo"));
-    }
+    val.i_int = AOUT_VAR_CHAN_RSTEREO;
+    var_Change(aout, "stereo-mode", VLC_VAR_ADDCHOICE, val,
+               _("Reverse stereo"));
 
-    if (input_chan_type == AUDIO_CHANNEL_TYPE_AMBISONICS
-     || i_nb_input_channels > 2)
-    {
-        val.i_int = AOUT_VAR_CHAN_HEADPHONES;
-        var_Change(aout, "stereo-mode", VLC_VAR_ADDCHOICE, val,
-                   _("Headphones"));
+    return i_default_mode;
+}
 
-        if (aout->current_sink_info.headphones)
-            i_default_mode = AOUT_VAR_CHAN_HEADPHONES;
-    }
-
-    bool mode_available = false;
-    vlc_value_t *vals;
-    size_t count;
-
-    if (!var_Change(aout, "stereo-mode", VLC_VAR_GETCHOICES,
-                    &count, &vals, (char ***)NULL))
-    {
-        for (size_t i = 0; !mode_available && i < count; ++i)
-        {
-            if (vals[i].i_int == i_output_mode)
-                mode_available = true;
-        }
-        free(vals);
-    }
-    if (!mode_available)
-        i_output_mode = i_default_mode;
-
+static void aout_UpdateStereoMode(audio_output_t *aout, int mode,
+                                  audio_sample_format_t *restrict fmt,
+                                  aout_filters_cfg_t *filters_cfg)
+{
     /* The user may have selected a different channels configuration. */
-    switch (i_output_mode)
+    switch (mode)
     {
         case AOUT_VAR_CHAN_RSTEREO:
             filters_cfg->remap[AOUT_CHANIDX_LEFT] = AOUT_CHANIDX_RIGHT;
@@ -493,15 +481,16 @@ static void aout_PrepareStereoMode (audio_output_t *aout,
             break;
         case AOUT_VAR_CHAN_LEFT:
             filters_cfg->remap[AOUT_CHANIDX_RIGHT] = AOUT_CHANIDX_DISABLE;
+            fmt->i_physical_channels = AOUT_CHAN_CENTER;
+            aout_FormatPrepare (fmt);
             break;
         case AOUT_VAR_CHAN_RIGHT:
             filters_cfg->remap[AOUT_CHANIDX_LEFT] = AOUT_CHANIDX_DISABLE;
+            fmt->i_physical_channels = AOUT_CHAN_CENTER;
+            aout_FormatPrepare (fmt);
             break;
         case AOUT_VAR_CHAN_DOLBYS:
             fmt->i_chan_mode = AOUT_CHANMODE_DOLBYSTEREO;
-            break;
-        case AOUT_VAR_CHAN_HEADPHONES:
-            filters_cfg->headphones = true;
             break;
         case AOUT_VAR_CHAN_MONO:
             /* Remix all channels into one */
@@ -513,7 +502,151 @@ static void aout_PrepareStereoMode (audio_output_t *aout,
     }
 
     var_Change(aout, "stereo-mode", VLC_VAR_SETVALUE,
-               (vlc_value_t) { .i_int = i_output_mode });
+               (vlc_value_t) { .i_int = mode});
+}
+
+static bool aout_HasStereoMode(audio_output_t *aout, int mode)
+{
+    bool mode_available = false;
+    vlc_value_t *vals;
+    size_t count;
+
+    if (!var_Change(aout, "stereo-mode", VLC_VAR_GETCHOICES,
+                    &count, &vals, (char ***)NULL))
+    {
+        for (size_t i = 0; !mode_available && i < count; ++i)
+        {
+            if (vals[i].i_int == mode)
+                mode_available = true;
+        }
+        free(vals);
+    }
+    return mode_available;
+}
+
+static void aout_AddMixModeChoice(audio_output_t *aout, int mode,
+                                  const char *suffix,
+                                  const audio_sample_format_t *restrict fmt)
+{
+    assert(suffix);
+    const char *text;
+    char *buffer = NULL;
+
+    if (fmt == NULL)
+        text = suffix;
+    else
+    {
+        const char *channels = aout_FormatPrintChannels(fmt);
+        if (asprintf(&buffer, "%s: %s", suffix, channels) < 0)
+            return;
+        text = buffer;
+    }
+
+    vlc_value_t val = { .i_int = mode };
+    var_Change(aout, "mix-mode", VLC_VAR_ADDCHOICE, val, text);
+
+    free(buffer);
+}
+
+static void aout_SetupMixModeChoices (audio_output_t *aout,
+                                      const audio_sample_format_t *restrict fmt)
+{
+    if (fmt->i_channels <= 2)
+        return;
+
+    const bool has_spatialaudio = module_exists("spatialaudio");
+
+    aout_AddMixModeChoice(aout, AOUT_MIX_MODE_UNSET, _("Original"), fmt);
+
+    if (fmt->channel_type != AUDIO_CHANNEL_TYPE_AMBISONICS && has_spatialaudio)
+        aout_AddMixModeChoice(aout, AOUT_MIX_MODE_STEREO, _("Stereo"), NULL);
+
+    if (has_spatialaudio)
+        aout_AddMixModeChoice(aout, AOUT_MIX_MODE_BINAURAL, _("Binaural"), NULL);
+
+    /* Only propose Original and Binaural for Ambisonics content */
+    if (fmt->channel_type == AUDIO_CHANNEL_TYPE_AMBISONICS && has_spatialaudio)
+        return;
+
+    if (fmt->i_physical_channels != AOUT_CHANS_4_0)
+    {
+        static const audio_sample_format_t fmt_4_0 = {
+            .i_physical_channels = AOUT_CHANS_4_0,
+            .i_channels = 4,
+        };
+        aout_AddMixModeChoice(aout, AOUT_MIX_MODE_4_0, _("4.0"), &fmt_4_0);
+    }
+
+    if (fmt->i_physical_channels != AOUT_CHANS_5_1)
+    {
+        static const audio_sample_format_t fmt_5_1 = {
+            .i_physical_channels = AOUT_CHANS_5_1,
+            .i_channels = 6,
+        };
+        aout_AddMixModeChoice(aout, AOUT_MIX_MODE_5_1, _("5.1"), &fmt_5_1);
+    }
+
+    if (fmt->i_physical_channels != AOUT_CHANS_7_1)
+    {
+        static const audio_sample_format_t fmt_7_1 = {
+            .i_physical_channels = AOUT_CHANS_7_1,
+            .i_channels = 8,
+        };
+        aout_AddMixModeChoice(aout, AOUT_MIX_MODE_7_1, _("7.1"), &fmt_7_1);
+    }
+}
+
+static bool aout_HasMixModeChoice(audio_output_t *aout, int mode)
+{
+    bool mode_available = false;
+    vlc_value_t *vals;
+    size_t count;
+
+    if (!var_Change(aout, "mix-mode", VLC_VAR_GETCHOICES,
+                    &count, &vals, (char ***)NULL))
+    {
+        for (size_t i = 0; !mode_available && i < count; ++i)
+        {
+            if (vals[i].i_int == mode)
+                mode_available = true;
+        }
+        free(vals);
+    }
+    return mode_available;
+}
+
+
+static void aout_UpdateMixMode(audio_output_t *aout, int mode,
+                               audio_sample_format_t *restrict fmt)
+{
+    /* The user may have selected a different channels configuration. */
+    switch (mode)
+    {
+        case AOUT_MIX_MODE_UNSET:
+            break;
+        case AOUT_MIX_MODE_BINAURAL:
+            fmt->i_physical_channels = AOUT_CHANS_STEREO;
+            fmt->i_chan_mode = AOUT_CHANMODE_BINAURAL;
+            break;
+        case AOUT_MIX_MODE_STEREO:
+            fmt->i_physical_channels = AOUT_CHANS_STEREO;
+            break;
+        case AOUT_MIX_MODE_4_0:
+            fmt->i_physical_channels = AOUT_CHANS_4_0;
+            break;
+        case AOUT_MIX_MODE_5_1:
+            fmt->i_physical_channels = AOUT_CHANS_5_1;
+            break;
+        case AOUT_MIX_MODE_7_1:
+            fmt->i_physical_channels = AOUT_CHANS_7_1;
+            break;
+        default:
+            break;
+    }
+
+    assert(mode == AOUT_VAR_CHAN_UNSET || aout_HasMixModeChoice(aout, mode));
+
+    var_Change(aout, "mix-mode", VLC_VAR_SETVALUE, (vlc_value_t) { .i_int = mode});
 }
 
 /**
@@ -529,11 +662,12 @@ int aout_OutputNew (audio_output_t *aout)
     audio_sample_format_t *filter_fmt = &owner->filter_format;
     aout_filters_cfg_t *filters_cfg = &owner->filters_cfg;
 
-    audio_channel_type_t input_chan_type = fmt->channel_type;
-    unsigned i_nb_input_channels = fmt->i_channels;
     vlc_fourcc_t formats[] = {
         fmt->i_format, 0, 0
     };
+
+    var_Change(aout, "stereo-mode", VLC_VAR_CLEARCHOICES);
+    var_Change(aout, "mix-mode", VLC_VAR_CLEARCHOICES);
 
     /* Ideally, the audio filters would be created before the audio output,
      * and the ideal audio format would be the output of the filters chain.
@@ -560,10 +694,12 @@ int aout_OutputNew (audio_output_t *aout)
         fmt->i_format = (fmt->i_bitspersample > 16) ? VLC_CODEC_FL32
                                                     : VLC_CODEC_S16N;
 
-        if (fmt->i_physical_channels == AOUT_CHANS_STEREO
-         && (owner->requested_stereo_mode == AOUT_VAR_CHAN_LEFT
-          || owner->requested_stereo_mode == AOUT_VAR_CHAN_RIGHT))
-            fmt->i_physical_channels = AOUT_CHAN_CENTER;
+        aout_SetupMixModeChoices(aout, fmt);
+
+        /* Prefer the user requested mode if available, otherwise, use the
+         * default one */
+        if (aout_HasMixModeChoice(aout, owner->requested_mix_mode))
+            aout_UpdateMixMode(aout, owner->requested_mix_mode, fmt);
 
         aout_FormatPrepare (fmt);
         assert (aout_FormatNbChannels(fmt) > 0);
@@ -594,6 +730,12 @@ int aout_OutputNew (audio_output_t *aout)
         }
     }
 
+    int stereo_mode = aout_PrepareStereoMode(aout, fmt);
+
+    if (stereo_mode != AOUT_VAR_CHAN_UNSET
+     && aout_HasStereoMode(aout, stereo_mode))
+        aout_UpdateStereoMode(aout, stereo_mode, fmt, filters_cfg);
+
     aout->current_sink_info.headphones = false;
 
     vlc_mutex_lock(&owner->lock);
@@ -615,8 +757,16 @@ int aout_OutputNew (audio_output_t *aout)
     }
     assert(aout->flush && aout->play && aout->time_get && aout->pause);
 
-    aout_PrepareStereoMode (aout, fmt, filters_cfg, input_chan_type,
-                            i_nb_input_channels);
+    /* Autoselect the headphones mode if available and if the user didn't
+     * request any mode */
+    if (aout->current_sink_info.headphones
+     && owner->requested_mix_mode == AOUT_VAR_CHAN_UNSET
+     && aout_HasMixModeChoice(aout, AOUT_MIX_MODE_BINAURAL))
+    {
+        assert(fmt->i_physical_channels == AOUT_CHANS_STEREO);
+        assert(stereo_mode == AOUT_VAR_CHAN_UNSET);
+        aout_UpdateMixMode(aout, AOUT_MIX_MODE_BINAURAL, fmt);
+    }
 
     aout_FormatPrepare (fmt);
     assert (fmt->i_bytes_per_frame > 0 && fmt->i_frame_length > 0);

@@ -64,14 +64,13 @@ static const char * const  ppsz_converter_text[] = {
 static int OpenConverter(filter_t *);
 
 vlc_module_begin()
-    add_submodule()
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
     set_shortname(N_("MMAL resizer"))
     set_description(N_("MMAL resizing conversion filter"))
     add_shortcut("mmal_converter")
 #ifndef NDEBUG
-    add_integer( MMAL_CONVERTER_TYPE_NAME, FILTER_RESIZER_HVS, MMAL_CONVERTER_TYPE_TEXT, MMAL_CONVERTER_TYPE_LONGTEXT, true )
+    add_integer( MMAL_CONVERTER_TYPE_NAME, FILTER_RESIZER_HVS, MMAL_CONVERTER_TYPE_TEXT, MMAL_CONVERTER_TYPE_LONGTEXT )
         change_integer_list( pi_converter_modes, ppsz_converter_text )
 #endif
     set_callback_video_converter(OpenConverter, 900)

@@ -607,7 +607,7 @@ static int Demux( demux_t * p_demux )
         }
     }
 
-    if( p_sys->b_preparsing_done )
+    if( p_sys->b_preparsing_done && p_sys->b_es_created )
         Ogg_OutputQueues( p_demux, false );
 
     return VLC_DEMUXER_SUCCESS;
@@ -2141,7 +2141,7 @@ static void Ogg_CreateES( demux_t *p_demux, bool stable_id )
             if( p_old_stream &&
                 p_old_stream->fmt.i_cat == p_stream->fmt.i_cat &&
                 p_old_stream->fmt.i_codec == p_stream->fmt.i_codec &&
-                p_old_stream->p_es != NULL && p_stream->p_es != NULL )
+                p_old_stream->p_es != NULL )
             {
                 msg_Dbg( p_demux, "will reuse old stream to avoid glitch" );
 

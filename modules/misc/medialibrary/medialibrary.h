@@ -44,6 +44,20 @@ struct vlc_thumbnailer_request_t;
 
 class Logger;
 
+class EmbeddedThumbnail : public medialibrary::parser::IEmbeddedThumbnail
+{
+public:
+    EmbeddedThumbnail( input_attachment_t* a, vlc_fourcc_t fcc );
+    virtual ~EmbeddedThumbnail();
+    virtual bool save(const std::string& path) override;
+    virtual size_t size() const override;
+    virtual std::string hash() const override;
+    virtual std::string extension() const override;
+private:
+    input_attachment_t* m_attachment;
+    vlc_fourcc_t m_fcc;
+};
+
 class MetadataExtractor : public medialibrary::parser::IParserService
 {
 private:
@@ -91,6 +105,7 @@ private:
     static void onParserEnded( input_item_t *, int status, void *user_data );
     static void onParserSubtreeAdded( input_item_t *, input_item_node_t *subtree,
                                       void *user_data );
+    static void onAttachmentFound( const vlc_event_t* p_event, void* data );
 
 private:
     vlc::threads::condition_variable m_cond;
@@ -134,7 +149,8 @@ private:
 class MediaLibrary : public medialibrary::IMediaLibraryCb
 {
 public:
-    MediaLibrary( vlc_medialibrary_module_t* ml );
+    static MediaLibrary* create( vlc_medialibrary_module_t* ml );
+
     bool Init();
     bool Start();
     int Control( int query, va_list args );
@@ -161,10 +177,14 @@ private:
     int listMedia( int listQuery, const medialibrary::QueryParameters* paramsPtr,
                    const char* pattern, uint32_t nbItems, uint32_t offset, va_list args );
 
+    medialibrary::PriorityAccess acquirePriorityAccess();
+
     static medialibrary::IMedia::MetadataType metadataType( int meta );
     static medialibrary::SortingCriteria sortingCriteria( int sort );
 
 private:
+    MediaLibrary( vlc_medialibrary_module_t* vlc_ml, medialibrary::IMediaLibrary* ml );
+
     vlc_medialibrary_module_t* m_vlc_ml;
     std::unique_ptr<Logger> m_logger;
     std::unique_ptr<medialibrary::IMediaLibrary> m_ml;
@@ -200,8 +220,6 @@ public:
     virtual void onDiscoveryStarted(const std::string& entryPoint) override;
     virtual void onDiscoveryProgress(const std::string& entryPoint) override;
     virtual void onDiscoveryCompleted(const std::string& entryPoint, bool success) override;
-    virtual void onReloadStarted(const std::string& entryPoint) override;
-    virtual void onReloadCompleted(const std::string& entryPoint, bool success) override;
     virtual void onEntryPointAdded(const std::string& entryPoint, bool success) override;
     virtual void onEntryPointRemoved(const std::string& entryPoint, bool success) override;
     virtual void onEntryPointBanned(const std::string& entryPoint, bool success) override;
@@ -227,7 +245,7 @@ bool Convert( const medialibrary::IShow* input, vlc_ml_show_t& output );
 bool Convert( const medialibrary::ILabel* input, vlc_ml_label_t& output );
 bool Convert( const medialibrary::IMediaGroup* input, vlc_ml_group_t& output );
 bool Convert( const medialibrary::IPlaylist* input, vlc_ml_playlist_t& output );
-bool Convert( const medialibrary::IFolder* input, vlc_ml_entry_point_t& output );
+bool Convert( const medialibrary::IFolder* input, vlc_ml_folder_t& output );
 bool Convert( const medialibrary::IBookmark* input, vlc_ml_bookmark_t& output );
 input_item_t* MediaToInputItem( const medialibrary::IMedia* media );
 

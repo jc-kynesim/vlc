@@ -18,16 +18,18 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-import QtQuick 2.11
+import QtQuick      2.11
+import QtQml.Models 2.11
 
 import org.videolan.medialib 0.1
+import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///main/"    as MainInterface
 import "qrc:///util/"    as Util
 import "qrc:///style/"
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: root
 
     //---------------------------------------------------------------------------------------------
@@ -56,20 +58,6 @@ Widgets.NavigableFocusScope {
     //---------------------------------------------------------------------------------------------
 
     signal showList(variant model)
-
-    //---------------------------------------------------------------------------------------------
-    // Settings
-    //---------------------------------------------------------------------------------------------
-
-    navigationCancel: function() {
-        if (currentItem.currentIndex > 0) {
-            currentItem.currentIndex = 0;
-
-            currentItem.positionViewAtIndex(0, ItemView.Contain);
-        } else {
-            defaultNavigationCancel();
-        }
-    }
 
     //---------------------------------------------------------------------------------------------
     // Events
@@ -117,29 +105,31 @@ Widgets.NavigableFocusScope {
 
     function _actionAtIndex() {
         if (modelSelect.selectedIndexes.length > 1) {
-            _play(model.getIdsForIndexes(modelSelect.selectedIndexes));
+            g_mainDisplay.play(medialib, model.getIdsForIndexes(modelSelect.selectedIndexes));
         } else if (modelSelect.selectedIndexes.length === 1) {
             var index = modelSelect.selectedIndexes[0];
             _showList(model.getDataAt(index));
         }
     }
 
-    function _play(ids) {
-        g_mainDisplay.showPlayer();
-
-        medialib.addAndPlay(ids);
-    }
-
     function _showList(model)
     {
         // NOTE: If the count is 1 we consider the group is a media.
         if (model.count == 1)
-            _play(model.id);
+            g_mainDisplay.play(medialib, model.id);
         else
             showList(model);
     }
 
-    //---------------------------------------------------------------------------------------------
+    function _onNavigationCancel() {
+        if (root.currentItem.currentIndex > 0) {
+            root.currentItem.currentIndex = 0;
+
+            root.currentItem.positionViewAtIndex(0, ItemView.Contain);
+        } else {
+            root.Navigation.defaultNavigationCancel();
+        }
+    }
 
     function _getLabels(model, string)
     {
@@ -150,9 +140,12 @@ Widgets.NavigableFocusScope {
                 model.resolution_name || "",
                 model.channel         || ""
             ].filter(function(a) { return a !== "" });
-        } else return [
-            string.arg(count)
-        ];
+        } else {
+            if (count < 100)
+                return [ string.arg(count) ];
+            else
+                return [ string.arg("99+") ];
+        }
     }
 
     //---------------------------------------------------------------------------------------------
@@ -194,7 +187,7 @@ Widgets.NavigableFocusScope {
     }
 
     Widgets.DragItem {
-        id: dragItem
+        id: dragItemGroup
 
         function updateComponents(maxCovers) {
             var items = modelSelect.selectedIndexes.slice(0, maxCovers).map(function (x){
@@ -205,13 +198,13 @@ Widgets.NavigableFocusScope {
                 return { artwork: item.thumbnail || VLCStyle.noArtCover }
             });
 
-            var title = items.map(function (item) {
-                return item.title
+            var name = items.map(function (item) {
+                return item.name
             }).join(", ");
 
             return {
                 covers: covers,
-                title: title,
+                title: name,
                 count: modelSelect.selectedIndexes.length
             }
         }
@@ -244,24 +237,32 @@ Widgets.NavigableFocusScope {
 
             activeFocusOnTab: true
 
-            navigationParent: root
+            Navigation.parentItem: root
+            //cancelAction takes a *function* pass it directly
+            Navigation.cancelAction: root._onNavigationCancel
 
             expandDelegate: VideoInfoExpandPanel {
                 width: gridView.width
 
                 x: 0
 
-                navigationParent: gridView
+                Navigation.parentItem: gridView
 
-                navigationUp    : function() { gridView.retract() }
-                navigationDown  : function() { gridView.retract() }
-                navigationCancel: function() { gridView.retract() }
+                Navigation.upAction    : function() { gridView.retract() }
+                Navigation.downAction  : function() { gridView.retract() }
+                Navigation.cancelAction: function() { gridView.retract() }
 
                 onRetract: gridView.retract()
             }
 
             delegate: VideoGridItem {
                 id: gridItem
+
+                //---------------------------------------------------------------------------------
+                // properties required by ExpandGridView
+
+                property var model: ({})
+                property int index: -1
 
                 //---------------------------------------------------------------------------------
                 // Settings
@@ -273,12 +274,15 @@ Widgets.NavigableFocusScope {
                 title: (model.name) ? model.name
                                     : i18n.qtr("Unknown title")
 
-                labels: _getLabels(model, i18n.qtr("%1 Medias"))
+                labels: _getLabels(model, i18n.qtr("%1 Videos"))
 
                 // NOTE: We don't want to show the indicator for a group.
                 showNewIndicator: (model.count === 1)
 
-                dragItem: root.dragItem
+                dragItem: dragItemGroup
+
+                selectedUnderlay  : shadows.selected
+                unselectedUnderlay: shadows.unselected
 
                 //---------------------------------------------------------------------------------
                 // Events
@@ -297,7 +301,7 @@ Widgets.NavigableFocusScope {
                 //---------------------------------------------------------------------------------
                 // Animations
 
-                Behavior on opacity { NumberAnimation { duration: 100 } }
+                Behavior on opacity { NumberAnimation { duration: VLCStyle.duration_faster } }
             }
 
             //-------------------------------------------------------------------------------------
@@ -324,7 +328,18 @@ Widgets.NavigableFocusScope {
             Connections {
                 target: contextMenu
 
-                onShowMediaInformation: gridView.switchExpandItem(index)
+                // FIXME: We need to implement this in qml_menu_wrapper.
+                //onShowMediaInformation: gridView.switchExpandItem(index)
+            }
+
+            //-------------------------------------------------------------------------------------
+            // Childs
+
+            Widgets.GridShadows {
+                id: shadows
+
+                coverWidth : VLCStyle.gridCover_video_width
+                coverHeight: VLCStyle.gridCover_video_height
             }
         }
     }
@@ -345,15 +360,15 @@ Widgets.NavigableFocusScope {
 
             selectionDelegateModel: modelSelect
 
-            dragItem: root.dragItem
-
-            header: root.header
+            dragItem: dragItemGroup
 
             headerTopPadding: VLCStyle.margin_normal
 
             headerPositioning: ListView.InlineHeader
 
-            navigationParent: root
+            Navigation.parentItem: root
+            //cancelAction takes a *function* pass it directly
+            Navigation.cancelAction: root._onNavigationCancel
 
             //-------------------------------------------------------------------------------------
             // Events
@@ -386,7 +401,7 @@ Widgets.NavigableFocusScope {
 
         cover: VLCStyle.noArtVideoCover
 
-        navigationParent: root
+        Navigation.parentItem: root
 
         focus: visible
     }

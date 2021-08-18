@@ -49,7 +49,7 @@
 /*********************************************************************
  * The Tree
  *********************************************************************/
-PrefsTree::PrefsTree( intf_thread_t *_p_intf, QWidget *_parent,
+PrefsTree::PrefsTree( qt_intf_t *_p_intf, QWidget *_parent,
                       module_t **p_list, size_t count ) :
                             QTreeWidget( _parent ), p_intf( _p_intf )
 {
@@ -58,7 +58,7 @@ PrefsTree::PrefsTree( intf_thread_t *_p_intf, QWidget *_parent,
     setAlternatingRowColors( true );
     setHeaderHidden( true );
 
-    setIconSize( QSize( ITEM_HEIGHT,ITEM_HEIGHT ) );
+    setIconSize( QSize( ITEM_HEIGHT, ITEM_HEIGHT ) );
     setTextElideMode( Qt::ElideNone );
 
     setUniformRowHeights( true );
@@ -97,7 +97,7 @@ PrefsTree::PrefsTree( intf_thread_t *_p_intf, QWidget *_parent,
         {
         /* This is a category */
         case CONFIG_CATEGORY:
-            if( p_item->value.i == -1 ) break;
+            if( p_item->value.i == CAT_HIDDEN ) break;
 
             /* PrefsItemData Init */
             data = new PrefsItemData( this );
@@ -133,17 +133,10 @@ PrefsTree::PrefsTree( intf_thread_t *_p_intf, QWidget *_parent,
 
         /* This is a subcategory */
         case CONFIG_SUBCATEGORY:
-            if( p_item->value.i == -1 ) break;
+            if( p_item->value.i == SUBCAT_HIDDEN ) break;
 
             /* Special cases: move the main subcategories to the parent cat*/
-            if( data &&
-                ( p_item->value.i == SUBCAT_VIDEO_GENERAL ||
-                  p_item->value.i == SUBCAT_ADVANCED_MISC ||
-                  p_item->value.i == SUBCAT_INPUT_GENERAL ||
-                  p_item->value.i == SUBCAT_INTERFACE_GENERAL ||
-                  p_item->value.i == SUBCAT_SOUT_GENERAL||
-                  p_item->value.i == SUBCAT_PLAYLIST_GENERAL||
-                  p_item->value.i == SUBCAT_AUDIO_GENERAL ) )
+            if( data && vlc_config_subcat_IsGeneral(p_item->value.i) )
             {
                 /* Data still contains the correct thing */
                 data->i_type = PrefsItemData::TYPE_CATSUBCAT;
@@ -189,7 +182,7 @@ PrefsTree::PrefsTree( intf_thread_t *_p_intf, QWidget *_parent,
         if( module_is_main( p_module) ) continue;
 
         unsigned  confsize;
-        int i_subcategory = 0, i_category = 0;
+        int i_subcategory = SUBCAT_UNKNOWN, i_category = CAT_UNKNOWN;
 
         bool b_options = false;
         module_config_t *const p_config = module_config_get (p_module, &confsize);
@@ -207,14 +200,14 @@ PrefsTree::PrefsTree( intf_thread_t *_p_intf, QWidget *_parent,
             if( CONFIG_ITEM(p_item->i_type) )
                 b_options = true;
 
-            if( b_options && i_category && i_subcategory )
+            if( b_options && i_category != CAT_UNKNOWN && i_subcategory != SUBCAT_UNKNOWN )
                 break;
         }
         module_config_free (p_config);
 
         /* Dummy item, please proceed */
-        if( !b_options || i_category == 0 || i_subcategory == 0 ) continue;
-
+        if( !b_options || i_category == CAT_UNKNOWN || i_subcategory == SUBCAT_UNKNOWN )
+            continue;
 
         // Locate the category item;
         QTreeWidgetItem *subcat_item = NULL;
@@ -256,12 +249,12 @@ PrefsTree::PrefsTree( intf_thread_t *_p_intf, QWidget *_parent,
         PrefsItemData *module_data = new PrefsItemData( this );
         module_data->i_type = PrefsItemData::TYPE_MODULE;
         module_data->psz_shortcut = strdup( module_get_object( p_module ) );
-        module_data->name = qtr( module_get_name( p_module, false ) );
+        module_data->name = qfut( module_GetShortName( p_module ) );
         module_data->help.clear();
         module_data->p_module = p_module;
         const char *psz_help = module_get_help( p_module );
         if ( psz_help )
-            module_data->help = qtr( psz_help );
+            module_data->help = qfut( psz_help );
 
         QTreeWidgetItem *module_item = new QTreeWidgetItem();
         module_item->setText( 0, module_data->name );
@@ -482,7 +475,7 @@ PrefsItemData::PrefsItemData( QObject *_parent ) : QObject( _parent )
 {
     panel = NULL;
     i_object_id = 0;
-    i_subcat_id = -1;
+    i_subcat_id = SUBCAT_UNKNOWN;
     psz_shortcut = NULL;
     b_loaded = false;
 }
@@ -491,100 +484,106 @@ PrefsItemData::PrefsItemData( QObject *_parent ) : QObject( _parent )
  * also search the module name and head */
 bool PrefsItemData::contains( const QString &text, Qt::CaseSensitivity cs )
 {
-    /* Find our module */
-    module_t *p_module = NULL;
     if( this->i_type == TYPE_CATEGORY )
         return false;
-    else if( this->i_type == TYPE_MODULE )
+
+    bool is_core = this->i_type != TYPE_MODULE;
+    int id = SUBCAT_UNKNOWN;
+
+    /* find our module */
+    module_t *p_module;
+    if( !is_core )
         p_module = this->p_module;
     else
     {
         p_module = module_get_main();
         assert( p_module );
+
+        if( this->i_type == TYPE_SUBCATEGORY )
+            id = this->i_object_id;
+        else // TYPE_CATSUBCAT
+            id = this->i_subcat_id;
     }
+
+    /* check the node itself (its name/longname/helptext) */
+
+    QString head;
+    if( is_core )
+        head.clear();
+    else
+        head = QString( qfut( module_GetLongName( p_module ) ) );
+
+    if ( name.contains( text, cs )
+         || (!is_core && head.contains( text, cs ))
+         || help.contains( text, cs )
+       )
+    {
+        return true;
+    }
+
+    /* check options belonging to this subcat or module */
 
     unsigned confsize;
     module_config_t *const p_config = module_config_get (p_module, &confsize),
                     *p_item = p_config,
                     *p_end = p_config + confsize;
 
-    if( this->i_type == TYPE_SUBCATEGORY || this->i_type ==  TYPE_CATSUBCAT )
+    if( !p_config )
+        return false;
+
+    bool ret = false;
+
+    if( is_core )
     {
+        /* find start of relevant option block */
         while ( p_item < p_end )
         {
             if( p_item->i_type == CONFIG_SUBCATEGORY &&
-                (
-                    ( this->i_type == TYPE_SUBCATEGORY &&
-                              p_item->value.i == this->i_object_id )
-                    ||
-                    ( this->i_type == TYPE_CATSUBCAT &&
-                              p_item->value.i == this->i_subcat_id )
-                )
+                p_item->value.i == id
               )
                 break;
             p_item++;
         }
-    }
-
-    QString head;
-
-    if( this->i_type == TYPE_SUBCATEGORY || this->i_type ==  TYPE_CATSUBCAT )
-    {
-        head.clear();
-        p_item++; // Why that ? +1
-    }
-    else
-    {
-        head = QString( qtr( module_GetLongName( p_module ) ) );
-    }
-
-    if (name.contains( text, cs ) || head.contains( text, cs ) || help.contains( text, cs ))
-    {
-        module_config_free( p_config );
-        return true;
-    }
-
-    if( p_item ) do
-    {
-        if (
-            (
-                ( this->i_type == TYPE_SUBCATEGORY && p_item->value.i != this->i_object_id )
-                ||
-                ( this->i_type == TYPE_CATSUBCAT && p_item->value.i != this->i_subcat_id )
-            ) &&
-            ( p_item->i_type == CONFIG_CATEGORY || p_item->i_type == CONFIG_SUBCATEGORY )
-           ) break;
-
-        if( p_item->b_internal ) continue;
-
-        if ( p_item->psz_text && qtr( p_item->psz_text ).contains( text, cs ) )
+        if( ++p_item >= p_end )
         {
-            module_config_free( p_config );
-            return true;
+            ret = false;
+            goto end;
         }
     }
-    while (
-            !(
-                ( this->i_type == TYPE_SUBCATEGORY || this->i_type == TYPE_CATSUBCAT )
-                &&
-                ( p_item->i_type == CONFIG_CATEGORY || p_item->i_type == CONFIG_SUBCATEGORY )
-             )
-             && ( ++p_item < p_end )
-          );
 
+    do
+    {
+        if ( p_item->i_type == CONFIG_CATEGORY || p_item->i_type == CONFIG_SUBCATEGORY )
+        {
+            /* for core, if we hit a cat or subcat, stop */
+            if ( is_core )
+                break;
+            /* a module's options are grouped under one node; we can/should
+               ignore all cat/subcat entries. */
+            continue;
+        }
+
+        /* cat-hint items are not relevant, they are an alternate set of headings for help output */
+        if( p_item->i_type == CONFIG_HINT_CATEGORY ) continue;
+
+        if ( p_item->psz_text && qfut( p_item->psz_text ).contains( text, cs ) )
+        {
+            ret = true;
+            goto end;
+        }
+    }
+    while ( ++p_item < p_end );
+
+end:
     module_config_free( p_config );
-    return false;
+    return ret;
 }
 
 /*********************************************************************
  * The Panel
  *********************************************************************/
-AdvPrefsPanel::AdvPrefsPanel( QWidget *_parent ) : QWidget( _parent )
-{
-    p_config = NULL;
-}
 
-AdvPrefsPanel::AdvPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
+AdvPrefsPanel::AdvPrefsPanel( qt_intf_t *_p_intf, QWidget *_parent,
                         PrefsItemData * data ) :
                         QWidget( _parent ), p_intf( _p_intf )
 {
@@ -637,7 +636,7 @@ AdvPrefsPanel::AdvPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
     }
     else
     {
-        head = QString( qtr( module_GetLongName( p_module ) ) );
+        head = QString( qfut( module_GetLongName( p_module ) ) );
     }
 
     QLabel *titleLabel = new QLabel( head );
@@ -677,7 +676,6 @@ AdvPrefsPanel::AdvPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             ( p_item->i_type == CONFIG_CATEGORY ||
               p_item->i_type == CONFIG_SUBCATEGORY ) )
             break;
-        if( p_item->b_internal ) continue;
 
         if( p_item->i_type == CONFIG_SECTION )
         {
@@ -689,7 +687,7 @@ AdvPrefsPanel::AdvPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                 i_line++;
             }
             i_boxline = 0;
-            box = new QGroupBox( qtr( p_item->psz_text ), this );
+            box = new QGroupBox( qfut( p_item->psz_text ), this );
             box->hide();
             boxlayout = new QGridLayout();
         }
@@ -703,11 +701,11 @@ AdvPrefsPanel::AdvPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
 
         ConfigControl *control;
         if( ! box )
-            control = ConfigControl::createControl( VLC_OBJECT( p_intf ),
-                                        p_item, this, layout, i_line );
+            control = ConfigControl::createControl( p_item, this,
+                                                    layout, i_line );
         else
-            control = ConfigControl::createControl( VLC_OBJECT( p_intf ),
-                                    p_item, this, boxlayout, i_boxline );
+            control = ConfigControl::createControl( p_item, this,
+                                                    boxlayout, i_boxline );
         if( !control )
             continue;
 
@@ -728,7 +726,7 @@ AdvPrefsPanel::AdvPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
         layout->addWidget( box, i_line, 0, 1, -1 );
     }
 
-    scrolled_area->setSizePolicy( QSizePolicy::Preferred,QSizePolicy::Fixed );
+    scrolled_area->setSizePolicy( QSizePolicy::Preferred, QSizePolicy::Fixed );
     scrolled_area->setLayout( layout );
     scroller->setWidget( scrolled_area );
     scroller->setWidgetResizable( true );
@@ -747,6 +745,7 @@ void AdvPrefsPanel::clean()
 
 AdvPrefsPanel::~AdvPrefsPanel()
 {
-    qDeleteAll( controls ); controls.clear();
+    qDeleteAll( controls );
+    controls.clear();
     module_config_free( p_config );
 }

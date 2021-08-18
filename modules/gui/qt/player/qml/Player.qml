@@ -17,7 +17,7 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtQml.Models 2.11
 import QtGraphicalEffects 1.0
 
@@ -25,10 +25,9 @@ import org.videolan.vlc 0.1
 
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
-import "qrc:///util/KeyHelper.js" as KeyHelper
 import "qrc:///playlist/" as PL
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: rootPlayer
 
     //menu/overlay to dismiss
@@ -52,7 +51,7 @@ Widgets.NavigableFocusScope {
     Keys.onPressed: {
         if (event.accepted)
             return
-        defaultKeyAction(event, 0)
+        rootPlayer.Navigation.defaultKeyAction(event)
 
         //unhandled keys are forwarded as hotkeys
         if (!event.accepted || controlBarView.state !== "visible")
@@ -65,20 +64,10 @@ Widgets.NavigableFocusScope {
         if (event.key === Qt.Key_Menu) {
             toolbarAutoHide.toggleForceVisible()
         } else {
-            defaultKeyReleaseAction(event, 0)
+            rootPlayer.Navigation.defaultKeyReleaseAction(event)
         }
     }
 
-    navigationCancel: function() {
-        if (rootPlayer.hasEmbededVideo && controlBarView.state === "visible") {
-            toolbarAutoHide.setVisibleControlBar(false)
-        } else {
-            if (mainInterface.hasEmbededVideo && !mainInterface.canShowVideoPIP) {
-               mainPlaylistController.stop()
-            }
-            history.previous()
-        }
-    }
 
     on_AutoHideChanged: {
         if (_autoHide)
@@ -103,6 +92,17 @@ Widgets.NavigableFocusScope {
     function lockUnlockAutoHide(lock, source /*unused*/) {
         _lockAutoHide += lock ? 1 : -1;
         console.assert(_lockAutoHide >= 0)
+    }
+
+    function _onNavigationCancel() {
+        if (rootPlayer.hasEmbededVideo && controlBarView.state === "visible") {
+            toolbarAutoHide.setVisibleControlBar(false)
+        } else {
+            if (mainInterface.hasEmbededVideo && !mainInterface.canShowVideoPIP) {
+               mainPlaylistController.stop()
+            }
+            history.previous()
+        }
     }
 
     ImageLuminanceExtractor {
@@ -336,8 +336,8 @@ Widgets.NavigableFocusScope {
                 title: mainPlaylistController.currentItem.title
                 colors: rootPlayer.colors
                 groupAlignment: rootPlayer.pinVideoControls ? TopBar.GroupAlignment.Horizontal : TopBar.GroupAlignment.Vertical
-                navigationParent: rootPlayer
-                navigationDownItem: playlistpopup.showPlaylist ? playlistpopup : (audioControls.visible ? audioControls : controlBarView)
+                Navigation.parentItem: rootPlayer
+                Navigation.downItem: playlistpopup.showPlaylist ? playlistpopup : (audioControls.visible ? audioControls : controlBarView)
 
                 onTooglePlaylistVisibility: {
                     if (mainInterface.playlistDocked)
@@ -356,7 +356,7 @@ Widgets.NavigableFocusScope {
 
                 anchors.fill: parent
                 colors: rootPlayer.colors
-                navigationParent: rootPlayer
+                Navigation.parentItem: rootPlayer
 
                 onHidden: {
                     if (activeFocus) {
@@ -454,9 +454,9 @@ Widgets.NavigableFocusScope {
                 visible: player.videoTracks.count === 0 && centerContent.height > (audioControls.y + audioControls.height)
                 focus: visible
                 spacing: VLCStyle.margin_xxsmall
-                navigationParent: rootPlayer
-                KeyNavigation.up: topcontrolView
-                KeyNavigation.down: controlBarView
+                Navigation.parentItem: rootPlayer
+                Navigation.upItem: topcontrolView
+                Navigation.downItem: controlBarView
 
                 model: ObjectModel {
                     Widgets.IconToolButton {
@@ -465,6 +465,8 @@ Widgets.NavigableFocusScope {
                         onClicked: player.jumpBwd()
                         text: i18n.qtr("Step back")
                         color: rootPlayer.colors.playerFg
+                        colorHover: rootPlayer.colors.buttonTextHover
+                        colorFocus: rootPlayer.colors.bgFocus
                     }
 
                     Widgets.IconToolButton {
@@ -473,6 +475,8 @@ Widgets.NavigableFocusScope {
                         onClicked: player.toggleVisualization()
                         text: i18n.qtr("Visualization")
                         color: rootPlayer.colors.playerFg
+                        colorHover: rootPlayer.colors.buttonTextHover
+                        colorFocus: rootPlayer.colors.bgFocus
                     }
 
                     Widgets.IconToolButton{
@@ -481,6 +485,8 @@ Widgets.NavigableFocusScope {
                         onClicked: player.jumpFwd()
                         text: i18n.qtr("Step forward")
                         color: rootPlayer.colors.playerFg
+                        colorHover: rootPlayer.colors.buttonTextHover
+                        colorFocus: rootPlayer.colors.bgFocus
                     }
                 }
             }
@@ -501,6 +507,11 @@ Widgets.NavigableFocusScope {
         state: "visible"
         edge: Widgets.DrawerExt.Edges.Bottom
 
+        onStateChanged: {
+            if (state === "visible")
+                contentItem.showChapterMarks()
+        }
+
         component: MouseArea {
             id: controllerMouseArea
 
@@ -509,6 +520,10 @@ Widgets.NavigableFocusScope {
             height: controllerId.implicitHeight + controllerId.anchors.bottomMargin
             width: controlBarView.width
             hoverEnabled: true
+
+            function showChapterMarks() {
+                controllerId.showChapterMarks()
+            }
 
             onContainsMouseChanged: rootPlayer.lockUnlockAutoHide(containsMouse, topcontrolView)
 
@@ -521,8 +536,8 @@ Widgets.NavigableFocusScope {
                 anchors.bottomMargin: VLCStyle.applicationVerticalMargin
                 colors: rootPlayer.colors
                 textPosition: rootPlayer.pinVideoControls ? ControlBar.TimeTextPosition.LeftRightSlider : ControlBar.TimeTextPosition.AboveSlider
-                navigationParent: rootPlayer
-                navigationUpItem: playlistpopup.showPlaylist ? playlistpopup : (audioControls.visible ? audioControls : topcontrolView)
+                Navigation.parentItem: rootPlayer
+                Navigation.upItem: playlistpopup.showPlaylist ? playlistpopup : (audioControls.visible ? audioControls : topcontrolView)
 
                 onRequestLockUnlockAutoHide: rootPlayer.lockUnlockAutoHide(lock, source)
 
@@ -546,7 +561,7 @@ Widgets.NavigableFocusScope {
         edge: Widgets.DrawerExt.Edges.Right
         state: showPlaylist && mainInterface.playlistDocked ? "visible" : "hidden"
         component: Rectangle {
-            color: rootPlayer.colors.setColorAlpha(rootPlayer.colors.banner, 0.8)
+            color: rootPlayer.colors.setColorAlpha(rootPlayer.colors.topBanner, 0.8)
             width: rootPlayer.width/4
             height: playlistpopup.height
 
@@ -556,11 +571,11 @@ Widgets.NavigableFocusScope {
                 anchors.fill: parent
 
                 colors: rootPlayer.colors
-                navigationParent: rootPlayer
-                navigationUpItem: topcontrolView
-                navigationDownItem: controlBarView
-                navigationLeft: closePlaylist
-                navigationCancel: closePlaylist
+                Navigation.parentItem: rootPlayer
+                Navigation.upItem: topcontrolView
+                Navigation.downItem: controlBarView
+                Navigation.leftAction: closePlaylist
+                Navigation.cancelAction: closePlaylist
 
                 function closePlaylist() {
                     playlistpopup.showPlaylist = false

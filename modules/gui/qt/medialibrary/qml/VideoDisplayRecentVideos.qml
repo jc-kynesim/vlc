@@ -20,13 +20,14 @@ import QtQuick.Controls 2.4
 import QtQml.Models 2.2
 
 import org.videolan.medialib 0.1
+import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///util/" as Util
 import "qrc:///util/Helpers.js" as Helpers
 import "qrc:///style/"
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: root
 
     property Item focusItem: recentVideosListView
@@ -45,7 +46,7 @@ Widgets.NavigableFocusScope {
 
     function _actionAtIndex(index, model, selectionModel) {
         g_mainDisplay.showPlayer()
-        medialib.addAndPlay( model.getIdsForIndexes( selectionModel.selectedIndexes ) )
+        medialib.addAndPlay( model.getIdsForIndexes( selectionModel.selectedIndexes ), [":restore-playback-pos=2"] )
     }
 
     onFocusChanged: {
@@ -81,8 +82,8 @@ Widgets.NavigableFocusScope {
             orientation: ListView.Horizontal
 
             focus: true
-            navigationParent: root
-            navigationDown: function() {
+            Navigation.parentItem: root
+            Navigation.downAction: function() {
                 recentVideosListView.focus = false
                 view.currentItem.setCurrentItemFocus()
             }
@@ -93,42 +94,18 @@ Widgets.NavigableFocusScope {
                 width: VLCStyle.margin_xlarge
             }
 
-            delegate: Widgets.GridItem {
+            delegate: VideoGridItem {
                 id: recentVideoGridItem
 
                 focus: true
                 x: selectedBorderWidth
                 y: selectedBorderWidth
-
-                image: model.thumbnail || VLCStyle.noArtCover
-                title: model.title || i18n.qtr("Unknown title")
-                subtitle: Helpers.msToString(model.duration) || ""
-                labels: [
-                    model.resolution_name || "",
-                    model.channel || ""
-                ].filter(function(a) { return a !== "" } )
-                progress: model.progress > 0 ? model.progress : 0
                 pictureWidth: VLCStyle.gridCover_video_width_large
                 pictureHeight: VLCStyle.gridCover_video_height_large
-                playCoverBorder.width: VLCStyle.gridCover_video_border
-                titleMargin: VLCStyle.margin_xxsmall
-                showNewIndicator: true
                 unselectedUnderlay: shadows.unselected
                 selectedUnderlay: shadows.selected
-                
-                onItemDoubleClicked: {
-                    if ( model.id !== undefined ) {
-                        g_mainDisplay.showPlayer()
-                        medialib.addAndPlay( model.id )
-                    }
-                }
 
-                onPlayClicked: {
-                    if ( model.id !== undefined ) {
-                        g_mainDisplay.showPlayer()
-                        medialib.addAndPlay( model.id )
-                    }
-                }
+                onItemDoubleClicked: recentVideoGridItem.play()
 
                 onItemClicked: {
                     recentVideoSelection.updateSelection( modifier , root.model.currentIndex, index )
@@ -144,7 +121,14 @@ Widgets.NavigableFocusScope {
 
                 Behavior on opacity {
                     NumberAnimation {
-                        duration: 100
+                        duration: VLCStyle.duration_faster
+                    }
+                }
+
+                function play() {
+                    if (model.id !== undefined) {
+                        g_mainDisplay.showPlayer()
+                        medialib.addAndPlay( model.id, [":restore-playback-pos=2"] )
                     }
                 }
             }
@@ -156,7 +140,7 @@ Widgets.NavigableFocusScope {
             onSelectionUpdated: recentVideoSelection.updateSelection( keyModifiers, oldIndex, newIndex )
             onActionAtIndex: {
                 g_mainDisplay.showPlayer()
-                medialib.addAndPlay( model.getIdsForIndexes( recentVideoSelection.selectedIndexes ) )
+                medialib.addAndPlay( model.getIdsForIndexes( recentVideoSelection.selectedIndexes ), [":restore-playback-pos=2"] )
             }
 
             Widgets.GridShadows {

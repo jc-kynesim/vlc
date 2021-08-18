@@ -43,13 +43,13 @@ struct vlc_vidsplit_part {
     unsigned height;
 };
 
-struct vout_display_sys_t {
+typedef struct vout_display_sys_t {
     video_splitter_t splitter;
     vlc_mutex_t lock;
 
     picture_t **pictures;
     struct vlc_vidsplit_part *parts;
-};
+} vout_display_sys_t;
 
 static void vlc_vidsplit_Prepare(vout_display_t *vd, picture_t *pic,
                                  subpicture_t *subpic, vlc_tick_t date)
@@ -86,7 +86,10 @@ static void vlc_vidsplit_Display(vout_display_t *vd, picture_t *picture)
         struct vlc_vidsplit_part *part = &sys->parts[i];
 
         if (sys->pictures[i] != NULL)
+        {
             vout_display_Display(part->display, sys->pictures[i]);
+            picture_Release(sys->pictures[i]);
+        }
         vlc_sem_post(&part->lock);
     }
 
@@ -148,7 +151,7 @@ static void vlc_vidsplit_window_Resized(vout_window_t *wnd,
         vout_display_SetSize(part->display, width, height);
 
     if (cb != NULL)
-        cb(wnd, opaque);
+        cb(wnd, width, height, opaque);
     vlc_sem_post(&part->lock);
 }
 
@@ -224,16 +227,18 @@ static vout_window_t *video_splitter_CreateWindow(vlc_object_t *obj,
 }
 
 static const struct vlc_display_operations ops = {
-    vlc_vidsplit_Close, vlc_vidsplit_Prepare, vlc_vidsplit_Display, vlc_vidsplit_Control, NULL, NULL,
+    .close = vlc_vidsplit_Close,
+    .prepare = vlc_vidsplit_Prepare,
+    .display = vlc_vidsplit_Display,
+    .control = vlc_vidsplit_Control,
 };
 
 static int vlc_vidsplit_Open(vout_display_t *vd,
-                             const vout_display_cfg_t *cfg,
                              video_format_t *fmtp, vlc_video_context *ctx)
 {
     vlc_object_t *obj = VLC_OBJECT(vd);
 
-    if (vout_display_cfg_IsWindowed(cfg))
+    if (vout_display_cfg_IsWindowed(vd->cfg))
         return VLC_EGENERIC;
 
     char *name = var_InheritString(obj, "video-splitter");
@@ -323,5 +328,5 @@ vlc_module_begin()
     set_subcategory(SUBCAT_VIDEO_VOUT)
     set_callback_display(vlc_vidsplit_Open, 0)
     add_module("video-splitter", "video splitter", NULL,
-               N_("Video splitter module"), N_("Video splitter module"))
+               N_("Video splitter module"), NULL)
 vlc_module_end()

@@ -350,6 +350,8 @@ int (var_Create)( vlc_object_t *p_this, const char *psz_name, int i_type )
             vlc_assert_unreachable ();
     }
 
+    vlc_cond_init(&p_var->wait);
+
     if (i_type & VLC_VAR_DOINHERIT)
         var_Inherit(p_this, psz_name, i_type, &p_var->val);
 
@@ -436,7 +438,7 @@ int (var_Change)(vlc_object_t *p_this, const char *psz_name, int i_action, ...)
     if( p_var == NULL )
     {
         vlc_mutex_unlock( &p_priv->var_lock );
-        return VLC_ENOVAR;
+        return VLC_ENOENT;
     }
 
     va_start(ap, i_action);
@@ -606,7 +608,7 @@ int (var_GetAndSet)(vlc_object_t *p_this, const char *psz_name, int i_action,
     if( p_var == NULL )
     {
         vlc_mutex_unlock( &p_priv->var_lock );
-        return VLC_ENOVAR;
+        return VLC_ENOENT;
     }
 
     WaitUnused( p_this, p_var );
@@ -687,7 +689,7 @@ int (var_SetChecked)(vlc_object_t *p_this, const char *psz_name,
     if( p_var == NULL )
     {
         vlc_mutex_unlock( &p_priv->var_lock );
-        return VLC_ENOVAR;
+        return VLC_ENOENT;
     }
 
     assert( expected_type == 0 ||
@@ -746,7 +748,7 @@ int (var_GetChecked)(vlc_object_t *p_this, const char *psz_name,
         p_var->ops->pf_dup( p_val );
     }
     else
-        err = VLC_ENOVAR;
+        err = VLC_ENOENT;
 
     vlc_mutex_unlock( &p_priv->var_lock );
     return err;
@@ -1065,7 +1067,7 @@ int var_Inherit( vlc_object_t *p_this, const char *psz_name, int i_type,
         default:
             vlc_assert_unreachable();
         case VLC_VAR_ADDRESS:
-            return VLC_ENOOBJ;
+            return VLC_ENOENT;
     }
     return VLC_SUCCESS;
 }

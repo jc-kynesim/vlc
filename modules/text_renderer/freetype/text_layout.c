@@ -760,17 +760,10 @@ static int ShapeParagraphHarfBuzz( filter_t *p_filter,
 
         hb_buffer_set_direction( p_run->p_buffer, p_run->direction );
         hb_buffer_set_script( p_run->p_buffer, p_run->script );
-#ifdef __OS2__
-        hb_buffer_add_utf16( p_run->p_buffer,
-                             p_paragraph->p_code_points + p_run->i_start_offset,
-                             p_run->i_end_offset - p_run->i_start_offset, 0,
-                             p_run->i_end_offset - p_run->i_start_offset );
-#else
         hb_buffer_add_utf32( p_run->p_buffer,
                              p_paragraph->p_code_points + p_run->i_start_offset,
                              p_run->i_end_offset - p_run->i_start_offset, 0,
                              p_run->i_end_offset - p_run->i_start_offset );
-#endif
         hb_shape( p_hb_font, p_run->p_buffer, 0, 0 );
 
         hb_font_destroy( p_hb_font );
@@ -981,7 +974,7 @@ static int CreateOutlinedGlyph( FT_Glyph src, FT_Glyph *dest, void *priv )
 {
     filter_t *p_filter = priv;
     filter_sys_t *p_sys = p_filter->p_sys;
-    if(FT_Glyph_StrokeBorder( &src, p_sys->p_stroker, 0, 0 ))
+    if(FT_Glyph_Stroke( &src, p_sys->p_stroker, 0 ))
         return -1;
     *dest = src;
     return 0;

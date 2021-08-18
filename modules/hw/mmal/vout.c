@@ -53,7 +53,6 @@
 
 #define MMAL_ADJUST_REFRESHRATE_NAME "mmal-adjust-refreshrate"
 #define MMAL_ADJUST_REFRESHRATE_TEXT N_("Adjust HDMI refresh rate to the video.")
-#define MMAL_ADJUST_REFRESHRATE_LONGTEXT N_("Adjust HDMI refresh rate to the video.")
 
 #define MMAL_NATIVE_INTERLACED "mmal-native-interlaced"
 #define MMAL_NATIVE_INTERLACE_TEXT N_("Force interlaced HDMI mode.")
@@ -64,8 +63,7 @@
 #define PHASE_OFFSET_TARGET ((double)0.25)
 #define PHASE_CHECK_INTERVAL 100
 
-static int OpenMmalVout(vout_display_t *, const vout_display_cfg_t *,
-                video_format_t *, vlc_video_context *);
+static int OpenMmalVout(vout_display_t *, video_format_t *, vlc_video_context *);
 
 #define SUBS_MAX 4
 
@@ -77,13 +75,13 @@ vlc_module_begin()
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VOUT )
 
-    add_integer(MMAL_LAYER_NAME, 1, MMAL_LAYER_TEXT, MMAL_LAYER_LONGTEXT, false)
+    add_integer(MMAL_LAYER_NAME, 1, MMAL_LAYER_TEXT, MMAL_LAYER_LONGTEXT)
     add_bool(MMAL_ADJUST_REFRESHRATE_NAME, false, MMAL_ADJUST_REFRESHRATE_TEXT,
-                    MMAL_ADJUST_REFRESHRATE_LONGTEXT, false)
+                    NULL)
     add_bool(MMAL_NATIVE_INTERLACED, false, MMAL_NATIVE_INTERLACE_TEXT,
-                    MMAL_NATIVE_INTERLACE_LONGTEXT, false)
+                    MMAL_NATIVE_INTERLACE_LONGTEXT)
     add_string(MMAL_DISPLAY_NAME, "auto", MMAL_DISPLAY_TEXT,
-                    MMAL_DISPLAY_LONGTEXT, false)
+                    MMAL_DISPLAY_LONGTEXT)
     set_callback_display(OpenMmalVout, 16)  // 1 point better than ASCII art
 vlc_module_end()
 
@@ -92,7 +90,7 @@ typedef struct vout_subpic_s {
     subpic_reg_stash_t sub;
 } vout_subpic_t;
 
-struct vout_display_sys_t {
+typedef struct vout_display_sys_t {
     vlc_mutex_t manage_mutex;
 
     vlc_decoder_device *dec_dev;
@@ -146,7 +144,7 @@ struct vout_display_sys_t {
 
     // Subpic blend if we have to do it here
     vzc_pool_ctl_t * vzc;
-};
+} vout_display_sys_t;
 
 
 // ISP setup
@@ -239,7 +237,8 @@ static void isp_output_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
         // The filter structure etc. should always exist if we have contents
         // but might not on later flushes as we shut down
         vout_display_t * const vd = (vout_display_t *)port->userdata;
-        struct vout_isp_conf_s *const isp = &vd->sys->isp;
+        vout_display_sys_t *sys = vd->sys;
+        struct vout_isp_conf_s *const isp = &sys->isp;
 
         mmal_queue_put(isp->out_q, buf);
     }
@@ -956,13 +955,14 @@ static void adjust_refresh_rate(vout_display_t *vd, const video_format_t *fmt)
 
 static void maintain_phase_sync(vout_display_t *vd)
 {
+    vout_display_sys_t *sys = vd->sys;
+
     MMAL_PARAMETER_VIDEO_RENDER_STATS_T render_stats = {
         .hdr = { MMAL_PARAMETER_VIDEO_RENDER_STATS, sizeof(render_stats) },
     };
     int32_t frame_duration = CLOCK_FREQ /
-        ((double)vd->sys->i_frame_rate /
-        vd->sys->i_frame_rate_base);
-    vout_display_sys_t *sys = vd->sys;
+        ((double)sys->i_frame_rate /
+        sys->i_frame_rate_base);
     int32_t phase_offset;
     MMAL_STATUS_T status;
 
@@ -1086,10 +1086,14 @@ static int find_display_num(const char * name)
 }
 
 static const struct vlc_display_operations ops = {
-    CloseMmalVout, vd_prepare, vd_display, vd_control, vd_reset_pictures, NULL,
+    .close = CloseMmalVout,
+    .prepare = vd_prepare,
+    .display = vd_display,
+    .control = vd_control,
+    .reset_pictures = vd_reset_pictures,
 };
 
-static int OpenMmalVout(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int OpenMmalVout(vout_display_t *vd,
                         video_format_t *fmtp, vlc_video_context *vctx)
 {
     vout_display_sys_t *sys;
@@ -1119,7 +1123,7 @@ static int OpenMmalVout(vout_display_t *vd, const vout_display_cfg_t *cfg,
     }
 
     if (sys->dec_dev == NULL)
-        sys->dec_dev = vlc_decoder_device_Create(VLC_OBJECT(vd), cfg->window);
+        sys->dec_dev = vlc_decoder_device_Create(VLC_OBJECT(vd), vd->cfg->window);
     if (sys->dec_dev == NULL || sys->dec_dev->type != VLC_DECODER_DEVICE_MMAL)
     {
         msg_Err(vd, "Missing decoder device");

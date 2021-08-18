@@ -20,6 +20,7 @@ check_PROGRAMS = \
 	test_libvlc_media_list \
 	test_libvlc_media_player \
 	test_libvlc_media_discoverer \
+	test_libvlc_meta \
 	test_libvlc_renderer_discoverer \
 	test_libvlc_slaves \
 	test_src_config_chain \
@@ -54,39 +55,24 @@ check_SCRIPTS = \
 	modules/lua/telnet.sh \
 	check_POTFILES.sh
 
-# Disabled test:
-# meta: No suitable test file
+# Disabled tests:
 EXTRA_PROGRAMS = \
-	test_libvlc_meta \
 	test_libvlc_media_list_player \
 	test_src_input_stream_net \
 	$(NULL)
 
-#check_DATA = samples/test.sample samples/meta.sample
 EXTRA_DIST = \
 	samples/certs/certkey.pem \
 	samples/empty.voc \
 	samples/image.jpg \
+	samples/meta.mp3 \
 	samples/subitems \
 	samples/slaves \
 	$(check_SCRIPTS)
 
-check_HEADERS = libvlc/test.h libvlc/libvlc_additions.h
+check_HEADERS = libvlc/test.h libvlc/libvlc_additions.h libvlc/media_utils.h
 
 TESTS = $(check_PROGRAMS) check_POTFILES.sh
-
-DISTCLEANFILES = samples/test.sample samples/meta.sample
-
-# Samples server
-SAMPLES_SERVER=http://streams.videolan.org/streams-videolan/reference
-
-samples/test.sample:
-	mkdir -p `dirname $@`
-	curl $(SAMPLES_SERVER)/avi/Hero-Div3.avi > $@
-
-samples/meta.sample:
-	mkdir -p `dirname $@`
-	curl $(SAMPLES_SERVER)/metadata/id3tag/Wesh-Bonneville.mp3 > $@
 
 AM_CFLAGS = -DSRCDIR=\"$(srcdir)\"
 AM_LDFLAGS = -no-install
@@ -112,7 +98,7 @@ test_libvlc_renderer_discoverer_LDADD = $(LIBVLC)
 test_libvlc_slaves_SOURCES = libvlc/slaves.c
 test_libvlc_slaves_LDADD = $(LIBVLCCORE) $(LIBVLC)
 test_libvlc_meta_SOURCES = libvlc/meta.c
-test_libvlc_meta_LDADD = $(LIBVLC)
+test_libvlc_meta_LDADD = $(LIBVLCCORE) $(LIBVLC)
 test_src_misc_variables_SOURCES = src/misc/variables.c
 test_src_misc_variables_LDADD = $(LIBVLCCORE) $(LIBVLC)
 test_src_config_chain_SOURCES = src/config/chain.c

@@ -30,6 +30,7 @@
 #include "preferences_widgets.hpp"
 #include "maininterface/main_interface.hpp"
 #include "util/color_scheme_model.hpp"
+#include "util/qvlcapp.hpp"
 #include "util/proxycolumnmodel.hpp"
 
 #include <vlc_config_cat.h>
@@ -153,53 +154,93 @@ static int getDefaultAudioVolume(const char *aout)
 #else
         return -1;
 #endif
-    else
+
     /* Note: For hysterical raisins, this is sorted by decreasing priority
      * order (then alphabetical order). */
     if (!strcmp(aout, "pulse"))
         return -1;
-    else
+
 #ifdef __linux__
     if (!strcmp(aout, "alsa") && module_exists("alsa"))
         return cbrtf(config_GetFloat("alsa-gain")) * 100.f + .5f;
-    else
 #endif
 #ifdef _WIN32
     if (!strcmp(aout, "mmdevice"))
         return config_GetFloat("mmdevice-volume") * 100.f + .5f;
-    else
 #endif
 #ifdef __APPLE__
     if (!strcmp(aout, "auhal") && module_exists("auhal"))
         return (config_GetFloat("auhal-volume") * 100.f + .5f)
                  / AOUT_VOLUME_DEFAULT;
-    else
 #endif
 #ifdef _WIN32
     if (!strcmp(aout, "directsound") && module_exists("directsound"))
         return config_GetFloat("directx-volume") * 100.f + .5f;
-    else
 #endif
+
     if (!strcmp(aout, "jack"))
         return cbrtf(config_GetFloat("jack-gain")) * 100.f + 0.5f;
-    else
+
 #ifdef __OS2__
     if (!strcmp(aout, "kai"))
         return cbrtf(config_GetFloat("kai-gain")) * 100.f + .5f;
-    else
 #endif
 #ifdef _WIN32
     if (!strcmp(aout, "waveout"))
         return config_GetFloat("waveout-volume") * 100.f + .5f;
-    else
 #endif
-        return -1;
+
+    return -1;
 }
+
+namespace
+{
+    void fillStylesCombo( QComboBox *stylesCombo, const QString &initialStyle)
+    {
+        stylesCombo->addItem( qtr("System's default") );
+        stylesCombo->addItems( QStyleFactory::keys() );
+        stylesCombo->setCurrentIndex( stylesCombo->findText( initialStyle ) );
+        stylesCombo->insertSeparator( 1 );
+        if ( stylesCombo->currentIndex() < 0 )
+            stylesCombo->setCurrentIndex( 0 ); /* default */
+    }
+
+    QString getQStyleKey(const QComboBox *stylesCombo, const QString &defaultStyleName)
+    {
+        vlc_assert( stylesCombo );
+        const int index = stylesCombo->currentIndex();
+        if (stylesCombo->currentIndex() == 0)
+            return defaultStyleName;
+        return QStyleFactory::keys().at( index - 2 );
+    }
+}
+
+class PropertyResetter
+{
+public:
+    PropertyResetter(QWidget *control, const char * property)
+        : m_control {control}
+        , m_property {property}
+        , m_initialValue {m_control->property(property)}
+    {
+    }
+
+    void reset()
+    {
+        bool success = m_control->setProperty(m_property.data(), m_initialValue);
+        vlc_assert(success);
+    }
+
+private:
+    QWidget *m_control;
+    const QByteArray m_property;
+    const QVariant m_initialValue;
+};
 
 /*********************************************************************
  * The List of categories
  *********************************************************************/
-SPrefsCatList::SPrefsCatList( intf_thread_t *_p_intf, QWidget *_parent ) :
+SPrefsCatList::SPrefsCatList( qt_intf_t *_p_intf, QWidget *_parent ) :
                                   QWidget( _parent ), p_intf( _p_intf )
 {
     QHBoxLayout *layout = new QHBoxLayout();
@@ -240,9 +281,9 @@ SPrefsCatList::SPrefsCatList( intf_thread_t *_p_intf, QWidget *_parent ) :
                   cone_audio_64, 1 );
     ADD_CATEGORY( SPrefsVideo, qtr("Video"), qtr("Video Settings"),
                   cone_video_64, 2 );
-    ADD_CATEGORY( SPrefsSubtitles, qtr(SUBPIC_TITLE), qtr("Subtitle & On Screen Display Settings"),
+    ADD_CATEGORY( SPrefsSubtitles, qfut(SUBPIC_TITLE), qtr("Subtitle & On Screen Display Settings"),
                   cone_subtitles_64, 3 );
-    ADD_CATEGORY( SPrefsInputAndCodecs, qtr(INPUT_TITLE), qtr("Input & Codecs Settings"),
+    ADD_CATEGORY( SPrefsInputAndCodecs, qfut(INPUT_TITLE), qtr("Input & Codecs Settings"),
                   cone_input_64, 4 );
     ADD_CATEGORY( SPrefsHotkeys, qtr("Hotkeys"), qtr("Configure Hotkeys"),
                   cone_hotkeys_64, 5 );
@@ -268,7 +309,7 @@ void SPrefsCatList::switchPanel( int i )
 /*********************************************************************
  * The Panels
  *********************************************************************/
-SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
+SPrefsPanel::SPrefsPanel( qt_intf_t *_p_intf, QWidget *_parent,
                           int _number ) : QWidget( _parent ), p_intf( _p_intf )
 {
     module_config_t *p_config;
@@ -281,8 +322,8 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             p_config =  config_FindConfig( option );                      \
             if( p_config )                                                \
             {                                                             \
-                control =  new type ## ConfigControl( VLC_OBJECT(p_intf), \
-                           p_config, label, ui.qcontrol, false );         \
+                control =  new type ## ConfigControl(                     \
+                           p_config, label, ui.qcontrol );                \
                 controls.append( control );                               \
             }                                                             \
             else {                                                        \
@@ -294,8 +335,8 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             p_config =  config_FindConfig( option );                      \
             if( p_config )                                                \
             {                                                             \
-                control =  new BoolConfigControl( VLC_OBJECT(p_intf),     \
-                           p_config, NULL, ui.qcontrol );          \
+                control =  new BoolConfigControl(                         \
+                           p_config, NULL, ui.qcontrol );                 \
                 controls.append( control );                               \
             }                                                             \
             else { ui.qcontrol->setEnabled( false ); }
@@ -305,8 +346,8 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             p_config =  config_FindConfig( option );                      \
             if( p_config )                                                \
             {                                                             \
-                control =  new type ## ConfigControl( VLC_OBJECT(p_intf), \
-                           p_config, label, qcontrol, false );            \
+                control =  new type ## ConfigControl(                     \
+                           p_config, label, qcontrol );                   \
                 controls.append( control );                               \
             }                                                             \
             else {                                                        \
@@ -320,7 +361,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             p_config =  config_FindConfig( option );                      \
             if( p_config )                                                \
             {                                                             \
-                control =  new type ## ConfigControl( VLC_OBJECT(p_intf), \
+                control =  new type ## ConfigControl(                     \
                            p_config, label, ui.qcontrol );                \
                 controls.append( control );                               \
             }
@@ -329,7 +370,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             p_config =  config_FindConfig( option );                      \
             if( p_config )                                                \
             {                                                             \
-                control =  new type ## ConfigControl( VLC_OBJECT(p_intf), \
+                control =  new type ## ConfigControl(                     \
                            p_config, label, qcontrol, qbutton );          \
                 controls.append( control );                               \
             }
@@ -368,7 +409,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
         /******************************
          * VIDEO Panel Implementation *
          ******************************/
-        START_SPREFS_CAT( Video , qtr("Video Settings") );
+        START_SPREFS_CAT( Video, qtr("Video Settings") );
             CONFIG_BOOL( "video", enableVideo );
             ui.videoZone->setEnabled( ui.enableVideo->isChecked() );
             CONNECT( ui.enableVideo, toggled( bool ),
@@ -388,7 +429,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                 ui.fullscreenScreenBox->addItem( screen->name(), i_screenCount );
                 i_screenCount++;
             }
-            p_config =  config_FindConfig( "qt-fullscreen-screennumber" );
+            p_config = config_FindConfig( "qt-fullscreen-screennumber" );
             if( p_config )
             {
                 int i_defaultScreen = p_config->value.i + 1;
@@ -423,7 +464,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                             snapshotsSequentialNumbering );
             CONFIG_GENERIC( "snapshot-format", StringList, ui.arLabel,
                             snapshotsFormat );
-         END_SPREFS_CAT;
+        END_SPREFS_CAT;
 
         /******************************
          * AUDIO Panel Implementation *
@@ -616,7 +657,9 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
 
         END_SPREFS_CAT;
 
-        /* Input and Codecs Panel Implementation */
+        /*****************************************
+         * INPUT AND CODECS Panel Implementation *
+         *****************************************/
         START_SPREFS_CAT( InputAndCodecs, qtr("Input & Codecs Settings") );
 
             /* Disk Devices */
@@ -659,8 +702,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             CONFIG_GENERIC( "avi-index", IntegerList, ui.aviLabel, AviRepair );
 
             /* live555 module prefs */
-            CONFIG_BOOL( "rtsp-tcp",
-                                live555TransportRTSP_TCPRadio );
+            CONFIG_BOOL( "rtsp-tcp", live555TransportRTSP_TCPRadio );
             if ( !module_exists( "live555" ) )
             {
                 ui.live555TransportRTSP_TCPRadio->hide();
@@ -681,7 +723,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             /* Caching */
             /* Add the things to the ComboBox */
             #define addToCachingBox( str, cachingNumber ) \
-                ui.cachingCombo->addItem( qtr(str), QVariant( cachingNumber ) );
+                ui.cachingCombo->addItem( qfut(str), QVariant( cachingNumber ) );
             addToCachingBox( N_("Custom"), CachingCustom );
             addToCachingBox( N_("Lowest latency"), CachingLowest );
             addToCachingBox( N_("Low latency"), CachingLow );
@@ -702,13 +744,14 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             TestCaC( "live-caching", 1 );
             if( b_cache_equal == 1 )
                 ui.cachingCombo->setCurrentIndex(
-                ui.cachingCombo->findData( QVariant( i_cache ) ) );
+                    ui.cachingCombo->findData( QVariant( i_cache ) ) );
 #undef TestCaC
 
         END_SPREFS_CAT;
-        /*******************
-         * Interface Panel *
-         *******************/
+
+        /**********************************
+         * INTERFACE Panel Implementation *
+         **********************************/
         START_SPREFS_CAT( Interface, qtr("Interface Settings") );
 
 #ifndef _WIN32
@@ -737,7 +780,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             ui.skinsLabel->setText(
                     qtr( "This is VLC's skinnable interface. You can download other skins at" )
                     + QString( " <a href=\"http://www.videolan.org/vlc/skins.php\">" )
-                    + qtr( "VLC skins website" )+ QString( "</a>." ) );
+                    + qtr( "VLC skins website" ) + QString( "</a>." ) );
             ui.skinsLabel->setFont( italicFont );
 
 #ifdef _WIN32
@@ -761,15 +804,10 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             optionWidgets["skinRB"] = ui.skins;
             optionWidgets["qtRB"] = ui.qt;
 #if !defined( _WIN32)
-            ui.stylesCombo->addItem( qtr("System's default") );
-            ui.stylesCombo->addItems( QStyleFactory::keys() );
-            ui.stylesCombo->setCurrentIndex( ui.stylesCombo->findText(
-                        getSettings()->value( "MainWindow/QtStyle", "" ).toString() ) );
-            ui.stylesCombo->insertSeparator( 1 );
-            if ( ui.stylesCombo->currentIndex() < 0 )
-                ui.stylesCombo->setCurrentIndex( 0 ); /* default */
+            fillStylesCombo( ui.stylesCombo, getSettings()->value( "MainWindow/QtStyle", "" ).toString() );
+            m_resetters.push_back( std::make_unique<PropertyResetter>( ui.stylesCombo, "currentIndex" ) );
 
-            CONNECT( ui.stylesCombo, currentIndexChanged( QString ), this, changeStyle( QString ) );
+            CONNECT( ui.stylesCombo, currentIndexChanged( int ), this, changeStyle( ) );
             optionWidgets["styleCB"] = ui.stylesCombo;
 #else
             ui.stylesCombo->hide();
@@ -810,11 +848,15 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             CONFIG_BOOL( "metadata-network-access", MetadataNetworkAccessMode );
             CONFIG_BOOL( "qt-menubar", menuBarCheck );
 
-            ui.pinVideoControlsCheckbox->setChecked( p_intf->p_sys->p_mi->pinVideoControls() );
-            QObject::connect( ui.pinVideoControlsCheckbox, &QCheckBox::stateChanged, p_intf->p_sys->p_mi, &MainInterface::setPinVideoControls );
+            ui.pinVideoControlsCheckbox->setChecked( p_intf->p_mi->pinVideoControls() );
+            m_resetters.push_back(std::make_unique<PropertyResetter>(ui.pinVideoControlsCheckbox, "checked"));
+            QObject::connect( ui.pinVideoControlsCheckbox, &QCheckBox::stateChanged, p_intf->p_mi, &MainInterface::setPinVideoControls );
 
-            ui.colorSchemeComboBox->insertItems(0, p_intf->p_sys->p_mi->getColorScheme()->stringList());
-            QObject::connect( ui.colorSchemeComboBox, &QComboBox::currentTextChanged, p_intf->p_sys->p_mi->getColorScheme(), &ColorSchemeModel::setCurrent );
+            ui.colorSchemeComboBox->setModel( p_intf->p_mi->getColorScheme() );
+            ui.colorSchemeComboBox->setCurrentText( p_intf->p_mi->getColorScheme()->currentText() );
+            m_resetters.push_back(std::make_unique<PropertyResetter>( ui.colorSchemeComboBox, "currentIndex" ));
+            QObject::connect( ui.colorSchemeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged)
+                              , p_intf->p_mi->getColorScheme(), &ColorSchemeModel::setCurrentIndex );
 
             const float intfScaleFloatFactor = 100.f;
             const auto updateIntfUserScaleFactorFromControls =
@@ -830,21 +872,23 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                     QSignalBlocker s( spinBox );
                     spinBox->setValue( value );
                 }
-                p_intf->p_sys->p_mi->setIntfUserScaleFactor( value / intfScaleFloatFactor );
+                p_intf->p_mi->setIntfUserScaleFactor( value / intfScaleFloatFactor );
             };
 
-            ui.intfScaleFactorSlider->setRange( p_intf->p_sys->p_mi->getMinIntfUserScaleFactor() * intfScaleFloatFactor
-                                                 , p_intf->p_sys->p_mi->getMaxIntfUserScaleFactor() * intfScaleFloatFactor);
-            ui.intfScaleFactorSpinBox->setRange( p_intf->p_sys->p_mi->getMinIntfUserScaleFactor() * intfScaleFloatFactor
-                                                 , p_intf->p_sys->p_mi->getMaxIntfUserScaleFactor() * intfScaleFloatFactor);
+            ui.intfScaleFactorSlider->setRange( p_intf->p_mi->getMinIntfUserScaleFactor() * intfScaleFloatFactor
+                                                 , p_intf->p_mi->getMaxIntfUserScaleFactor() * intfScaleFloatFactor);
+            ui.intfScaleFactorSpinBox->setRange( p_intf->p_mi->getMinIntfUserScaleFactor() * intfScaleFloatFactor
+                                                 , p_intf->p_mi->getMaxIntfUserScaleFactor() * intfScaleFloatFactor);
 
-            updateIntfUserScaleFactorFromControls( p_intf->p_sys->p_mi->getIntfUserScaleFactor() * intfScaleFloatFactor );
+            updateIntfUserScaleFactorFromControls( p_intf->p_mi->getIntfUserScaleFactor() * intfScaleFloatFactor );
+            m_resetters.push_back( std::make_unique<PropertyResetter>( ui.intfScaleFactorSlider, "value" ) );
+
             QObject::connect( ui.intfScaleFactorSlider, QOverload<int>::of(&QSlider::valueChanged)
-                              , p_intf->p_sys->p_mi , updateIntfUserScaleFactorFromControls );
+                              , p_intf->p_mi , updateIntfUserScaleFactorFromControls );
             QObject::connect( ui.intfScaleFactorSpinBox, QOverload<int>::of(&QSpinBox::valueChanged)
-                              , p_intf->p_sys->p_mi , updateIntfUserScaleFactorFromControls );
+                              , p_intf->p_mi , updateIntfUserScaleFactorFromControls );
 
-#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+#if QT_CLIENT_SIDE_DECORATION_AVAILABLE
             CONFIG_BOOL( "qt-titlebar", titleBarCheckBox );
 #else
             ui.titleBarCheckBox->hide();
@@ -871,8 +915,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             {
                 CONFIG_BOOL( "one-instance", OneInterfaceMode );
                 CONFIG_BOOL( "playlist-enqueue", EnqueueOneInterfaceMode );
-                ui.EnqueueOneInterfaceMode->setEnabled(
-                                                       ui.OneInterfaceMode->isChecked() );
+                ui.EnqueueOneInterfaceMode->setEnabled( ui.OneInterfaceMode->isChecked() );
                 CONNECT( ui.OneInterfaceMode, toggled( bool ),
                          ui.EnqueueOneInterfaceMode, setEnabled( bool ) );
                 CONFIG_BOOL( "one-instance-when-started-from-file", oneInstanceFromFile );
@@ -883,13 +926,16 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
                      ui.recentlyPlayedFilters, setEnabled( bool ) );
             ui.recentlyPlayedFilters->setEnabled( false );
             CONFIG_BOOL( "qt-recentplay", saveRecentlyPlayed );
-            CONFIG_GENERIC( "qt-continue", IntegerList, ui.continuePlaybackLabel, continuePlaybackComboBox );
+            CONFIG_GENERIC( "restore-playback-pos", IntegerList, ui.continuePlaybackLabel, continuePlaybackComboBox );
             CONFIG_GENERIC( "qt-recentplay-filter", String, ui.filterLabel,
                     recentlyPlayedFilters );
             CONFIG_GENERIC( "qt-auto-raise", IntegerList, ui.autoRaiseLabel, autoRaiseComboBox );
 
         END_SPREFS_CAT;
 
+        /**********************************
+         * SUBTITLES Panel Implementation *
+         **********************************/
         START_SPREFS_CAT( Subtitles,
                             qtr("Subtitle & On Screen Display Settings") );
             CONFIG_BOOL( "osd", OSDBox);
@@ -930,38 +976,31 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             CONFIG_GENERIC_NO_BOOL( "secondary-sub-margin", Integer, ui.secondarySubsPosLabel, secondarySubsPosition );
         END_SPREFS_CAT;
 
+        /********************************
+         * HOTKEYS Panel Implementation *
+         ********************************/
         case SPrefsHotkeys:
         {
-            p_config = config_FindConfig( "key-play" );
-
             QGridLayout *gLayout = new QGridLayout;
             panel->setLayout( gLayout );
             int line = 0;
 
             panel_label->setText( qtr( "Configure Hotkeys" ) );
-            control = new KeySelectorControl( VLC_OBJECT(p_intf), p_config, this );
+            control = new KeySelectorControl( this );
             control->insertIntoExistingGrid( gLayout, line );
             controls.append( control );
 
             line++;
 
-            QFrame *sepline = new QFrame;
-            sepline->setFrameStyle(QFrame::HLine | QFrame::Sunken);
-            gLayout->addWidget( sepline, line, 0, 1, -1 );
-
-            line++;
-
             p_config = config_FindConfig( "hotkeys-y-wheel-mode" );
-            control = new IntegerListConfigControl( VLC_OBJECT(p_intf),
-                    p_config, this, false );
+            control = new IntegerListConfigControl( p_config, this );
             control->insertIntoExistingGrid( gLayout, line );
             controls.append( control );
 
             line++;
 
             p_config = config_FindConfig( "hotkeys-x-wheel-mode" );
-            control = new IntegerListConfigControl( VLC_OBJECT(p_intf),
-                    p_config, this, false );
+            control = new IntegerListConfigControl( p_config, this );
             control->insertIntoExistingGrid( gLayout, line );
             controls.append( control );
 
@@ -969,39 +1008,39 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
             line++;
 
             p_config = config_FindConfig( "qt-disable-volume-keys" );
-            control = new BoolConfigControl( VLC_OBJECT(p_intf), p_config, this );
+            control = new BoolConfigControl( p_config, this );
             control->insertIntoExistingGrid( gLayout, line );
             controls.append( control );
 #endif
             break;
         }
 
-            START_SPREFS_CAT( MediaLibrary , qtr("Media Library Settings") );
+        /**************************************
+         * MEDIA LIBRARY Panel Implementation *
+         **************************************/
+        START_SPREFS_CAT( MediaLibrary , qtr("Media Library Settings") );
 
-                if ( vlc_ml_instance_get( p_intf ) != NULL )
-                {
-                    mlFoldersModel = new ProxyColumnModel<MLFoldersModel>(1, {{0, qtr("Path")}, {1, qtr("Remove")}}, this );
-                    mlFoldersModel->setMl( vlc_ml_instance_get( p_intf ) );
-                    ui.entryPoints->setModel( mlFoldersModel );
-                    connect( mlFoldersModel , &QAbstractItemModel::modelReset , this, [this, view = ui.entryPoints]() { MLdrawControls( view ); } );
+            if ( vlc_ml_instance_get( p_intf ) != NULL )
+            {
+                auto foldersModel = new MLFoldersModel( this );
+                foldersModel->setMl( vlc_ml_instance_get( p_intf ) );
+                ui.entryPoints->setMLFoldersModel( foldersModel );
+                mlFoldersEditor = ui.entryPoints;
 
-                    mlBannedFoldersModel = new ProxyColumnModel<MLBannedFoldersModel>(1, {{0, qtr("Path")}, {1, qtr("Remove")}}, this );
-                    mlBannedFoldersModel->setMl( vlc_ml_instance_get( p_intf ));
-                    ui.bannedEntryPoints->setModel( mlBannedFoldersModel );
-                    connect( mlBannedFoldersModel , &QAbstractItemModel::modelReset , this, [this, view = ui.bannedEntryPoints]() { MLdrawControls( view ); } );
+                auto bannedFoldersModel = new MLBannedFoldersModel( this );
+                bannedFoldersModel->setMl( vlc_ml_instance_get( p_intf ));
+                ui.bannedEntryPoints->setMLFoldersModel( bannedFoldersModel );
+                mlBannedFoldersEditor = ui.bannedEntryPoints;
 
-                    BUTTONACT( ui.addButton , MLaddNewFolder() );
-                    BUTTONACT( ui.banButton , MLBanFolder() );
+                BUTTONACT( ui.addButton , MLaddNewFolder() );
+                BUTTONACT( ui.banButton , MLBanFolder() );
+            }
+            else
+            {
+                ui.mlGroupBox->hide( );
+            }
 
-                    MLdrawControls( ui.entryPoints );
-                    MLdrawControls( ui.bannedEntryPoints );
-                }
-                else
-                {
-                    ui.mlGroupBox->hide( );
-                }
-
-            END_SPREFS_CAT;
+        END_SPREFS_CAT;
     }
 
     panel_layout->addWidget( panel_label );
@@ -1025,7 +1064,7 @@ SPrefsPanel::SPrefsPanel( intf_thread_t *_p_intf, QWidget *_parent,
 }
 
 
-void SPrefsPanel::updateAudioOptions( int number)
+void SPrefsPanel::updateAudioOptions( int number )
 {
     QString value = qobject_cast<QComboBox *>(optionWidgets["audioOutCoB"])
                                             ->itemData( number ).toString();
@@ -1082,6 +1121,9 @@ void SPrefsPanel::updateAudioOptions( int number)
 
 SPrefsPanel::~SPrefsPanel()
 {
+    if (!m_isApplied)
+        clean();
+
     qDeleteAll( controls ); controls.clear();
     free( lang );
 }
@@ -1096,6 +1138,8 @@ void SPrefsPanel::updateAudioVolume( int volume )
 /* Function called from the main Preferences dialog on each SPrefs Panel */
 void SPrefsPanel::apply()
 {
+    m_isApplied = true;
+
     /* Generic save for ever panel */
     QList<ConfigControl *>::const_iterator i;
     for( i = controls.begin() ; i != controls.end() ; ++i )
@@ -1141,9 +1185,8 @@ void SPrefsPanel::apply()
         else
         //if( qobject_cast<QRadioButton *>(optionWidgets[qtRB])->isChecked() )
             config_PutPsz( "intf", "" );
-        if( qobject_cast<QComboBox *>(optionWidgets["styleCB"]) )
-            getSettings()->setValue( "MainWindow/QtStyle",
-                qobject_cast<QComboBox *>(optionWidgets["styleCB"])->currentText() );
+        if( auto stylesCombo = qobject_cast<QComboBox *>(optionWidgets["styleCB"]) )
+            getSettings()->setValue( "MainWindow/QtStyle", getQStyleKey(  stylesCombo , "" ) );
 #ifdef _WIN32
     saveLang();
 #endif
@@ -1227,13 +1270,22 @@ void SPrefsPanel::apply()
         else if (!b_checked ) {
             config_PutInt( "freetype-background-opacity", 0 );
         }
+        break;
+    }
 
+    case SPrefsMediaLibrary:
+    {
+        mlFoldersEditor->commit();
+        mlBannedFoldersEditor->commit();
     }
     }
 }
 
 void SPrefsPanel::clean()
-{}
+{
+    for ( auto &resetter : m_resetters )
+        resetter->reset();
+}
 
 void SPrefsPanel::lastfm_Changed( int i_state )
 {
@@ -1243,9 +1295,10 @@ void SPrefsPanel::lastfm_Changed( int i_state )
         config_RemoveIntf( "audioscrobbler" );
 }
 
-void SPrefsPanel::changeStyle( QString s_style )
+void SPrefsPanel::changeStyle()
 {
-    QApplication::setStyle( s_style );
+    QApplication::setStyle( getQStyleKey( qobject_cast<QComboBox *>( optionWidgets["styleCB"] )
+                                          , p_intf->p_app->defaultStyle() ) );
 
     /* force refresh on all widgets */
     QWidgetList widgets = QApplication::allWidgets();
@@ -1564,59 +1617,17 @@ void SPrefsPanel::saveAsso()
 #endif /* _WIN32 */
 
 void SPrefsPanel::MLaddNewFolder() {
-    QUrl newEntryPoints = QFileDialog::getExistingDirectoryUrl( this , qtr("Please choose an entry point folder") ,
+    QUrl newEntryPoint = QFileDialog::getExistingDirectoryUrl( this , qtr("Please choose an entry point folder") ,
                                              QUrl( QDir::homePath( ) ) );
 
-    if(! newEntryPoints.isEmpty() )
-        mlFoldersModel->add( newEntryPoints );
+    if(! newEntryPoint.isEmpty() )
+        mlFoldersEditor->add( newEntryPoint );
 }
 
 void SPrefsPanel::MLBanFolder( ) {
-    QUrl newEntryPoints = QFileDialog::getExistingDirectoryUrl( this , qtr("Please choose an entry point folder") ,
+    QUrl newEntryPoint = QFileDialog::getExistingDirectoryUrl( this , qtr("Please choose an entry point folder") ,
                                              QUrl( QDir::homePath( ) ) );
 
-    if(! newEntryPoints.isEmpty() )
-        mlBannedFoldersModel->add( newEntryPoints );
-}
-
-QWidget *SPrefsPanel::MLgenerateWidget( QModelIndex index , MLFoldersBaseModel *mlf , QWidget *parent){
-    if ( index.column( ) == 1 ){
-        QWidget *wid = new QWidget( parent );
-
-        QBoxLayout* layout = new QBoxLayout( QBoxLayout::LeftToRight , wid );
-
-        QPushButton *pb = new QPushButton( "-" , wid );
-        pb->setFixedSize( 16 , 16 );
-
-        layout->addWidget( pb , Qt::AlignCenter );
-        wid->setLayout( layout );
-
-
-        connect( pb , &QPushButton::clicked , [=]() {
-            mlf->removeAt(index.row());
-        } );
-
-        return wid;
-    }
-
-    return nullptr;
-}
-
-void SPrefsPanel::MLdrawControls(QTableView *mlTableView) {
-    const auto model = mlTableView->model();
-    for ( int col = 0 ; col < model->columnCount( model->index(0, 0) ) ; col++ )
-    {
-        for (int row = 0 ; row < model->rowCount() ; row++ )
-        {
-            QModelIndex index = model->index ( row , col );
-            mlTableView->setIndexWidget( index, MLgenerateWidget ( index, qobject_cast<MLFoldersBaseModel *>(model),
-                                       mlTableView ) );
-        }
-    }
-
-  mlTableView->resizeColumnsToContents( );
-  mlTableView->horizontalHeader()->setMinimumSectionSize( 100 );
-  mlTableView->horizontalHeader()->setSectionResizeMode( 0 , QHeaderView::Stretch );
-
-  mlTableView->horizontalHeader()->setFixedHeight( 24 );
+    if(! newEntryPoint.isEmpty() )
+        mlBannedFoldersEditor->add( newEntryPoint );
 }

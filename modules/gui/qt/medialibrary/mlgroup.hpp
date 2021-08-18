@@ -26,22 +26,15 @@
 #endif
 
 // MediaLibrary includes
-#include "mlqmltypes.hpp"
+#include "mlitemcover.hpp"
 
-// Qt includes
-#include <QObject>
-
-class MLGroup : public QObject, public MLItem
+class MLGroup : public MLItemCover
 {
-    Q_OBJECT
-
 public:
-    MLGroup(vlc_medialibrary_t * ml, const vlc_ml_group_t * data, QObject * parent = nullptr);
+    MLGroup(vlc_medialibrary_t * ml, const vlc_ml_group_t * data);
 
 public: // Interface
     QString getName() const;
-
-    QString getThumbnail();
 
     int64_t getDuration() const;
 

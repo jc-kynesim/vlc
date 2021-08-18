@@ -67,7 +67,7 @@
 
 typedef enum { drvSuccess, drvTryNext, drvFail } deviceRval;
 
-struct vout_display_sys_t {
+typedef struct vout_display_sys_t {
 /*
  * buffer information
  */
@@ -99,7 +99,7 @@ struct vout_display_sys_t {
  * other generic stuff
  */
     int             drm_fd;
-};
+} vout_display_sys_t;
 
 static void DestroyFB(vout_display_sys_t const *sys, uint32_t const buf)
 {
@@ -667,13 +667,16 @@ static void Close(vout_display_t *vd)
 }
 
 static const struct vlc_display_operations ops = {
-    Close, Prepare, Display, Control, NULL, NULL,
+    .close = Close,
+    .prepare = Prepare,
+    .display = Display,
+    .control = Control,
 };
 
 /**
  * This function allocates and initializes a KMS vout method.
  */
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
 {
     vout_display_sys_t *sys;
@@ -682,7 +685,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     video_format_t fmt = {};
     char *chroma;
 
-    if (vout_display_cfg_IsWindowed(cfg))
+    if (vout_display_cfg_IsWindowed(vd->cfg))
         return VLC_EGENERIC;
 
     /*
@@ -756,10 +759,8 @@ vlc_module_begin ()
     set_subcategory(SUBCAT_VIDEO_VOUT)
     add_loadfile(KMS_VAR, "/dev/dri/card0", DEVICE_TEXT, DEVICE_LONGTEXT)
 
-    add_string( "kms-vlc-chroma", NULL, VLC_CHROMA_TEXT, VLC_CHROMA_LONGTEXT,
-                true)
-    add_string( "kms-drm-chroma", NULL, DRM_CHROMA_TEXT, DRM_CHROMA_LONGTEXT,
-                true)
+    add_string( "kms-vlc-chroma", NULL, VLC_CHROMA_TEXT, VLC_CHROMA_LONGTEXT)
+    add_string( "kms-drm-chroma", NULL, DRM_CHROMA_TEXT, DRM_CHROMA_LONGTEXT)
     set_description("Linux kernel mode setting video output")
     set_callback_display(Open, 30)
 vlc_module_end ()

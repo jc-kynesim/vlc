@@ -46,7 +46,7 @@ vlc_module_begin()
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
 
-    add_integer("gpu-affinity", -1, HW_GPU_AFFINITY_TEXT, HW_GPU_AFFINITY_TEXT, true)
+    add_integer("gpu-affinity", -1, HW_GPU_AFFINITY_TEXT, NULL)
 
     set_capability("opengl", 50)
     set_callback(Open)
@@ -57,7 +57,7 @@ vlc_module_end()
  * Local prototypes.
  *****************************************************************************/
 
-struct vout_display_sys_t
+typedef struct vout_display_sys_t
 {
     HWND                  hvideownd;
     HDC                   hGLDC;
@@ -71,7 +71,7 @@ struct vout_display_sys_t
         PFNWGLGETEXTENSIONSSTRINGEXTPROC GetExtensionsStringEXT;
         PFNWGLGETEXTENSIONSSTRINGARBPROC GetExtensionsStringARB;
     } exts;
-};
+} vout_display_sys_t;
 
 static void          Swap(vlc_gl_t *);
 static void          *OurGetProcAddress(vlc_gl_t *, const char *);

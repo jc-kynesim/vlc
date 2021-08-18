@@ -196,7 +196,8 @@ typedef enum libvlc_media_parsed_status_t
 typedef enum libvlc_media_slave_type_t
 {
     libvlc_media_slave_type_subtitle,
-    libvlc_media_slave_type_audio,
+    libvlc_media_slave_type_generic,
+    libvlc_media_slave_type_audio = libvlc_media_slave_type_generic,
 } libvlc_media_slave_type_t;
 
 /**
@@ -430,8 +431,7 @@ LIBVLC_API void libvlc_media_retain( libvlc_media_t *p_md );
 /**
  * Decrement the reference count of a media descriptor object. If the
  * reference count is 0, then libvlc_media_release() will release the
- * media descriptor object. It will send out an libvlc_MediaFreed event
- * to all listeners. If the media descriptor object has been released it
+ * media descriptor object. If the media descriptor object has been released it
  * should not be used again.
  *
  * \param p_md the media descriptor
@@ -511,8 +511,8 @@ LIBVLC_API libvlc_state_t libvlc_media_get_state(
 
 /**
  * Get the current statistics about the media
- * \param p_md: media descriptor object
- * \param p_stats: structure that contain the statistics about the media
+ * \param p_md media descriptor object
+ * \param p_stats structure that contain the statistics about the media
  *                 (this structure must be allocated by the caller)
  * \retval true statistics are available
  * \retval false otherwise
@@ -713,7 +713,7 @@ typedef enum libvlc_thumbnailer_seek_speed_t
 } libvlc_thumbnailer_seek_speed_t;
 
 /**
- * \brief libvlc_media_get_thumbnail_by_time Start an asynchronous thumbnail generation
+ * \brief libvlc_media_request_thumbnail_by_time Start an asynchronous thumbnail generation
  *
  * If the request is successfuly queued, the libvlc_MediaThumbnailGenerated
  * is guaranteed to be emited.
@@ -750,7 +750,7 @@ libvlc_media_thumbnail_request_by_time( libvlc_media_t *md,
                                         libvlc_time_t timeout );
 
 /**
- * \brief libvlc_media_get_thumbnail_by_pos Start an asynchronous thumbnail generation
+ * \brief libvlc_media_request_thumbnail_by_pos Start an asynchronous thumbnail generation
  *
  * If the request is successfuly queued, the libvlc_MediaThumbnailGenerated
  * is guaranteed to be emited.

@@ -44,7 +44,6 @@
  */
 
 typedef struct vout_display_t vout_display_t;
-typedef struct vout_display_sys_t vout_display_sys_t;
 typedef struct vout_display_owner_t vout_display_owner_t;
 
 /**
@@ -216,7 +215,6 @@ struct vout_display_owner_t {
  * @return VLC_SUCCESS or a VLC error code
  */
 typedef int (*vout_display_open_cb)(vout_display_t *vd,
-                                    const vout_display_cfg_t *cfg,
                                     video_format_t *fmtp,
                                     vlc_video_context *context);
 
@@ -365,7 +363,7 @@ struct vout_display_t {
      *
      * A module is free to use it as it wishes.
      */
-    vout_display_sys_t *sys;
+    void *sys;
 
     /**
      * Callbacks the display module must set on Open.
@@ -419,7 +417,6 @@ static inline void vout_display_Display(vout_display_t *vd, picture_t *picture)
 {
     if (vd->ops->display != NULL)
         vd->ops->display(vd, picture);
-    picture_Release(picture);
 }
 
 VLC_API
@@ -432,10 +429,6 @@ static inline void vout_display_SendEventMousePressed(vout_display_t *vd, int bu
 static inline void vout_display_SendEventMouseReleased(vout_display_t *vd, int button)
 {
     vout_window_ReportMouseReleased(vd->cfg->window, button);
-}
-static inline void vout_display_SendEventMouseDoubleClick(vout_display_t *vd)
-{
-    vout_window_ReportMouseDoubleClick(vd->cfg->window, MOUSE_BUTTON_LEFT);
 }
 static inline void vout_display_SendEventViewpointMoved(vout_display_t *vd,
                                                         const vlc_viewpoint_t *vp)

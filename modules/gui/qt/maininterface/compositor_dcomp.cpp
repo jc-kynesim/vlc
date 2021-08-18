@@ -29,6 +29,7 @@
 #include <QApplication>
 #include <QDesktopWidget>
 #include <QQuickWidget>
+#include <QLibrary>
 
 #include <QOpenGLFunctions>
 #include <QOpenGLFramebufferObject>
@@ -101,6 +102,7 @@ void CompositorDirectComposition::window_destroy(struct vout_window_t * p_wnd)
     msg_Dbg(that->m_intf, "window_destroy");
     that->m_window = nullptr;
     that->m_videoVisual.Reset();
+    that->onWindowDestruction(p_wnd);
 }
 
 void CompositorDirectComposition::window_set_state(struct vout_window_t * p_wnd, unsigned state)
@@ -124,7 +126,7 @@ void CompositorDirectComposition::window_set_fullscreen(struct vout_window_t * p
     that->m_videoWindowHandler->requestVideoFullScreen(id);
 }
 
-CompositorDirectComposition::CompositorDirectComposition( intf_thread_t* p_intf,  QObject *parent)
+CompositorDirectComposition::CompositorDirectComposition( qt_intf_t* p_intf,  QObject *parent)
     : QObject(parent)
     , m_intf(p_intf)
 {
@@ -137,6 +139,98 @@ CompositorDirectComposition::~CompositorDirectComposition()
     m_d3d11Device.Reset();
     if (m_dcomp_dll)
         FreeLibrary(m_dcomp_dll);
+}
+
+bool CompositorDirectComposition::preInit(qt_intf_t * p_intf)
+{
+    //import DirectComposition API (WIN8+)
+    QLibrary dcompDll("DCOMP.dll");
+    if (!dcompDll.load())
+        return false;
+    DCompositionCreateDeviceFun myDCompositionCreateDevice = (DCompositionCreateDeviceFun)dcompDll.resolve("DCompositionCreateDevice");
+    if (!myDCompositionCreateDevice)
+    {
+        msg_Dbg(p_intf, "Direct Composition is not present, can't initialize direct composition");
+        return false;
+    }
+
+    //check whether D3DCompiler is available. whitout it Angle won't work
+    QLibrary d3dCompilerDll;
+    for (int i = 47; i > 41; --i)
+    {
+        d3dCompilerDll.setFileName(QString("D3DCOMPILER_%1.dll").arg(i));
+        if (d3dCompilerDll.load())
+            break;
+    }
+    if (!d3dCompilerDll.isLoaded())
+    {
+        msg_Dbg(p_intf, "can't find d3dcompiler_xx.dll, can't initialize direct composition");
+        return false;
+    }
+
+    HRESULT hr;
+    UINT creationFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT
+        //| D3D11_CREATE_DEVICE_DEBUG
+            ;
+
+    D3D_FEATURE_LEVEL requestedFeatureLevels[] = {
+        D3D_FEATURE_LEVEL_11_1,
+        D3D_FEATURE_LEVEL_11_0,
+    };
+
+    ComPtr<ID3D11Device> d3dDevice;
+    hr = D3D11CreateDevice(
+        nullptr,    // Adapter
+        D3D_DRIVER_TYPE_HARDWARE,
+        nullptr,    // Module
+        creationFlags,
+        requestedFeatureLevels,
+        ARRAY_SIZE(requestedFeatureLevels),
+        D3D11_SDK_VERSION,
+        d3dDevice.GetAddressOf(),
+        nullptr,    // Actual feature level
+        nullptr);
+
+    if (FAILED(hr))
+    {
+        msg_Dbg(p_intf, "can't create D3D11 device, can't initialize direct composition");
+        return false;
+    }
+
+    //check that we can create a shared texture
+    D3D11_FEATURE_DATA_D3D11_OPTIONS d3d11Options;
+    HRESULT checkFeatureHR = d3dDevice->CheckFeatureSupport(D3D11_FEATURE_D3D11_OPTIONS, &d3d11Options, sizeof(d3d11Options));
+
+    D3D11_TEXTURE2D_DESC texDesc = { };
+    texDesc.MipLevels = 1;
+    texDesc.SampleDesc.Count = 1;
+    texDesc.MiscFlags = 0;
+    texDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    texDesc.Usage = D3D11_USAGE_DEFAULT;
+    texDesc.CPUAccessFlags = 0;
+    texDesc.ArraySize = 1;
+    texDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texDesc.Height = 16;
+    texDesc.Width  = 16;
+    if (SUCCEEDED(checkFeatureHR) && d3d11Options.ExtendedResourceSharing) //D3D11.1 feature
+        texDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED | D3D11_RESOURCE_MISC_SHARED_NTHANDLE;
+    else
+        texDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+
+    ComPtr<ID3D11Texture2D> d3dTmpTexture;
+    hr = d3dDevice->CreateTexture2D( &texDesc, NULL, &d3dTmpTexture );
+    if (FAILED(hr))
+    {
+        msg_Dbg(p_intf, "can't create shared texture, can't initialize direct composition");
+        return false;
+    }
+
+    //sanity check succeeded, we can now setup global Qt settings
+
+    //force usage of ANGLE backend
+    QApplication::setAttribute( Qt::AA_UseOpenGLES );
+
+    return true;
 }
 
 bool CompositorDirectComposition::init()
@@ -186,8 +280,6 @@ bool CompositorDirectComposition::init()
     if (FAILED(hr))
         return false;
 
-    QApplication::setAttribute( Qt::AA_UseOpenGLES ); //force usage of ANGLE backend
-
     return true;
 }
 
@@ -196,28 +288,25 @@ MainInterface* CompositorDirectComposition::makeMainInterface()
     try
     {
         bool ret;
-        m_rootWindow = new MainInterfaceWin32(m_intf);
-        m_rootWindow->setAttribute(Qt::WA_NativeWindow);
-        m_rootWindow->setAttribute(Qt::WA_DontCreateNativeAncestors);
-        m_rootWindow->setAttribute(Qt::WA_TranslucentBackground);
+        m_mainInterface = new MainInterfaceWin32(m_intf);
 
-        m_rootWindow->winId();
+        m_rootWindow = new QWindow();
         m_rootWindow->show();
 
-        WinTaskbarWidget* taskbarWidget = new WinTaskbarWidget(m_intf, m_rootWindow->windowHandle(), this);
-        qApp->installNativeEventFilter(taskbarWidget);
+        m_taskbarWidget = std::make_unique<WinTaskbarWidget>(m_intf, m_rootWindow);
+        qApp->installNativeEventFilter(m_taskbarWidget.get());
 
-        m_videoWindowHandler = std::make_unique<VideoWindowHandler>(m_intf, m_rootWindow);
-        m_videoWindowHandler->setWindow( m_rootWindow->windowHandle() );
+        m_videoWindowHandler = std::make_unique<VideoWindowHandler>(m_intf);
+        m_videoWindowHandler->setWindow( m_rootWindow );
 
-        HR(m_dcompDevice->CreateTargetForHwnd((HWND)m_rootWindow->windowHandle()->winId(), TRUE, &m_dcompTarget), "create target");
+        HR(m_dcompDevice->CreateTargetForHwnd((HWND)m_rootWindow->winId(), TRUE, &m_dcompTarget), "create target");
         HR(m_dcompDevice->CreateVisual(&m_rootVisual), "create root visual");
         HR(m_dcompTarget->SetRoot(m_rootVisual.Get()), "set root visual");
 
         HR(m_dcompDevice->CreateVisual(&m_uiVisual), "create ui visual");
 
         m_uiSurface  = std::make_unique<CompositorDCompositionUISurface>(m_intf,
-                                                                         m_rootWindow->windowHandle(),
+                                                                         m_rootWindow,
                                                                          m_uiVisual);
         ret = m_uiSurface->init();
         if (!ret)
@@ -228,23 +317,18 @@ MainInterface* CompositorDirectComposition::makeMainInterface()
 
         //install the interface window handler after the creation of CompositorDCompositionUISurface
         //so the event filter is handled before the one of the UISurface (for wheel events)
-        m_interfaceWindowHandler = new InterfaceWindowHandlerWin32(m_intf, m_rootWindow, m_rootWindow->window()->windowHandle(), m_rootWindow);
+        m_interfaceWindowHandler = new InterfaceWindowHandlerWin32(m_intf, m_mainInterface, m_rootWindow, m_rootWindow);
 
         m_qmlVideoSurfaceProvider = std::make_unique<VideoSurfaceProvider>();
-        m_rootWindow->setVideoSurfaceProvider(m_qmlVideoSurfaceProvider.get());
-        m_rootWindow->setCanShowVideoPIP(true);
+        m_mainInterface->setVideoSurfaceProvider(m_qmlVideoSurfaceProvider.get());
+        m_mainInterface->setCanShowVideoPIP(true);
 
         connect(m_qmlVideoSurfaceProvider.get(), &VideoSurfaceProvider::hasVideoEmbedChanged,
                 m_interfaceWindowHandler, &InterfaceWindowHandlerWin32::onVideoEmbedChanged);
         connect(m_qmlVideoSurfaceProvider.get(), &VideoSurfaceProvider::surfacePositionChanged,
                 this, &CompositorDirectComposition::onSurfacePositionChanged);
 
-        connect(m_rootWindow, &MainInterface::requestInterfaceMaximized,
-                m_rootWindow, &MainInterface::showMaximized);
-        connect(m_rootWindow, &MainInterface::requestInterfaceNormal,
-                m_rootWindow, &MainInterface::showNormal);
-
-        m_ui = std::make_unique<MainUI>(m_intf, m_rootWindow, m_rootWindow->windowHandle());
+        m_ui = std::make_unique<MainUI>(m_intf, m_mainInterface, m_rootWindow);
         ret = m_ui->setup(m_uiSurface->engine());
         if (! ret)
         {
@@ -254,7 +338,7 @@ MainInterface* CompositorDirectComposition::makeMainInterface()
         m_uiSurface->setContent(m_ui->getComponent(), m_ui->createRootItem());
         HR(m_rootVisual->AddVisual(m_uiVisual.Get(), FALSE, nullptr), "add ui visual to root");
         HR(m_dcompDevice->Commit(), "commit UI visual");
-        return m_rootWindow;
+        return m_mainInterface;
     }
     catch (const DXError& err)
     {
@@ -276,12 +360,8 @@ void CompositorDirectComposition::destroyMainInterface()
     if (m_videoVisual)
         msg_Err(m_intf, "video surface still active while destroying main interface");
 
-    if (m_uiVisual)
-    {
-        m_rootVisual->RemoveVisual(m_uiVisual.Get());
-        m_uiVisual.Reset();
-    }
-    m_uiSurface.reset();
+    unloadGUI();
+
     m_rootVisual.Reset();
     m_dcompTarget.Reset();
     m_qmlVideoSurfaceProvider.reset();
@@ -290,11 +370,30 @@ void CompositorDirectComposition::destroyMainInterface()
         delete m_rootWindow;
         m_rootWindow = nullptr;
     }
-    m_ui.reset();
 }
 
-bool CompositorDirectComposition::setupVoutWindow(vout_window_t *p_wnd)
+void CompositorDirectComposition::unloadGUI()
+
 {
+    if (m_uiVisual)
+    {
+        m_rootVisual->RemoveVisual(m_uiVisual.Get());
+        m_uiVisual.Reset();
+    }
+    m_uiSurface.reset();
+    m_ui.reset();
+    m_taskbarWidget.reset();
+    if (m_mainInterface)
+    {
+        delete m_mainInterface;
+        m_mainInterface = nullptr;
+    }
+}
+
+bool CompositorDirectComposition::setupVoutWindow(vout_window_t *p_wnd, VoutDestroyCb destroyCb)
+{
+    m_destroyCb = destroyCb;
+
     //Only the first video is embedded
     if (m_videoVisual.Get())
         return false;
@@ -324,6 +423,16 @@ bool CompositorDirectComposition::setupVoutWindow(vout_window_t *p_wnd)
     p_wnd->info.has_double_click = true;
     m_window = p_wnd;
     return true;
+}
+
+QWindow *CompositorDirectComposition::interfaceMainWindow() const
+{
+    return m_rootWindow;
+}
+
+Compositor::Type CompositorDirectComposition::type() const
+{
+    return Compositor::DirectCompositionCompositor;
 }
 
 }

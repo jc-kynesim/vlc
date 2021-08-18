@@ -38,7 +38,8 @@ enum
     ES_OUT_PRIVATE_COMMAND_DEL,
     ES_OUT_PRIVATE_COMMAND_DESTROY,
     ES_OUT_PRIVATE_COMMAND_SEND,
-    ES_OUT_PRIVATE_COMMAND_DISCONTINUITY
+    ES_OUT_PRIVATE_COMMAND_DISCONTINUITY,
+    ES_OUT_PRIVATE_COMMAND_MILESTONE,
 };
 
 AbstractCommand::AbstractCommand( int type_ )
@@ -67,6 +68,11 @@ AbstractFakeEsCommand::AbstractFakeEsCommand( int type, AbstractFakeESOutID *p_e
     p_fakeid = p_es;
 }
 
+const void * AbstractFakeEsCommand::esIdentifier() const
+{
+    return static_cast<const void *>(p_fakeid);
+}
+
 EsOutSendCommand::EsOutSendCommand( AbstractFakeESOutID *p_es, block_t *p_block_ ) :
     AbstractFakeEsCommand( ES_OUT_PRIVATE_COMMAND_SEND, p_es )
 {
@@ -91,11 +97,6 @@ vlc_tick_t EsOutSendCommand::getTime() const
         return p_block->i_dts;
     else
         return AbstractCommand::getTime();
-}
-
-const void * EsOutSendCommand::esIdentifier() const
-{
-    return static_cast<const void *>(p_fakeid);
 }
 
 EsOutDelCommand::EsOutDelCommand( AbstractFakeESOutID *p_es ) :
@@ -179,6 +180,17 @@ void EsOutMetaCommand::Execute()
     out->sendMeta( group, p_meta );
 }
 
+EsOutMilestoneCommand::EsOutMilestoneCommand( AbstractFakeEsOut *out )
+    : AbstractCommand( ES_OUT_PRIVATE_COMMAND_MILESTONE )
+{
+    this->out = out;
+}
+
+void EsOutMilestoneCommand::Execute()
+{
+    out->milestoneReached();
+}
+
 /*
  * Commands Default Factory
  */
@@ -225,6 +237,11 @@ EsOutMetaCommand * CommandsFactory::createEsOutMetaCommand( AbstractFakeEsOut *o
     return nullptr;
 }
 
+EsOutMilestoneCommand * CommandsFactory::createEsOutMilestoneCommand( AbstractFakeEsOut *out ) const
+{
+    return new (std::nothrow) EsOutMilestoneCommand( out );
+}
+
 /*
  * Commands Queue management
  */
@@ -239,13 +256,47 @@ std::ostream& operator<<(std::ostream& ostr, const std::list<AbstractCommand *>&
 }
 #endif
 
-CommandsQueue::CommandsQueue()
+AbstractCommandsQueue::AbstractCommandsQueue()
 {
-    bufferinglevel = VLC_TICK_INVALID;
-    pcr = VLC_TICK_INVALID;
     b_drop = false;
     b_draining = false;
     b_eof = false;
+}
+
+void AbstractCommandsQueue::setDrop( bool b )
+{
+    b_drop = b;
+}
+
+void AbstractCommandsQueue::setDraining()
+{
+    b_draining = true;
+}
+
+bool AbstractCommandsQueue::isDraining() const
+{
+    return b_draining;
+}
+
+void AbstractCommandsQueue::setEOF( bool b )
+{
+    b_eof = b;
+    if( b_eof )
+        setDraining();
+    else
+        b_draining = false;
+}
+
+bool AbstractCommandsQueue::isEOF() const
+{
+    return b_eof;
+}
+
+CommandsQueue::CommandsQueue()
+    : AbstractCommandsQueue()
+{
+    bufferinglevel = VLC_TICK_INVALID;
+    pcr = VLC_TICK_INVALID;
     nextsequence = 0;
 }
 
@@ -277,7 +328,7 @@ static bool compareCommands( const Queueentry &a, const Queueentry &b )
     }
 }
 
-void CommandsQueue::Schedule( AbstractCommand *command )
+void CommandsQueue::Schedule( AbstractCommand *command, EsType )
 {
     if( b_drop )
     {
@@ -423,33 +474,9 @@ bool CommandsQueue::isEmpty() const
     return commands.empty() && incoming.empty();
 }
 
-void CommandsQueue::setDrop( bool b )
-{
-    b_drop = b;
-}
-
 void CommandsQueue::setDraining()
 {
     LockedSetDraining();
-}
-
-bool CommandsQueue::isDraining() const
-{
-    return b_draining;
-}
-
-void CommandsQueue::setEOF( bool b )
-{
-    b_eof = b;
-    if( b_eof )
-        LockedSetDraining();
-    else
-        b_draining = false;
-}
-
-bool CommandsQueue::isEOF() const
-{
-    return b_eof;
 }
 
 vlc_tick_t CommandsQueue::getDemuxedAmount(vlc_tick_t from) const

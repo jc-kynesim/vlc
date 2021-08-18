@@ -47,12 +47,48 @@ class PlaylistListModel;
 }
 
 #define SIMPLE_MENU_PROPERTY(type, name, defaultValue) \
-    Q_PROPERTY(type name READ get##name WRITE set##name) \
+    Q_PROPERTY(type name READ get##name WRITE set##name FINAL) \
     public: \
     inline void set##name( type data) { m_##name = data; } \
     inline type get##name() const { return m_##name; } \
     private: \
     type m_##name = defaultValue;
+
+
+class StringListMenu : public QObject
+{
+    Q_OBJECT
+
+public:
+    using QObject::QObject;
+
+    Q_INVOKABLE void popup(const QPoint &point, const QVariantList &stringList);
+
+signals:
+    void selected(int index, const QString &str);
+};
+
+
+class SortMenu : public QObject
+{
+    Q_OBJECT
+
+public:
+    using QObject::QObject;
+
+    ~SortMenu();
+
+    Q_INVOKABLE void popup(const QPoint &point, bool popupAbovePoint, const QVariantList &model);
+
+    Q_INVOKABLE void close();
+
+signals:
+    void selected(int index);
+
+private:
+    QMenu *m_menu = nullptr;
+};
+
 
 //inherit VLCMenuBar so we can access menu creation functions
 class QmlGlobalMenu : public VLCMenuBar
@@ -62,6 +98,10 @@ class QmlGlobalMenu : public VLCMenuBar
 public:
     explicit QmlGlobalMenu(QObject *parent = nullptr);
     ~QmlGlobalMenu();
+
+signals:
+    void aboutToShow();
+    void aboutToHide();
 
 public slots:
     void popup( QPoint pos );

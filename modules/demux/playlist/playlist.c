@@ -56,10 +56,8 @@ vlc_module_begin ()
     set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_DEMUX )
 
-    add_obsolete_integer( "parent-item" ) /* removed since 1.1.0 */
-
     add_bool( "playlist-skip-ads", true,
-              SKIP_ADS_TEXT, SKIP_ADS_LONGTEXT, false )
+              SKIP_ADS_TEXT, SKIP_ADS_LONGTEXT )
 
     set_shortname( N_("Playlist") )
     set_description( N_("Playlist") )

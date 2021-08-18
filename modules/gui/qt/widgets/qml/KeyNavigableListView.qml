@@ -17,11 +17,11 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
+import org.videolan.vlc 0.1
 
 import "qrc:///style/"
-import "qrc:///util/KeyHelper.js" as KeyHelper
 
-NavigableFocusScope {
+FocusScope {
     id: listview_id
 
     property int modelCount: view.count
@@ -69,6 +69,9 @@ NavigableFocusScope {
     property alias add: view.add
     property alias displaced: view.displaced
 
+    property alias displayMarginBeginning: view.displayMarginBeginning
+    property alias displayMarginEnd: view.displayMarginEnd
+
     property int highlightMargin: VLCStyle.margin_large
     property var fadeColor: undefined
     property alias fadeRectBottomHovered: fadeRectBottom.isHovered
@@ -85,7 +88,7 @@ NavigableFocusScope {
         view.contentX += (Math.min(view.width, (view.contentWidth - view.width - view.contentX ) ))
     }
     function prevPage() {
-        view.contentX -= Math.min(view.width,view.contentX )
+        view.contentX -= Math.min(view.width,view.contentX - view.originX)
     }
 
     function positionViewAtIndex(index, mode) {
@@ -134,7 +137,6 @@ NavigableFocusScope {
 
         focus: true
 
-        clip: true
         ScrollBar.vertical: ScrollBar { id: scroll_id }
         ScrollBar.horizontal: ScrollBar { visible: view.contentWidth > view.width }
 
@@ -145,38 +147,8 @@ NavigableFocusScope {
         section.criteria: ViewSection.FullString
         section.delegate: sectionHeading
 
-        Connections {
-            target: view.currentItem
-            ignoreUnknownSignals: true
-            onActionRight: if ( !listview_id.keyNavigationWraps ) listview_id.navigationRight(currentIndex);
-            onActionLeft: if ( !listview_id.keyNavigationWraps ) listview_id.navigationLeft(currentIndex);
-            onActionDown: {
-                if ( listview_id.keyNavigationWraps )
-                    return
-
-                if ( currentIndex !== modelCount - 1 ) {
-                    var newIndex = currentIndex + 1
-                    var oldIndex = currentIndex
-                    currentIndex = newIndex
-                    selectionUpdated(0, oldIndex, newIndex)
-                } else {
-                    root.navigationDown(currentIndex)
-                }
-            }
-            onActionUp: {
-                if ( listview_id.keyNavigationWraps )
-                    return
-
-                if ( currentIndex !== 0 ) {
-                    var newIndex = currentIndex - 1
-                    var oldIndex = currentIndex
-                    currentIndex = newIndex
-                    selectionUpdated(0, oldIndex, newIndex)
-                } else {
-                    root.navigationUp(currentIndex)
-                }
-            }
-        }
+        boundsBehavior: Flickable.StopAtBounds
+        boundsMovement :Flickable.StopAtBounds
 
         Keys.onPressed: {
             var newIndex = -1
@@ -229,8 +201,9 @@ NavigableFocusScope {
                 selectionUpdated(event.modifiers, oldIndex, newIndex)
             }
 
-            if (!event.accepted)
-                defaultKeyAction(event, currentIndex)
+            if (!event.accepted) {
+                listview_id.Navigation.defaultKeyAction(event)
+            }
         }
 
         Keys.onReleased: {
@@ -280,7 +253,7 @@ NavigableFocusScope {
             transitions: Transition {
                 NumberAnimation {
                     property: "opacity"
-                    duration: 150
+                    duration: VLCStyle.duration_fast
                     easing.type: Easing.InOutSine
                 }
             }
@@ -325,7 +298,7 @@ NavigableFocusScope {
             transitions: Transition {
                 NumberAnimation {
                     property: "opacity"
-                    duration: 150
+                    duration: VLCStyle.duration_fast
                     easing.type: Easing.InOutSine
                 }
             }
@@ -337,22 +310,24 @@ NavigableFocusScope {
         }
     }
 
-    RoundButton{
+    RoundButton {
         id: leftBtn
+
         anchors.verticalCenter: parent.verticalCenter
         anchors.left: parent.left
         text:"<"
         onClicked: listview_id.prevPage()
-        visible: view.orientation === ListView.Horizontal && view.contentX > 0
+        visible: view.orientation === ListView.Horizontal && !view.atXBeginning
     }
 
 
-    RoundButton{
+    RoundButton {
         id: rightBtn
+
         anchors.verticalCenter: parent.verticalCenter
         anchors.right: parent.right
         text:">"
         onClicked: listview_id.nextPage()
-        visible: view.orientation === ListView.Horizontal && (view.contentWidth - view.width - view.contentX) > 0
+        visible: view.orientation === ListView.Horizontal && !view.atXEnd
     }
 }

@@ -43,17 +43,11 @@
 #include <spatialaudio/Ambisonics.h>
 #include <spatialaudio/SpeakersBinauralizer.h>
 
-#define CFG_PREFIX "spatialaudio-"
-
 #define DEFAULT_HRTF_PATH "hrtfs" DIR_SEP "dodeca_and_7channel_3DSL_HRTF.sofa"
 
 #define HRTF_FILE_TEXT N_("HRTF file for the binauralization")
 #define HRTF_FILE_LONGTEXT N_("Custom HRTF (Head-related transfer function) file " \
                               "in the SOFA format.")
-
-#define HEADPHONES_TEXT N_("Headphones mode (binaural)")
-#define HEADPHONES_LONGTEXT N_("If the output is stereo, render ambisonics " \
-                               "with the binaural decoder.")
 
 static int OpenBinauralizer(vlc_object_t *p_this);
 static int Open( vlc_object_t * );
@@ -67,14 +61,13 @@ vlc_module_begin()
     set_category(CAT_AUDIO)
     set_subcategory(SUBCAT_AUDIO_AFILTER)
     set_callback(Open)
-    add_bool(CFG_PREFIX "headphones", false,
-             HEADPHONES_TEXT, HEADPHONES_LONGTEXT, true)
+    add_obsolete_bool("spatialaudio-headphones")
     add_loadfile("hrtf-file", NULL, HRTF_FILE_TEXT, HRTF_FILE_LONGTEXT)
     add_shortcut("ambisonics")
 
     add_submodule()
     set_shortname(N_("Binauralizer"))
-    set_capability("audio filter", 0)
+    set_capability("audio converter", 30)
     set_callback(OpenBinauralizer)
     add_shortcut("binauralizer")
 vlc_module_end()
@@ -332,8 +325,18 @@ static const struct FilterOperationInitializer {
 static int OpenBinauralizer(vlc_object_t *p_this)
 {
     filter_t *p_filter = (filter_t *)p_this;
-    audio_format_t *infmt = &p_filter->fmt_in.audio;
-    audio_format_t *outfmt = &p_filter->fmt_out.audio;
+    const audio_format_t *infmt = &p_filter->fmt_in.audio;
+    const audio_format_t *outfmt = &p_filter->fmt_out.audio;
+
+    if (infmt->i_format != VLC_CODEC_FL32 || outfmt->i_format != VLC_CODEC_FL32)
+        return VLC_EGENERIC;
+
+    if (infmt->i_rate != outfmt->i_rate)
+        return VLC_EGENERIC;
+
+    if (infmt->i_channels <= 2 || outfmt->i_channels != 2
+     || outfmt->i_chan_mode != AOUT_CHANMODE_BINAURAL)
+        return VLC_EGENERIC;
 
     filter_spatialaudio *p_sys = new(std::nothrow)filter_spatialaudio();
     if (p_sys == NULL)
@@ -394,12 +397,6 @@ static int OpenBinauralizer(vlc_object_t *p_this)
         return VLC_EGENERIC;
     }
     p_sys->binauralizer.Reset();
-
-    outfmt->i_format = infmt->i_format = VLC_CODEC_FL32;
-    outfmt->i_rate = infmt->i_rate;
-    outfmt->i_physical_channels = AOUT_CHANS_STEREO;
-    aout_FormatPrepare(infmt);
-    aout_FormatPrepare(outfmt);
 
     p_filter->p_sys = p_sys;
     p_filter->ops = &filter_ops.ops;
@@ -463,12 +460,9 @@ static int Open(vlc_object_t *p_this)
 
     msg_Dbg(p_filter, "Order: %d %d %d", p_sys->i_order, p_sys->i_nondiegetic, infmt->i_channels);
 
-    static const char *const options[] = { "headphones", NULL };
-    config_ChainParse(p_filter, CFG_PREFIX, options, p_filter->p_cfg);
-
     unsigned i_tailLength = 0;
     if (p_filter->fmt_out.audio.i_channels == 2
-     && var_InheritBool(p_filter, CFG_PREFIX "headphones"))
+     && p_filter->fmt_out.audio.i_chan_mode == AOUT_CHANMODE_BINAURAL)
     {
         p_sys->mode = filter_spatialaudio::AMBISONICS_BINAURAL_DECODER;
 

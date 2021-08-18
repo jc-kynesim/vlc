@@ -140,7 +140,7 @@ vlc_module_begin ()
 
     /* opacity valid on 0..255, with default 255 = fully opaque */
     add_integer_with_range( "freetype-opacity", 255, 0, 255,
-        OPACITY_TEXT, OPACITY_LONGTEXT, false )
+        OPACITY_TEXT, OPACITY_LONGTEXT )
         change_safe()
 
     /* hook to the color values list, with default 0x00ffffff = white */
@@ -149,11 +149,11 @@ vlc_module_begin ()
         change_integer_range( 0x000000, 0xFFFFFF )
         change_safe()
 
-    add_bool( "freetype-bold", false, BOLD_TEXT, NULL, false )
+    add_bool( "freetype-bold", false, BOLD_TEXT, NULL )
         change_safe()
 
     add_integer_with_range( "freetype-background-opacity", 0, 0, 255,
-                            BG_OPACITY_TEXT, NULL, false )
+                            BG_OPACITY_TEXT, NULL )
         change_safe()
     add_rgb("freetype-background-color", 0x00000000, BG_COLOR_TEXT, NULL)
         change_integer_list( pi_color_values, ppsz_color_descriptions )
@@ -161,45 +161,44 @@ vlc_module_begin ()
         change_safe()
 
     add_integer_with_range( "freetype-outline-opacity", 255, 0, 255,
-                            OUTLINE_OPACITY_TEXT, NULL, false )
+                            OUTLINE_OPACITY_TEXT, NULL )
         change_safe()
     add_rgb("freetype-outline-color", 0x00000000, OUTLINE_COLOR_TEXT, NULL)
         change_integer_list( pi_color_values, ppsz_color_descriptions )
         change_integer_range( 0x000000, 0xFFFFFF )
         change_safe()
     add_integer_with_range( "freetype-outline-thickness", 4, 0, 50, OUTLINE_THICKNESS_TEXT,
-             NULL, false )
+             NULL )
         change_integer_list( pi_outline_thickness, ppsz_outline_thickness )
         change_safe()
 
     add_integer_with_range( "freetype-shadow-opacity", 128, 0, 255,
-                            SHADOW_OPACITY_TEXT, NULL, false )
+                            SHADOW_OPACITY_TEXT, NULL )
         change_safe()
     add_rgb("freetype-shadow-color", 0x00000000, SHADOW_COLOR_TEXT, NULL)
         change_integer_list( pi_color_values, ppsz_color_descriptions )
         change_integer_range( 0x000000, 0xFFFFFF )
         change_safe()
     add_float_with_range( "freetype-shadow-angle", -45, -360, 360,
-                          SHADOW_ANGLE_TEXT, NULL, false )
+                          SHADOW_ANGLE_TEXT, NULL )
         change_safe()
     add_float_with_range( "freetype-shadow-distance", 0.06, 0.0, 1.0,
-                          SHADOW_DISTANCE_TEXT, NULL, false )
+                          SHADOW_DISTANCE_TEXT, NULL )
         change_safe()
 
     add_integer_with_range( "freetype-cache-size", 200, 25, (UINT32_MAX >> 10),
-                            CACHE_SIZE_TEXT, CACHE_SIZE_LONGTEXT, true )
+                            CACHE_SIZE_TEXT, CACHE_SIZE_LONGTEXT )
         change_safe()
 
-    add_obsolete_integer( "freetype-fontsize" );
-    add_obsolete_integer( "freetype-rel-fontsize" );
-    add_obsolete_integer( "freetype-effect" );
+    add_obsolete_integer( "freetype-fontsize" ); /* since 4.0.0 */
+    add_obsolete_integer( "freetype-rel-fontsize" ); /* since 4.0.0 */
 
     add_bool( "freetype-yuvp", false, YUVP_TEXT,
-              YUVP_LONGTEXT, true )
+              YUVP_LONGTEXT )
 
 #ifdef HAVE_FRIBIDI
     add_integer_with_range( "freetype-text-direction", 0, 0, 2, TEXT_DIRECTION_TEXT,
-                            TEXT_DIRECTION_LONGTEXT, false )
+                            TEXT_DIRECTION_LONGTEXT )
         change_integer_list( pi_text_direction, ppsz_text_direction )
         change_safe()
 #endif
@@ -815,6 +814,40 @@ static void FreeStylesArray( text_style_t **pp_styles, size_t i_styles )
     free( pp_styles );
 }
 
+#ifdef __OS2__
+static void *ToUCS4( const char *in, size_t *outsize )
+{
+    uint16_t *psz_ucs2;
+    uint32_t *psz_ucs4;
+    size_t i_bytes;
+
+    psz_ucs2 = ToCharset("UCS-2LE", in, &i_bytes );
+    if( unlikely( !psz_ucs2 ) )
+        return NULL;
+
+    i_bytes <<= 1;
+    /* Realloc including NULL-terminator */
+    psz_ucs4 = realloc( psz_ucs2, i_bytes + sizeof( *psz_ucs4 ));
+    if( unlikely( !psz_ucs4 ) )
+    {
+        free( psz_ucs2 );
+
+        return NULL;
+    }
+
+    psz_ucs2 = ( uint16_t * )psz_ucs4;
+    /* Copy including NULL-terminator */
+    for( int i = i_bytes / sizeof( *psz_ucs4 ); i >= 0; --i )
+        psz_ucs4[ i ] = psz_ucs2[ i ];
+
+    *outsize = i_bytes;
+
+    return psz_ucs4;
+}
+#else
+# define ToUCS4( in, outsize ) ToCharset( FREETYPE_TO_UCS, ( in ), ( outsize ))
+#endif
+
 static size_t AddTextAndStyles( filter_sys_t *p_sys,
                                 const char *psz_text, const char *psz_rt,
                                 const text_style_t *p_style,
@@ -822,7 +855,7 @@ static size_t AddTextAndStyles( filter_sys_t *p_sys,
 {
     /* Convert chars to unicode */
     size_t i_bytes;
-    uni_char_t *p_ucs4 = ToCharset( FREETYPE_TO_UCS, psz_text, &i_bytes );
+    uni_char_t *p_ucs4 = ToUCS4( psz_text, &i_bytes );
     if( !p_ucs4 )
         return 0;
 
@@ -878,7 +911,7 @@ static size_t AddTextAndStyles( filter_sys_t *p_sys,
     ruby_block_t *p_rubyblock = NULL;
     if( psz_rt )
     {
-        p_ucs4 = ToCharset( FREETYPE_TO_UCS, psz_rt, &i_bytes );
+        p_ucs4 = ToUCS4( psz_rt, &i_bytes );
         if( !p_ucs4 )
             return 0;
         p_rubyblock = malloc(sizeof(ruby_block_t));

@@ -17,7 +17,7 @@
  *****************************************************************************/
 
 import QtQuick 2.11
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtQuick.Controls 2.4
 
 import org.videolan.vlc 0.1
@@ -25,7 +25,7 @@ import org.videolan.vlc 0.1
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: resumePanel
 
     property VLCColors colors: VLCStyle.colors
@@ -77,11 +77,7 @@ Widgets.NavigableFocusScope {
         }
     }
 
-    Keys.priority: Keys.AfterItem
-    Keys.onPressed: defaultKeyAction(event)
-    Keys.onReleased: defaultKeyReleaseAction(event)
-
-    navigationCancel: function() {
+    Navigation.cancelAction: function() {
         hideResumePanel()
     }
 
@@ -123,7 +119,10 @@ Widgets.NavigableFocusScope {
                 hideResumePanel()
             }
 
-            KeyNavigation.right: closeBtn
+            Navigation.parentItem: resumePanel
+            Navigation.rightItem: closeBtn
+            Keys.priority: Keys.AfterItem
+            Keys.onPressed:  continueBtn.Navigation.defaultKeyAction(event)
         }
 
         Widgets.TabButtonExt {
@@ -135,7 +134,10 @@ Widgets.NavigableFocusScope {
             color: resumePanel.colors.playerFg
             onClicked: hideResumePanel()
 
-            KeyNavigation.left: continueBtn
+            Navigation.parentItem: resumePanel
+            Navigation.leftItem: continueBtn
+            Keys.priority: Keys.AfterItem
+            Keys.onPressed: closeBtn.Navigation.defaultKeyAction(event)
         }
 
         Item {

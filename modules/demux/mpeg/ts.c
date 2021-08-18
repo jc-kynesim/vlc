@@ -76,6 +76,9 @@ static void Close ( vlc_object_t * );
  *          1. pid:pcr (to force the pcr pid)
  *          2. pid:stream_type
  *          3. pid:type=fourcc where type=(video|audio|spu)
+ *   Ex: Program 1 on pid 8190 with hevc on pid 289, aac on pid 305
+ *       and pcr on 305
+ *      "8190:1=289:video=hevc,305:pcr,305:audio=mp4a"
  */
 #define PMT_TEXT N_("Extra PMT")
 #define PMT_LONGTEXT N_( \
@@ -138,33 +141,29 @@ vlc_module_begin ()
     set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_DEMUX )
 
-    add_string( "ts-standard", "auto", STANDARD_TEXT, STANDARD_LONGTEXT, true )
+    add_string( "ts-standard", "auto", STANDARD_TEXT, STANDARD_LONGTEXT )
         change_string_list( ts_standards_list, ts_standards_list_text )
 
-    add_string( "ts-extra-pmt", NULL, PMT_TEXT, PMT_LONGTEXT, true )
-    add_bool( "ts-trust-pcr", true, PCR_TEXT, PCR_LONGTEXT, true )
+    add_string( "ts-extra-pmt", NULL, PMT_TEXT, PMT_LONGTEXT )
+    add_bool( "ts-trust-pcr", true, PCR_TEXT, PCR_LONGTEXT )
         change_safe()
-    add_bool( "ts-es-id-pid", true, PID_TEXT, PID_LONGTEXT, true )
+    add_bool( "ts-es-id-pid", true, PID_TEXT, PID_LONGTEXT )
         change_safe()
-    add_obsolete_string( "ts-out" ) /* since 2.2.0 */
-    add_obsolete_integer( "ts-out-mtu" ) /* since 2.2.0 */
-    add_string( "ts-csa-ck", NULL, CSA_TEXT, CSA_LONGTEXT, true )
+    add_string( "ts-csa-ck", NULL, CSA_TEXT, CSA_LONGTEXT )
         change_safe()
-    add_string( "ts-csa2-ck", NULL, CSA2_TEXT, CSA2_LONGTEXT, true )
+    add_string( "ts-csa2-ck", NULL, CSA2_TEXT, CSA2_LONGTEXT )
         change_safe()
-    add_integer( "ts-csa-pkt", 188, CPKT_TEXT, CPKT_LONGTEXT, true )
+    add_integer( "ts-csa-pkt", 188, CPKT_TEXT, CPKT_LONGTEXT )
         change_safe()
 
-    add_bool( "ts-split-es", true, SPLIT_ES_TEXT, SPLIT_ES_LONGTEXT, false )
-    add_bool( "ts-seek-percent", false, SEEK_PERCENT_TEXT, SEEK_PERCENT_LONGTEXT, true )
-    add_bool( "ts-cc-check", true, CC_CHECK_TEXT, CC_CHECK_LONGTEXT, true )
-    add_bool( "ts-pmtfix-waitdata", true, TS_SKIP_GHOST_PROGRAM_TEXT, NULL, true )
-    add_bool( "ts-patfix", true, TS_PATFIX_TEXT, NULL, true )
-    add_bool( "ts-pcr-offsetfix", true, TS_OFFSETFIX_TEXT, NULL, true )
+    add_bool( "ts-split-es", true, SPLIT_ES_TEXT, SPLIT_ES_LONGTEXT )
+    add_bool( "ts-seek-percent", false, SEEK_PERCENT_TEXT, SEEK_PERCENT_LONGTEXT )
+    add_bool( "ts-cc-check", true, CC_CHECK_TEXT, CC_CHECK_LONGTEXT )
+    add_bool( "ts-pmtfix-waitdata", true, TS_SKIP_GHOST_PROGRAM_TEXT, NULL )
+    add_bool( "ts-patfix", true, TS_PATFIX_TEXT, NULL )
+    add_bool( "ts-pcr-offsetfix", true, TS_OFFSETFIX_TEXT, NULL )
     add_integer_with_range( "ts-generated-pcr-offset", 120, 0, 500,
-                            TS_GENERATED_PCR_OFFSET_TEXT, NULL, true )
-
-    add_obsolete_bool( "ts-silent" );
+                            TS_GENERATED_PCR_OFFSET_TEXT, NULL )
 
     set_capability( "demux", 10 )
     set_callbacks( Open, Close )
@@ -1826,7 +1825,8 @@ static block_t* ReadTSPacket( demux_t *p_demux )
                 }
                 i_skip++;
             }
-            msg_Dbg( p_demux, "skipping %d bytes of garbage", i_skip );
+            msg_Dbg( p_demux, "skipping %d bytes of garbage at %"PRIu64,
+                     i_skip, vlc_stream_Tell( p_sys->stream ) );
             if (vlc_stream_Read( p_sys->stream, NULL, i_skip ) != i_skip)
                 return NULL;
 
@@ -1835,6 +1835,7 @@ static block_t* ReadTSPacket( demux_t *p_demux )
                 break;
             }
         }
+        msg_Dbg( p_demux, "resynced at %" PRIu64, vlc_stream_Tell( p_sys->stream ) );
         if( !( p_pkt = vlc_stream_Block( p_sys->stream, p_sys->i_packet_size ) ) )
         {
             msg_Dbg( p_demux, "eof ?" );
@@ -1850,10 +1851,15 @@ static stime_t GetPCR( const block_t *p_pkt )
 
     stime_t i_pcr = -1;
 
-    if( likely(p_pkt->i_buffer > 11) &&
-        ( p[3]&0x20 ) && /* adaptation */
-        ( p[5]&0x10 ) &&
-        ( p[4] >= 7 ) )
+    if(unlikely(p_pkt->i_buffer < 12))
+        return i_pcr;
+
+    const uint8_t i_adaption = p[3] & 0x30;
+
+    if( ( ( i_adaption == 0x30 && p[4] <= 182 ) ||   /* adaptation 0b11 */
+          ( i_adaption == 0x20 && p[4] == 183 ) ) && /* adaptation 0b10 */
+        ( p[4] >= 7 )  &&
+        ( p[5] & 0x10 ) ) /* PCR carry flag */
     {
         /* PCR is 33 bits */
         i_pcr = ( (stime_t)p[6] << 25 ) |

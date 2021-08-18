@@ -1,5 +1,5 @@
 /*****************************************************************************
- * platform.h: Vulkan platform-specific functions
+ * platform.h: Vulkan platform abstraction
  *****************************************************************************
  * Copyright (C) 2018 Niklas Haas
  *
@@ -21,16 +21,41 @@
 #ifndef VLC_VULKAN_PLATFORM_H
 #define VLC_VULKAN_PLATFORM_H
 
-#include "instance.h"
+#include <vlc_common.h>
+#include <vlc_vout_window.h>
 
-// Initializes a platform-specific context to vk->platform_sys
-int vlc_vk_InitPlatform(vlc_vk_t *);
-void vlc_vk_ClosePlatform(vlc_vk_t *);
+#include <vulkan/vulkan.h>
 
-// Contains the required platform-specific instance extension
-extern const char * const vlc_vk_PlatformExt;
+struct vlc_vk_platform_t;
+struct vlc_vk_platform_operations
+{
+    void (*close)(struct vlc_vk_platform_t *);
+    int (*create_surface)(struct vlc_vk_platform_t *, VkInstance, VkSurfaceKHR *);
+};
 
-// Create a vulkan surface to vk->surface
-int vlc_vk_CreateSurface(vlc_vk_t *);
+
+// Struct for platform-specific Vulkan state
+typedef struct vlc_vk_platform_t
+{
+    // set by platform.c
+    struct vlc_object_t obj;
+    struct vout_window_t *window;
+    module_t *module;
+
+    // set by the platform
+    void *platform_sys;
+    const char *platform_ext;
+    const struct vlc_vk_platform_operations *ops;
+} vlc_vk_platform_t;
+
+vlc_vk_platform_t *vlc_vk_platform_Create(struct vout_window_t *, const char *) VLC_USED;
+void vlc_vk_platform_Release(vlc_vk_platform_t *);
+
+// Create a vulkan surface and store it to `surface_out`
+static inline int vlc_vk_CreateSurface(vlc_vk_platform_t * vk, VkInstance instance,
+                                       VkSurfaceKHR *surface_out)
+{
+    return vk->ops->create_surface(vk, instance, surface_out);
+}
 
 #endif // VLC_VULKAN_PLATFORM_H

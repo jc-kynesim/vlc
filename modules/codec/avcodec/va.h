@@ -27,24 +27,23 @@
 #include <libavutil/pixdesc.h>
 
 typedef struct vlc_va_t vlc_va_t;
-typedef struct vlc_va_sys_t vlc_va_sys_t;
 typedef struct vlc_decoder_device vlc_decoder_device;
 typedef struct vlc_video_context vlc_video_context;
 
 struct vlc_va_operations {
-    int (*get)(vlc_va_t *, picture_t *pic, uint8_t **surface);
+    int (*get)(vlc_va_t *, picture_t *pic, AVCodecContext *ctx, AVFrame *frame);
     void (*close)(vlc_va_t *);
 };
 
 struct vlc_va_t {
     struct vlc_object_t obj;
 
-    vlc_va_sys_t *sys;
+    void *sys;
     const struct vlc_va_operations *ops;
 };
 
 typedef int (*vlc_va_open)(vlc_va_t *, AVCodecContext *,
-                           enum PixelFormat hwfmt, const AVPixFmtDescriptor *,
+                           enum AVPixelFormat hwfmt, const AVPixFmtDescriptor *,
                            const es_format_t *, vlc_decoder_device *,
                            video_format_t *, vlc_video_context **);
 
@@ -63,7 +62,7 @@ typedef int (*vlc_va_open)(vlc_va_t *, AVCodecContext *,
  * @param swfmt the software pixel format
  * @return true if the hardware acceleration should be supported
  */
-bool vlc_va_MightDecode(enum PixelFormat hwfmt, enum PixelFormat swfmt);
+bool vlc_va_MightDecode(enum AVPixelFormat hwfmt, enum AVPixelFormat swfmt);
 
 /**
  * Creates an accelerated video decoding back-end for libavcodec.
@@ -72,7 +71,7 @@ bool vlc_va_MightDecode(enum PixelFormat hwfmt, enum PixelFormat swfmt);
  * @return a new VLC object on success, NULL on error.
  */
 vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *,
-                     enum PixelFormat hwfmt, const AVPixFmtDescriptor *,
+                     enum AVPixelFormat hwfmt, const AVPixFmtDescriptor *,
                      const es_format_t *fmt, vlc_decoder_device *device,
                      video_format_t *, vlc_video_context **vtcx_out);
 
@@ -85,18 +84,20 @@ vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *,
  * AV_PIX_FMT_D3D11VA_VLD - ID3D11VideoDecoderOutputView*
  * AV_PIX_FMT_DXVA2_VLD   - IDirect3DSurface9*
  * AV_PIX_FMT_VDPAU       - VdpVideoSurface
- * AV_PIX_FMT_VAAPI_VLD   - VASurfaceID
+ * AV_PIX_FMT_VAAPI       - VASurfaceID
  *
  * @param pic pointer to VLC picture containing the surface [IN/OUT]
- * @param surface pointer to the AVFrame data[0] and data[3] pointers [OUT]
+ * @param ctx pointer to the current AVCodecContext [IN]
+ * @param frame pointer to the AVFrame [IN]
  *
  * @note This function needs not be reentrant.
  *
  * @return VLC_SUCCESS on success, otherwise an error code.
  */
-static inline int vlc_va_Get(vlc_va_t *va, picture_t *pic, uint8_t **surface)
+static inline int vlc_va_Get(vlc_va_t *va, picture_t *pic, AVCodecContext *ctx,
+                             AVFrame *frame)
 {
-    return va->ops->get(va, pic, surface);
+    return va->ops->get(va, pic, ctx, frame);
 }
 
 /**

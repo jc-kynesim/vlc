@@ -66,11 +66,11 @@ vlc_module_begin()
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
     add_float_with_range(CFG_PREFIX "variance", 2.0, VARIANCE_MIN, VARIANCE_MAX,
-                         VARIANCE_TEXT, VARIANCE_LONGTEXT, false)
+                         VARIANCE_TEXT, VARIANCE_LONGTEXT)
     add_integer_with_range(CFG_PREFIX "period-min", 1, PERIOD_MIN, PERIOD_MAX,
-                           PERIOD_MIN_TEXT, PERIOD_MIN_LONGTEXT, false)
+                           PERIOD_MIN_TEXT, PERIOD_MIN_LONGTEXT)
     add_integer_with_range(CFG_PREFIX "period-max", 3*PERIOD_MAX/4, PERIOD_MIN, PERIOD_MAX,
-                           PERIOD_MAX_TEXT, PERIOD_MAX_LONGTEXT, false)
+                           PERIOD_MAX_TEXT, PERIOD_MAX_LONGTEXT)
     set_callback_video_filter(Open)
 vlc_module_end()
 
@@ -92,7 +92,6 @@ typedef struct
     void (*blend)(uint8_t *dst, size_t dst_pitch,
                   const uint8_t *src, size_t src_pitch,
                   const int16_t *noise);
-    void (*emms)(void);
 
     struct {
         vlc_mutex_t lock;
@@ -192,10 +191,6 @@ static void BlockBlendSse2(uint8_t *dst, size_t dst_pitch,
 #   error "BLEND_SIZE unsupported"
 #endif
 }
-static void Emms(void)
-{
-    asm volatile ("emms");
-}
 #endif
 
 /**
@@ -244,8 +239,6 @@ static void PlaneFilter(filter_t *filter,
                            __MIN(w, BLEND_SIZE), __MIN(h, BLEND_SIZE));
         }
     }
-    if (sys->emms)
-        sys->emms();
 }
 
 static void Filter(filter_t *filter, picture_t *src, picture_t *dst)
@@ -394,11 +387,9 @@ static int Open(filter_t *filter)
     }
 
     sys->blend = BlockBlendC;
-    sys->emms  = NULL;
-#if defined(CAN_COMPILE_SSE2) && 1
+#if defined(CAN_COMPILE_SSE2)
     if (vlc_CPU_SSE2()) {
         sys->blend = BlockBlendSse2;
-        sys->emms  = Emms;
     }
 #endif
 

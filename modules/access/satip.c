@@ -71,8 +71,8 @@ vlc_module_begin()
     set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_ACCESS)
     add_obsolete_integer("satip-buffer") /* obsolete since 4.0.0 */
-    add_bool("satip-multicast", false, MULTICAST_TEXT, MULTICAST_LONGTEXT, true)
-    add_string("satip-host", "", SATIP_HOST_TEXT, SATIP_HOST_TEXT, true)
+    add_bool("satip-multicast", false, MULTICAST_TEXT, MULTICAST_LONGTEXT)
+    add_string("satip-host", "", SATIP_HOST_TEXT, NULL)
     change_safe()
     add_shortcut("rtsp", "satip")
 vlc_module_end()
@@ -156,7 +156,7 @@ static int parse_port(char *str, uint16_t *port)
 {
     int p = atoi(str);
     if (p < 0 || p > UINT16_MAX)
-        return VLC_EBADVAR;
+        return VLC_EINVAL;
 
     *port = p;
 

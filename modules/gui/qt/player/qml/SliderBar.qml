@@ -17,7 +17,7 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtGraphicalEffects 1.0
 
 import "qrc:///widgets/" as Widgets
@@ -38,6 +38,11 @@ Slider {
 
     Keys.onRightPressed: player.jumpFwd()
     Keys.onLeftPressed: player.jumpBwd()
+
+    function showChapterMarks() {
+        _isSeekPointsShown = true
+        seekpointTimer.restart()
+    }
 
     Timer {
         id: seekpointTimer
@@ -183,28 +188,31 @@ Slider {
                 PropertyAnimation {
                     from: 0.0
                     to: bufferRect.bufferFrames
-                    duration: 2000
+                    duration: VLCStyle.ms2000
                     easing.type: "OutBounce"
                 }
                 PauseAnimation {
-                    duration: 500
+                    duration: VLCStyle.ms500
                 }
                 PropertyAnimation {
                     from: bufferRect.bufferFrames
                     to: 0.0
-                    duration: 2000
+                    duration: VLCStyle.ms2000
                     easing.type: "OutBounce"
                 }
                 PauseAnimation {
-                    duration: 500
+                    duration: VLCStyle.ms500
                 }
             }
         }
 
-        RowLayout {
+        Item {
             id: seekpointsRow
-            spacing: 0
+
+            width: parent.width
+            height: control.barHeight
             visible: player.hasChapters
+
             Repeater {
                 id: seekpointsRptr
                 model: player.chapters
@@ -247,7 +255,14 @@ Slider {
             Transition {
                 to: "hidden"
                 SequentialAnimation {
-                    NumberAnimation { target: sliderHandle; properties: "implicitWidth,implicitHeight"; to: 0; duration: 150; easing.type: Easing.OutSine}
+                    NumberAnimation {
+                        target: sliderHandle; properties: "implicitWidth,implicitHeight"
+
+                        to: 0
+
+                        duration: VLCStyle.duration_fast; easing.type: Easing.OutSine
+                    }
+
                     PropertyAction { target: sliderHandle; property: "visible"; value: false; }
                 }
             },
@@ -255,7 +270,14 @@ Slider {
                 to: "visible"
                 SequentialAnimation {
                     PropertyAction { target: sliderHandle; property: "visible"; value: true; }
-                    NumberAnimation { target: sliderHandle; properties: "implicitWidth,implicitHeight"; to: VLCStyle.margin_small; duration: 150; easing.type: Easing.InSine}
+
+                    NumberAnimation {
+                        target: sliderHandle; properties: "implicitWidth,implicitHeight"
+
+                        to: VLCStyle.margin_small
+
+                        duration: VLCStyle.duration_fast; easing.type: Easing.InSine
+                    }
                 }
             }
         ]

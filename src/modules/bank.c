@@ -96,8 +96,9 @@ static struct
     vlc_mutex_t lock;
     block_t *caches;
     void *caps_tree;
+    size_t count;
     unsigned usage;
-} modules = { VLC_STATIC_MUTEX, NULL, NULL, 0 };
+} modules = { VLC_STATIC_MUTEX, NULL, NULL, 0, 0 };
 
 vlc_plugin_t *vlc_plugins = NULL;
 
@@ -150,6 +151,7 @@ static void vlc_plugin_store(vlc_plugin_t *lib)
 
     lib->next = vlc_plugins;
     vlc_plugins = lib;
+    modules.count += lib->modules_count;
 
     for (module_t *m = lib->module; m != NULL; m = m->next)
         vlc_module_store(m);
@@ -358,6 +360,56 @@ static int AllocatePluginFile (module_bank_t *bank, const char *abspath,
     return  0;
 }
 
+#ifdef __APPLE__
+/* Apple specific framework library browsing */
+
+static int AllocatePluginFramework (module_bank_t *bank, const char *file,
+                                    const char *relpath, const char *abspath)
+{
+    int i_ret = VLC_EGENERIC;
+    size_t len_name = strlen (file);
+
+    /* Skip frameworks not matching plugins naming conventions. */
+    if (len_name < sizeof "_plugin.framework"
+      || strncmp(file + len_name - sizeof "_plugin.framework" + 1,
+                 "_plugin", sizeof "_plugin" - 1) != 0)
+    {
+        /* The framework doesn't contain plugins, there's no need to
+         * browse the rest of the framework folder. */
+        return VLC_EGENERIC;
+    }
+
+    /* The framework is a plugin, extract the dylib from it. */
+    int filename_len = len_name - sizeof ".framework" - 1;
+
+    char *framework_relpath = NULL, *framework_abspath = NULL;
+    /* Compute absolute path */
+    if (asprintf (&framework_abspath, "%s"DIR_SEP"%.*s",
+                  abspath, filename_len, file) == -1)
+    {
+        framework_abspath = NULL;
+        goto end;
+    }
+
+    struct stat framework_st;
+    if (vlc_stat (framework_abspath, &framework_st) == -1
+     || !S_ISREG (framework_st.st_mode))
+        goto end;
+
+    if (asprintf (&framework_relpath, "%s"DIR_SEP"%.*s",
+                  relpath, filename_len, file) == -1)
+        framework_relpath = NULL;
+
+    i_ret = AllocatePluginFile (bank, framework_abspath, framework_relpath, &framework_st);
+
+end:
+    free(framework_relpath);
+    free(framework_abspath);
+    return i_ret;
+}
+#endif
+
+
 /**
  * Recursively browses a directory to look for plug-ins.
  */
@@ -426,8 +478,24 @@ static void AllocatePluginDir (module_bank_t *bank, unsigned maxdepth,
                 AllocatePluginFile (bank, abspath, relpath, &st);
         }
         else if (S_ISDIR (st.st_mode))
+        {
+#ifdef __APPLE__
+            size_t len_name = strlen (file);
+            const char *framework_extension =
+                file + len_name - sizeof ".framework" + 1;
+
+            if (len_name > sizeof ".framework" - 1
+             && strcmp(framework_extension, ".framework") == 0)
+            {
+                AllocatePluginFramework (bank, file, abspath, relpath);
+                /* Don't browse framework directories. */
+                goto skip;
+            }
+#endif
+
             /* Recurse into another directory */
             AllocatePluginDir (bank, maxdepth, abspath, relpath);
+        }
     skip:
         free (relpath);
         free (abspath);
@@ -697,6 +765,7 @@ void module_EndBank (bool b_plugins)
         vlc_plugins = NULL;
         modules.caches = NULL;
         modules.caps_tree = NULL;
+        modules.count = 0;
     }
     vlc_mutex_unlock (&modules.lock);
 
@@ -739,51 +808,35 @@ void module_LoadPlugins(vlc_object_t *obj)
     }
     vlc_mutex_unlock (&modules.lock);
 
-    size_t count;
-    module_t **list = module_list_get (&count);
-    module_list_free (list);
-    msg_Dbg (obj, "plug-ins loaded: %zu modules", count);
+    msg_Dbg (obj, "plug-ins loaded: %zu modules", modules.count);
 }
 
-/**
- * Frees the flat list of VLC modules.
- * @param list list obtained by module_list_get()
- * @param length number of items on the list
- * @return nothing.
- */
 void module_list_free (module_t **list)
 {
     free (list);
 }
 
-/**
- * Gets the flat list of VLC modules.
- * @param n [OUT] pointer to the number of modules
- * @return table of module pointers (release with module_list_free()),
- *         or NULL in case of error (in that case, *n is zeroed).
- */
 module_t **module_list_get (size_t *n)
 {
-    module_t **tab = NULL;
-    size_t i = 0;
-
     assert (n != NULL);
+    *n = modules.count;
 
+    if (unlikely(modules.count == 0))
+        return NULL;
+
+    module_t **tab = malloc(modules.count * sizeof(*tab));
+    if (unlikely(tab == NULL))
+        return NULL;
+
+    size_t i = 0;
     for (vlc_plugin_t *lib = vlc_plugins; lib != NULL; lib = lib->next)
     {
-        module_t **nt = realloc(tab, (i + lib->modules_count) * sizeof (*tab));
-        if (unlikely(nt == NULL))
-        {
-            free (tab);
-            *n = 0;
-            return NULL;
-        }
-
-        tab = nt;
         for (module_t *m = lib->module; m != NULL; m = m->next)
+        {
+            assert(i < modules.count);
             tab[i++] = m;
+        }
     }
-    *n = i;
     return tab;
 }
 

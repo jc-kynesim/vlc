@@ -49,7 +49,7 @@ struct dxva2_pic_context
 
 #include "directx_va.h"
 
-static int Open(vlc_va_t *, AVCodecContext *, enum PixelFormat hwfmt, const AVPixFmtDescriptor *,
+static int Open(vlc_va_t *, AVCodecContext *, enum AVPixelFormat hwfmt, const AVPixFmtDescriptor *,
                 const es_format_t *, vlc_decoder_device *, video_format_t *, vlc_video_context **);
 
 vlc_module_begin()
@@ -92,7 +92,7 @@ static const d3d9_format_t *D3dFindFormat(D3DFORMAT format)
     return NULL;
 }
 
-struct vlc_va_sys_t
+typedef struct
 {
     /* Direct3D */
     vlc_video_context      *vctx;
@@ -118,7 +118,7 @@ struct vlc_va_sys_t
 
     /* avcodec internals */
     struct dxva_context hw;
-};
+} vlc_va_sys_t;
 
 
 /* */
@@ -191,8 +191,9 @@ static picture_context_t* NewSurfacePicContext(vlc_va_t *va, vlc_va_surface_t *v
     return &pic_ctx->ctx.s;
 }
 
-static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
+static int Get(vlc_va_t *va, picture_t *pic, AVCodecContext *ctx, AVFrame *frame)
 {
+    (void) ctx;
     vlc_va_sys_t *sys = va->sys;
 
     /* Check the device */
@@ -207,15 +208,15 @@ static int Get(vlc_va_t *va, picture_t *pic, uint8_t **data)
 
     vlc_va_surface_t *va_surface = va_pool_Get(sys->va_pool);
     if (unlikely(va_surface==NULL))
-        return VLC_ENOITEM;
+        return VLC_ENOENT;
 
     pic->context = NewSurfacePicContext(va, va_surface);
     if (unlikely(pic->context == NULL))
     {
         va_surface_Release(va_surface);
-        return VLC_ENOITEM;
+        return VLC_ENOENT;
     }
-    data[3] = (uint8_t*)DXVA2_PICCONTEXT_FROM_PICCTX(pic->context)->ctx.picsys.surface;
+    frame->data[3] = (uint8_t*)DXVA2_PICCONTEXT_FROM_PICCTX(pic->context)->ctx.picsys.surface;
     return VLC_SUCCESS;
 }
 
@@ -232,7 +233,7 @@ static void Close(vlc_va_t *va)
 
 static const struct vlc_va_operations ops = { Get, Close, };
 
-static int Open(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat hwfmt, const AVPixFmtDescriptor *desc,
+static int Open(vlc_va_t *va, AVCodecContext *ctx, enum AVPixelFormat hwfmt, const AVPixFmtDescriptor *desc,
                 const es_format_t *fmt_in, vlc_decoder_device *dec_device,
                 video_format_t *fmt_out, vlc_video_context **vtcx_out)
 {

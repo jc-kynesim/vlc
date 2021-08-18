@@ -138,34 +138,34 @@ public:
 
 };
 
-class MainInterface : public QVLCMW
+class MainInterface : public QObject
 {
     Q_OBJECT
 
-    Q_PROPERTY(bool playlistDocked READ isPlaylistDocked WRITE setPlaylistDocked NOTIFY playlistDockedChanged)
-    Q_PROPERTY(bool playlistVisible READ isPlaylistVisible WRITE setPlaylistVisible NOTIFY playlistVisibleChanged)
-    Q_PROPERTY(double playlistWidthFactor READ getPlaylistWidthFactor WRITE setPlaylistWidthFactor NOTIFY playlistWidthFactorChanged)
-    Q_PROPERTY(bool interfaceAlwaysOnTop READ isInterfaceAlwaysOnTop WRITE setInterfaceAlwaysOnTop NOTIFY interfaceAlwaysOnTopChanged)
-    Q_PROPERTY(bool interfaceFullScreen READ isInterfaceFullScreen WRITE setInterfaceFullScreen NOTIFY interfaceFullScreenChanged)
-    Q_PROPERTY(bool hasEmbededVideo READ hasEmbededVideo NOTIFY hasEmbededVideoChanged)
-    Q_PROPERTY(bool showRemainingTime READ isShowRemainingTime WRITE setShowRemainingTime NOTIFY showRemainingTimeChanged)
-    Q_PROPERTY(VLCVarChoiceModel* extraInterfaces READ getExtraInterfaces CONSTANT)
-    Q_PROPERTY(float intfScaleFactor READ getIntfScaleFactor NOTIFY intfScaleFactorChanged)
-    Q_PROPERTY(bool mediaLibraryAvailable READ hasMediaLibrary CONSTANT)
-    Q_PROPERTY(MediaLib* mediaLibrary READ getMediaLibrary CONSTANT)
-    Q_PROPERTY(bool gridView READ hasGridView WRITE setGridView NOTIFY gridViewChanged)
-    Q_PROPERTY(ColorSchemeModel* colorScheme READ getColorScheme CONSTANT)
-    Q_PROPERTY(bool hasVLM READ hasVLM CONSTANT)
-    Q_PROPERTY(bool clientSideDecoration READ useClientSideDecoration NOTIFY useClientSideDecorationChanged)
-    Q_PROPERTY(bool hasToolbarMenu READ hasToolbarMenu NOTIFY hasToolbarMenuChanged)
-    Q_PROPERTY(bool canShowVideoPIP READ canShowVideoPIP CONSTANT)
-    Q_PROPERTY(bool pinVideoControls READ pinVideoControls WRITE setPinVideoControls NOTIFY pinVideoControlsChanged)
-    Q_PROPERTY(ControlbarProfileModel* controlbarProfileModel READ controlbarProfileModel CONSTANT)
-
+    Q_PROPERTY(bool playlistDocked READ isPlaylistDocked WRITE setPlaylistDocked NOTIFY playlistDockedChanged FINAL)
+    Q_PROPERTY(bool playlistVisible READ isPlaylistVisible WRITE setPlaylistVisible NOTIFY playlistVisibleChanged FINAL)
+    Q_PROPERTY(double playlistWidthFactor READ getPlaylistWidthFactor WRITE setPlaylistWidthFactor NOTIFY playlistWidthFactorChanged FINAL)
+    Q_PROPERTY(bool interfaceAlwaysOnTop READ isInterfaceAlwaysOnTop WRITE setInterfaceAlwaysOnTop NOTIFY interfaceAlwaysOnTopChanged FINAL)
+    Q_PROPERTY(bool interfaceFullScreen READ isInterfaceFullScreen WRITE setInterfaceFullScreen NOTIFY interfaceFullScreenChanged FINAL)
+    Q_PROPERTY(bool hasEmbededVideo READ hasEmbededVideo NOTIFY hasEmbededVideoChanged FINAL)
+    Q_PROPERTY(bool showRemainingTime READ isShowRemainingTime WRITE setShowRemainingTime NOTIFY showRemainingTimeChanged FINAL)
+    Q_PROPERTY(VLCVarChoiceModel* extraInterfaces READ getExtraInterfaces CONSTANT FINAL)
+    Q_PROPERTY(float intfScaleFactor READ getIntfScaleFactor NOTIFY intfScaleFactorChanged FINAL)
+    Q_PROPERTY(bool mediaLibraryAvailable READ hasMediaLibrary CONSTANT FINAL)
+    Q_PROPERTY(MediaLib* mediaLibrary READ getMediaLibrary CONSTANT FINAL)
+    Q_PROPERTY(bool gridView READ hasGridView WRITE setGridView NOTIFY gridViewChanged FINAL)
+    Q_PROPERTY(ColorSchemeModel* colorScheme READ getColorScheme CONSTANT FINAL)
+    Q_PROPERTY(bool hasVLM READ hasVLM CONSTANT FINAL)
+    Q_PROPERTY(bool clientSideDecoration READ useClientSideDecoration NOTIFY useClientSideDecorationChanged FINAL)
+    Q_PROPERTY(int  csdBorderSize READ CSDBorderSize NOTIFY useClientSideDecorationChanged FINAL)
+    Q_PROPERTY(bool hasToolbarMenu READ hasToolbarMenu NOTIFY hasToolbarMenuChanged FINAL)
+    Q_PROPERTY(bool canShowVideoPIP READ canShowVideoPIP CONSTANT FINAL)
+    Q_PROPERTY(bool pinVideoControls READ pinVideoControls WRITE setPinVideoControls NOTIFY pinVideoControlsChanged FINAL)
+    Q_PROPERTY(ControlbarProfileModel* controlbarProfileModel READ controlbarProfileModel CONSTANT FINAL)
 
 public:
     /* tors */
-    MainInterface( intf_thread_t *, QWidget *parent = nullptr, Qt::WindowFlags flags = Qt::WindowFlags());
+    MainInterface(qt_intf_t *);
     virtual ~MainInterface();
 
     static const QEvent::Type ToolbarsNeedRebuild;
@@ -175,7 +175,7 @@ public:
 public:
     /* Getters */
     QSystemTrayIcon *getSysTray() { return sysTray; }
-    QMenu *getSysTrayMenu() { return systrayMenu; }
+    QMenu *getSysTrayMenu() { return systrayMenu.get(); }
     enum
     {
         CONTROLS_VISIBLE  = 0x1,
@@ -189,7 +189,8 @@ public:
         RAISE_AUDIO,
         RAISE_AUDIOVIDEO,
     };
-    bool isInterfaceFullScreen() { return b_interfaceFullScreen; }
+    inline bool isInterfaceFullScreen() const { return m_windowVisibility == QWindow::FullScreen; }
+    inline bool isInterfaceVisible() const { return m_windowVisibility != QWindow::Hidden; }
     bool isPlaylistDocked() { return b_playlistDocked; }
     bool isPlaylistVisible() { return playlistVisible; }
     inline double getPlaylistWidthFactor() const { return playlistWidthFactor; }
@@ -198,6 +199,7 @@ public:
     inline bool isShowRemainingTime() const  { return m_showRemainingTime; }
     inline float getIntfScaleFactor() const { return m_intfScaleFactor; }
     inline float getIntfUserScaleFactor() const { return m_intfUserScaleFactor; }
+    inline int CSDBorderSize() const { return 5 * getIntfScaleFactor(); }
     inline float getMinIntfUserScaleFactor() const { return MIN_INTF_USER_SCALE_FACTOR; }
     inline float getMaxIntfUserScaleFactor() const { return MAX_INTF_USER_SCALE_FACTOR; }
     inline bool hasMediaLibrary() const { return b_hasMedialibrary; }
@@ -211,6 +213,8 @@ public:
     inline void setCanShowVideoPIP(bool canShowVideoPIP) { m_canShowVideoPIP = canShowVideoPIP; }
     inline bool pinVideoControls() const { return m_pinVideoControls; }
     inline ControlbarProfileModel* controlbarProfileModel() const { return m_controlbarProfileModel; }
+    inline QUrl getDialogFilePath() const { return m_dialogFilepath; }
+    inline void setDialogFilePath(const QUrl& filepath ){ m_dialogFilepath = filepath; }
 
     bool hasEmbededVideo() const;
     VideoSurfaceProvider* getVideoSurfaceProvider() const;
@@ -219,14 +223,12 @@ public:
     Q_INVOKABLE static inline void setCursor(Qt::CursorShape cursor) { QApplication::setOverrideCursor(QCursor(cursor)); };
     Q_INVOKABLE static inline void restoreCursor(void) { QApplication::restoreOverrideCursor(); };
 
-protected:
     void dropEventPlay( QDropEvent* event, bool b_play );
-    void dropEvent( QDropEvent *) Q_DECL_OVERRIDE;
-    void dragEnterEvent( QDragEnterEvent * ) Q_DECL_OVERRIDE;
-    void dragMoveEvent( QDragMoveEvent * ) Q_DECL_OVERRIDE;
-    void dragLeaveEvent( QDragLeaveEvent * ) Q_DECL_OVERRIDE;
-    void closeEvent( QCloseEvent *) Q_DECL_OVERRIDE;
-    virtual void updateClientSideDecorations();
+    /**
+     * @brief ask for the application to terminate
+     * @return true if the application can be close right away, false if it will be delayed
+     */
+    bool onWindowClose(QWindow* );
 
 protected:
     /* Systray */
@@ -234,9 +236,7 @@ protected:
     void initSystray();
     void handleSystray();
 
-    /* */
-    void setInterfaceFullScreen( bool );
-    void computeMinimumSize();
+    qt_intf_t* p_intf = nullptr;
 
     bool m_hasEmbededVideo = false;
     VideoSurfaceProvider* m_videoSurfaceProvider = nullptr;
@@ -245,14 +245,9 @@ protected:
     /* */
     QSettings           *settings;
     QSystemTrayIcon     *sysTray;
-    QMenu               *systrayMenu;
+    std::unique_ptr<QMenu> systrayMenu;
 
     QString              input_name;
-    QVBoxLayout         *mainLayout;
-
-    /* Status Bar */
-    QLabel              *nameLabel;
-    QLabel              *cryptedLabel;
 
     /* Status and flags */
     QPoint              lastWinPosition;
@@ -270,7 +265,7 @@ protected:
     bool                 b_hideAfterCreation;
     bool                 b_minimalView;         ///< Minimal video
     bool                 b_playlistDocked;
-    bool                 b_interfaceFullScreen;
+    QWindow::Visibility  m_windowVisibility = QWindow::Windowed;
     bool                 b_interfaceOnTop;      ///keep UI on top
 #ifdef QT5_HAS_WAYLAND
     bool                 b_hasWayland;
@@ -283,14 +278,11 @@ protected:
     bool                 m_hasToolbarMenu = false;
     bool                 m_canShowVideoPIP = false;
     bool                 m_pinVideoControls = false;
+    QUrl                 m_dialogFilepath; /* Last path used in dialogs */
 
     /* States */
     bool                 playlistVisible;       ///< Is the playlist visible ?
     double               playlistWidthFactor;   ///< playlist size: root.width / playlistScaleFactor
-
-
-    static const Qt::Key kc[10]; /* easter eggs */
-    int i_kc_offset;
 
     VLCVarChoiceModel* m_extraInterfaces;
 
@@ -310,6 +302,8 @@ public slots:
     void incrementIntfUserScaleFactor( bool increment);
     void setIntfUserScaleFactor( float );
     void setPinVideoControls( bool );
+    void updateIntfScaleFactor();
+    void onWindowVisibilityChanged(QWindow::Visibility);
 
     void emitBoss();
     void emitRaise();
@@ -323,10 +317,7 @@ protected slots:
     void updateSystrayTooltipName( const QString& );
     void updateSystrayTooltipStatus( PlayerController::PlayingState );
 
-    void showBuffering( float );
-
     void onInputChanged( bool );
-    void updateIntfScaleFactor();
 
     void sendHotkey(Qt::Key key, Qt::KeyboardModifiers modifiers );
 
@@ -334,6 +325,7 @@ signals:
     void minimalViewToggled( bool );
     void fullscreenInterfaceToggled( bool );
     void setInterfaceVisibible(bool );
+    void setInterfaceFullScreen( bool );
     void toggleWindowVisibility();
     void askToQuit();
     void askShow();

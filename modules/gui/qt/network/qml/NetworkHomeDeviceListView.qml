@@ -25,7 +25,7 @@ import "qrc:///widgets/" as Widgets
 import "qrc:///util/" as Util
 import "qrc:///style/"
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: root
 
     height: deviceListView.implicitHeight
@@ -109,7 +109,7 @@ Widgets.NavigableFocusScope {
                 if (model.type === NetworkMediaModel.TYPE_NODE || model.type === NetworkMediaModel.TYPE_DIRECTORY)
                     history.push( ["mc", "network", { tree: model.tree } ])
                 else
-                    model.addAndPlay( index )
+                    deviceModel.addAndPlay( index )
             }
         }
 
@@ -118,6 +118,6 @@ Widgets.NavigableFocusScope {
         onActionAtIndex: {
             _actionAtIndex(index, deviceModel, deviceSelection)
         }
-        navigationParent: root
+        Navigation.parentItem: root
     }
 }

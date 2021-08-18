@@ -177,6 +177,9 @@ typedef struct
 static const pair_format_guid video_format_table[] =
 {
     { VLC_CODEC_H264, &MFVideoFormat_H264 },
+    { VLC_CODEC_MPGV, &MFVideoFormat_MPEG2 },
+    { VLC_CODEC_MP2V, &MFVideoFormat_MPEG2 },
+    { VLC_CODEC_MP1V, &MFVideoFormat_MPG1 },
     { VLC_CODEC_MJPG, &MFVideoFormat_MJPG },
     { VLC_CODEC_WMV1, &MFVideoFormat_WMV1 },
     { VLC_CODEC_WMV2, &MFVideoFormat_WMV2 },
@@ -186,7 +189,13 @@ static const pair_format_guid video_format_table[] =
 };
 
 // 8-bit luminance only
-DEFINE_MEDIATYPE_GUID (MFVideoFormat_L8, 50);
+
+// Older versions of mingw-w64 lack this GUID, but it was added in mingw-w64
+// git on 2021-07-11 (during __MINGW64_VERSION_MAJOR 10). Use a local
+// redefinition of this GUID with a custom prefix, to let the same code build
+// with both older and newer versions of mingw-w64 (and earlier git snapshots
+// with __MINGW64_VERSION_MAJOR == 10).
+DEFINE_MEDIATYPE_GUID (vlc_MFVideoFormat_L8, 50);
 
 /*
  * Table to map MF Transform raw 3D3 output formats to native VLC FourCC
@@ -195,7 +204,7 @@ static const pair_format_guid d3d_format_table[] = {
     { VLC_CODEC_RGB32, &MFVideoFormat_RGB32  },
     { VLC_CODEC_RGB24, &MFVideoFormat_RGB24  },
     { VLC_CODEC_RGBA,  &MFVideoFormat_ARGB32 },
-    { VLC_CODEC_GREY,  &MFVideoFormat_L8     },
+    { VLC_CODEC_GREY,  &vlc_MFVideoFormat_L8 },
     { 0, NULL }
 };
 
@@ -410,7 +419,7 @@ static int SetOutputType(decoder_t *p_dec, DWORD stream_id, IMFMediaType **resul
 
         if (p_dec->fmt_in.i_cat == VIDEO_ES)
         {
-            if (IsEqualGUID(&subtype, &MFVideoFormat_YV12) || IsEqualGUID(&subtype, &MFVideoFormat_I420))
+            if (IsEqualGUID(&subtype, &MFVideoFormat_NV12) || IsEqualGUID(&subtype, &MFVideoFormat_YV12) || IsEqualGUID(&subtype, &MFVideoFormat_I420))
                 found = true;
             /* Transform might offer output in a D3DFMT propietary FCC. If we can
              * use it, fall back to it in case we do not find YV12 or I420 */
@@ -516,6 +525,7 @@ static int AllocateInputSample(decoder_t *p_dec, DWORD stream_id, IMFSample** re
     *result = NULL;
 
     IMFSample *input_sample = NULL;
+    IMFMediaBuffer *input_media_buffer = NULL;
 
     MFT_INPUT_STREAM_INFO input_info;
     hr = IMFTransform_GetInputStreamInfo(p_sys->mft, stream_id, &input_info);
@@ -526,7 +536,6 @@ static int AllocateInputSample(decoder_t *p_dec, DWORD stream_id, IMFSample** re
     if (FAILED(hr))
         goto error;
 
-    IMFMediaBuffer *input_media_buffer = NULL;
     DWORD allocation_size = __MAX(input_info.cbSize, size);
     hr = mf->fptr_MFCreateMemoryBuffer(allocation_size, &input_media_buffer);
     if (FAILED(hr))
@@ -1029,7 +1038,7 @@ static int InitializeMFT(decoder_t *p_dec)
 
         if (p_dec->fmt_in.i_extra)
         {
-            if (h264_isavcC((uint8_t*)p_dec->fmt_in.p_extra, p_dec->fmt_in.i_extra))
+            if (h264_isavcC(p_dec->fmt_in.p_extra, p_dec->fmt_in.i_extra))
             {
                 size_t i_buf;
                 uint8_t *buf = h264_avcC_to_AnnexB_NAL(p_dec->fmt_in.p_extra,

@@ -26,37 +26,60 @@ set -e
 LANG=C
 export LANG
 
-if test "$1" = "-h" -o "$1" = "--help" -o $# -gt 2; then
-  echo "Usage: $0 [old prefix] [new prefix]
+usage() {
+  echo "Usage: $0 [prefix]
 
-Without arguments, this script assumes old prefix = @@CONTRIB_PREFIX@@,
-and new prefix = current directory.
+ * If a prefix is provided, this script will replaces any of its occurences
+   with its own internal value to be able to replace the prefixes when using a
+   prebuild package.
+   If the .pc file contains a prefix which doesn't match the provided one, this
+   script will error out
+ * If no prefix is provided, this script will replace its internal value with
+   the current working directory
 "
-fi
+}
 
-if [ $# != 2 ]
-then
+if test "$1" = "-h" -o "$1" = "--help" ; then
+    usage
+    exit 0;
+elif [ $# -gt 2 ]; then
+    usage
+    exit 1
+elif [ $# != 1 ]; then
     old_prefix=@@CONTRIB_PREFIX@@
     new_prefix=`pwd`
 else
     old_prefix=$1
-    new_prefix=$2
+    new_prefix=@@CONTRIB_PREFIX@@
+    CHECK_PREFIX=1
 fi
 
-# process [dir] [filemask] [text only]
+# process [dir] [filemask] [text_only|check]
 process() {
     for file in `find $1 \( ! -name \`basename $1\` -o -type f \) -prune -type f -name "$2"`
     do
-        if [ -n "$3" ]
+        if [ -n "$3" -a "$3" = "text_only" ]
         then
             file $file | sed "s/^.*: //" | grep -q 'text\|shell' || continue
         fi
         echo "Fixing up $file"
+        if [ -n "$3" -a "$3" = "check" -a ! -z "$CHECK_PREFIX" ]
+        then
+            # Ensure the file we're checking contains a prefix
+            if grep -q '^prefix=' $file; then
+                # And if it does, ensure it's correctly pointing to the configured one
+                if ! grep -q $old_prefix $file; then
+                    echo "Can't find the old_prefix ($old_prefix) in file $file:"
+                    cat $file
+                    exit 1;
+                fi
+            fi
+        fi
         sed -i.orig -e "s,$old_prefix,$new_prefix,g" $file
         rm -f $file.orig
     done
 }
 
-process bin/ "*" check
+process bin/ "*" text_only
 process lib/ "*.la"
-process lib/pkgconfig/ "*.pc"
+process lib/pkgconfig/ "*.pc" check

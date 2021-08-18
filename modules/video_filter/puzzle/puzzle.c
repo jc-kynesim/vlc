@@ -50,15 +50,13 @@
  * Module descriptor
  *****************************************************************************/
 #define ROWS_TEXT N_("Number of puzzle rows")
-#define ROWS_LONGTEXT N_("Number of puzzle rows")
 #define COLS_TEXT N_("Number of puzzle columns")
-#define COLS_LONGTEXT N_("Number of puzzle columns")
 #define MODE_TEXT N_("Game mode")
 #define MODE_LONGTEXT N_("Select game mode variation from jigsaw puzzle to sliding puzzle.")
 #define BORDER_TEXT N_("Border")
 #define BORDER_LONGTEXT N_("Unshuffled Border width.")
 #define PREVIEW_TEXT N_("Small preview")
-#define PREVIEW_LONGTEXT N_("Show small preview.")
+#define PREVIEW_LONGTEXT NULL
 #define PREVIEWSIZE_TEXT N_("Small preview size")
 #define PREVIEWSIZE_LONGTEXT N_("Show small preview size (percent of source).")
 #define SHAPE_SIZE_TEXT N_("Piece edge shape size")
@@ -87,26 +85,26 @@ vlc_module_begin()
     set_subcategory( SUBCAT_VIDEO_VFILTER )
 
     add_integer_with_range( CFG_PREFIX "rows", 4, 2, 42,
-                            ROWS_TEXT, ROWS_LONGTEXT, false )
+                            ROWS_TEXT, NULL )
     add_integer_with_range( CFG_PREFIX "cols", 4, 2, 42,
-                            COLS_TEXT, COLS_LONGTEXT, false )
+                            COLS_TEXT, NULL )
     add_integer_with_range( CFG_PREFIX "border", 3, 0, 40,
-              BORDER_TEXT, BORDER_LONGTEXT, false )
+              BORDER_TEXT, BORDER_LONGTEXT )
     add_bool( CFG_PREFIX "preview", false,
-              PREVIEW_TEXT, PREVIEW_LONGTEXT, false )
+              PREVIEW_TEXT, PREVIEW_LONGTEXT )
     add_integer_with_range( CFG_PREFIX "preview-size", 15, 0, 100,
-              PREVIEWSIZE_TEXT, PREVIEWSIZE_LONGTEXT, false )
+              PREVIEWSIZE_TEXT, PREVIEWSIZE_LONGTEXT )
     add_integer_with_range( CFG_PREFIX "shape-size", 90, 0, 100,
-              SHAPE_SIZE_TEXT, SHAPE_SIZE_LONGTEXT, false )
+              SHAPE_SIZE_TEXT, SHAPE_SIZE_LONGTEXT )
     add_integer_with_range( CFG_PREFIX "auto-shuffle", 0, 0, 30000,
-              AUTO_SHUFFLE_TEXT, AUTO_SHUFFLE_LONGTEXT, false )
+              AUTO_SHUFFLE_TEXT, AUTO_SHUFFLE_LONGTEXT )
     add_integer_with_range( CFG_PREFIX "auto-solve", 0, 0, 30000,
-              AUTO_SOLVE_TEXT, AUTO_SOLVE_LONGTEXT, false )
+              AUTO_SOLVE_TEXT, AUTO_SOLVE_LONGTEXT )
     add_integer( CFG_PREFIX "rotation", 0,
-              ROTATION_TEXT, ROTATION_LONGTEXT, false )
+              ROTATION_TEXT, ROTATION_LONGTEXT )
         change_integer_list(pi_rotation_values, ppsz_rotation_descriptions )
     add_integer( CFG_PREFIX "mode", 0,
-              MODE_TEXT, MODE_LONGTEXT, false )
+              MODE_TEXT, MODE_LONGTEXT )
         change_integer_list(pi_mode_values, ppsz_mode_descriptions )
 
     set_callback_video_filter( Open )

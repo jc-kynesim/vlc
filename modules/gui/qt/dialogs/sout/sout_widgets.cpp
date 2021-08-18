@@ -25,6 +25,7 @@
 
 #include "dialogs/sout/sout_widgets.hpp"
 #include "dialogs/sout/sout.hpp"
+#include "maininterface/main_interface.hpp"
 #include "util/soutchain.hpp"
 #include "util/qt_dirs.hpp"
 #include <vlc_intf_strings.h>
@@ -95,7 +96,7 @@ void SoutInputBox::setMRL( const QString& mrl )
             toNativeSeparators(uri.toDisplayString(
                 QUrl::RemovePassword | QUrl::PreferLocalFile | QUrl::NormalizePathSegments
             )));
-        if ( type.isEmpty() ) type = qtr( I_FILE_SLASH_DIR );
+        if ( type.isEmpty() ) type = qfut( I_FILE_SLASH_DIR );
         sourceValueLabel->setText( type );
     }
 }
@@ -118,7 +119,7 @@ VirtualDestBox::~VirtualDestBox()
 }
 
 /* FileDest Box */
-FileDestBox::FileDestBox( QWidget *_parent, intf_thread_t * _p_intf ) : VirtualDestBox( _parent )
+FileDestBox::FileDestBox( QWidget *_parent, qt_intf_t * _p_intf ) : VirtualDestBox( _parent )
 {
     p_intf = _p_intf;
 
@@ -171,7 +172,7 @@ void FileDestBox::fileBrowse()
 {
     const QStringList schemes = QStringList(QStringLiteral("file"));
     QString fileName = QFileDialog::getSaveFileUrl( this, qtr( "Save file..." ),
-            p_intf->p_sys->filepath, qtr( "Containers (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv *.webm)" ),
+            p_intf->p_mi->getDialogFilePath(), qtr( "Containers (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv *.webm)" ),
             nullptr, QFileDialog::Options(), schemes).toLocalFile();
     fileEdit->setText( toNativeSeparators( fileName ) );
     emit mrlUpdated();

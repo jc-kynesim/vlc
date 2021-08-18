@@ -32,7 +32,7 @@ class WinTaskbarWidget : public QObject, public QAbstractNativeEventFilter
 {
     Q_OBJECT
 public:
-    WinTaskbarWidget( intf_thread_t *p_intf, QWindow* windowHandle, QObject* parent = nullptr);
+    WinTaskbarWidget( qt_intf_t *p_intf, QWindow* windowHandle, QObject* parent = nullptr);
     virtual ~WinTaskbarWidget();
 
 private:
@@ -45,7 +45,7 @@ private slots:
     virtual void onVideoFullscreenChanged( bool fs );
 
 private:
-    intf_thread_t* p_intf = nullptr;
+    qt_intf_t* p_intf = nullptr;
     HIMAGELIST himl = nullptr;
     ITaskbarList3 *p_taskbl = nullptr;
     UINT taskbar_wmsg = 0;
@@ -59,28 +59,31 @@ class MainInterfaceWin32 : public MainInterface
 {
     Q_OBJECT
 public:
-    MainInterfaceWin32( intf_thread_t *, QWidget *parent = nullptr, Qt::WindowFlags flags = Qt::WindowFlags());
+    explicit MainInterfaceWin32(qt_intf_t *);
     virtual ~MainInterfaceWin32() = default;
-
-private:
-    virtual bool nativeEvent(const QByteArray &eventType, void *message, long *result) override;
 
 public slots:
     virtual void reloadPrefs() override;
-
-protected:
-    void updateClientSideDecorations() Q_DECL_OVERRIDE;
 };
 
-class InterfaceWindowHandlerWin32 : public InterfaceWindowHandler
+class InterfaceWindowHandlerWin32 : public InterfaceWindowHandler, public QAbstractNativeEventFilter
 {
     Q_OBJECT
 public:
-    explicit InterfaceWindowHandlerWin32(intf_thread_t *_p_intf, MainInterface* mainInterface, QWindow* window, QObject *parent = nullptr);
-    virtual ~InterfaceWindowHandlerWin32() = default;
+    explicit InterfaceWindowHandlerWin32(qt_intf_t *_p_intf, MainInterface* mainInterface, QWindow* window, QObject *parent = nullptr);
+    virtual ~InterfaceWindowHandlerWin32();
     virtual void toggleWindowVisiblity() override;
 
     virtual bool eventFilter(QObject*, QEvent* event) override;
+
+protected:
+    bool nativeEventFilter(const QByteArray &eventType, void *message, long *result) override;
+
+private:
+#if QT_CLIENT_SIDE_DECORATION_AVAILABLE
+    void updateCSDWindowSettings() override;
+    QObject *m_CSDWindowEventHandler {};
+#endif
 };
 
 #endif // MAIN_INTERFACE_WIN32_HPP

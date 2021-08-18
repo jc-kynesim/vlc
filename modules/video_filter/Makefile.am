@@ -159,7 +159,6 @@ noinst_LTLIBRARIES += libdeinterlace_common.la
 
 libdeinterlace_plugin_la_SOURCES = \
 	video_filter/deinterlace/deinterlace.c video_filter/deinterlace/deinterlace.h \
-        video_filter/deinterlace/mmx.h \
 	video_filter/deinterlace/merge.c video_filter/deinterlace/merge.h \
 	video_filter/deinterlace/helpers.c video_filter/deinterlace/helpers.h \
 	video_filter/deinterlace/algo_basic.c video_filter/deinterlace/algo_basic.h \
@@ -187,6 +186,25 @@ libdeinterlace_plugin_la_CFLAGS += -DCAN_COMPILE_SVE
 endif
 libdeinterlace_plugin_la_LIBADD = libdeinterlace_common.la
 video_filter_LTLIBRARIES += libdeinterlace_plugin.la
+
+libglblend_plugin_la_SOURCES = video_filter/deinterlace/glblend.c
+libglblend_plugin_la_CFLAGS = $(AM_CFLAGS)
+if HAVE_GL
+libglblend_plugin_la_LIBADD = libvlc_opengl.la
+video_filter_LTLIBRARIES += libglblend_plugin.la
+endif
+
+if HAVE_IOS
+libglblend_plugin_la_LIBADD = libvlc_opengles.la
+libglblend_plugin_la_CFLAGS += -DUSE_OPENGL_ES2=1
+video_filter_LTLIBRARIES += libglblend_plugin.la
+endif
+
+if HAVE_ANDROID
+libglblend_plugin_la_LIBADD = libvlc_opengles.la
+libglblend_plugin_la_CFLAGS += -DUSE_OPENGL_ES2=1
+video_filter_LTLIBRARIES += libglblend_plugin.la
+endif
 
 libopencv_wrapper_plugin_la_SOURCES = video_filter/opencv_wrapper.c
 libopencv_wrapper_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(OPENCV_CFLAGS)

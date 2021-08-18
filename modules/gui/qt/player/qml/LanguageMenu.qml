@@ -19,7 +19,7 @@
 import QtQuick 2.11
 import QtQuick.Controls 2.4
 import QtQuick.Templates 2.4 as T
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtQml.Models 2.11
 
 import org.videolan.vlc 0.1
@@ -27,7 +27,6 @@ import org.videolan.vlc 0.1
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
 import "qrc:///util/" as Util
-import "qrc:///util/KeyHelper.js" as KeyHelper
 
 T.Popup {
     id: control
@@ -56,7 +55,7 @@ T.Popup {
                 property: "opacity"
                 from: 0
                 to: 1
-                duration: 200
+                duration: VLCStyle.duration_normal
             }
         }
         pushExit: Transition {
@@ -64,7 +63,7 @@ T.Popup {
                 property: "opacity"
                 from: 1
                 to: 0
-                duration: 200
+                duration: VLCStyle.duration_normal
             }
         }
         popEnter: Transition {
@@ -72,7 +71,7 @@ T.Popup {
                 property: "opacity"
                 from: 0
                 to: 1
-                duration: 200
+                duration: VLCStyle.duration_normal
             }
         }
         popExit: Transition {
@@ -80,7 +79,7 @@ T.Popup {
                 property: "opacity"
                 from: 1
                 to: 0
-                duration: 200
+                duration: VLCStyle.duration_normal
             }
         }
     }
@@ -104,7 +103,7 @@ T.Popup {
 
     Behavior on width {
         SmoothedAnimation {
-            duration: 64
+            duration: VLCStyle.ms64
             easing.type: Easing.InOutSine
         }
     }
@@ -127,7 +126,7 @@ T.Popup {
                 Layout.preferredWidth: VLCStyle.dp(72, VLCStyle.scale)
                 Layout.alignment: Qt.AlignTop | Qt.AlignLeft
                 Layout.topMargin: VLCStyle.margin_large
-                navigationRightItem: tracksListRow
+                Navigation.rightItem: tracksListRow
 
                 model: [{
                         "icon": VLCIcons.download,
@@ -147,20 +146,20 @@ T.Popup {
                         "component": undefined
                     }]
 
-                delegate: Widgets.IconToolButton {
-                    id: btn
-
+                delegate: Widgets.IconTrackButton {
                     iconText: modelData.icon
-                    color: "white"
+
                     size: VLCStyle.dp(40, VLCStyle.scale)
                     x: (btnsCol.width - width) / 2
                     highlighted: index === 3
                                  && player.subtitleTracks.multiSelect
 
-                    ToolTip.visible: btn.hovered || btn.activeFocus
+                    ToolTip.visible: (hovered || activeFocus)
                     ToolTip.text: modelData.tooltip
                     ToolTip.delay: 1000
                     ToolTip.toolTip.z: 2
+
+                    Navigation.parentItem: btnsCol
 
                     onClicked: {
                         if (index === 0) {
@@ -180,9 +179,10 @@ T.Popup {
             Widgets.NavigableRow {
                 id: tracksListRow
 
-                navigationLeftItem: btnsCol
                 Layout.fillHeight: true
                 Layout.fillWidth: true
+
+                Navigation.leftItem: btnsCol
 
                 model: [{
                         "title": i18n.qtr("Subtitle"),
@@ -214,7 +214,7 @@ T.Popup {
 
                            x: 0
                            y: 0
-                           width: VLCStyle.dp(2, VLCStyle.scale)
+                           width: VLCStyle.margin_xxxsmall
 
                            height: tracksListContainer.height
                            color: "white"
@@ -243,12 +243,11 @@ T.Popup {
                                    - parent.leftPadding - parent.rightPadding
                         }
 
-                        Widgets.IconToolButton {
+                        Widgets.IconTrackButton {
                             id: addBtn
 
                             iconText: VLCIcons.add
                             size: VLCStyle.icon_normal
-                            color: "white"
                             focus: true
                             onClicked: {
                                 switch (index) {
@@ -264,7 +263,8 @@ T.Popup {
                                 }
                             }
 
-                            KeyNavigation.down: tracksList
+                            Navigation.parentItem: tracksListContainer
+                            Navigation.downItem: tracksList
                         }
                     }
 
@@ -278,13 +278,18 @@ T.Popup {
                         focus: true
                         clip: true
 
+                        Navigation.parentItem: tracksListContainer
+                        Navigation.upItem: addBtn
+                        Keys.priority: Keys.AfterItem
+                        Keys.onPressed: Navigation.defaultKeyAction(event)
+
                         delegate: Widgets.CheckedDelegate {
                             readonly property bool isModelChecked: model.checked
                             clip: true
 
                             focus: true
                             text: model.display
-                            width: tracksListContainer.width
+                            width: tracksListContainer.width - VLCStyle.margin_xxxsmall
                             height: VLCStyle.dp(40, VLCStyle.scale)
                             opacity: hovered || activeFocus || checked ? 1 : .6
                             font.weight: hovered
@@ -300,8 +305,6 @@ T.Popup {
                                     model.checked = checked
                             }
                         }
-
-                        KeyNavigation.up: addBtn
                     }
                 }
             }
@@ -325,24 +328,23 @@ T.Popup {
                 Layout.topMargin: VLCStyle.margin_large
                 Layout.fillHeight: true
 
-                Widgets.IconToolButton {
+                Widgets.IconTrackButton {
                     id: backBtn
 
                     anchors.horizontalCenter: parent.horizontalCenter
                     size: VLCStyle.dp(36, VLCStyle.scale)
                     iconText: VLCIcons.back
-                    color: "white"
 
                     onClicked: {
                         control._updateWidth(true)
                         delayPageRoot.StackView.view.pop()
                     }
-                    KeyNavigation.right: audioDelaySpin
+                    Navigation.rightItem: audioDelaySpin
                 }
             }
 
             Rectangle {
-                Layout.preferredWidth: VLCStyle.dp(2, VLCStyle.scale)
+                Layout.preferredWidth: VLCStyle.margin_xxxsmall
                 Layout.fillHeight: true
                 color: "white"
                 opacity: .1
@@ -357,7 +359,7 @@ T.Popup {
                 Layout.topMargin: VLCStyle.margin_large
                 spacing: VLCStyle.margin_xxsmall
 
-                KeyNavigation.left: backBtn
+                Navigation.leftItem: backBtn
 
                 Widgets.SubtitleLabel {
                     Layout.fillWidth: true
@@ -416,19 +418,18 @@ T.Popup {
                             }
                         }
 
-                        KeyNavigation.right: audioDelaySpinReset
+                        Navigation.rightItem: audioDelaySpinReset
                     }
 
-                    Widgets.TabButtonExt {
+                    Widgets.ActionButtonOverlay {
                         id: audioDelaySpinReset
 
                         text: i18n.qtr("Reset")
-                        color: "white"
 
                         onClicked: audioDelaySpin.value = 0
-                        KeyNavigation.left: audioDelaySpin
-                        KeyNavigation.right: primarySubSpin
-                        KeyNavigation.down: primarySubSpinReset
+                        Navigation.leftItem: audioDelaySpin
+                        Navigation.rightItem: primarySubSpin
+                        Navigation.downItem: primarySubSpinReset
                     }
                 }
 
@@ -482,20 +483,19 @@ T.Popup {
                             }
                         }
 
-                        KeyNavigation.right: primarySubSpinReset
+                        Navigation.rightItem: primarySubSpinReset
                     }
 
-                    Widgets.TabButtonExt {
+                    Widgets.ActionButtonOverlay {
                         id: primarySubSpinReset
 
                         text: i18n.qtr("Reset")
-                        color: "white"
                         focus: true
                         onClicked: primarySubSpin.value = 0
-                        KeyNavigation.left: primarySubSpin
-                        KeyNavigation.right: secondarySubSpin
-                        KeyNavigation.up: audioDelaySpinReset
-                        KeyNavigation.down: secondarySubSpinReset
+                        Navigation.leftItem: primarySubSpin
+                        Navigation.rightItem: secondarySubSpin
+                        Navigation.upItem: audioDelaySpinReset
+                        Navigation.downItem: secondarySubSpinReset
                     }
                 }
 
@@ -542,17 +542,16 @@ T.Popup {
                             }
                         }
 
-                        KeyNavigation.right: secondarySubSpinReset
+                        Navigation.rightItem: secondarySubSpinReset
                     }
 
-                    Widgets.TabButtonExt {
+                    Widgets.ActionButtonOverlay {
                         id: secondarySubSpinReset
 
                         text: i18n.qtr("Reset")
-                        color: "white"
                         onClicked: secondarySubSpin.value = 0
-                        KeyNavigation.left: secondarySubSpin
-                        KeyNavigation.up: primarySubSpinReset
+                        Navigation.leftItem: secondarySubSpin
+                        Navigation.upItem: primarySubSpinReset
                     }
                 }
             }
@@ -576,30 +575,31 @@ T.Popup {
                 Layout.topMargin: VLCStyle.margin_large
                 Layout.fillHeight: true
 
-                Widgets.IconToolButton {
+                Widgets.IconTrackButton {
                     id: backBtn
 
                     anchors.horizontalCenter: parent.horizontalCenter
                     size: VLCStyle.dp(36, VLCStyle.scale)
                     iconText: VLCIcons.back
-                    color: "white"
 
                     onClicked: {
                         control._updateWidth(true)
                         syncPageRoot.StackView.view.pop()
                     }
-                    KeyNavigation.right: subSpeedSpin
+                    Navigation.rightItem: subSpeedSpin
                 }
             }
 
             Rectangle {
-                Layout.preferredWidth: VLCStyle.dp(2, VLCStyle.scale)
+                Layout.preferredWidth: VLCStyle.margin_xxxsmall
                 Layout.fillHeight: true
                 color: "white"
                 opacity: .1
             }
 
             ColumnLayout {
+                id: subtitleSyncLayout
+
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.alignment: Qt.AlignLeft | Qt.AlignTop
@@ -608,7 +608,7 @@ T.Popup {
                 Layout.topMargin: VLCStyle.margin_large
                 spacing: VLCStyle.margin_xsmall
 
-                KeyNavigation.left: backBtn
+                Navigation.leftItem: backBtn
 
                 Widgets.SubtitleLabel {
                     Layout.fillWidth: true
@@ -665,17 +665,19 @@ T.Popup {
                             }
                         }
 
-                        KeyNavigation.right: subSpeedSpinReset
+                        Navigation.parentItem: subtitleSyncLayout
+                        Navigation.rightItem: subSpeedSpinReset
                     }
 
-                    Widgets.TabButtonExt {
+                    Widgets.ActionButtonOverlay {
                         id: subSpeedSpinReset
 
                         text: i18n.qtr("Reset")
-                        color: "white"
                         onClicked: subSpeedSpin.value = 10
 
-                        KeyNavigation.right: subSpeedSpin
+
+                        Navigation.parentItem: subtitleSyncLayout
+                        Navigation.leftItem: subSpeedSpin
                     }
                 }
             }

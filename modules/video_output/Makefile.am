@@ -3,6 +3,12 @@ vout_LTLIBRARIES =
 
 EXTRA_DIST += video_output/README
 
+### libplacebo ###
+if HAVE_LIBPLACEBO
+include video_output/libplacebo/Makefile.am
+endif
+
+### OpenGL ###
 include video_output/opengl/Makefile.am
 
 if HAVE_DECKLINK
@@ -34,7 +40,7 @@ libvout_macosx_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)' \
 	-Wl,-framework,OpenGL,-framework,Cocoa
 
 libcaopengllayer_plugin_la_SOURCES = video_output/caopengllayer.m
-libcaopengllayer_plugin_la_CFLAGS = $(AM_CFLAGS)  -DHAVE_GL_CORE_SYMBOLS
+libcaopengllayer_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)  -DHAVE_GL_CORE_SYMBOLS
 libcaopengllayer_plugin_la_LIBADD = libvlc_opengl.la
 libcaopengllayer_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)' \
 	-Wl,-framework,OpenGL,-framework,Cocoa,-framework,QuartzCore
@@ -139,18 +145,15 @@ vout_LTLIBRARIES += libglinterop_dxva2_plugin.la
 endif
 endif
 
-libdirect3d11_plugin_la_SOURCES = video_output/win32/direct3d11.c \
- video_output/win32/d3d11_quad.c video_output/win32/d3d11_quad.h \
- video_output/win32/d3d11_shaders.c video_output/win32/d3d11_shaders.h \
+libdirect3d11_plugin_la_SOURCES = video_output/win32/direct3d11.cpp \
+ video_output/win32/d3d11_quad.cpp video_output/win32/d3d11_quad.h \
+ video_output/win32/d3d11_shaders.cpp video_output/win32/d3d11_shaders.h \
  video_output/win32/d3d_shaders.c video_output/win32/d3d_shaders.h \
  video_output/win32/d3d_dynamic_shader.c video_output/win32/d3d_dynamic_shader.h \
- video_output/win32/d3d11_swapchain.c video_output/win32/d3d11_swapchain.h \
- video_output/win32/dxgi_swapchain.c video_output/win32/dxgi_swapchain.h \
+ video_output/win32/d3d11_swapchain.cpp video_output/win32/d3d11_swapchain.h \
+ video_output/win32/dxgi_swapchain.cpp video_output/win32/dxgi_swapchain.h \
  video_output/win32/common.c video_output/win32/common.h
 libdirect3d11_plugin_la_LIBADD = libchroma_copy.la libd3d11_common.la $(LIBCOM) -luuid
-if HAVE_DCOMP
-libdirect3d11_plugin_la_SOURCES += video_output/win32/dcomp_wrapper.cpp video_output/win32/dcomp_wrapper.h
-endif
 if !HAVE_WINSTORE
 libdirect3d11_plugin_la_SOURCES += video_output/win32/events.c \
  video_output/win32/events.h \
@@ -250,7 +253,7 @@ endif
 
 libegl_android_plugin_la_SOURCES = video_output/opengl/egl.c
 libegl_android_plugin_la_CFLAGS = $(AM_CFLAGS) $(EGL_CFLAGS) -DUSE_PLATFORM_ANDROID=1
-libegl_android_plugin_la_LIBADD = $(EGL_LIBS)
+libegl_android_plugin_la_LIBADD = $(EGL_LIBS) libandroid_utils.la
 
 libandroid_window_plugin_la_SOURCES = video_output/android/window.c
 libandroid_window_plugin_la_CFLAGS = $(AM_CFLAGS)
@@ -263,6 +266,7 @@ libandroid_display_plugin_la_LIBADD = libandroid_utils.la $(LIBDL)
 libglinterop_android_plugin_la_SOURCES = video_output/opengl/interop_android.c \
 	video_output/opengl/interop.h
 libglinterop_android_plugin_la_CFLAGS = $(AM_CFLAGS) -DUSE_OPENGL_ES2
+libglinterop_android_plugin_la_LIBADD = libandroid_utils.la
 
 if HAVE_ANDROID
 vout_LTLIBRARIES += libandroid_window_plugin.la libandroid_display_plugin.la

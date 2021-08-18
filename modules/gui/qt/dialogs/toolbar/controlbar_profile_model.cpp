@@ -188,7 +188,7 @@ decltype (ControlbarProfileModel::m_defaults)
         };
 
 
-ControlbarProfileModel::ControlbarProfileModel(intf_thread_t *p_intf, QObject *parent)
+ControlbarProfileModel::ControlbarProfileModel(qt_intf_t *p_intf, QObject *parent)
     : QAbstractListModel(parent),
     m_intf(p_intf)
 {
@@ -208,11 +208,14 @@ ControlbarProfileModel::ControlbarProfileModel(intf_thread_t *p_intf, QObject *p
             insertDefaults();
     });
 
-    if (reload() == false)
-    {
-        // If initial reload fails, load the default profiles:
-        insertDefaults();
-    }
+    // defer initialization reload:
+    QMetaObject::invokeMethod(this, [this] () {
+        if (reload() == false)
+        {
+            // If initial reload fails, load the default profiles:
+            insertDefaults();
+        }
+    }, Qt::QueuedConnection);
 }
 
 void ControlbarProfileModel::insertDefaults()
@@ -224,7 +227,7 @@ void ControlbarProfileModel::insertDefaults()
     // Add default profiles:
     for (const auto& i : m_defaults)
     {
-        const auto ptrNewProfile = newProfile(qtr(i.name));
+        const auto ptrNewProfile = newProfile(qfut(i.name));
         if (!ptrNewProfile)
             continue;
 
@@ -421,13 +424,13 @@ ControlbarProfile* ControlbarProfileModel::currentModel() const
 
 void ControlbarProfileModel::save(bool clearDirty) const
 {
-    assert(m_intf->p_sys);
-    assert(m_intf->p_sys->mainSettings);
+    assert(m_intf);
+    assert(m_intf->mainSettings);
 
-    if (!m_intf || !m_intf->p_sys || !m_intf->p_sys->mainSettings)
+    if (!m_intf || !m_intf || !m_intf->mainSettings)
         return;
 
-    const auto settings = m_intf->p_sys->mainSettings;
+    const auto settings = m_intf->mainSettings;
     const auto groupName = metaObject()->className();
 
     settings->beginGroup(groupName);
@@ -487,13 +490,13 @@ void ControlbarProfileModel::save(bool clearDirty) const
 
 bool ControlbarProfileModel::reload()
 {
-    assert(m_intf->p_sys);
-    assert(m_intf->p_sys->mainSettings);
+    assert(m_intf);
+    assert(m_intf->mainSettings);
 
-    if (!m_intf || !m_intf->p_sys || !m_intf->p_sys->mainSettings)
+    if (!m_intf || !m_intf || !m_intf->mainSettings)
         return false;
 
-    const auto settings = m_intf->p_sys->mainSettings;
+    const auto settings = m_intf->mainSettings;
     const auto groupName = metaObject()->className();
 
     settings->beginGroup(groupName);

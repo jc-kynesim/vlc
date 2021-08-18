@@ -50,7 +50,7 @@
     "Force use of a specific chroma for output. Default is RGB32."
 
 #define CFG_PREFIX "android-display-"
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context);
 static void Close(vout_display_t *vd);
 static void SubpicturePrepare(vout_display_t *vd, subpicture_t *subpicture);
@@ -60,7 +60,7 @@ vlc_module_begin()
     set_subcategory(SUBCAT_VIDEO_VOUT)
     set_description("Android video output")
     add_shortcut("android-display")
-    add_string(CFG_PREFIX "chroma", NULL, CHROMA_TEXT, CHROMA_LONGTEXT, true)
+    add_string(CFG_PREFIX "chroma", NULL, CHROMA_TEXT, CHROMA_LONGTEXT)
     set_callback_display(Open, 260)
 vlc_module_end()
 
@@ -104,12 +104,9 @@ struct buffer_bounds
     ARect bounds;
 };
 
-struct vout_display_sys_t
+typedef struct vout_display_sys_t
 {
     vout_window_t *embed;
-
-    int i_display_width;
-    int i_display_height;
 
     AWindowHandler *p_awh;
     native_window_api_t *anw;
@@ -129,7 +126,7 @@ struct vout_display_sys_t
     ARect sub_last_region;
 
     bool b_has_subpictures;
-};
+} vout_display_sys_t;
 
 #define PRIV_WINDOW_FORMAT_YV12 0x32315659
 
@@ -199,8 +196,9 @@ static picture_t *PictureAlloc(video_format_t *fmt)
     return p_pic;
 }
 
-static void FixSubtitleFormat(vout_display_sys_t *sys)
+static void FixSubtitleFormat(vout_display_t *vd)
 {
+    vout_display_sys_t *sys = vd->sys;
     video_format_t *p_subfmt;
     video_format_t fmt;
     int i_width, i_height;
@@ -230,12 +228,12 @@ static void FixSubtitleFormat(vout_display_sys_t *sys)
     }
 
     if (sys->p_window->i_angle == 90 || sys->p_window->i_angle == 180) {
-        i_display_width = sys->i_display_height;
-        i_display_height = sys->i_display_width;
+        i_display_width = vd->cfg->display.height;
+        i_display_height = vd->cfg->display.width;
         aspect = i_video_height / (double) i_video_width;
     } else {
-        i_display_width = sys->i_display_width;
-        i_display_height = sys->i_display_height;
+        i_display_width = vd->cfg->display.width;
+        i_display_height = vd->cfg->display.height;
         aspect = i_video_width / (double) i_video_height;
     }
 
@@ -477,16 +475,20 @@ static void SetRGBMask(video_format_t *p_fmt)
 }
 
 static const struct vlc_display_operations ops = {
-    Close, Prepare, Display, Control, NULL, NULL,
+    .close = Close,
+    .prepare = Prepare,
+    .display = Display,
+    .control = Control,
+    .set_viewpoint = NULL,
 };
 
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
 {
     vout_display_sys_t *sys;
     video_format_t fmt, sub_fmt;
 
-    vout_window_t *embed = cfg->window;
+    vout_window_t *embed = vd->cfg->window;
     if (embed->type != VOUT_WINDOW_TYPE_ANDROID_NATIVE)
         return VLC_EGENERIC;
 
@@ -503,9 +505,6 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     sys->embed = embed;
     sys->p_awh = p_awh;
     sys->anw = AWindowHandler_getANativeWindowAPI(sys->p_awh);
-
-    sys->i_display_width = cfg->display.width;
-    sys->i_display_height = cfg->display.height;
 
     fmt = *fmtp;
     if (fmt.i_chroma != VLC_CODEC_ANDROID_OPAQUE) {
@@ -565,7 +564,7 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     sys->p_sub_window = AndroidWindow_New(vd, &sub_fmt, AWindow_Subtitles);
     if (sys->p_sub_window) {
 
-        FixSubtitleFormat(sys);
+        FixSubtitleFormat(vd);
         sys->i_sub_last_order = -1;
 
         /* Export the subpicture capability of this vout. */
@@ -912,16 +911,14 @@ static int Control(vout_display_t *vd, int query)
             CopySourceAspect(&sys->p_window->fmt, vd->source);
 
         UpdateVideoSize(sys, &sys->p_window->fmt);
-        FixSubtitleFormat(sys);
+        FixSubtitleFormat(vd);
         return VLC_SUCCESS;
     }
     case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
     {
-        sys->i_display_width = vd->cfg->display.width;
-        sys->i_display_height = vd->cfg->display.height;
-        msg_Dbg(vd, "change display size: %dx%d", sys->i_display_width,
-                                                  sys->i_display_height);
-        FixSubtitleFormat(sys);
+        msg_Dbg(vd, "change display size: %dx%d", vd->cfg->display.width,
+                                                  vd->cfg->display.height);
+        FixSubtitleFormat(vd);
         return VLC_SUCCESS;
     }
     case VOUT_DISPLAY_CHANGE_ZOOM:

@@ -66,7 +66,8 @@ struct input_resource_t
     /* */
     input_thread_t *p_input;
 
-    sout_instance_t *p_sout;
+    sout_stream_t *p_sout;
+    char *psz_sout;
     vout_thread_t   *p_vout_dummy;
     struct vout_resource *vout_rsc_free;
 
@@ -135,7 +136,8 @@ static void DestroySout( input_resource_t *p_resource )
     if( p_resource->p_sout )
     {
         msg_Dbg( p_resource->p_parent, "destroying stream output" );
-        sout_DeleteInstance( p_resource->p_sout );
+        sout_StreamChainDelete( p_resource->p_sout, NULL );
+        free(p_resource->psz_sout);
     }
 #endif
     p_resource->p_sout = NULL;
@@ -571,16 +573,16 @@ void input_resource_StopFreeVout(input_resource_t *p_resource)
 }
 
 /* */
-sout_instance_t *input_resource_RequestSout( input_resource_t *p_resource, const char *psz_sout )
+sout_stream_t *input_resource_RequestSout( input_resource_t *p_resource, const char *psz_sout )
 {
-    sout_instance_t *sout;
+    sout_stream_t *sout;
 
     assert(psz_sout != NULL);
     vlc_mutex_lock( &p_resource->lock );
 #ifdef ENABLE_SOUT
     /* Check the validity of the sout */
     if (p_resource->p_sout != NULL
-     && strcmp(p_resource->p_sout->psz_sout, psz_sout) != 0)
+     && strcmp(p_resource->psz_sout, psz_sout) != 0)
     {
         msg_Dbg(p_resource->p_parent, "destroying unusable sout");
         DestroySout(p_resource);
@@ -598,7 +600,10 @@ sout_instance_t *input_resource_RequestSout( input_resource_t *p_resource, const
     else
     {
         /* Create a new one */
-        sout = sout_NewInstance(p_resource->p_parent, psz_sout);
+        p_resource->psz_sout = strdup(psz_sout);
+
+        if (likely(p_resource->psz_sout != NULL))
+            sout = sout_NewInstance(p_resource->p_parent, psz_sout);
     }
 #else
     sout = NULL;
@@ -607,7 +612,7 @@ sout_instance_t *input_resource_RequestSout( input_resource_t *p_resource, const
     return sout;
 }
 
-void input_resource_PutSout(input_resource_t *resource, sout_instance_t *sout)
+void input_resource_PutSout(input_resource_t *resource, sout_stream_t *sout)
 {
     if (sout == NULL)
     {

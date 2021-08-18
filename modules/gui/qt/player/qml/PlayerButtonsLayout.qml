@@ -23,7 +23,7 @@ import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
 
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: playerButtonsLayout
 
     implicitHeight: Math.max(buttonrow_left.implicitHeight, buttonrow_center.implicitHeight, buttonrow_right.implicitHeight)
@@ -77,7 +77,10 @@ Widgets.NavigableFocusScope {
             rightMargin: layoutSpacing
         }
 
-        active: !!playerButtonsLayout.model && !!playerButtonsLayout.model.left
+        active: !!playerButtonsLayout.model
+                && !!playerButtonsLayout.model.left
+
+        focus: true
 
         sourceComponent: ButtonsLayout {
             model: playerButtonsLayout.model.left
@@ -86,10 +89,12 @@ Widgets.NavigableFocusScope {
 
             visible: extraWidth < 0 ? false : true // extraWidth < 0 means there is not even available space for minimumSize
 
-            navigationParent: playerButtonsLayout
-            navigationRightItem: buttonrow_center
+            Navigation.parentItem: playerButtonsLayout
+            Navigation.rightItem: buttonrow_center.item
 
             focus: true
+
+            altFocusAction: Navigation.defaultNavigationRight
         }
     }
 
@@ -103,14 +108,19 @@ Widgets.NavigableFocusScope {
             bottomMargin: playerButtonsLayout.marginBottom
         }
 
-        active: !!playerButtonsLayout.model && !!playerButtonsLayout.model.center
+        active: !!playerButtonsLayout.model
+                && !!playerButtonsLayout.model.center
 
         sourceComponent: ButtonsLayout {
             model: playerButtonsLayout.model.center
 
-            navigationParent: playerButtonsLayout
-            navigationLeftItem: buttonrow_left
-            navigationRightItem: buttonrow_right
+            Navigation.parentItem: playerButtonsLayout
+            Navigation.leftItem: buttonrow_left.item
+            Navigation.rightItem: buttonrow_right.item
+
+            focus: true
+
+            altFocusAction: Navigation.defaultNavigationUp
         }
     }
 
@@ -127,19 +137,22 @@ Widgets.NavigableFocusScope {
             leftMargin: layoutSpacing
         }
 
-        active: !!playerButtonsLayout.model && !!playerButtonsLayout.model.right
+        active: !!playerButtonsLayout.model
+                && !!playerButtonsLayout.model.right
 
         sourceComponent: ButtonsLayout {
-
-
             model: playerButtonsLayout.model.right
 
             extraWidth: (playerButtonsLayout.width - (buttonrow_center.x + buttonrow_center.width) - minimumWidth - (2 * layoutSpacing))
 
             visible: extraWidth < 0 ? false : true // extraWidth < 0 means there is not even available space for minimumSize
 
-            navigationParent: playerButtonsLayout
-            navigationLeftItem: buttonrow_center
+            Navigation.parentItem: playerButtonsLayout
+            Navigation.leftItem: buttonrow_center.item
+
+            focus: true
+
+            altFocusAction: Navigation.defaultNavigationLeft
         }
     }
 }

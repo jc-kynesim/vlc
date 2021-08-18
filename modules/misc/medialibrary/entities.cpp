@@ -296,6 +296,8 @@ bool Convert( const medialibrary::IFile* input, vlc_ml_file_t& output )
             vlc_assert_unreachable();
     }
 
+    output.i_size = input->size();
+    output.i_last_modification_date = input->lastModificationDate();
     output.b_removable = input->isRemovable();
     output.b_present = true;
     try
@@ -427,6 +429,9 @@ bool Convert( const medialibrary::IPlaylist* input, vlc_ml_playlist_t& output )
 {
     output.i_id = input->id();
 
+    output.i_nb_media         = input->nbMedia();
+    output.i_nb_present_media = input->nbPresentMedia();
+
     output.i_creation_date = input->creationDate();
 
     output.b_is_read_only = input->isReadOnly();
@@ -444,8 +449,10 @@ bool Convert( const medialibrary::IPlaylist* input, vlc_ml_playlist_t& output )
     return true;
 }
 
-bool Convert( const medialibrary::IFolder* input, vlc_ml_entry_point_t& output )
+bool Convert( const medialibrary::IFolder* input, vlc_ml_folder_t& output )
 {
+    output.i_id = input->id();
+    output.b_banned = input->isBanned();
     try
     {
         if ( strdup_helper( input->mrl(), output.psz_mrl ) == false )
@@ -457,7 +464,6 @@ bool Convert( const medialibrary::IFolder* input, vlc_ml_entry_point_t& output )
         output.psz_mrl = nullptr;
         output.b_present = false;
     }
-    output.b_banned = input->isBanned();
     return true;
 }
 

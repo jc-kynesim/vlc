@@ -25,19 +25,14 @@
 // Ctor / dtor
 //-------------------------------------------------------------------------------------------------
 
-MLPlaylist::MLPlaylist(vlc_medialibrary_t * ml, const vlc_ml_playlist_t * data, QObject * parent)
-    : QObject(parent)
-    , MLItem(MLItemId(data->i_id, VLC_ML_PARENT_PLAYLIST))
+MLPlaylist::MLPlaylist(vlc_medialibrary_t * ml, const vlc_ml_playlist_t * data)
+    : MLItemCover(MLItemId(data->i_id, VLC_ML_PARENT_PLAYLIST))
     , m_ml(ml)
+    , m_name(qfu(data->psz_name))
+    , m_duration(0) // TODO m_duration
+    , m_count(data->i_nb_media)
 {
     assert(data);
-
-    m_name = qfu(data->psz_name);
-
-    // TODO m_cover
-
-    // TODO m_count
-    m_count = 0;//data->i_nb_tracks;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -49,9 +44,11 @@ QString MLPlaylist::getName() const
     return m_name;
 }
 
-QString MLPlaylist::getCover() const
+//-------------------------------------------------------------------------------------------------
+
+int64_t MLPlaylist::getDuration() const
 {
-    return m_cover;
+    return m_duration;
 }
 
 unsigned int MLPlaylist::getCount() const

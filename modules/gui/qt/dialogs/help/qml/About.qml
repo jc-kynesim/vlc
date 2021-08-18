@@ -17,18 +17,17 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import org.videolan.vlc 0.1
 
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
-import "qrc:///util/KeyHelper.js" as KeyHelper
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: root
     property alias columnLayout: columnLayout
 
-    onActionCancel: {
+    Navigation.onActionCancel: {
         history.previous()
     }
 
@@ -49,7 +48,7 @@ Widgets.NavigableFocusScope {
 
             Layout.preferredWidth: columnLayout.implicitWidth
             Layout.fillHeight: true
-            color: VLCStyle.colors.banner
+            color: VLCStyle.colors.topBanner
 
             ColumnLayout {
                 id: columnLayout
@@ -172,5 +171,5 @@ Widgets.NavigableFocusScope {
     }
 
     Keys.priority: Keys.AfterItem
-    Keys.onPressed: defaultKeyAction(event, 0)
+    Keys.onPressed: root.Navigation.defaultKeyAction(event)
 }

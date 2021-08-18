@@ -76,6 +76,7 @@ void vout_display_GetDefaultDisplaySize(unsigned *width, unsigned *height,
                                         const video_format_t *source,
                                         const vout_display_cfg_t *cfg)
 {
+    bool from_source = true;
     /* Requested by the user */
     if (cfg->display.width != 0 && cfg->display.height != 0) {
         *width  = cfg->display.width;
@@ -93,6 +94,8 @@ void vout_display_GetDefaultDisplaySize(unsigned *width, unsigned *height,
     else if (cfg->window_props.width != 0 && cfg->window_props.height != 0) {
         *width = cfg->window_props.width;
         *height = cfg->window_props.height;
+        /* The dimensions are not initialized from the source format */
+        from_source = false;
     }
     /* Use the original video size */
     else if (source->i_sar_num >= source->i_sar_den) {
@@ -106,8 +109,9 @@ void vout_display_GetDefaultDisplaySize(unsigned *width, unsigned *height,
     *width  = *width  * cfg->zoom.num / cfg->zoom.den;
     *height = *height * cfg->zoom.num / cfg->zoom.den;
 
-    if (ORIENT_IS_SWAP(source->orientation)) {
-
+    if (from_source && ORIENT_IS_SWAP(source->orientation)) {
+        /* Apply the source orientation only if the dimensions are initialized
+         * from the source format */
         unsigned store = *width;
         *width = *height;
         *height = store;
@@ -279,7 +283,6 @@ static int vout_display_start(void *func, bool forced, va_list ap)
 {
     vout_display_open_cb activate = func;
     vout_display_priv_t *osys = va_arg(ap, vout_display_priv_t *);
-    const vout_display_cfg_t *cfg = &osys->cfg;
     vout_display_t *vd = &osys->display;
     vlc_video_context *context = osys->src_vctx;
 
@@ -287,7 +290,7 @@ static int vout_display_start(void *func, bool forced, va_list ap)
     video_format_Copy(&osys->display_fmt, vd->source);
     vd->obj.force = forced; /* TODO: pass to activate() instead? */
 
-    int ret = activate(vd, cfg, &osys->display_fmt, context);
+    int ret = activate(vd, &osys->display_fmt, context);
     if (ret != VLC_SUCCESS) {
         video_format_Clean(&osys->display_fmt);
         vlc_objres_clear(VLC_OBJECT(vd));

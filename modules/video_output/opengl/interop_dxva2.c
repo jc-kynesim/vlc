@@ -67,7 +67,7 @@ vlc_module_begin ()
     set_capability("glinterop", 1)
     set_callbacks(GLConvOpen, GLConvClose)
 
-    add_bool("direct3d9-dxvahd", true, DXVAHD_TEXT, DXVAHD_LONGTEXT, true)
+    add_bool("direct3d9-dxvahd", true, DXVAHD_TEXT, NULL)
 vlc_module_end ()
 
 struct wgl_vt {
@@ -380,6 +380,9 @@ static int InitRangeProcessor(struct vlc_gl_interop *interop, IDirect3DDevice9Ex
         msg_Dbg(interop, "Failed to create the processor (error 0x%lX)", hr);
         goto error;
     }
+
+    free(capsList);
+    free(formatsList);
     IDXVAHD_Device_Release( hd_device );
 
     SetupProcessorInput(interop, &interop->fmt_in, src_format);

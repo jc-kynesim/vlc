@@ -17,12 +17,11 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 
 import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
-import "qrc:///util/KeyHelper.js" as KeyHelper
 import "qrc:///style/"
 
 
@@ -79,7 +78,8 @@ RowLayout {
             anchors.centerIn: parent
 
             enabled: mainPlaylistController.count > 1
-            popupAlignment: Qt.AlignRight | Qt.AlignTop
+
+            popupAbove: true
 
             focusPolicy: Qt.NoFocus
 

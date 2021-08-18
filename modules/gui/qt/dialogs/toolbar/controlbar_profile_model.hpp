@@ -22,20 +22,19 @@
 #include <array>
 
 #include "controlbar_profile.hpp"
-
-struct intf_thread_t;
+#include "qt.hpp"
 
 class ControlbarProfileModel : public QAbstractListModel
 {
     Q_OBJECT
 
-    Q_PROPERTY(int selectedProfile READ selectedProfile WRITE setSelectedProfile NOTIFY selectedProfileChanged)
-    Q_PROPERTY(ControlbarProfile* currentModel READ currentModel NOTIFY selectedProfileChanged)
+    Q_PROPERTY(int selectedProfile READ selectedProfile WRITE setSelectedProfile NOTIFY selectedProfileChanged FINAL)
+    Q_PROPERTY(ControlbarProfile* currentModel READ currentModel NOTIFY selectedProfileChanged FINAL)
 
-    Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
+    Q_PROPERTY(int count READ rowCount NOTIFY countChanged FINAL)
 
 public:
-    explicit ControlbarProfileModel(intf_thread_t *p_intf, QObject *parent = nullptr);
+    explicit ControlbarProfileModel(qt_intf_t *p_intf, QObject *parent = nullptr);
 
     // Basic functionality:
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
@@ -104,7 +103,7 @@ private:
     QString generateUniqueName(const QString& name);
 
 protected:
-    intf_thread_t *m_intf = nullptr;
+    qt_intf_t *m_intf = nullptr;
 };
 
 #endif // CONTROLBARPROFILEMODEL_H

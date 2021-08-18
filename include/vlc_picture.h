@@ -29,6 +29,9 @@
 #include <vlc_atomic.h>
 
 /**
+ * \defgroup picture Generic picture API
+ * \ingroup output
+ * @{
  * \file
  * This file defines picture structures and functions in vlc
  */
@@ -243,10 +246,7 @@ static inline picture_t * vlc_picture_chain_PeekFront(vlc_picture_chain_t *chain
  * Append a picture to a picture chain.
  *
  * \param chain the picture chain pointer
- * \param tail the known tail of the picture chain
  * \param pic the picture to append to the chain
- *
- * \return the new tail of the picture chain
  */
 static inline void vlc_picture_chain_Append(vlc_picture_chain_t *chain,
                                             picture_t *pic)
@@ -484,6 +484,6 @@ static inline void picture_SwapUV(picture_t *picture)
     picture->p[V_PLANE] = tmp_plane;
 }
 
-/**@}*/
+/** @} */
 
 #endif /* VLC_PICTURE_H */

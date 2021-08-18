@@ -27,6 +27,7 @@
 
 #include "main_interface_win32.hpp"
 
+#include "maininterface/compositor.hpp"
 #include "player/player_controller.hpp"
 #include "playlist/playlist_controller.hpp"
 #include "dialogs/dialogs_provider.hpp"
@@ -38,6 +39,8 @@
 
 #include <QWindow>
 #include <qpa/qplatformnativeinterface.h>
+
+#include <dwmapi.h>
 
 #define WM_APPCOMMAND 0x0319
 
@@ -82,6 +85,16 @@
 
 using namespace vlc::playlist;
 
+#ifndef WM_NCUAHDRAWCAPTION
+// Not documented, only available since Windows Vista
+#define WM_NCUAHDRAWCAPTION 0x00AE
+#endif
+
+#ifndef WM_NCUAHDRAWFRAME
+// Not documented, only available since Windows Vista
+#define WM_NCUAHDRAWFRAME 0x00AF
+#endif
+
 namespace  {
 
 HWND WinId( QWindow *windowHandle )
@@ -93,9 +106,144 @@ HWND WinId( QWindow *windowHandle )
         return 0;
 }
 
+class CSDWin32EventHandler : public QObject, public QAbstractNativeEventFilter
+{
+public:
+    CSDWin32EventHandler(const bool useClientSideDecoration, const bool isWin7Compositor, QWindow *window, QObject *parent)
+        : QObject {parent}
+        , m_useClientSideDecoration {useClientSideDecoration}
+        , m_window {window}
+        , m_isWin7Compositor {isWin7Compositor}
+    {
+        QApplication::instance()->installNativeEventFilter(this);
+        updateCSDSettings();
+    }
+
+    static int resizeBorderWidth(QWindow *window)
+    {
+        const int result = GetSystemMetrics(SM_CXSIZEFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
+        if (result > 0)
+            return qRound(static_cast<qreal>(result) / window->devicePixelRatio());
+        else
+            return qRound(static_cast<qreal>(8) * window->devicePixelRatio());
+    }
+
+    static int resizeBorderHeight(QWindow *window)
+    {
+        const int result = GetSystemMetrics(SM_CYSIZEFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
+        if (result > 0)
+            return qRound(static_cast<qreal>(result) / window->devicePixelRatio());
+        else
+            return qRound(static_cast<qreal>(8) * window->devicePixelRatio());
+    }
+
+    bool nativeEventFilter(const QByteArray &, void *message, long *result) override
+    {
+        MSG* msg = static_cast<MSG*>( message );
+
+        if ( !m_useClientSideDecoration || (msg->hwnd != WinId(m_window)) )
+            return false;
+
+        if ( msg->message == WM_NCCALCSIZE )
+        {
+            /* This is used to remove the decoration instead of using FramelessWindowHint because
+             * frameless window don't support areo snapping
+             */
+
+            if (!msg->wParam)
+            {
+                *result = 0;
+                return true;
+            }
+
+
+            bool nonClientAreaExists = false;
+            const auto clientRect = &(reinterpret_cast<LPNCCALCSIZE_PARAMS>(msg->lParam)->rgrc[0]);
+            // We don't need this correction when we're fullscreen. We will
+            // have the WS_POPUP size, so we don't have to worry about
+            // borders, and the default frame will be fine.
+            if (IsZoomed(msg->hwnd) && (m_window->windowState() != Qt::WindowFullScreen))
+            {
+                // Windows automatically adds a standard width border to all
+                // sides when a window is maximized. We have to remove it
+                // otherwise the content of our window will be cut-off from
+                // the screen.
+                // The value of border width and border height should be
+                // identical in most cases, when the scale factor is 1.0, it
+                // should be eight pixels.
+                const int rbh = resizeBorderHeight(m_window);
+                clientRect->top += rbh;
+                clientRect->bottom -= rbh;
+
+                const int rbw = resizeBorderWidth(m_window);
+                clientRect->left += rbw;
+                clientRect->right -= rbw;
+                nonClientAreaExists = true;
+            }
+
+            *result = nonClientAreaExists ? 0 : WVR_REDRAW;
+            return true;
+        }
+
+        // These undocumented messages are sent to draw themed window
+        // borders. Block them to prevent drawing borders over the client
+        // area.
+        if ( msg->message == WM_NCUAHDRAWCAPTION || msg->message == WM_NCUAHDRAWFRAME)
+        {
+             *result = 0;
+             return true;
+        }
+
+        return false;
+    }
+
+    void setUseClientSideDecoration(bool useClientSideDecoration)
+    {
+        m_useClientSideDecoration = useClientSideDecoration;
+
+        updateCSDSettings();
+    }
+
+private:
+    void updateCSDSettings()
+    {
+        HWND winId = WinId(m_window);
+
+        if (m_isWin7Compositor)
+        {
+            // special case for win7 compositor
+            // removing CSD borders with win7 compositor works with Qt::FramelessWindowHint
+            // but with that the shadows don't work, so manually remove WS_CAPTION style
+            DWORD style = m_nonCSDGwlStyle == 0 ? GetWindowLong(winId, GWL_STYLE) : m_nonCSDGwlStyle;
+            if (m_nonCSDGwlStyle == 0)
+                m_nonCSDGwlStyle = style;
+            if (m_useClientSideDecoration)
+            {
+                style &= ~WS_CAPTION;
+                style |= (WS_MAXIMIZEBOX | WS_THICKFRAME);
+            }
+            SetWindowLong (winId, GWL_STYLE, style);
+        }
+
+        // add back shadows
+        const MARGINS m {0, 0, (m_useClientSideDecoration ? 1 : 0) /* top margin */ , 0};
+        DwmExtendFrameIntoClientArea(winId, &m);
+
+        SetWindowPos(winId, NULL, 0, 0, 0, 0,
+            SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOCOPYBITS |
+            SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOREPOSITION |
+            SWP_NOSENDCHANGING | SWP_NOSIZE | SWP_NOZORDER);
+    }
+
+    DWORD m_nonCSDGwlStyle = 0;
+    bool m_useClientSideDecoration;
+    QWindow *m_window;
+    const bool m_isWin7Compositor;
+};
+
 }
 
-WinTaskbarWidget::WinTaskbarWidget(intf_thread_t *_p_intf, QWindow* windowHandle, QObject* parent)
+WinTaskbarWidget::WinTaskbarWidget(qt_intf_t *_p_intf, QWindow* windowHandle, QObject* parent)
     : QObject(parent)
     , p_intf(_p_intf)
     , m_window(windowHandle)
@@ -324,125 +472,40 @@ void WinTaskbarWidget::changeThumbbarButtons( PlayerController::PlayingState i_s
     }
 }
 
+// MainInterface
 
-MainInterfaceWin32::MainInterfaceWin32(intf_thread_t * _p_intf, QWidget *parent, Qt::WindowFlags flags )
-    : MainInterface( _p_intf, parent, flags )
+MainInterfaceWin32::MainInterfaceWin32(qt_intf_t * _p_intf )
+    : MainInterface( _p_intf )
 {
     /* Volume keys */
-    p_intf->p_sys->disable_volume_keys = var_InheritBool( _p_intf, "qt-disable-volume-keys" );
-}
-
-
-bool MainInterfaceWin32::nativeEvent(const QByteArray &eventType, void *message, long *result)
-{
-    MSG* msg = static_cast<MSG*>( message );
-
-    short cmd;
-    switch( msg->message )
-    {
-#if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
-        case WM_NCCALCSIZE:
-        {
-            /* This is used to remove the decoration instead of using FramelessWindowHint because
-             * frameless window don't support areo snapping
-             */
-            if (useClientSideDecoration()) {
-                *result = 0;
-                return true;
-            }
-            break;
-        }
-#endif
-        case WM_APPCOMMAND:
-            cmd = GET_APPCOMMAND_LPARAM(msg->lParam);
-
-            if( p_intf->p_sys->disable_volume_keys &&
-                    (   cmd == APPCOMMAND_VOLUME_DOWN   ||
-                        cmd == APPCOMMAND_VOLUME_UP     ||
-                        cmd == APPCOMMAND_VOLUME_MUTE ) )
-            {
-                break;
-            }
-
-            *result = TRUE;
-
-            switch(cmd)
-            {
-                case APPCOMMAND_MEDIA_PLAY_PAUSE:
-                    THEMPL->togglePlayPause();
-                    break;
-                case APPCOMMAND_MEDIA_PLAY:
-                    THEMPL->play();
-                    break;
-                case APPCOMMAND_MEDIA_PAUSE:
-                    THEMPL->pause();
-                    break;
-                case APPCOMMAND_MEDIA_CHANNEL_DOWN:
-                case APPCOMMAND_MEDIA_PREVIOUSTRACK:
-                    THEMPL->prev();
-                    break;
-                case APPCOMMAND_MEDIA_CHANNEL_UP:
-                case APPCOMMAND_MEDIA_NEXTTRACK:
-                    THEMPL->next();
-                    break;
-                case APPCOMMAND_MEDIA_STOP:
-                    THEMPL->stop();
-                    break;
-                case APPCOMMAND_MEDIA_RECORD:
-                    THEMIM->toggleRecord();
-                    break;
-                case APPCOMMAND_VOLUME_DOWN:
-                    THEMIM->setVolumeDown();
-                    break;
-                case APPCOMMAND_VOLUME_UP:
-                    THEMIM->setVolumeUp();
-                    break;
-                case APPCOMMAND_VOLUME_MUTE:
-                    THEMIM->toggleMuted();
-                    break;
-                case APPCOMMAND_MEDIA_FAST_FORWARD:
-                    THEMIM->faster();
-                    break;
-                case APPCOMMAND_MEDIA_REWIND:
-                    THEMIM->slower();
-                    break;
-                case APPCOMMAND_HELP:
-                    THEDP->mediaInfoDialog();
-                    break;
-                case APPCOMMAND_OPEN:
-                    THEDP->simpleOpenDialog();
-                    break;
-                default:
-                     msg_Dbg( p_intf, "unknown APPCOMMAND = %d", cmd);
-                     *result = FALSE;
-                     break;
-            }
-            if (*result) return true;
-            break;
-    }
-    return false;
-}
-
-InterfaceWindowHandlerWin32::InterfaceWindowHandlerWin32(intf_thread_t *_p_intf, MainInterface* mainInterface, QWindow* window, QObject *parent)
-    : InterfaceWindowHandler(_p_intf, mainInterface, window, parent)
-{
+    p_intf->disable_volume_keys = var_InheritBool( _p_intf, "qt-disable-volume-keys" );
 }
 
 void MainInterfaceWin32::reloadPrefs()
 {
-    p_intf->p_sys->disable_volume_keys = var_InheritBool( p_intf, "qt-disable-volume-keys" );
+    p_intf->disable_volume_keys = var_InheritBool( p_intf, "qt-disable-volume-keys" );
     MainInterface::reloadPrefs();
 }
 
-void MainInterfaceWin32::updateClientSideDecorations()
+// InterfaceWindowHandlerWin32
+
+InterfaceWindowHandlerWin32::InterfaceWindowHandlerWin32(qt_intf_t *_p_intf, MainInterface* mainInterface, QWindow* window, QObject *parent)
+    : InterfaceWindowHandler(_p_intf, mainInterface, window, parent)
+
+#if QT_CLIENT_SIDE_DECORATION_AVAILABLE
+    , m_CSDWindowEventHandler(new CSDWin32EventHandler(mainInterface->useClientSideDecoration(),
+                                                       _p_intf->p_compositor->type() == vlc::Compositor::Win7Compositor,
+                                                       window, window))
+#endif
+
 {
-    HWND winId = WinId(windowHandle());
-    SetWindowPos(winId, NULL, 0, 0, 0, 0,
-        SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOCOPYBITS |
-        SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOREPOSITION |
-        SWP_NOSENDCHANGING | SWP_NOSIZE | SWP_NOZORDER);
+    QApplication::instance()->installNativeEventFilter(this);
 }
 
+InterfaceWindowHandlerWin32::~InterfaceWindowHandlerWin32()
+{
+    QApplication::instance()->removeNativeEventFilter(this);
+}
 
 void InterfaceWindowHandlerWin32::toggleWindowVisiblity()
 {
@@ -530,3 +593,89 @@ bool InterfaceWindowHandlerWin32::eventFilter(QObject* obj, QEvent* ev)
 
     return ret;
 }
+
+bool InterfaceWindowHandlerWin32::nativeEventFilter(const QByteArray &eventType, void *message, long *result)
+{
+    MSG* msg = static_cast<MSG*>( message );
+
+    short cmd;
+    switch( msg->message )
+    {
+        case WM_APPCOMMAND:
+            cmd = GET_APPCOMMAND_LPARAM(msg->lParam);
+
+            if( p_intf->disable_volume_keys &&
+                    (   cmd == APPCOMMAND_VOLUME_DOWN   ||
+                        cmd == APPCOMMAND_VOLUME_UP     ||
+                        cmd == APPCOMMAND_VOLUME_MUTE ) )
+            {
+                break;
+            }
+
+            *result = TRUE;
+
+            switch(cmd)
+            {
+                case APPCOMMAND_MEDIA_PLAY_PAUSE:
+                    THEMPL->togglePlayPause();
+                    break;
+                case APPCOMMAND_MEDIA_PLAY:
+                    THEMPL->play();
+                    break;
+                case APPCOMMAND_MEDIA_PAUSE:
+                    THEMPL->pause();
+                    break;
+                case APPCOMMAND_MEDIA_CHANNEL_DOWN:
+                case APPCOMMAND_MEDIA_PREVIOUSTRACK:
+                    THEMPL->prev();
+                    break;
+                case APPCOMMAND_MEDIA_CHANNEL_UP:
+                case APPCOMMAND_MEDIA_NEXTTRACK:
+                    THEMPL->next();
+                    break;
+                case APPCOMMAND_MEDIA_STOP:
+                    THEMPL->stop();
+                    break;
+                case APPCOMMAND_MEDIA_RECORD:
+                    THEMIM->toggleRecord();
+                    break;
+                case APPCOMMAND_VOLUME_DOWN:
+                    THEMIM->setVolumeDown();
+                    break;
+                case APPCOMMAND_VOLUME_UP:
+                    THEMIM->setVolumeUp();
+                    break;
+                case APPCOMMAND_VOLUME_MUTE:
+                    THEMIM->toggleMuted();
+                    break;
+                case APPCOMMAND_MEDIA_FAST_FORWARD:
+                    THEMIM->faster();
+                    break;
+                case APPCOMMAND_MEDIA_REWIND:
+                    THEMIM->slower();
+                    break;
+                case APPCOMMAND_HELP:
+                    THEDP->mediaInfoDialog();
+                    break;
+                case APPCOMMAND_OPEN:
+                    THEDP->simpleOpenDialog();
+                    break;
+                default:
+                     msg_Dbg( p_intf, "unknown APPCOMMAND = %d", cmd);
+                     *result = FALSE;
+                     break;
+            }
+            if (*result) return true;
+            break;
+    }
+    return false;
+}
+
+
+
+#if QT_CLIENT_SIDE_DECORATION_AVAILABLE
+void InterfaceWindowHandlerWin32::updateCSDWindowSettings()
+{
+    static_cast<CSDWin32EventHandler *>(m_CSDWindowEventHandler)->setUseClientSideDecoration(m_mainInterface->useClientSideDecoration());
+}
+#endif

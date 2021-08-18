@@ -157,7 +157,8 @@ static void *Thread(void *data)
     //return NULL;
 }
 
-static void ResizeAck(vout_window_t *wnd, void *data)
+static void ResizeAck(vout_window_t *wnd, unsigned width, unsigned height,
+                      void *data)
 {
 #ifdef XDG_SHELL
     vout_window_sys_t *sys = wnd->sys;
@@ -165,8 +166,10 @@ static void ResizeAck(vout_window_t *wnd, void *data)
 
     if (serial != NULL)
         xdg_surface_ack_configure(sys->surface, *serial);
+
+    xdg_surface_set_window_geometry(sys->surface, 0, 0, width, height);
 #else
-    (void) wnd; (void) data;
+    (void) wnd; (void) width; (void) height; (void) data;
 #endif
 }
 
@@ -179,7 +182,6 @@ static void ReportSize(vout_window_t *wnd, void *data)
     unsigned height = sys->wm.height ? sys->wm.height : sys->set.height;
 
     wnd->owner.cbs->resized(wnd, width, height, ResizeAck, data);
-    xdg_surface_set_window_geometry(sys->surface, 0, 0, width, height);
 }
 
 static void Resize(vout_window_t *wnd, unsigned width, unsigned height)
@@ -823,8 +825,8 @@ vlc_module_begin()
 #endif
     set_callback(Open)
 
-    add_string("wl-display", NULL, DISPLAY_TEXT, DISPLAY_LONGTEXT, true)
-    add_integer("wl-output", 0, OUTPUT_TEXT, OUTPUT_LONGTEXT, true)
+    add_string("wl-display", NULL, DISPLAY_TEXT, DISPLAY_LONGTEXT)
+    add_integer("wl-output", 0, OUTPUT_TEXT, OUTPUT_LONGTEXT)
         change_integer_range(0, UINT32_MAX)
         change_volatile()
 vlc_module_end()

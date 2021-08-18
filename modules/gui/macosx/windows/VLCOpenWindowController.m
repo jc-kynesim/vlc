@@ -1,7 +1,7 @@
 /*****************************************************************************
  * VLCOpenWindowController.m: Open dialogues for VLC's MacOS X port
  *****************************************************************************
- * Copyright (C) 2002-2019 VLC authors and VideoLAN
+ * Copyright (C) 2002-2021 VLC authors and VideoLAN
  *
  * Authors: Jon Lech Johansen <jon-vl@nanocrew.net>
  *          Christophe Massiot <massiot@via.ecp.fr>
@@ -259,8 +259,8 @@ NSString *const VLCOpenTextFieldWasClicked = @"VLCOpenTextFieldWasClicked";
     [[_netModeMatrix cellAtRow:0 column:0] setTitle: _NS("Unicast")];
     [[_netModeMatrix cellAtRow:1 column:0] setTitle: _NS("Multicast")];
 
-    [_netUDPPortTextField setIntegerValue: config_GetInt("server-port")];
-    [_netUDPPortStepper setIntegerValue: config_GetInt("server-port")];
+    [_netUDPPortTextField setIntegerValue: 0];
+    [_netUDPPortStepper setIntegerValue: 0];
 
     [_captureModePopup removeAllItems];
     [_captureModePopup addItemWithTitle: _NS("Input Devices")];
@@ -447,10 +447,8 @@ NSString *const VLCOpenTextFieldWasClicked = @"VLCOpenTextFieldWasClicked";
 
 - (void)addStreamOutputOptionsToArray:(NSMutableArray *)options
 {
-    NSArray *soutMRL = [_output soutMRL];
-    NSUInteger count = [soutMRL count];
-    for (NSUInteger i = 0 ; i < count ; i++)
-        [options addObject: [NSString stringWithString: [soutMRL objectAtIndex:i]]];
+    for (NSString *item in [_output soutMRL])
+        [options addObject: [NSString stringWithString: item]];
 }
 
 - (void)addScreenRecordingOptionsToArray:(NSMutableArray *)options
@@ -548,18 +546,16 @@ NSString *const VLCOpenTextFieldWasClicked = @"VLCOpenTextFieldWasClicked";
         NSUInteger count = [URLs count];
         NSMutableArray *values = [NSMutableArray arrayWithCapacity:count];
         NSMutableArray *array = [NSMutableArray arrayWithCapacity:count];
-        for (NSUInteger i = 0; i < count; i++)
-            [values addObject: [[URLs objectAtIndex:i] path]];
+        for (NSURL *url in URLs)
+            [values addObject: [url path]];
         [values sortUsingSelector:@selector(caseInsensitiveCompare:)];
 
-        for (NSUInteger i = 0; i < count; i++) {
+        for (NSString *filepath in values) {
             VLCOpenInputMetadata *inputMetadata;
-            char *psz_uri = vlc_path2uri([[values objectAtIndex:i] UTF8String], "file");
-            if (!psz_uri)
+            inputMetadata = [VLCOpenInputMetadata inputMetaWithPath:filepath];
+            if (!inputMetadata)
                 continue;
-            inputMetadata = [[VLCOpenInputMetadata alloc] init];
-            inputMetadata.MRLString = toNSStr(psz_uri);
-            free(psz_uri);
+
             [array addObject:inputMetadata];
         }
 
@@ -781,10 +777,8 @@ NSString *const VLCOpenTextFieldWasClicked = @"VLCOpenTextFieldWasClicked";
 {
     @autoreleasepool {
         NSArray *mountURLs = [[NSFileManager defaultManager] mountedVolumeURLsIncludingResourceValuesForKeys:@[NSURLVolumeIsRemovableKey] options:NSVolumeEnumerationSkipHiddenVolumes];
-        NSUInteger count = [mountURLs count];
         NSMutableArray *o_result = [NSMutableArray array];
-        for (NSUInteger i = 0; i < count; i++) {
-            NSURL *currentURL = [mountURLs objectAtIndex:i];
+        for (NSURL *currentURL in mountURLs) {
 
             NSNumber *isRemovable = nil;
             if (![currentURL getResourceValue:&isRemovable forKey:NSURLVolumeIsRemovableKey error:nil] || !isRemovable) {
@@ -837,8 +831,7 @@ NSString *const VLCOpenTextFieldWasClicked = @"VLCOpenTextFieldWasClicked";
 
         NSUInteger count = [self->_allMediaDevices count];
         if (count > 0) {
-            for (NSUInteger i = 0; i < count ; i++) {
-                VLCOpenBlockDeviceDescription *deviceDescription = [self->_allMediaDevices objectAtIndex:i];
+            for (VLCOpenBlockDeviceDescription *deviceDescription in self->_allMediaDevices) {
                 [self->_discSelectorPopup addItemWithTitle: [[NSFileManager defaultManager] displayNameAtPath:deviceDescription.path]];
             }
 
@@ -998,23 +991,22 @@ NSString *const VLCOpenTextFieldWasClicked = @"VLCOpenTextFieldWasClicked";
             else
                 mrlString = @"rtp://";
 
-            if (port != config_GetInt("server-port")) {
+            if (port > 0) {
                 mrlString =
                 [mrlString stringByAppendingFormat: @"@:%i", port];
             }
         }
         else if ([mode isEqualToString: _NS("Multicast")]) {
-            NSString *oAddress = [_netUDPMAddressTextField stringValue];
-            int iPort = [_netUDPMPortTextField intValue];
+            NSString *address = [_netUDPMAddressTextField stringValue];
+            int port = [_netUDPMPortTextField intValue];
 
             if ([[_netUDPProtocolMatrix selectedCell] tag] == 0)
-                mrlString = [NSString stringWithFormat: @"udp://@%@", oAddress];
+                mrlString = [NSString stringWithFormat: @"udp://@%@", address];
             else
-                mrlString = [NSString stringWithFormat: @"rtp://@%@", oAddress];
+                mrlString = [NSString stringWithFormat: @"rtp://@%@", address];
 
-            if (iPort != config_GetInt("server-port")) {
-                mrlString =
-                [mrlString stringByAppendingFormat: @":%i", iPort];
+            if (port > 0) {
+                mrlString = [mrlString stringByAppendingFormat: @":%i", port];
             }
         }
     } else
@@ -1044,23 +1036,21 @@ NSString *const VLCOpenTextFieldWasClicked = @"VLCOpenTextFieldWasClicked";
             else
                 mrlString = @"rtp://";
 
-            if (port != config_GetInt("server-port")) {
-                mrlString =
-                [mrlString stringByAppendingFormat: @"@:%i", port];
+            if (port > 0) {
+                mrlString = [mrlString stringByAppendingFormat: @"@:%i", port];
             }
         }
         else if ([[[_netModeMatrix selectedCell] title] isEqualToString: _NS("Multicast")]) {
-            NSString *oAddress = [_netUDPMAddressTextField stringValue];
-            int iPort = [_netUDPMPortTextField intValue];
+            NSString *address = [_netUDPMAddressTextField stringValue];
+            int port = [_netUDPMPortTextField intValue];
 
             if ([[_netUDPProtocolMatrix selectedCell] tag] == 0)
-                mrlString = [NSString stringWithFormat: @"udp://@%@", oAddress];
+                mrlString = [NSString stringWithFormat: @"udp://@%@", address];
             else
-                mrlString = [NSString stringWithFormat: @"rtp://@%@", oAddress];
+                mrlString = [NSString stringWithFormat: @"rtp://@%@", address];
 
-            if (iPort != config_GetInt("server-port")) {
-                mrlString =
-                [mrlString stringByAppendingFormat: @":%i", iPort];
+            if (port > 0) {
+                mrlString = [mrlString stringByAppendingFormat: @":%i", port];
             }
         }
         [self setMRL: mrlString];

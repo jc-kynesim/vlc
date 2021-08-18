@@ -234,7 +234,7 @@ static int DemuxPayload(asf_packet_sys_t *p_packetsys, asf_packet_t *pkt, int i_
     vlc_tick_t i_pkt_time_delta = 0;
     uint32_t i_payload_data_length = 0;
     uint32_t i_temp_payload_length = 0;
-    *p_packetsys->pi_preroll = __MIN( *p_packetsys->pi_preroll, INT64_MAX );
+    *p_packetsys->pi_preroll = __MIN( *p_packetsys->pi_preroll, VLC_TICK_MAX );
 
     /* First packet, in case we do not have index to guess preroll start time */
     if ( *p_packetsys->pi_preroll_start == ASFPACKET_PREROLL_FROM_CURRENT )
@@ -411,8 +411,8 @@ int DemuxASFPacket( asf_packet_sys_t *p_packetsys,
 {
     const uint64_t i_read_pos = vlc_stream_Tell( p_packetsys->s );
     if( i_read_pos < i_data_begin ||
-        i_data_packet_min > i_data_end ||
-        i_read_pos > i_data_end - i_data_packet_min )
+        (i_data_end && ( i_data_packet_min > i_data_end ||
+                         i_read_pos > i_data_end - i_data_packet_min ) ) )
         return 0;
 
     const uint8_t *p_peek;
@@ -483,8 +483,9 @@ int DemuxASFPacket( asf_packet_sys_t *p_packetsys,
     pkt.send_time = VLC_TICK_FROM_MS(GetDWLE( p_peek + i_skip )); i_skip += 4;
     /* uint16_t i_packet_duration = GetWLE( p_peek + i_skip ); */ i_skip += 2;
 
-    if( pkt.length > i_data_end ||
-        i_read_pos > i_data_end - pkt.length )
+    if( i_data_end &&
+        (pkt.length > i_data_end ||
+         i_read_pos > i_data_end - pkt.length) )
     {
         vlc_warning( p_packetsys->logger, "pkt size %"PRIu32" at %"PRIu64" does not fit data chunk size %"PRIu32,
                   pkt.length, i_read_pos, i_data_packet_max );

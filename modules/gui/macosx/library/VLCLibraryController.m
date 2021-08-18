@@ -85,12 +85,12 @@
 - (int)appendItemToPlaylist:(VLCMediaLibraryMediaItem *)mediaItem playImmediately:(BOOL)playImmediately
 {
     if (!_p_libraryInstance) {
-        return VLC_ENOOBJ;
+        return VLC_EACCES;
     }
     input_item_t *p_inputItem = vlc_ml_get_input_item(_p_libraryInstance, mediaItem.libraryID);
     if (!p_inputItem) {
         msg_Err(getIntf(), "No input item found for media id %lli", mediaItem.libraryID);
-        return VLC_ENOITEM;
+        return VLC_ENOENT;
     }
     int ret = [[[VLCMain sharedInstance] playlistController] addInputItem:p_inputItem atPosition:-1 startPlayback:playImmediately];
     input_item_Release(p_inputItem);
@@ -100,7 +100,7 @@
 - (int)appendItemsToPlaylist:(NSArray <VLCMediaLibraryMediaItem *> *)mediaItemArray playFirstItemImmediately:(BOOL)playFirstItemImmediately
 {
     if (!_p_libraryInstance) {
-        return VLC_ENOOBJ;
+        return VLC_EACCES;
     }
 
     NSUInteger itemCount = [mediaItemArray count];
@@ -138,10 +138,10 @@
 - (int)addFolderWithFileURL:(NSURL *)fileURL
 {
     if (!_p_libraryInstance) {
-        return VLC_ENOOBJ;
+        return VLC_EACCES;
     }
     if (!fileURL) {
-        return VLC_EBADVAR;
+        return VLC_EINVAL;
     }
     return vlc_ml_add_folder(_p_libraryInstance, [[fileURL absoluteString] UTF8String]);
 }
@@ -149,10 +149,10 @@
 - (int)banFolderWithFileURL:(NSURL *)fileURL
 {
     if (!_p_libraryInstance) {
-        return VLC_ENOOBJ;
+        return VLC_EACCES;
     }
     if (!fileURL) {
-        return VLC_EBADVAR;
+        return VLC_EINVAL;
     }
     return vlc_ml_ban_folder(_p_libraryInstance, [[fileURL absoluteString] UTF8String]);
 }
@@ -160,10 +160,10 @@
 - (int)unbanFolderWithFileURL:(NSURL *)fileURL
 {
     if (!_p_libraryInstance) {
-        return VLC_ENOOBJ;
+        return VLC_EACCES;
     }
     if (!fileURL) {
-        return VLC_EBADVAR;
+        return VLC_EINVAL;
     }
     return vlc_ml_unban_folder(_p_libraryInstance, [[fileURL absoluteString] UTF8String]);
 }
@@ -171,10 +171,10 @@
 - (int)removeFolderWithFileURL:(NSURL *)fileURL
 {
     if (!_p_libraryInstance) {
-        return VLC_ENOOBJ;
+        return VLC_EACCES;
     }
     if (!fileURL) {
-        return VLC_EBADVAR;
+        return VLC_EINVAL;
     }
     return vlc_ml_remove_folder(_p_libraryInstance, [[fileURL absoluteString] UTF8String]);
 }
@@ -182,7 +182,7 @@
 - (int)clearHistory
 {
     if (!_p_libraryInstance) {
-        return VLC_ENOOBJ;
+        return VLC_EACCES;
     }
     return vlc_ml_clear_history(_p_libraryInstance);
 }

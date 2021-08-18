@@ -313,11 +313,14 @@ error:      wordfree(&we);
     for (size_t i = 0; i < we.we_wordc; i++)
         args[i] = we.we_wordv[i];
 #else
+    char *cmd_dup = strdup(cmd);
+    if (unlikely(cmd_dup == NULL))
+        return VLC_ENOMEM;
     /* Split psz_cmd at the first space and make sure that
      * psz_arg is valid */
-    const char *args[] = { cmd, NULL };
+    const char *args[] = { cmd_dup, NULL };
     size_t count = 1;
-    char *arg = strchr(cmd, ' ');
+    char *arg = strchr(cmd_dup, ' ');
 
     if (arg != NULL)
     {
@@ -325,7 +328,7 @@ error:      wordfree(&we);
         arg += strspn(arg, " ");
 
         if (*arg)
-            count++;
+            args[count++] = arg;
     }
 #endif
 
@@ -350,6 +353,8 @@ error:      wordfree(&we);
 #ifdef HAVE_WORDEXP
     free(args);
     wordfree(&we);
+#else
+    free(cmd_dup);
 #endif
     return ret;
 }
@@ -1037,19 +1042,19 @@ vlc_module_begin()
     set_category(CAT_INTERFACE)
     set_subcategory(SUBCAT_INTERFACE_MAIN)
     set_description(N_("Remote control interface"))
-    add_bool("rc-show-pos", false, POS_TEXT, POS_LONGTEXT, true)
+    add_bool("rc-show-pos", false, POS_TEXT, POS_LONGTEXT)
 
 #ifdef _WIN32
-    add_bool("rc-quiet", false, QUIET_TEXT, QUIET_LONGTEXT, false)
+    add_bool("rc-quiet", false, QUIET_TEXT, QUIET_LONGTEXT)
 #else
 #if defined (HAVE_ISATTY)
-    add_bool("rc-fake-tty", false, TTY_TEXT, TTY_LONGTEXT, true)
+    add_bool("rc-fake-tty", false, TTY_TEXT, TTY_LONGTEXT)
 #endif
 #ifdef AF_LOCAL
-    add_string("rc-unix", NULL, UNIX_TEXT, UNIX_LONGTEXT, true)
+    add_string("rc-unix", NULL, UNIX_TEXT, UNIX_LONGTEXT)
 #endif
 #endif
-    add_string("rc-host", NULL, HOST_TEXT, HOST_LONGTEXT, true)
+    add_string("rc-host", NULL, HOST_TEXT, HOST_LONGTEXT)
 
     set_capability("interface", 20)
 

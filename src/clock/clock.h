@@ -40,8 +40,8 @@ struct vlc_clock_cbs
      * Called when a clock is updated
      *
      * @param system_ts system date when the ts will be rendered,
-     * VLC_TICK_INVALID when the clock is reset or INT64_MAX when the update is
-     * forced (an output was still rendered while paused for example). Note:
+     * VLC_TICK_INVALID when the clock is reset or VLC_TICK_MAX when the update
+     * is forced (an output was still rendered while paused for example). Note:
      * when valid, this date can be in the future, it is not necessarily now.
      * @param ts stream timestamp or VLC_TICK_INVALID when the clock is reset,
      * should be subtracted with VLC_TICK_0 to get the original value
@@ -58,17 +58,12 @@ struct vlc_clock_cbs
 /**
  * This function creates the vlc_clock_main_t of the program
  */
-vlc_clock_main_t *vlc_clock_main_New(void);
+vlc_clock_main_t *vlc_clock_main_New(struct vlc_logger *parent_logger);
 
 /**
  * Destroy the clock main
  */
 void vlc_clock_main_Delete(vlc_clock_main_t *main_clock);
-
-/**
- * Abort all the pending vlc_clock_Wait
- */
-void vlc_clock_main_Abort(vlc_clock_main_t *main_clock);
 
 /**
  * Reset the vlc_clock_main_t
@@ -106,6 +101,18 @@ vlc_clock_t *vlc_clock_main_CreateMaster(vlc_clock_main_t *main_clock,
                                          void *cbs_data);
 
 /**
+ * This function creates a new input master vlc_clock_t interface
+ *
+ * Once the input master is created, the current or future master clock created
+ * from vlc_clock_main_CreateMaster() will be demoted as slave.
+ *
+ * @warning There can be only one input master at a given time.
+ *
+ * You must use vlc_clock_Delete to free it.
+ */
+vlc_clock_t *vlc_clock_main_CreateInputMaster(vlc_clock_main_t *main_clock);
+
+/**
  * This function creates a new slave vlc_clock_t interface
  *
  * You must use vlc_clock_Delete to free it.
@@ -130,10 +137,10 @@ void vlc_clock_Delete(vlc_clock_t *clock);
 
 /**
  * This function will update the clock drift and returns the drift
- * @param system_now valid system time or INT64_MAX is the updated point is
+ * @param system_now valid system time or VLC_TICK_MAX is the updated point is
  * forced (when paused for example)
  * @return a valid drift relative time, VLC_TICK_INVALID if there is no drift
- * (clock is master) or INT64_MAX if the clock is paused
+ * (clock is master) or VLC_TICK_MAX if the clock is paused
  */
 vlc_tick_t vlc_clock_Update(vlc_clock_t *clock, vlc_tick_t system_now,
                             vlc_tick_t ts, double rate);
@@ -162,23 +169,63 @@ void vlc_clock_Reset(vlc_clock_t *clock);
 vlc_tick_t vlc_clock_SetDelay(vlc_clock_t *clock, vlc_tick_t ts_delay);
 
 /**
- * Wait for a timestamp expressed in stream time
+ * Lock the clock mutex
  */
-void vlc_clock_Wait(vlc_clock_t *clock, vlc_tick_t system_now, vlc_tick_t ts,
-                   double rate, vlc_tick_t max_duration);
+void vlc_clock_Lock(vlc_clock_t *clock);
+
+/**
+ * Unlock the clock mutex
+ */
+void vlc_clock_Unlock(vlc_clock_t *clock);
+
+/**
+ * Indicate if the clock is paused
+ *
+ * The clock mutex must be locked.
+ *
+ * @retval true if the clock is paused
+ * @retval false if the clock is not paused
+ */
+bool vlc_clock_IsPaused(vlc_clock_t *clock);
+
+/**
+ * Wait for a timestamp expressed in system time
+ *
+ * The wait will be interrupted (signaled) on clock state changes which could
+ * invalidate the computed deadline. In that case, the caller must recompute
+ * the new deadline and call it again.
+ *
+ * The clock mutex must be locked.
+ *
+ * @return 0 if the condition was signaled, an error code in case of timeout
+ */
+int vlc_clock_Wait(vlc_clock_t *clock, vlc_tick_t system_deadline);
+
+/**
+ * Wake up any vlc_clock_Wait()
+ */
+void vlc_clock_Wake(vlc_clock_t *clock);
 
 /**
  * This function converts a timestamp from stream to system
- * @return the valid system time or INT64_MAX when the clock is paused
+ *
+ * The clock mutex must be locked.
+ *
+ * @return the valid system time or VLC_TICK_MAX when the clock is paused
  */
-vlc_tick_t vlc_clock_ConvertToSystem(vlc_clock_t *clock, vlc_tick_t system_now,
-                                     vlc_tick_t ts, double rate);
+vlc_tick_t vlc_clock_ConvertToSystemLocked(vlc_clock_t *clock,
+                                           vlc_tick_t system_now, vlc_tick_t ts,
+                                           double rate);
 
-/**
- * This functon converts an array of timestamp from stream to system
- */
-void vlc_clock_ConvertArrayToSystem(vlc_clock_t *clock, vlc_tick_t system_now,
-                                    vlc_tick_t *ts_array, size_t ts_count,
-                                    double rate);
+static inline vlc_tick_t
+vlc_clock_ConvertToSystem(vlc_clock_t *clock, vlc_tick_t system_now,
+                          vlc_tick_t ts, double rate)
+{
+    vlc_clock_Lock(clock);
+    vlc_tick_t system =
+        vlc_clock_ConvertToSystemLocked(clock, system_now, ts, rate);
+    vlc_clock_Unlock(clock);
+    return system;
+}
 
 #endif /*VLC_CLOCK_H*/

@@ -43,7 +43,7 @@
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
-static int  Open (vout_display_t *, const vout_display_cfg_t *,
+static int  Open (vout_display_t *,
                   video_format_t *, vlc_video_context *);
 static void Close(vout_display_t *);
 
@@ -63,7 +63,7 @@ vlc_module_end()
 /*****************************************************************************
  * Local prototypes.
  *****************************************************************************/
-struct vout_display_sys_t
+typedef struct vout_display_sys_t
 {
     vout_display_sys_win32_t sys;
     display_win32_area_t     area;
@@ -73,7 +73,7 @@ struct vout_display_sys_t
 
     /* Sensors */
     void *p_sensors;
-};
+} vout_display_sys_t;
 
 static void           Prepare(vout_display_t *, picture_t *, subpicture_t *, vlc_tick_t);
 static void           Display(vout_display_t *, picture_t *);
@@ -109,13 +109,17 @@ static vout_window_t *EmbedVideoWindow_Create(vout_display_t *vd)
 }
 
 static const struct vlc_display_operations ops = {
-    Close, Prepare, Display, Control, NULL, SetViewpoint,
+    .close = Close,
+    .prepare = Prepare,
+    .display = Display,
+    .control = Control,
+    .set_viewpoint = SetViewpoint,
 };
 
 /**
  * It creates an OpenGL vout display.
  */
-static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
 {
     vout_display_sys_t *sys;
@@ -138,9 +142,9 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
     if (vd->source->projection_mode != PROJECTION_MODE_RECTANGULAR)
         sys->p_sensors = HookWindowsSensors(vd, sys->sys.hvideownd);
 
-    vout_window_SetTitle(cfg->window, VOUT_TITLE " (OpenGL output)");
+    vout_window_SetTitle(vd->cfg->window, VOUT_TITLE " (OpenGL output)");
 
-    vout_display_cfg_t embed_cfg = *cfg;
+    vout_display_cfg_t embed_cfg = *vd->cfg;
     embed_cfg.window = EmbedVideoWindow_Create(vd);
     if (!embed_cfg.window)
         goto error;
@@ -154,13 +158,13 @@ static int Open(vout_display_t *vd, const vout_display_cfg_t *cfg,
         goto error;
     }
 
-    vlc_gl_Resize (sys->gl, cfg->display.width, cfg->display.height);
+    vlc_gl_Resize (sys->gl, vd->cfg->display.width, vd->cfg->display.height);
 
     const vlc_fourcc_t *subpicture_chromas;
     if (vlc_gl_MakeCurrent (sys->gl))
         goto error;
     sys->vgl = vout_display_opengl_New(fmtp, &subpicture_chromas, sys->gl,
-                                       &cfg->viewpoint, context);
+                                       &vd->cfg->viewpoint, context);
     vlc_gl_ReleaseCurrent (sys->gl);
     if (!sys->vgl)
         goto error;

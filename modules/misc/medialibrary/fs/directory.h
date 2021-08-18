@@ -40,9 +40,11 @@ public:
     const std::vector<std::shared_ptr<fs::IDirectory>> &dirs() const override;
     std::shared_ptr<fs::IDevice> device() const override;
     std::shared_ptr<fs::IFile> file( const std::string& mrl ) const override;
+    bool contains( const std::string& file ) const override;
 
 private:
     void read() const;
+    void addFile( std::string mrl, fs::IFile::LinkedFileType, std::string linkedWith ) const;
 
     std::string m_mrl;
     SDFileSystemFactory &m_fs;

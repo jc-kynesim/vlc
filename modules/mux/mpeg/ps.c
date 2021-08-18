@@ -71,9 +71,9 @@ vlc_module_begin ()
     set_callbacks( Open, Close )
 
     add_integer( SOUT_CFG_PREFIX "dts-delay", 200, DTS_TEXT,
-                 DTS_LONGTEXT, true )
+                 DTS_LONGTEXT )
     add_integer( SOUT_CFG_PREFIX "pes-max-size", PES_PAYLOAD_SIZE_MAX,
-                 PES_SIZE_TEXT, PES_SIZE_LONGTEXT, true )
+                 PES_SIZE_TEXT, PES_SIZE_LONGTEXT )
 vlc_module_end ()
 
 /*****************************************************************************
@@ -352,28 +352,15 @@ static int AddStream( sout_mux_t *p_mux, sout_input_t *p_input )
     if( p_input->p_fmt->psz_language )
     {
         char *psz = p_input->p_fmt->psz_language;
-        const iso639_lang_t *pl = NULL;
+        const iso639_lang_t *pl = vlc_find_iso639( psz, false );
 
-        if( strlen( psz ) == 2 )
-        {
-            pl = GetLang_1( psz );
-        }
-        else if( strlen( psz ) == 3 )
-        {
-            pl = GetLang_2B( psz );
-            if( !strcmp( pl->psz_iso639_1, "??" ) )
-            {
-                pl = GetLang_2T( psz );
-            }
-        }
-        if( pl && strcmp( pl->psz_iso639_1, "??" ) )
+        if( pl )
         {
             p_stream->lang[0] = pl->psz_iso639_2T[0];
             p_stream->lang[1] = pl->psz_iso639_2T[1];
             p_stream->lang[2] = pl->psz_iso639_2T[2];
 
-            msg_Dbg( p_mux, "    - lang=%c%c%c",
-                     p_stream->lang[0], p_stream->lang[1], p_stream->lang[2] );
+            msg_Dbg( p_mux, "    - lang=%3.3s", pl->psz_iso639_2T );
         }
     }
     return VLC_SUCCESS;
@@ -474,7 +461,7 @@ static int Mux( sout_mux_t *p_mux )
         /* Write regulary PackHeader */
         if( p_sys->i_pes_count % 30 == 0)
         {
-            vlc_tick_t i_mindts = INT64_MAX;
+            vlc_tick_t i_mindts = VLC_TICK_MAX;
             for( int i=0; i < p_mux->i_nb_inputs; i++ )
             {
                 ps_stream_t *p_s = (ps_stream_t*)p_input->p_sys;
@@ -484,7 +471,7 @@ static int Mux( sout_mux_t *p_mux )
                     i_mindts = p_s->i_dts;
             }
 
-            if( i_mindts != INT64_MAX && i_mindts > p_sys->i_instant_dts )
+            if( i_mindts != VLC_TICK_MAX && i_mindts > p_sys->i_instant_dts )
             {
                 /* Update the instant bitrate every second or so */
                 if( p_sys->i_instant_size &&

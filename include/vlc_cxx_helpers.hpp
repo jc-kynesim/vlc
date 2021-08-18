@@ -407,7 +407,7 @@ public:
     class invalid : public std::runtime_error
     {
     public:
-        invalid( const char* url )
+        explicit invalid( const char* url )
             : std::runtime_error( std::string{ "Invalid url: " } + url )
         {
         }
@@ -420,13 +420,16 @@ public:
         psz_host = nullptr;
     }
 
-    url( const char* str )
+    explicit url( const char* str )
     {
         if ( vlc_UrlParse( this, str ) )
+        {
+            vlc_UrlClean( this );
             throw invalid( str );
+        }
     }
 
-    url( const std::string& str )
+    explicit url( const std::string& str )
         : url( str.c_str() )
     {
     }
@@ -449,6 +452,7 @@ public:
 
     url& operator=( url&& u ) noexcept
     {
+        vlc_UrlClean( this );
         *(static_cast<vlc_url_t*>( this )) = u;
         u.psz_buffer = nullptr;
         u.psz_pathbuffer = nullptr;

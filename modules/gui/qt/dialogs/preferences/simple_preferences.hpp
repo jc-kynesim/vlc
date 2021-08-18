@@ -42,7 +42,8 @@
 #include <QDialogButtonBox>
 #include <QTableView>
 #include <QFileDialog>
-#include "medialibrary/mlfoldersmodel.hpp"
+
+class MLFoldersEditor;
 
 #ifdef _WIN32
 # include "util/registry.hpp"
@@ -82,10 +83,10 @@ class SPrefsCatList : public QWidget
 {
     Q_OBJECT
 public:
-    SPrefsCatList( intf_thread_t *, QWidget * );
+    SPrefsCatList( qt_intf_t *, QWidget * );
     virtual ~SPrefsCatList() {};
 private:
-    intf_thread_t *p_intf;
+    qt_intf_t *p_intf;
 signals:
     void currentItemChanged( int );
 public slots:
@@ -96,16 +97,15 @@ class SPrefsPanel : public QWidget
 {
     Q_OBJECT
 public:
-    SPrefsPanel( intf_thread_t *, QWidget *, int );
+    SPrefsPanel( qt_intf_t *, QWidget *, int );
     virtual ~SPrefsPanel();
     void apply();
-    void clean();
 #ifdef _WIN32
     void cleanLang();
 #endif
 
 private:
-    intf_thread_t *p_intf;
+    qt_intf_t *p_intf;
     QList<ConfigControl *> controls;
 
     int number;
@@ -115,14 +115,18 @@ private:
     QButtonGroup *radioGroup;
 
     char *lang;
-    MLFoldersModel *mlFoldersModel;
-    MLBannedFoldersModel *mlBannedFoldersModel;
+    MLFoldersEditor *mlFoldersEditor {};
+    MLFoldersEditor *mlBannedFoldersEditor {};
 
 #ifdef _WIN32
     QList<QTreeWidgetItem *> listAsso;
     bool addType( const char * psz_ext, QTreeWidgetItem*, QTreeWidgetItem*, QVLCRegistry* );
     void saveLang();
 #endif
+
+    // used to revert properties on cancel which are immediately set
+    bool m_isApplied = false;
+    std::vector<std::unique_ptr<class PropertyResetter>> m_resetters;
 
 /* Display only the options for the selected audio output */
 private slots:
@@ -137,11 +141,11 @@ private slots:
 #endif
     void MLaddNewFolder( );
     void MLBanFolder( );
-    QWidget * MLgenerateWidget(QModelIndex index , MLFoldersBaseModel *mlf , QWidget *parent );
-    void MLdrawControls( QTableView *mlView );
 
     void configML();
-    void changeStyle( QString );
+    void changeStyle( );
+
+    void clean();
 };
 
 #endif

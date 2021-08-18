@@ -17,62 +17,60 @@
  *****************************************************************************/
 
 import QtQuick         2.11
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-Rectangle {
+Widgets.AnimatedBackground {
     id: delegate
 
-    //---------------------------------------------------------------------------------------------
     // Properties
-    //---------------------------------------------------------------------------------------------
 
     property var rowModel: model
 
     property bool selected: selectionDelegateModel.isSelected(root.model.index(index, 0))
 
-    readonly property bool highlighted: (selected || hoverArea.containsMouse || activeFocus)
-
     readonly property int _index: index
 
     property int _modifiersOnLastPress: Qt.NoModifier
 
-    readonly property color foregroundColor: (highlighted) ? VLCStyle.colors.bgHoverText
-                                                           : VLCStyle.colors.text
-
-    //---------------------------------------------------------------------------------------------
     // Settings
-    //---------------------------------------------------------------------------------------------
 
     width: view.width
 
     height: root.rowHeight
 
-    color: (highlighted) ? VLCStyle.colors.bgHover
-                         : "transparent"
+    active: activeFocus
 
-    //---------------------------------------------------------------------------------------------
+    animationDuration: VLCStyle.ms140
+
+    backgroundColor: {
+        if (delegate.selected)
+            return VLCStyle.colors.gridSelect;
+        else if (hoverArea.containsMouse)
+            return VLCStyle.colors.listHover;
+        else
+            return VLCStyle.colors.setColorAlpha(VLCStyle.colors.listHover, 0);
+    }
+
     // Connections
-    //---------------------------------------------------------------------------------------------
 
     Connections {
         target: selectionDelegateModel
 
         onSelectionChanged: {
-            delegate.selected = selectionDelegateModel.isSelected(root.model.index(index, 0));
+            delegate.selected = Qt.binding(function() {
+              return  selectionDelegateModel.isSelected(root.model.index(index, 0))
+            })
         }
     }
 
-    //---------------------------------------------------------------------------------------------
     // Childs
-    //---------------------------------------------------------------------------------------------
 
     MouseArea {
         id: hoverArea
 
-        //-----------------------------------------------------------------------------------------
         // Settings
 
         anchors.fill: parent
@@ -87,7 +85,6 @@ Rectangle {
 
         drag.axis: Drag.XAndYAxis
 
-        //-----------------------------------------------------------------------------------------
         // Events
 
         onPressed: _modifiersOnLastPress = mouse.modifiers
@@ -142,7 +139,6 @@ Rectangle {
             root.dragItem.Drag.active = drag.active;
         }
 
-        //-----------------------------------------------------------------------------------------
         // Childs
 
         Row {
@@ -165,37 +161,25 @@ Rectangle {
             Repeater {
                 model: sortModel
 
-                Item {
+                Loader{
+                    property var rowModel: delegate.rowModel
+
+                    property var colModel: modelData
+
+                    readonly property int index: delegate._index
+
+                    readonly property bool currentlyFocused: delegate.activeFocus
+
+                    readonly property bool containsMouse: hoverArea.containsMouse
+
+                    readonly property color foregroundColor: delegate.foregroundColor
+
+                    width: (modelData.width) ? modelData.width : 0
+
                     height: parent.height
 
-                    width: (modelData.width) ? modelData.width
-                                             : 1
-
-                    Layout.alignment: Qt.AlignVCenter
-
-                    SmoothedAnimation on width {
-                        duration: 256
-
-                        easing.type: Easing.OutCubic
-                    }
-
-                    Loader{
-                        property var rowModel: delegate.rowModel
-                        property var colModel: modelData
-
-                        readonly property int index: delegate._index
-
-                        readonly property bool currentlyFocused: delegate.activeFocus
-
-                        readonly property bool containsMouse: hoverArea.containsMouse
-
-                        readonly property color foregroundColor: delegate.foregroundColor
-
-                        anchors.fill: parent
-
-                        sourceComponent: (colModel.colDelegate) ? colModel.colDelegate
-                                                                : root.colDelegate
-                    }
+                    sourceComponent: (colModel.colDelegate) ? colModel.colDelegate
+                                                            : root.colDelegate
                 }
             }
         }

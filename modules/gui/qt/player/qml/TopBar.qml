@@ -18,7 +18,7 @@
 
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 
 import org.videolan.vlc 0.1
 
@@ -26,7 +26,7 @@ import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
 import "qrc:///menus/" as Menus
 
-Widgets.NavigableFocusScope{
+FocusScope{
     id: topFocusScope
 
     enum GroupAlignment {
@@ -43,8 +43,6 @@ Widgets.NavigableFocusScope{
     signal requestLockUnlockAutoHide(bool lock, var source)
 
     implicitHeight: topcontrollerMouseArea.implicitHeight
-    Keys.priority: Keys.AfterItem
-    Keys.onPressed: defaultKeyAction(event, 0)
 
     Component.onCompleted: {
         // if groupAlignment == Horizontal, then onGroupAlignment isn't called when Component is created
@@ -137,7 +135,7 @@ Widgets.NavigableFocusScope{
 
         spacing: VLCStyle.margin_xxsmall
 
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: backBtn
 
             Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
@@ -146,9 +144,11 @@ Widgets.NavigableFocusScope{
             size: VLCStyle.banner_icon_size
             iconText: VLCIcons.topbar_previous
             text: i18n.qtr("Back")
-            color: topFocusScope.colors.playerFg
             focus: true
-            KeyNavigation.right: menuSelector
+            colors: topFocusScope.colors
+
+            Navigation.parentItem: topFocusScope
+            Navigation.rightItem: menuSelector
             onClicked: {
                 if (mainInterface.hasEmbededVideo && !mainInterface.canShowVideoPIP) {
                    mainPlaylistController.stop()
@@ -245,40 +245,43 @@ Widgets.NavigableFocusScope{
         topPadding: VLCStyle.margin_xxsmall
         rightPadding: VLCStyle.margin_xxsmall
 
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: menuSelector
 
             focus: true
             size: VLCStyle.banner_icon_size
             iconText: VLCIcons.ellipsis
             text: i18n.qtr("Menu")
-            color: rootPlayer.colors.playerFg
-            property bool acceptFocus: true
+            colors: topFocusScope.colors
+
+            Navigation.parentItem: topFocusScope
+            Navigation.leftItem: backBtn
+            Navigation.rightItem: playlistButton
 
             onClicked: contextMenu.popup(this.mapToGlobal(0, height))
 
-            KeyNavigation.left: backBtn
-            KeyNavigation.right: playlistButton
-
             QmlGlobalMenu {
                 id: contextMenu
+
                 ctx: mainctx
+
+                onAboutToShow: topFocusScope.requestLockUnlockAutoHide(true, contextMenu)
+                onAboutToHide: topFocusScope.requestLockUnlockAutoHide(false, contextMenu)
             }
         }
 
-        Widgets.IconToolButton {
+        Widgets.IconControlButton {
             id: playlistButton
 
             objectName: ControlListModel.PLAYLIST_BUTTON
             size: VLCStyle.banner_icon_size
             iconText: VLCIcons.playlist
             text: i18n.qtr("Playlist")
-            color: rootPlayer.colors.playerFg
+            colors: topFocusScope.colors
             focus: false
 
-            property bool acceptFocus: true
-
-            KeyNavigation.left: menuSelector
+            Navigation.parentItem: topFocusScope
+            Navigation.leftItem: menuSelector
             onClicked: tooglePlaylistVisibility()
         }
     }

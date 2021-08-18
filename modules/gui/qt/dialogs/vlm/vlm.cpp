@@ -52,7 +52,7 @@
 #include <QFileDialog>
 
 
-VLMDialog::VLMDialog( intf_thread_t *_p_intf ) : QVLCFrame( _p_intf )
+VLMDialog::VLMDialog( qt_intf_t *_p_intf ) : QVLCFrame( _p_intf )
 {
     vlm_t *p_vlm = vlm_New( vlc_object_instance(p_intf), NULL );
 
@@ -68,7 +68,7 @@ VLMDialog::VLMDialog( intf_thread_t *_p_intf ) : QVLCFrame( _p_intf )
     ui.setupUi( this );
     ui.saveButton->hide();
 
-#define ADDMEDIATYPES( str, type ) ui.mediaType->addItem( qtr( str ), QVariant( type ) );
+#define ADDMEDIATYPES( str, type ) ui.mediaType->addItem( qfut( str ), QVariant( type ) );
     ADDMEDIATYPES( N_("Broadcast"), QVLM_Broadcast );
     ADDMEDIATYPES( N_("Schedule"), QVLM_Schedule );
 #undef ADDMEDIATYPES
@@ -348,7 +348,7 @@ void VLMDialog::clearWidgets()
 
 void VLMDialog::selectInput()
 {
-    OpenDialog *o = OpenDialog::getInstance( this, p_intf, false, SELECT, true );
+    OpenDialog *o = OpenDialog::getInstance( p_intf, false, SELECT, true );
     o->exec();
     ui.inputLedit->setText( o->getMRL( false ) );
     inputOptions = o->getOptions();
@@ -356,7 +356,7 @@ void VLMDialog::selectInput()
 
 void VLMDialog::selectOutput()
 {
-    SoutDialog *s = new SoutDialog( this, p_intf );
+    SoutDialog *s = new SoutDialog( windowHandle(), p_intf );
     if( s->exec() == QDialog::Accepted )
     {
         int i = s->getChain().indexOf( " " );

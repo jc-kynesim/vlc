@@ -30,17 +30,17 @@ class MainInterface;
 class QmlMainContext : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(PlaylistPtr playlist READ getPlaylist CONSTANT)
+    Q_PROPERTY(PlaylistPtr playlist READ getPlaylist CONSTANT FINAL)
 
 public:
-    explicit QmlMainContext(intf_thread_t *intf,  MainInterface *mainInterface, QObject* parent = nullptr);
+    explicit QmlMainContext(qt_intf_t *intf,  MainInterface *mainInterface, QObject* parent = nullptr);
 
     MainInterface* getMainInterface() const;
-    intf_thread_t* getIntf() const;
+    qt_intf_t* getIntf() const;
     PlaylistPtr getPlaylist() const;
 
 private:
-    intf_thread_t* m_intf;
+    qt_intf_t* m_intf;
     PlaylistPtr m_playlist;
     MainInterface* m_mainInterface;
 };

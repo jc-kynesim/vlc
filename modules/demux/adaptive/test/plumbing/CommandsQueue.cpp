@@ -42,6 +42,7 @@ class TestEsOut : public AbstractFakeEsOut
     public:
         TestEsOut() {}
         virtual ~TestEsOut() { cleanup(); }
+        virtual void milestoneReached() override {}
         virtual void recycle(AbstractFakeESOutID *) override {}
         virtual void createOrRecycleRealEsID(AbstractFakeESOutID *) override {}
         virtual void setPriority(int) override {}
@@ -81,6 +82,7 @@ class TestEsOutID : public AbstractFakeESOutID
         {
             out->sendData(this, b);
         }
+        virtual EsType esType() const override { return EsType::Other; }
 
     private:
         TestEsOut *out;

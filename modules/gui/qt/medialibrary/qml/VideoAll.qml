@@ -18,17 +18,18 @@
 
 import QtQuick          2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts  1.3
+import QtQuick.Layouts  1.11
 import QtQml.Models     2.2
 
 import org.videolan.medialib 0.1
+import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///main/"    as MainInterface
 import "qrc:///util/"    as Util
 import "qrc:///style/"
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: root
 
     //---------------------------------------------------------------------------------------------
@@ -62,20 +63,6 @@ Widgets.NavigableFocusScope {
     property alias dragItem: dragItem
 
     //---------------------------------------------------------------------------------------------
-    // Settings
-    //---------------------------------------------------------------------------------------------
-
-    navigationCancel: function() {
-        if (currentItem.currentIndex <= 0) {
-            defaultNavigationCancel()
-        } else {
-            currentItem.currentIndex = 0;
-
-            currentItem.positionViewAtIndex(0, ItemView.Contain);
-        }
-    }
-
-    //---------------------------------------------------------------------------------------------
     // Events
     //---------------------------------------------------------------------------------------------
 
@@ -100,7 +87,7 @@ Widgets.NavigableFocusScope {
         target: model
 
         onCountChanged: {
-            if (count === 0 || modelSelect.hasSelection) return;
+            if (model.count === 0 || modelSelect.hasSelection) return;
 
             resetFocus();
         }
@@ -135,6 +122,16 @@ Widgets.NavigableFocusScope {
         medialib.addAndPlay(model.getIdsForIndexes(modelSelect.selectedIndexes));
     }
 
+    function _onNavigationCancel() {
+        if (root.currentItem.currentIndex <= 0) {
+            root.Navigation.defaultNavigationCancel()
+        } else {
+            root.currentItem.currentIndex = 0;
+
+            root.currentItem.positionViewAtIndex(0, ItemView.Contain);
+        }
+    }
+
     //---------------------------------------------------------------------------------------------
     // Childs
     //---------------------------------------------------------------------------------------------
@@ -143,8 +140,6 @@ Widgets.NavigableFocusScope {
         id: view
 
         anchors.fill: parent
-
-        clip: true
 
         initialItem: (mainInterface.gridView) ? grid : list
 
@@ -216,19 +211,21 @@ Widgets.NavigableFocusScope {
 
             activeFocusOnTab: true
 
-            navigationParent: root
-            navigationUpItem: (headerItem) ? headerItem.focusItem : undefined
+            Navigation.parentItem: root
+            Navigation.upItem: (headerItem) ? headerItem.focusItem : null
+            //cancelAction takes a *function* pass it directly
+            Navigation.cancelAction: root._onNavigationCancel
 
             expandDelegate: VideoInfoExpandPanel {
                 width: gridView.width
 
                 x: 0
 
-                navigationParent: gridView
+                Navigation.parentItem: gridView
 
-                navigationCancel: function() { gridView.retract() }
-                navigationUp    : function() { gridView.retract() }
-                navigationDown  : function() { gridView.retract() }
+                Navigation.cancelAction: function() { gridView.retract() }
+                Navigation.upAction    : function() { gridView.retract() }
+                Navigation.downAction  : function() { gridView.retract() }
 
                 onRetract: gridView.retract()
             }
@@ -247,6 +244,12 @@ Widgets.NavigableFocusScope {
                 id: gridItem
 
                 //---------------------------------------------------------------------------------
+                // properties required by ExpandGridView
+
+                property var model: ({})
+                property int index: -1
+
+                //---------------------------------------------------------------------------------
                 // Settings
 
                 opacity: (gridView.expandIndex !== -1
@@ -262,11 +265,7 @@ Widgets.NavigableFocusScope {
 
                 onItemClicked: gridView.leftClickOnItem(modifier, index)
 
-                onItemDoubleClicked: {
-                    g_mainDisplay.showPlayer();
-
-                    medialib.addAndPlay(model.id);
-                }
+                onItemDoubleClicked: g_mainDisplay.play(medialib, model.id)
 
                 onContextMenuButtonClicked: {
                     gridView.rightClickOnItem(index);
@@ -278,7 +277,7 @@ Widgets.NavigableFocusScope {
                 //---------------------------------------------------------------------------------
                 // Animations
 
-                Behavior on opacity { NumberAnimation { duration: 100 } }
+                Behavior on opacity { NumberAnimation { duration: VLCStyle.duration_faster } }
             }
 
             //-------------------------------------------------------------------------------------
@@ -332,13 +331,17 @@ Widgets.NavigableFocusScope {
 
             headerPositioning: ListView.InlineHeader
 
-            navigationParent: root
-            navigationUpItem: (headerItem) ? headerItem.focus : undefined
+            Navigation.parentItem: root
+            Navigation.upItem: (headerItem) ? headerItem.focus : null
+            //cancelAction takes a *function* pass it directly
+            Navigation.cancelAction: root._onNavigationCancel
 
             //-------------------------------------------------------------------------------------
             // Events
 
-            onActionForSelection: medialib.addAndPlay(model.getIdsForIndexes(selection))
+            onActionForSelection: _actionAtIndex()
+
+            onItemDoubleClicked: g_mainDisplay.play(medialib, model.id)
 
             onContextMenuButtonClicked: contextMenu.popup(modelSelect.selectedIndexes,
                                                           menuParent.mapToGlobal(0,0))
@@ -359,7 +362,7 @@ Widgets.NavigableFocusScope {
 
         cover: VLCStyle.noArtVideoCover
 
-        navigationParent: root
+        Navigation.parentItem: root
 
         focus: visible
     }

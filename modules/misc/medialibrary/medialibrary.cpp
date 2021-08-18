@@ -41,6 +41,7 @@
 #include <medialibrary/IMediaGroup.h>
 #include <medialibrary/IPlaylist.h>
 #include <medialibrary/IBookmark.h>
+#include <medialibrary/IFolder.h>
 
 #include <sstream>
 #include <initializer_list>
@@ -272,23 +273,6 @@ void MediaLibrary::onDiscoveryCompleted( const std::string& entryPoint, bool suc
     m_vlc_ml->cbs->pf_send_event( m_vlc_ml, &ev );
 }
 
-void MediaLibrary::onReloadStarted( const std::string& entryPoint )
-{
-    vlc_ml_event_t ev;
-    ev.i_type = VLC_ML_EVENT_RELOAD_STARTED;
-    ev.reload_started.psz_entry_point = entryPoint.c_str();
-    m_vlc_ml->cbs->pf_send_event( m_vlc_ml, &ev );
-}
-
-void MediaLibrary::onReloadCompleted( const std::string& entryPoint, bool success )
-{
-    vlc_ml_event_t ev;
-    ev.i_type = VLC_ML_EVENT_RELOAD_COMPLETED;
-    ev.reload_completed.psz_entry_point = entryPoint.c_str();
-    ev.reload_completed.b_success = success;
-    m_vlc_ml->cbs->pf_send_event( m_vlc_ml, &ev );
-}
-
 void MediaLibrary::onEntryPointAdded( const std::string& entryPoint, bool success )
 {
     vlc_ml_event_t ev;
@@ -385,11 +369,24 @@ void MediaLibrary::onRescanStarted()
     m_vlc_ml->cbs->pf_send_event( m_vlc_ml, &ev );
 }
 
-MediaLibrary::MediaLibrary( vlc_medialibrary_module_t* ml )
-    : m_vlc_ml( ml )
+MediaLibrary* MediaLibrary::create( vlc_medialibrary_module_t* vlc_ml )
 {
-    m_ml.reset( NewMediaLibrary() );
+    auto userDir = vlc::wrap_cptr( config_GetUserDir( VLC_USERDATA_DIR ) );
+    auto mlDir = std::string{ userDir.get() } + "/ml/";
+    auto dbPath = mlDir + "ml.db";
+    auto mlFolderPath = mlDir + "mlstorage/";
+    auto ml = NewMediaLibrary( dbPath.c_str(), mlFolderPath.c_str(), true );
+    if ( !ml )
+        return nullptr;
 
+    return new MediaLibrary( vlc_ml, ml );
+}
+
+MediaLibrary::MediaLibrary( vlc_medialibrary_module_t* vlc_ml,
+                            medialibrary::IMediaLibrary* ml )
+    : m_vlc_ml( vlc_ml )
+    , m_ml( ml )
+{
     m_logger.reset( new Logger( VLC_OBJECT( m_vlc_ml ) ) );
     m_ml->setVerbosity( var_InheritBool( VLC_OBJECT( m_vlc_ml ), "ml-verbose" ) ?
                           medialibrary::LogLevel::Debug : medialibrary::LogLevel::Warning );
@@ -402,16 +399,13 @@ bool MediaLibrary::Init()
     if( m_initialized )
         return true;
 
-    auto userDir = vlc::wrap_cptr( config_GetUserDir( VLC_USERDATA_DIR ) );
-    std::string mlDir = std::string{ userDir.get() } + "/ml/";
-
     m_ml->registerDeviceLister( std::make_shared<vlc::medialibrary::DeviceLister>(
                                     VLC_OBJECT(m_vlc_ml) ), "smb://" );
     m_ml->addFileSystemFactory( std::make_shared<vlc::medialibrary::SDFileSystemFactory>(
                                     VLC_OBJECT( m_vlc_ml ), m_ml.get(), "file://") );
     m_ml->addFileSystemFactory( std::make_shared<vlc::medialibrary::SDFileSystemFactory>(
                                     VLC_OBJECT( m_vlc_ml ), m_ml.get(), "smb://") );
-    auto initStatus = m_ml->initialize( mlDir + "ml.db", mlDir + "/mlstorage/", this );
+    auto initStatus = m_ml->initialize( this );
     switch ( initStatus )
     {
         case medialibrary::InitializeResult::AlreadyInitialized:
@@ -512,6 +506,19 @@ bool MediaLibrary::Start()
 
 int MediaLibrary::Control( int query, va_list args )
 {
+    /*
+     * Contrary to Get and List requests, not all Control requests may acquire
+     * the priority access safely (without deadlocks) currently: some of them
+     * indirectly acquire the internal medialibrary mutex (for example,
+     * MediaLibrary::reload() calls startDiscoverer()), which may be locked by
+     * a non-priority caller.
+     *
+     * Therefore, priority access is only acquired for Control requests which
+     * do not suffer for this problem.
+     *
+     * See <https://code.videolan.org/videolan/vlc/-/merge_requests/223>
+     */
+
     switch ( query )
     {
         case VLC_ML_ADD_FOLDER:
@@ -557,19 +564,10 @@ int MediaLibrary::Control( int query, va_list args )
             }
             break;
         }
-        case VLC_ML_LIST_FOLDERS:
-        case VLC_ML_LIST_BANNED_FOLDERS:
-        {
-            auto entryPoints = ( query == VLC_ML_LIST_FOLDERS )
-                    ? m_ml->entryPoints()->all()
-                    : m_ml->bannedEntryPoints()->all();
-            auto res = ml_convert_list<vlc_ml_entry_point_list_t,
-                                         vlc_ml_entry_point_t>( entryPoints );
-            *(va_arg( args, vlc_ml_entry_point_list_t**) ) = res;
-            break;
-        }
         case VLC_ML_IS_INDEXED:
         {
+            auto priorityAccess = m_ml->acquirePriorityAccess();
+
             auto mrl = va_arg( args, const char* );
             auto res = va_arg( args, bool* );
             *res = m_ml->isIndexed( mrl );
@@ -595,6 +593,8 @@ int MediaLibrary::Control( int query, va_list args )
             break;
         case VLC_ML_NEW_EXTERNAL_MEDIA:
         {
+            auto priorityAccess = m_ml->acquirePriorityAccess();
+
             auto mrl = va_arg( args, const char* );
             auto media = m_ml->addExternalMedia( mrl, -1 );
             if ( media == nullptr )
@@ -604,6 +604,8 @@ int MediaLibrary::Control( int query, va_list args )
         }
         case VLC_ML_NEW_STREAM:
         {
+            auto priorityAccess = m_ml->acquirePriorityAccess();
+
             auto mrl = va_arg( args, const char* );
             auto media = m_ml->addStream( mrl );
             if ( media == nullptr )
@@ -613,6 +615,8 @@ int MediaLibrary::Control( int query, va_list args )
         }
         case VLC_ML_MEDIA_GENERATE_THUMBNAIL:
         {
+            auto priorityAccess = m_ml->acquirePriorityAccess();
+
             auto mediaId = va_arg( args, int64_t );
             auto sizeType = va_arg( args, int );
             auto width = va_arg( args, uint32_t );
@@ -635,9 +639,15 @@ int MediaLibrary::Control( int query, va_list args )
         case VLC_ML_MEDIA_REMOVE_BOOKMARK:
         case VLC_ML_MEDIA_REMOVE_ALL_BOOKMARKS:
         case VLC_ML_MEDIA_UPDATE_BOOKMARK:
+        {
+            auto priorityAccess = m_ml->acquirePriorityAccess();
+
             return controlMedia( query, args );
+        }
         case VLC_ML_PLAYLIST_CREATE:
         {
+            auto priorityAccess = m_ml->acquirePriorityAccess();
+
             auto name = va_arg( args, const char * );
             auto playlist = m_ml->createPlaylist( name );
             if ( playlist == nullptr )
@@ -648,12 +658,16 @@ int MediaLibrary::Control( int query, va_list args )
         }
         case VLC_ML_PLAYLIST_DELETE:
         {
+            auto priorityAccess = m_ml->acquirePriorityAccess();
+
             if ( m_ml->deletePlaylist( va_arg( args, int64_t ) ) == false )
                 return VLC_EGENERIC;
             return VLC_SUCCESS;
         }
         case VLC_ML_PLAYLIST_APPEND:
         {
+            auto priorityAccess = m_ml->acquirePriorityAccess();
+
             auto playlist = m_ml->playlist( va_arg( args, int64_t ) );
             if ( playlist == nullptr )
                 return VLC_EGENERIC;
@@ -663,6 +677,8 @@ int MediaLibrary::Control( int query, va_list args )
         }
         case VLC_ML_PLAYLIST_INSERT:
         {
+            auto priorityAccess = m_ml->acquirePriorityAccess();
+
             auto playlist = m_ml->playlist( va_arg( args, int64_t ) );
             if ( playlist == nullptr )
                 return VLC_EGENERIC;
@@ -674,6 +690,8 @@ int MediaLibrary::Control( int query, va_list args )
         }
         case VLC_ML_PLAYLIST_MOVE:
         {
+            auto priorityAccess = m_ml->acquirePriorityAccess();
+
             auto playlist = m_ml->playlist( va_arg( args, int64_t ) );
             if ( playlist == nullptr )
                 return VLC_EGENERIC;
@@ -685,6 +703,8 @@ int MediaLibrary::Control( int query, va_list args )
         }
         case VLC_ML_PLAYLIST_REMOVE:
         {
+            auto priorityAccess = m_ml->acquirePriorityAccess();
+
             auto playlist = m_ml->playlist( va_arg( args, int64_t ) );
             if ( playlist == nullptr )
                 return VLC_EGENERIC;
@@ -703,6 +723,8 @@ int MediaLibrary::List( int listQuery, const vlc_ml_query_params_t* params, va_l
 {
     if ( Init() == false )
         return VLC_EGENERIC;
+
+    auto priorityAccess = m_ml->acquirePriorityAccess();
 
     medialibrary::QueryParameters p{};
     medialibrary::QueryParameters* paramsPtr = nullptr;
@@ -1006,7 +1028,81 @@ int MediaLibrary::List( int listQuery, const vlc_ml_query_params_t* params, va_l
                 vlc_assert_unreachable();
             }
         }
-
+        case VLC_ML_LIST_ENTRY_POINTS:
+        {
+            const bool banned = va_arg( args, int ) != 0;
+            const auto query = banned ? m_ml->bannedEntryPoints() : m_ml->entryPoints();
+            if ( query == nullptr )
+                return VLC_EGENERIC;
+            auto* res =
+                ml_convert_list<vlc_ml_folder_list_t, vlc_ml_folder_t>( query->all() );
+            *( va_arg( args, vlc_ml_folder_list_t** ) ) = res;
+            break;
+        }
+        case VLC_ML_COUNT_ENTRY_POINTS:
+        {
+            const bool banned = va_arg( args, int ) != 0;
+            const auto query = banned ? m_ml->bannedEntryPoints() : m_ml->entryPoints();
+            *( va_arg( args, size_t* ) ) = query ? query->count() : 0;
+            break;
+        }
+        case VLC_ML_LIST_SUBFOLDERS:
+        {
+            const auto parent = m_ml->folder( va_arg( args, int64_t ) );
+            if ( parent == nullptr )
+                return VLC_EGENERIC;
+            const auto query = parent->subfolders();
+            if ( query == nullptr )
+                return VLC_EGENERIC;
+            auto* res = ml_convert_list<vlc_ml_folder_list_t, vlc_ml_folder_t>( query->all() );
+            *( va_arg( args, vlc_ml_folder_list_t** ) ) = res;
+            break;
+        }
+        case VLC_ML_COUNT_SUBFOLDERS:
+        {
+            const auto parent = m_ml->folder( va_arg( args, int64_t ) );
+            if ( parent == nullptr )
+                return VLC_EGENERIC;
+            const auto query = parent->subfolders();
+            *( va_arg( args, size_t* ) ) = query == nullptr ? 0 : query->count();
+            break;
+        }
+        case VLC_ML_LIST_FOLDERS:
+        {
+            const auto query = m_ml->folders( medialibrary::IMedia::Type::Unknown, paramsPtr );
+            if ( query == nullptr )
+                return VLC_EGENERIC;
+            auto* res = ml_convert_list<vlc_ml_folder_list_t, vlc_ml_folder_t>( query->all() );
+            *( va_arg( args, vlc_ml_folder_list_t** ) ) = res;
+            break;
+        }
+        case VLC_ML_COUNT_FOLDERS:
+        {
+            const auto query = m_ml->folders( medialibrary::IMedia::Type::Unknown, paramsPtr );
+            *( va_arg( args, size_t* ) ) = query == nullptr ? 0 : query->count();
+            break;
+        }
+        case VLC_ML_LIST_FOLDER_MEDIAS:
+        {
+            const auto folder = m_ml->folder( va_arg( args, int64_t ) );
+            if ( folder == nullptr )
+                return VLC_EGENERIC;
+            const auto query = folder->media( medialibrary::IMedia::Type::Unknown, paramsPtr );
+            if ( query == nullptr )
+                return VLC_EGENERIC;
+            auto* res = ml_convert_list<vlc_ml_media_list_t, vlc_ml_media_t>( query->all() );
+            *( va_arg( args, vlc_ml_media_list_t** ) ) = res;
+            break;
+        }
+        case VLC_ML_COUNT_FOLDER_MEDIAS:
+        {
+            const auto folder = m_ml->folder( va_arg( args, int64_t ) );
+            if ( folder == nullptr )
+                return VLC_EGENERIC;
+            const auto query = folder->media( medialibrary::IMedia::Type::Unknown, paramsPtr );
+            *( va_arg( args, size_t* ) ) = query == nullptr ? 0 : query->count();
+            break;
+        }
     }
     return VLC_SUCCESS;
 }
@@ -1015,6 +1111,8 @@ void* MediaLibrary::Get( int query, va_list args )
 {
     if ( Init() == false )
         return nullptr;
+
+    auto priorityAccess = m_ml->acquirePriorityAccess();
 
     switch ( query )
     {
@@ -1065,6 +1163,12 @@ void* MediaLibrary::Get( int query, va_list args )
             auto id = va_arg( args, int64_t );
             auto playlist = m_ml->playlist( id );
             return CreateAndConvert<vlc_ml_playlist_t>( playlist.get() );
+        }
+        case VLC_ML_GET_FOLDER:
+        {
+            auto id = va_arg( args, int64_t );
+            auto folder = m_ml->folder( id );
+            return CreateAndConvert<vlc_ml_folder_t>( folder.get() );
         }
         case VLC_ML_GET_MEDIA_BY_MRL:
         {
@@ -1803,7 +1907,7 @@ int MediaLibrary::listPlaylist( int listQuery, const medialibrary::QueryParamete
             if ( pattern != nullptr )
                 query = playlist->searchMedia( pattern, paramsPtr );
             else
-                query = playlist->media();
+                query = playlist->media( nullptr );
             if ( query == nullptr )
                 return VLC_EGENERIC;
             switch ( listQuery )
@@ -1866,6 +1970,11 @@ int MediaLibrary::listMedia( int listQuery, const medialibrary::QueryParameters 
     }
 }
 
+medialibrary::PriorityAccess MediaLibrary::acquirePriorityAccess()
+{
+    return m_ml->acquirePriorityAccess();
+}
+
 static void* Get( vlc_medialibrary_module_t* module, int query, va_list args )
 {
     auto ml = static_cast<MediaLibrary*>( module->p_sys );
@@ -1891,7 +2000,9 @@ static int Open( vlc_object_t* obj )
 
     try
     {
-        p_ml->p_sys = new MediaLibrary( p_ml );
+        p_ml->p_sys = MediaLibrary::create( p_ml );
+        if ( !p_ml->p_sys)
+            return VLC_EGENERIC;
     }
     catch ( const std::exception& ex )
     {
@@ -1911,8 +2022,8 @@ static void Close( vlc_object_t* obj )
     delete p_ml;
 }
 
-#define ML_FOLDER_TEXT _( "Folders discovered by the media library" )
-#define ML_FOLDER_LONGTEXT _( "Semicolon separated list of folders to discover " \
+#define ML_FOLDER_TEXT N_( "Folders discovered by the media library" )
+#define ML_FOLDER_LONGTEXT N_( "Semicolon separated list of folders to discover " \
                               "media from" )
 
 #define ML_VERBOSE _( "Extra verbose media library logs" )
@@ -1924,6 +2035,6 @@ vlc_module_begin()
     set_subcategory(SUBCAT_ADVANCED_MISC)
     set_capability("medialibrary", 100)
     set_callbacks(Open, Close)
-    add_string( "ml-folders", nullptr, ML_FOLDER_TEXT, ML_FOLDER_LONGTEXT, false )
-    add_bool( "ml-verbose", false, ML_VERBOSE, ML_VERBOSE, false )
+    add_string( "ml-folders", nullptr, ML_FOLDER_TEXT, ML_FOLDER_LONGTEXT )
+    add_bool( "ml-verbose", false, ML_VERBOSE, nullptr )
 vlc_module_end()

@@ -18,10 +18,11 @@
 
 import QtQuick          2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts  1.3
+import QtQuick.Layouts  1.11
 import QtQml.Models     2.2
 
 import org.videolan.medialib 0.1
+import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///main/"    as MainInterface
@@ -50,7 +51,7 @@ VideoAll {
     }
 
     header: Column {
-        property Item focusItem: loader.item.focusItem
+        property Item focusItem: (loader.status === Loader.Ready) ? loader.item.focusItem : null
 
         width: root.width
 
@@ -58,12 +59,16 @@ VideoAll {
 
         spacing: VLCStyle.margin_normal
 
+        // NOTE: We want the header to be visible when we have at least one media visible.
+        //       Otherwise it overlaps the default caption.
+        visible: (model.count)
+
         Loader {
             id: loader
 
             width: parent.width
 
-            height: item.implicitHeight
+            height: (status === Loader.Ready) ? item.implicitHeight : 0
 
             active: (modelRecent.count)
 
@@ -80,9 +85,9 @@ VideoAll {
 
                 focus: true
 
-                navigationParent: root
+                Navigation.parentItem: root
 
-                navigationDown: function() {
+                Navigation.downAction: function() {
                     component.focus = false;
 
                     currentItem.setCurrentItemFocus();

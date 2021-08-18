@@ -90,7 +90,6 @@ static const int pi_channels_maps[CHANNELS_MAX+1] =
 #define AFDLINE_INDEX_LONGTEXT N_("VBI line on which to output Active Format Descriptor.")
 
 #define NOSIGNAL_IMAGE_TEXT N_("Picture to display on input signal loss")
-#define NOSIGNAL_IMAGE_LONGTEXT NOSIGNAL_IMAGE_TEXT
 
 #define CARD_INDEX_TEXT N_("Output card")
 #define CARD_INDEX_LONGTEXT N_(\
@@ -102,11 +101,6 @@ static const int pi_channels_maps[CHANNELS_MAX+1] =
     "Desired output mode for DeckLink output. " \
     "This value should be a FOURCC code in textual " \
     "form, e.g. \"ntsc\".")
-
-#define AUDIO_CONNECTION_TEXT N_("Audio connection")
-#define AUDIO_CONNECTION_LONGTEXT N_(\
-    "Audio connection for DeckLink output.")
-
 
 #define RATE_TEXT N_("Audio samplerate (Hz)")
 #define RATE_LONGTEXT N_(\
@@ -234,7 +228,7 @@ struct decklink_sys_t
  * Local prototypes.
  *****************************************************************************/
 
-static int  OpenVideo           (vout_display_t *, const vout_display_cfg_t *,
+static int  OpenVideo           (vout_display_t *,
                                  video_format_t *, vlc_video_context *);
 static void CloseVideo          (vout_display_t *);
 static int  OpenAudio           (vlc_object_t *);
@@ -249,7 +243,7 @@ vlc_module_begin()
     set_description(N_("Output module to write to Blackmagic SDI card"))
     set_section(N_("DeckLink General Options"), NULL)
     add_integer(CFG_PREFIX "card-index", 0,
-                CARD_INDEX_TEXT, CARD_INDEX_LONGTEXT, true)
+                CARD_INDEX_TEXT, CARD_INDEX_LONGTEXT)
 
     add_submodule ()
     set_description (N_("DeckLink Video Output module"))
@@ -258,24 +252,24 @@ vlc_module_begin()
     set_callback_display(OpenVideo, 0)
     set_section(N_("DeckLink Video Options"), NULL)
     add_string(VIDEO_CFG_PREFIX "video-connection", "sdi",
-                VIDEO_CONNECTION_TEXT, VIDEO_CONNECTION_LONGTEXT, true)
+                VIDEO_CONNECTION_TEXT, VIDEO_CONNECTION_LONGTEXT)
                 change_string_list(ppsz_videoconns, ppsz_videoconns_text)
     add_string(VIDEO_CFG_PREFIX "mode", "",
-                MODE_TEXT, MODE_LONGTEXT, true)
+                MODE_TEXT, MODE_LONGTEXT)
     add_bool(VIDEO_CFG_PREFIX "tenbits", true,
-                VIDEO_TENBITS_TEXT, VIDEO_TENBITS_LONGTEXT, true)
+                VIDEO_TENBITS_TEXT, VIDEO_TENBITS_LONGTEXT)
     add_integer(VIDEO_CFG_PREFIX "nosignal-delay", 5,
-                NOSIGNAL_INDEX_TEXT, NOSIGNAL_INDEX_LONGTEXT, true)
+                NOSIGNAL_INDEX_TEXT, NOSIGNAL_INDEX_LONGTEXT)
     add_integer(VIDEO_CFG_PREFIX "afd-line", 16,
-                AFDLINE_INDEX_TEXT, AFDLINE_INDEX_LONGTEXT, true)
+                AFDLINE_INDEX_TEXT, AFDLINE_INDEX_LONGTEXT)
     add_integer_with_range(VIDEO_CFG_PREFIX "afd", 8, 0, 16,
-                AFD_INDEX_TEXT, AFD_INDEX_TEXT, true)
+                AFD_INDEX_TEXT, nullptr)
                 change_integer_list(rgi_afd_values, rgsz_afd_text)
     add_integer_with_range(VIDEO_CFG_PREFIX "ar", 1, 0, 1,
-                AR_INDEX_TEXT, AR_INDEX_LONGTEXT, true)
+                AR_INDEX_TEXT, AR_INDEX_LONGTEXT)
                 change_integer_list(rgi_ar_values, rgsz_ar_text)
     add_loadfile(VIDEO_CFG_PREFIX "nosignal-image", NULL,
-                 NOSIGNAL_IMAGE_TEXT, NOSIGNAL_IMAGE_LONGTEXT)
+                 NOSIGNAL_IMAGE_TEXT, nullptr)
 
 
     add_submodule ()
@@ -285,11 +279,10 @@ vlc_module_begin()
     set_capability("audio output", 0)
     set_callbacks (OpenAudio, CloseAudio)
     set_section(N_("DeckLink Audio Options"), NULL)
-    add_obsolete_string("audio-connection")
     add_integer(AUDIO_CFG_PREFIX "audio-rate", 48000,
-                RATE_TEXT, RATE_LONGTEXT, true)
+                RATE_TEXT, RATE_LONGTEXT)
     add_integer(AUDIO_CFG_PREFIX "audio-channels", 2,
-                CHANNELS_TEXT, CHANNELS_LONGTEXT, true)
+                CHANNELS_TEXT, CHANNELS_LONGTEXT)
 vlc_module_end ()
 
 /* Protects decklink_sys_t creation/deletion */
@@ -772,10 +765,10 @@ static const struct vlc_display_operations ops = {
     CloseVideo, PrepareVideo, NULL, ControlVideo, NULL, NULL,
 };
 
-static int OpenVideo(vout_display_t *vd, const vout_display_cfg_t *cfg,
+static int OpenVideo(vout_display_t *vd,
                      video_format_t *fmtp, vlc_video_context *context)
 {
-    VLC_UNUSED(cfg); VLC_UNUSED(context);
+    VLC_UNUSED(context);
     decklink_sys_t *sys = HoldDLSys(VLC_OBJECT(vd), VIDEO_ES);
     if(!sys)
         return VLC_ENOMEM;
@@ -811,7 +804,7 @@ static int OpenVideo(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     vd->ops = &ops;
 
-    vd->sys = (vout_display_sys_t*) sys;
+    vd->sys = (void *) sys;
 
     return VLC_SUCCESS;
 }

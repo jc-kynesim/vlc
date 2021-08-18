@@ -98,7 +98,6 @@ vlc_object_cast(audio_output)
 vlc_object_cast(vout_thread_t)
 vlc_object_cast(vout_display_t)
 vlc_object_cast(vout_window_t)
-vlc_object_cast(sout_instance_t)
 vlc_object_cast(sout_stream_t)
 vlc_object_cast(sout_access_out_t)
 vlc_object_cast(extensions_manager_t)
@@ -122,7 +121,7 @@ struct libvlc_int_t
  *
  * @return the new object, or NULL on error.
  */
-VLC_API void *vlc_object_create( vlc_object_t *, size_t ) VLC_MALLOC VLC_USED;
+VLC_API void *vlc_object_create( vlc_object_t *, size_t i_size) VLC_MALLOC VLC_USED;
 
 /**
  * Drops the strong reference to an object.

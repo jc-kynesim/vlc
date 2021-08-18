@@ -32,8 +32,11 @@
 // Qt includes
 #include <QAbstractListModel>
 
+#include "qt.hpp"
+
 // Forward declarations
 class DialogModel;
+
 
 //-------------------------------------------------------------------------------------------------
 // DialogId
@@ -68,7 +71,7 @@ class DialogErrorModel : public QAbstractListModel
 
     Q_ENUMS(DialogRoles)
 
-    Q_PROPERTY(int count READ count NOTIFY countChanged)
+    Q_PROPERTY(int count READ count NOTIFY countChanged FINAL)
 
 public: // Enums
     enum DialogRoles
@@ -123,14 +126,14 @@ class DialogModel : public QObject
 
     Q_ENUMS(QuestionType)
 
-    Q_PROPERTY(DialogErrorModel * model READ model CONSTANT)
+    Q_PROPERTY(DialogErrorModel * model READ model CONSTANT FINAL)
 
 public: // Enums
     // NOTE: Is it really useful to have this declared here ?
     enum QuestionType { QUESTION_NORMAL, QUESTION_WARNING, QUESTION_CRITICAL };
 
 public:
-    explicit DialogModel(intf_thread_t * intf, QObject * parent = nullptr);
+    explicit DialogModel(qt_intf_t * intf, QObject * parent = nullptr);
 
 public: // Interface
     Q_INVOKABLE void post_login(DialogId dialogId, const QString & username,
@@ -187,7 +190,7 @@ public: // Properties
 private: // Variables
     DialogErrorModel * m_model;
 
-    intf_thread_t * m_intf;
+    qt_intf_t * m_intf;
 };
 
 #endif // DIALOGMODEL_HPP

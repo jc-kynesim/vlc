@@ -141,10 +141,10 @@ vlc_module_begin()
     set_callbacks( SD::OpenSD, SD::CloseSD );
 
     add_string( "satip-channelist", "auto", SATIP_CHANNEL_LIST,
-                SATIP_CHANNEL_LIST, false )
+                nullptr )
     change_string_list( ppsz_satip_channel_lists, ppsz_readible_satip_channel_lists )
     add_string( "satip-channellist-url", NULL, SATIP_CHANNEL_LIST_URL,
-                SATIP_CHANNEL_LIST_URL, false )
+                nullptr )
 
     add_submodule()
         set_category( CAT_INPUT )
@@ -173,12 +173,12 @@ vlc_module_begin()
         set_subcategory(SUBCAT_SOUT_STREAM)
         set_callbacks(DLNA::OpenSout, DLNA::CloseSout)
 
-        add_string(SOUT_CFG_PREFIX "ip", NULL, IP_ADDR_TEXT, IP_ADDR_LONGTEXT, false)
-        add_integer(SOUT_CFG_PREFIX "port", NULL, PORT_TEXT, PORT_LONGTEXT, false)
-        add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT, false)
-        add_bool(SOUT_CFG_PREFIX "video", true, HAS_VIDEO_TEXT, HAS_VIDEO_LONGTEXT, false)
-        add_string(SOUT_CFG_PREFIX "base_url", NULL, BASE_URL_TEXT, BASE_URL_LONGTEXT, false)
-        add_string(SOUT_CFG_PREFIX "url", NULL, URL_TEXT, URL_LONGTEXT, false)
+        add_string(SOUT_CFG_PREFIX "ip", NULL, IP_ADDR_TEXT, IP_ADDR_LONGTEXT)
+        add_integer(SOUT_CFG_PREFIX "port", 0, PORT_TEXT, PORT_LONGTEXT)
+        add_integer(SOUT_CFG_PREFIX "http-port", HTTP_PORT, HTTP_PORT_TEXT, HTTP_PORT_LONGTEXT)
+        add_bool(SOUT_CFG_PREFIX "video", true, HAS_VIDEO_TEXT, HAS_VIDEO_LONGTEXT)
+        add_string(SOUT_CFG_PREFIX "base_url", NULL, BASE_URL_TEXT, BASE_URL_LONGTEXT)
+        add_string(SOUT_CFG_PREFIX "url", NULL, URL_TEXT, URL_LONGTEXT)
         add_renderer_opts(SOUT_CFG_PREFIX)
 vlc_module_end()
 
@@ -658,7 +658,7 @@ MediaServerList::parseSatipServer( IXML_Element* p_device_element, const char *p
     vlc_UrlParse( &url, psz_base_url );
 
     /* Part 1: a user may have provided a custom playlist url */
-    if (strncmp(psz_satip_channellist, "CustomList", 10) == 0) {
+    if (strcmp(psz_satip_channellist, "CustomList") == 0) {
         char *psz_satip_playlist_url = config_GetPsz( "satip-channellist-url" );
         if ( psz_satip_playlist_url ) {
             p_server = new(std::nothrow) SD::MediaServerDesc( psz_udn, psz_friendly_name, psz_satip_playlist_url, iconUrl );
@@ -681,8 +681,8 @@ MediaServerList::parseSatipServer( IXML_Element* p_device_element, const char *p
 
     /* Part 2: device playlist
      * In Automatic mode, or if requested by the user, check for a SAT>IP m3u list on the device */
-    if (strncmp(psz_satip_channellist, "ServerList", 10) == 0 ||
-        strncmp(psz_satip_channellist, "Auto", strlen ("Auto")) == 0 ) {
+    if (strcmp(psz_satip_channellist, "ServerList") == 0 ||
+        strcmp(psz_satip_channellist, "Auto") == 0 ) {
         const char* psz_m3u_url = xml_getChildElementValue( p_device_element, "satip:X_SATIPM3U" );
         if ( psz_m3u_url ) {
             if ( strncmp( "http", psz_m3u_url, 4) )
@@ -712,7 +712,7 @@ MediaServerList::parseSatipServer( IXML_Element* p_device_element, const char *p
             msg_Dbg( m_sd, "SAT>IP server '%s' did not provide a playlist", url.psz_host);
         }
 
-        if(strncmp(psz_satip_channellist, "ServerList", 10) == 0) {
+        if(strcmp(psz_satip_channellist, "ServerList") == 0) {
             /* to comply with the SAT>IP specifications, we don't fallback on another channel list if this path failed,
              * but in Automatic mode, we continue */
             free(psz_satip_channellist);
@@ -727,7 +727,7 @@ MediaServerList::parseSatipServer( IXML_Element* p_device_element, const char *p
      * MasterList is a list of usual Satellites */
 
     /* In Auto mode, default to MasterList list from satip.info */
-    if( strncmp(psz_satip_channellist, "Auto", strlen ("Auto")) == 0 ) {
+    if( strcmp(psz_satip_channellist, "Auto") == 0 ) {
         free(psz_satip_channellist);
         psz_satip_channellist = strdup( "MasterList" );
     }
@@ -909,13 +909,13 @@ namespace
             psz_album_artist = xml_getChildElementValue( itemElement, "upnp:albumArtist" );
             psz_albumArt = xml_getChildElementValue( itemElement, "upnp:albumArtURI" );
             const char *psz_media_type = xml_getChildElementValue( itemElement, "upnp:class" );
-            if (strncmp(psz_media_type, "object.item.videoItem", 21) == 0)
+            if (strcmp(psz_media_type, "object.item.videoItem") == 0)
                 media_type = VIDEO;
-            else if (strncmp(psz_media_type, "object.item.audioItem", 21) == 0)
+            else if (strcmp(psz_media_type, "object.item.audioItem") == 0)
                 media_type = AUDIO;
-            else if (strncmp(psz_media_type, "object.item.imageItem", 21) == 0)
+            else if (strcmp(psz_media_type, "object.item.imageItem") == 0)
                 media_type = IMAGE;
-            else if (strncmp(psz_media_type, "object.container", 16 ) == 0)
+            else if (strcmp(psz_media_type, "object.container") == 0)
                 media_type = CONTAINER;
             else
                 return false;
@@ -1139,7 +1139,7 @@ bool MediaServer::addItem( IXML_Element* itemElement )
             }
             else
                 holder.addSlave(xml_getChildElementValue( p_resource, "res" ),
-                                SLAVE_TYPE_AUDIO);
+                                SLAVE_TYPE_GENERIC);
         }
     }
     ixmlNodeList_free( p_resource_list );

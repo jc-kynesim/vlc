@@ -32,6 +32,7 @@
 #include "util/qmleventfilter.hpp"
 #include "util/imageluminanceextractor.hpp"
 #include "util/i18n.hpp"
+#include "util/keyhelper.hpp"
 #include "util/systempalette.hpp"
 #include "util/sortfilterproxymodel.hpp"
 #include "util/navigation_history.hpp"
@@ -49,6 +50,9 @@
 #include "maininterface/main_interface.hpp"
 
 #include "menus/qml_menu_wrapper.hpp"
+
+#include "widgets/native/roundimage.hpp"
+#include "widgets/native/navigation_attached.hpp"
 
 #include "videosurface.hpp"
 
@@ -75,7 +79,7 @@ void registerAnonymousType( const char *uri, int versionMajor )
 } // anonymous namespace
 
 
-MainUI::MainUI(intf_thread_t *p_intf, MainInterface *mainInterface, QWindow* interfaceWindow,  QObject *parent)
+MainUI::MainUI(qt_intf_t *p_intf, MainInterface *mainInterface, QWindow* interfaceWindow,  QObject *parent)
     : QObject(parent)
     , m_intf(p_intf)
     , m_mainInterface(mainInterface)
@@ -101,7 +105,7 @@ bool MainUI::setup(QQmlEngine* engine)
     QQmlContext *rootCtx = engine->rootContext();
 
     rootCtx->setContextProperty( "history", new NavigationHistory(this) );
-    rootCtx->setContextProperty( "player", m_intf->p_sys->p_mainPlayerController );
+    rootCtx->setContextProperty( "player", m_intf->p_mainPlayerController );
     rootCtx->setContextProperty( "i18n", new I18n(this) );
     rootCtx->setContextProperty( "mainctx", new QmlMainContext(m_intf, m_mainInterface, this));
     rootCtx->setContextProperty( "mainInterface", m_mainInterface);
@@ -166,6 +170,7 @@ void MainUI::registerQMLTypes()
 {
     qRegisterMetaType<VLCTick>();
     qmlRegisterUncreatableType<VLCTick>("org.videolan.vlc", 0, 1, "VLCTick", "");
+    qmlRegisterUncreatableType<ColorSchemeModel>("org.videolan.vlc", 0, 1, "ColorSchemeModel", "");
 
     qRegisterMetaType<QmlInputItem>();
 
@@ -197,8 +202,6 @@ void MainUI::registerQMLTypes()
         registerAnonymousType<MLAlbum>("org.videolan.medialib", 1);
         registerAnonymousType<MLArtist>("org.videolan.medialib", 1);
         registerAnonymousType<MLAlbumTrack>("org.videolan.medialib", 1);
-        registerAnonymousType<MLGenre>("org.videolan.medialib", 1);
-        registerAnonymousType<MLPlaylist>("org.videolan.medialib", 1);
 
         qmlRegisterType<AlbumContextMenu>( "org.videolan.medialib", 0, 1, "AlbumContextMenu" );
         qmlRegisterType<ArtistContextMenu>( "org.videolan.medialib", 0, 1, "ArtistContextMenu" );
@@ -242,14 +245,15 @@ void MainUI::registerQMLTypes()
 
     qmlRegisterType<QmlEventFilter>( "org.videolan.vlc", 0, 1, "EventFilter" );
 
-    qRegisterMetaType<ControlbarProfile*>();
-    qRegisterMetaType<ControlbarProfileModel*>();
+    qmlRegisterUncreatableType<ControlbarProfileModel>("org.videolan.vlc", 0, 1, "ControlbarProfileModel", "");
     qmlRegisterUncreatableType<ControlbarProfile>("org.videolan.vlc", 0, 1, "ControlbarProfile", "");
     qmlRegisterUncreatableType<PlayerControlbarModel>("org.videolan.vlc", 0, 1, "PlayerControlbarModel", "");
     qmlRegisterUncreatableType<ControlListModel>( "org.videolan.vlc", 0, 1, "ControlListModel", "" );
     qmlRegisterSingletonType("org.videolan.vlc", 0, 1, "PlayerListModel", PlayerControlbarModel::getPlaylistIdentifierListModel);
 
     qRegisterMetaType<QmlMainContext*>();
+    qmlRegisterType<StringListMenu>( "org.videolan.vlc", 0, 1, "StringListMenu" );
+    qmlRegisterType<SortMenu>( "org.videolan.vlc", 0, 1, "SortMenu" );
     qmlRegisterType<QmlGlobalMenu>( "org.videolan.vlc", 0, 1, "QmlGlobalMenu" );
     qmlRegisterType<QmlMenuBar>( "org.videolan.vlc", 0, 1, "QmlMenuBar" );
     qmlRegisterType<NetworkMediaContextMenu>( "org.videolan.vlc", 0, 1, "NetworkMediaContextMenu" );
@@ -257,7 +261,13 @@ void MainUI::registerQMLTypes()
     qmlRegisterType<PlaylistContextMenu>( "org.videolan.vlc", 0, 1, "PlaylistContextMenu" );
     qmlRegisterType<SortFilterProxyModel>( "org.videolan.vlc", 0, 1, "SortFilterProxyModel" );
 
+    // Custom controls
+    qmlRegisterType<RoundImage>( "org.videolan.controls", 0, 1, "RoundImage" );
+
     qRegisterMetaType<QList<QQmlError>>("QList<QQmlError>");
+
+    qmlRegisterUncreatableType<NavigationAttached>( "org.videolan.vlc", 0, 1, "Navigation", "Navigation is only available via attached properties");
+    qmlRegisterSingletonType<QmlKeyHelper>("org.videolan.vlc", 0, 1, "KeyHelper", &QmlKeyHelper::getSingletonInstance);
 }
 
 void MainUI::onQmlWarning(const QList<QQmlError>& qmlErrors)

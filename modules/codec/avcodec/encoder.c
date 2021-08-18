@@ -297,7 +297,7 @@ int InitVideoEnc( vlc_object_t *p_this )
     encoder_sys_t *p_sys;
     AVCodecContext *p_context;
     AVCodec *p_codec = NULL;
-    unsigned i_codec_id;
+    enum AVCodecID i_codec_id;
     const char *psz_namecodec;
     float f_val;
     char *psz_val;
@@ -557,7 +557,7 @@ int InitVideoEnc( vlc_object_t *p_this )
                 AV_PIX_FMT_RGB24,
             };
             bool found = false;
-            const enum PixelFormat *p = p_codec->pix_fmts;
+            const enum AVPixelFormat *p = p_codec->pix_fmts;
             for( ; !found && *p != -1; p++ )
             {
                 for( size_t i = 0; i < ARRAY_SIZE(vlc_pix_fmts); ++i )
@@ -1067,14 +1067,14 @@ error:
 typedef struct
 {
     block_t self;
-    AVPacket packet;
+    AVPacket *packet;
 } vlc_av_packet_t;
 
 static void vlc_av_packet_Release(block_t *block)
 {
     vlc_av_packet_t *b = (void *) block;
 
-    av_packet_unref(&b->packet);
+    av_packet_free( &b->packet );
     free(b);
 }
 
@@ -1100,7 +1100,7 @@ static block_t *vlc_av_packet_Wrap(AVPacket *packet, AVCodecContext *context )
     block_Init( p_block, &vlc_av_packet_cbs, packet->data, packet->size );
     p_block->i_nb_samples = 0;
     p_block->cbs = &vlc_av_packet_cbs;
-    b->packet = *packet;
+    b->packet = packet;
 
     p_block->i_length = FROM_AVSCALE(packet->duration, context->time_base);
     if( unlikely( packet->flags & AV_PKT_FLAG_CORRUPT ) )
@@ -1109,6 +1109,29 @@ static block_t *vlc_av_packet_Wrap(AVPacket *packet, AVCodecContext *context )
         p_block->i_flags |= BLOCK_FLAG_TYPE_I;
     p_block->i_pts = VLC_TICK_0 + FROM_AVSCALE(packet->pts, context->time_base);
     p_block->i_dts = VLC_TICK_0 + FROM_AVSCALE(packet->dts, context->time_base);
+
+    uint8_t *av_packet_sidedata = av_packet_get_side_data(packet, AV_PKT_DATA_QUALITY_STATS, NULL);
+    if( av_packet_sidedata )
+    {
+       switch ( av_packet_sidedata[4] )
+       {
+       case AV_PICTURE_TYPE_I:
+       case AV_PICTURE_TYPE_SI:
+           p_block->i_flags |= BLOCK_FLAG_TYPE_I;
+           break;
+       case AV_PICTURE_TYPE_P:
+       case AV_PICTURE_TYPE_SP:
+           p_block->i_flags |= BLOCK_FLAG_TYPE_P;
+           break;
+       case AV_PICTURE_TYPE_B:
+       case AV_PICTURE_TYPE_BI:
+           p_block->i_flags |= BLOCK_FLAG_TYPE_B;
+           break;
+       default:
+           p_block->i_flags |= BLOCK_FLAG_TYPE_PB;
+       }
+
+    }
 
     return p_block;
 }
@@ -1147,11 +1170,13 @@ static void check_hurry_up( encoder_sys_t *p_sys, AVFrame *frame, encoder_t *p_e
 
 static block_t *encode_avframe( encoder_t *p_enc, encoder_sys_t *p_sys, AVFrame *frame )
 {
-    AVPacket av_pkt;
-    av_pkt.data = NULL;
-    av_pkt.size = 0;
+    AVPacket *av_pkt = av_packet_alloc();
 
-    av_init_packet( &av_pkt );
+    if( !av_pkt )
+    {
+        av_frame_unref( frame );
+        return NULL;
+    }
 
     int ret = avcodec_send_frame( p_sys->p_context, frame );
     if( frame && ret != 0 && ret != AVERROR(EAGAIN) )
@@ -1159,17 +1184,18 @@ static block_t *encode_avframe( encoder_t *p_enc, encoder_sys_t *p_sys, AVFrame 
         msg_Warn( p_enc, "cannot send one frame to encoder %d", ret );
         return NULL;
     }
-    ret = avcodec_receive_packet( p_sys->p_context, &av_pkt );
+    ret = avcodec_receive_packet( p_sys->p_context, av_pkt );
     if( ret != 0 && ret != AVERROR(EAGAIN) )
     {
         msg_Warn( p_enc, "cannot encode one frame" );
+        av_packet_free( &av_pkt );
         return NULL;
     }
 
-    block_t *p_block = vlc_av_packet_Wrap( &av_pkt, p_sys->p_context );
+    block_t *p_block = vlc_av_packet_Wrap( av_pkt, p_sys->p_context );
     if( unlikely(p_block == NULL) )
     {
-        av_packet_unref( &av_pkt );
+        av_packet_free( &av_pkt );
         return NULL;
     }
     return p_block;
@@ -1241,27 +1267,6 @@ static block_t *EncodeVideo( encoder_t *p_enc, picture_t *p_pict )
 
     block_t *p_block = encode_avframe( p_enc, p_sys, frame );
 
-    if( p_block )
-    {
-       switch ( p_sys->p_context->coded_frame->pict_type )
-       {
-       case AV_PICTURE_TYPE_I:
-       case AV_PICTURE_TYPE_SI:
-           p_block->i_flags |= BLOCK_FLAG_TYPE_I;
-           break;
-       case AV_PICTURE_TYPE_P:
-       case AV_PICTURE_TYPE_SP:
-           p_block->i_flags |= BLOCK_FLAG_TYPE_P;
-           break;
-       case AV_PICTURE_TYPE_B:
-       case AV_PICTURE_TYPE_BI:
-           p_block->i_flags |= BLOCK_FLAG_TYPE_B;
-           break;
-       default:
-           p_block->i_flags |= BLOCK_FLAG_TYPE_PB;
-       }
-    }
-
     return p_block;
 }
 
@@ -1275,6 +1280,8 @@ static block_t *handle_delay_buffer( encoder_t *p_enc, encoder_sys_t *p_sys, uns
     av_frame_unref( p_sys->frame );
     p_sys->frame->format     = p_sys->p_context->sample_fmt;
     p_sys->frame->nb_samples = leftover_samples + p_sys->i_samples_delay;
+    p_sys->frame->channel_layout = p_sys->p_context->channel_layout;
+    p_sys->frame->channels = p_sys->p_context->channels;
 
     if( likely( date_Get( &p_sys->buffer_date ) != VLC_TICK_INVALID) )
     {
@@ -1402,7 +1409,10 @@ static block_t *EncodeAudio( encoder_t *p_enc, block_t *p_aout_buf )
             p_sys->frame->nb_samples = p_aout_buf->i_nb_samples;
         else
             p_sys->frame->nb_samples = p_sys->i_frame_size;
-        p_sys->frame->format     = p_sys->p_context->sample_fmt;
+        p_sys->frame->format = p_sys->p_context->sample_fmt;
+        p_sys->frame->channel_layout = p_sys->p_context->channel_layout;
+        p_sys->frame->channels = p_sys->p_context->channels;
+
         if( likely(date_Get( &p_sys->buffer_date ) != VLC_TICK_INVALID) )
         {
             /* Convert to AV timing */

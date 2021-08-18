@@ -23,26 +23,43 @@ import org.videolan.vlc 0.1
 
 import "qrc:///util" as Util
 import "qrc:///widgets/" as Widgets
-import "qrc:///util/KeyHelper.js" as KeyHelper
 import "qrc:///style/"
 
-Widgets.NavigableFocusScope {
+FocusScope {
     id: root
 
     readonly property bool isViewMultiView: false
 
+    //---------------------------------------------------------------------------------------------
+    // Functions
+    //---------------------------------------------------------------------------------------------
+    // Private
+
+    function _getColor() {
+        if (searchField.activeFocus) {
+            return VLCStyle.colors.accent;
+        } else if (searchField.hovered) {
+            return VLCStyle.colors.textFieldHover;
+        } else
+            return VLCStyle.colors.textField;
+    }
+
+    //---------------------------------------------------------------------------------------------
+    // Childs
+    //---------------------------------------------------------------------------------------------
+
     Column {
         anchors.fill: parent
 
-        Widgets.NavigableFocusScope {
+        FocusScope {
             id: searchFieldContainer
 
             width: root.width
             height: searchField.height + VLCStyle.margin_normal * 2
             focus: true
 
-            navigationParent:  root
-            navigationDownItem: !medialib ? undefined : urlListDisplay.item
+            Navigation.parentItem:  root
+            Navigation.downItem: (!!urlListDisplay.item) ? urlListDisplay.item : null
 
             TextField {
                 id: searchField
@@ -61,9 +78,7 @@ Widgets.NavigableFocusScope {
                 background: Rectangle {
                     color: VLCStyle.colors.bg
                     border.width: VLCStyle.dp(2, VLCStyle.scale)
-                    border.color: searchField.activeFocus || searchField.hovered
-                                  ? VLCStyle.colors.accent
-                                  : VLCStyle.colors.setColorAlpha(VLCStyle.colors.text, .4)
+                    border.color: _getColor()
                 }
 
                 onAccepted: {
@@ -74,11 +89,7 @@ Widgets.NavigableFocusScope {
                 }
 
                 Keys.priority: Keys.AfterItem
-                Keys.onPressed: {
-                    if (event.accepted)
-                        return
-                    searchFieldContainer.defaultKeyAction(event, 0)
-                }
+                Keys.onPressed: searchFieldContainer.Navigation.defaultKeyAction(event)
             }
         }
 
@@ -91,8 +102,8 @@ Widgets.NavigableFocusScope {
             active:  !!medialib
             source: "qrc:///medialibrary/UrlListDisplay.qml"
             onLoaded: {
-                item.navigationUpItem = searchField
-                item.navigationParent =  root
+                item.Navigation.upItem = searchField
+                item.Navigation.parentItem =  root
             }
         }
     }

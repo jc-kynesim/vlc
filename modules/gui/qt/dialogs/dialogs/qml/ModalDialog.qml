@@ -17,7 +17,7 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
 import QtGraphicalEffects 1.0
 
 import "qrc:///widgets/" as Widgets
@@ -51,7 +51,7 @@ Dialog {
     }
 
     background: Rectangle {
-        color: VLCStyle.colors.banner
+        color: VLCStyle.colors.topBanner
     }
 
     header: Label {
@@ -65,7 +65,7 @@ Dialog {
             x: 1; y: 1
             width: parent.width - 2
             height: parent.height - 1
-            color: VLCStyle.colors.banner
+            color: VLCStyle.colors.topBanner
         }
     }
 

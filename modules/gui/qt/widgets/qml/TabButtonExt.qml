@@ -19,36 +19,69 @@
 import QtQuick 2.11
 import QtQuick.Controls 2.4
 import QtQuick.Templates 2.4 as T
-import QtQuick.Layouts 1.3
+import QtQuick.Layouts 1.11
+
+import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
 T.TabButton {
     id: control
-    text: model.displayText
 
-    padding: 0
+    // Properties
+
+    property bool selected: false
+
+    property bool busy: false
+
+    property string iconTxt: ""
+
+    property int iconSize: VLCStyle.icon_normal
+
+    property color color: VLCStyle.colors.text
+
+    // Aliases
+
+    property alias backgroundColor: background.backgroundColor
+    property alias foregroundColor: background.foregroundColor
+
+    property alias colorFocus: background.activeBorderColor
+
+    // Settings
 
     width: implicitWidth
     height: implicitHeight
+
     implicitWidth: contentItem.implicitWidth
     implicitHeight: contentItem.implicitHeight
 
-    property string iconTxt: ""
-    property int iconSize: VLCStyle.icon_normal
-    property bool selected: false
-    property alias color: focusBackground.defaultForeground
-    property bool busy: false
+    padding: 0
+
+    text: model.displayText
 
     font.pixelSize: VLCStyle.fontSize_normal
 
-    background: FocusBackground {
-        id: focusBackground
+    // Keys
+
+    Keys.priority: Keys.AfterItem
+
+    Keys.onPressed: Navigation.defaultKeyAction(event)
+
+    // Childs
+
+    background: Widgets.AnimatedBackground {
+        id: background
 
         height: control.height
         width: control.width
-        active: (control.activeFocus || control.hovered)
+
+        active: control.activeFocus
+
+        foregroundColor: (hovered) ? VLCStyle.colors.buttonTextHover
+                                   : VLCStyle.colors.buttonBanner
+
+        activeBorderColor: VLCStyle.colors.bgFocus
     }
 
     contentItem: Item {
@@ -58,7 +91,7 @@ T.TabButton {
         Row {
             id: tabRow
 
-            anchors.fill:  parent
+            anchors.fill: parent
 
             padding: VLCStyle.margin_xsmall
             spacing: VLCStyle.margin_xsmall
@@ -66,46 +99,54 @@ T.TabButton {
             Item {
                 width: implicitWidth
                 height: implicitHeight
+
                 implicitWidth: VLCStyle.fontHeight_normal
                 implicitHeight: VLCStyle.fontHeight_normal
-                visible: control.iconTxt !== ""
+
+                visible: (control.iconTxt !== "")
 
                 Widgets.IconLabel {
                     id: icon
 
                     anchors.fill: parent
+
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
-                    visible: !control.busy
+
+                    visible: (!control.busy)
 
                     text: control.iconTxt
-                    color: control.color
+
+                    color: background.foregroundColor
 
                     font.pixelSize: VLCIcons.pixelSize(control.iconSize)
                 }
 
                 BusyIndicator {
                     anchors.centerIn: parent
+
                     running: control.busy
                 }
             }
 
-
             Widgets.ListLabel {
                 text: control.text
-                color: focusBackground.foregroundColor
+
+                color: background.foregroundColor
             }
         }
 
         Rectangle {
-            anchors {
-                left: tabRow.left
-                right: tabRow.right
-                bottom: tabRow.bottom
-            }
+            anchors.left: tabRow.left
+            anchors.right: tabRow.right
+            anchors.bottom: tabRow.bottom
+
             height: 2
+
             visible: control.selected
+
             color: "transparent"
+
             border.color: VLCStyle.colors.accent
         }
     }

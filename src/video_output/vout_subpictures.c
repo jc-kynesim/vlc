@@ -596,42 +596,38 @@ static size_t spu_channel_UpdateDates(struct spu_channel *channel,
      * one shot */
     if (channel->entries.size == 0)
         return 0;
-    vlc_tick_t *date_array = vlc_alloc(channel->entries.size,
-                                       2 * sizeof(vlc_tick_t));
-    if (!date_array)
-        return 0;
 
+    if (!channel->clock)
+        goto end;
+
+    vlc_clock_Lock(channel->clock);
     for (size_t index = 0; index < channel->entries.size; index++)
     {
-        spu_render_entry_t *current = &channel->entries.data[index];
-        assert(current);
+        spu_render_entry_t *entry = &channel->entries.data[index];
+        assert(entry);
 
-        date_array[index * 2] = current->orgstart;
-        date_array[index * 2 + 1] = current->orgstop;
+        vlc_tick_t ts;
+
+        ts = vlc_clock_ConvertToSystemLocked(channel->clock, system_now,
+                                             entry->orgstart, channel->rate);
+        if (ts != VLC_TICK_MAX) /* pause triggered before or during spu render */
+        {
+            entry->start = ts;
+
+            entry->stop =
+                vlc_clock_ConvertToSystemLocked(channel->clock, system_now,
+                                                entry->orgstop, channel->rate);
+        }
     }
+    vlc_clock_Unlock(channel->clock);
 
-    /* Convert all spu ts */
-    if (channel->clock)
-        vlc_clock_ConvertArrayToSystem(channel->clock, system_now, date_array,
-                                       channel->entries.size * 2, channel->rate);
-
-    /* Put back the converted ts into the output spu_render_entry_t struct */
-    for (size_t index = 0; index < channel->entries.size; index++)
-    {
-        spu_render_entry_t *render_entry = &channel->entries.data[index];
-
-        render_entry->start = date_array[index * 2];
-        render_entry->stop = date_array[index * 2 + 1];
-    }
-
-    free(date_array);
+end:
     return channel->entries.size;
 }
 
 static bool
 spu_render_entry_IsSelected(spu_render_entry_t *render_entry, size_t channel_id,
-                            vlc_tick_t system_now,
-                            vlc_tick_t render_subtitle_date, bool ignore_osd)
+                            vlc_tick_t render_date, bool ignore_osd)
 {
     subpicture_t *subpic = render_entry->subpic;
     assert(subpic);
@@ -641,9 +637,6 @@ spu_render_entry_IsSelected(spu_render_entry_t *render_entry, size_t channel_id,
 
     if (ignore_osd && !subpic->b_subtitle)
         return false;
-
-    const vlc_tick_t render_date =
-        subpic->b_subtitle ? render_subtitle_date : system_now;
 
     if (render_date && render_date < render_entry->start)
         return false; /* Too early, come back next monday */
@@ -699,13 +692,11 @@ spu_SelectSubpictures(spu_t *spu, vlc_tick_t system_now,
         for (size_t index = 0; index < channel->entries.size; index++) {
             spu_render_entry_t *render_entry = &channel->entries.data[index];
             subpicture_t *current = render_entry->subpic;
+            const vlc_tick_t render_date = current->b_subtitle ? render_subtitle_date : system_now;
 
             if (!spu_render_entry_IsSelected(render_entry, channel->id,
-                                             system_now, render_subtitle_date,
-                                             ignore_osd))
+                                             render_date, ignore_osd))
                 continue;
-
-            const vlc_tick_t render_date = current->b_subtitle ? render_subtitle_date : system_now;
 
             vlc_tick_t *date_ptr  = current->b_subtitle ? &ephemer_subtitle_date  : &ephemer_osd_date;
             if (current->i_start >= *date_ptr) {
@@ -735,7 +726,7 @@ spu_SelectSubpictures(spu_t *spu, vlc_tick_t system_now,
         if (start_date < sys->last_sort_date)
             start_date = sys->last_sort_date;
         if (start_date <= 0)
-            start_date = INT64_MAX;
+            start_date = VLC_TICK_MAX;
 
         /* Select pictures to be displayed */
         for (size_t index = 0; index < channel->entries.size; ) {
@@ -744,7 +735,7 @@ spu_SelectSubpictures(spu_t *spu, vlc_tick_t system_now,
             bool is_late = render_entry->is_late;
 
             if (!spu_render_entry_IsSelected(render_entry, channel->id,
-                                             system_now, render_subtitle_date,
+                                             current->b_subtitle ? render_subtitle_date : system_now,
                                              ignore_osd))
             {
                 index++;
@@ -1233,7 +1224,7 @@ static subpicture_t *SpuRenderSubpictures(spu_t *spu,
              * FIXME The current scaling ensure that the heights match, the width being
              * cropped.
              */
-            spu_scale_t scale = spu_scale_createq((int64_t)fmt_dst->i_visible_height                 * fmt_dst->i_sar_den * region_fmt.i_sar_num,
+            spu_scale_t scale = spu_scale_createq((int64_t)fmt_dst->i_visible_height         * fmt_dst->i_sar_den * region_fmt.i_sar_num,
                                                   (int64_t)subpic->i_original_picture_height * fmt_dst->i_sar_num * region_fmt.i_sar_den,
                                                   fmt_dst->i_visible_height,
                                                   subpic->i_original_picture_height);
@@ -1874,11 +1865,15 @@ void spu_PutSubpicture(spu_t *spu, subpicture_t *subpic)
     if (channel->clock)
     {
         vlc_tick_t system_now = vlc_tick_now();
-        vlc_tick_t times[2] = { orgstart, orgstop };
-        vlc_clock_ConvertArrayToSystem(channel->clock, system_now,
-                                       times, 2, channel->rate);
-        subpic->i_start = times[0];
-        subpic->i_stop = times[1];
+
+        vlc_clock_Lock(channel->clock);
+        subpic->i_start =
+            vlc_clock_ConvertToSystemLocked(channel->clock, system_now,
+                                            orgstart, channel->rate);
+        subpic->i_stop =
+            vlc_clock_ConvertToSystemLocked(channel->clock, system_now,
+                                            orgstop, channel->rate);
+        vlc_clock_Unlock(channel->clock);
     }
 
     if (spu_channel_Push(channel, subpic, orgstart, orgstop))

@@ -18,21 +18,20 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
-import QtQuick.Layouts 1.11
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-Widgets.RoundImage {
+import org.videolan.controls 0.1
+
+RoundImage {
     id: root
 
-    property var labels: []
-    property alias progress: progressBar.value
-    property alias playCoverOpacity: playCover.opacity
-    property alias playCoverVisible: playCover.visible
-    property alias playCoverOnlyBorders: playCover.onlyBorders
-    property alias playIconSize: playCover.iconSize
-    property alias playCoverBorder: playCover.border
+    property alias playCoverOpacity: playCoverLoader.opacity
+    property alias playCoverVisible: playCoverLoader.visible
+    property bool playCoverOnlyBorders: false
+    property real playIconSize: VLCStyle.play_cover_normal
+    property real playCoverBorderWidth: VLCStyle.table_cover_border
     property alias imageOverlay: overlay.sourceComponent
     signal playIconClicked
 
@@ -45,50 +44,24 @@ Widgets.RoundImage {
         anchors.fill: parent
     }
 
-    RowLayout {
-        anchors {
-            top: parent.top
-            left: parent.left
-            right: parent.right
-            topMargin: VLCStyle.margin_xxsmall
-            leftMargin: VLCStyle.margin_xxsmall
-            rightMargin: VLCStyle.margin_xxsmall
-        }
-
-        spacing: VLCStyle.margin_xxsmall
-
-        Repeater {
-            model: labels
-            VideoQualityLabel {
-                Layout.preferredWidth: implicitWidth
-                Layout.preferredHeight: implicitHeight
-                text: modelData
-            }
-        }
-
-        Item {
-            Layout.fillWidth: true
-        }
-    }
-
-    Widgets.VideoProgressBar {
-        id: progressBar
-
-        visible: !playCover.visible && value > 0
-        anchors {
-            bottom: parent.bottom
-            left: parent.left
-            right: parent.right
-        }
-    }
-
-    Widgets.PlayCover {
-        id: playCover
+    Loader {
+        id: playCoverLoader
 
         anchors.fill: parent
-        iconSize: VLCStyle.play_root_small
-        radius: root.radius
+        visible: false
+        active: false
+        sourceComponent: Widgets.PlayCover {
+            onlyBorders: root.playCoverOnlyBorders
+            iconSize: root.playIconSize
+            border.width: root.playCoverBorderWidth
+            radius: root.radius
 
-        onIconClicked: root.playIconClicked()
+            onIconClicked: root.playIconClicked()
+        }
+
+        onVisibleChanged: {
+            if (visible && !active)
+                active = true
+        }
     }
 }

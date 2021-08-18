@@ -642,14 +642,11 @@ vlc_module_begin()
     set_category(CAT_PLAYLIST)
     set_subcategory(SUBCAT_PLAYLIST_SD)
 
-    add_string("sap-addr", NULL, SAP_ADDR_TEXT, SAP_ADDR_LONGTEXT, true)
-    add_obsolete_bool("sap-ipv4") /* since 2.0.0 */
-    add_obsolete_bool("sap-ipv6") /* since 2.0.0 */
+    add_string("sap-addr", NULL, SAP_ADDR_TEXT, SAP_ADDR_LONGTEXT)
     add_integer("sap-timeout", 1800,
-                SAP_TIMEOUT_TEXT, SAP_TIMEOUT_LONGTEXT, true)
+                SAP_TIMEOUT_TEXT, SAP_TIMEOUT_LONGTEXT)
     add_obsolete_bool("sap-parse") /* since 4.0.0 */
     add_obsolete_bool("sap-strict") /* since 4.0.0 */
-    add_obsolete_bool("sap-timeshift") /* Redundant since 1.0.0 */
 
     set_capability("services_discovery", 0)
     set_callbacks(Open, Close)

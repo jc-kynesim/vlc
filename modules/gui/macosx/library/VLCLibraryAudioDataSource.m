@@ -299,7 +299,7 @@ static NSString *VLCAudioLibraryCellIdentifier = @"VLCAudioLibraryCellIdentifier
 
 - (void)collectionSelectionDoubleClickAction:(id)sender
 {
-    NSArray *listOfAlbums;
+    NSArray <VLCMediaLibraryAlbum *> *listOfAlbums = nil;
 
     switch (_currentParentType) {
         case VLC_ML_PARENT_ARTIST:
@@ -331,17 +331,13 @@ static NSString *VLCAudioLibraryCellIdentifier = @"VLCAudioLibraryCellIdentifier
             break;
     }
 
-    if (!listOfAlbums) {
-        return;
-    }
-    NSUInteger albumCount = listOfAlbums.count;
-    if (albumCount == 0) {
+    if (listOfAlbums.count == 0) {
         return;
     }
 
     VLCLibraryController *libraryController = [[VLCMain sharedInstance] libraryController];
-    for (NSUInteger x = 0; x < albumCount; x++) {
-        NSArray *tracks = [listOfAlbums[x] tracksAsMediaItems];
+    for (VLCMediaLibraryAlbum *album in listOfAlbums) {
+        NSArray *tracks = [album tracksAsMediaItems];
         [libraryController appendItemsToPlaylist:tracks playFirstItemImmediately:YES];
     }
 }

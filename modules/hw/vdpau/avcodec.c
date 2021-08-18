@@ -40,14 +40,14 @@
 #include "vlc_vdpau.h"
 #include "../../codec/avcodec/va.h"
 
-struct vlc_va_sys_t
+typedef struct
 {
     VdpChromaType type;
     void *hwaccel_context;
     uint32_t width;
     uint32_t height;
     vlc_video_context *vctx;
-};
+} vlc_va_sys_t;
 
 static inline vlc_vdp_video_field_t **GetVDPAUContextPrivate(vlc_video_context *vctx)
 {
@@ -109,8 +109,10 @@ static vlc_vdp_video_field_t *Get(vlc_va_sys_t *sys)
     return field;
 }
 
-static int Lock(vlc_va_t *va, picture_t *pic, uint8_t **data)
+static int Lock(vlc_va_t *va, picture_t *pic, AVCodecContext *ctx, AVFrame *frame)
 {
+    (void) ctx;
+
     vlc_va_sys_t *sys = va->sys;
     vlc_vdp_video_field_t *field = Get(sys);
     if (field == NULL)
@@ -120,7 +122,7 @@ static int Lock(vlc_va_t *va, picture_t *pic, uint8_t **data)
     field->context.vctx = vlc_video_context_Hold(sys->vctx);
 
     pic->context = &field->context;
-    data[3] = (void *)(uintptr_t)field->frame->surface;
+    frame->data[3] = (void *)(uintptr_t)field->frame->surface;
     return VLC_SUCCESS;
 }
 
@@ -147,7 +149,7 @@ const struct vlc_video_context_operations vdpau_vctx_ops = {
     DestroyVDPAUVideoContext,
 };
 
-static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat hwfmt, const AVPixFmtDescriptor *desc,
+static int Open(vlc_va_t *va, AVCodecContext *avctx, enum AVPixelFormat hwfmt, const AVPixFmtDescriptor *desc,
                 const es_format_t *fmt_in, vlc_decoder_device *dec_device,
                 video_format_t *fmt_out, vlc_video_context **vtcx_out)
 {
@@ -189,9 +191,11 @@ static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat hwfmt, con
     unsigned codec_refs;
     switch (avctx->codec_id)
     {
-        case AV_CODEC_ID_HEVC:
         case AV_CODEC_ID_H264:
             codec_refs = avctx->refs; // we can rely on this
+            break;
+        case AV_CODEC_ID_HEVC:
+            codec_refs = 16;
             break;
         case AV_CODEC_ID_VP9:
             codec_refs = 8;

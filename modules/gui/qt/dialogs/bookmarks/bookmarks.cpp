@@ -34,7 +34,7 @@
 #include <QDialogButtonBox>
 #include <QModelIndexList>
 
-BookmarksDialog::BookmarksDialog( intf_thread_t *_p_intf ):QVLCFrame( _p_intf )
+BookmarksDialog::BookmarksDialog( qt_intf_t *_p_intf ):QVLCFrame( _p_intf )
 {
     setWindowFlags( Qt::Tool );
     setWindowOpacity( var_InheritFloat( p_intf, "qt-opacity" ) );
@@ -64,7 +64,7 @@ BookmarksDialog::BookmarksDialog( intf_thread_t *_p_intf ):QVLCFrame( _p_intf )
 
     bookmarksList = new QTreeView( this );
     m_model = new MLBookmarkModel( vlc_ml_instance_get(_p_intf ),
-                                   _p_intf->p_sys->p_player,
+                                   _p_intf->p_player,
                                    bookmarksList );
     bookmarksList->setModel( m_model );
     bookmarksList->setRootIsDecorated( false );

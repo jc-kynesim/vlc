@@ -25,8 +25,8 @@
 
 /* VLC <-> avcodec tables */
 bool GetFfmpegCodec( enum es_format_category_e cat, vlc_fourcc_t i_fourcc,
-                     unsigned *pi_ffmpeg_codec, const char **ppsz_name );
-vlc_fourcc_t GetVlcFourcc( unsigned i_ffmpeg_codec );
+                     enum AVCodecID *pi_ffmpeg_codec, const char **ppsz_name );
+vlc_fourcc_t GetVlcFourcc( enum AVCodecID i_ffmpeg_codec );
 vlc_fourcc_t GetVlcAudioFormat( int i_sample_fmt );
 
 /* Video encoder module */
@@ -95,7 +95,7 @@ int ffmpeg_OpenCodec( decoder_t *p_dec, AVCodecContext *, const AVCodec * );
     "(-1=None, 0=Default, 1=B-frames, 2=P-frames, 3=B+P frames, 4=all frames)." )
 
 #define DEBUG_TEXT N_( "Debug mask" )
-#define DEBUG_LONGTEXT N_( "Set FFmpeg debug mask" )
+#define DEBUG_LONGTEXT NULL
 
 #define CODEC_TEXT N_( "Codec name" )
 #define CODEC_LONGTEXT N_( "Internal libavcodec codec name" )
@@ -133,8 +133,7 @@ int ffmpeg_OpenCodec( decoder_t *p_dec, AVCodecContext *, const AVCodec * );
   "motion estimation algorithms. This requires more CPU." )
 
 #define ENC_PRE_ME_TEXT N_( "Pre-motion estimation" )
-#define ENC_PRE_ME_LONGTEXT N_( "Enable the pre-motion " \
-  "estimation algorithm.")
+#define ENC_PRE_ME_LONGTEXT NULL
 
 #define ENC_RC_BUF_TEXT N_( "Rate control buffer size" )
 #define ENC_RC_BUF_LONGTEXT N_( "Rate control " \
@@ -142,8 +141,6 @@ int ffmpeg_OpenCodec( decoder_t *p_dec, AVCodecContext *, const AVCodec * );
   "control, but will cause a delay in the stream." )
 
 #define ENC_RC_BUF_AGGR_TEXT N_( "Rate control buffer aggressiveness" )
-#define ENC_RC_BUF_AGGR_LONGTEXT N_( "Rate control "\
-  "buffer aggressiveness." )
 
 #define ENC_IQUANT_FACTOR_TEXT N_( "I quantization factor" )
 #define ENC_IQUANT_FACTOR_LONGTEXT N_(  \
@@ -174,12 +171,8 @@ int ffmpeg_OpenCodec( decoder_t *p_dec, AVCodecContext *, const AVCodec * );
   "threshold to ease the encoder's task." )
 
 #define ENC_QMIN_TEXT N_( "Minimum video quantizer scale" )
-#define ENC_QMIN_LONGTEXT N_( "Minimum video " \
-  "quantizer scale." )
 
 #define ENC_QMAX_TEXT N_( "Maximum video quantizer scale" )
-#define ENC_QMAX_LONGTEXT N_( "Maximum video " \
-  "quantizer scale." )
 
 #define ENC_TRELLIS_TEXT N_( "Trellis quantization" )
 #define ENC_TRELLIS_LONGTEXT N_( "Enable trellis " \

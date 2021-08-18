@@ -568,7 +568,7 @@ static int MMSOpen( stream_t  *p_access, vlc_url_t *p_url, int  i_proto )
     free( tmp );
 
     mms_CommandSend( p_access,
-                     0x01,          /* connexion request */
+                     0x01,          /* connection request */
                      0x00000000,    /* flags, FIXME */
                      0x0004000b,    /* ???? */
                      buffer.p_data,
@@ -595,7 +595,7 @@ do \
     {\
         var_buffer_free( &buffer );\
         MMSClose( p_access );\
-        return VLC_EBADVAR;\
+        return VLC_EINVAL;\
     }\
     char *str = FromCharset( "UTF-16LE", p, (size) * 2 ); \
     p += (size) * 2; \
@@ -645,7 +645,7 @@ do \
     free( tmp );
 
     mms_CommandSend( p_access,
-                     0x02,          /* connexion request */
+                     0x02,          /* connection request */
                      0x00000000,    /* flags, FIXME */
                      0xffffffff,    /* ???? */
                      buffer.p_data,
@@ -711,7 +711,7 @@ do \
     {
         var_buffer_free( &buffer );
         MMSClose( p_access );
-        return VLC_EBADVAR;
+        return VLC_EINVAL;
     }
 
     /*  1 for file ok, 2 for authen ok */
