@@ -75,13 +75,13 @@ AC_MSG_CHECKING([C atomics])
 VLC_SAVE_FLAGS
 ATOMIC_LIB=""
 AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <stdatomic.h>],[
- atomic_uintmax_t test;
+ atomic_uint test;
  atomic_init(&test, 0);
  atomic_fetch_add_explicit(&test, 2u, memory_order_relaxed);
 ])], [AC_MSG_RESULT([built-in])], [
   LDFLAGS="$LDFLAGS -latomic"
   AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <stdatomic.h>],[
-atomic_uintmax_t test;
+atomic_uint test;
 atomic_init(&test, 0);
 atomic_fetch_add_explicit(&test, 2u, memory_order_relaxed);
 ])],[

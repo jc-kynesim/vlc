@@ -730,15 +730,15 @@ typedef struct input_rate_t
 struct input_stats {
     input_rate_t input_bitrate;
     input_rate_t demux_bitrate;
-    atomic_uintmax_t demux_corrupted;
-    atomic_uintmax_t demux_discontinuity;
-    atomic_uintmax_t decoded_audio;
-    atomic_uintmax_t decoded_video;
-    atomic_uintmax_t played_abuffers;
-    atomic_uintmax_t lost_abuffers;
-    atomic_uintmax_t displayed_pictures;
-    atomic_uintmax_t late_pictures;
-    atomic_uintmax_t lost_pictures;
+    atomic_uint demux_corrupted;
+    atomic_uint demux_discontinuity;
+    atomic_uint decoded_audio;
+    atomic_uint decoded_video;
+    atomic_uint played_abuffers;
+    atomic_uint lost_abuffers;
+    atomic_uint displayed_pictures;
+    atomic_uint late_pictures;
+    atomic_uint lost_pictures;
 };
 
 struct input_stats *input_stats_Create(void);
