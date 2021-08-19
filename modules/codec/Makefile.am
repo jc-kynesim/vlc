@@ -394,7 +394,7 @@ codec_LTLIBRARIES += libvaapi_plugin.la
 endif
 
 libdrm_prime_plugin_la_SOURCES = \
-	codec/avcodec/drm_prime.c
+	codec/avcodec/drm_prime.c codec/avcodec/drm_pic.c codec/avcodec/drm_pic.h
 libdrm_prime_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)
 libdrm_prime_plugin_la_CFLAGS = $(AM_CFLAGS) $(AVCODEC_CFLAGS)
 libdrm_prime_plugin_la_LIBADD = $(LIBVA_LIBS) $(AVFORMAT_LIBS) $(AVUTIL_LIBS) $(LIBM)

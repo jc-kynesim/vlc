@@ -15,6 +15,7 @@
 
 #include "avcodec.h"
 #include "va.h"
+#include "drm_pic.h"
 
 typedef struct vlc_drm_prime_sys_s {
     vlc_video_context * vctx;
@@ -39,10 +40,21 @@ static const AVCodecHWConfig* find_hw_config(const AVCodecContext * const ctx)
   return NULL;
 }
 
-static int DrmPrimeGet(vlc_va_t *va, picture_t *pic, uint8_t **data)
+static int DrmPrimeGet(vlc_va_t *va, picture_t *pic, AVCodecContext * avctx, AVFrame * frame)
 {
-//    vlc_drm_prime_sys_t * const sys = va->sys;
-    msg_Info(va, "%s", __func__);
+    vlc_drm_prime_sys_t * const sys = va->sys;
+    int rv;
+
+    msg_Info(va, "%s: frame=%p", __func__, frame);
+
+    if (avcodec_default_get_buffer2(avctx, frame, 0))
+    {
+        msg_Err(va, "%s: HW alloc failure", __func__);
+        return VLC_EGENERIC;
+    }
+
+    return drm_prime_attach_buf_to_pic(NULL, pic, frame);
+
 #if 0
     vlc_va_surface_t *va_surface = va_pool_Get(sys->va_pool);
     if (unlikely(va_surface == NULL))
@@ -64,8 +76,6 @@ static int DrmPrimeGet(vlc_va_t *va, picture_t *pic, uint8_t **data)
     data[3] = (void *) (uintptr_t) vaapi_ctx->ctx.surface;
 
     return VLC_SUCCESS;
-#else
-    return VLC_EGENERIC;
 #endif
 }
 
@@ -87,11 +97,12 @@ static void DrmPrimeDelete(vlc_va_t *va)
 // *** Probably wrong but it doesn't matter
 #define VLC_TIME_BASE 1000000
 
-static int DrmPrimeCreate(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat hwfmt, const AVPixFmtDescriptor *desc,
+static int DrmPrimeCreate(vlc_va_t *va, AVCodecContext *ctx, enum AVPixelFormat hwfmt, const AVPixFmtDescriptor *desc,
                   const es_format_t *fmt_in, vlc_decoder_device *dec_device,
                   video_format_t *fmt_out, vlc_video_context **vtcx_out)
 {
     VLC_UNUSED(desc);
+    VLC_UNUSED(fmt_in);
 
     msg_Err(va, "<<< %s: hwfmt=%d, dec_device=%p, type=%d", __func__, hwfmt, dec_device, dec_device ? (int)dec_device->type : -1);
 
@@ -116,6 +127,13 @@ static int DrmPrimeCreate(vlc_va_t *va, AVCodecContext *ctx, enum PixelFormat hw
             msg_Err(va, "%s: unable to create hwdevice context", __func__);
             return VLC_EGENERIC;
         }
+#if 0
+        if ((ctx->hw_frames_ctx = av_hwframe_ctx_alloc(ctx->hw_device_ctx)) == NULL)
+        {
+            msg_Err(va, "%s: unable to create hwframe context", __func__);
+            return VLC_EGENERIC;
+        }
+#endif
     }
 
 #if 0
