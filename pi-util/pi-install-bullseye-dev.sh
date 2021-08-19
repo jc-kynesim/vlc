@@ -41,7 +41,7 @@ libexif-dev \
 libffi-dev \
 libgconf2-dev \
 libgl1-mesa-dev \
-libgnutls30-dev \
+libgnutls28-dev \
 libidn11-dev \
 libjpeg-dev \
 libkrb5-dev \
@@ -65,7 +65,9 @@ libxss-dev \
 libxt-dev \
 libxtst-dev \
 mesa-common-dev \
-"qt*-dev" \
+qtbase5-dev \
+qtdeclarative5-dev \
+qtquickcontrols2-5-dev \
 "qml-module-*" \
 #libgnome-keyring-dev \
 
