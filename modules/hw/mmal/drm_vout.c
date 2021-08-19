@@ -45,7 +45,7 @@
 
 #include "../codec/avcodec/drm_pic.h"
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 #define DRM_MODULE "vc4"
 #define ERRSTR strerror(errno)
@@ -63,7 +63,7 @@ struct drm_setup {
 
 #define HOLD_SIZE 3
 
-struct vout_display_sys_t {
+typedef struct vout_display_sys_t {
     vlc_decoder_device *dec_dev;
 
     int drm_fd;
@@ -75,7 +75,7 @@ struct vout_display_sys_t {
         unsigned int fb_handle;
         picture_t * pic;
     } hold[HOLD_SIZE];
-};
+} vout_display_sys_t;
 
 static const vlc_fourcc_t drm_subpicture_chromas[] = { VLC_CODEC_RGBA, VLC_CODEC_BGRA, VLC_CODEC_ARGB, 0 };
 
@@ -260,6 +260,10 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
     VLC_UNUSED(p_pic);
     VLC_UNUSED(subpicture);
     VLC_UNUSED(date);
+
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s", __func__);
+#endif
 }
 
 static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
