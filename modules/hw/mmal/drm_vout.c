@@ -69,6 +69,7 @@ typedef struct vout_display_sys_t {
     int drm_fd;
     uint32_t con_id;
     struct drm_setup setup;
+    const drmModeCrtc * crtc;
 
     unsigned int hold_n;
     struct display_hold_s {
@@ -94,13 +95,24 @@ static void hold_uninit(vout_display_sys_t *const de, struct display_hold_s * co
 }
 
 
+static void free_crtc(vout_display_sys_t * const de)
+{
+    if (de->crtc) {
+        drmModeFreeCrtc((drmModeCrtc *)de->crtc);
+        de->crtc = NULL;
+    }
+}
+
 static int find_crtc(vout_display_t *const vd, const int drmfd,
                      struct drm_setup *const s, uint32_t *const pConId)
 {
+    vout_display_sys_t *const de = vd->sys;
     int ret = -1;
     int i;
     drmModeRes * const res = drmModeGetResources(drmfd);
     drmModeConnector *c;
+
+    free_crtc(de);
 
     if (!res) {
         msg_Err(vd, "drmModeGetResources failed: %s", ERRSTR);
@@ -185,7 +197,7 @@ static int find_crtc(vout_display_t *const vd, const int drmfd,
         s->compose.y = crtc->y;
         s->compose.width = crtc->width;
         s->compose.height = crtc->height;
-        drmModeFreeCrtc(crtc);
+        de->crtc = crtc;
     }
 
     if (pConId)
@@ -274,6 +286,7 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
     const uint32_t format = desc->layers[0].format;
     unsigned int fb_handle = 0;
     int ret = 0;
+    vout_display_place_t place;
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s: fd=%d", __func__, desc->objects[0].fd);
@@ -377,12 +390,23 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
         }
     }
 
+    {
+        vout_display_cfg_t tcfg = *vd->cfg;
+        tcfg.is_display_filled = true;
+        tcfg.display.width = de->crtc->width;
+        tcfg.display.height = de->crtc->height;
+        vout_display_PlacePicture(&place, vd->source, &tcfg);
+    }
+
     ret = drmModeSetPlane(de->drm_fd, de->setup.planeId, de->setup.crtcId,
                           fb_handle, 0,
-                          de->setup.compose.x, de->setup.compose.y,
-                          de->setup.compose.width,
-                          de->setup.compose.height,
-                          0, 0,
+                          place.x, place.y,
+                          place.width, place.height,
+//                          de->setup.compose.x, de->setup.compose.y,  // Output coords
+//                          de->setup.compose.width,
+//                          de->setup.compose.height,
+                          p_pic->format.i_x_offset,
+                          p_pic->format.i_y_offset,
                           p_pic->format.i_visible_width << 16,
                           p_pic->format.i_visible_height << 16);
 
@@ -425,6 +449,8 @@ static void CloseDrmVout(vout_display_t *vd)
     if (sys->dec_dev)
         vlc_decoder_device_Release(sys->dec_dev);
 
+    free_crtc(sys);
+
     free(sys);
 }
 
@@ -437,8 +463,8 @@ static const struct vlc_display_operations ops = {
     .set_viewpoint =    NULL,
 };
 
-static int OpenDrmVout(vout_display_t *vd, const vout_display_cfg_t *cfg,
-                       video_format_t *fmtp, vlc_video_context *vctx)
+static int OpenDrmVout(vout_display_t *vd,
+                        video_format_t *fmtp, vlc_video_context *vctx)
 {
     vout_display_sys_t *sys;
     int ret = VLC_EGENERIC;
@@ -460,7 +486,7 @@ static int OpenDrmVout(vout_display_t *vd, const vout_display_cfg_t *cfg,
     }
 
     if (sys->dec_dev == NULL)
-        sys->dec_dev = vlc_decoder_device_Create(VLC_OBJECT(vd), cfg->window);
+        sys->dec_dev = vlc_decoder_device_Create(VLC_OBJECT(vd), vd->cfg->window);
     if (sys->dec_dev == NULL || sys->dec_dev->type != VLC_DECODER_DEVICE_DRM_PRIME) {
         msg_Err(vd, "Missing decoder device");
         goto fail;
