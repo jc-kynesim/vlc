@@ -50,6 +50,389 @@
 #define DRM_MODULE "vc4"
 #define ERRSTR strerror(errno)
 
+#define drmu_err_log(...)       msg_Err(__VA_ARGS__)
+#define drmu_warn_log(...)      msg_Warn(__VA_ARGS__)
+#define drmu_info_log(...)      msg_Info(__VA_ARGS__)
+#define drmu_debug_log(...)     msg_Dbg(__VA_ARGS__)
+
+#define drmu_err(_du, ...)      drmu_err_log((_du)->log, __VA_ARGS__)
+#define drmu_warn(_du, ...)     drmu_warn_log((_du)->log, __VA_ARGS__)
+#define drmu_info(_du, ...)     drmu_info_log((_du)->log, __VA_ARGS__)
+#define drmu_debug(_du, ...)    drmu_debug_log((_du)->log, __VA_ARGS__)
+
+typedef struct drmu_env_s {
+    vlc_object_t * log;
+    int fd;
+    uint32_t plane_count;
+    drmModePlanePtr * planes;
+    drmModeResPtr res;
+} drmu_env_t;
+
+typedef struct drmu_crtc_s {
+    drmu_env_t * du;
+    drmModeCrtcPtr crtc;
+    drmModeEncoderPtr enc;
+    drmModeConnectorPtr con;
+    int crtc_idx;
+} drmu_crtc_t;
+
+typedef struct drmu_plane_s {
+    drmu_env_t * du;
+    drmu_crtc_t * dc;
+    const drmModePlane * plane;
+} drmu_plane_t;
+
+static void
+uninit_crtc(drmu_crtc_t * const dc)
+{
+    if (dc->crtc != NULL)
+        drmModeFreeCrtc(dc->crtc);
+    if (dc->enc != NULL)
+        drmModeFreeEncoder(dc->enc);
+    if (dc->con != NULL)
+        drmModeFreeConnector(dc->con);
+    dc->crtc = NULL;
+    dc->enc = NULL;
+    dc->con = NULL;
+}
+
+static void
+free_crtc(drmu_crtc_t * const dc)
+{
+    uninit_crtc(dc);
+    free(dc);
+}
+
+static uint32_t
+drmu_crtc_id(const drmu_crtc_t * const dc)
+{
+    return dc->crtc->crtc_id;
+}
+
+static void
+drmu_crtc_delete(drmu_crtc_t ** ppdc)
+{
+    drmu_crtc_t * const dc = * ppdc;
+
+    if (dc == NULL)
+        return;
+    *ppdc = NULL;
+
+    free_crtc(dc);
+}
+
+static inline uint32_t
+drmu_crtc_x(const drmu_crtc_t * const dc)
+{
+    return dc->crtc->x;
+}
+static inline uint32_t
+drmu_crtc_y(const drmu_crtc_t * const dc)
+{
+    return dc->crtc->y;
+}
+static inline uint32_t
+drmu_crtc_width(const drmu_crtc_t * const dc)
+{
+    return dc->crtc->width;
+}
+static inline uint32_t
+drmu_crtc_height(const drmu_crtc_t * const dc)
+{
+    return dc->crtc->height;
+}
+
+static inline uint32_t
+drmu_plane_id(const drmu_plane_t * const dp)
+{
+    return dp->plane->plane_id;
+}
+
+static void
+drmu_plane_delete(drmu_plane_t ** const ppdp)
+{
+    drmu_plane_t * const dp = *ppdp;
+
+    if (dp == NULL)
+        return;
+    *ppdp = NULL;
+
+    free(dp);
+}
+
+static drmu_plane_t *
+drmu_plane_new_find(drmu_crtc_t * const dc, const uint32_t fmt)
+{
+    uint32_t i;
+    drmu_env_t * const du = dc->du;
+    drmu_plane_t * dp;
+    const drmModePlane * plane = NULL;
+    const uint32_t crtc_mask = (uint32_t)1 << dc->crtc_idx;
+
+    for (i = 0; i != du->plane_count && plane == NULL; ++i) {
+        uint32_t j;
+        const drmModePlane * const p = du->planes[i];
+
+        if ((p->possible_crtcs & crtc_mask) == 0)
+            continue;
+
+        for (j = 0; j != p->count_formats; ++j) {
+            if (p->formats[j] == fmt) {
+                plane = p;
+                break;
+            }
+        }
+    }
+    if (i == du->plane_count) {
+        drmu_err(du, "%s: No plane (count=%d) found for fmt %#x", __func__, du->plane_count, fmt);
+        return NULL;
+    }
+
+    if ((dp = calloc(1, sizeof(*dp))) == NULL) {
+        drmu_err(du, "%s: Alloc fail", __func__);
+        return NULL;
+    }
+
+    dp->du = du;
+    dp->dc = dc;
+    dp->plane = plane;
+    return dp;
+}
+
+static drmu_crtc_t *
+crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
+{
+    drmu_crtc_t * const dc = calloc(1, sizeof(*dc));
+    int i;
+
+    if (dc == NULL) {
+        drmu_err(du, "%s: Alloc failure", __func__);
+        return NULL;
+    }
+    dc->du = du;
+    dc->crtc_idx = -1;
+
+    if ((dc->con = drmModeGetConnector(du->fd, con_id)) == NULL) {
+        drmu_err(du, "%s: Failed to find connector %d", __func__, con_id);
+        goto fail;
+    }
+
+    if (dc->con->encoder_id == 0) {
+        drmu_debug(du, "%s: Connector %d has no encoder", __func__, con_id);
+        goto fail;
+    }
+
+    if ((dc->enc = drmModeGetEncoder(du->fd, dc->con->encoder_id)) == NULL) {
+        drmu_err(du, "%s: Failed to find encoder %d", __func__, dc->con->encoder_id);
+        goto fail;
+    }
+
+    if (dc->enc->crtc_id == 0) {
+        drmu_debug(du, "%s: Connector %d has no encoder", __func__, con_id);
+        goto fail;
+    }
+
+    for (i = 0; i <= du->res->count_connectors; ++i) {
+        if (du->res->crtcs[i] == dc->enc->crtc_id) {
+            dc->crtc_idx = i;
+            break;
+        }
+    }
+    if (dc->crtc_idx < 0) {
+        drmu_err(du, "%s: Crtc id %d not in resource list", __func__, dc->enc->crtc_id);
+        goto fail;
+    }
+
+    if ((dc->crtc = drmModeGetCrtc(du->fd, dc->enc->crtc_id)) == NULL) {
+        drmu_err(du, "%s: Failed to find crtc %d", __func__, dc->enc->crtc_id);
+        goto fail;
+    }
+
+    return dc;
+
+fail:
+    free_crtc(dc);
+    return NULL;
+}
+
+static drmu_crtc_t *
+drmu_crtc_new_find(drmu_env_t * const du)
+{
+    int i;
+    drmu_crtc_t * dc;
+
+    if (du->res->count_crtcs <= 0) {
+        drmu_err(du, "%s: no crts", __func__);
+        return NULL;
+    }
+
+    i = 0;
+    do {
+        if (i >= du->res->count_connectors) {
+            drmu_err(du, "%s: No suitable crtc found in %d connectors", __func__, du->res->count_connectors);
+            break;
+        }
+
+        dc = crtc_from_con_id(du, du->res->connectors[i]);
+
+        ++i;
+    } while (dc == NULL);
+
+    return dc;
+}
+
+static void
+free_planes(drmu_env_t * const du)
+{
+    uint32_t i;
+    for (i = 0; i != du->plane_count; ++i)
+        drmModeFreePlane(du->planes[i]);
+    free(du->planes);
+    du->plane_count = 0;
+    du->planes = NULL;
+}
+
+static int
+drmu_env_planes_populate(drmu_env_t * const du)
+{
+    int err;
+    drmModePlaneResPtr res;
+    uint32_t i;
+
+    if ((res = drmModeGetPlaneResources(du->fd)) == NULL) {
+        err = errno;
+        drmu_err(du, "%s: drmModeGetPlaneResources failed: %s", __func__, strerror(err));
+        goto fail0;
+    }
+
+    if ((du->planes = calloc(res->count_planes, sizeof(*du->planes))) == NULL) {
+        err = ENOMEM;
+        drmu_err(du, "%s: drmModeGetPlaneResources failed: %s", __func__, strerror(err));
+        goto fail1;
+    }
+
+    for (i = 0; i != res->count_planes; ++i) {
+        if ((du->planes[i] = drmModeGetPlane(du->fd, res->planes[i])) == NULL) {
+            err = errno;
+            drmu_err(du, "%s: drmModeGetPlaneResources failed: %s", __func__, strerror(err));
+            goto fail2;
+        }
+        du->plane_count = i;
+    }
+
+    return 0;
+
+fail2:
+    free_planes(du);
+fail1:
+    drmModeFreePlaneResources(res);
+fail0:
+    return -err;
+}
+
+#if 0
+static int
+drmu_env_resources_populate(drmu_env_t * const du)
+{
+    int err;
+    drmModeResPtr res;
+    uint32_t i;
+
+    if ((res = drmModeGetResources(du->fd)) == NULL) {
+        err = errno;
+        drmu_err(du, "%s: drmModeGetResources failed: %s", __func__, strerror(err));
+        goto fail0;
+    }
+
+    if ((du->planes = calloc(res->count_planes, sizeof(*du->planes))) == NULL) {
+        err = ENOMEM;
+        drmu_err(du, "%s: drmModeGetPlaneResources failed: %s", __func__, strerror(err));
+        goto fail1;
+    }
+
+    for (i = 0; i != res->count_planes; ++i) {
+        if ((du->planes[i] = drmModeGetPlane(du->fd, res->planes[i])) == NULL) {
+            err = errno;
+            drmu_err(du, "%s: drmModeGetPlaneResources failed: %s", __func__, strerror(err));
+            goto fail2;
+        }
+    }
+
+    return 0;
+
+fail2:
+    free_planes(du);
+fail1:
+    drmModeFreePlaneResources(res);
+fail0:
+    return -err;
+}
+#endif
+
+static inline int
+drmu_fd(const drmu_env_t * const du)
+{
+    return du->fd;
+}
+
+static void
+drmu_env_delete(drmu_env_t ** const ppdu)
+{
+    drmu_env_t * const du = *ppdu;
+
+    if (!du)
+        return;
+    *ppdu = NULL;
+
+    if (du->res != NULL)
+        drmModeFreeResources(du->res);
+    free_planes(du);
+
+    close(du->fd);
+    free(du);
+}
+
+// Closes fd on failure
+static drmu_env_t *
+drmu_env_new_fd(vlc_object_t * const log, const int fd)
+{
+    drmu_env_t * du = calloc(1, sizeof(*du));
+    if (!du) {
+        drmu_err_log(log, "Failed to create du: No memory");
+        close(fd);
+        return NULL;
+    }
+
+    du->log = log;
+    du->fd = fd;
+
+    if (drmu_env_planes_populate(du) != 0)
+        goto fail1;
+
+    if ((du->res = drmModeGetResources(du->fd)) == NULL) {
+        drmu_err(du, "%s: Failed to get resources", __func__);
+        goto fail1;
+    }
+
+    return du;
+
+fail1:
+    drmu_env_delete(&du);
+    return NULL;
+}
+
+static drmu_env_t *
+drmu_env_new_open(vlc_object_t * const log, const char * name)
+{
+    int fd = drmOpen(name, NULL);
+    if (fd == -1) {
+        drmu_err_log(log, "Failed to open %s", name);
+        return NULL;
+    }
+    return drmu_env_new_fd(log, fd);
+}
+
+
 struct drm_setup {
     int conId;
     uint32_t crtcId;
@@ -66,10 +449,12 @@ struct drm_setup {
 typedef struct vout_display_sys_t {
     vlc_decoder_device *dec_dev;
 
-    int drm_fd;
+    drmu_env_t * du;
+    drmu_crtc_t * dc;
+    drmu_plane_t * dp;
+
     uint32_t con_id;
     struct drm_setup setup;
-    const drmModeCrtc * crtc;
 
     unsigned int hold_n;
     struct display_hold_s {
@@ -84,7 +469,7 @@ static void hold_uninit(vout_display_sys_t *const de, struct display_hold_s * co
 {
     if (dh->fb_handle != 0)
     {
-        drmModeRmFB(de->drm_fd, dh->fb_handle);
+        drmModeRmFB(drmu_fd(de->du), dh->fb_handle);
         dh->fb_handle = 0;
     }
 
@@ -94,8 +479,8 @@ static void hold_uninit(vout_display_sys_t *const de, struct display_hold_s * co
     }
 }
 
-
-static void free_crtc(vout_display_sys_t * const de)
+#if 0
+static void free_crtcx(vout_display_sys_t * const de)
 {
     if (de->crtc) {
         drmModeFreeCrtc((drmModeCrtc *)de->crtc);
@@ -112,7 +497,7 @@ static int find_crtc(vout_display_t *const vd, const int drmfd,
     drmModeRes * const res = drmModeGetResources(drmfd);
     drmModeConnector *c;
 
-    free_crtc(de);
+    free_crtcx(de);
 
     if (!res) {
         msg_Err(vd, "drmModeGetResources failed: %s", ERRSTR);
@@ -125,7 +510,7 @@ static int find_crtc(vout_display_t *const vd, const int drmfd,
     }
 
     if (!s->conId) {
-        msg_Info(vd, "No connector ID specified.  Choosing default from list:");
+        msg_Info(vd, "No connector ID specified.  Choosing default from list (%d):", res->count_connectors);
 
         for (i = 0; i < res->count_connectors; i++) {
             drmModeConnector *con =
@@ -157,7 +542,7 @@ static int find_crtc(vout_display_t *const vd, const int drmfd,
 
         if (!s->conId) {
             msg_Err(vd, "No suitable enabled connector found.");
-            return -1;;
+            return -1;
         }
     }
 
@@ -264,6 +649,7 @@ static int find_plane(vout_display_t *const vd, int drmfd, struct drm_setup *s, 
     drmModeFreePlaneResources(planes);
     return ret;
 }
+#endif
 
 static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
                            subpicture_t *subpicture, vlc_tick_t date)
@@ -283,7 +669,7 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
     const AVDRMFrameDescriptor * const desc = drm_prime_get_desc(p_pic);
     vout_display_sys_t *const de = vd->sys;
     struct display_hold_s *const dh = de->hold + de->hold_n;
-    const uint32_t format = desc->layers[0].format;
+//    const uint32_t format = desc->layers[0].format;
     unsigned int fb_handle = 0;
     int ret = 0;
     vout_display_place_t place;
@@ -291,15 +677,6 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s: fd=%d", __func__, desc->objects[0].fd);
 #endif
-
-    if (de->setup.out_fourcc != format)
-    {
-        if (find_plane(vd, de->drm_fd, &de->setup, format))
-        {
-            msg_Warn(vd, "No plane for format: %s", fourcc2str(format));
-            return;
-        }
-    }
 
 #if 0
     {
@@ -331,7 +708,7 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
 
         for (i = 0; i < desc->nb_objects; ++i)
         {
-            if (drmPrimeFDToHandle(de->drm_fd, desc->objects[i].fd, bo_object_handles + i) != 0)
+            if (drmPrimeFDToHandle(drmu_fd(de->du), desc->objects[i].fd, bo_object_handles + i) != 0)
             {
                 msg_Warn(vd, "drmPrimeFDToHandle[%d](%d) failed: %s", i, desc->objects[i].fd, ERRSTR);
                 return;
@@ -378,7 +755,7 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
               );
 #endif
 
-        if (drmModeAddFB2WithModifiers(de->drm_fd,
+        if (drmModeAddFB2WithModifiers(drmu_fd(de->du),
                                        p_pic->format.i_visible_width,
                                        p_pic->format.i_visible_height,
                                        desc->layers[0].format, bo_handles,
@@ -393,18 +770,18 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
     {
         vout_display_cfg_t tcfg = *vd->cfg;
         tcfg.is_display_filled = true;
-        tcfg.display.width = de->crtc->width;
-        tcfg.display.height = de->crtc->height;
+        tcfg.display.width = drmu_crtc_width(de->dc);
+        tcfg.display.height = drmu_crtc_height(de->dc);
         vout_display_PlacePicture(&place, vd->source, &tcfg);
     }
 
-    ret = drmModeSetPlane(de->drm_fd, de->setup.planeId, de->setup.crtcId,
+    // *** Make drmu_plane_set
+    ret = drmModeSetPlane(drmu_fd(de->du),
+                          drmu_plane_id(de->dp),
+                          drmu_crtc_id(de->dc),
                           fb_handle, 0,
                           place.x, place.y,
                           place.width, place.height,
-//                          de->setup.compose.x, de->setup.compose.y,  // Output coords
-//                          de->setup.compose.width,
-//                          de->setup.compose.height,
                           p_pic->format.i_x_offset,
                           p_pic->format.i_y_offset,
                           p_pic->format.i_visible_width << 16,
@@ -446,10 +823,12 @@ static void CloseDrmVout(vout_display_t *vd)
     for (i = 0; i != HOLD_SIZE; ++i)
         hold_uninit(sys, sys->hold + i);
 
+    drmu_plane_delete(&sys->dp);
+    drmu_crtc_delete(&sys->dc);
+    drmu_env_delete(&sys->du);
+
     if (sys->dec_dev)
         vlc_decoder_device_Release(sys->dec_dev);
-
-    free_crtc(sys);
 
     free(sys);
 }
@@ -492,20 +871,14 @@ static int OpenDrmVout(vout_display_t *vd,
         goto fail;
     }
 
-    if ((sys->drm_fd = drmOpen(DRM_MODULE, NULL)) < 0) {
-        msg_Err(vd, "Failed to drmOpen %s", DRM_MODULE);
-        return -1;
-    }
+    if ((sys->du = drmu_env_new_open(VLC_OBJECT(vd), DRM_MODULE)) == NULL)
+        goto fail;;
 
-    if (find_crtc(vd, sys->drm_fd, &sys->setup, &sys->con_id) != 0) {
-        msg_Err(vd, "failed to find valid mode");
-        return -1;
-    }
+    if ((sys->dc = drmu_crtc_new_find(sys->du)) == NULL)
+        goto fail;
 
-    if (find_plane(vd, sys->drm_fd, &sys->setup, DRM_FORMAT_NV12) != 0) {
-        msg_Err(vd, "failed to find compatible plane");
-        return -1;
-    }
+    if ((sys->dp = drmu_plane_new_find(sys->dc, DRM_FORMAT_NV12)) == NULL)
+        goto fail;
 
     vd->info = (vout_display_info_t) {
         .subpicture_chromas = drm_subpicture_chromas
