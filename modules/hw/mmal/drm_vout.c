@@ -40,6 +40,7 @@
 #include <libdrm/drm.h>
 #include <libdrm/drm_mode.h>
 #include <libdrm/drm_fourcc.h>
+#include <sys/mman.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
@@ -79,6 +80,10 @@ typedef struct drmu_fb_s {
     drmu_rect_t cropped;
     unsigned int handle;
 
+    void * map_ptr;
+    size_t map_size;
+    size_t map_pitch;
+
     void * on_delete_v;
     drmu_fb_delete_fn on_delete_fn;
 
@@ -111,10 +116,16 @@ free_fb(drmu_fb_t * const dfb)
 {
     drmu_env_t * const du = dfb->du;
 
-    if (dfb->on_delete_fn)
-        dfb->on_delete_fn(dfb, dfb->on_delete_v);
     if (dfb->handle != 0)
         drmModeRmFB(du->fd, dfb->handle);
+
+    if (dfb->map_ptr != NULL && dfb->map_ptr != MAP_FAILED)
+        munmap(dfb->map_ptr, dfb->map_size);
+
+    // Call on_delete last so we have stopped using anything that might be
+    // freed by it
+    if (dfb->on_delete_fn)
+        dfb->on_delete_fn(dfb, dfb->on_delete_v);
 
     free(dfb);
 }
@@ -150,6 +161,112 @@ pic_fb_delete_cb(drmu_fb_t * dfb, void * v)
     picture_Release(v);
 }
 
+typedef struct fb_dumb_s {
+    uint32_t handle;
+} fb_dumb_t;
+
+static void
+dumb_fb_free_cb(drmu_fb_t * dfb, void * v)
+{
+    fb_dumb_t * const aux = v;
+    struct drm_mode_destroy_dumb destroy_env = {
+        .handle = aux->handle
+    };
+    drmIoctl(dfb->du->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_env);
+    free(aux);
+}
+
+static drmu_fb_t *
+drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format)
+{
+    drmu_fb_t * const dfb = alloc_fb(du);
+    fb_dumb_t * aux;
+    uint32_t bpp;
+
+    if (dfb == NULL) {
+        drmu_err(du, "%s: Alloc failure", __func__);
+        return NULL;
+    }
+    dfb->width = w;
+    dfb->height = h;
+    dfb->cropped = (drmu_rect_t) {.w = w, .h = h};
+    dfb->format = format;
+
+    switch (format) {
+        case DRM_FORMAT_ABGR8888:
+        case DRM_FORMAT_ARGB8888:
+            bpp = 32;
+            break;
+        default:
+            drmu_err(du, "%s: Unexpected format %#x", __func__, format);
+            goto fail;
+    }
+
+    if ((aux = calloc(1, sizeof(*aux))) == NULL) {
+        drmu_err(du, "%s: Aux alloc failure", __func__);
+        goto fail;
+    }
+
+    {
+        struct drm_mode_create_dumb dumb = {
+            .height = h,
+            .width = w,
+            .bpp = bpp
+        };
+        if (drmIoctl(du->fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb) != 0)
+        {
+            drmu_err(du, "%s: Create dumb %dx%dx%d failed: %s", __func__, w, h, bpp, strerror(errno));
+            free(aux);  // After this point aux is bound to dfb and gets freed with it
+            goto fail;
+        }
+
+        aux->handle = dumb.handle;
+        dfb->map_pitch = dumb.pitch;
+        dfb->on_delete_v = aux;
+        dfb->on_delete_fn = dumb_fb_free_cb;
+    }
+
+    {
+        struct drm_mode_map_dumb map_dumb = {
+            .handle = aux->handle
+        };
+        if (drmIoctl(du->fd, DRM_IOCTL_MODE_MAP_DUMB, &map_dumb) != 0)
+        {
+            drmu_err(du, "%s: map dumb failed: %s", __func__, strerror(errno));
+            goto fail;
+        }
+
+        dfb->map_size = dfb->map_pitch * h;
+        if ((dfb->map_ptr = mmap(NULL, dfb->map_size,
+                                 PROT_READ | PROT_WRITE, MAP_POPULATE,
+                                 du->fd, (off_t)map_dumb.offset)) == MAP_FAILED) {
+            drmu_err(du, "%s: mmap failed: %s", __func__, strerror(errno));
+            goto fail;
+        }
+    }
+
+    {
+        uint32_t pitches[4] = { dfb->map_pitch };
+        uint32_t offsets[4] = { 0 };
+        uint32_t bo_handles[4] = { aux->handle };
+
+        if (drmModeAddFB2WithModifiers(du->fd,
+                                       dfb->width, dfb->height, dfb->format,
+                                       bo_handles, pitches, offsets, NULL,
+                                       &dfb->handle, 0) != 0)
+        {
+            drmu_err(du, "%s: drmModeAddFB2WithModifiers failed: %s\n", __func__, ERRSTR);
+            goto fail;
+        }
+    }
+
+    return dfb;
+
+fail:
+    free_fb(dfb);
+    return NULL;
+}
+
 // *** If we make a lib from the drmu fns this should be separated to avoid
 //     unwanted library dependancies - For the general case we will need to
 //     think harder about how we split this
@@ -176,6 +293,7 @@ drmu_fb_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
         goto fail;
     }
 
+    dfb->format  = desc->layers[0].format;
     dfb->width   = pic->format.i_width;
     dfb->height  = pic->format.i_height;
     dfb->cropped = (drmu_rect_t){
@@ -241,9 +359,8 @@ drmu_fb_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
 #endif
 
     if (drmModeAddFB2WithModifiers(du->fd,
-                                   dfb->width, dfb->height,
-                                   desc->layers[0].format, bo_handles,
-                                   pitches, offsets, modifiers,
+                                   dfb->width, dfb->height, dfb->format,
+                                   bo_handles, pitches, offsets, modifiers,
                                    &dfb->handle, DRM_MODE_FB_MODIFIERS /** 0 if no mods */) != 0)
     {
         drmu_err(du, "drmModeAddFB2WithModifiers failed: %s\n", ERRSTR);
