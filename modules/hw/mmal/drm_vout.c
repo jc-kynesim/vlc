@@ -501,9 +501,9 @@ drmu_plane_set(drmu_plane_t * const dp,
     const drmu_rect_t pos)
 {
     int rv = drmModeSetPlane(dp->du->fd, dp->plane->plane_id, drmu_crtc_id(dp->dc),
-                           dfb->handle, flags,
-                           dfb->cropped.x, dfb->cropped.y, dfb->cropped.w, dfb->cropped.h,
-                           pos.x, pos.y, pos.w << 16, pos.h << 16);
+        dfb->handle, flags,
+        pos.x, pos.y, pos.w, pos.h,
+        dfb->cropped.x << 16, dfb->cropped.y << 16, dfb->cropped.w << 16, dfb->cropped.h << 16);
     return rv != 0 ? -errno : 0;
 }
 
