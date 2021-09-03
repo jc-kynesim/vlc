@@ -27,6 +27,7 @@
 #endif
 
 #include <errno.h>
+#include <stdatomic.h>
 
 #include <vlc_common.h>
 
@@ -47,6 +48,8 @@
 #include "../codec/avcodec/drm_pic.h"
 
 #define TRACE_ALL 1
+
+#define SUBPICS_MAX 4
 
 #define DRM_MODULE "vc4"
 #define ERRSTR strerror(errno)
@@ -73,6 +76,8 @@ typedef struct drmu_rect_s {
 typedef void (* drmu_fb_delete_fn)(struct drmu_fb_s * dfb, void * v);
 
 typedef struct drmu_fb_s {
+    atomic_int ref_count;  // 0 == 1 ref for ease of init
+
     struct drmu_env_s * du;
     uint32_t width;
     uint32_t height;
@@ -111,6 +116,22 @@ typedef struct drmu_env_s {
     drmModeResPtr res;
 } drmu_env_t;
 
+static inline drmu_rect_t
+drmu_rect_vlc_format_crop(const video_frame_format_t * const format)
+{
+    return (drmu_rect_t){
+        .x = format->i_x_offset,
+        .y = format->i_y_offset,
+        .w = format->i_visible_width,
+        .h = format->i_visible_height};
+}
+
+static inline drmu_rect_t
+drmu_rect_vlc_pic_crop(const picture_t * const pic)
+{
+    return drmu_rect_vlc_format_crop(&pic->format);
+}
+
 static void
 free_fb(drmu_fb_t * const dfb)
 {
@@ -142,7 +163,7 @@ alloc_fb(drmu_env_t * const du)
 }
 
 static void
-drmu_fb_delete(drmu_fb_t ** const ppdfb)
+drmu_fb_unref(drmu_fb_t ** const ppdfb)
 {
     drmu_fb_t * const dfb = *ppdfb;
 
@@ -150,7 +171,17 @@ drmu_fb_delete(drmu_fb_t ** const ppdfb)
         return;
     *ppdfb = NULL;
 
+    if (atomic_fetch_sub(&dfb->ref_count, 1) > 0)
+        return;
+
     free_fb(dfb);
+}
+
+static drmu_fb_t *
+drmu_fb_ref(drmu_fb_t * const dfb)
+{
+    atomic_fetch_add(&dfb->ref_count, 1);
+    return dfb;
 }
 
 static void
@@ -175,6 +206,7 @@ dumb_fb_free_cb(drmu_fb_t * dfb, void * v)
     drmIoctl(dfb->du->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_env);
     free(aux);
 }
+
 
 static drmu_fb_t *
 drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format)
@@ -222,6 +254,7 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
 
         aux->handle = dumb.handle;
         dfb->map_pitch = dumb.pitch;
+        dfb->map_size = (size_t)dumb.size;
         dfb->on_delete_v = aux;
         dfb->on_delete_fn = dumb_fb_free_cb;
     }
@@ -236,7 +269,6 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
             goto fail;
         }
 
-        dfb->map_size = dfb->map_pitch * h;
         if ((dfb->map_ptr = mmap(NULL, dfb->map_size,
                                  PROT_READ | PROT_WRITE, MAP_POPULATE,
                                  du->fd, (off_t)map_dumb.offset)) == MAP_FAILED) {
@@ -267,11 +299,32 @@ fail:
     return NULL;
 }
 
+
+static drmu_fb_t *
+drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format)
+{
+    if (dfb == NULL)
+        return drmu_fb_new_dumb(du, w, h, format);
+
+    if (w <= dfb->width && h <= dfb->height && format == dfb->format)
+    {
+        dfb->cropped = (drmu_rect_t){.w = w, .h = h};
+        return dfb;
+    }
+
+    drmu_fb_unref(&dfb);
+    return drmu_fb_new_dumb(du, w, h, format);
+}
+
+// VLC specific helper fb fns
 // *** If we make a lib from the drmu fns this should be separated to avoid
 //     unwanted library dependancies - For the general case we will need to
 //     think harder about how we split this
+
+// Create a new fb from a VLC DRM_PRIME picture.
+// Picture is held reffed by the fb until the fb is deleted
 static drmu_fb_t *
-drmu_fb_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
+drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
 {
 
     uint32_t pitches[4] = { 0 };
@@ -374,6 +427,22 @@ fail:
     return NULL;
 }
 
+static plane_t
+drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
+{
+    if (plane_n != 0)
+        return (plane_t){.p_pixels = NULL};
+
+    return (plane_t){
+        .p_pixels = dfb->map_ptr,
+        .i_lines = dfb->height,
+        .i_pitch = dfb->map_pitch,
+        .i_pixel_pitch = 4,
+        .i_visible_lines = dfb->cropped.h,
+        .i_visible_pitch = dfb->cropped.w
+    };
+}
+
 static void
 free_crtc(drmu_crtc_t * const dc)
 {
@@ -428,13 +497,13 @@ drmu_crtc_height(const drmu_crtc_t * const dc)
 static int
 drmu_plane_set(drmu_plane_t * const dp,
     drmu_fb_t * const dfb, const uint32_t flags,
-    const uint32_t src_x, const uint32_t src_y,
-    const uint32_t src_w, const uint32_t src_h)
+    const drmu_rect_t pos)
 {
-    return drmModeSetPlane(dp->du->fd, dp->plane->plane_id, dp->dc->crtc->crtc_id,
+    int rv = drmModeSetPlane(dp->du->fd, dp->plane->plane_id, drmu_crtc_id(dp->dc),
                            dfb->handle, flags,
                            dfb->cropped.x, dfb->cropped.y, dfb->cropped.w, dfb->cropped.h,
-                           src_x, src_y, src_w, src_h);
+                           pos.x, pos.y, pos.w, pos.h);
+    return rv != 0 ? -errno : 0;
 }
 
 static inline uint32_t
@@ -525,7 +594,7 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
         goto fail;
     }
 
-    for (i = 0; i <= du->res->count_connectors; ++i) {
+    for (i = 0; i <= du->res->count_crtcs; ++i) {
         if (du->res->crtcs[i] == dc->enc->crtc_id) {
             dc->crtc_idx = i;
             break;
@@ -741,15 +810,21 @@ struct drm_setup {
 
 #define HOLD_SIZE 3
 
+typedef struct subpic_ent_s {
+    drmu_fb_t * fb;
+    drmu_rect_t pos;
+} subpic_ent_t;
+
 typedef struct vout_display_sys_t {
     vlc_decoder_device *dec_dev;
 
     drmu_env_t * du;
     drmu_crtc_t * dc;
     drmu_plane_t * dp;
+    drmu_plane_t * subplanes[SUBPICS_MAX];
+    subpic_ent_t subpics[SUBPICS_MAX];
 
     uint32_t con_id;
-    struct drm_setup setup;
 
     unsigned int hold_n;
     drmu_fb_t * hold[HOLD_SIZE];
@@ -760,10 +835,46 @@ static const vlc_fourcc_t drm_subpicture_chromas[] = { VLC_CODEC_RGBA, VLC_CODEC
 static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
                            subpicture_t *subpicture, vlc_tick_t date)
 {
-    VLC_UNUSED(vd);
+    vout_display_sys_t * const sys = vd->sys;
+    unsigned int n = 0;
+
     VLC_UNUSED(p_pic);
-    VLC_UNUSED(subpicture);
     VLC_UNUSED(date);
+
+    // Attempt to import the subpics
+    for (subpicture_t * spic = subpicture; spic != NULL; spic = spic->p_next)
+    {
+        for (subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
+            picture_t * const src = sreg->p_picture;
+            subpic_ent_t * const dst = sys->subpics + n;
+            plane_t dst_plane;
+
+            dst->fb = drmu_fb_realloc_dumb(sys->du, dst->fb, src->format.i_width, src->format.i_height, DRM_FORMAT_ARGB8888);
+            if (dst->fb == NULL) {
+                msg_Warn(vd, "Failed alloc for subpic %d: %dx%d", n, src->format.i_width, src->format.i_height);
+                continue;
+            }
+
+            dst_plane = drmu_fb_vlc_plane(dst->fb, 0);
+            plane_CopyPixels(&dst_plane, src->p + 0);
+
+            // *** More transform required
+            dst->pos = (drmu_rect_t){
+                .x = sreg->i_x,
+                .y = sreg->i_y,
+                .w = src->format.i_visible_width,
+                .h = src->format.i_visible_height,
+            };
+
+            if (++n == SUBPICS_MAX)
+                goto subpics_done;
+        }
+    }
+subpics_done:
+
+    // Clear any other entries
+    for (; n != SUBPICS_MAX; ++n)
+        drmu_fb_unref(&sys->subpics[n].fb);
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
@@ -772,10 +883,11 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
 
 static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
 {
-    vout_display_sys_t *const de = vd->sys;
-    drmu_fb_t ** const dh = de->hold + de->hold_n;
+    vout_display_sys_t *const sys = vd->sys;
+    drmu_fb_t ** const dh = sys->hold + sys->hold_n;
     int ret = 0;
     vout_display_place_t place;
+    unsigned int i;
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
@@ -801,9 +913,9 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
     }
 #endif
 
-    drmu_fb_delete(dh);
+    drmu_fb_unref(dh);
 
-    if ((*dh = drmu_fb_new_pic_attach(de->du, p_pic)) == NULL) {
+    if ((*dh = drmu_fb_vlc_new_pic_attach(sys->du, p_pic)) == NULL) {
         msg_Err(vd, "Failed to create frme buffer from pic");
         return;
     }
@@ -811,21 +923,31 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
     {
         vout_display_cfg_t tcfg = *vd->cfg;
         tcfg.is_display_filled = true;
-        tcfg.display.width = drmu_crtc_width(de->dc);
-        tcfg.display.height = drmu_crtc_height(de->dc);
+        tcfg.display.width = drmu_crtc_width(sys->dc);
+        tcfg.display.height = drmu_crtc_height(sys->dc);
         vout_display_PlacePicture(&place, vd->source, &tcfg);
     }
 
-    ret = drmu_plane_set(de->dp, *dh, 0,
-        p_pic->format.i_x_offset, p_pic->format.i_y_offset,
-        p_pic->format.i_visible_width << 16, p_pic->format.i_visible_height << 16);
+    ret = drmu_plane_set(sys->dp, *dh, 0, drmu_rect_vlc_pic_crop(p_pic));
 
     if (ret != 0)
     {
         msg_Err(vd, "drmModeSetPlane failed: %s", ERRSTR);
     }
 
-    de->hold_n = de->hold_n + 1 >= HOLD_SIZE ? 0 : de->hold_n + 1;
+    for (i = 0; i != SUBPICS_MAX; ++i) {
+        subpic_ent_t * const spe = sys->subpics + i;
+
+        if (spe->fb == NULL)
+            continue;
+
+        if ((ret = drmu_plane_set(sys->subplanes[i], spe->fb, 0, spe->pos)) != 0)
+        {
+            msg_Err(vd, "drmModeSetPlane for subplane %d failed: %s", i, strerror(-ret));
+        }
+    }
+
+    sys->hold_n = sys->hold_n + 1 >= HOLD_SIZE ? 0 : sys->hold_n + 1;
     return;
 }
 
@@ -849,7 +971,12 @@ static void CloseDrmVout(vout_display_t *vd)
     unsigned int i;
 
     for (i = 0; i != HOLD_SIZE; ++i)
-        drmu_fb_delete(sys->hold + i);
+        drmu_fb_unref(sys->hold + i);
+
+    for (i = 0; i != SUBPICS_MAX; ++i)
+        drmu_plane_delete(sys->subplanes + i);
+    for (i = 0; i != SUBPICS_MAX; ++i)
+        drmu_fb_unref(&sys->subpics[i].fb);
 
     drmu_plane_delete(&sys->dp);
     drmu_crtc_delete(&sys->dc);
@@ -900,7 +1027,7 @@ static int OpenDrmVout(vout_display_t *vd,
     }
 
     if ((sys->du = drmu_env_new_open(VLC_OBJECT(vd), DRM_MODULE)) == NULL)
-        goto fail;;
+        goto fail;
 
     if ((sys->dc = drmu_crtc_new_find(sys->du)) == NULL)
         goto fail;
@@ -908,6 +1035,12 @@ static int OpenDrmVout(vout_display_t *vd,
     if ((sys->dp = drmu_plane_new_find(sys->dc, DRM_FORMAT_NV12)) == NULL)
         goto fail;
 
+    for (unsigned int i = 0; i != SUBPICS_MAX; ++i) {
+        if ((sys->subplanes[i] = drmu_plane_new_find(sys->dc, DRM_FORMAT_ARGB8888)) == NULL) {
+            msg_Warn(vd, "Cannot allocate subplane %d", i);
+            break;
+        }
+    }
     vd->info = (vout_display_info_t) {
         .subpicture_chromas = drm_subpicture_chromas
     };
