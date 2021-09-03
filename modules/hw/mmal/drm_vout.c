@@ -219,8 +219,8 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
         drmu_err(du, "%s: Alloc failure", __func__);
         return NULL;
     }
-    dfb->width = w;
-    dfb->height = h;
+    dfb->width = (w + 63) & ~63;
+    dfb->height = (h + 63) & ~63;
     dfb->cropped = (drmu_rect_t) {.w = w, .h = h};
     dfb->format = format;
 
@@ -241,8 +241,8 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
 
     {
         struct drm_mode_create_dumb dumb = {
-            .height = h,
-            .width = w,
+            .height = dfb->height,
+            .width = dfb->width,
             .bpp = bpp
         };
         if (drmIoctl(du->fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb) != 0)
@@ -270,9 +270,10 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
         }
 
         if ((dfb->map_ptr = mmap(NULL, dfb->map_size,
-                                 PROT_READ | PROT_WRITE, MAP_POPULATE,
+                                 PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE,
                                  du->fd, (off_t)map_dumb.offset)) == MAP_FAILED) {
-            drmu_err(du, "%s: mmap failed: %s", __func__, strerror(errno));
+            drmu_err(du, "%s: mmap failed (size=%zd, fd=%d, off=%zd): %s", __func__,
+                     dfb->map_size, du->fd, (size_t)map_dumb.offset, strerror(errno));
             goto fail;
         }
     }
@@ -502,7 +503,7 @@ drmu_plane_set(drmu_plane_t * const dp,
     int rv = drmModeSetPlane(dp->du->fd, dp->plane->plane_id, drmu_crtc_id(dp->dc),
                            dfb->handle, flags,
                            dfb->cropped.x, dfb->cropped.y, dfb->cropped.w, dfb->cropped.h,
-                           pos.x, pos.y, pos.w, pos.h);
+                           pos.x, pos.y, pos.w << 16, pos.h << 16);
     return rv != 0 ? -errno : 0;
 }
 
