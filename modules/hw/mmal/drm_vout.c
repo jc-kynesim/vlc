@@ -440,7 +440,7 @@ drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
         .i_pitch = dfb->map_pitch,
         .i_pixel_pitch = 4,
         .i_visible_lines = dfb->cropped.h,
-        .i_visible_pitch = dfb->cropped.w
+        .i_visible_pitch = dfb->cropped.w * 4
     };
 }
 
