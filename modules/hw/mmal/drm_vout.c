@@ -69,7 +69,7 @@ struct drmu_crtc_s;
 struct drmu_env_s;
 
 typedef struct drmu_rect_s {
-    uint32_t x, y;
+    int32_t x, y;
     uint32_t w, h;
 } drmu_rect_t;
 
@@ -116,6 +116,78 @@ typedef struct drmu_env_s {
     drmModeResPtr res;
 } drmu_env_t;
 
+static uint32_t
+drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc)
+{
+    switch (vf_vlc->i_chroma) {
+        case VLC_CODEC_RGB32:
+        {
+            // VLC RGB32 aka RV32 means we have to look at the mask values
+            const uint32_t r = vf_vlc->i_rmask;
+            const uint32_t g = vf_vlc->i_gmask;
+            const uint32_t b = vf_vlc->i_bmask;
+            if (r == 0xff0000 && g == 0xff00 && b == 0xff)
+                return DRM_FORMAT_BGRX8888;
+            if (r == 0xff && g == 0xff00 && b == 0xff0000)
+                return DRM_FORMAT_RGBX8888;
+            if (r == 0xff000000 && g == 0xff0000 && b == 0xff00)
+                return DRM_FORMAT_XBGR8888;
+            if (r == 0xff00 && g == 0xff0000 && b == 0xff000000)
+                return DRM_FORMAT_XRGB8888;
+            break;
+        }
+        case VLC_CODEC_RGB16:
+        {
+            // VLC RGB16 aka RV16 means we have to look at the mask values
+            const uint32_t r = vf_vlc->i_rmask;
+            const uint32_t g = vf_vlc->i_gmask;
+            const uint32_t b = vf_vlc->i_bmask;
+            if (r == 0xf800 && g == 0x7e0 && b == 0x1f)
+                return DRM_FORMAT_BGR565;
+            if (r == 0x1f && g == 0x7e0 && b == 0xf800)
+                return DRM_FORMAT_RGB565;
+            break;
+        }
+        case VLC_CODEC_RGBA:
+            return DRM_FORMAT_RGBA8888;
+        case VLC_CODEC_BGRA:
+            return DRM_FORMAT_BGRA8888;
+        case VLC_CODEC_ARGB:
+            return DRM_FORMAT_ARGB8888;
+        // VLC_CODEC_ABGR does not exist in VLC
+        default:
+            break;
+    }
+    return 0;
+}
+
+static vlc_fourcc_t
+drmu_format_vlc_to_vlc(const uint32_t vf_drm)
+{
+    switch (vf_drm) {
+        case DRM_FORMAT_XRGB8888:
+        case DRM_FORMAT_XBGR8888:
+        case DRM_FORMAT_RGBX8888:
+        case DRM_FORMAT_BGRX8888:
+            return VLC_CODEC_RGB32;
+        case DRM_FORMAT_BGR565:
+        case DRM_FORMAT_RGB565:
+            return VLC_CODEC_RGB16;
+        case DRM_FORMAT_RGBA8888:
+            return VLC_CODEC_RGBA;
+        case DRM_FORMAT_BGRA8888:
+            return VLC_CODEC_BGRA;
+        case DRM_FORMAT_ARGB8888:
+            return VLC_CODEC_ARGB;
+        // VLC_CODEC_ABGR does not exist in VLC
+        default:
+            break;
+    }
+    return 0;
+}
+
+
+// Get cropping rectangle from a vlc format
 static inline drmu_rect_t
 drmu_rect_vlc_format_crop(const video_frame_format_t * const format)
 {
@@ -126,10 +198,60 @@ drmu_rect_vlc_format_crop(const video_frame_format_t * const format)
         .h = format->i_visible_height};
 }
 
+// Get cropping rectangle from a vlc pic
 static inline drmu_rect_t
 drmu_rect_vlc_pic_crop(const picture_t * const pic)
 {
     return drmu_rect_vlc_format_crop(&pic->format);
+}
+
+// Get rect from vlc place
+static inline drmu_rect_t
+drmu_rect_vlc_place(const vout_display_place_t * const place)
+{
+    return (drmu_rect_t){
+        .x = place->x,
+        .y = place->y,
+        .w = place->width,
+        .h = place->height
+    };
+}
+
+static inline int
+rescale_1(int x, int mul, int div)
+{
+    return div == 0 ? x * mul : (x * mul + div/2) / div;
+}
+
+static inline drmu_rect_t
+drmu_rect_rescale(const drmu_rect_t s, const drmu_rect_t mul, const drmu_rect_t div)
+{
+    return (drmu_rect_t){
+        .x = rescale_1(s.x - div.x, mul.w, div.w) + mul.x,
+        .y = rescale_1(s.y - div.y, mul.h, div.h) + mul.y,
+        .w = rescale_1(s.w,         mul.w, div.w),
+        .h = rescale_1(s.h,         mul.h, div.h)
+    };
+}
+
+static inline drmu_rect_t
+drmu_rect_add_xy(const drmu_rect_t a, const drmu_rect_t b)
+{
+    return (drmu_rect_t){
+        .x = a.x + b.x,
+        .y = a.y + b.y,
+        .w = a.w,
+        .h = a.h
+    };
+}
+
+static inline drmu_rect_t
+drmu_rect_wh(const unsigned int w, const unsigned int h)
+{
+    return (drmu_rect_t){
+        .w = w,
+        .h = h
+    };
 }
 
 static void
@@ -184,6 +306,25 @@ drmu_fb_ref(drmu_fb_t * const dfb)
     return dfb;
 }
 
+static unsigned int
+drmu_fb_pixel_bits(const drmu_fb_t * const dfb, unsigned int plane_n)
+{
+    switch (dfb->format) {
+        case DRM_FORMAT_XRGB8888:
+        case DRM_FORMAT_XBGR8888:
+        case DRM_FORMAT_RGBX8888:
+        case DRM_FORMAT_BGRX8888:
+        case DRM_FORMAT_ARGB8888:
+        case DRM_FORMAT_ABGR8888:
+        case DRM_FORMAT_RGBA8888:
+        case DRM_FORMAT_BGRA8888:
+            return plane_n == 0 ? 32 : 0;
+        default:
+            break;
+    }
+    return 0;
+}
+
 static void
 pic_fb_delete_cb(drmu_fb_t * dfb, void * v)
 {
@@ -209,7 +350,8 @@ dumb_fb_free_cb(drmu_fb_t * dfb, void * v)
 
 
 static drmu_fb_t *
-drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format)
+drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h,
+                 const uint32_t format, const unsigned int plane_n)
 {
     drmu_fb_t * const dfb = alloc_fb(du);
     fb_dumb_t * aux;
@@ -224,14 +366,9 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
     dfb->cropped = (drmu_rect_t) {.w = w, .h = h};
     dfb->format = format;
 
-    switch (format) {
-        case DRM_FORMAT_ABGR8888:
-        case DRM_FORMAT_ARGB8888:
-            bpp = 32;
-            break;
-        default:
-            drmu_err(du, "%s: Unexpected format %#x", __func__, format);
-            goto fail;
+    if ((bpp = drmu_fb_pixel_bits(dfb, plane_n)) == 0) {
+        drmu_err(du, "%s: Unexpected format %#x", __func__, format);
+        goto fail;
     }
 
     if ((aux = calloc(1, sizeof(*aux))) == NULL) {
@@ -305,7 +442,7 @@ static drmu_fb_t *
 drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format)
 {
     if (dfb == NULL)
-        return drmu_fb_new_dumb(du, w, h, format);
+        return drmu_fb_new_dumb(du, w, h, format, 0);
 
     if (w <= dfb->width && h <= dfb->height && format == dfb->format)
     {
@@ -314,7 +451,7 @@ drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_
     }
 
     drmu_fb_unref(&dfb);
-    return drmu_fb_new_dumb(du, w, h, format);
+    return drmu_fb_new_dumb(du, w, h, format, 0);
 }
 
 // VLC specific helper fb fns
@@ -431,16 +568,18 @@ fail:
 static plane_t
 drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
 {
-    if (plane_n != 0)
+    const unsigned int bpp = drmu_fb_pixel_bits(dfb, plane_n);
+
+    if (plane_n != 0 || bpp == 0)
         return (plane_t){.p_pixels = NULL};
 
     return (plane_t){
         .p_pixels = dfb->map_ptr,
         .i_lines = dfb->height,
         .i_pitch = dfb->map_pitch,
-        .i_pixel_pitch = 4,
+        .i_pixel_pitch = bpp / 8,
         .i_visible_lines = dfb->cropped.h,
-        .i_visible_pitch = dfb->cropped.w * 4
+        .i_visible_pitch = dfb->cropped.w * bpp / 8
     };
 }
 
@@ -511,6 +650,13 @@ static inline uint32_t
 drmu_plane_id(const drmu_plane_t * const dp)
 {
     return dp->plane->plane_id;
+}
+
+static const uint32_t *
+drmu_plane_formats(const drmu_plane_t * const dp, unsigned int * const pCount)
+{
+    *pCount = dp->plane->count_formats;
+    return dp->plane->formats;
 }
 
 static void
@@ -771,6 +917,9 @@ drmu_env_new_fd(vlc_object_t * const log, const int fd)
     du->log = log;
     du->fd = fd;
 
+    // We want the primary plane for video
+    drmSetClientCap(du->fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+
     if (drmu_env_planes_populate(du) != 0)
         goto fail1;
 
@@ -814,6 +963,7 @@ struct drm_setup {
 typedef struct subpic_ent_s {
     drmu_fb_t * fb;
     drmu_rect_t pos;
+    drmu_rect_t space;  // display space of pos
 } subpic_ent_t;
 
 typedef struct vout_display_sys_t {
@@ -824,6 +974,7 @@ typedef struct vout_display_sys_t {
     drmu_plane_t * dp;
     drmu_plane_t * subplanes[SUBPICS_MAX];
     subpic_ent_t subpics[SUBPICS_MAX];
+    vlc_fourcc_t * subpic_chromas;
 
     uint32_t con_id;
 
@@ -867,6 +1018,9 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
                 .h = src->format.i_visible_height,
             };
 
+//            msg_Info(vd, "Orig: %dx%d", spic->i_original_picture_width, spic->i_original_picture_height);
+            dst->space = drmu_rect_wh(spic->i_original_picture_width, spic->i_original_picture_height);
+
             if (++n == SUBPICS_MAX)
                 goto subpics_done;
         }
@@ -887,7 +1041,7 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
     vout_display_sys_t *const sys = vd->sys;
     drmu_fb_t ** const dh = sys->hold + sys->hold_n;
     int ret = 0;
-    vout_display_place_t place;
+    drmu_rect_t r;
     unsigned int i;
 
 #if TRACE_ALL
@@ -922,14 +1076,12 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
     }
 
     {
-        vout_display_cfg_t tcfg = *vd->cfg;
-        tcfg.is_display_filled = true;
-        tcfg.display.width = drmu_crtc_width(sys->dc);
-        tcfg.display.height = drmu_crtc_height(sys->dc);
-        vout_display_PlacePicture(&place, vd->source, &tcfg);
+        vout_display_place_t place;
+        vout_display_PlacePicture(&place, vd->source, vd->cfg);
+        r = drmu_rect_vlc_place(&place);
     }
 
-    ret = drmu_plane_set(sys->dp, *dh, 0, drmu_rect_vlc_pic_crop(p_pic));
+    ret = drmu_plane_set(sys->dp, *dh, 0, r);
 
     if (ret != 0)
     {
@@ -942,7 +1094,14 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
         if (spe->fb == NULL)
             continue;
 
-        if ((ret = drmu_plane_set(sys->subplanes[i], spe->fb, 0, spe->pos)) != 0)
+//        msg_Info(vd, "pic=%dx%d @ %d,%d, r=%dx%d @ %d,%d, space=%dx%d @ %d,%d",
+//                 spe->pos.w, spe->pos.h, spe->pos.x, spe->pos.y,
+//                 r.w, r.h, r.x, r.y,
+//                 spe->space.w, spe->space.h, spe->space.x, spe->space.y);
+
+        // Rescale from sub-space
+        if ((ret = drmu_plane_set(sys->subplanes[i], spe->fb, 0,
+                                  drmu_rect_rescale(spe->pos, r, spe->space))) != 0)
         {
             msg_Err(vd, "drmModeSetPlane for subplane %d failed: %s", i, strerror(-ret));
         }
@@ -986,6 +1145,9 @@ static void CloseDrmVout(vout_display_t *vd)
     if (sys->dec_dev)
         vlc_decoder_device_Release(sys->dec_dev);
 
+    free(sys->subpic_chromas);
+    vd->info.subpicture_chromas = NULL;
+
     free(sys);
 }
 
@@ -997,6 +1159,33 @@ static const struct vlc_display_operations ops = {
     .reset_pictures =   vd_drm_reset_pictures,
     .set_viewpoint =    NULL,
 };
+
+// VLC will take a list of subpic formats but it then ignores the fact it is a
+// list and picks the 1st one whether it is 'best' or indeed whether or not it
+// can use it.  So we have to sort ourselves & have checked usablity.
+// Higher number, higher priority. 0 == Do not use.
+static int subpic_fourcc_usability(const vlc_fourcc_t fcc)
+{
+    switch (fcc) {
+        case VLC_CODEC_ARGB:
+            return 22;
+        case VLC_CODEC_RGBA:
+            return 21;
+        case VLC_CODEC_BGRA:
+            return 20;
+        case VLC_CODEC_YUVA:
+            return 40;
+        default:
+            break;
+    }
+    return 0;
+}
+
+// Sort in descending priority number
+static int subpic_fourcc_sort_cb(const void * a, const void * b)
+{
+    return subpic_fourcc_usability(*(vlc_fourcc_t *)b) - subpic_fourcc_usability(*(vlc_fourcc_t *)a);
+}
 
 static int OpenDrmVout(vout_display_t *vd,
                         video_format_t *fmtp, vlc_video_context *vctx)
@@ -1041,12 +1230,48 @@ static int OpenDrmVout(vout_display_t *vd,
             msg_Warn(vd, "Cannot allocate subplane %d", i);
             break;
         }
+        if (sys->subpic_chromas == NULL) {
+            unsigned int n;
+            const uint32_t * const drm_chromas = drmu_plane_formats(sys->subplanes[i], &n);
+            if (n != 0) {
+                vlc_fourcc_t * const c = calloc(n + 1, sizeof(*sys->subpic_chromas));
+                vlc_fourcc_t * p = c;
+
+                if (c == NULL) {
+                    msg_Err(vd, "Cannot alloc subpic chromas");
+                    goto fail;
+                }
+                for (unsigned int j = 0; j != n; ++j) {
+                    if ((*p = drmu_format_vlc_to_vlc(drm_chromas[j])) != 0)
+                        ++p;
+                }
+
+                // Sort for our preferred order & remove any that would confuse VLC
+                qsort(c, p - c, sizeof(*c), subpic_fourcc_sort_cb);
+                while (p != c) {
+                    if (subpic_fourcc_usability(p[-1]) != 0)
+                        break;
+                    *--p = 0;
+                }
+
+                if (p == c)
+                    free(c);
+                else
+                    sys->subpic_chromas = c;
+            }
+        }
     }
     vd->info = (vout_display_info_t) {
-        .subpicture_chromas = drm_subpicture_chromas
+// We can scale but as it stands it looks like VLC is confused about coord
+// systems s.t. system message are in display space and subs are in source
+// with no way of distinguishing
+//        .can_scale_spu = true,
+        .subpicture_chromas = sys->subpic_chromas
     };
 
     vd->ops = &ops;
+
+    vout_display_SetSize(vd, drmu_crtc_width(sys->dc), drmu_crtc_height(sys->dc));
     return VLC_SUCCESS;
 
 fail:
