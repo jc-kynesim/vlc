@@ -28,6 +28,7 @@
 
 #include <errno.h>
 #include <stdatomic.h>
+#include <pthread.h>
 
 #include <vlc_common.h>
 
@@ -73,10 +74,17 @@ typedef struct drmu_rect_s {
     uint32_t w, h;
 } drmu_rect_t;
 
-typedef void (* drmu_fb_delete_fn)(struct drmu_fb_s * dfb, void * v);
+// Called pre delete.
+// Zero returned means continue delete.
+// Non-zero means stop delete - fb will have zero refs so will probably want a new ref
+//   before next use
+typedef int (* drmu_fb_pre_delete_fn)(struct drmu_fb_s * dfb, void * v);
+typedef void (* drmu_fb_on_delete_fn)(struct drmu_fb_s * dfb, void * v);
 
 typedef struct drmu_fb_s {
     atomic_int ref_count;  // 0 == 1 ref for ease of init
+    struct drmu_fb_s * prev;
+    struct drmu_fb_s * next;
 
     struct drmu_env_s * du;
     uint32_t width;
@@ -89,15 +97,38 @@ typedef struct drmu_fb_s {
     size_t map_size;
     size_t map_pitch;
 
+    void * pre_delete_v;
+    drmu_fb_pre_delete_fn pre_delete_fn;
+
     void * on_delete_v;
-    drmu_fb_delete_fn on_delete_fn;
+    drmu_fb_on_delete_fn on_delete_fn;
 
 } drmu_fb_t;
 
+typedef struct drmu_pool_s {
+    atomic_int ref_count;  // 0 == 1 ref for ease of init
+
+    struct drmu_env_s * du;
+
+    pthread_mutex_t lock;
+    int dead;
+
+    unsigned int fb_count;
+    unsigned int fb_max;
+
+    drmu_fb_t * head;
+    drmu_fb_t * tail;
+} drmu_pool_t;
+
+#define DRMU_PLANE_HOLD_COUNT 3
 typedef struct drmu_plane_s {
     struct drmu_env_s * du;
     struct drmu_crtc_s * dc;    // NULL if not in use
     const drmModePlane * plane;
+
+    // Next, Current, Prev FBs - might only need 2 if we have vsync CB
+    unsigned int fb_n;
+    drmu_fb_t * fbs[DRMU_PLANE_HOLD_COUNT];
 } drmu_plane_t;
 
 typedef struct drmu_crtc_s {
@@ -259,6 +290,9 @@ free_fb(drmu_fb_t * const dfb)
 {
     drmu_env_t * const du = dfb->du;
 
+    if (dfb->pre_delete_fn && dfb->pre_delete_fn(dfb, dfb->pre_delete_v) != 0)
+        return;
+
     if (dfb->handle != 0)
         drmModeRmFB(du->fd, dfb->handle);
 
@@ -271,6 +305,21 @@ free_fb(drmu_fb_t * const dfb)
         dfb->on_delete_fn(dfb, dfb->on_delete_v);
 
     free(dfb);
+}
+
+// Beware: used by pool fns
+static void
+drmu_fb_pre_delete_set(drmu_fb_t *const dfb, drmu_fb_pre_delete_fn fn, void * v)
+{
+    dfb->pre_delete_fn = fn;
+    dfb->pre_delete_v  = v;
+}
+
+static void
+drmu_fb_pre_delete_unset(drmu_fb_t *const dfb)
+{
+    dfb->pre_delete_fn = (drmu_fb_pre_delete_fn)0;
+    dfb->pre_delete_v  = NULL;
 }
 
 static drmu_fb_t *
@@ -302,7 +351,8 @@ drmu_fb_unref(drmu_fb_t ** const ppdfb)
 static drmu_fb_t *
 drmu_fb_ref(drmu_fb_t * const dfb)
 {
-    atomic_fetch_add(&dfb->ref_count, 1);
+    if (dfb != NULL)
+        atomic_fetch_add(&dfb->ref_count, 1);
     return dfb;
 }
 
@@ -350,8 +400,7 @@ dumb_fb_free_cb(drmu_fb_t * dfb, void * v)
 
 
 static drmu_fb_t *
-drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h,
-                 const uint32_t format, const unsigned int plane_n)
+drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format)
 {
     drmu_fb_t * const dfb = alloc_fb(du);
     fb_dumb_t * aux;
@@ -363,10 +412,10 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h,
     }
     dfb->width = (w + 63) & ~63;
     dfb->height = (h + 63) & ~63;
-    dfb->cropped = (drmu_rect_t) {.w = w, .h = h};
+    dfb->cropped = drmu_rect_wh(w, h);
     dfb->format = format;
 
-    if ((bpp = drmu_fb_pixel_bits(dfb, plane_n)) == 0) {
+    if ((bpp = drmu_fb_pixel_bits(dfb, 0)) == 0) {
         drmu_err(du, "%s: Unexpected format %#x", __func__, format);
         goto fail;
     }
@@ -437,21 +486,27 @@ fail:
     return NULL;
 }
 
+static int
+fb_try_reuse(drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format)
+{
+    if (w > dfb->width || h > dfb->height || format != dfb->format)
+        return 0;
+
+    dfb->cropped = drmu_rect_wh(w, h);
+    return 1;
+}
 
 static drmu_fb_t *
 drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format)
 {
     if (dfb == NULL)
-        return drmu_fb_new_dumb(du, w, h, format, 0);
+        return drmu_fb_new_dumb(du, w, h, format);
 
-    if (w <= dfb->width && h <= dfb->height && format == dfb->format)
-    {
-        dfb->cropped = (drmu_rect_t){.w = w, .h = h};
+    if (fb_try_reuse(dfb, w, h, format))
         return dfb;
-    }
 
     drmu_fb_unref(&dfb);
-    return drmu_fb_new_dumb(du, w, h, format, 0);
+    return drmu_fb_new_dumb(du, w, h, format);
 }
 
 // VLC specific helper fb fns
@@ -584,6 +639,163 @@ drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
 }
 
 static void
+pool_add_tail(drmu_pool_t * const pool, drmu_fb_t * const dfb)
+{
+    if (pool->tail == NULL)
+        pool->head = dfb;
+    else
+        pool->tail->next = dfb;
+    dfb->prev = pool->tail;
+    pool->tail = dfb;
+}
+
+static drmu_fb_t *
+pool_extract(drmu_pool_t * const pool, drmu_fb_t * const dfb)
+{
+    if (dfb->prev == NULL)
+        pool->head = dfb->next;
+    else
+        dfb->prev->next = dfb->next;
+
+    if (dfb->next == NULL)
+        pool->tail = dfb->prev;
+    else
+        dfb->next->prev = dfb->prev;
+
+    dfb->next = NULL;
+    dfb->prev = NULL;
+    return dfb;
+}
+
+static void
+pool_free_pool(drmu_pool_t * const pool)
+{
+    while (pool->head) {
+        drmu_fb_t * dfb = pool_extract(pool, pool->head);
+        drmu_fb_unref(&dfb);
+    }
+}
+
+static void
+pool_free(drmu_pool_t * const pool)
+{
+    pool_free_pool(pool);
+    pthread_mutex_destroy(&pool->lock);
+    free(pool);
+}
+
+static void
+drmu_pool_unref(drmu_pool_t ** const pppool)
+{
+    drmu_pool_t * const pool = *pppool;
+
+    if (pool == NULL)
+        return;
+    *pppool = NULL;
+
+    if (atomic_fetch_sub(&pool->ref_count, 1) != 0)
+        return;
+
+    pool_free(pool);
+}
+
+static drmu_pool_t *
+drmu_pool_ref(drmu_pool_t * const pool)
+{
+    atomic_fetch_add(&pool->ref_count, 1);
+    return pool;
+}
+
+static drmu_pool_t *
+drmu_pool_new(drmu_env_t * const du, unsigned int total_fbs_max)
+{
+    drmu_pool_t * const pool = calloc(1, sizeof(*pool));
+
+    if (pool == NULL) {
+        drmu_err(du, "Failed pool env alloc");
+        return NULL;
+    }
+
+    pool->du = du;
+    pool->fb_max = total_fbs_max;
+    pthread_mutex_init(&pool->lock, NULL);
+
+    return pool;
+}
+
+static int
+pool_fb_pre_delete_cb(drmu_fb_t * dfb, void * v)
+{
+    drmu_pool_t * pool = v;
+
+    // Ensure we cannot end up in a delete loop
+    drmu_fb_pre_delete_unset(dfb);
+
+    // If dead set then might as well delete now
+    // It should all work without this shortcut but this reclaims
+    // storage quicker
+    if (pool->dead) {
+        drmu_pool_unref(&pool);
+        return 0;
+    }
+
+    drmu_fb_ref(dfb);  // Restore ref
+    pool_add_tail(pool, dfb);
+    // May cause suicide & recursion on fb delete, but that should be OK as
+    // the 1 we return here should cause simple exit of fb delete
+    drmu_pool_unref(&pool);
+    return 1;  // Stop delete
+}
+
+static drmu_fb_t *
+drmu_pool_fb_new_dumb(drmu_pool_t * const pool, uint32_t w, uint32_t h, const uint32_t format)
+{
+    drmu_env_t * const du = pool->du;
+    drmu_fb_t * dfb = pool->head;
+
+    while (dfb != NULL) {
+        if (fb_try_reuse(dfb, w, h, format)) {
+            pool_extract(pool, dfb);
+            break;
+        }
+        dfb = dfb->next;
+    }
+
+    if (dfb == NULL) {
+        if (pool->fb_count >= pool->fb_max && pool->head != NULL) {
+            --pool->fb_count;
+            dfb = pool_extract(pool, pool->head);
+            drmu_fb_unref(&dfb);
+        }
+
+        ++pool->fb_count;
+        dfb = drmu_fb_realloc_dumb(du, NULL, w, h, format);
+    }
+
+    drmu_fb_pre_delete_set(dfb, pool_fb_pre_delete_cb, pool);
+    drmu_pool_ref(pool);
+    return dfb;
+}
+
+// Mark pool as dead (i.e. no new allocs) and unref it
+// Simple unref will also work but this reclaims storage faster
+// Actual pool structure will persist until all referencing fbs are deleted too
+static void
+drmu_pool_delete(drmu_pool_t ** const pppool)
+{
+    drmu_pool_t * pool = *pppool;
+
+    if (pool == NULL)
+        return;
+    *pppool = NULL;
+
+    pool->dead = 1;
+    pool_free_pool(pool);
+
+    drmu_pool_unref(&pool);
+}
+
+static void
 free_crtc(drmu_crtc_t * const dc)
 {
     if (dc->crtc != NULL)
@@ -639,10 +851,33 @@ drmu_plane_set(drmu_plane_t * const dp,
     drmu_fb_t * const dfb, const uint32_t flags,
     const drmu_rect_t pos)
 {
-    int rv = drmModeSetPlane(dp->du->fd, dp->plane->plane_id, drmu_crtc_id(dp->dc),
-        dfb->handle, flags,
-        pos.x, pos.y, pos.w, pos.h,
-        dfb->cropped.x << 16, dfb->cropped.y << 16, dfb->cropped.w << 16, dfb->cropped.h << 16);
+    int rv;
+
+    // VSYNC rather than this simplistic circular buffer?
+    drmu_fb_t **ppdfb = dp->fbs + dp->fb_n;
+
+    // Do nothing if the same as last time
+    if (*ppdfb == dfb)
+        return 0;
+
+    dp->fb_n = dp->fb_n + 1 >= DRMU_PLANE_HOLD_COUNT ? 0 : dp->fb_n + 1;
+    ppdfb = dp->fbs + dp->fb_n;
+
+    drmu_fb_unref(ppdfb);
+    *ppdfb = drmu_fb_ref(dfb);
+
+    if (dfb == NULL) {
+        rv = drmModeSetPlane(dp->du->fd, dp->plane->plane_id, drmu_crtc_id(dp->dc),
+            0, 0,
+            0, 0, 0, 0,
+            0, 0, 0, 0);
+    }
+    else {
+        rv = drmModeSetPlane(dp->du->fd, dp->plane->plane_id, drmu_crtc_id(dp->dc),
+            dfb->handle, flags,
+            pos.x, pos.y, pos.w, pos.h,
+            dfb->cropped.x << 16, dfb->cropped.y << 16, dfb->cropped.w << 16, dfb->cropped.h << 16);
+    }
     return rv != 0 ? -errno : 0;
 }
 
@@ -663,10 +898,14 @@ static void
 drmu_plane_delete(drmu_plane_t ** const ppdp)
 {
     drmu_plane_t * const dp = *ppdp;
+    unsigned int i;
 
     if (dp == NULL)
         return;
     *ppdp = NULL;
+
+    for (i = 0; i != DRMU_PLANE_HOLD_COUNT; ++i)
+        drmu_fb_unref(dp->fbs + i);
 
     dp->dc = NULL;
 }
@@ -972,17 +1211,13 @@ typedef struct vout_display_sys_t {
     drmu_env_t * du;
     drmu_crtc_t * dc;
     drmu_plane_t * dp;
+    drmu_pool_t * sub_fb_pool;
     drmu_plane_t * subplanes[SUBPICS_MAX];
     subpic_ent_t subpics[SUBPICS_MAX];
     vlc_fourcc_t * subpic_chromas;
 
     uint32_t con_id;
-
-    unsigned int hold_n;
-    drmu_fb_t * hold[HOLD_SIZE];
 } vout_display_sys_t;
-
-static const vlc_fourcc_t drm_subpicture_chromas[] = { VLC_CODEC_RGBA, VLC_CODEC_BGRA, VLC_CODEC_ARGB, 0 };
 
 static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
                            subpicture_t *subpicture, vlc_tick_t date)
@@ -1000,8 +1235,14 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
             picture_t * const src = sreg->p_picture;
             subpic_ent_t * const dst = sys->subpics + n;
             plane_t dst_plane;
+            const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format);
 
-            dst->fb = drmu_fb_realloc_dumb(sys->du, dst->fb, src->format.i_width, src->format.i_height, DRM_FORMAT_ARGB8888);
+            if (drm_fmt == 0) {
+                msg_Warn(vd, "Failed drm format for subpic %d: %#x", n, src->format.i_chroma);
+                continue;
+            }
+
+            dst->fb = drmu_fb_realloc_dumb(sys->du, dst->fb, src->format.i_width, src->format.i_height, drm_fmt);
             if (dst->fb == NULL) {
                 msg_Warn(vd, "Failed alloc for subpic %d: %dx%d", n, src->format.i_width, src->format.i_height);
                 continue;
@@ -1039,7 +1280,7 @@ subpics_done:
 static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
 {
     vout_display_sys_t *const sys = vd->sys;
-    drmu_fb_t ** const dh = sys->hold + sys->hold_n;
+    drmu_fb_t * dfb;
     int ret = 0;
     drmu_rect_t r;
     unsigned int i;
@@ -1068,20 +1309,19 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
     }
 #endif
 
-    drmu_fb_unref(dh);
-
-    if ((*dh = drmu_fb_vlc_new_pic_attach(sys->du, p_pic)) == NULL) {
-        msg_Err(vd, "Failed to create frme buffer from pic");
-        return;
-    }
-
     {
         vout_display_place_t place;
         vout_display_PlacePicture(&place, vd->source, vd->cfg);
         r = drmu_rect_vlc_place(&place);
     }
 
-    ret = drmu_plane_set(sys->dp, *dh, 0, r);
+    if ((dfb = drmu_fb_vlc_new_pic_attach(sys->du, p_pic)) == NULL) {
+        msg_Err(vd, "Failed to create frme buffer from pic");
+        return;
+    }
+
+    ret = drmu_plane_set(sys->dp, dfb, 0, r);
+    drmu_fb_unref(&dfb);
 
     if (ret != 0)
     {
@@ -1091,8 +1331,8 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
     for (i = 0; i != SUBPICS_MAX; ++i) {
         subpic_ent_t * const spe = sys->subpics + i;
 
-        if (spe->fb == NULL)
-            continue;
+//        if (spe->fb == NULL)
+//            continue;
 
 //        msg_Info(vd, "pic=%dx%d @ %d,%d, r=%dx%d @ %d,%d, space=%dx%d @ %d,%d",
 //                 spe->pos.w, spe->pos.h, spe->pos.x, spe->pos.y,
@@ -1106,8 +1346,6 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
             msg_Err(vd, "drmModeSetPlane for subplane %d failed: %s", i, strerror(-ret));
         }
     }
-
-    sys->hold_n = sys->hold_n + 1 >= HOLD_SIZE ? 0 : sys->hold_n + 1;
     return;
 }
 
@@ -1130,8 +1368,7 @@ static void CloseDrmVout(vout_display_t *vd)
     vout_display_sys_t *const sys = vd->sys;
     unsigned int i;
 
-    for (i = 0; i != HOLD_SIZE; ++i)
-        drmu_fb_unref(sys->hold + i);
+    drmu_pool_delete(&sys->sub_fb_pool);
 
     for (i = 0; i != SUBPICS_MAX; ++i)
         drmu_plane_delete(sys->subplanes + i);
@@ -1187,6 +1424,36 @@ static int subpic_fourcc_sort_cb(const void * a, const void * b)
     return subpic_fourcc_usability(*(vlc_fourcc_t *)b) - subpic_fourcc_usability(*(vlc_fourcc_t *)a);
 }
 
+static vlc_fourcc_t *
+subpic_make_chromas_from_drm(const uint32_t * const drm_chromas, const unsigned int n)
+{
+    vlc_fourcc_t * const c = (n == 0) ? NULL : calloc(n + 1, sizeof(*c));
+    vlc_fourcc_t * p = c;
+
+    if (c == NULL)
+        return NULL;
+
+    for (unsigned int j = 0; j != n; ++j) {
+        if ((*p = drmu_format_vlc_to_vlc(drm_chromas[j])) != 0)
+            ++p;
+    }
+
+    // Sort for our preferred order & remove any that would confuse VLC
+    qsort(c, p - c, sizeof(*c), subpic_fourcc_sort_cb);
+    while (p != c) {
+        if (subpic_fourcc_usability(p[-1]) != 0)
+            break;
+        *--p = 0;
+    }
+
+    if (p == c) {
+        free(c);
+        return NULL;
+    }
+
+    return c;
+}
+
 static int OpenDrmVout(vout_display_t *vd,
                         video_format_t *fmtp, vlc_video_context *vctx)
 {
@@ -1222,6 +1489,11 @@ static int OpenDrmVout(vout_display_t *vd,
     if ((sys->dc = drmu_crtc_new_find(sys->du)) == NULL)
         goto fail;
 
+    if ((sys->sub_fb_pool = drmu_pool_new(sys->du, 10)) == NULL)
+        goto fail;
+
+    // **** Plane selection needs noticable improvement
+    // This wants to be the primary
     if ((sys->dp = drmu_plane_new_find(sys->dc, DRM_FORMAT_NV12)) == NULL)
         goto fail;
 
@@ -1233,38 +1505,13 @@ static int OpenDrmVout(vout_display_t *vd,
         if (sys->subpic_chromas == NULL) {
             unsigned int n;
             const uint32_t * const drm_chromas = drmu_plane_formats(sys->subplanes[i], &n);
-            if (n != 0) {
-                vlc_fourcc_t * const c = calloc(n + 1, sizeof(*sys->subpic_chromas));
-                vlc_fourcc_t * p = c;
-
-                if (c == NULL) {
-                    msg_Err(vd, "Cannot alloc subpic chromas");
-                    goto fail;
-                }
-                for (unsigned int j = 0; j != n; ++j) {
-                    if ((*p = drmu_format_vlc_to_vlc(drm_chromas[j])) != 0)
-                        ++p;
-                }
-
-                // Sort for our preferred order & remove any that would confuse VLC
-                qsort(c, p - c, sizeof(*c), subpic_fourcc_sort_cb);
-                while (p != c) {
-                    if (subpic_fourcc_usability(p[-1]) != 0)
-                        break;
-                    *--p = 0;
-                }
-
-                if (p == c)
-                    free(c);
-                else
-                    sys->subpic_chromas = c;
-            }
+            sys->subpic_chromas = subpic_make_chromas_from_drm(drm_chromas, n);
         }
     }
     vd->info = (vout_display_info_t) {
 // We can scale but as it stands it looks like VLC is confused about coord
 // systems s.t. system message are in display space and subs are in source
-// with no way of distinguishing
+// with no way of distinguishing so we don't know what to scale by :-(
 //        .can_scale_spu = true,
         .subpicture_chromas = sys->subpic_chromas
     };
