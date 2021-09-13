@@ -42,10 +42,12 @@
 #include <libdrm/drm.h>
 #include <libdrm/drm_mode.h>
 #include <libdrm/drm_fourcc.h>
+#include <poll.h>
 #include <sys/mman.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
+#include "pollqueue.h"
 #include "../codec/avcodec/drm_pic.h"
 
 #define TRACE_ALL 1
@@ -177,6 +179,9 @@ typedef struct drmu_env_s {
     // atomic lock held whilst we accumulate atomic ops
     pthread_mutex_t atomic_lock;
     drmu_atomic_t * da;
+
+    struct pollqueue * pq;
+    struct polltask * pt;
 } drmu_env_t;
 
 static uint32_t
@@ -335,7 +340,7 @@ drmu_atomic_commit(drmu_atomic_t * const da)
 {
     drmu_env_t * const du = da->du;
 
-    if (drmModeAtomicCommit(du->fd, da->a, DRM_MODE_ATOMIC_NONBLOCK, NULL) != 0) {
+    if (drmModeAtomicCommit(du->fd, da->a, DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT, du) != 0) {
         int err = errno;
         drmu_err(du, "%s: drmModeAtomicCommit failed: %s", __func__, strerror(err));
         return -err;
@@ -1438,6 +1443,9 @@ drmu_env_delete(drmu_env_t ** const ppdu)
         return;
     *ppdu = NULL;
 
+    pollqueue_delete(&du->pq);
+    polltask_delete(&du->pt);
+
     if (du->res != NULL)
         drmModeFreeResources(du->res);
     free_planes(du);
@@ -1445,6 +1453,47 @@ drmu_env_delete(drmu_env_t ** const ppdu)
     close(du->fd);
     pthread_mutex_destroy(&du->atomic_lock);
     free(du);
+}
+
+static void
+vblank_cb(int fd, unsigned int sequence, unsigned int tv_sec, unsigned int tv_usec, void *user_data)
+{
+    (void)fd;
+    (void)tv_sec;
+    (void)tv_usec;
+    fprintf(stderr, "%s: seq=%d, user=%p\n", __func__, sequence, user_data);
+}
+
+static void
+page_flip_cb(int fd, unsigned int sequence, unsigned int tv_sec, unsigned int tv_usec, unsigned int crtc_id, void *user_data)
+{
+    (void)fd;
+    (void)tv_sec;
+    (void)tv_usec;
+    (void)crtc_id;
+    fprintf(stderr, "%s: seq=%d, user=%p\n", __func__, sequence, user_data);
+}
+
+
+static void
+drmu_env_polltask_cb(void * v, short revents)
+{
+    drmu_env_t * const du = v;
+    drmEventContext ctx = {
+        .version = DRM_EVENT_CONTEXT_VERSION,
+        .vblank_handler = vblank_cb,
+        .page_flip_handler2 = page_flip_cb,
+    };
+
+    if (revents == 0) {
+        drmu_warn(du, "%s: Timeout", __func__);
+    }
+    else {
+        drmu_warn(du, "%s: Handle", __func__);
+        drmHandleEvent(du->fd, &ctx);
+    }
+
+    pollqueue_add_task(du->pq, du->pt, 1000);
 }
 
 // Closes fd on failure
@@ -1462,6 +1511,15 @@ drmu_env_new_fd(vlc_object_t * const log, const int fd)
     du->fd = fd;
     pthread_mutex_init(&du->atomic_lock, NULL);
 
+    if ((du->pq = pollqueue_new()) == NULL) {
+        drmu_err(du, "Failed to create pollqueue");
+        goto fail1;
+    }
+    if ((du->pt = polltask_new(du->fd, POLLIN | POLLPRI, drmu_env_polltask_cb, du)) == NULL) {
+        drmu_err(du, "Failed to create polltask");
+        goto fail1;
+    }
+
     // We want the primary plane for video
     drmSetClientCap(du->fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
     drmSetClientCap(du->fd, DRM_CLIENT_CAP_ATOMIC, 1);
@@ -1473,6 +1531,8 @@ drmu_env_new_fd(vlc_object_t * const log, const int fd)
         drmu_err(du, "%s: Failed to get resources", __func__);
         goto fail1;
     }
+
+    pollqueue_add_task(du->pq, du->pt, 1000);
 
     return du;
 
