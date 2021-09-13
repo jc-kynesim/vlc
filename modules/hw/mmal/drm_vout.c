@@ -105,6 +105,11 @@ typedef struct drmu_fb_s {
 
 } drmu_fb_t;
 
+typedef struct drmu_fb_list_s {
+    drmu_fb_t * head;
+    drmu_fb_t * tail;
+} drmu_fb_list_t;
+
 typedef struct drmu_pool_s {
     atomic_int ref_count;  // 0 == 1 ref for ease of init
 
@@ -116,8 +121,7 @@ typedef struct drmu_pool_s {
     unsigned int fb_count;
     unsigned int fb_max;
 
-    drmu_fb_t * head;
-    drmu_fb_t * tail;
+    drmu_fb_list_t free_fbs;
 } drmu_pool_t;
 
 #define DRMU_PLANE_HOLD_COUNT 3
@@ -639,8 +643,10 @@ drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
 }
 
 static void
-pool_add_tail(drmu_pool_t * const pool, drmu_fb_t * const dfb)
+fb_list_add_tail(drmu_fb_list_t * const pool, drmu_fb_t * const dfb)
 {
+    assert(dfb->prev == NULL && dfb->next == NULL);
+
     if (pool->tail == NULL)
         pool->head = dfb;
     else
@@ -650,8 +656,11 @@ pool_add_tail(drmu_pool_t * const pool, drmu_fb_t * const dfb)
 }
 
 static drmu_fb_t *
-pool_extract(drmu_pool_t * const pool, drmu_fb_t * const dfb)
+fb_list_extract(drmu_fb_list_t * const pool, drmu_fb_t * const dfb)
 {
+    if (dfb == NULL)
+        return NULL;
+
     if (dfb->prev == NULL)
         pool->head = dfb->next;
     else
@@ -667,13 +676,30 @@ pool_extract(drmu_pool_t * const pool, drmu_fb_t * const dfb)
     return dfb;
 }
 
+static drmu_fb_t *
+fb_list_extract_head(drmu_fb_list_t * const pool)
+{
+    return fb_list_extract(pool, pool->head);
+}
+
+static drmu_fb_t *
+fb_list_peek_head(drmu_fb_list_t * const pool)
+{
+    return pool->head;
+}
+
+static bool
+fb_list_is_empty(drmu_fb_list_t * const pool)
+{
+    return pool->head == NULL;
+}
+
 static void
 pool_free_pool(drmu_pool_t * const pool)
 {
-    while (pool->head) {
-        drmu_fb_t * dfb = pool_extract(pool, pool->head);
+    drmu_fb_t * dfb;
+    while ((dfb = fb_list_extract_head(&pool->free_fbs)) != NULL)
         drmu_fb_unref(&dfb);
-    }
 }
 
 static void
@@ -740,7 +766,7 @@ pool_fb_pre_delete_cb(drmu_fb_t * dfb, void * v)
     }
 
     drmu_fb_ref(dfb);  // Restore ref
-    pool_add_tail(pool, dfb);
+    fb_list_add_tail(&pool->free_fbs, dfb);
     // May cause suicide & recursion on fb delete, but that should be OK as
     // the 1 we return here should cause simple exit of fb delete
     drmu_pool_unref(&pool);
@@ -751,20 +777,20 @@ static drmu_fb_t *
 drmu_pool_fb_new_dumb(drmu_pool_t * const pool, uint32_t w, uint32_t h, const uint32_t format)
 {
     drmu_env_t * const du = pool->du;
-    drmu_fb_t * dfb = pool->head;
+    drmu_fb_t * dfb = fb_list_peek_head(&pool->free_fbs);
 
     while (dfb != NULL) {
         if (fb_try_reuse(dfb, w, h, format)) {
-            pool_extract(pool, dfb);
+            fb_list_extract(&pool->free_fbs, dfb);
             break;
         }
         dfb = dfb->next;
     }
 
     if (dfb == NULL) {
-        if (pool->fb_count >= pool->fb_max && pool->head != NULL) {
+        if (pool->fb_count >= pool->fb_max && !fb_list_is_empty(&pool->free_fbs)) {
             --pool->fb_count;
-            dfb = pool_extract(pool, pool->head);
+            dfb = fb_list_extract_head(&pool->free_fbs);
             drmu_fb_unref(&dfb);
         }
 
@@ -1242,7 +1268,13 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
                 continue;
             }
 
-            dst->fb = drmu_fb_realloc_dumb(sys->du, dst->fb, src->format.i_width, src->format.i_height, drm_fmt);
+            if (dst->fb != NULL) {
+                // Should never happen - fbs consumed by display
+                msg_Warn(vd, "Subpic %d: still has fb attached", n);
+                drmu_fb_unref(&dst->fb);
+            }
+
+            dst->fb = drmu_pool_fb_new_dumb(sys->sub_fb_pool, src->format.i_width, src->format.i_height, drm_fmt);
             if (dst->fb == NULL) {
                 msg_Warn(vd, "Failed alloc for subpic %d: %dx%d", n, src->format.i_width, src->format.i_height);
                 continue;
@@ -1330,9 +1362,6 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
 
     for (i = 0; i != SUBPICS_MAX; ++i) {
         subpic_ent_t * const spe = sys->subpics + i;
-
-//        if (spe->fb == NULL)
-//            continue;
 
 //        msg_Info(vd, "pic=%dx%d @ %d,%d, r=%dx%d @ %d,%d, space=%dx%d @ %d,%d",
 //                 spe->pos.w, spe->pos.h, spe->pos.x, spe->pos.y,
