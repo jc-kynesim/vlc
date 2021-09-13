@@ -74,6 +74,12 @@ typedef struct drmu_rect_s {
     uint32_t w, h;
 } drmu_rect_t;
 
+typedef struct drmu_props_s {
+    struct drmu_env_s * du;
+    unsigned int prop_count;
+    drmModePropertyPtr * props;
+} drmu_props_t;
+
 // Called pre delete.
 // Zero returned means continue delete.
 // Non-zero means stop delete - fb will have zero refs so will probably want a new ref
@@ -130,6 +136,19 @@ typedef struct drmu_plane_s {
     struct drmu_crtc_s * dc;    // NULL if not in use
     const drmModePlane * plane;
 
+    struct {
+        uint32_t crtc_id;
+        uint32_t fb_id;
+        uint32_t crtc_h;
+        uint32_t crtc_w;
+        uint32_t crtc_x;
+        uint32_t crtc_y;
+        uint32_t src_h;
+        uint32_t src_w;
+        uint32_t src_x;
+        uint32_t src_y;
+    } pid;
+
     // Next, Current, Prev FBs - might only need 2 if we have vsync CB
     unsigned int fb_n;
     drmu_fb_t * fbs[DRMU_PLANE_HOLD_COUNT];
@@ -143,12 +162,21 @@ typedef struct drmu_crtc_s {
     int crtc_idx;
 } drmu_crtc_t;
 
+typedef struct drmu_atomic_s {
+    struct drmu_env_s * du;
+    drmModeAtomicReqPtr a;
+} drmu_atomic_t;
+
 typedef struct drmu_env_s {
     vlc_object_t * log;
     int fd;
     uint32_t plane_count;
     drmu_plane_t * planes;
     drmModeResPtr res;
+
+    // atomic lock held whilst we accumulate atomic ops
+    pthread_mutex_t atomic_lock;
+    drmu_atomic_t * da;
 } drmu_env_t;
 
 static uint32_t
@@ -287,6 +315,62 @@ drmu_rect_wh(const unsigned int w, const unsigned int h)
         .w = w,
         .h = h
     };
+}
+
+static void
+drmu_atomic_delete(drmu_atomic_t ** const ppda)
+{
+    drmu_atomic_t * const da = *ppda;
+
+    if (da == NULL)
+        return;
+
+    if (da->a != NULL)
+        drmModeAtomicFree(da->a);
+    free(da);
+}
+
+static int
+drmu_atomic_commit(drmu_atomic_t * const da)
+{
+    drmu_env_t * const du = da->du;
+
+    if (drmModeAtomicCommit(du->fd, da->a, DRM_MODE_ATOMIC_NONBLOCK, NULL) != 0) {
+        int err = errno;
+        drmu_err(du, "%s: drmModeAtomicCommit failed: %s", __func__, strerror(err));
+        return -err;
+    }
+
+    return 0;
+}
+
+static int
+drmu_atomic_add_prop(drmu_atomic_t * const da, const uint32_t obj_id, const uint32_t prop_id, const uint64_t value)
+{
+    if (drmModeAtomicAddProperty(da->a, obj_id, prop_id, value) < 0)
+        drmu_warn(da->du, "%s: Failed to set obj_id=%#x, prop_id=%#x, val=%" PRId64, __func__,
+                 obj_id, prop_id, value);
+    return 0;
+}
+
+static drmu_atomic_t *
+drmu_atomic_new(drmu_env_t * const du)
+{
+    drmu_atomic_t * const da = calloc(1, sizeof(*da));
+
+    if (da == NULL) {
+        drmu_err(du, "%s: Failed to alloc struct", __func__);
+        return NULL;
+    }
+    da->du = du;
+
+    if ((da->a = drmModeAtomicAlloc()) == NULL) {
+        drmu_err(du, "%s: Failed to alloc atomic context", __func__);
+        free(da);
+        return NULL;
+    }
+
+    return da;
 }
 
 static void
@@ -643,31 +727,31 @@ drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
 }
 
 static void
-fb_list_add_tail(drmu_fb_list_t * const pool, drmu_fb_t * const dfb)
+fb_list_add_tail(drmu_fb_list_t * const fbl, drmu_fb_t * const dfb)
 {
     assert(dfb->prev == NULL && dfb->next == NULL);
 
-    if (pool->tail == NULL)
-        pool->head = dfb;
+    if (fbl->tail == NULL)
+        fbl->head = dfb;
     else
-        pool->tail->next = dfb;
-    dfb->prev = pool->tail;
-    pool->tail = dfb;
+        fbl->tail->next = dfb;
+    dfb->prev = fbl->tail;
+    fbl->tail = dfb;
 }
 
 static drmu_fb_t *
-fb_list_extract(drmu_fb_list_t * const pool, drmu_fb_t * const dfb)
+fb_list_extract(drmu_fb_list_t * const fbl, drmu_fb_t * const dfb)
 {
     if (dfb == NULL)
         return NULL;
 
     if (dfb->prev == NULL)
-        pool->head = dfb->next;
+        fbl->head = dfb->next;
     else
         dfb->prev->next = dfb->next;
 
     if (dfb->next == NULL)
-        pool->tail = dfb->prev;
+        fbl->tail = dfb->prev;
     else
         dfb->next->prev = dfb->prev;
 
@@ -677,21 +761,21 @@ fb_list_extract(drmu_fb_list_t * const pool, drmu_fb_t * const dfb)
 }
 
 static drmu_fb_t *
-fb_list_extract_head(drmu_fb_list_t * const pool)
+fb_list_extract_head(drmu_fb_list_t * const fbl)
 {
-    return fb_list_extract(pool, pool->head);
+    return fb_list_extract(fbl, fbl->head);
 }
 
 static drmu_fb_t *
-fb_list_peek_head(drmu_fb_list_t * const pool)
+fb_list_peek_head(drmu_fb_list_t * const fbl)
 {
-    return pool->head;
+    return fbl->head;
 }
 
 static bool
-fb_list_is_empty(drmu_fb_list_t * const pool)
+fb_list_is_empty(drmu_fb_list_t * const fbl)
 {
-    return pool->head == NULL;
+    return fbl->head == NULL;
 }
 
 static void
@@ -873,11 +957,35 @@ drmu_crtc_height(const drmu_crtc_t * const dc)
 }
 
 static int
+plane_set_atomic(drmu_atomic_t * const da,
+                 drmu_plane_t * const dp,
+                 drmu_fb_t * const dfb,
+                int32_t crtc_x, int32_t crtc_y,
+                uint32_t crtc_w, uint32_t crtc_h,
+                uint32_t src_x, uint32_t src_y,
+                uint32_t src_w, uint32_t src_h)
+{
+    const uint32_t plid = dp->plane->plane_id;
+    drmu_atomic_add_prop(da, plid, dp->pid.crtc_id, dfb == NULL ? 0 : drmu_crtc_id(dp->dc));
+    drmu_atomic_add_prop(da, plid, dp->pid.fb_id,  dfb == NULL ? 0 : dfb->handle);
+    drmu_atomic_add_prop(da, plid, dp->pid.crtc_x, crtc_x);
+    drmu_atomic_add_prop(da, plid, dp->pid.crtc_y, crtc_y);
+    drmu_atomic_add_prop(da, plid, dp->pid.crtc_w, crtc_w);
+    drmu_atomic_add_prop(da, plid, dp->pid.crtc_h, crtc_h);
+    drmu_atomic_add_prop(da, plid, dp->pid.src_x,  src_x);
+    drmu_atomic_add_prop(da, plid, dp->pid.src_y,  src_y);
+    drmu_atomic_add_prop(da, plid, dp->pid.src_w,  src_w);
+    drmu_atomic_add_prop(da, plid, dp->pid.src_h,  src_h);
+    return 0;
+}
+
+static int
 drmu_plane_set(drmu_plane_t * const dp,
     drmu_fb_t * const dfb, const uint32_t flags,
     const drmu_rect_t pos)
 {
     int rv;
+    drmu_env_t * const du = dp->du;
 
     // VSYNC rather than this simplistic circular buffer?
     drmu_fb_t **ppdfb = dp->fbs + dp->fb_n;
@@ -892,17 +1000,31 @@ drmu_plane_set(drmu_plane_t * const dp,
     drmu_fb_unref(ppdfb);
     *ppdfb = drmu_fb_ref(dfb);
 
-    if (dfb == NULL) {
-        rv = drmModeSetPlane(dp->du->fd, dp->plane->plane_id, drmu_crtc_id(dp->dc),
-            0, 0,
-            0, 0, 0, 0,
-            0, 0, 0, 0);
+    if (du->da != NULL) {
+        if (dfb == NULL) {
+            rv = plane_set_atomic(du->da, dp, NULL,
+                                  0, 0, 0, 0,
+                                  0, 0, 0, 0);
+        }
+        else {
+            rv = plane_set_atomic(du->da, dp, dfb,
+                                  pos.x, pos.y, pos.w, pos.h,
+                                  dfb->cropped.x << 16, dfb->cropped.y << 16, dfb->cropped.w << 16, dfb->cropped.h << 16);
+        }
     }
     else {
-        rv = drmModeSetPlane(dp->du->fd, dp->plane->plane_id, drmu_crtc_id(dp->dc),
-            dfb->handle, flags,
-            pos.x, pos.y, pos.w, pos.h,
-            dfb->cropped.x << 16, dfb->cropped.y << 16, dfb->cropped.w << 16, dfb->cropped.h << 16);
+        if (dfb == NULL) {
+            rv = drmModeSetPlane(du->fd, dp->plane->plane_id, drmu_crtc_id(dp->dc),
+                0, 0,
+                0, 0, 0, 0,
+                0, 0, 0, 0);
+            }
+        else {
+            rv = drmModeSetPlane(du->fd, dp->plane->plane_id, drmu_crtc_id(dp->dc),
+                dfb->handle, flags,
+                pos.x, pos.y, pos.w, pos.h,
+                dfb->cropped.x << 16, dfb->cropped.y << 16, dfb->cropped.w << 16, dfb->cropped.h << 16);
+            }
     }
     return rv != 0 ? -errno : 0;
 }
@@ -1055,6 +1177,36 @@ drmu_crtc_new_find(drmu_env_t * const du)
     return dc;
 }
 
+static int
+drmu_env_atomic_start(drmu_env_t * const du)
+{
+    pthread_mutex_lock(&du->atomic_lock);
+    if ((du->da = drmu_atomic_new(du)) == NULL) {
+        pthread_mutex_unlock(&du->atomic_lock);
+        return -ENOMEM;
+    }
+    return 0;
+}
+
+static void
+drmu_env_atomic_abort(drmu_env_t * const du)
+{
+    if (du->da == NULL)
+        return;
+
+    drmu_atomic_delete(&du->da);
+    pthread_mutex_unlock(&du->atomic_lock);
+}
+
+static drmu_atomic_t *
+drmu_env_atomic_finish(drmu_env_t * const du)
+{
+    drmu_atomic_t * const da = du->da;
+    du->da = NULL;
+    pthread_mutex_unlock(&du->atomic_lock);
+    return da;
+}
+
 static void
 free_planes(drmu_env_t * const du)
 {
@@ -1066,10 +1218,109 @@ free_planes(drmu_env_t * const du)
     du->planes = NULL;
 }
 
+static void
+props_free(drmu_props_t * const props)
+{
+    unsigned int i;
+    for (i = 0; i != props->prop_count; ++i)
+        drmModeFreeProperty(props->props[i]);
+    free(props);
+}
+
+static uint32_t
+props_name_to_id(drmu_props_t * const props, const char * const name)
+{
+    unsigned int i = props->prop_count / 2;
+    unsigned int a = 0;
+    unsigned int b = props->prop_count;
+
+    while (a < b) {
+        const int r = strcmp(name, props->props[i]->name);
+
+        if (r == 0)
+            return props->props[i]->prop_id;
+
+        if (r < 0) {
+            b = i;
+            i = (i + a) / 2;
+        } else {
+            a = i + 1;
+            i = (i + b) / 2;
+        }
+    }
+    return 0;
+}
+
+static void
+props_dump(const drmu_props_t * const props)
+{
+    unsigned int i;
+    drmu_env_t * const du = props->du;
+
+    for (i = 0; i != props->prop_count; ++i) {
+        drmModePropertyPtr p = props->props[i];
+        drmu_info(du, "Prop%d/%d: id=%#x, name=%s", i, props->prop_count, p->prop_id, p->name);
+    }
+}
+
+static int
+props_qsort_cb(const void * va, const void * vb)
+{
+    const drmModePropertyPtr a = *(drmModePropertyPtr *)va;
+    const drmModePropertyPtr b = *(drmModePropertyPtr *)vb;
+    return strcmp(a->name, b->name);
+}
+
+static drmu_props_t *
+props_new(drmu_env_t * const du, const uint32_t objid, const uint32_t objtype)
+{
+    drmu_props_t * const props = calloc(1, sizeof(*props));
+    drmModeObjectProperties * objprops;
+    int err;
+    unsigned int i;
+
+    if (props == NULL) {
+        drmu_err(du, "%s: Failed struct alloc", __func__);
+        return NULL;
+    }
+    props->du = du;
+
+    if ((objprops = drmModeObjectGetProperties(du->fd, objid, objtype)) == NULL) {
+        err = errno;
+        drmu_err(du, "%s: drmModeObjectGetProperties failed: %s", __func__, strerror(err));
+        return NULL;
+    }
+
+    if ((props->props = calloc(objprops->count_props, sizeof(*props))) == NULL) {
+        drmu_err(du, "%s: Failed array alloc", __func__);
+        goto fail1;
+    }
+
+    for (i = 0; i != objprops->count_props; ++i) {
+        if ((props->props[i] = drmModeGetProperty(du->fd, objprops->props[i])) == NULL) {
+            err = errno;
+            drmu_err(du, "%s: drmModeGetPropertiy %#x failed: %s", __func__, objprops->props[i], strerror(err));
+            goto fail2;
+        }
+        ++props->prop_count;
+    }
+
+    // Sort into name order for faster lookup
+    qsort(props->props, props->prop_count, sizeof(*props->props), props_qsort_cb);
+
+    return props;
+
+fail2:
+    props_free(props);
+fail1:
+    drmModeFreeObjectProperties(objprops);
+    return NULL;
+}
+
 static int
 drmu_env_planes_populate(drmu_env_t * const du)
 {
-    int err;
+    int err = EINVAL;
     drmModePlaneResPtr res;
     uint32_t i;
 
@@ -1086,13 +1337,40 @@ drmu_env_planes_populate(drmu_env_t * const du)
     }
 
     for (i = 0; i != res->count_planes; ++i) {
-        if ((du->planes[i].plane = drmModeGetPlane(du->fd, res->planes[i])) == NULL) {
+        drmu_plane_t * const dp = du->planes + i;
+        drmu_props_t *props;
+
+        dp->du = du;
+
+        if ((dp->plane = drmModeGetPlane(du->fd, res->planes[i])) == NULL) {
             err = errno;
-            drmu_err(du, "%s: drmModeGetPlaneResources failed: %s", __func__, strerror(err));
+            drmu_err(du, "%s: drmModeGetPlane failed: %s", __func__, strerror(err));
             goto fail2;
         }
-        du->planes[i].du = du;
 
+        if ((props = props_new(du, dp->plane->plane_id, DRM_MODE_OBJECT_PLANE)) == NULL) {
+            err = errno;
+            drmu_err(du, "%s: drmModeObjectGetProperties failed: %s", __func__, strerror(err));
+            goto fail2;
+        }
+
+        if ((dp->pid.crtc_id = props_name_to_id(props, "CRTC_ID")) == 0 ||
+            (dp->pid.fb_id  = props_name_to_id(props, "FB_ID")) == 0 ||
+            (dp->pid.crtc_h = props_name_to_id(props, "CRTC_H")) == 0 ||
+            (dp->pid.crtc_w = props_name_to_id(props, "CRTC_W")) == 0 ||
+            (dp->pid.crtc_x = props_name_to_id(props, "CRTC_X")) == 0 ||
+            (dp->pid.crtc_y = props_name_to_id(props, "CRTC_Y")) == 0 ||
+            (dp->pid.src_h  = props_name_to_id(props, "SRC_H")) == 0 ||
+            (dp->pid.src_w  = props_name_to_id(props, "SRC_W")) == 0 ||
+            (dp->pid.src_x  = props_name_to_id(props, "SRC_X")) == 0 ||
+            (dp->pid.src_y  = props_name_to_id(props, "SRC_Y")) == 0)
+        {
+            drmu_err(du, "%s: failed to find required id", __func__);
+            props_free(props);
+            goto fail2;
+        }
+
+        props_free(props);
         du->plane_count = i;
     }
 
@@ -1165,6 +1443,7 @@ drmu_env_delete(drmu_env_t ** const ppdu)
     free_planes(du);
 
     close(du->fd);
+    pthread_mutex_destroy(&du->atomic_lock);
     free(du);
 }
 
@@ -1181,9 +1460,11 @@ drmu_env_new_fd(vlc_object_t * const log, const int fd)
 
     du->log = log;
     du->fd = fd;
+    pthread_mutex_init(&du->atomic_lock, NULL);
 
     // We want the primary plane for video
     drmSetClientCap(du->fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+    drmSetClientCap(du->fd, DRM_CLIENT_CAP_ATOMIC, 1);
 
     if (drmu_env_planes_populate(du) != 0)
         goto fail1;
@@ -1316,6 +1597,7 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
     int ret = 0;
     drmu_rect_t r;
     unsigned int i;
+    drmu_atomic_t * da;
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
@@ -1352,6 +1634,8 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
         return;
     }
 
+    drmu_env_atomic_start(sys->du);
+
     ret = drmu_plane_set(sys->dp, dfb, 0, r);
     drmu_fb_unref(&dfb);
 
@@ -1374,7 +1658,15 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
         {
             msg_Err(vd, "drmModeSetPlane for subplane %d failed: %s", i, strerror(-ret));
         }
+        drmu_fb_unref(&spe->fb);
     }
+
+    da = drmu_env_atomic_finish(sys->du);
+
+    drmu_atomic_commit(da);
+
+    drmu_atomic_delete(&da);
+
     return;
 }
 
