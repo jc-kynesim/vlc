@@ -23,8 +23,8 @@ void pollqueue_add_task(struct pollqueue *const pq, struct polltask *const pt,
 // Create a new pollqueue (starts thread)
 struct pollqueue * pollqueue_new(void);
 // Stop and delete the pollqueue
-// Pending tasks may not complete but any callback that is running will complete
-// Poll task will be dead by the time this returns so safe to delete all
+// Pending tasks may not run but any callback that is running will complete
+// Poll task will be dead by the time this returns so it is safe to delete all
 // polltask objects after calling this
 void pollqueue_delete(struct pollqueue **const ppq);
 

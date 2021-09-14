@@ -132,7 +132,6 @@ typedef struct drmu_pool_s {
     drmu_fb_list_t free_fbs;
 } drmu_pool_t;
 
-#define DRMU_PLANE_HOLD_COUNT 3
 typedef struct drmu_plane_s {
     struct drmu_env_s * du;
     struct drmu_crtc_s * dc;    // NULL if not in use
@@ -151,9 +150,9 @@ typedef struct drmu_plane_s {
         uint32_t src_y;
     } pid;
 
-    // Next, Current, Prev FBs - might only need 2 if we have vsync CB
-    unsigned int fb_n;
-    drmu_fb_t * fbs[DRMU_PLANE_HOLD_COUNT];
+    // Current, Prev FBs
+    drmu_fb_t * fb_cur;
+    drmu_fb_t * fb_last;
 } drmu_plane_t;
 
 typedef struct drmu_crtc_s {
@@ -164,10 +163,27 @@ typedef struct drmu_crtc_s {
     int crtc_idx;
 } drmu_crtc_t;
 
+typedef struct drmu_atomic_fb_op_s {
+    drmu_plane_t * plane;
+    drmu_fb_t * fb;
+} drmu_atomic_fb_op_t;
+
 typedef struct drmu_atomic_s {
+    atomic_int ref_count;  // 0 == 1 ref for ease of init
+
     struct drmu_env_s * du;
     drmModeAtomicReqPtr a;
+
+    unsigned int fb_op_count;
+    drmu_atomic_fb_op_t * fb_ops;
 } drmu_atomic_t;
+
+typedef struct drmu_atomic_q_s {
+    pthread_mutex_t lock;
+    drmu_atomic_t * next_flip;
+    drmu_atomic_t * cur_flip;
+    drmu_atomic_t * last_flip;
+} drmu_atomic_q_t;
 
 typedef struct drmu_env_s {
     vlc_object_t * log;
@@ -179,10 +195,15 @@ typedef struct drmu_env_s {
     // atomic lock held whilst we accumulate atomic ops
     pthread_mutex_t atomic_lock;
     drmu_atomic_t * da;
+    // global env for atomic flip
+    drmu_atomic_q_t aq;
 
     struct pollqueue * pq;
     struct polltask * pt;
 } drmu_env_t;
+
+static void drmu_fb_unref(drmu_fb_t ** const ppdfb);
+static drmu_fb_t * drmu_fb_ref(drmu_fb_t * const dfb);
 
 static uint32_t
 drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc)
@@ -323,30 +344,161 @@ drmu_rect_wh(const unsigned int w, const unsigned int h)
 }
 
 static void
-drmu_atomic_delete(drmu_atomic_t ** const ppda)
+drmu_atomic_fb_ops_flip(drmu_atomic_t * const da)
+{
+    drmu_atomic_fb_op_t *op = da->fb_ops;
+    unsigned int i = 0;
+
+    for (i = 0; i != da->fb_op_count; ++i, ++op) {
+        drmu_plane_t * const dp = op->plane;
+        drmu_fb_unref(&dp->fb_last);
+        dp->fb_last = op->fb;
+
+        op->plane = NULL;
+        op->fb = NULL;
+    }
+}
+
+static void
+drmu_atomic_fb_ops_add(drmu_atomic_t * const da, drmu_plane_t * const dp, drmu_fb_t * const dfb)
+{
+    drmu_atomic_fb_op_t *op = da->fb_ops;
+    unsigned int i = 0;
+
+    for (i = 0; i != da->fb_op_count; ++i, ++op) {
+        if (op->plane == dp) {
+            drmu_fb_unref(&op->fb);
+            break;
+        }
+    }
+    if (i == da->fb_op_count)
+        da->fb_op_count = i + 1;
+
+    op->plane = dp;
+    op->fb = drmu_fb_ref(dfb);
+}
+
+static void
+drmu_atomic_free(drmu_atomic_t * const da)
+{
+    for (unsigned int i = 0; i != da->fb_op_count; ++i)
+        drmu_fb_unref(&da->fb_ops[i].fb);
+    free(da->fb_ops);
+    if (da->a != NULL)
+        drmModeAtomicFree(da->a);
+    free(da);
+}
+
+static void
+drmu_atomic_unref(drmu_atomic_t ** const ppda)
 {
     drmu_atomic_t * const da = *ppda;
 
     if (da == NULL)
         return;
+    *ppda = NULL;
 
-    if (da->a != NULL)
-        drmModeAtomicFree(da->a);
-    free(da);
+    if (atomic_fetch_sub(&da->ref_count, 1) == 0)
+        drmu_atomic_free(da);
 }
+
+static drmu_atomic_t *
+drmu_atomic_ref(drmu_atomic_t * const da)
+{
+    atomic_fetch_add(&da->ref_count, 1);
+    return da;
+}
+
 
 static int
 drmu_atomic_commit(drmu_atomic_t * const da)
 {
     drmu_env_t * const du = da->du;
 
-    if (drmModeAtomicCommit(du->fd, da->a, DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT, du) != 0) {
-        int err = errno;
+    if (drmModeAtomicCommit(du->fd, da->a,
+                            DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT,
+                            da) != 0) {
+        const int err = errno;
         drmu_err(du, "%s: drmModeAtomicCommit failed: %s", __func__, strerror(err));
         return -err;
     }
 
     return 0;
+}
+
+static void
+drmu_atomic_page_flip_cb(int fd, unsigned int sequence, unsigned int tv_sec, unsigned int tv_usec, unsigned int crtc_id, void *user_data)
+{
+    drmu_atomic_t * const da = user_data;
+    drmu_env_t * const du = da->du;
+    drmu_atomic_q_t * const aq = &du->aq;
+
+    (void)fd;
+    (void)sequence;
+    (void)tv_sec;
+    (void)tv_usec;
+    (void)crtc_id;
+
+    pthread_mutex_lock(&aq->lock);
+
+    if (da != aq->cur_flip) {
+        drmu_err(du, "%s: User data el (%p) != cur (%p)", __func__, da, aq->cur_flip);
+    }
+
+    drmu_atomic_unref(&aq->last_flip);
+    aq->last_flip = aq->cur_flip;
+    aq->cur_flip = NULL;
+
+    if (aq->next_flip != NULL) {
+        if (drmu_atomic_commit(aq->next_flip) == 0) {
+            aq->cur_flip = aq->next_flip;
+            aq->next_flip = NULL;
+
+            // Sort out fb references
+            drmu_atomic_fb_ops_flip(da);
+        }
+        else {
+            drmu_atomic_unref(&aq->next_flip);
+        }
+    }
+
+    pthread_mutex_unlock(&aq->lock);
+}
+
+static int
+drmu_atomic_queue(drmu_atomic_t * da)
+{
+    int rv = 0;
+    drmu_env_t * const du = da->du;
+    drmu_atomic_q_t * const aq = &du->aq;
+
+    pthread_mutex_lock(&aq->lock);
+
+    if (aq->next_flip != NULL || aq->cur_flip != NULL) {
+        drmu_atomic_unref(&aq->next_flip);
+        aq->next_flip = drmu_atomic_ref(da);
+    }
+    else {
+        // Mutex makes commit/asignment order safe
+        if ((rv = drmu_atomic_commit(da)) == 0)
+            aq->cur_flip = drmu_atomic_ref(da);
+    }
+
+    pthread_mutex_unlock(&aq->lock);
+    return rv;
+}
+
+static void
+drmu_atomic_q_uninit(drmu_atomic_q_t * const aq)
+{
+    pthread_mutex_destroy(&aq->lock);
+}
+
+static void
+drmu_atomic_q_init(drmu_atomic_q_t * const aq)
+{
+    aq->next_flip = NULL;
+    pthread_mutex_init(&aq->lock, NULL);
 }
 
 static int
@@ -369,13 +521,21 @@ drmu_atomic_new(drmu_env_t * const du)
     }
     da->du = du;
 
+    if ((da->fb_ops = calloc(du->plane_count, sizeof(*da->fb_ops))) == NULL) {
+        drmu_err(du, "%s: Failed to alloc ops", __func__);
+        goto fail;
+    }
+
     if ((da->a = drmModeAtomicAlloc()) == NULL) {
         drmu_err(du, "%s: Failed to alloc atomic context", __func__);
-        free(da);
-        return NULL;
+        goto fail;
     }
 
     return da;
+
+fail:
+    drmu_atomic_free(da);
+    return NULL;
 }
 
 static void
@@ -981,6 +1141,9 @@ plane_set_atomic(drmu_atomic_t * const da,
     drmu_atomic_add_prop(da, plid, dp->pid.src_y,  src_y);
     drmu_atomic_add_prop(da, plid, dp->pid.src_w,  src_w);
     drmu_atomic_add_prop(da, plid, dp->pid.src_h,  src_h);
+
+    // Remember for ref counting
+    drmu_atomic_fb_ops_add(da, dp, dfb);
     return 0;
 }
 
@@ -991,19 +1154,6 @@ drmu_plane_set(drmu_plane_t * const dp,
 {
     int rv;
     drmu_env_t * const du = dp->du;
-
-    // VSYNC rather than this simplistic circular buffer?
-    drmu_fb_t **ppdfb = dp->fbs + dp->fb_n;
-
-    // Do nothing if the same as last time
-    if (*ppdfb == dfb)
-        return 0;
-
-    dp->fb_n = dp->fb_n + 1 >= DRMU_PLANE_HOLD_COUNT ? 0 : dp->fb_n + 1;
-    ppdfb = dp->fbs + dp->fb_n;
-
-    drmu_fb_unref(ppdfb);
-    *ppdfb = drmu_fb_ref(dfb);
 
     if (du->da != NULL) {
         if (dfb == NULL) {
@@ -1023,13 +1173,18 @@ drmu_plane_set(drmu_plane_t * const dp,
                 0, 0,
                 0, 0, 0, 0,
                 0, 0, 0, 0);
-            }
+        }
         else {
             rv = drmModeSetPlane(du->fd, dp->plane->plane_id, drmu_crtc_id(dp->dc),
                 dfb->handle, flags,
                 pos.x, pos.y, pos.w, pos.h,
                 dfb->cropped.x << 16, dfb->cropped.y << 16, dfb->cropped.w << 16, dfb->cropped.h << 16);
-            }
+        }
+        if (rv == 0) {
+            drmu_fb_unref(&dp->fb_last);
+            dp->fb_last = dp->fb_cur;
+            dp->fb_cur = drmu_fb_ref(dfb);
+        }
     }
     return rv != 0 ? -errno : 0;
 }
@@ -1051,14 +1206,14 @@ static void
 drmu_plane_delete(drmu_plane_t ** const ppdp)
 {
     drmu_plane_t * const dp = *ppdp;
-    unsigned int i;
 
     if (dp == NULL)
         return;
     *ppdp = NULL;
 
-    for (i = 0; i != DRMU_PLANE_HOLD_COUNT; ++i)
-        drmu_fb_unref(dp->fbs + i);
+    // ??? Ensure we kill the plane on the display ???
+    drmu_fb_unref(&dp->fb_cur);
+    drmu_fb_unref(&dp->fb_last);
 
     dp->dc = NULL;
 }
@@ -1199,7 +1354,7 @@ drmu_env_atomic_abort(drmu_env_t * const du)
     if (du->da == NULL)
         return;
 
-    drmu_atomic_delete(&du->da);
+    drmu_atomic_unref(&du->da);
     pthread_mutex_unlock(&du->atomic_lock);
 }
 
@@ -1451,29 +1606,10 @@ drmu_env_delete(drmu_env_t ** const ppdu)
     free_planes(du);
 
     close(du->fd);
+    drmu_atomic_q_uninit(&du->aq);
     pthread_mutex_destroy(&du->atomic_lock);
     free(du);
 }
-
-static void
-vblank_cb(int fd, unsigned int sequence, unsigned int tv_sec, unsigned int tv_usec, void *user_data)
-{
-    (void)fd;
-    (void)tv_sec;
-    (void)tv_usec;
-    fprintf(stderr, "%s: seq=%d, user=%p\n", __func__, sequence, user_data);
-}
-
-static void
-page_flip_cb(int fd, unsigned int sequence, unsigned int tv_sec, unsigned int tv_usec, unsigned int crtc_id, void *user_data)
-{
-    (void)fd;
-    (void)tv_sec;
-    (void)tv_usec;
-    (void)crtc_id;
-    fprintf(stderr, "%s: seq=%d, user=%p\n", __func__, sequence, user_data);
-}
-
 
 static void
 drmu_env_polltask_cb(void * v, short revents)
@@ -1481,8 +1617,7 @@ drmu_env_polltask_cb(void * v, short revents)
     drmu_env_t * const du = v;
     drmEventContext ctx = {
         .version = DRM_EVENT_CONTEXT_VERSION,
-        .vblank_handler = vblank_cb,
-        .page_flip_handler2 = page_flip_cb,
+        .page_flip_handler2 = drmu_atomic_page_flip_cb,
     };
 
     if (revents == 0) {
@@ -1510,6 +1645,7 @@ drmu_env_new_fd(vlc_object_t * const log, const int fd)
     du->log = log;
     du->fd = fd;
     pthread_mutex_init(&du->atomic_lock, NULL);
+    drmu_atomic_q_init(&du->aq);
 
     if ((du->pq = pollqueue_new()) == NULL) {
         drmu_err(du, "Failed to create pollqueue");
@@ -1723,9 +1859,9 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
 
     da = drmu_env_atomic_finish(sys->du);
 
-    drmu_atomic_commit(da);
+    drmu_atomic_queue(da);
 
-    drmu_atomic_delete(&da);
+    drmu_atomic_unref(&da);
 
     return;
 }
