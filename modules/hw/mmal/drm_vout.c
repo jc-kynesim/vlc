@@ -105,6 +105,9 @@ typedef struct drmu_fb_s {
     size_t map_size;
     size_t map_pitch;
 
+    uint32_t pitches[4];
+    uint32_t offsets[4];
+
     void * pre_delete_v;
     drmu_fb_pre_delete_fn pre_delete_fn;
 
@@ -205,6 +208,9 @@ typedef struct drmu_env_s {
 static void drmu_fb_unref(drmu_fb_t ** const ppdfb);
 static drmu_fb_t * drmu_fb_ref(drmu_fb_t * const dfb);
 
+// N.B. DRM seems to order its format descriptor names the opposite way round to VLC
+// DRM is hi->lo within a little-endian word, VLC is byte order
+
 static uint32_t
 drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc)
 {
@@ -216,13 +222,13 @@ drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc)
             const uint32_t g = vf_vlc->i_gmask;
             const uint32_t b = vf_vlc->i_bmask;
             if (r == 0xff0000 && g == 0xff00 && b == 0xff)
-                return DRM_FORMAT_BGRX8888;
-            if (r == 0xff && g == 0xff00 && b == 0xff0000)
-                return DRM_FORMAT_RGBX8888;
-            if (r == 0xff000000 && g == 0xff0000 && b == 0xff00)
-                return DRM_FORMAT_XBGR8888;
-            if (r == 0xff00 && g == 0xff0000 && b == 0xff000000)
                 return DRM_FORMAT_XRGB8888;
+            if (r == 0xff && g == 0xff00 && b == 0xff0000)
+                return DRM_FORMAT_XBGR8888;
+            if (r == 0xff000000 && g == 0xff0000 && b == 0xff00)
+                return DRM_FORMAT_RGBX8888;
+            if (r == 0xff00 && g == 0xff0000 && b == 0xff000000)
+                return DRM_FORMAT_BGRX8888;
             break;
         }
         case VLC_CODEC_RGB16:
@@ -232,18 +238,35 @@ drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc)
             const uint32_t g = vf_vlc->i_gmask;
             const uint32_t b = vf_vlc->i_bmask;
             if (r == 0xf800 && g == 0x7e0 && b == 0x1f)
-                return DRM_FORMAT_BGR565;
-            if (r == 0x1f && g == 0x7e0 && b == 0xf800)
                 return DRM_FORMAT_RGB565;
+            if (r == 0x1f && g == 0x7e0 && b == 0xf800)
+                return DRM_FORMAT_BGR565;
             break;
         }
         case VLC_CODEC_RGBA:
-            return DRM_FORMAT_RGBA8888;
+            return DRM_FORMAT_ABGR8888;
         case VLC_CODEC_BGRA:
-            return DRM_FORMAT_BGRA8888;
-        case VLC_CODEC_ARGB:
             return DRM_FORMAT_ARGB8888;
+        case VLC_CODEC_ARGB:
+            return DRM_FORMAT_BGRA8888;
         // VLC_CODEC_ABGR does not exist in VLC
+        case VLC_CODEC_VUYA:
+            return DRM_FORMAT_AYUV;
+        // AYUV appears to be the only DRM YUVA-like format
+        case VLC_CODEC_VYUY:
+            return DRM_FORMAT_YUYV;
+        case VLC_CODEC_UYVY:
+            return DRM_FORMAT_YVYU;
+        case VLC_CODEC_YUYV:
+            return DRM_FORMAT_VYUY;
+        case VLC_CODEC_YVYU:
+            return DRM_FORMAT_UYVY;
+        case VLC_CODEC_NV12:
+            return DRM_FORMAT_NV12;
+        case VLC_CODEC_NV21:
+            return DRM_FORMAT_NV21;
+        case VLC_CODEC_I420:
+            return DRM_FORMAT_YUV420;
         default:
             break;
     }
@@ -262,13 +285,29 @@ drmu_format_vlc_to_vlc(const uint32_t vf_drm)
         case DRM_FORMAT_BGR565:
         case DRM_FORMAT_RGB565:
             return VLC_CODEC_RGB16;
-        case DRM_FORMAT_RGBA8888:
+        case DRM_FORMAT_ABGR8888:
             return VLC_CODEC_RGBA;
-        case DRM_FORMAT_BGRA8888:
-            return VLC_CODEC_BGRA;
         case DRM_FORMAT_ARGB8888:
+            return VLC_CODEC_BGRA;
+        case DRM_FORMAT_BGRA8888:
             return VLC_CODEC_ARGB;
         // VLC_CODEC_ABGR does not exist in VLC
+        case DRM_FORMAT_AYUV:
+            return VLC_CODEC_VUYA;
+        case DRM_FORMAT_YUYV:
+            return VLC_CODEC_VYUY;
+        case DRM_FORMAT_YVYU:
+            return VLC_CODEC_UYVY;
+        case DRM_FORMAT_VYUY:
+            return VLC_CODEC_YUYV;
+        case DRM_FORMAT_UYVY:
+            return VLC_CODEC_YVYU;
+        case DRM_FORMAT_NV12:
+            return VLC_CODEC_NV12;
+        case DRM_FORMAT_NV21:
+            return VLC_CODEC_NV21;
+        case DRM_FORMAT_YUV420:
+            return VLC_CODEC_I420;
         default:
             break;
     }
@@ -609,8 +648,9 @@ drmu_fb_ref(drmu_fb_t * const dfb)
     return dfb;
 }
 
+// Bits per pixel on plane 0
 static unsigned int
-drmu_fb_pixel_bits(const drmu_fb_t * const dfb, unsigned int plane_n)
+drmu_fb_pixel_bits(const drmu_fb_t * const dfb)
 {
     switch (dfb->format) {
         case DRM_FORMAT_XRGB8888:
@@ -621,12 +661,79 @@ drmu_fb_pixel_bits(const drmu_fb_t * const dfb, unsigned int plane_n)
         case DRM_FORMAT_ABGR8888:
         case DRM_FORMAT_RGBA8888:
         case DRM_FORMAT_BGRA8888:
-            return plane_n == 0 ? 32 : 0;
+        case DRM_FORMAT_AYUV:
+            return 32;
+        case DRM_FORMAT_YUYV:
+        case DRM_FORMAT_YVYU:
+        case DRM_FORMAT_VYUY:
+        case DRM_FORMAT_UYVY:
+            return 16;
+        case DRM_FORMAT_NV12:
+        case DRM_FORMAT_NV21:
+        case DRM_FORMAT_YUV420:
+            return 8;
         default:
             break;
     }
     return 0;
 }
+
+// For allocation purposes given fb_pixel bits how tall
+// does the frame have to be to fit all planes
+static unsigned int
+fb_total_height(const drmu_fb_t * const dfb, unsigned int h)
+{
+    switch (dfb->format) {
+        case DRM_FORMAT_NV12:
+        case DRM_FORMAT_NV21:
+        case DRM_FORMAT_YUV420:
+            return h * 3 / 2;
+        default:
+            break;
+    }
+    return h;
+}
+
+static void
+fb_pitches_set(drmu_fb_t * const dfb)
+{
+    memset(dfb->offsets, 0, sizeof(dfb->offsets));
+    memset(dfb->pitches, 0, sizeof(dfb->pitches));
+
+    switch (dfb->format) {
+        case DRM_FORMAT_XRGB8888:
+        case DRM_FORMAT_XBGR8888:
+        case DRM_FORMAT_RGBX8888:
+        case DRM_FORMAT_BGRX8888:
+        case DRM_FORMAT_ARGB8888:
+        case DRM_FORMAT_ABGR8888:
+        case DRM_FORMAT_RGBA8888:
+        case DRM_FORMAT_BGRA8888:
+        case DRM_FORMAT_AYUV:
+        case DRM_FORMAT_YUYV:
+        case DRM_FORMAT_YVYU:
+        case DRM_FORMAT_VYUY:
+        case DRM_FORMAT_UYVY:
+            dfb->pitches[0] = dfb->map_pitch;
+            break;
+        case DRM_FORMAT_NV12:
+        case DRM_FORMAT_NV21:
+            dfb->pitches[0] = dfb->map_pitch;
+            dfb->pitches[1] = dfb->map_pitch;
+            dfb->offsets[1] = dfb->pitches[0] * dfb->height;
+            break;
+        case DRM_FORMAT_YUV420:
+            dfb->pitches[0] = dfb->map_pitch;
+            dfb->pitches[1] = dfb->map_pitch / 2;
+            dfb->pitches[2] = dfb->map_pitch / 2;
+            dfb->offsets[1] = dfb->pitches[0] * dfb->height;
+            dfb->offsets[2] = dfb->offsets[1] + dfb->pitches[1] * dfb->height / 2;
+            break;
+        default:
+            break;
+    }
+}
+
 
 static void
 pic_fb_delete_cb(drmu_fb_t * dfb, void * v)
@@ -668,7 +775,7 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
     dfb->cropped = drmu_rect_wh(w, h);
     dfb->format = format;
 
-    if ((bpp = drmu_fb_pixel_bits(dfb, 0)) == 0) {
+    if ((bpp = drmu_fb_pixel_bits(dfb)) == 0) {
         drmu_err(du, "%s: Unexpected format %#x", __func__, format);
         goto fail;
     }
@@ -680,7 +787,7 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
 
     {
         struct drm_mode_create_dumb dumb = {
-            .height = dfb->height,
+            .height = fb_total_height(dfb, dfb->height),
             .width = dfb->width,
             .bpp = bpp
         };
@@ -718,13 +825,18 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
     }
 
     {
-        uint32_t pitches[4] = { dfb->map_pitch };
-        uint32_t offsets[4] = { 0 };
         uint32_t bo_handles[4] = { aux->handle };
+
+        fb_pitches_set(dfb);
+
+        if (dfb->pitches[1] != 0)
+            bo_handles[1] = aux->handle;
+        if (dfb->pitches[2] != 0)
+            bo_handles[2] = aux->handle;
 
         if (drmModeAddFB2WithModifiers(du->fd,
                                        dfb->width, dfb->height, dfb->format,
-                                       bo_handles, pitches, offsets, NULL,
+                                       bo_handles, dfb->pitches, dfb->offsets, NULL,
                                        &dfb->handle, 0) != 0)
         {
             drmu_err(du, "%s: drmModeAddFB2WithModifiers failed: %s\n", __func__, ERRSTR);
@@ -772,9 +884,6 @@ drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_
 static drmu_fb_t *
 drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
 {
-
-    uint32_t pitches[4] = { 0 };
-    uint32_t offsets[4] = { 0 };
     uint64_t modifiers[4] = { 0 };
     uint32_t bo_object_handles[4] = { 0 };
     uint32_t bo_handles[4] = { 0 };
@@ -824,8 +933,8 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
         {
             const AVDRMPlaneDescriptor *const p = desc->layers[i].planes + j;
             const AVDRMObjectDescriptor *const obj = desc->objects + p->object_index;
-            pitches[n] = p->pitch;
-            offsets[n] = p->offset;
+            dfb->pitches[n] = p->pitch;
+            dfb->offsets[n] = p->offset;
             modifiers[n] = obj->format_modifier;
             bo_handles[n] = bo_object_handles[p->object_index];
             ++n;
@@ -859,7 +968,7 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
 
     if (drmModeAddFB2WithModifiers(du->fd,
                                    dfb->width, dfb->height, dfb->format,
-                                   bo_handles, pitches, offsets, modifiers,
+                                   bo_handles, dfb->pitches, dfb->offsets, modifiers,
                                    &dfb->handle, DRM_MODE_FB_MODIFIERS /** 0 if no mods */) != 0)
     {
         drmu_err(du, "drmModeAddFB2WithModifiers failed: %s\n", ERRSTR);
@@ -876,18 +985,27 @@ fail:
 static plane_t
 drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
 {
-    const unsigned int bpp = drmu_fb_pixel_bits(dfb, plane_n);
+    const unsigned int bpp = drmu_fb_pixel_bits(dfb);
+    unsigned int hdiv = 1;
+    unsigned int wdiv = 1;
 
-    if (plane_n != 0 || bpp == 0)
-        return (plane_t){.p_pixels = NULL};
+    if (plane_n > 4 || dfb->pitches[plane_n] == 0) {
+        return (plane_t) {.p_pixels = NULL };
+    }
+
+    // Slightly kludgy derivation of height & width divs
+    if (plane_n > 0) {
+        wdiv = dfb->pitches[0] / dfb->pitches[plane_n];
+        hdiv = 2;
+    }
 
     return (plane_t){
-        .p_pixels = dfb->map_ptr,
-        .i_lines = dfb->height,
-        .i_pitch = dfb->map_pitch,
+        .p_pixels = (uint8_t *)dfb->map_ptr + dfb->offsets[plane_n],
+        .i_lines = dfb->height / hdiv,
+        .i_pitch = dfb->pitches[plane_n],
         .i_pixel_pitch = bpp / 8,
-        .i_visible_lines = dfb->cropped.h,
-        .i_visible_pitch = dfb->cropped.w * bpp / 8
+        .i_visible_lines = dfb->cropped.h / hdiv,
+        .i_visible_pitch = (dfb->cropped.w * bpp / 8) / wdiv
     };
 }
 
@@ -1624,7 +1742,6 @@ drmu_env_polltask_cb(void * v, short revents)
         drmu_warn(du, "%s: Timeout", __func__);
     }
     else {
-        drmu_warn(du, "%s: Handle", __func__);
         drmHandleEvent(du->fd, &ctx);
     }
 
@@ -1714,6 +1831,7 @@ typedef struct vout_display_sys_t {
     drmu_env_t * du;
     drmu_crtc_t * dc;
     drmu_plane_t * dp;
+    drmu_pool_t * pic_pool;
     drmu_pool_t * sub_fb_pool;
     drmu_plane_t * subplanes[SUBPICS_MAX];
     subpic_ent_t subpics[SUBPICS_MAX];
@@ -1721,6 +1839,33 @@ typedef struct vout_display_sys_t {
 
     uint32_t con_id;
 } vout_display_sys_t;
+
+static drmu_fb_t *
+copy_pic_to_fb(vout_display_t *vd, drmu_pool_t * const pool, picture_t * const src)
+{
+    const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format);
+    drmu_fb_t * fb;
+    int i;
+
+    if (drm_fmt == 0) {
+        msg_Warn(vd, "Failed drm format copy_pic: %#x", src->format.i_chroma);
+        return NULL;
+    }
+
+    fb = drmu_pool_fb_new_dumb(pool, src->format.i_width, src->format.i_height, drm_fmt);
+    if (fb == NULL) {
+        msg_Warn(vd, "Failed alloc for copy_pic: %dx%d", src->format.i_width, src->format.i_height);
+        return NULL;
+    }
+
+    for (i = 0; i != src->i_planes; ++i) {
+        plane_t dst_plane;
+        dst_plane = drmu_fb_vlc_plane(fb, i);
+        plane_CopyPixels(&dst_plane, src->p + i);
+    }
+
+    return fb;
+}
 
 static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
                            subpicture_t *subpicture, vlc_tick_t date)
@@ -1737,13 +1882,6 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
         for (subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
             picture_t * const src = sreg->p_picture;
             subpic_ent_t * const dst = sys->subpics + n;
-            plane_t dst_plane;
-            const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format);
-
-            if (drm_fmt == 0) {
-                msg_Warn(vd, "Failed drm format for subpic %d: %#x", n, src->format.i_chroma);
-                continue;
-            }
 
             if (dst->fb != NULL) {
                 // Should never happen - fbs consumed by display
@@ -1751,14 +1889,9 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
                 drmu_fb_unref(&dst->fb);
             }
 
-            dst->fb = drmu_pool_fb_new_dumb(sys->sub_fb_pool, src->format.i_width, src->format.i_height, drm_fmt);
-            if (dst->fb == NULL) {
-                msg_Warn(vd, "Failed alloc for subpic %d: %dx%d", n, src->format.i_width, src->format.i_height);
+            dst->fb = copy_pic_to_fb(vd, sys->sub_fb_pool, src);
+            if (dst->fb == NULL)
                 continue;
-            }
-
-            dst_plane = drmu_fb_vlc_plane(dst->fb, 0);
-            plane_CopyPixels(&dst_plane, src->p + 0);
 
             // *** More transform required
             dst->pos = (drmu_rect_t){
@@ -1825,10 +1958,18 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
         r = drmu_rect_vlc_place(&place);
     }
 
-    if ((dfb = drmu_fb_vlc_new_pic_attach(sys->du, p_pic)) == NULL) {
+    if (p_pic->format.i_chroma != VLC_CODEC_DRM_PRIME_OPAQUE) {
+        dfb = copy_pic_to_fb(vd, sys->pic_pool, p_pic);
+    }
+    else {
+        dfb = drmu_fb_vlc_new_pic_attach(sys->du, p_pic);
+    }
+
+    if (dfb == NULL) {
         msg_Err(vd, "Failed to create frme buffer from pic");
         return;
     }
+
 
     drmu_env_atomic_start(sys->du);
 
@@ -2008,6 +2149,8 @@ static int OpenDrmVout(vout_display_t *vd,
 
     if ((sys->sub_fb_pool = drmu_pool_new(sys->du, 10)) == NULL)
         goto fail;
+    if ((sys->pic_pool = drmu_pool_new(sys->du, 5)) == NULL)
+        goto fail;
 
     // **** Plane selection needs noticable improvement
     // This wants to be the primary
@@ -2027,7 +2170,7 @@ static int OpenDrmVout(vout_display_t *vd,
     }
     vd->info = (vout_display_info_t) {
 // We can scale but as it stands it looks like VLC is confused about coord
-// systems s.t. system message are in display space and subs are in source
+// systems s.t. system messages are in display space and subs are in source
 // with no way of distinguishing so we don't know what to scale by :-(
 //        .can_scale_spu = true,
         .subpicture_chromas = sys->subpic_chromas
