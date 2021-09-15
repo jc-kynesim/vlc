@@ -50,7 +50,7 @@
 #include "pollqueue.h"
 #include "../codec/avcodec/drm_pic.h"
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 #define SUBPICS_MAX 4
 
@@ -114,6 +114,7 @@ typedef struct drmu_fb_s {
     void * on_delete_v;
     drmu_fb_on_delete_fn on_delete_fn;
 
+    unsigned int seq; // Id for debug
 } drmu_fb_t;
 
 typedef struct drmu_fb_list_s {
@@ -128,6 +129,8 @@ typedef struct drmu_pool_s {
 
     pthread_mutex_t lock;
     int dead;
+
+    unsigned int seq;  // debug
 
     unsigned int fb_count;
     unsigned int fb_max;
@@ -173,6 +176,8 @@ typedef struct drmu_atomic_fb_op_s {
 
 typedef struct drmu_atomic_s {
     atomic_int ref_count;  // 0 == 1 ref for ease of init
+
+    unsigned int seq; // debug
 
     struct drmu_env_s * du;
     drmModeAtomicReqPtr a;
@@ -396,6 +401,7 @@ drmu_atomic_fb_ops_flip(drmu_atomic_t * const da)
         op->plane = NULL;
         op->fb = NULL;
     }
+    da->fb_op_count = 0;
 }
 
 static void
@@ -420,6 +426,8 @@ drmu_atomic_fb_ops_add(drmu_atomic_t * const da, drmu_plane_t * const dp, drmu_f
 static void
 drmu_atomic_free(drmu_atomic_t * const da)
 {
+    drmu_debug(da->du, "%s: ops=%d, seq=%d", __func__, da->fb_op_count, da->seq);
+
     for (unsigned int i = 0; i != da->fb_op_count; ++i)
         drmu_fb_unref(&da->fb_ops[i].fb);
     free(da->fb_ops);
@@ -478,6 +486,9 @@ drmu_atomic_page_flip_cb(int fd, unsigned int sequence, unsigned int tv_sec, uns
     (void)tv_usec;
     (void)crtc_id;
 
+    // Sort out fb references
+    drmu_atomic_fb_ops_flip(da);
+
     pthread_mutex_lock(&aq->lock);
 
     if (da != aq->cur_flip) {
@@ -492,9 +503,6 @@ drmu_atomic_page_flip_cb(int fd, unsigned int sequence, unsigned int tv_sec, uns
         if (drmu_atomic_commit(aq->next_flip) == 0) {
             aq->cur_flip = aq->next_flip;
             aq->next_flip = NULL;
-
-            // Sort out fb references
-            drmu_atomic_fb_ops_flip(da);
         }
         else {
             drmu_atomic_unref(&aq->next_flip);
@@ -510,15 +518,21 @@ drmu_atomic_queue(drmu_atomic_t * da)
     int rv = 0;
     drmu_env_t * const du = da->du;
     drmu_atomic_q_t * const aq = &du->aq;
+    static unsigned int seq = 0;
 
     pthread_mutex_lock(&aq->lock);
 
+    da->seq = ++seq;
+
     if (aq->next_flip != NULL || aq->cur_flip != NULL) {
+        drmu_debug(du, "%s: seq=%d, next=%p, cur=%p, da=%p", __func__, da->seq, aq->next_flip, aq->cur_flip, da);
+#warning Merge not discard
         drmu_atomic_unref(&aq->next_flip);
         aq->next_flip = drmu_atomic_ref(da);
     }
     else {
         // Mutex makes commit/asignment order safe
+        drmu_debug(du, "%s: seq=%d, commit %p", __func__, da->seq, da);
         if ((rv = drmu_atomic_commit(da)) == 0)
             aq->cur_flip = drmu_atomic_ref(da);
     }
@@ -750,11 +764,14 @@ typedef struct fb_dumb_s {
 static void
 dumb_fb_free_cb(drmu_fb_t * dfb, void * v)
 {
+    drmu_env_t * const du = dfb->du;
     fb_dumb_t * const aux = v;
     struct drm_mode_destroy_dumb destroy_env = {
         .handle = aux->handle
     };
-    drmIoctl(dfb->du->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_env);
+    drmu_debug(du, "Free dumb %p size: %zd", dfb, dfb->map_size);
+
+    drmIoctl(du->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_env);
     free(aux);
 }
 
@@ -843,6 +860,8 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
             goto fail;
         }
     }
+
+    drmu_debug(du, "Create dumb %p %dx%d / %dx%d size: %zd", dfb, dfb->width, dfb->height, dfb->cropped.w, dfb->cropped.h, dfb->map_size);
 
     return dfb;
 
@@ -1121,6 +1140,8 @@ pool_fb_pre_delete_cb(drmu_fb_t * dfb, void * v)
 {
     drmu_pool_t * pool = v;
 
+    drmu_debug(pool->du, "%s: pool %p fb %p seq %u", __func__, pool, dfb, dfb->seq);
+
     // Ensure we cannot end up in a delete loop
     drmu_fb_pre_delete_unset(dfb);
 
@@ -1133,7 +1154,11 @@ pool_fb_pre_delete_cb(drmu_fb_t * dfb, void * v)
     }
 
     drmu_fb_ref(dfb);  // Restore ref
+
+    pthread_mutex_lock(&pool->lock);
     fb_list_add_tail(&pool->free_fbs, dfb);
+    pthread_mutex_unlock(&pool->lock);
+
     // May cause suicide & recursion on fb delete, but that should be OK as
     // the 1 we return here should cause simple exit of fb delete
     drmu_pool_unref(&pool);
@@ -1144,8 +1169,11 @@ static drmu_fb_t *
 drmu_pool_fb_new_dumb(drmu_pool_t * const pool, uint32_t w, uint32_t h, const uint32_t format)
 {
     drmu_env_t * const du = pool->du;
-    drmu_fb_t * dfb = fb_list_peek_head(&pool->free_fbs);
+    drmu_fb_t * dfb;
 
+    pthread_mutex_lock(&pool->lock);
+
+    dfb = fb_list_peek_head(&pool->free_fbs);
     while (dfb != NULL) {
         if (fb_try_reuse(dfb, w, h, format)) {
             fb_list_extract(&pool->free_fbs, dfb);
@@ -1158,13 +1186,21 @@ drmu_pool_fb_new_dumb(drmu_pool_t * const pool, uint32_t w, uint32_t h, const ui
         if (pool->fb_count >= pool->fb_max && !fb_list_is_empty(&pool->free_fbs)) {
             --pool->fb_count;
             dfb = fb_list_extract_head(&pool->free_fbs);
-            drmu_fb_unref(&dfb);
         }
-
         ++pool->fb_count;
-        dfb = drmu_fb_realloc_dumb(du, NULL, w, h, format);
+        pthread_mutex_unlock(&pool->lock);
+
+        drmu_fb_unref(&dfb);  // Will free the dfb as pre-delete CB will be unset
+        if ((dfb = drmu_fb_realloc_dumb(du, NULL, w, h, format)) == NULL) {
+            --pool->fb_count;  // ??? lock
+            return NULL;
+        }
+    }
+    else {
+        pthread_mutex_unlock(&pool->lock);
     }
 
+    dfb->seq = ++pool->seq;
     drmu_fb_pre_delete_set(dfb, pool_fb_pre_delete_cb, pool);
     drmu_pool_ref(pool);
     return dfb;
@@ -1823,6 +1859,7 @@ typedef struct subpic_ent_s {
     drmu_fb_t * fb;
     drmu_rect_t pos;
     drmu_rect_t space;  // display space of pos
+    picture_t * pic;
 } subpic_ent_t;
 
 typedef struct vout_display_sys_t {
@@ -1836,6 +1873,8 @@ typedef struct vout_display_sys_t {
     drmu_plane_t * subplanes[SUBPICS_MAX];
     subpic_ent_t subpics[SUBPICS_MAX];
     vlc_fourcc_t * subpic_chromas;
+
+    drmu_atomic_t * display_set;
 
     uint32_t con_id;
 } vout_display_sys_t;
@@ -1872,8 +1911,11 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
 {
     vout_display_sys_t * const sys = vd->sys;
     unsigned int n = 0;
+    drmu_fb_t * dfb;
+    drmu_rect_t r;
+    unsigned int i;
+    int ret;
 
-    VLC_UNUSED(p_pic);
     VLC_UNUSED(date);
 
     // Attempt to import the subpics
@@ -1883,15 +1925,22 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
             picture_t * const src = sreg->p_picture;
             subpic_ent_t * const dst = sys->subpics + n;
 
-            if (dst->fb != NULL) {
-                // Should never happen - fbs consumed by display
-                msg_Warn(vd, "Subpic %d: still has fb attached", n);
+            // If the same picture then assume the same contents
+            // We keep a ref to the previous pic to ensure that teh same picture
+            // structure doesn't get reused and confuse us.
+            if (src != dst->pic) {
                 drmu_fb_unref(&dst->fb);
-            }
+                if (dst->pic != NULL) {
+                    picture_Release(dst->pic);
+                    dst->pic = NULL;
+                }
 
-            dst->fb = copy_pic_to_fb(vd, sys->sub_fb_pool, src);
-            if (dst->fb == NULL)
-                continue;
+                dst->fb = copy_pic_to_fb(vd, sys->sub_fb_pool, src);
+                if (dst->fb == NULL)
+                    continue;
+
+                dst->pic = picture_Hold(src);
+            }
 
             // *** More transform required
             dst->pos = (drmu_rect_t){
@@ -1911,46 +1960,15 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
 subpics_done:
 
     // Clear any other entries
-    for (; n != SUBPICS_MAX; ++n)
-        drmu_fb_unref(&sys->subpics[n].fb);
-
-#if TRACE_ALL
-    msg_Dbg(vd, "<<< %s", __func__);
-#endif
-}
-
-static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
-{
-    vout_display_sys_t *const sys = vd->sys;
-    drmu_fb_t * dfb;
-    int ret = 0;
-    drmu_rect_t r;
-    unsigned int i;
-    drmu_atomic_t * da;
-
-#if TRACE_ALL
-    msg_Dbg(vd, "<<< %s", __func__);
-#endif
-
-#if 0
-    {
-        drmVBlank vbl = {
-            .request = {
-                .type = DRM_VBLANK_RELATIVE,
-                .sequence = 1
-            }
-        };
-
-        while (drmWaitVBlank(de->drm_fd, &vbl))
-        {
-            if (errno != EINTR)
-            {
-                av_log(s, AV_LOG_WARNING, "drmWaitVBlank failed: %s\n", ERRSTR);
-                break;
-            }
+    for (; n != SUBPICS_MAX; ++n) {
+        subpic_ent_t * const dst = sys->subpics + n;
+        if (dst->pic != NULL) {
+            picture_Release(dst->pic);
+            dst->pic = NULL;
         }
+        drmu_fb_unref(&dst->fb);
     }
-#endif
+
 
     {
         vout_display_place_t place;
@@ -1969,7 +1987,6 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
         msg_Err(vd, "Failed to create frme buffer from pic");
         return;
     }
-
 
     drmu_env_atomic_start(sys->du);
 
@@ -1995,14 +2012,31 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
         {
             msg_Err(vd, "drmModeSetPlane for subplane %d failed: %s", i, strerror(-ret));
         }
-        drmu_fb_unref(&spe->fb);
     }
 
-    da = drmu_env_atomic_finish(sys->du);
+    if (sys->display_set != NULL) {
+        msg_Warn(vd, "sys->display_set != NULL");
+        drmu_atomic_unref(&sys->display_set);
+    }
+    sys->display_set = drmu_env_atomic_finish(sys->du);
 
-    drmu_atomic_queue(da);
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s", __func__);
+#endif
+}
 
-    drmu_atomic_unref(&da);
+static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
+{
+    vout_display_sys_t *const sys = vd->sys;
+    VLC_UNUSED(p_pic);
+
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s", __func__);
+#endif
+
+    drmu_atomic_queue(sys->display_set);
+
+    drmu_atomic_unref(&sys->display_set);
 
     return;
 }
@@ -2030,8 +2064,11 @@ static void CloseDrmVout(vout_display_t *vd)
 
     for (i = 0; i != SUBPICS_MAX; ++i)
         drmu_plane_delete(sys->subplanes + i);
-    for (i = 0; i != SUBPICS_MAX; ++i)
+    for (i = 0; i != SUBPICS_MAX; ++i) {
+        if (sys->subpics[i].pic != NULL)
+            picture_Release(sys->subpics[i].pic);
         drmu_fb_unref(&sys->subpics[i].fb);
+    }
 
     drmu_plane_delete(&sys->dp);
     drmu_crtc_delete(&sys->dc);

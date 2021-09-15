@@ -87,8 +87,6 @@ int decoder_UpdateVideoOutput( decoder_t *dec, vlc_video_context *vctx_out )
     if ( unlikely(dec->fmt_in.i_cat != VIDEO_ES || dec->cbs == NULL) )
         return -1;
 
-    msg_Info(dec, "<<< %s", __func__);
-
     /* */
     dec->fmt_out.video.i_chroma = dec->fmt_out.i_codec;
 

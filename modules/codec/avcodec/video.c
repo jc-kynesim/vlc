@@ -1253,7 +1253,6 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
                 p_pic->b_still = true;
             p_sys->b_first_frame = false;
             vlc_mutex_unlock(&p_sys->lock);
-            msg_Info(p_dec, "%s: Q Vid: %#x, PTS:%" PRId64, __func__, p_pic->format.i_chroma, p_pic->date);
             decoder_QueueVideo( p_dec, p_pic );
         }
         else
