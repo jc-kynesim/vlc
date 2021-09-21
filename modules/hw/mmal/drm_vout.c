@@ -1752,7 +1752,7 @@ drmu_env_delete(drmu_env_t ** const ppdu)
         return;
     *ppdu = NULL;
 
-    pollqueue_delete(&du->pq);
+    pollqueue_unref(&du->pq);
     polltask_delete(&du->pt);
 
     if (du->res != NULL)
@@ -1781,7 +1781,7 @@ drmu_env_polltask_cb(void * v, short revents)
         drmHandleEvent(du->fd, &ctx);
     }
 
-    pollqueue_add_task(du->pq, du->pt, 1000);
+    pollqueue_add_task(du->pt, 1000);
 }
 
 // Closes fd on failure
@@ -1804,7 +1804,7 @@ drmu_env_new_fd(vlc_object_t * const log, const int fd)
         drmu_err(du, "Failed to create pollqueue");
         goto fail1;
     }
-    if ((du->pt = polltask_new(du->fd, POLLIN | POLLPRI, drmu_env_polltask_cb, du)) == NULL) {
+    if ((du->pt = polltask_new(du->pq, du->fd, POLLIN | POLLPRI, drmu_env_polltask_cb, du)) == NULL) {
         drmu_err(du, "Failed to create polltask");
         goto fail1;
     }
@@ -1821,7 +1821,7 @@ drmu_env_new_fd(vlc_object_t * const log, const int fd)
         goto fail1;
     }
 
-    pollqueue_add_task(du->pq, du->pt, 1000);
+    pollqueue_add_task(du->pt, 1000);
 
     return du;
 

@@ -6,26 +6,42 @@
 struct polltask;
 struct pollqueue;
 
+// Create a new polltask
+// Holds a reference on the pollqueue until the polltask is deleted
+//
+// pq       pollqueue this task belongs to
 // fd       fd to poll
 // events   Events to wait for (POLLxxx)
 // revents  Event that triggered the callback
 //          0 => timeout
 // v        User pointer to callback
-struct polltask *polltask_new(const int fd, const short events,
-			      void (*const fn)(void *v, short revents),
-			      void *const v);
-// deletes the task - no locking so do not delete until not in use
+struct polltask *polltask_new(struct pollqueue *const pq,
+                              const int fd, const short events,
+                              void (*const fn)(void *v, short revents),
+                              void *const v);
+
+// deletes the task
+// Safe to call if *ppt == NULL
+// It is safe to call whilst a polltask is queued (and may be triggered)
+// Callback may occur whilst this is in progress but will not occur
+// once it is done. (*ppt is nulled only once the callback can not occur)
+// DO NOT CALL in a polltask callback
 void polltask_delete(struct polltask **const ppt);
 
 // timeout_ms == -1 => never
-void pollqueue_add_task(struct pollqueue *const pq, struct polltask *const pt,
-			const int timeout_ms);
-// Create a new pollqueue (starts thread)
+// May be called from the polltask callback
+// May only be added once (currently)
+void pollqueue_add_task(struct polltask *const pt, const int timeout);
+
+// Create a pollqueue
+// Generates a new thread to do the polltask callbacks
 struct pollqueue * pollqueue_new(void);
-// Stop and delete the pollqueue
-// Pending tasks may not run but any callback that is running will complete
-// Poll task will be dead by the time this returns so it is safe to delete all
-// polltask objects after calling this
-void pollqueue_delete(struct pollqueue **const ppq);
+
+// Unref a pollqueue
+// Will be deleted once all polltasks (Qed or otherwise) are deleted too
+void pollqueue_unref(struct pollqueue **const ppq);
+
+// Add a reference to a pollqueue
+struct pollqueue * pollqueue_ref(struct pollqueue *const pq);
 
 #endif /* POLLQUEUE_H_ */
