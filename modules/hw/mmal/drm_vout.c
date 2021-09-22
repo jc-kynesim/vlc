@@ -113,8 +113,6 @@ typedef struct drmu_fb_s {
 
     void * on_delete_v;
     drmu_fb_on_delete_fn on_delete_fn;
-
-    unsigned int seq; // Id for debug
 } drmu_fb_t;
 
 typedef struct drmu_fb_list_s {
@@ -176,8 +174,6 @@ typedef struct drmu_atomic_fb_op_s {
 
 typedef struct drmu_atomic_s {
     atomic_int ref_count;  // 0 == 1 ref for ease of init
-
-    unsigned int seq; // debug
 
     struct drmu_env_s * du;
     drmModeAtomicReqPtr a;
@@ -388,6 +384,17 @@ drmu_rect_wh(const unsigned int w, const unsigned int h)
 }
 
 static void
+drmu_bo_close(drmu_env_t * const du, uint32_t * const ph)
+{
+    const uint32_t h = *ph;
+    if (h) {
+        struct drm_gem_close gem_close = {.handle = h};
+        *ph = 0;
+        drmIoctl(du->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
+    }
+}
+
+static void
 drmu_atomic_fb_ops_flip(drmu_atomic_t * const da)
 {
     drmu_atomic_fb_op_t *op = da->fb_ops;
@@ -426,8 +433,6 @@ drmu_atomic_fb_ops_add(drmu_atomic_t * const da, drmu_plane_t * const dp, drmu_f
 static void
 drmu_atomic_free(drmu_atomic_t * const da)
 {
-    drmu_debug(da->du, "%s: ops=%d, seq=%d", __func__, da->fb_op_count, da->seq);
-
     for (unsigned int i = 0; i != da->fb_op_count; ++i)
         drmu_fb_unref(&da->fb_ops[i].fb);
     free(da->fb_ops);
@@ -513,7 +518,7 @@ drmu_atomic_page_flip_cb(int fd, unsigned int sequence, unsigned int tv_sec, uns
 }
 
 static int
-drmu_atomic_queue(drmu_atomic_t * da)
+atomic_queue(drmu_atomic_t * const da)
 {
     int rv = 0;
     drmu_env_t * const du = da->du;
@@ -522,22 +527,38 @@ drmu_atomic_queue(drmu_atomic_t * da)
 
     pthread_mutex_lock(&aq->lock);
 
-    da->seq = ++seq;
-
-    if (aq->next_flip != NULL || aq->cur_flip != NULL) {
-        drmu_debug(du, "%s: seq=%d, next=%p, cur=%p, da=%p", __func__, da->seq, aq->next_flip, aq->cur_flip, da);
-#warning Merge not discard
-        drmu_atomic_unref(&aq->next_flip);
+    if (aq->next_flip != NULL) {
+        // If we already have a next_flip then merge new changes into it
+        rv = drmModeAtomicMerge(aq->next_flip->a, da->a);
+    } else if (aq->cur_flip != NULL) {
+        // Q something to commit on next flip
         aq->next_flip = drmu_atomic_ref(da);
     }
     else {
+        // No pending commit
         // Mutex makes commit/asignment order safe
-        drmu_debug(du, "%s: seq=%d, commit %p", __func__, da->seq, da);
         if ((rv = drmu_atomic_commit(da)) == 0)
             aq->cur_flip = drmu_atomic_ref(da);
     }
 
     pthread_mutex_unlock(&aq->lock);
+    return rv;
+}
+
+// Consumes the passed atomic structure as there is a possiblity that it will
+// be modified (if something ends up being merged with it).
+static int
+drmu_atomic_queue(drmu_atomic_t ** ppda)
+{
+    drmu_atomic_t * da = *ppda;
+    int rv;
+
+    if (da == NULL)
+        return 0;
+    *ppda = NULL;
+
+    rv = atomic_queue(da);
+    drmu_atomic_unref(&da);
     return rv;
 }
 
@@ -748,15 +769,6 @@ fb_pitches_set(drmu_fb_t * const dfb)
     }
 }
 
-
-static void
-pic_fb_delete_cb(drmu_fb_t * dfb, void * v)
-{
-    VLC_UNUSED(dfb);
-
-    picture_Release(v);
-}
-
 typedef struct fb_dumb_s {
     uint32_t handle;
 } fb_dumb_t;
@@ -893,6 +905,22 @@ drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_
     return drmu_fb_new_dumb(du, w, h, format);
 }
 
+typedef struct fb_aux_pic_s {
+    picture_t * pic;
+    uint32_t bo_handles[AV_DRM_MAX_PLANES];
+} fb_aux_pic_t;
+
+static void
+pic_fb_delete_cb(drmu_fb_t * dfb, void * v)
+{
+    fb_aux_pic_t * const aux = v;
+    unsigned int i;
+
+    for (i = 0; i != AV_DRM_MAX_PLANES; ++i)
+        drmu_bo_close(dfb->du, aux->bo_handles + i);
+    picture_Release(aux->pic);
+}
+
 // VLC specific helper fb fns
 // *** If we make a lib from the drmu fns this should be separated to avoid
 //     unwanted library dependancies - For the general case we will need to
@@ -904,11 +932,11 @@ static drmu_fb_t *
 drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
 {
     uint64_t modifiers[4] = { 0 };
-    uint32_t bo_object_handles[4] = { 0 };
     uint32_t bo_handles[4] = { 0 };
     int i, j, n;
     drmu_fb_t * const dfb = alloc_fb(du);
     const AVDRMFrameDescriptor * const desc = drm_prime_get_desc(pic);
+    fb_aux_pic_t * aux = NULL;
 
     if (dfb == NULL) {
         drmu_err(du, "%s: Alloc failure", __func__);
@@ -931,13 +959,19 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
     };
 
     // Set delete callback & hold this pic
-    dfb->on_delete_v = picture_Hold(pic);
+    // Aux attached to dfb immediately so no fail cleanup required
+    if ((aux = calloc(1, sizeof(*aux))) == NULL) {
+        drmu_err(du, "%s: Aux alloc failure", __func__);
+        goto fail;
+    }
+    aux->pic = picture_Hold(pic);
+
+    dfb->on_delete_v = aux;
     dfb->on_delete_fn = pic_fb_delete_cb;
 
-    // bo handles don't seem to have a close or unref
     for (i = 0; i < desc->nb_objects; ++i)
     {
-        if (drmPrimeFDToHandle(du->fd, desc->objects[i].fd, bo_object_handles + i) != 0)
+        if (drmPrimeFDToHandle(du->fd, desc->objects[i].fd, aux->bo_handles + i) != 0)
         {
             drmu_warn(du, "%s: drmPrimeFDToHandle[%d](%d) failed: %s", __func__,
                       i, desc->objects[i].fd, ERRSTR);
@@ -955,7 +989,7 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
             dfb->pitches[n] = p->pitch;
             dfb->offsets[n] = p->offset;
             modifiers[n] = obj->format_modifier;
-            bo_handles[n] = bo_object_handles[p->object_index];
+            bo_handles[n] = aux->bo_handles[p->object_index];
             ++n;
         }
     }
@@ -1140,8 +1174,6 @@ pool_fb_pre_delete_cb(drmu_fb_t * dfb, void * v)
 {
     drmu_pool_t * pool = v;
 
-    drmu_debug(pool->du, "%s: pool %p fb %p seq %u", __func__, pool, dfb, dfb->seq);
-
     // Ensure we cannot end up in a delete loop
     drmu_fb_pre_delete_unset(dfb);
 
@@ -1200,7 +1232,6 @@ drmu_pool_fb_new_dumb(drmu_pool_t * const pool, uint32_t w, uint32_t h, const ui
         pthread_mutex_unlock(&pool->lock);
     }
 
-    dfb->seq = ++pool->seq;
     drmu_fb_pre_delete_set(dfb, pool_fb_pre_delete_cb, pool);
     drmu_pool_ref(pool);
     return dfb;
@@ -2034,10 +2065,7 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
 
-    drmu_atomic_queue(sys->display_set);
-
-    drmu_atomic_unref(&sys->display_set);
-
+    drmu_atomic_queue(&sys->display_set);
     return;
 }
 
