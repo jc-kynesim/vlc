@@ -142,6 +142,7 @@ static int DrmPrimeCreate(vlc_va_t *va, AVCodecContext *ctx, enum AVPixelFormat 
     m_pCodecContext->get_format = GetFormat;
     m_pCodecContext->get_buffer2 = GetBuffer;
 #endif
+    ctx->extra_hw_frames = 6;  // set blocking frame alloc for Pi H265 - unlikely to do anything elsewhere
     ctx->pix_fmt = AV_PIX_FMT_DRM_PRIME;
     ctx->time_base.num = 1;
     ctx->time_base.den = VLC_TIME_BASE;
