@@ -565,6 +565,9 @@ drmu_atomic_queue(drmu_atomic_t ** ppda)
 static void
 drmu_atomic_q_uninit(drmu_atomic_q_t * const aq)
 {
+    drmu_atomic_unref(&aq->next_flip);
+    drmu_atomic_unref(&aq->cur_flip);
+    drmu_atomic_unref(&aq->last_flip);
     pthread_mutex_destroy(&aq->lock);
 }
 
