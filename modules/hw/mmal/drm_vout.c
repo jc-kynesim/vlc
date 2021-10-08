@@ -1027,7 +1027,7 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
                                    bo_handles, dfb->pitches, dfb->offsets, modifiers,
                                    &dfb->handle, DRM_MODE_FB_MODIFIERS /** 0 if no mods */) != 0)
     {
-        drmu_err(du, "drmModeAddFB2WithModifiers failed: %s\n", ERRSTR);
+        drmu_err(du, "drmModeAddFB2WithModifiers failed: %s", ERRSTR);
         goto fail;
     }
 
@@ -2091,6 +2091,10 @@ static void CloseDrmVout(vout_display_t *vd)
     vout_display_sys_t *const sys = vd->sys;
     unsigned int i;
 
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s", __func__);
+#endif
+
     drmu_pool_delete(&sys->sub_fb_pool);
 
     for (i = 0; i != SUBPICS_MAX; ++i)
@@ -2112,6 +2116,9 @@ static void CloseDrmVout(vout_display_t *vd)
     vd->info.subpicture_chromas = NULL;
 
     free(sys);
+#if TRACE_ALL
+    msg_Dbg(vd, ">>> %s", __func__);
+#endif
 }
 
 static const struct vlc_display_operations ops = {
