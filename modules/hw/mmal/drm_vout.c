@@ -511,6 +511,7 @@ drmu_atomic_page_flip_cb(int fd, unsigned int sequence, unsigned int tv_sec, uns
         }
         else {
             drmu_atomic_unref(&aq->next_flip);
+            drmu_warn(du, "%s: Atomic commit failed", __func__);
         }
     }
 
@@ -528,9 +529,15 @@ atomic_queue(drmu_atomic_t * const da)
     pthread_mutex_lock(&aq->lock);
 
     if (aq->next_flip != NULL) {
-        // If we already have a next_flip then merge new changes into it
-        rv = drmModeAtomicMerge(aq->next_flip->a, da->a);
-    } else if (aq->cur_flip != NULL) {
+        // * This really should be a merge but that is tricky as we have to
+        //   manage refs and (at least at the moment) we always set everything
+        //   so the merge doesn't matter. (I'm also a bit dubious of libdrms
+        //   merge handling which looks like it was written by an intern with
+        //   little actual knowledge of C.)
+        drmu_atomic_unref(&aq->next_flip);
+        aq->next_flip = drmu_atomic_ref(da);
+    }
+    else if (aq->cur_flip != NULL) {
         // Q something to commit on next flip
         aq->next_flip = drmu_atomic_ref(da);
     }
@@ -539,6 +546,8 @@ atomic_queue(drmu_atomic_t * const da)
         // Mutex makes commit/asignment order safe
         if ((rv = drmu_atomic_commit(da)) == 0)
             aq->cur_flip = drmu_atomic_ref(da);
+        else
+            drmu_warn(du, "%s: Atomic commit failed", __func__);
     }
 
     pthread_mutex_unlock(&aq->lock);
