@@ -515,17 +515,19 @@ M3U8 * M3U8Parser::parse(vlc_object_t *p_object, stream_t *p_stream, const std::
                     desc += pair.second->getAttributeByName("NAME")->quotedString();
                 }
 
+                const Attribute *typeattr = pair.second->getAttributeByName("TYPE");
+
                 if(pair.second->getAttributeByName("CODECS"))
                 {
                     rep->addCodecs(pair.second->getAttributeByName("CODECS")->quotedString());
                 }
-                else
+                else if(typeattr)
                 {
-                    if(pair.second->getAttributeByName("TYPE")->value == "AUDIO")
+                    if(typeattr->value == "AUDIO")
                         rep->addCodecs("mp4a");
-                    else if(pair.second->getAttributeByName("TYPE")->value == "VIDEO")
+                    else if(typeattr->value == "VIDEO")
                         rep->addCodecs("avc1");
-                    else if(pair.second->getAttributeByName("TYPE")->value == "SUBTITLES")
+                    else if(typeattr->value == "SUBTITLES")
                         rep->addCodecs("wvtt");
                 }
 
@@ -539,23 +541,22 @@ M3U8 * M3U8Parser::parse(vlc_object_t *p_object, stream_t *p_stream, const std::
                 if(pair.second->getAttributeByName("DEFAULT"))
                 {
                     if(pair.second->getAttributeByName("DEFAULT")->value == "YES")
-                        altAdaptSet->setRole(Role(Role::ROLE_MAIN));
+                        altAdaptSet->setRole(Role(Role::Value::Main));
                     else
-                        altAdaptSet->setRole(Role(Role::ROLE_ALTERNATE));
+                        altAdaptSet->setRole(Role(Role::Value::Alternate));
                 }
 
                 if(pair.second->getAttributeByName("AUTOSELECT"))
                 {
                     if(pair.second->getAttributeByName("AUTOSELECT")->value == "NO" &&
                        !pair.second->getAttributeByName("DEFAULT"))
-                        altAdaptSet->setRole(Role(Role::ROLE_SUPPLEMENTARY));
+                        altAdaptSet->setRole(Role(Role::Value::Supplementary));
                 }
 
                 /* Subtitles unsupported for now */
-                const Attribute *typeattr = pair.second->getAttributeByName("TYPE");
                 if(typeattr->value == "SUBTITLES")
                 {
-                    altAdaptSet->setRole(Role(Role::ROLE_SUBTITLE));
+                    altAdaptSet->setRole(Role(Role::Value::Subtitle));
                     rep->streamFormat = StreamFormat(StreamFormat::Type::Unsupported);
                 }
                 else if(typeattr->value != "AUDIO" && typeattr->value != "VIDEO")

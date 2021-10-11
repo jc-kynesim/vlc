@@ -179,7 +179,9 @@ static vlc_plugin_t *module_InitStatic(vlc_plugin_cb entry)
  * not provided at runtime. However, although __MACH__ implies the same runtime
  * consequences for weak linking, it will still require the definition to exist
  * at build time. To workaround this, we add -Wl,-U,vlc_static_modules. */
-#if defined(__ELF__) || defined(__MACH__) || !HAVE_DYNAMIC_PLUGINS
+#if defined(__ELF__) \
+    || (defined(__MACH__) && defined(HAVE_DYLIB_DYNAMIC_LOOKUP)) \
+    || !HAVE_DYNAMIC_PLUGINS
 VLC_WEAK
 extern vlc_plugin_cb vlc_static_modules[];
 
@@ -568,7 +570,7 @@ static void AllocateAllPlugins (vlc_object_t *p_this)
     if (var_InheritBool(p_this, "reset-plugins-cache"))
         mode = (mode | CACHE_WRITE_FILE) & ~CACHE_READ_FILE;
 
-#if VLC_WINSTORE_APP
+#ifdef VLC_WINSTORE_APP
     /* Windows Store Apps can not load external plugins with absolute paths. */
     AllocatePluginPath (p_this, "plugins", mode);
 #else

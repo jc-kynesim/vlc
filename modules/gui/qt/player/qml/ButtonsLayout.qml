@@ -97,7 +97,7 @@ FocusScope {
             delegate: Loader {
                 id: buttonloader
 
-                sourceComponent: controlmodelbuttons.returnbuttondelegate(model.id)
+                source: PlayerControlbarControls.control(model.id).source
 
                 focus: (index === 0)
 
@@ -120,7 +120,7 @@ FocusScope {
                 }
 
                 onActiveFocusChanged: {
-                    if (activeFocus && !item.focus) {
+                    if (activeFocus && (!!item && !item.focus)) {
                         recoverFocus()
                     }
                 }

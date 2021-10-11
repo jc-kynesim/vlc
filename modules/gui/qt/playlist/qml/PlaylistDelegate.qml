@@ -27,82 +27,203 @@ import org.videolan.vlc 0.1
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-
-Rectangle {
+Control {
     id: delegate
+
+    // Properties
 
     readonly property int selectionLength: root.model.selectedCount
 
     readonly property bool isLastItem: (index === listView.modelCount - 1)
+
     readonly property bool selected : model.selected
 
-    property alias hovered: mouseArea.containsMouse
+    // Settings
 
-    height: artworkItem.height * 1.5
+    topPadding: VLCStyle.margin_xxsmall
 
-    color: {
-        if (selected)
-            return colors.gridSelect;
-        else if (hovered)
-            return colors.listHover;
-        else
-            return "transparent";
-    }
+    bottomPadding: VLCStyle.margin_xxsmall
 
-    border.width: (activeFocus) ? VLCStyle.focus_border : 0
+    leftPadding: VLCStyle.margin_normal
 
-    border.color: VLCStyle.colors.bgFocus
+    rightPadding: Math.max(listView.scrollBarWidth, VLCStyle.margin_normal)
+
+    ListView.delayRemove: mouseArea.drag.active
+
+    // Events
 
     onHoveredChanged: {
-        if(hovered)
-            showTooltip(false)
+        if (hovered)
+            adjustTooltip()
     }
 
-    onSelectedChanged: {
-        if(selected)
-            showTooltip(true)
+    onVisualFocusChanged: {
+        if (visualFocus)
+            adjustTooltip()
     }
 
-    function showTooltip(selectAction) {
-        plInfoTooltip.close()
-        plInfoTooltip.text = Qt.binding(function() { return (textInfo.text + '\n' + textArtist.text); })
-        plInfoTooltip.parent = textInfoColumn
-        if (selectionLength > 1 && selectAction)
-            plInfoTooltip.timeout = 2000
-        else
-            plInfoTooltip.timeout = 0
-        plInfoTooltip.visible = Qt.binding(function() { return ( (selectAction ? selected : hovered) && !overlayMenu.shown && mainInterface.playlistVisible &&
-                                                                (textInfo.implicitWidth > textInfo.width || textArtist.implicitWidth > textArtist.width)); })
-    }
+    // Connections
 
     Connections {
         target: listView
 
         onSetItemDropIndicatorVisible: {
             if (index === model.index) {
-                topDropIndicator.visible = Qt.binding(function() { return visible || higherDropArea.containsDragItem; })
+                topDropIndicator.visible = Qt.binding(function() { return visible || higherDropArea.containsDrag; })
             }
+        }
+    }
+
+    // Functions
+
+    function adjustTooltip() {
+        plInfoTooltip.close()
+        plInfoTooltip.text = Qt.binding(function() { return (textInfo.text + '\n' + textArtist.text); })
+        plInfoTooltip.parent = textInfoColumn
+        if (hovered)
+            plInfoTooltip.timeout = 0
+        else
+            plInfoTooltip.timeout = 2000
+        plInfoTooltip.visible = Qt.binding(function() { return ( (visualFocus || hovered) && !mouseArea.drag.active &&
+                                                                !overlayMenu.shown && mainInterface.playlistVisible &&
+                                                                (textInfo.implicitWidth > textInfo.width || textArtist.implicitWidth > textArtist.width) ) })
+    }
+
+    // Childs
+
+    background: Widgets.AnimatedBackground {
+        color: {
+            if (selected)
+                return colors.gridSelect;
+            else if (hovered)
+                return colors.listHover;
+            else
+                return colors.setColorAlpha(colors.gridSelect, 0);
+        }
+
+        active: visualFocus
+
+        activeBorderColor: colors.bgFocus
+
+        visible: animationRunning || active || selected || hovered
+    }
+
+    contentItem: RowLayout {
+        id: content
+
+        spacing: 0
+
+        Item {
+            id: artworkItem
+
+            Layout.preferredHeight: VLCStyle.icon_normal
+            Layout.preferredWidth: VLCStyle.icon_normal
+            Layout.alignment: Qt.AlignVCenter
+
+            DropShadow {
+                id: effect
+
+                anchors.fill: artwork
+                source: artwork
+                radius: 8
+                samples: 17
+                color: colors.glowColorBanner
+                visible: artwork.visible
+                spread: 0.1
+            }
+
+            Image {
+                id: artwork
+
+                mipmap: true
+                anchors.fill: parent
+                fillMode: Image.PreserveAspectFit
+                source: (model.artwork && model.artwork.toString()) ? model.artwork : VLCStyle.noArtCover
+                visible: !statusIcon.visible
+            }
+
+            Widgets.IconLabel {
+                id: statusIcon
+
+                anchors.fill: parent
+                visible: (model.isCurrent && text !== "")
+                width: height
+                height: VLCStyle.icon_normal
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                color: colors.accent
+                text: {
+                    if (player.playingState === PlayerController.PLAYING_STATE_PLAYING)
+                        return VLCIcons.volume_high
+                    if (player.playingState === PlayerController.PLAYING_STATE_PAUSED)
+                        return VLCIcons.pause
+                    return ""
+                }
+            }
+        }
+
+        ColumnLayout {
+            id: textInfoColumn
+
+            Layout.fillWidth: true
+            Layout.leftMargin: VLCStyle.margin_large
+            Layout.preferredHeight: artworkItem.height * 1.25
+            spacing: 0
+
+            Widgets.ListLabel {
+                id: textInfo
+
+                Layout.fillHeight: true
+                Layout.fillWidth: true
+
+                font.weight: model.isCurrent ? Font.Bold : Font.DemiBold
+                text: model.title
+                color: colors.text
+            }
+
+            Widgets.ListSubtitleLabel {
+                id: textArtist
+
+                Layout.fillHeight: true
+                Layout.fillWidth: true
+
+                font.weight: model.isCurrent ? Font.DemiBold : Font.Normal
+                text: (model.artist ? model.artist : i18n.qtr("Unknown Artist"))
+                color: colors.text
+            }
+        }
+
+        Widgets.ListLabel {
+            id: textDuration
+
+            text: model.duration
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            color: colors.text
+            opacity: 0.5
         }
     }
 
     Rectangle {
         id: topDropIndicator
 
-        anchors.left: parent.left
-        anchors.right: parent.right
+        anchors {
+            left: parent.left
+            right: parent.right
+            top: parent.top
+        }
 
-        height: VLCStyle.dp(1)
-        anchors.top: parent.top
+        visible: higherDropArea.containsDrag
 
-        visible: higherDropArea.containsDragItem
+        height: VLCStyle.dp(1, VLCStyle.scale)
+
         color: colors.accent
     }
 
     MouseArea {
         id: mouseArea
 
-        width: parent.width
-        implicitHeight: childrenRect.height
+        anchors.fill: parent
 
         hoverEnabled: true
 
@@ -163,7 +284,13 @@ Rectangle {
                     root.model.setSelection([index])
                 }
 
-                dragItem.index = index
+                if (contains(mapFromItem(dragItem.parent, dragItem.x, dragItem.y))) {
+                    // Force trigger entered signal in drop areas
+                    // so that containsDrag work properly
+                    dragItem.x = -1
+                    dragItem.y = -1
+                }
+
                 dragItem.Drag.active = drag.active
             }
             else {
@@ -173,165 +300,65 @@ Rectangle {
 
         onPositionChanged: {
             if (drag.active) {
-                var pos = drag.target.parent.mapFromItem(mouseArea, mouseX, mouseY)
-                dragItem.updatePos(pos)
+                // FIXME: Override dragItem's position
+                var pos = mapToItem(dragItem.parent, mouseX, mouseY)
+                dragItem.x = pos.x + VLCStyle.dp(15)
+                dragItem.y = pos.y // y should be changed after x
+            }
+        }
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 0
+
+        DropArea {
+            id: higherDropArea
+
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+
+            onEntered: {
+                if (!isDropAcceptable(drag, index)) {
+                    drag.accepted = false
+                    return
+                }
+            }
+
+            onDropped: {
+                root.acceptDrop(index, drop)
             }
         }
 
-        RowLayout {
-            id: content
+        DropArea {
+            id: lowerDropArea
 
-            height: delegate.height
-            spacing: 0
+            Layout.fillWidth: true
+            Layout.fillHeight: true
 
-            anchors {
-                left: parent.left
-                right: parent.right
-
-                leftMargin: VLCStyle.margin_normal
-                rightMargin: listView.scrollBarWidth
+            function handleDropIndicators(visible) {
+                if (isLastItem)
+                    listView.footerItem.setDropIndicatorVisible(visible)
+                else
+                    listView.setItemDropIndicatorVisible(index + 1, visible)
             }
 
-            Item {
-                id: artworkItem
-                Layout.preferredHeight: VLCStyle.icon_normal
-                Layout.preferredWidth: VLCStyle.icon_normal
-                Layout.alignment: Qt.AlignVCenter
-
-                DropShadow {
-                    id: effect
-                    anchors.fill: artwork
-                    source: artwork
-                    radius: 8
-                    samples: 17
-                    color: colors.glowColorBanner
-                    visible: artwork.visible
-                    spread: 0.1
+            onEntered: {
+                if (!isDropAcceptable(drag, index + 1)) {
+                    drag.accepted = false
+                    return
                 }
 
-                Image {
-                    id: artwork
-                    anchors.fill: parent
-                    fillMode: Image.PreserveAspectFit
-                    source: (model.artwork && model.artwork.toString()) ? model.artwork : VLCStyle.noArtCover
-                    visible: !statusIcon.visible
-                }
-
-                Widgets.IconLabel {
-                    id: statusIcon
-                    anchors.fill: parent
-                    visible: (model.isCurrent && text !== "")
-                    width: height
-                    height: VLCStyle.icon_normal
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    color: colors.accent
-                    text: player.playingState === PlayerController.PLAYING_STATE_PLAYING ? VLCIcons.volume_high :
-                                                    player.playingState === PlayerController.PLAYING_STATE_PAUSED ? VLCIcons.pause : ""
-                }
+                handleDropIndicators(true)
             }
 
-            ColumnLayout {
-                id: textInfoColumn
-                Layout.fillWidth: true
-                Layout.leftMargin: VLCStyle.margin_large
-                Layout.preferredHeight: artworkItem.height * 1.25
-                spacing: 0
-
-                Widgets.ListLabel {
-                    id: textInfo
-
-                    Layout.fillHeight: true
-                    Layout.fillWidth: true
-
-                    font.weight: model.isCurrent ? Font.Bold : Font.DemiBold
-                    text: model.title
-                    color: colors.text
-                }
-
-                Widgets.ListSubtitleLabel {
-                    id: textArtist
-
-                    Layout.fillHeight: true
-                    Layout.fillWidth: true
-
-                    font.weight: model.isCurrent ? Font.DemiBold : Font.Normal
-                    text: (model.artist ? model.artist : i18n.qtr("Unknown Artist"))
-                    color: colors.text
-                }
+            onExited: {
+                handleDropIndicators(false)
             }
 
-            Widgets.ListLabel {
-                id: textDuration
-                Layout.rightMargin: VLCStyle.margin_xsmall
-                Layout.preferredWidth: durationMetric.width
-                text: model.duration
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-                color: colors.text
-                opacity: 0.5
-            }
-        }
-
-        ColumnLayout {
-            anchors.fill: content
-            spacing: 0
-
-            DropArea {
-                id: higherDropArea
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                property bool containsDragItem: false
-
-                onEntered: {
-                    if (!isDropAcceptable(drag, index))
-                        return
-
-                    containsDragItem = true
-                }
-                onExited: {
-                    containsDragItem = false
-                }
-                onDropped: {
-                    if (!isDropAcceptable(drop, index))
-                        return
-
-                    root.acceptDrop(index, drop)
-
-                    containsDragItem = false
-                }
-            }
-
-            DropArea {
-                id: lowerDropArea
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                function handleDropIndicators(visible) {
-                    if (isLastItem)
-                        listView.footerItem.setDropIndicatorVisible(visible)
-                    else
-                        listView.setItemDropIndicatorVisible(index + 1, visible)
-                }
-
-                onEntered: {
-                    if (!isDropAcceptable(drag, index + 1))
-                        return
-
-                    handleDropIndicators(true)
-                }
-                onExited: {
-                    handleDropIndicators(false)
-                }
-                onDropped: {
-                    if(!isDropAcceptable(drop, index + 1))
-                        return
-
-                    root.acceptDrop(index + 1, drop)
-
-                    handleDropIndicators(false)
-                }
+            onDropped: {
+                root.acceptDrop(index + 1, drop)
+                handleDropIndicators(false)
             }
         }
     }

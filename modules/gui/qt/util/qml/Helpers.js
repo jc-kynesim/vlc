@@ -52,3 +52,14 @@ function get(dict, key, defaultValue) {
     var v = typeof dict !== "undefined" ? dict[key] : undefined
     return !v ? defaultValue : v
 }
+
+// NOTE: This allows us to force another 'reason' even when the item has activeFocus.
+function enforceFocus(item, reason) {
+    item.focus = false;
+
+    item.forceActiveFocus(reason);
+}
+
+function pointInRadius(x, y, radius) {
+     return (x * x + y * y < radius * radius)
+}

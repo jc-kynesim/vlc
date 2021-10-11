@@ -44,8 +44,10 @@ FocusScope {
     readonly property string coverSource: (mainPlaylistController.currentItem.artwork && mainPlaylistController.currentItem.artwork.toString())
                                           ? mainPlaylistController.currentItem.artwork
                                           : VLCStyle.noArtCover
-    readonly property VLCColors colors: (mainInterface.hasEmbededVideo || (coverLuminance.luminance < 140))
-                                        ? VLCStyle.nightColors : VLCStyle.dayColors
+
+    // NOTE: We force the night theme when playing a video.
+    readonly property VLCColors colors: (mainInterface.hasEmbededVideo) ? VLCStyle.nightColors
+                                                                        : VLCStyle.colors
 
     Keys.priority: Keys.AfterItem
     Keys.onPressed: {
@@ -103,13 +105,6 @@ FocusScope {
             }
             history.previous()
         }
-    }
-
-    ImageLuminanceExtractor {
-        id: coverLuminance
-
-        enabled: !rootPlayer.hasEmbededVideo
-        source: rootPlayer.coverSource
     }
 
     VideoSurface {
@@ -556,21 +551,26 @@ FocusScope {
             right: parent.right
             bottom: parent.bottom
             bottomMargin: parent.height - rootPlayer.positionSliderY
+            topMargin: VLCStyle.applicationVerticalMargin
         }
         focus: false
         edge: Widgets.DrawerExt.Edges.Right
         state: showPlaylist && mainInterface.playlistDocked ? "visible" : "hidden"
         component: Rectangle {
             color: rootPlayer.colors.setColorAlpha(rootPlayer.colors.topBanner, 0.8)
-            width: rootPlayer.width/4
+            width: (rootPlayer.width + playlistView.rightPadding) / 4
             height: playlistpopup.height
 
             PL.PlaylistListView {
                 id: playlistView
+
+                useAcrylic: false
                 focus: true
                 anchors.fill: parent
 
                 colors: rootPlayer.colors
+                rightPadding: VLCStyle.applicationHorizontalMargin
+
                 Navigation.parentItem: rootPlayer
                 Navigation.upItem: topcontrolView
                 Navigation.downItem: controlBarView

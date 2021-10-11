@@ -55,7 +55,7 @@ const struct
     /* Take a thumbnail of a file without video, which should timeout. */
     { 0, 1, VLC_TICK_INVALID, VLC_TICK_FROM_SEC( 60 ), .0f, false, true, VLC_TICK_FROM_MS( 100 ), false },
     /* Take a thumbnail of a file with a video track starting later */
-    { 1, 1, VLC_TICK_FROM_SEC( 120 ), VLC_TICK_FROM_SEC( 60 ), .0f, false, true,
+    { 1, 1, VLC_TICK_FROM_SEC( 60 ), VLC_TICK_FROM_SEC( 30 ), .0f, false, true,
         VLC_TICK_FROM_SEC( 2 ), true },
 };
 
@@ -151,7 +151,7 @@ static void test_thumbnails( libvlc_instance_t* p_vlc )
 
         while ( ctx.b_done == false )
         {
-            vlc_tick_t timeout = vlc_tick_now() + VLC_TICK_FROM_SEC( 1 );
+            vlc_tick_t timeout = vlc_tick_now() + VLC_TICK_FROM_SEC( 2 );
             res = vlc_cond_timedwait( &ctx.cond, &ctx.lock, timeout );
             assert( res != ETIMEDOUT );
         }
@@ -181,6 +181,7 @@ static void test_cancel_thumbnail( libvlc_instance_t* p_vlc )
     assert( p_thumbnailer != NULL );
 
     struct test_ctx ctx;
+    ctx.b_done = false;
     vlc_cond_init( &ctx.cond );
     vlc_mutex_init( &ctx.lock );
 

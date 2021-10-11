@@ -54,6 +54,7 @@
 #include "dialogs/epg/epg.hpp"
 #include "dialogs/errors/errors.hpp"
 #include "dialogs/playlists/playlists.hpp"
+#include "dialogs/firstrun/firstrunwizard.hpp"
 
 #include <QEvent>
 #include <QApplication>
@@ -98,6 +99,7 @@ DialogsProvider::~DialogsProvider()
     PodcastConfigDialog::killInstance();
     OpenDialog::killInstance();
     ErrorsDialog::killInstance();
+    FirstRunWizard::killInstance();
 
     delete popupMenu;
     delete videoPopupMenu;
@@ -260,6 +262,13 @@ void DialogsProvider::prefsDialog()
     PrefsDialog *p = new PrefsDialog( nullptr, p_intf );
     p->setAttribute(Qt::WA_DeleteOnClose);
     p->toggleVisible();
+}
+
+void DialogsProvider::firstRunDialog()
+{
+    FirstRunWizard *p = FirstRunWizard::getInstance( p_intf );
+    QVLCDialog::setWindowTransientParent(p, nullptr, p_intf);
+    p->show();
 }
 
 void DialogsProvider::extendedDialog()
@@ -576,14 +585,19 @@ void DialogsProvider::openUrlDialog()
     if( url.isEmpty() )
         return;
 
+    char *uri;
     if( !url.contains( qfu( "://" ) ) )
     {
-        char *uri = vlc_path2uri( qtu( url ), NULL );
-        if( uri == NULL )
-            return;
-        url = qfu(uri);
-        free( uri );
+        uri = vlc_path2uri( qtu( url ), NULL );
+    } else {
+        uri = vlc_uri_fixup( qtu( url ) );
     }
+
+    if( uri == NULL )
+        return;
+    url = qfu(uri);
+    free( uri );
+
     QVector<vlc::playlist::Media> medias = { {url, QString {}} };
     THEMPL->append(medias, !oud.shouldEnqueue());
 }

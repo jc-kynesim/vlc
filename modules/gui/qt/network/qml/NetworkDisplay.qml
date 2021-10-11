@@ -25,75 +25,89 @@ import org.videolan.vlc 0.1
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-FocusScope {
+Widgets.PageLoader {
     id: root
 
-    property var extraLocalActions: undefined
-    property bool isViewMultiView: true
-    property var tree: undefined
-    onTreeChanged:  loadView()
-    Component.onCompleted: loadView()
+    // Properties
 
-    property var contentModel
     property var sortModel
-
-    //reset view
-    function loadDefaultView() {
-        root.tree = undefined
-    }
+    property var contentModel
+    property bool isViewMultiView: true
 
     property Component localMenuDelegate
 
-    function loadView() {
-        var page = "";
-        var props = undefined;
-        if (root.tree === undefined) {
-            page ="qrc:///network/NetworkHomeDisplay.qml"
-            root.localMenuDelegate = null
-            isViewMultiView = false
-        } else {
-            page = "qrc:///network/NetworkBrowseDisplay.qml"
-            props = { providerModel: mediaModel, contextMenu: mediaContextMenu, tree: root.tree }
-            root.localMenuDelegate = addressBar
-            isViewMultiView = true
+    // Settings
+
+    defaultPage: "home"
+
+    pageModel: [{
+        name: "home",
+        url: "qrc:///network/NetworkHomeDisplay.qml"
+    }, {
+        name: "browse",
+        component: browseComponent,
+        guard: function (prop) { return !!prop.tree }
+    }]
+
+    // Events
+    onCurrentItemChanged: {
+        sortModel = currentItem.sortModel;
+        contentModel = currentItem.model;
+
+        isViewMultiView = (currentItem.isViewMultiView === undefined
+                           ||
+                           currentItem.isViewMultiView);
+
+        if (view.name === "browse")
+            localMenuDelegate = componentBar
+        else
+            localMenuDelegate = null
+    }
+
+    // Connections
+
+    Connections {
+        target: stackView.currentItem
+
+        onBrowse: {
+            history.push(["mc", "network", "browse", { tree: tree }]);
+            stackView.currentItem.setCurrentItemFocus(reason);
         }
-        view.replace(page, props)
-        if (view.currentItem.model)
-            root.contentModel = view.currentItem.model
-        root.sortModel = view.currentItem.sortModel
+    }
+
+    // Children
+
+    Component {
+        id: browseComponent
+
+        NetworkBrowseDisplay {
+            providerModel: NetworkMediaModel {
+                ctx: mainctx
+            }
+
+            contextMenu: NetworkMediaContextMenu {
+                model: providerModel
+            }
+        }
     }
 
     Component {
-        id: addressBar
+        id: componentBar
 
         NetworkAddressbar {
-            path: mediaModel.path
+            path: view.name === "browse" ? root.stackView.currentItem.providerModel.path : []
 
-            onHomeButtonClicked: history.push(["mc", "network"])
-        }
-    }
+            onHomeButtonClicked: {
+                history.push(["mc", "network", "home"])
 
-    NetworkMediaModel {
-        id: mediaModel
+                stackView.currentItem.setCurrentItemFocus(reason)
+            }
 
-        ctx: mainctx
-    }
+            onBrowse: {
+                history.push(["mc", "network", "browse", { "tree": tree }])
 
-    NetworkMediaContextMenu {
-        id: mediaContextMenu
-
-        model: mediaModel
-    }
-
-    Widgets.StackViewExt {
-        id: view
-
-        anchors.fill:parent
-        focus: true
-
-        onCurrentItemChanged: {
-            extraLocalActions = view.currentItem.extraLocalActions
-            view.currentItem.Navigation.parentItem = root
+                stackView.currentItem.setCurrentItemFocus(reason)
+            }
         }
     }
 }

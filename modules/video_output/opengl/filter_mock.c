@@ -87,8 +87,10 @@ struct sys {
     struct {
         GLint vertex_pos;
         GLint rotation_matrix;
+        GLint pic_to_tex; // mask only
         GLint vertex_color; // blend (non-mask) only
-        GLint plane;
+        GLint tex_coords_in; // plane only
+        GLint offset;
     } loc;
 
     float theta0;
@@ -184,6 +186,16 @@ DrawMask(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
     vt->UniformMatrix4fv(sys->loc.rotation_matrix, 1, GL_FALSE,
                          sys->rotation_matrix);
 
+    const float *mtx = sampler->pic_to_tex_matrix;
+    assert(mtx);
+
+    /* Expand the 3x2 matrix to 3x3 to store it in a mat3 uniform (for better
+     * compatibility). Both are in column-major order. */
+    float pic_to_tex[] = { mtx[0], mtx[1], 0,
+                           mtx[2], mtx[3], 0,
+                           mtx[4], mtx[5], 1 };
+    vt->UniformMatrix3fv(sys->loc.pic_to_tex, 1, GL_FALSE, pic_to_tex);
+
     vt->Clear(GL_COLOR_BUFFER_BIT);
     vt->DrawArrays(GL_TRIANGLES, 0, 3);
 
@@ -202,12 +214,41 @@ DrawPlane(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
     struct vlc_gl_sampler *sampler = vlc_gl_filter_GetSampler(filter);
     vlc_gl_sampler_Load(sampler);
 
-    vt->Uniform1i(sys->loc.plane, (int) meta->plane);
+    vt->Uniform1f(sys->loc.offset, 0.02 * meta->plane);
 
     vt->BindBuffer(GL_ARRAY_BUFFER, sys->vbo);
+
+    if (vlc_gl_sampler_MustRecomputeCoords(sampler))
+    {
+        float coords[] = {
+            0, 1,
+            0, 0,
+            1, 1,
+            1, 0,
+        };
+
+        /* Transform coordinates in place */
+        vlc_gl_sampler_PicToTexCoords(sampler, 4, coords, coords);
+
+        const float data[] = {
+            -1,  1, coords[0], coords[1],
+            -1, -1, coords[2], coords[3],
+             1,  1, coords[4], coords[5],
+             1, -1, coords[6], coords[7],
+        };
+        vt->BufferData(GL_ARRAY_BUFFER, sizeof(data), data, GL_STATIC_DRAW);
+    }
+
+    const GLsizei stride = 4 * sizeof(float);
+
     vt->EnableVertexAttribArray(sys->loc.vertex_pos);
-    vt->VertexAttribPointer(sys->loc.vertex_pos, 2, GL_FLOAT, GL_FALSE, 0,
+    vt->VertexAttribPointer(sys->loc.vertex_pos, 2, GL_FLOAT, GL_FALSE, stride,
                             (const void *) 0);
+
+    intptr_t offset = 2 * sizeof(float);
+    vt->EnableVertexAttribArray(sys->loc.tex_coords_in);
+    vt->VertexAttribPointer(sys->loc.tex_coords_in, 2, GL_FLOAT, GL_FALSE,
+                            stride, (const void *) offset);
 
     vt->Clear(GL_COLOR_BUFFER_BIT);
     vt->DrawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -292,10 +333,6 @@ InitBlend(struct vlc_gl_filter *filter)
     sys->loc.vertex_color = vt->GetAttribLocation(program_id, "vertex_color");
     assert(sys->loc.vertex_color != -1);
 
-    sys->loc.rotation_matrix = vt->GetUniformLocation(sys->program_id,
-                                                      "rotation_matrix");
-    assert(sys->loc.rotation_matrix != -1);
-
     vt->GenBuffers(1, &sys->vbo);
 
     static const GLfloat data[] = {
@@ -327,15 +364,18 @@ InitMask(struct vlc_gl_filter *filter)
     const opengl_vtable_t *vt = &filter->api->vt;
 
     struct vlc_gl_sampler *sampler = vlc_gl_filter_GetSampler(filter);
+    if (!sampler)
+        return VLC_EGENERIC;
 
     static const char *const VERTEX_SHADER_BODY =
         "attribute vec2 vertex_pos;\n"
         "uniform mat4 rotation_matrix;\n"
+        "uniform mat3 pix_to_tex;\n"
         "varying vec2 tex_coords;\n"
         "void main() {\n"
         "  vec4 pos = rotation_matrix * vec4(vertex_pos, 0.0, 1.0);\n"
-        "  tex_coords = vec2((pos.x + 1.0) / 2.0,\n"
-        "                    (pos.y + 1.0) / 2.0);\n"
+        "  vec2 pic_coords = (pos.xy + vec2(1.0)) / 2.0;\n"
+        "  tex_coords = (pix_to_tex * vec3(pic_coords, 1.0)).xy;\n"
         "  gl_Position = pos\n;"
         "}\n";
 
@@ -391,6 +431,9 @@ InitMask(struct vlc_gl_filter *filter)
                                                       "rotation_matrix");
     assert(sys->loc.rotation_matrix != -1);
 
+    sys->loc.pic_to_tex = vt->GetUniformLocation(sys->program_id, "pix_to_tex");
+    assert(sys->loc.pic_to_tex != -1);
+
     vt->GenBuffers(1, &sys->vbo);
 
     static const GLfloat data[] = {
@@ -425,22 +468,23 @@ InitPlane(struct vlc_gl_filter *filter)
     filter->config.filter_planes = true;
 
     struct vlc_gl_sampler *sampler = vlc_gl_filter_GetSampler(filter);
+    if (!sampler)
+        return VLC_EGENERIC;
 
     static const char *const VERTEX_SHADER_BODY =
         "attribute vec2 vertex_pos;\n"
+        "attribute vec2 tex_coords_in;\n"
         "varying vec2 tex_coords;\n"
+        "uniform float offset;\n"
         "void main() {\n"
         "  gl_Position = vec4(vertex_pos, 0.0, 1.0);\n"
-        "  tex_coords = vec2((vertex_pos.x + 1.0) / 2.0,\n"
-        "                    (vertex_pos.y + 1.0) / 2.0);\n"
+        "  tex_coords = tex_coords_in + offset;\n"
         "}\n";
 
     static const char *const FRAGMENT_SHADER_BODY =
         "varying vec2 tex_coords;\n"
-        "uniform int plane;\n"
         "void main() {\n"
-        "  vec2 offset = vec2(float(plane) * 0.02);\n"
-        "  gl_FragColor = vlc_texture(fract(tex_coords + offset));\n"
+        "  gl_FragColor = vlc_texture(fract(tex_coords));\n"
         "}\n";
 
     const char *extensions = sampler->shader.extensions
@@ -485,21 +529,14 @@ InitPlane(struct vlc_gl_filter *filter)
     sys->loc.vertex_pos = vt->GetAttribLocation(sys->program_id, "vertex_pos");
     assert(sys->loc.vertex_pos != -1);
 
-    sys->loc.plane = vt->GetUniformLocation(program_id, "plane");
-    assert(sys->loc.plane != -1);
+    sys->loc.tex_coords_in = vt->GetAttribLocation(sys->program_id,
+                                                   "tex_coords_in");
+    assert(sys->loc.tex_coords_in != -1);
 
-    static const GLfloat vertex_pos[] = {
-        -1,  1,
-        -1, -1,
-         1,  1,
-         1, -1,
-    };
+    sys->loc.offset = vt->GetUniformLocation(program_id, "offset");
+    assert(sys->loc.offset != -1);
 
     vt->BindBuffer(GL_ARRAY_BUFFER, sys->vbo);
-    vt->BufferData(GL_ARRAY_BUFFER, sizeof(vertex_pos), vertex_pos,
-                   GL_STATIC_DRAW);
-
-    vt->BindBuffer(GL_ARRAY_BUFFER, 0);
 
     static const struct vlc_gl_filter_ops ops = {
         .draw = DrawPlane,

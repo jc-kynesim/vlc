@@ -32,47 +32,39 @@ import "qrc:///style/"
 FocusScope {
     id: root
 
-    //---------------------------------------------------------------------------------------------
     // Properties
-    //---------------------------------------------------------------------------------------------
 
     // NOTE: Specify an optionnal header for the view.
     property Component header: undefined
 
-    property Item headerItem: (currentItem) ? currentItem.headerItem : undefined
+    property Item headerItem: (_currentView) ? _currentView.headerItem : undefined
 
-    readonly property int currentIndex: currentItem.currentIndex
+    readonly property int currentIndex: _currentView.currentIndex
 
     property int initialIndex: 0
 
     property var model: MLVideoModel { ml: medialib }
 
     property var sortModel: [
-        { text: i18n.qtr("Alphabetic"), criteria: "title"          },
+        { text: i18n.qtr("Alphabetic"), criteria: "title"    },
         { text: i18n.qtr("Duration"),   criteria: "duration" }
     ]
 
-    //---------------------------------------------------------------------------------------------
     // Aliases
-    //---------------------------------------------------------------------------------------------
-
-    property alias currentItem: view.currentItem
-
-    //---------------------------------------------------------------------------------------------
 
     property alias dragItem: dragItem
 
-    //---------------------------------------------------------------------------------------------
+    // Private
+
+    property alias _currentView: view.currentItem
+
     // Events
-    //---------------------------------------------------------------------------------------------
 
     onModelChanged: resetFocus()
 
     onInitialIndexChanged: resetFocus()
 
-    //---------------------------------------------------------------------------------------------
     // Connections
-    //---------------------------------------------------------------------------------------------
 
     Connections {
         target: mainInterface
@@ -87,17 +79,18 @@ FocusScope {
         target: model
 
         onCountChanged: {
-            if (model.count === 0 || modelSelect.hasSelection) return;
+            if (model.count === 0 || modelSelect.hasSelection)
+                return;
 
             resetFocus();
         }
     }
 
-    //---------------------------------------------------------------------------------------------
     // Functions
-    //---------------------------------------------------------------------------------------------
 
-    function setCurrentItemFocus() { listView.currentItem.forceActiveFocus() }
+    function setCurrentItemFocus(reason) {
+        _currentView.setCurrentItemFocus(reason);
+    }
 
     function resetFocus() {
         if (model.count === 0) return
@@ -109,11 +102,10 @@ FocusScope {
 
         modelSelect.select(model.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect);
 
-        if (currentItem)
-            currentItem.positionViewAtIndex(initialIndex, ItemView.Contain);
+        if (_currentView)
+            _currentView.positionViewAtIndex(initialIndex, ItemView.Contain);
     }
 
-    //---------------------------------------------------------------------------------------------
     // Private
 
     function _actionAtIndex() {
@@ -123,27 +115,25 @@ FocusScope {
     }
 
     function _onNavigationCancel() {
-        if (root.currentItem.currentIndex <= 0) {
-            root.Navigation.defaultNavigationCancel()
+        if (_currentView.currentIndex <= 0) {
+            Navigation.defaultNavigationCancel()
         } else {
-            root.currentItem.currentIndex = 0;
+            _currentView.currentIndex = 0;
 
-            root.currentItem.positionViewAtIndex(0, ItemView.Contain);
+            _currentView.positionViewAtIndex(0, ItemView.Contain);
         }
     }
 
-    //---------------------------------------------------------------------------------------------
     // Childs
-    //---------------------------------------------------------------------------------------------
 
     Widgets.StackViewExt {
         id: view
 
         anchors.fill: parent
 
-        initialItem: (mainInterface.gridView) ? grid : list
-
         focus: (model.count !== 0)
+
+        initialItem: (mainInterface.gridView) ? grid : list
     }
 
     Widgets.DragItem {
@@ -192,12 +182,10 @@ FocusScope {
         MainInterface.MainGridView {
             id: gridView
 
-            //-------------------------------------------------------------------------------------
             // Properties
 
             property Item currentItem: Item{}
 
-            //-------------------------------------------------------------------------------------
             // Settings
 
             cellWidth : VLCStyle.gridItem_video_width
@@ -213,6 +201,7 @@ FocusScope {
 
             Navigation.parentItem: root
             Navigation.upItem: (headerItem) ? headerItem.focusItem : null
+
             //cancelAction takes a *function* pass it directly
             Navigation.cancelAction: root._onNavigationCancel
 
@@ -230,8 +219,33 @@ FocusScope {
                 onRetract: gridView.retract()
             }
 
-            //---------------------------------------------------------------------------------
-            // Shadows
+            // Events
+
+            // NOTE: Define the initial position and selection. This is done on activeFocus rather
+            //       than Component.onCompleted because modelSelect.selectedGroup update itself
+            //       after this event.
+            onActiveFocusChanged: {
+                if (activeFocus == false || model.count === 0 || modelSelect.hasSelection)
+                    return;
+
+                modelSelect.select(model.index(0,0), ItemSelectionModel.ClearAndSelect);
+            }
+
+            onSelectAll: modelSelect.selectAll()
+
+            onSelectionUpdated: modelSelect.updateSelection(keyModifiers, oldIndex, newIndex)
+
+            onActionAtIndex: _actionAtIndex()
+
+            // Connections
+
+            Connections {
+                target: contextMenu
+
+                onShowMediaInformation: gridView.switchExpandItem(index)
+            }
+
+            // Childs
 
             Widgets.GridShadows {
                 id: shadows
@@ -243,13 +257,11 @@ FocusScope {
             delegate: VideoGridItem {
                 id: gridItem
 
-                //---------------------------------------------------------------------------------
                 // properties required by ExpandGridView
 
                 property var model: ({})
                 property int index: -1
 
-                //---------------------------------------------------------------------------------
                 // Settings
 
                 opacity: (gridView.expandIndex !== -1
@@ -260,7 +272,6 @@ FocusScope {
                 unselectedUnderlay: shadows.unselected
                 selectedUnderlay: shadows.selected
 
-                //---------------------------------------------------------------------------------
                 // Events
 
                 onItemClicked: gridView.leftClickOnItem(modifier, index)
@@ -274,37 +285,9 @@ FocusScope {
                                       { "information" : index });
                 }
 
-                //---------------------------------------------------------------------------------
                 // Animations
 
                 Behavior on opacity { NumberAnimation { duration: VLCStyle.duration_faster } }
-            }
-
-            //-------------------------------------------------------------------------------------
-            // Events
-
-            // NOTE: Define the initial position and selection. This is done on activeFocus rather
-            //       than Component.onCompleted because modelSelect.selectedGroup update itself
-            //       after this event.
-            onActiveFocusChanged: {
-                if (activeFocus == false || model.count === 0 || modelSelect.hasSelection) return;
-
-                modelSelect.select(model.index(0,0), ItemSelectionModel.ClearAndSelect)
-            }
-
-            onSelectAll: modelSelect.selectAll()
-
-            onSelectionUpdated: modelSelect.updateSelection(keyModifiers, oldIndex, newIndex)
-
-            onActionAtIndex: _actionAtIndex()
-
-            //-------------------------------------------------------------------------------------
-            // Connections
-
-            Connections {
-                target: contextMenu
-
-                onShowMediaInformation: gridView.switchExpandItem(index)
             }
         }
     }
@@ -316,7 +299,6 @@ FocusScope {
         {
             id: listView
 
-            //-------------------------------------------------------------------------------------
             // Settings
 
             model: root.model
@@ -331,12 +313,14 @@ FocusScope {
 
             headerPositioning: ListView.InlineHeader
 
+            activeFocusOnTab: true
+
             Navigation.parentItem: root
-            Navigation.upItem: (headerItem) ? headerItem.focus : null
+            Navigation.upItem: (headerItem) ? headerItem.focusItem : null
+
             //cancelAction takes a *function* pass it directly
             Navigation.cancelAction: root._onNavigationCancel
 
-            //-------------------------------------------------------------------------------------
             // Events
 
             onActionForSelection: _actionAtIndex()

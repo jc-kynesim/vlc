@@ -30,6 +30,7 @@
 #include <QDesktopWidget>
 #include <QQuickWidget>
 #include <QLibrary>
+#include <QScreen>
 
 #include <QOpenGLFunctions>
 #include <QOpenGLFramebufferObject>
@@ -291,7 +292,6 @@ MainInterface* CompositorDirectComposition::makeMainInterface()
         m_mainInterface = new MainInterfaceWin32(m_intf);
 
         m_rootWindow = new QWindow();
-        m_rootWindow->show();
 
         m_taskbarWidget = std::make_unique<WinTaskbarWidget>(m_intf, m_rootWindow);
         qApp->installNativeEventFilter(m_taskbarWidget.get());
@@ -317,14 +317,14 @@ MainInterface* CompositorDirectComposition::makeMainInterface()
 
         //install the interface window handler after the creation of CompositorDCompositionUISurface
         //so the event filter is handled before the one of the UISurface (for wheel events)
-        m_interfaceWindowHandler = new InterfaceWindowHandlerWin32(m_intf, m_mainInterface, m_rootWindow, m_rootWindow);
+        m_interfaceWindowHandler = std::make_unique<InterfaceWindowHandlerWin32>(m_intf, m_mainInterface, m_rootWindow);
 
         m_qmlVideoSurfaceProvider = std::make_unique<VideoSurfaceProvider>();
         m_mainInterface->setVideoSurfaceProvider(m_qmlVideoSurfaceProvider.get());
         m_mainInterface->setCanShowVideoPIP(true);
 
         connect(m_qmlVideoSurfaceProvider.get(), &VideoSurfaceProvider::hasVideoEmbedChanged,
-                m_interfaceWindowHandler, &InterfaceWindowHandlerWin32::onVideoEmbedChanged);
+                m_interfaceWindowHandler.get(), &InterfaceWindowHandlerWin32::onVideoEmbedChanged);
         connect(m_qmlVideoSurfaceProvider.get(), &VideoSurfaceProvider::surfacePositionChanged,
                 this, &CompositorDirectComposition::onSurfacePositionChanged);
 
@@ -338,6 +338,17 @@ MainInterface* CompositorDirectComposition::makeMainInterface()
         m_uiSurface->setContent(m_ui->getComponent(), m_ui->createRootItem());
         HR(m_rootVisual->AddVisual(m_uiVisual.Get(), FALSE, nullptr), "add ui visual to root");
         HR(m_dcompDevice->Commit(), "commit UI visual");
+
+        auto resetAcrylicSurface = [this](QScreen * = nullptr)
+        {
+            m_acrylicSurface.reset(new CompositorDCompositionAcrylicSurface(m_intf, m_d3d11Device.Get()));
+        };
+
+        resetAcrylicSurface();
+        connect(qGuiApp, &QGuiApplication::screenAdded, this, resetAcrylicSurface);
+        connect(qGuiApp, &QGuiApplication::screenRemoved, this, resetAcrylicSurface);
+
+        m_rootWindow->show();
         return m_mainInterface;
     }
     catch (const DXError& err)
@@ -380,9 +391,11 @@ void CompositorDirectComposition::unloadGUI()
         m_rootVisual->RemoveVisual(m_uiVisual.Get());
         m_uiVisual.Reset();
     }
+    m_acrylicSurface.reset();
     m_uiSurface.reset();
     m_ui.reset();
     m_taskbarWidget.reset();
+    m_interfaceWindowHandler.reset();
     if (m_mainInterface)
     {
         delete m_mainInterface;
@@ -433,6 +446,26 @@ QWindow *CompositorDirectComposition::interfaceMainWindow() const
 Compositor::Type CompositorDirectComposition::type() const
 {
     return Compositor::DirectCompositionCompositor;
+}
+
+void CompositorDirectComposition::addVisual(Microsoft::WRL::ComPtr<IDCompositionVisual> visual)
+{
+    vlc_assert(m_rootVisual);
+
+    HRESULT hr = m_rootVisual->AddVisual(visual.Get(), FALSE, m_videoVisual ? m_videoVisual.Get() : m_uiVisual.Get());
+    if (FAILED(hr))
+        msg_Err(m_intf, "failed to add visual, code: 0x%lX", hr);
+
+    m_dcompDevice->Commit();
+}
+
+void CompositorDirectComposition::removeVisual(Microsoft::WRL::ComPtr<IDCompositionVisual> visual)
+{
+    auto hr = m_rootVisual->RemoveVisual(visual.Get());
+    if (FAILED(hr))
+        msg_Err(m_intf, "failed to remove visual, code: 0x%lX", hr);
+
+    m_dcompDevice->Commit();
 }
 
 }

@@ -33,30 +33,30 @@ FocusScope {
     id: root
 
     //name and properties of the tab to be initially loaded
-    property string view: ""
-    property var viewProperties: ({})
+    property var view: ({
+        "name": "",
+        "properties": {}
+    })
 
     property alias g_mainDisplay: root
     property bool _inhibitMiniPlayer: false
     property bool _showMiniPlayer: false
-    property var _defaultPages: ({}) // saves last page of view
+    property var _oldViewProperties: ({}) // saves last state of the views
 
     onViewChanged: {
-        viewProperties = _defaultPages[root.view] !== undefined ? ({"defaultPage": _defaultPages[root.view]}) : ({})
+        _oldViewProperties[view.name] = view.properties
         loadView()
     }
-    onViewPropertiesChanged: loadView()
+
     Component.onCompleted: {
         loadView()
-        if (medialib)
+        if (medialib && !mainInterface.hasFirstrun)
             // asynchronous call
             medialib.reload()
     }
 
     function loadView() {
-        var found = stackView.loadView(root.pageModel, root.view, root.viewProperties)
-        if (stackView.currentItem.view !== undefined)
-            _defaultPages[root.view] = stackView.currentItem.view
+        var found = stackView.loadView(root.pageModel, root.view.name, root.view.properties)
 
         stackView.currentItem.Navigation.parentItem = medialibId
         stackView.currentItem.Navigation.upItem = sourcesBanner
@@ -197,14 +197,19 @@ FocusScope {
                     model: root.tabModel
 
                     onItemClicked: {
-                        sourcesBanner.localMenuDelegate = null
                         var name = root.tabModel.get(index).name
                         selectedIndex = index
-                        history.push(["mc", name])
+                        if (_oldViewProperties[name] === undefined)
+                            history.push(["mc", name])
+                        else
+                            history.push(["mc", name, _oldViewProperties[name]])
                     }
 
                     Navigation.parentItem: medialibId
-                    Navigation.downItem: stackView
+
+                    Navigation.downAction: function() {
+                        stackView.currentItem.setCurrentItemFocus(Qt.TabFocusReason);
+                    }
                 }
 
                 Item {
@@ -253,7 +258,7 @@ FocusScope {
                         }
                         focus: false
 
-                        height: parent.height - miniPlayer.implicitHeight
+                        height: parent.height - miniPlayer.height
 
                         property bool expanded: mainInterface.playlistDocked && mainInterface.playlistVisible
 
@@ -322,6 +327,7 @@ FocusScope {
                             focus: true
 
                             rightPadding: VLCStyle.applicationHorizontalMargin
+                            bottomPadding: topPadding + Math.max(VLCStyle.applicationVerticalMargin - miniPlayer.height, 0)
 
                             Navigation.parentItem: medialibId
                             Navigation.leftItem: stackView
@@ -380,8 +386,8 @@ FocusScope {
                 width: VLCStyle.dp(320, VLCStyle.scale)
                 height: VLCStyle.dp(180, VLCStyle.scale)
                 z: 2
-                visible: !root._inhibitMiniPlayer && root._showMiniPlayer
-                enabled: !root._inhibitMiniPlayer && root._showMiniPlayer
+                visible: !root._inhibitMiniPlayer && root._showMiniPlayer && mainInterface.hasEmbededVideo
+                enabled: !root._inhibitMiniPlayer && root._showMiniPlayer && mainInterface.hasEmbededVideo
 
                 dragXMin: 0
                 dragXMax: root.width - playerPip.width

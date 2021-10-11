@@ -24,6 +24,8 @@
 #ifndef VLC_CDROM_H
 #define VLC_CDROM_H
 
+#include <assert.h>
+
 enum {
     CDDA_TYPE = 0,
     VCD_TYPE  = 1,
@@ -41,7 +43,12 @@ enum {
 #define CD_ROM_XA_INTERVAL ((60 + 90 + 2) * CD_ROM_XA_FRAMES)
 
 /* Subcode control flag */
-#define CD_ROM_DATA_FLAG    0x04
+#define CD_ROM_SUBCODE_NONE           0x00
+#define CD_ROM_SUBCODE_PRE_EMPHASIS   0x01
+#define CD_ROM_SUBCODE_COPY_PERMITTED 0x02
+#define CD_ROM_SUBCODE_DATA           0x04
+#define CD_ROM_SUBCODE_4CH            0x08
+#define CD_ROM_SUBCODE_SCMS           0x10
 
 /* size of a CD sector */
 #define CD_SECTOR_SIZE      CD_ROM_MODE1_DATA_SIZE
@@ -55,23 +62,24 @@ enum {
 /* sector containing the entry points */
 #define VCD_ENTRIES_SECTOR  151
 
-/* where the data start on a CDDA sector */
-#define CDDA_DATA_START     0
 /* size of the available data on a CDDA sector */
 #define CDDA_DATA_SIZE      CD_RAW_SECTOR_SIZE
 /* size of a CDDA sector, header and tail included */
 #define CDDA_SECTOR_SIZE    CD_RAW_SECTOR_SIZE
+/* number of audio frames per second */
+#define CD_ROM_CDDA_FRAMES  ((44100 * 4) / CDDA_DATA_SIZE)
 
 /*****************************************************************************
  * Misc. Macros
  *****************************************************************************/
 static inline int MSF_TO_LBA(uint8_t min, uint8_t sec, uint8_t frame)
 {
-    return (int)(frame + 75 * (sec + 60 * min));
+    static_assert(((44100 * 4) % CDDA_DATA_SIZE) == 0, "bogus CDDA_DATA_SIZE");
+    return (int)(frame + CD_ROM_CDDA_FRAMES * (sec + 60 * min));
 }
 static inline int MSF_TO_LBA2(uint8_t min, uint8_t sec, uint8_t frame)
 {
-    return (int)(frame + 75 * (sec -2 + 60 * min));
+    return (int)(frame + CD_ROM_CDDA_FRAMES * (sec -2 + 60 * min));
 }
 
 /* Converts BCD to Binary data */
@@ -146,7 +154,7 @@ typedef struct entries_sect_s
  *****************************************************************************/
 vcddev_t *ioctl_Open         ( vlc_object_t *, const char * );
 void      ioctl_Close        ( vlc_object_t *, vcddev_t * );
-vcddev_toc_t * ioctl_GetTOC  ( vlc_object_t *, const vcddev_t *, bool );
+vcddev_toc_t * ioctl_GetTOC  ( vlc_object_t *, const vcddev_t * );
 int       ioctl_ReadSectors  ( vlc_object_t *, const vcddev_t *,
                                int, uint8_t *, int, int );
 

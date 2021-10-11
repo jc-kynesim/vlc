@@ -28,6 +28,7 @@
 #include <stdatomic.h>
 
 #include <vlc_common.h>
+#include <vlc_atomic.h>
 #include "libvlc.h"
 
 /* <stdatomic.h> types cannot be used in the C++ view of <vlc_threads.h> */
@@ -62,62 +63,11 @@ void vlc_global_mutex (unsigned n, bool acquire)
         vlc_mutex_unlock (lock);
 }
 
-#if defined (_WIN32) && (_WIN32_WINNT < _WIN32_WINNT_WIN8)
-/* Cannot define OS version-dependent stuff in public headers */
-# undef LIBVLC_NEED_SLEEP
-#endif
-
-#if defined(_WIN32) || defined(__ANDROID__)
-static void do_vlc_cancel_addr_clear(void *addr)
-{
-    vlc_cancel_addr_clear(addr);
-}
-
-static void vlc_cancel_addr_prepare(atomic_uint *addr)
-{
-    /* Let thread subsystem on address to broadcast for cancellation */
-    vlc_cancel_addr_set(addr);
-    vlc_cleanup_push(do_vlc_cancel_addr_clear, addr);
-    /* Check if cancellation was pending before vlc_cancel_addr_set() */
-    vlc_testcancel();
-    vlc_cleanup_pop();
-}
-
-static void vlc_cancel_addr_finish(atomic_uint *addr)
-{
-    vlc_cancel_addr_clear(addr);
-    /* Act on cancellation as potential wake-up source */
-    vlc_testcancel();
-}
-#else
-# define vlc_cancel_addr_prepare(addr) ((void)0)
-# define vlc_cancel_addr_finish(addr) ((void)0)
-#endif
-
-#ifdef LIBVLC_NEED_SLEEP
-void (vlc_tick_wait)(vlc_tick_t deadline)
-{
-    atomic_uint value = ATOMIC_VAR_INIT(0);
-
-    vlc_cancel_addr_prepare(&value);
-
-    while (vlc_atomic_timedwait(&value, 0, deadline) == 0)
-        vlc_testcancel();
-
-    vlc_cancel_addr_finish(&value);
-}
-
-void (vlc_tick_sleep)(vlc_tick_t delay)
-{
-    vlc_tick_wait(vlc_tick_now() + delay);
-}
-#endif
-
 static void vlc_mutex_init_common(vlc_mutex_t *mtx, bool recursive)
 {
     atomic_init(&mtx->value, 0);
     atomic_init(&mtx->recursion, recursive);
-    atomic_init(&mtx->owner, NULL);
+    atomic_init(&mtx->owner, 0);
 }
 
 void vlc_mutex_init(vlc_mutex_t *mtx)
@@ -129,9 +79,6 @@ void vlc_mutex_init_recursive(vlc_mutex_t *mtx)
 {
     vlc_mutex_init_common(mtx, true);
 }
-
-static _Thread_local char thread_self[1];
-#define THREAD_SELF ((const void *)thread_self)
 
 bool vlc_mutex_held(const vlc_mutex_t *mtx)
 {
@@ -151,8 +98,8 @@ bool vlc_mutex_held(const vlc_mutex_t *mtx)
      * Even though other threads may modify the owner field at any time,
      * they will never make it compare equal to the calling thread.
      */
-    return THREAD_SELF == atomic_load_explicit(&tmp_mtx->owner,
-                                               memory_order_relaxed);
+    return vlc_thread_id() == atomic_load_explicit(&tmp_mtx->owner,
+                                                   memory_order_relaxed);
 }
 
 void vlc_mutex_lock(vlc_mutex_t *mtx)
@@ -172,7 +119,7 @@ void vlc_mutex_lock(vlc_mutex_t *mtx)
         vlc_atomic_wait(&mtx->value, 2);
 
     vlc_restorecancel(canc);
-    atomic_store_explicit(&mtx->owner, THREAD_SELF, memory_order_relaxed);
+    atomic_store_explicit(&mtx->owner, vlc_thread_id(), memory_order_relaxed);
 }
 
 int vlc_mutex_trylock(vlc_mutex_t *mtx)
@@ -199,7 +146,8 @@ int vlc_mutex_trylock(vlc_mutex_t *mtx)
     if (atomic_compare_exchange_strong_explicit(&mtx->value, &value, 1,
                                                 memory_order_acquire,
                                                 memory_order_relaxed)) {
-        atomic_store_explicit(&mtx->owner, THREAD_SELF, memory_order_relaxed);
+        atomic_store_explicit(&mtx->owner, vlc_thread_id(),
+                              memory_order_relaxed);
         return 0;
     }
 
@@ -219,7 +167,7 @@ void vlc_mutex_unlock(vlc_mutex_t *mtx)
         return;
     }
 
-    atomic_store_explicit(&mtx->owner, NULL, memory_order_relaxed);
+    atomic_store_explicit(&mtx->owner, 0, memory_order_relaxed);
 
     switch (atomic_exchange_explicit(&mtx->value, 0, memory_order_release)) {
         case 2:

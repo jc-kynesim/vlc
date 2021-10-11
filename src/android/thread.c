@@ -43,6 +43,8 @@
 #include <pthread.h>
 #include <sched.h>
 
+#include <vlc_atomic.h>
+
 /* debug */
 
 #ifndef NDEBUG
@@ -74,13 +76,7 @@ struct vlc_thread
     void *(*entry)(void*);
     void *data;
 
-    struct
-    {
-        atomic_uint *addr; /// Non-null if waiting on futex
-        vlc_mutex_t lock ; /// Protects futex address
-    } wait;
-
-    atomic_bool killed;
+    atomic_uint killed;
     bool killable;
 };
 
@@ -126,8 +122,6 @@ static int vlc_clone_attr (vlc_thread_t *th, void *(*entry) (void *),
     thread->killable = true;
     thread->entry = entry;
     thread->data = data;
-    thread->wait.addr = NULL;
-    vlc_mutex_init(&thread->wait.lock);
 
     pthread_attr_t attr;
     pthread_attr_init (&attr);
@@ -166,18 +160,8 @@ int vlc_set_priority (vlc_thread_t th, int priority)
 
 void vlc_cancel (vlc_thread_t thread_id)
 {
-    atomic_uint *addr;
-
     atomic_store(&thread_id->killed, true);
-
-    vlc_mutex_lock(&thread_id->wait.lock);
-    addr = thread_id->wait.addr;
-    if (addr != NULL)
-    {
-        atomic_fetch_or_explicit(addr, 1, memory_order_relaxed);
-        vlc_atomic_notify_all(addr);
-    }
-    vlc_mutex_unlock(&thread_id->wait.lock);
+    vlc_atomic_notify_one(&thread_id->killed);
 }
 
 int vlc_savecancel (void)
@@ -210,31 +194,6 @@ void vlc_testcancel (void)
     pthread_exit(NULL);
 }
 
-void vlc_cancel_addr_set(atomic_uint *addr)
-{
-    vlc_thread_t th = thread;
-    if (th == NULL)
-        return;
-
-    vlc_mutex_lock(&th->wait.lock);
-    assert(th->wait.addr == NULL);
-    th->wait.addr = addr;
-    vlc_mutex_unlock(&th->wait.lock);
-}
-
-void vlc_cancel_addr_clear(atomic_uint *addr)
-{
-    vlc_thread_t th = thread;
-    if (th == NULL)
-        return;
-
-    vlc_mutex_lock(&th->wait.lock);
-    assert(th->wait.addr == addr);
-    th->wait.addr = NULL;
-    (void) addr;
-    vlc_mutex_unlock(&th->wait.lock);
-}
-
 /* threadvar */
 
 int vlc_threadvar_create (vlc_threadvar_t *key, void (*destr) (void *))
@@ -258,6 +217,18 @@ void *vlc_threadvar_get (vlc_threadvar_t key)
 }
 
 /* time */
+void (vlc_tick_wait)(vlc_tick_t deadline)
+{
+    do
+        vlc_testcancel();
+    while (vlc_atomic_timedwait(&thread->killed, false, deadline) == 0);
+}
+
+void (vlc_tick_sleep)(vlc_tick_t delay)
+{
+    vlc_tick_wait(vlc_tick_now() + delay);
+}
+
 vlc_tick_t vlc_tick_now (void)
 {
     struct timespec ts;

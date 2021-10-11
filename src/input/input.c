@@ -104,7 +104,7 @@ static void InputMetaUser( input_thread_t *p_input, vlc_meta_t *p_meta );
 static void InputUpdateMeta( input_thread_t *p_input, demux_t *p_demux );
 static void InputGetExtraFiles( input_thread_t *p_input,
                                 int *pi_list, char ***pppsz_list,
-                                const char **psz_access, const char *psz_path );
+                                const char **psz_access, const char *mrl );
 
 static void AppendAttachment(input_thread_t* p_input,
                               int i_new, input_attachment_t **pp_new);
@@ -998,6 +998,30 @@ static void SetSubtitlesOptions( input_thread_t *p_input )
     }
 }
 
+static enum slave_type DeduceSlaveType( input_thread_t *p_input,
+                                        const char *psz_uri )
+{
+    vlc_url_t parsed_uri;
+    if( vlc_UrlParse( &parsed_uri, psz_uri ) != VLC_SUCCESS ||
+        parsed_uri.psz_path == NULL )
+    {
+        goto fail;
+    }
+
+    enum slave_type i_type;
+    if( !input_item_slave_GetType( parsed_uri.psz_path, &i_type ) )
+        goto fail;
+
+    vlc_UrlClean( &parsed_uri );
+    return i_type;
+
+fail:
+    msg_Dbg( p_input, "Can't deduce slave type of \"%s\" with file extension.",
+             psz_uri );
+    vlc_UrlClean( &parsed_uri );
+    return SLAVE_TYPE_GENERIC;
+}
+
 static void GetVarSlaves( input_thread_t *p_input,
                           input_item_slave_t ***ppp_slaves, int *p_slaves )
 {
@@ -1027,28 +1051,9 @@ static void GetVarSlaves( input_thread_t *p_input,
         if( uri == NULL )
             continue;
 
-        vlc_url_t parsed_uri;
-        if ( vlc_UrlParse( &parsed_uri, uri ) != VLC_SUCCESS )
-        {
-            msg_Err( p_input,
-                    "Invalid url passed to the \"input-slave\" option" );
-            vlc_UrlClean( &parsed_uri );
-            free( uri );
-            continue;
-        }
-
-        enum slave_type i_type;
-        if ( !input_item_slave_GetType( parsed_uri.psz_path, &i_type ) )
-        {
-            msg_Warn( p_input,
-                     "Can't deduce slave type of `%s\" with file extension.",
-                     uri );
-            i_type = SLAVE_TYPE_GENERIC;
-        }
+        const enum slave_type i_type = DeduceSlaveType( p_input, uri );
         input_item_slave_t *p_slave =
             input_item_slave_New( uri, i_type, SLAVE_PRIORITY_USER );
-
-        vlc_UrlClean( &parsed_uri );
         free( uri );
 
         if( unlikely( p_slave == NULL ) )
@@ -2678,7 +2683,7 @@ static int InputSourceInit( input_source_t *in, input_thread_t *p_input,
         char **tab;
 
         TAB_INIT( count, tab );
-        InputGetExtraFiles( p_input, &count, &tab, &psz_access, psz_path );
+        InputGetExtraFiles( p_input, &count, &tab, &psz_access, psz_mrl );
         if( count > 0 )
         {
             char *list = NULL;
@@ -2931,7 +2936,7 @@ static void InputSourceMeta( input_thread_t *p_input,
                               p_demux_meta->attachments );
             vlc_mutex_unlock( &input_priv(p_input)->p_item->lock );
         }
-        module_unneed( p_demux, p_id3 );
+        module_unneed( p_demux_meta, p_id3 );
     }
     vlc_object_delete(p_demux_meta);
 }
@@ -3154,7 +3159,7 @@ static void InputUpdateMeta( input_thread_t *p_input, demux_t *p_demux )
  *****************************************************************************/
 static void InputGetExtraFilesPattern( input_thread_t *p_input,
                                        int *pi_list, char ***pppsz_list,
-                                       const char *psz_path,
+                                       const char *uri,
                                        const char *psz_match,
                                        const char *psz_format,
                                        int i_start, int i_stop )
@@ -3163,43 +3168,33 @@ static void InputGetExtraFilesPattern( input_thread_t *p_input,
     char **ppsz_list;
     TAB_INIT( i_list, ppsz_list );
 
-    char *psz_base = strdup( psz_path );
-    if( !psz_base )
-        goto exit;
-
     /* Remove the extension */
-    char *psz_end = &psz_base[strlen(psz_base)-strlen(psz_match)];
-    assert( psz_end >= psz_base);
-    *psz_end = '\0';
+    size_t end = strlen(uri) - strlen(psz_match);
+    if (unlikely(end > INT_MAX))
+        goto exit;
 
     /* Try to list files */
     for( int i = i_start; i <= i_stop; i++ )
     {
-        char *psz_probe;
-        if( asprintf( &psz_probe, psz_format, psz_base, i ) < 0 )
+        char *url;
+        if( asprintf( &url, psz_format, (int)end, uri, i ) < 0 )
             break;
 
-        char *filepath = get_path( psz_probe );
+        char *filepath = vlc_uri2path(url);
 
         struct stat st;
         if( filepath == NULL ||
             vlc_stat( filepath, &st ) || !S_ISREG( st.st_mode ) || !st.st_size )
         {
             free( filepath );
-            free( psz_probe );
+            free( url );
             break;
         }
 
         msg_Dbg( p_input, "Detected extra file `%s'", filepath );
-
-        char* psz_uri = vlc_path2uri( filepath, NULL );
-        if( psz_uri )
-            TAB_APPEND( i_list, ppsz_list, psz_uri );
-
         free( filepath );
-        free( psz_probe );
+        TAB_APPEND( i_list, ppsz_list, url );
     }
-    free( psz_base );
 exit:
     *pi_list = i_list;
     *pppsz_list = ppsz_list;
@@ -3207,7 +3202,7 @@ exit:
 
 static void InputGetExtraFiles( input_thread_t *p_input,
                                 int *pi_list, char ***pppsz_list,
-                                const char **ppsz_access, const char *psz_path )
+                                const char **ppsz_access, const char *mrl )
 {
     static const struct pattern
     {
@@ -3218,20 +3213,21 @@ static void InputGetExtraFiles( input_thread_t *p_input,
         int i_stop;
     } patterns[] = {
         /* XXX the order is important */
-        { "concat", ".001", "%s.%.3d", 2, 999 },
-        { NULL, ".part1.rar","%s.part%.1d.rar", 2, 9 },
-        { NULL, ".part01.rar","%s.part%.2d.rar", 2, 99, },
-        { NULL, ".part001.rar", "%s.part%.3d.rar", 2, 999 },
-        { NULL, ".rar", "%s.r%.2d", 0, 99 },
-        { "concat", ".mts", "%s.mts%d", 1, 999 },
+        { "concat", ".001", "%.*s.%.3d", 2, 999 },
+        { NULL, ".part1.rar","%.*s.part%.1d.rar", 2, 9 },
+        { NULL, ".part01.rar","%.*s.part%.2d.rar", 2, 99, },
+        { NULL, ".part001.rar", "%.*s.part%.3d.rar", 2, 999 },
+        { NULL, ".rar", "%.*s.r%.2d", 0, 99 },
+        { "concat", ".mts", "%.*s.mts%d", 1, 999 },
     };
 
+    assert(mrl != NULL);
     TAB_INIT( *pi_list, *pppsz_list );
 
-    if( ( **ppsz_access && strcmp( *ppsz_access, "file" ) ) || !psz_path )
+    if( **ppsz_access && strcmp( *ppsz_access, "file" ) )
         return;
 
-    const size_t i_path = strlen(psz_path);
+    const size_t i_path = strlen(mrl);
 
     for( size_t i = 0; i < ARRAY_SIZE( patterns ); ++i )
     {
@@ -3241,9 +3237,9 @@ static void InputGetExtraFiles( input_thread_t *p_input,
         if( i_path < i_ext )
             continue;
 
-        if( !strcmp( &psz_path[i_path-i_ext], pat->psz_match ) )
+        if( !strcmp( &mrl[i_path-i_ext], pat->psz_match ) )
         {
-            InputGetExtraFilesPattern( p_input, pi_list, pppsz_list, psz_path,
+            InputGetExtraFilesPattern( p_input, pi_list, pppsz_list, mrl,
                 pat->psz_match, pat->psz_format, pat->i_start, pat->i_stop );
 
             if( *pi_list > 0 && pat->psz_access_force )
@@ -3277,12 +3273,11 @@ static void input_SplitMRL( const char **access, const char **demux,
     char *p;
 
     /* Separate <path> from <access>[/<demux>]:// */
-    p = strstr( buf, "://" );
+    p = strchr( buf, ':');
     if( p != NULL )
     {
-        *p = '\0';
-        p += 3; /* skips "://" */
-        *path = p;
+        *(p++) = '\0'; /* skips ':' */
+        *path = p + (strncmp(p, "//", 2) ? 0 : 2); /* skips "//" */
 
         /* Remove HTML anchor if present (not supported).
          * The hash symbol itself should be URI-encoded. */

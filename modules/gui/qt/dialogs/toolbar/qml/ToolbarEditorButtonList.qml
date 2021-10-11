@@ -22,20 +22,24 @@ import QtQuick.Layouts 1.11
 
 import org.videolan.vlc 0.1
 
+import "qrc:///player/"
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
 
-GridView{
-    id: allButtonsView
+GridView {
     clip: true
 
     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }
-    model: controlButtons.buttonL.length
+    model: PlayerControlbarControls.controlList.length
 
+    currentIndex: -1
     highlightFollowsCurrentItem: false
 
     cellWidth: VLCStyle.cover_small
     cellHeight: cellWidth
+
+    boundsBehavior: Flickable.StopAtBounds
+    boundsMovement: Flickable.StopAtBounds
 
     property alias removeInfoRectVisible: removeInfoRect.visible
 
@@ -97,78 +101,88 @@ GridView{
         anchors.fill: parent
         z: 1
 
-        visible: root._held
+        visible: buttonDragItem.Drag.active
 
         cursorShape: visible ? Qt.DragMoveCursor : Qt.ArrowCursor
     }
 
     delegate: MouseArea {
-        id:dragArea
-        objectName: "buttonsList"
-        hoverEnabled: true
         width: cellWidth
         height: cellHeight
 
-        property bool held: false
-        property int mIndex: controlButtons.buttonL[model.index].id
-        drag.target: held ? buttonDragItem : undefined
+        hoverEnabled: true
         cursorShape: Qt.OpenHandCursor
 
-        onPressed: {
-            buttonDragItem.visible = true
-            buttonDragItem.text = controlButtons.buttonL[model.index].label
-            buttonDragItem.Drag.source = dragArea
-            held = true
-            root._held = true
-        }
+        objectName: "buttonsList"
 
-        onReleased: {
-            drag.target.Drag.drop()
-            buttonDragItem.visible = false
-            held = false
-            root._held = false
+        drag.target: buttonDragItem
+
+        readonly property int mIndex: PlayerControlbarControls.controlList[model.index].id
+
+        drag.onActiveChanged: {
+            if (drag.active) {
+                root.dragStarted(mIndex)
+
+                buttonDragItem.text = PlayerControlbarControls.controlList[model.index].label
+                buttonDragItem.Drag.source = this
+                buttonDragItem.Drag.start()
+
+                GridView.delayRemove = true
+            } else {
+                buttonDragItem.Drag.drop()
+
+                root.dragStopped(mIndex)
+
+                GridView.delayRemove = false
+            }
         }
 
         onPositionChanged: {
-            var pos = this.mapToGlobal(mouseX, mouseY)
-            buttonDragItem.updatePos(pos.x, pos.y)
-        }
+            if (drag.active) {
+                // FIXME: There must be a better way of this
 
-        onEntered: allButtonsView.currentIndex = index
-
-        Loader {
-            active: allButtonsView.currentIndex === index
-            anchors.fill: parent
-
-            sourceComponent: Rectangle {
-                color: VLCStyle.colors.bgHover
+                var pos = mapToItem(buttonDragItem.parent, mouseX, mouseY)
+                // y should be set first, because the automatic scroll is
+                // triggered by change on X
+                buttonDragItem.y = pos.y
+                buttonDragItem.x = pos.x
             }
         }
 
-        ColumnLayout{
-            id: listelemlayout
+        Rectangle {
             anchors.fill: parent
-            anchors.margins: 10
 
-            EditorDummyButton {
-                Layout.preferredWidth: VLCStyle.icon_medium
-                Layout.preferredHeight: VLCStyle.icon_medium
-                Layout.alignment: Qt.AlignHCenter
-                text: controlButtons.buttonL[model.index].label
-            }
+            implicitWidth: childrenRect.width
+            implicitHeight: childrenRect.height
 
-            Widgets.ListSubtitleLabel {
-                id: buttonName
-                Layout.fillWidth: true
-                Layout.fillHeight: true
+            color: "transparent"
 
-                elide: Text.ElideNone
-                text: controlButtons.buttonL[model.index].text
-                wrapMode: Text.WordWrap
-                horizontalAlignment: Text.AlignHCenter
+            border.width: VLCStyle.dp(1, VLCStyle.scale)
+            border.color: containsMouse && !buttonDragItem.Drag.active ? VLCStyle.colors.buttonBorder
+                                                                       : "transparent"
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 10
+
+                EditorDummyButton {
+                    Layout.preferredWidth: VLCStyle.icon_medium
+                    Layout.preferredHeight: VLCStyle.icon_medium
+                    Layout.alignment: Qt.AlignHCenter
+
+                    text: PlayerControlbarControls.controlList[model.index].label
+                }
+
+                Widgets.ListSubtitleLabel {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    elide: Text.ElideNone
+                    text: PlayerControlbarControls.controlList[model.index].text
+                    wrapMode: Text.WordWrap
+                    horizontalAlignment: Text.AlignHCenter
+                }
             }
         }
     }
 }
-
-

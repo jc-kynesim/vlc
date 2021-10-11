@@ -33,9 +33,13 @@ FocusScope {
         { text: i18n.qtr("Alphabetic"), criteria: "title" }
     ]
 
-    readonly property var currentIndex: view.currentItem.currentIndex
+    readonly property var currentIndex: _currentView.currentIndex
     //the index to "go to" when the view is loaded
     property var initialIndex: 0
+
+    property alias _currentView: view.currentItem
+
+    signal showAlbumView(var id, string name, int reason)
 
     onInitialIndexChanged:  resetFocus()
 
@@ -49,10 +53,6 @@ FocusScope {
         }
     }
 
-    function showAlbumView( m ) {
-        history.push([ "mc", "music", "genres", "albums", { parentId: m.id, genreName: m.name } ])
-    }
-
     function resetFocus() {
         if (genreModel.count === 0) {
             return
@@ -61,8 +61,12 @@ FocusScope {
         if (initialIndex >= genreModel.count)
             initialIndex = 0
         selectionModel.select(genreModel.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect)
-        if (view.currentItem)
-            view.currentItem.positionViewAtIndex(initialIndex, ItemView.Contain)
+        if (_currentView)
+            _currentView.positionViewAtIndex(initialIndex, ItemView.Contain)
+    }
+
+    function setCurrentItemFocus(reason) {
+        _currentView.setCurrentItemFocus(reason);
     }
 
     MLGenreModel {
@@ -81,7 +85,8 @@ FocusScope {
             medialib.addAndPlay(model.getIdsForIndexes(selectionModel.selectedIndexes))
         } else if (selectionModel.selectedIndexes.length === 1) {
             var sel = selectionModel.selectedIndexes[0]
-            showAlbumView( genreModel.getDataAt(sel) )
+            var model = genreModel.getDataAt(sel)
+            showAlbumView(model.id, model.name, Qt.TabFocusReason)
         }
     }
 
@@ -120,10 +125,10 @@ FocusScope {
     onActiveFocusChanged: {
         if (activeFocus && genreModel.count > 0 && !selectionModel.hasSelection) {
             var initialIndex = 0
-            if (view.currentItem.currentIndex !== -1)
-                initialIndex = view.currentItem.currentIndex
+            if (_currentView.currentIndex !== -1)
+                initialIndex = _currentView.currentIndex
             selectionModel.select(genreModel.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect)
-            view.currentItem.currentIndex = initialIndex
+            _currentView.currentIndex = initialIndex
         }
     }
 
@@ -166,7 +171,7 @@ FocusScope {
                 unselectedUnderlay: shadows.unselected
                 selectedUnderlay: shadows.selected
 
-                onItemDoubleClicked: root.showAlbumView(model)
+                onItemDoubleClicked: root.showAlbumView(model.id, model.name, Qt.MouseFocusReason)
                 onItemClicked: gridView_id.leftClickOnItem(modifier, item.index)
 
                 onPlayClicked: {
@@ -227,10 +232,10 @@ FocusScope {
 
             Navigation.parentItem: root
             Navigation.cancelAction: function() {
-                if (view.currentItem.currentIndex <= 0)
+                if (_currentView.currentIndex <= 0)
                     root.Navigation.defaultNavigationCancel()
                 else
-                    view.currentItem.currentIndex = 0;
+                    _currentView.currentIndex = 0;
             }
         }
     }
@@ -252,10 +257,10 @@ FocusScope {
             onActionForSelection: _actionAtIndex(selection)
             Navigation.parentItem: root
             Navigation.cancelAction: function() {
-                if (view.currentItem.currentIndex <= 0)
+                if (_currentView.currentIndex <= 0)
                     root.Navigation.defaultNavigationCancel()
                 else
-                    view.currentItem.currentIndex = 0;
+                    _currentView.currentIndex = 0;
             }
             dragItem: genreDragItem
             rowHeight: VLCStyle.tableCoverRow_height
@@ -268,7 +273,7 @@ FocusScope {
             ]
 
             onItemDoubleClicked: {
-                root.showAlbumView(model)
+                root.showAlbumView(model.id, model.name, Qt.MouseFocusReason)
             }
 
             onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes, menuParent.mapToGlobal(0,0))

@@ -1,6 +1,6 @@
 # GPGERROR
 GPGERROR_VERSION := 1.27
-GPGERROR_URL := ftp://ftp.gnupg.org/gcrypt/libgpg-error/libgpg-error-$(GPGERROR_VERSION).tar.bz2
+GPGERROR_URL := https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-$(GPGERROR_VERSION).tar.bz2
 
 $(TARBALLS)/libgpg-error-$(GPGERROR_VERSION).tar.bz2:
 	$(call download_pkg,$(GPGERROR_URL),gpg-error)
@@ -32,15 +32,6 @@ ifeq ($(ARCH),aarch64)
 	cp $@/src/syscfg/lock-obj-pub.x86_64-pc-linux-gnu.h $@/src/syscfg/lock-obj-pub.linux-android.h
 else
 	cp $@/src/syscfg/lock-obj-pub.arm-unknown-linux-androideabi.h $@/src/syscfg/lock-obj-pub.linux-android.h
-endif
-endif
-ifdef HAVE_NACL
-ifeq ($(ARCH),i386) # 32bits intel
-	cp $@/src/syscfg/lock-obj-pub.i686-pc-linux-gnu.h $@/src/syscfg/lock-obj-pub.nacl.h
-else
-ifeq ($(ARCH),x86_64)
-	cp $@/src/syscfg/lock-obj-pub.x86_64-pc-linux-gnu.h $@/src/syscfg/lock-obj-pub.nacl.h
-endif
 endif
 endif
 

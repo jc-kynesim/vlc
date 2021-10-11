@@ -1,8 +1,5 @@
-OPENGL_COMMONSOURCES = video_output/opengl/vout_helper.c \
+OPENGL_COMMONSOURCES = \
        video_output/opengl/filter.c \
-       video_output/opengl/filter.h \
-       video_output/opengl/filter_draw.c \
-       video_output/opengl/filter_draw.h \
        video_output/opengl/filter.h \
        video_output/opengl/filter_priv.h \
        video_output/opengl/filters.c \
@@ -13,16 +10,12 @@ OPENGL_COMMONSOURCES = video_output/opengl/vout_helper.c \
        video_output/opengl/gl_util.c \
        video_output/opengl/gl_util.h \
        video_output/opengl/interop.h \
-       video_output/opengl/vout_helper.h \
-       video_output/opengl/internal.h \
-       video_output/opengl/interop.c video_output/opengl/interop_sw.c \
-       video_output/opengl/renderer.c \
-       video_output/opengl/renderer.h \
+       video_output/opengl/interop.c \
+       video_output/opengl/interop_sw.c \
+       video_output/opengl/interop_sw.h \
        video_output/opengl/sampler.c \
        video_output/opengl/sampler.h \
-       video_output/opengl/sampler_priv.h \
-       video_output/opengl/sub_renderer.c \
-       video_output/opengl/sub_renderer.h
+       video_output/opengl/sampler_priv.h
 
 OPENGL_COMMONCFLAGS = $(LIBPLACEBO_CFLAGS)
 OPENGL_COMMONLIBS = $(LIBPLACEBO_LIBS)
@@ -30,6 +23,14 @@ OPENGL_COMMONLIBS = $(LIBPLACEBO_LIBS)
 if HAVE_LIBPLACEBO
 OPENGL_COMMONLIBS += libplacebo_utils.la
 endif
+
+OPENGL_VOUT_COMMONSOURCES = \
+    video_output/opengl/renderer.c \
+    video_output/opengl/renderer.h \
+    video_output/opengl/sub_renderer.c \
+    video_output/opengl/sub_renderer.h \
+    video_output/opengl/vout_helper.c \
+    video_output/opengl/vout_helper.h
 
 # Convenience library for OpenGL components -- OpenGL only
 libvlc_opengl_la_SOURCES = $(OPENGL_COMMONSOURCES)
@@ -54,7 +55,8 @@ noinst_LTLIBRARIES += libvlc_opengles.la
 endif
 
 ### OpenGL ###
-libgles2_plugin_la_SOURCES = video_output/opengl/display.c
+libgles2_plugin_la_SOURCES = video_output/opengl/display.c \
+    $(OPENGL_VOUT_COMMONSOURCES)
 libgles2_plugin_la_CFLAGS = $(AM_CFLAGS) $(GLES2_CFLAGS) -DUSE_OPENGL_ES2
 libgles2_plugin_la_LIBADD = libvlc_opengles.la
 libgles2_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
@@ -62,9 +64,34 @@ if HAVE_GLES2
 vout_LTLIBRARIES += libgles2_plugin.la
 endif
 
-libgl_plugin_la_SOURCES = video_output/opengl/display.c
+libgl_plugin_la_SOURCES = video_output/opengl/display.c \
+    $(OPENGL_VOUT_COMMONSOURCES)
 libgl_plugin_la_CFLAGS = $(AM_CFLAGS) $(GL_CFLAGS) $(OPENGL_COMMONCFLAGS)
 libgl_plugin_la_LIBADD = libvlc_opengl.la
+if HAVE_GL
+vout_LTLIBRARIES += libgl_plugin.la
+endif # HAVE_GL
+
+libglfilter_draw_plugin_la_SOURCES = video_output/opengl/filter_draw.c
+libglfilter_draw_plugin_la_LDFLAGS = $(AM_LDFLAGS)
+if HAVE_GL
+libglfilter_draw_plugin_la_LIBADD = libvlc_opengl.la $(GL_LIBS)
+vout_LTLIBRARIES += libglfilter_draw_plugin.la
+endif
+if HAVE_OSX
+libglfilter_draw_plugin_la_LIBADD = libvlc_opengl.la
+vout_LTLIBRARIES += libglfilter_draw_plugin.la
+endif
+if HAVE_IOS
+libglfilter_draw_plugin_la_LIBADD = libvlc_opengles.la $(GLES2_LIBS)
+libglfilter_draw_plugin_la_CFLAGS = -DUSE_OPENGL_ES2=1
+vout_LTLIBRARIES += libglfilter_draw_plugin.la
+endif
+if HAVE_ANDROID
+libglfilter_draw_plugin_la_LIBADD = libvlc_opengles.la $(GLES2_LIBS)
+libglfilter_draw_plugin_la_CFLAGS = -DUSE_OPENGL_ES2=1
+vout_LTLIBRARIES += libglfilter_draw_plugin.la
+endif
 
 libglfilter_mock_plugin_la_SOURCES = video_output/opengl/filter_mock.c
 libglfilter_mock_plugin_la_LIBADD = $(LIBM)
@@ -80,15 +107,16 @@ libglfilter_mock_plugin_la_CFLAGS = -DUSE_OPENGL_ES2=1
 noinst_LTLIBRARIES += libglfilter_mock_plugin.la
 endif
 
+if HAVE_OSX
+libglfilter_mock_plugin_la_LIBADD += libvlc_opengl.la
+noinst_LTLIBRARIES += libglfilter_mock_plugin.la
+endif
+
 if HAVE_ANDROID
 libglfilter_mock_plugin_la_LIBADD += libvlc_opengles.la $(GLES2_LIBS)
 libglfilter_mock_plugin_la_CFLAGS = -DUSE_OPENGL_ES2=1
 noinst_LTLIBRARIES += libglfilter_mock_plugin.la
 endif
-
-if HAVE_GL
-vout_LTLIBRARIES += libgl_plugin.la
-endif # HAVE_GL
 
 libegl_display_generic_plugin_la_SOURCES = video_output/opengl/egl_display_generic.c
 libegl_display_generic_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(EGL_FLAGS)

@@ -25,26 +25,26 @@ import "qrc:///style/"
 
 ListView {
     id: playerBtnDND
+
     spacing: VLCStyle.margin_xsmall
     orientation: Qt.Horizontal
     clip: true
 
+    currentIndex: -1
     highlightFollowsCurrentItem: false
+
+    boundsBehavior: Flickable.StopAtBounds
+    boundsMovement: Flickable.StopAtBounds
 
     property bool containsDrag: footerItem.dropVisible
 
     property alias scrollBar: scrollBar
 
+    property bool extraWidthAvailable: true
+
     ScrollBar.horizontal: ScrollBar {
         id: scrollBar
         policy: playerBtnDND.contentWidth > playerBtnDND.width ? ScrollBar.AlwaysOn : ScrollBar.AsNeeded
-    }
-
-    function wheelScroll(delta) {
-        if (delta > 0)
-            scrollBar.decrease()
-        else
-            scrollBar.increase()
     }
 
     remove: Transition {
@@ -55,6 +55,10 @@ ListView {
         }
     }
 
+    // FIXME: Animations are disabled because they are incompatible
+    // with the delegate loader which sets extra width after the
+    // control gets loaded.
+    /*
     add: Transition {
         NumberAnimation {
             property: "opacity"; from: 0; to: 1.0
@@ -73,85 +77,102 @@ ListView {
 
         NumberAnimation { property: "opacity"; to: 1.0 }
     }
+    */
+
+    function dropEvent(drag, destIndex) {
+        if (drag.source.dndView === playerBtnDND) {
+            // moving from same section
+            playerBtnDND.model.move(drag.source.DelegateModel.itemsIndex,
+                                    destIndex)
+        } else if (drag.source.objectName === "buttonsList") {
+            // moving from buttonsList
+            playerBtnDND.model.insert(destIndex, {"id" : drag.source.mIndex})
+        } else {
+            // moving between sections or views
+            playerBtnDND.model.insert(destIndex, {"id" : drag.source.controlId})
+            drag.source.dndView.model.remove(drag.source.DelegateModel.itemsIndex)
+        }
+    }
     
     MouseArea {
         anchors.fill: parent
-        z: 1
 
-        visible: root._held
+        acceptedButtons: Qt.NoButton
+        z: -1
 
-        cursorShape: visible ? Qt.DragMoveCursor : Qt.ArrowCursor
-    }
-
-    footer: MouseArea {
-        height: VLCStyle.icon_medium
-        width: Math.max(height, playerBtnDND.width - x)
-        anchors.verticalCenter: parent.verticalCenter
-        property bool dropVisible: false
+        cursorShape: root.dragActive ? Qt.DragMoveCursor : Qt.ArrowCursor
 
         onWheel: {
-            wheelScroll(wheel.angleDelta.y)
+            // scrolling based on angleDelta.x is handled by the listview itself
+            var y = wheel.angleDelta.y
+
+            if (y > 0) {
+                scrollBar.decrease()
+                wheel.accepted = true
+            } else if (y < 0) {
+                scrollBar.increase()
+                wheel.accepted = true
+            } else {
+                wheel.accepted = false
+            }
         }
+    }
+
+    footer: Item {
+        anchors.verticalCenter: parent.verticalCenter
+
+        implicitHeight: VLCStyle.icon_medium
+        implicitWidth: Math.max(implicitHeight, playerBtnDND.width - x)
+
+        property alias dropVisible: footerDropArea.containsDrag
 
         Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+
             z: 2
-            width: VLCStyle.dp(2, VLCStyle.scale)
-            height: parent.height
-            anchors {
-                left: parent.left
-            }
-            antialiasing: true
+
+            implicitWidth: VLCStyle.dp(2, VLCStyle.scale)
+
             visible: dropVisible
             color: VLCStyle.colors.accent
         }
+
         DropArea {
+            id: footerDropArea
+
             anchors.fill: parent
 
             onEntered: {
-                if (drag.source.dndView === playerBtnDND && drag.source.DelegateModel.itemsIndex === playerBtnDND.count - 1)
-                    return
-
-                dropVisible = true
-            }
-
-            onExited: {
-                dropVisible = false
+                if (drag.source.dndView === playerBtnDND &&
+                        drag.source.DelegateModel.itemsIndex === playerBtnDND.count - 1) {
+                    drag.accepted = false
+                }
             }
 
             onDropped: {
-                if (!dropVisible)
-                    return
+                var destIndex = playerBtnDND.count
 
-                if (drag.source.dndView === playerBtnDND) {
-                    // moving from same section
-                    playerBtnDND.model.move(drag.source.DelegateModel.itemsIndex, playerBtnDND.count - 1)
-                }
-                else if (drag.source.objectName == "buttonsList"){
-                    // moving from buttonsList
-                    playerBtnDND.model.insert(playerBtnDND.count, {"id" : drag.source.mIndex})
-                }
-                else {
-                    // moving between sections
-                    playerBtnDND.model.insert(playerBtnDND.count, {"id" : drag.source.controlId})
-                    drag.source.dndView.model.remove(drag.source.DelegateModel.itemsIndex)
-                }
+                if (drag.source.dndView === playerBtnDND)
+                    --destIndex
 
-                dropVisible = false
+                dropEvent(drag, destIndex)
             }
         }
     }
 
     delegate: EditorDNDDelegate {
+        anchors.verticalCenter: (!!parent) ? parent.verticalCenter : undefined
+
         dndView: playerBtnDND
 
-        onContainsDragChanged: {
-            for(var child in playerBtnDND.contentItem.children) {
-                if (playerBtnDND.contentItem.children[child].containsDrag === true) {
-                    playerBtnDND.containsDrag = true
-                    return
-                }
-            }
-            playerBtnDND.containsDrag = Qt.binding(function() { return footerItem.dropVisible; } )
+        Binding {
+            when: dropArea.containsDrag
+            value: true
+
+            target: playerBtnDND
+            property: "containsDrag"
         }
     }
 }

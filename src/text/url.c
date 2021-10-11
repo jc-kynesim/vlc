@@ -297,9 +297,9 @@ char *vlc_uri2path (const char *url)
     else
     if (schemelen == 2 && !strncasecmp (url, "fd", 2))
     {
-        int fd = strtol (path, &end, 0);
+        long fd = strtol(path, &end, 0);
 
-        if (*end)
+        if (*end || ((unsigned long)fd) > INT_MAX)
             goto out;
 
 #if !defined( _WIN32 ) && !defined( __OS2__ )
@@ -315,7 +315,7 @@ char *vlc_uri2path (const char *url)
                 ret = strdup ("/dev/stderr");
                 break;
             default:
-                if (asprintf (&ret, "/dev/fd/%d", fd) == -1)
+                if (asprintf (&ret, "/dev/fd/%ld", fd) == -1)
                     ret = NULL;
         }
 #else
@@ -404,7 +404,7 @@ static bool vlc_uri_host_validate(const char *str)
 
 static bool vlc_uri_path_validate(const char *str)
 {
-    return vlc_uri_component_validate(str, "/@:");
+    return vlc_uri_component_validate(str, "/@:[]");
 }
 
 static int vlc_UrlParseInner(vlc_url_t *restrict url, const char *str)

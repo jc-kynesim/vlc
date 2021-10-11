@@ -20,6 +20,7 @@ import QtQuick.Controls 2.4
 import org.videolan.vlc 0.1
 
 import "qrc:///style/"
+import "qrc:///util/Helpers.js" as Helpers
 
 FocusScope {
     id: root
@@ -49,6 +50,7 @@ FocusScope {
     property var model
 
     property int currentIndex: 0
+
     property alias contentHeight: flickable.contentHeight
     property alias contentWidth: flickable.contentWidth
     property alias contentX: flickable.contentX
@@ -59,10 +61,15 @@ FocusScope {
 
     property bool _isInitialised: false
 
+    property bool _releaseActionButtonPressed: false
+
     /// the id of the item to be expanded
     property int expandIndex: -1
     property int _newExpandIndex: -1
     property int _expandItemVerticalSpace: 0
+
+    property int _currentFocusReason: Qt.OtherFocusReason
+
     on_ExpandItemVerticalSpaceChanged: {
         if (expandItem) {
             expandItem.visible = root._expandItemVerticalSpace - root.verticalSpacing > 0
@@ -94,11 +101,32 @@ FocusScope {
 
     Accessible.role: Accessible.Table
 
-    function setCurrentItemFocus() {
-        if (!model || model.count === 0 || currentIndex === -1)
-            return
-        positionViewAtIndex(currentIndex, ItemView.Contain)
-        flickable.setCurrentItemFocus()
+    function setCurrentItemFocus(reason) {
+
+        // NOTE: Saving the focus reason for later.
+        _currentFocusReason = reason;
+
+        if (!model || model.count === 0 || currentIndex === -1) {
+            // NOTE: By default we want the focus on the flickable.
+            flickable.forceActiveFocus(reason);
+
+            return;
+        }
+
+        if (_containsItem(currentIndex))
+            Helpers.enforceFocus(_getItem(currentIndex), reason);
+        else
+            flickable.forceActiveFocus(reason);
+
+        // NOTE: We make sure the current item is fully visible.
+        positionViewAtIndex(currentIndex, ItemView.Contain);
+
+        if (expandIndex !== -1) {
+            // NOTE: We clear expandIndex so we can apply the proper focus in _setupChild.
+            expandIndex = -1;
+
+            retract();
+        }
     }
 
     function switchExpandItem(index) {
@@ -133,10 +161,18 @@ FocusScope {
     }
 
     function getItemPos(id) {
-        var colCount = root.getNbItemsPerRow()
-        var remainingSpace = (flickable.width - root.rightMargin - root.leftMargin) - (colCount * root._effectiveCellWidth) + root.horizontalSpacing
-        var rowCol = getItemRowCol(id)
-        return [(rowCol[0] * root._effectiveCellWidth) + (remainingSpace / 2) + root.leftMargin, rowCol[1] * root._effectiveCellHeight + headerHeight + topMargin]
+        var remainingSpace = (flickable.width - rightMargin - leftMargin)
+                             - getNbItemsPerRow() * _effectiveCellWidth + horizontalSpacing;
+
+        var rowCol = getItemRowCol(id);
+
+        var x = rowCol[0] * _effectiveCellWidth + remainingSpace / 2 + leftMargin;
+
+        var y = rowCol[1] * _effectiveCellHeight + headerHeight + topMargin;
+
+        // NOTE: Position needs to be integer based if we want to avoid visual artifacts like
+        //       wrong alignments or blurry texture rendering.
+        return [Math.round(x), Math.round(y)];
     }
 
     //use the same signature as Gridview.positionViewAtIndex(index, PositionMode mode)
@@ -184,7 +220,9 @@ FocusScope {
                 root._getItem(currentIndex).focus = false
             currentIndex = -1
         }
-        root.forceActiveFocus()
+
+        // NOTE: We make sure to clear the keyboard focus.
+        flickable.forceActiveFocus();
     }
 
     function rightClickOnItem(index) {
@@ -252,10 +290,11 @@ FocusScope {
             throw "wrong child: " + id
 
         //theses properties are always defined in Item
-        item.focus = (id === root.currentIndex) && (root.expandIndex === -1)
         item.x = x
         item.y = y
         item.selected = delegateModel.isSelected(model.index(id, 0))
+
+        return item
     }
 
     function _recycleItem(id, x, y) {
@@ -266,12 +305,13 @@ FocusScope {
         item.index = id
         item.model = model.getDataAt(id)
         item.selected = delegateModel.isSelected(model.index(id, 0))
-        item.focus = (id === root.currentIndex) && (root.expandIndex === -1)
         item.x = x
         item.y = y
         item.visible = true
 
         root._setItem(id, item)
+
+        return item
     }
 
     function _createItem(id, x, y) {
@@ -279,26 +319,35 @@ FocusScope {
                         selected: delegateModel.isSelected(model.index(id, 0)),
                         index: id,
                         model: model.getDataAt(id),
-                        focus: (id === root.currentIndex) && (root.expandIndex === -1),
                         x: x,
                         y: y,
                         visible: true
                     });
         if (item === undefined)
             throw "wrong unable to instantiate child " + id
+
         root._setItem(id, item)
+
+        return item
     }
 
     function _setupChild(id, ydelta) {
         var pos = root.getItemPos(id)
 
-        if (root._containsItem(id)) {
-            _repositionItem(id, pos[0], pos[1] + ydelta)
-        }  else if (_unusedItemList.length > 0) {
-            _recycleItem(id, pos[0], pos[1] + ydelta)
-        } else {
-            _createItem(id, pos[0], pos[1] + ydelta)
-        }
+        var item;
+
+        if (root._containsItem(id))
+            item = _repositionItem(id, pos[0], pos[1] + ydelta)
+        else if (_unusedItemList.length > 0)
+            item = _recycleItem(id, pos[0], pos[1] + ydelta)
+        else
+            item = _createItem(id, pos[0], pos[1] + ydelta)
+
+        // NOTE: This makes sure we have the proper focus reason on the GridItem.
+        if (activeFocus && currentIndex === item.index && expandIndex === -1)
+            item.forceActiveFocus(_currentFocusReason)
+        else
+            item.focus = false
     }
 
     function _refreshData( iMin, iMax ) {
@@ -402,13 +451,11 @@ FocusScope {
             sourceComponent: headerDelegate
             focus: item.focus
             onFocusChanged: {
-                if (focus) {
-                    //when we gain the focus ensure the widget is fully visible
-                    animateFlickableContentY(0)
-                } else {
-                    //when we lose the focus restore the focus on the current grid item
-                    flickable.setCurrentItemFocus()
-                }
+                if (!focus)
+                    return;
+
+                // when we gain the focus ensure the widget is fully visible
+                animateFlickableContentY(0);
             }
             onLoaded: {
                 item.x = 0
@@ -626,8 +673,6 @@ FocusScope {
             to: 0
             onStopped: {
                 expandIndex = -1
-                flickable.setCurrentItemFocus()
-                root.positionViewAtIndex(root.currentIndex, ItemView.Contain)
                 if (_newExpandIndex !== -1)
                     flickable.expand()
             }
@@ -640,16 +685,6 @@ FocusScope {
             easing.type: Easing.InQuad
             duration: VLCStyle.duration_slow
             from: 0
-        }
-
-        function setCurrentItemFocus() {
-            if (expandIndex !== -1)
-                return
-            var child
-            if (root._containsItem(currentIndex))
-                child = root._getItem(currentIndex)
-            if (child !== undefined)
-                child.focus = true
         }
     }
 
@@ -669,7 +704,6 @@ FocusScope {
     onCurrentIndexChanged: {
         if (expandIndex !== -1)
             retract()
-        flickable.setCurrentItemFocus()
         positionViewAtIndex(root.currentIndex, ItemView.Contain)
     }
 
@@ -702,11 +736,24 @@ FocusScope {
             event.accepted = true
         }
 
+        if (event.matches(StandardKey.SelectAll) || KeyHelper.matchOk(event)) {
+            _releaseActionButtonPressed = true
+        } else {
+            _releaseActionButtonPressed = false
+        }
+
         if (newIndex !== -1 && newIndex !== currentIndex) {
-            event.accepted = true
-            var oldIndex = currentIndex
-            currentIndex = newIndex
-            root.selectionUpdated(event.modifiers, oldIndex, newIndex)
+            event.accepted = true;
+
+            var oldIndex = currentIndex;
+            currentIndex = newIndex;
+            root.selectionUpdated(event.modifiers, oldIndex, newIndex);
+
+            // NOTE: We make sure we have the proper visual focus on components.
+            if (oldIndex < currentIndex)
+                setCurrentItemFocus(Qt.TabFocusReason);
+            else
+                setCurrentItemFocus(Qt.BacktabFocusReason);
         }
 
         if (!event.accepted) {
@@ -715,6 +762,9 @@ FocusScope {
     }
 
     Keys.onReleased: {
+        if (!_releaseActionButtonPressed)
+            return
+
         if (event.matches(StandardKey.SelectAll)) {
             event.accepted = true
             root.selectAll()
@@ -722,5 +772,6 @@ FocusScope {
             event.accepted = true
             root.actionAtIndex(currentIndex)
         }
+        _releaseActionButtonPressed = false
     }
 }

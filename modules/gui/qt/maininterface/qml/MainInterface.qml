@@ -34,7 +34,7 @@ Rectangle {
     property bool _playlistReady: false
 
     property alias g_root: root
-    property variant g_dialogs: dialogsLoader.item
+    property var g_dialogs: dialogsLoader.item
 
     Binding {
         target: VLCStyle.self
@@ -79,11 +79,11 @@ Rectangle {
 
     function loadCurrentHistoryView() {
         var current = history.current
-        if ( !current || !current.view ) {
+        if ( !current || !current.name  || !current.properties ) {
             console.warn("unable to load requested view, undefined")
             return
         }
-        stackView.loadView(root.pageModel, current.view, current.viewProperties)
+        stackView.loadView(root.pageModel, current.name, current.properties)
     }
 
     Connections {
@@ -135,7 +135,7 @@ Rectangle {
                 target: player
                 onPlayingStateChanged: {
                     if (player.playingState === PlayerController.PLAYING_STATE_STOPPED
-                            && history.current.view === "player") {
+                            && history.current.name === "player") {
                         if (history.previousEmpty)
                         {
                             if (medialib)

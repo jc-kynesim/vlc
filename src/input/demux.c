@@ -69,11 +69,11 @@ static const char *demux_NameFromMimeType(const char *mime)
     return (type != NULL) ? type->name : "any";
 }
 
-demux_t *demux_New( vlc_object_t *p_obj, const char *psz_name,
+demux_t *demux_New( vlc_object_t *p_obj, const char *module, const char *url,
                     stream_t *s, es_out_t *out )
 {
     assert(s != NULL );
-    return demux_NewAdvanced( p_obj, NULL, psz_name, "", s, out, false );
+    return demux_NewAdvanced( p_obj, NULL, module, url, s, out, false );
 }
 
 struct vlc_demux_private
@@ -118,6 +118,12 @@ demux_t *demux_NewAdvanced( vlc_object_t *p_obj, input_thread_t *p_input,
                             const char *module, const char *url,
                             stream_t *s, es_out_t *out, bool b_preparsing )
 {
+    const char *p = strchr(url, ':');
+    if (p == NULL) {
+        errno = EINVAL;
+        return NULL;
+    }
+
     struct vlc_demux_private *priv;
     demux_t *p_demux = vlc_stream_CustomNew(p_obj, demux_DestroyDemux,
                                             sizeof (*priv), "demux");
@@ -137,9 +143,10 @@ demux_t *demux_NewAdvanced( vlc_object_t *p_obj, input_thread_t *p_input,
     if (unlikely(p_demux->psz_url == NULL))
         goto error;
 
-    const char *p = strstr(p_demux->psz_url, "://");
-    p_demux->psz_location = (p != NULL) ? (p + 3) : "";
-    p_demux->psz_filepath = get_path(p_demux->psz_location); /* parse URL */
+    p_demux->psz_location = p_demux->psz_url + 1 + (p - url);
+    if (strncmp(p_demux->psz_location, "//", 2) == 0)
+        p_demux->psz_location += 2;
+    p_demux->psz_filepath = vlc_uri2path(url); /* parse URL */
 
     if( !b_preparsing )
         msg_Dbg( p_obj, "creating demux \"%s\", URL: %s, path: %s",

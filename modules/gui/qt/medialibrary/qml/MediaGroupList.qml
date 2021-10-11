@@ -51,13 +51,15 @@ FocusScope {
 
     property alias model: model
 
-    property alias currentItem: view.currentItem
+    // Private
+
+    property alias _currentView: view.currentItem
 
     //---------------------------------------------------------------------------------------------
     // Signals
     //---------------------------------------------------------------------------------------------
 
-    signal showList(variant model)
+    signal showList(var model, int reason)
 
     //---------------------------------------------------------------------------------------------
     // Events
@@ -84,10 +86,13 @@ FocusScope {
     // Functions
     //---------------------------------------------------------------------------------------------
 
-    function setCurrentItemFocus() { listView.currentItem.forceActiveFocus() }
+    function setCurrentItemFocus(reason) {
+        _currentView.setCurrentItemFocus(reason);
+    }
 
     function resetFocus() {
-        if (model.count === 0) return;
+        if (model.count === 0)
+            return;
 
         var initialIndex = root.initialIndex;
 
@@ -96,8 +101,8 @@ FocusScope {
 
         modelSelect.select(model.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect);
 
-        if (currentItem)
-            currentItem.positionViewAtIndex(initialIndex, ItemView.Contain);
+        if (_currentView)
+            _currentView.positionViewAtIndex(initialIndex, ItemView.Contain);
     }
 
     //---------------------------------------------------------------------------------------------
@@ -108,24 +113,24 @@ FocusScope {
             g_mainDisplay.play(medialib, model.getIdsForIndexes(modelSelect.selectedIndexes));
         } else if (modelSelect.selectedIndexes.length === 1) {
             var index = modelSelect.selectedIndexes[0];
-            _showList(model.getDataAt(index));
+            _showList(model.getDataAt(index), Qt.TabFocusReason);
         }
     }
 
-    function _showList(model)
+    function _showList(model, reason)
     {
         // NOTE: If the count is 1 we consider the group is a media.
         if (model.count == 1)
             g_mainDisplay.play(medialib, model.id);
         else
-            showList(model);
+            showList(model, reason);
     }
 
     function _onNavigationCancel() {
-        if (root.currentItem.currentIndex > 0) {
-            root.currentItem.currentIndex = 0;
+        if (_currentView.currentIndex > 0) {
+            _currentView.currentIndex = 0;
 
-            root.currentItem.positionViewAtIndex(0, ItemView.Contain);
+            _currentView.positionViewAtIndex(0, ItemView.Contain);
         } else {
             root.Navigation.defaultNavigationCancel();
         }
@@ -158,7 +163,8 @@ FocusScope {
         ml: medialib
 
         onCountChanged: {
-            if (count === 0 || modelSelect.hasSelection) return;
+            if (count === 0 || modelSelect.hasSelection)
+                return;
 
             resetFocus();
         }
@@ -289,7 +295,7 @@ FocusScope {
 
                 onItemClicked: gridView.leftClickOnItem(modifier, index)
 
-                onItemDoubleClicked: _showList(model)
+                onItemDoubleClicked: _showList(model, Qt.MouseFocusReason)
 
                 onContextMenuButtonClicked: {
                     gridView.rightClickOnItem(index);
@@ -311,7 +317,8 @@ FocusScope {
             //       than Component.onCompleted because modelSelect.selectedGroup update itself
             //       after this event.
             onActiveFocusChanged: {
-                if (activeFocus == false || model.count === 0 || modelSelect.hasSelection) return;
+                if (activeFocus == false || model.count === 0 || modelSelect.hasSelection)
+                    return;
 
                 modelSelect.select(model.index(0,0), ItemSelectionModel.ClearAndSelect)
             }

@@ -744,6 +744,11 @@ static bool open_amt_tunnel( stream_t *p_access )
         {
             block_Release( pkt );
             msg_Dbg( p_access, "Got UDP packet from multicast group via AMT relay %s, continuing...", relay_ip );
+
+            /* Arm IGMP timer once we've confirmed we are getting packets */
+            vlc_timer_schedule( sys->updateTimer, false,
+                        VLC_TICK_FROM_SEC( sys->relay_igmp_query.qqic ), VLC_TICK_FROM_SEC( sys->relay_igmp_query.qqic ) );
+
             break;   /* found an active server sending UDP packets, so exit loop */
         }
     }
@@ -880,20 +885,6 @@ static int amt_sockets_init( stream_t *p_access )
         msg_Err( p_access, "Failed to bind query socket" );
         goto error;
     }
-
-    struct sockaddr_in stSvrAddr =
-    {
-        .sin_family = AF_INET,
-        .sin_port = htons( 9124 ),
-    };
-
-    res = inet_pton( AF_INET, LOCAL_LOOPBACK, &stSvrAddr.sin_addr );
-    if( res != 1 )
-    {
-        msg_Err( p_access, "Could not convert loopback address" );
-        goto error;
-    }
-    /* TODO: stSvrAddr is unused ? */
 
     return 0;
 
@@ -1243,10 +1234,6 @@ static bool amt_rcv_relay_mem_query( stream_t *p_access )
 
     shift++; assert( shift < RELAY_QUERY_MSG_LEN);
     memcpy( &sys->relay_igmp_query.nSrc, &pkt[shift], 2 );
-
-    /* Arms the timer for a single shot: cf. amt_update_timer_cb comment */
-    vlc_timer_schedule( sys->updateTimer, false,
-                        VLC_TICK_FROM_SEC( sys->relay_igmp_query.qqic ), 0 );
 
     return true;
 }

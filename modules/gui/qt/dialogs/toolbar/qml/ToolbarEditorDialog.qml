@@ -27,8 +27,11 @@ import org.videolan.vlc 0.1
 WindowDialog {
     id: root
 
-    width: 800
+    width: minimumWidth
     height: 600
+
+    minimumWidth: 825
+    minimumHeight: 400
 
     modal: true
     title: i18n.qtr("Toolbar Editor")
@@ -56,6 +59,12 @@ WindowDialog {
     }
 
     contentComponent: Item {
+        MouseArea {
+            anchors.fill: parent
+
+            cursorShape: toolbarEditor.dragActive ? Qt.ForbiddenCursor : Qt.ArrowCursor
+        }
+
         ColumnLayout {
             anchors.fill: parent
 
@@ -68,6 +77,9 @@ WindowDialog {
 
                 Widgets.ComboBoxExt {
                     id: comboBox
+
+                    Layout.maximumWidth: (root.width / 2)
+
                     font.pixelSize: VLCStyle.fontSize_normal
 
                     width: VLCStyle.combobox_width_large

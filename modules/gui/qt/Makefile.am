@@ -17,6 +17,7 @@ libqt_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
 	-I$(srcdir)/gui/qt -I$(builddir)/gui/qt/ \
 	-I$(builddir)/gui/qt/dialogs/extended \
 	-I$(builddir)/gui/qt/dialogs/fingerprint \
+	-I$(builddir)/gui/qt/dialogs/firstrun \
 	-I$(builddir)/gui/qt/dialogs/help \
 	-I$(builddir)/gui/qt/dialogs/messages \
 	-I$(builddir)/gui/qt/dialogs/open \
@@ -81,7 +82,7 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/dialogs/fingerprint/chromaprint.hpp \
 	gui/qt/dialogs/fingerprint/fingerprintdialog.cpp \
 	gui/qt/dialogs/fingerprint/fingerprintdialog.hpp \
-	gui/qt/dialogs/firstrun/firstrun.cpp gui/qt/dialogs/firstrun/firstrun.hpp \
+	gui/qt/dialogs/firstrun/firstrunwizard.cpp gui/qt/dialogs/firstrun/firstrunwizard.hpp \
 	gui/qt/dialogs/gototime/gototime.cpp gui/qt/dialogs/gototime/gototime.hpp \
 	gui/qt/dialogs/help/aboutmodel.cpp \
 	gui/qt/dialogs/help/aboutmodel.hpp \
@@ -277,6 +278,8 @@ libqt_plugin_la_SOURCES += \
 	gui/qt/maininterface/compositor_dcomp.cpp \
 	gui/qt/maininterface/compositor_dcomp.hpp \
 	gui/qt/maininterface/compositor_dcomp_error.hpp \
+	gui/qt/maininterface/compositor_dcomp_acrylicsurface.hpp \
+	gui/qt/maininterface/compositor_dcomp_acrylicsurface.cpp \
 	gui/qt/maininterface/compositor_dcomp_uisurface.cpp \
 	gui/qt/maininterface/compositor_dcomp_uisurface.hpp
 endif
@@ -312,7 +315,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/dialogs/extensions/extensions_manager.moc.cpp \
 	gui/qt/dialogs/fingerprint/chromaprint.moc.cpp \
 	gui/qt/dialogs/fingerprint/fingerprintdialog.moc.cpp \
-	gui/qt/dialogs/firstrun/firstrun.moc.cpp \
+	gui/qt/dialogs/firstrun/firstrunwizard.moc.cpp \
 	gui/qt/dialogs/gototime/gototime.moc.cpp \
 	gui/qt/dialogs/help/aboutmodel.moc.cpp \
 	gui/qt/dialogs/help/help.moc.cpp \
@@ -412,6 +415,7 @@ nodist_libqt_plugin_la_SOURCES += gui/qt/maininterface/main_interface_win32.moc.
 
 if HAVE_DCOMP
 nodist_libqt_plugin_la_SOURCES += \
+	gui/qt/maininterface/compositor_dcomp_acrylicsurface.moc.cpp \
 	gui/qt/maininterface/compositor_dcomp.moc.cpp \
 	gui/qt/maininterface/compositor_dcomp_uisurface.moc.cpp
 endif
@@ -422,6 +426,7 @@ nodist_libqt_plugin_la_SOURCES += \
 	gui/qt/dialogs/extended/ui_equalizer.h \
 	gui/qt/dialogs/extended/ui_video_effects.h \
 	gui/qt/dialogs/fingerprint/ui_fingerprintdialog.h \
+	gui/qt/dialogs/firstrun/ui_firstrunwizard.h \
 	gui/qt/dialogs/help/ui_about.h \
 	gui/qt/dialogs/help/ui_update.h \
 	gui/qt/dialogs/messages/ui_messages_panel.h \
@@ -462,6 +467,7 @@ libqt_plugin_la_UI = \
 	gui/qt/dialogs/extended/equalizer.ui \
 	gui/qt/dialogs/extended/video_effects.ui \
 	gui/qt/dialogs/fingerprint/fingerprintdialog.ui \
+	gui/qt/dialogs/firstrun/firstrunwizard.ui \
 	gui/qt/dialogs/help/about.ui \
 	gui/qt/dialogs/help/update.ui \
 	gui/qt/dialogs/messages/messages_panel.ui \
@@ -653,7 +659,10 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/cone.svg \
 	gui/qt/pixmaps/album_cover.svg \
 	gui/qt/pixmaps/back.svg \
-	gui/qt/pixmaps/time.svg
+	gui/qt/pixmaps/time.svg \
+	gui/qt/pixmaps/theme_dark.svg \
+	gui/qt/pixmaps/theme_daynight.svg \
+	gui/qt/pixmaps/theme_light.svg
 
 if HAVE_WIN32
 libqt_plugin_la_RES += gui/qt/pixmaps/windows-theme.conf
@@ -689,6 +698,7 @@ libqt_plugin_la_QML = \
 	gui/qt/medialibrary/qml/MusicAlbumsDisplay.qml \
 	gui/qt/medialibrary/qml/MusicAlbumsGridExpandDelegate.qml \
 	gui/qt/medialibrary/qml/MusicArtist.qml \
+	gui/qt/medialibrary/qml/MusicArtistDelegate.qml \
 	gui/qt/medialibrary/qml/MusicArtistsAlbums.qml \
 	gui/qt/medialibrary/qml/MusicAllArtists.qml \
 	gui/qt/medialibrary/qml/MusicArtistsDisplay.qml \
@@ -728,8 +738,9 @@ libqt_plugin_la_QML = \
 	gui/qt/network/qml/NetworkListItem.qml \
 	gui/qt/network/qml/NetworkThumbnailItem.qml \
 	gui/qt/network/qml/ServicesHomeDisplay.qml \
+	gui/qt/player/qml/qmldir \
 	gui/qt/player/qml/ControlBar.qml \
-	gui/qt/player/qml/ControlButtons.qml \
+	gui/qt/player/qml/ControlbarControls.qml \
 	gui/qt/player/qml/LanguageMenu.qml \
 	gui/qt/player/qml/PlaybackSpeed.qml \
 	gui/qt/player/qml/MiniPlayer.qml \
@@ -740,11 +751,43 @@ libqt_plugin_la_QML = \
 	gui/qt/player/qml/PlayerMenuItem.qml \
 	gui/qt/player/qml/ResumeDialog.qml \
 	gui/qt/player/qml/SliderBar.qml \
-	gui/qt/player/qml/TeletextWidget.qml \
 	gui/qt/player/qml/TopBar.qml \
 	gui/qt/player/qml/TrackInfo.qml \
-	gui/qt/player/qml/VolumeWidget.qml \
 	gui/qt/player/qml/ButtonsLayout.qml \
+	gui/qt/player/qml/controlbarcontrols/ArtworkInfoWidget.qml \
+	gui/qt/player/qml/controlbarcontrols/AspectRatioWidget.qml \
+	gui/qt/player/qml/controlbarcontrols/AtoBButton.qml \
+	gui/qt/player/qml/controlbarcontrols/BackButton.qml \
+	gui/qt/player/qml/controlbarcontrols/ChapterNextButton.qml \
+	gui/qt/player/qml/controlbarcontrols/ChapterPreviousButton.qml \
+	gui/qt/player/qml/controlbarcontrols/ExpandingSpacerWidget.qml \
+	gui/qt/player/qml/controlbarcontrols/ExtendedSettingsButton.qml \
+	gui/qt/player/qml/controlbarcontrols/FasterButton.qml \
+	gui/qt/player/qml/controlbarcontrols/FrameButton.qml \
+	gui/qt/player/qml/controlbarcontrols/FullscreenButton.qml \
+	gui/qt/player/qml/controlbarcontrols/InfoButton.qml \
+	gui/qt/player/qml/controlbarcontrols/LangButton.qml \
+	gui/qt/player/qml/controlbarcontrols/LoopButton.qml \
+	gui/qt/player/qml/controlbarcontrols/MenuButton.qml \
+	gui/qt/player/qml/controlbarcontrols/NextButton.qml \
+	gui/qt/player/qml/controlbarcontrols/OpenButton.qml \
+	gui/qt/player/qml/controlbarcontrols/PlaybackSpeedButton.qml \
+	gui/qt/player/qml/controlbarcontrols/PlayButton.qml \
+	gui/qt/player/qml/controlbarcontrols/PlayerSwitchButton.qml \
+	gui/qt/player/qml/controlbarcontrols/PlaylistButton.qml \
+	gui/qt/player/qml/controlbarcontrols/PreviousButton.qml \
+	gui/qt/player/qml/controlbarcontrols/QuitButton.qml \
+	gui/qt/player/qml/controlbarcontrols/RandomButton.qml \
+	gui/qt/player/qml/controlbarcontrols/RecordButton.qml \
+	gui/qt/player/qml/controlbarcontrols/SkipBackButton.qml \
+	gui/qt/player/qml/controlbarcontrols/SkipForwardButton.qml \
+	gui/qt/player/qml/controlbarcontrols/SlowerButton.qml \
+	gui/qt/player/qml/controlbarcontrols/SnapshotButton.qml \
+	gui/qt/player/qml/controlbarcontrols/SpacerWidget.qml \
+	gui/qt/player/qml/controlbarcontrols/StopButton.qml \
+	gui/qt/player/qml/controlbarcontrols/TeletextWidget.qml \
+	gui/qt/player/qml/controlbarcontrols/VolumeWidget.qml \
+	gui/qt/player/qml/controlbarcontrols/Fallback.qml \
 	gui/qt/playlist/qml/PlaylistDelegate.qml \
 	gui/qt/playlist/qml/PlaylistListView.qml \
 	gui/qt/playlist/qml/PlaylistOverlayMenu.qml \
@@ -764,6 +807,7 @@ libqt_plugin_la_QML = \
 	gui/qt/widgets/qml/CheckedDelegate.qml \
 	gui/qt/widgets/qml/ComboBoxExt.qml \
 	gui/qt/widgets/qml/ContextButton.qml \
+	gui/qt/widgets/qml/AcrylicBackground.qml \
 	gui/qt/widgets/qml/AnimatedBackground.qml \
 	gui/qt/widgets/qml/CoverShadow.qml \
 	gui/qt/widgets/qml/CSDWindowButton.qml \

@@ -250,6 +250,7 @@ vlc_uri_compose
 vlc_uri_resolve
 vlc_uri_fixup
 vlc_tick_now
+vlc_tick_to_str
 module_config_free
 module_config_get
 module_find
@@ -278,6 +279,7 @@ vlc_memstream_printf
 vlc_Log
 vlc_LogSet
 vlc_vaLog
+vlc_tracer_Trace
 vlc_LogHeaderCreate
 vlc_LogDestroy
 vlc_strerror
@@ -324,7 +326,6 @@ picture_pool_Wait
 picture_Reset
 picture_Setup
 plane_CopyPixels
-secstotimestr
 sout_AccessOutControl
 sout_AccessOutDelete
 sout_AccessOutNew
@@ -500,6 +501,10 @@ vlc_clone
 VLC_CompileBy
 VLC_CompileHost
 VLC_Compiler
+vlc_atomic_wait
+vlc_atomic_timedwait
+vlc_atomic_notify_one
+vlc_atomic_notify_all
 vlc_cond_broadcast
 vlc_cond_init
 vlc_cond_signal
@@ -642,6 +647,7 @@ vlc_object_create
 vlc_object_delete
 vlc_object_typename
 vlc_object_parent
+vlc_object_get_tracer
 vlc_object_Log
 vlc_object_vaLog
 vlc_once

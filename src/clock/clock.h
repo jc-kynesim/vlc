@@ -58,7 +58,7 @@ struct vlc_clock_cbs
 /**
  * This function creates the vlc_clock_main_t of the program
  */
-vlc_clock_main_t *vlc_clock_main_New(struct vlc_logger *parent_logger);
+vlc_clock_main_t *vlc_clock_main_New(struct vlc_logger *parent_logger, struct vlc_tracer *parent_tracer);
 
 /**
  * Destroy the clock main
@@ -97,6 +97,7 @@ void vlc_clock_main_ChangePause(vlc_clock_main_t *clock, vlc_tick_t system_now,
  * You must use vlc_clock_Delete to free it.
  */
 vlc_clock_t *vlc_clock_main_CreateMaster(vlc_clock_main_t *main_clock,
+                                         const char *track_str_id,
                                          const struct vlc_clock_cbs *cbs,
                                          void *cbs_data);
 
@@ -118,6 +119,7 @@ vlc_clock_t *vlc_clock_main_CreateInputMaster(vlc_clock_main_t *main_clock);
  * You must use vlc_clock_Delete to free it.
  */
 vlc_clock_t *vlc_clock_main_CreateSlave(vlc_clock_main_t *main_clock,
+                                        const char *track_str_id,
                                         enum es_format_category_e cat,
                                         const struct vlc_clock_cbs *cbs,
                                         void *cbs_data);

@@ -81,7 +81,7 @@ AbstractChunk::AbstractChunk(AbstractChunkSource *source_)
 
 AbstractChunk::~AbstractChunk()
 {
-    delete source;
+    source->recycle();
 }
 
 std::string AbstractChunk::getContentType() const
@@ -234,16 +234,22 @@ block_t * HTTPChunkSource::read(size_t readsize)
             eof = true;
             downloadEndTime = vlc_tick_now();
         }
-        if(ret && p_block->i_buffer &&
+        if(ret && connection->getBytesRead() &&
            downloadEndTime > requestStartTime && type == ChunkType::Segment)
         {
-            connManager->updateDownloadRate(sourceid, p_block->i_buffer,
+            connManager->updateDownloadRate(sourceid,
+                                            connection->getBytesRead(),
                                             downloadEndTime - requestStartTime,
                                             downloadEndTime - responseTime);
         }
     }
 
     return p_block;
+}
+
+void HTTPChunkSource::recycle()
+{
+    connManager->recycleSource(this);
 }
 
 std::string HTTPChunkSource::getContentType() const
@@ -268,7 +274,7 @@ bool HTTPChunkSource::prepare()
     requestStartTime = vlc_tick_now();
 
     unsigned int i_redirects = 0;
-    while(i_redirects++ < HTTPConnection::MAX_REDIRECTS)
+    while(i_redirects++ < http::MAX_REDIRECTS)
     {
         if(!connection)
         {
@@ -282,12 +288,10 @@ bool HTTPChunkSource::prepare()
         {
             if(requeststatus == RequestStatus::Redirection)
             {
-                HTTPConnection *httpconn = dynamic_cast<HTTPConnection *>(connection);
-                if(httpconn)
-                    connparams = httpconn->getRedirection();
+                connparams = connection->getRedirection();
                 connection->setUsed(false);
                 connection = nullptr;
-                if(httpconn)
+                if(!connparams.getUrl().empty())
                     continue;
             }
             break;
@@ -431,13 +435,6 @@ void HTTPChunkBufferedSource::bufferize(size_t readsize)
     avail.signal();
 }
 
-bool HTTPChunkBufferedSource::prepare()
-{
-    if(!prepared)
-        return HTTPChunkSource::prepare();
-    return true;
-}
-
 bool HTTPChunkBufferedSource::hasMoreData() const
 {
     mutex_locker locker {lock};
@@ -526,6 +523,7 @@ HTTPChunk::HTTPChunk(const std::string &url, AbstractConnectionManager *manager,
                      const adaptive::ID &id, ChunkType type, const BytesRange &range):
     AbstractChunk(manager->makeSource(url, id, type, range))
 {
+    manager->start(source);
 }
 
 HTTPChunk::~HTTPChunk()

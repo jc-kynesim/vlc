@@ -39,7 +39,6 @@ QtObject {
     // When trying to force night/dark theme colors for items,
     // this can be used:
     readonly property VLCColors nightColors: VLCColors { state: "night" }
-    readonly property VLCColors dayColors: VLCColors { state: "day" }
 
     // Sizes
     readonly property double margin_xxxsmall: dp(2, scale);
@@ -134,8 +133,6 @@ QtObject {
 
     readonly property real network_normal: dp(100, scale)
 
-    readonly property int miniPlayerHeight: dp(76, scale)
-
     readonly property int expandAlbumTracksHeight: dp(200, scale)
 
     //combobox
@@ -220,6 +217,10 @@ QtObject {
     readonly property int bannerButton_height: dp(32, scale)
     readonly property int bannerButton_width: dp(40, scale)
 
+    // Drag and drop
+
+    readonly property int dragDelta: dp(12, scale)
+
     // Speed
 
     property bool animate: true
@@ -260,6 +261,9 @@ QtObject {
     readonly property url noArtAlbumCover: "qrc:///noart_albumCover.svg";
     readonly property url noArtArtistCover: "qrc:///noart_artistCover.svg";
     readonly property url noArtVideoCover: "qrc:///noart_videoCover.svg";
+
+    // Player controlbar
+    readonly property int maxControlbarControlHeight: dp(64, scale)
 
     //device pixel
     function dp(px, scale) {

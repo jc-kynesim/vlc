@@ -36,18 +36,26 @@ FocusScope {
     property int leftPadding: VLCStyle.margin_xlarge
 
     property int _currentIndex: -1
+
+    signal browse(var tree, int reason)
+
     on_CurrentIndexChanged: {
         deviceListView.currentIndex = _currentIndex
     }
 
+    function setCurrentItemFocus(reason) {
+        deviceListView.setCurrentItemFocus(reason);
+    }
+
     function _actionAtIndex(index, model, selectionModel) {
-        var data = model.getDataAt(index)
+        var data = model.getDataAt(index);
+
         if (data.type === NetworkMediaModel.TYPE_DIRECTORY
-                || data.type === NetworkMediaModel.TYPE_NODE)  {
-            history.push(["mc", "network", { tree: data.tree }]);
-        } else {
-            model.addAndPlay( selectionModel.selectedIndexes )
-        }
+            ||
+            data.type === NetworkMediaModel.TYPE_NODE)
+            browse(data.tree, Qt.TabFocusReason);
+        else
+            model.addAndPlay( selectionModel.selectedIndexes);
     }
 
     onFocusChanged: {
@@ -106,10 +114,12 @@ FocusScope {
             onPlayClicked: deviceModel.addAndPlay( index )
 
             onItemDoubleClicked: {
-                if (model.type === NetworkMediaModel.TYPE_NODE || model.type === NetworkMediaModel.TYPE_DIRECTORY)
-                    history.push( ["mc", "network", { tree: model.tree } ])
+                if (model.type === NetworkMediaModel.TYPE_NODE
+                    ||
+                    model.type === NetworkMediaModel.TYPE_DIRECTORY)
+                    browse(model.tree, Qt.MouseFocusReason);
                 else
-                    deviceModel.addAndPlay( index )
+                    deviceModel.addAndPlay(index);
             }
         }
 

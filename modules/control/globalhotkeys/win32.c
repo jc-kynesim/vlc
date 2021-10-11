@@ -58,7 +58,7 @@ struct intf_sys_t
     vlc_thread_t thread;
     HWND hotkeyWindow;
     vlc_mutex_t lock;
-    vlc_cond_t wait;
+    vlc_sem_t wait;
 };
 
 /*****************************************************************************
@@ -67,39 +67,27 @@ struct intf_sys_t
 static int Open( vlc_object_t *p_this )
 {
     intf_thread_t *p_intf = (intf_thread_t *)p_this;
-    intf_sys_t *p_sys = malloc( sizeof (intf_sys_t) );
+    intf_sys_t *p_sys = vlc_obj_malloc( p_this, sizeof (intf_sys_t) );
 
     if( p_sys == NULL )
         return VLC_ENOMEM;
 
     p_intf->p_sys = p_sys;
-    p_sys->hotkeyWindow = NULL;
     vlc_mutex_init( &p_sys->lock );
-    vlc_cond_init( &p_sys->wait );
+    vlc_sem_init( &p_sys->wait, 0 );
 
     if( vlc_clone( &p_sys->thread, Thread, p_intf, VLC_THREAD_PRIORITY_LOW ) )
-    {
-        free( p_sys );
-        p_intf->p_sys = NULL;
-
         return VLC_ENOMEM;
-    }
 
+    vlc_sem_wait( &p_sys->wait );
     vlc_mutex_lock( &p_sys->lock );
-    while( p_sys->hotkeyWindow == NULL )
-        vlc_cond_wait( &p_sys->wait, &p_sys->lock );
-    if( p_sys->hotkeyWindow == INVALID_HANDLE_VALUE )
-    {
-        vlc_mutex_unlock( &p_sys->lock );
-        vlc_join( p_sys->thread, NULL );
-        free( p_sys );
-        p_intf->p_sys = NULL;
-
-        return VLC_ENOMEM;
-    }
+    bool fail = p_sys->hotkeyWindow == NULL;
     vlc_mutex_unlock( &p_sys->lock );
 
-    return VLC_SUCCESS;
+    if( fail )
+        vlc_join( p_sys->thread, NULL );
+
+    return fail ? VLC_ENOMEM : VLC_SUCCESS;
 }
 
 /*****************************************************************************
@@ -117,7 +105,6 @@ static void Close( vlc_object_t *p_this )
     vlc_mutex_unlock( &p_sys->lock );
 
     vlc_join( p_sys->thread, NULL );
-    free( p_sys );
 }
 
 /*****************************************************************************
@@ -131,7 +118,6 @@ static void *Thread( void *p_data )
     intf_sys_t *p_sys = p_intf->p_sys;
 
     /* Window which receives Hotkeys */
-    vlc_mutex_lock( &p_sys->lock );
     p_sys->hotkeyWindow =
         (void*)CreateWindow( TEXT("STATIC"),         /* name of window class */
                 TEXT("VLC ghk ") TEXT(VERSION),     /* window title bar text */
@@ -144,16 +130,10 @@ static void *Thread( void *p_data )
                 NULL,                              /* no menu in this window */
                 GetModuleHandle(NULL),    /* handle of this program instance */
                 NULL );                                 /* sent to WM_CREATE */
+    vlc_sem_post( &p_sys->wait );
 
     if( p_sys->hotkeyWindow == NULL )
-    {
-        p_sys->hotkeyWindow = INVALID_HANDLE_VALUE;
-        vlc_cond_signal( &p_sys->wait );
-        vlc_mutex_unlock( &p_sys->lock );
         return NULL;
-    }
-    vlc_cond_signal( &p_sys->wait );
-    vlc_mutex_unlock( &p_sys->lock );
 
     SetWindowLongPtr( p_sys->hotkeyWindow, GWLP_WNDPROC,
             (LONG_PTR)WMHOTKEYPROC );

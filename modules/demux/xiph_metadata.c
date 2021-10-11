@@ -403,22 +403,22 @@ void vorbis_ParseComment( es_format_t *p_fmt, vlc_meta_t **pp_meta,
         memcpy( psz_comment, p_data, comment_size );
         psz_comment[comment_size] = '\0';
 
-        EnsureUTF8( psz_comment );
-
 #define IF_EXTRACT(txt,var) \
     if( !strncasecmp(psz_comment, txt, strlen(txt)) ) \
     { \
+        size_t key_length = strlen(txt); \
+        EnsureUTF8( psz_comment + key_length ); \
         const char *oldval = vlc_meta_Get( p_meta, vlc_meta_ ## var ); \
         if( oldval && (hasMetaFlags & XIPHMETA_##var)) \
         { \
             char * newval; \
-            if( asprintf( &newval, "%s,%s", oldval, &psz_comment[strlen(txt)] ) == -1 ) \
+            if( asprintf( &newval, "%s,%s", oldval, &psz_comment[key_length] ) == -1 ) \
                 newval = NULL; \
             vlc_meta_Set( p_meta, vlc_meta_ ## var, newval ); \
             free( newval ); \
         } \
         else \
-            vlc_meta_Set( p_meta, vlc_meta_ ## var, &psz_comment[strlen(txt)] ); \
+            vlc_meta_Set( p_meta, vlc_meta_ ## var, &psz_comment[key_length] ); \
         hasMetaFlags |= XIPHMETA_##var; \
     }
 
@@ -427,17 +427,6 @@ void vorbis_ParseComment( es_format_t *p_fmt, vlc_meta_t **pp_meta,
     { \
         vlc_meta_Set( p_meta, vlc_meta_ ## var, &psz_comment[strlen(txt)] ); \
         hasMetaFlags |= XIPHMETA_##var; \
-    }
-
-#define IF_EXTRACT_FMT(txt,var,fmt,target) \
-    if( !strncasecmp(psz_comment, txt, strlen(txt)) ) \
-    { \
-        IF_EXTRACT(txt,var)\
-        if( fmt )\
-        {\
-            free( fmt->target );\
-            fmt->target = strdup(&psz_comment[strlen(txt)]);\
-        }\
     }
 
         IF_EXTRACT("TITLE=", Title )
@@ -472,7 +461,15 @@ void vorbis_ParseComment( es_format_t *p_fmt, vlc_meta_t **pp_meta,
         else IF_EXTRACT("COMMENTS=", Description )
         else IF_EXTRACT("RATING=", Rating )
         else IF_EXTRACT("DATE=", Date )
-        else IF_EXTRACT_FMT("LANGUAGE=", Language, p_fmt, psz_language )
+        else if( !strncasecmp(psz_comment, "LANGUAGE=", strlen("LANGUAGE=") ) )
+        {
+            IF_EXTRACT("LANGUAGE=",Language)
+            if( p_fmt )
+            {
+                free( p_fmt->psz_language );
+                p_fmt->psz_language = strdup(&psz_comment[strlen("LANGUAGE=")]);
+            }
+        }
         else IF_EXTRACT("ORGANIZATION=", Publisher )
         else IF_EXTRACT("ENCODER=", EncodedBy )
         else if( !strncasecmp( psz_comment, "METADATA_BLOCK_PICTURE=", strlen("METADATA_BLOCK_PICTURE=")))
@@ -527,8 +524,9 @@ void vorbis_ParseComment( es_format_t *p_fmt, vlc_meta_t **pp_meta,
                 char *p = strchr( psz_comment, '=' );
                 p_seekpoint = getChapterEntry( i_chapt, &chapters_array );
                 if ( !p || ! p_seekpoint ) goto next_comment;
+                EnsureUTF8( ++p );
                 if ( ! p_seekpoint->psz_name )
-                    p_seekpoint->psz_name = strdup( ++p );
+                    p_seekpoint->psz_name = strdup( p );
             }
             else if( sscanf( psz_comment, "CHAPTER%u=", &i_chapt ) == 1 )
             {
@@ -544,6 +542,7 @@ void vorbis_ParseComment( es_format_t *p_fmt, vlc_meta_t **pp_meta,
         }
         else if( !strncasecmp(psz_comment, "cuesheet=", 9) )
         {
+            EnsureUTF8( &psz_comment[9] );
             xiph_ParseCueSheet( &hasMetaFlags, p_meta, &psz_comment[9], comment_size - 9,
                                 i_seekpoint, ppp_seekpoint );
         }
@@ -553,6 +552,7 @@ void vorbis_ParseComment( es_format_t *p_fmt, vlc_meta_t **pp_meta,
              * undocumented tags and replay gain ) */
             char *p = strchr( psz_comment, '=' );
             *p++ = '\0';
+            EnsureUTF8( p );
 
             for( int i = 0; psz_comment[i]; i++ )
                 if( psz_comment[i] >= 'a' && psz_comment[i] <= 'z' )

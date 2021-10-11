@@ -47,22 +47,6 @@ struct vlc_access_stream_private
     input_thread_t *input;
 };
 
-/* Decode URL (which has had its scheme stripped earlier) to a file path. */
-char *get_path(const char *location)
-{
-    char *url, *path;
-
-    /* Prepending "file://" is a bit hackish. But then again, we do not want
-     * to hard-code the list of schemes that use file paths in vlc_uri2path().
-     */
-    if (asprintf(&url, "file://%s", location) == -1)
-        return NULL;
-
-    path = vlc_uri2path (url);
-    free (url);
-    return path;
-}
-
 static void vlc_access_Destroy(stream_t *access)
 {
     struct vlc_access_private *priv = vlc_stream_Private(access);
@@ -133,7 +117,7 @@ static stream_t *access_New(vlc_object_t *parent, input_thread_t *input,
         char *url = access->psz_url;
         msg_Dbg(access, "creating access: %s", url);
 
-        const char *p = strstr(url, "://");
+        const char *p = strchr(url, ':');
         if (p == NULL)
             goto error;
 
@@ -141,8 +125,17 @@ static stream_t *access_New(vlc_object_t *parent, input_thread_t *input,
         if (unlikely(access->psz_name == NULL))
             goto error;
 
-        access->psz_location = p + 3;
-        access->psz_filepath = get_path(access->psz_location);
+        access->psz_location = p + (strncmp(p + 1, "//", 2) ? 1 : 3);
+        access->psz_filepath = vlc_uri2path(url);
+        if (access->psz_filepath == NULL)
+        {   /* FIXME: some access plugins want a file path for non-file MRLs */
+            char *file_url;
+            if (asprintf(&file_url, "file://%s", access->psz_location) >= 0)
+            {
+                access->psz_filepath = vlc_uri2path(file_url);
+                free(file_url);
+            }
+        }
         if (access->psz_filepath != NULL)
             msg_Dbg(access, " (path: %s)", access->psz_filepath);
 

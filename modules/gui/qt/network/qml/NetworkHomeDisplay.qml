@@ -31,20 +31,22 @@ FocusScope {
     id: topFocusScope
     focus: true
 
+    readonly property bool isViewMultiView: false
+
+    signal browse(var tree, int reason)
+
+    Component.onCompleted: resetFocus()
+    onActiveFocusChanged: resetFocus()
+
+    function setCurrentItemFocus(reason) {
+        deviceSection.setCurrentItemFocus(reason);
+    }
+
     function _centerFlickableOnItem(minY, maxY) {
         if (maxY > flickable.contentItem.contentY + flickable.height) {
             flickable.contentItem.contentY = maxY - flickable.height
         } else if (minY < flickable.contentItem.contentY) {
             flickable.contentItem.contentY = minY
-        }
-    }
-
-    function _actionAtIndex(index, model, selectionModel) {
-        if (selectionModel.items.get(index).model.type === NetworkMediaModel.TYPE_DIRECTORY
-                || selectionModel.items.get(index).model.type === NetworkMediaModel.TYPE_NODE)  {
-            history.push(["mc", "network", { tree: selectionModel.items.get(index).model.tree }]);
-        } else {
-            model.addAndPlay( selectionModel.selectedIndexes )
         }
     }
 
@@ -85,8 +87,16 @@ FocusScope {
                 visible: deviceSection.model.count !== 0
                 onVisibleChanged: topFocusScope.resetFocus()
 
+                onBrowse: topFocusScope.browse(tree, reason)
+
                 Navigation.parentItem: topFocusScope
-                Navigation.downItem: lanSection.visible ?  lanSection : null
+
+                Navigation.downAction: function() {
+                    if (lanSection.visible == false)
+                        return;
+
+                    lanSection.setCurrentItemFocus(Qt.TabFocusReason);
+                }
 
                 onActiveFocusChanged: {
                     if (activeFocus)
@@ -112,8 +122,16 @@ FocusScope {
                 visible: lanSection.model.count !== 0
                 onVisibleChanged: topFocusScope.resetFocus()
 
+                onBrowse: topFocusScope.browse(tree, reason)
+
                 Navigation.parentItem: topFocusScope
-                Navigation.upItem: deviceSection.visible ?  deviceSection : null
+
+                Navigation.upAction: function() {
+                    if (deviceSection.visible == false)
+                        return;
+
+                    deviceSection.setCurrentItemFocus(Qt.TabFocusReason);
+                }
 
                 onActiveFocusChanged: {
                     if (activeFocus)
@@ -124,8 +142,6 @@ FocusScope {
 
     }
 
-    Component.onCompleted: resetFocus()
-    onActiveFocusChanged: resetFocus()
     function resetFocus() {
         var widgetlist = [deviceSection, lanSection]
         var i;

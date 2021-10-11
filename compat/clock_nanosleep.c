@@ -20,7 +20,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-#ifdef __APPLE__
+#ifndef _WIN32
 
 #ifdef HAVE_CONFIG_H
 # include <config.h>
@@ -32,14 +32,17 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/sysctl.h>
+
+# ifdef __APPLE__
 #include <mach/clock_types.h>
+# endif
 
 int clock_nanosleep(clockid_t clock_id, int flags,
         const struct timespec *rqtp, struct timespec *rmtp)
 {
     // Validate timespec
     if (rqtp == NULL || rqtp->tv_sec < 0 ||
-            rqtp->tv_nsec < 0 || (unsigned long)rqtp->tv_nsec >= NSEC_PER_SEC) {
+            rqtp->tv_nsec < 0 || (unsigned long)rqtp->tv_nsec >= 1000*1000*1000) {
         errno = EINVAL;
         return -1;
     }
@@ -68,7 +71,7 @@ int clock_nanosleep(clockid_t clock_id, int flags,
             ts_rel.tv_nsec = rqtp->tv_nsec - ts_now.tv_nsec;
             if (ts_rel.tv_nsec < 0) {
                 ts_rel.tv_sec  -= 1;
-                ts_rel.tv_nsec += NSEC_PER_SEC;
+                ts_rel.tv_nsec += 1000*1000*1000;
             }
 
             // Check if time already elapsed

@@ -21,12 +21,9 @@
 #include "compositor.hpp"
 
 #include <windows.h>
-#include <dcomp.h>
-#include <d3d11.h>
-#include <wrl.h>
-#include <dwmapi.h>
 
 #include "maininterface/mainui.hpp"
+#include "compositor_dcomp_acrylicsurface.hpp"
 #include "compositor_dcomp_uisurface.hpp"
 #include "videosurface.hpp"
 #include "interface_window_handler.hpp"
@@ -58,6 +55,9 @@ public:
 
     Type type() const override;
 
+    void addVisual(Microsoft::WRL::ComPtr<IDCompositionVisual> visual);
+    void removeVisual(Microsoft::WRL::ComPtr<IDCompositionVisual> visual);
+
 private slots:
     void onSurfacePositionChanged(QPointF position);
 
@@ -77,11 +77,12 @@ private:
     std::unique_ptr<WinTaskbarWidget> m_taskbarWidget;
 
     std::unique_ptr<CompositorDCompositionUISurface> m_uiSurface;
+    std::unique_ptr<CompositorDCompositionAcrylicSurface> m_acrylicSurface;
     vout_window_t *m_window = nullptr;
     std::unique_ptr<MainUI> m_ui;
     std::unique_ptr<VideoWindowHandler> m_videoWindowHandler;
     std::unique_ptr<VideoSurfaceProvider> m_qmlVideoSurfaceProvider;
-    InterfaceWindowHandler* m_interfaceWindowHandler = nullptr;
+    std::unique_ptr<InterfaceWindowHandler> m_interfaceWindowHandler;
 
     //main window composition
     HINSTANCE m_dcomp_dll = nullptr;

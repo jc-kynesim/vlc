@@ -70,6 +70,7 @@ pluginsinclude_HEADERS = \
 	../include/vlc_media_source.h \
 	../include/vlc_memstream.h \
 	../include/vlc_messages.h \
+	../include/vlc_tracer.h \
 	../include/vlc_meta.h \
 	../include/vlc_meta_fetcher.h \
 	../include/vlc_mime.h \
@@ -378,6 +379,7 @@ libvlccore_la_SOURCES = \
 	misc/events.c \
 	misc/image.c \
 	misc/messages.c \
+	misc/tracer.c \
 	misc/mime.c \
 	misc/objects.c \
 	misc/objres.c \
@@ -431,15 +433,17 @@ libvlccore_la_SOURCES += \
 	os2/thread.c
 endif
 
-if HAVE_NACL
+if HAVE_EMSCRIPTEN
 libvlccore_la_SOURCES += \
-	android/error.c \
+	posix/thread.c \
+	posix/getaddrinfo.c \
+	posix/error.c \
 	posix/dirs.c \
 	posix/filesystem.c \
-	posix/netconf.c \
-	posix/rand.c \
 	posix/specific.c \
-	posix/timer.c
+	posix/timer.c \
+	emscripten/netconf.c \
+	emscripten/thread.c
 endif
 
 if HAVE_DARWIN
@@ -475,7 +479,6 @@ endif
 
 if !HAVE_WIN32
 if !HAVE_OS2
-if !HAVE_NACL
 libvlccore_la_SOURCES += \
 	posix/filesystem.c \
 	posix/plugin.c \
@@ -485,8 +488,10 @@ if !HAVE_LINUX
 libvlccore_la_SOURCES += posix/wait.c
 endif
 if !HAVE_ANDROID
+if !HAVE_EMSCRIPTEN
+libvlccore_la_SOURCES += posix/sort.c
+endif
 libvlccore_la_SOURCES += \
-	posix/sort.c \
 	posix/thread.c
 if !HAVE_DARWIN
 libvlccore_la_SOURCES += \
@@ -503,7 +508,6 @@ libvlccore_la_LIBADD += -lanl
 else
 libvlccore_la_SOURCES += \
 	posix/getaddrinfo.c
-endif
 endif
 endif
 endif
@@ -549,7 +553,7 @@ $(libvlccore_la_OBJECTS): libvlccore_objc.la
 libvlccore_objc_la_OBJCFLAGS = $(AM_OBJCFLAGS) -fobjc-arc
 libvlccore_objc_la_LDFLAGS = -static
 libvlccore_la_LIBADD += libvlccore_objc.la
-libvlccore_la_LDFLAGS +=  -Wl,-framework,Foundation -Xlinker -install_name -Xlinker @rpath/libvlccore.dylib -Wl,-U,_vlc_static_modules
+libvlccore_la_LDFLAGS +=  -Wl,-framework,Foundation -Xlinker -install_name -Xlinker @rpath/libvlccore.dylib
 endif
 
 # iOS and tvOS applications cannot install global shared libraries and

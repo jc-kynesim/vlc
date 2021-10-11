@@ -74,11 +74,10 @@ RendererMenu::RendererMenu( QMenu *parent, qt_intf_t *p_intf_ )
     addAction( action );
     group->addAction(action);
 
-    char *psz_renderer = var_InheritString( p_intf->p_player, "sout" );
-    if ( psz_renderer == NULL )
+    vlc_player_Lock( p_intf_->p_player );
+    if ( vlc_player_GetRenderer( p_intf->p_player ) == nullptr )
         action->setChecked( true );
-    else
-        free( psz_renderer );
+    vlc_player_Unlock( p_intf_->p_player );
 
     addSeparator();
 

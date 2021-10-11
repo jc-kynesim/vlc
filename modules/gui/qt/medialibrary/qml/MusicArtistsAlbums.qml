@@ -64,6 +64,10 @@ FocusScope {
         }
     }
 
+    function setCurrentItemFocus(reason) {
+        artistList.setCurrentItemFocus(reason);
+    }
+
     function _actionAtIndex(index) {
         albumSubView.forceActiveFocus()
     }
@@ -92,200 +96,123 @@ FocusScope {
         model: artistModel
     }
 
-    FocusScope {
-        visible: artistModel.count > 0
-        focus: visible
-        anchors.fill: parent
+    Widgets.AcrylicBackground {
+      /* id: artistListBackground */
 
-        Rectangle {
-            width: artistList.width
-            height: artistList.height
-            color: VLCStyle.colors.bgAlt
-            opacity: .8
+      visible: artistModel.count > 0
+      width: artistList.width
+      height: artistList.height
+      alternativeColor: VLCStyle.colors.bgAlt
+      focus: false
+    }
+
+    Row {
+        anchors.fill: parent
+        visible: artistModel.count > 0
+
+        Widgets.KeyNavigableListView {
+            id: artistList
+
+            spacing: 4
+            model: artistModel
+            currentIndex: -1
+            z: 1
+            height: parent.height
+            width: Helpers.clamp(root.width / resizeHandle.widthFactor,
+                                 VLCStyle.colWidth(1) + VLCStyle.column_margin_width,
+                                 root.width * .5)
+
+            visible: artistModel.count > 0
+            focus: artistModel.count > 0
+            displayMarginEnd: miniPlayer.height // to get blur effect while scrolling in mainview
+            Navigation.parentItem: root
+
+            Navigation.rightAction: function() {
+                albumSubView.setCurrentItemFocus(Qt.TabFocusReason);
+            }
+
+            Navigation.cancelAction: function() {
+                if (artistList.currentIndex <= 0)
+                    root.Navigation.defaultNavigationCancel()
+                else
+                    artistList.currentIndex = 0;
+            }
+
+            header: Widgets.SubtitleLabel {
+                text: i18n.qtr("Artists")
+                font.pixelSize: VLCStyle.fontSize_large
+                leftPadding: VLCStyle.margin_normal
+                bottomPadding: VLCStyle.margin_small
+                topPadding: VLCStyle.margin_xlarge
+            }
+
+            delegate: MusicArtistDelegate {
+                width: artistList.width
+
+                isCurrent: ListView.isCurrentItem
+
+                mlModel: artistModel
+
+                onItemClicked: {
+                    selectionModel.updateSelection(mouse.modifiers, artistList.currentIndex,
+                                                   index);
+
+                    artistList.currentIndex = index;
+
+                    artistList.forceActiveFocus(Qt.MouseFocusReason);
+                }
+
+                onItemDoubleClicked: {
+                    if (mouse.buttons === Qt.LeftButton)
+                        medialib.addAndPlay(model.id);
+                    else
+                        albumSubView.forceActiveFocus();
+                }
+            }
+
+            Behavior on width {
+                SmoothedAnimation {
+                    easing.type: Easing.InSine
+                    duration: VLCStyle.ms10
+                }
+            }
+
+            Rectangle {
+                // id: musicArtistLeftBorder
+
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.right: parent.right
+
+                width: VLCStyle.border
+                color: VLCStyle.colors.border
+            }
+
+
+            Widgets.HorizontalResizeHandle {
+                id: resizeHandle
+
+                anchors {
+                    top: parent.top
+                    bottom: parent.bottom
+                    right: parent.right
+
+                    rightMargin: -(width / 2)
+                }
+                sourceWidth: root.width
+                targetWidth: artistList.width
+            }
         }
 
-        Row {
-            anchors.fill: parent
+        MusicArtist {
+            id: albumSubView
 
-            Widgets.KeyNavigableListView {
-                id: artistList
-
-                spacing: 4
-                model: artistModel
-                currentIndex: -1
-                z: 1
-                height: parent.height
-                width: Helpers.clamp(root.width / resizeHandle.widthFactor,
-                                     VLCStyle.colWidth(1) + VLCStyle.column_margin_width,
-                                     root.width * .5)
-
-                focus: true
-                displayMarginEnd: miniPlayer.height // to get blur effect while scrolling in mainview
-                Navigation.parentItem: root
-                Navigation.rightItem: albumSubView
-                Navigation.cancelAction: function() {
-                    if (artistList.currentIndex <= 0)
-                        root.Navigation.defaultNavigationCancel()
-                    else
-                        artistList.currentIndex = 0;
-                }
-
-                header: Widgets.SubtitleLabel {
-                    text: i18n.qtr("Artists")
-                    font.pixelSize: VLCStyle.fontSize_large
-                    leftPadding: VLCStyle.margin_normal
-                    bottomPadding: VLCStyle.margin_small
-                    topPadding: VLCStyle.margin_xlarge
-                }
-
-                delegate: Widgets.AnimatedBackground {
-                    id: item
-
-                    property bool _highlighted: mouseArea.containsMouse || this.activeFocus
-
-                    height: VLCStyle.play_cover_small + (VLCStyle.margin_xsmall * 2)
-                    width: artistList.width
-                    active: false
-                    backgroundColor: _highlighted ? VLCStyle.colors.bgHover : "transparent"
-                    foregroundColor: _highlighted ? VLCStyle.colors.bgHoverText : VLCStyle.colors.text
-
-                    Widgets.CurrentIndicator {
-                       visible: item.ListView.isCurrentItem
-                    }
-
-                    RowLayout {
-                        spacing: VLCStyle.margin_xsmall
-                        anchors {
-                            fill: parent
-                            leftMargin: VLCStyle.margin_normal
-                            rightMargin: VLCStyle.margin_normal
-                            topMargin: VLCStyle.margin_xsmall
-                            bottomMargin: VLCStyle.margin_xsmall
-                        }
-
-                        RoundImage {
-                            source: model.cover || VLCStyle.noArtArtistSmall
-                            height: VLCStyle.play_cover_small
-                            width: VLCStyle.play_cover_small
-                            radius: VLCStyle.play_cover_small
-
-                            Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
-
-                            Rectangle {
-                                anchors.fill: parent
-                                color: "transparent"
-                                radius: VLCStyle.play_cover_small
-                                border.width: VLCStyle.dp(1, VLCStyle.scale)
-                                border.color: !_highlighted ? VLCStyle.colors.roundPlayCoverBorder : VLCStyle.colors.accent
-                            }
-                        }
-
-                        Widgets.ListLabel {
-                            text: model.name || i18n.qtr("Unknown artist")
-                            color: item.foregroundColor
-
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                        }
-                    }
-
-                    MouseArea {
-                        id: mouseArea
-
-                        anchors.fill: parent
-                        hoverEnabled: true
-
-                        onClicked: {
-                            selectionModel.updateSelection( mouse.modifiers , artistList.currentIndex, index)
-                            artistList.currentIndex = index
-                            artistList.forceActiveFocus()
-                        }
-
-                        onDoubleClicked: {
-                            if (mouse.buttons === Qt.LeftButton)
-                                medialib.addAndPlay( model.id )
-                            else
-                                albumSubView.forceActiveFocus()
-                        }
-
-                        drag.axis: Drag.XAndYAxis
-                        drag.target: Widgets.DragItem {
-                            function updateComponents(maxCovers) {
-                                return {
-                                    covers: [{artwork: model.cover || VLCStyle.noArtArtistSmall}],
-                                    title: model.name || i18n.qtr("Unknown artist"),
-                                    count: 1
-                                }
-                            }
-
-                            function getSelectedInputItem() {
-                                return artistModel.getItemsForIndexes([artistModel.index(index, 0)])
-                            }
-                        }
-
-                        drag.onActiveChanged: {
-                            var dragItem = drag.target
-
-                            if (!drag.active)
-                                dragItem.Drag.drop()
-
-                            dragItem.Drag.active = drag.active
-                        }
-
-                        onPositionChanged: {
-                            if (drag.active) {
-                                var pos = drag.target.parent.mapFromItem(item, mouseX, mouseY)
-                                drag.target.x = pos.x + 12
-                                drag.target.y = pos.y + 12
-                            }
-                        }
-                    }
-                }
-
-                Behavior on width {
-                    SmoothedAnimation {
-                        easing.type: Easing.InSine
-                        duration: VLCStyle.ms10
-                    }
-                }
-
-                Rectangle {
-                    // id: musicArtistLeftBorder
-
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    anchors.right: parent.right
-
-                    width: VLCStyle.border
-                    color: VLCStyle.colors.border
-                }
-
-
-                Widgets.HorizontalResizeHandle {
-                    id: resizeHandle
-
-                    anchors {
-                        top: parent.top
-                        bottom: parent.bottom
-                        right: parent.right
-
-                        rightMargin: -(width / 2)
-                    }
-                    sourceWidth: root.width
-                    targetWidth: artistList.width
-                }
-            }
-
-            MusicArtist {
-                id: albumSubView
-
-                height: parent.height
-                width: root.width - artistList.width
-                focus: true
-                initialIndex: root.initialAlbumIndex
-                Navigation.parentItem: root
-                Navigation.leftItem: artistList
-            }
+            height: parent.height
+            width: root.width - artistList.width
+            focus: true
+            initialIndex: root.initialAlbumIndex
+            Navigation.parentItem: root
+            Navigation.leftItem: artistList
         }
     }
 

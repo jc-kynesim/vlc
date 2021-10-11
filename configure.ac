@@ -205,8 +205,25 @@ case "${host_os}" in
     AX_APPEND_FLAG([-Werror=partial-availability], [OBJCFLAGS])
     AX_APPEND_FLAG([-Wl,-headerpad_max_install_names], [LDFLAGS])
 
-    VLC_ADD_LIBS([libvlc vlc],[-Wl,-undefined,dynamic_lookup,-framework,AppKit])
     VLC_ADD_LIBS([libvlccore],[-Wl,-framework,CoreFoundation])
+
+    dnl This is not supported when bitcode is enabled. In that case, we need
+    dnl to disable the static bank loader.
+    AC_MSG_CHECKING([if -Wl,-U is allowed])
+    VLC_SAVE_FLAGS
+    AX_APPEND_FLAG([LDFLAGS],[-Wl,-U,_my_array -no-undefined])
+    AC_LINK_IFELSE(
+       [AC_LANG_PROGRAM([], [dnl
+__attribute__((visibility("default"))) extern int my_array[];
+__attribute__((visibility("default"))) int foo() { return my_array[0]; }
+])],
+       [
+        VLC_ADD_LDFLAGS([libvlccore],[-Wl,-U,_vlc_static_modules])
+        VLC_ADD_LDFLAGS([libvlc vlc],[-Wl,-undefined,dynamic_lookup])
+        VLC_ADD_CPPFLAGS([libvlccore],[-DHAVE_DYLIB_DYNAMIC_LOOKUP=1])
+        AC_MSG_RESULT([yes])
+       ],[AC_MSG_RESULT([no])])
+    VLC_RESTORE_FLAGS
 
     AC_EGREP_CPP(yes,
             [#import <TargetConditionals.h>
@@ -371,12 +388,11 @@ case "${host_os}" in
     X86ASMFLAGS="-f aout"
     X86ASMDEFS="-DARCH_X86_32=1 -DARCH_X86_64=0 -DPREFIX"
     ;;
-  *nacl*)
-    SYS=nacl
-    AC_DEFINE([_XOPEN_SOURCE], [700], [POSIX and XPG 7th edition])
-    AC_LIBOBJ([sigwait])
-    AC_LIBOBJ([recvmsg])
-    AC_LIBOBJ([sendmsg])
+  *emscripten*)
+    SYS=emscripten
+    # tdestroy() is a GNU extension
+    CFLAGS="${CFLAGS} -pthread -D_GNU_SOURCE"
+    CXXFLAGS="${CXXFLAGS} -pthread"
     ;;
   *)
     SYS="${host_os}"
@@ -390,20 +406,20 @@ AC_ARG_ENABLE([winstore_app],
 
 vlc_winstore_app=0
 AS_IF([test "${SYS}" = "mingw32"],[
-  LIBCOM="-lole32"
+  LIBCOM="-lole32 -loleaut32"
   AS_IF([test "${enable_winstore_app}" = "yes"], [
     vlc_winstore_app=1
-    LIBCOM=""
+    LIBCOM="-loleaut32"
     AX_APPEND_FLAG([-DWINSTORECOMPAT],[CFLAGS])
     AX_APPEND_FLAG([-DWINSTORECOMPAT],[CPPFLAGS])
     AX_APPEND_FLAG([-DWINSTORECOMPAT],[CXXFLAGS])
     LDFLAGS="${LDFLAGS} -lwindowsappcompat"
     VLC_ADD_LIBS([libvlccore], [-lruntimeobject])
     AC_LIBOBJ([gai_strerror])
+    AC_DEFINE([VLC_WINSTORE_APP], [1], [Define to 1 if building for Windows Store.])
   ],[])
   AC_SUBST([LIBCOM])
   ])
-AC_DEFINE_UNQUOTED(VLC_WINSTORE_APP, ${vlc_winstore_app}, [Define to 1 if you want to build for Windows Store apps])
 
 vlc_build_pdb=0
 AC_ARG_ENABLE([pdb],
@@ -427,7 +443,6 @@ AM_CONDITIONAL([HAVE_IOS],     [test "${HAVE_IOS}" = "1"])
 AM_CONDITIONAL([HAVE_OSX],     [test "${HAVE_OSX}" = "1"])
 AM_CONDITIONAL([HAVE_TVOS],    [test "${HAVE_TVOS}" = "1"])
 
-AM_CONDITIONAL([HAVE_NACL],    [test "${SYS}" = "nacl"])
 AM_CONDITIONAL([HAVE_LIBANL],  [test "${HAVE_LIBANL}" = "1"])
 
 AM_CONDITIONAL([HAVE_WIN32],   [test "${SYS}" = "mingw32"])
@@ -450,6 +465,8 @@ AS_IF([test x$with_pic = xyes], [X86ASMDEFS="${X86ASMDEFS} -DPIC"])
 
 AC_SUBST([X86ASMFLAGS])
 AC_SUBST([X86ASMDEFS])
+
+AM_CONDITIONAL([HAVE_EMSCRIPTEN], [test "${SYS}" = "emscripten"])
 
 dnl
 dnl Sadly autoconf does not think about testing foo.exe when ask to test
@@ -697,7 +714,7 @@ need_libc=false
 
 dnl Check for usual libc functions
 AC_CHECK_FUNCS([accept4 dup3 fcntl flock fstatat fstatvfs fork getmntent_r getenv getpwuid_r isatty memalign mkostemp mmap open_memstream newlocale pipe2 posix_fadvise setlocale stricmp uselocale wordexp])
-AC_REPLACE_FUNCS([aligned_alloc atof atoll dirfd fdopendir flockfile fsync getdelim getpid lfind lldiv memrchr nrand48 poll posix_memalign recvmsg rewind sendmsg setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy tfind timegm timespec_get strverscmp pathconf])
+AC_REPLACE_FUNCS([aligned_alloc atof atoll dirfd fdopendir flockfile fsync getdelim getpid lfind lldiv memrchr nrand48 poll posix_memalign recvmsg rewind sendmsg setenv strcasecmp strcasestr strdup strlcpy strndup strnlen strnstr strsep strtof strtok_r strtoll swab tdestroy tfind timegm timespec_get strverscmp])
 AC_REPLACE_FUNCS([gettimeofday])
 AC_CHECK_FUNC(fdatasync,,
   [AC_DEFINE(fdatasync, fsync, [Alias fdatasync() to fsync() if missing.])
@@ -769,9 +786,6 @@ AC_LINK_IFELSE([
     AC_LANG_PROGRAM([#ifdef _WIN32
         #include <ws2tcpip.h>
         #include <windows.h>
-        # if _WIN32_WINNT < 0x600
-        #  error Needs vista+
-        # endif
         #else
         #include <sys/socket.h>
         #include <arpa/inet.h>
@@ -2584,9 +2598,7 @@ AS_IF([test "${enable_dxva2}" != "no"], [
     AS_IF([test "${enable_dxva2}" = "yes"],
           [AC_MSG_ERROR([dxva2 is present but libavcodec/dxva2.h is missing])],
               [AC_MSG_WARN([dxva2 is present but libavcodec/dxva2.h is missing ])])
-        ], [#undef _WIN32_WINNT
-            /* DXVA2 is only available in Vista and above */
-            #define _WIN32_WINNT 0x600])
+        ], [])
       ],[
     AS_IF([test "${enable_dxva2}" = "yes"],
               [AC_MSG_ERROR([Could not find required dxva2api.h])],
@@ -2623,9 +2635,7 @@ AS_IF([test "${enable_d3d11va}" != "no"], [
                   AS_IF([test "${enable_d3d11va}" = "yes"],
                     [AC_MSG_ERROR([d3d11va is present but libavcodec/d3d11va.h is missing])],
                         [AC_MSG_WARN([d3d11va is present but libavcodec/d3d11va.h is missing ])])
-                  ], [#undef _WIN32_WINNT
-                      /* D3D11 is only available in Vista and above */
-                      #define _WIN32_WINNT 0x600])
+                  ], [])
                   ],[
                     AS_IF([test "${enable_d3d11va}" = "yes"],
                           [AC_MSG_ERROR([Could not find required dxva2api.h])],
@@ -2987,9 +2997,6 @@ if test "${enable_x262}" != "no"; then
           VLC_ADD_LIBS([x262],[${av_cv_ld_bsymbolic}])
         ])
         VLC_ADD_CFLAGS([x262],[${X262_CFLAGS}])
-        if echo ${X262_LIBS} |grep -q 'pthreadGC2'; then
-          VLC_ADD_CFLAGS([x262], [-DPTW32_STATIC_LIB])
-        fi
     ], [
        if test "${enable_x262}" = "yes"; then
         AC_MSG_ERROR([x262 module doesn't work without staticly compiled libx262.a])
@@ -3015,9 +3022,6 @@ if test "${enable_x264}" != "no"; then
         ])
 
         VLC_ADD_CFLAGS([x264],[${X264_CFLAGS}])
-        if echo ${X264_LIBS} |grep -q 'pthreadGC2'; then
-          VLC_ADD_CFLAGS([x264], [-DPTW32_STATIC_LIB])
-        fi
       ],[
         if test "${enable_x264}" = "yes"; then
             AC_MSG_ERROR([${X264_PKG_ERRORS}: you may get it from http://www.videolan.org/x264.html])
@@ -3040,9 +3044,6 @@ if test "${enable_x26410b}" != "no"; then
         ])
 
         VLC_ADD_CFLAGS([x26410b],[${X264_CFLAGS}])
-        if echo ${X264_LIBS} |grep -q 'pthreadGC2'; then
-          VLC_ADD_CFLAGS([x26410b], [-DPTW32_STATIC_LIB])
-        fi
       ],[
         if test "${enable_x26410b}" = "yes"; then
             AC_MSG_ERROR([${X264_PKG_ERRORS}: you may get it from http://www.videolan.org/x264.html])
@@ -3166,7 +3167,7 @@ AC_ARG_ENABLE([libplacebo],
       [disable libplacebo support (default auto)]))
 
 AS_IF([test "$enable_libplacebo" != "no"], [
-  PKG_CHECK_MODULES([LIBPLACEBO], [libplacebo >= 1.7], [
+  PKG_CHECK_MODULES([LIBPLACEBO], [libplacebo >= 2.72], [
     AC_DEFINE([HAVE_LIBPLACEBO], [1], [Define to 1 if libplacebo is enabled.])
     AC_CHECK_HEADER([libplacebo/vulkan.h], [VLC_ADD_PLUGIN([placebo_vk])])
     AC_CHECK_HEADER([libplacebo/opengl.h], [
@@ -4309,15 +4310,18 @@ AS_IF([test "${enable_gnutls}" != "no"], [
 dnl
 dnl Taglib plugin
 dnl
+have_taglib="no"
 AC_ARG_ENABLE([taglib],
   AS_HELP_STRING([--disable-taglib],
     [do not use TagLib (default enabled)]))
 AS_IF([test "${enable_taglib}" != "no"], [
   PKG_CHECK_MODULES(TAGLIB, taglib >= 1.11, [
+    have_taglib="yes"
     VLC_ADD_PLUGIN([taglib])
   ], [
     AC_MSG_WARN([${TAGLIB_PKG_ERRORS}.])])
 ])
+AM_CONDITIONAL([HAVE_TAGLIB], [test "${have_taglib}" = "yes"])
 
 dnl
 dnl  libsecret
@@ -4367,7 +4371,7 @@ dnl Libnotify notification plugin
 dnl
 PKG_ENABLE_MODULES_VLC([NOTIFY], [], [libnotify], [libnotify notification], [auto])
 
-PKG_ENABLE_MODULES_VLC([MEDIALIBRARY], [medialibrary], [medialibrary >= 0.9.2], (medialibrary support), [auto])
+PKG_ENABLE_MODULES_VLC([MEDIALIBRARY], [medialibrary], [medialibrary >= 0.9.3], (medialibrary support), [auto])
 
 dnl
 dnl  Endianness check
@@ -4502,8 +4506,14 @@ AC_SUBST([VERSION_MINOR])
 AC_SUBST([VERSION_REVISION])
 AC_SUBST([VERSION_EXTRA])
 AC_SUBST([COPYRIGHT_YEARS])
-AC_DEFINE_UNQUOTED([VLC_COMPILE_BY], "`whoami|sed -e 's/\\\/\\\\\\\/g'`", [user who ran configure])
-AC_DEFINE_UNQUOTED([VLC_COMPILE_HOST], "`hostname -f 2>/dev/null || hostname`", [host which ran configure])
+AS_IF([test -z "$VLC_COMPILE_BY"],[
+   VLC_COMPILE_BY=`whoami|sed -e 's/\\\/\\\\\\\/g'`
+])
+AC_DEFINE_UNQUOTED([VLC_COMPILE_BY], "$VLC_COMPILE_BY", [user who ran configure])
+AS_IF([test -z "$VLC_COMPILE_HOST"],[
+   VLC_COMPILE_HOST=`hostname -f 2>/dev/null || hostname`
+])
+AC_DEFINE_UNQUOTED([VLC_COMPILE_HOST], "$VLC_COMPILE_HOST", [host which ran configure])
 AC_DEFINE_UNQUOTED([VLC_COMPILER], "`$CC -v 2>&1 | tail -n 1 | sed -e 's/ *$//'`", [compiler])
 dnl
 dnl  Handle substvars that use $(top_srcdir)

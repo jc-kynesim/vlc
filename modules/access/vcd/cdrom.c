@@ -49,6 +49,7 @@
 #ifdef HAVE_ARPA_INET_H
 #include <arpa/inet.h>
 #endif
+#include <assert.h>
 
 #include <vlc_common.h>
 #include <vlc_access.h>
@@ -260,8 +261,7 @@ void ioctl_Close( vlc_object_t * p_this, vcddev_t *p_vcddev )
  * ioctl_GetTOC: Read the Table of Content, fill in the p_sectors map
  *               if b_fill_sector_info is true.
  *****************************************************************************/
-vcddev_toc_t * ioctl_GetTOC( vlc_object_t *p_this, const vcddev_t *p_vcddev,
-                             bool b_fill_sectorinfo )
+vcddev_toc_t * ioctl_GetTOC( vlc_object_t *p_this, const vcddev_t *p_vcddev )
 {
     vcddev_toc_t *p_toc = calloc(1, sizeof(*p_toc));
     if(!p_toc)
@@ -276,17 +276,14 @@ vcddev_toc_t * ioctl_GetTOC( vlc_object_t *p_this, const vcddev_t *p_vcddev,
         *p_toc = p_vcddev->toc;
         p_toc->p_sectors = NULL;
 
-        if( b_fill_sectorinfo )
+        p_toc->p_sectors = calloc( p_toc->i_tracks + 1, sizeof(*p_toc->p_sectors) );
+        if( p_toc->p_sectors == NULL )
         {
-            p_toc->p_sectors = calloc( p_toc->i_tracks + 1, sizeof(*p_toc->p_sectors) );
-            if( p_toc->p_sectors == NULL )
-            {
-                free( p_toc );
-                return NULL;
-            }
-            memcpy( p_toc->p_sectors, p_vcddev->toc.p_sectors,
-                    (p_toc->i_tracks + 1) * sizeof(*p_toc->p_sectors) );
+            free( p_toc );
+            return NULL;
         }
+        memcpy( p_toc->p_sectors, p_vcddev->toc.p_sectors,
+                (p_toc->i_tracks + 1) * sizeof(*p_toc->p_sectors) );
 
         return p_toc;
     }
@@ -314,50 +311,47 @@ vcddev_toc_t * ioctl_GetTOC( vlc_object_t *p_this, const vcddev_t *p_vcddev,
                                                     &p_toc->i_first_track,
                                                     &p_toc->i_last_track );
 
-        if( b_fill_sectorinfo )
+        int i, i_leadout = -1;
+        CDTOCDescriptor *pTrackDescriptors;
+        u_char track;
+
+        p_toc->p_sectors = calloc( p_toc->i_tracks + 1,
+                                    sizeof(*p_toc->p_sectors) );
+        if( p_toc->p_sectors == NULL )
         {
-            int i, i_leadout = -1;
-            CDTOCDescriptor *pTrackDescriptors;
-            u_char track;
-
-            p_toc->p_sectors = calloc( p_toc->i_tracks + 1,
-                                       sizeof(*p_toc->p_sectors) );
-            if( p_toc->p_sectors == NULL )
-            {
-                vcddev_toc_Free( p_toc );
-                darwin_freeTOC( pTOC );
-                return NULL;
-            }
-
-            pTrackDescriptors = pTOC->descriptors;
-
-            for( p_toc->i_tracks = 0, i = 0; i < i_descriptors; i++ )
-            {
-                track = pTrackDescriptors[i].point;
-
-                if( track == 0xA2 )
-                    i_leadout = i;
-
-                if( track > CD_MAX_TRACK_NO || track < CD_MIN_TRACK_NO )
-                    continue;
-
-                p_toc->p_sectors[p_toc->i_tracks].i_control = pTrackDescriptors[i].control;
-                p_toc->p_sectors[p_toc->i_tracks++].i_lba =
-                    CDConvertMSFToLBA( pTrackDescriptors[i].p );
-            }
-
-            if( i_leadout == -1 )
-            {
-                msg_Err( p_this, "leadout not found" );
-                vcddev_toc_Free( p_toc );
-                darwin_freeTOC( pTOC );
-                return NULL;
-            }
-
-            /* set leadout sector */
-            p_toc->p_sectors[p_toc->i_tracks].i_lba =
-                CDConvertMSFToLBA( pTrackDescriptors[i_leadout].p );
+            vcddev_toc_Free( p_toc );
+            darwin_freeTOC( pTOC );
+            return NULL;
         }
+
+        pTrackDescriptors = pTOC->descriptors;
+
+        for( p_toc->i_tracks = 0, i = 0; i < i_descriptors; i++ )
+        {
+            track = pTrackDescriptors[i].point;
+
+            if( track == 0xA2 )
+                i_leadout = i;
+
+            if( track > CD_MAX_TRACK_NO || track < CD_MIN_TRACK_NO )
+                continue;
+
+            p_toc->p_sectors[p_toc->i_tracks].i_control = pTrackDescriptors[i].control;
+            p_toc->p_sectors[p_toc->i_tracks++].i_lba =
+                CDConvertMSFToLBA( pTrackDescriptors[i].p );
+        }
+
+        if( i_leadout == -1 )
+        {
+            msg_Err( p_this, "leadout not found" );
+            vcddev_toc_Free( p_toc );
+            darwin_freeTOC( pTOC );
+            return NULL;
+        }
+
+        /* set leadout sector */
+        p_toc->p_sectors[p_toc->i_tracks].i_lba =
+            CDConvertMSFToLBA( pTrackDescriptors[i_leadout].p );
 
         darwin_freeTOC( pTOC );
 
@@ -365,9 +359,10 @@ vcddev_toc_t * ioctl_GetTOC( vlc_object_t *p_this, const vcddev_t *p_vcddev,
         DWORD dwBytesReturned;
         CDROM_TOC cdrom_toc;
 
-        if( DeviceIoControl( p_vcddev->h_device_handle, IOCTL_CDROM_READ_TOC,
-                             NULL, 0, &cdrom_toc, sizeof(CDROM_TOC),
-                             &dwBytesReturned, NULL ) == 0 )
+        CDROM_READ_TOC_EX TOCEx = { .Format = CDROM_READ_TOC_EX_FORMAT_TOC, .Msf = 0 };
+        if( DeviceIoControl( p_vcddev->h_device_handle, IOCTL_CDROM_READ_TOC_EX,
+                             &TOCEx, sizeof(TOCEx),
+                             &cdrom_toc, sizeof(cdrom_toc), &dwBytesReturned, 0 ) == 0 )
         {
             msg_Err( p_this, "could not read TOCHDR" );
             vcddev_toc_Free( p_toc );
@@ -378,24 +373,24 @@ vcddev_toc_t * ioctl_GetTOC( vlc_object_t *p_this, const vcddev_t *p_vcddev,
         p_toc->i_first_track = cdrom_toc.FirstTrack;
         p_toc->i_last_track = cdrom_toc.LastTrack;
 
-        if( b_fill_sectorinfo )
-        {
-            p_toc->p_sectors = calloc( p_toc->i_tracks + 1, sizeof(p_toc->p_sectors) );
-            if( p_toc->p_sectors == NULL )
-            {
-                vcddev_toc_Free( p_toc );
-                return NULL;
-            }
+        if ( cdrom_toc.TrackData[p_toc->i_tracks].TrackNumber != 0xAA )
+            msg_Warn(p_this, "leadout not read properly");
 
-            for( int i = 0 ; i <= p_toc->i_tracks ; i++ )
-            {
-                p_toc->p_sectors[ i ].i_control = cdrom_toc.TrackData[i].Control;
-                p_toc->p_sectors[ i ].i_lba = MSF_TO_LBA2(
-                                           cdrom_toc.TrackData[i].Address[1],
-                                           cdrom_toc.TrackData[i].Address[2],
-                                           cdrom_toc.TrackData[i].Address[3] );
-                msg_Dbg( p_this, "p_sectors: %i, %i", i, p_toc->p_sectors[i].i_lba);
-             }
+        p_toc->p_sectors = calloc( p_toc->i_tracks + 1, sizeof(p_toc->p_sectors) );
+        if( p_toc->p_sectors == NULL )
+        {
+            vcddev_toc_Free( p_toc );
+            return NULL;
+        }
+
+        for( int i = 0 ; i <= p_toc->i_tracks ; i++ )
+        {
+            p_toc->p_sectors[ i ].i_control = cdrom_toc.TrackData[i].Control;
+            p_toc->p_sectors[ i ].i_lba = (unsigned)cdrom_toc.TrackData[i].Address[0] << 24 |
+                                          (unsigned)cdrom_toc.TrackData[i].Address[1] << 16 |
+                                          (unsigned)cdrom_toc.TrackData[i].Address[2] << 8 |
+                                          (unsigned)cdrom_toc.TrackData[i].Address[3];
+            msg_Dbg( p_this, "p_sectors: %i, %i", i, p_toc->p_sectors[i].i_lba);
         }
 
 #elif defined( __OS2__ )
@@ -420,48 +415,45 @@ vcddev_toc_t * ioctl_GetTOC( vlc_object_t *p_this, const vcddev_t *p_vcddev,
         p_toc->i_first_track = tochdr.first_track;
         p_toc->i_last_track = tochdr.last_track;
 
-        if( b_fill_sectorinfo )
-        {
-            cdrom_get_track_t get_track = {{'C', 'D', '0', '1'}, };
-            cdrom_track_t track;
-            int i;
+        cdrom_get_track_t get_track = {{'C', 'D', '0', '1'}, };
+        cdrom_track_t track;
+        int i;
 
-            p_toc->p_sectors = calloc( p_toc->i_tracks + 1, sizeof(*p_toc->p_sectors) );
-            if( p_toc->p_sectors == NULL )
+        p_toc->p_sectors = calloc( p_toc->i_tracks + 1, sizeof(*p_toc->p_sectors) );
+        if( p_toc->p_sectors == NULL )
+        {
+            vcddev_toc_Free( p_toc );
+            return NULL;
+        }
+
+        for( i = 0 ; i < p_toc->i_tracks ; i++ )
+        {
+            get_track.track = tochdr.first_track + i;
+            rc = DosDevIOCtl( p_vcddev->hcd, IOCTL_CDROMAUDIO,
+                                CDROMAUDIO_GETAUDIOTRACK,
+                                &get_track, sizeof(get_track), &param_len,
+                                &track, sizeof(track), &data_len );
+            if (rc)
             {
+                msg_Err( p_this, "could not read %d track",
+                            get_track.track );
                 vcddev_toc_Free( p_toc );
                 return NULL;
             }
 
-            for( i = 0 ; i < p_toc->i_tracks ; i++ )
-            {
-                get_track.track = tochdr.first_track + i;
-                rc = DosDevIOCtl( p_vcddev->hcd, IOCTL_CDROMAUDIO,
-                                  CDROMAUDIO_GETAUDIOTRACK,
-                                  &get_track, sizeof(get_track), &param_len,
-                                  &track, sizeof(track), &data_len );
-                if (rc)
-                {
-                    msg_Err( p_this, "could not read %d track",
-                             get_track.track );
-                    vcddev_toc_Free( p_toc );
-                    return NULL;
-                }
-
-                p_toc->p_sectors[ i ].i_lba = MSF_TO_LBA2(
-                                       track.start.minute,
-                                       track.start.second,
-                                       track.start.frame );
-                msg_Dbg( p_this, "p_sectors: %i, %i", i, p_toc->p_sectors[i].i_lba);
-            }
-
-            /* for lead-out track */
             p_toc->p_sectors[ i ].i_lba = MSF_TO_LBA2(
-                                   tochdr.lead_out.minute,
-                                   tochdr.lead_out.second,
-                                   tochdr.lead_out.frame );
+                                    track.start.minute,
+                                    track.start.second,
+                                    track.start.frame );
             msg_Dbg( p_this, "p_sectors: %i, %i", i, p_toc->p_sectors[i].i_lba);
         }
+
+        /* for lead-out track */
+        p_toc->p_sectors[ i ].i_lba = MSF_TO_LBA2(
+                                tochdr.lead_out.minute,
+                                tochdr.lead_out.second,
+                                tochdr.lead_out.frame );
+        msg_Dbg( p_this, "p_sectors: %i, %i", i, p_toc->p_sectors[i].i_lba);
 
 #elif defined( HAVE_IOC_TOC_HEADER_IN_SYS_CDIO_H ) \
        || defined( HAVE_SCSIREQ_IN_SYS_SCSIIO_H )
@@ -480,47 +472,44 @@ vcddev_toc_t * ioctl_GetTOC( vlc_object_t *p_this, const vcddev_t *p_vcddev,
         p_toc->i_first_track = tochdr.starting_track;
         p_toc->i_last_track = tochdr.ending_track;
 
-        if( b_fill_sectorinfo )
+        p_toc->p_sectors = calloc( p_toc->i_tracks + 1, sizeof(*p_toc->p_sectors) );
+        if( p_toc->p_sectors == NULL )
         {
-             p_toc->p_sectors = calloc( p_toc->i_tracks + 1, sizeof(*p_toc->p_sectors) );
-             if( p_toc->p_sectors == NULL )
-             {
-                 vcddev_toc_Free( p_toc );
-                 return NULL;
-             }
+            vcddev_toc_Free( p_toc );
+            return NULL;
+        }
 
-             toc_entries.address_format = CD_LBA_FORMAT;
-             toc_entries.starting_track = 0;
-             toc_entries.data_len = ( p_toc->i_tracks + 1 ) *
-                                        sizeof( struct cd_toc_entry );
-             toc_entries.data = (struct cd_toc_entry *)
-                                    malloc( toc_entries.data_len );
-             if( toc_entries.data == NULL )
-             {
-                 vcddev_toc_Free( p_toc );
-                 return NULL;
-             }
+        toc_entries.address_format = CD_LBA_FORMAT;
+        toc_entries.starting_track = 0;
+        toc_entries.data_len = ( p_toc->i_tracks + 1 ) *
+                                sizeof( struct cd_toc_entry );
+        toc_entries.data = (struct cd_toc_entry *)
+                            malloc( toc_entries.data_len );
+        if( toc_entries.data == NULL )
+        {
+            vcddev_toc_Free( p_toc );
+            return NULL;
+        }
 
-             /* Read the TOC */
-             if( ioctl( p_vcddev->i_device_handle, CDIOREADTOCENTRYS,
-                        &toc_entries ) == -1 )
-             {
-                 msg_Err( p_this, "could not read the TOC" );
-                 free( toc_entries.data );
-                 vcddev_toc_Free( p_toc );
-                 return NULL;
-             }
+        /* Read the TOC */
+        if( ioctl( p_vcddev->i_device_handle, CDIOREADTOCENTRYS,
+                &toc_entries ) == -1 )
+        {
+            msg_Err( p_this, "could not read the TOC" );
+            free( toc_entries.data );
+            vcddev_toc_Free( p_toc );
+            return NULL;
+        }
 
-             /* Fill the p_sectors structure with the track/sector matches */
-             for( int i = 0 ; i <= p_toc->i_tracks ; i++ )
-             {
+        /* Fill the p_sectors structure with the track/sector matches */
+        for( int i = 0 ; i <= p_toc->i_tracks ; i++ )
+        {
 #if defined( HAVE_SCSIREQ_IN_SYS_SCSIIO_H )
-                 /* FIXME: is this ok? */
-                 p_toc->p_sectors[ i ].i_lba = toc_entries.data[i].addr.lba;
+            /* FIXME: is this ok? */
+            p_toc->p_sectors[ i ].i_lba = toc_entries.data[i].addr.lba;
 #else
-                 p_toc->p_sectors[ i ].i_lba = ntohl( toc_entries.data[i].addr.lba );
+            p_toc->p_sectors[ i ].i_lba = ntohl( toc_entries.data[i].addr.lba );
 #endif
-             }
         }
 #else
         struct cdrom_tochdr   tochdr;
@@ -539,34 +528,31 @@ vcddev_toc_t * ioctl_GetTOC( vlc_object_t *p_this, const vcddev_t *p_vcddev,
         p_toc->i_first_track = tochdr.cdth_trk0;
         p_toc->i_last_track = tochdr.cdth_trk1;
 
-        if( b_fill_sectorinfo )
+        p_toc->p_sectors = calloc( p_toc->i_tracks + 1, sizeof(*p_toc->p_sectors) );
+        if( p_toc->p_sectors == NULL )
         {
-            p_toc->p_sectors = calloc( p_toc->i_tracks + 1, sizeof(*p_toc->p_sectors) );
-            if( p_toc->p_sectors == NULL )
+            free( p_toc );
+            return NULL;
+        }
+
+        /* Fill the p_sectors structure with the track/sector matches */
+        for( int i = 0 ; i <= p_toc->i_tracks ; i++ )
+        {
+            tocent.cdte_format = CDROM_LBA;
+            tocent.cdte_track =
+                ( i == p_toc->i_tracks ) ? CDROM_LEADOUT : tochdr.cdth_trk0 + i;
+
+            if( ioctl( p_vcddev->i_device_handle, CDROMREADTOCENTRY,
+                        &tocent ) == -1 )
             {
+                msg_Err( p_this, "could not read TOCENTRY" );
+                free( p_toc->p_sectors );
                 free( p_toc );
                 return NULL;
             }
 
-            /* Fill the p_sectors structure with the track/sector matches */
-            for( int i = 0 ; i <= p_toc->i_tracks ; i++ )
-            {
-                tocent.cdte_format = CDROM_LBA;
-                tocent.cdte_track =
-                    ( i == p_toc->i_tracks ) ? CDROM_LEADOUT : tochdr.cdth_trk0 + i;
-
-                if( ioctl( p_vcddev->i_device_handle, CDROMREADTOCENTRY,
-                           &tocent ) == -1 )
-                {
-                    msg_Err( p_this, "could not read TOCENTRY" );
-                    free( p_toc->p_sectors );
-                    free( p_toc );
-                    return NULL;
-                }
-
-                p_toc->p_sectors[ i ].i_lba = tocent.cdte_addr.lba;
-                p_toc->p_sectors[ i ].i_control = tocent.cdte_ctrl;
-            }
+            p_toc->p_sectors[ i ].i_lba = tocent.cdte_addr.lba;
+            p_toc->p_sectors[ i ].i_control = tocent.cdte_ctrl;
         }
 #endif
 
@@ -855,7 +841,7 @@ static int OpenVCDImage( vlc_object_t * p_this, const char *psz_dev,
     p_vcddev->i_vcdimage_handle = vlc_open( psz_vcdfile,
                                     O_RDONLY | O_NONBLOCK | O_BINARY );
 
-    while( fgets( line, 1024, cuefile ) && !b_found )
+    while( !b_found && fgets( line, 1024, cuefile ) )
     {
         /* We have a cue file, but no valid vcd file yet */
         char filename[1024];
@@ -898,12 +884,31 @@ static int OpenVCDImage( vlc_object_t * p_this, const char *psz_dev,
      * about the cuefile */
     p_toc->i_tracks = 0;
 
+    int track_subcodes = CD_ROM_SUBCODE_NONE;
+
     while( fgets( line, 1024, cuefile ) && p_toc->i_tracks < INT_MAX-1 )
     {
         /* look for a TRACK line */
-        char psz_dummy[10];
-        if( !sscanf( line, "%9s", psz_dummy ) || strcmp(psz_dummy, "TRACK") )
+        unsigned track_num;
+        char psz_track_type[32];
+        const char *track_start = strstr(line, "TRACK ");
+        if( track_start == NULL )
             continue;
+        track_start += 6; // skip the "TRACK " part
+        int i = sscanf( track_start, "%u %31s", &track_num, psz_track_type );
+        if( i != 2 ) // no type set: assume audio track
+            psz_track_type[0] = '\0';
+        if( i<=0 )
+            i = sscanf( track_start, "%u", &track_num);
+        if( i<=0 )
+            continue;
+        if ( psz_track_type[0] && strcmp(psz_track_type,"AUDIO")!=0)
+        {
+            msg_Dbg( p_this, "detected %s track %02u", psz_track_type, track_num);
+            track_subcodes = CD_ROM_SUBCODE_DATA;
+        }
+        else
+            track_subcodes = CD_ROM_SUBCODE_NONE;
 
         /* look for an INDEX line */
         while( fgets( line, 1024, cuefile ) )
@@ -920,7 +925,7 @@ static int OpenVCDImage( vlc_object_t * p_this, const char *psz_dev,
                 goto error;
             p_toc->p_sectors = buf;
             p_toc->p_sectors[p_toc->i_tracks].i_lba = MSF_TO_LBA(i_min, i_sec, i_frame);
-            p_toc->p_sectors[p_toc->i_tracks].i_control = 0x00;
+            p_toc->p_sectors[p_toc->i_tracks].i_control = track_subcodes;
             msg_Dbg( p_this, "vcd track %i begins at sector:%i",
                      p_toc->i_tracks, p_toc->p_sectors[p_toc->i_tracks].i_lba );
             p_toc->i_tracks++;
@@ -936,10 +941,9 @@ static int OpenVCDImage( vlc_object_t * p_this, const char *psz_dev,
     p_toc->p_sectors = buf;
     p_toc->p_sectors[p_toc->i_tracks].i_lba =
             lseek(p_vcddev->i_vcdimage_handle, 0, SEEK_END) / VCD_SECTOR_SIZE;
-    p_toc->p_sectors[p_toc->i_tracks].i_control = 0x00;
-    msg_Dbg( p_this, "vcd track %i, begins at sector:%i",
-             p_toc->i_tracks, p_toc->p_sectors[p_toc->i_tracks].i_lba );
-    p_toc->i_tracks++;
+    p_toc->p_sectors[p_toc->i_tracks].i_control = track_subcodes;
+    msg_Dbg( p_this, "vcd tracks end at sector:%i",
+             p_toc->p_sectors[p_toc->i_tracks].i_lba );
     p_toc->i_first_track = 1;
     p_toc->i_last_track = p_toc->i_tracks;
     i_ret = 0;
@@ -1191,6 +1195,24 @@ enum cdtext_charset_e
     CDTEXT_CHARSET_MSJIS = 0x80,
 };
 
+typedef enum {
+    cd_text_title       = 0x80,
+    cd_text_performer   = 0x81,
+    cd_text_songwriter  = 0x82,
+    cd_text_composer    = 0x83,
+    cd_text_arrangers   = 0x84,
+    cd_text_message     = 0x85,
+    cd_text_discid      = 0x86, // text & binary (track 0)
+    cd_text_genre       = 0x87, // text & binary (track 0)
+    cd_text_TOC         = 0x88, // binary (track 0)
+    cd_text_TOC2        = 0x89, // binary (track 0)
+    cd_text_closed_info = 0x8d, // (track 0)
+    cd_text_ean_isrc    = 0x8e,
+    cd_text_block_size  = 0x8f, // binary
+
+    cd_text_meta_invalid = 0x00,
+} cd_text_pack_type;
+
 static void CdTextAppendPayload( const char *buffer, size_t i_len,
                                  enum cdtext_charset_e e_charset, char **ppsz_text )
 {
@@ -1339,7 +1361,7 @@ static int CdTextParse( vlc_meta_t ***ppp_tracks, int *pi_tracks,
 {
     char *pppsz_info[CDTEXT_MAX_TRACKS + 1][0x10];
     int i_track_last = -1;
-    if( i_buffer < 4 )
+    if( i_buffer <= 4 )
         return -1;
 
     p_buffer += 4;
@@ -1351,9 +1373,10 @@ static int CdTextParse( vlc_meta_t ***ppp_tracks, int *pi_tracks,
     {
         const uint8_t *p_pack = &p_buffer[CDTEXT_PACK_SIZE*i];
         const uint8_t i_block_number = (p_pack[3] >> 4) & 0x07;
+        const cd_text_pack_type i_pack_type = p_pack[0];
         if( i_block_number > 0 )
             continue;
-        if( p_pack[0] == 0x8f )
+        if( i_pack_type == cd_text_block_size )
         {
             const int i_track = p_pack[1] & 0x7f;
             /* can't be higher than 3 blocks */
@@ -1387,12 +1410,12 @@ static int CdTextParse( vlc_meta_t ***ppp_tracks, int *pi_tracks,
     char textbuffer[CDTEXT_TEXT_BUFFER];
     size_t i_textbuffer = 0;
     size_t i_repeatbuffer = 0;
-    uint8_t i_prev_pack_type = 0x00;
+    cd_text_pack_type i_prev_pack_type = cd_text_meta_invalid;
 
     for( int i = 0; i < i_buffer/CDTEXT_PACK_SIZE; i++ )
     {
         const uint8_t *p_pack = &p_buffer[CDTEXT_PACK_SIZE*i];
-        const uint8_t i_pack_type = p_pack[0];
+        const cd_text_pack_type i_pack_type = p_pack[0];
         //const int i_sequence_number = p_block[2];
         const uint8_t i_block_number = (p_pack[3] >> 4) & 0x07;
         //const int i_crc = (p_block[4+12] << 8) | (p_block[4+13] << 0);
@@ -1405,35 +1428,33 @@ static int CdTextParse( vlc_meta_t ***ppp_tracks, int *pi_tracks,
         }
         i_prev_pack_type = i_pack_type;
 
-        uint8_t i_track = p_pack[1] & 0x7f;
-        if( i_track > CDTEXT_MAX_TRACKS ||
-            (p_pack[1] & 0x80) /* extension flag */ ||
+        if( (p_pack[1] & 0x80) /* extension flag */ ||
             i_block_number > 0 /* support only first language */
            )
         {
-            i_prev_pack_type = 0x00;
+            i_prev_pack_type = cd_text_meta_invalid;
             continue;
         }
 
         /* */
         switch( i_pack_type )
         {
-            case 0x80:
-            case 0x81:
-            case 0x85:
-            case 0x87:
+            case cd_text_title:
+            case cd_text_performer:
+            case cd_text_message:
+            case cd_text_genre:
+            case cd_text_songwriter:
+            case cd_text_composer:
+            case cd_text_arrangers:
+            case cd_text_ean_isrc:
             {
                 CdTextParsePackText( p_pack, e_textpackcharset,
                                      &i_textbuffer, &i_repeatbuffer, textbuffer,
                                      &i_track_last, pppsz_info );
                 break;
             }
-            case 0x82:
-            case 0x83:
-            case 0x84:
-            case 0x86:
-            case 0x8d:
-            case 0x8e:
+            case cd_text_discid:
+            case cd_text_closed_info:
             default:
                 continue;
         }
@@ -1453,6 +1474,11 @@ static int CdTextParse( vlc_meta_t ***ppp_tracks, int *pi_tracks,
             /* */
             const char *psz_default = pppsz_info[0][j];
             const char *psz_value = pppsz_info[i][j];
+            // discard junk values
+            if (psz_value && (psz_value[0] == '\0' || (psz_value[0] == ' ' && psz_value[1] == '\0')))
+                psz_value = NULL;
+            if (psz_default && (psz_default[0] == '\0' || (psz_default[0] == ' ' && psz_default[1] == '\0')))
+                psz_default = NULL;
 
             if( !psz_value && !psz_default )
                 continue;
@@ -1465,7 +1491,7 @@ static int CdTextParse( vlc_meta_t ***ppp_tracks, int *pi_tracks,
             }
             switch( 0x80 + j )
             {
-            case 0x80: /* Album/Title */
+            case cd_text_title:
                 if( i == 0 )
                 {
                     vlc_meta_SetAlbum( p_track, psz_value );
@@ -1478,23 +1504,43 @@ static int CdTextParse( vlc_meta_t ***ppp_tracks, int *pi_tracks,
                         vlc_meta_SetAlbum( p_track, psz_default );
                 }
                 break;
-            case 0x81: /* Performer */
+            case cd_text_performer:
                 vlc_meta_SetArtist( p_track,
                                     psz_value ? psz_value : psz_default );
+                if ( psz_value && i != 0 )
+                    vlc_meta_SetAlbumArtist( p_track, psz_default );
                 break;
-            case 0x85: /* Messages */
+            case cd_text_message:
                 vlc_meta_SetDescription( p_track,
                                          psz_value ? psz_value : psz_default );
                 break;
-            case 0x87: /* Genre */
+            case cd_text_genre:
                 vlc_meta_SetGenre( p_track,
                                    psz_value ? psz_value : psz_default );
                 break;
+            case cd_text_songwriter:
+                // lyrics
+                vlc_meta_AddExtra( p_track, "AUTHOR",
+                                   psz_value ? psz_value : psz_default );
+                break;
+            case cd_text_composer:
+                // music
+                vlc_meta_AddExtra( p_track, "COMPOSER",
+                                   psz_value ? psz_value : psz_default );
+                break;
+            case cd_text_arrangers:
+                vlc_meta_AddExtra( p_track, "ARRANGER",
+                                   psz_value ? psz_value : psz_default );
+                break;
+            case cd_text_ean_isrc:
+            {
+                if ( i == 0 )
+                    vlc_meta_AddExtra( p_track, "EAN/UPN", psz_default );
+                else if ( psz_value )
+                    vlc_meta_AddExtra( p_track, "ISRC", psz_value );
+            }
             /* FIXME unsupported:
-             * 0x82: songwriter
-             * 0x83: composer
-             * 0x84: arrenger
-             * 0x86: disc id */
+             * cd_text_discid */
             }
         }
     }
@@ -1528,15 +1574,13 @@ static int CdTextRead( vlc_object_t *p_object, const vcddev_t *p_vcddev,
 {
     VLC_UNUSED( p_object );
 
-    CDROM_READ_TOC_EX TOCEx;
-    memset(&TOCEx, 0, sizeof(TOCEx));
-    TOCEx.Format = CDROM_READ_TOC_EX_FORMAT_CDTEXT;
+    CDROM_READ_TOC_EX TOCEx = { .Format = CDROM_READ_TOC_EX_FORMAT_CDTEXT };
 
-    const int i_header_size = __MAX( 4, MINIMUM_CDROM_READ_TOC_EX_SIZE );
-    uint8_t header[i_header_size];
+    uint8_t header[4];
+    static_assert(ARRAY_SIZE(header) >= MINIMUM_CDROM_READ_TOC_EX_SIZE, "wrong header size");
     DWORD i_read;
     if( !DeviceIoControl( p_vcddev->h_device_handle, IOCTL_CDROM_READ_TOC_EX,
-                          &TOCEx, sizeof(TOCEx), header, i_header_size, &i_read, 0 ) )
+                          &TOCEx, sizeof(TOCEx), header, ARRAY_SIZE(header), &i_read, 0 ) )
         return -1;
 
     const int i_text = 2 + (header[0] << 8) + header[1];

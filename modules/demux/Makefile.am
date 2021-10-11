@@ -154,9 +154,6 @@ libavformat_plugin_la_LDFLAGS = $(AM_LDFLAGS) $(SYMBOLIC_LDFLAGS)
 if HAVE_ZLIB
 libavformat_plugin_la_LIBADD += -lz
 endif
-if HAVE_DARWIN
-libavformat_plugin_la_LDFLAGS += -Wl,-read_only_relocs,suppress
-endif
 if HAVE_AVFORMAT
 if !MERGE_FFMPEG
 demux_LTLIBRARIES += libavformat_plugin.la
@@ -371,8 +368,6 @@ libvlc_adaptive_la_SOURCES = \
     demux/adaptive/http/HTTPConnection.hpp \
     demux/adaptive/http/HTTPConnectionManager.cpp \
     demux/adaptive/http/HTTPConnectionManager.h \
-    demux/adaptive/http/Transport.hpp \
-    demux/adaptive/http/Transport.cpp \
     demux/adaptive/plumbing/CommandsQueue.cpp \
     demux/adaptive/plumbing/CommandsQueue.hpp \
     demux/adaptive/plumbing/Demuxer.cpp \
@@ -494,6 +489,10 @@ libvlc_adaptive_la_SOURCES += \
 libvlc_adaptive_la_CXXFLAGS = $(AM_CXXFLAGS) -I$(srcdir)/demux/adaptive
 libvlc_adaptive_la_LIBADD = $(SOCKET_LIBS) $(LIBM)
 libvlc_adaptive_la_LDFLAGS = -static
+if !HAVE_WIN32
+libvlc_adaptive_la_LDFLAGS += -lpthread
+endif
+libvlc_adaptive_la_LIBADD += libvlc_http.la
 if HAVE_ZLIB
 libvlc_adaptive_la_LIBADD += -lz
 endif

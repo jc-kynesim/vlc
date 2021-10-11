@@ -17,126 +17,65 @@
  *****************************************************************************/
 
 import QtQuick 2.11
+import QtQuick.Controls 2.4
 import QtQml.Models 2.11
 
 import org.videolan.vlc 0.1
 
+import "qrc:///player/"
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-MouseArea {
-    id: dragArea
+Control {
+    id: control
 
-    property int controlId: model.id
-    property bool held: false
-    property bool dropVisible: false
+    padding: background.border.width
+
+    readonly property int controlId: model.id
     property var dndView: null
-    anchors.verticalCenter: (!!parent) ? parent.verticalCenter : undefined
-    cursorShape: Qt.OpenHandCursor
-    drag.target: held ? content : undefined
-    width: buttonloader.width
-    height: VLCStyle.icon_medium
-    hoverEnabled: true
 
-    property alias containsDrag: dropArea.containsDrag
+    readonly property bool dragActive: loader.Drag.active
+    property alias dropArea: dropArea
 
-    onHeldChanged: {
-        if (held) {
-            removeInfoRectVisible = true
-        }
-        else {
-            removeInfoRectVisible = false
-        }
-    }
+    property alias containsMouse: mouseArea.containsMouse
+    property alias pressed: mouseArea.pressed
 
-    Rectangle {
-        z: -1
+    ListView.delayRemove: dragActive
+    
+    MouseArea {
+        id: mouseArea
+
         anchors.fill: parent
 
-        visible: dragArea.containsMouse && !held
-        color: VLCStyle.colors.bgHover
-    }
+        cursorShape: (pressed || root.dragActive) ? Qt.DragMoveCursor
+                                                  : Qt.OpenHandCursor
 
-    Rectangle {
-        z: 1
-        width: VLCStyle.dp(2, VLCStyle.scale)
-        height: parent.height
-        anchors {
-            left: parent.left
-            verticalCenter: parent.verticalCenter
-            leftMargin: index === 0 ? 0 : -width
-        }
-        antialiasing: true
-        visible: dropVisible
-        color: VLCStyle.colors.accent
-    }
+        drag.target: loader
 
-    onPressed: {
-        held = true
-        root._held = true
-    }
+        hoverEnabled: true
 
-    onEntered: playerBtnDND.currentIndex = index
+        drag.onActiveChanged: {
+            if (drag.active) {
+                root.dragStarted(controlId)
+                removeInfoRectVisible = true
+                drag.target.Drag.start()
 
-    onWheel: {
-        playerBtnDND.wheelScroll(wheel.angleDelta.y)
-    }
-
-    onReleased: {
-        drag.target.Drag.drop()
-        held = false
-        root._held = false
-    }
-
-    onPositionChanged: {
-        var pos = this.mapToGlobal(mouseX, mouseY)
-        updatePos(pos.x, pos.y)
-    }
-
-    function updatePos(x, y) {
-        var pos = root.mapFromGlobal(x, y)
-        content.x = pos.x
-        content.y = pos.y
-    }
-
-    Rectangle {
-        id: content
-        Drag.active: dragArea.held
-        Drag.source: dragArea
-        anchors {
-            horizontalCenter: parent.horizontalCenter
-            verticalCenter: parent.verticalCenter
-        }
-
-        opacity: held ? 0.75 : 1.0
-
-        Loader{
-            id: buttonloader
-            anchors {
-                horizontalCenter: parent.horizontalCenter
-                verticalCenter: parent.verticalCenter
-            }
-            sourceComponent: controlButtons.returnbuttondelegate(model.id)
-            onLoaded: {
-                buttonloader.item.paintOnly = true
-                buttonloader.item.enabled = false
-            }
-
-        }
-
-        states: State {
-            when: dragArea.held
-
-            ParentChange { target: content; parent: root }
-            AnchorChanges {
-                target: content
-                anchors { horizontalCenter: undefined; verticalCenter: undefined }
+            } else {
+                drag.target.Drag.drop()
+                removeInfoRectVisible = false
+                root.dragStopped(controlId)
             }
         }
 
-        onXChanged: {
-            if (content.Drag.active)
-                root.handleScroll(this)
+        onPositionChanged: {
+            if (drag.active) {
+                // FIXME: There must be a better way of this
+                var pos = mapToItem(loader.parent, mouseX, mouseY)
+                // y should be set first, because the automatic scroll is
+                // triggered by change on X
+                loader.y = pos.y
+                loader.x = pos.x
+            }
         }
     }
 
@@ -146,50 +85,91 @@ MouseArea {
 
         onEntered: {
             if ((drag.source === null ||
-                 (drag.source.dndView === playerBtnDND &&
-                  (parent.DelegateModel.itemsIndex === drag.source.DelegateModel.itemsIndex + 1))))
-                return
-
-            if (held)
-                return
-
-            dropVisible = true
-        }
-
-        onExited: {
-            if (held)
-                return
-
-            dropVisible = false
+                 (drag.source.dndView === dndView &&
+                  (parent.DelegateModel.itemsIndex === drag.source.DelegateModel.itemsIndex + 1))) ||
+                    pressed)
+                drag.accepted = false
         }
 
         onDropped: {
-            if (!dropVisible)
-                return
+            var destIndex = parent.DelegateModel.itemsIndex
 
-            if (held)
-                return
+            if((drag.source.dndView === dndView)
+                    && (drag.source.DelegateModel.itemsIndex < destIndex))
+                --destIndex
 
-            if (drag.source.dndView === playerBtnDND) {
-                // moving from same section
-                var srcIndex = drag.source.DelegateModel.itemsIndex
-                var destIndex = parent.DelegateModel.itemsIndex
+            dropEvent(drag, destIndex)
+        }
+    }
 
-                if(srcIndex < destIndex)
-                    destIndex -= 1
-                playerBtnDND.model.move(srcIndex,destIndex)
+    Binding {
+        when: dragActive
+        value: true
+
+        target: root
+        property: "dragActive"
+    }
+
+    Rectangle {
+        anchors {
+            left: parent.left
+            verticalCenter: parent.verticalCenter
+            leftMargin: index === 0 ? 0 : -width
+        }
+
+        z: 1
+
+        implicitWidth: VLCStyle.dp(2, VLCStyle.scale)
+        implicitHeight: VLCStyle.icon_medium
+
+        visible: dropArea.containsDrag
+        color: VLCStyle.colors.accent
+    }
+
+    background: Rectangle {
+        opacity: Drag.active ? 0.75 : 1.0
+
+        color: "transparent"
+
+        border.width: VLCStyle.dp(1, VLCStyle.scale)
+        border.color: containsMouse && !pressed ? VLCStyle.colors.buttonBorder
+                                                : "transparent"
+    }
+
+    contentItem: Item {
+        id: wrapper
+
+        implicitHeight: loader.implicitHeight
+        implicitWidth: loader.implicitWidth
+
+        Loader {
+            id: loader
+
+            parent: Drag.active ? root : wrapper
+
+            anchors.horizontalCenter: Drag.active ? undefined : parent.horizontalCenter
+            anchors.verticalCenter:  Drag.active ? undefined : parent.verticalCenter
+
+            source: PlayerControlbarControls.control(model.id).source
+
+            Drag.source: control
+
+            onXChanged: {
+                if (Drag.active)
+                    root.handleScroll(this)
             }
-            else if (drag.source.objectName == "buttonsList"){
-                // moving from buttonsList
-                dndView.model.insert(parent.DelegateModel.itemsIndex, {"id" : drag.source.mIndex})
-            }
-            else {
-                // moving between sections
-                dndView.model.insert(parent.DelegateModel.itemsIndex, {"id" : drag.source.controlId})
-                drag.source.dndView.model.remove(drag.source.DelegateModel.itemsIndex)
-            }
 
-            dropVisible = false
+            onLoaded: {
+                item.paintOnly = true
+                item.enabled = false
+
+                if (item.extraWidth !== undefined) {
+                    if (extraWidthAvailable)
+                        item.extraWidth = Number.MAX_VALUE
+                    else
+                        item.extraWidth = 0
+                }
+            }
         }
     }
 }

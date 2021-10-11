@@ -66,6 +66,8 @@
  #include <errno.h>
 #endif
 
+#define INVALID_SECTOR ((unsigned) -1)
+
 static vcddev_t *DiscOpen(vlc_object_t *obj, const char *location,
                          const char *path, unsigned *restrict trackp)
 {
@@ -86,10 +88,21 @@ static vcddev_t *DiscOpen(vlc_object_t *obj, const char *location,
         const char *sl = strrchr(dec, '/');
         if (sl != NULL)
         {
-            if (sscanf(sl, "/Track %2u", trackp) == 1)
+            unsigned track = 0;
+
+            /* Match a location in the form "/" or "/Track <number>*".  If
+             * there's no match or if it's 0 (invalid), read the whole disk --
+             * but leave *trackp to the inherited value from cdda-track option.
+             * It's important not to reset it to 0 because although it means
+             * "whole disk" we must not switch back to that mode if we get
+             * called for a specific track later on, at the risk of recursing
+             * forever. */
+            if (sl[1] == '\0' || sscanf(sl, "/Track %2u", &track) == 1)
+            {
+                if (track != 0)
+                    *trackp = track;
                 dec[sl - dec] = '\0';
-            else
-                *trackp = 0;
+            }
         }
 
         if (unlikely(asprintf(&devpath, "/dev/%s", dec) == -1))
@@ -112,10 +125,12 @@ static vcddev_t *DiscOpen(vlc_object_t *obj, const char *location,
         devpath[2] = '\0';
 #endif
 
+#ifdef __APPLE__
     if (DiscProbeMacOSPermission(obj, devpath) != VLC_SUCCESS) {
         free(devpath);
         return NULL;
     }
+#endif
 
     /* Open CDDA */
     vcddev_t *dev = ioctl_Open(obj, devpath);
@@ -127,7 +142,7 @@ static vcddev_t *DiscOpen(vlc_object_t *obj, const char *location,
 }
 
 /* how many blocks Demux() will read in each iteration */
-#define CDDA_BLOCKS_ONCE 20
+#define CDDA_BLOCKS_ONCE 20 // ~267 ms
 
 typedef struct
 {
@@ -182,10 +197,6 @@ static int DemuxControl(demux_t *demux, int query, va_list args)
 {
     demux_sys_t *sys = demux->p_sys;
 
-    /* One sector is 40000/3 µs */
-    static_assert (CDDA_DATA_SIZE * CLOCK_FREQ * 3 ==
-                   4 * 44100 * INT64_C(40000), "Wrong time/sector ratio");
-
     switch (query)
     {
         case DEMUX_CAN_SEEK:
@@ -211,13 +222,13 @@ static int DemuxControl(demux_t *demux, int query, va_list args)
             break;
 
         case DEMUX_GET_LENGTH:
-            *va_arg(args, vlc_tick_t *) = (INT64_C(40000) * sys->length) / 3;
+            *va_arg(args, vlc_tick_t *) = vlc_tick_from_samples(sys->length, CD_ROM_CDDA_FRAMES);
             break;
         case DEMUX_GET_TIME:
-            *va_arg(args, vlc_tick_t *) = (INT64_C(40000) * sys->position) / 3;
+            *va_arg(args, vlc_tick_t *) = vlc_tick_from_samples(sys->position, CD_ROM_CDDA_FRAMES);
             break;
         case DEMUX_SET_TIME:
-            sys->position = (va_arg(args, vlc_tick_t) * 3) / INT64_C(40000);
+            sys->position = samples_from_vlc_tick(va_arg(args, vlc_tick_t), CD_ROM_CDDA_FRAMES);
             break;
 
         default:
@@ -256,13 +267,13 @@ static int TOC_GetAudioRange(vcddev_toc_t *p_toc,
     int i_last = p_toc->i_last_track;
     for(int i=i_first; i<p_toc->i_tracks; i++)
     {
-        if((p_toc->p_sectors[i - 1].i_control & CD_ROM_DATA_FLAG) == 0)
+        if((p_toc->p_sectors[i - 1].i_control & CD_ROM_SUBCODE_DATA) == 0)
             break;
         i_first++;
     }
     for(int i=i_last; i > 0; i--)
     {
-        if((p_toc->p_sectors[i - 1].i_control & CD_ROM_DATA_FLAG) == 0)
+        if((p_toc->p_sectors[i - 1].i_control & CD_ROM_SUBCODE_DATA) == 0)
             break;
         i_last--;
     }
@@ -304,9 +315,9 @@ static int DemuxOpen(vlc_object_t *obj, vcddev_t *dev, unsigned track)
     sys->length = var_InheritInteger(obj, "cdda-last-sector") - sys->start;
 
     /* Track number in input item */
-    if (sys->start == (unsigned)-1 || sys->length == (unsigned)-1)
+    if (sys->start == INVALID_SECTOR || sys->length == INVALID_SECTOR)
     {
-        vcddev_toc_t *p_toc = ioctl_GetTOC(obj, dev, true);
+        vcddev_toc_t *p_toc = ioctl_GetTOC(obj, dev);
         if(p_toc == NULL)
             goto error;
 
@@ -554,22 +565,21 @@ static cddb_disc_t *GetCDDBInfo( vlc_object_t *obj, const vcddev_toc_t *p_toc )
         goto error;
     }
 
-    int64_t i_length = 2000000; /* PreGap */
     for( int i = 0; i < p_toc->i_tracks; i++ )
     {
+        int cddb_offset = LBAPregap(p_toc->p_sectors[i].i_lba); // 2s Pregap offset
         cddb_track_t *t = cddb_track_new();
-        cddb_track_set_frame_offset( t, p_toc->p_sectors[i].i_lba + 150 );  /* Pregap offset */
+        cddb_track_set_frame_offset( t, cddb_offset );
 
         cddb_disc_add_track( p_disc, t );
-        const int64_t i_size = ( p_toc->p_sectors[i+1].i_lba - p_toc->p_sectors[i].i_lba ) *
-                               (int64_t)CDDA_DATA_SIZE;
-        i_length += INT64_C(1000000) * i_size / 44100 / 4  ;
 
-        msg_Dbg( obj, "Track %i offset: %i", i, p_toc->p_sectors[i].i_lba + 150 );
+        msg_Dbg( obj, "Track %i offset: %i", i, cddb_offset );
     }
+    const int64_t i_size = p_toc->p_sectors[p_toc->i_tracks].i_lba - p_toc->p_sectors[0].i_lba;
+    int i_length = (int)(i_size * CDDA_DATA_SIZE / 4 / 44100) + 2 ; // 2s Pregap
 
-    msg_Dbg( obj, "Total length: %i", (int)(i_length/1000000) );
-    cddb_disc_set_length( p_disc, (int)(i_length/1000000) );
+    msg_Dbg( obj, "Total length: %i", i_length );
+    cddb_disc_set_length( p_disc, i_length );
 
     if( !cddb_disc_calc_discid( p_disc ) )
     {
@@ -678,31 +688,27 @@ static int ReadDir(stream_t *access, input_item_node_t *node)
     const vcddev_toc_t *p_toc = sys->p_toc;
 
     /* Build title table */
-    const int i_start_track_offset = sys->i_cdda_first - sys->p_toc->i_first_track;
+    const int cdda_offset = sys->i_cdda_first - p_toc->i_first_track;
     for (int i = 0; i < sys->i_cdda_tracks; i++)
     {
-        if(i < i_start_track_offset)
-            continue;
-
-        msg_Dbg(access, "track[%d] start=%d", i, p_toc->p_sectors[i].i_lba);
+        msg_Dbg(access, "track[%d] start=%d", i, p_toc->p_sectors[i + cdda_offset].i_lba);
 
         /* Initial/default name */
         char *name;
 
         if (unlikely(asprintf(&name, _("Audio CD - Track %02i"),
-                              i - i_start_track_offset + 1 ) == -1))
+                              i + 1 ) == -1))
             name = NULL;
 
         /* Create playlist items */
-        int i_first_sector = p_toc->p_sectors[i].i_lba;
-        int i_last_sector = p_toc->p_sectors[i + 1].i_lba;
+        int i_first_sector = p_toc->p_sectors[i + cdda_offset].i_lba;
+        int i_last_sector = p_toc->p_sectors[i + cdda_offset + 1].i_lba;
         if(sys->i_cdda_first + i == sys->i_cdda_last &&
            p_toc->i_last_track > sys->i_cdda_last)
             i_last_sector -= CD_ROM_XA_INTERVAL;
 
         const vlc_tick_t duration =
-            (vlc_tick_t)(i_last_sector - i_first_sector)
-            * CDDA_DATA_SIZE * CLOCK_FREQ / 44100 / 2 / 2;
+            vlc_tick_from_samples(i_last_sector - i_first_sector, CD_ROM_CDDA_FRAMES);
 
         input_item_t *item = input_item_NewDisc(access->psz_url,
                                                 (name != NULL) ? name :
@@ -719,8 +725,7 @@ static int ReadDir(stream_t *access, input_item_node_t *node)
             free(opt);
         }
 
-        if (likely(asprintf(&opt, "cdda-first-sector=%i",
-                            p_toc->p_sectors[i].i_lba) != -1))
+        if (likely(asprintf(&opt, "cdda-first-sector=%i", i_first_sector) != -1))
         {
             input_item_AddOption(item, opt, VLC_INPUT_OPTION_TRUSTED);
             free(opt);
@@ -734,9 +739,14 @@ static int ReadDir(stream_t *access, input_item_node_t *node)
 
         const char *title = NULL;
         const char *artist = NULL;
+        const char *album_artist = NULL;
         const char *album = NULL;
         const char *genre = NULL;
         const char *description = NULL;
+        const char *author = NULL;
+        const char *composer = NULL;
+        const char *arranger = NULL;
+        const char *isrc = NULL;
         int year = 0;
 
 #ifdef HAVE_LIBCDDB
@@ -760,21 +770,27 @@ static int ReadDir(stream_t *access, input_item_node_t *node)
         if(sys->cdtextc > 0)
         {
             const vlc_meta_t *m;
-            if (i + 1 < sys->cdtextc && (m = sys->cdtextv[i + 1]) != NULL)
-            {
-                ON_EMPTY(title,       vlc_meta_Get(m, vlc_meta_Title));
-                ON_EMPTY(artist,      vlc_meta_Get(m, vlc_meta_Artist));
-                ON_EMPTY(genre,       vlc_meta_Get(m, vlc_meta_Genre));
-                ON_EMPTY(description, vlc_meta_Get(m, vlc_meta_Description));
-            }
 
             /* Album CDtext data */
             if ((m = sys->cdtextv[0]) != NULL)
             {
+                ON_EMPTY(genre,       vlc_meta_Get(m, vlc_meta_Genre));
+                ON_EMPTY(description, vlc_meta_Get(m, vlc_meta_Description));
+            }
+
+            if (i + 1 < sys->cdtextc && (m = sys->cdtextv[i + 1]) != NULL)
+            {
+                ON_EMPTY(title,       vlc_meta_Get(m, vlc_meta_Title));
                 ON_EMPTY(artist,      vlc_meta_Get(m, vlc_meta_Artist));
+                ON_EMPTY(album_artist,vlc_meta_Get(m, vlc_meta_AlbumArtist));
                 ON_EMPTY(album,       vlc_meta_Get(m, vlc_meta_Album));
                 ON_EMPTY(genre,       vlc_meta_Get(m, vlc_meta_Genre));
                 ON_EMPTY(description, vlc_meta_Get(m, vlc_meta_Description));
+
+                author = vlc_meta_GetExtra(m, "AUTHOR");
+                composer = vlc_meta_GetExtra(m, "COMPOSER");
+                arranger = vlc_meta_GetExtra(m, "ARRANGER");
+                isrc = vlc_meta_GetExtra(m, "ISRC");
             }
         }
 
@@ -827,6 +843,15 @@ static int ReadDir(stream_t *access, input_item_node_t *node)
         if (NONEMPTY(album))
             input_item_SetAlbum(item, album);
 
+        if (NONEMPTY(author))
+            vlc_meta_AddExtra(item->p_meta, "AUTHOR", author);
+        if (NONEMPTY(composer))
+            vlc_meta_AddExtra(item->p_meta, "COMPOSER", composer);
+        if (NONEMPTY(arranger))
+            vlc_meta_AddExtra(item->p_meta, "ARRANGER", arranger);
+        if (NONEMPTY(isrc))
+            vlc_meta_AddExtra(item->p_meta, "ISRC", isrc);
+
         if (year != 0)
         {
             char yearbuf[5];
@@ -838,7 +863,7 @@ static int ReadDir(stream_t *access, input_item_node_t *node)
         char num[4];
         if(snprintf(num, sizeof (num), "%u", i + 1) < 4)
             input_item_SetTrackNum(item, num);
-        snprintf(num, sizeof (num), "%u", p_toc->i_tracks);
+        snprintf(num, sizeof (num), "%u", p_toc->i_last_track - p_toc->i_first_track);
         input_item_SetTrackTotal(item, num);
 
         input_item_node_AppendItem(node, item);
@@ -871,7 +896,7 @@ static int AccessOpen(vlc_object_t *obj, vcddev_t *dev)
     }
 
     sys->vcddev = dev;
-    sys->p_toc = ioctl_GetTOC(obj, dev, true);
+    sys->p_toc = ioctl_GetTOC(obj, dev);
     if (sys->p_toc == NULL)
     {
         msg_Err(obj, "cannot count tracks");
@@ -1006,9 +1031,9 @@ vlc_module_begin ()
 
     add_integer( "cdda-track", 0 , NULL, NULL )
         change_volatile ()
-    add_integer( "cdda-first-sector", -1, NULL, NULL )
+    add_integer( "cdda-first-sector", INVALID_SECTOR, NULL, NULL )
         change_volatile ()
-    add_integer( "cdda-last-sector", -1, NULL, NULL )
+    add_integer( "cdda-last-sector", INVALID_SECTOR, NULL, NULL )
         change_volatile ()
 
     add_string( "musicbrainz-server", MUSICBRAINZ_DEFAULT_SERVER,

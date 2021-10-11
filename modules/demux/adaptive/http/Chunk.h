@@ -67,15 +67,18 @@ namespace adaptive
 
         class AbstractChunkSource : public ChunkInterface
         {
+            friend class AbstractConnectionManager;
+
             public:
-                AbstractChunkSource(ChunkType, const BytesRange & = BytesRange());
-                virtual ~AbstractChunkSource();
                 const BytesRange &  getBytesRange   () const;
                 ChunkType           getChunkType    () const;
                 virtual std::string getContentType  () const override;
                 virtual RequestStatus getRequestStatus() const override;
+                virtual void        recycle() = 0;
 
             protected:
+                AbstractChunkSource(ChunkType, const BytesRange & = BytesRange());
+                virtual ~AbstractChunkSource();
                 ChunkType           type;
                 RequestStatus       requeststatus;
                 size_t              contentLength;
@@ -119,6 +122,7 @@ namespace adaptive
                 virtual bool        hasMoreData     () const  override;
                 virtual size_t      getBytesRead    () const  override;
                 virtual std::string getContentType  () const  override;
+                virtual void        recycle() override;
 
                 static const size_t CHUNK_SIZE = 32768;
 
@@ -159,7 +163,6 @@ namespace adaptive
                 HTTPChunkBufferedSource(const std::string &url, AbstractConnectionManager *,
                                         const ID &, ChunkType, const BytesRange &,
                                         bool = false);
-                virtual bool       prepare()  override;
                 void               bufferize(size_t);
                 bool               isDone() const;
                 void               hold();

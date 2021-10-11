@@ -28,33 +28,40 @@ endif
 
 libglinterop_cvpx_plugin_la_SOURCES = video_output/opengl/interop_cvpx.m \
 	video_output/opengl/interop.h
-libglinterop_cvpx_plugin_la_SOURCES += codec/vt_utils.c codec/vt_utils.h
+libglinterop_cvpx_plugin_la_LIBADD = libvlc_vtutils.la
 libglinterop_cvpx_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)' \
-	-Wl,-framework,Foundation,-framework,CoreVideo
+	-Wl,-framework,Foundation,-framework,CoreVideo,-framework,IOSurface
+libglinterop_cvpx_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)
+if HAVE_DARWIN
+if HAVE_OSX
+libglinterop_cvpx_plugin_la_LDFLAGS += -Wl,-framework,OpenGL
+else
+libglinterop_cvpx_plugin_la_CPPFLAGS += -DUSE_OPENGL_ES2
+libglinterop_cvpx_plugin_la_LDFLAGS += -Wl,-framework,OpenGLES
+endif
+vout_LTLIBRARIES += libglinterop_cvpx_plugin.la
+endif
+
 
 if HAVE_OSX
-libvout_macosx_plugin_la_SOURCES = video_output/macosx.m
-libvout_macosx_plugin_la_CFLAGS = $(AM_CFLAGS) -DHAVE_GL_CORE_SYMBOLS
+libvout_macosx_plugin_la_SOURCES = video_output/macosx.m \
+	$(OPENGL_VOUT_COMMONSOURCES)
+libvout_macosx_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -DHAVE_GL_CORE_SYMBOLS
 libvout_macosx_plugin_la_LIBADD = libvlc_opengl.la
 libvout_macosx_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)' \
 	-Wl,-framework,OpenGL,-framework,Cocoa
 
-libcaopengllayer_plugin_la_SOURCES = video_output/caopengllayer.m
+libcaopengllayer_plugin_la_SOURCES = video_output/caopengllayer.m \
+	$(OPENGL_VOUT_COMMONSOURCES)
 libcaopengllayer_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)  -DHAVE_GL_CORE_SYMBOLS
 libcaopengllayer_plugin_la_LIBADD = libvlc_opengl.la
 libcaopengllayer_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)' \
 	-Wl,-framework,OpenGL,-framework,Cocoa,-framework,QuartzCore
 
-libglinterop_cvpx_plugin_la_LDFLAGS += -Wl,-framework,IOSurface,-framework,OpenGL
-vout_LTLIBRARIES += libvout_macosx_plugin.la libcaopengllayer_plugin.la \
-	libglinterop_cvpx_plugin.la
-endif
-if HAVE_IOS
-libglinterop_cvpx_plugin_la_CFLAGS = $(AM_CFLAGS) -DUSE_OPENGL_ES2
-libglinterop_cvpx_plugin_la_LDFLAGS += -Wl,-framework,IOSurface,-framework,OpenGLES
+vout_LTLIBRARIES += libvout_macosx_plugin.la libcaopengllayer_plugin.la
 endif
 
-libvout_ios_plugin_la_SOURCES = video_output/opengl/display.c
+libvout_ios_plugin_la_SOURCES = video_output/opengl/display.c $(OPENGL_VOUT_COMMONSOURCES)
 libvout_ios_plugin_la_CFLAGS = $(AM_CFLAGS) $(OPENGL_COMMONCFLAGS) -DUSE_OPENGL_ES2
 libvout_ios_plugin_la_LIBADD = libvlc_opengles.la
 
@@ -68,16 +75,33 @@ libcaeagl_ios_plugin_la_LDFLAGS = $(AM_LDFLAGS) \
 	-Wl,-framework,Foundation,-framework,OpenGLES,-framework,QuartzCore,-framework,UIKit
 libcaeagl_ios_plugin_la_OBJCFLAGS = $(AM_OBJCFLAGS) -fobjc-arc
 
+libcvpx_gl_plugin_la_SOURCES = video_output/apple/VLCCVOpenGLProvider.m
+libcvpx_gl_plugin_la_OBJCFLAGS = $(AM_OBJCFLAGS) -fobjc-arc
+libcvpx_gl_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -DGL_SILENCE_DEPRECATION
+libcvpx_gl_plugin_la_LDFLAGS = $(AM_LDFLAGS) \
+    -Wl,-framework,Foundation,-framework,CoreFoundation,-framework,CoreVideo
+libcvpx_gl_plugin_la_LIBADD = libvlc_vtutils.la
+
+if HAVE_DARWIN
+if HAVE_OSX
+libcvpx_gl_plugin_la_LDFLAGS += -Wl,-framework,OpenGL
+libcvpx_gl_plugin_la_LIBADD += libvlc_opengl.la
+else
+libcvpx_gl_plugin_la_CPPFLAGS += -DUSE_OPENGL_ES2
+libcvpx_gl_plugin_la_LDFLAGS += -Wl,-framework,OpenGLES
+libcvpx_gl_plugin_la_LIBADD += libvlc_opengles.la
+endif
+vout_LTLIBRARIES += libcvpx_gl_plugin.la
+endif
+
 if HAVE_IOS
 vout_LTLIBRARIES += libvout_ios_plugin.la \
-	libglinterop_cvpx_plugin.la \
 	libuiview_window_plugin.la \
 	libcaeagl_ios_plugin.la
 endif
 if HAVE_TVOS
 vout_LTLIBRARIES += \
 	libvout_ios_plugin.la \
-	libglinterop_cvpx_plugin.la \
 	libuiview_window_plugin.la \
 	libcaeagl_ios_plugin.la
 endif
@@ -168,7 +192,7 @@ libdirect3d11_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
 vout_LTLIBRARIES += $(LTLIBdirect3d11)
 EXTRA_LTLIBRARIES += libdirect3d11_plugin.la
 
-libglwin32_plugin_la_SOURCES = \
+libglwin32_plugin_la_SOURCES = $(OPENGL_VOUT_COMMONSOURCES) \
 	video_output/win32/glwin32.c \
 	video_output/win32/common.c video_output/win32/common.h \
 	video_output/win32/events.c video_output/win32/events.h \

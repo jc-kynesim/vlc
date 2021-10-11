@@ -36,17 +36,19 @@ FocusScope {
     //the index to "go to" when the view is loaded
     property var initialIndex: 0
 
-    property Item headerItem: view.currentItem ? view.currentItem.headerItem : null
+    property Item headerItem: _currentView ? _currentView.headerItem : null
 
     // current index of album model
     readonly property int currentIndex: {
-        if (!view.currentItem)
+        if (!_currentView)
            return -1
         else if (mainInterface.gridView)
-           return view.currentItem.currentIndex
+           return _currentView.currentIndex
         else
            return headerItem.albumsListView.currentIndex
     }
+
+    property alias _currentView: view.currentItem
 
     property Component header: FocusScope {
         id: headerFs
@@ -57,6 +59,13 @@ FocusScope {
         focus: true
         height: col.height
         width: root.width
+
+        function setCurrentItemFocus(reason) {
+            if (albumsListView)
+                albumsListView.setCurrentItemFocus(reason);
+            else
+                artistBanner.setCurrentItemFocus(reason);
+        }
 
         Column {
             id: col
@@ -73,11 +82,10 @@ FocusScope {
                 artist: root.artist
                 Navigation.parentItem: root
                 Navigation.downAction: function() {
-                    headerFs.focus = false
                     if (albumsListView)
-                        albumsListView.forceActiveFocus()
+                        albumsListView.setCurrentItemFocus(Qt.TabFocusReason);
                     else
-                        view.currentItem.setCurrentItemFocus()
+                        _currentView.setCurrentItemFocus(Qt.TabFocusReason);
 
                 }
             }
@@ -116,10 +124,13 @@ FocusScope {
                         spacing: VLCStyle.column_margin_width
 
                         Navigation.parentItem: root
-                        Navigation.upItem: artistBanner
+
+                        Navigation.upAction: function() {
+                            artistBanner.setCurrentItemFocus(Qt.TabFocusReason);
+                        }
+
                         Navigation.downAction: function() {
-                            headerFs.focus = false
-                            view.currentItem.setCurrentItemFocus()
+                            root.setCurrentItemFocus(Qt.TabFocusReason);
                         }
 
                         delegate: Widgets.GridItem {
@@ -188,12 +199,16 @@ FocusScope {
     onActiveFocusChanged: {
         if (activeFocus && albumModel.count > 0 && !albumSelectionModel.hasSelection) {
             var initialIndex = 0
-            var albumsListView = mainInterface.gridView ? view.currentItem : headerItem.albumsListView
+            var albumsListView = mainInterface.gridView ? _currentView : headerItem.albumsListView
             if (albumsListView.currentIndex !== -1)
                 initialIndex = albumsListView.currentIndex
             albumSelectionModel.select(albumModel.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect)
             albumsListView.currentIndex = initialIndex
         }
+    }
+
+    function setCurrentItemFocus(reason) {
+        view.currentItem.setCurrentItemFocus(reason);
     }
 
     function resetFocus() {
@@ -204,7 +219,7 @@ FocusScope {
         if (initialIndex >= albumModel.count)
             initialIndex = 0
         albumSelectionModel.select(albumModel.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect)
-        var albumsListView = mainInterface.gridView ? view.currentItem : headerItem.albumsListView
+        var albumsListView = mainInterface.gridView ? _currentView : headerItem.albumsListView
         if (albumsListView) {
             albumsListView.currentIndex = initialIndex
             albumsListView.positionViewAtIndex(initialIndex, ItemView.Contain)
@@ -220,11 +235,11 @@ FocusScope {
     }
 
     function _onNavigationCancel() {
-        if (view.currentItem.currentIndex <= 0) {
+        if (_currentView.currentIndex <= 0) {
             root.Navigation.defaultNavigationCancel()
         } else {
-            view.currentItem.currentIndex = 0;
-            view.currentItem.positionViewAtIndex(0, ItemView.Contain)
+            _currentView.currentIndex = 0;
+            _currentView.positionViewAtIndex(0, ItemView.Contain)
         }
 
         if (tableView_id.currentIndex <= 0)
@@ -320,7 +335,7 @@ FocusScope {
                 onItemClicked : gridView_id.leftClickOnItem(modifier, index)
 
                 onItemDoubleClicked: {
-                    if ( model.id !== undefined ) { medialib.addAndPlay( model.id ) }
+                    gridView_id.switchExpandItem(index)
                 }
 
                 onContextMenuButtonClicked: {
@@ -342,23 +357,36 @@ FocusScope {
                 width: gridView_id.width
                 onRetract: gridView_id.retract()
                 Navigation.parentItem: root
-                Navigation.cancelAction:  function() {  gridView_id.retract() }
-                Navigation.upAction: function() {  gridView_id.retract() }
+
+                Navigation.cancelAction: function() {
+                    gridView_id.setCurrentItemFocus(Qt.TabFocusReason);
+                }
+
+                Navigation.upAction: function() {
+                    gridView_id.setCurrentItemFocus(Qt.TabFocusReason);
+                }
+
                 Navigation.downAction: function() {}
             }
 
             onActionAtIndex: {
-                if (albumSelectionModel.selectedIndexes.length <= 1) {
-                    gridView_id.switchExpandItem( index )
+                if (albumSelectionModel.selectedIndexes.length === 1) {
+                    switchExpandItem(index);
+
+                    expandItem.setCurrentItemFocus(Qt.TabFocusReason);
                 } else {
-                    root._actionAtIndex( index, albumModel, albumSelectionModel )
+                    _actionAtIndex(index, albumModel, albumSelectionModel);
                 }
             }
 
             onSelectAll: albumSelectionModel.selectAll()
             onSelectionUpdated: albumSelectionModel.updateSelection( keyModifiers, oldIndex, newIndex )
             Navigation.parentItem: root
-            Navigation.upItem: headerItem
+
+            Navigation.upAction: function() {
+                headerItem.setCurrentItemFocus(Qt.TabFocusReason);
+            }
+
             Navigation.cancelAction: root._onNavigationCancel
 
             Connections {
@@ -402,7 +430,11 @@ FocusScope {
             ]
 
             Navigation.parentItem: root
-            Navigation.upItem: headerItem
+
+            Navigation.upAction: function() {
+                headerItem.setCurrentItemFocus(Qt.TabFocusReason);
+            }
+
             Navigation.cancelAction: root._onNavigationCancel
 
             onItemDoubleClicked: medialib.addAndPlay(model.id)
@@ -429,11 +461,6 @@ FocusScope {
 
             Widgets.TableColumns {
                 id: tableColumns
-            }
-
-            function setCurrentItemFocus() {
-                positionViewAtIndex(currentIndex, ItemView.Contain)
-                currentItem.forceActiveFocus()
             }
 
             Util.SelectableDelegateModel {

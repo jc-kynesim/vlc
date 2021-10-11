@@ -26,14 +26,9 @@ import "qrc:///widgets/" as Widgets
 FocusScope {
     id: playerButtonsLayout
 
-    implicitHeight: Math.max(buttonrow_left.implicitHeight, buttonrow_center.implicitHeight, buttonrow_right.implicitHeight)
+    implicitHeight: VLCStyle.maxControlbarControlHeight
 
-    property alias parentWindow: controlmodelbuttons.parentWindow
-
-    property real marginLeft: VLCStyle.margin_normal
-    property real marginRight: VLCStyle.margin_normal
-    property real marginTop: 0
-    property real marginBottom: 0
+    property var parentWindow: g_root
 
     property var colors: undefined
 
@@ -56,24 +51,14 @@ FocusScope {
         console.assert(identifier >= 0)
     }
 
-    ControlButtons {
-        id: controlmodelbuttons
-
-        parentWindow: g_root
-
-        onRequestLockUnlockAutoHide: playerButtonsLayout.requestLockUnlockAutoHide(lock, source)
-    }
-
     Loader {
         id: buttonrow_left
 
         anchors {
             left: parent.left
-            verticalCenter: parent.verticalCenter
+            top: parent.top
+            bottom: parent.bottom
 
-            leftMargin: marginLeft
-            topMargin: marginTop
-            bottomMargin: marginBottom
             rightMargin: layoutSpacing
         }
 
@@ -102,10 +87,9 @@ FocusScope {
         id: buttonrow_center
 
         anchors {
-            centerIn: parent
-
-            topMargin: playerButtonsLayout.marginTop
-            bottomMargin: playerButtonsLayout.marginBottom
+            horizontalCenter: parent.horizontalCenter
+            top: parent.top
+            bottom: parent.bottom
         }
 
         active: !!playerButtonsLayout.model
@@ -129,11 +113,9 @@ FocusScope {
 
         anchors {
             right: parent.right
-            verticalCenter: parent.verticalCenter
+            top: parent.top
+            bottom: parent.bottom
 
-            rightMargin: marginRight
-            topMargin: marginTop
-            bottomMargin: marginBottom
             leftMargin: layoutSpacing
         }
 

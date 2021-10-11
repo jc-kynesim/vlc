@@ -59,7 +59,6 @@ VLC_API void vlc_testcancel(void);
 typedef struct vlc_thread *vlc_thread_t;
 # define VLC_THREAD_CANCELED NULL
 
-# define LIBVLC_NEED_SLEEP
 typedef struct vlc_threadvar *vlc_threadvar_t;
 typedef struct vlc_timer *vlc_timer_t;
 
@@ -125,7 +124,6 @@ static inline int vlc_poll (struct pollfd *fds, unsigned nfds, int timeout)
 # include <pthread.h>
 # include <poll.h>
 # define LIBVLC_USE_PTHREAD_CLEANUP   1
-# define LIBVLC_NEED_SLEEP
 
 typedef struct vlc_thread *vlc_thread_t;
 #define VLC_THREAD_CANCELED NULL
@@ -228,13 +226,13 @@ typedef struct
         struct {
             atomic_uint value;
             atomic_uint recursion;
-            _Atomic (const void *) owner;
+            atomic_ulong owner;
         };
 #endif
         struct {
             unsigned int value;
             unsigned int recursion;
-            const void *owner;
+            unsigned long owner;
         } dummy;
     };
 } vlc_mutex_t;
@@ -248,7 +246,7 @@ typedef struct
 #define VLC_STATIC_MUTEX { \
     .value = ATOMIC_VAR_INIT(0), \
     .recursion = ATOMIC_VAR_INIT(0), \
-    .owner = ATOMIC_VAR_INIT(NULL), \
+    .owner = ATOMIC_VAR_INIT(0), \
 }
 
 /**
@@ -655,63 +653,6 @@ VLC_API void *vlc_threadvar_get(vlc_threadvar_t);
 /** @} */
 
 /**
- * Waits on an address.
- *
- * Puts the calling thread to sleep if a specific unsigned 32-bits value is
- * stored at a specified address. The thread will sleep until it is woken up by
- * a call to vlc_atomic_notify_one() or vlc_atomic_notify_all() in another
- * thread, or spuriously.
- *
- * If the value does not match, do nothing and return immediately.
- *
- * \param addr address to check for
- * \param val value to match at the address
- */
-void vlc_atomic_wait(void *addr, unsigned val);
-
-/**
- * Waits on an address with a time-out.
- *
- * This function operates as vlc_atomic_wait() but provides an additional
- * time-out. If the deadline is reached, the thread resumes and the function
- * returns.
- *
- * \param addr address to check for
- * \param val value to match at the address
- * \param deadline deadline to wait until
- *
- * \retval 0 the function was woken up before the time-out
- * \retval ETIMEDOUT the deadline was reached
- */
-int vlc_atomic_timedwait(void *addr, unsigned val, vlc_tick_t deadline);
-
-int vlc_atomic_timedwait_daytime(void *addr, unsigned val, time_t deadline);
-
-/**
- * Wakes up one thread on an address.
- *
- * Wakes up (at least) one of the thread sleeping on the specified address.
- * The address must be equal to the first parameter given by at least one
- * thread sleeping within the vlc_atomic_wait() or vlc_atomic_timedwait()
- * functions. If no threads are found, this function does nothing.
- *
- * \param addr address identifying which threads may be woken up
- */
-void vlc_atomic_notify_one(void *addr);
-
-/**
- * Wakes up all thread on an address.
- *
- * Wakes up all threads sleeping on the specified address (if any).
- * Any thread sleeping within a call to vlc_atomic_wait() or
- * vlc_atomic_timedwait() with the specified address as first call parameter
- * will be woken up.
- *
- * \param addr address identifying which threads to wake up
- */
-void vlc_atomic_notify_all(void *addr);
-
-/**
  * Creates and starts a new thread.
  *
  * The thread must be <i>joined</i> with vlc_join() to reclaim resources
@@ -793,19 +734,23 @@ VLC_API void vlc_control_cancel(vlc_cleanup_t *);
 /**
  * Thread identifier.
  *
- * This function returns the identifier of the calling thread. The identifier
- * cannot change for the entire duration of the thread, and no other thread can
- * have the same identifier at the same time in the same process. Typically,
- * the identifier is also unique across all running threads of all existing
- * processes, but that depends on the operating system.
+ * This function returns a non-zero unique identifier of the calling thread.
+ * The identifier cannot change for the entire lifetime of the thread, and two
+ * concurrent threads cannot have the same identifier.
  *
- * There are no particular semantics to the thread ID with LibVLC.
+ * The thread identifier has no defined semantics other than uniqueness,
+ * and no particular purposes within LibVLC.
  * It is provided mainly for tracing and debugging.
  *
- * \warning This function is not currently implemented on all supported
- * platforms. Where not implemented, it returns (unsigned long)-1.
+ * On some but not all supported platforms, the thread identifier is in fact
+ * the OS/kernel thread identifier (a.k.a. task PID), and is temporally unique
+ * not only within the process but across the entire system.
  *
- * \return the thread identifier (or -1 if unimplemented)
+ * \note
+ * The `main()` thread identifier is typically identical to the process
+ * identifier, but this is not portable.
+ *
+ * \return the thread identifier (cannot fail)
  */
 VLC_API unsigned long vlc_thread_id(void) VLC_USED;
 
@@ -1051,10 +996,7 @@ static inline void vlc_cleanup_lock (void *lock)
 }
 #define mutex_cleanup_push( lock ) vlc_cleanup_push (vlc_cleanup_lock, lock)
 
-#ifndef __cplusplus
-void vlc_cancel_addr_set(atomic_uint *addr);
-void vlc_cancel_addr_clear(atomic_uint *addr);
-#else
+#ifdef __cplusplus
 /**
  * Helper C++ class to lock a mutex.
  *

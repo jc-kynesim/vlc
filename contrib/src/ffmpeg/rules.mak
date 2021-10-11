@@ -211,8 +211,8 @@ endif
 FFMPEGCONF += --target-os=sunos --enable-pic
 endif
 
-ifdef HAVE_NACL
-FFMPEGCONF+=--disable-inline-asm --disable-asm --target-os=linux
+ifdef HAVE_EMSCRIPTEN
+FFMPEGCONF+= --arch=wasm32 --target-os=emscripten
 endif
 
 # Build
@@ -242,10 +242,12 @@ ifdef USE_FFMPEG
 	$(APPLY) $(SRC)/ffmpeg/0001-avcodec-mpeg12dec-don-t-call-hw-end_frame-when-start.patch
 	$(APPLY) $(SRC)/ffmpeg/0002-avcodec-mpeg12dec-don-t-end-a-slice-without-first_sl.patch
 	$(APPLY) $(SRC)/ffmpeg/0001-fix-mf_utils-compilation-with-mingw64.patch
+	$(APPLY) $(SRC)/ffmpeg/0001-avcodec-vp9-Do-not-destroy-uninitialized-mutexes-con.patch
 endif
 ifdef USE_LIBAV
 	$(APPLY) $(SRC)/ffmpeg/libav_gsm.patch
 endif
+	$(APPLY) $(SRC)/ffmpeg/0001-ffmpeg-add-target_os-support-for-emscripten.patch
 	$(MOVE)
 
 .ffmpeg: ffmpeg

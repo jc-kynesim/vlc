@@ -33,11 +33,6 @@
 
 #include <cassert>
 
-#if !defined(_WIN32_WINNT) || _WIN32_WINNT < 0x0601 // _WIN32_WINNT_WIN7
-# undef _WIN32_WINNT
-# define _WIN32_WINNT 0x0601 // _WIN32_WINNT_WIN7
-#endif
-
 #include <windows.h>
 
 #include <d3d11.h>
@@ -91,7 +86,7 @@ static bool UpdateSwapchain( d3d11_local_swapchain *display, const libvlc_video_
         display->swapchainTargetView[i].Reset();
 
     const d3d_format_t *newPixelFormat = NULL;
-#if VLC_WINSTORE_APP
+#ifdef VLC_WINSTORE_APP
     ComPtr<IDXGISwapChain1> dxgiswapChain = DXGI_GetSwapChain1(display->sys);
     if (!dxgiswapChain.Get())
         dxgiswapChain = static_cast<IDXGISwapChain1*>((void*)(uintptr_t)var_InheritInteger(display->obj, "winrt-swapchain"));
@@ -192,7 +187,7 @@ void D3D11_LocalSwapchainSetMetadata( void *opaque, libvlc_video_metadata_type_t
 
 bool D3D11_LocalSwapchainWinstoreSize( void *opaque, uint32_t *width, uint32_t *height )
 {
-#if VLC_WINSTORE_APP
+#ifdef VLC_WINSTORE_APP
     d3d11_local_swapchain *display = static_cast<d3d11_local_swapchain *>(opaque);
     /* legacy UWP mode, the width/height was set in GUID_SWAPCHAIN_WIDTH/HEIGHT */
     UINT dataSize = sizeof(*width);
@@ -244,7 +239,7 @@ void *D3D11_CreateLocalSwapchainHandleHwnd(vlc_object_t *o, HWND hwnd, d3d11_dev
     return display;
 }
 
-#if defined(HAVE_DCOMP_H) && !VLC_WINSTORE_APP
+#if defined(HAVE_DCOMP_H) && !defined(VLC_WINSTORE_APP)
 void *D3D11_CreateLocalSwapchainHandleDComp(vlc_object_t *o, void* dcompDevice, void* dcompVisual, d3d11_device_t *d3d_dev)
 {
     d3d11_local_swapchain *display = new (std::nothrow) d3d11_local_swapchain();

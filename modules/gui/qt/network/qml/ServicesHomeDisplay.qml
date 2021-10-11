@@ -48,7 +48,8 @@ Widgets.PageLoader {
         component: sourceRootComponent
     }, {
         name: "source_browse",
-        component: sourceBrowseComponent
+        component: sourceBrowseComponent,
+        guard: function (prop) { return !!prop.tree }
     }]
 
     onCurrentItemChanged: {
@@ -58,25 +59,35 @@ Widgets.PageLoader {
         isViewMultiView = currentItem.isViewMultiView === undefined || currentItem.isViewMultiView
     }
 
+    function setCurrentItemFocus(reason) {
+        stackView.currentItem.setCurrentItemFocus(reason);
+    }
+
     Component {
         id: sourceRootComponent
 
         NetworkBrowseDisplay {
             property alias source_name: deviceModel.source_name
+
             property Component addressBar: NetworkAddressbar {
                 path: [{display: deviceModel.name, tree: {}}]
 
-                onHomeButtonClicked: history.push(["mc", "discover", "services"])
+                onHomeButtonClicked: {
+                    history.push(["mc", "discover", "services"]);
 
-                function changeTree(new_tree) {
+                    root.setCurrentItemFocus(reason);
                 }
             }
 
             providerModel: deviceModel
             contextMenu: contextMenu
 
-            function changeTree(new_tree) {
-                history.push(["mc", "discover", "services", "source_browse", { tree: new_tree, "root_name": deviceModel.name, "source_name": source_name }]);
+            onBrowse: {
+                history.push(["mc", "discover", "services", "source_browse",
+                              { tree: tree, "root_name": deviceModel.name,
+                                "source_name": source_name }]);
+
+                root.setCurrentItemFocus(reason);
             }
 
             NetworkDeviceModel {
@@ -96,42 +107,49 @@ Widgets.PageLoader {
 
     Component {
         id: sourceBrowseComponent
-        NetworkBrowseDisplay {
 
-            providerModel: mediaModel
-            contextMenu: contextMenu
+        NetworkBrowseDisplay {
             property string root_name
             property string source_name
+
             property Component addressBar: NetworkAddressbar {
                 path: {
-                    var _path = mediaModel.path
+                    var _path = providerModel.path
                     _path.unshift({display: root_name, tree: {"source_name": source_name, "isRoot": true}})
                     return _path
                 }
 
-                onHomeButtonClicked: history.push(["mc", "discover", "services"])
-                function changeTree(new_tree) {
-                    if (!!new_tree.isRoot)
-                        history.push(["mc", "discover", "services", "source_root", { source_name: new_tree.source_name }])
+                onHomeButtonClicked: {
+                    history.push(["mc", "discover", "services"]);
+
+                    root.setCurrentItemFocus(reason);
+                }
+
+                onBrowse: {
+                    if (!!tree.isRoot)
+                        history.push(["mc", "discover", "services", "source_root",
+                                      { source_name: tree.source_name }]);
                     else
-                        history.push(["mc", "discover", "services", "source_browse", { tree: new_tree, "root": root_name }]);
+                        history.push(["mc", "discover", "services", "source_browse",
+                                      { tree: tree, "root": root_name }]);
+
+                    root.setCurrentItemFocus(reason);
                 }
             }
 
-            function changeTree(new_tree) {
-                history.push(["mc", "discover", "services", "source_browse", { tree: new_tree, "root": root_name }]);
+            onBrowse: {
+                history.push(["mc", "discover", "services", "source_browse",
+                              { tree: tree, "root": root_name }]);
+
+                root.setCurrentItemFocus(reason);
             }
 
-            NetworkMediaModel {
-                id: mediaModel
-
+            providerModel: NetworkMediaModel {
                 ctx: mainctx
             }
 
-            NetworkMediaContextMenu {
-                id: contextMenu
-
-                model: mediaModel
+            contextMenu: NetworkMediaContextMenu {
+                model: providerModel
             }
         }
     }
@@ -300,16 +318,19 @@ Widgets.PageLoader {
                 pictureHeight: VLCStyle.gridCover_network_height
                 height: VLCStyle.gridCover_network_height + VLCStyle.margin_xsmall + VLCStyle.fontHeight_normal
                 playCoverBorderWidth: VLCStyle.gridCover_network_border
-                playCoverOnlyBorders: true
+                playCoverShowGradient: false
                 pictureOverlay: overlay
                 unselectedUnderlay: shadows.unselected
                 selectedUnderlay: shadows.selected
 
                 onItemDoubleClicked: {
                     if (is_dummy)
-                        history.push(["mc", "discover", "services", "services_manage"])
+                        history.push(["mc", "discover", "services", "services_manage"]);
                     else
-                        history.push(["mc", "discover", "services", "source_root", { source_name: model.name } ])
+                        history.push(["mc", "discover", "services", "source_root",
+                                      { source_name: model.name }]);
+
+                    root.setCurrentItemFocus(Qt.MouseFocusReason);
                 }
 
                 onItemClicked : {
@@ -376,17 +397,25 @@ Widgets.PageLoader {
 
             onSelectAll: selectionModel.selectAll()
             onSelectionUpdated: selectionModel.updateSelection( keyModifiers, oldIndex, newIndex )
+
             onActionAtIndex: {
-                var itemData = sourcesFilterModel.getDataAt(index)
+                var itemData = sourcesFilterModel.getDataAt(index);
+
                 if (itemData.type === NetworkSourcesModel.TYPE_DUMMY)
-                    history.push(["mc", "discover", "services", "services_manage"])
+                    history.push(["mc", "discover", "services", "services_manage"]);
                 else
-                    history.push(["mc", "discover", "services", "source_root", { source_name: itemData.name } ])
+                    history.push(["mc", "discover", "services", "source_root",
+                                  { source_name: itemData.name }]);
+
+                root.setCurrentItemFocus(Qt.TabFocusReason);
             }
 
             Navigation.parentItem: root
+
             Navigation.cancelAction: function() {
-                history.previous()
+                history.previous();
+
+                root.setCurrentItemFocus(Qt.TabFocusReason);
             }
 
             NetworkSourcesModel {

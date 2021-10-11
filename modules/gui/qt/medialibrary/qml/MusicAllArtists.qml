@@ -32,15 +32,15 @@ import "qrc:///style/"
 FocusScope {
     id: root
 
-    readonly property int currentIndex: view.currentItem.currentIndex
+    readonly property int currentIndex: _currentView.currentIndex
     property int initialIndex: 0
     property alias model: artistModel
 
+    property alias _currentView: view.currentItem
+
     onInitialIndexChanged: resetFocus()
 
-    function requestArtistAlbumView() {
-        console.assert(false, "must be reimplemented")
-    }
+    signal requestArtistAlbumView(int reason)
 
     function resetFocus() {
         if (artistModel.count === 0)
@@ -50,18 +50,22 @@ FocusScope {
         if (initialIndex >= artistModel.count)
             initialIndex = 0
         selectionModel.select(artistModel.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect)
-        if (view.currentItem) {
-            view.currentItem.currentIndex = initialIndex
-            view.currentItem.positionViewAtIndex(initialIndex, ItemView.Contain)
+        if (_currentView) {
+            _currentView.currentIndex = initialIndex
+            _currentView.positionViewAtIndex(initialIndex, ItemView.Contain)
         }
     }
 
+    function setCurrentItemFocus(reason) {
+        _currentView.setCurrentItemFocus(reason);
+    }
+
     function _onNavigationCancel() {
-        if (view.currentItem.currentIndex <= 0) {
+        if (_currentView.currentIndex <= 0) {
             root.Navigation.defaultNavigationCancel()
         } else {
-            view.currentItem.currentIndex = 0;
-            view.currentItem.positionViewAtIndex(0, ItemView.Contain);
+            _currentView.currentIndex = 0;
+            _currentView.positionViewAtIndex(0, ItemView.Contain);
         }
     }
 
@@ -130,9 +134,8 @@ FocusScope {
                 if (selectionModel.selectedIndexes.length > 1) {
                     medialib.addAndPlay( artistModel.getIdsForIndexes( selectionModel.selectedIndexes ) )
                 } else {
-                    view.currentItem.currentIndex = index
-                    requestArtistAlbumView()
-                    medialib.addAndPlay( artistModel.getIdForIndex(index) )
+                    _currentView.currentIndex = index
+                    requestArtistAlbumView(Qt.TabFocusReason)
                 }
             }
 
@@ -165,7 +168,7 @@ FocusScope {
 
                 onItemClicked: artistGrid.leftClickOnItem(modifier, index)
 
-                onItemDoubleClicked: root.requestArtistAlbumView(model)
+                onItemDoubleClicked: root.requestArtistAlbumView(Qt.MouseFocusReason)
 
                 onContextMenuButtonClicked: {
                     artistGrid.rightClickOnItem(index)
@@ -200,7 +203,7 @@ FocusScope {
                 if (selection.length > 1) {
                     medialib.addAndPlay( artistModel.getIdsForIndexes( selection ) )
                 } else if ( selection.length === 1) {
-                    requestArtistAlbumView()
+                    requestArtistAlbumView(Qt.TabFocusReason)
                     medialib.addAndPlay( artistModel.getIdForIndex( selection[0] ) )
                 }
             }
@@ -210,9 +213,8 @@ FocusScope {
                 { criteria: "nb_tracks", width: VLCStyle.colWidth(1), text: i18n.qtr("Tracks") }
             ]
 
-            onItemDoubleClicked: {
-                root.requestArtistAlbumView(model)
-            }
+            onItemDoubleClicked: root.requestArtistAlbumView(Qt.MouseFocusReason)
+
             onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes, menuParent.mapToGlobal(0,0))
             onRightClick: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
 

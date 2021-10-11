@@ -40,6 +40,7 @@
 #include <vlc_list.h>
 #include <vlc_decoder.h>
 #include <vlc_memstream.h>
+#include <vlc_tracer.h>
 
 #include "input_internal.h"
 #include "../clock/input_clock.h"
@@ -845,7 +846,8 @@ static int EsOutSetRecord(  es_out_t *out, bool b_record )
                 continue;
 
             p_es->p_dec_record =
-                vlc_input_decoder_New( VLC_OBJECT(p_input), &p_es->fmt, NULL,
+                vlc_input_decoder_New( VLC_OBJECT(p_input), &p_es->fmt,
+                                       p_es->id.str_id, NULL,
                                        input_priv(p_input)->p_resource,
                                        p_sys->p_sout_record, false,
                                        &decoder_cbs, p_es );
@@ -1498,7 +1500,8 @@ static es_out_pgrm_t *EsOutProgramAdd( es_out_t *out, input_source_t *source, in
     p_pgrm->p_master_es_clock = NULL;
     p_pgrm->active_clock_source = VLC_CLOCK_MASTER_AUTO;
 
-    p_pgrm->p_main_clock = vlc_clock_main_New( p_input->obj.logger );
+    struct vlc_tracer *tracer = vlc_object_get_tracer( &p_input->obj );
+    p_pgrm->p_main_clock = vlc_clock_main_New( p_input->obj.logger, tracer );
     if( !p_pgrm->p_main_clock )
     {
         free( p_pgrm );
@@ -2313,12 +2316,14 @@ static void EsOutCreateDecoder( es_out_t *out, es_out_id_t *p_es )
         p_es->master = true;
         p_es->p_pgrm->p_master_es_clock = p_es->p_clock =
             vlc_clock_main_CreateMaster( p_es->p_pgrm->p_main_clock,
+                                         p_es->id.str_id,
                                          &clock_cbs, p_es );
     }
     else
     {
         p_es->master = false;
         p_es->p_clock = vlc_clock_main_CreateSlave( p_es->p_pgrm->p_main_clock,
+                                                    p_es->id.str_id,
                                                     p_es->fmt.i_cat,
                                                     &clock_cbs, p_es );
     }
@@ -2330,7 +2335,8 @@ static void EsOutCreateDecoder( es_out_t *out, es_out_id_t *p_es )
     }
 
     input_thread_private_t *priv = input_priv(p_input);
-    dec = vlc_input_decoder_New( VLC_OBJECT(p_input), &p_es->fmt, p_es->p_clock,
+    dec = vlc_input_decoder_New( VLC_OBJECT(p_input), &p_es->fmt,
+                                 p_es->id.str_id, p_es->p_clock,
                                  priv->p_resource, priv->p_sout,
                                  priv->b_thumbnailing, &decoder_cbs, p_es );
     if( dec != NULL )
@@ -2343,7 +2349,8 @@ static void EsOutCreateDecoder( es_out_t *out, es_out_id_t *p_es )
         if( !p_es->p_master && p_sys->p_sout_record )
         {
             p_es->p_dec_record =
-                vlc_input_decoder_New( VLC_OBJECT(p_input), &p_es->fmt, NULL,
+                vlc_input_decoder_New( VLC_OBJECT(p_input), &p_es->fmt,
+                                       p_es->id.str_id, NULL,
                                        priv->p_resource, p_sys->p_sout_record,
                                        false, &decoder_cbs, p_es );
             if( p_es->p_dec_record && p_sys->b_buffering )
@@ -2895,6 +2902,13 @@ static int EsOutSend( es_out_t *out, es_out_id_t *es, block_t *p_block )
     input_thread_t *p_input = p_sys->p_input;
 
     assert( p_block->p_next == NULL );
+    struct vlc_tracer *tracer = vlc_object_get_tracer( &p_input->obj );
+
+    if ( tracer != NULL )
+    {
+        vlc_tracer_TraceStreamDTS( tracer, "DEMUX", es->id.str_id, "OUT",
+                            p_block->i_pts, p_block->i_dts);
+    }
 
     struct input_stats *stats = input_priv(p_input)->stats;
     if( stats != NULL )
@@ -2992,8 +3006,9 @@ static int EsOutSend( es_out_t *out, es_out_id_t *es, block_t *p_block )
     if( p_sys->cc_decoder == 708 )
         EsOutCreateCCChannels( out, VLC_CODEC_CEA708, status.cc.desc.i_708_channels,
                                _("DTVCC Closed captions %u"), es );
-    EsOutCreateCCChannels( out, VLC_CODEC_CEA608, status.cc.desc.i_608_channels,
-                           _("Closed captions %u"), es );
+    else
+        EsOutCreateCCChannels( out, VLC_CODEC_CEA608, status.cc.desc.i_608_channels,
+                               _("Closed captions %u"), es );
 
     vlc_mutex_unlock( &p_sys->lock );
 
@@ -3342,6 +3357,11 @@ static int EsOutVaControlLocked( es_out_t *out, input_source_t *source,
 
         p_pgrm->i_last_pcr = i_pcr;
 
+        struct vlc_tracer *tracer = vlc_object_get_tracer( &p_sys->p_input->obj );
+        if ( tracer != NULL )
+        {
+            vlc_tracer_TracePCR(tracer, "DEMUX", "PCR", i_pcr);
+        }
         input_thread_private_t *priv = input_priv(p_sys->p_input);
 
         /* TODO do not use vlc_tick_now() but proper stream acquisition date */

@@ -39,21 +39,18 @@ InterfaceWindowHandler::InterfaceWindowHandler(qt_intf_t *_p_intf, MainInterface
     m_window->setMinimumWidth( 450 );
     m_window->setMinimumHeight( 300 );
 
-    QVLCTools::restoreWindowPosition( getSettings(), m_window, QSize(600, 420) );
-
-    WindowStateHolder::holdOnTop( m_window,  WindowStateHolder::INTERFACE, m_mainInterface->isInterfaceAlwaysOnTop() );
-    WindowStateHolder::holdFullscreen( m_window,  WindowStateHolder::INTERFACE, m_window->visibility() == QWindow::FullScreen );
-
-
-    if (m_mainInterface->isHideAfterCreation())
+    // this needs to be called asynchronously
+    // otherwise QQuickWidget won't initialize properly
+    QMetaObject::invokeMethod(this, [this]()
     {
-        //this needs to be called asynchronously
-        //otherwise QQuickWidget won't initialize properly
-        QMetaObject::invokeMethod(this, [this]() {
-                m_window->hide();
-            }, Qt::QueuedConnection, nullptr);
-    }
+        QVLCTools::restoreWindowPosition( getSettings(), m_window, QSize(600, 420) );
 
+        WindowStateHolder::holdOnTop( m_window,  WindowStateHolder::INTERFACE, m_mainInterface->isInterfaceAlwaysOnTop() );
+        WindowStateHolder::holdFullscreen( m_window,  WindowStateHolder::INTERFACE, m_window->visibility() == QWindow::FullScreen );
+
+        if (m_mainInterface->isHideAfterCreation())
+            m_window->hide();
+    }, Qt::QueuedConnection, nullptr);
 
     m_window->setTitle("");
 
@@ -99,6 +96,14 @@ InterfaceWindowHandler::InterfaceWindowHandler(qt_intf_t *_p_intf, MainInterface
 
     connect(m_mainInterface, &MainInterface::requestInterfaceNormal,
             m_window, &QWindow::showNormal);
+
+    connect(m_mainInterface, &MainInterface::requestInterfaceMinimized,
+            m_window, [this]()
+    {
+        // taking OR with the current state, we preserve the current state
+        // so with next active request, we restore window in it's pre-minimized state
+        m_window->setWindowStates(m_window->windowStates() | Qt::WindowMinimized);
+    });
 
     m_window->installEventFilter(this);
 }

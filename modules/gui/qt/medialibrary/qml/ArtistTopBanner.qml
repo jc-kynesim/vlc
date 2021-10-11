@@ -35,6 +35,10 @@ FocusScope {
 
     height: VLCStyle.artistBanner_height
 
+    function setCurrentItemFocus(reason) {
+        playActionBtn.forceActiveFocus(reason);
+    }
+
     Image {
         id: background
         asynchronous: true
@@ -127,6 +131,8 @@ FocusScope {
                         iconTxt: VLCIcons.play
                         text: i18n.qtr("Play all")
                         focus: true
+                        // NOTE: In overlay, the focus rectangle is always white.
+                        colorFocus: VLCStyle.colors.white
                         onClicked: medialib.addAndPlay( artist.id )
                     }
 

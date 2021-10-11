@@ -21,30 +21,33 @@ import org.videolan.vlc 0.1
 FocusScope {
     id: root
 
-    property string view: defaultPage
-    property var viewProperties: ({})
-
+    property var view: ({
+        "name": defaultPage,
+        "properties": {}
+    })
     property string defaultPage: ""
 
     property var pageModel: []
+
+    property alias stackView: stackView
 
     signal pageChanged(string page)
     signal currentItemChanged(var currentItem)
 
     Component.onCompleted: loadView()
     onViewChanged: {
-        viewProperties = {}
         loadView()
     }
-    onViewPropertiesChanged: loadView()
 
     function loadDefaultView() {
-        root.view = defaultPage
-        root.viewProperties = ({})
+        root.view = {
+            "name": defaultPage,
+            "properties": {}
+        }
     }
 
     function loadView() {
-        if (view === "") {
+        if (view.name === "") {
             console.error("view is not defined")
             return
         }
@@ -52,12 +55,18 @@ FocusScope {
             console.error("pageModel is not defined")
             return
         }
-        var found = stackView.loadView(root.pageModel, view, viewProperties)
-        if (!found)
-            stackView.replace(root.pageModel[0].component)
+        var found = stackView.loadView(root.pageModel, view.name, view.properties)
+        if (!found) {
+            loadDefaultView()
+            return
+        }
 
         stackView.currentItem.Navigation.parentItem = root
         root.currentItemChanged(stackView.currentItem)
+    }
+
+    function setCurrentItemFocus(reason) {
+        stackView.setCurrentItemFocus(reason);
     }
 
     StackViewExt {

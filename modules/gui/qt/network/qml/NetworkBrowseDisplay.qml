@@ -33,8 +33,11 @@ FocusScope {
     property var providerModel
     property var contextMenu
     property var tree
-    onTreeChanged: providerModel.tree = tree
-    readonly property var currentIndex: view.currentItem.currentIndex
+
+    readonly property var currentIndex: _currentView.currentIndex
+
+    readonly property bool isViewMultiView: true
+
     //the index to "go to" when the view is loaded
     property var initialIndex: 0
     property var sortModel: [
@@ -42,9 +45,11 @@ FocusScope {
         { text: i18n.qtr("Url"), criteria: "mrl" }
     ]
 
-    function changeTree(new_tree) {
-        history.push(["mc", "network", { tree: new_tree }]);
-    }
+    property alias _currentView: view.currentItem
+
+    signal browse(var tree, int reason)
+
+    onTreeChanged: providerModel.tree = tree
 
     function playSelected() {
         providerModel.addAndPlay(filterModel.mapIndexesToSource(selectionModel.selectedIndexes))
@@ -52,6 +57,10 @@ FocusScope {
 
     function playAt(index) {
         providerModel.addAndPlay(filterModel.mapIndexToSource(index))
+    }
+
+    function setCurrentItemFocus(reason) {
+        _currentView.setCurrentItemFocus(reason);
     }
 
     Util.SelectableDelegateModel{
@@ -104,9 +113,9 @@ FocusScope {
         if (initialIndex >= filterModel.count)
             initialIndex = 0
         selectionModel.select(filterModel.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect)
-        if (view.currentItem) {
-            view.currentItem.currentIndex = initialIndex
-            view.currentItem.positionViewAtIndex(initialIndex, ItemView.Contain)
+        if (_currentView) {
+            _currentView.currentIndex = initialIndex
+            _currentView.positionViewAtIndex(initialIndex, ItemView.Contain)
         }
     }
 
@@ -118,7 +127,7 @@ FocusScope {
             var data = filterModel.getDataAt(index)
             if (data.type === NetworkMediaModel.TYPE_DIRECTORY
                     || data.type === NetworkMediaModel.TYPE_NODE)  {
-                changeTree(data.tree)
+                browse(data.tree, Qt.TabFocusReason)
             } else {
                 playAt(index)
             }
@@ -144,7 +153,7 @@ FocusScope {
                 Navigation.parentItem: root
                 Navigation.downAction: function() {
                     focus = false
-                    gridView.forceActiveFocus()
+                    gridView.forceActiveFocus(Qt.TabFocusReason)
                 }
 
                 RowLayout {
@@ -198,7 +207,7 @@ FocusScope {
 
                 onItemDoubleClicked: {
                     if (model.type === NetworkMediaModel.TYPE_NODE || model.type === NetworkMediaModel.TYPE_DIRECTORY)
-                        changeTree(model.tree)
+                        browse(model.tree, Qt.MouseFocusReason)
                     else
                         playAt(index)
                 }
@@ -272,6 +281,7 @@ FocusScope {
                 height: layout.implicitHeight + VLCStyle.margin_large + VLCStyle.margin_small
 
                 Navigation.navigable: btn.visible
+                Navigation.parentItem: root
 
                 RowLayout {
                     id: layout
@@ -300,7 +310,7 @@ FocusScope {
                         Navigation.parentItem: root
                         Navigation.downAction: function() {
                             head.focus = false
-                            tableView.forceActiveFocus()
+                            tableView.forceActiveFocus(Qt.TabFocusReason)
                         }
 
                         Layout.preferredWidth: implicitWidth
