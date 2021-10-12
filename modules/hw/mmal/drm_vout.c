@@ -89,6 +89,26 @@ typedef struct drmu_props_s {
 typedef int (* drmu_fb_pre_delete_fn)(struct drmu_fb_s * dfb, void * v);
 typedef void (* drmu_fb_on_delete_fn)(struct drmu_fb_s * dfb, void * v);
 
+enum drmu_bo_type_e {
+    BO_TYPE_NONE = 0,
+    BO_TYPE_FD,
+    BO_TYPE_DUMB
+};
+
+typedef struct drmu_bo_s {
+    int ref_count;  // ref counted under bo_env lock so no need for atomic
+    struct drmu_bo_s * next;
+    struct drmu_bo_s * prev;
+    struct drmu_env_s * du;
+    enum drmu_bo_type_e bo_type;
+    uint32_t handle;
+} drmu_bo_t;
+
+typedef struct drmu_bo_env_s {
+    pthread_mutex_t lock;
+    drmu_bo_t * fd_head;
+} drmu_bo_env_t;
+
 typedef struct drmu_fb_s {
     atomic_int ref_count;  // 0 == 1 ref for ease of init
     struct drmu_fb_s * prev;
@@ -201,6 +221,8 @@ typedef struct drmu_env_s {
     drmu_atomic_t * da;
     // global env for atomic flip
     drmu_atomic_q_t aq;
+    // global env for bo tracking
+    drmu_bo_env_t boe;
 
     struct pollqueue * pq;
     struct polltask * pt;
@@ -383,15 +405,136 @@ drmu_rect_wh(const unsigned int w, const unsigned int h)
     };
 }
 
-static void
-drmu_bo_close(drmu_env_t * const du, uint32_t * const ph)
+static int
+bo_close(drmu_env_t * const du, uint32_t * const ph)
 {
-    const uint32_t h = *ph;
-    if (h) {
-        struct drm_gem_close gem_close = {.handle = h};
-        *ph = 0;
-        drmIoctl(du->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
+    struct drm_gem_close gem_close = {.handle = *ph};
+
+    if (gem_close.handle == 0)
+        return 0;
+    *ph = 0;
+
+    return drmIoctl(du->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
+}
+
+// BOE lock expected
+static void
+drmu_bo_free(drmu_bo_t * bo)
+{
+    drmu_env_t * const du = bo->du;
+
+    if (bo->handle != 0) {
+        switch (bo->bo_type) {
+            case BO_TYPE_FD:
+            {
+                drmu_bo_env_t * const boe = &du->boe;
+                if (bo_close(du, &bo->handle) != 0)
+                    drmu_warn(du, "%s: Failed to close BO handle %d", __func__, bo->handle);
+                if (bo->next != NULL)
+                    bo->next->prev = bo->prev;
+                if (bo->prev != NULL)
+                    bo->prev->next = bo->next;
+                else
+                    boe->fd_head = bo->next;
+                break;
+            }
+            case BO_TYPE_DUMB:
+            {
+                struct drm_mode_destroy_dumb destroy_env = {.handle = bo->handle};
+                if (drmIoctl(du->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_env) != 0)
+                    drmu_warn(du, "%s: Failed to destroy dumb handle %d", __func__, bo->handle);
+                break;
+            }
+            case BO_TYPE_NONE:
+            default:
+                break;
+        }
     }
+    free(bo);
+}
+
+static void
+drmu_bo_unref(drmu_bo_t ** ppbo)
+{
+    drmu_bo_t * const bo = *ppbo;
+    drmu_bo_env_t * boe;
+
+    if (bo == NULL)
+        return;
+    *ppbo = NULL;
+
+    boe = &bo->du->boe;
+    pthread_mutex_lock(&boe->lock);
+    if (bo->ref_count-- == 0)
+        drmu_bo_free(bo);
+    pthread_mutex_unlock(&boe->lock);
+}
+
+static drmu_bo_t *
+drmu_bo_alloc(drmu_env_t *const du, enum drmu_bo_type_e bo_type)
+{
+    drmu_bo_t * const bo = calloc(1, sizeof(*bo));
+    if (bo == NULL) {
+        drmu_err(du, "Failed to alloc BO");
+        return NULL;
+    }
+
+    bo->du = du;
+    bo->bo_type = bo_type;
+    return bo;
+}
+
+static drmu_bo_t *
+drmu_bo_new_fd(drmu_env_t *const du, const int fd)
+{
+    drmu_bo_env_t * const boe = &du->boe;
+    static drmu_bo_t * bo = NULL;
+    uint32_t h = 0;
+
+    pthread_mutex_lock(&boe->lock);
+
+    if (drmPrimeFDToHandle(du->fd, fd, &h) != 0) {
+        drmu_err(du, "%s: Failed to convert fd %d to BO: %s", __func__, fd, strerror(errno));
+        goto unlock;
+    }
+
+    bo = boe->fd_head;
+    while (bo != NULL && bo->handle != h)
+        bo = bo->next;
+
+    if (bo != NULL) {
+        ++bo->ref_count;
+    }
+    else {
+        if ((bo = drmu_bo_alloc(du, BO_TYPE_FD)) == NULL) {
+            bo_close(du, &h);
+        }
+        else {
+            bo->handle = h;
+
+            if ((bo->next = boe->fd_head) != NULL)
+                bo->next->prev = bo;
+            boe->fd_head = bo;
+        }
+    }
+
+unlock:
+    pthread_mutex_unlock(&boe->lock);
+    return bo;
+}
+
+static void
+drmu_bo_env_uninit(drmu_bo_env_t * boe)
+{
+    boe->fd_head = NULL;
+    pthread_mutex_destroy(&boe->lock);
+}
+
+static void
+drmu_bo_env_init(drmu_bo_env_t * boe)
+{
+    boe->fd_head = NULL;
+    pthread_mutex_init(&boe->lock, NULL);
 }
 
 static void
@@ -524,7 +667,6 @@ atomic_queue(drmu_atomic_t * const da)
     int rv = 0;
     drmu_env_t * const du = da->du;
     drmu_atomic_q_t * const aq = &du->aq;
-    static unsigned int seq = 0;
 
     pthread_mutex_lock(&aq->lock);
 
@@ -919,7 +1061,7 @@ drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_
 
 typedef struct fb_aux_pic_s {
     picture_t * pic;
-    uint32_t bo_handles[AV_DRM_MAX_PLANES];
+    drmu_bo_t * bo_handles[AV_DRM_MAX_PLANES];
 } fb_aux_pic_t;
 
 static void
@@ -927,10 +1069,12 @@ pic_fb_delete_cb(drmu_fb_t * dfb, void * v)
 {
     fb_aux_pic_t * const aux = v;
     unsigned int i;
+    VLC_UNUSED(dfb);
 
     for (i = 0; i != AV_DRM_MAX_PLANES; ++i)
-        drmu_bo_close(dfb->du, aux->bo_handles + i);
+        drmu_bo_unref(aux->bo_handles + i);
     picture_Release(aux->pic);
+    free(aux);
 }
 
 // VLC specific helper fb fns
@@ -983,12 +1127,8 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
 
     for (i = 0; i < desc->nb_objects; ++i)
     {
-        if (drmPrimeFDToHandle(du->fd, desc->objects[i].fd, aux->bo_handles + i) != 0)
-        {
-            drmu_warn(du, "%s: drmPrimeFDToHandle[%d](%d) failed: %s", __func__,
-                      i, desc->objects[i].fd, ERRSTR);
+        if ((aux->bo_handles[i] = drmu_bo_new_fd(du, desc->objects[i].fd)) == NULL)
             goto fail;
-        }
     }
 
     n = 0;
@@ -1001,7 +1141,7 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
             dfb->pitches[n] = p->pitch;
             dfb->offsets[n] = p->offset;
             modifiers[n] = obj->format_modifier;
-            bo_handles[n] = aux->bo_handles[p->object_index];
+            bo_handles[n] = aux->bo_handles[p->object_index]->handle;
             ++n;
         }
     }
@@ -1804,6 +1944,7 @@ drmu_env_delete(drmu_env_t ** const ppdu)
 
     close(du->fd);
     drmu_atomic_q_uninit(&du->aq);
+    drmu_bo_env_uninit(&du->boe);
     pthread_mutex_destroy(&du->atomic_lock);
     free(du);
 }
@@ -1841,6 +1982,7 @@ drmu_env_new_fd(vlc_object_t * const log, const int fd)
     du->log = log;
     du->fd = fd;
     pthread_mutex_init(&du->atomic_lock, NULL);
+    drmu_bo_env_init(&du->boe);
     drmu_atomic_q_init(&du->aq);
 
     if ((du->pq = pollqueue_new()) == NULL) {
