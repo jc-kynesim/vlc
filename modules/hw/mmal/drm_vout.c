@@ -127,6 +127,7 @@ typedef struct drmu_fb_s {
 
     uint32_t pitches[4];
     uint32_t offsets[4];
+    drmu_bo_t * bo_list[4];
 
     void * pre_delete_v;
     drmu_fb_pre_delete_fn pre_delete_fn;
@@ -488,7 +489,7 @@ static drmu_bo_t *
 drmu_bo_new_fd(drmu_env_t *const du, const int fd)
 {
     drmu_bo_env_t * const boe = &du->boe;
-    static drmu_bo_t * bo = NULL;
+    drmu_bo_t * bo = NULL;
     uint32_t h = 0;
 
     pthread_mutex_lock(&boe->lock);
@@ -520,6 +521,27 @@ drmu_bo_new_fd(drmu_env_t *const du, const int fd)
 
 unlock:
     pthread_mutex_unlock(&boe->lock);
+    return bo;
+}
+
+// Updates the passed dumb structure with the results of creation
+static drmu_bo_t *
+drmu_bo_new_dumb(drmu_env_t *const du, struct drm_mode_create_dumb * const d)
+{
+    drmu_bo_t *bo = drmu_bo_alloc(du, BO_TYPE_DUMB);
+
+    if (bo == NULL)
+        return NULL;
+
+    if (drmIoctl(du->fd, DRM_IOCTL_MODE_CREATE_DUMB, d) != 0)
+    {
+        drmu_err(du, "%s: Create dumb %dx%dx%d failed: %s", __func__,
+                 d->width, d->height, d->bpp, strerror(errno));
+        drmu_bo_unref(&bo);  // After this point aux is bound to dfb and gets freed with it
+        return NULL;
+    }
+
+    bo->handle = d->handle;
     return bo;
 }
 
@@ -770,6 +792,7 @@ static void
 free_fb(drmu_fb_t * const dfb)
 {
     drmu_env_t * const du = dfb->du;
+    unsigned int i;
 
     if (dfb->pre_delete_fn && dfb->pre_delete_fn(dfb, dfb->pre_delete_v) != 0)
         return;
@@ -779,6 +802,9 @@ free_fb(drmu_fb_t * const dfb)
 
     if (dfb->map_ptr != NULL && dfb->map_ptr != MAP_FAILED)
         munmap(dfb->map_ptr, dfb->map_size);
+
+    for (i = 0; i != 4; ++i)
+        drmu_bo_unref(dfb->bo_list + i);
 
     // Call on_delete last so we have stopped using anything that might be
     // freed by it
@@ -923,30 +949,10 @@ fb_pitches_set(drmu_fb_t * const dfb)
     }
 }
 
-typedef struct fb_dumb_s {
-    uint32_t handle;
-} fb_dumb_t;
-
-static void
-dumb_fb_free_cb(drmu_fb_t * dfb, void * v)
-{
-    drmu_env_t * const du = dfb->du;
-    fb_dumb_t * const aux = v;
-    struct drm_mode_destroy_dumb destroy_env = {
-        .handle = aux->handle
-    };
-    drmu_debug(du, "Free dumb %p size: %zd", dfb, dfb->map_size);
-
-    drmIoctl(du->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_env);
-    free(aux);
-}
-
-
 static drmu_fb_t *
 drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format)
 {
     drmu_fb_t * const dfb = alloc_fb(du);
-    fb_dumb_t * aux;
     uint32_t bpp;
 
     if (dfb == NULL) {
@@ -963,34 +969,22 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
         goto fail;
     }
 
-    if ((aux = calloc(1, sizeof(*aux))) == NULL) {
-        drmu_err(du, "%s: Aux alloc failure", __func__);
-        goto fail;
-    }
-
     {
         struct drm_mode_create_dumb dumb = {
             .height = fb_total_height(dfb, dfb->height),
             .width = dfb->width,
             .bpp = bpp
         };
-        if (drmIoctl(du->fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb) != 0)
-        {
-            drmu_err(du, "%s: Create dumb %dx%dx%d failed: %s", __func__, w, h, bpp, strerror(errno));
-            free(aux);  // After this point aux is bound to dfb and gets freed with it
+        if ((dfb->bo_list[0] = drmu_bo_new_dumb(du, &dumb)) == NULL)
             goto fail;
-        }
 
-        aux->handle = dumb.handle;
         dfb->map_pitch = dumb.pitch;
         dfb->map_size = (size_t)dumb.size;
-        dfb->on_delete_v = aux;
-        dfb->on_delete_fn = dumb_fb_free_cb;
     }
 
     {
         struct drm_mode_map_dumb map_dumb = {
-            .handle = aux->handle
+            .handle = dfb->bo_list[0]->handle
         };
         if (drmIoctl(du->fd, DRM_IOCTL_MODE_MAP_DUMB, &map_dumb) != 0)
         {
@@ -1008,14 +1002,14 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
     }
 
     {
-        uint32_t bo_handles[4] = { aux->handle };
+        uint32_t bo_handles[4] = { dfb->bo_list[0]->handle };
 
         fb_pitches_set(dfb);
 
         if (dfb->pitches[1] != 0)
-            bo_handles[1] = aux->handle;
+            bo_handles[1] = bo_handles[0];
         if (dfb->pitches[2] != 0)
-            bo_handles[2] = aux->handle;
+            bo_handles[2] = bo_handles[0];
 
         if (drmModeAddFB2WithModifiers(du->fd,
                                        dfb->width, dfb->height, dfb->format,
@@ -1061,18 +1055,14 @@ drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_
 
 typedef struct fb_aux_pic_s {
     picture_t * pic;
-    drmu_bo_t * bo_handles[AV_DRM_MAX_PLANES];
 } fb_aux_pic_t;
 
 static void
 pic_fb_delete_cb(drmu_fb_t * dfb, void * v)
 {
     fb_aux_pic_t * const aux = v;
-    unsigned int i;
     VLC_UNUSED(dfb);
 
-    for (i = 0; i != AV_DRM_MAX_PLANES; ++i)
-        drmu_bo_unref(aux->bo_handles + i);
     picture_Release(aux->pic);
     free(aux);
 }
@@ -1103,6 +1093,10 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
         drmu_err(du, "%s: Missing descriptor", __func__);
         goto fail;
     }
+    if (desc->nb_objects > 4) {
+        drmu_err(du, "%s: Bad descriptor", __func__);
+        goto fail;
+    }
 
     dfb->format  = desc->layers[0].format;
     dfb->width   = pic->format.i_width;
@@ -1127,7 +1121,7 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
 
     for (i = 0; i < desc->nb_objects; ++i)
     {
-        if ((aux->bo_handles[i] = drmu_bo_new_fd(du, desc->objects[i].fd)) == NULL)
+        if ((dfb->bo_list[i] = drmu_bo_new_fd(du, desc->objects[i].fd)) == NULL)
             goto fail;
     }
 
@@ -1141,7 +1135,7 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
             dfb->pitches[n] = p->pitch;
             dfb->offsets[n] = p->offset;
             modifiers[n] = obj->format_modifier;
-            bo_handles[n] = aux->bo_handles[p->object_index]->handle;
+            bo_handles[n] = dfb->bo_list[p->object_index]->handle;
             ++n;
         }
     }
