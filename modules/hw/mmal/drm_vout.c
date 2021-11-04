@@ -135,11 +135,13 @@ typedef struct drmu_bo_env_s {
 } drmu_bo_env_t;
 
 typedef void (* drmu_prop_del_fn)(void * v);
+typedef void (* drmu_prop_ref_fn)(void * v);
 
 typedef struct drmu_prop_prop_s {
     uint32_t id;
     uint64_t value;
     void * v;
+    drmu_prop_ref_fn ref_fn;
     drmu_prop_del_fn del_fn;
 } drmu_prop_prop_t;
 
@@ -287,6 +289,13 @@ typedef struct drmu_env_s {
 
 static void drmu_fb_unref(drmu_fb_t ** const ppdfb);
 static drmu_fb_t * drmu_fb_ref(drmu_fb_t * const dfb);
+
+static inline unsigned int
+max_uint(const unsigned int a, const unsigned int b)
+{
+    return a < b ? b : a;
+}
+
 
 // N.B. DRM seems to order its format descriptor names the opposite way round to VLC
 // DRM is hi->lo within a little-endian word, VLC is byte order
@@ -542,6 +551,87 @@ prop_prop_del(drmu_prop_prop_t * const pp)
         pp->del_fn(pp->v);
 }
 
+static void
+prop_prop_ref(drmu_prop_prop_t * const pp)
+{
+    if (pp->ref_fn)
+        pp->ref_fn(pp->v);
+}
+
+static int
+prop_obj_prop_copy(drmu_prop_obj_t * const po_c, const drmu_prop_obj_t * const po_a)
+{
+    unsigned int i;
+
+    *po_c = *po_a;
+    if (po_a->n == 0)
+        return 0;
+
+    if ((po_c->props = calloc(po_a->size, sizeof(*po_c->props))) == NULL)
+        return -ENOMEM;
+    memcpy(po_c->props, po_a->props, po_a->n * sizeof(*po_a->props));
+
+    for (i = 0; i != po_a->n; ++i)
+        prop_prop_ref(po_c->props + i);
+    return 0;
+}
+
+static int
+prop_prop_qsort_cb(const void * va, const void * vb)
+{
+    const drmu_prop_prop_t * const a = va;
+    const drmu_prop_prop_t * const b = vb;
+    return a->id == b->id ? 0 : a->id < b->id ? -1 : 1;
+}
+
+// Merge a, b into c, identical entries from b
+static int
+prop_obj_prop_merge(drmu_prop_obj_t * const po_c,
+                    const drmu_prop_obj_t * const po_a, const drmu_prop_obj_t * const po_b)
+{
+    unsigned int i, j, k;
+    drmu_prop_prop_t * c;
+    drmu_prop_prop_t a[po_a->n];
+    drmu_prop_prop_t b[po_b->n];
+
+    // As we should have no identical els we don't care that qsort is unstable
+    memcpy(a, po_a->props, sizeof(a));
+    memcpy(b, po_b->props, sizeof(b));
+    qsort(a, po_a->n, sizeof(a[0]), prop_prop_qsort_cb);
+    qsort(b, po_b->n, sizeof(b[0]), prop_prop_qsort_cb);
+
+    // Pick a size
+    po_c->size = max_uint(po_a->size, po_b->size);
+    if (po_c->size < po_a->n + po_b->n)
+        po_c->size *= 2;
+    if ((c = calloc(po_c->size, sizeof(*c))) == NULL)
+        return -ENOMEM;
+
+    for (i = 0, j = 0, k = 0; i < po_a->n && j < po_a->n; ++k) {
+        if (a[i].id < b[j].id)
+            c[k] = a[i++];
+        else if (a[i].id > b[j].id)
+            c[k] = b[j++];
+        else {
+            c[k] = b[j++];
+            ++i;
+        }
+    }
+    for (; i < po_a->n; ++i, ++k)
+        c[k] = a[i++];
+    for (; j < po_b->n; ++j, ++k)
+        c[k] = b[j++];
+
+    for (i = 0; i != k; ++i)
+        prop_prop_ref(c + i);
+
+    po_c->id = po_a->id;
+    po_c->props = c;
+    po_c->n = k;
+
+    return 0;
+}
+
 static drmu_prop_prop_t *
 prop_obj_prop_get(drmu_prop_obj_t * const po, const uint32_t id)
 {
@@ -588,6 +678,25 @@ prop_obj_atomic_fill(const drmu_prop_obj_t * const po, uint32_t * prop_ids, uint
     }
 }
 
+static void
+prop_obj_dump(drmu_env_t * const du, const drmu_prop_obj_t * const po)
+{
+    unsigned int i;
+    drmu_info(du, "Obj: %02x: size %d n %d", po->id, po->size, po->n);
+    for (i = 0; i != po->n; ++i) {
+        drmu_info(du, "Obj %02x: Prop %02x Value %"PRIx64" v %p", po->id, po->props[i].id, po->props[i].value, po->props[i].v);
+    }
+}
+
+static void
+prop_hdr_dump(drmu_env_t * const du, const drmu_prop_hdr_t * const ph)
+{
+    unsigned int i;
+    drmu_info(du, "Header: size %d n %d", ph->size, ph->n);
+    for (i = 0; i != ph->n; ++i)
+        prop_obj_dump(du, ph->objs + i);
+}
+
 static drmu_prop_obj_t *
 prop_hdr_obj_get(drmu_prop_hdr_t * const ph, const uint32_t id)
 {
@@ -622,6 +731,86 @@ prop_hdr_uninit(drmu_prop_hdr_t * const ph)
     for (i = 0; i != ph->n; ++i)
         prop_obj_uninit(ph->objs + i);
     free(ph->objs);
+    memset(ph, 0, sizeof(*ph));
+}
+
+static int
+prop_hdr_obj_copy(drmu_prop_hdr_t * const ph_c, const drmu_prop_hdr_t * const ph_a)
+{
+    unsigned int i;
+
+    prop_hdr_uninit(ph_c);
+
+    if (ph_a->n == 0)
+        return 0;
+
+    if ((ph_c->objs = calloc(ph_a->size, sizeof(*ph_c->objs))) == NULL)
+        return -ENOMEM;
+
+    for (i = 0; i != ph_a->n; ++i)
+        prop_obj_prop_copy(ph_c->objs + i, ph_a->objs + i);
+    return 0;
+}
+
+static int
+prop_obj_qsort_cb(const void * va, const void * vb)
+{
+    const drmu_prop_obj_t * const a = va;
+    const drmu_prop_obj_t * const b = vb;
+    return a->id == b->id ? 0 : a->id < b->id ? -1 : 1;
+}
+
+// Guaranteed to have at least 1 el in both a & b
+static int
+prop_hdr_obj_merge(drmu_prop_hdr_t * const ph_c,
+                   const drmu_prop_hdr_t * const ph_a, const drmu_prop_hdr_t * const ph_b)
+{
+    unsigned int i, j, k;
+    drmu_prop_obj_t * c;
+    drmu_prop_obj_t a[ph_a->n];
+    drmu_prop_obj_t b[ph_b->n];
+
+    // As we should have no identical els we don't care that qsort is unstable
+    memcpy(a, ph_a->objs, sizeof(a));
+    memcpy(b, ph_b->objs, sizeof(b));
+    qsort(a, ph_a->n, sizeof(a[0]), prop_obj_qsort_cb);
+    qsort(b, ph_b->n, sizeof(b[0]), prop_obj_qsort_cb);
+
+    // Pick a size
+    ph_c->size = max_uint(ph_a->size, ph_b->size);
+    if (ph_c->size < ph_a->n + ph_b->n)
+        ph_c->size *= 2;
+    if ((c = calloc(ph_c->size, sizeof(*c))) == NULL)
+        return -ENOMEM;
+
+    for (i = 0, j = 0, k = 0; i < ph_a->n && j < ph_a->n; ++k) {
+        if (a[i].id < b[j].id)
+            prop_obj_prop_copy(c + k, a + i++);
+        else if (a[i].id > b[j].id)
+            prop_obj_prop_copy(c + k, b + j++);
+        else
+            prop_obj_prop_merge(c + k, a + i++, b + j++);
+    }
+    for (; i < ph_a->n; ++i, ++k)
+        prop_obj_prop_copy(c + k, a + i++);
+    for (; j < ph_b->n; ++j, ++k)
+        prop_obj_prop_copy(c + k, b + j++);
+
+    ph_c->objs = c;
+    ph_c->n = k;
+
+    return 0;
+}
+
+static int
+prop_hdr_merge(drmu_prop_hdr_t * const ph_c,
+                   const drmu_prop_hdr_t * const ph_a, const drmu_prop_hdr_t * const ph_b)
+{
+    if (ph_a->n == 0)
+        return prop_hdr_obj_copy(ph_c, ph_b);
+    if (ph_b->n == 0)
+        return prop_hdr_obj_copy(ph_c, ph_a);
+    return prop_hdr_obj_merge(ph_c, ph_a, ph_b);
 }
 
 static drmu_prop_prop_t *
@@ -668,8 +857,9 @@ prop_hdr_atomic_fill(const drmu_prop_hdr_t * const ph,
 }
 
 static int
-prop_hdr_prop_set(drmu_prop_hdr_t * const ph, const uint32_t obj_id, const uint32_t prop_id,
-                  const uint64_t value, const drmu_prop_del_fn del_fn, void * const v)
+prop_hdr_prop_set(drmu_prop_hdr_t * const ph,
+                  const uint32_t obj_id, const uint32_t prop_id, const uint64_t value,
+                  const drmu_prop_ref_fn ref_fn, const drmu_prop_del_fn del_fn, void * const v)
 {
     if (obj_id == 0 || prop_id == 0)
     {
@@ -683,8 +873,10 @@ prop_hdr_prop_set(drmu_prop_hdr_t * const ph, const uint32_t obj_id, const uint3
 
         prop_prop_del(pp);
         pp->value = value;
+        pp->ref_fn = ref_fn;
         pp->del_fn = del_fn;
         pp->v = v;
+        prop_prop_ref(pp);
         return 0;
     }
 }
@@ -1067,6 +1259,13 @@ fail1:
 }
 
 static void
+drmu_atomic_dump(const drmu_atomic_t * const da)
+{
+    drmu_info(da->du, "Atomic %p: refs %d", da, atomic_load(&da->ref_count));
+    prop_hdr_dump(da->du, &da->props);
+}
+
+static void
 drmu_atomic_free(drmu_atomic_t * const da)
 {
     prop_hdr_uninit(&da->props);
@@ -1091,6 +1290,38 @@ drmu_atomic_ref(drmu_atomic_t * const da)
 {
     atomic_fetch_add(&da->ref_count, 1);
     return da;
+}
+
+static drmu_atomic_t *
+drmu_atomic_new(drmu_env_t * const du)
+{
+    drmu_atomic_t * const da = calloc(1, sizeof(*da));
+
+    if (da == NULL) {
+        drmu_err(du, "%s: Failed to alloc struct", __func__);
+        return NULL;
+    }
+    da->du = du;
+
+    return da;
+}
+
+static drmu_atomic_t *
+drmu_atomic_merge(const drmu_atomic_t * const a, const drmu_atomic_t * const b)
+{
+    drmu_env_t * const du = a->du;
+    drmu_atomic_t * const c = drmu_atomic_new(du);
+
+    if (c == NULL)
+        return NULL;
+
+    if (prop_hdr_merge(&c->props, &a->props, &b->props) != 0) {
+        drmu_err(du, "%s: Failed", __func__);
+        drmu_atomic_free(c);
+        return NULL;
+    }
+
+    return c;
 }
 
 static int
@@ -1121,6 +1352,7 @@ drmu_atomic_commit(drmu_atomic_t * const da)
         if ((rv = drmIoctl(du->fd, DRM_IOCTL_MODE_ATOMIC, &atomic)) != 0) {
             rv = -errno;
             drmu_err(du, "%s: Atomic failed: %s", __func__, strerror(-rv));
+            drmu_atomic_dump(da);
         }
     }
 
@@ -1181,13 +1413,14 @@ atomic_queue(drmu_atomic_t * const da)
     pthread_mutex_lock(&aq->lock);
 
     if (aq->next_flip != NULL) {
-        // * This really should be a merge but that is tricky as we have to
-        //   manage refs and (at least at the moment) we always set everything
-        //   so the merge doesn't matter. (I'm also a bit dubious of libdrms
-        //   merge handling which looks like it was written by an intern with
-        //   little actual knowledge of C.)
-        drmu_atomic_unref(&aq->next_flip);
-        aq->next_flip = drmu_atomic_ref(da);
+        drmu_atomic_t * const next = drmu_atomic_merge(aq->next_flip, da);
+        if (next == NULL) {
+            rv = -ENOMEM;
+        }
+        else {
+            drmu_atomic_unref(&aq->next_flip);
+            aq->next_flip = next;
+        }
     }
     else if (aq->cur_flip != NULL) {
         // Q something to commit on next flip
@@ -1239,10 +1472,11 @@ drmu_atomic_q_init(drmu_atomic_q_t * const aq)
     pthread_mutex_init(&aq->lock, NULL);
 }
 
+
 static int
 drmu_atomic_add_prop(drmu_atomic_t * const da, const uint32_t obj_id, const uint32_t prop_id, const uint64_t value)
 {
-    if (prop_hdr_prop_set(&da->props, obj_id, prop_id, value, 0, NULL) < 0)
+    if (prop_hdr_prop_set(&da->props, obj_id, prop_id, value, 0, 0, NULL) < 0)
         drmu_warn(da->du, "%s: Failed to set obj_id=%#x, prop_id=%#x, val=%" PRId64, __func__,
                  obj_id, prop_id, value);
     return 0;
@@ -1255,6 +1489,12 @@ atomic_prop_fb_unref(void * v)
     drmu_fb_unref(&fb);
 }
 
+static void
+atomic_prop_fb_ref(void * v)
+{
+    drmu_fb_ref(v);
+}
+
 static int
 drmu_atomic_add_prop_fb(drmu_atomic_t * const da, const uint32_t obj_id, const uint32_t prop_id, drmu_fb_t * const dfb)
 {
@@ -1263,7 +1503,7 @@ drmu_atomic_add_prop_fb(drmu_atomic_t * const da, const uint32_t obj_id, const u
     if (dfb == NULL)
         return drmu_atomic_add_prop(da, obj_id, prop_id, 0);
 
-    rv = prop_hdr_prop_set(&da->props, obj_id, prop_id, dfb->handle, atomic_prop_fb_unref, drmu_fb_ref(dfb));
+    rv = prop_hdr_prop_set(&da->props, obj_id, prop_id, dfb->handle, atomic_prop_fb_ref, atomic_prop_fb_unref, dfb);
     if (rv != 0)
         drmu_warn(da->du, "%s: Failed to add fb obj_id=%#x, prop_id=%#x: %s", __func__, obj_id, prop_id, strerror(-rv));
 
@@ -1277,7 +1517,7 @@ drmu_atomic_add_prop_enum(drmu_atomic_t * const da, const uint32_t obj_id, const
     int rv;
 
     rv = (pval == NULL) ? -EINVAL :
-        prop_hdr_prop_set(&da->props, obj_id, drmu_prop_enum_id(pen), *pval, 0, NULL);
+        prop_hdr_prop_set(&da->props, obj_id, drmu_prop_enum_id(pen), *pval, 0, 0, NULL);
 
     if (rv != 0 && name != NULL)
         drmu_warn(da->du, "%s: Failed to add enum obj_id=%#x, prop_id=%#x, name='%s': %s", __func__, obj_id, drmu_prop_enum_id(pen), name, strerror(-rv));
@@ -1292,6 +1532,12 @@ atomic_prop_blob_unref(void * v)
     drmu_blob_unref(&blob);
 }
 
+static void
+atomic_prop_blob_ref(void * v)
+{
+    drmu_blob_ref(v);
+}
+
 static int
 drmu_atomic_add_prop_blob(drmu_atomic_t * const da, const uint32_t obj_id, const uint32_t prop_id, drmu_blob_t * const blob)
 {
@@ -1300,26 +1546,11 @@ drmu_atomic_add_prop_blob(drmu_atomic_t * const da, const uint32_t obj_id, const
     if (blob == NULL)
         return drmu_atomic_add_prop(da, obj_id, prop_id, 0);
 
-    rv = prop_hdr_prop_set(&da->props, obj_id, prop_id, drmu_blob_id(blob), atomic_prop_blob_unref, drmu_blob_ref(blob));
+    rv = prop_hdr_prop_set(&da->props, obj_id, prop_id, drmu_blob_id(blob), atomic_prop_blob_ref, atomic_prop_blob_unref, blob);
     if (rv != 0)
         drmu_warn(da->du, "%s: Failed to add blob obj_id=%#x, prop_id=%#x: %s", __func__, obj_id, prop_id, strerror(-rv));
 
     return rv;
-}
-
-
-static drmu_atomic_t *
-drmu_atomic_new(drmu_env_t * const du)
-{
-    drmu_atomic_t * const da = calloc(1, sizeof(*da));
-
-    if (da == NULL) {
-        drmu_err(du, "%s: Failed to alloc struct", __func__);
-        return NULL;
-    }
-    da->du = du;
-
-    return da;
 }
 
 static void
