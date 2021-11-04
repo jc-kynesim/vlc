@@ -949,8 +949,10 @@ drmu_bo_new_dumb(drmu_env_t *const du, struct drm_mode_create_dumb * const d)
 }
 
 static void
-drmu_bo_env_uninit(drmu_bo_env_t * boe)
+drmu_bo_env_uninit(drmu_bo_env_t * const boe)
 {
+    if (boe->fd_head != NULL)
+        drmu_warn(boe->fd_head->du, "%s: fd chain not null", __func__);
     boe->fd_head = NULL;
     pthread_mutex_destroy(&boe->lock);
 }
@@ -2658,10 +2660,10 @@ drmu_env_delete(drmu_env_t ** const ppdu)
     if (du->res != NULL)
         drmModeFreeResources(du->res);
     free_planes(du);
-
-    close(du->fd);
     drmu_atomic_q_uninit(&du->aq);
     drmu_bo_env_uninit(&du->boe);
+
+    close(du->fd);
     pthread_mutex_destroy(&du->atomic_lock);
     free(du);
 }
