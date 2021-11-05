@@ -63,7 +63,7 @@ struct polltask *polltask_new(struct pollqueue *const pq,
 {
     struct polltask *pt;
 
-    if (!events)
+    if (!events && fd != -1)
         return NULL;
 
     pt = malloc(sizeof(*pt));
@@ -83,6 +83,13 @@ struct polltask *polltask_new(struct pollqueue *const pq,
     sem_init(&pt->kill_sem, 0, 0);
 
     return pt;
+}
+
+struct polltask *polltask_new_timer(struct pollqueue *const pq,
+                  void (*const fn)(void *v, short revents),
+                  void *const v)
+{
+    return polltask_new(pq, -1, 0, fn, v);
 }
 
 static void pollqueue_rem_task(struct pollqueue *const pq, struct polltask *const pt)
@@ -184,8 +191,9 @@ static void *poll_thread(void *v)
 
     pthread_mutex_lock(&pq->lock);
     do {
-        unsigned int i;
-        unsigned int n = 0;
+        unsigned int i, j;
+        unsigned int nall = 0;
+        unsigned int npoll = 0;
         struct polltask *pt;
         struct polltask *pt_next;
         uint64_t now = pollqueue_now(0);
@@ -203,28 +211,31 @@ static void *poll_thread(void *v)
                 continue;
             }
 
-            if (n >= asize) {
-                asize = asize ? asize * 2 : 4;
-                a = realloc(a, asize * sizeof(*a));
-                if (!a) {
-                    request_log("Failed to realloc poll array to %zd\n", asize);
-                    goto fail_locked;
+            if (pt->fd != -1) {
+                if (npoll >= asize) {
+                    asize = asize ? asize * 2 : 4;
+                    a = realloc(a, asize * sizeof(*a));
+                    if (!a) {
+                        request_log("Failed to realloc poll array to %zd\n", asize);
+                        goto fail_locked;
+                    }
                 }
-            }
 
-            a[n++] = (struct pollfd){
-                .fd = pt->fd,
-                .events = pt->events
-            };
+                a[npoll++] = (struct pollfd){
+                    .fd = pt->fd,
+                    .events = pt->events
+                };
+            }
 
             t = (int64_t)(pt->timeout - now);
             if (pt->timeout && t < INT_MAX &&
                 (timeout < 0 || (int)t < timeout))
                 timeout = (t < 0) ? 0 : (int)t;
+            ++nall;
         }
         pthread_mutex_unlock(&pq->lock);
 
-        if ((rv = poll(a, n, timeout)) == -1) {
+        if ((rv = poll(a, npoll, timeout)) == -1) {
             if (errno != EINTR) {
                 request_log("Poll error: %s\n", strerror(errno));
                 goto fail_unlocked;
@@ -238,12 +249,12 @@ static void *poll_thread(void *v)
          * infinite looping
         */
         pq->no_prod = true;
-        for (i = 0, pt = pq->head; i < n; ++i, pt = pt_next) {
+        for (i = 0, j = 0, pt = pq->head; i < nall; ++i, pt = pt_next) {
+            const short r = pt->fd == -1 ? 0 : a[j++].revents;
             pt_next = pt->next;
 
             /* Pending? */
-            if (a[i].revents ||
-                (pt->timeout && (int64_t)(now - pt->timeout) >= 0)) {
+            if (r || (pt->timeout && (int64_t)(now - pt->timeout) >= 0)) {
                 pollqueue_rem_task(pq, pt);
                 if (pt->state == POLLTASK_QUEUED)
                     pt->state = POLLTASK_RUNNING;
@@ -255,7 +266,7 @@ static void *poll_thread(void *v)
                  * those are added to the tail our existing
                  * chain remains intact
                 */
-                pt->fn(pt->v, a[i].revents);
+                pt->fn(pt->v, r);
 
                 pthread_mutex_lock(&pq->lock);
                 if (pt->state == POLLTASK_RUNNING)

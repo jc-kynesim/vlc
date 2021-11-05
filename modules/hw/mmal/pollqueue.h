@@ -19,6 +19,10 @@ struct polltask *polltask_new(struct pollqueue *const pq,
                               const int fd, const short events,
                               void (*const fn)(void *v, short revents),
                               void *const v);
+// polltask suitable for timing (i.e. has no trigger event)
+struct polltask *polltask_new_timer(struct pollqueue *const pq,
+                              void (*const fn)(void *v, short revents),
+                              void *const v);
 
 // deletes the task
 // Safe to call if *ppt == NULL

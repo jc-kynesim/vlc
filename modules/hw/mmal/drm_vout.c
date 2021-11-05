@@ -158,6 +158,12 @@ typedef struct drmu_prop_hdr_s {
     drmu_prop_obj_t * objs;
 } drmu_prop_hdr_t;
 
+typedef enum drmu_isset_e {
+    DRMU_ISSET_UNSET = 0,  // Thing unset
+    DRMU_ISSET_NULL,       // Thing is empty
+    DRMU_ISSET_SET,        // Thing has valid data
+} drmu_isset_t;
+
 typedef struct drmu_fb_s {
     atomic_int ref_count;  // 0 == 1 ref for ease of init
     struct drmu_fb_s * prev;
@@ -183,7 +189,7 @@ typedef struct drmu_fb_s {
 
     // Do not set colorspace or metadata if not the "master" plane
     const char * colorspace;
-    bool hdr_metadata_set;
+    drmu_isset_t hdr_metadata_isset;
     struct hdr_output_metadata hdr_metadata;
 
     void * pre_delete_v;
@@ -266,6 +272,8 @@ typedef struct drmu_atomic_q_s {
     drmu_atomic_t * next_flip;
     drmu_atomic_t * cur_flip;
     drmu_atomic_t * last_flip;
+    unsigned int retry_count;
+    struct polltask * retry_task;
 } drmu_atomic_q_t;
 
 typedef struct drmu_env_s {
@@ -985,12 +993,14 @@ drmu_prop_enum_new(drmu_env_t * const du, const uint32_t id)
     qsort(enums, pen->n, sizeof(*enums), prop_enum_qsort_cb);
     pen->enums = enums;
 
+#if 0
     {
         unsigned int i;
         for (i = 0; i != pen->n; ++i) {
             drmu_info(du, "%32s %2d:%02d: %32s %#"PRIx64, prop.name, pen->id, i, pen->enums[i].name, pen->enums[i].value);
         }
     }
+#endif
 
     return pen;
 
@@ -1261,7 +1271,7 @@ fail1:
 static void
 drmu_atomic_dump(const drmu_atomic_t * const da)
 {
-    drmu_info(da->du, "Atomic %p: refs %d", da, atomic_load(&da->ref_count));
+    drmu_info(da->du, "Atomic %p: refs %d", da, atomic_load(&da->ref_count)+1);
     prop_hdr_dump(da->du, &da->props);
 }
 
@@ -1324,6 +1334,23 @@ drmu_atomic_merge(const drmu_atomic_t * const a, const drmu_atomic_t * const b)
     return c;
 }
 
+// Merge b into a. b is unrefed (inc on error), *ppa is replaced by the merged
+// contents any other refs of a are unchanged
+static int
+drmu_atomic_merge2(drmu_atomic_t ** const ppa, drmu_atomic_t ** const ppb)
+{
+    drmu_atomic_t * const c = drmu_atomic_merge(*ppa, *ppb);
+
+    drmu_atomic_unref(ppb);
+
+    if (c == NULL)
+        return -ENOMEM;
+
+    drmu_atomic_unref(ppa);
+    *ppa = c;
+    return 0;
+}
+
 static int
 drmu_atomic_commit(drmu_atomic_t * const da)
 {
@@ -1338,7 +1365,7 @@ drmu_atomic_commit(drmu_atomic_t * const da)
         uint32_t prop_ids[n_props];
         uint64_t prop_values[n_props];
         struct drm_mode_atomic atomic = {
-            .flags           = DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_ALLOW_MODESET,
+            .flags           = DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT,
             .count_objs      = n_objs,
             .objs_ptr        = (uintptr_t)obj_ids,
             .count_props_ptr = (uintptr_t)prop_counts,
@@ -1349,14 +1376,77 @@ drmu_atomic_commit(drmu_atomic_t * const da)
 
         prop_hdr_atomic_fill(&da->props, obj_ids, prop_counts, prop_ids, prop_values);
 
-        if ((rv = drmIoctl(du->fd, DRM_IOCTL_MODE_ATOMIC, &atomic)) != 0) {
-            rv = -errno;
-            drmu_err(du, "%s: Atomic failed: %s", __func__, strerror(-rv));
-            drmu_atomic_dump(da);
+        if (drmIoctl(du->fd, DRM_IOCTL_MODE_ATOMIC, &atomic) == 0)
+            return 0;
+
+        rv = -errno;
+        if (rv == -EINVAL) {
+            drmu_err(du, "%s: EINVAL try ALLOW_MODESET", __func__);
+            atomic.flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
+            if (drmIoctl(du->fd, DRM_IOCTL_MODE_ATOMIC, &atomic) == 0)
+                return 0;
         }
+
+        drmu_err(du, "%s: Atomic failed: %s", __func__, strerror(-rv));
+//        drmu_atomic_dump(da);
     }
 
     return rv;
+}
+
+static void atomic_q_retry(drmu_atomic_q_t * const aq, drmu_env_t * const du);
+
+// Needs locked
+static int
+atomic_q_attempt_commit_next(drmu_atomic_q_t * const aq)
+{
+    drmu_env_t * const du = aq->next_flip->du;
+    int rv;
+
+    if ((rv = drmu_atomic_commit(aq->next_flip)) == 0) {
+        if (aq->retry_count != 0)
+            drmu_warn(du, "%s: Atomic commit OK", __func__);
+        aq->cur_flip = aq->next_flip;
+        aq->next_flip = NULL;
+        aq->retry_count = 0;
+    }
+    else if (rv == -EBUSY && ++aq->retry_count < 16) {
+        drmu_warn(du, "%s: Atomic commit BUSY", __func__);
+        atomic_q_retry(aq, du);
+        rv = 0;
+    }
+    else {
+        drmu_err(du, "%s: Atomic commit failed", __func__);
+        drmu_atomic_unref(&aq->next_flip);
+        aq->retry_count = 0;
+    }
+
+    return rv;
+}
+
+static void
+atomic_q_retry_cb(void * v, short revents)
+{
+    drmu_atomic_q_t * const aq = v;
+    (void)revents;
+
+    pthread_mutex_lock(&aq->lock);
+
+    // If we need a retry then next != NULL && cur == NULL
+    // if not that then we've fixed ourselves elsewhere
+
+    if (aq->next_flip != NULL && aq->cur_flip == NULL)
+        atomic_q_attempt_commit_next(aq);
+
+    pthread_mutex_unlock(&aq->lock);
+}
+
+static void
+atomic_q_retry(drmu_atomic_q_t * const aq, drmu_env_t * const du)
+{
+    if (aq->retry_task == NULL)
+        aq->retry_task = polltask_new_timer(du->pq, atomic_q_retry_cb, aq);
+    pollqueue_add_task(aq->retry_task, 20);
 }
 
 // Called after an atomic commit has completed
@@ -1376,7 +1466,7 @@ drmu_atomic_page_flip_cb(int fd, unsigned int sequence, unsigned int tv_sec, uns
 
     // At this point:
     //  next   The atomic we are about to commit
-    //  cur    The last atomic we committed, now in use
+    //  cur    The last atomic we committed, now in use (must be != NULL)
     //  last   The atomic that has just become obsolete
 
     pthread_mutex_lock(&aq->lock);
@@ -1389,50 +1479,29 @@ drmu_atomic_page_flip_cb(int fd, unsigned int sequence, unsigned int tv_sec, uns
     aq->last_flip = aq->cur_flip;
     aq->cur_flip = NULL;
 
-    if (aq->next_flip != NULL) {
-        if (drmu_atomic_commit(aq->next_flip) == 0) {
-            aq->cur_flip = aq->next_flip;
-            aq->next_flip = NULL;
-        }
-        else {
-            drmu_atomic_unref(&aq->next_flip);
-            drmu_warn(du, "%s: Atomic commit failed", __func__);
-        }
-    }
+    if (aq->next_flip != NULL)
+        atomic_q_attempt_commit_next(aq);
 
     pthread_mutex_unlock(&aq->lock);
 }
 
+// 'consumes' da
 static int
-atomic_queue(drmu_atomic_t * const da)
+atomic_q_queue(drmu_atomic_q_t * const aq, drmu_atomic_t * da)
 {
     int rv = 0;
-    drmu_env_t * const du = da->du;
-    drmu_atomic_q_t * const aq = &du->aq;
 
     pthread_mutex_lock(&aq->lock);
 
     if (aq->next_flip != NULL) {
-        drmu_atomic_t * const next = drmu_atomic_merge(aq->next_flip, da);
-        if (next == NULL) {
-            rv = -ENOMEM;
-        }
-        else {
-            drmu_atomic_unref(&aq->next_flip);
-            aq->next_flip = next;
-        }
-    }
-    else if (aq->cur_flip != NULL) {
-        // Q something to commit on next flip
-        aq->next_flip = drmu_atomic_ref(da);
+        // We already have something pending or retrying - merge the new with it
+        rv = drmu_atomic_merge2(&aq->next_flip, &da);
     }
     else {
-        // No pending commit
-        // Mutex makes commit/asignment order safe
-        if ((rv = drmu_atomic_commit(da)) == 0)
-            aq->cur_flip = drmu_atomic_ref(da);
-        else
-            drmu_warn(du, "%s: Atomic commit failed", __func__);
+        aq->next_flip = da;
+        // No pending commit?
+        if (aq->cur_flip == NULL)
+            rv = atomic_q_attempt_commit_next(aq);
     }
 
     pthread_mutex_unlock(&aq->lock);
@@ -1445,20 +1514,18 @@ static int
 drmu_atomic_queue(drmu_atomic_t ** ppda)
 {
     drmu_atomic_t * da = *ppda;
-    int rv;
 
     if (da == NULL)
         return 0;
     *ppda = NULL;
 
-    rv = atomic_queue(da);
-    drmu_atomic_unref(&da);
-    return rv;
+    return atomic_q_queue(&da->du->aq, da);
 }
 
 static void
 drmu_atomic_q_uninit(drmu_atomic_q_t * const aq)
 {
+    polltask_delete(&aq->retry_task);
     drmu_atomic_unref(&aq->next_flip);
     drmu_atomic_unref(&aq->cur_flip);
     drmu_atomic_unref(&aq->last_flip);
@@ -2136,10 +2203,11 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
         }
     }
 
-    dfb->hdr_metadata_set = false;
-    if (pic->format.mastering.max_luminance != 0)
-    {
-        dfb->hdr_metadata_set = true;
+    if (pic->format.mastering.max_luminance == 0) {
+        dfb->hdr_metadata_isset = DRMU_ISSET_NULL;
+    }
+    else {
+        dfb->hdr_metadata_isset = DRMU_ISSET_SET;
         dfb->hdr_metadata = pic_hdr_metadata(&pic->format);
     }
 
@@ -2422,38 +2490,40 @@ static int
 drmu_crtc_hdr_metadata_set(drmu_crtc_t * const dc, const struct hdr_output_metadata * const m)
 {
     drmu_env_t * const du = dc->du;
-    drmu_blob_t * blob = NULL;
-    const size_t blob_len = sizeof(*m);
     int rv;
 
     if (dc->pid.hdr_output_metadata == 0)
         return 0;
 
     if (m == NULL) {
-        if (dc->hdr_metadata_blob == NULL)
-            return 0;
+        if (dc->hdr_metadata_blob != NULL) {
+            drmu_info(du, "Unset hdr metadata");
+            drmu_blob_unref(&dc->hdr_metadata_blob);
+        }
     }
     else {
-        if (dc->hdr_metadata_blob != NULL && memcmp(&dc->hdr_metadata, m, blob_len) == 0)
-            return 0;
+        const size_t blob_len = sizeof(*m);
+        drmu_blob_t * blob = NULL;
 
-        if ((blob = drmu_blob_new(du, m, blob_len)) == NULL)
-            return -ENOMEM;
+        if (dc->hdr_metadata_blob == NULL || memcmp(&dc->hdr_metadata, m, blob_len) != 0)
+        {
+            drmu_info(du, "Set hdr metadata");
 
-        // memcpy rather than structure copy to ensure keeping all padding 0s
-        memcpy(&dc->hdr_metadata, m, blob_len);
+            if ((blob = drmu_blob_new(du, m, blob_len)) == NULL)
+                return -ENOMEM;
+
+            // memcpy rather than structure copy to ensure keeping all padding 0s
+            memcpy(&dc->hdr_metadata, m, blob_len);
+
+            drmu_blob_unref(&dc->hdr_metadata_blob);
+            dc->hdr_metadata_blob = blob;
+        }
     }
 
-    drmu_info(du, "%s: %s hdr metadata", __func__, blob ? "Set" : "Unset");
-    if (blob) {
-        drmu_info(du, "%s: Crtc: %#x prop: %#x blob %#x", __func__, dc->con->connector_id, dc->pid.hdr_output_metadata, drmu_blob_id(blob));
-    }
-    rv = drmu_atomic_add_prop_blob(du->da, dc->con->connector_id, dc->pid.hdr_output_metadata, blob);
+    rv = drmu_atomic_add_prop_blob(du->da, dc->con->connector_id, dc->pid.hdr_output_metadata, dc->hdr_metadata_blob);
     if (rv != 0)
         drmu_err(du, "Set property fail: %s", strerror(errno));
 
-    drmu_blob_unref(&dc->hdr_metadata_blob);
-    dc->hdr_metadata_blob = blob;
     return rv;
 }
 
@@ -2553,7 +2623,9 @@ drmu_plane_set(drmu_plane_t * const dp,
 
     if (dp->dc != NULL) {
         drmu_crtc_colorspace_set(dp->dc, dfb->colorspace);
-        if (dfb->hdr_metadata_set)
+        if (dfb->hdr_metadata_isset == DRMU_ISSET_NULL)
+            drmu_crtc_hdr_metadata_set(dp->dc, NULL);
+        else if (dfb->hdr_metadata_isset == DRMU_ISSET_SET)
             drmu_crtc_hdr_metadata_set(dp->dc, &dfb->hdr_metadata);
     }
 
@@ -2676,8 +2748,6 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
     {
         drmu_props_t * const props = props_new(du, dc->con->connector_id, DRM_MODE_OBJECT_CONNECTOR);
 
-        props_dump(props);
-
         if (props != NULL) {
             dc->pid.colorspace          = drmu_prop_enum_new(du, props_name_to_id(props, "Colorspace"));
             dc->pid.hdr_output_metadata = props_name_to_id(props, "HDR_OUTPUT_METADATA");
@@ -2795,8 +2865,6 @@ drmu_env_planes_populate(drmu_env_t * const du)
             drmu_err(du, "%s: drmModeObjectGetProperties failed: %s", __func__, strerror(err));
             goto fail2;
         }
-
-        props_dump(props);
 
         if ((dp->pid.crtc_id = props_name_to_id(props, "CRTC_ID")) == 0 ||
             (dp->pid.fb_id  = props_name_to_id(props, "FB_ID")) == 0 ||
@@ -2946,7 +3014,6 @@ drmu_env_new_fd(vlc_object_t * const log, const int fd)
 
     // We want the primary plane for video
     drmSetClientCap(du->fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
-    drmSetClientCap(du->fd, DRM_CLIENT_CAP_ATOMIC, 1);
     drmSetClientCap(du->fd, DRM_CLIENT_CAP_ATOMIC, 1);
 
     if (drmu_env_planes_populate(du) != 0)
@@ -3176,9 +3243,24 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
 
 static int vd_drm_control(vout_display_t *vd, int query)
 {
-    VLC_UNUSED(vd);
-    VLC_UNUSED(query);
-    return VLC_SUCCESS;
+    int ret = VLC_EGENERIC;
+
+    switch (query) {
+        case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
+        case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
+        case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
+        case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
+        case VOUT_DISPLAY_CHANGE_ZOOM:
+            msg_Warn(vd, "Unsupported control query %d", query);
+            ret = VLC_SUCCESS;
+            break;
+
+        default:
+            msg_Warn(vd, "Unknown control query %d", query);
+            break;
+    }
+
+    return ret;
 }
 
 static int vd_drm_reset_pictures(vout_display_t *vd, video_format_t *fmt)
