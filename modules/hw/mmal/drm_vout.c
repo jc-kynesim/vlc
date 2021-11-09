@@ -64,6 +64,7 @@ enum hdmi_eotf
 };
 
 #define TRACE_ALL 0
+#define TRACE_PROP_NEW 1
 
 #define SUBPICS_MAX 4
 
@@ -97,9 +98,18 @@ typedef struct drmu_props_s {
 
 typedef struct drmu_prop_enum_s {
     uint32_t id;
+    uint32_t flags;
     unsigned int n;
     const struct drm_mode_property_enum * enums;
+    char name[DRM_PROP_NAME_LEN];
 } drmu_prop_enum_t;
+
+typedef struct drmu_prop_range_s {
+    uint32_t id;
+    uint32_t flags;
+    uint64_t range[2];
+    char name[DRM_PROP_NAME_LEN];
+} drmu_prop_range_t;
 
 typedef struct drmu_blob_s {
     atomic_int ref_count;  // 0 == 1 ref for ease of init
@@ -248,9 +258,12 @@ typedef struct drmu_crtc_s {
     drmModeEncoderPtr enc;
     drmModeConnectorPtr con;
     int crtc_idx;
+    bool hi_bpc_ok;
 
     struct {
+        drmu_prop_range_t * max_bpc;
         drmu_prop_enum_t * colorspace;
+        drmu_prop_enum_t * output_format;
         uint32_t hdr_output_metadata;
     } pid;
 
@@ -283,9 +296,6 @@ typedef struct drmu_env_s {
     drmu_plane_t * planes;
     drmModeResPtr res;
 
-    // atomic lock held whilst we accumulate atomic ops
-    pthread_mutex_t atomic_lock;
-    drmu_atomic_t * da;
     // global env for atomic flip
     drmu_atomic_q_t aq;
     // global env for bo tracking
@@ -908,25 +918,27 @@ prop_enum_qsort_cb(const void * va, const void * vb)
 static const uint64_t *
 drmu_prop_enum_value(const drmu_prop_enum_t * const pen, const char * const name)
 {
-    unsigned int i = pen->n / 2;
-    unsigned int a = 0;
-    unsigned int b = pen->n;
+    if (pen != NULL && name != NULL) {
+        unsigned int i = pen->n / 2;
+        unsigned int a = 0;
+        unsigned int b = pen->n;
 
-    if (name == NULL)
-        return NULL;
+        if (name == NULL)
+            return NULL;
 
-    while (a < b) {
-        const int r = strcmp(name, pen->enums[i].name);
+        while (a < b) {
+            const int r = strcmp(name, pen->enums[i].name);
 
-        if (r == 0)
-            return &pen->enums[i].value;
+            if (r == 0)
+                return &pen->enums[i].value;
 
-        if (r < 0) {
-            b = i;
-            i = (i + a) / 2;
-        } else {
-            a = i + 1;
-            i = (i + b) / 2;
+            if (r < 0) {
+                b = i;
+                i = (i + a) / 2;
+            } else {
+                a = i + 1;
+                i = (i + b) / 2;
+            }
         }
     }
     return NULL;
@@ -935,7 +947,7 @@ drmu_prop_enum_value(const drmu_prop_enum_t * const pen, const char * const name
 static uint32_t
 drmu_prop_enum_id(const drmu_prop_enum_t * const pen)
 {
-    return pen->id;
+    return pen == NULL ? 0 : pen->id;
 }
 
 static void
@@ -954,50 +966,58 @@ drmu_prop_enum_new(drmu_env_t * const du, const uint32_t id)
 {
     drmu_prop_enum_t * pen;
     struct drm_mode_property_enum * enums = NULL;
-    struct drm_mode_get_property prop = {
-        .prop_id = id
-    };
+    unsigned int retries;
 
     // If id 0 return without warning for ease of getting props on init
     if (id == 0 || (pen = calloc(1, sizeof(*pen))) == NULL)
         return NULL;
     pen->id = id;
 
-    if (drmIoctl(du->fd, DRM_IOCTL_MODE_GETPROPERTY, &prop) != 0) {
-        drmu_err(du, "%s: get property 1 failed: %s", __func__, strerror(errno));
-        goto fail;
+    // Docn says we must loop till stable as there may be hotplug races
+    for (retries = 0; retries < 8; ++retries) {
+        struct drm_mode_get_property prop = {
+            .prop_id = id,
+            .count_enum_blobs = pen->n,
+            .enum_blob_ptr = (uintptr_t)enums
+        };
+
+        if (drmIoctl(du->fd, DRM_IOCTL_MODE_GETPROPERTY, &prop) != 0) {
+            drmu_err(du, "%s: get property failed: %s", __func__, strerror(errno));
+            goto fail;
+        }
+
+        if (prop.count_enum_blobs == 0 ||
+            (prop.flags & (DRM_MODE_PROP_ENUM | DRM_MODE_PROP_BITMASK)) == 0) {
+            drmu_err(du, "%s: not an enum: flags=%#x, enums=%d", __func__, prop.flags, prop.count_enum_blobs);
+            goto fail;
+        }
+
+        if (pen->n >= prop.count_enum_blobs) {
+            pen->flags = prop.flags;
+            pen->n = prop.count_enum_blobs;
+            memcpy(pen->name, prop.name, sizeof(pen->name));
+            break;
+        }
+
+        free(enums);
+
+        pen->n = prop.count_enum_blobs;
+        if ((enums = malloc(pen->n * sizeof(*enums))) == NULL)
+            goto fail;
     }
-
-    if (prop.count_enum_blobs == 0 ||
-        (prop.flags & (DRM_MODE_PROP_ENUM | DRM_MODE_PROP_BITMASK)) == 0) {
-        drmu_err(du, "%s: not an enum: flags=%#x", __func__, prop.flags);
-        goto fail;
-    }
-
-    pen->n = prop.count_enum_blobs;
-    if ((enums = calloc(pen->n, sizeof(*enums))) == NULL)
-        goto fail;
-
-    // Only get enums - need to clear other filled in fields - ignore values
-    prop = (struct drm_mode_get_property){
-        .prop_id = id,
-        .count_enum_blobs = pen->n,
-        .enum_blob_ptr = (uintptr_t)enums
-    };
-
-    if (drmIoctl(du->fd, DRM_IOCTL_MODE_GETPROPERTY, &prop) != 0) {
-        drmu_err(du, "%s: get property 2 failed: %s", __func__, strerror(errno));
+    if (retries >= 8) {
+        drmu_err(du, "%s: Too many retries", __func__);
         goto fail;
     }
 
     qsort(enums, pen->n, sizeof(*enums), prop_enum_qsort_cb);
     pen->enums = enums;
 
-#if 0
+#if TRACE_PROP_NEW
     {
         unsigned int i;
         for (i = 0; i != pen->n; ++i) {
-            drmu_info(du, "%32s %2d:%02d: %32s %#"PRIx64, prop.name, pen->id, i, pen->enums[i].name, pen->enums[i].value);
+            drmu_info(du, "%32s %2d:%02d: %32s %#"PRIx64, pen->name, pen->id, i, pen->enums[i].name, pen->enums[i].value);
         }
     }
 #endif
@@ -1009,6 +1029,91 @@ fail:
     prop_enum_free(pen);
     return NULL;
 }
+
+static void
+prop_range_free(drmu_prop_range_t * const pra)
+{
+    free(pra);
+}
+
+static void
+drmu_prop_range_delete(drmu_prop_range_t ** pppra)
+{
+    drmu_prop_range_t * const pra = *pppra;
+
+    if (pra == NULL)
+        return;
+    *pppra = NULL;
+
+    prop_range_free(pra);
+}
+
+static bool
+drmu_prop_range_validate(const drmu_prop_range_t * const pra, const uint64_t x)
+{
+    if (pra == NULL)
+        return false;
+    if ((pra->flags & DRM_MODE_PROP_EXTENDED_TYPE) == DRM_MODE_PROP_TYPE(DRM_MODE_PROP_SIGNED_RANGE)) {
+        return (int64_t)pra->range[0] <= (int64_t)x && (int64_t)pra->range[1] >= (int64_t)x;
+    }
+    return pra->range[0] <= x && pra->range[1] >= x;
+}
+
+static uint32_t
+drmu_prop_range_id(const drmu_prop_range_t * const pra)
+{
+    return pra == NULL ? 0 : pra->id;
+}
+
+static drmu_prop_range_t *
+drmu_prop_range_new(drmu_env_t * const du, const uint32_t id)
+{
+    drmu_prop_range_t * pra;
+
+    // If id 0 return without warning for ease of getting props on init
+    if (id == 0 || (pra = calloc(1, sizeof(*pra))) == NULL)
+        return NULL;
+    pra->id = id;
+
+    // We are expecting exactly 2 values so no need to loop
+    {
+        struct drm_mode_get_property prop = {
+            .prop_id = id,
+            .count_values = 2,
+            .values_ptr = (uintptr_t)pra->range
+        };
+
+        if (drmIoctl(du->fd, DRM_IOCTL_MODE_GETPROPERTY, &prop) != 0) {
+            drmu_err(du, "%s: get property failed: %s", __func__, strerror(errno));
+            goto fail;
+        }
+
+        if ((prop.flags & DRM_MODE_PROP_RANGE) == 0 &&
+            (prop.flags & DRM_MODE_PROP_EXTENDED_TYPE) != DRM_MODE_PROP_TYPE(DRM_MODE_PROP_SIGNED_RANGE)) {
+            drmu_err(du, "%s: not an enum: flags=%#x", __func__, prop.flags);
+            goto fail;
+        }
+        if ((prop.count_values != 2)) {
+            drmu_err(du, "%s: unexpected count values: %d", __func__, prop.count_values);
+            goto fail;
+        }
+
+        pra->flags = prop.flags;
+        memcpy(pra->name, prop.name, sizeof(pra->name));
+    }
+
+#if TRACE_PROP_NEW
+    drmu_info(du, "%32s %2d: %"PRId64"->%"PRId64, pra->name, pra->id, pra->range[0], pra->range[1]);
+#endif
+
+    return pra;
+
+fail:
+    prop_range_free(pra);
+    return NULL;
+}
+
+
 
 static int
 bo_close(drmu_env_t * const du, uint32_t * const ph)
@@ -1199,6 +1304,7 @@ props_name_to_id(drmu_props_t * const props, const char * const name)
     return 0;
 }
 
+#if TRACE_PROP_NEW
 static void
 props_dump(const drmu_props_t * const props)
 {
@@ -1213,6 +1319,7 @@ props_dump(const drmu_props_t * const props)
                   p->count_blobs, !p->blob_ids ? 0 : p->blob_ids[0]);
     }
 }
+#endif
 
 static int
 props_qsort_cb(const void * va, const void * vb)
@@ -1352,7 +1459,7 @@ drmu_atomic_merge2(drmu_atomic_t ** const ppa, drmu_atomic_t ** const ppb)
 }
 
 static int
-drmu_atomic_commit(drmu_atomic_t * const da)
+drmu_atomic_commit(drmu_atomic_t * const da, uint32_t flags)
 {
     drmu_env_t * const du = da->du;
     const unsigned int n_objs = prop_hdr_objs_count(&da->props);
@@ -1365,7 +1472,7 @@ drmu_atomic_commit(drmu_atomic_t * const da)
         uint32_t prop_ids[n_props];
         uint64_t prop_values[n_props];
         struct drm_mode_atomic atomic = {
-            .flags           = DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT,
+            .flags           = flags,
             .count_objs      = n_objs,
             .objs_ptr        = (uintptr_t)obj_ids,
             .count_props_ptr = (uintptr_t)prop_counts,
@@ -1387,8 +1494,7 @@ drmu_atomic_commit(drmu_atomic_t * const da)
                 return 0;
         }
 
-        drmu_err(du, "%s: Atomic failed: %s", __func__, strerror(-rv));
-//        drmu_atomic_dump(da);
+//        drmu_err(du, "%s: Atomic failed: %s", __func__, strerror(-rv));
     }
 
     return rv;
@@ -1403,7 +1509,7 @@ atomic_q_attempt_commit_next(drmu_atomic_q_t * const aq)
     drmu_env_t * const du = aq->next_flip->du;
     int rv;
 
-    if ((rv = drmu_atomic_commit(aq->next_flip)) == 0) {
+    if ((rv = drmu_atomic_commit(aq->next_flip, DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT)) == 0) {
         if (aq->retry_count != 0)
             drmu_warn(du, "%s: Atomic commit OK", __func__);
         aq->cur_flip = aq->next_flip;
@@ -1411,12 +1517,16 @@ atomic_q_attempt_commit_next(drmu_atomic_q_t * const aq)
         aq->retry_count = 0;
     }
     else if (rv == -EBUSY && ++aq->retry_count < 16) {
+        // This really shouldn't happen but we observe that the 1st commit after
+        // a modeset often fails with BUSY.  It seems to be fine on a 10ms retry
+        // but allow some more in case ww need a bit longer in some cases
         drmu_warn(du, "%s: Atomic commit BUSY", __func__);
         atomic_q_retry(aq, du);
         rv = 0;
     }
     else {
         drmu_err(du, "%s: Atomic commit failed", __func__);
+        drmu_atomic_dump(aq->next_flip);
         drmu_atomic_unref(&aq->next_flip);
         aq->retry_count = 0;
     }
@@ -1508,8 +1618,8 @@ atomic_q_queue(drmu_atomic_q_t * const aq, drmu_atomic_t * da)
     return rv;
 }
 
-// Consumes the passed atomic structure as there is a possiblity that it will
-// be modified (if something ends up being merged with it).
+// Consumes the passed atomic structure as it isn't copied
+// * arguably should copy & unref if ref count != 0
 static int
 drmu_atomic_queue(drmu_atomic_t ** ppda)
 {
@@ -1587,7 +1697,23 @@ drmu_atomic_add_prop_enum(drmu_atomic_t * const da, const uint32_t obj_id, const
         prop_hdr_prop_set(&da->props, obj_id, drmu_prop_enum_id(pen), *pval, 0, 0, NULL);
 
     if (rv != 0 && name != NULL)
-        drmu_warn(da->du, "%s: Failed to add enum obj_id=%#x, prop_id=%#x, name='%s': %s", __func__, obj_id, drmu_prop_enum_id(pen), name, strerror(-rv));
+        drmu_warn(da->du, "%s: Failed to add enum obj_id=%#x, prop_id=%#x, name='%s': %s", __func__,
+                  obj_id, drmu_prop_enum_id(pen), name, strerror(-rv));
+
+    return rv;
+}
+
+static int
+drmu_atomic_add_prop_range(drmu_atomic_t * const da, const uint32_t obj_id, const drmu_prop_range_t * const pra, const uint64_t x)
+{
+    int rv;
+
+    rv = !drmu_prop_range_validate(pra, x) ? -EINVAL :
+        prop_hdr_prop_set(&da->props, obj_id, drmu_prop_range_id(pra), x, 0, 0, NULL);
+
+    if (rv != 0)
+        drmu_warn(da->du, "%s: Failed to add range obj_id=%#x, prop_id=%#x, val=%"PRId64": %s", __func__,
+                  obj_id, drmu_prop_range_id(pra), x, strerror(-rv));
 
     return rv;
 }
@@ -2482,14 +2608,17 @@ free_crtc(drmu_crtc_t * const dc)
     if (dc->con != NULL)
         drmModeFreeConnector(dc->con);
 
+    drmu_prop_range_delete(&dc->pid.max_bpc);
+    drmu_prop_enum_delete(&dc->pid.colorspace);
+    drmu_prop_enum_delete(&dc->pid.output_format);
     drmu_blob_unref(&dc->hdr_metadata_blob);
     free(dc);
 }
 
 static int
-drmu_crtc_hdr_metadata_set(drmu_crtc_t * const dc, const struct hdr_output_metadata * const m)
+drmu_atomic_crtc_hdr_metadata_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, const struct hdr_output_metadata * const m)
 {
-    drmu_env_t * const du = dc->du;
+    drmu_env_t * const du = da->du;
     int rv;
 
     if (dc->pid.hdr_output_metadata == 0)
@@ -2520,7 +2649,7 @@ drmu_crtc_hdr_metadata_set(drmu_crtc_t * const dc, const struct hdr_output_metad
         }
     }
 
-    rv = drmu_atomic_add_prop_blob(du->da, dc->con->connector_id, dc->pid.hdr_output_metadata, dc->hdr_metadata_blob);
+    rv = drmu_atomic_add_prop_blob(da, dc->con->connector_id, dc->pid.hdr_output_metadata, dc->hdr_metadata_blob);
     if (rv != 0)
         drmu_err(du, "Set property fail: %s", strerror(errno));
 
@@ -2528,9 +2657,38 @@ drmu_crtc_hdr_metadata_set(drmu_crtc_t * const dc, const struct hdr_output_metad
 }
 
 static int
-drmu_crtc_colorspace_set(drmu_crtc_t * const dc, const char * colorspace)
+atomic_crtc_bpc_set(drmu_atomic_t * const da, drmu_crtc_t * const dc,
+                    const char * const colorspace, const char * const output_format,
+                    const unsigned int max_bpc)
 {
-    return drmu_atomic_add_prop_enum(dc->du->da, dc->con->connector_id, dc->pid.colorspace, colorspace);
+    const uint32_t con_id = dc->con->connector_id;
+    int rv = 0;
+
+    if ((dc->pid.colorspace &&
+         (rv = drmu_atomic_add_prop_enum(da, con_id, dc->pid.colorspace, colorspace)) != 0) ||
+        (dc->pid.output_format &&
+         (rv = drmu_atomic_add_prop_enum(da, con_id, dc->pid.output_format, output_format)) != 0) ||
+        (dc->pid.max_bpc &&
+         (rv = drmu_atomic_add_prop_range(da, con_id, dc->pid.max_bpc, max_bpc)) != 0))
+        return rv;
+    return 0;
+}
+
+static int
+atomic_crtc_hi_bpc_set(drmu_atomic_t * const da, drmu_crtc_t * const dc)
+{
+    return atomic_crtc_bpc_set(da, dc, "BT2020_YCC", "YCrCb422", 12);
+}
+
+static int
+drmu_atomic_crtc_colorspace_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, const char * colorspace, int hi_bpc)
+{
+    if (!hi_bpc || !dc->hi_bpc_ok || !colorspace || strcmp(colorspace, "BT2020_RGB") != 0) {
+        return atomic_crtc_bpc_set(da, dc, colorspace, "RGB444", 8);
+    }
+    else {
+        return atomic_crtc_hi_bpc_set(da, dc);
+    }
 }
 
 static uint32_t
@@ -2548,7 +2706,6 @@ drmu_crtc_delete(drmu_crtc_t ** ppdc)
         return;
     *ppdc = NULL;
 
-    drmu_prop_enum_delete(&dc->pid.colorspace);
     free_crtc(dc);
 }
 
@@ -2597,12 +2754,10 @@ plane_set_atomic(drmu_atomic_t * const da,
 }
 
 static int
-drmu_plane_set(drmu_plane_t * const dp,
+drmu_atomic_plane_set(drmu_atomic_t * const da, drmu_plane_t * const dp,
     drmu_fb_t * const dfb, const drmu_rect_t pos)
 {
     int rv;
-    drmu_env_t * const du = dp->du;
-    drmu_atomic_t * const da = du->da;
     const uint32_t plid = dp->plane->plane_id;
 
     if (dfb == NULL) {
@@ -2621,12 +2776,17 @@ drmu_plane_set(drmu_plane_t * const dp,
     drmu_atomic_add_prop_enum(da, plid, dp->pid.color_encoding, dfb->color_encoding);
     drmu_atomic_add_prop_enum(da, plid, dp->pid.color_range,    dfb->color_range);
 
+    // *** Need to rethink this
     if (dp->dc != NULL) {
-        drmu_crtc_colorspace_set(dp->dc, dfb->colorspace);
+        drmu_crtc_t * const dc = dp->dc;
+
+        if (dfb->colorspace != NULL) {
+            drmu_atomic_crtc_colorspace_set(da, dc, dfb->colorspace, 1);
+        }
         if (dfb->hdr_metadata_isset == DRMU_ISSET_NULL)
-            drmu_crtc_hdr_metadata_set(dp->dc, NULL);
+            drmu_atomic_crtc_hdr_metadata_set(da, dc, NULL);
         else if (dfb->hdr_metadata_isset == DRMU_ISSET_SET)
-            drmu_crtc_hdr_metadata_set(dp->dc, &dfb->hdr_metadata);
+            drmu_atomic_crtc_hdr_metadata_set(da, dc, &dfb->hdr_metadata);
     }
 
     return rv != 0 ? -errno : 0;
@@ -2749,11 +2909,27 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
         drmu_props_t * const props = props_new(du, dc->con->connector_id, DRM_MODE_OBJECT_CONNECTOR);
 
         if (props != NULL) {
+#if TRACE_PROP_NEW
+            props_dump(props);
+#endif
+            dc->pid.max_bpc             = drmu_prop_range_new(du, props_name_to_id(props, "max bpc"));
             dc->pid.colorspace          = drmu_prop_enum_new(du, props_name_to_id(props, "Colorspace"));
+            dc->pid.output_format       = drmu_prop_enum_new(du, props_name_to_id(props, "output format"));
             dc->pid.hdr_output_metadata = props_name_to_id(props, "HDR_OUTPUT_METADATA");
             props_free(props);
         }
     }
+
+    if (dc->pid.output_format && dc->pid.colorspace && dc->pid.max_bpc) {
+        drmu_atomic_t * da = drmu_atomic_new(du);
+        if (da != NULL &&
+            atomic_crtc_hi_bpc_set(da, dc) == 0 &&
+            drmu_atomic_commit(da, DRM_MODE_ATOMIC_TEST_ONLY) == 0) {
+            dc->hi_bpc_ok = true;
+        }
+        drmu_atomic_unref(&da);
+    }
+    drmu_info(du, "Hi BPC %s", dc->hi_bpc_ok ? "OK" : "no");
 
     return dc;
 
@@ -2786,36 +2962,6 @@ drmu_crtc_new_find(drmu_env_t * const du)
     } while (dc == NULL);
 
     return dc;
-}
-
-static int
-drmu_env_atomic_start(drmu_env_t * const du)
-{
-    pthread_mutex_lock(&du->atomic_lock);
-    if ((du->da = drmu_atomic_new(du)) == NULL) {
-        pthread_mutex_unlock(&du->atomic_lock);
-        return -ENOMEM;
-    }
-    return 0;
-}
-
-static void
-drmu_env_atomic_abort(drmu_env_t * const du)
-{
-    if (du->da == NULL)
-        return;
-
-    drmu_atomic_unref(&du->da);
-    pthread_mutex_unlock(&du->atomic_lock);
-}
-
-static drmu_atomic_t *
-drmu_env_atomic_finish(drmu_env_t * const du)
-{
-    drmu_atomic_t * const da = du->da;
-    du->da = NULL;
-    pthread_mutex_unlock(&du->atomic_lock);
-    return da;
 }
 
 static void
@@ -2963,7 +3109,6 @@ drmu_env_delete(drmu_env_t ** const ppdu)
     drmu_bo_env_uninit(&du->boe);
 
     close(du->fd);
-    pthread_mutex_destroy(&du->atomic_lock);
     free(du);
 }
 
@@ -2999,7 +3144,6 @@ drmu_env_new_fd(vlc_object_t * const log, const int fd)
 
     du->log = log;
     du->fd = fd;
-    pthread_mutex_init(&du->atomic_lock, NULL);
     drmu_bo_env_init(&du->boe);
     drmu_atomic_q_init(&du->aq);
 
@@ -3114,12 +3258,18 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
 {
     vout_display_sys_t * const sys = vd->sys;
     unsigned int n = 0;
-    drmu_fb_t * dfb;
+    drmu_atomic_t * da = NULL;
+    drmu_fb_t * dfb = NULL;
     drmu_rect_t r;
     unsigned int i;
     int ret;
 
     VLC_UNUSED(date);
+
+    if (sys->display_set != NULL) {
+        msg_Warn(vd, "sys->display_set != NULL");
+        drmu_atomic_unref(&sys->display_set);
+    }
 
     // Attempt to import the subpics
     for (subpicture_t * spic = subpicture; spic != NULL; spic = spic->p_next)
@@ -3172,7 +3322,6 @@ subpics_done:
         drmu_fb_unref(&dst->fb);
     }
 
-
     {
         vout_display_place_t place;
         vout_display_PlacePicture(&place, vd->source, vd->cfg);
@@ -3191,14 +3340,15 @@ subpics_done:
         return;
     }
 
-    drmu_env_atomic_start(sys->du);
+    if ((da = drmu_atomic_new(sys->du)) == NULL)
+        goto fail;
 
-    ret = drmu_plane_set(sys->dp, dfb, r);
+    ret = drmu_atomic_plane_set(da, sys->dp, dfb, r);
     drmu_fb_unref(&dfb);
 
-    if (ret != 0)
-    {
-        msg_Err(vd, "drmModeSetPlane failed: %s", ERRSTR);
+    if (ret != 0) {
+        msg_Err(vd, "Failed to set video plane: %s", strerror(-ret));
+        goto fail;
     }
 
     for (i = 0; i != SUBPICS_MAX; ++i) {
@@ -3210,22 +3360,22 @@ subpics_done:
 //                 spe->space.w, spe->space.h, spe->space.x, spe->space.y);
 
         // Rescale from sub-space
-        if ((ret = drmu_plane_set(sys->subplanes[i], spe->fb,
-                                  drmu_rect_rescale(spe->pos, r, spe->space))) != 0)
-        {
+        if ((ret = drmu_atomic_plane_set(da, sys->subplanes[i], spe->fb,
+                                  drmu_rect_rescale(spe->pos, r, spe->space))) != 0) {
             msg_Err(vd, "drmModeSetPlane for subplane %d failed: %s", i, strerror(-ret));
         }
     }
 
-    if (sys->display_set != NULL) {
-        msg_Warn(vd, "sys->display_set != NULL");
-        drmu_atomic_unref(&sys->display_set);
-    }
-    sys->display_set = drmu_env_atomic_finish(sys->du);
+    sys->display_set = da;
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
+    return;
+
+fail:
+    drmu_fb_unref(&dfb);
+    drmu_atomic_unref(&da);
 }
 
 static void vd_drm_display(vout_display_t *vd, picture_t *p_pic)
