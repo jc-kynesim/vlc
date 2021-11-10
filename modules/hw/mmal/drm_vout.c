@@ -147,26 +147,27 @@ typedef struct drmu_bo_env_s {
 typedef void (* drmu_prop_del_fn)(void * v);
 typedef void (* drmu_prop_ref_fn)(void * v);
 
-typedef struct drmu_prop_prop_s {
+// Atomic property chain structures - no external visibility
+typedef struct aprop_prop_s {
     uint32_t id;
     uint64_t value;
     void * v;
     drmu_prop_ref_fn ref_fn;
     drmu_prop_del_fn del_fn;
-} drmu_prop_prop_t;
+} aprop_prop_t;
 
-typedef struct drmu_prop_obj_s {
+typedef struct aprop_obj_s {
     uint32_t id;
     unsigned int n;
     unsigned int size;
-    drmu_prop_prop_t * props;
-} drmu_prop_obj_t;
+    aprop_prop_t * props;
+} aprop_obj_t;
 
-typedef struct drmu_prop_hdr_s {
+typedef struct aprop_hdr_s {
     unsigned int n;
     unsigned int size;
-    drmu_prop_obj_t * objs;
-} drmu_prop_hdr_t;
+    aprop_obj_t * objs;
+} aprop_hdr_t;
 
 typedef enum drmu_isset_e {
     DRMU_ISSET_UNSET = 0,  // Thing unset
@@ -277,7 +278,7 @@ typedef struct drmu_atomic_s {
 
     struct drmu_env_s * du;
 
-    drmu_prop_hdr_t props;
+    aprop_hdr_t props;
 } drmu_atomic_t;
 
 typedef struct drmu_atomic_q_s {
@@ -563,35 +564,35 @@ drmu_blob_new(drmu_env_t * const du, const void * const data, const size_t len)
 }
 
 static void
-prop_prop_unref(drmu_prop_prop_t * const pp)
+aprop_prop_unref(aprop_prop_t * const pp)
 {
     if (pp->del_fn)
         pp->del_fn(pp->v);
 }
 
 static void
-prop_prop_ref(drmu_prop_prop_t * const pp)
+aprop_prop_ref(aprop_prop_t * const pp)
 {
     if (pp->ref_fn)
         pp->ref_fn(pp->v);
 }
 
 static void
-prop_obj_uninit(drmu_prop_obj_t * const po)
+aprop_obj_uninit(aprop_obj_t * const po)
 {
     unsigned int i;
     for (i = 0; i != po->n; ++i)
-        prop_prop_unref(po->props + i);
+        aprop_prop_unref(po->props + i);
     free(po->props);
 }
 
 static int
-prop_obj_prop_copy(drmu_prop_obj_t * const po_c, const drmu_prop_obj_t * const po_a)
+aprop_obj_copy(aprop_obj_t * const po_c, const aprop_obj_t * const po_a)
 {
     unsigned int i;
-    drmu_prop_prop_t * props;
+    aprop_prop_t * props;
 
-    prop_obj_uninit(po_c);
+    aprop_obj_uninit(po_c);
     if (po_a->n == 0)
         return 0;
 
@@ -603,12 +604,12 @@ prop_obj_prop_copy(drmu_prop_obj_t * const po_c, const drmu_prop_obj_t * const p
     po_c->props = props;
 
     for (i = 0; i != po_a->n; ++i)
-        prop_prop_ref(props + i);
+        aprop_prop_ref(props + i);
     return 0;
 }
 
 static int
-prop_obj_prop_move(drmu_prop_obj_t * const po_c, drmu_prop_obj_t * const po_a)
+aprop_obj_move(aprop_obj_t * const po_c, aprop_obj_t * const po_a)
 {
     *po_c = *po_a;
     memset(po_a, 0, sizeof(*po_a));
@@ -616,26 +617,26 @@ prop_obj_prop_move(drmu_prop_obj_t * const po_c, drmu_prop_obj_t * const po_a)
 }
 
 static int
-prop_prop_qsort_cb(const void * va, const void * vb)
+aprop_prop_qsort_cb(const void * va, const void * vb)
 {
-    const drmu_prop_prop_t * const a = va;
-    const drmu_prop_prop_t * const b = vb;
+    const aprop_prop_t * const a = va;
+    const aprop_prop_t * const b = vb;
     return a->id == b->id ? 0 : a->id < b->id ? -1 : 1;
 }
 
 // Merge b into a. b is zeroed on exit so must be discarded
 static int
-prop_obj_prop_merge(drmu_prop_obj_t * const po_c, drmu_prop_obj_t * const po_a, drmu_prop_obj_t * const po_b)
+aprop_obj_merge(aprop_obj_t * const po_c, aprop_obj_t * const po_a, aprop_obj_t * const po_b)
 {
     unsigned int i, j, k;
     unsigned int c_size;
-    drmu_prop_prop_t * c;
-    drmu_prop_prop_t * const a = po_a->props;
-    drmu_prop_prop_t * const b = po_b->props;
+    aprop_prop_t * c;
+    aprop_prop_t * const a = po_a->props;
+    aprop_prop_t * const b = po_b->props;
 
     // As we should have no identical els we don't care that qsort is unstable
-    qsort(a, po_a->n, sizeof(a[0]), prop_prop_qsort_cb);
-    qsort(b, po_b->n, sizeof(b[0]), prop_prop_qsort_cb);
+    qsort(a, po_a->n, sizeof(a[0]), aprop_prop_qsort_cb);
+    qsort(b, po_b->n, sizeof(b[0]), aprop_prop_qsort_cb);
 
     // Pick a size
     c_size = max_uint(po_a->size, po_b->size);
@@ -651,7 +652,7 @@ prop_obj_prop_merge(drmu_prop_obj_t * const po_c, drmu_prop_obj_t * const po_a, 
             c[k] = b[j++];
         else {
             c[k] = b[j++];
-            prop_prop_unref(a + i++);
+            aprop_prop_unref(a + i++);
         }
     }
     for (; i < po_a->n; ++i, ++k)
@@ -659,7 +660,7 @@ prop_obj_prop_merge(drmu_prop_obj_t * const po_c, drmu_prop_obj_t * const po_a, 
     for (; j < po_b->n; ++j, ++k)
         c[k] = b[j++];
 
-    *po_c = (drmu_prop_obj_t){
+    *po_c = (aprop_obj_t){
         .id = po_a->id,
         .n = k,
         .size = c_size,
@@ -676,11 +677,11 @@ prop_obj_prop_merge(drmu_prop_obj_t * const po_c, drmu_prop_obj_t * const po_a, 
     return 0;
 }
 
-static drmu_prop_prop_t *
-prop_obj_prop_get(drmu_prop_obj_t * const po, const uint32_t id)
+static aprop_prop_t *
+aprop_obj_prop_get(aprop_obj_t * const po, const uint32_t id)
 {
     unsigned int i;
-    drmu_prop_prop_t * pp = po->props;
+    aprop_prop_t * pp = po->props;
 
     for (i = 0; i != po->n; ++i, ++pp) {
         if (pp->id == id)
@@ -704,7 +705,7 @@ prop_obj_prop_get(drmu_prop_obj_t * const po, const uint32_t id)
 }
 
 static void
-prop_obj_atomic_fill(const drmu_prop_obj_t * const po, uint32_t * prop_ids, uint64_t * prop_values)
+aprop_obj_atomic_fill(const aprop_obj_t * const po, uint32_t * prop_ids, uint64_t * prop_values)
 {
     unsigned int i;
     for (i = 0; i != po->n; ++i) {
@@ -714,7 +715,7 @@ prop_obj_atomic_fill(const drmu_prop_obj_t * const po, uint32_t * prop_ids, uint
 }
 
 static void
-prop_obj_dump(drmu_env_t * const du, const drmu_prop_obj_t * const po)
+aprop_obj_dump(drmu_env_t * const du, const aprop_obj_t * const po)
 {
     unsigned int i;
     drmu_info(du, "Obj: %02x: size %d n %d", po->id, po->size, po->n);
@@ -724,19 +725,19 @@ prop_obj_dump(drmu_env_t * const du, const drmu_prop_obj_t * const po)
 }
 
 static void
-prop_hdr_dump(drmu_env_t * const du, const drmu_prop_hdr_t * const ph)
+aprop_hdr_dump(drmu_env_t * const du, const aprop_hdr_t * const ph)
 {
     unsigned int i;
     drmu_info(du, "Header: size %d n %d", ph->size, ph->n);
     for (i = 0; i != ph->n; ++i)
-        prop_obj_dump(du, ph->objs + i);
+        aprop_obj_dump(du, ph->objs + i);
 }
 
-static drmu_prop_obj_t *
-prop_hdr_obj_get(drmu_prop_hdr_t * const ph, const uint32_t id)
+static aprop_obj_t *
+aprop_hdr_obj_get(aprop_hdr_t * const ph, const uint32_t id)
 {
     unsigned int i;
-    drmu_prop_obj_t * po = ph->objs;
+    aprop_obj_t * po = ph->objs;
 
     for (i = 0; i != ph->n; ++i, ++po) {
         if (po->id == id)
@@ -760,21 +761,21 @@ prop_hdr_obj_get(drmu_prop_hdr_t * const ph, const uint32_t id)
 }
 
 static void
-prop_hdr_uninit(drmu_prop_hdr_t * const ph)
+aprop_hdr_uninit(aprop_hdr_t * const ph)
 {
     unsigned int i;
     for (i = 0; i != ph->n; ++i)
-        prop_obj_uninit(ph->objs + i);
+        aprop_obj_uninit(ph->objs + i);
     free(ph->objs);
     memset(ph, 0, sizeof(*ph));
 }
 
 static int
-prop_hdr_obj_copy(drmu_prop_hdr_t * const ph_c, const drmu_prop_hdr_t * const ph_a)
+aprop_hdr_copy(aprop_hdr_t * const ph_c, const aprop_hdr_t * const ph_a)
 {
     unsigned int i;
 
-    prop_hdr_uninit(ph_c);
+    aprop_hdr_uninit(ph_c);
 
     if (ph_a->n == 0)
         return 0;
@@ -786,40 +787,45 @@ prop_hdr_obj_copy(drmu_prop_hdr_t * const ph_c, const drmu_prop_hdr_t * const ph
     ph_c->size = ph_a->size;
 
     for (i = 0; i != ph_a->n; ++i)
-        prop_obj_prop_copy(ph_c->objs + i, ph_a->objs + i);
+        aprop_obj_copy(ph_c->objs + i, ph_a->objs + i);
     return 0;
 }
 
 // Move b to a. a must be empty
 static int
-prop_hdr_obj_move(drmu_prop_hdr_t * const ph_a, drmu_prop_hdr_t * const ph_b)
+aprop_hdr_move(aprop_hdr_t * const ph_a, aprop_hdr_t * const ph_b)
 {
     *ph_a = *ph_b;
-    *ph_b = (drmu_prop_hdr_t){0};
+    *ph_b = (aprop_hdr_t){0};
     return 0;
 }
 
 static int
-prop_obj_qsort_cb(const void * va, const void * vb)
+aprop_obj_qsort_cb(const void * va, const void * vb)
 {
-    const drmu_prop_obj_t * const a = va;
-    const drmu_prop_obj_t * const b = vb;
+    const aprop_obj_t * const a = va;
+    const aprop_obj_t * const b = vb;
     return a->id == b->id ? 0 : a->id < b->id ? -1 : 1;
 }
 
-// Guaranteed to have at least 1 el in both a & b
+// Merge b into a. b will be uninited
 static int
-prop_hdr_obj_merge(drmu_prop_hdr_t * const ph_a, drmu_prop_hdr_t * const ph_b)
+aprop_hdr_merge(aprop_hdr_t * const ph_a, aprop_hdr_t * const ph_b)
 {
     unsigned int i, j, k;
     unsigned int c_size;
-    drmu_prop_obj_t * c;
-    drmu_prop_obj_t * const a = ph_a->objs;
-    drmu_prop_obj_t * const b = ph_b->objs;
+    aprop_obj_t * c;
+    aprop_obj_t * const a = ph_a->objs;
+    aprop_obj_t * const b = ph_b->objs;
+
+    if (ph_b->n == 0)
+        return 0;
+    if (ph_a->n == 0)
+        return aprop_hdr_move(ph_a, ph_b);
 
     // As we should have no identical els we don't care that qsort is unstable
-    qsort(a, ph_a->n, sizeof(a[0]), prop_obj_qsort_cb);
-    qsort(b, ph_b->n, sizeof(b[0]), prop_obj_qsort_cb);
+    qsort(a, ph_a->n, sizeof(a[0]), aprop_obj_qsort_cb);
+    qsort(b, ph_b->n, sizeof(b[0]), aprop_obj_qsort_cb);
 
     // Pick a size
     c_size = max_uint(ph_a->size, ph_b->size);
@@ -830,19 +836,19 @@ prop_hdr_obj_merge(drmu_prop_hdr_t * const ph_a, drmu_prop_hdr_t * const ph_b)
 
     for (i = 0, j = 0, k = 0; i < ph_a->n && j < ph_a->n; ++k) {
         if (a[i].id < b[j].id)
-            prop_obj_prop_move(c + k, a + i++);
+            aprop_obj_move(c + k, a + i++);
         else if (a[i].id > b[j].id)
-            prop_obj_prop_move(c + k, b + j++);
+            aprop_obj_move(c + k, b + j++);
         else
-            prop_obj_prop_merge(c + k, a + i++, b + j++);
+            aprop_obj_merge(c + k, a + i++, b + j++);
     }
     for (; i < ph_a->n; ++i, ++k)
-        prop_obj_prop_move(c + k, a + i++);
+        aprop_obj_move(c + k, a + i++);
     for (; j < ph_b->n; ++j, ++k)
-        prop_obj_prop_move(c + k, b + j++);
+        aprop_obj_move(c + k, b + j++);
 
-    prop_hdr_uninit(ph_a);
-    prop_hdr_uninit(ph_b);
+    aprop_hdr_uninit(ph_a);
+    aprop_hdr_uninit(ph_b);
 
     ph_a->n = k;
     ph_a->size = c_size;
@@ -851,27 +857,16 @@ prop_hdr_obj_merge(drmu_prop_hdr_t * const ph_a, drmu_prop_hdr_t * const ph_b)
     return 0;
 }
 
-// Merge b into a. b will be uninited
-static int
-prop_hdr_merge(drmu_prop_hdr_t * const ph_a, drmu_prop_hdr_t * const ph_b)
+static aprop_prop_t *
+aprop_hdr_prop_get(aprop_hdr_t * const ph, const uint32_t obj_id, const uint32_t prop_id)
 {
-    if (ph_a->n == 0)
-        return prop_hdr_obj_move(ph_a, ph_b);
-    if (ph_b->n == 0)
-        return 0;
-    return prop_hdr_obj_merge(ph_a, ph_b);
-}
-
-static drmu_prop_prop_t *
-prop_hdr_prop_get(drmu_prop_hdr_t * const ph, const uint32_t obj_id, const uint32_t prop_id)
-{
-    drmu_prop_obj_t * const po = prop_hdr_obj_get(ph, obj_id);
-    return po == NULL ? NULL : prop_obj_prop_get(po, prop_id);
+    aprop_obj_t * const po = aprop_hdr_obj_get(ph, obj_id);
+    return po == NULL ? NULL : aprop_obj_prop_get(po, prop_id);
 }
 
 // Total props
 static unsigned int
-prop_hdr_props_count(const drmu_prop_hdr_t * const ph)
+aprop_hdr_props_count(const aprop_hdr_t * const ph)
 {
     unsigned int i;
     unsigned int n = 0;
@@ -882,13 +877,13 @@ prop_hdr_props_count(const drmu_prop_hdr_t * const ph)
 }
 
 static unsigned int
-prop_hdr_objs_count(const drmu_prop_hdr_t * const ph)
+aprop_hdr_objs_count(const aprop_hdr_t * const ph)
 {
     return ph->n;
 }
 
 static void
-prop_hdr_atomic_fill(const drmu_prop_hdr_t * const ph,
+aprop_hdr_atomic_fill(const aprop_hdr_t * const ph,
                      uint32_t * obj_ids,
                      uint32_t * prop_counts,
                      uint32_t * prop_ids,
@@ -899,14 +894,14 @@ prop_hdr_atomic_fill(const drmu_prop_hdr_t * const ph,
         const unsigned int n = ph->objs[i].n;
         *obj_ids++ = ph->objs[i].id;
         *prop_counts++ = n;
-        prop_obj_atomic_fill(ph->objs +i, prop_ids, prop_values);
+        aprop_obj_atomic_fill(ph->objs +i, prop_ids, prop_values);
         prop_ids += n;
         prop_values += n;
     }
 }
 
 static int
-prop_hdr_prop_set(drmu_prop_hdr_t * const ph,
+aprop_hdr_prop_set(aprop_hdr_t * const ph,
                   const uint32_t obj_id, const uint32_t prop_id, const uint64_t value,
                   const drmu_prop_ref_fn ref_fn, const drmu_prop_del_fn del_fn, void * const v)
 {
@@ -916,16 +911,16 @@ prop_hdr_prop_set(drmu_prop_hdr_t * const ph,
     }
     else
     {
-        drmu_prop_prop_t *const pp = prop_hdr_prop_get(ph, obj_id, prop_id);
+        aprop_prop_t *const pp = aprop_hdr_prop_get(ph, obj_id, prop_id);
         if (pp == NULL)
             return -ENOMEM;
 
-        prop_prop_unref(pp);
+        aprop_prop_unref(pp);
         pp->value = value;
         pp->ref_fn = ref_fn;
         pp->del_fn = del_fn;
         pp->v = v;
-        prop_prop_ref(pp);
+        aprop_prop_ref(pp);
         return 0;
     }
 }
@@ -1410,13 +1405,13 @@ static void
 drmu_atomic_dump(const drmu_atomic_t * const da)
 {
     drmu_info(da->du, "Atomic %p: refs %d", da, atomic_load(&da->ref_count)+1);
-    prop_hdr_dump(da->du, &da->props);
+    aprop_hdr_dump(da->du, &da->props);
 }
 
 static void
 drmu_atomic_free(drmu_atomic_t * const da)
 {
-    prop_hdr_uninit(&da->props);
+    aprop_hdr_uninit(&da->props);
     free(da);
 }
 
@@ -1460,7 +1455,7 @@ static int
 drmu_atomic_merge(drmu_atomic_t * const a, drmu_atomic_t ** const ppb)
 {
     drmu_atomic_t * b = *ppb;
-    drmu_prop_hdr_t bh = {0};
+    aprop_hdr_t bh = {0};
     int rv = -EINVAL;
 
     if (b == NULL)
@@ -1477,9 +1472,9 @@ drmu_atomic_merge(drmu_atomic_t * const a, drmu_atomic_t ** const ppb)
     // If this is the only copy of b then use it directly otherwise
     // copy before (probably) making it unusable
     if (atomic_load(&b->ref_count) == 0)
-        rv = prop_hdr_obj_move(&bh, &b->props);
+        rv = aprop_hdr_move(&bh, &b->props);
     else
-        rv = prop_hdr_obj_copy(&bh, &b->props);
+        rv = aprop_hdr_copy(&bh, &b->props);
     drmu_atomic_unref(&b);
 
     if (rv != 0) {
@@ -1487,8 +1482,8 @@ drmu_atomic_merge(drmu_atomic_t * const a, drmu_atomic_t ** const ppb)
         return rv;
     }
 
-    rv = prop_hdr_merge(&a->props, &bh);
-    prop_hdr_uninit(&bh);
+    rv = aprop_hdr_merge(&a->props, &bh);
+    aprop_hdr_uninit(&bh);
 
     if (rv != 0) {
         drmu_err(a->du, "%s: Merge Failed", __func__);
@@ -1502,8 +1497,8 @@ static int
 drmu_atomic_commit(drmu_atomic_t * const da, uint32_t flags)
 {
     drmu_env_t * const du = da->du;
-    const unsigned int n_objs = prop_hdr_objs_count(&da->props);
-    const unsigned int n_props = prop_hdr_props_count(&da->props);
+    const unsigned int n_objs = aprop_hdr_objs_count(&da->props);
+    const unsigned int n_props = aprop_hdr_props_count(&da->props);
     int rv = 0;
 
     if (n_props != 0) {
@@ -1521,7 +1516,7 @@ drmu_atomic_commit(drmu_atomic_t * const da, uint32_t flags)
             .user_data       = (uintptr_t)da
         };
 
-        prop_hdr_atomic_fill(&da->props, obj_ids, prop_counts, prop_ids, prop_values);
+        aprop_hdr_atomic_fill(&da->props, obj_ids, prop_counts, prop_ids, prop_values);
 
         if (drmIoctl(du->fd, DRM_IOCTL_MODE_ATOMIC, &atomic) == 0)
             return 0;
@@ -1694,7 +1689,7 @@ drmu_atomic_q_init(drmu_atomic_q_t * const aq)
 static int
 drmu_atomic_add_prop(drmu_atomic_t * const da, const uint32_t obj_id, const uint32_t prop_id, const uint64_t value)
 {
-    if (prop_hdr_prop_set(&da->props, obj_id, prop_id, value, 0, 0, NULL) < 0)
+    if (aprop_hdr_prop_set(&da->props, obj_id, prop_id, value, 0, 0, NULL) < 0)
         drmu_warn(da->du, "%s: Failed to set obj_id=%#x, prop_id=%#x, val=%" PRId64, __func__,
                  obj_id, prop_id, value);
     return 0;
@@ -1721,7 +1716,7 @@ drmu_atomic_add_prop_fb(drmu_atomic_t * const da, const uint32_t obj_id, const u
     if (dfb == NULL)
         return drmu_atomic_add_prop(da, obj_id, prop_id, 0);
 
-    rv = prop_hdr_prop_set(&da->props, obj_id, prop_id, dfb->handle, atomic_prop_fb_ref, atomic_prop_fb_unref, dfb);
+    rv = aprop_hdr_prop_set(&da->props, obj_id, prop_id, dfb->handle, atomic_prop_fb_ref, atomic_prop_fb_unref, dfb);
     if (rv != 0)
         drmu_warn(da->du, "%s: Failed to add fb obj_id=%#x, prop_id=%#x: %s", __func__, obj_id, prop_id, strerror(-rv));
 
@@ -1735,7 +1730,7 @@ drmu_atomic_add_prop_enum(drmu_atomic_t * const da, const uint32_t obj_id, const
     int rv;
 
     rv = (pval == NULL) ? -EINVAL :
-        prop_hdr_prop_set(&da->props, obj_id, drmu_prop_enum_id(pen), *pval, 0, 0, NULL);
+        aprop_hdr_prop_set(&da->props, obj_id, drmu_prop_enum_id(pen), *pval, 0, 0, NULL);
 
     if (rv != 0 && name != NULL)
         drmu_warn(da->du, "%s: Failed to add enum obj_id=%#x, prop_id=%#x, name='%s': %s", __func__,
@@ -1750,7 +1745,7 @@ drmu_atomic_add_prop_range(drmu_atomic_t * const da, const uint32_t obj_id, cons
     int rv;
 
     rv = !drmu_prop_range_validate(pra, x) ? -EINVAL :
-        prop_hdr_prop_set(&da->props, obj_id, drmu_prop_range_id(pra), x, 0, 0, NULL);
+        aprop_hdr_prop_set(&da->props, obj_id, drmu_prop_range_id(pra), x, 0, 0, NULL);
 
     if (rv != 0)
         drmu_warn(da->du, "%s: Failed to add range obj_id=%#x, prop_id=%#x, val=%"PRId64": %s", __func__,
@@ -1780,7 +1775,7 @@ drmu_atomic_add_prop_blob(drmu_atomic_t * const da, const uint32_t obj_id, const
     if (blob == NULL)
         return drmu_atomic_add_prop(da, obj_id, prop_id, 0);
 
-    rv = prop_hdr_prop_set(&da->props, obj_id, prop_id, drmu_blob_id(blob), atomic_prop_blob_ref, atomic_prop_blob_unref, blob);
+    rv = aprop_hdr_prop_set(&da->props, obj_id, prop_id, drmu_blob_id(blob), atomic_prop_blob_ref, atomic_prop_blob_unref, blob);
     if (rv != 0)
         drmu_warn(da->du, "%s: Failed to add blob obj_id=%#x, prop_id=%#x: %s", __func__, obj_id, prop_id, strerror(-rv));
 
