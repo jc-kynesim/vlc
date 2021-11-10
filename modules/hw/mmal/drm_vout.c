@@ -64,7 +64,7 @@ enum hdmi_eotf
 };
 
 #define TRACE_ALL 0
-#define TRACE_PROP_NEW 1
+#define TRACE_PROP_NEW 0
 
 #define SUBPICS_MAX 4
 
@@ -563,7 +563,7 @@ drmu_blob_new(drmu_env_t * const du, const void * const data, const size_t len)
 }
 
 static void
-prop_prop_del(drmu_prop_prop_t * const pp)
+prop_prop_unref(drmu_prop_prop_t * const pp)
 {
     if (pp->del_fn)
         pp->del_fn(pp->v);
@@ -576,21 +576,42 @@ prop_prop_ref(drmu_prop_prop_t * const pp)
         pp->ref_fn(pp->v);
 }
 
+static void
+prop_obj_uninit(drmu_prop_obj_t * const po)
+{
+    unsigned int i;
+    for (i = 0; i != po->n; ++i)
+        prop_prop_unref(po->props + i);
+    free(po->props);
+}
+
 static int
 prop_obj_prop_copy(drmu_prop_obj_t * const po_c, const drmu_prop_obj_t * const po_a)
 {
     unsigned int i;
+    drmu_prop_prop_t * props;
 
-    *po_c = *po_a;
+    prop_obj_uninit(po_c);
     if (po_a->n == 0)
         return 0;
 
-    if ((po_c->props = calloc(po_a->size, sizeof(*po_c->props))) == NULL)
+    if ((props = calloc(po_a->size, sizeof(*props))) == NULL)
         return -ENOMEM;
-    memcpy(po_c->props, po_a->props, po_a->n * sizeof(*po_a->props));
+    memcpy(props, po_a->props, po_a->n * sizeof(*po_a->props));
+
+    *po_c = *po_a;
+    po_c->props = props;
 
     for (i = 0; i != po_a->n; ++i)
-        prop_prop_ref(po_c->props + i);
+        prop_prop_ref(props + i);
+    return 0;
+}
+
+static int
+prop_obj_prop_move(drmu_prop_obj_t * const po_c, drmu_prop_obj_t * const po_a)
+{
+    *po_c = *po_a;
+    memset(po_a, 0, sizeof(*po_a));
     return 0;
 }
 
@@ -602,27 +623,25 @@ prop_prop_qsort_cb(const void * va, const void * vb)
     return a->id == b->id ? 0 : a->id < b->id ? -1 : 1;
 }
 
-// Merge a, b into c, identical entries from b
+// Merge b into a. b is zeroed on exit so must be discarded
 static int
-prop_obj_prop_merge(drmu_prop_obj_t * const po_c,
-                    const drmu_prop_obj_t * const po_a, const drmu_prop_obj_t * const po_b)
+prop_obj_prop_merge(drmu_prop_obj_t * const po_c, drmu_prop_obj_t * const po_a, drmu_prop_obj_t * const po_b)
 {
     unsigned int i, j, k;
+    unsigned int c_size;
     drmu_prop_prop_t * c;
-    drmu_prop_prop_t a[po_a->n];
-    drmu_prop_prop_t b[po_b->n];
+    drmu_prop_prop_t * const a = po_a->props;
+    drmu_prop_prop_t * const b = po_b->props;
 
     // As we should have no identical els we don't care that qsort is unstable
-    memcpy(a, po_a->props, sizeof(a));
-    memcpy(b, po_b->props, sizeof(b));
     qsort(a, po_a->n, sizeof(a[0]), prop_prop_qsort_cb);
     qsort(b, po_b->n, sizeof(b[0]), prop_prop_qsort_cb);
 
     // Pick a size
-    po_c->size = max_uint(po_a->size, po_b->size);
-    if (po_c->size < po_a->n + po_b->n)
-        po_c->size *= 2;
-    if ((c = calloc(po_c->size, sizeof(*c))) == NULL)
+    c_size = max_uint(po_a->size, po_b->size);
+    if (c_size < po_a->n + po_b->n)
+        c_size *= 2;
+    if ((c = calloc(c_size, sizeof(*c))) == NULL)
         return -ENOMEM;
 
     for (i = 0, j = 0, k = 0; i < po_a->n && j < po_a->n; ++k) {
@@ -632,7 +651,7 @@ prop_obj_prop_merge(drmu_prop_obj_t * const po_c,
             c[k] = b[j++];
         else {
             c[k] = b[j++];
-            ++i;
+            prop_prop_unref(a + i++);
         }
     }
     for (; i < po_a->n; ++i, ++k)
@@ -640,12 +659,19 @@ prop_obj_prop_merge(drmu_prop_obj_t * const po_c,
     for (; j < po_b->n; ++j, ++k)
         c[k] = b[j++];
 
-    for (i = 0; i != k; ++i)
-        prop_prop_ref(c + i);
+    *po_c = (drmu_prop_obj_t){
+        .id = po_a->id,
+        .n = k,
+        .size = c_size,
+        .props = c
+    };
 
-    po_c->id = po_a->id;
-    po_c->props = c;
-    po_c->n = k;
+    // We have avoided excess ref / unref by simple copy so just free the objs
+    free(po_a->props);
+    free(po_b->props);
+
+    memset(po_a, 0, sizeof(*po_a));
+    memset(po_b, 0, sizeof(*po_b));
 
     return 0;
 }
@@ -675,15 +701,6 @@ prop_obj_prop_get(drmu_prop_obj_t * const po, const uint32_t id)
 
     pp->id = id;
     return pp;
-}
-
-static void
-prop_obj_uninit(drmu_prop_obj_t * const po)
-{
-    unsigned int i;
-    for (i = 0; i != po->n; ++i)
-        prop_prop_del(po->props + i);
-    free(po->props);
 }
 
 static void
@@ -765,8 +782,20 @@ prop_hdr_obj_copy(drmu_prop_hdr_t * const ph_c, const drmu_prop_hdr_t * const ph
     if ((ph_c->objs = calloc(ph_a->size, sizeof(*ph_c->objs))) == NULL)
         return -ENOMEM;
 
+    ph_c->n = ph_a->n;
+    ph_c->size = ph_a->size;
+
     for (i = 0; i != ph_a->n; ++i)
         prop_obj_prop_copy(ph_c->objs + i, ph_a->objs + i);
+    return 0;
+}
+
+// Move b to a. a must be empty
+static int
+prop_hdr_obj_move(drmu_prop_hdr_t * const ph_a, drmu_prop_hdr_t * const ph_b)
+{
+    *ph_a = *ph_b;
+    *ph_b = (drmu_prop_hdr_t){0};
     return 0;
 }
 
@@ -780,55 +809,57 @@ prop_obj_qsort_cb(const void * va, const void * vb)
 
 // Guaranteed to have at least 1 el in both a & b
 static int
-prop_hdr_obj_merge(drmu_prop_hdr_t * const ph_c,
-                   const drmu_prop_hdr_t * const ph_a, const drmu_prop_hdr_t * const ph_b)
+prop_hdr_obj_merge(drmu_prop_hdr_t * const ph_a, drmu_prop_hdr_t * const ph_b)
 {
     unsigned int i, j, k;
+    unsigned int c_size;
     drmu_prop_obj_t * c;
-    drmu_prop_obj_t a[ph_a->n];
-    drmu_prop_obj_t b[ph_b->n];
+    drmu_prop_obj_t * const a = ph_a->objs;
+    drmu_prop_obj_t * const b = ph_b->objs;
 
     // As we should have no identical els we don't care that qsort is unstable
-    memcpy(a, ph_a->objs, sizeof(a));
-    memcpy(b, ph_b->objs, sizeof(b));
     qsort(a, ph_a->n, sizeof(a[0]), prop_obj_qsort_cb);
     qsort(b, ph_b->n, sizeof(b[0]), prop_obj_qsort_cb);
 
     // Pick a size
-    ph_c->size = max_uint(ph_a->size, ph_b->size);
-    if (ph_c->size < ph_a->n + ph_b->n)
-        ph_c->size *= 2;
-    if ((c = calloc(ph_c->size, sizeof(*c))) == NULL)
+    c_size = max_uint(ph_a->size, ph_b->size);
+    if (c_size < ph_a->n + ph_b->n)
+        c_size *= 2;
+    if ((c = calloc(c_size, sizeof(*c))) == NULL)
         return -ENOMEM;
 
     for (i = 0, j = 0, k = 0; i < ph_a->n && j < ph_a->n; ++k) {
         if (a[i].id < b[j].id)
-            prop_obj_prop_copy(c + k, a + i++);
+            prop_obj_prop_move(c + k, a + i++);
         else if (a[i].id > b[j].id)
-            prop_obj_prop_copy(c + k, b + j++);
+            prop_obj_prop_move(c + k, b + j++);
         else
             prop_obj_prop_merge(c + k, a + i++, b + j++);
     }
     for (; i < ph_a->n; ++i, ++k)
-        prop_obj_prop_copy(c + k, a + i++);
+        prop_obj_prop_move(c + k, a + i++);
     for (; j < ph_b->n; ++j, ++k)
-        prop_obj_prop_copy(c + k, b + j++);
+        prop_obj_prop_move(c + k, b + j++);
 
-    ph_c->objs = c;
-    ph_c->n = k;
+    prop_hdr_uninit(ph_a);
+    prop_hdr_uninit(ph_b);
+
+    ph_a->n = k;
+    ph_a->size = c_size;
+    ph_a->objs = c;
 
     return 0;
 }
 
+// Merge b into a. b will be uninited
 static int
-prop_hdr_merge(drmu_prop_hdr_t * const ph_c,
-                   const drmu_prop_hdr_t * const ph_a, const drmu_prop_hdr_t * const ph_b)
+prop_hdr_merge(drmu_prop_hdr_t * const ph_a, drmu_prop_hdr_t * const ph_b)
 {
     if (ph_a->n == 0)
-        return prop_hdr_obj_copy(ph_c, ph_b);
+        return prop_hdr_obj_move(ph_a, ph_b);
     if (ph_b->n == 0)
-        return prop_hdr_obj_copy(ph_c, ph_a);
-    return prop_hdr_obj_merge(ph_c, ph_a, ph_b);
+        return 0;
+    return prop_hdr_obj_merge(ph_a, ph_b);
 }
 
 static drmu_prop_prop_t *
@@ -889,7 +920,7 @@ prop_hdr_prop_set(drmu_prop_hdr_t * const ph,
         if (pp == NULL)
             return -ENOMEM;
 
-        prop_prop_del(pp);
+        prop_prop_unref(pp);
         pp->value = value;
         pp->ref_fn = ref_fn;
         pp->del_fn = del_fn;
@@ -1423,38 +1454,47 @@ drmu_atomic_new(drmu_env_t * const du)
     return da;
 }
 
-static drmu_atomic_t *
-drmu_atomic_merge(const drmu_atomic_t * const a, const drmu_atomic_t * const b)
+// Merge b into a. b is unrefed (inc on error), *ppa is replaced by the merged
+// contents
+static int
+drmu_atomic_merge(drmu_atomic_t * const a, drmu_atomic_t ** const ppb)
 {
-    drmu_env_t * const du = a->du;
-    drmu_atomic_t * const c = drmu_atomic_new(du);
+    drmu_atomic_t * b = *ppb;
+    drmu_prop_hdr_t bh = {0};
+    int rv = -EINVAL;
 
-    if (c == NULL)
-        return NULL;
+    if (b == NULL)
+        return 0;
+    *ppb = NULL;
 
-    if (prop_hdr_merge(&c->props, &a->props, &b->props) != 0) {
-        drmu_err(du, "%s: Failed", __func__);
-        drmu_atomic_free(c);
-        return NULL;
+    if (a == NULL) {
+        drmu_atomic_unref(&b);
+        return -EINVAL;
+    }
+    // We expect this to be the sole ref to a
+    assert(atomic_load(&a->ref_count) == 0);
+
+    // If this is the only copy of b then use it directly otherwise
+    // copy before (probably) making it unusable
+    if (atomic_load(&b->ref_count) == 0)
+        rv = prop_hdr_obj_move(&bh, &b->props);
+    else
+        rv = prop_hdr_obj_copy(&bh, &b->props);
+    drmu_atomic_unref(&b);
+
+    if (rv != 0) {
+        drmu_err(a->du, "%s: Copy Failed", __func__);
+        return rv;
     }
 
-    return c;
-}
+    rv = prop_hdr_merge(&a->props, &bh);
+    prop_hdr_uninit(&bh);
 
-// Merge b into a. b is unrefed (inc on error), *ppa is replaced by the merged
-// contents any other refs of a are unchanged
-static int
-drmu_atomic_merge2(drmu_atomic_t ** const ppa, drmu_atomic_t ** const ppb)
-{
-    drmu_atomic_t * const c = drmu_atomic_merge(*ppa, *ppb);
+    if (rv != 0) {
+        drmu_err(a->du, "%s: Merge Failed", __func__);
+        return rv;
+    }
 
-    drmu_atomic_unref(ppb);
-
-    if (c == NULL)
-        return -ENOMEM;
-
-    drmu_atomic_unref(ppa);
-    *ppa = c;
     return 0;
 }
 
@@ -1605,10 +1645,11 @@ atomic_q_queue(drmu_atomic_q_t * const aq, drmu_atomic_t * da)
 
     if (aq->next_flip != NULL) {
         // We already have something pending or retrying - merge the new with it
-        rv = drmu_atomic_merge2(&aq->next_flip, &da);
+        rv = drmu_atomic_merge(aq->next_flip, &da);
     }
     else {
         aq->next_flip = da;
+
         // No pending commit?
         if (aq->cur_flip == NULL)
             rv = atomic_q_attempt_commit_next(aq);
