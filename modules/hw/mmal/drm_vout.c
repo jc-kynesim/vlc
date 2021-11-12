@@ -50,6 +50,23 @@
 #include "pollqueue.h"
 #include "../codec/avcodec/drm_pic.h"
 
+#define DRM_VOUT_SOURCE_MODESET_NAME "drm-vout-source-modeset"
+#define DRM_VOUT_SOURCE_MODESET_TEXT N_("Attempt to match display to source")
+#define DRM_VOUT_SOURCE_MODESET_LONGTEXT N_("Attempt to match display resolution and refresh rate to source.\
+ Defaults to the 'preferred' mode if no good enough match found. \
+ If unset then resolution & refresh will not be set.")
+
+#define DRM_VOUT_NO_MODESET_NAME "drm-vout-no-modeset"
+#define DRM_VOUT_NO_MODESET_TEXT N_("Do not modeset")
+#define DRM_VOUT_NO_MODESET_LONGTEXT N_("Do no operation that would cause a modeset.\
+ This overrides the operatino of all other flags.")
+
+#define DRM_VOUT_NO_MAX_BPC "drm-vout-no-max-bpc"
+#define DRM_VOUT_NO_MAX_BPC_TEXT N_("Do not set bpc on output")
+#define DRM_VOUT_NO_MAX_BPC_LONGTEXT N_("Do not try to switch from 8-bit RGB to 12-bit YCC on UHD frames.\
+ 12 bit is dependant on kernel and display support so may not be availible")
+
+
 // HDR enums is copied from linux include/linux/hdmi.h (strangely not part of uapi)
 enum hdmi_metadata_type
 {
@@ -89,6 +106,11 @@ typedef struct drmu_rect_s {
     int32_t x, y;
     uint32_t w, h;
 } drmu_rect_t;
+
+typedef struct drmu_ufrac_s {
+    unsigned int num;
+    unsigned int den;
+} drmu_ufrac_t;
 
 typedef struct drmu_props_s {
     struct drmu_env_s * du;
@@ -253,6 +275,8 @@ typedef struct drmu_plane_s {
 
 } drmu_plane_t;
 
+typedef int (* drmu_mode_score_fn)(void * v, const drmModeModeInfo * mode);
+
 typedef struct drmu_crtc_s {
     struct drmu_env_s * du;
     drmModeCrtcPtr crtc;
@@ -260,14 +284,21 @@ typedef struct drmu_crtc_s {
     drmModeConnectorPtr con;
     int crtc_idx;
     bool hi_bpc_ok;
+    drmu_ufrac_t sar;
+    drmu_ufrac_t par;
 
     struct {
+        // crtc
+        uint32_t mode_id;
+        // connection
         drmu_prop_range_t * max_bpc;
         drmu_prop_enum_t * colorspace;
         drmu_prop_enum_t * output_format;
         uint32_t hdr_output_metadata;
     } pid;
 
+    int cur_mode_id;
+    drmu_blob_t * mode_id_blob;
     drmu_blob_t * hdr_metadata_blob;
     struct hdr_output_metadata hdr_metadata;
 
@@ -488,6 +519,26 @@ drmu_rect_wh(const unsigned int w, const unsigned int h)
         .w = w,
         .h = h
     };
+}
+
+static drmu_ufrac_t
+drmu_ufrac_reduce(drmu_ufrac_t x)
+{
+    static const unsigned int primes[] = {2,3,5,7,11,13,17,19,23,0};
+    const unsigned int * p;
+    for (p = primes; *p != 0; ++p) {
+        while (x.den % *p == 0 && x.num % *p ==0) {
+            x.den /= *p;
+            x.num /= *p;
+        }
+    }
+    return x;
+}
+
+static inline vlc_rational_t
+drmu_ufrac_vlc_to_rational(const drmu_ufrac_t x)
+{
+    return (vlc_rational_t) {.num = x.num, .den = x.den};
 }
 
 static void
@@ -1330,19 +1381,21 @@ props_name_to_id(drmu_props_t * const props, const char * const name)
     return 0;
 }
 
-#if TRACE_PROP_NEW
+#if TRACE_PROP_NEW || 1
 static void
 props_dump(const drmu_props_t * const props)
 {
-    unsigned int i;
-    drmu_env_t * const du = props->du;
+    if (props != NULL) {
+        unsigned int i;
+        drmu_env_t * const du = props->du;
 
-    for (i = 0; i != props->prop_count; ++i) {
-        drmModePropertyPtr p = props->props[i];
-        drmu_info(du, "Prop%02d/%02d: id=%#02x, name=%s, flags=%#x, values=%d, value[0]=%#"PRIx64", blobs=%d, blob[0]=%#x", i, props->prop_count, p->prop_id,
-                  p->name, p->flags,
-                  p->count_values, !p->values ? (uint64_t)0 : p->values[0],
-                  p->count_blobs, !p->blob_ids ? 0 : p->blob_ids[0]);
+        for (i = 0; i != props->prop_count; ++i) {
+            drmModePropertyPtr p = props->props[i];
+            drmu_info(du, "Prop%02d/%02d: id=%#02x, name=%s, flags=%#x, values=%d, value[0]=%#"PRIx64", blobs=%d, blob[0]=%#x", i, props->prop_count, p->prop_id,
+                      p->name, p->flags,
+                      p->count_values, !p->values ? (uint64_t)0 : p->values[0],
+                      p->count_blobs, !p->blob_ids ? 0 : p->blob_ids[0]);
+        }
     }
 }
 #endif
@@ -1523,7 +1576,7 @@ drmu_atomic_commit(drmu_atomic_t * const da, uint32_t flags)
 
         rv = -errno;
         if (rv == -EINVAL) {
-            drmu_err(du, "%s: EINVAL try ALLOW_MODESET", __func__);
+            drmu_debug(du, "%s: EINVAL try ALLOW_MODESET", __func__);
             atomic.flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
             if (drmIoctl(du->fd, DRM_IOCTL_MODE_ATOMIC, &atomic) == 0)
                 return 0;
@@ -1560,7 +1613,7 @@ atomic_q_attempt_commit_next(drmu_atomic_q_t * const aq)
         rv = 0;
     }
     else {
-        drmu_err(du, "%s: Atomic commit failed", __func__);
+        drmu_err(du, "%s: Atomic commit failed: %s", __func__, strerror(-rv));
         drmu_atomic_dump(aq->next_flip);
         drmu_atomic_unref(&aq->next_flip);
         aq->retry_count = 0;
@@ -2648,6 +2701,7 @@ free_crtc(drmu_crtc_t * const dc)
     drmu_prop_enum_delete(&dc->pid.colorspace);
     drmu_prop_enum_delete(&dc->pid.output_format);
     drmu_blob_unref(&dc->hdr_metadata_blob);
+    drmu_blob_unref(&dc->mode_id_blob);
     free(dc);
 }
 
@@ -2690,6 +2744,73 @@ drmu_atomic_crtc_hdr_metadata_set(drmu_atomic_t * const da, drmu_crtc_t * const 
         drmu_err(du, "Set property fail: %s", strerror(errno));
 
     return rv;
+}
+
+// Set misc derived vars from mode
+static void
+crtc_mode_set_vars(drmu_crtc_t * const dc)
+{
+    switch (dc->crtc->mode.flags & DRM_MODE_FLAG_PIC_AR_MASK) {
+        case DRM_MODE_FLAG_PIC_AR_4_3:
+            dc->par = (drmu_ufrac_t){4,3};
+            break;
+        case DRM_MODE_FLAG_PIC_AR_16_9:
+            dc->par = (drmu_ufrac_t){16,9};
+            break;
+        case DRM_MODE_FLAG_PIC_AR_64_27:
+            dc->par = (drmu_ufrac_t){64,27};
+            break;
+        case DRM_MODE_FLAG_PIC_AR_256_135:
+            dc->par = (drmu_ufrac_t){256,135};
+            break;
+        default:
+        case DRM_MODE_FLAG_PIC_AR_NONE:
+            dc->par = (drmu_ufrac_t){0,0};
+            break;
+    }
+
+    if (dc->par.den == 0) {
+        // Assume 1:1
+        dc->sar = (drmu_ufrac_t){1,1};
+    }
+    else {
+        dc->sar = drmu_ufrac_reduce((drmu_ufrac_t){dc->par.num * dc->crtc->height, dc->par.den * dc->crtc->width});
+    }
+}
+
+// This sets width/height etc on the CRTC
+// Really it should be held with the atomic but so far I haven't worked out
+// a plausible API
+static int
+drmu_atomic_crtc_mode_id_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, const int mode_id)
+{
+    drmu_env_t * const du = dc->du;
+    drmu_blob_t * blob = NULL;
+    const drmModeModeInfo * mode;
+
+    if (mode_id < 0 || dc->pid.mode_id == 0)
+        return 0;
+
+    if (dc->cur_mode_id == mode_id && dc->mode_id_blob != NULL)
+        return 0;
+
+    drmu_info(du, "Set mode_id");
+
+    mode = dc->con->modes + mode_id;
+    if ((blob = drmu_blob_new(du, mode, sizeof(*mode))) == NULL) {
+        return -ENOMEM;
+    }
+
+    drmu_blob_unref(&dc->mode_id_blob);
+    dc->cur_mode_id = mode_id;
+    dc->mode_id_blob = blob;
+
+    dc->crtc->mode = *mode;
+    dc->crtc->width = mode->hdisplay;
+    dc->crtc->height = mode->vdisplay;
+    crtc_mode_set_vars(dc);
+
+    return drmu_atomic_add_prop_blob(da, dc->enc->crtc_id, dc->pid.mode_id, dc->mode_id_blob);
 }
 
 static int
@@ -2764,6 +2885,11 @@ static inline uint32_t
 drmu_crtc_height(const drmu_crtc_t * const dc)
 {
     return dc->crtc->height;
+}
+static inline drmu_ufrac_t
+drmu_crtc_sar(const drmu_crtc_t * const dc)
+{
+    return dc->sar;;
 }
 
 static int
@@ -2942,10 +3068,21 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
     }
 
     {
+        drmu_info(du, "Crtc:");
+        drmu_props_t * props = props_new(du, dc->crtc->crtc_id, DRM_MODE_OBJECT_CRTC);
+        props_dump(props);
+
+        dc->pid.mode_id = props_name_to_id(props, "MODE_ID");
+
+        props_free(props);
+    }
+
+    {
         drmu_props_t * const props = props_new(du, dc->con->connector_id, DRM_MODE_OBJECT_CONNECTOR);
 
         if (props != NULL) {
-#if TRACE_PROP_NEW
+#if TRACE_PROP_NEW || 1
+            drmu_info(du, "Connector:");
             props_dump(props);
 #endif
             dc->pid.max_bpc             = drmu_prop_range_new(du, props_name_to_id(props, "max bpc"));
@@ -2967,11 +3104,39 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
     }
     drmu_info(du, "Hi BPC %s", dc->hi_bpc_ok ? "OK" : "no");
 
+    crtc_mode_set_vars(dc);
+
+    drmu_info(du, "Flags: %#x, par=%d/%d sar=%d/%d", dc->crtc->mode.flags, dc->par.num, dc->par.den, dc->sar.num, dc->sar.den);
+
+    {
+        drmModePropertyPtr p = drmModeGetProperty(du->fd, dc->pid.mode_id);
+        drmu_info(du, "Mode_id: flags %#x, values=%d, blobs=%d, blob[0]=%#x", p->flags, p->count_values, p->count_blobs, p->blob_ids == NULL ? 0 : p->blob_ids[0]);
+        drmModeFreeProperty(p);
+    }
+
     return dc;
 
 fail:
     free_crtc(dc);
     return NULL;
+}
+
+static int
+drmu_crtc_mode_pick(drmu_crtc_t * const dc, drmu_mode_score_fn score_fn, void * const score_v)
+{
+    int best_score = -1;
+    int best_mode = -1;
+    int i;
+
+    for (i = 0; i < dc->con->count_modes; ++i) {
+        int score = score_fn(score_v, dc->con->modes + i);
+        if (score > best_score) {
+            best_score = score;
+            best_mode = i;
+        }
+    }
+
+    return best_mode;
 }
 
 static drmu_crtc_t *
@@ -3260,6 +3425,7 @@ typedef struct vout_display_sys_t {
     drmu_atomic_t * display_set;
 
     uint32_t con_id;
+    int mode_id;
 } vout_display_sys_t;
 
 static drmu_fb_t *
@@ -3289,12 +3455,12 @@ copy_pic_to_fb(vout_display_t *vd, drmu_pool_t * const pool, picture_t * const s
     return fb;
 }
 
-static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
+static void vd_drm_prepare(vout_display_t *vd, picture_t *pic,
                            subpicture_t *subpicture, vlc_tick_t date)
 {
     vout_display_sys_t * const sys = vd->sys;
     unsigned int n = 0;
-    drmu_atomic_t * da = NULL;
+    drmu_atomic_t * da = drmu_atomic_new(sys->du);;
     drmu_fb_t * dfb = NULL;
     drmu_rect_t r;
     unsigned int i;
@@ -3302,10 +3468,16 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *p_pic,
 
     VLC_UNUSED(date);
 
+    if (da == NULL)
+        goto fail;
+
     if (sys->display_set != NULL) {
         msg_Warn(vd, "sys->display_set != NULL");
         drmu_atomic_unref(&sys->display_set);
     }
+
+    // Set mode early so w/h are correct
+    drmu_atomic_crtc_mode_id_set(da, sys->dc, sys->mode_id);
 
     // Attempt to import the subpics
     for (subpicture_t * spic = subpicture; spic != NULL; spic = spic->p_next)
@@ -3360,24 +3532,45 @@ subpics_done:
 
     {
         vout_display_place_t place;
-        vout_display_PlacePicture(&place, vd->source, vd->cfg);
+        vout_display_cfg_t cfg = *vd->cfg;
+
+        cfg.display.width  = drmu_crtc_width(sys->dc);
+        cfg.display.height = drmu_crtc_height(sys->dc);
+        cfg.display.sar    = drmu_ufrac_vlc_to_rational(drmu_crtc_sar(sys->dc));
+
+        vout_display_PlacePicture(&place, &pic->format, &cfg);
         r = drmu_rect_vlc_place(&place);
+
+#if 0
+        {
+            static int z = 0;
+            if (--z < 0) {
+                z = 200;
+                msg_Info(vd, "Cropped: %d,%d %dx%d %d/%d Cfg: %dx%d %d/%d Display: %dx%d %d/%d Place: %d,%d %dx%d",
+                         pic->format.i_x_offset, pic->format.i_y_offset,
+                         pic->format.i_visible_width, pic->format.i_visible_height,
+                         pic->format.i_sar_num, pic->format.i_sar_den,
+                         vd->cfg->display.width,   vd->cfg->display.height,
+                         vd->cfg->display.sar.num, vd->cfg->display.sar.den,
+                         cfg.display.width,   cfg.display.height,
+                         cfg.display.sar.num, cfg.display.sar.den,
+                         r.x, r.y, r.w, r.h);
+            }
+        }
+#endif
     }
 
-    if (p_pic->format.i_chroma != VLC_CODEC_DRM_PRIME_OPAQUE) {
-        dfb = copy_pic_to_fb(vd, sys->pic_pool, p_pic);
+    if (pic->format.i_chroma != VLC_CODEC_DRM_PRIME_OPAQUE) {
+        dfb = copy_pic_to_fb(vd, sys->pic_pool, pic);
     }
     else {
-        dfb = drmu_fb_vlc_new_pic_attach(sys->du, p_pic);
+        dfb = drmu_fb_vlc_new_pic_attach(sys->du, pic);
     }
 
     if (dfb == NULL) {
         msg_Err(vd, "Failed to create frme buffer from pic");
         return;
     }
-
-    if ((da = drmu_atomic_new(sys->du)) == NULL)
-        goto fail;
 
     ret = drmu_atomic_plane_set(da, sys->dp, dfb, r);
     drmu_fb_unref(&dfb);
@@ -3557,6 +3750,45 @@ subpic_make_chromas_from_drm(const uint32_t * const drm_chromas, const unsigned 
     return c;
 }
 
+static int
+mode_pick_cb(void * v, const drmModeModeInfo * mode)
+{
+    const video_format_t * const fmt = v;
+
+    const int pref = (mode->type & DRM_MODE_TYPE_PREFERRED) != 0;
+    const unsigned int r_m = (uint32_t)(((uint64_t)mode->clock * 1000000) / (mode->htotal * mode->vtotal));
+    const unsigned int r_f = fmt->i_frame_rate_base == 0 ? 0 :
+        (uint32_t)(((uint64_t)fmt->i_frame_rate * 1000) / fmt->i_frame_rate_base);
+
+    printf("Fmt %dx%d @ %d, Mode %dx%d @ %d/%d flags %#x, pref %d\n",
+           fmt->i_visible_width, fmt->i_visible_height, r_f,
+           mode->hdisplay, mode->vdisplay, mode->vrefresh, r_m, mode->flags, pref);
+
+    // We don't understand interlace
+    if ((mode->flags & DRM_MODE_FLAG_INTERLACE) != 0)
+        return -1;
+
+    if (fmt->i_visible_width == mode->hdisplay &&
+        fmt->i_visible_height == mode->vdisplay)
+    {
+        // Prefer a good match to 29.97 / 30 but allow the other
+        if ((r_m + 10 >= r_f && r_m <= r_f + 10))
+            return 100;
+        if ((r_m + 100 >= r_f && r_m <= r_f + 100))
+            return 95;
+        // Double isn't bad
+        if ((r_m + 10 >= r_f * 2 && r_m <= r_f * 2 + 10))
+            return 90;
+        if ((r_m + 100 >= r_f * 2 && r_m <= r_f * 2 + 100))
+            return 85;
+    }
+
+    if (pref)
+        return 50;
+
+    return -1;
+}
+
 static int OpenDrmVout(vout_display_t *vd,
                         video_format_t *fmtp, vlc_video_context *vctx)
 {
@@ -3570,6 +3802,8 @@ static int OpenDrmVout(vout_display_t *vd,
     if (!sys)
         return VLC_ENOMEM;
     vd->sys = sys;
+
+    sys->mode_id = -1;
 
     if (vctx) {
         sys->dec_dev = vlc_video_context_HoldDevice(vctx);
@@ -3623,7 +3857,26 @@ static int OpenDrmVout(vout_display_t *vd,
 
     vd->ops = &ops;
 
-    vout_display_SetSize(vd, drmu_crtc_width(sys->dc), drmu_crtc_height(sys->dc));
+    if (!var_InheritBool(vd, DRM_VOUT_SOURCE_MODESET_NAME)) {
+        sys->mode_id = -1;
+    }
+    else {
+        sys->mode_id = drmu_crtc_mode_pick(sys->dc, mode_pick_cb, fmtp);
+
+        msg_Dbg(vd, "Mode id=%d", sys->mode_id);
+
+        // This will set the mode on the crtc var but won't actually change the output
+        if (sys->mode_id >= 0) {
+            drmu_atomic_t * da = drmu_atomic_new(sys->du);
+            if (da != NULL) {
+                drmu_atomic_crtc_mode_id_set(da, sys->dc, sys->mode_id);
+                drmu_atomic_unref(&da);
+            }
+        }
+    }
+
+    vout_display_SetSizeAndSar(vd, drmu_crtc_width(sys->dc), drmu_crtc_height(sys->dc),
+                               drmu_ufrac_vlc_to_rational(drmu_crtc_sar(sys->dc)));
     return VLC_SUCCESS;
 
 fail:
@@ -3632,13 +3885,16 @@ fail:
 }
 
 vlc_module_begin()
-set_shortname(N_("DRM vout"))
-set_description(N_("DRM vout plugin"))
-add_shortcut("drm_vout")
-set_category(CAT_VIDEO)
-set_subcategory(SUBCAT_VIDEO_VOUT)
+    set_shortname(N_("DRM vout"))
+    set_description(N_("DRM vout plugin"))
+    add_shortcut("drm_vout")
+    set_category(CAT_VIDEO)
+    set_subcategory(SUBCAT_VIDEO_VOUT)
 
-set_callback_display(OpenDrmVout, 16)  // 1 point better than ASCII art
+    add_bool(DRM_VOUT_SOURCE_MODESET_NAME, false, DRM_VOUT_SOURCE_MODESET_TEXT, DRM_VOUT_SOURCE_MODESET_LONGTEXT)
+    add_bool(DRM_VOUT_NO_MODESET_NAME,     false, DRM_VOUT_NO_MODESET_TEXT, DRM_VOUT_NO_MODESET_LONGTEXT)
+    add_bool(DRM_VOUT_NO_MAX_BPC,          false, DRM_VOUT_NO_MAX_BPC_TEXT, DRM_VOUT_NO_MAX_BPC_LONGTEXT)
+
+    set_callback_display(OpenDrmVout, 16)  // 1 point better than ASCII art
 vlc_module_end()
-
 

@@ -573,6 +573,19 @@ void vout_display_SetSize(vout_display_t *vd, unsigned width, unsigned height)
 
     osys->cfg.display.width  = width;
     osys->cfg.display.height = height;
+
+    if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_DISPLAY_SIZE))
+        vout_display_Reset(vd);
+}
+
+void vout_display_SetSizeAndSar(vout_display_t *vd, unsigned width, unsigned height, vlc_rational_t sar)
+{
+    vout_display_priv_t *osys = container_of(vd, vout_display_priv_t, display);
+
+    osys->cfg.display.width  = width;
+    osys->cfg.display.height = height;
+    osys->cfg.display.sar    = sar;
+
     if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_DISPLAY_SIZE))
         vout_display_Reset(vd);
 }

@@ -422,6 +422,9 @@ static inline void vout_display_Display(vout_display_t *vd, picture_t *picture)
 VLC_API
 void vout_display_SetSize(vout_display_t *vd, unsigned width, unsigned height);
 
+VLC_API
+void vout_display_SetSizeAndSar(vout_display_t *vd, unsigned width, unsigned height, vlc_rational_t sar);
+
 static inline void vout_display_SendEventMousePressed(vout_display_t *vd, int button)
 {
     vout_window_ReportMousePressed(vd->cfg->window, button);
