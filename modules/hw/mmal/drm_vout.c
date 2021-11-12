@@ -328,6 +328,8 @@ typedef struct drmu_env_s {
     drmu_plane_t * planes;
     drmModeResPtr res;
 
+    bool modeset_allow;
+
     // global env for atomic flip
     drmu_atomic_q_t aq;
     // global env for bo tracking
@@ -1575,7 +1577,7 @@ drmu_atomic_commit(drmu_atomic_t * const da, uint32_t flags)
             return 0;
 
         rv = -errno;
-        if (rv == -EINVAL) {
+        if (rv == -EINVAL && du->modeset_allow) {
             drmu_debug(du, "%s: EINVAL try ALLOW_MODESET", __func__);
             atomic.flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
             if (drmIoctl(du->fd, DRM_IOCTL_MODE_ATOMIC, &atomic) == 0)
@@ -2711,7 +2713,7 @@ drmu_atomic_crtc_hdr_metadata_set(drmu_atomic_t * const da, drmu_crtc_t * const 
     drmu_env_t * const du = da->du;
     int rv;
 
-    if (dc->pid.hdr_output_metadata == 0)
+    if (dc->pid.hdr_output_metadata == 0 || !du->modeset_allow)
         return 0;
 
     if (m == NULL) {
@@ -2788,7 +2790,7 @@ drmu_atomic_crtc_mode_id_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, c
     drmu_blob_t * blob = NULL;
     const drmModeModeInfo * mode;
 
-    if (mode_id < 0 || dc->pid.mode_id == 0)
+    if (mode_id < 0 || dc->pid.mode_id == 0 || !du->modeset_allow)
         return 0;
 
     if (dc->cur_mode_id == mode_id && dc->mode_id_blob != NULL)
@@ -2820,6 +2822,9 @@ atomic_crtc_bpc_set(drmu_atomic_t * const da, drmu_crtc_t * const dc,
 {
     const uint32_t con_id = dc->con->connector_id;
     int rv = 0;
+
+    if (!dc->du->modeset_allow)
+        return 0;
 
     if ((dc->pid.colorspace &&
          (rv = drmu_atomic_add_prop_enum(da, con_id, dc->pid.colorspace, colorspace)) != 0) ||
@@ -3018,6 +3023,13 @@ drmu_plane_new_find(drmu_crtc_t * const dc, const uint32_t fmt)
     return dp;
 }
 
+static void
+drmu_crtc_max_bpc_allow(drmu_crtc_t * const dc, const bool max_bpc_allowed)
+{
+    if (!max_bpc_allowed)
+        dc->hi_bpc_ok = false;
+}
+
 static drmu_crtc_t *
 crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
 {
@@ -3068,20 +3080,23 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
     }
 
     {
-        drmu_info(du, "Crtc:");
         drmu_props_t * props = props_new(du, dc->crtc->crtc_id, DRM_MODE_OBJECT_CRTC);
-        props_dump(props);
+        if (props != NULL) {
+#if TRACE_PROP_NEW
+            drmu_info(du, "Crtc:");
+            props_dump(props);
+#endif
 
-        dc->pid.mode_id = props_name_to_id(props, "MODE_ID");
-
-        props_free(props);
+            dc->pid.mode_id = props_name_to_id(props, "MODE_ID");
+            props_free(props);
+        }
     }
 
     {
         drmu_props_t * const props = props_new(du, dc->con->connector_id, DRM_MODE_OBJECT_CONNECTOR);
 
         if (props != NULL) {
-#if TRACE_PROP_NEW || 1
+#if TRACE_PROP_NEW
             drmu_info(du, "Connector:");
             props_dump(props);
 #endif
@@ -3313,6 +3328,13 @@ drmu_env_delete(drmu_env_t ** const ppdu)
     free(du);
 }
 
+// Default is yes
+static void
+drmu_env_modeset_allow(drmu_env_t * const du, const bool modeset_allowed)
+{
+    du->modeset_allow = modeset_allowed;
+}
+
 static void
 drmu_env_polltask_cb(void * v, short revents)
 {
@@ -3345,6 +3367,8 @@ drmu_env_new_fd(vlc_object_t * const log, const int fd)
 
     du->log = log;
     du->fd = fd;
+    du->modeset_allow = true;
+
     drmu_bo_env_init(&du->boe);
     drmu_atomic_q_init(&du->aq);
 
@@ -3823,8 +3847,12 @@ static int OpenDrmVout(vout_display_t *vd,
     if ((sys->du = drmu_env_new_open(VLC_OBJECT(vd), DRM_MODULE)) == NULL)
         goto fail;
 
+    drmu_env_modeset_allow(sys->du, !var_InheritBool(vd, DRM_VOUT_NO_MODESET_NAME));
+
     if ((sys->dc = drmu_crtc_new_find(sys->du)) == NULL)
         goto fail;
+
+    drmu_crtc_max_bpc_allow(sys->dc, !var_InheritBool(vd, DRM_VOUT_NO_MAX_BPC));
 
     if ((sys->sub_fb_pool = drmu_pool_new(sys->du, 10)) == NULL)
         goto fail;
