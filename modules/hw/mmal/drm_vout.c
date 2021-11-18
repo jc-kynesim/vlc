@@ -59,7 +59,7 @@
 #define DRM_VOUT_NO_MODESET_NAME "drm-vout-no-modeset"
 #define DRM_VOUT_NO_MODESET_TEXT N_("Do not modeset")
 #define DRM_VOUT_NO_MODESET_LONGTEXT N_("Do no operation that would cause a modeset.\
- This overrides the operatino of all other flags.")
+ This overrides the operation of all other flags.")
 
 #define DRM_VOUT_NO_MAX_BPC "drm-vout-no-max-bpc"
 #define DRM_VOUT_NO_MAX_BPC_TEXT N_("Do not set bpc on output")
@@ -2117,139 +2117,6 @@ pic_fb_delete_cb(drmu_fb_t * dfb, void * v)
     picture_Release(aux->pic);
     free(aux);
 }
-
-#if 0
-
-std::string GetColorimetry(const VideoPicture& picture)
-{
-  switch (picture.color_space)
-  {
-    case AVCOL_SPC_BT2020_CL:
-    case AVCOL_SPC_BT2020_NCL:
-      return "BT2020_RGB";
-  }
-
-  return "Default";
-}
-
-std::string GetColorEncoding(const VideoPicture& picture)
-{
-  switch (picture.color_space)
-  {
-    case AVCOL_SPC_BT2020_CL:
-    case AVCOL_SPC_BT2020_NCL:
-      return "ITU-R BT.2020 YCbCr";
-    case AVCOL_SPC_SMPTE170M:
-    case AVCOL_SPC_BT470BG:
-    case AVCOL_SPC_FCC:
-      return "ITU-R BT.601 YCbCr";
-    case AVCOL_SPC_BT709:
-      return "ITU-R BT.709 YCbCr";
-    case AVCOL_SPC_RESERVED:
-    case AVCOL_SPC_UNSPECIFIED:
-    default:
-      if (picture.iWidth > 1024 || picture.iHeight >= 600)
-        return "ITU-R BT.709 YCbCr";
-      else
-        return "ITU-R BT.601 YCbCr";
-  }
-}
-
-std::string GetColorRange(const VideoPicture& picture)
-{
-  if (picture.color_range)
-    return "YCbCr full range";
-  return "YCbCr limited range";
-}
-
-
-void CVideoLayerBridgeDRMPRIME::Configure(CVideoBufferDRMPRIME* buffer)
-{
-  const VideoPicture& picture = buffer->GetPicture();
-
-  auto plane = m_DRM->GetVideoPlane();
-
-  bool result;
-  uint64_t value;
-  std::tie(result, value) = plane->GetPropertyValue("COLOR_ENCODING", GetColorEncoding(picture));
-  if (result)
-    m_DRM->AddProperty(plane, "COLOR_ENCODING", value);
-
-  std::tie(result, value) = plane->GetPropertyValue("COLOR_RANGE", GetColorRange(picture));
-  if (result)
-    m_DRM->AddProperty(plane, "COLOR_RANGE", value);
-
-  auto connector = m_DRM->GetConnector();
-
-  std::tie(result, value) =  connector->GetPropertyValue("Colorspace", GetColorimetry(picture));
-  if (result)
-  {
-    CLog::Log(LOGDEBUG, "CVideoLayerBridgeDRMPRIME::{} - setting connector colorspace to {}", __FUNCTION__,
-              GetColorimetry(picture));
-    m_DRM->AddProperty(connector, "Colorspace", value);
-    m_DRM->SetActive(true);
-  }
-
-  if (connector->SupportsProperty("HDR_OUTPUT_METADATA"))
-  {
-    m_hdr_metadata.metadata_type = HDMI_STATIC_METADATA_TYPE1;
-    m_hdr_metadata.hdmi_metadata_type1 = {
-        .eotf = GetEOTF(picture),
-        .metadata_type = HDMI_STATIC_METADATA_TYPE1,
-    };
-
-    if (m_hdr_blob_id)
-      drmModeDestroyPropertyBlob(m_DRM->GetFileDescriptor(), m_hdr_blob_id);
-    m_hdr_blob_id = 0;
-
-    if (m_hdr_metadata.hdmi_metadata_type1.eotf)
-    {
-      const AVMasteringDisplayMetadata* mdmd = GetMasteringDisplayMetadata(picture);
-      if (mdmd && mdmd->has_primaries)
-      {
-        // Convert to unsigned 16-bit values in units of 0.00002,
-        // where 0x0000 represents zero and 0xC350 represents 1.0000
-        for (int i = 0; i < 3; i++)
-        {
-          m_hdr_metadata.hdmi_metadata_type1.display_primaries[i].x =
-              std::round(av_q2d(mdmd->display_primaries[i][0]) * 50000.0);
-          m_hdr_metadata.hdmi_metadata_type1.display_primaries[i].y =
-              std::round(av_q2d(mdmd->display_primaries[i][1]) * 50000.0);
-        }
-        m_hdr_metadata.hdmi_metadata_type1.white_point.x =
-            std::round(av_q2d(mdmd->white_point[0]) * 50000.0);
-        m_hdr_metadata.hdmi_metadata_type1.white_point.y =
-            std::round(av_q2d(mdmd->white_point[1]) * 50000.0);
-      }
-      if (mdmd && mdmd->has_luminance)
-      {
-        // Convert to unsigned 16-bit value in units of 1 cd/m2,
-        // where 0x0001 represents 1 cd/m2 and 0xFFFF represents 65535 cd/m2
-        m_hdr_metadata.hdmi_metadata_type1.max_display_mastering_luminance =
-            std::round(av_q2d(mdmd->max_luminance));
-
-        // Convert to unsigned 16-bit value in units of 0.0001 cd/m2,
-        // where 0x0001 represents 0.0001 cd/m2 and 0xFFFF represents 6.5535 cd/m2
-        m_hdr_metadata.hdmi_metadata_type1.min_display_mastering_luminance =
-            std::round(av_q2d(mdmd->min_luminance) * 10000.0);
-      }
-
-      const AVContentLightMetadata* clmd = GetContentLightMetadata(picture);
-      if (clmd)
-      {
-        m_hdr_metadata.hdmi_metadata_type1.max_cll = clmd->MaxCLL;
-        m_hdr_metadata.hdmi_metadata_type1.max_fall = clmd->MaxFALL;
-      }
-
-      drmModeCreatePropertyBlob(m_DRM->GetFileDescriptor(), &m_hdr_metadata, sizeof(m_hdr_metadata),
-                                &m_hdr_blob_id);
-    }
-
-    m_DRM->AddProperty(connector, "HDR_OUTPUT_METADATA", m_hdr_blob_id);
-    m_DRM->SetActive(true);
-  }
-}
-#endif
 
 static uint8_t
 pic_transfer_to_eotf(const video_transfer_func_t vtf)
