@@ -152,13 +152,19 @@ enum drmu_bo_type_e {
     BO_TYPE_DUMB
 };
 
+// BO handles come in 2 very distinct types: DUMB and FD
+// They need very different alloc & free but BO usage is the same for both
+// so it is better to have a single type.
 typedef struct drmu_bo_s {
-    int ref_count;  // ref counted under bo_env lock so no need for atomic
-    struct drmu_bo_s * next;
-    struct drmu_bo_s * prev;
+    // Arguably could be non-atomic for FD as then it is always protected by mutex
+    atomic_int ref_count;
     struct drmu_env_s * du;
     enum drmu_bo_type_e bo_type;
     uint32_t handle;
+
+    // FD only els - FD BOs need to be tracked globally
+    struct drmu_bo_s * next;
+    struct drmu_bo_s * prev;
 } drmu_bo_t;
 
 typedef struct drmu_bo_env_s {
@@ -1210,57 +1216,78 @@ bo_close(drmu_env_t * const du, uint32_t * const ph)
 
 // BOE lock expected
 static void
-drmu_bo_free(drmu_bo_t * bo)
+bo_free_dumb(drmu_bo_t * const bo)
 {
-    drmu_env_t * const du = bo->du;
-
     if (bo->handle != 0) {
-        switch (bo->bo_type) {
-            case BO_TYPE_FD:
-            {
-                drmu_bo_env_t * const boe = &du->boe;
-                const uint32_t h = bo->handle;
-                if (bo_close(du, &bo->handle) != 0)
-                    drmu_warn(du, "%s: Failed to close BO handle %d", __func__, h);
-                if (bo->next != NULL)
-                    bo->next->prev = bo->prev;
-                if (bo->prev != NULL)
-                    bo->prev->next = bo->next;
-                else
-                    boe->fd_head = bo->next;
-                break;
-            }
-            case BO_TYPE_DUMB:
-            {
-                struct drm_mode_destroy_dumb destroy_env = {.handle = bo->handle};
-                if (drmIoctl(du->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_env) != 0)
-                    drmu_warn(du, "%s: Failed to destroy dumb handle %d", __func__, bo->handle);
-                break;
-            }
-            case BO_TYPE_NONE:
-            default:
-                break;
-        }
+        drmu_env_t * const du = bo->du;
+        struct drm_mode_destroy_dumb destroy_env = {.handle = bo->handle};
+
+        if (drmIoctl(du->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_env) != 0)
+            drmu_warn(du, "%s: Failed to destroy dumb handle %d", __func__, bo->handle);
     }
     free(bo);
 }
 
 static void
-drmu_bo_unref(drmu_bo_t ** ppbo)
+bo_free_fd(drmu_bo_t * const bo)
+{
+    if (bo->handle != 0) {
+        drmu_env_t * const du = bo->du;
+        drmu_bo_env_t * const boe = &du->boe;
+        const uint32_t h = bo->handle;
+
+        if (bo_close(du, &bo->handle) != 0)
+            drmu_warn(du, "%s: Failed to close BO handle %d", __func__, h);
+        if (bo->next != NULL)
+            bo->next->prev = bo->prev;
+        if (bo->prev != NULL)
+            bo->prev->next = bo->next;
+        else
+            boe->fd_head = bo->next;
+    }
+    free(bo);
+}
+
+
+static void
+drmu_bo_unref(drmu_bo_t ** const ppbo)
 {
     drmu_bo_t * const bo = *ppbo;
-    drmu_bo_env_t * boe;
 
     if (bo == NULL)
         return;
     *ppbo = NULL;
 
-    boe = &bo->du->boe;
-    pthread_mutex_lock(&boe->lock);
-    if (bo->ref_count-- == 0)
-        drmu_bo_free(bo);
-    pthread_mutex_unlock(&boe->lock);
+    switch (bo->bo_type) {
+        case BO_TYPE_FD:
+        {
+            drmu_bo_env_t * const boe = &bo->du->boe;
+
+            pthread_mutex_lock(&boe->lock);
+            if (atomic_fetch_sub(&bo->ref_count, 1) == 0)
+                bo_free_fd(bo);
+            pthread_mutex_unlock(&boe->lock);
+            break;
+        }
+        case BO_TYPE_DUMB:
+            if (atomic_fetch_sub(&bo->ref_count, 1) == 0)
+                bo_free_dumb(bo);
+            break;
+        case BO_TYPE_NONE:
+        default:
+            free(bo);
+            break;
+    }
 }
+
+static drmu_bo_t *
+drmu_bo_ref(drmu_bo_t * const bo)
+{
+    if (bo != NULL)
+        atomic_fetch_add(&bo->ref_count, 1);
+    return bo;
+}
+
 
 static drmu_bo_t *
 drmu_bo_alloc(drmu_env_t *const du, enum drmu_bo_type_e bo_type)
@@ -1273,6 +1300,7 @@ drmu_bo_alloc(drmu_env_t *const du, enum drmu_bo_type_e bo_type)
 
     bo->du = du;
     bo->bo_type = bo_type;
+    atomic_init(&bo->ref_count, 0);
     return bo;
 }
 
@@ -1295,7 +1323,7 @@ drmu_bo_new_fd(drmu_env_t *const du, const int fd)
         bo = bo->next;
 
     if (bo != NULL) {
-        ++bo->ref_count;
+        drmu_bo_ref(bo);
     }
     else {
         if ((bo = drmu_bo_alloc(du, BO_TYPE_FD)) == NULL) {
@@ -2585,7 +2613,7 @@ drmu_atomic_crtc_hdr_metadata_set(drmu_atomic_t * const da, drmu_crtc_t * const 
 
     if (m == NULL) {
         if (dc->hdr_metadata_blob != NULL) {
-            drmu_info(du, "Unset hdr metadata");
+            drmu_debug(du, "Unset hdr metadata");
             drmu_blob_unref(&dc->hdr_metadata_blob);
         }
     }
@@ -2595,7 +2623,7 @@ drmu_atomic_crtc_hdr_metadata_set(drmu_atomic_t * const da, drmu_crtc_t * const 
 
         if (dc->hdr_metadata_blob == NULL || memcmp(&dc->hdr_metadata, m, blob_len) != 0)
         {
-            drmu_info(du, "Set hdr metadata");
+            drmu_debug(du, "Set hdr metadata");
 
             if ((blob = drmu_blob_new(du, m, blob_len)) == NULL)
                 return -ENOMEM;
@@ -2986,17 +3014,10 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
         }
         drmu_atomic_unref(&da);
     }
-    drmu_info(du, "Hi BPC %s", dc->hi_bpc_ok ? "OK" : "no");
+    drmu_debug(du, "Hi BPC %s", dc->hi_bpc_ok ? "OK" : "no");
 
     crtc_mode_set_vars(dc);
-
-    drmu_info(du, "Flags: %#x, par=%d/%d sar=%d/%d", dc->crtc.mode.flags, dc->par.num, dc->par.den, dc->sar.num, dc->sar.den);
-
-    {
-        drmModePropertyPtr p = drmModeGetProperty(du->fd, dc->pid.mode_id);
-        drmu_info(du, "Mode_id: flags %#x, values=%d, blobs=%d, blob[0]=%#x", p->flags, p->count_values, p->count_blobs, p->blob_ids == NULL ? 0 : p->blob_ids[0]);
-        drmModeFreeProperty(p);
-    }
+    drmu_debug(du, "Flags: %#x, par=%d/%d sar=%d/%d", dc->crtc.mode.flags, dc->par.num, dc->par.den, dc->sar.num, dc->sar.den);
 
     return dc;
 
