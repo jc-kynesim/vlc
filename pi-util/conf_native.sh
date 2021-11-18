@@ -1,13 +1,13 @@
 set -e
 BASE=`pwd`
 
-MC=`uname -m`
-if [ "$MC" == "armv7l" ]; then
+MC=`dpkg  --print-architecture`
+if [ "$MC" == "armhf" ]; then
   ARM=armv7
-elif [ "$MC" == "aarch64" ]; then
+elif [ "$MC" == "arm64" ]; then
   ARM=arm64
 else
-  echo "Unkown machine name: $MC"
+  echo "Unknown machine name: $MC"
   exit 1
 fi
 OUT=$BASE/out/$ARM-`lsb_release -sc`-rel
