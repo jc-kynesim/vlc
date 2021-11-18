@@ -279,13 +279,15 @@ typedef int (* drmu_mode_score_fn)(void * v, const drmModeModeInfo * mode);
 
 typedef struct drmu_crtc_s {
     struct drmu_env_s * du;
-    drmModeCrtcPtr crtc;
+//    drmModeCrtcPtr crtc;
     drmModeEncoderPtr enc;
     drmModeConnectorPtr con;
     int crtc_idx;
     bool hi_bpc_ok;
     drmu_ufrac_t sar;
     drmu_ufrac_t par;
+
+    struct drm_mode_crtc crtc;
 
     struct {
         // crtc
@@ -2692,8 +2694,6 @@ drmu_pool_delete(drmu_pool_t ** const pppool)
 static void
 free_crtc(drmu_crtc_t * const dc)
 {
-    if (dc->crtc != NULL)
-        drmModeFreeCrtc(dc->crtc);
     if (dc->enc != NULL)
         drmModeFreeEncoder(dc->enc);
     if (dc->con != NULL)
@@ -2752,7 +2752,7 @@ drmu_atomic_crtc_hdr_metadata_set(drmu_atomic_t * const da, drmu_crtc_t * const 
 static void
 crtc_mode_set_vars(drmu_crtc_t * const dc)
 {
-    switch (dc->crtc->mode.flags & DRM_MODE_FLAG_PIC_AR_MASK) {
+    switch (dc->crtc.mode.flags & DRM_MODE_FLAG_PIC_AR_MASK) {
         case DRM_MODE_FLAG_PIC_AR_4_3:
             dc->par = (drmu_ufrac_t){4,3};
             break;
@@ -2776,7 +2776,7 @@ crtc_mode_set_vars(drmu_crtc_t * const dc)
         dc->sar = (drmu_ufrac_t){1,1};
     }
     else {
-        dc->sar = drmu_ufrac_reduce((drmu_ufrac_t){dc->par.num * dc->crtc->height, dc->par.den * dc->crtc->width});
+        dc->sar = drmu_ufrac_reduce((drmu_ufrac_t) {dc->par.num * dc->crtc.mode.hdisplay, dc->par.den * dc->crtc.mode.vdisplay});
     }
 }
 
@@ -2788,7 +2788,10 @@ drmu_atomic_crtc_mode_id_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, c
 {
     drmu_env_t * const du = dc->du;
     drmu_blob_t * blob = NULL;
-    const drmModeModeInfo * mode;
+    const struct drm_mode_modeinfo * mode;
+
+    // they are the same structure really
+    assert(sizeof(*dc->con->modes) == sizeof(*mode));
 
     if (mode_id < 0 || dc->pid.mode_id == 0 || !du->modeset_allow)
         return 0;
@@ -2798,7 +2801,7 @@ drmu_atomic_crtc_mode_id_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, c
 
     drmu_info(du, "Set mode_id");
 
-    mode = dc->con->modes + mode_id;
+    mode = (const struct drm_mode_modeinfo *)(dc->con->modes + mode_id);
     if ((blob = drmu_blob_new(du, mode, sizeof(*mode))) == NULL) {
         return -ENOMEM;
     }
@@ -2807,9 +2810,7 @@ drmu_atomic_crtc_mode_id_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, c
     dc->cur_mode_id = mode_id;
     dc->mode_id_blob = blob;
 
-    dc->crtc->mode = *mode;
-    dc->crtc->width = mode->hdisplay;
-    dc->crtc->height = mode->vdisplay;
+    dc->crtc.mode = *mode;
     crtc_mode_set_vars(dc);
 
     return drmu_atomic_add_prop_blob(da, dc->enc->crtc_id, dc->pid.mode_id, dc->mode_id_blob);
@@ -2856,7 +2857,7 @@ drmu_atomic_crtc_colorspace_set(drmu_atomic_t * const da, drmu_crtc_t * const dc
 static uint32_t
 drmu_crtc_id(const drmu_crtc_t * const dc)
 {
-    return dc->crtc->crtc_id;
+    return dc->crtc.crtc_id;
 }
 
 static void
@@ -2874,27 +2875,27 @@ drmu_crtc_delete(drmu_crtc_t ** ppdc)
 static inline uint32_t
 drmu_crtc_x(const drmu_crtc_t * const dc)
 {
-    return dc->crtc->x;
+    return dc->crtc.x;
 }
 static inline uint32_t
 drmu_crtc_y(const drmu_crtc_t * const dc)
 {
-    return dc->crtc->y;
+    return dc->crtc.y;
 }
 static inline uint32_t
 drmu_crtc_width(const drmu_crtc_t * const dc)
 {
-    return dc->crtc->width;
+    return dc->crtc.mode.hdisplay;
 }
 static inline uint32_t
 drmu_crtc_height(const drmu_crtc_t * const dc)
 {
-    return dc->crtc->height;
+    return dc->crtc.mode.vdisplay;
 }
 static inline drmu_ufrac_t
 drmu_crtc_sar(const drmu_crtc_t * const dc)
 {
-    return dc->sar;;
+    return dc->sar;
 }
 
 static int
@@ -3074,13 +3075,14 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
         goto fail;
     }
 
-    if ((dc->crtc = drmModeGetCrtc(du->fd, dc->enc->crtc_id)) == NULL) {
+    dc->crtc.crtc_id = dc->enc->crtc_id;
+    if (drmIoctl(du->fd, DRM_IOCTL_MODE_GETCRTC, &dc->crtc) != 0) {
         drmu_err(du, "%s: Failed to find crtc %d", __func__, dc->enc->crtc_id);
         goto fail;
     }
 
     {
-        drmu_props_t * props = props_new(du, dc->crtc->crtc_id, DRM_MODE_OBJECT_CRTC);
+        drmu_props_t * props = props_new(du, dc->crtc.crtc_id, DRM_MODE_OBJECT_CRTC);
         if (props != NULL) {
 #if TRACE_PROP_NEW
             drmu_info(du, "Crtc:");
@@ -3121,7 +3123,7 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
 
     crtc_mode_set_vars(dc);
 
-    drmu_info(du, "Flags: %#x, par=%d/%d sar=%d/%d", dc->crtc->mode.flags, dc->par.num, dc->par.den, dc->sar.num, dc->sar.den);
+    drmu_info(du, "Flags: %#x, par=%d/%d sar=%d/%d", dc->crtc.mode.flags, dc->par.num, dc->par.den, dc->sar.num, dc->sar.den);
 
     {
         drmModePropertyPtr p = drmModeGetProperty(du->fd, dc->pid.mode_id);
