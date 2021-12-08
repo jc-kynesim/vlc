@@ -33,8 +33,11 @@
 #include "video_output/opengl/gl_api.h"
 #include "video_output/opengl/gl_common.h"
 #include "video_output/opengl/gl_util.h"
+#include "video_output/opengl/sampler.h"
 
 struct sys {
+    struct vlc_gl_sampler *sampler;
+
     GLuint program_id;
 
     GLuint vbo;
@@ -49,7 +52,8 @@ struct sys {
 };
 
 static int
-Draw(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
+Draw(struct vlc_gl_filter *filter, const struct vlc_gl_picture *pic,
+     const struct vlc_gl_input_meta *meta)
 {
     struct sys *sys = filter->sys;
 
@@ -57,12 +61,14 @@ Draw(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
 
     vt->UseProgram(sys->program_id);
 
-    struct vlc_gl_sampler *sampler = vlc_gl_filter_GetSampler(filter);
+    struct vlc_gl_sampler *sampler = sys->sampler;
+    vlc_gl_sampler_SelectPlane(sampler, meta->plane);
+    vlc_gl_sampler_Update(sampler, pic);
     vlc_gl_sampler_Load(sampler);
 
     vt->BindBuffer(GL_ARRAY_BUFFER, sys->vbo);
 
-    if (vlc_gl_sampler_MustRecomputeCoords(sampler))
+    if (pic->mtx_has_changed)
     {
         float coords[] = {
             0, 1,
@@ -72,7 +78,7 @@ Draw(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
         };
 
         /* Transform coordinates in place */
-        vlc_gl_sampler_PicToTexCoords(sampler, 4, coords, coords);
+        vlc_gl_picture_ToTexCoords(pic, 4, coords, coords);
 
         const float data[] = {
             -1,  1, coords[0], coords[1],
@@ -85,7 +91,7 @@ Draw(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
         /* Compute the (normalized) vector representing the _up_ direction in
          * texture coordinates, to take any orientation/flip into account. */
         float direction[2*2];
-        vlc_gl_sampler_ComputeDirectionMatrix(sampler, direction);
+        vlc_gl_picture_ComputeDirectionMatrix(pic, direction);
         sys->up_vector[0] = direction[2];
         sys->up_vector[1] = direction[3];
     }
@@ -101,13 +107,15 @@ Draw(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
     vt->VertexAttribPointer(sys->loc.tex_coords_in, 2, GL_FLOAT, GL_FALSE,
                             stride, (const void *) offset);
 
+    struct vlc_gl_format *glfmt = &sampler->glfmt;
+
     /* If the direction matrix contains a 90° rotation, then the unit vector
      * should be divided by width rather than by height. Since up_vector is
      * always a unit vector with one of its components equal to 0, then we can
      * always devide the horizontal component by width and the vertical
      * component by height. */
-    GLsizei width = sampler->tex_widths[meta->plane];
-    GLsizei height = sampler->tex_heights[meta->plane];
+    GLsizei width = glfmt->tex_widths[meta->plane];
+    GLsizei height = glfmt->tex_heights[meta->plane];
     vt->Uniform2f(sys->loc.one_pixel_up, sys->up_vector[0] / width,
                                          sys->up_vector[1] / height);
 
@@ -122,6 +130,8 @@ Close(struct vlc_gl_filter *filter)
 {
     struct sys *sys = filter->sys;
 
+    vlc_gl_sampler_Delete(sys->sampler);
+
     const opengl_vtable_t *vt = &filter->api->vt;
     vt->DeleteProgram(sys->program_id);
     vt->DeleteBuffers(1, &sys->vbo);
@@ -131,7 +141,7 @@ Close(struct vlc_gl_filter *filter)
 
 static int
 Open(struct vlc_gl_filter *filter, const config_chain_t *config,
-     struct vlc_gl_tex_size *size_out)
+     const struct vlc_gl_format *glfmt, struct vlc_gl_tex_size *size_out)
 {
     (void) config;
     (void) size_out;
@@ -143,13 +153,19 @@ Open(struct vlc_gl_filter *filter, const config_chain_t *config,
     filter->ops = &ops;
     filter->config.filter_planes = true;
 
-    struct vlc_gl_sampler *sampler = vlc_gl_filter_GetSampler(filter);
+    struct vlc_gl_sampler *sampler =
+        vlc_gl_sampler_New(filter->gl, filter->api, glfmt, true);
     if (!sampler)
         return VLC_EGENERIC;
 
     struct sys *sys = filter->sys = malloc(sizeof(*sys));
     if (!sys)
+    {
+        vlc_gl_sampler_Delete(sampler);
         return VLC_EGENERIC;
+    }
+
+    sys->sampler = sampler;
 
     static const char *const VERTEX_SHADER =
         "attribute vec2 vertex_pos;\n"
@@ -262,6 +278,6 @@ vlc_module_begin()
 
     add_submodule()
         set_capability("opengl filter", 0)
-        set_callback(Open)
+        set_callback_opengl_filter(Open)
         add_shortcut("glblend")
 vlc_module_end()

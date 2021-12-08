@@ -51,9 +51,9 @@ extern "C" char **environ;
 #include "playlist/playlist_controller.hpp" /* THEMPL creation */
 #include "dialogs/dialogs_provider.hpp" /* THEDP creation */
 #ifdef _WIN32
-# include "maininterface/main_interface_win32.hpp"
+# include "maininterface/mainctx_win32.hpp"
 #else
-# include "maininterface/main_interface.hpp"   /* MainInterface creation */
+# include "maininterface/mainctx.hpp"   /* MainCtx creation */
 #endif
 #include "dialogs/extensions/extensions_manager.hpp" /* Extensions manager */
 #include "dialogs/plugins/addons_manager.hpp" /* Addons manager */
@@ -253,8 +253,8 @@ static const char *const psz_notification_list_text[] =
     { N_("Never"), N_("When minimized"), N_("Always") };
 
 static const int i_raise_list[] =
-    { MainInterface::RAISE_NEVER, MainInterface::RAISE_VIDEO, \
-      MainInterface::RAISE_AUDIO, MainInterface::RAISE_AUDIOVIDEO,  };
+    { MainCtx::RAISE_NEVER, MainCtx::RAISE_VIDEO, \
+      MainCtx::RAISE_AUDIO, MainCtx::RAISE_AUDIOVIDEO,  };
 
 static const char *const psz_raise_list_text[] =
     { N_( "Never" ), N_( "Video" ), N_( "Audio" ), _( "Audio/Video" ) };
@@ -267,6 +267,9 @@ static const char *const compositor_vlc[] = {
 #endif
     "win7",
 #endif
+#ifdef QT5_HAS_X11_COMPOSITOR
+    "x11",
+#endif
     "dummy"
 };
 static const char *const compositor_user[] = {
@@ -276,6 +279,9 @@ static const char *const compositor_user[] = {
     "Direct Composition",
 #endif
     "Windows 7",
+#endif
+#ifdef QT5_HAS_X11_COMPOSITOR
+    N_("X11"),
 #endif
     N_("Dummy"),
 };
@@ -396,7 +402,7 @@ vlc_module_begin ()
     add_integer_with_range( "qt-fs-sensitivity", 3, 0, 4000, FULLSCREEN_CONTROL_PIXELS,
             nullptr)
 
-    add_integer( "qt-auto-raise", MainInterface::RAISE_VIDEO, AUTORAISE_ON_PLAYBACK_TEXT,
+    add_integer( "qt-auto-raise", MainCtx::RAISE_VIDEO, AUTORAISE_ON_PLAYBACK_TEXT,
                  AUTORAISE_ON_PLAYBACK_LONGTEXT )
             change_integer_list( i_raise_list, psz_raise_list_text )
 
@@ -757,21 +763,33 @@ static void *Thread( void *obj )
 #endif
 
     /* Create the normal interface in non-DP mode */
-    MainInterface *p_mi = NULL;
+#ifdef _WIN32
+    p_intf->p_mi = new MainCtxWin32(p_intf);
+#else
+    p_intf->p_mi = new MainCtx(p_intf);
+#endif
 
     if( !p_intf->b_isDialogProvider )
     {
+        bool ret = false;
         do {
             p_intf->p_compositor = compositorFactory.createCompositor();
             if (! p_intf->p_compositor)
                 break;
-            p_mi = p_intf->p_compositor->makeMainInterface();
-        } while(p_mi == nullptr);
-        p_intf->p_mi = p_mi;
+            ret = p_intf->p_compositor->makeMainInterface(p_intf->p_mi);
+            if (!ret)
+            {
+                p_intf->p_compositor->destroyMainInterface();
+                delete p_intf->p_compositor;
+                p_intf->p_compositor = nullptr;
+            }
+        } while(!ret);
 
-        if (!p_mi)
+        if (!ret)
         {
             msg_Err(p_intf, "unable to create main interface");
+            delete p_intf->p_mi;
+            p_intf->p_mi = nullptr;
             return ThreadCleanup( p_intf, CLEANUP_ERROR );
         }
 
@@ -860,10 +878,15 @@ static void *ThreadCleanup( qt_intf_t *p_intf, CleanupReason cleanupReason )
         if (cleanupReason == CLEANUP_INTF_CLOSED)
         {
             p_intf->p_compositor->unloadGUI();
+            if (p_intf->p_mi)
+                delete p_intf->p_mi;
+            p_intf->p_mi = nullptr;
         }
         else // CLEANUP_APP_TERMINATED
         {
             p_intf->p_compositor->destroyMainInterface();
+            if (p_intf->p_mi)
+                delete p_intf->p_mi;
             p_intf->p_mi = nullptr;
 
             delete p_intf->mainSettings;
@@ -914,9 +937,8 @@ static void ShowDialog( intf_thread_t *p_intf, int i_dialog_event, int i_arg,
     QApplication::postEvent( THEDP, event );
 }
 
-static void WindowCloseCb( vout_window_t *p_wnd )
+static void WindowCloseCb( vout_window_t * )
 {
-    libvlc_int_t *libvlc = vlc_object_instance( p_wnd );
     qt_intf_t *p_intf = nullptr;
     bool shutdown = false;
     //mutex scope

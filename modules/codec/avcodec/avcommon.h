@@ -117,7 +117,7 @@ static inline void vlc_init_avformat(vlc_object_t *obj)
 
     avformat_network_init();
 
-#if (LIBAVFORMAT_VERSION_MICRO < 100) || (LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(58, 9, 100))
+#if (LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(58, 9, 100))
     av_register_all();
 #endif
 
@@ -133,7 +133,7 @@ static inline void vlc_init_avcodec(vlc_object_t *obj)
 
     vlc_init_avutil(obj);
 
-#if (LIBAVFORMAT_VERSION_MICRO < 100) || (LIBAVCODEC_VERSION_INT < AV_VERSION_INT(58, 10, 100))
+#if (LIBAVCODEC_VERSION_INT < AV_VERSION_INT(58, 10, 100))
     avcodec_register_all();
 #endif
 
@@ -303,12 +303,12 @@ static inline void get_video_color_settings( const AVCodecContext *ctx,
         case AVCOL_TRC_BT2020_12:
             fmt->transfer = TRANSFER_FUNC_BT2020;
             break;
-#if LIBAVUTIL_VERSION_CHECK( 55, 14, 0, 31, 100)
+#if LIBAVUTIL_VERSION_CHECK( 55, 31, 100)
         case AVCOL_TRC_ARIB_STD_B67:
             fmt->transfer = TRANSFER_FUNC_ARIB_B67;
             break;
 #endif
-#if LIBAVUTIL_VERSION_CHECK( 55, 17, 0, 37, 100)
+#if LIBAVUTIL_VERSION_CHECK( 55, 37, 100)
         case AVCOL_TRC_SMPTE2084:
             fmt->transfer = TRANSFER_FUNC_SMPTE_ST2084;
             break;

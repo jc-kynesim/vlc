@@ -393,6 +393,8 @@ __attribute__((visibility("default"))) int foo() { return my_array[0]; }
     # tdestroy() is a GNU extension
     CFLAGS="${CFLAGS} -pthread -D_GNU_SOURCE"
     CXXFLAGS="${CXXFLAGS} -pthread"
+    ac_cv_func_if_nameindex=yes
+    ac_cv_header_sys_shm_h=no
     ;;
   *)
     SYS="${host_os}"
@@ -1298,12 +1300,6 @@ AS_IF([test "${enable_ssp}" != "no" -a "${enable_optimizations}" != "no"], [
   ])
 ])
 
-AS_IF([test "${SYS}" = "mingw32"], [
-    dnl library for BCrypt APIs
-    AS_IF([test "${vlc_winstore_app}" = 1],
-          VLC_ADD_LIBS([libvlccore], [-lbcrypt]))
-])
-
 VLC_SAVE_FLAGS
 LDFLAGS="${LDFLAGS} -Wl,-Bsymbolic"
 AC_CACHE_CHECK([if linker supports -Bsymbolic], [ac_cv_ld_bsymbolic], [
@@ -2104,14 +2100,17 @@ then
   if test "${with_decklink_sdk}" != "no" -a -n "${with_decklink_sdk}"
   then
     VLC_ADD_CPPFLAGS([decklink decklinkoutput stream_out_sdi],[-I${with_decklink_sdk}/include])
+  elif test -d "${CONTRIB_DIR}/include/decklink"
+  then
+    VLC_ADD_CPPFLAGS([decklink decklinkoutput stream_out_sdi],[-I${CONTRIB_DIR}/include/decklink])
   fi
   VLC_SAVE_FLAGS
   CPPFLAGS="${CPPFLAGS} ${CPPFLAGS_decklink}"
   AC_LANG_PUSH([C++])
-  AC_CHECK_HEADERS([DeckLinkAPIDispatch.cpp], [
+  AC_CHECK_HEADERS([DeckLinkAPI.h], [
       have_decklink=yes
       AS_IF([test "${SYS}" = "darwin"], [
-        VLC_ADD_LIBS([decklink decklinkoutput],[-Wl,-framework,CoreFoundation])
+        VLC_ADD_LIBS([decklink decklinkoutput stream_out_sdi],[-Wl,-framework,CoreFoundation])
       ])
   ], [
       AS_IF([test "${enable_decklink}" = "yes"], [
@@ -2480,32 +2479,12 @@ AS_HELP_STRING([--enable-merge-ffmpeg], [merge FFmpeg-based plugins (default dis
 ])
 AM_CONDITIONAL([MERGE_FFMPEG], [test "$enable_merge_ffmpeg" != "no"])
 
-AC_MSG_CHECKING([for libavutil variant])
-PKG_CHECK_EXISTS([libavutil], [
-  libavutil_version="$(${PKG_CONFIG} --modversion libavutil)"
-  libavutil_micro="${libavutil_version##*.}"
-  AS_IF([test ${libavutil_micro} -le 99], [
-    avfork="libav"
-  ], [
-    avfork="ffmpeg"
-  ])
-], [
-  avfork="none"
-])
-AC_MSG_RESULT([${avfork}])
-
 AC_ARG_ENABLE([avcodec],
 AS_HELP_STRING([--enable-avcodec], [libavcodec codec (default enabled)]))
 AS_IF([test "${enable_avcodec}" != "no"], [
-  dnl We need >=57.16.0 from libav or >=57.37.100 from ffmpeg
-  case "${avfork}" in
-    libav) av_codec_ver="57.16.0" ;;
-    dnl 05f66706d182eb0c36af54d72614bf4c33e957a9  includes libavutil 55.9.0
-    ffmpeg) av_codec_ver="57.37.100" ;;
-    dnl 7fc329e2dd6226dfecaa4a1d7adf353bf2773726  include libavutil 55.22.101
-    *) AC_MSG_ERROR([Missing libav or FFmpeg. Pass --disable-avcodec to ignore this error.])
-  esac
-  PKG_CHECK_MODULES(AVCODEC,[libavcodec >= ${av_codec_ver} libavutil >= 55.9.0], [
+  dnl We need >=57.37.100 from ffmpeg
+  dnl 7fc329e2dd6226dfecaa4a1d7adf353bf2773726  include libavutil 55.22.101
+  PKG_CHECK_MODULES(AVCODEC,[libavcodec >= 57.37.100 libavutil >= 55.22.101], [
     have_avcodec="yes"
   ],[
     AC_MSG_ERROR([${AVCODEC_PKG_ERRORS}. Pass --disable-avcodec to ignore this error.])
@@ -3184,6 +3163,11 @@ AS_IF([test "$enable_libplacebo" != "no"], [
 AM_CONDITIONAL([HAVE_LIBPLACEBO], [test "$enable_libplacebo" != "no"])
 
 dnl
+dnl  OpenGL filter pl_scale
+dnl
+PKG_HAVE_WITH_MODULES([LIBPLACEBO_SCALE], [libplacebo >= 4.167])
+
+dnl
 dnl  OpenGL
 dnl
 PKG_CHECK_MODULES([EGL], [egl], [
@@ -3272,6 +3256,7 @@ AC_ARG_ENABLE([xcb],
 have_xcb="no"
 have_xkbcommon_x11="no"
 have_xcb_keysyms="no"
+have_xcb_damage="no"
 AS_IF([test "${enable_xcb}" != "no"], [
   xcb_err=""
 
@@ -3311,12 +3296,19 @@ AS_IF([test "${enable_xcb}" != "no"], [
     AC_MSG_WARN([${XCB_KEYSYMS_PKG_ERRORS}. Global hotkeys are disabled.])
   ])
 
+  dnl xcb-damage
+  PKG_CHECK_MODULES([XCB_DAMAGE], [xcb-damage], [
+      have_xcb_damage="yes"
+  ], [
+    AC_MSG_WARN([${XCB_DAMAGE_PKG_ERRORS}. Qt X11 composition disabled.])
+  ])
+
   have_xcb="yes"
 ])
 AM_CONDITIONAL([HAVE_XCB], [test "${have_xcb}" = "yes"])
 AM_CONDITIONAL([HAVE_XKBCOMMON_X11], [test "${have_xkbcommon_x11}" = "yes"])
 AM_CONDITIONAL([HAVE_XCB_KEYSYMS], [test "${have_xcb_keysyms}" = "yes"])
-
+AM_CONDITIONAL([HAVE_XCB_DAMAGE], [test "${have_xcb_damage}" = "yes"])
 
 dnl
 dnl VDPAU needs X11
@@ -3340,11 +3332,7 @@ AM_CONDITIONAL([HAVE_VDPAU], [test "${have_vdpau}" = "yes"])
 
 have_avcodec_vdpau="no"
 AS_IF([test "${have_vdpau}" = "yes" -a "${have_avcodec}" = "yes"], [
-  case "${avfork}" in
-    libav) av_vdpau_ver="56.10.0" ;;
-    ffmpeg) av_vdpau_ver="56.19.100" ;;
-  esac
-  PKG_CHECK_EXISTS([libavcodec >= ${av_vdpau_ver}], [
+  PKG_CHECK_EXISTS([libavcodec >= 56.19.100], [
     have_avcodec_vdpau="yes"
     AC_MSG_NOTICE([VDPAU decoding acceleration activated])
   ], [
@@ -4004,14 +3992,6 @@ AS_IF([test "${enable_skins2}" != "no"], [
 ])
 AM_CONDITIONAL([BUILD_SKINS], [test "${enable_skins2}" = "yes"])
 
-AC_ARG_ENABLE([libtar],
-  AS_HELP_STRING([--enable-libtar], [libtar support for skins2 (default auto)]))
-AS_IF([test "${enable_skins2}" = "yes" && test "${enable_libtar}" != "no"], [
-  AC_CHECK_HEADERS([libtar.h], [
-    VLC_ADD_LIBS([skins2],[-ltar])
-  ])
-])
-
 dnl
 dnl  MacOS X gui module
 dnl
@@ -4531,7 +4511,6 @@ AC_SUBST([MOC])
 AC_SUBST([RCC])
 AC_SUBST([UIC])
 AC_SUBST([WINDRES])
-AC_SUBST([WINE_SDK_PATH])
 AC_SUBST([LIBEXT])
 AC_SUBST([AM_CPPFLAGS])
 AC_SUBST([MACOSX_DEPLOYMENT_TARGET])

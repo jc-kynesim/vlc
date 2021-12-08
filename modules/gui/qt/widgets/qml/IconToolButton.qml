@@ -17,13 +17,14 @@
  *****************************************************************************/
 
 import QtQuick 2.11
-import QtQuick.Controls 2.4
+import QtQuick.Templates 2.4 as T
 
 import org.videolan.vlc 0.1
 
+import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-ToolButton {
+T.ToolButton {
     id: control
 
     // Properties
@@ -49,6 +50,8 @@ ToolButton {
 
     // Aliases
 
+    property alias toolTip: toolTip
+
     // active border color
     property alias colorFocus: background.activeBorderColor
 
@@ -58,8 +61,11 @@ ToolButton {
 
     enabled: !paintOnly
 
-    ToolTip.text: text
-    ToolTip.delay: 500
+    implicitWidth: Math.max(background.implicitWidth,
+                            contentItem.implicitWidth + leftPadding + rightPadding)
+    implicitHeight: Math.max(background.implicitHeight,
+                            contentItem.implicitHeight + topPadding + bottomPadding)
+    baselineOffset: contentItem.y + contentItem.baselineOffset
 
     // Keys
 
@@ -68,6 +74,12 @@ ToolButton {
     Keys.onPressed: Navigation.defaultKeyAction(event)
 
     // Childs
+
+    Widgets.ToolTipExt {
+        id: toolTip
+        text: control.text
+        delay: 500
+    }
 
     background: AnimatedBackground {
         id: background
@@ -101,7 +113,7 @@ ToolButton {
         activeBorderColor: VLCStyle.colors.bgFocus
     }
 
-    contentItem: Label {
+    contentItem: T.Label {
         anchors.centerIn: parent
 
         verticalAlignment: Text.AlignVCenter
@@ -117,7 +129,7 @@ ToolButton {
 
         Accessible.ignored: true
 
-        Label {
+        T.Label {
             anchors.centerIn: parent
 
             verticalAlignment: Text.AlignVCenter

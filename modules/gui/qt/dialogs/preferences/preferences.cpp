@@ -33,7 +33,7 @@
 #include "dialogs/preferences/simple_preferences.hpp"
 #include "widgets/native/searchlineedit.hpp"
 #include "widgets/native/qvlcframe.hpp"
-#include "maininterface/main_interface.hpp"
+#include "maininterface/mainctx.hpp"
 
 #include <QHBoxLayout>
 #include <QGroupBox>
@@ -305,6 +305,8 @@ void PrefsDialog::reset()
         config_ResetAll();
         config_SaveConfigFile( p_intf );
         getSettings()->clear();
+        p_intf->p_mi->reloadPrefs();
+        p_intf->p_mi->reloadFromSettings();
 
 #ifdef _WIN32
         simple_panels[0]->cleanLang();

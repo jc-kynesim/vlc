@@ -39,7 +39,7 @@ signals:
     void windowStyleChanged();
 };
 
-class CompositorWin7 : public QObject, public Compositor
+class CompositorWin7 : public CompositorVideo
 {
     Q_OBJECT
 public:
@@ -50,7 +50,7 @@ public:
     static bool preInit(qt_intf_t *p_intf);
     virtual bool init() override;
 
-    virtual MainInterface *makeMainInterface() override;
+    virtual bool makeMainInterface(MainCtx*) override;
     virtual void destroyMainInterface() override;
     virtual void unloadGUI() override;
     virtual bool setupVoutWindow(vout_window_t*, VoutDestroyCb destroyCb) override;
@@ -62,30 +62,18 @@ protected:
     bool eventFilter(QObject *obj, QEvent *ev) override;
 
 private:
-    static int window_enable(struct vout_window_t *, const vout_window_cfg_t *);
-    static void window_disable(struct vout_window_t *);
-    static void window_resize(struct vout_window_t *, unsigned width, unsigned height);
-    static void window_destroy(struct vout_window_t *);
-    static void window_set_state(struct vout_window_t *, unsigned state);
-    static void window_unset_fullscreen(struct vout_window_t *);
-    static void window_set_fullscreen(struct vout_window_t *, const char *id);
+    int windowEnable(const vout_window_cfg_t *) override;
+    void windowDisable() override;
 
 private slots:
     void resetVideoZOrder();
-    void onSurfacePositionChanged(QPointF position);
-    void onSurfaceSizeChanged(QSizeF size);
+    void onSurfacePositionChanged(const QPointF& position) override;
+    void onSurfaceSizeChanged(const QSizeF& size) override;
 
 private:
-    qt_intf_t *m_intf = nullptr;
-
-    MainInterface* m_mainInterface = nullptr;
     QWidget* m_videoWidget = nullptr;
     QWidget* m_stable = nullptr;
-    std::unique_ptr<InterfaceWindowHandlerWin32> m_interfaceWindowHandler;
     std::unique_ptr<QQuickView> m_qmlView;
-    std::unique_ptr<VideoWindowHandler> m_videoWindowHandler;
-    std::unique_ptr<VideoSurfaceProvider> m_videoSurfaceProvider;
-    std::unique_ptr<WinTaskbarWidget> m_taskbarWidget;
     std::unique_ptr<Win7NativeEventFilter> m_nativeEventFilter;
 
     HWND m_qmlWindowHWND = nullptr;

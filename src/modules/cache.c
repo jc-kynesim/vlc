@@ -28,6 +28,7 @@
 #endif
 
 #include <stdalign.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -178,14 +179,16 @@ static int vlc_cache_load_align(size_t align, block_t *file)
     if (vlc_cache_load_align(alignof(t), file)) \
         goto error
 
-static int vlc_cache_load_config(module_config_t *cfg, block_t *file)
+static int vlc_cache_load_config(struct vlc_param *param, block_t *file)
 {
+    module_config_t *cfg = &param->item;
+
     LOAD_IMMEDIATE (cfg->i_type);
-    LOAD_IMMEDIATE (cfg->i_short);
-    LOAD_FLAG (cfg->b_internal);
-    LOAD_FLAG (cfg->b_unsaveable);
-    LOAD_FLAG (cfg->b_safe);
-    LOAD_FLAG (cfg->b_removed);
+    LOAD_IMMEDIATE (param->shortname);
+    LOAD_FLAG (param->internal);
+    LOAD_FLAG (param->unsaved);
+    LOAD_FLAG (param->safe);
+    LOAD_FLAG (param->obsolete);
     LOAD_STRING (cfg->psz_type);
     LOAD_STRING (cfg->psz_name);
     LOAD_STRING (cfg->psz_text);
@@ -197,7 +200,8 @@ static int vlc_cache_load_config(module_config_t *cfg, block_t *file)
         const char *psz;
         LOAD_STRING(psz);
         cfg->orig.psz = (char *)psz;
-        cfg->value.psz = (psz != NULL) ? strdup (cfg->orig.psz) : NULL;
+        atomic_init(&param->value.str, NULL);
+        vlc_param_SetString(param, psz);
 
         if (cfg->list_count)
             cfg->list.psz = xmalloc (cfg->list_count * sizeof (char *));
@@ -214,6 +218,12 @@ static int vlc_cache_load_config(module_config_t *cfg, block_t *file)
         LOAD_IMMEDIATE (cfg->orig);
         LOAD_IMMEDIATE (cfg->min);
         LOAD_IMMEDIATE (cfg->max);
+        if (IsConfigFloatType(cfg->i_type))
+            atomic_store_explicit(&param->value.f, cfg->orig.f,
+                                  memory_order_relaxed);
+        else
+            atomic_store_explicit(&param->value.i, cfg->orig.i,
+                                  memory_order_relaxed);
         cfg->value = cfg->orig;
 
         if (cfg->list_count)
@@ -248,24 +258,25 @@ static int vlc_cache_load_plugin_config(vlc_plugin_t *plugin, block_t *file)
     /* Allocate memory */
     if (lines)
     {
-        plugin->conf.items = calloc(sizeof (module_config_t), lines);
-        if (unlikely(plugin->conf.items == NULL))
+        plugin->conf.params = calloc(sizeof (struct vlc_param), lines);
+        if (unlikely(plugin->conf.params == NULL))
         {
             plugin->conf.size = 0;
             return -1;
         }
     }
     else
-        plugin->conf.items = NULL;
+        plugin->conf.params = NULL;
 
     plugin->conf.size = lines;
 
     /* Do the duplication job */
     for (size_t i = 0; i < lines; i++)
     {
-        module_config_t *item = plugin->conf.items + i;
+        struct vlc_param *param = plugin->conf.params + i;
+        module_config_t *item = &param->item;
 
-        if (vlc_cache_load_config(item, file))
+        if (vlc_cache_load_config(param, file))
             return -1;
 
         if (CONFIG_ITEM(item->i_type))
@@ -274,7 +285,7 @@ static int vlc_cache_load_plugin_config(vlc_plugin_t *plugin, block_t *file)
             if (item->i_type == CONFIG_ITEM_BOOL)
                 plugin->conf.booleans++;
         }
-        item->owner = plugin;
+        param->owner = plugin;
     }
 
     return 0;
@@ -506,14 +517,16 @@ static int CacheSaveAlign(FILE *file, size_t align)
     if (CacheSaveAlign(file, alignof (t))) \
         goto error
 
-static int CacheSaveConfig (FILE *file, const module_config_t *cfg)
+static int CacheSaveConfig(FILE *file, const struct vlc_param *param)
 {
+    const module_config_t *cfg = &param->item;
+
     SAVE_IMMEDIATE (cfg->i_type);
-    SAVE_IMMEDIATE (cfg->i_short);
-    SAVE_FLAG (cfg->b_internal);
-    SAVE_FLAG (cfg->b_unsaveable);
-    SAVE_FLAG (cfg->b_safe);
-    SAVE_FLAG (cfg->b_removed);
+    SAVE_IMMEDIATE (param->shortname);
+    SAVE_FLAG (param->internal);
+    SAVE_FLAG (param->unsaved);
+    SAVE_FLAG (param->safe);
+    SAVE_FLAG (param->obsolete);
     SAVE_STRING (cfg->psz_type);
     SAVE_STRING (cfg->psz_name);
     SAVE_STRING (cfg->psz_text);
@@ -556,7 +569,7 @@ static int CacheSaveModuleConfig(FILE *file, const vlc_plugin_t *plugin)
     SAVE_IMMEDIATE (lines);
 
     for (size_t i = 0; i < lines; i++)
-        if (CacheSaveConfig(file, plugin->conf.items + i))
+        if (CacheSaveConfig(file, plugin->conf.params + i))
            goto error;
 
     return 0;

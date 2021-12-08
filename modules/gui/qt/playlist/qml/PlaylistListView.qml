@@ -17,6 +17,7 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
+import QtQuick.Templates 2.4 as T
 import QtQuick.Layouts 1.11
 import QtQml.Models 2.2
 import QtGraphicalEffects 1.0
@@ -113,7 +114,7 @@ Control {
         anchors.fill: parent
         z: 1
 
-        active: mainInterface.playlistDocked
+        active: MainCtx.playlistDocked
 
         readonly property bool shown: (status === Loader.Ready) ? item.visible : false
 
@@ -139,29 +140,19 @@ Control {
 
         parent: (typeof g_mainDisplay !== 'undefined') ? g_mainDisplay : root
 
-        property var selection: null
+        property var selection: null // make this indexes alias?
 
         colors: root.colors
 
-        function updateComponents(maxCovers) {
-            var count = root.model.selectedCount
+        indexes: selection
+
+        onRequestData: {
             selection = root.model.getSelection()
-            var _selection = selection.slice(0, maxCovers)
-
-            var title = _selection.map(function (index){
-                return root.model.itemAt(index).title
-            }).join(", ")
-
-            var covers = _selection.map(function (index) {
-                var artwork = root.model.itemAt(index).artwork
-                return {artwork: (artwork && artwork.toString()) ? artwork : VLCStyle.noArtCover}
-            })
-
-            return ({covers: covers, title: title, count: root.model.selectedCount})
-        }
-
-        function getSelectedInputItem(index) {
-            return model.getItemsForIndexes(model.getSelection())
+            indexes = selection
+            setData(identifier, indexes.map(function (index) {
+                var item = root.model.itemAt(index)
+                return {"title": item.title, "cover": item.artwork}
+            }))
         }
 
         property int _scrollingDirection: 0
@@ -175,40 +166,40 @@ Control {
             var topDiff    = (viewY + margin) - dragItemY
             var bottomDiff = dragItemY - (viewY + listView.height - toolbar.height - margin)
 
-            if (!listView.listView.atYBeginning && topDiff > 0) {
+            if (topDiff > 0)
                 _scrollingDirection = -1
-
-                listView.fadeRectTopHovered = true
-            } else if (!listView.listView.atYEnd && bottomDiff > 0) {
+            else if (bottomDiff > 0)
                 _scrollingDirection = 1
-
-                listView.fadeRectBottomHovered = true
-            } else {
+            else
                 _scrollingDirection = 0
-
-                listView.fadeRectTopHovered = false
-                listView.fadeRectBottomHovered = false
-            }
         }
 
         SmoothedAnimation {
             id: upAnimation
-            target: listView.listView
+            target: listView
             property: "contentY"
             to: 0
-            running: dragItem._scrollingDirection === -1 && dragItem.visible
+            running: dragItem._scrollingDirection === -1 && dragItem.visible && !target.listView.atYBeginning
 
             velocity: VLCStyle.dp(225, VLCStyle.scale)
+
+            onRunningChanged: {
+                target.fadeRectTopHovered = running
+            }
         }
 
         SmoothedAnimation {
             id: downAnimation
-            target: listView.listView
+            target: listView
             property: "contentY"
-            to: listView.listView.contentHeight - listView.height
-            running: dragItem._scrollingDirection === 1 && dragItem.visible
+            to: target.contentHeight - target.height + target.footerItem.height
+            running: dragItem._scrollingDirection === 1 && dragItem.visible && !target.listView.atYEnd
 
             velocity: VLCStyle.dp(225, VLCStyle.scale)
+
+            onRunningChanged: {
+                target.fadeRectBottomHovered = running
+            }
         }
     }
 
@@ -335,7 +326,7 @@ Control {
             clip: true // else out of view items will overlap with surronding items
 
             model: PlaylistListModel {
-                playlistId: mainctx.playlist
+                playlistId: MainCtx.mainPlaylist
             }
 
             fadeColor: background.usingAcrylic ? undefined
@@ -345,6 +336,14 @@ Control {
             property int mode: PlaylistListView.Mode.Normal
 
             signal setItemDropIndicatorVisible(int index, bool visible)
+
+            onDeselectAll: {
+                root.model.deselectAll()
+            }
+
+            onShowContextMenu: {
+                contextMenu.popup(-1, globalPos)
+            }
 
             Connections {
                 target: listView.model
@@ -390,23 +389,6 @@ Control {
                     dropIndicator.visible = Qt.binding(function() { return (visible || dropArea.containsDrag); })
                 }
 
-                MouseArea {
-                    anchors.fill: parent
-                    acceptedButtons: Qt.RightButton | Qt.LeftButton
-
-                    onClicked: {
-                        listView.forceActiveFocus()
-
-                        if ( mouse.button === Qt.LeftButton || mouse.button === Qt.RightButton ) {
-                            root.model.deselectAll()
-                        }
-
-                        if ( mouse.button === Qt.RightButton ) {
-                            contextMenu.popup(-1, this.mapToGlobal(mouse.x, mouse.y))
-                        }
-                    }
-                }
-
                 Rectangle {
                     id: dropIndicator
 
@@ -434,7 +416,7 @@ Control {
 
                     opacity: 0.8
 
-                    Label {
+                    T.Label {
                         anchors.centerIn: parent
 
                         text: VLCIcons.add
@@ -464,9 +446,11 @@ Control {
                 }
             }
 
-            ToolTip {
+            Widgets.ToolTipExt {
                 id: plInfoTooltip
                 delay: 750
+
+                colors: root.colors
             }
 
             delegate: PlaylistDelegate {
@@ -614,38 +598,55 @@ Control {
 
             Column {
                 id: noContentInfoColumn
+
                 anchors.centerIn: parent
-                visible: model.count === 0 && !listView.footerItem.firstItemIndicatorVisible
+
+                visible: (model.count === 0 && !listView.footerItem.firstItemIndicatorVisible)
+
+                opacity: (listView.activeFocus) ? 1.0 : 0.4
 
                 Widgets.IconLabel {
-                    font.pixelSize: VLCStyle.dp(48, VLCStyle.scale)
+                    id: label
+
                     anchors.horizontalCenter: parent.horizontalCenter
+
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
+
                     text: VLCIcons.playlist
-                    color: (listView.activeFocus) ? colors.accent : colors.text
-                    opacity: 0.3
+
+                    color: (listView.activeFocus) ? colors.bgFocus
+                                                  : colors.text
+
+                    font.pixelSize: VLCStyle.dp(48, VLCStyle.scale)
                 }
 
-                Label {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                T.Label {
                     anchors.topMargin: VLCStyle.margin_xlarge
-                    text: i18n.qtr("No content yet")
+
+                    anchors.horizontalCenter: parent.horizontalCenter
+
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
+
+                    text: i18n.qtr("No content yet")
+
+                    color: label.color
+
                     font.pixelSize: VLCStyle.fontSize_xxlarge
-                    color: (listView.activeFocus) ? colors.accent : colors.text
-                    opacity: 0.4
                 }
 
-                Label {
+                T.Label {
                     anchors.topMargin: VLCStyle.margin_normal
-                    text: i18n.qtr("Drag & Drop some content here!")
+
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
+
+                    text: i18n.qtr("Drag & Drop some content here!")
+
+                    color: label.color
+
                     font.pixelSize: VLCStyle.fontSize_large
-                    color: (listView.activeFocus) ? colors.accent : colors.text
-                    opacity: 0.4
                 }
             }
         }

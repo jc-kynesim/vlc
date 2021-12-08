@@ -120,6 +120,8 @@
         <file alias="theme_dark.svg">pixmaps/theme_dark.svg</file>
         <file alias="theme_daynight.svg">pixmaps/theme_daynight.svg</file>
         <file alias="theme_light.svg">pixmaps/theme_light.svg</file>
+        <file alias="play_shadow.png">pixmaps/play_shadow.png</file>
+        <file alias="new_indicator.svg">pixmaps/new_indicator.svg</file>
     </qresource>
     <qresource prefix="/prefsmenu">
         <file alias="cone_audio_64.png">pixmaps/prefs/spref_cone_Audio_64.png</file>
@@ -258,6 +260,8 @@
         <file alias="IconControlButton.qml">widgets/qml/IconControlButton.qml</file>
         <file alias="ShadowCoverGenerator.qml">widgets/qml/ShadowCoverGenerator.qml</file>
         <file alias="GridShadows.qml">widgets/qml/GridShadows.qml</file>
+        <file alias="ToolTipExt.qml">widgets/qml/ToolTipExt.qml</file>
+        <file alias="MLDragItem.qml">widgets/qml/MLDragItem.qml</file>
     </qresource>
     <qresource prefix="/network">
         <file alias="AddressbarButton.qml">network/qml/AddressbarButton.qml</file>
@@ -310,6 +314,7 @@
         <file alias="VideoDisplayRecentVideos.qml">medialibrary/qml/VideoDisplayRecentVideos.qml</file>
     </qresource>
     <qresource prefix="/style">
+        <file alias="AcrylicController.qml">style/AcrylicController.qml</file>
         <file alias="qmldir">style/qmldir</file>
         <file alias="VLCStyle.qml">style/VLCStyle.qml</file>
         <file alias="VLCColors.qml">style/VLCColors.qml</file>
@@ -338,14 +343,15 @@
         <file alias="MiniPlayer.qml">player/qml/MiniPlayer.qml</file>
         <file alias="TopBar.qml">player/qml/TopBar.qml</file>
         <file alias="PIPPlayer.qml">player/qml/PIPPlayer.qml</file>
-        <file alias="PlayerButtonsLayout.qml">player/qml/PlayerButtonsLayout.qml</file>
+        <file alias="PlayerControlLayout.qml">player/qml/PlayerControlLayout.qml</file>
         <file alias="PlayerMenu.qml">player/qml/PlayerMenu.qml</file>
         <file alias="PlayerMenuItem.qml">player/qml/PlayerMenuItem.qml</file>
         <file alias="LanguageMenu.qml">player/qml/LanguageMenu.qml</file>
-        <file alias="ButtonsLayout.qml">player/qml/ButtonsLayout.qml</file>
+        <file alias="ControlLayout.qml">player/qml/ControlLayout.qml</file>
         <file alias="PlaybackSpeed.qml">player/qml/PlaybackSpeed.qml</file>
     </qresource>
     <qresource prefix="/player/controlbarcontrols">
+        <file alias="HighResolutionTimeWidget.qml">player/qml/controlbarcontrols/HighResolutionTimeWidget.qml</file>
         <file alias="ArtworkInfoWidget.qml">player/qml/controlbarcontrols/ArtworkInfoWidget.qml</file>
         <file alias="AspectRatioWidget.qml">player/qml/controlbarcontrols/AspectRatioWidget.qml</file>
         <file alias="AtoBButton.qml">player/qml/controlbarcontrols/AtoBButton.qml</file>

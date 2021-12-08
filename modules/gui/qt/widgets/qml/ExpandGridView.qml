@@ -25,6 +25,8 @@ import "qrc:///util/Helpers.js" as Helpers
 FocusScope {
     id: root
 
+    // Properties
+
     /// cell Width
     property int cellWidth: 100
     // cell Height
@@ -36,25 +38,31 @@ FocusScope {
     property int leftMargin: VLCStyle.margin_normal
     property int rightMargin: VLCStyle.margin_normal
 
+    // NOTE: The grid margin for the item(s) horizontal positioning.
+    readonly property int contentMargin: (_contentWidth - _nbItemPerRow * _effectiveCellWidth
+                                          +
+                                          horizontalSpacing) / 2
+
     property int rowX: 0
     property int horizontalSpacing: VLCStyle.column_margin_width
     property int verticalSpacing: VLCStyle.column_margin_width
 
     property int displayMarginEnd: 0
-    onDisplayMarginEndChanged: flickable.layout(false)
 
     readonly property int _effectiveCellWidth: cellWidth + horizontalSpacing
     readonly property int _effectiveCellHeight: cellHeight + verticalSpacing
+
+    readonly property int _contentWidth: width - rightMargin - leftMargin
+
+    readonly property int _nbItemPerRow: Math.max(Math.floor((_contentWidth + horizontalSpacing)
+                                                             /
+                                                             _effectiveCellWidth), 1)
 
     property var delegateModel
     property var model
 
     property int currentIndex: 0
 
-    property alias contentHeight: flickable.contentHeight
-    property alias contentWidth: flickable.contentWidth
-    property alias contentX: flickable.contentX
-    property alias gridScrollBar: flickableScrollBar
     property bool isAnimating: animateRetractItem.running || animateExpandItem.running
 
     property int _count: 0
@@ -70,36 +78,201 @@ FocusScope {
 
     property int _currentFocusReason: Qt.OtherFocusReason
 
-    on_ExpandItemVerticalSpaceChanged: {
-        if (expandItem) {
-            expandItem.visible = root._expandItemVerticalSpace - root.verticalSpacing > 0
-            expandItem.height = Math.max(root._expandItemVerticalSpace - root.verticalSpacing, 0)
-        }
-        flickable.layout(true)
-    }
-
     //delegate to display the extended item
     property Component delegate: Item{}
     property Component expandDelegate: Item{}
-    property alias expandItem: expandItemLoader.item
 
     property Component headerDelegate: Item{}
+
+    property var _idChildrenList: []
+    property var _unusedItemList: []
+    property var _currentRange: [0,0]
+
+    // Aliases
+
+    property alias contentHeight: flickable.contentHeight
+    property alias contentWidth: flickable.contentWidth
+    property alias contentX: flickable.contentX
+    property alias gridScrollBar: flickableScrollBar
+
+    property alias expandItem: expandItemLoader.item
+
     property alias headerHeight: headerItemLoader.implicitHeight
     property alias headerItem: headerItemLoader.item
 
     property alias footerItem: footerItemLoader.item
     property alias footerDelegate: footerItemLoader.sourceComponent
 
+    // Signals
+
     //signals emitted when selected items is updated from keyboard
     signal selectionUpdated( int keyModifiers, int oldIndex,int newIndex )
     signal selectAll()
     signal actionAtIndex(int index)
 
-    property var _idChildrenList: []
-    property var _unusedItemList: []
-    property var _currentRange: [0,0]
+    signal showContextMenu(point globalPos)
+
+    // Settings
 
     Accessible.role: Accessible.Table
+
+    // Events
+
+    Component.onCompleted: flickable.layout(true)
+
+    onHeightChanged: flickable.layout(false)
+
+    // NOTE: Update on contentMargin change rather than width since the margin defines the x
+    //       position and depends on the width.
+    onContentMarginChanged: flickable.layout(true)
+
+    onDisplayMarginEndChanged: flickable.layout(false)
+
+    onModelChanged: _onModelCountChanged()
+
+    onCurrentIndexChanged: {
+        if (expandIndex !== -1)
+            retract()
+        positionViewAtIndex(currentIndex, ItemView.Contain)
+    }
+
+    on_ExpandItemVerticalSpaceChanged: {
+        if (expandItem) {
+            expandItem.visible = _expandItemVerticalSpace - verticalSpacing > 0
+            expandItem.height = Math.max(_expandItemVerticalSpace - verticalSpacing, 0)
+        }
+        flickable.layout(true)
+    }
+
+    // Keys
+
+    Keys.onPressed: {
+        var newIndex = -1
+        if (KeyHelper.matchRight(event)) {
+            if ((currentIndex + 1) % _nbItemPerRow !== 0) {//are we not at the end of line
+                newIndex = Math.min(_count - 1, currentIndex + 1)
+            }
+        } else if (KeyHelper.matchLeft(event)) {
+            if (currentIndex % _nbItemPerRow !== 0) {//are we not at the begining of line
+                newIndex = Math.max(0, currentIndex - 1)
+            }
+        } else if (KeyHelper.matchDown(event)) {
+            // we are not on the last line
+            if (Math.floor(currentIndex / _nbItemPerRow) !== Math.floor(_count / _nbItemPerRow)) {
+                newIndex = Math.min(_count - 1, currentIndex + _nbItemPerRow)
+            }
+        } else if (KeyHelper.matchPageDown(event)) {
+            newIndex = Math.min(_count - 1, currentIndex + _nbItemPerRow * 5)
+        } else if (KeyHelper.matchUp(event)) {
+            if (Math.floor(currentIndex / _nbItemPerRow) !== 0) { //we are not on the first line
+                newIndex = Math.max(0, currentIndex - _nbItemPerRow)
+            }
+        } else if (KeyHelper.matchPageUp(event)) {
+            newIndex = Math.max(0, currentIndex - _nbItemPerRow * 5)
+        } else if (KeyHelper.matchOk(event) || event.matches(StandardKey.SelectAll) ) {
+            //these events are matched on release
+            event.accepted = true
+        }
+
+        if (event.matches(StandardKey.SelectAll) || KeyHelper.matchOk(event)) {
+            _releaseActionButtonPressed = true
+        } else {
+            _releaseActionButtonPressed = false
+        }
+
+        if (newIndex !== -1 && newIndex !== currentIndex) {
+            event.accepted = true;
+
+            var oldIndex = currentIndex;
+            currentIndex = newIndex;
+            selectionUpdated(event.modifiers, oldIndex, newIndex);
+
+            // NOTE: We make sure we have the proper visual focus on components.
+            if (oldIndex < currentIndex)
+                setCurrentItemFocus(Qt.TabFocusReason);
+            else
+                setCurrentItemFocus(Qt.BacktabFocusReason);
+        }
+
+        if (!event.accepted) {
+            Navigation.defaultKeyAction(event)
+        }
+    }
+
+    Keys.onReleased: {
+        if (!_releaseActionButtonPressed)
+            return
+
+        if (event.matches(StandardKey.SelectAll)) {
+            event.accepted = true
+            selectAll()
+        } else if ( KeyHelper.matchOk(event) ) {
+            event.accepted = true
+            actionAtIndex(currentIndex)
+        }
+        _releaseActionButtonPressed = false
+    }
+
+    // Connections
+
+    Connections {
+        target: model
+        onDataChanged: {
+            var iMin = topLeft.row
+            var iMax = bottomRight.row + 1 // [] => [)
+            var f_l = _currentRange
+            if (iMin < f_l[1] && f_l[0] < iMax) {
+                _refreshData(iMin, iMax)
+            }
+        }
+        onRowsInserted: _onModelCountChanged()
+        onRowsRemoved: _onModelCountChanged()
+        onModelReset: _onModelCountChanged()
+    }
+
+    Connections {
+        target: delegateModel
+
+        onSelectionChanged: {
+            var i
+            for (i = 0; i < selected.length; ++i) {
+                _updateSelectedRange(selected[i].topLeft, selected[i].bottomRight, true)
+            }
+
+            for (i = 0; i < deselected.length; ++i) {
+                _updateSelectedRange(deselected[i].topLeft, deselected[i].bottomRight, false)
+            }
+        }
+
+        function _updateSelectedRange(topLeft, bottomRight, select) {
+            var iMin = topLeft.row
+            var iMax = bottomRight.row + 1 // [] => [)
+            if (iMin < root._currentRange[1] && root._currentRange[0] < iMax) {
+                iMin = Math.max(iMin, root._currentRange[0])
+                iMax = Math.min(iMax, root._currentRange[1])
+                for (var j = iMin; j < iMax; j++) {
+                    var item = root._getItem(j)
+                    console.assert(item)
+                    item.selected = select
+                }
+            }
+        }
+    }
+
+    Connections {
+        target: MainCtx
+        onIntfScaleFactorChanged: flickable.layout(true)
+    }
+
+    // Animations
+
+    PropertyAnimation {
+        id: animateContentY;
+        target: flickable;
+        properties: "contentY"
+    }
+
+    // Functions
 
     function setCurrentItemFocus(reason) {
 
@@ -149,24 +322,16 @@ FocusScope {
         flickable.retract()
     }
 
-    function getNbItemsPerRow() {
-        return Math.max(Math.floor(((width - root.rightMargin - root.leftMargin) + root.horizontalSpacing) / root._effectiveCellWidth), 1)
-    }
-
     function getItemRowCol(id) {
-        var nbItemsPerRow = getNbItemsPerRow()
-        var rowId = Math.floor(id / nbItemsPerRow)
-        var colId = id % nbItemsPerRow
+        var rowId = Math.floor(id / _nbItemPerRow)
+        var colId = id % _nbItemPerRow
         return [colId, rowId]
     }
 
     function getItemPos(id) {
-        var remainingSpace = (flickable.width - rightMargin - leftMargin)
-                             - getNbItemsPerRow() * _effectiveCellWidth + horizontalSpacing;
-
         var rowCol = getItemRowCol(id);
 
-        var x = rowCol[0] * _effectiveCellWidth + remainingSpace / 2 + leftMargin;
+        var x = rowCol[0] * _effectiveCellWidth + contentMargin + leftMargin;
 
         var y = rowCol[1] * _effectiveCellHeight + headerHeight + topMargin;
 
@@ -190,13 +355,13 @@ FocusScope {
 
         var newContentY = flickable.contentY
 
-        var itemTopY = root.getItemPos(index)[1]
-        var itemBottomY = itemTopY + root._effectiveCellHeight
+        var itemTopY = getItemPos(index)[1]
+        var itemBottomY = itemTopY + _effectiveCellHeight
 
         var viewTopY = flickable.contentY
         var viewBottomY = viewTopY + flickable.height
 
-        if (index < getNbItemsPerRow()) {
+        if (index < _nbItemPerRow) {
             //force to see the header when on the first row
             newContentY = 0
         } else if ( itemTopY < viewTopY ) {
@@ -212,12 +377,12 @@ FocusScope {
     }
 
     function leftClickOnItem(modifier, index) {
-        delegateModel.updateSelection( modifier , currentIndex, index)
+        delegateModel.updateSelection(modifier, currentIndex, index)
         if (delegateModel.isSelected(model.index(index, 0)))
             currentIndex = index
         else if (currentIndex === index) {
-            if (root._containsItem(currentIndex))
-                root._getItem(currentIndex).focus = false
+            if (_containsItem(currentIndex))
+                _getItem(currentIndex).focus = false
             currentIndex = -1
         }
 
@@ -227,27 +392,36 @@ FocusScope {
 
     function rightClickOnItem(index) {
         if (!delegateModel.isSelected(model.index(index, 0))) {
-            root.leftClickOnItem(Qt.NoModifier, index)
+            leftClickOnItem(Qt.NoModifier, index)
         }
     }
 
+    function animateFlickableContentY( newContentY ) {
+        animateContentY.stop()
+        animateContentY.duration = VLCStyle.duration_slow
+        animateContentY.to = newContentY
+        animateContentY.start()
+    }
+
+    // Private
+
     function _initialize() {
-        if (root._isInitialised)
+        if (_isInitialised)
             return;
 
         if (flickable.width === 0 || flickable.height === 0)
             return;
         if (currentIndex !== 0)
             positionViewAtIndex(currentIndex, ItemView.Contain)
-        root._isInitialised = true;
+        _isInitialised = true;
     }
 
     function _calculateCurrentRange() {
-        var myContentY = flickable.contentY - root.headerHeight - topMargin
+        var myContentY = flickable.contentY - headerHeight - topMargin
 
         var contentYWithoutExpand = myContentY
-        var heightWithoutExpand = flickable.height + root.displayMarginEnd
-        if (root.expandIndex !== -1) {
+        var heightWithoutExpand = flickable.height + displayMarginEnd
+        if (expandIndex !== -1) {
             if (myContentY >= expandItem.y && myContentY < expandItem.y + _expandItemVerticalSpace)
                 contentYWithoutExpand = expandItem.y
             if (myContentY >= expandItem.y + _expandItemVerticalSpace)
@@ -259,33 +433,33 @@ FocusScope {
             heightWithoutExpand -= expandDisplayedHeight
         }
 
-        var rowId = Math.floor(contentYWithoutExpand / root._effectiveCellHeight)
-        var firstId = Math.max(rowId * root.getNbItemsPerRow(), 0)
+        var rowId = Math.floor(contentYWithoutExpand / _effectiveCellHeight)
+        var firstId = Math.max(rowId * _nbItemPerRow, 0)
 
 
-        rowId = Math.ceil((contentYWithoutExpand + heightWithoutExpand) / root._effectiveCellHeight)
-        var lastId = Math.min(rowId * root.getNbItemsPerRow(), _count)
+        rowId = Math.ceil((contentYWithoutExpand + heightWithoutExpand) / _effectiveCellHeight)
+        var lastId = Math.min(rowId * _nbItemPerRow, _count)
 
         return [firstId, lastId]
     }
 
     function _getItem(id) {
-        var i = id - root._currentRange[0]
-        return root._idChildrenList[i]
+        var i = id - _currentRange[0]
+        return _idChildrenList[i]
     }
 
     function _setItem(id, item) {
-        var i = id - root._currentRange[0]
-        root._idChildrenList[i] = item
+        var i = id - _currentRange[0]
+        _idChildrenList[i] = item
     }
 
     function _containsItem(id) {
-        var i = id - root._currentRange[0]
-        return i >= 0 && i < root._idChildrenList.length && typeof root._idChildrenList[i] !== "undefined"
+        var i = id - _currentRange[0]
+        return i >= 0 && i < _idChildrenList.length && typeof _idChildrenList[i] !== "undefined"
     }
 
     function _repositionItem(id, x, y) {
-        var item = root._getItem(id)
+        var item = _getItem(id)
         if (item === undefined)
             throw "wrong child: " + id
 
@@ -309,13 +483,13 @@ FocusScope {
         item.y = y
         item.visible = true
 
-        root._setItem(id, item)
+        _setItem(id, item)
 
         return item
     }
 
     function _createItem(id, x, y) {
-        var item = root.delegate.createObject( flickable.contentItem, {
+        var item = delegate.createObject( flickable.contentItem, {
                         selected: delegateModel.isSelected(model.index(id, 0)),
                         index: id,
                         model: model.getDataAt(id),
@@ -326,17 +500,17 @@ FocusScope {
         if (item === undefined)
             throw "wrong unable to instantiate child " + id
 
-        root._setItem(id, item)
+        _setItem(id, item)
 
         return item
     }
 
     function _setupChild(id, ydelta) {
-        var pos = root.getItemPos(id)
+        var pos = getItemPos(id)
 
         var item;
 
-        if (root._containsItem(id))
+        if (_containsItem(id))
             item = _repositionItem(id, pos[0], pos[1] + ydelta)
         else if (_unusedItemList.length > 0)
             item = _recycleItem(id, pos[0], pos[1] + ydelta)
@@ -351,25 +525,25 @@ FocusScope {
     }
 
     function _refreshData( iMin, iMax ) {
-        var f_l = root._currentRange
+        var f_l = _currentRange
         if (!iMin || iMin < f_l[0])
             iMin = f_l[0]
         if (!iMax || iMax > f_l[1])
             iMax= f_l[1]
 
         for (var id  = iMin; id < iMax; id++) {
-            var item = root._getItem(id)
+            var item = _getItem(id)
             item.model = model.getDataAt(id)
         }
 
-        if (root.expandIndex >= iMin && root.expandIndex < iMax) {
-            expandItem.model = model.getDataAt(root.expandIndex)
+        if (expandIndex >= iMin && expandIndex < iMax) {
+            expandItem.model = model.getDataAt(expandIndex)
         }
     }
 
     function _onModelCountChanged() {
         _count = model ? model.rowCount() : 0
-        if (!root._isInitialised)
+        if (!_isInitialised)
             return
 
         // Hide the expandItem with no animation
@@ -381,56 +555,7 @@ FocusScope {
         _refreshData()
     }
 
-    Connections {
-        target: model
-        onDataChanged: {
-            var iMin = topLeft.row
-            var iMax = bottomRight.row + 1 // [] => [)
-            var f_l = root._currentRange
-            if (iMin < f_l[1] && f_l[0] < iMax) {
-                _refreshData(iMin, iMax)
-            }
-        }
-        onRowsInserted: _onModelCountChanged()
-        onRowsRemoved: _onModelCountChanged()
-        onModelReset: _onModelCountChanged()
-    }
-
-    Connections {
-        target: delegateModel
-
-        onSelectionChanged: {
-            var i
-            for (i = 0; i < selected.length; ++i) {
-                _updateSelectedRange(selected[i].topLeft, selected[i].bottomRight, true)
-            }
-
-            for (i = 0; i < deselected.length; ++i) {
-                _updateSelectedRange(deselected[i].topLeft, deselected[i].bottomRight, false)
-            }
-        }
-
-        function _updateSelectedRange(topLeft, bottomRight, select) {
-            var iMin = topLeft.row
-            var iMax = bottomRight.row + 1 // [] => [)
-            if (iMin < root._currentRange[1] && root._currentRange[0] < iMax) {
-                iMin = Math.max(iMin, root._currentRange[0])
-                iMax = Math.min(iMax, root._currentRange[1])
-                for (var j = iMin; j < iMax; j++) {
-                    var item = root._getItem(j)
-                    console.assert(item)
-                    item.selected = select
-                }
-            }
-        }
-    }
-
-    onModelChanged: _onModelCountChanged()
-
-    Connections {
-        target: mainInterface
-        onIntfScaleFactorChanged: flickable.layout(true)
-    }
+    // Children
 
     //Gridview visible above the expanded item
     Flickable {
@@ -442,6 +567,27 @@ FocusScope {
 
         ScrollBar.vertical: ScrollBar {
             id: flickableScrollBar
+        }
+
+        MouseEventFilter {
+            target: flickable
+
+            onMouseButtonPress: {
+                if (buttons & (Qt.LeftButton | Qt.RightButton)) {
+                    Helpers.enforceFocus(flickable, Qt.MouseFocusReason)
+
+                    if (!(modifiers & (Qt.ShiftModifier | Qt.ControlModifier))) {
+                        if (delegateModel)
+                            delegateModel.clear()
+                    }
+                }
+            }
+
+            onMouseButtonRelease: {
+                if (button & Qt.RightButton) {
+                    root.showContextMenu(globalPos)
+                }
+            }
         }
 
         Loader {
@@ -466,8 +612,9 @@ FocusScope {
         Loader {
             id: footerItemLoader
             focus: (status === Loader.Ready) ? item.focus : false
-            y: root.topMargin + root.headerHeight + (root._effectiveCellHeight * (Math.ceil(model.count / getNbItemsPerRow()))) +
-               _expandItemVerticalSpace
+
+            y: root.topMargin + root.headerHeight + (root._effectiveCellHeight * (Math.ceil(model.count / root._nbItemPerRow))) +
+               root._expandItemVerticalSpace
         }
 
         Connections {
@@ -500,10 +647,8 @@ FocusScope {
             }
         }
 
-
         anchors.fill: parent
-        onWidthChanged: { layout(true) }
-        onHeightChanged: { layout(false) }
+
         onContentYChanged: { scrollLayoutTimer.start() }
 
         Timer {
@@ -521,9 +666,9 @@ FocusScope {
             if (root.expandIndex !== -1) {
                 var rowCol = root.getItemRowCol(root.expandIndex)
                 var rowId = rowCol[1] + 1
-                ret = rowId * root.getNbItemsPerRow()
+                ret = rowId * root._nbItemPerRow
             } else {
-                ret = _count
+                ret = root._count
             }
             return ret
         }
@@ -561,16 +706,16 @@ FocusScope {
                 root._setItem(i, undefined)
             }
 
-            for (i = _currentRange[0]; i < _currentRange[1]; ++i) {
+            for (i = root._currentRange[0]; i < root._currentRange[1]; ++i) {
                 var item = root._getItem(i)
                 if (typeof item !== "undefined") {
                     item.visible = false
-                    _unusedItemList.push(item)
+                    root._unusedItemList.push(item)
                     //  root._setItem(i, undefined) // not needed the list will be reset following this loop
                 }
             }
 
-            _idChildrenList = newList
+            root._idChildrenList = newList
             root._currentRange = [first, last]
         }
 
@@ -610,13 +755,13 @@ FocusScope {
             }
 
             // Place the delegates after the expandItem
-            _setupIndexes(forceRelayout, [topGridEndId, lastId], _expandItemVerticalSpace)
+            _setupIndexes(forceRelayout, [topGridEndId, lastId], root._expandItemVerticalSpace)
 
             // Calculate and set the contentHeight
-            var newContentHeight = root.getItemPos(_count - 1)[1] + root._effectiveCellHeight + _expandItemVerticalSpace
+            var newContentHeight = root.getItemPos(root._count - 1)[1] + root._effectiveCellHeight + root._expandItemVerticalSpace
             contentHeight = newContentHeight + root.bottomMargin // topMargin is included from root.getItemPos
             contentHeight += footerItemLoader.item ? footerItemLoader.item.height : 0
-            contentWidth = root._effectiveCellWidth * root.getNbItemsPerRow() - root.horizontalSpacing
+            contentWidth = root._effectiveCellWidth * root._nbItemPerRow - root.horizontalSpacing
         }
 
         Connections {
@@ -630,17 +775,17 @@ FocusScope {
         }
 
         function expand() {
-            expandIndex = _newExpandIndex
-            if (expandIndex === -1)
+            root.expandIndex = root._newExpandIndex
+            if (root.expandIndex === -1)
                 return
-            expandItem.model = model.getDataAt(expandIndex)
+            expandItem.model = model.getDataAt(root.expandIndex)
             /* We must also start the expand animation here since the expandItem implicitHeight is not
                changed if it had the same height at previous opening. */
             expandAnimation()
         }
 
         function expandAnimation() {
-            if (expandIndex === -1)
+            if (root.expandIndex === -1)
                 return
 
             var expandItemHeight = expandItem.implicitHeight + root.verticalSpacing
@@ -655,7 +800,7 @@ FocusScope {
             animateExpandItem.start()
 
             // Sliding animation
-            var currentItemYPos = root.getItemPos(expandIndex)[1]
+            var currentItemYPos = root.getItemPos(root.expandIndex)[1]
             currentItemYPos += root._effectiveCellHeight / 2
             animateFlickableContentY(currentItemYPos)
         }
@@ -672,8 +817,8 @@ FocusScope {
             duration: VLCStyle.duration_slow
             to: 0
             onStopped: {
-                expandIndex = -1
-                if (_newExpandIndex !== -1)
+                root.expandIndex = -1
+                if (root._newExpandIndex !== -1)
                     flickable.expand()
             }
         }
@@ -686,92 +831,5 @@ FocusScope {
             duration: VLCStyle.duration_slow
             from: 0
         }
-    }
-
-    PropertyAnimation {
-        id: animateContentY;
-        target: flickable;
-        properties: "contentY"
-    }
-
-    function animateFlickableContentY( newContentY ) {
-        animateContentY.stop()
-        animateContentY.duration = VLCStyle.duration_slow
-        animateContentY.to = newContentY
-        animateContentY.start()
-    }
-
-    onCurrentIndexChanged: {
-        if (expandIndex !== -1)
-            retract()
-        positionViewAtIndex(root.currentIndex, ItemView.Contain)
-    }
-
-    Keys.onPressed: {
-        var colCount = root.getNbItemsPerRow()
-
-        var newIndex = -1
-        if (KeyHelper.matchRight(event)) {
-            if ((currentIndex + 1) % colCount !== 0) {//are we not at the end of line
-                newIndex = Math.min(_count - 1, currentIndex + 1)
-            }
-        } else if (KeyHelper.matchLeft(event)) {
-            if (currentIndex % colCount !== 0) {//are we not at the begining of line
-                newIndex = Math.max(0, currentIndex - 1)
-            }
-        } else if (KeyHelper.matchDown(event)) {
-            if (Math.floor(currentIndex / colCount) !== Math.floor(_count / colCount)) { //we are not on the last line
-                newIndex = Math.min(_count - 1, currentIndex + colCount)
-            }
-        } else if (KeyHelper.matchPageDown(event)) {
-            newIndex = Math.min(_count - 1, currentIndex + colCount * 5)
-        } else if (KeyHelper.matchUp(event)) {
-            if (Math.floor(currentIndex / colCount) !== 0) { //we are not on the first line
-                newIndex = Math.max(0, currentIndex - colCount)
-            }
-        } else if (KeyHelper.matchPageUp(event)) {
-            newIndex = Math.max(0, currentIndex - colCount * 5)
-        } else if (KeyHelper.matchOk(event) || event.matches(StandardKey.SelectAll) ) {
-            //these events are matched on release
-            event.accepted = true
-        }
-
-        if (event.matches(StandardKey.SelectAll) || KeyHelper.matchOk(event)) {
-            _releaseActionButtonPressed = true
-        } else {
-            _releaseActionButtonPressed = false
-        }
-
-        if (newIndex !== -1 && newIndex !== currentIndex) {
-            event.accepted = true;
-
-            var oldIndex = currentIndex;
-            currentIndex = newIndex;
-            root.selectionUpdated(event.modifiers, oldIndex, newIndex);
-
-            // NOTE: We make sure we have the proper visual focus on components.
-            if (oldIndex < currentIndex)
-                setCurrentItemFocus(Qt.TabFocusReason);
-            else
-                setCurrentItemFocus(Qt.BacktabFocusReason);
-        }
-
-        if (!event.accepted) {
-            root.Navigation.defaultKeyAction(event)
-        }
-    }
-
-    Keys.onReleased: {
-        if (!_releaseActionButtonPressed)
-            return
-
-        if (event.matches(StandardKey.SelectAll)) {
-            event.accepted = true
-            root.selectAll()
-        } else if ( KeyHelper.matchOk(event) ) {
-            event.accepted = true
-            root.actionAtIndex(currentIndex)
-        }
-        _releaseActionButtonPressed = false
     }
 }

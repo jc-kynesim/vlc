@@ -520,6 +520,7 @@ static const staticentry_t p_list_video[] = {
 
     B(VLC_CODEC_AV1, "AOMedia's AV1 Video"),
         A("av10"),
+        A("AV01"),
 
     /* Xiph.org theora */
     B(VLC_CODEC_THEORA, "Xiph.org's Theora Video"),
@@ -782,7 +783,10 @@ static const staticentry_t p_list_video[] = {
         A("I40A"),
     B(VLC_CODEC_YUV422A, "Planar YUV 4:2:2 Y:U:V:A"),
         A("I42A"),
-    B(VLC_CODEC_YUVA_444_10L, "Planar YUV 4:4:4 Y:U:V:A 10bits"),
+    B(VLC_CODEC_YUVA_444_10L, "Planar YUV 4:4:4 Y:U:V:A 10bits LE"),
+    B(VLC_CODEC_YUVA_444_10B, "Planar YUV 4:4:4 Y:U:V:A 10bits BE"),
+    B(VLC_CODEC_YUVA_444_12L, "Planar YUV 4:4:4 Y:U:V:A 12bits LE"),
+    B(VLC_CODEC_YUVA_444_12B, "Planar YUV 4:4:4 Y:U:V:A 12bits BE"),
 
     B(VLC_CODEC_RGBP, "Palettized RGB with palette element R:G:B"),
         A("RGBP"),
@@ -1256,6 +1260,8 @@ static const staticentry_t p_list_video[] = {
         A("AGM5"),
         A("AGM6"),
         A("AGM7"),
+
+    B(VLC_CODEC_NOTCHLC, "NotchLC"),
 };
 
 static const staticentry_t p_list_audio[] = {
@@ -1339,17 +1345,17 @@ static const staticentry_t p_list_audio[] = {
         A("MP3 "),
 
     /* A52 Audio (aka AC3) */
-    B(VLC_CODEC_A52, "A52 Audio (aka AC3)"),
+    B(VLC_CODEC_A52, "Audio Coding 3 (AC-3)"),
         A("a52 "),
         A("a52b"),
         A("ac-3"),
         A("sac3"),
         A("ms\x20\x00"),
 
-    B(VLC_CODEC_EAC3, "A/52 B Audio (aka E-AC3)"),
-        A("eac3"),
+    B(VLC_CODEC_EAC3, "Enhanced Audio Coding 3 (E-AC-3)"),
+        A("ec-3"),
 
-    B(VLC_CODEC_AC4,  "AC-4 Digital Audio"),
+    B(VLC_CODEC_AC4,  "Audio Coding 4 (AC-4)"),
 
     /* DTS Audio */
     B(VLC_CODEC_DTS, "DTS Audio"),
@@ -1423,6 +1429,10 @@ static const staticentry_t p_list_audio[] = {
     /* G.726 ADPCM */
     B(VLC_CODEC_ADPCM_G726, "G.726 ADPCM Audio"),
         A("g726"),
+
+    /* G.726 ADPCM */
+    B(VLC_CODEC_ADPCM_G726_LE, "G.726 ADPCM Audio (little-endian)"),
+        A("g72s"),
 
     /* G.722 ADPCM */
     B(VLC_CODEC_ADPCM_G722, "G.722 ADPCM Audio"),

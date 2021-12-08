@@ -44,11 +44,6 @@ DEFINE_GUID(_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_DIGITAL,
             WAVE_FORMAT_DOLBY_AC3_SPDIF, 0x0000, 0x0010, 0x80, 0x00,
             0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
 
-/* 00000001-0000-0010-8000-00aa00389b71 */
-DEFINE_GUID(_KSDATAFORMAT_SUBTYPE_WAVEFORMATEX,
-            WAVE_FORMAT_PCM, 0x0000, 0x0010, 0x80, 0x00,
-            0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
-
 /* 00000008-0000-0010-8000-00aa00389b71 */
 DEFINE_GUID(_KSDATAFORMAT_SUBTYPE_IEC61937_DTS,
             WAVE_FORMAT_DTS, 0x0000, 0x0010, 0x80, 0x00,
@@ -69,23 +64,44 @@ DEFINE_GUID(_KSDATAFORMAT_SUBTYPE_IEC61937_DOLBY_MLP,
             0x000c, 0x0cea, 0x0010, 0x80, 0x00,
             0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71);
 
-static BOOL CALLBACK InitFreq(INIT_ONCE *once, void *param, void **context)
-{
-    (void) once; (void) context;
-    return QueryPerformanceFrequency(param);
-}
-
 static LARGE_INTEGER freq; /* performance counters frequency */
 
 static msftime_t GetQPC(void)
 {
     LARGE_INTEGER counter;
 
-    if (!QueryPerformanceCounter(&counter))
+    if (unlikely(!QueryPerformanceCounter(&counter)))
         abort();
 
     lldiv_t d = lldiv(counter.QuadPart, freq.QuadPart);
     return (d.quot * 10000000) + ((d.rem * 10000000) / freq.QuadPart);
+}
+
+static msftime_t GetQPC_100ns(void)
+{
+    LARGE_INTEGER counter;
+
+    if (unlikely(!QueryPerformanceCounter(&counter)))
+        abort();
+
+    return counter.QuadPart;
+}
+
+static msftime_t (*get_qpc)(void);
+
+static BOOL CALLBACK InitFreq(INIT_ONCE *once, void *param, void **context)
+{
+    (void) once; (void) context;
+    LARGE_INTEGER *qpc_freq = param;
+    BOOL res = QueryPerformanceFrequency(qpc_freq);
+    if (res)
+    {
+        if (qpc_freq->QuadPart == 10000000)
+            get_qpc = GetQPC_100ns;
+        else
+            get_qpc = GetQPC;
+    }
+    return res;
 }
 
 typedef struct aout_stream_sys
@@ -151,7 +167,7 @@ static HRESULT TimeGet(aout_stream_t *s, vlc_tick_t *restrict delay)
     static_assert((10000000 % CLOCK_FREQ) == 0, "Frequency conversion broken");
 
     *delay = written - tick_pos
-           - VLC_TICK_FROM_MSFTIME(GetQPC() - qpcpos);
+           - VLC_TICK_FROM_MSFTIME(get_qpc() - qpcpos);
 
     return hr;
 }
@@ -413,13 +429,7 @@ static void vlc_SpdifToWave(WAVEFORMATEXTENSIBLE *restrict wf,
     switch (audio->i_format)
     {
     case VLC_CODEC_DTS:
-        if (audio->i_rate < 48000)
-        {
-            /* Wasapi doesn't accept DTS @ 44.1kHz but accept IEC 60958 PCM */
-            wf->SubFormat = _KSDATAFORMAT_SUBTYPE_WAVEFORMATEX;
-        }
-        else
-            wf->SubFormat = _KSDATAFORMAT_SUBTYPE_IEC61937_DTS;
+        wf->SubFormat = _KSDATAFORMAT_SUBTYPE_IEC61937_DTS;
         break;
     case VLC_CODEC_SPDIFL:
     case VLC_CODEC_SPDIFB:

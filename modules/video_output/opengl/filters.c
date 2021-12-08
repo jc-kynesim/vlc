@@ -29,7 +29,7 @@
 #include <vlc_list.h>
 
 #include "filter_priv.h"
-#include "sampler_priv.h"
+#include "importer_priv.h"
 
 /* The filter chain contains the sequential list of filters.
  *
@@ -116,10 +116,10 @@ struct vlc_gl_filters {
     const struct vlc_gl_api *api;
 
     /**
-     * Interop to use for the sampler of the first filter of the chain,
-     * the one which uses the picture_t as input.
+     * Interop to use for the input picture.
      */
     struct vlc_gl_interop *interop;
+    struct vlc_gl_importer *importer;
 
     struct vlc_list list; /**< list of vlc_gl_filter.node */
 
@@ -144,6 +144,13 @@ vlc_gl_filters_New(struct vlc_gl_t *gl, const struct vlc_gl_api *api,
     if (!filters)
         return NULL;
 
+    filters->importer = vlc_gl_importer_New(interop);
+    if (!filters->importer)
+    {
+        free(filters);
+        return NULL;
+    }
+
     filters->gl = gl;
     filters->api = api;
     filters->interop = interop;
@@ -165,155 +172,8 @@ vlc_gl_filters_Delete(struct vlc_gl_filters *filters)
         vlc_gl_filter_Delete(filter);
     }
 
+    vlc_gl_importer_Delete(filters->importer);
     free(filters);
-}
-
-static int
-InitPlane(struct vlc_gl_filter_priv *priv, unsigned plane, GLsizei width,
-          GLsizei height)
-{
-    const opengl_vtable_t *vt = &priv->filter.api->vt;
-
-    GLuint framebuffer = priv->framebuffers_out[plane];
-    GLuint texture = priv->textures_out[plane];
-
-    vt->BindTexture(GL_TEXTURE_2D, texture);
-    vt->TexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
-                   GL_UNSIGNED_BYTE, NULL);
-    vt->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    vt->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    /* iOS needs GL_CLAMP_TO_EDGE or power-of-two textures */
-    vt->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    vt->TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    /* Create a framebuffer and attach the texture */
-    vt->BindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-    vt->FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                             GL_TEXTURE_2D, texture, 0);
-
-    GLenum status = vt->CheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != GL_FRAMEBUFFER_COMPLETE)
-        return VLC_EGENERIC;
-
-    return VLC_SUCCESS;
-}
-
-static int
-InitFramebuffersOut(struct vlc_gl_filter_priv *priv)
-{
-    assert(priv->size_out.width > 0 && priv->size_out.height > 0);
-
-    const opengl_vtable_t *vt = &priv->filter.api->vt;
-
-    struct vlc_gl_filter *filter = &priv->filter;
-    if (filter->config.filter_planes)
-    {
-        struct vlc_gl_sampler *sampler = vlc_gl_filter_GetSampler(filter);
-        if (!sampler)
-            return VLC_EGENERIC;
-
-        priv->tex_count = sampler->tex_count;
-        vt->GenFramebuffers(priv->tex_count, priv->framebuffers_out);
-        vt->GenTextures(priv->tex_count, priv->textures_out);
-
-        for (unsigned i = 0; i < sampler->tex_count; ++i)
-        {
-            priv->tex_widths[i] = priv->size_out.width * sampler->tex_widths[i]
-                                / sampler->tex_widths[0];
-            priv->tex_heights[i] = priv->size_out.height * sampler->tex_heights[i]
-                                 / sampler->tex_heights[0];
-            /* Init one framebuffer and texture for each plane */
-            int ret =
-                InitPlane(priv, i, priv->tex_widths[i], priv->tex_heights[i]);
-            if (ret != VLC_SUCCESS)
-                return ret;
-        }
-    }
-    else
-    {
-        priv->tex_count = 1;
-
-        /* Create a texture having the expected size */
-
-        vt->GenFramebuffers(1, priv->framebuffers_out);
-        vt->GenTextures(1, priv->textures_out);
-
-        priv->tex_widths[0] = priv->size_out.width;
-        priv->tex_heights[0] = priv->size_out.height;
-
-        int ret = InitPlane(priv, 0, priv->tex_widths[0], priv->tex_heights[0]);
-        if (ret != VLC_SUCCESS)
-            return ret;
-    }
-
-    return VLC_SUCCESS;
-}
-
-static int
-InitFramebufferMSAA(struct vlc_gl_filter_priv *priv, unsigned msaa_level)
-{
-    assert(msaa_level);
-    assert(priv->size_out.width > 0 && priv->size_out.height > 0);
-
-    const opengl_vtable_t *vt = &priv->filter.api->vt;
-
-    vt->GenRenderbuffers(1, &priv->renderbuffer_msaa);
-    vt->BindRenderbuffer(GL_RENDERBUFFER, priv->renderbuffer_msaa);
-    vt->RenderbufferStorageMultisample(GL_RENDERBUFFER, msaa_level,
-                                       GL_RGBA8,
-                                       priv->size_out.width,
-                                       priv->size_out.height);
-
-    vt->GenFramebuffers(1, &priv->framebuffer_msaa);
-    vt->BindFramebuffer(GL_FRAMEBUFFER, priv->framebuffer_msaa);
-    vt->FramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                                GL_RENDERBUFFER, priv->renderbuffer_msaa);
-
-    GLenum status = vt->CheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != GL_FRAMEBUFFER_COMPLETE)
-        return VLC_EGENERIC;
-
-    return VLC_SUCCESS;
-}
-
-static struct vlc_gl_sampler *
-GetSampler(struct vlc_gl_filter *filter)
-{
-    struct vlc_gl_filter_priv *priv = vlc_gl_filter_PRIV(filter);
-    if (priv->sampler)
-        /* already initialized */
-        return priv->sampler;
-
-    struct vlc_gl_filters *filters = priv->filters;
-    struct vlc_gl_filter_priv *prev_filter = priv->prev_filter;
-
-    bool expose_planes = filter->config.filter_planes;
-    struct vlc_gl_sampler *sampler;
-    if (!priv->prev_filter)
-        sampler = vlc_gl_sampler_NewFromInterop(filters->interop,
-                                                expose_planes);
-    else
-    {
-        video_format_t fmt;
-
-        /* If the previous filter operated on planes, then its output chroma is
-         * the same as its input chroma. Otherwise, it's RGBA. */
-        vlc_fourcc_t chroma = prev_filter->filter.config.filter_planes
-                            ? prev_filter->sampler->fmt.i_chroma
-                            : VLC_CODEC_RGBA;
-
-        video_format_Init(&fmt, chroma);
-        fmt.i_width = fmt.i_visible_width = prev_filter->size_out.width;
-        fmt.i_height = fmt.i_visible_height = prev_filter->size_out.height;
-
-        sampler = vlc_gl_sampler_NewFromTexture2D(filters->gl, filters->api,
-                                                  &fmt, expose_planes);
-    }
-
-    priv->sampler = sampler;
-
-    return sampler;
 }
 
 struct vlc_gl_filter *
@@ -327,6 +187,7 @@ vlc_gl_filters_Append(struct vlc_gl_filters *filters, const char *name,
     struct vlc_gl_filter_priv *priv = vlc_gl_filter_PRIV(filter);
 
     struct vlc_gl_tex_size size_in;
+    struct vlc_gl_format *glfmt = &priv->glfmt_in;
 
     struct vlc_gl_filter_priv *prev_filter =
         vlc_list_last_entry_or_null(&filters->list, struct vlc_gl_filter_priv,
@@ -335,29 +196,45 @@ vlc_gl_filters_Append(struct vlc_gl_filters *filters, const char *name,
     {
         size_in.width = filters->interop->fmt_out.i_visible_width;
         size_in.height = filters->interop->fmt_out.i_visible_height;
+
+        assert(filters->importer);
+        *glfmt = filters->importer->glfmt;
     }
     else
     {
         size_in = prev_filter->size_out;
+
+        /* If the previous filter operated on planes, then its output chroma is
+         * the same as its input chroma. Otherwise, it's RGBA. */
+        vlc_fourcc_t chroma = prev_filter->filter.config.filter_planes
+                            ? prev_filter->glfmt_in.fmt.i_chroma
+                            : VLC_CODEC_RGBA;
+
+        video_format_t *fmt = &glfmt->fmt;
+        video_format_Init(fmt, chroma);
+        fmt->i_width = fmt->i_visible_width = prev_filter->size_out.width;
+        fmt->i_height = fmt->i_visible_height = prev_filter->size_out.height;
+
+        glfmt->tex_target = GL_TEXTURE_2D;
+        glfmt->tex_count = prev_filter->plane_count;
+
+        size_t size = glfmt->tex_count * sizeof(GLsizei);
+        memcpy(glfmt->tex_widths, prev_filter->plane_widths, size);
+        memcpy(glfmt->tex_heights, prev_filter->plane_heights, size);
+        memcpy(glfmt->visible_widths, prev_filter->plane_widths, size);
+        memcpy(glfmt->visible_heights, prev_filter->plane_heights, size);
     }
-
-    priv->filters = filters;
-    priv->prev_filter = prev_filter;
-
-    static const struct vlc_gl_filter_owner_ops owner_ops = {
-        .get_sampler = GetSampler,
-    };
-    filter->owner_ops = &owner_ops;
 
     /* By default, the output size is the same as the input size. The filter
      * may change it during its Open(). */
     priv->size_out = size_in;
 
     int ret = vlc_gl_filter_LoadModule(filters->gl, name, filter, config,
-                                       &priv->size_out);
+                                       glfmt, &priv->size_out);
     if (ret != VLC_SUCCESS)
     {
         /* Creation failed, do not call close() */
+        msg_Err(filters->gl, "Could not load OpenGL filter '%s'", name);
         filter->ops = NULL;
         vlc_gl_filter_Delete(filter);
         return NULL;
@@ -373,15 +250,6 @@ vlc_gl_filters_Append(struct vlc_gl_filters *filters, const char *name,
 
     /* A filter operating on planes may not use anti-aliasing. */
     assert(!filter->config.filter_planes || !filter->config.msaa_level);
-
-    /* A blend filter may not read its input, so it is an error if a sampler
-     * has been requested.
-     *
-     * We assert it here instead of in vlc_gl_filter_GetSampler() because the
-     * filter implementation may set the "blend" flag after it get the sampler
-     * in its Open() function.
-     */
-    assert(!filter->config.blend || !priv->sampler);
 
     if (filter->config.blend)
     {
@@ -407,13 +275,7 @@ vlc_gl_filters_Append(struct vlc_gl_filters *filters, const char *name,
     }
     else
     {
-        /* Make sure the sampler of non-blend filters is initialized */
-        struct vlc_gl_sampler *sampler = vlc_gl_filter_GetSampler(filter);
-        if (!sampler)
-        {
-            vlc_gl_filter_Delete(filter);
-            return NULL;
-        }
+        vlc_gl_filter_InitPlaneSizes(filter);
 
         /* Append to the main filter list */
         vlc_list_append(&priv->node, &filters->list);
@@ -477,26 +339,15 @@ vlc_gl_filters_InitFramebuffers(struct vlc_gl_filters *filters)
 
     vlc_list_foreach(priv, &filters->list, node)
     {
-        unsigned msaa_level = priv->filter.config.msaa_level;
-        if (msaa_level)
-        {
-            int ret = InitFramebufferMSAA(priv, msaa_level);
-            if (ret != VLC_SUCCESS)
-                return ret;
-        }
+        struct vlc_gl_filter *filter = &priv->filter;
 
         bool is_last = vlc_list_is_last(&priv->node, &filters->list);
-        if (!is_last)
-        {
-            /* It was the last non-blend filter before we append this one */
-            assert(priv->tex_count == 0);
-
-            /* Every non-blend filter needs its own framebuffer, except the last
-             * one */
-            int ret = InitFramebuffersOut(priv);
-            if (ret != VLC_SUCCESS)
-                return ret;
-        }
+        /* Every non-blend filter needs its own framebuffer, except the last
+         * one */
+        bool has_out = !is_last;
+        int ret = vlc_gl_filter_InitFramebuffers(filter, has_out);
+        if (ret != VLC_SUCCESS)
+            return ret;
     }
 
     /* Restore bindings */
@@ -512,21 +363,28 @@ vlc_gl_filters_UpdatePicture(struct vlc_gl_filters *filters,
 {
     assert(!vlc_list_is_empty(&filters->list));
 
+    struct vlc_gl_importer *importer = filters->importer;
+    int ret = vlc_gl_importer_Update(importer, picture);
+    if (ret != VLC_SUCCESS)
+        return ret;
+
+    filters->pic.pts = picture->date;
+
     struct vlc_gl_filter_priv *first_filter =
         vlc_list_first_entry_or_null(&filters->list, struct vlc_gl_filter_priv,
                                      node);
 
     assert(first_filter);
+    first_filter->has_picture = true;
 
-    filters->pic.pts = picture->date;
-
-    return vlc_gl_sampler_UpdatePicture(first_filter->sampler, picture);
+    return VLC_SUCCESS;
 }
 
 int
 vlc_gl_filters_Draw(struct vlc_gl_filters *filters)
 {
     const opengl_vtable_t *vt = &filters->api->vt;
+    struct vlc_gl_importer *importer = filters->importer;
 
     GLint value;
     vt->GetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &value);
@@ -537,6 +395,9 @@ vlc_gl_filters_Draw(struct vlc_gl_filters *filters)
         .plane = 0,
     };
 
+    struct vlc_gl_picture direct_pic;
+    const struct vlc_gl_picture *pic;
+
     struct vlc_gl_filter_priv *priv;
     vlc_list_foreach(priv, &filters->list, node)
     {
@@ -545,16 +406,22 @@ vlc_gl_filters_Draw(struct vlc_gl_filters *filters)
                                         struct vlc_gl_filter_priv, node);
         if (previous)
         {
-            /* Read from the output of the previous filter */
-            int ret = vlc_gl_sampler_UpdateTextures(priv->sampler,
-                                                    previous->textures_out,
-                                                    previous->tex_widths,
-                                                    previous->tex_heights);
-            if (ret != VLC_SUCCESS)
-            {
-                msg_Err(filters->gl, "Could not update sampler texture");
-                return ret;
-            }
+            memcpy(direct_pic.textures, previous->textures_out,
+                   previous->tex_count * sizeof(*direct_pic.textures));
+            memcpy(direct_pic.mtx, MATRIX2x3_IDENTITY,
+                   sizeof(MATRIX2x3_IDENTITY));
+            /* The transform never changes (except for the first picture, where
+             * it is defined for the first time) */
+            direct_pic.mtx_has_changed = !priv->has_picture;
+
+            priv->has_picture = true;
+
+            pic = &direct_pic;
+        }
+        else
+        {
+            assert(importer);
+            pic = &importer->pic;
         }
 
         struct vlc_gl_filter *filter = &priv->filter;
@@ -572,8 +439,7 @@ vlc_gl_filters_Draw(struct vlc_gl_filters *filters)
                 assert(!vlc_list_is_last(&priv->node, &filters->list));
                 vt->Viewport(0, 0, priv->tex_widths[i], priv->tex_heights[i]);
 
-                vlc_gl_sampler_SelectPlane(priv->sampler, i);
-                int ret = filter->ops->draw(filter, &meta);
+                int ret = filter->ops->draw(filter, pic, &meta);
                 if (ret != VLC_SUCCESS)
                     return ret;
             }
@@ -601,7 +467,7 @@ vlc_gl_filters_Draw(struct vlc_gl_filters *filters)
                 vt->Viewport(0, 0, priv->tex_widths[0], priv->tex_heights[0]);
 
             meta.plane = 0;
-            int ret = filter->ops->draw(filter, &meta);
+            int ret = filter->ops->draw(filter, pic, &meta);
             if (ret != VLC_SUCCESS)
                 return ret;
 
@@ -614,7 +480,7 @@ vlc_gl_filters_Draw(struct vlc_gl_filters *filters)
                 vt->BindFramebuffer(GL_DRAW_FRAMEBUFFER, draw_fb);
 
                 struct vlc_gl_filter *subfilter = &subfilter_priv->filter;
-                ret = subfilter->ops->draw(subfilter, &meta);
+                ret = subfilter->ops->draw(subfilter, NULL, &meta);
                 if (ret != VLC_SUCCESS)
                     return ret;
             }
@@ -651,4 +517,56 @@ vlc_gl_filters_SetViewport(struct vlc_gl_filters *filters, int x, int y,
     filters->viewport.y = y;
     filters->viewport.width = width;
     filters->viewport.height = height;
+}
+
+int
+vlc_gl_filters_SetOutputSize(struct vlc_gl_filters *filters, unsigned width,
+                             unsigned height)
+{
+    bool resized = false;
+    struct vlc_gl_tex_size req = { width, height };
+
+    struct vlc_gl_filter *next = NULL;
+
+    struct vlc_gl_filter_priv *priv;
+    vlc_list_reverse_foreach(priv, &filters->list, node)
+    {
+        struct vlc_gl_filter *filter = &priv->filter;
+        if (!filter->ops->request_output_size) {
+            /* Could not propagate further */
+            break;
+        }
+
+        struct vlc_gl_tex_size optimal_in = {0};
+        int ret =
+            filter->ops->request_output_size(filter, &req, &optimal_in);
+        if (ret != VLC_SUCCESS)
+            break;
+
+        /* The filter may have modified the requested size */
+        priv->size_out = req;
+
+        /* Recreate the framebuffers/textures with the new size */
+        vlc_gl_filter_ApplyOutputSize(filter);
+
+        resized = true;
+
+        /* Notify the next filter of the input size change */
+        if (next && next->ops->on_input_size_change)
+            next->ops->on_input_size_change(next, &req);
+
+        if (!optimal_in.width || !optimal_in.height)
+            /* No specific input size requested, do not propagate further */
+            break;
+
+        /* Request the previous filter to output at the optimal input size of
+         * the current filter. */
+        req = optimal_in;
+
+        /* The filters are iterated backwards, so the current filter will
+         * become the next filter. */
+        next = filter;
+    }
+
+    return resized ? VLC_SUCCESS : VLC_EGENERIC;
 }

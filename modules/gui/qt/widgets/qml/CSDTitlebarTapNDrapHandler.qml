@@ -20,16 +20,18 @@
 import QtQuick 2.15
 import QtQuick.Window 2.15
 
+import org.videolan.vlc 0.1
+
 Item {
     TapHandler {
-        onTapped: {
-            if (tapCount === 2) {
+        onDoubleTapped: {
+            
                 if ((topWindow.visibility & Window.Maximized) !== 0) {
-                    mainInterface.requestInterfaceNormal()
+                    MainCtx.requestInterfaceNormal()
                 } else {
-                    mainInterface.requestInterfaceMaximized()
+                    MainCtx.requestInterfaceMaximized()
                 }
-            }
+            
         }
         gesturePolicy: TapHandler.DragThreshold
     }

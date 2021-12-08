@@ -18,6 +18,7 @@
 
 import QtQuick 2.11
 import QtQuick.Controls 2.4
+import QtQuick.Templates 2.4 as T
 import QtQuick.Layouts 1.11
 import QtGraphicalEffects 1.0
 import org.videolan.vlc 0.1
@@ -52,7 +53,7 @@ FocusScope {
 
     // Triggered when the toogleView button is selected
     function toggleView () {
-        mainInterface.gridView = !mainInterface.gridView
+        MainCtx.gridView = !MainCtx.gridView
     }
 
     function search() {
@@ -98,7 +99,7 @@ FocusScope {
                 //drag and dbl click the titlebar in CSD mode
                 Loader {
                     anchors.fill: parent
-                    active: mainInterface.clientSideDecoration
+                    active: MainCtx.clientSideDecoration
                     source: "qrc:///widgets/CSDTitlebarTapNDrapHandler.qml"
                 }
 
@@ -111,7 +112,7 @@ FocusScope {
                         id: menubar
                         width: parent.width
                         height: implicitHeight
-                        visible: mainInterface.hasToolbarMenu
+                        visible: MainCtx.hasToolbarMenu
                     }
 
                     Item {
@@ -188,12 +189,13 @@ FocusScope {
                         rightMargin: VLCStyle.applicationHorizontalMargin
                     }
                     height: VLCStyle.globalToolbar_height
-                    active: mainInterface.clientSideDecoration
+                    active: MainCtx.clientSideDecoration
                     source: "qrc:///widgets/CSDWindowButtonSet.qml"
                 }
             }
 
-            Control {
+            //use a raw control, we don't want platforms customisation
+            T.Control {
                 id: localToolbar
 
                 width: parent.width
@@ -251,9 +253,9 @@ FocusScope {
                                 width: VLCStyle.bannerButton_width
                                 height: VLCStyle.bannerButton_height
                                 size: VLCStyle.banner_icon_size
-                                iconText: mainInterface.gridView ? VLCIcons.list : VLCIcons.grid
+                                iconText: MainCtx.gridView ? VLCIcons.list : VLCIcons.grid
                                 text: i18n.qtr("List/Grid")
-                                onClicked: mainInterface.gridView = !mainInterface.gridView
+                                onClicked: MainCtx.gridView = !MainCtx.gridView
                                 enabled: true
                             }
 
@@ -398,9 +400,9 @@ FocusScope {
                                 text: i18n.qtr("Playlist")
                                 width: VLCStyle.bannerButton_width
                                 height: VLCStyle.bannerButton_height
-                                highlighted: mainInterface.playlistVisible
+                                highlighted: MainCtx.playlistVisible
 
-                                onClicked:  mainInterface.playlistVisible = !mainInterface.playlistVisible
+                                onClicked:  MainCtx.playlistVisible = !MainCtx.playlistVisible
                             }
 
                             Widgets.IconToolButton {
@@ -416,7 +418,7 @@ FocusScope {
 
                                 QmlGlobalMenu {
                                     id: contextMenu
-                                    ctx: mainctx
+                                    ctx: MainCtx
                                 }
                             }
                         }

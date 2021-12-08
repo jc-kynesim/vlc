@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 #include "videosurface.hpp"
-#include "maininterface/main_interface.hpp"
+#include "maininterface/mainctx.hpp"
 #include "widgets/native/customwidgets.hpp" //for qtEventToVLCKey
 #include <QSGRectangleNode>
 
@@ -136,18 +136,18 @@ VideoSurface::VideoSurface(QQuickItem* parent)
     connect(this, &QQuickItem::yChanged, this, &VideoSurface::onSurfacePositionChanged);
     connect(this, &QQuickItem::widthChanged, this, &VideoSurface::onSurfaceSizeChanged);
     connect(this, &QQuickItem::heightChanged, this, &VideoSurface::onSurfaceSizeChanged);
-    connect(this, &QQuickItem::enabledChanged, this, &VideoSurface::onSurfaceSizeChanged);
+    connect(this, &VideoSurface::enabledChanged, this, &VideoSurface::updatePositionAndSize);
 }
 
-QmlMainContext*VideoSurface::getCtx()
+MainCtx* VideoSurface::getCtx()
 {
-    return m_mainCtx;
+    return m_ctx;
 }
 
-void VideoSurface::setCtx(QmlMainContext* mainctx)
+void VideoSurface::setCtx(MainCtx* ctx)
 {
-    m_mainCtx = mainctx;
-    emit ctxChanged(mainctx);
+    m_ctx = ctx;
+    emit ctxChanged(ctx);
 }
 
 QSize VideoSurface::getSourceSize() const
@@ -269,9 +269,9 @@ QSGNode*VideoSurface::updatePaintNode(QSGNode* oldNode, QQuickItem::UpdatePaintN
 
     if (m_provider == nullptr)
     {
-        if (m_mainCtx == nullptr)
+        if (m_ctx == nullptr)
             return node;
-        m_provider =  m_mainCtx->getMainInterface()->getVideoSurfaceProvider();
+        m_provider =  m_ctx->getVideoSurfaceProvider();
         if (!m_provider)
             return node;
 

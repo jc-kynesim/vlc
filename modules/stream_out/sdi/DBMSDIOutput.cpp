@@ -36,7 +36,9 @@
 #include "Ancillary.hpp"
 #include "V210.hpp"
 
+#ifndef _WIN32
 #include <DeckLinkAPIDispatch.cpp>
+#endif
 #include <DeckLinkAPIVersion.h>
 #if BLACKMAGIC_DECKLINK_API_VERSION < 0x0b010000
  #define IID_IDeckLinkProfileAttributes IID_IDeckLinkAttributes
@@ -124,7 +126,7 @@ AbstractStream *DBMSDIOutput::Add(const es_format_t *fmt)
     if(psz_err)\
     msg_Err(p_stream, message ": %s", psz_err); \
     else \
-    msg_Err(p_stream, message ": 0x%X", result); \
+    msg_Err(p_stream, message ":0x%" PRIHR, result); \
     goto error; \
 } \
 } while(0)
@@ -152,7 +154,11 @@ HRESULT STDMETHODCALLTYPE DBMSDIOutput::ScheduledFrameCompleted
     else if(result == bmdOutputFrameDisplayedLate)
         msg_Warn(p_stream, "late frame");
 
+#ifdef _WIN32
+    BOOL b_active;
+#else
     bool b_active;
+#endif
     vlc_mutex_lock(&feeder.lock);
     if((S_OK == p_output->IsScheduledPlaybackRunning(&b_active)) && b_active)
         vlc_cond_signal(&feeder.cond);
@@ -198,13 +204,14 @@ int DBMSDIOutput::Open()
     }
 
     decklink_str_t tmp_name;
-    const char *psz_model_name;
+    char *psz_model_name;
     result = p_card->GetModelName(&tmp_name);
     CHECK("Unknown model name");
     psz_model_name = DECKLINK_STRDUP(tmp_name);
     DECKLINK_FREE(tmp_name);
 
     msg_Dbg(p_stream, "Opened DeckLink PCI card %s", psz_model_name);
+    free(psz_model_name);
 
     result = p_card->QueryInterface(IID_IDeckLinkOutput, (void**)&p_output);
     CHECK("No outputs");
@@ -316,7 +323,11 @@ static BMDVideoConnection getVConn(const char *psz)
 int DBMSDIOutput::ConfigureVideo(const video_format_t *vfmt)
 {
     HRESULT result;
-    BMDDisplayMode wanted_mode_id = bmdModeUnknown;
+    union {
+        BMDDisplayMode id;
+        char str[4];
+    } wanted_mode;
+    wanted_mode.id = bmdModeUnknown;
     IDeckLinkConfiguration *p_config = NULL;
     IDeckLinkProfileAttributes *p_attributes = NULL;
     IDeckLinkDisplayMode *p_display_mode = NULL;
@@ -356,9 +367,7 @@ int DBMSDIOutput::ConfigureVideo(const video_format_t *vfmt)
             msg_Err(p_stream, "Invalid mode %s", psz_string);
             goto error;
         }
-        memset(&wanted_mode_id, ' ', 4);
-        strncpy((char*)&wanted_mode_id, psz_string, 4);
-        wanted_mode_id = ntohl(wanted_mode_id);
+        strncpy(wanted_mode.str, psz_string, 4);
         free(psz_string);
     }
 
@@ -366,24 +375,24 @@ int DBMSDIOutput::ConfigureVideo(const video_format_t *vfmt)
     result = p_card->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&p_attributes);
     CHECK("Could not get IDeckLinkAttributes");
 
-    int64_t vconn;
-    result = p_attributes->GetInt(BMDDeckLinkVideoOutputConnections, &vconn); /* reads mask */
+#ifdef _WIN32
+    LONGLONG iconn;
+#else
+    int64_t iconn;
+#endif
+    BMDVideoConnection vconn;
+    result = p_attributes->GetInt(BMDDeckLinkVideoOutputConnections, &iconn); /* reads mask */
     CHECK("Could not get BMDDeckLinkVideoOutputConnections");
 
     psz_string = var_InheritString(p_stream, CFG_PREFIX "video-connection");
     vconn = getVConn(psz_string);
     free(psz_string);
-    if (vconn == 0)
-    {
-        msg_Err(p_stream, "Invalid video connection specified");
-        goto error;
-    }
 
     result = p_config->SetInt(bmdDeckLinkConfigVideoOutputConnection, vconn);
     CHECK("Could not set video output connection");
 
     p_display_mode = Decklink::Helper::MatchDisplayMode(VLC_OBJECT(p_stream),
-                                                        p_output, vfmt, wanted_mode_id);
+                                                        p_output, vfmt, wanted_mode.id);
     if(p_display_mode == NULL)
     {
         msg_Err(p_stream, "Could not negociate a compatible display mode");
@@ -391,22 +400,29 @@ int DBMSDIOutput::ConfigureVideo(const video_format_t *vfmt)
     }
     else
     {
-        BMDDisplayMode mode_id = p_display_mode->GetDisplayMode();
-        BMDDisplayMode modenl = htonl(mode_id);
-        msg_Dbg(p_stream, "Selected mode '%4.4s'", (char *) &modenl);
+        union {
+            BMDDisplayMode id;
+            char str[4];
+        } mode;
+        mode.id = p_display_mode->GetDisplayMode();
+        msg_Dbg(p_stream, "Selected mode '%4.4s'", mode.str);
 
         BMDPixelFormat pixelFormat = video.tenbits ? bmdFormat10BitYUV : bmdFormat8BitYUV;
         BMDVideoOutputFlags flags = bmdVideoOutputVANC;
-        if (mode_id == bmdModeNTSC ||
-            mode_id == bmdModeNTSC2398 ||
-            mode_id == bmdModePAL)
+        if (mode.id == bmdModeNTSC ||
+            mode.id == bmdModeNTSC2398 ||
+            mode.id == bmdModePAL)
         {
             flags = bmdVideoOutputVITC;
         }
+#ifdef _WIN32
+        BOOL supported;
+#else
         bool supported;
+#endif
 #if BLACKMAGIC_DECKLINK_API_VERSION < 0x0b010000
         BMDDisplayModeSupport support = bmdDisplayModeNotSupported;
-        result = p_output->DoesSupportVideoMode(mode_id,
+        result = p_output->DoesSupportVideoMode(mode.id,
                                                 pixelFormat,
                                                 flags,
                                                 &support,
@@ -414,7 +430,7 @@ int DBMSDIOutput::ConfigureVideo(const video_format_t *vfmt)
         supported = (support != bmdDisplayModeNotSupported);
 #else
         result = p_output->DoesSupportVideoMode(vconn,
-                                                mode_id,
+                                                mode.id,
                                                 pixelFormat,
                                                 bmdSupportedVideoModeDefault,
                                                 NULL,
@@ -437,7 +453,7 @@ int DBMSDIOutput::ConfigureVideo(const video_format_t *vfmt)
                                               &timescale);
         CHECK("Could not read frame rate");
 
-        result = p_output->EnableVideoOutput(mode_id, flags);
+        result = p_output->EnableVideoOutput(mode.id, flags);
         CHECK("Could not enable video output");
 
         p_output->SetScheduledFrameCompletionCallback(this);
@@ -681,7 +697,7 @@ int DBMSDIOutput::ProcessAudio(block_t *p_block)
                 scheduleTime, CLOCK_FREQ, &written);
 
     if (result != S_OK)
-        msg_Err(p_stream, "Failed to schedule audio sample: 0x%X", result);
+        msg_Err(p_stream, "Failed to schedule audio sample:0x%" PRIHR, result);
     else
     {
         lasttimestamp = __MAX(p_block->i_pts, lasttimestamp);
@@ -737,7 +753,7 @@ int DBMSDIOutput::doProcessVideo(picture_t *picture, block_t *p_cc)
                                         video.tenbits ? bmdFormat10BitYUV : bmdFormat8BitYUV,
                                         bmdFrameFlagDefault, &pDLVideoFrame);
     if(result != S_OK) {
-        msg_Err(p_stream, "Failed to create video frame: 0x%X", result);
+        msg_Err(p_stream, "Failed to create video frame:0x%" PRIHR, result);
         goto error;
     }
 
@@ -752,13 +768,13 @@ int DBMSDIOutput::doProcessVideo(picture_t *picture, block_t *p_cc)
 
         result = p_output->CreateAncillaryData(bmdFormat10BitYUV, &vanc);
         if (result != S_OK) {
-            msg_Err(p_stream, "Failed to create vanc: %d", result);
+            msg_Err(p_stream, "Failed to create vanc:0x%" PRIHR, result);
             goto error;
         }
 
         result = vanc->GetBufferForVerticalBlankingLine(ancillary.afd_line, &buf);
         if (result != S_OK) {
-            msg_Err(p_stream, "Failed to get VBI line %u: %d", ancillary.afd_line, result);
+            msg_Err(p_stream, "Failed to get VBI line %u:0x%" PRIHR, ancillary.afd_line, result);
             goto error;
         }
 
@@ -769,7 +785,7 @@ int DBMSDIOutput::doProcessVideo(picture_t *picture, block_t *p_cc)
         {
             result = vanc->GetBufferForVerticalBlankingLine(ancillary.captions_line, &buf);
             if (result != S_OK) {
-                msg_Err(p_stream, "Failed to get VBI line %u: %d", ancillary.captions_line, result);
+                msg_Err(p_stream, "Failed to get VBI line %u:0x%" PRIHR, ancillary.captions_line, result);
                 goto error;
             }
             sdi::Captions captions(p_cc->p_buffer, p_cc->i_buffer, timescale, frameduration);
@@ -781,7 +797,7 @@ int DBMSDIOutput::doProcessVideo(picture_t *picture, block_t *p_cc)
         result = pDLVideoFrame->SetAncillaryData(vanc);
         vanc->Release();
         if (result != S_OK) {
-            msg_Err(p_stream, "Failed to set vanc: %d", result);
+            msg_Err(p_stream, "Failed to set vanc:0x%" PRIHR, result);
             goto error;
         }
     }
@@ -799,7 +815,7 @@ int DBMSDIOutput::doProcessVideo(picture_t *picture, block_t *p_cc)
     scheduleTime = picture->date + DECKLINK_SCHED_OFFSET;
     result = p_output->ScheduleVideoFrame(pDLVideoFrame, scheduleTime, length, CLOCK_FREQ);
     if (result != S_OK) {
-        msg_Err(p_stream, "Dropped Video frame %" PRId64 ": 0x%x",
+        msg_Err(p_stream, "Dropped Video frame %" PRId64 ":0x%" PRIHR,
                 picture->date, result);
         goto error;
     }

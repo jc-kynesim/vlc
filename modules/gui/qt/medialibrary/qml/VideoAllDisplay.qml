@@ -41,10 +41,8 @@ VideoAll {
     // Functions
 
     function setCurrentItemFocus(reason) {
-        var loader = headerItem.loader;
-
-        if (loader.visible)
-            loader.item.forceActiveFocus(reason);
+        if (modelRecent.count)
+            headerItem.setCurrentItemFocus(reason);
         else
             _currentView.setCurrentItemFocus(reason);
     }
@@ -65,17 +63,29 @@ VideoAll {
         width: root.width
 
         topPadding: VLCStyle.margin_normal
-
-        spacing: VLCStyle.margin_normal
+        bottomPadding: VLCStyle.margin_normal
 
         // NOTE: We want the header to be visible when we have at least one media visible.
         //       Otherwise it overlaps the default caption.
         visible: (model.count)
 
+        // NOTE: Making sure this item will be focussed by VideoAll::_onNavigationUp().
+        focus: true
+
+        function setCurrentItemFocus(reason) {
+            var item = loader.item;
+
+            if (item)
+                item.setCurrentItemFocus(reason);
+        }
+
         Loader {
             id: loader
 
-            width: parent.width
+            anchors.left : parent.left
+            anchors.right: parent.right
+
+            anchors.margins: root.contentMargin
 
             height: (status === Loader.Ready) ? item.implicitHeight : 0
 
@@ -87,6 +97,9 @@ VideoAll {
                 id: component
 
                 width: parent.width
+
+                // NOTE: We want grid items to be visible on the sides.
+                displayMargins: root.contentMargin
 
                 model: modelRecent
 
@@ -101,10 +114,11 @@ VideoAll {
         }
 
         Widgets.SubtitleLabel {
-            width: root.width
+            anchors.left: loader.left
+            anchors.right: loader.right
 
-            leftPadding  : VLCStyle.margin_xlarge
-            bottomPadding: VLCStyle.margin_xsmall
+            // NOTE: We want this to be properly aligned with the grid items.
+            anchors.leftMargin: VLCStyle.margin_normal
 
             text: i18n.qtr("Videos")
         }

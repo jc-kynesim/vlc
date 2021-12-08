@@ -173,6 +173,7 @@ QHash<int, QByteArray> MLPlaylistModel::roleNames() const /* override */
     return
     {
         { MEDIA_ID,                 "id"                 },
+        { MEDIA_IS_NEW,             "isNew"              },
         { MEDIA_TITLE,              "title"              },
         { MEDIA_THUMBNAIL,          "thumbnail"          },
         { MEDIA_DURATION,           "duration"           },
@@ -188,10 +189,9 @@ QHash<int, QByteArray> MLPlaylistModel::roleNames() const /* override */
     };
 }
 
-QVariant MLPlaylistModel::data(const QModelIndex & index, int role) const /* override */
+QVariant MLPlaylistModel::itemRoleData(MLItem *item, int role) const /* override */
 {
-    MLPlaylistMedia * media = static_cast<MLPlaylistMedia *>(item(index.row()));
-
+    MLPlaylistMedia * media = static_cast<MLPlaylistMedia *>(item);
     if (media == nullptr)
         return QVariant();
 
@@ -199,6 +199,8 @@ QVariant MLPlaylistModel::data(const QModelIndex & index, int role) const /* ove
     {
         case MEDIA_ID:
             return QVariant::fromValue(media->getId());
+        case MEDIA_IS_NEW:
+            return QVariant::fromValue(media->isNew());
         case MEDIA_TITLE:
             return QVariant::fromValue(media->getTitle());
         case MEDIA_THUMBNAIL:

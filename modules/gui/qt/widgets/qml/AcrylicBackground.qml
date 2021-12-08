@@ -20,21 +20,25 @@
 
 import QtQuick 2.11
 
+import org.videolan.vlc 0.1
+
 import "qrc:///style/"
 
 // This Component uses layering, avoid adding children to this widget
 Item {
     id: root
 
-    readonly property bool usingAcrylic: visible && enabled && mainInterface.useAcrylicBackground && mainInterface.hasAcrylicSurface
+    readonly property bool usingAcrylic: visible && enabled && AcrylicController.enabled
 
     property color tintColor: VLCStyle.colors.setColorAlpha(VLCStyle.colors.bg, 0.7)
 
     property color alternativeColor: VLCStyle.colors.bgAlt
 
+    property real _blend: usingAcrylic ? AcrylicController.uiTransluency : 0
+
     layer.enabled: true
     layer.effect: ShaderEffect {
-        property color overlay: root.usingAcrylic ? root.tintColor : root.alternativeColor
+        property color overlay: VLCStyle.colors.blendColors(root.tintColor, root.alternativeColor, root._blend)
 
         blending: false
         fragmentShader: "

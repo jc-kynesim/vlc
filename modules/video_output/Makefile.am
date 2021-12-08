@@ -22,7 +22,13 @@ libdecklinkoutput_plugin_la_SOURCES = video_output/decklink.cpp \
                                       stream_out/sdi/V210.cpp \
                                       stream_out/sdi/V210.hpp
 libdecklinkoutput_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) $(CPPFLAGS_decklinkoutput)
-libdecklinkoutput_plugin_la_LIBADD = $(LIBS_decklink) $(LIBDL) -lpthread
+libdecklinkoutput_plugin_la_LIBADD = $(LIBS_decklinkoutput)
+if HAVE_WIN32
+libdecklinkoutput_plugin_la_LIBADD += $(LIBCOM)
+endif
+if HAVE_LINUX
+libdecklinkoutput_plugin_la_LIBADD += $(LIBDL) -lpthread
+endif
 vout_LTLIBRARIES += libdecklinkoutput_plugin.la
 endif
 
@@ -159,7 +165,7 @@ libdirect3d9_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
 libglinterop_dxva2_plugin_la_SOURCES = video_output/opengl/interop_dxva2.c \
 	video_output/opengl/interop.h
 libglinterop_dxva2_plugin_la_CFLAGS = $(AM_CFLAGS) $(GL_CFLAGS)
-libglinterop_dxva2_plugin_la_LIBADD = libd3d9_common.la
+libglinterop_dxva2_plugin_la_LIBADD = libd3d9_common.la -lopengl32
 
 if HAVE_WIN32_DESKTOP
 vout_LTLIBRARIES += $(LTLIBdirect3d9)

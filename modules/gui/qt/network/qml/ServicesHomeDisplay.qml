@@ -93,7 +93,7 @@ Widgets.PageLoader {
             NetworkDeviceModel {
                 id: deviceModel
 
-                ctx: mainctx
+                ctx: MainCtx
                 sd_source: NetworkDeviceModel.CAT_INTERNET
             }
 
@@ -145,7 +145,7 @@ Widgets.PageLoader {
             }
 
             providerModel: NetworkMediaModel {
-                ctx: mainctx
+                ctx: MainCtx
             }
 
             contextMenu: NetworkMediaContextMenu {
@@ -279,7 +279,7 @@ Widgets.PageLoader {
             ServicesDiscoveryModel {
                 id: discoveryModel
 
-                ctx: mainctx
+                ctx: MainCtx
             }
 
             SortFilterProxyModel {
@@ -318,7 +318,7 @@ Widgets.PageLoader {
                 pictureHeight: VLCStyle.gridCover_network_height
                 height: VLCStyle.gridCover_network_height + VLCStyle.margin_xsmall + VLCStyle.fontHeight_normal
                 playCoverBorderWidth: VLCStyle.gridCover_network_border
-                playCoverShowGradient: false
+                playCoverShowPlay: false
                 pictureOverlay: overlay
                 unselectedUnderlay: shadows.unselected
                 selectedUnderlay: shadows.selected
@@ -421,7 +421,7 @@ Widgets.PageLoader {
             NetworkSourcesModel {
                 id: sourcesModel
 
-                ctx: mainctx
+                ctx: MainCtx
             }
 
             Util.SelectableDelegateModel {

@@ -45,8 +45,6 @@
 #include "gl_util.h"
 #include "vout_helper.h"
 #include "renderer.h"
-#include "sampler.h"
-#include "sampler_priv.h"
 #include "sub_renderer.h"
 
 struct vout_display_opengl_t {
@@ -149,6 +147,41 @@ vout_display_opengl_t *vout_display_opengl_New(video_format_t *fmt,
         goto delete_interop;
     }
 
+    int upscaler = var_InheritInteger(gl, "gl-upscaler");
+    int downscaler = var_InheritInteger(gl, "gl-downscaler");
+
+    if (upscaler || downscaler)
+    {
+        char upscaler_value[12];
+        char downscaler_value[12];
+
+        snprintf(upscaler_value, sizeof(upscaler_value), "%d", upscaler);
+        snprintf(downscaler_value, sizeof(downscaler_value), "%d", downscaler);
+        upscaler_value[sizeof(upscaler_value) - 1] = '\0';
+        downscaler_value[sizeof(downscaler_value) - 1] = '\0';
+
+        config_chain_t cfg = {
+            .psz_name = (char *) "upscaler",
+            .psz_value = upscaler_value,
+            .p_next = &(config_chain_t) {
+                .psz_name = (char *) "downscaler",
+                .psz_value = downscaler_value,
+            },
+        };
+
+        struct vlc_gl_filter *scale_filter =
+            vlc_gl_filters_Append(vgl->filters, "pl_scale", &cfg);
+        if (!scale_filter)
+        {
+            if (upscaler)
+                msg_Err(gl, "Could not apply upscaler filter, "
+                            "ignoring --gl-upscaler=%d", upscaler);
+            if (downscaler)
+                msg_Err(gl, "Could not apply downscaler filter, "
+                            "ignoring --gl-downscaler=%d", downscaler);
+        }
+    }
+
     /* The renderer is the only filter, for now */
     struct vlc_gl_filter *renderer_filter =
         vlc_gl_filters_Append(vgl->filters, "renderer", NULL);
@@ -243,10 +276,14 @@ int vout_display_opengl_SetViewpoint(vout_display_opengl_t *vgl,
     return vlc_gl_renderer_SetViewpoint(vgl->renderer, p_vp);
 }
 
-void vout_display_opengl_SetWindowAspectRatio(vout_display_opengl_t *vgl,
-                                              float f_sar)
+void vout_display_opengl_SetOutputSize(vout_display_opengl_t *vgl,
+                                       unsigned width, unsigned height)
 {
-    vlc_gl_renderer_SetWindowAspectRatio(vgl->renderer, f_sar);
+    int ret = vlc_gl_filters_SetOutputSize(vgl->filters, width, height);
+    /* The renderer, last filter in the chain, necessarily accepts the new
+     * output size */
+    assert(ret == VLC_SUCCESS);
+    (void) ret;
 }
 
 void vout_display_opengl_Viewport(vout_display_opengl_t *vgl, int x, int y,

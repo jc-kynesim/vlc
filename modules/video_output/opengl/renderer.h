@@ -42,14 +42,14 @@ struct pl_shader_res;
     add_shortcut("renderer") \
     set_shortname("renderer_gles2") \
     set_capability("opengl filter", 1) \
-    set_callback(vlc_gl_renderer_Open)
+    set_callback_opengl_filter(vlc_gl_renderer_Open)
 #else
 #define add_opengl_submodule_renderer() \
     add_submodule() \
     add_shortcut("renderer") \
     set_shortname("renderer_gl") \
     set_capability("opengl filter", 0) \
-    set_callback(vlc_gl_renderer_Open)
+    set_callback_opengl_filter(vlc_gl_renderer_Open)
 #endif
 
 /**
@@ -103,6 +103,11 @@ struct vlc_gl_renderer
     float f_fovy; /* to avoid recalculating them when needed.      */
     float f_z;    /* Position of the camera on the shpere radius vector */
     float f_sar;
+
+    /* Original size from which f_sar is computed
+     *     f_sar = (float) target_width / target_height */
+    unsigned target_width;
+    unsigned target_height;
 };
 
 vlc_gl_filter_open_fn vlc_gl_renderer_Open;
@@ -110,9 +115,5 @@ vlc_gl_filter_open_fn vlc_gl_renderer_Open;
 int
 vlc_gl_renderer_SetViewpoint(struct vlc_gl_renderer *renderer,
                              const vlc_viewpoint_t *p_vp);
-
-void
-vlc_gl_renderer_SetWindowAspectRatio(struct vlc_gl_renderer *renderer,
-                                     float f_sar);
 
 #endif /* include-guard */

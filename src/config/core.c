@@ -24,6 +24,7 @@
 # include "config.h"
 #endif
 
+#include <stdatomic.h>
 #include <vlc_common.h>
 #include <vlc_actions.h>
 #include <vlc_modules.h>
@@ -36,26 +37,24 @@
 
 #include "configuration.h"
 #include "modules/modules.h"
+#include "misc/rcu.h"
 
-vlc_rwlock_t config_lock = VLC_STATIC_RWLOCK;
-bool config_dirty = false;
+vlc_mutex_t config_lock = VLC_STATIC_MUTEX;
+atomic_bool config_dirty = ATOMIC_VAR_INIT(false);
 
 static inline char *strdupnull (const char *src)
 {
     return src ? strdup (src) : NULL;
 }
 
-int config_GetType(const char *psz_name)
+int config_GetType(const char *name)
 {
-    module_config_t *p_config = config_FindConfig(psz_name);
+    const struct vlc_param *param = vlc_param_Find(name);
 
-    /* sanity checks */
-    if( !p_config )
-    {
+    if (param == NULL)
         return 0;
-    }
 
-    switch( CONFIG_CLASS(p_config->i_type) )
+    switch (CONFIG_CLASS(param->item.i_type))
     {
         case CONFIG_ITEM_FLOAT:
             return VLC_VAR_FLOAT;
@@ -72,119 +71,109 @@ int config_GetType(const char *psz_name)
 
 bool config_IsSafe( const char *name )
 {
-    module_config_t *p_config = config_FindConfig( name );
-    return p_config != NULL && p_config->b_safe;
+    const struct vlc_param *param = vlc_param_Find(name);
+
+    return (param != NULL) ? param->safe : false;
 }
 
-static module_config_t * config_FindConfigChecked( const char *psz_name )
+int64_t config_GetInt(const char *name)
 {
-    module_config_t *p_config = config_FindConfig( psz_name );
-#ifndef NDEBUG
-    if (p_config == NULL)
-        fprintf(stderr, "Unknown vlc configuration variable named %s\n", psz_name);
-#endif
-    return p_config;
-}
-
-int64_t config_GetInt(const char *psz_name)
-{
-    module_config_t *p_config = config_FindConfigChecked( psz_name );
+    const struct vlc_param *param = vlc_param_Find(name);
 
     /* sanity checks */
-    assert(p_config != NULL);
-    assert(IsConfigIntegerType(p_config->i_type));
+    assert(param != NULL);
+    assert(IsConfigIntegerType(param->item.i_type));
 
-    int64_t val;
-
-    vlc_rwlock_rdlock (&config_lock);
-    val = p_config->value.i;
-    vlc_rwlock_unlock (&config_lock);
-    return val;
+    return atomic_load_explicit(&param->value.i, memory_order_relaxed);
 }
 
-float config_GetFloat(const char *psz_name)
+float config_GetFloat(const char *name)
 {
-    module_config_t *p_config;
-
-    p_config = config_FindConfigChecked( psz_name );
+    const struct vlc_param *param = vlc_param_Find(name);
 
     /* sanity checks */
-    assert(p_config != NULL);
-    assert(IsConfigFloatType(p_config->i_type));
+    assert(param != NULL);
+    assert(IsConfigFloatType(param->item.i_type));
 
-    float val;
-
-    vlc_rwlock_rdlock (&config_lock);
-    val = p_config->value.f;
-    vlc_rwlock_unlock (&config_lock);
-    return val;
+    return atomic_load_explicit(&param->value.f, memory_order_relaxed);
 }
 
-char *config_GetPsz(const char *psz_name)
+char *config_GetPsz(const char *name)
 {
-    module_config_t *p_config = config_FindConfigChecked( psz_name );
+    const struct vlc_param *param = vlc_param_Find(name);
+    char *str;
 
     /* sanity checks */
-    assert(p_config != NULL);
-    assert(IsConfigStringType (p_config->i_type));
+    assert(param != NULL);
+    assert(IsConfigStringType(param->item.i_type));
 
     /* return a copy of the string */
-    vlc_rwlock_rdlock (&config_lock);
-    char *psz_value = strdupnull (p_config->value.psz);
-    vlc_rwlock_unlock (&config_lock);
+    vlc_rcu_read_lock();
+    str = atomic_load_explicit(&param->value.str, memory_order_acquire);
+    if (str != NULL)
+        str = strdup(str);
+    vlc_rcu_read_unlock();
+    return str;
+}
 
-    return psz_value;
+int vlc_param_SetString(struct vlc_param *param, const char *value)
+{
+    char *str = NULL, *oldstr;
+
+    assert(param != NULL);
+    assert(IsConfigStringType(param->item.i_type));
+
+    if (value != NULL && value[0] != '\0') {
+        str = strdup(value);
+        if (unlikely(str == NULL))
+            return -1;
+    }
+
+    oldstr = atomic_load_explicit(&param->value.str, memory_order_relaxed);
+    atomic_store_explicit(&param->value.str, str, memory_order_release);
+    param->item.value.psz = str;
+    vlc_rcu_synchronize();
+    free(oldstr);
+    return 0;
 }
 
 void config_PutPsz(const char *psz_name, const char *psz_value)
 {
-    module_config_t *p_config = config_FindConfigChecked( psz_name );
-
-    /* sanity checks */
-    assert(p_config != NULL);
-    assert(IsConfigStringType(p_config->i_type));
-
-    char *str, *oldstr;
-    if ((psz_value != NULL) && *psz_value)
-        str = strdup (psz_value);
-    else
-        str = NULL;
-
-    vlc_rwlock_wrlock (&config_lock);
-    oldstr = (char *)p_config->value.psz;
-    p_config->value.psz = str;
-    config_dirty = true;
-    vlc_rwlock_unlock (&config_lock);
-
-    free (oldstr);
+    vlc_mutex_lock(&config_lock);
+    vlc_param_SetString(vlc_param_Find(psz_name), psz_value);
+    vlc_mutex_unlock(&config_lock);
+    atomic_store_explicit(&config_dirty, true, memory_order_release);
 }
 
-void config_PutInt(const char *psz_name, int64_t i_value )
+void config_PutInt(const char *name, int64_t i_value)
 {
-    module_config_t *p_config = config_FindConfigChecked( psz_name );
+    struct vlc_param *param = vlc_param_Find(name);
+    module_config_t *p_config = &param->item;
 
     /* sanity checks */
-    assert(p_config != NULL);
-    assert(IsConfigIntegerType(p_config->i_type));
+    assert(param != NULL);
+    assert(IsConfigIntegerType(param->item.i_type));
 
     if (i_value < p_config->min.i)
         i_value = p_config->min.i;
     if (i_value > p_config->max.i)
         i_value = p_config->max.i;
 
-    vlc_rwlock_wrlock (&config_lock);
+    atomic_store_explicit(&param->value.i, i_value, memory_order_relaxed);
+    vlc_mutex_lock(&config_lock);
     p_config->value.i = i_value;
-    config_dirty = true;
-    vlc_rwlock_unlock (&config_lock);
+    vlc_mutex_unlock(&config_lock);
+    atomic_store_explicit(&config_dirty, true, memory_order_release);
 }
 
-void config_PutFloat(const char *psz_name, float f_value)
+void config_PutFloat(const char *name, float f_value)
 {
-    module_config_t *p_config = config_FindConfigChecked( psz_name );
+    struct vlc_param *param = vlc_param_Find(name);
+    module_config_t *p_config = &param->item;
 
     /* sanity checks */
-    assert(p_config != NULL);
-    assert(IsConfigFloatType(p_config->i_type));
+    assert(param != NULL);
+    assert(IsConfigFloatType(param->item.i_type));
 
     /* if f_min == f_max == 0, then do not use them */
     if ((p_config->min.f == 0.f) && (p_config->max.f == 0.f))
@@ -194,10 +183,11 @@ void config_PutFloat(const char *psz_name, float f_value)
     else if (f_value > p_config->max.f)
         f_value = p_config->max.f;
 
-    vlc_rwlock_wrlock (&config_lock);
+    atomic_store_explicit(&param->value.f, f_value, memory_order_relaxed);
+    vlc_mutex_lock(&config_lock);
     p_config->value.f = f_value;
-    config_dirty = true;
-    vlc_rwlock_unlock (&config_lock);
+    vlc_mutex_unlock(&config_lock);
+    atomic_store_explicit(&config_dirty, true, memory_order_release);
 }
 
 ssize_t config_GetIntChoices(const char *name,
@@ -206,15 +196,20 @@ ssize_t config_GetIntChoices(const char *name,
     *values = NULL;
     *texts = NULL;
 
-    module_config_t *cfg = config_FindConfigChecked(name);
-    assert(cfg != NULL);
+    struct vlc_param *param = vlc_param_Find(name);
+    if (param == NULL)
+    {
+        errno = ENOENT;
+        return -1;
+    }
 
+    module_config_t *cfg = &param->item;
     size_t count = cfg->list_count;
     if (count == 0)
     {
         int (*cb)(const char *, int64_t **, char ***);
 
-        cb = vlc_plugin_Symbol(NULL, cfg->owner, "vlc_entry_cfg_int_enum");
+        cb = vlc_plugin_Symbol(NULL, param->owner, "vlc_entry_cfg_int_enum");
         if (cb == NULL)
             return 0;
 
@@ -312,13 +307,14 @@ ssize_t config_GetPszChoices(const char *name,
 {
     *values = *texts = NULL;
 
-    module_config_t *cfg = config_FindConfig(name);
-    if (cfg == NULL)
+    struct vlc_param *param = vlc_param_Find(name);
+    if (param == NULL)
     {
         errno = ENOENT;
         return -1;
     }
 
+    module_config_t *cfg = &param->item;
     switch (cfg->i_type)
     {
         case CONFIG_ITEM_MODULE:
@@ -337,7 +333,7 @@ ssize_t config_GetPszChoices(const char *name,
     {
         int (*cb)(const char *, char ***, char ***);
 
-        cb = vlc_plugin_Symbol(NULL, cfg->owner, "vlc_entry_cfg_str_enum");
+        cb = vlc_plugin_Symbol(NULL, param->owner, "vlc_entry_cfg_str_enum");
         if (cb == NULL)
             return 0;
 
@@ -383,21 +379,21 @@ error:
 
 static int confcmp (const void *a, const void *b)
 {
-    const module_config_t *const *ca = a, *const *cb = b;
+    const struct vlc_param *const *ca = a, *const *cb = b;
 
-    return strcmp ((*ca)->psz_name, (*cb)->psz_name);
+    return strcmp ((*ca)->item.psz_name, (*cb)->item.psz_name);
 }
 
 static int confnamecmp (const void *key, const void *elem)
 {
-    const module_config_t *const *conf = elem;
+    const struct vlc_param *const *conf = elem;
 
-    return strcmp (key, (*conf)->psz_name);
+    return strcmp (key, (*conf)->item.psz_name);
 }
 
 static struct
 {
-    module_config_t **list;
+    struct vlc_param **list;
     size_t count;
 } config = { NULL, 0 };
 
@@ -412,7 +408,7 @@ int config_SortConfig (void)
     for (p = vlc_plugins; p != NULL; p = p->next)
         nconf += p->conf.count;
 
-    module_config_t **clist = vlc_alloc (nconf, sizeof (*clist));
+    struct vlc_param **clist = vlc_alloc(nconf, sizeof (*clist));
     if (unlikely(clist == NULL))
         return VLC_ENOMEM;
 
@@ -421,12 +417,13 @@ int config_SortConfig (void)
     {
         for (size_t i = 0; i < p->conf.size; i++)
         {
-            module_config_t *item = p->conf.items + i;
+            struct vlc_param *param = p->conf.params + i;
+            module_config_t *item = &param->item;
 
             if (!CONFIG_ITEM(item->i_type))
                 continue; /* ignore hints */
             assert(index < nconf);
-            clist[index++] = item;
+            clist[index++] = param;
         }
     }
 
@@ -439,7 +436,7 @@ int config_SortConfig (void)
 
 void config_UnsortConfig (void)
 {
-    module_config_t **clist;
+    struct vlc_param **clist;
 
     clist = config.list;
     config.list = NULL;
@@ -448,14 +445,23 @@ void config_UnsortConfig (void)
     free (clist);
 }
 
+struct vlc_param *vlc_param_Find(const char *name)
+{
+    struct vlc_param *const *p;
+
+    assert(name != NULL);
+    p = bsearch (name, config.list, config.count, sizeof (*p), confnamecmp);
+    return (p != NULL) ? *p : NULL;
+}
+
 module_config_t *config_FindConfig(const char *name)
 {
     if (unlikely(name == NULL))
         return NULL;
 
-    module_config_t *const *p;
-    p = bsearch (name, config.list, config.count, sizeof (*p), confnamecmp);
-    return p ? *p : NULL;
+    struct vlc_param *param = vlc_param_Find(name);
+
+    return (param != NULL) ? &param->item : NULL;
 }
 
 /**
@@ -463,15 +469,17 @@ module_config_t *config_FindConfig(const char *name)
  * \param config start of array of items
  * \param confsize number of items in the array
  */
-void config_Free (module_config_t *tab, size_t confsize)
+void config_Free(struct vlc_param *tab, size_t confsize)
 {
     for (size_t j = 0; j < confsize; j++)
     {
-        module_config_t *p_item = &tab[j];
+        struct vlc_param *param = &tab[j];
+        module_config_t *p_item = &param->item;
 
         if (IsConfigStringType (p_item->i_type))
         {
-            free (p_item->value.psz);
+            free(atomic_load_explicit(&param->value.str,
+                                      memory_order_relaxed));
             if (p_item->list_count)
                 free (p_item->list.psz);
         }
@@ -484,27 +492,32 @@ void config_Free (module_config_t *tab, size_t confsize)
 
 void config_ResetAll(void)
 {
-    vlc_rwlock_wrlock (&config_lock);
+    vlc_mutex_lock(&config_lock);
     for (vlc_plugin_t *p = vlc_plugins; p != NULL; p = p->next)
     {
         for (size_t i = 0; i < p->conf.size; i++ )
         {
-            module_config_t *p_config = p->conf.items + i;
+            struct vlc_param *param = p->conf.params + i;
+            module_config_t *p_config = &param->item;
 
             if (IsConfigIntegerType (p_config->i_type))
+            {
+                atomic_store_explicit(&param->value.i, p_config->orig.i,
+                                      memory_order_relaxed);
                 p_config->value.i = p_config->orig.i;
+            }
             else
             if (IsConfigFloatType (p_config->i_type))
+            {
+                atomic_store_explicit(&param->value.f, p_config->orig.f,
+                                      memory_order_relaxed);
                 p_config->value.f = p_config->orig.f;
+            }
             else
             if (IsConfigStringType (p_config->i_type))
-            {
-                free ((char *)p_config->value.psz);
-                p_config->value.psz =
-                        strdupnull (p_config->orig.psz);
-            }
+                vlc_param_SetString(param, p_config->orig.psz);
         }
     }
-    config_dirty = true;
-    vlc_rwlock_unlock (&config_lock);
+    vlc_mutex_lock(&config_lock);
+    atomic_store_explicit(&config_dirty, true, memory_order_release);
 }

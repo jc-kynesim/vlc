@@ -24,7 +24,7 @@
 
 #include <vlc_tick.h>
 
-#include "sampler.h"
+#include "picture.h"
 
 struct vlc_gl_filter;
 
@@ -41,37 +41,58 @@ struct vlc_gl_input_meta {
 typedef int
 vlc_gl_filter_open_fn(struct vlc_gl_filter *filter,
                       const config_chain_t *config,
+                      const struct vlc_gl_format *glfmt,
                       struct vlc_gl_tex_size *size_out);
+
+#define set_callback_opengl_filter(open) \
+    { \
+        vlc_gl_filter_open_fn *fn = open; \
+        (void) fn; \
+        set_callback(fn); \
+    }
 
 struct vlc_gl_filter_ops {
     /**
      * Draw the result of the filter to the current framebuffer
      */
-    int (*draw)(struct vlc_gl_filter *filter,
+    int (*draw)(struct vlc_gl_filter *filter, const struct vlc_gl_picture *pic,
                 const struct vlc_gl_input_meta *meta);
 
     /**
      * Free filter resources
      */
     void (*close)(struct vlc_gl_filter *filter);
-};
 
-struct vlc_gl_filter_owner_ops {
     /**
-     * Get the sampler associated to this filter.
+     * Request a (responsive) filter to adapt its output size (optional)
      *
-     * The instance is lazy-loaded (to avoid creating one for blend filters).
-     * Successive calls to this function for the same filter is guaranteed to
-     * always return the same sampler.
+     * A responsive filter is a filter for which the size of the produced
+     * pictures depends on the output (e.g. display) size rather than the
+     * input. This is for example the case for a renderer.
      *
-     * Important: filter->config must be initialized *before* getting the
-     * sampler, since the sampler behavior may depend on it.
+     * A new output size is requested (size_out). The filter is authorized to
+     * change the size_out to enforce its own constraints.
      *
-     * \param filter the filter
-     * \return sampler the sampler, NULL on error
+     * In addition, it may request to the previous filter (if any) an optimal
+     * size it wants to receive. If set to non-zero value, this previous filter
+     * will receive this size as its requested size (and so on).
+     *
+     * \retval true if the resize is accepted (possibly with a modified
+     *              size_out)
+     * \retval false if the resize is rejected (included on error)
      */
-    struct vlc_gl_sampler *
-    (*get_sampler)(struct vlc_gl_filter *filter);
+    int (*request_output_size)(struct vlc_gl_filter *filter,
+                               struct vlc_gl_tex_size *size_out,
+                               struct vlc_gl_tex_size *optimal_in);
+
+    /**
+     * Callback to notify input size changes
+     *
+     * When a filter changes its output size as a result of
+     * request_output_size(), the next filter is notified by this callback.
+     */
+    void (*on_input_size_change)(struct vlc_gl_filter *filter,
+                                 const struct vlc_gl_tex_size *size);
 };
 
 /**
@@ -81,7 +102,9 @@ struct vlc_gl_filter {
     vlc_object_t obj;
     module_t *module;
 
+    struct vlc_gl_t *gl;
     const struct vlc_gl_api *api;
+    const struct vlc_gl_format *glfmt_in;
 
     struct {
         /**
@@ -120,14 +143,6 @@ struct vlc_gl_filter {
 
     const struct vlc_gl_filter_ops *ops;
     void *sys;
-
-    const struct vlc_gl_filter_owner_ops *owner_ops;
 };
-
-static inline struct vlc_gl_sampler *
-vlc_gl_filter_GetSampler(struct vlc_gl_filter *filter)
-{
-    return filter->owner_ops->get_sampler(filter);
-}
 
 #endif

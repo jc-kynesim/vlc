@@ -19,6 +19,7 @@
 import QtQuick 2.11
 import QtQuick.Layouts 1.11
 import QtQuick.Controls 2.4
+import QtQuick.Templates 2.4 as T
 
 import org.videolan.vlc 0.1
 
@@ -84,7 +85,7 @@ FocusScope {
     //drag and dbl click the titlebar in CSD mode
     Loader {
         anchors.fill: parent
-        active: mainInterface.clientSideDecoration
+        active: MainCtx.clientSideDecoration
         source: "qrc:///widgets/CSDTitlebarTapNDrapHandler.qml"
     }
 
@@ -95,7 +96,8 @@ FocusScope {
         anchors.leftMargin: VLCStyle.margin_small
         spacing: VLCStyle.margin_small
 
-        Label {
+        //FIXME use the right xxxLabel class
+        T.Label {
             Layout.preferredHeight: implicitHeight
             Layout.preferredWidth: implicitWidth
 
@@ -151,9 +153,9 @@ FocusScope {
 
             focus: false
             height: VLCStyle.icon_normal
-            active: mainInterface.clientSideDecoration
-            enabled: mainInterface.clientSideDecoration
-            visible: mainInterface.clientSideDecoration
+            active: MainCtx.clientSideDecoration
+            enabled: MainCtx.clientSideDecoration
+            visible: MainCtx.clientSideDecoration
             source: "qrc:///widgets/CSDWindowButtonSet.qml"
             onLoaded: {
                 item.color = Qt.binding(function() { return resumePanel.colors.playerFg })

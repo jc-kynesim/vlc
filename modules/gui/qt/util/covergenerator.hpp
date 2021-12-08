@@ -35,7 +35,7 @@
 #include <QPainter>
 
 // Forward declarations
-class vlc_medialibrary_t;
+struct vlc_medialibrary_t;
 class MLItemId;
 
 class CoverGenerator : public AsyncTask<QString>
@@ -52,12 +52,10 @@ public: // Enums
     };
 
 public:
-    CoverGenerator(vlc_medialibrary_t * ml, const MLItemId & itemId, int index = -1);
+    CoverGenerator(vlc_medialibrary_t * ml, const MLItemId & itemId);
 
 public: // Interface
     Q_INVOKABLE MLItemId getId();
-
-    Q_INVOKABLE int getIndex();
 
     Q_INVOKABLE void setSize(const QSize & size);
 
@@ -78,10 +76,16 @@ public: // Interface
     // NOTE: This lets us enforce a specific prefix for the cover fileName.
     Q_INVOKABLE void setPrefix(const QString & prefix);
 
+    bool cachedFileAvailable() const;
+
+    QString cachedFileURL() const;
+
 public: // AsyncTask implementation
     QString execute() override;
 
 private: // Functions
+    QString fileName() const;
+
     void draw(QPainter & painter, const QStringList & fileNames, int countX, int countY);
 
     void drawImage(QPainter & painter, const QString & fileName, const QRect & rect);
@@ -97,8 +101,6 @@ private:
     vlc_medialibrary_t * m_ml;
 
     MLItemId m_id;
-
-    int m_index;
 
     QSize m_size;
 

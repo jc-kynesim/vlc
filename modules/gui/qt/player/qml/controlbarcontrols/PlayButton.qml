@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 import QtQuick 2.11
-import QtQuick.Controls 2.4
+import QtQuick.Templates 2.4 as T
 import QtGraphicalEffects 1.0
 
 import org.videolan.vlc 0.1
@@ -26,7 +26,7 @@ import "qrc:///style/"
 import "qrc:///util/Helpers.js" as Helpers
 
 
-Control {
+T.Control {
     id: playBtn
 
     implicitHeight: VLCStyle.icon_medium
@@ -108,8 +108,12 @@ Control {
         }
 
         onPressed: {
-            if (!cursorInside)
+            if (!cursorInside) {
                 mouse.accepted = false
+                return
+            }
+
+            playBtn.forceActiveFocus(Qt.MouseFocusReason)
         }
 
         onClicked: {
@@ -158,7 +162,7 @@ Control {
         }
     }
 
-    contentItem: Label {
+    contentItem: T.Label {
         id: contentLabel
 
         text: {

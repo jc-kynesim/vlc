@@ -190,6 +190,7 @@
 #define VLC_CODEC_IMM4            VLC_FOURCC('I','M','M','4')
 #define VLC_CODEC_IMM5            VLC_FOURCC('I','M','M','5')
 #define VLC_CODEC_AGM             VLC_FOURCC('A','G','M','0')
+#define VLC_CODEC_NOTCHLC         VLC_FOURCC('n','c','l','c')
 
 /***********
  * Chromas
@@ -275,6 +276,10 @@
 /* Planar Y:U:V:A 4:4:4 10bits */
 #define VLC_CODEC_YUVA_444_10L    VLC_FOURCC('Y','A','0','L')
 #define VLC_CODEC_YUVA_444_10B    VLC_FOURCC('Y','A','0','B')
+
+/* Planar Y:U:V:A 4:4:4 12bits */
+#define VLC_CODEC_YUVA_444_12L    VLC_FOURCC('Y','A','2','L')
+#define VLC_CODEC_YUVA_444_12B    VLC_FOURCC('Y','A','2','B')
 
 /* Semi-planar Y/UV */
 
@@ -498,6 +503,7 @@
 #define VLC_CODEC_ADPCM_IMA_WS               VLC_FOURCC('A','I','W','S')
 #define VLC_CODEC_ADPCM_G722                 VLC_FOURCC('g','7','2','2')
 #define VLC_CODEC_ADPCM_G726                 VLC_FOURCC('g','7','2','6')
+#define VLC_CODEC_ADPCM_G726_LE              VLC_FOURCC('g','7','2','s')
 #define VLC_CODEC_ADPCM_SWF                  VLC_FOURCC('S','W','F','a')
 #define VLC_CODEC_ADPCM_MS                   VLC_FOURCC('m','s',0x00,0x02)
 #define VLC_CODEC_ADPCM_IMA_WAV              VLC_FOURCC('m','s',0x00,0x11)

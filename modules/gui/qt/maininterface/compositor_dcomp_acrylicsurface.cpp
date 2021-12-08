@@ -78,25 +78,27 @@ bool isWinPreIron()
 namespace vlc
 {
 
-CompositorDCompositionAcrylicSurface::CompositorDCompositionAcrylicSurface(qt_intf_t *intf_t, ID3D11Device *device, QObject *parent)
+CompositorDCompositionAcrylicSurface::CompositorDCompositionAcrylicSurface(qt_intf_t *intf, CompositorDirectComposition *compositor, MainCtx *mainCtx, ID3D11Device *device, QObject *parent)
     : QObject(parent)
-    , m_intf {intf_t}
+    , m_intf {intf}
+    , m_compositor {compositor}
+    , m_mainCtx {mainCtx}
 {
     if (!init(device))
-    {
-        m_intf = nullptr;
         return;
-    }
-
-    if (auto w = window())
-        setActive(m_transparencyEnabled && w->isActive());
 
     qApp->installNativeEventFilter(this);
+
+    setActive(m_transparencyEnabled && m_mainCtx->acrylicActive());
+    connect(m_mainCtx, &MainCtx::acrylicActiveChanged, this, [this]()
+    {
+        setActive(m_transparencyEnabled && m_mainCtx->acrylicActive());
+    });
 }
 
 CompositorDCompositionAcrylicSurface::~CompositorDCompositionAcrylicSurface()
 {
-    setActive(false);
+    m_mainCtx->setHasAcrylicSurface(false);
 
     if (m_dummyWindow)
         DestroyWindow(m_dummyWindow);
@@ -106,7 +108,7 @@ bool CompositorDCompositionAcrylicSurface::nativeEventFilter(const QByteArray &e
 {
     MSG* msg = static_cast<MSG*>( message );
 
-    if (!m_intf || msg->hwnd != hwnd())
+    if (msg->hwnd != hwnd())
         return false;
 
     switch (msg->message)
@@ -122,18 +124,6 @@ bool CompositorDCompositionAcrylicSurface::nativeEventFilter(const QByteArray &e
         requestReset(); // incase z-order changed
         break;
     }
-    case WM_ACTIVATE:
-    {
-        if (!m_transparencyEnabled)
-            break;
-
-        const int activeType = LOWORD(msg->wParam);
-        if ((activeType == WA_ACTIVE) || (activeType == WA_CLICKACTIVE))
-            setActive(true);
-        else if (activeType == WA_INACTIVE)
-            setActive(false);
-        break;
-    }
     case WM_SETTINGCHANGE:
     {
         if (!lstrcmpW(LPCWSTR(msg->lParam), L"ImmersiveColorSet"))
@@ -143,8 +133,8 @@ bool CompositorDCompositionAcrylicSurface::nativeEventFilter(const QByteArray &e
                 break;
 
             m_transparencyEnabled = transparencyEnabled;
-            if (const auto w = window())
-                setActive(m_transparencyEnabled && w->isActive());
+            m_mainCtx->setHasAcrylicSurface(m_transparencyEnabled);
+            setActive(m_transparencyEnabled && m_mainCtx->acrylicActive());
         }
         break;
     }
@@ -168,8 +158,6 @@ bool CompositorDCompositionAcrylicSurface::init(ID3D11Device *device)
     if (!createBackHostVisual())
         return false;
 
-    m_transparencyEnabled = isTransparencyEnabled();
-
     m_leftMostScreenX = 0;
     m_topMostScreenY = 0;
     for (const auto screen : qGuiApp->screens())
@@ -178,6 +166,9 @@ bool CompositorDCompositionAcrylicSurface::init(ID3D11Device *device)
         m_leftMostScreenX = std::min<int>(geometry.left(), m_leftMostScreenX);
         m_topMostScreenY = std::min<int>(geometry.top(), m_topMostScreenY);
     }
+
+    m_transparencyEnabled = isTransparencyEnabled();
+    m_mainCtx->setHasAcrylicSurface(m_transparencyEnabled);
 
     return true;
 }
@@ -251,7 +242,7 @@ try
     m_saturationEffect->SetSaturation(2);
 
     m_gaussianBlur->SetBorderMode(D2D1_BORDER_MODE_HARD);
-    m_gaussianBlur->SetStandardDeviation(20);
+    m_gaussianBlur->SetStandardDeviation(40);
     m_gaussianBlur->SetInput(0, m_saturationEffect.Get(), 0);
     m_rootVisual->SetEffect(m_gaussianBlur.Get());
 
@@ -333,7 +324,7 @@ catch (const DXError &err)
 
 void CompositorDCompositionAcrylicSurface::sync()
 {
-    if (!m_intf || !hwnd())
+    if (!hwnd())
         return;
 
     const int dx = std::abs(m_leftMostScreenX);
@@ -344,14 +335,14 @@ void CompositorDCompositionAcrylicSurface::sync()
     GetWindowRect(hwnd(), &rect);
     m_rootClip->SetLeft((float)rect.left + dx);
     m_rootClip->SetRight((float)rect.right + dx);
-    m_rootClip->SetTop((float)rect.top);
-    m_rootClip->SetBottom((float)rect.bottom);
+    m_rootClip->SetTop((float)rect.top + dy);
+    m_rootClip->SetBottom((float)rect.bottom + dy);
     m_rootVisual->SetClip(m_rootClip.Get());
 
     int frameX = 0;
     int frameY = 0;
 
-    if (m_intf->p_mi && !m_intf->p_mi->useClientSideDecoration())
+    if (!m_mainCtx->useClientSideDecoration())
     {
         frameX = GetSystemMetrics(SM_CXFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER);
         frameY = GetSystemMetrics(SM_CYFRAME) + GetSystemMetrics(SM_CYCAPTION)
@@ -375,9 +366,10 @@ void CompositorDCompositionAcrylicSurface::updateVisual()
     if (!w || !w->screen())
         return;
 
-    const auto screenRect = w->screen()->availableVirtualGeometry();
-    RECT sourceRect {screenRect.left(), screenRect.top(), screenRect.right(), screenRect.bottom()};
-    SIZE destinationSize {screenRect.width(), screenRect.height()};
+    const int desktopWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+    const int desktopHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+    RECT sourceRect {0, 0, desktopWidth, desktopHeight};
+    SIZE destinationSize {desktopWidth, desktopHeight};
 
     HWND hwndExclusionList[2];
     hwndExclusionList[0] = hwnd();
@@ -419,41 +411,29 @@ void CompositorDCompositionAcrylicSurface::setActive(const bool newActive)
     m_active = newActive;
     if (m_active)
     {
-        auto dcompositor = static_cast<vlc::CompositorDirectComposition *>(m_intf->p_compositor);
-        dcompositor->addVisual(m_rootVisual);
+        m_compositor->addVisual(m_rootVisual);
 
         updateVisual();
         sync();
         commitChanges();
-
-        // delay propagating changes to avoid flickering
-        QMetaObject::invokeMethod(this, [this]()
-        {
-            m_intf->p_mi->setHasAcrylicSurface(true);
-        }, Qt::QueuedConnection);
     }
     else
     {
-        m_intf->p_mi->setHasAcrylicSurface(false);
-
-        // delay propagating changes to avoid flickering
-        QMetaObject::invokeMethod(this, [this]()
-        {
-            auto dcompositor = static_cast<vlc::CompositorDirectComposition *>(m_intf->p_compositor);
-            dcompositor->removeVisual(m_rootVisual);
-        }, Qt::QueuedConnection);
+        m_compositor->removeVisual(m_rootVisual);
     }
 }
 
 QWindow *CompositorDCompositionAcrylicSurface::window()
 {
-    return m_intf ? m_intf->p_compositor->interfaceMainWindow() : nullptr;
+    return m_compositor->interfaceMainWindow();
 }
 
 HWND CompositorDCompositionAcrylicSurface::hwnd()
 {
-    auto w = window();
-    return w->handle() ? (HWND)w->winId() : nullptr;
+    if (auto w = window())
+        return w->handle() ? (HWND)w->winId() : nullptr;
+
+    return nullptr;
 }
 
 void CompositorDCompositionAcrylicSurface::timerEvent(QTimerEvent *event)

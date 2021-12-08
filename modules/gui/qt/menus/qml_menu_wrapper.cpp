@@ -17,7 +17,6 @@
  *****************************************************************************/
 #include "qml_menu_wrapper.hpp"
 #include "menus.hpp"
-#include "util/qml_main_context.hpp"
 #include "medialibrary/medialib.hpp"
 #include "medialibrary/mlvideomodel.hpp"
 #include "medialibrary/mlgrouplistmodel.hpp"
@@ -33,7 +32,7 @@
 #include "playlist/playlist_controller.hpp"
 #include "playlist/playlist_model.hpp"
 #include "dialogs/dialogs_provider.hpp"
-#include "maininterface/main_interface.hpp"
+#include "maininterface/mainctx.hpp"
 
 
 #include <QSignalMapper>
@@ -67,12 +66,6 @@ namespace
         return QIcon(arrow);
     }
 }
-
-static inline void addSubMenu( QMenu *func, QString title, QMenu *bar ) {
-    func->setTitle( title );
-    bar->addMenu( func);
-}
-
 
 void StringListMenu::popup(const QPoint &point, const QVariantList &stringList)
 {
@@ -631,7 +624,7 @@ void PlaylistMediaContextMenu::popup(const QModelIndexList & selected, QPoint po
 
     action = m_menu->addAction(qtr("Add to playlist"));
 
-    connect(action, &QAction::triggered, [ml, ids]() {
+    connect(action, &QAction::triggered, [ids]() {
         DialogsProvider::getInstance()->playlistsDialog(ids);
     });
 

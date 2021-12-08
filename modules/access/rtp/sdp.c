@@ -31,6 +31,31 @@
 #include "sdp.h"
 #include <vlc_common.h>
 
+static bool istokenchar(unsigned char c)
+{   /* RFC4566 §9 */
+    if (c < 0x21 || c > 0x7E)
+        return false;
+    if (memchr("\x22\x28\x29\x2C\x2F\x5B\x5C\x5D", c, 8) != NULL)
+        return false;
+    if (c > 0x39 && c < 0x41)
+        return false;
+    return true;
+}
+
+static size_t vlc_sdp_token_length(const char *str)
+{
+    const char *p = str;
+
+    while (istokenchar(*p))
+        p++;
+    return p - str;
+}
+
+static bool vlc_sdp_is_token(const char *str)
+{
+    return str[vlc_sdp_token_length(str)] == '\0';
+}
+
 static void vlc_sdp_conn_free(struct vlc_sdp_conn **conn)
 {
     struct vlc_sdp_conn *c = *conn;
@@ -98,17 +123,23 @@ bad:
 
 static struct vlc_sdp_attr *vlc_sdp_attr_parse(const char *str, size_t len)
 {
-    struct vlc_sdp_attr *a = malloc(sizeof (*a) + len + 1);
-    const char *sep = memchr(str, ':', len);
-    size_t namelen = (sep != NULL) ? (size_t)(sep - str) : len;
+    size_t namelen = vlc_sdp_token_length(str);
+    if (namelen < len && str[namelen] != ':') {
+        errno = EINVAL;
+        return NULL;
+    }
 
+    struct vlc_sdp_attr *a = malloc(sizeof (*a) + len + 1);
     if (unlikely(a == NULL))
         return NULL;
 
     memcpy(a->name, str, len);
     a->name[namelen] = '\0';
-    a->name[len] = '\0';
-    a->value = (sep != NULL) ? a->name + namelen + 1 : NULL;
+    if (namelen < len) {
+        a->name[len] = '\0';
+        a->value = a->name + namelen + 1;
+    } else
+        a->value = NULL;
     a->next = NULL;
     return a;
 }
@@ -191,6 +222,10 @@ bad:
 
     if (unlikely(m->type == NULL || m->proto == NULL || m->format == NULL))
         vlc_sdp_media_free(&m);
+    if (!vlc_sdp_is_token(m->type)) {
+        vlc_sdp_media_free(&m);
+        errno = EINVAL;
+    }
 
     return m;
 }

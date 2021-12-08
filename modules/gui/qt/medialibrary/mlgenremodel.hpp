@@ -49,9 +49,10 @@ public:
     virtual ~MLGenreModel() = default;
 
     QHash<int, QByteArray> roleNames() const override;
-    QVariant data(const QModelIndex &index, int role) const override;
 
 protected:
+    QVariant itemRoleData(MLItem *item, int role) const override;
+
     ListCacheLoader<std::unique_ptr<MLItem>> *createLoader() const override;
 
 private:
@@ -60,7 +61,7 @@ private:
     vlc_ml_sorting_criteria_t roleToCriteria(int role) const override;
     vlc_ml_sorting_criteria_t nameToCriteria(QByteArray name) const override;
 
-    QString getCover(MLGenre * genre, int index) const;
+    QString getCover(MLGenre * genre) const;
 
 private slots:
     void onCover();

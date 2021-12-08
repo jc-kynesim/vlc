@@ -72,7 +72,7 @@ const char* SATIP_SERVER_DEVICE_TYPE = "urn:ses-com:device:SatIPServer:1";
 #define URL_LONGTEXT N_("The Url used to get the xml descriptor of the UPnP Renderer")
 
 static const char *const ppsz_satip_channel_lists[] = {
-    "Auto", "ASTRA_19_2E", "ASTRA_28_2E", "ASTRA_23_5E", "MasterList", "ServerList", "CustomList"
+    "auto", "ASTRA_19_2E", "ASTRA_28_2E", "ASTRA_23_5E", "MasterList", "ServerList", "CustomList"
 };
 static const char *const ppsz_readible_satip_channel_lists[] = {
     N_("Auto"), "Astra 19.2°E", "Astra 28.2°E", "Astra 23.5°E", N_("SAT>IP Main List"), N_("Device List"), N_("Custom List")
@@ -647,12 +647,20 @@ MediaServerList::parseSatipServer( IXML_Element* p_device_element, const char *p
     SD::MediaServerDesc* p_server = NULL;
 
     char *psz_satip_channellist = config_GetPsz("satip-channelist");
-    if( !psz_satip_channellist ) {
-        psz_satip_channellist = strdup("Auto");
-    }
 
-    if( unlikely( !psz_satip_channellist ) )
-        return;
+    /* In Auto mode, default to MasterList list from satip.info */
+    bool automode = false;
+    if( !psz_satip_channellist || /* On lookup failure or empty string, use auto mode */
+        strcmp(psz_satip_channellist, "auto") == 0 ||
+        strcmp(psz_satip_channellist, "Auto") == 0 ) /* for backwards compatibility */
+    {
+        automode = true;
+        if( psz_satip_channellist )
+            free(psz_satip_channellist);
+        psz_satip_channellist = strdup( "MasterList" );
+        if( unlikely( !psz_satip_channellist ) )
+            return;
+    }
 
     vlc_url_t url;
     vlc_UrlParse( &url, psz_base_url );
@@ -681,8 +689,7 @@ MediaServerList::parseSatipServer( IXML_Element* p_device_element, const char *p
 
     /* Part 2: device playlist
      * In Automatic mode, or if requested by the user, check for a SAT>IP m3u list on the device */
-    if (strcmp(psz_satip_channellist, "ServerList") == 0 ||
-        strcmp(psz_satip_channellist, "Auto") == 0 ) {
+    if (automode || strcmp(psz_satip_channellist, "ServerList") == 0) {
         const char* psz_m3u_url = xml_getChildElementValue( p_device_element, "satip:X_SATIPM3U" );
         if ( psz_m3u_url ) {
             if ( strncmp( "http", psz_m3u_url, 4) )
@@ -712,7 +719,7 @@ MediaServerList::parseSatipServer( IXML_Element* p_device_element, const char *p
             msg_Dbg( m_sd, "SAT>IP server '%s' did not provide a playlist", url.psz_host);
         }
 
-        if(strcmp(psz_satip_channellist, "ServerList") == 0) {
+        if (!automode) {
             /* to comply with the SAT>IP specifications, we don't fallback on another channel list if this path failed,
              * but in Automatic mode, we continue */
             free(psz_satip_channellist);
@@ -725,12 +732,6 @@ MediaServerList::parseSatipServer( IXML_Element* p_device_element, const char *p
      * In the normal case, fetch a playlist from the satip website,
      * which will be processed by a lua script a bit later, to make it work sanely
      * MasterList is a list of usual Satellites */
-
-    /* In Auto mode, default to MasterList list from satip.info */
-    if( strcmp(psz_satip_channellist, "Auto") == 0 ) {
-        free(psz_satip_channellist);
-        psz_satip_channellist = strdup( "MasterList" );
-    }
 
     char *psz_url;
     if (asprintf( &psz_url, "http://www.satip.info/Playlists/%s.m3u",
@@ -1618,32 +1619,18 @@ void *SearchThread(void *data)
 }
 
 static int OpenRD( vlc_object_t *p_this )
+try
 {
     vlc_renderer_discovery_t *p_rd = ( vlc_renderer_discovery_t* )p_this;
-    renderer_discovery_sys_t *p_sys  = new(std::nothrow) renderer_discovery_sys_t;
+    auto p_sys = std::make_unique<renderer_discovery_sys_t>();
 
-    if ( !p_sys )
-        return VLC_ENOMEM;
-    p_rd->p_sys = p_sys;
+    p_rd->p_sys = p_sys.get();
     p_sys->p_upnp = UpnpInstanceWrapper::get( p_this );
 
     if ( !p_sys->p_upnp )
-    {
-        delete p_sys;
         return VLC_EGENERIC;
-    }
 
-    try
-    {
-        p_sys->p_renderer_list = std::make_shared<RD::MediaRendererList>( p_rd );
-    }
-    catch ( const std::bad_alloc& )
-    {
-        msg_Err( p_rd, "Failed to create a MediaRendererList");
-        p_sys->p_upnp->release();
-        free(p_sys);
-        return VLC_EGENERIC;
-    }
+    p_sys->p_renderer_list = std::make_shared<RD::MediaRendererList>( p_rd );
     p_sys->p_upnp->addListener( p_sys->p_renderer_list );
 
     if( vlc_clone( &p_sys->thread, SearchThread, (void*)p_rd,
@@ -1652,10 +1639,21 @@ static int OpenRD( vlc_object_t *p_this )
             msg_Err( p_rd, "Can't run the lookup thread" );
             p_sys->p_upnp->removeListener( p_sys->p_renderer_list );
             p_sys->p_upnp->release();
-            delete p_sys;
             return VLC_EGENERIC;
         }
+
+    /* Release ownership of std::unique_ptr */
+    p_sys.release();
+
     return VLC_SUCCESS;
+}
+catch ( const std::bad_alloc& )
+{
+    vlc_renderer_discovery_t *p_rd = (vlc_renderer_discovery_t*)p_this;
+    renderer_discovery_sys_t *p_sys = static_cast<renderer_discovery_sys_t *>(p_rd->p_sys);
+    if (p_sys && p_sys->p_upnp)
+        p_sys->p_upnp->release();
+    return VLC_ENOMEM;
 }
 
 static void CloseRD( vlc_object_t *p_this )

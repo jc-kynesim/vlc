@@ -28,8 +28,7 @@
 #include "playlist/playlist_model.hpp"
 #include "playlist/playlist_controller.hpp"
 
-#include "util/qml_main_context.hpp"
-#include "util/qmleventfilter.hpp"
+#include "util/item_key_event_filter.hpp"
 #include "util/imageluminanceextractor.hpp"
 #include "util/i18n.hpp"
 #include "util/keyhelper.hpp"
@@ -37,6 +36,7 @@
 #include "util/sortfilterproxymodel.hpp"
 #include "util/navigation_history.hpp"
 #include "util/qmlinputitem.hpp"
+#include "util/mouse_event_filter.hpp"
 
 #include "dialogs/help/aboutmodel.hpp"
 #include "dialogs/dialogs_provider.hpp"
@@ -46,8 +46,6 @@
 #include "network/networkdevicemodel.hpp"
 #include "network/networksourcesmodel.hpp"
 #include "network/servicesdiscoverymodel.hpp"
-
-#include "maininterface/main_interface.hpp"
 
 #include "menus/qml_menu_wrapper.hpp"
 
@@ -76,25 +74,30 @@ void registerAnonymousType( const char *uri, int versionMajor )
 #endif
 }
 
+MainCtx* g_mainCtx = nullptr;
+
 } // anonymous namespace
 
 
-MainUI::MainUI(qt_intf_t *p_intf, MainInterface *mainInterface, QWindow* interfaceWindow,  QObject *parent)
+MainUI::MainUI(qt_intf_t *p_intf, MainCtx *mainCtx, QWindow* interfaceWindow,  QObject *parent)
     : QObject(parent)
     , m_intf(p_intf)
-    , m_mainInterface(mainInterface)
+    , m_mainCtx(mainCtx)
     , m_interfaceWindow(interfaceWindow)
 {
     assert(m_intf);
-    assert(m_mainInterface);
+    assert(m_mainCtx);
     assert(m_interfaceWindow);
+
+    assert(g_mainCtx == nullptr);
+    g_mainCtx = mainCtx;
 
     registerQMLTypes();
 }
 
 MainUI::~MainUI()
 {
-
+    g_mainCtx = nullptr;
 }
 
 bool MainUI::setup(QQmlEngine* engine)
@@ -107,15 +110,13 @@ bool MainUI::setup(QQmlEngine* engine)
     rootCtx->setContextProperty( "history", new NavigationHistory(this) );
     rootCtx->setContextProperty( "player", m_intf->p_mainPlayerController );
     rootCtx->setContextProperty( "i18n", new I18n(this) );
-    rootCtx->setContextProperty( "mainctx", new QmlMainContext(m_intf, m_mainInterface, this));
-    rootCtx->setContextProperty( "mainInterface", m_mainInterface);
     rootCtx->setContextProperty( "topWindow", m_interfaceWindow);
     rootCtx->setContextProperty( "dialogProvider", DialogsProvider::getInstance());
     rootCtx->setContextProperty( "systemPalette", new SystemPalette(this));
     rootCtx->setContextProperty( "dialogModel", new DialogModel(m_intf, this));
 
-    if (m_mainInterface->hasMediaLibrary())
-        rootCtx->setContextProperty( "medialib", m_mainInterface->getMediaLibrary() );
+    if (m_mainCtx->hasMediaLibrary())
+        rootCtx->setContextProperty( "medialib", m_mainCtx->getMediaLibrary() );
     else
         rootCtx->setContextProperty( "medialib", nullptr );
 
@@ -173,6 +174,8 @@ void MainUI::registerQMLTypes()
         const int versionMajor = 0;
         const int versionMinor = 1;
 
+        qmlRegisterSingletonType<MainCtx>(uri, versionMajor, versionMinor, "MainCtx", MainUI::getMainCtxInstance);
+
         qRegisterMetaType<VLCTick>();
         qmlRegisterUncreatableType<VLCTick>(uri, versionMajor, versionMinor, "VLCTick", "");
         qmlRegisterUncreatableType<ColorSchemeModel>(uri, versionMajor, versionMinor, "ColorSchemeModel", "");
@@ -210,7 +213,8 @@ void MainUI::registerQMLTypes()
         qmlRegisterUncreatableType<DialogErrorModel>( uri, versionMajor, versionMinor, "DialogErrorModel", "");
         qRegisterMetaType<DialogId>();
 
-        qmlRegisterType<QmlEventFilter>( uri, versionMajor, versionMinor, "EventFilter" );
+        qmlRegisterType<ItemKeyEventFilter>( uri, versionMajor, versionMinor, "KeyEventFilter" );
+        qmlRegisterType<MouseEventFilter>( uri, versionMajor, versionMinor, "MouseEventFilter" );
 
         qmlRegisterUncreatableType<ControlbarProfileModel>(uri, versionMajor, versionMinor, "ControlbarProfileModel", "");
         qmlRegisterUncreatableType<ControlbarProfile>(uri, versionMajor, versionMinor, "ControlbarProfile", "");
@@ -218,7 +222,6 @@ void MainUI::registerQMLTypes()
         qmlRegisterUncreatableType<ControlListModel>( uri, versionMajor, versionMinor, "ControlListModel", "" );
         qmlRegisterSingletonType(uri, versionMajor, versionMinor, "PlayerListModel", PlayerControlbarModel::getPlaylistIdentifierListModel);
 
-        qRegisterMetaType<QmlMainContext*>();
         qmlRegisterType<StringListMenu>( uri, versionMajor, versionMinor, "StringListMenu" );
         qmlRegisterType<SortMenu>( uri, versionMajor, versionMinor, "SortMenu" );
         qmlRegisterType<QmlGlobalMenu>( uri, versionMajor, versionMinor, "QmlGlobalMenu" );
@@ -244,7 +247,7 @@ void MainUI::registerQMLTypes()
         qmlRegisterType<RoundImage>( uri, versionMajor, versionMinor, "RoundImage" );
     }
 
-    if (m_mainInterface->hasMediaLibrary())
+    if (m_mainCtx->hasMediaLibrary())
     {
         const char* uri = "org.videolan.medialib";
         const int versionMajor = 0;
@@ -293,4 +296,10 @@ void MainUI::onQmlWarning(const QList<QQmlError>& qmlErrors)
     {
         msg_Warn( m_intf, "qml error %s:%i %s", qtu(error.url().toString()), error.line(), qtu(error.description()) );
     }
+}
+
+QObject* MainUI::getMainCtxInstance(QQmlEngine *, QJSEngine *)
+{
+    assert(g_mainCtx != nullptr);
+    return g_mainCtx;
 }

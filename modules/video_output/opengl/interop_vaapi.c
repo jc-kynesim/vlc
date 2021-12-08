@@ -61,6 +61,16 @@ struct priv
     VASurfaceID *va_surface_ids;
     PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
 
+    struct
+    {
+        EGLDisplay display;
+        EGLDisplay (*getCurrentDisplay)();
+        const char *(*queryString)(EGLDisplay, EGLint);
+        EGLImage (*createImageKHR)(EGLDisplay, EGLContext, EGLenum target, EGLClientBuffer buffer,
+                const EGLint *attrib_list);
+        void (*destroyImageKHR)(EGLDisplay, EGLImage image);
+    } egl;
+
     unsigned fourcc;
     EGLint drm_fourccs[3];
 
@@ -83,7 +93,8 @@ vaegl_image_create(const struct vlc_gl_interop *interop, EGLint w, EGLint h,
                    EGLint fourcc, EGLint fd, EGLint offset, EGLint pitch,
                    EGLuint64KHR modifier)
 {
-    EGLint attribs[] = {
+    struct priv *priv = interop->priv;
+    const EGLint attribs[] = {
         EGL_WIDTH, w,
         EGL_HEIGHT, h,
         EGL_LINUX_DRM_FOURCC_EXT, fourcc,
@@ -95,14 +106,15 @@ vaegl_image_create(const struct vlc_gl_interop *interop, EGLint w, EGLint h,
         EGL_NONE
     };
 
-    return interop->gl->egl.createImageKHR(interop->gl, EGL_LINUX_DMA_BUF_EXT,
-                                           NULL, attribs);
+    return priv->egl.createImageKHR(priv->egl.display,
+            EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, NULL, attribs);
 }
 
 static void
 vaegl_image_destroy(const struct vlc_gl_interop *interop, EGLImageKHR image)
 {
-    interop->gl->egl.destroyImageKHR(interop->gl, image);
+    struct priv *priv = interop->priv;
+    priv->egl.destroyImageKHR(priv->egl.display, image);
 }
 
 static void
@@ -418,34 +430,21 @@ static int
 Open(vlc_object_t *obj)
 {
     struct vlc_gl_interop *interop = (void *) obj;
+    struct priv *priv = NULL;
 
     if (interop->vctx == NULL)
         return VLC_EGENERIC;
     vlc_decoder_device *dec_device = vlc_video_context_HoldDevice(interop->vctx);
     if (dec_device->type != VLC_DECODER_DEVICE_VAAPI
-     || !vlc_vaapi_IsChromaOpaque(interop->fmt_in.i_chroma)
-     || interop->gl->ext != VLC_GL_EXT_EGL
-     || interop->gl->egl.createImageKHR == NULL
-     || interop->gl->egl.destroyImageKHR == NULL)
+     || !vlc_vaapi_IsChromaOpaque(interop->fmt_in.i_chroma))
     {
-        vlc_decoder_device_Release(dec_device);
-        return VLC_EGENERIC;
+        goto error;
     }
 
     if (!vlc_gl_StrHasToken(interop->api->extensions, "GL_OES_EGL_image"))
-    {
-        vlc_decoder_device_Release(dec_device);
-        return VLC_EGENERIC;
-    }
+        goto error;
 
-    const char *eglexts = interop->gl->egl.queryString(interop->gl, EGL_EXTENSIONS);
-    if (eglexts == NULL || !vlc_gl_StrHasToken(eglexts, "EGL_EXT_image_dma_buf_import"))
-    {
-        vlc_decoder_device_Release(dec_device);
-        return VLC_EGENERIC;
-    }
-
-    struct priv *priv = interop->priv = calloc(1, sizeof(struct priv));
+    priv = interop->priv = calloc(1, sizeof(struct priv));
     if (unlikely(priv == NULL))
         goto error;
     priv->fourcc = 0;
@@ -467,6 +466,33 @@ Open(vlc_object_t *obj)
     }
 
     if (vaegl_init_fourcc(priv, va_fourcc))
+        goto error;
+
+    priv->egl.getCurrentDisplay = vlc_gl_GetProcAddress(interop->gl, "eglGetCurrentDisplay");
+    if (priv->egl.getCurrentDisplay == EGL_NO_DISPLAY)
+        goto error;
+
+    priv->egl.display = priv->egl.getCurrentDisplay();
+    if (priv->egl.display == EGL_NO_DISPLAY)
+        goto error;
+
+    priv->egl.queryString = vlc_gl_GetProcAddress(interop->gl, "eglQueryString");
+    if (priv->egl.queryString == NULL)
+        goto error;
+
+    /* EGL_EXT_image_dma_buf_import implies EGL_KHR_image_base */
+    const char *eglexts = priv->egl.queryString(priv->egl.display, EGL_EXTENSIONS);
+    if (eglexts == NULL || !vlc_gl_StrHasToken(eglexts, "EGL_EXT_image_dma_buf_import"))
+        goto error;
+
+    priv->egl.createImageKHR =
+        vlc_gl_GetProcAddress(interop->gl, "eglCreateImageKHR");
+    if (priv->egl.createImageKHR == NULL)
+        goto error;
+
+    priv->egl.destroyImageKHR =
+        vlc_gl_GetProcAddress(interop->gl, "eglDestroyImageKHR");
+    if (priv->egl.destroyImageKHR == NULL)
         goto error;
 
     priv->glEGLImageTargetTexture2DOES =

@@ -371,6 +371,8 @@ libvlccore_la_SOURCES = \
 	misc/interrupt.h \
 	misc/interrupt.c \
 	misc/keystore.c \
+	misc/rcu.h \
+	misc/rcu.c \
 	misc/renderer_discovery.c \
 	misc/threads.c \
 	misc/cpu.c \
@@ -418,6 +420,7 @@ libvlccore_la_SOURCES += posix/timer.c win32/dirs-uap.c
 else
 libvlccore_la_SOURCES += win32/timer.c win32/dirs.c
 endif
+libvlccore_la_LIBADD += -lbcrypt
 endif
 
 if HAVE_OS2

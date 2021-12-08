@@ -311,8 +311,6 @@ void config_ChainParse( vlc_object_t *p_this, const char *psz_prefix,
         vlc_value_t val;
         bool b_yes = true;
         bool b_once = false;
-        module_config_t *p_conf;
-        int i_type;
         size_t i;
 
         if( cfg->psz_name == NULL || *cfg->psz_name == '\0' )
@@ -354,40 +352,35 @@ void config_ChainParse( vlc_object_t *p_this, const char *psz_prefix,
         snprintf( name, sizeof (name), "%s%s", psz_prefix,
                   b_once ? (ppsz_options[i] + 1) : ppsz_options[i] );
 
-        /* Check if the option is deprecated */
-        p_conf = config_FindConfig( name );
+        const struct vlc_param *param = vlc_param_Find(name);
 
-        /* This is basically cut and paste from src/misc/configuration.c
-         * with slight changes */
-        if( p_conf )
+        if (param == NULL)
         {
-            if( p_conf->b_removed )
-            {
-                msg_Err( p_this, "Option %s is not supported anymore.",
-                         name );
-                /* TODO: this should return an error and end option parsing
-                 * ... but doing this would change the VLC API and all the
-                 * modules so i'll do it later */
-                continue;
-            }
-        }
-        /* </Check if the option is deprecated> */
-
-        /* get the type of the variable */
-        i_type = config_GetType( psz_name );
-        if( !i_type )
-        {
-            msg_Warn( p_this, "unknown option %s (value=%s)",
-                      cfg->psz_name, cfg->psz_value );
+            msg_Warn(p_this, "unknown option %s", name);
             continue;
         }
 
-        if( i_type != VLC_VAR_BOOL && cfg->psz_value == NULL )
+        /* Check if the option is deprecated */
+        /* This is basically cut and paste from src/misc/configuration.c
+         * with slight changes */
+        if (param->obsolete)
+        {
+            msg_Err(p_this, "Option %s is not supported any longer.", name);
+            /* TODO: this should return an error and end option parsing
+             * ... but doing this would change the VLC API and all the
+             * modules so i'll do it later */
+           continue;
+        }
+
+        /* get the type of the variable */
+        const int i_type = param->item.i_type;
+
+        if( i_type != CONFIG_ITEM_BOOL && cfg->psz_value == NULL )
         {
             msg_Warn( p_this, "missing value for option %s", cfg->psz_name );
             continue;
         }
-        if( i_type != VLC_VAR_STRING && b_once )
+        if( i_type != CONFIG_ITEM_STRING && b_once )
         {
             msg_Warn( p_this, "*option_name need to be a string option" );
             continue;
@@ -395,17 +388,17 @@ void config_ChainParse( vlc_object_t *p_this, const char *psz_prefix,
 
         switch( i_type )
         {
-            case VLC_VAR_BOOL:
+            case CONFIG_ITEM_BOOL:
                 val.b_bool = b_yes;
                 break;
-            case VLC_VAR_INTEGER:
+            case CONFIG_ITEM_INTEGER:
                 val.i_int = strtoll( cfg->psz_value ? cfg->psz_value : "0",
                                      NULL, 0 );
                 break;
-            case VLC_VAR_FLOAT:
+            case CONFIG_ITEM_FLOAT:
                 val.f_float = us_atof( cfg->psz_value ? cfg->psz_value : "0" );
                 break;
-            case VLC_VAR_STRING:
+            case CONFIG_ITEM_STRING:
                 val.psz_string = cfg->psz_value;
                 break;
             default:

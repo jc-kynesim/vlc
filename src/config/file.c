@@ -27,6 +27,7 @@
 #include <errno.h>                                                  /* errno */
 #include <assert.h>
 #include <limits.h>
+#include <stdatomic.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #ifdef __APPLE__
@@ -46,6 +47,7 @@
 
 #include "configuration.h"
 #include "modules/modules.h"
+#include "misc/rcu.h"
 
 static inline char *strdupnull (const char *src)
 {
@@ -184,7 +186,7 @@ int config_LoadConfigFile( vlc_object_t *p_this )
     locale_t loc = newlocale (LC_NUMERIC_MASK, "C", NULL);
     locale_t baseloc = uselocale (loc);
 
-    vlc_rwlock_wrlock (&config_lock);
+    vlc_mutex_lock(&config_lock);
     while ((linelen = getline (&line, &bufsize, file)) != -1)
     {
         line[linelen - 1] = '\0'; /* trim newline */
@@ -201,17 +203,18 @@ int config_LoadConfigFile( vlc_object_t *p_this )
             continue; /* syntax error */
         *ptr = '\0';
 
-        module_config_t *item = config_FindConfig(psz_option_name);
-        if (item == NULL)
+        struct vlc_param *param = vlc_param_Find(psz_option_name);
+        if (param == NULL)
             continue;
 
         /* Reject values of options that are unsaveable */
-        if (item->b_unsaveable)
+        if (param->unsaved)
             continue;
         /* Ignore options that are obsolete */
-        if (item->b_removed)
+        if (param->obsolete)
             continue;
 
+        module_config_t *item = &param->item;
         const char *psz_option_value = ptr + 1;
         switch (CONFIG_CLASS(item->i_type))
         {
@@ -229,23 +232,32 @@ int config_LoadConfigFile( vlc_object_t *p_this )
                               psz_option_value, psz_option_name,
                               vlc_strerror_c(errno));
                 else
+                {
+                    atomic_store_explicit(&param->value.i, l,
+                                          memory_order_relaxed);
                     item->value.i = l;
+                }
                 break;
             }
 
             case CONFIG_ITEM_FLOAT:
+            {
                 if (!*psz_option_value)
                     break;                    /* ignore empty option */
-                item->value.f = (float)atof (psz_option_value);
+
+                float f = (float)atof(psz_option_value);
+                atomic_store_explicit(&param->value.f, f,
+                                      memory_order_relaxed);
+                item->value.f = f;
                 break;
+            }
 
             default:
-                free (item->value.psz);
-                item->value.psz = strdupnull (psz_option_value);
+                vlc_param_SetString(param, psz_option_value);
                 break;
         }
     }
-    vlc_rwlock_unlock (&config_lock);
+    vlc_mutex_unlock(&config_lock);
     free (line);
 
     if (ferror (file))
@@ -379,9 +391,6 @@ int config_SaveConfigFile (vlc_object_t *p_this)
         }
     }
 
-    /* Configuration lock must be taken before vlcrc serializer below. */
-    vlc_rwlock_rdlock (&config_lock);
-
     /* The temporary configuration file is per-PID. Therefore this function
      * should be serialized against itself within a given process. */
     static vlc_mutex_t lock = VLC_STATIC_MUTEX;
@@ -390,7 +399,6 @@ int config_SaveConfigFile (vlc_object_t *p_this)
     int fd = vlc_open (temporary, O_CREAT|O_WRONLY|O_TRUNC, S_IRUSR|S_IWUSR);
     if (fd == -1)
     {
-        vlc_rwlock_unlock (&config_lock);
         vlc_mutex_unlock (&lock);
         goto error;
     }
@@ -399,7 +407,6 @@ int config_SaveConfigFile (vlc_object_t *p_this)
     {
         msg_Err (p_this, "cannot create configuration file: %s",
                  vlc_strerror_c(errno));
-        vlc_rwlock_unlock (&config_lock);
         vlc_close (fd);
         vlc_mutex_unlock (&lock);
         goto error;
@@ -419,15 +426,12 @@ int config_SaveConfigFile (vlc_object_t *p_this)
     locale_t loc = newlocale (LC_NUMERIC_MASK, "C", NULL);
     locale_t baseloc = uselocale (loc);
 
-    /* We would take the config lock here. But this would cause a lock
-     * inversion with the serializer above and config_AutoSaveConfigFile().
-    vlc_rwlock_rdlock (&config_lock);*/
+    vlc_rcu_read_lock(); /* preserve string values */
 
     /* Look for the selected module, if NULL then save everything */
     for (vlc_plugin_t *p = vlc_plugins; p != NULL; p = p->next)
     {
         module_t *p_parser = p->module;
-        module_config_t *p_item, *p_end;
 
         if (p->conf.count == 0)
             continue;
@@ -438,18 +442,22 @@ int config_SaveConfigFile (vlc_object_t *p_this)
         else
             fprintf( file, "\n\n" );
 
-        for (p_item = p->conf.items, p_end = p_item + p->conf.size;
-             p_item < p_end;
-             p_item++)
+        for (struct vlc_param *param = p->conf.params,
+                              *end = param + p->conf.size;
+             param < end;
+             param++)
         {
+            module_config_t *p_item = &param->item;
+
             if (!CONFIG_ITEM(p_item->i_type)   /* ignore hint */
-             || p_item->b_removed              /* ignore deprecated option */
-             || p_item->b_unsaveable)          /* ignore volatile option */
+             || param->obsolete                /* ignore deprecated option */
+             || param->unsaved)                /* ignore volatile option */
                 continue;
 
             if (IsConfigIntegerType (p_item->i_type))
             {
-                int64_t val = p_item->value.i;
+                int64_t val = atomic_load_explicit(&param->value.i,
+                                                   memory_order_relaxed);
                 config_Write (file, p_item->psz_text,
                              (CONFIG_CLASS(p_item->i_type) == CONFIG_ITEM_BOOL)
                                   ? N_("boolean") : N_("integer"),
@@ -459,27 +467,31 @@ int config_SaveConfigFile (vlc_object_t *p_this)
             else
             if (IsConfigFloatType (p_item->i_type))
             {
-                float val = p_item->value.f;
+                float val = atomic_load_explicit(&param->value.f,
+                                                 memory_order_relaxed);
                 config_Write (file, p_item->psz_text, N_("float"),
                               val == p_item->orig.f,
                               p_item->psz_name, "%f", val);
             }
             else
             {
-                const char *psz_value = p_item->value.psz;
-                bool modified;
+                const char *val = atomic_load_explicit(&param->value.str,
+                                                       memory_order_relaxed);
+                const char *orig = p_item->orig.psz;
 
-                assert (IsConfigStringType (p_item->i_type));
+                if (val == NULL)
+                    val = "";
+                if (orig == NULL)
+                    orig = "";
 
-                modified = !!strcmp (psz_value ? psz_value : "",
-                                     p_item->orig.psz ? p_item->orig.psz : "");
-                config_Write (file, p_item->psz_text, N_("string"),
-                              !modified, p_item->psz_name, "%s",
-                              psz_value ? psz_value : "");
+                assert(IsConfigStringType(p_item->i_type));
+                config_Write(file, p_item->psz_text, N_("string"),
+                             strcmp(val, orig) == 0, p_item->psz_name, "%s",
+                             val);
             }
         }
     }
-    vlc_rwlock_unlock (&config_lock);
+    vlc_rcu_read_unlock();
 
     if (loc != (locale_t)0)
     {
@@ -527,18 +539,20 @@ error:
 
 int config_AutoSaveConfigFile( vlc_object_t *p_this )
 {
-    int ret = 0;
-
     assert( p_this );
 
-    vlc_rwlock_rdlock (&config_lock);
-    if (config_dirty)
-    {
-        /* Note: this will get the read lock recursively. Ok. */
-        ret = config_SaveConfigFile (p_this);
-        config_dirty = (ret != 0);
-    }
-    vlc_rwlock_unlock (&config_lock);
+    if (!atomic_exchange_explicit(&config_dirty, false, memory_order_acquire))
+        return 0;
+
+    int ret = config_SaveConfigFile (p_this);
+
+    if (unlikely(ret != 0))
+        /*
+         * On write failure, set the dirty flag back again. While it looks
+         * racy, it really means to retry later in hope that it does not
+         * fail again. Concurrent write attempts would not succeed anyway.
+         */
+        atomic_store_explicit(&config_dirty, true, memory_order_relaxed);
 
     return ret;
 }

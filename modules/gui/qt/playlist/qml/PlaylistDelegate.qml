@@ -18,6 +18,7 @@
 
 import QtQuick 2.11
 import QtQuick.Controls 2.4
+import QtQuick.Templates 2.4 as T
 import QtQuick.Layouts 1.11
 
 import QtGraphicalEffects 1.0
@@ -27,7 +28,7 @@ import org.videolan.vlc 0.1
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-Control {
+T.Control {
     id: delegate
 
     // Properties
@@ -47,6 +48,12 @@ Control {
     leftPadding: VLCStyle.margin_normal
 
     rightPadding: Math.max(listView.scrollBarWidth, VLCStyle.margin_normal)
+
+    implicitWidth: Math.max(background.implicitWidth,
+                            contentItem.implicitWidth + leftPadding + rightPadding)
+
+    implicitHeight: Math.max(background.implicitHeight,
+                            contentItem.implicitHeight + topPadding + bottomPadding)
 
     ListView.delayRemove: mouseArea.drag.active
 
@@ -85,7 +92,7 @@ Control {
         else
             plInfoTooltip.timeout = 2000
         plInfoTooltip.visible = Qt.binding(function() { return ( (visualFocus || hovered) && !mouseArea.drag.active &&
-                                                                !overlayMenu.shown && mainInterface.playlistVisible &&
+                                                                !overlayMenu.shown && MainCtx.playlistVisible &&
                                                                 (textInfo.implicitWidth > textInfo.width || textArtist.implicitWidth > textArtist.width) ) })
     }
 

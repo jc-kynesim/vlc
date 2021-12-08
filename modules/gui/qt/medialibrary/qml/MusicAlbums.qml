@@ -43,7 +43,7 @@ FocusScope {
     //the index to "go to" when the view is loaded
     property var initialIndex: 0
     property int gridViewMarginTop: VLCStyle.margin_large
-    property var gridViewRowX: mainInterface.gridView ? _currentView.rowX : undefined
+    property var gridViewRowX: MainCtx.gridView ? _currentView.rowX : undefined
 
     property Component header: Item{}
     readonly property var headerItem: _currentView ? _currentView.headerItem : undefined
@@ -104,25 +104,12 @@ FocusScope {
         model: albumModelId
     }
 
-    Widgets.DragItem {
+    Widgets.MLDragItem {
         id: albumDragItem
 
-        function updateComponents(maxCovers) {
-          var items = selectionModel.selectedIndexes.slice(0, maxCovers).map(function (x){
-            return albumModelId.getDataAt(x.row)
-          })
-          var title = items.map(function (item){ return item.title}).join(", ")
-          var covers = items.map(function (item) { return {artwork: item.cover || VLCStyle.noArtAlbum}})
-          return {
-            covers: covers,
-            title: title,
-            count: selectionModel.selectedIndexes.length
-          }
-        }
-
-        function getSelectedInputItem() {
-            return albumModelId.getItemsForIndexes(selectionModel.selectedIndexes);
-        }
+        mlModel: albumModelId
+        indexes: selectionModel.selectedIndexes
+        defaultCover: VLCStyle.noArtAlbum
     }
 
     AlbumContextMenu {
@@ -280,12 +267,12 @@ FocusScope {
         anchors.fill: parent
         focus: albumModelId.count !== 0
 
-        initialItem: mainInterface.gridView ? gridComponent : tableComponent
+        initialItem: MainCtx.gridView ? gridComponent : tableComponent
 
         Connections {
-            target: mainInterface
+            target: MainCtx
             onGridViewChanged: {
-                if (mainInterface.gridView)
+                if (MainCtx.gridView)
                     view.replace(gridComponent)
                 else
                     view.replace(tableComponent)

@@ -18,7 +18,7 @@
 
 #include "firstrunwizard.hpp"
 #include "util/color_scheme_model.hpp"
-#include "maininterface/main_interface.hpp"
+#include "maininterface/mainctx.hpp"
 #include "dialogs/toolbar/controlbar_profile_model.hpp"
 
 #include <QPushButton>
@@ -101,7 +101,7 @@ FirstRunWizard::FirstRunWizard( qt_intf_t *_p_intf, QWidget *parent)
     if ( vlc_ml_instance_get( p_intf ) )
     {
         const auto foldersModel = new MLFoldersModel( this );
-        foldersModel->setMl( vlc_ml_instance_get( p_intf ) );
+        foldersModel->setCtx( p_intf->p_mi );
         ui.entryPoints->setMLFoldersModel( foldersModel );
         mlFoldersEditor = ui.entryPoints;
         mlFoldersModel = foldersModel;

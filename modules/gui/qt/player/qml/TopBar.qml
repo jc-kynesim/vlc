@@ -18,6 +18,7 @@
 
 import QtQuick 2.11
 import QtQuick.Controls 2.4
+import QtQuick.Templates 2.4 as T
 import QtQuick.Layouts 1.11
 
 import org.videolan.vlc 0.1
@@ -37,7 +38,7 @@ FocusScope{
     property string title
     property VLCColors colors: VLCStyle.nightColors
     property int groupAlignment: TopBar.GroupAlignment.Vertical
-    property Label _currentTitleText: null
+    property Item _currentTitleText: null
 
     signal tooglePlaylistVisibility()
     signal requestLockUnlockAutoHide(bool lock, var source)
@@ -89,7 +90,7 @@ FocusScope{
         //drag and dbl click the titlebar in CSD mode
         Loader {
             anchors.fill: parent
-            active: mainInterface.clientSideDecoration
+            active: MainCtx.clientSideDecoration
             source: "qrc:///widgets/CSDTitlebarTapNDrapHandler.qml"
         }
 
@@ -124,7 +125,7 @@ FocusScope{
 
         width: implicitWidth
         height: VLCStyle.icon_normal
-        visible: mainInterface.hasToolbarMenu
+        visible: MainCtx.hasToolbarMenu
         textColor: topFocusScope.colors.text
         highlightedBgColor: topFocusScope.colors.bgHover
         highlightedTextColor: topFocusScope.colors.bgHoverText
@@ -150,7 +151,7 @@ FocusScope{
             Navigation.parentItem: topFocusScope
             Navigation.rightItem: menuSelector
             onClicked: {
-                if (mainInterface.hasEmbededVideo && !mainInterface.canShowVideoPIP) {
+                if (MainCtx.hasEmbededVideo && !MainCtx.canShowVideoPIP) {
                    mainPlaylistController.stop()
                 }
                 history.previous()
@@ -171,7 +172,7 @@ FocusScope{
     Component {
         id: centerTitleTextComponent
 
-        Label {
+        T.Label {
             id: centerTitleText
 
             readonly property int _availableWidth: rightColumn.x - (leftColumn.x + leftColumn.width)
@@ -208,7 +209,8 @@ FocusScope{
     Component {
         id: leftTitleTextComponent
 
-        Label {
+        //FIXME use the the right class
+        T.Label {
             text: topFocusScope.title
             horizontalAlignment: Text.AlignLeft
             topPadding: VLCStyle.margin_large
@@ -227,9 +229,9 @@ FocusScope{
 
         focus: false
         height: VLCStyle.icon_normal
-        active: mainInterface.clientSideDecoration
-        enabled: mainInterface.clientSideDecoration
-        visible: mainInterface.clientSideDecoration
+        active: MainCtx.clientSideDecoration
+        enabled: MainCtx.clientSideDecoration
+        visible: MainCtx.clientSideDecoration
         source: "qrc:///widgets/CSDWindowButtonSet.qml"
         onLoaded: {
             item.color = Qt.binding(function() { return topFocusScope.colors.playerFg })
@@ -263,7 +265,7 @@ FocusScope{
             QmlGlobalMenu {
                 id: contextMenu
 
-                ctx: mainctx
+                ctx: MainCtx
 
                 onAboutToShow: topFocusScope.requestLockUnlockAutoHide(true, contextMenu)
                 onAboutToHide: topFocusScope.requestLockUnlockAutoHide(false, contextMenu)

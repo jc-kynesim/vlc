@@ -77,6 +77,7 @@ QHash<int, QByteArray> MLGroupListModel::roleNames() const /* override */
         { GROUP_DATE,               "date"               },
         { GROUP_COUNT,              "count"              },
         // NOTE: Media specific.
+        { GROUP_IS_NEW,             "isNew"              },
         { GROUP_TITLE,              "title"              },
         { GROUP_RESOLUTION,         "resolution_name"    },
         { GROUP_CHANNEL,            "channel"            },
@@ -90,12 +91,8 @@ QHash<int, QByteArray> MLGroupListModel::roleNames() const /* override */
     };
 }
 
-QVariant MLGroupListModel::data(const QModelIndex & index, int role) const /* override */
+QVariant MLGroupListModel::itemRoleData(MLItem *item, const int role) const /* override */
 {
-    int row = index.row();
-
-    MLItem * item = this->item(row);
-
     if (item == nullptr)
         return QVariant();
 
@@ -107,17 +104,14 @@ QVariant MLGroupListModel::data(const QModelIndex & index, int role) const /* ov
         {
             // NOTE: This is the condition for QWidget view(s).
             case Qt::DisplayRole:
-                if (index.column() == 0)
-                    return QVariant::fromValue(group->getName());
-                else
-                    return QVariant();
+                return QVariant::fromValue(group->getName());
             // NOTE: These are the conditions for QML view(s).
             case GROUP_ID:
                 return QVariant::fromValue(group->getId());
             case GROUP_NAME:
                 return QVariant::fromValue(group->getName());
             case GROUP_THUMBNAIL:
-                return getCover(group, row);
+                return getCover(group);
             case GROUP_DURATION:
                 return QVariant::fromValue(group->getDuration());
             case GROUP_DATE:
@@ -134,13 +128,8 @@ QVariant MLGroupListModel::data(const QModelIndex & index, int role) const /* ov
 
         switch (role)
         {
-            // NOTE: This is the condition for QWidget view(s).
             case Qt::DisplayRole:
-                if (index.column() == 0)
-                    return QVariant::fromValue(video->getTitle());
-                else
-                    return QVariant();
-            // NOTE: These are the conditions for QML view(s).
+                return QVariant::fromValue(video->getTitle());
             case GROUP_ID:
                 return QVariant::fromValue(video->getId());
             case GROUP_NAME:
@@ -154,6 +143,8 @@ QVariant MLGroupListModel::data(const QModelIndex & index, int role) const /* ov
             case GROUP_COUNT:
                 return 1;
             // NOTE: Media specific.
+            case GROUP_IS_NEW:
+                return QVariant::fromValue(video->isNew());
             case GROUP_TITLE:
                 return QVariant::fromValue(video->getTitle());
             case GROUP_RESOLUTION:
@@ -219,7 +210,7 @@ ListCacheLoader<std::unique_ptr<MLItem>> * MLGroupListModel::createLoader() cons
 // Private functions
 //-------------------------------------------------------------------------------------------------
 
-QString MLGroupListModel::getCover(MLGroup * group, int index) const
+QString MLGroupListModel::getCover(MLGroup * group) const
 {
     QString cover = group->getCover();
 
@@ -227,12 +218,19 @@ QString MLGroupListModel::getCover(MLGroup * group, int index) const
     if (cover.isNull() == false || group->hasGenerator())
         return cover;
 
-    CoverGenerator * generator = new CoverGenerator(m_ml, group->getId(), index);
+    CoverGenerator * generator = new CoverGenerator(m_ml, group->getId());
 
     generator->setSize(QSize(MLGROUPLISTMODEL_COVER_WIDTH,
                              MLGROUPLISTMODEL_COVER_HEIGHT));
 
     generator->setDefaultThumbnail(":/noart_videoCover.svg");
+
+    if (generator->cachedFileAvailable())
+    {
+        group->setCover(generator->cachedFileURL());
+        generator->deleteLater();
+        return group->getCover();
+    }
 
     // NOTE: We'll apply the new thumbnail once it's loaded.
     connect(generator, &CoverGenerator::result, this, &MLGroupListModel::onCover);
@@ -280,16 +278,15 @@ void MLGroupListModel::onCover()
 {
     CoverGenerator * generator = static_cast<CoverGenerator *> (sender());
 
-    int index = generator->getIndex();
+    int index = 0;
 
     // NOTE: We want to avoid calling 'MLBaseModel::item' for performance issues.
-    MLItem * item = this->itemCache(index);
+    MLItem * item = this->findInCache(generator->getId().id, &index);
 
     // NOTE: When the item is no longer cached or has been moved we return right away.
-    if (item == nullptr || item->getId() != generator->getId())
+    if (!item)
     {
         generator->deleteLater();
-
         return;
     }
 

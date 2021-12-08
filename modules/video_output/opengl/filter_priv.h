@@ -27,7 +27,6 @@
 #include <vlc_picture.h>
 
 #include "filter.h"
-#include "sampler.h"
 
 struct vlc_gl_filter_priv {
     struct vlc_gl_filter filter;
@@ -36,8 +35,13 @@ struct vlc_gl_filter_priv {
      * filter */
     struct vlc_gl_tex_size size_out;
 
-    /* Only meaningful for non-blend filters { */
-    struct vlc_gl_sampler *sampler; /* owned */
+    struct vlc_gl_format glfmt_in;
+
+    /* Describe the output planes, independently of whether textures are
+     * created for this filter (the last filter does not own any textures). */
+    unsigned plane_count;
+    GLsizei plane_widths[PICTURE_PLANE_MAX];
+    GLsizei plane_heights[PICTURE_PLANE_MAX];
 
     /* owned (this filter must delete it) */
     GLuint framebuffers_out[PICTURE_PLANE_MAX];
@@ -53,19 +57,13 @@ struct vlc_gl_filter_priv {
     GLuint renderbuffer_msaa; /* owned (attached to framebuffer_msaa) */
     /* } */
 
-    /* For lazy-loading sampler */
-    struct vlc_gl_filters *filters; /* weak reference to the container */
-
-    /* Previous filter to construct the expected sampler. It is necessary
-     * because owner_ops->get_sampler() may be called during the Open(), while
-     * the filter is not added to the filter chain yet. */
-    struct vlc_gl_filter_priv *prev_filter;
-
     struct vlc_list node; /**< node of vlc_gl_filters.list */
 
     /* Blend filters are attached to their non-blend "parent" instead of the
      * filter chain to simplify the rendering code */
     struct vlc_list blend_subfilters; /**< list of vlc_gl_filter_priv.node */
+
+    bool has_picture;
 };
 
 static inline struct vlc_gl_filter_priv *
@@ -75,18 +73,28 @@ vlc_gl_filter_PRIV(struct vlc_gl_filter *filter)
 }
 
 struct vlc_gl_filter *
-vlc_gl_filter_New(vlc_object_t *parent, const struct vlc_gl_api *api);
-#define vlc_gl_filter_New(o, a) vlc_gl_filter_New(VLC_OBJECT(o), a)
+vlc_gl_filter_New(struct vlc_gl_t *gl, const struct vlc_gl_api *api);
 
 int
 vlc_gl_filter_LoadModule(vlc_object_t *parent, const char *name,
                          struct vlc_gl_filter *filter,
                          const config_chain_t *config,
+                         const struct vlc_gl_format *glfmt,
                          struct vlc_gl_tex_size *size_out);
-#define vlc_gl_filter_LoadModule(o, a, b, c, d) \
-    vlc_gl_filter_LoadModule(VLC_OBJECT(o), a, b, c, d)
+#define vlc_gl_filter_LoadModule(o, a, b, c, d, e) \
+    vlc_gl_filter_LoadModule(VLC_OBJECT(o), a, b, c, d, e)
 
 void
 vlc_gl_filter_Delete(struct vlc_gl_filter *filter);
+
+int
+vlc_gl_filter_InitFramebuffers(struct vlc_gl_filter *filter, bool is_last);
+
+/** Recompute plane count, widths and heights after size_out have changed */
+void
+vlc_gl_filter_InitPlaneSizes(struct vlc_gl_filter *filter);
+
+void
+vlc_gl_filter_ApplyOutputSize(struct vlc_gl_filter *filter);
 
 #endif

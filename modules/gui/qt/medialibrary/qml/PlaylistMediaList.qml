@@ -102,10 +102,10 @@ FocusScope {
     //---------------------------------------------------------------------------------------------
 
     Connections {
-        target: mainInterface
+        target: MainCtx
 
         onGridViewChanged: {
-            if (mainInterface.gridView) view.replace(grid);
+            if (MainCtx.gridView) view.replace(grid);
             else                        view.replace(table);
         }
     }
@@ -193,40 +193,21 @@ FocusScope {
 
         anchors.fill: parent
 
-        initialItem: (mainInterface.gridView) ? grid : table
+        initialItem: (MainCtx.gridView) ? grid : table
 
         focus: (model.count !== 0)
     }
 
-    Widgets.DragItem {
+    Widgets.MLDragItem {
         id: dragItemPlaylist
 
-        //---------------------------------------------------------------------------------------------
-        // DragItem implementation
+        mlModel: model
 
-        function updateComponents(maxCovers) {
-            var items = modelSelect.selectedIndexes.slice(0, maxCovers).map(function (x){
-                return model.getDataAt(x.row);
-            })
+        indexes: modelSelect.selectedIndexes
 
-            var covers = items.map(function (item) {
-                return { artwork: item.thumbnail || VLCStyle.noArtCover };
-            })
+        coverRole: "thumbnail"
 
-            var title = items.map(function (item) {
-                return item.name
-            }).join(", ");
-
-            return {
-                covers: covers,
-                title: title,
-                count: modelSelect.selectedIndexes.length
-            };
-        }
-
-        function getSelectedInputItem() {
-            return model.getItemsForIndexes(modelSelect.selectedIndexes);
-        }
+        titleRole: "name"
     }
 
     Util.SelectableDelegateModel {
@@ -283,9 +264,6 @@ FocusScope {
 
                 labels: (model.count > 1) ? [ i18n.qtr("%1 Tracks").arg(_getCount(model)) ]
                                           : [ i18n.qtr("%1 Track") .arg(_getCount(model)) ]
-
-                // NOTE: We don't want to show the new indicator for a playlist.
-                showNewIndicator: false
 
                 dragItem: dragItemPlaylist
 

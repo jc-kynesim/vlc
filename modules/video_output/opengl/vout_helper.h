@@ -30,10 +30,10 @@
 #define VLC_OPENGL_VOUT_HELPER_H
 
 #include "gl_common.h"
+#include "gl_scale.h"
 
 #ifdef HAVE_LIBPLACEBO
 #include "../libplacebo/utils.h"
-
 
 #if PL_API_VER >= 10
 #define add_desat_params() \
@@ -82,6 +82,7 @@
 
 #define add_glopts() \
     add_module("glinterop", "glinterop", NULL, GLINTEROP_TEXT, GLINTEROP_LONGTEXT) \
+    add_glscale_opts() \
     add_glopts_placebo ()
 
 typedef struct vout_display_opengl_t vout_display_opengl_t;
@@ -95,8 +96,8 @@ void vout_display_opengl_Delete(vout_display_opengl_t *vgl);
 
 int vout_display_opengl_SetViewpoint(vout_display_opengl_t *vgl, const vlc_viewpoint_t*);
 
-void vout_display_opengl_SetWindowAspectRatio(vout_display_opengl_t *vgl,
-                                              float f_sar);
+void vout_display_opengl_SetOutputSize(vout_display_opengl_t *vgl,
+                                       unsigned width, unsigned height);
 
 void vout_display_opengl_Viewport(vout_display_opengl_t *vgl, int x, int y,
                                   unsigned width, unsigned height);

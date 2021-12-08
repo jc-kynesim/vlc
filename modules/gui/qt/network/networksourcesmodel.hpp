@@ -30,7 +30,7 @@
 #include <vlc_threads.h>
 #include <vlc_cxx_helpers.hpp>
 
-#include <util/qml_main_context.hpp>
+#include <maininterface/mainctx.hpp>
 #include "networksourcelistener.hpp"
 
 #include <memory>
@@ -39,7 +39,7 @@ class NetworkSourcesModel : public QAbstractListModel
 {
     Q_OBJECT
 
-    Q_PROPERTY(QmlMainContext* ctx READ getCtx WRITE setCtx NOTIFY ctxChanged FINAL)
+    Q_PROPERTY(MainCtx* ctx READ getCtx WRITE setCtx NOTIFY ctxChanged FINAL)
     Q_PROPERTY(int count READ getCount NOTIFY countChanged FINAL)
 
 public:
@@ -63,9 +63,9 @@ public:
     QHash<int, QByteArray> roleNames() const override;
     int rowCount(const QModelIndex& parent = {}) const override;
 
-    void setCtx(QmlMainContext* ctx);
+    void setCtx(MainCtx* ctx);
 
-    inline QmlMainContext* getCtx() { return m_ctx; }
+    inline MainCtx* getCtx() { return m_ctx; }
 
     int getCount() const;
 
@@ -87,7 +87,7 @@ private:
 
 private:
     std::vector<Item> m_items;
-    QmlMainContext* m_ctx = nullptr;
+    MainCtx* m_ctx = nullptr;
     vlc_medialibrary_t* m_ml = nullptr;
     services_discovery_category_e m_sdSource = services_discovery_category_e::SD_CAT_INTERNET;
 };

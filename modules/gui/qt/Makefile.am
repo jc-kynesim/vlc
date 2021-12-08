@@ -36,9 +36,17 @@ if HAVE_QT5_X11
 libqt_plugin_la_CXXFLAGS += $(QT5_X11_CFLAGS) -DQT5_HAS_X11
 libqt_plugin_la_LIBADD += $(QT5_X11_LIBS) $(X_LIBS) $(X_PRE_LIB) -lX11
 endif
+
 if HAVE_XCB
-libqt_plugin_la_CXXFLAGS += -DQT5_HAS_XCB
+libqt_plugin_la_CXXFLAGS += -DQT5_HAS_XCB $(XCB_CFLAGS)
+libqt_plugin_la_LIBADD += $(XCB_LIBS)
+if HAVE_XCB_DAMAGE
+libqt_plugin_la_CXXFLAGS += -DQT5_HAS_X11_COMPOSITOR \
+        $(XCB_RENDER_CFLAGS) $(XCB_COMPOSITE_CFLAGS) $(XLCB_DAMAGE_CFLAGS)
+libqt_plugin_la_LIBADD += $(XCB_RENDER_LIBS) $(XCB_COMPOSITE_LIBS) $(XCB_DAMAGE_LIBS)
 endif
+endif
+
 if HAVE_WAYLAND
 libqt_plugin_la_CPPFLAGS += -DQT5_HAS_WAYLAND \
 	-DQPNI_HEADER=\<$(QT_VERSION)/QtGui/qpa/qplatformnativeinterface.h\>
@@ -125,8 +133,8 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/maininterface/compositor_dummy.cpp \
 	gui/qt/maininterface/interface_window_handler.cpp \
 	gui/qt/maininterface/interface_window_handler.hpp \
-	gui/qt/maininterface/main_interface.cpp \
-	gui/qt/maininterface/main_interface.hpp \
+	gui/qt/maininterface/mainctx.cpp \
+	gui/qt/maininterface/mainctx.hpp \
 	gui/qt/maininterface/mainui.cpp \
 	gui/qt/maininterface/mainui.hpp \
 	gui/qt/maininterface/videosurface.cpp \
@@ -230,10 +238,8 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/listcache.hpp \
 	gui/qt/util/listcacheloader.hpp \
 	gui/qt/util/navigation_history.cpp gui/qt/util/navigation_history.hpp \
-	gui/qt/util/qml_main_context.cpp \
-	gui/qt/util/qml_main_context.hpp \
-	gui/qt/util/qmleventfilter.cpp \
-	gui/qt/util/qmleventfilter.hpp \
+	gui/qt/util/item_key_event_filter.cpp \
+	gui/qt/util/item_key_event_filter.hpp \
 	gui/qt/util/qt_dirs.cpp gui/qt/util/qt_dirs.hpp \
 	gui/qt/util/qvlcapp.hpp \
 	gui/qt/util/proxycolumnmodel.hpp \
@@ -253,6 +259,8 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/vlctick.cpp \
 	gui/qt/util/vlctick.hpp \
 	gui/qt/util/qmlinputitem.hpp \
+	gui/qt/util/mouse_event_filter.cpp \
+	gui/qt/util/mouse_event_filter.hpp \
 	gui/qt/widgets/native/animators.cpp \
 	gui/qt/widgets/native/animators.hpp \
 	gui/qt/widgets/native/customwidgets.cpp gui/qt/widgets/native/customwidgets.hpp \
@@ -268,8 +276,8 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/widgets/native/searchlineedit.cpp gui/qt/widgets/native/searchlineedit.hpp
 if HAVE_WIN32
 libqt_plugin_la_SOURCES += \
-	gui/qt/maininterface/main_interface_win32.cpp \
-	gui/qt/maininterface/main_interface_win32.hpp \
+	gui/qt/maininterface/mainctx_win32.cpp \
+	gui/qt/maininterface/mainctx_win32.hpp \
 	gui/qt/maininterface/compositor_win7.cpp \
 	gui/qt/maininterface/compositor_win7.hpp
 
@@ -282,6 +290,23 @@ libqt_plugin_la_SOURCES += \
 	gui/qt/maininterface/compositor_dcomp_acrylicsurface.cpp \
 	gui/qt/maininterface/compositor_dcomp_uisurface.cpp \
 	gui/qt/maininterface/compositor_dcomp_uisurface.hpp
+endif
+
+endif
+
+if HAVE_XCB
+if HAVE_XCB_DAMAGE
+libqt_plugin_la_SOURCES += \
+	gui/qt/maininterface/compositor_x11.cpp \
+	gui/qt/maininterface/compositor_x11.hpp \
+	gui/qt/maininterface/compositor_x11_renderclient.cpp \
+	gui/qt/maininterface/compositor_x11_renderclient.hpp \
+	gui/qt/maininterface/compositor_x11_renderwindow.cpp \
+	gui/qt/maininterface/compositor_x11_renderwindow.hpp \
+	gui/qt/maininterface/compositor_x11_uisurface.cpp \
+	gui/qt/maininterface/compositor_x11_uisurface.hpp \
+	gui/qt/maininterface/compositor_x11_utils.cpp \
+	gui/qt/maininterface/compositor_x11_utils.hpp
 endif
 endif
 
@@ -340,9 +365,10 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/dialogs/toolbar/controlbar_profile.moc.cpp \
 	gui/qt/dialogs/toolbar/controlbar_profile_model.moc.cpp \
 	gui/qt/dialogs/playlists/playlists.moc.cpp \
+	gui/qt/maininterface/compositor.moc.cpp \
 	gui/qt/maininterface/compositor_dummy.moc.cpp \
 	gui/qt/maininterface/interface_window_handler.moc.cpp \
-	gui/qt/maininterface/main_interface.moc.cpp \
+	gui/qt/maininterface/mainctx.moc.cpp \
 	gui/qt/maininterface/mainui.moc.cpp \
 	gui/qt/maininterface/videosurface.moc.cpp \
 	gui/qt/maininterface/video_window_handler.moc.cpp \
@@ -389,8 +415,8 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/util/keyhelper.moc.cpp \
 	gui/qt/util/listcache.moc.cpp \
 	gui/qt/util/navigation_history.moc.cpp \
-	gui/qt/util/qml_main_context.moc.cpp \
-	gui/qt/util/qmleventfilter.moc.cpp \
+	gui/qt/util/item_key_event_filter.moc.cpp \
+	gui/qt/util/mouse_event_filter.moc.cpp \
 	gui/qt/util/qvlcapp.moc.cpp \
 	gui/qt/util/renderer_manager.moc.cpp \
 	gui/qt/util/selectable_list_model.moc.cpp \
@@ -410,7 +436,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/widgets/native/searchlineedit.moc.cpp
 
 if HAVE_WIN32
-nodist_libqt_plugin_la_SOURCES += gui/qt/maininterface/main_interface_win32.moc.cpp \
+nodist_libqt_plugin_la_SOURCES += gui/qt/maininterface/mainctx_win32.moc.cpp \
 	gui/qt/maininterface/compositor_win7.moc.cpp
 
 if HAVE_DCOMP
@@ -420,6 +446,17 @@ nodist_libqt_plugin_la_SOURCES += \
 	gui/qt/maininterface/compositor_dcomp_uisurface.moc.cpp
 endif
 
+endif
+
+if HAVE_XCB
+if HAVE_XCB_DAMAGE
+nodist_libqt_plugin_la_SOURCES += \
+	gui/qt/maininterface/compositor_x11.moc.cpp \
+	gui/qt/maininterface/compositor_x11_renderclient.moc.cpp \
+	gui/qt/maininterface/compositor_x11_renderwindow.moc.cpp \
+	gui/qt/maininterface/compositor_x11_uisurface.moc.cpp \
+	gui/qt/maininterface/compositor_x11_utils.moc.cpp
+endif
 endif
 
 nodist_libqt_plugin_la_SOURCES += \
@@ -535,6 +572,8 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/pause.svg \
 	gui/qt/pixmaps/play.svg \
 	gui/qt/pixmaps/play_button.svg \
+	gui/qt/pixmaps/play_shadow.png \
+	gui/qt/pixmaps/new_indicator.svg \
 	gui/qt/pixmaps/playlist/add.svg \
 	gui/qt/pixmaps/playlist/playlist.svg \
 	gui/qt/pixmaps/playlist/remove.svg \
@@ -746,14 +785,15 @@ libqt_plugin_la_QML = \
 	gui/qt/player/qml/MiniPlayer.qml \
 	gui/qt/player/qml/PIPPlayer.qml \
 	gui/qt/player/qml/Player.qml \
-	gui/qt/player/qml/PlayerButtonsLayout.qml \
+	gui/qt/player/qml/PlayerControlLayout.qml \
 	gui/qt/player/qml/PlayerMenu.qml \
 	gui/qt/player/qml/PlayerMenuItem.qml \
 	gui/qt/player/qml/ResumeDialog.qml \
 	gui/qt/player/qml/SliderBar.qml \
 	gui/qt/player/qml/TopBar.qml \
 	gui/qt/player/qml/TrackInfo.qml \
-	gui/qt/player/qml/ButtonsLayout.qml \
+	gui/qt/player/qml/ControlLayout.qml \
+	gui/qt/player/qml/controlbarcontrols/HighResolutionTimeWidget.qml \
 	gui/qt/player/qml/controlbarcontrols/ArtworkInfoWidget.qml \
 	gui/qt/player/qml/controlbarcontrols/AspectRatioWidget.qml \
 	gui/qt/player/qml/controlbarcontrols/AtoBButton.qml \
@@ -793,6 +833,7 @@ libqt_plugin_la_QML = \
 	gui/qt/playlist/qml/PlaylistOverlayMenu.qml \
 	gui/qt/playlist/qml/PlaylistToolbar.qml \
 	gui/qt/playlist/qml/PlaylistDetachedWindow.qml \
+	gui/qt/style/AcrylicController.qml \
 	gui/qt/style/VLCColors.qml \
 	gui/qt/style/VLCIcons.qml \
 	gui/qt/style/VLCStyle.qml \
@@ -842,6 +883,7 @@ libqt_plugin_la_QML = \
 	gui/qt/widgets/qml/MenuExt.qml \
 	gui/qt/widgets/qml/MenuItemExt.qml \
 	gui/qt/widgets/qml/MenuLabel.qml \
+	gui/qt/widgets/qml/MLDragItem.qml \
 	gui/qt/widgets/qml/NavigableCol.qml \
 	gui/qt/widgets/qml/NavigableRow.qml \
 	gui/qt/widgets/qml/PlayCover.qml \
@@ -864,7 +906,8 @@ libqt_plugin_la_QML = \
 	gui/qt/widgets/qml/ListSubtitleLabel.qml \
 	gui/qt/widgets/qml/PointingTooltip.qml \
 	gui/qt/widgets/qml/FrostedGlassEffect.qml \
-	gui/qt/widgets/qml/OverlayMenu.qml
+	gui/qt/widgets/qml/OverlayMenu.qml \
+	gui/qt/widgets/qml/ToolTipExt.qml
 
 lib_qt_plugin_la_QRC = gui/qt/vlc.qrc
 

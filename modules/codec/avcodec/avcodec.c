@@ -250,6 +250,9 @@ AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
 
     avctx->debug = var_InheritInteger( p_dec, "avcodec-debug" );
     avctx->opaque = p_dec;
+
+av_log_set_level(AV_LOG_TRACE);
+
     return avctx;
 }
 

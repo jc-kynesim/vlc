@@ -32,6 +32,7 @@
 #include <vlc_network.h>
 #include <vlc_plugin.h>
 #include <vlc_dtls.h>
+#include <vlc_modules.h> /* module_exists() */
 
 #include "rtp.h"
 #ifdef HAVE_SRTP
@@ -44,7 +45,6 @@
 /*
  * TODO: so much stuff
  * - send RTCP-RR and RTCP-BYE
- * - dynamic payload types (need SDP parser)
  * - multiple medias (need SDP parser, and RTCP-SR parser for lip-sync)
  * - support for stream_filter in case of chained demux (MPEG-TS)
  */
@@ -56,6 +56,135 @@
 #ifndef IPPROTO_UDPLITE
 # define IPPROTO_UDPLITE 136 /* from IANA */
 #endif
+
+struct vlc_rtp_es_id {
+    struct vlc_rtp_es es;
+    es_out_t *out;
+    es_out_id_t *id;
+};
+
+static void vlc_rtp_es_id_destroy(struct vlc_rtp_es *es)
+{
+    struct vlc_rtp_es_id *ei = container_of(es, struct vlc_rtp_es_id, es);
+
+    es_out_Del(ei->out, ei->id);
+    free(ei);
+}
+
+static void vlc_rtp_es_id_send(struct vlc_rtp_es *es, block_t *block)
+{
+    struct vlc_rtp_es_id *ei = container_of(es, struct vlc_rtp_es_id, es);
+
+    /* TODO: Don't set PCR here. Breaks multiple sources (in a session)
+     * and more importantly eventually multiple sessions. */
+    if (block->i_pts != VLC_TICK_INVALID)
+        es_out_SetPCR(ei->out, block->i_pts);
+    es_out_Send(ei->out, ei->id, block);
+}
+
+static const struct vlc_rtp_es_operations vlc_rtp_es_id_ops = {
+    vlc_rtp_es_id_destroy, vlc_rtp_es_id_send,
+};
+
+static struct vlc_rtp_es *vlc_rtp_es_request(struct vlc_rtp_pt *pt,
+                                             const es_format_t *restrict fmt)
+{
+    demux_t *demux = pt->owner.data;
+
+    struct vlc_rtp_es_id *ei = malloc(sizeof (*ei));
+    if (unlikely(ei == NULL))
+        return vlc_rtp_es_dummy;
+
+    ei->es.ops = &vlc_rtp_es_id_ops;
+    ei->out = demux->out;
+    ei->id = es_out_Add(demux->out, fmt);
+    if (ei->id == NULL) {
+        free(ei);
+        return NULL;
+    }
+    return &ei->es;
+}
+
+struct vlc_rtp_es_mux {
+    struct vlc_rtp_es es;
+    vlc_demux_chained_t *chained_demux;
+};
+
+static void vlc_rtp_es_mux_destroy(struct vlc_rtp_es *es)
+{
+    struct vlc_rtp_es_mux *em = container_of(es, struct vlc_rtp_es_mux, es);
+
+    vlc_demux_chained_Delete(em->chained_demux);
+    free(em);
+}
+
+static void vlc_rtp_es_mux_send(struct vlc_rtp_es *es, block_t *block)
+{
+    struct vlc_rtp_es_mux *em = container_of(es, struct vlc_rtp_es_mux, es);
+
+    vlc_demux_chained_Send(em->chained_demux, block);
+}
+
+static const struct vlc_rtp_es_operations vlc_rtp_es_mux_ops = {
+    vlc_rtp_es_mux_destroy, vlc_rtp_es_mux_send,
+};
+
+static struct vlc_rtp_es *vlc_rtp_mux_request(struct vlc_rtp_pt *pt,
+                                              const char *name)
+{
+    demux_t *demux = pt->owner.data;
+
+    struct vlc_rtp_es_mux *em = malloc(sizeof (*em));
+    if (unlikely(em == NULL))
+        return vlc_rtp_es_dummy;
+
+    em->es.ops = &vlc_rtp_es_mux_ops;
+    em->chained_demux = vlc_demux_chained_New(VLC_OBJECT(demux), name,
+                                              demux->out);
+    if (em->chained_demux == NULL) {
+        free(em);
+        return NULL;
+    }
+    return &em->es;
+}
+
+static const struct vlc_rtp_pt_owner_operations vlc_rtp_pt_owner_ops = {
+    vlc_rtp_es_request, vlc_rtp_mux_request,
+};
+
+int vlc_rtp_pt_instantiate(vlc_object_t *obj, struct vlc_rtp_pt *restrict pt,
+                           const struct vlc_sdp_pt *restrict desc)
+{
+    char modname[32];
+    int ret = VLC_ENOTSUP;
+
+    if (strchr(desc->name, ',') != NULL)
+        /* Comma has special meaning in vlc_module_match(), forbid it */
+        return VLC_EINVAL;
+    if ((size_t)snprintf(modname, sizeof (modname), "%s/%s",
+                         desc->media->type, desc->name) >= sizeof (modname))
+        return VLC_ENOTSUP; /* Outlandish media type with long name */
+
+    module_t **mods;
+    ssize_t n = vlc_module_match("rtp parser", modname, true, &mods, NULL);
+
+    for (ssize_t i = 0; i < n; i++) {
+        vlc_rtp_parser_cb cb = vlc_module_map(vlc_object_logger(obj), mods[i]);
+        if (cb == NULL)
+            continue;
+
+        ret = cb(obj, pt, desc);
+        if (ret == VLC_SUCCESS) {
+            msg_Dbg(obj, "- module \"%s\"", module_get_name(mods[i], true));
+            assert(pt->ops != NULL);
+            ret = 0;
+            break;
+        }
+    }
+
+    free(mods);
+    return ret;
+}
 
 /**
  * Extracts port number from "[host]:port" or "host:port" strings,
@@ -199,13 +328,6 @@ static int OpenSDP(vlc_object_t *obj)
         goto error;
     }
 
-    /* Check payload type (FIXME: handle multiple, match w/ a=rtpmap) */
-    unsigned char pt = atoi(media->format);
-    if (pt >= 64 || !(UINT64_C(0x300005d09) & (UINT64_C(1) << pt))) {
-        msg_Dbg(obj, "unsupported payload format(s) %s", media->format);
-        goto error;
-    }
-
     if (vlc_sdp_media_attr_value(media, "control") != NULL
      || vlc_sdp_attr_value(sdp, "control") != NULL) {
         msg_Dbg(obj, "RTSP not supported");
@@ -294,15 +416,11 @@ static int OpenSDP(vlc_object_t *obj)
         }
     }
 
-    vlc_sdp_free(sdp);
-    sdp = NULL;
-
     sys->chained_demux = NULL;
     sys->max_src = var_InheritInteger(obj, "rtp-max-src");
     sys->timeout = vlc_tick_from_sec(var_InheritInteger(obj, "rtp-timeout"));
     sys->max_dropout  = var_InheritInteger(obj, "rtp-max-dropout");
-    sys->max_misorder = var_InheritInteger(obj, "rtp-max-misorder");
-    sys->autodetect = true;
+    sys->max_misorder = -var_InheritInteger(obj, "rtp-max-misorder");
 
     demux->pf_demux = NULL;
     demux->pf_control = Control;
@@ -312,11 +430,23 @@ static int OpenSDP(vlc_object_t *obj)
     if (sys->session == NULL)
         goto error;
 
+    /* Parse payload types */
+    const struct vlc_rtp_pt_owner pt_owner = { &vlc_rtp_pt_owner_ops, demux };
+    int err = vlc_rtp_add_media_types(obj, sys->session, media, &pt_owner);
+    if (err < 0) {
+        msg_Err(obj, "SDP description parse error");
+        goto error;
+    }
+    if (err > 0 && module_exists("live555")) /* Bail out to live555 */
+        goto error;
+
     if (vlc_clone(&sys->thread, rtp_dgram_thread, demux,
                   VLC_THREAD_PRIORITY_INPUT)) {
         rtp_session_destroy(demux, sys->session);
         goto error;
     }
+
+    vlc_sdp_free(sdp);
     return VLC_SUCCESS;
 
 error:
@@ -324,8 +454,7 @@ error:
         vlc_dtls_Close(sys->rtcp_sock);
     if (sys->rtp_sock != NULL)
         vlc_dtls_Close(sys->rtp_sock);
-    if (sdp != NULL)
-        vlc_sdp_free(sdp);
+    vlc_sdp_free(sdp);
     return VLC_EGENERIC;
 }
 
@@ -443,8 +572,7 @@ static int OpenURL(vlc_object_t *obj)
     p_sys->max_src      = var_CreateGetInteger (obj, "rtp-max-src");
     p_sys->timeout      = vlc_tick_from_sec( var_CreateGetInteger (obj, "rtp-timeout") );
     p_sys->max_dropout  = var_CreateGetInteger (obj, "rtp-max-dropout");
-    p_sys->max_misorder = var_CreateGetInteger (obj, "rtp-max-misorder");
-    p_sys->autodetect   = true;
+    p_sys->max_misorder = -var_CreateGetInteger (obj, "rtp-max-misorder");
 
     demux->pf_demux   = NULL;
     demux->pf_control = Control;
@@ -453,6 +581,9 @@ static int OpenURL(vlc_object_t *obj)
     p_sys->session = rtp_session_create (demux);
     if (p_sys->session == NULL)
         goto error;
+
+    const struct vlc_rtp_pt_owner pt_owner = { &vlc_rtp_pt_owner_ops, demux };
+    rtp_autodetect(VLC_OBJECT(demux), p_sys->session, &pt_owner);
 
 #ifdef HAVE_SRTP
     char *key = var_CreateGetNonEmptyString (demux, "srtp-key");
@@ -532,16 +663,6 @@ error:
     "RTP packets will be discarded if they are too far behind (i.e. in the " \
     "past) by this many packets from the last received packet." )
 
-#define RTP_DYNAMIC_PT_TEXT N_("RTP payload format assumed for dynamic " \
-                               "payloads")
-#define RTP_DYNAMIC_PT_LONGTEXT N_( \
-    "This payload format will be assumed for dynamic payload types " \
-    "(between 96 and 127) if it can't be determined otherwise with " \
-    "out-of-band mappings (SDP)" )
-
-static const char *const dynamic_pt_list[] = { "theora" };
-static const char *const dynamic_pt_list_text[] = { "Theora Encoded Video" };
-
 /*
  * Module descriptor
  */
@@ -580,9 +701,7 @@ vlc_module_begin()
     add_integer("rtp-max-misorder", 100, RTP_MAX_MISORDER_TEXT,
                 RTP_MAX_MISORDER_LONGTEXT)
         change_integer_range (0, 32767)
-    add_string("rtp-dynamic-pt", NULL, RTP_DYNAMIC_PT_TEXT,
-               RTP_DYNAMIC_PT_LONGTEXT)
-        change_string_list(dynamic_pt_list, dynamic_pt_list_text)
+    add_obsolete_string("rtp-dynamic-pt") /* since 4.0.0 */
 
     /*add_shortcut ("sctp")*/
     add_shortcut("dccp", "rtp", "udplite")

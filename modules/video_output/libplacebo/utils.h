@@ -28,6 +28,8 @@
 #include <libplacebo/shaders/colorspace.h>
 #include <libplacebo/utils/upload.h>
 
+#include "../opengl/gl_scale.h"
+
 // Create a libplacebo context, hooked up to the log system; or NULL on OOM
 struct pl_context *vlc_placebo_CreateContext(vlc_object_t *);
 
@@ -35,6 +37,8 @@ struct pl_context *vlc_placebo_CreateContext(vlc_object_t *);
 struct pl_color_space vlc_placebo_ColorSpace(const video_format_t *);
 struct pl_color_repr vlc_placebo_ColorRepr(const video_format_t *);
 enum pl_chroma_location vlc_placebo_ChromaLoc(const video_format_t *);
+
+int vlc_placebo_PlaneComponents(const video_format_t *, struct pl_plane[4]);
 
 // Fill a pl_plane_data array with various data. Returns the number of planes,
 // or 0 if the format is unsupported by the libplacebo API. If `buf` is set,
@@ -297,6 +301,30 @@ enum {
     SCALE_SINC,
     SCALE_EWA_JINC,
     SCALE_CUSTOM,
+};
+
+static const int libplacebo_scale_map[] = {
+    [VLC_GLSCALE_BUILTIN] = SCALE_BUILTIN,
+    [VLC_GLSCALE_SPLINE16] = SCALE_SPLINE16,
+    [VLC_GLSCALE_SPLINE36] = SCALE_SPLINE36,
+    [VLC_GLSCALE_SPLINE64] = SCALE_SPLINE64,
+    [VLC_GLSCALE_MITCHELL] = SCALE_MITCHELL,
+    [VLC_GLSCALE_BICUBIC] = SCALE_BICUBIC,
+    [VLC_GLSCALE_EWA_LANCZOS] = SCALE_EWA_LANCZOS,
+    [VLC_GLSCALE_NEAREST] = SCALE_NEAREST,
+    [VLC_GLSCALE_BILINEAR] = SCALE_BILINEAR,
+    [VLC_GLSCALE_GAUSSIAN] = SCALE_GAUSSIAN,
+    [VLC_GLSCALE_LANCZOS] = SCALE_LANCZOS,
+    [VLC_GLSCALE_GINSENG] = SCALE_GINSENG,
+    [VLC_GLSCALE_EWA_GINSENG] = SCALE_EWA_GINSENG,
+    [VLC_GLSCALE_EWA_HANN] = SCALE_EWA_HANN,
+    [VLC_GLSCALE_CATMULL_ROM] = SCALE_CATMULL_ROM,
+    [VLC_GLSCALE_ROBIDOUX] = SCALE_ROBIDOUX,
+    [VLC_GLSCALE_ROBIDOUXSHARP] = SCALE_ROBIDOUXSHARP,
+    [VLC_GLSCALE_EWA_ROBIDOUX] = SCALE_EWA_ROBIDOUX,
+    [VLC_GLSCALE_EWA_ROBIDOUXSHARP] = SCALE_EWA_ROBIDOUXSHARP,
+    [VLC_GLSCALE_SINC] = SCALE_SINC,
+    [VLC_GLSCALE_EWA_JINC] = SCALE_EWA_JINC,
 };
 
 static const int scale_values[] = {

@@ -22,15 +22,29 @@
 # include "config.h"
 #endif
 
+#include <memory>
+
+#include <QObject>
+
 #include <vlc_common.h>
 #include <vlc_interface.h>
 #include <vlc_vout_window.h>
 
-#include <QQuickView>
 
 #include "qt.hpp"
 
-class MainInterface;
+
+class MainCtx;
+class VideoWindowHandler;
+class VideoSurfaceProvider;
+class InterfaceWindowHandler;
+class WinTaskbarWidget;
+class MainUI;
+class QQmlEngine;
+class QQmlComponent;
+class QWindow;
+class QQuickItem;
+class QQuickView;
 
 namespace vlc {
 
@@ -40,7 +54,8 @@ public:
     {
         DummyCompositor,
         Win7Compositor,
-        DirectCompositionCompositor
+        DirectCompositionCompositor,
+        X11Compositor
     };
 
     typedef void (*VoutDestroyCb)(vout_window_t *p_wnd);
@@ -50,7 +65,7 @@ public:
 
     virtual bool init() = 0;
 
-    virtual MainInterface* makeMainInterface() = 0;
+    virtual bool makeMainInterface(MainCtx* intf) = 0;
     virtual void destroyMainInterface() = 0;
 
     virtual void unloadGUI() = 0;
@@ -61,11 +76,79 @@ public:
 
     virtual QWindow* interfaceMainWindow() const = 0;
 
+};
+
+/**
+ * @brief The CompositorVideo class is a base class for compositor that implements video embeding
+ */
+class CompositorVideo: public QObject, public Compositor
+{
+    Q_OBJECT
+public:
+    enum Flag : unsigned
+    {
+        CAN_SHOW_PIP = 1,
+        HAS_ACRYLIC = 2
+    };
+    Q_DECLARE_FLAGS(Flags, Flag)
+
+    class QmlUISurface
+    {
+    public:
+        virtual QQmlEngine* engine() const = 0;
+        virtual void setContent(QQmlComponent *component, QQuickItem *item) = 0;
+    };
+public:
+    explicit CompositorVideo(qt_intf_t* p_intf, QObject* parent = nullptr);
+    virtual ~CompositorVideo();
+
+public:
+    virtual int windowEnable(const vout_window_cfg_t *) = 0;
+    virtual void windowDisable() = 0;
+    virtual void windowDestroy();
+    virtual void windowResize(unsigned width, unsigned height);
+    virtual void windowSetState(unsigned state);
+    virtual void windowUnsetFullscreen();
+    virtual void windowSetFullscreen(const char *id);
+
 protected:
-    void onWindowDestruction(vout_window_t *p_wnd);
+    void commonSetupVoutWindow(vout_window_t* p_wnd, VoutDestroyCb destroyCb);
+    void commonWindowEnable();
+    void commonWindowDisable();
+
+protected:
+    bool commonGUICreate(QWindow* window, QmlUISurface* , CompositorVideo::Flags flags);
+    bool commonGUICreate(QWindow* window, QQuickView* , CompositorVideo::Flags flags);
+    void commonGUIDestroy();
+    void commonIntfDestroy();
+
+private:
+    bool commonGUICreateImpl(QWindow* window, CompositorVideo::Flags flags);
+
+
+protected slots:
+    virtual void onSurfacePositionChanged(const QPointF&) {}
+    virtual void onSurfaceSizeChanged(const QSizeF&) {}
+
+protected:
+    qt_intf_t *m_intf = nullptr;
+    vout_window_t* m_wnd = nullptr;
+
+    MainCtx* m_mainCtx = nullptr;
 
     VoutDestroyCb m_destroyCb = nullptr;
+    std::unique_ptr<VideoWindowHandler> m_videoWindowHandler;
+
+    std::unique_ptr<InterfaceWindowHandler> m_interfaceWindowHandler;
+    std::unique_ptr<MainUI> m_ui;
+    std::unique_ptr<VideoSurfaceProvider> m_videoSurfaceProvider;
+#ifdef _WIN32
+    std::unique_ptr<WinTaskbarWidget> m_taskbarWidget;
+#endif
 };
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(CompositorVideo::Flags)
+
 
 /**
  * @brief The CompositorFactory class will instanciate a compositor

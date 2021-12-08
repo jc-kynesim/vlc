@@ -22,7 +22,7 @@
 # include "config.h"
 #endif
 
-#include "sampler_priv.h"
+#include "sampler.h"
 
 #include <vlc_common.h>
 #include <vlc_memstream.h>
@@ -37,7 +37,6 @@
 #include "gl_api.h"
 #include "gl_common.h"
 #include "gl_util.h"
-#include "interop.h"
 
 struct vlc_gl_sampler_priv {
     struct vlc_gl_sampler sampler;
@@ -45,6 +44,8 @@ struct vlc_gl_sampler_priv {
     struct vlc_gl_t *gl;
     const struct vlc_gl_api *api;
     const opengl_vtable_t *vt; /* for convenience, same as &api->vt */
+
+    struct vlc_gl_picture pic;
 
     struct {
         GLint Textures[PICTURE_PLANE_MAX];
@@ -61,66 +62,10 @@ struct vlc_gl_sampler_priv {
     struct pl_shader *pl_sh;
     const struct pl_shader_res *pl_sh_res;
 
-    GLsizei tex_widths[PICTURE_PLANE_MAX];
-    GLsizei tex_heights[PICTURE_PLANE_MAX];
-
-    GLsizei visible_widths[PICTURE_PLANE_MAX];
-    GLsizei visible_heights[PICTURE_PLANE_MAX];
-
-    GLuint textures[PICTURE_PLANE_MAX];
-
-    GLenum tex_target;
-
-    struct {
-        unsigned int i_x_offset;
-        unsigned int i_y_offset;
-        unsigned int i_visible_width;
-        unsigned int i_visible_height;
-    } last_source;
-
-    /* A sampler supports 2 kinds of input.
-     *  - created with _NewFromInterop(), it receives input pictures from VLC
-     *    (picture_t) via _UpdatePicture();
-     *  - created with _NewFromTexture2D() (interop is NULL), it receives
-     *    directly OpenGL textures via _UpdateTextures().
-     */
-    struct vlc_gl_interop *interop;
-
-    /* Only used for "direct" sampler (when interop == NULL) */
-    video_format_t direct_fmt;
-
     /* If set, vlc_texture() exposes a single plane (without chroma
      * conversion), selected by vlc_gl_sampler_SetCurrentPlane(). */
     bool expose_planes;
     unsigned plane;
-
-    /* All matrices below are stored in column-major order. */
-
-    float mtx_orientation[3*2];
-    float mtx_coords_map[3*2];
-
-    float mtx_transform[3*2];
-    bool mtx_transform_defined;
-
-    /**
-     * tex_coords =   mtx_all  × pic_coords
-     *
-     *  / tex_x \    / a b c \   / pic_x \
-     *  \ tex_y / =  \ d e f / × | pic_y |
-     *                           \   1   /
-     *
-     * Semantically, it represents the result of:
-     *
-     *     get_transform_matrix() * mtx_coords_map * mtx_orientation
-     *
-     * (The intermediate matrices are implicitly expanded to 3x3 with [0 0 1]
-     * as the last row.)
-     *
-     * It is stored in column-major order: [a, d, b, e, c, f].
-     */
-    float mtx_all[3*2];
-    bool mtx_all_defined;
-    bool mtx_all_has_changed; /* since the previous picture */
 };
 
 static inline struct vlc_gl_sampler_priv *
@@ -308,8 +253,10 @@ sampler_base_fetch_locations(struct vlc_gl_sampler *sampler, GLuint program)
         assert(priv->uloc.ConvMatrix != -1);
     }
 
-    assert(sampler->tex_count < 10); /* to guarantee variable names length */
-    for (unsigned int i = 0; i < sampler->tex_count; ++i)
+    struct vlc_gl_format *glfmt = &sampler->glfmt;
+
+    assert(glfmt->tex_count < 10); /* to guarantee variable names length */
+    for (unsigned int i = 0; i < glfmt->tex_count; ++i)
     {
         char name[sizeof("Textures[X]")];
 
@@ -317,7 +264,7 @@ sampler_base_fetch_locations(struct vlc_gl_sampler *sampler, GLuint program)
         priv->uloc.Textures[i] = vt->GetUniformLocation(program, name);
         assert(priv->uloc.Textures[i] != -1);
 
-        if (priv->tex_target == GL_TEXTURE_RECTANGLE)
+        if (glfmt->tex_target == GL_TEXTURE_RECTANGLE)
         {
             snprintf(name, sizeof(name), "TexSizes[%1u]", i);
             priv->uloc.TexSizes[i] = vt->GetUniformLocation(program, name);
@@ -334,41 +281,34 @@ sampler_base_fetch_locations(struct vlc_gl_sampler *sampler, GLuint program)
 #endif
 }
 
-static const GLfloat *
-GetTransformMatrix(const struct vlc_gl_interop *interop)
-{
-    const GLfloat *tm = NULL;
-    if (interop && interop->ops && interop->ops->get_transform_matrix)
-        tm = interop->ops->get_transform_matrix(interop);
-    return tm;
-}
-
 static void
 sampler_base_load(struct vlc_gl_sampler *sampler)
 {
     struct vlc_gl_sampler_priv *priv = PRIV(sampler);
 
     const opengl_vtable_t *vt = priv->vt;
+    struct vlc_gl_format *glfmt = &sampler->glfmt;
+    struct vlc_gl_picture *pic = &priv->pic;
 
     if (priv->yuv_color)
         vt->UniformMatrix4fv(priv->uloc.ConvMatrix, 1, GL_FALSE,
                              priv->conv_matrix);
 
-    for (unsigned i = 0; i < sampler->tex_count; ++i)
+    for (unsigned i = 0; i < glfmt->tex_count; ++i)
     {
         vt->Uniform1i(priv->uloc.Textures[i], i);
 
-        assert(priv->textures[i] != 0);
+        assert(pic->textures[i] != 0);
         vt->ActiveTexture(GL_TEXTURE0 + i);
-        vt->BindTexture(priv->tex_target, priv->textures[i]);
+        vt->BindTexture(glfmt->tex_target, pic->textures[i]);
 
     }
 
-    if (priv->tex_target == GL_TEXTURE_RECTANGLE)
+    if (glfmt->tex_target == GL_TEXTURE_RECTANGLE)
     {
-        for (unsigned i = 0; i < sampler->tex_count; ++i)
-            vt->Uniform2f(priv->uloc.TexSizes[i], priv->tex_widths[i],
-                          priv->tex_heights[i]);
+        for (unsigned i = 0; i < glfmt->tex_count; ++i)
+            vt->Uniform2f(priv->uloc.TexSizes[i], glfmt->tex_widths[i],
+                          glfmt->tex_heights[i]);
     }
 
 #ifdef HAVE_LIBPLACEBO
@@ -420,12 +360,14 @@ sampler_xyz12_load(struct vlc_gl_sampler *sampler)
 {
     struct vlc_gl_sampler_priv *priv = PRIV(sampler);
     const opengl_vtable_t *vt = priv->vt;
+    struct vlc_gl_format *glfmt = &sampler->glfmt;
+    struct vlc_gl_picture *pic = &priv->pic;
 
     vt->Uniform1i(priv->uloc.Textures[0], 0);
 
-    assert(priv->textures[0] != 0);
+    assert(pic->textures[0] != 0);
     vt->ActiveTexture(GL_TEXTURE0);
-    vt->BindTexture(priv->tex_target, priv->textures[0]);
+    vt->BindTexture(glfmt->tex_target, pic->textures[0]);
 }
 
 static int
@@ -535,155 +477,6 @@ opengl_init_swizzle(struct vlc_gl_sampler *sampler,
 }
 
 static void
-InitOrientationMatrix(float matrix[static 3*2], video_orientation_t orientation)
-{
-/**
- * / C0R0  C1R0  C3R0 \
- * \ C0R1  C1R1  C3R1 /
- *
- * (note that in memory, the matrix is stored in column-major order)
- */
-#define MATRIX_SET(C0R0, C1R0, C3R0, \
-                   C0R1, C1R1, C3R1) \
-    matrix[0*2 + 0] = C0R0; \
-    matrix[1*2 + 0] = C1R0; \
-    matrix[2*2 + 0] = C3R0; \
-    matrix[0*2 + 1] = C0R1; \
-    matrix[1*2 + 1] = C1R1; \
-    matrix[2*2 + 1] = C3R1;
-
-    /**
-     * The following schemas show how the video picture is oriented in the
-     * texture, according to the "orientation" value:
-     *
-     *     video         texture
-     *    picture        storage
-     *
-     *     1---2          2---3
-     *     |   |   --->   |   |
-     *     4---3          1---4
-     *
-     * In addition, they show how the orientation transforms video picture
-     * coordinates axis (x,y) into texture axis (X,Y):
-     *
-     *   y         --->         X
-     *   |                      |
-     *   +---x              Y---+
-     *
-     * The resulting coordinates undergo the reverse of the transformation
-     * applied to the axis, so expressing (x,y) in terms of (X,Y) gives the
-     * orientation matrix coefficients.
-     */
-
-    switch (orientation) {
-        case ORIENT_ROTATED_90:
-            /**
-             *     1---2          2---3
-             *   y |   |   --->   |   | X
-             *   | 4---3          1---4 |
-             *   +---x              Y---+
-             *
-             *          x = 1-Y
-             *          y = X
-             */
-                     /* X  Y  1 */
-            MATRIX_SET( 0,-1, 1, /* 1-Y */
-                        1, 0, 0) /* X */
-            break;
-        case ORIENT_ROTATED_180:
-            /**
-             *                      X---+
-             *     1---2          3---4 |
-             *   y |   |   --->   |   | Y
-             *   | 4---3          2---1
-             *   +---x
-             *
-             *          x = 1-X
-             *          y = 1-Y
-             */
-                     /* X  Y  1 */
-            MATRIX_SET(-1, 0, 1, /* 1-X */
-                        0,-1, 1) /* 1-Y */
-            break;
-        case ORIENT_ROTATED_270:
-            /**
-             *                    +---Y
-             *     1---2          | 4---1
-             *   y |   |   --->   X |   |
-             *   | 4---3            3---2
-             *   +---x
-             *
-             *          x = Y
-             *          y = 1-X
-             */
-                     /* X  Y  1 */
-            MATRIX_SET( 0, 1, 0, /* Y */
-                       -1, 0, 1) /* 1-X */
-            break;
-        case ORIENT_HFLIPPED:
-            /**
-             *     1---2          2---1
-             *   y |   |   --->   |   | Y
-             *   | 4---3          3---4 |
-             *   +---x              X---+
-             *
-             *          x = 1-X
-             *          y = Y
-             */
-                     /* X  Y  1 */
-            MATRIX_SET(-1, 0, 1, /* 1-X */
-                        0, 1, 0) /* Y */
-            break;
-        case ORIENT_VFLIPPED:
-            /**
-             *                    +---X
-             *     1---2          | 4---3
-             *   y |   |   --->   Y |   |
-             *   | 4---3            1---2
-             *   +---x
-             *
-             *          x = X
-             *          y = 1-Y
-             */
-                     /* X  Y  1 */
-            MATRIX_SET( 1, 0, 0, /* X */
-                        0,-1, 1) /* 1-Y */
-            break;
-        case ORIENT_TRANSPOSED:
-            /**
-             *                      Y---+
-             *     1---2          1---4 |
-             *   y |   |   --->   |   | X
-             *   | 4---3          2---3
-             *   +---x
-             *
-             *          x = 1-Y
-             *          y = 1-X
-             */
-                     /* X  Y  1 */
-            MATRIX_SET( 0,-1, 1, /* 1-Y */
-                       -1, 0, 1) /* 1-X */
-            break;
-        case ORIENT_ANTI_TRANSPOSED:
-            /**
-             *     1---2            3---2
-             *   y |   |   --->   X |   |
-             *   | 4---3          | 4---1
-             *   +---x            +---Y
-             *
-             *          x = Y
-             *          y = X
-             */
-                     /* X  Y  1 */
-            MATRIX_SET( 0, 1, 0, /* Y */
-                        1, 0, 0) /* X */
-            break;
-        default:
-            break;
-    }
-}
-
-static void
 GetNames(GLenum tex_target, const char **glsl_sampler, const char **texture)
 {
     switch (tex_target)
@@ -727,11 +520,12 @@ sampler_planes_fetch_locations(struct vlc_gl_sampler *sampler, GLuint program)
     struct vlc_gl_sampler_priv *priv = PRIV(sampler);
 
     const opengl_vtable_t *vt = priv->vt;
+    struct vlc_gl_format *glfmt = &sampler->glfmt;
 
     priv->uloc.Textures[0] = vt->GetUniformLocation(program, "Texture");
     assert(priv->uloc.Textures[0] != -1);
 
-    if (priv->tex_target == GL_TEXTURE_RECTANGLE)
+    if (glfmt->tex_target == GL_TEXTURE_RECTANGLE)
     {
         priv->uloc.TexSizes[0] = vt->GetUniformLocation(program, "TexSize");
         assert(priv->uloc.TexSizes[0] != -1);
@@ -745,25 +539,27 @@ sampler_planes_load(struct vlc_gl_sampler *sampler)
     unsigned plane = priv->plane;
 
     const opengl_vtable_t *vt = priv->vt;
+    struct vlc_gl_format *glfmt = &sampler->glfmt;
+    struct vlc_gl_picture *pic = &priv->pic;
 
     vt->Uniform1i(priv->uloc.Textures[0], 0);
 
-    assert(priv->textures[plane] != 0);
+    assert(pic->textures[plane] != 0);
     vt->ActiveTexture(GL_TEXTURE0);
-    vt->BindTexture(priv->tex_target, priv->textures[plane]);
+    vt->BindTexture(glfmt->tex_target, pic->textures[plane]);
 
-    if (priv->tex_target == GL_TEXTURE_RECTANGLE)
+    if (glfmt->tex_target == GL_TEXTURE_RECTANGLE)
     {
-        vt->Uniform2f(priv->uloc.TexSizes[0], priv->tex_widths[plane],
-                      priv->tex_heights[plane]);
+        vt->Uniform2f(priv->uloc.TexSizes[0], glfmt->tex_widths[plane],
+                      glfmt->tex_heights[plane]);
     }
 }
 
 static int
 sampler_planes_init(struct vlc_gl_sampler *sampler)
 {
-    struct vlc_gl_sampler_priv *priv = PRIV(sampler);
-    GLenum tex_target = priv->tex_target;
+    struct vlc_gl_format *glfmt = &sampler->glfmt;
+    GLenum tex_target = glfmt->tex_target;
 
     struct vlc_memstream ms;
     if (vlc_memstream_open(&ms))
@@ -816,18 +612,19 @@ sampler_planes_init(struct vlc_gl_sampler *sampler)
 }
 
 static int
-opengl_fragment_shader_init(struct vlc_gl_sampler *sampler, GLenum tex_target,
-                            const video_format_t *fmt, bool expose_planes)
+opengl_fragment_shader_init(struct vlc_gl_sampler *sampler, bool expose_planes)
 {
     struct vlc_gl_sampler_priv *priv = PRIV(sampler);
+    struct vlc_gl_format *glfmt = &sampler->glfmt;
+    const video_format_t *fmt = &glfmt->fmt;
 
-    priv->tex_target = tex_target;
+    GLenum tex_target = glfmt->tex_target;
+
     priv->expose_planes = expose_planes;
     priv->plane = 0;
 
     vlc_fourcc_t chroma = fmt->i_chroma;
     video_color_space_t yuv_space = fmt->space;
-    video_orientation_t orientation = fmt->orientation;
 
     const char *swizzle_per_tex[PICTURE_PLANE_MAX] = { NULL, };
     const bool is_yuv = vlc_fourcc_IsYUV(chroma);
@@ -838,9 +635,7 @@ opengl_fragment_shader_init(struct vlc_gl_sampler *sampler, GLenum tex_target,
         return VLC_EGENERIC;
 
     unsigned tex_count = desc->plane_count;
-    sampler->tex_count = tex_count;
-
-    InitOrientationMatrix(priv->mtx_orientation, orientation);
+    assert(tex_count == glfmt->tex_count);
 
     if (expose_planes)
         return sampler_planes_init(sampler);
@@ -968,7 +763,7 @@ opengl_fragment_shader_init(struct vlc_gl_sampler *sampler, GLenum tex_target,
             if (tex_target == GL_TEXTURE_RECTANGLE)
             {
                 /* The coordinates are in texels values, not normalized */
-                ADDF("  %s(Textures[%u], TexSizes[%u] * tex_coords).%s;\n", lookup, i, i, swizzle);
+                ADDF("  %s(Textures[%u], TexSizes[%u] * tex_coords).%s,\n", lookup, i, i, swizzle);
             }
             else
             {
@@ -991,9 +786,11 @@ opengl_fragment_shader_init(struct vlc_gl_sampler *sampler, GLenum tex_target,
 #ifdef HAVE_LIBPLACEBO
     if (priv->pl_sh_res) {
         const struct pl_shader_res *res = priv->pl_sh_res;
-        assert(res->input  == PL_SHADER_SIG_COLOR);
-        assert(res->output == PL_SHADER_SIG_COLOR);
-        ADDF(" result = %s(result);\n", res->name);
+        if (res->input != PL_SHADER_SIG_NONE) {
+            assert(res->input  == PL_SHADER_SIG_COLOR);
+            assert(res->output == PL_SHADER_SIG_COLOR);
+            ADDF(" result = %s(result);\n", res->name);
+        }
     }
 #endif
 
@@ -1023,10 +820,9 @@ opengl_fragment_shader_init(struct vlc_gl_sampler *sampler, GLenum tex_target,
     return VLC_SUCCESS;
 }
 
-static struct vlc_gl_sampler *
-CreateSampler(struct vlc_gl_interop *interop, struct vlc_gl_t *gl,
-              const struct vlc_gl_api *api, const video_format_t *fmt,
-              unsigned tex_target, bool expose_planes)
+struct vlc_gl_sampler *
+vlc_gl_sampler_New(struct vlc_gl_t *gl, const struct vlc_gl_api *api,
+                   const struct vlc_gl_format *glfmt, bool expose_planes)
 {
     struct vlc_gl_sampler_priv *priv = calloc(1, sizeof(*priv));
     if (!priv)
@@ -1039,28 +835,24 @@ CreateSampler(struct vlc_gl_interop *interop, struct vlc_gl_t *gl,
     priv->pl_sh = NULL;
     priv->pl_sh_res = NULL;
 
-    priv->interop = interop;
     priv->gl = gl;
     priv->api = api;
     priv->vt = &api->vt;
 
-    priv->mtx_transform_defined = false;
-    sampler->pic_to_tex_matrix = NULL;
-    priv->mtx_all_defined = false;
-    priv->mtx_all_has_changed = false;
+    struct vlc_gl_picture *pic = &priv->pic;
+    memcpy(pic->mtx, MATRIX2x3_IDENTITY, sizeof(MATRIX2x3_IDENTITY));
+    priv->pic.mtx_has_changed = true;
+
+    sampler->pic_to_tex_matrix = pic->mtx;
 
     /* Formats with palette are not supported. This also allows to copy
      * video_format_t without possibility of failure. */
-    assert(!sampler->fmt.p_palette);
+    assert(!glfmt->fmt.p_palette);
 
-    sampler->fmt = *fmt;
+    sampler->glfmt = *glfmt;
 
     sampler->shader.extensions = NULL;
     sampler->shader.body = NULL;
-
-    /* Expose the texture sizes publicly */
-    sampler->tex_widths = priv->tex_widths;
-    sampler->tex_heights = priv->tex_heights;
 
 #ifdef HAVE_LIBPLACEBO
     // Create the main libplacebo context
@@ -1079,83 +871,20 @@ CreateSampler(struct vlc_gl_interop *interop, struct vlc_gl_t *gl,
     }
 #endif
 
-    int ret = opengl_fragment_shader_init(sampler, tex_target, fmt,
-                                          expose_planes);
+    int ret = opengl_fragment_shader_init(sampler, expose_planes);
     if (ret != VLC_SUCCESS)
     {
         free(sampler);
         return NULL;
     }
 
-    unsigned tex_count = sampler->tex_count;
-    assert(!interop || interop->tex_count == tex_count);
-
-    /* This might be updated in UpdatePicture for non-direct samplers */
-    memcpy(&priv->mtx_coords_map, MATRIX3x2_IDENTITY,
-           sizeof(MATRIX3x2_IDENTITY));
-
-    if (interop)
-    {
-        /* Texture size */
-        for (unsigned j = 0; j < interop->tex_count; j++) {
-            const GLsizei w = interop->fmt_out.i_visible_width  * interop->texs[j].w.num
-                            / interop->texs[j].w.den;
-            const GLsizei h = interop->fmt_out.i_visible_height * interop->texs[j].h.num
-                            / interop->texs[j].h.den;
-            priv->visible_widths[j] = w;
-            priv->visible_heights[j] = h;
-            if (interop->api->supports_npot) {
-                priv->tex_widths[j]  = w;
-                priv->tex_heights[j] = h;
-            } else {
-                priv->tex_widths[j]  = vlc_align_pot(w);
-                priv->tex_heights[j] = vlc_align_pot(h);
-            }
-        }
-
-        if (!interop->handle_texs_gen)
-        {
-            ret = vlc_gl_interop_GenerateTextures(interop, priv->tex_widths,
-                                                  priv->tex_heights,
-                                                  priv->textures);
-            if (ret != VLC_SUCCESS)
-            {
-                free(sampler);
-                return NULL;
-            }
-        }
-    }
-
     return sampler;
-}
-
-struct vlc_gl_sampler *
-vlc_gl_sampler_NewFromInterop(struct vlc_gl_interop *interop,
-                              bool expose_planes)
-{
-    return CreateSampler(interop, interop->gl, interop->api, &interop->fmt_out,
-                         interop->tex_target, expose_planes);
-}
-
-struct vlc_gl_sampler *
-vlc_gl_sampler_NewFromTexture2D(struct vlc_gl_t *gl,
-                                const struct vlc_gl_api *api,
-                                const video_format_t *fmt, bool expose_planes)
-{
-    return CreateSampler(NULL, gl, api, fmt, GL_TEXTURE_2D, expose_planes);
 }
 
 void
 vlc_gl_sampler_Delete(struct vlc_gl_sampler *sampler)
 {
     struct vlc_gl_sampler_priv *priv = PRIV(sampler);
-
-    struct vlc_gl_interop *interop = priv->interop;
-    if (interop && !interop->handle_texs_gen)
-    {
-        const opengl_vtable_t *vt = interop->vt;
-        vt->DeleteTextures(interop->tex_count, priv->textures);
-    }
 
 #ifdef HAVE_LIBPLACEBO
     FREENULL(priv->uloc.pl_vars);
@@ -1169,180 +898,12 @@ vlc_gl_sampler_Delete(struct vlc_gl_sampler *sampler)
     free(priv);
 }
 
-/**
- * Compute out = a * b, as if the 3x2 matrices were expanded to 3x3 with
- *  [0 0 1] as the last row.
- */
-static void
-MatrixMultiply(float out[static 3*2],
-               const float a[static 3*2], const float b[static 3*2])
-{
-    /* All matrices are stored in column-major order. */
-    for (unsigned i = 0; i < 3; ++i)
-        for (unsigned j = 0; j < 2; ++j)
-            out[i*2+j] = a[0*2+j] * b[i*2+0]
-                       + a[1*2+j] * b[i*2+1]
-                       + a[2*2+j];
-}
-
-static void
-UpdateMatrixAll(struct vlc_gl_sampler_priv *priv)
-{
-    float tmp[3*2];
-
-    float *out = priv->mtx_transform_defined ? tmp : priv->mtx_all;
-    /* out = mtx_coords_map * mtx_orientation */
-    MatrixMultiply(out, priv->mtx_coords_map, priv->mtx_orientation);
-
-    if (priv->mtx_transform_defined)
-        /* mtx_all = mtx_transform * tmp */
-        MatrixMultiply(priv->mtx_all, priv->mtx_transform, tmp);
-}
-
 int
-vlc_gl_sampler_UpdatePicture(struct vlc_gl_sampler *sampler, picture_t *picture)
+vlc_gl_sampler_Update(struct vlc_gl_sampler *sampler,
+                      const struct vlc_gl_picture *picture)
 {
     struct vlc_gl_sampler_priv *priv = PRIV(sampler);
-
-    const struct vlc_gl_interop *interop = priv->interop;
-    assert(interop);
-
-    const video_format_t *source = &picture->format;
-
-    bool mtx_changed = false;
-
-    if (!priv->mtx_all_defined
-     || source->i_x_offset != priv->last_source.i_x_offset
-     || source->i_y_offset != priv->last_source.i_y_offset
-     || source->i_visible_width != priv->last_source.i_visible_width
-     || source->i_visible_height != priv->last_source.i_visible_height)
-    {
-        memset(priv->mtx_coords_map, 0, sizeof(priv->mtx_coords_map));
-
-        /* The transformation is the same for all planes, even with power-of-two
-         * textures. */
-        float scale_w = priv->tex_widths[0];
-        float scale_h = priv->tex_heights[0];
-
-        /* Warning: if NPOT is not supported a larger texture is
-           allocated. This will cause right and bottom coordinates to
-           land on the edge of two texels with the texels to the
-           right/bottom uninitialized by the call to
-           glTexSubImage2D. This might cause a green line to appear on
-           the right/bottom of the display.
-           There are two possible solutions:
-           - Manually mirror the edges of the texture.
-           - Add a "-1" when computing right and bottom, however the
-           last row/column might not be displayed at all.
-        */
-        float left   = (source->i_x_offset +                       0 ) / scale_w;
-        float top    = (source->i_y_offset +                       0 ) / scale_h;
-        float right  = (source->i_x_offset + source->i_visible_width ) / scale_w;
-        float bottom = (source->i_y_offset + source->i_visible_height) / scale_h;
-
-        /**
-         * This matrix converts from picture coordinates (in range [0; 1])
-         * to textures coordinates where the picture is actually stored
-         * (removing paddings).
-         *
-         *        texture           (in texture coordinates)
-         *       +----------------+--- 0.0
-         *       |                |
-         *       |  +---------+---|--- top
-         *       |  | picture |   |
-         *       |  +---------+---|--- bottom
-         *       |  .         .   |
-         *       |  .         .   |
-         *       +----------------+--- 1.0
-         *       |  .         .   |
-         *      0.0 left  right  1.0  (in texture coordinates)
-         *
-         * In particular:
-         *  - (0.0, 0.0) is mapped to (left, top)
-         *  - (1.0, 1.0) is mapped to (right, bottom)
-         *
-         * This is an affine 2D transformation, so the input coordinates
-         * are given as a 3D vector in the form (x, y, 1), and the output
-         * is (x', y').
-         *
-         * The paddings are l (left), r (right), t (top) and b (bottom).
-         *
-         *      matrix = / (r-l)   0     l \
-         *               \   0   (b-t)   t /
-         *
-         * It is stored in column-major order.
-         */
-        float *matrix = priv->mtx_coords_map;
-#define COL(x) (x*2)
-#define ROW(x) (x)
-        matrix[COL(0) + ROW(0)] = right - left;
-        matrix[COL(1) + ROW(1)] = bottom - top;
-        matrix[COL(2) + ROW(0)] = left;
-        matrix[COL(2) + ROW(1)] = top;
-#undef COL
-#undef ROW
-
-        mtx_changed = true;
-
-        priv->last_source.i_x_offset = source->i_x_offset;
-        priv->last_source.i_y_offset = source->i_y_offset;
-        priv->last_source.i_visible_width = source->i_visible_width;
-        priv->last_source.i_visible_height = source->i_visible_height;
-    }
-
-    /* Update the texture */
-    int ret = interop->ops->update_textures(interop, priv->textures,
-                                            priv->visible_widths,
-                                            priv->visible_heights, picture,
-                                            NULL);
-
-    const float *tm = GetTransformMatrix(interop);
-    if (tm) {
-        memcpy(priv->mtx_transform, tm, sizeof(priv->mtx_transform));
-        priv->mtx_transform_defined = true;
-        mtx_changed = true;
-    }
-    else if (priv->mtx_transform_defined)
-    {
-        priv->mtx_transform_defined = false;
-        mtx_changed = true;
-    }
-
-    if (!priv->mtx_all_defined || mtx_changed)
-    {
-        UpdateMatrixAll(priv);
-        priv->mtx_all_defined = true;
-        sampler->pic_to_tex_matrix = priv->mtx_all;
-        priv->mtx_all_has_changed = true;
-    }
-    else
-        priv->mtx_all_has_changed = false;
-
-    return ret;
-}
-
-int
-vlc_gl_sampler_UpdateTextures(struct vlc_gl_sampler *sampler, GLuint textures[],
-                              GLsizei tex_widths[], GLsizei tex_heights[])
-{
-    struct vlc_gl_sampler_priv *priv = PRIV(sampler);
-    assert(!priv->interop);
-
-    if (!priv->mtx_all_defined)
-    {
-        memcpy(priv->mtx_all, MATRIX3x2_IDENTITY, sizeof(MATRIX3x2_IDENTITY));
-        priv->mtx_all_defined = true;
-        priv->mtx_all_has_changed = true;
-
-        sampler->pic_to_tex_matrix = priv->mtx_all;
-    }
-    else
-        priv->mtx_all_has_changed = false;
-
-    unsigned tex_count = sampler->tex_count;
-    memcpy(priv->textures, textures, tex_count * sizeof(textures[0]));
-    memcpy(priv->tex_widths, tex_widths, tex_count * sizeof(tex_widths[0]));
-    memcpy(priv->tex_heights, tex_heights, tex_count * sizeof(tex_heights[0]));
+    priv->pic = *picture;
 
     return VLC_SUCCESS;
 }
@@ -1352,70 +913,4 @@ vlc_gl_sampler_SelectPlane(struct vlc_gl_sampler *sampler, unsigned plane)
 {
     struct vlc_gl_sampler_priv *priv = PRIV(sampler);
     priv->plane = plane;
-}
-
-void
-vlc_gl_sampler_PicToTexCoords(struct vlc_gl_sampler *sampler,
-                              unsigned coords_count, const float *pic_coords,
-                              float *tex_coords_out)
-{
-    struct vlc_gl_sampler_priv *priv = PRIV(sampler);
-    const float *mtx = priv->mtx_all;
-#define MTX(col,row) mtx[(col*2)+row]
-    for (unsigned i = 0; i < coords_count; ++i)
-    {
-        /* Store the coordinates, in case the transform must be applied in
-         * place (i.e. with pic_coords == tex_coords_out) */
-        float x = pic_coords[0];
-        float y = pic_coords[1];
-        tex_coords_out[0] = MTX(0,0) * x + MTX(1,0) * y + MTX(2,0);
-        tex_coords_out[1] = MTX(0,1) * x + MTX(1,1) * y + MTX(2,1);
-        pic_coords += 2;
-        tex_coords_out += 2;
-    }
-}
-
-void
-vlc_gl_sampler_ComputeDirectionMatrix(struct vlc_gl_sampler *sampler,
-                                      float direction[static 2*2])
-{
-    /**
-     * The direction matrix is extracted from priv->mtx_all:
-     *
-     *    mtx_all = / a b c \
-     *              \ d e f /
-     *
-     * The last column (the offset part of the affine transformation) is
-     * discarded, and the 2 remaining column vectors are normalized to remove
-     * any scaling:
-     *
-     *    direction = / a/unorm  b/vnorm \
-     *                \ d/unorm  e/vnorm /
-     *
-     * where unorm = norm( / a \ ) and vnorm = norm( / b \ ).
-     *                     \ d /                     \ e /
-     */
-
-    struct vlc_gl_sampler_priv *priv = PRIV(sampler);
-    assert(priv->mtx_all_defined);
-
-    float ux = priv->mtx_all[0];
-    float uy = priv->mtx_all[1];
-    float vx = priv->mtx_all[2];
-    float vy = priv->mtx_all[3];
-
-    float unorm = sqrt(ux * ux + uy * uy);
-    float vnorm = sqrt(vx * vx + vy * vy);
-
-    direction[0] = ux / unorm;
-    direction[1] = uy / unorm;
-    direction[2] = vx / vnorm;
-    direction[3] = vy / vnorm;
-}
-
-bool
-vlc_gl_sampler_MustRecomputeCoords(struct vlc_gl_sampler *sampler)
-{
-    struct vlc_gl_sampler_priv *priv = PRIV(sampler);
-    return priv->mtx_all_has_changed;
 }

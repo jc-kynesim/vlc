@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 import QtQuick 2.11
-import QtQuick.Controls 2.4
+import QtQuick.Templates 2.4 as T
 import QtQuick.Layouts 1.11
 import QtQml.Models 2.2
 import QtGraphicalEffects 1.0
@@ -25,7 +25,7 @@ import org.videolan.vlc 0.1
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-Control {
+T.Control {
     id: root
 
     // Properties
@@ -53,7 +53,7 @@ Control {
     property alias title: titleLabel.text
     property alias subtitle: subtitleTxt.text
     property alias playCoverBorderWidth: picture.playCoverBorderWidth
-    property alias playCoverShowGradient: picture.playCoverShowGradient
+    property alias playCoverShowPlay: picture.playCoverShowPlay
     property alias playIconSize: picture.playIconSize
     property alias pictureRadius: picture.radius
     property alias pictureOverlay: picture.imageOverlay
@@ -70,12 +70,15 @@ Control {
 
     // Settings
 
+    implicitWidth: layout.implicitWidth
+    implicitHeight: layout.implicitHeight
+
     Accessible.role: Accessible.Cell
     Accessible.name: title
 
-    // Keys
-
     Keys.onMenuPressed: root.contextMenuButtonClicked(picture, root.mapToGlobal(0,0))
+
+    // States
 
     states: [
         State {
@@ -96,13 +99,12 @@ Control {
 
             PropertyChanges {
                 target: picture
-                playCoverOpacity: 1
                 playCoverVisible: true
+                playCoverOpacity: 1.0
             }
+
         }
     ]
-
-    // States
 
     transitions: [
         Transition {
@@ -113,11 +115,11 @@ Control {
             SequentialAnimation {
                 PropertyAction {
                     targets: [picture, selectedUnderlayLoader]
-                    properties: "playCoverVisible,visible"
+                    properties: "visible, playCoverVisible"
                 }
 
                 NumberAnimation {
-                    properties: "opacity,playCoverOpacity"
+                    properties: "opacity, playCoverOpacity"
                     duration: VLCStyle.duration_slow
                     easing.type: Easing.InSine
                 }
@@ -136,18 +138,18 @@ Control {
             SequentialAnimation {
                 PropertyAction {
                     target: unselectedUnderlayLoader
-                    property: "visible"
+                    property: "visible, playCoverVisible"
                 }
 
                 NumberAnimation {
-                    properties: "opacity,playCoverOpacity"
+                    properties: "opacity, playCoverOpacity"
                     duration: VLCStyle.duration_normal
                     easing.type: Easing.OutSine
                 }
 
                 PropertyAction {
                     targets: [picture, selectedUnderlayLoader]
-                    properties: "playCoverVisible,visible"
+                    properties: "visible"
                 }
             }
         }

@@ -241,7 +241,7 @@ static int CreateEntry( input_item_node_t *p_node, const struct entry_meta_s *me
     if( meta->psz_tvgid )
         input_item_AddInfo( p_input, "XMLTV", "tvg-id", "%s", meta->psz_tvgid );
     if( meta->psz_grouptitle )
-        input_item_SetAlbum( p_input, meta->psz_grouptitle );
+        input_item_SetPublisher( p_input, meta->psz_grouptitle );
 
     input_item_node_AppendItem( p_node, p_input );
     input_item_Release( p_input );
@@ -252,6 +252,7 @@ static int CreateEntry( input_item_node_t *p_node, const struct entry_meta_s *me
 static int ReadDir( stream_t *p_demux, input_item_node_t *p_subitems )
 {
     char       *psz_line;
+    char       *psz_group = NULL; /* group is toggling tag */
     struct entry_meta_s meta;
     entry_meta_Init( &meta );
     char *    (*pf_dup) (const char *) = p_demux->p_sys;
@@ -283,6 +284,15 @@ static int ReadDir( stream_t *p_demux, input_item_node_t *p_subitems )
                 meta.i_duration = INPUT_DURATION_INDEFINITE;
                 parseEXTINF( psz_parse, pf_dup, &meta );
             }
+            else if( !strncasecmp( psz_parse, "EXTGRP:", sizeof("EXTGRP:") -1 ) )
+            {
+                psz_parse += sizeof("EXTGRP:") - 1;
+                if( *psz_parse )
+                {
+                    free( psz_group );
+                    psz_group = pf_dup( psz_parse );
+                }
+            }
             else if( !strncasecmp( psz_parse, "EXTVLCOPT:",
                                    sizeof("EXTVLCOPT:") -1 ) )
             {
@@ -310,7 +320,7 @@ static int ReadDir( stream_t *p_demux, input_item_node_t *p_subitems )
                       sizeof( "PLAYLIST:" ) - 1 ) )
             {
                 psz_parse += sizeof( "PLAYLIST:" ) - 1;
-                input_item_SetTitle( p_demux->p_input_item, psz_parse );
+                input_item_SetTitle( p_subitems->p_item, psz_parse );
             }
         }
         else if( !strncasecmp( psz_parse, "RTSPtext", sizeof("RTSPtext") -1 ) )
@@ -323,6 +333,8 @@ static int ReadDir( stream_t *p_demux, input_item_node_t *p_subitems )
             if( !meta.psz_name && psz_parse )
                 /* Use filename as name for relative entries */
                 meta.psz_name = strdup( psz_parse );
+            if( psz_group && !meta.psz_grouptitle )
+                meta.psz_grouptitle = strdup( psz_group );
 
             meta.psz_mrl = ProcessMRL( psz_parse, p_demux->psz_url );
             free( psz_parse );
@@ -343,6 +355,7 @@ static int ReadDir( stream_t *p_demux, input_item_node_t *p_subitems )
             /* Cleanup state */
             entry_meta_Clean( &meta );
             entry_meta_Init( &meta );
+            free( psz_group );
         }
     }
     return VLC_SUCCESS; /* Needed for correct operation of go back */
@@ -399,47 +412,50 @@ static void parseEXTINFIptvDiots( char *psz_string,
                                   char *(*pf_dup)(const char *),
                                   struct entry_meta_s *meta )
 {
-    char **ppsz_meta = NULL;
-    if( strncmp( psz_string, "tvg-", 4 ) &&
-        strncmp( psz_string, "group-", 6 ) )
+    char *psz = strchr( psz_string, '=' );
+    if( unlikely(!psz) )
         return;
-    char *psz_sep = strchr( psz_string + 4, '=' );
-    if( unlikely(!psz_sep) )
-        return;
-    size_t i_keylen = psz_sep - psz_string;
 
-    if( !strncmp( psz_string + 4, "logo", i_keylen - 4 ) )
-        ppsz_meta = &meta->psz_album_art;
-    else if( !strncmp( psz_string + 4, "name", i_keylen - 4 ) )
-        ppsz_meta = &meta->psz_name;
-    else if( !strncmp( psz_string + 4, "language", i_keylen - 4 ) )
-        ppsz_meta = &meta->psz_language;
-    else if( !strncmp( psz_string + 4, "id", i_keylen - 4 ) )
-        ppsz_meta = &meta->psz_tvgid;
-    else if( !strncmp( psz_string + 6, "title", i_keylen - 4 ) )
+    char **ppsz_meta = NULL;
+    *psz = 0;
+    if( !strncasecmp( psz_string, "tvg-", 4 ) )
+    {
+        if( !strcasecmp( psz_string + 4, "logo" ) )
+            ppsz_meta = &meta->psz_album_art;
+        else if( !strcasecmp( psz_string + 4, "name" ) )
+            ppsz_meta = &meta->psz_name;
+        else if( !strcasecmp( psz_string + 4, "language" ) )
+            ppsz_meta = &meta->psz_language;
+        else if( !strcasecmp( psz_string + 4, "id" ) )
+            ppsz_meta = &meta->psz_tvgid;
+    }
+    else if( !strcasecmp( psz_string, "group-title" ) )
+    {
         ppsz_meta = &meta->psz_grouptitle;
+    }
+    *psz = '=';
 
     if( !ppsz_meta || *ppsz_meta /* no overwrite */ )
         return;
 
-    char *psz_value = psz_sep + 1;
-    size_t i_valuelen = strlen( psz_value );
+    size_t i_valuelen = strlen( ++psz );
     if( unlikely(i_valuelen == 0) )
         return;
 
-    bool b_escaped = (*psz_value == '"');
+    bool b_escaped = (*psz == '"');
     if( i_valuelen > 2 && b_escaped )
     {
-        psz_value[ i_valuelen - 1 ] = 0;
-        *ppsz_meta = pf_dup( psz_value + 1 );
+        psz[ i_valuelen - 1 ] = 0;
+        *ppsz_meta = pf_dup( psz + 1 );
     }
     else
-        *ppsz_meta = pf_dup( psz_value );
+        *ppsz_meta = pf_dup( psz );
 }
 
 static void parseEXTINFIptvDiotsInDuration( char *psz_string,
                                             char *(*pf_dup)(const char *),
-                                            struct entry_meta_s *meta )
+                                            struct entry_meta_s *meta,
+                                            char **ppsz_end )
 {
     for( ;; )
     {
@@ -456,6 +472,18 @@ static void parseEXTINFIptvDiotsInDuration( char *psz_string,
         {
             switch( *psz_string )
             {
+                case ',': /* Last comma for title */
+                    if(!b_escaped)
+                    {
+                        if(b_value)
+                        {
+                            *psz_string = '\0';
+                            parseEXTINFIptvDiots( psz_start, pf_dup, meta );
+                        }
+                        *ppsz_end = psz_string + 1;
+                        return;
+                    }
+                    break;
                 case '"':
                     if(!b_escaped && b_value)
                         return;
@@ -502,24 +530,41 @@ static void parseEXTINF( char *psz_string,
     while( psz_string < end && ( *psz_string == '\t' || *psz_string == ' ' ) )
         psz_string++;
 
-    /* duration: read to next comma */
-    char *psz_comma = strchr( psz_string, ',' );
-    if( psz_comma )
-    {
-        *psz_comma = '\0'; /* Split strings */
-        if( ++psz_comma < end )
-            parseEXTINFTitle( psz_comma, pf_dup, meta );
-    }
-
     /* Parse duration */
     char *psz_end = NULL;
-    long i_parsed_duration = strtol( psz_string, &psz_end, 10 );
+    float i_parsed_duration = us_strtof( psz_string, &psz_end );
     if( i_parsed_duration > 0 )
-        meta->i_duration = vlc_tick_from_sec( i_parsed_duration );
+        meta->i_duration = vlc_tick_from_sec( (double)i_parsed_duration );
 
-    if( psz_end && psz_end != psz_string && ( *psz_end == '\t' || *psz_end == ' ' ) )
+    /* skip to first unmatched */
+    if( psz_end )
+        psz_string = psz_end;
+
+    /* skip whitespaces */
+    while( psz_string < end && ( *psz_string == '\t' || *psz_string == ' ' ) )
+        psz_string++;
+
+    if( psz_string == end )
+        return;
+
+    /* EXTINF:1,title*/
+    /* EXTINF: -123.12  ,title*/
+    if( *psz_string == ',' )
     {
-        parseEXTINFIptvDiotsInDuration( psz_end, pf_dup, meta );
+        if( ++psz_string < end )
+            parseEXTINFTitle( psz_string, pf_dup, meta );
+    }
+    /* EXTINF: -1  tvg-foo="val" tvg-foo2="val",title */
+    /* EXTINF: -1  tvg-foo="val,val2" ,title */
+    else if( *psz_string >= 'A' && *psz_string <= 'z' )
+    {
+        psz_end = NULL;
+        parseEXTINFIptvDiotsInDuration( psz_string, pf_dup, meta, &psz_end );
+        if( psz_end && *psz_end ) /* returns past last comma */
+        {
+            free(meta->psz_name);
+            meta->psz_name = pf_dup( psz_end );
+        }
     }
 }
 

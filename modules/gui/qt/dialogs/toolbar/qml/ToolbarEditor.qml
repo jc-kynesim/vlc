@@ -46,7 +46,7 @@ Rectangle{
             id: bar
             z: 1
 
-            background: Item { }
+            background: null
 
             readonly property int currentIdentifier: currentItem.identifier
 
@@ -54,9 +54,6 @@ Rectangle{
                 model: PlayerListModel.model
 
                 delegate: EditorTabButton {
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-
                     text: modelData.name
                     readonly property int identifier: modelData.identifier
                 }
@@ -111,8 +108,8 @@ Rectangle{
 
                     readonly property int identifier: modelData.identifier
                     readonly property var model: {
-                        if (!!mainInterface.controlbarProfileModel.currentModel)
-                            return mainInterface.controlbarProfileModel.currentModel.getModel(identifier)
+                        if (!!MainCtx.controlbarProfileModel.currentModel)
+                            return MainCtx.controlbarProfileModel.currentModel.getModel(identifier)
                         else
                             return undefined
                     }
@@ -269,6 +266,9 @@ Rectangle{
         color: VLCStyle.colors.buttonText
         opacity: 0.75
 
+        x: -1
+        y: -1
+
         onXChanged: {
             if (Drag.active)
                 handleScroll(this)
@@ -324,7 +324,7 @@ Rectangle{
             if (direction === -1)
                 0
             else if (direction === 1 && !!target)
-                target.contentWidth - target.width
+                target.contentWidth - target.width + target.footerItem.width
             else
                 0
         }

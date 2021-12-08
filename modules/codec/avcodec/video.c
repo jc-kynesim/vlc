@@ -39,9 +39,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavutil/mem.h>
 #include <libavutil/pixdesc.h>
-#if (LIBAVUTIL_VERSION_MICRO >= 100)
 #include <libavutil/mastering_display_metadata.h>
-#endif
 
 #include "avcodec.h"
 #include "va.h"
@@ -221,10 +219,6 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
     {
         fmt->i_frame_rate = ctx->framerate.num;
         fmt->i_frame_rate_base = ctx->framerate.den;
-# if LIBAVCODEC_VERSION_MICRO <  100
-        // for some reason libav don't thinkg framerate presents actually same thing as in ffmpeg
-        fmt->i_frame_rate_base *= __MAX(ctx->ticks_per_frame, 1);
-# endif
     }
     else if (ctx->time_base.num > 0 && ctx->time_base.den > 0)
     {
@@ -745,7 +739,6 @@ static int DecodeSidedata( decoder_t *p_dec, const AVFrame *frame, picture_t *p_
     decoder_sys_t *p_sys = p_dec->p_sys;
     bool format_changed = false;
 
-#if (LIBAVUTIL_VERSION_MICRO >= 100)
 #define FROM_AVRAT(default_factor, avrat) \
 (uint64_t)(default_factor) * (avrat).num / (avrat).den
     const AVFrameSideData *metadata =
@@ -799,8 +792,7 @@ static int DecodeSidedata( decoder_t *p_dec, const AVFrame *frame, picture_t *p_
         }
 #undef FROM_AVRAT
     }
-#endif
-#if (LIBAVUTIL_VERSION_MICRO >= 100 && LIBAVUTIL_VERSION_INT >= AV_VERSION_INT( 55, 60, 100 ) )
+#if (LIBAVUTIL_VERSION_INT >= AV_VERSION_INT( 55, 60, 100 ))
     const AVFrameSideData *metadata_lt =
             av_frame_get_side_data( frame,
                                     AV_FRAME_DATA_CONTENT_LIGHT_LEVEL );
@@ -852,7 +844,7 @@ static int DecodeSidedata( decoder_t *p_dec, const AVFrame *frame, picture_t *p_
             p_pic->format.multiview_mode = MULTIVIEW_2D;
             break;
         }
-#if LIBAVUTIL_VERSION_CHECK( 56, 7, 0, 4, 100 )
+#if LIBAVUTIL_VERSION_CHECK( 56, 4, 100 )
         p_pic->format.b_multiview_right_eye_first = stereo_data->flags & AV_STEREO3D_FLAG_INVERT;
         p_pic->b_multiview_left_eye = (stereo_data->view == AV_STEREO3D_VIEW_LEFT);
 
@@ -922,9 +914,6 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
             return VLCDEC_ECRITICAL;
         }
     }
-
-    if(!p_block && !(p_sys->p_codec->capabilities & AV_CODEC_CAP_DELAY) )
-        return VLCDEC_SUCCESS;
 
     if( !avcodec_is_open( p_context ) )
     {
@@ -1095,12 +1084,8 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
         vlc_mutex_lock(&p_sys->lock);
 
         /* Compute the PTS */
-#if LIBAVCODEC_VERSION_CHECK( 57, 24, 0, 61, 100 )
-# if LIBAVCODEC_VERSION_MICRO >= 100
+#if LIBAVCODEC_VERSION_CHECK( 57, 61, 100 )
         int64_t av_pts = frame->best_effort_timestamp;
-# else
-        int64_t av_pts = frame->pts;
-# endif
 #else
         int64_t av_pts = frame->pkt_pts;
 #endif
@@ -1663,8 +1648,7 @@ no_reuse:
         return swfmt;
     }
 
-#if (LIBAVCODEC_VERSION_MICRO >= 100) \
-  && (LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 83, 101))
+#if LIBAVCODEC_VERSION_CHECK(57, 83, 101)
     if (p_context->active_thread_type)
     {
         msg_Warn(p_dec, "thread type %d: disabling hardware acceleration",
@@ -1711,8 +1695,7 @@ no_reuse:
         const AVPixFmtDescriptor *dsc = av_pix_fmt_desc_get(hwfmt);
         vlc_decoder_device *init_device = NULL;
         msg_Dbg(p_dec, "trying format %s", dsc ? dsc->name : "unknown");
-        if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt, &init_device) ||
-            init_device == NULL)
+        if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt, &init_device))
             continue; /* Unsupported brand of hardware acceleration */
         vlc_mutex_unlock(&p_sys->lock);
 

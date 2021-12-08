@@ -46,10 +46,9 @@ static const QString COVERGENERATOR_DEFAULT = ":/noart.png";
 // Ctor / dtor
 //-------------------------------------------------------------------------------------------------
 
-CoverGenerator::CoverGenerator(vlc_medialibrary_t * ml, const MLItemId & itemId, int index)
+CoverGenerator::CoverGenerator(vlc_medialibrary_t * ml, const MLItemId & itemId)
     : m_ml(ml)
     , m_id(itemId)
-    , m_index(index)
     , m_countX(COVERGENERATOR_COUNT)
     , m_countY(COVERGENERATOR_COUNT)
     , m_split(Divide)
@@ -64,11 +63,6 @@ CoverGenerator::CoverGenerator(vlc_medialibrary_t * ml, const MLItemId & itemId,
 /* Q_INVOKABLE */ MLItemId CoverGenerator::getId()
 {
     return m_id;
-}
-
-/* Q_INVOKABLE */ int CoverGenerator::getIndex()
-{
-    return m_index;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -113,6 +107,26 @@ CoverGenerator::CoverGenerator(vlc_medialibrary_t * ml, const MLItemId & itemId,
     m_prefix = prefix;
 }
 
+bool CoverGenerator::cachedFileAvailable() const
+{
+    return QFile::exists(fileName());
+}
+
+QString CoverGenerator::cachedFileURL() const
+{
+    return QUrl::fromLocalFile(fileName()).toString();
+}
+
+QString CoverGenerator::fileName() const
+{
+    QDir dir(config_GetUserDir(VLC_CACHE_DIR) + COVERGENERATOR_STORAGE);
+    return dir.absoluteFilePath(QString("%1_thumbnail_%2_%3x%4.jpg")
+                                .arg((m_prefix.isEmpty() ? getPrefix(m_id.type) : m_prefix)
+                                     , QString::number(m_id.id)
+                                     , QString::number(m_size.width())
+                                     , QString::number(m_size.height())));
+}
+
 //-------------------------------------------------------------------------------------------------
 // QRunnable implementation
 //-------------------------------------------------------------------------------------------------
@@ -127,18 +141,7 @@ QString CoverGenerator::execute() /* override */
 
     int64_t id = m_id.id;
 
-    QString fileName;
-
-    // NOTE: If we don't have a valid prefix we generate one based on the item type.
-    if (m_prefix.isEmpty())
-    {
-        m_prefix = getPrefix(type);
-    }
-
-    fileName = QString("%1_thumbnail_%2.jpg").arg(m_prefix).arg(id);
-
-    fileName = dir.absoluteFilePath(fileName);
-
+    QString fileName = this->fileName();
     if (dir.exists(fileName))
     {
         return QUrl::fromLocalFile(fileName).toString();

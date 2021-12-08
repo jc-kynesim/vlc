@@ -17,11 +17,12 @@
  *****************************************************************************/
 pragma Singleton
 import QtQuick 2.11
+import org.videolan.vlc 0.1
 
 QtObject {
     id: vlc_style
 
-    readonly property real scale: mainInterface.intfScaleFactor
+    readonly property real scale: MainCtx.intfScaleFactor
 
     readonly property FontMetrics fontMetrics_xxsmall  : FontMetrics { font.pixelSize: dp(6, scale);  }
     readonly property FontMetrics fontMetrics_xsmall   : FontMetrics { font.pixelSize: dp(8, scale);  }
@@ -52,7 +53,7 @@ QtObject {
 
     // Borders
     readonly property int border: dp(1, scale)
-    readonly property int focus_border: dp(2, scale)
+    readonly property int focus_border: border
 
     readonly property int fontSize_xsmall: fontMetrics_xsmall.font.pixelSize
     readonly property int fontSize_small:  fontMetrics_small.font.pixelSize
@@ -164,9 +165,6 @@ QtObject {
     readonly property int gridCover_video_height: ( gridCover_video_width * 10.0 ) / 16
     readonly property int gridCover_video_border: dp(4, scale)
 
-    readonly property int gridCover_video_width_large: dp(406, scale)
-    readonly property int gridCover_video_height_large: ( gridCover_video_width_large * 10.0 ) / 16
-    
     readonly property int gridCover_radius: dp(4, scale)
 
     readonly property int expandCover_music_height: dp(171, scale)
@@ -186,11 +184,9 @@ QtObject {
     readonly property int gridItem_video_width: VLCStyle.gridCover_video_width
     readonly property int gridItem_video_height: VLCStyle.gridCover_video_height + VLCStyle.margin_xxsmall + VLCStyle.fontHeight_normal + VLCStyle.fontHeight_normal
 
-    readonly property int gridItem_video_width_large: VLCStyle.gridCover_video_width_large
-    readonly property int gridItem_video_height_large: VLCStyle.gridCover_video_height_large + VLCStyle.margin_xxsmall + VLCStyle.fontHeight_large +
-                                              VLCStyle.margin_xxsmall + VLCStyle.fontHeight_normal
-
     readonly property int gridItemSelectedBorder: dp(8, scale)
+
+    readonly property int gridItem_newIndicator: dp(8, scale)
 
     readonly property int column_width: dp(114, scale)
     readonly property int column_margin_width: dp(32, scale)
@@ -262,13 +258,19 @@ QtObject {
     readonly property url noArtArtistCover: "qrc:///noart_artistCover.svg";
     readonly property url noArtVideoCover: "qrc:///noart_videoCover.svg";
 
+    // Play shadow
+    readonly property url playShadow: "qrc:///play_shadow.png";
+
+    // New indicator
+    readonly property url newIndicator: "qrc:///new_indicator.svg";
+
     // Player controlbar
     readonly property int maxControlbarControlHeight: dp(64, scale)
 
     //device pixel
     function dp(px, scale) {
         if (typeof scale === "undefined")
-            scale = mainInterface.intfScaleFactor
+            scale = MainCtx.intfScaleFactor
 
         var scaledPx = Math.round(px * scale)
         if (scaledPx < 0)

@@ -18,6 +18,7 @@
 
 import QtQuick 2.11
 import QtQuick.Controls 2.4
+import QtQuick.Templates 2.4 as T
 import QtQuick.Layouts 1.11
 import QtQml.Models 2.11
 
@@ -40,7 +41,7 @@ Control {
     readonly property alias sliderY: row2.y
     property int textPosition: ControlBar.TimeTextPosition.AboveSlider
     property VLCColors colors: VLCStyle.nightColors
-    property alias identifier: playerButtonsLayout.identifier
+    property alias identifier: playerControlLayout.identifier
     property alias sliderHeight: trackPositionSlider.barHeight
     property alias sliderBackgroundColor: trackPositionSlider.backgroundColor
     property alias sliderProgressColor: trackPositionSlider.progressBarColor
@@ -69,8 +70,8 @@ Control {
         trackPositionSlider.visible = true
         mediaTime.visible = true
         mediaRemainingTime.visible = true
-        mediaTime.font.pixelSize = VLCStyle.fontSize_normal
-        mediaRemainingTime.font.pixelSize = VLCStyle.fontSize_normal
+        mediaTime.font.pixelSize = Qt.binding(function() { return VLCStyle.fontSize_normal })
+        mediaRemainingTime.font.pixelSize = Qt.binding(function() { return VLCStyle.fontSize_normal })
         row2.Layout.leftMargin = 0
         row2.Layout.rightMargin = 0
 
@@ -92,10 +93,10 @@ Control {
         case ControlBar.TimeTextPosition.LeftRightSlider:
             row1.children = []
             row2.children = [mediaTime, trackPositionSlider, mediaRemainingTime]
-            row2.Layout.leftMargin = VLCStyle.margin_xsmall
-            row2.Layout.rightMargin = VLCStyle.margin_xsmall
-            mediaTime.font.pixelSize = VLCStyle.fontSize_small
-            mediaRemainingTime.font.pixelSize = VLCStyle.fontSize_small
+            row2.Layout.leftMargin = Qt.binding(function() { return VLCStyle.margin_xsmall })
+            row2.Layout.rightMargin = Qt.binding(function() { return VLCStyle.margin_xsmall })
+            mediaTime.font.pixelSize = Qt.binding(function() { return VLCStyle.fontSize_small })
+            mediaRemainingTime.font.pixelSize = Qt.binding(function() { return VLCStyle.fontSize_small })
             trackPositionSlider.Layout.alignment = Qt.AlignVCenter
             break;
 
@@ -129,14 +130,13 @@ Control {
             Layout.fillWidth: true
         }
 
-        PlayerButtonsLayout {
-            id: playerButtonsLayout
+        PlayerControlLayout {
+            id: playerControlLayout
 
             Layout.fillWidth: true
             Layout.leftMargin: VLCStyle.margin_large
             Layout.rightMargin: VLCStyle.margin_large
             Layout.bottomMargin: VLCStyle.margin_xsmall
-            Layout.preferredHeight: playerButtonsLayout.implicitHeight
 
             Navigation.upItem: trackPositionSlider.enabled ? trackPositionSlider : root.Navigation.upItem
 
@@ -146,7 +146,8 @@ Control {
         }
     }
 
-    Label {
+    //FIXME use the right xxxLabel class
+    T.Label {
         id: mediaTime
 
         visible: false
@@ -155,11 +156,12 @@ Control {
         font.pixelSize: VLCStyle.fontSize_normal
     }
 
-    Label {
+    //FIXME use the right xxxLabel class
+    T.Label {
         id: mediaRemainingTime
 
         visible: false
-        text: (mainInterface.showRemainingTime && player.remainingTime.valid())
+        text: (MainCtx.showRemainingTime && player.remainingTime.valid())
               ? "-" + player.remainingTime.toString()
               : player.length.toString()
         color: root.colors.playerFg
@@ -167,7 +169,7 @@ Control {
 
         MouseArea {
             anchors.fill: parent
-            onClicked: mainInterface.showRemainingTime = !mainInterface.showRemainingTime
+            onClicked: MainCtx.showRemainingTime = !MainCtx.showRemainingTime
         }
     }
 
@@ -179,11 +181,10 @@ Control {
         progressBarColor: activeFocus ? colors.accent : colors.playerControlBarFg
         barHeight: VLCStyle.heightBar_xxsmall
         enabled: player.playingState == PlayerController.PLAYING_STATE_PLAYING || player.playingState == PlayerController.PLAYING_STATE_PAUSED
-        parentWindow: g_root
         colors: root.colors
 
         Navigation.parentItem: root
-        Navigation.downItem: playerButtonsLayout
+        Navigation.downItem: playerControlLayout
 
         Keys.onPressed: {
             Navigation.defaultKeyAction(event)

@@ -22,6 +22,7 @@
 # include "config.h"
 #endif
 
+#include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -343,9 +344,10 @@ static int vlc_swidth(const char *str)
     }
 }
 
-static void print_item(const module_t *m, const module_config_t *item,
+static void print_item(const module_t *m, const struct vlc_param *param,
                        const module_config_t **section, bool color, bool desc)
 {
+    const module_config_t *item = &param->item;
 #ifndef _WIN32
 # define OPTION_VALUE_SEP " "
 #else
@@ -484,8 +486,8 @@ static void print_item(const module_t *m, const module_config_t *item,
         case CONFIG_ITEM_BOOL:
             bra = type = ket = "";
             prefix = ", --no-";
-            suffix = item->value.i ? _("(default enabled)")
-                                   : _("(default disabled)");
+            suffix = item->orig.i ? _("(default enabled)")
+                                  : _("(default disabled)");
             break;
        default:
             return;
@@ -495,8 +497,8 @@ static void print_item(const module_t *m, const module_config_t *item,
 
     /* Add short option if any */
     char shortopt[4];
-    if (item->i_short != '\0')
-        sprintf(shortopt, "-%c,", item->i_short);
+    if (param->shortname != '\0')
+        sprintf(shortopt, "-%c,", param->shortname);
     else
         strcpy(shortopt, "   ");
 
@@ -566,11 +568,12 @@ static bool plugin_show(const vlc_plugin_t *plugin)
 {
     for (size_t i = 0; i < plugin->conf.size; i++)
     {
-        const module_config_t *item = plugin->conf.items + i;
+        const struct vlc_param *param = plugin->conf.params + i;
+        const module_config_t *item = &param->item;
 
         if (!CONFIG_ITEM(item->i_type))
             continue;
-        if (item->b_removed)
+        if (param->obsolete)
             continue;
         return true;
     }
@@ -624,12 +627,12 @@ static void Usage (vlc_object_t *p_this, char const *psz_search)
         /* Print module options */
         for (size_t j = 0; j < p->conf.size; j++)
         {
-            const module_config_t *item = p->conf.items + j;
+            const struct vlc_param *param = p->conf.params + j;
 
-            if (item->b_removed)
+            if (param->obsolete)
                 continue; /* Skip removed options */
 
-            print_item(m, item, &section, color, desc);
+            print_item(m, param, &section, color, desc);
         }
     }
 

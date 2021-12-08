@@ -35,6 +35,9 @@ FocusScope {
 
     property var fadeColor: undefined
 
+    // NOTE: We want buttons to be centered verticaly but configurable.
+    property int buttonMargin: height / 2 - buttonLeft.height / 2
+
     property int scrollBarWidth: scroll_id.visible ? scroll_id.width : 0
 
     property bool keyNavigationWraps : false
@@ -90,6 +93,9 @@ FocusScope {
 
     property alias listScrollBar: scroll_id
 
+    property alias buttonLeft: buttonLeft
+    property alias buttonRight: buttonRight
+
     // Signals
 
     signal selectionUpdated(int keyModifiers, int oldIndex, int newIndex)
@@ -97,6 +103,10 @@ FocusScope {
     signal selectAll()
 
     signal actionAtIndex(int index)
+
+    signal deselectAll()
+
+    signal showContextMenu(point globalPos)
 
     // Settings
 
@@ -208,7 +218,27 @@ FocusScope {
         section.delegate: sectionHeading
 
         boundsBehavior: Flickable.StopAtBounds
-        boundsMovement :Flickable.StopAtBounds
+        boundsMovement: Flickable.StopAtBounds
+
+        MouseEventFilter {
+            target: view
+
+            onMouseButtonPress: {
+                if (buttons & (Qt.LeftButton | Qt.RightButton)) {
+                    Helpers.enforceFocus(view, Qt.MouseFocusReason)
+
+                    if (!(modifiers & (Qt.ShiftModifier | Qt.ControlModifier))) {
+                        listview_id.deselectAll()
+                    }
+                }
+            }
+
+            onMouseButtonRelease: {
+                if (button & Qt.RightButton) {
+                    listview_id.showContextMenu(globalPos)
+                }
+            }
+        }
 
         // NOTE: We always want a valid 'currentIndex' by default.
         onCountChanged: if (count && currentIndex === -1) currentIndex = 0
@@ -382,23 +412,34 @@ FocusScope {
         }
     }
 
-    RoundButton {
-        id: leftBtn
+    // FIXME: We propbably need to upgrade these RoundButton(s) eventually. And we probably need
+    //        to have some kind of animation when switching pages.
 
-        anchors.verticalCenter: parent.verticalCenter
+    RoundButton {
+        id: buttonLeft
+
         anchors.left: parent.left
-        text:"<"
+        anchors.top: parent.top
+
+        anchors.topMargin: buttonMargin
+
+        text: '<'
+
+        visible: (view.orientation === ListView.Horizontal && !(view.atXBeginning))
+
         onClicked: listview_id.prevPage()
-        visible: view.orientation === ListView.Horizontal && !view.atXBeginning
     }
 
     RoundButton {
-        id: rightBtn
+        id: buttonRight
 
-        anchors.verticalCenter: parent.verticalCenter
         anchors.right: parent.right
-        text:">"
+        anchors.top: buttonLeft.top
+
+        text: '>'
+
+        visible: (view.orientation === ListView.Horizontal && !(view.atXEnd))
+
         onClicked: listview_id.nextPage()
-        visible: view.orientation === ListView.Horizontal && !view.atXEnd
     }
 }

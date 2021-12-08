@@ -15,10 +15,10 @@ usage()
     echo "Usage: $0 [--mode=(default=1)]"
     echo "  --with-prebuilt-contribs | -c"
     echo "  --mode=1 build all "
-    echo "  --mode=0 incremental build (do not bootstrap and configure) "  
+    echo "  --mode=0 incremental build (do not bootstrap and configure) "
 }
 
-NM="$EMSDK/upstream/bin/llvm-nm"
+NM="emnm"
 get_symbol()
 {
     echo "$1" | grep vlc_entry_"$2" | cut -d " " -f 3
@@ -41,12 +41,12 @@ do
         --mode=*)
             BUILD_MODE="${1#--mode=}"
             ;;
-	--with-prebuilt-contribs)
-	    VLC_USE_PREBUILT_CONTRIBS=1
-	    ;;
-	--gen-contrib-archive|-c)
-	    GENERATE_ARCHIVE=1
-	    ;;
+        --with-prebuilt-contribs)
+            VLC_USE_PREBUILT_CONTRIBS=1
+            ;;
+        --gen-contrib-archive|-c)
+            GENERATE_ARCHIVE=1
+            ;;
         *)
             echo "Unrecognized options $1"
             usage
@@ -87,7 +87,7 @@ echo "$VLC_SRCPATH";
 
 diagnostic "vlc tools: bootstrap"
 cd "$VLC_SRCPATH"/extras/tools
-./bootstrap 
+./bootstrap
 
 diagnostic "vlc tools: make"
 make
@@ -113,24 +113,27 @@ cd "$VLC_SRCPATH"/contrib/contrib-emscripten
 
 diagnostic "vlc contribs: bootstrap"
 ../bootstrap --disable-disc --disable-sout --disable-net \
-	     --disable-postproc --disable-gmp --disable-gcrypt --disable-ass \
-	     --disable-gpgerror --disable-harfbuzz --disable-fontconfig \
-	     --disable-asdcplib --disable-caca --disable-gettext \
-             --disable-goom --disable-libplacebo \
-             --disable-lua --disable-luac --disable-sqlite \
-             --disable-medialibrary --disable-mpcdec --disable-schroedinger \
-             --disable-orc --disable-protobuf --disable-sidplay2 \
-             --disable-soxr --disable-spatialaudio --disable-speex \
-             --disable-speexdsp --disable-taglib --disable-zvbi \
-             --disable-rnnoise \
-             --host=wasm32-unknown-emscripten
+            --disable-a52 --disable-aom --disable-faad2 --disable-chromaprint \
+            --disable-mad --disable-libmpeg2 --disable-nvcodec \
+            --disable-tremor --disable-vpx --disable-theora \
+            --disable-postproc --disable-gmp --disable-gcrypt --disable-ass \
+            --disable-gpgerror --disable-harfbuzz --disable-fontconfig \
+            --disable-asdcplib --disable-caca --disable-gettext \
+            --disable-goom --disable-libplacebo \
+            --disable-lua --disable-luac --disable-sqlite \
+            --disable-medialibrary --disable-mpcdec --disable-schroedinger \
+            --disable-orc --disable-protobuf --disable-sidplay2 \
+            --disable-soxr --disable-spatialaudio --disable-speex \
+            --disable-speexdsp --disable-taglib --disable-zvbi \
+            --disable-rnnoise \
+            --host=wasm32-unknown-emscripten
 
 diagnostic "vlc contribs: make"
 if [ "$VLC_USE_PREBUILT_CONTRIBS" -eq "0" ]; then
     emmake make
     if [ "$GENERATE_ARCHIVE" -eq "1" ]; then
-	diagnostic "vlc contribs: generating package"
-	emmake make package
+        diagnostic "vlc contribs: generating package"
+        emmake make package
     fi
 else
     diagnostic "vlc contribs: using prebuilt contribs"
@@ -158,9 +161,9 @@ if [ $BUILD_MODE -eq 1 ]; then
     # shm.h is a blacklisted module
     emconfigure "$VLC_SRCPATH"/configure --host=wasm32-unknown-emscripten --enable-debug \
                         --disable-shared --disable-vlc \
-                        --disable-sout --disable-vlm --disable-xcb --disable-lua \
+                        --disable-sout --disable-vlm --disable-a52 --disable-xcb --disable-lua \
                         --disable-addonmanagermodules --disable-ssp --disable-nls \
-                        ac_cv_func_if_nameindex=yes ac_cv_header_sys_shm_h=no \
+                        --enable-gles2 \
                         --with-contrib="$VLC_SRCPATH"/contrib/wasm32-unknown-emscripten
 fi
 

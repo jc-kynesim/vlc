@@ -178,11 +178,11 @@ public:
     ByteVector readBlock(ulong length)
     {
         if(m_borked || m_seqReadLength >= m_seqReadLimit)
-           return ByteVector::null;
+            return {};
         ByteVector res(length, 0);
         ssize_t i_read = vlc_stream_Read( m_stream, res.data(), length);
         if (i_read < 0)
-            return ByteVector::null;
+            return {};
         else if ((size_t)i_read != length)
             res.resize(i_read);
         m_previousPos += i_read;
@@ -813,15 +813,15 @@ static void ReadMetaFromMP4( MP4::Tag* tag, demux_meta_t *p_demux_meta, vlc_meta
 {
     MP4::Item list;
 #define SET( keyName, metaName )                                                             \
-    if( tag->itemListMap().contains(keyName) )                                               \
+    if( tag->contains(keyName) )                                                             \
     {                                                                                        \
-        list = tag->itemListMap()[keyName];                                                  \
+        list = tag->item(keyName);                                                           \
         vlc_meta_Set##metaName( p_meta, list.toStringList().front().toCString( true ) );     \
     }
 #define SET_EXTRA( keyName, metaName )                                                   \
-    if( tag->itemListMap().contains(keyName) )                                  \
-    {                                                                                \
-        list = tag->itemListMap()[keyName];                                     \
+    if( tag->contains(keyName) )                                                         \
+    {                                                                                    \
+        list = tag->item(keyName);                                                       \
         vlc_meta_AddExtra( p_meta, metaName, list.toStringList().front().toCString( true ) ); \
     }
 
@@ -831,9 +831,9 @@ static void ReadMetaFromMP4( MP4::Tag* tag, demux_meta_t *p_demux_meta, vlc_meta
 #undef SET
 #undef SET_EXTRA
 
-    if( tag->itemListMap().contains("covr") )
+    if( tag->contains("covr") )
     {
-        MP4::CoverArtList cover_list = tag->itemListMap()["covr"].toCoverArtList();
+        MP4::CoverArtList cover_list = tag->item("covr").toCoverArtList();
         const char *psz_format = cover_list[0].format() == MP4::CoverArt::PNG ? "image/png" : "image/jpeg";
 
         msg_Dbg( p_demux_meta, "Found embedded art (%s) is %i bytes",
@@ -931,7 +931,7 @@ static int ReadMeta( vlc_object_t* p_this)
     Tag* p_tag = f.tag();
 
 #define SET( tag, meta )                                                       \
-    if( !p_tag->tag().isNull() && !p_tag->tag().isEmpty() )                    \
+    if( !p_tag->tag().isEmpty() )                                              \
         vlc_meta_Set##meta( p_meta, p_tag->tag().toCString(true) )
 #define SETINT( tag, meta )                                                    \
     if( p_tag->tag() )                                                         \

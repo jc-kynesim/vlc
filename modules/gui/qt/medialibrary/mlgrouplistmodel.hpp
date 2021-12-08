@@ -25,7 +25,7 @@
 #include "mlbasemodel.hpp"
 
 // Forward declarations
-class vlc_medialibrary_t;
+struct vlc_medialibrary_t;
 class MLGroup;
 
 class MLGroupListModel : public MLBaseModel
@@ -42,6 +42,7 @@ public:
         GROUP_DATE,
         GROUP_COUNT,
         // NOTE: Media specific.
+        GROUP_IS_NEW,
         GROUP_TITLE,
         GROUP_RESOLUTION,
         GROUP_CHANNEL,
@@ -62,9 +63,9 @@ public:
 public: // QAbstractItemModel implementation
     QHash<int, QByteArray> roleNames() const override;
 
-    QVariant data(const QModelIndex & index, int role = Qt::DisplayRole) const override;
-
 protected: // MLBaseModel implementation
+    QVariant itemRoleData(MLItem *item, int role = Qt::DisplayRole) const override;
+
     vlc_ml_sorting_criteria_t roleToCriteria(int role) const override;
 
     vlc_ml_sorting_criteria_t nameToCriteria(QByteArray name) const override;
@@ -74,7 +75,7 @@ protected: // MLBaseModel implementation
     ListCacheLoader<std::unique_ptr<MLItem>> * createLoader() const override;
 
 private: // Functions
-    QString getCover(MLGroup * group, int index) const;
+    QString getCover(MLGroup * group) const;
 
 private: // MLBaseModel implementation
     void onVlcMlEvent(const MLEvent & event) override;

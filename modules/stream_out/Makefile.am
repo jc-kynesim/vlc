@@ -4,10 +4,8 @@ libstream_out_dummy_plugin_la_SOURCES = stream_out/dummy.c
 libstream_out_cycle_plugin_la_SOURCES = stream_out/cycle.c
 libstream_out_delay_plugin_la_SOURCES = stream_out/delay.c
 libstream_out_stats_plugin_la_SOURCES = stream_out/stats.c
-libstream_out_standard_plugin_la_SOURCES = stream_out/standard.c \
-	stream_out/sdp_helper.c stream_out/sdp_helper.h
+libstream_out_standard_plugin_la_SOURCES = stream_out/standard.c
 libstream_out_standard_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(CPPFLAGS_access_output_srt)
-libstream_out_standard_plugin_la_LIBADD = $(SOCKET_LIBS)
 libstream_out_duplicate_plugin_la_SOURCES = stream_out/duplicate.c
 libstream_out_es_plugin_la_SOURCES = stream_out/es.c
 libstream_out_display_plugin_la_SOURCES = stream_out/display.c
@@ -30,6 +28,10 @@ libstream_out_transcode_plugin_la_SOURCES = \
 	stream_out/transcode/audio.c stream_out/transcode/video.c
 libstream_out_transcode_plugin_la_CFLAGS = $(AM_CFLAGS)
 libstream_out_transcode_plugin_la_LIBADD = $(LIBM)
+libstream_out_udp_plugin_la_SOURCES = \
+	stream_out/sdp_helper.c stream_out/sdp_helper.h \
+	stream_out/udp.c
+libstream_out_udp_plugin_la_LIBADD = $(SOCKET_LIBS)
 
 sout_LTLIBRARIES = \
 	libstream_out_dummy_plugin.la \
@@ -47,11 +49,18 @@ sout_LTLIBRARIES = \
 	libstream_out_record_plugin.la \
 	libstream_out_smem_plugin.la \
 	libstream_out_setid_plugin.la \
-	libstream_out_transcode_plugin.la
+	libstream_out_transcode_plugin.la \
+	libstream_out_udp_plugin.la
 
 if HAVE_DECKLINK
-libstream_out_sdi_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) $(CPPFLAGS_decklinkoutput)
-libstream_out_sdi_plugin_la_LIBADD = $(LIBS_decklink) $(LIBDL) -lpthread
+libstream_out_sdi_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) $(CPPFLAGS_stream_out_sdi)
+libstream_out_sdi_plugin_la_LIBADD = $(LIBS_stream_out_sdi)
+if HAVE_WIN32
+libstream_out_sdi_plugin_la_LIBADD += $(LIBCOM)
+endif
+if HAVE_LINUX
+libstream_out_sdi_plugin_la_LIBADD += $(LIBDL) -lpthread
+endif
 libstream_out_sdi_plugin_la_SOURCES = stream_out/sdi/sdiout.cpp \
         stream_out/sdi/sdiout.hpp \
         stream_out/sdi/Ancillary.cpp \

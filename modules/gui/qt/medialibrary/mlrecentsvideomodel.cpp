@@ -22,6 +22,7 @@ namespace {
 
 enum Role {
     VIDEO_ID = Qt::UserRole + 1,
+    VIDEO_IS_NEW,
     VIDEO_TITLE,
     VIDEO_THUMBNAIL,
     VIDEO_DURATION,
@@ -41,15 +42,18 @@ MLRecentsVideoModel::MLRecentsVideoModel( QObject* parent )
 {
 }
 
-QVariant MLRecentsVideoModel::data( const QModelIndex& index , int role ) const
+QVariant MLRecentsVideoModel::itemRoleData(MLItem *item , const int role) const
 {
-    const auto video = static_cast<MLVideo *>( item( index.row() ) );
+    const auto video = static_cast<MLVideo *>( item );
     if ( video == nullptr )
         return {};
+
     switch ( role )
     {
         case VIDEO_ID:
             return QVariant::fromValue( video->getId() );
+        case VIDEO_IS_NEW:
+            return QVariant::fromValue( video->isNew() );
         case VIDEO_TITLE:
             return QVariant::fromValue( video->getTitle() );
         case VIDEO_THUMBNAIL:
@@ -79,6 +83,7 @@ QHash<int, QByteArray> MLRecentsVideoModel::roleNames() const
 {
     return {
         { VIDEO_ID, "id" },
+        { VIDEO_IS_NEW, "isNew" },
         { VIDEO_TITLE, "title" },
         { VIDEO_THUMBNAIL, "thumbnail" },
         { VIDEO_DURATION, "duration" },

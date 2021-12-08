@@ -29,7 +29,9 @@
 #include <vlc_opengl.h>
 #include <vlc_picture.h>
 
+#include "gl_api.h"
 #include "gl_common.h"
+#include "picture.h"
 
 /**
  * The purpose of a sampler is to provide pixel values of a VLC input picture,
@@ -51,19 +53,12 @@
  */
 struct vlc_gl_sampler {
     /* Input format */
-    video_format_t fmt;
-
-    /* Number of input planes */
-    unsigned tex_count;
-
-    /* Texture sizes (arrays of tex_count values) */
-    const GLsizei *tex_widths;
-    const GLsizei *tex_heights;
+    struct vlc_gl_format glfmt;
 
     /**
      * Matrix to convert from picture coordinates to texture coordinates
      *
-     * The matrix is 3x2 and is stored in column-major order:
+     * The matrix is 2x3 and is stored in column-major order:
      *
      *     / a b c \
      *     \ d e f /
@@ -153,86 +148,46 @@ vlc_gl_sampler_Load(struct vlc_gl_sampler *sampler)
 }
 
 /**
- * Convert from picture coordinates to texture coordinates, which can be used to
- * sample at the correct location.
+ * Create a new sampler
  *
- * This is a equivalent to retrieve the matrix and multiply manually.
- *
- * The picture and texture coords may point to the same memory, in that case
- * the transformation is applied in place (overwriting the picture coordinates
- * by the texture coordinates).
- *
- * \param sampler the sampler
- * \param coords_count the number of coordinates (x,y) coordinates to convert
- * \param pic_coords picture coordinates as an array of 2*coords_count floats
- * \param tex_coords_out texture coordinates as an array of 2*coords_count
- *                       floats
+ * \param gl the OpenGL context
+ * \param api the OpenGL API
+ * \param glfmt the input format
+ * \param expose_planes if set, vlc_texture() exposes a single plane at a time
+ *                      (selected by vlc_gl_sampler_SetCurrentPlane())
  */
-void
-vlc_gl_sampler_PicToTexCoords(struct vlc_gl_sampler *sampler,
-                              unsigned coords_count, const float *pic_coords,
-                              float *tex_coords_out);
+struct vlc_gl_sampler *
+vlc_gl_sampler_New(struct vlc_gl_t *gl, const struct vlc_gl_api *api,
+                   const struct vlc_gl_format *glfmt, bool expose_planes);
 
 /**
- * Return a matrix to orient texture coordinates
- *
- * This matrix is 2x2 and is stored in column-major order.
- *
- * While pic_to_tex_matrix transforms any picture coordinates into texture
- * coordinates, it may be useful for example for vertex or fragment shaders to
- * sample one pixel to the left of the current one, or two pixels to the top.
- * Since the input texture may be rotated or flipped, the shaders need to
- * know in which direction is the top and in which direction is the right of
- * the picture.
- *
- * This 2x2 matrix allows to transform a 2D vector expressed in picture
- * coordinates into a 2D vector expressed in texture coordinates.
- *
- * Concretely, it contains the coordinates (U, V) of the transformed unit
- * vectors u = / 1 \ and v = / 0 \:
- *             \ 0 /         \ 1 /
- *
- *     / Ux Vx \
- *     \ Uy Vy /
- *
- * It is guaranteed that:
- *  - both U and V are unit vectors (this matrix does not change the scaling);
- *  - only one of their components have a non-zero value (they may not be
- *    oblique); in other words, here are the possible values for U and V:
- *
- *        /  0 \  or  / 0 \  or  / 1 \  or  / -1 \
- *        \ -1 /      \ 1 /      \ 0 /      \  0 /
- *
- *  - U and V are orthogonal.
- *
- * Therefore, there are 8 possible matrices (4 possible rotations, flipped or
- * not).
- *
- * Calling this function before the first picture (i.e. when
- * sampler->pic_to_tex_matrix is NULL) results in undefined behavior.
- *
- * It may theoretically change on every picture (the transform matrix provided
- * by Android may change). If it has changed since the last picture, then
- * vlc_gl_sampler_MustRecomputeCoords() will return true.
- */
-void
-vlc_gl_sampler_ComputeDirectionMatrix(struct vlc_gl_sampler *sampler,
-                                      float direction[static 2*2]);
-
-/**
- * Indicate if the transform to convert picture coordinates to textures
- * coordinates have changed due to the last picture.
- *
- * The filters should call this function on every draw() call, and update their
- * coordinates if necessary (using vlc_gl_sampler_PicToTexCoords()).
- *
- * It is guaranteed that it returns true for the first picture.
+ * Delete a sampler
  *
  * \param sampler the sampler
- * \retval true if the transform has changed due to the last picture
- * \retval false if the transform remains the same
  */
-bool
-vlc_gl_sampler_MustRecomputeCoords(struct vlc_gl_sampler *sampler);
+void
+vlc_gl_sampler_Delete(struct vlc_gl_sampler *sampler);
+
+/**
+ * Update the input textures
+ *
+ * \param sampler the sampler
+ * \param picture the OpenGL picture
+ */
+int
+vlc_gl_sampler_Update(struct vlc_gl_sampler *sampler,
+                      const struct vlc_gl_picture *picture);
+
+/**
+ * Select the plane to expose
+ *
+ * If the sampler exposes planes separately (for plane filters), select the
+ * plane to expose via the GLSL function vlc_texture().
+ *
+ * \param sampler the sampler
+ * \param plane the plane number
+ */
+void
+vlc_gl_sampler_SelectPlane(struct vlc_gl_sampler *sampler, unsigned plane);
 
 #endif

@@ -40,7 +40,9 @@
 #endif
 
 #include "vlc_decklink.h"
+#ifndef _WIN32
 #include <DeckLinkAPIDispatch.cpp>
+#endif
 #include <DeckLinkAPIVersion.h>
 #if BLACKMAGIC_DECKLINK_API_VERSION < 0x0b010000
  #define IID_IDeckLinkProfileAttributes IID_IDeckLinkAttributes
@@ -152,7 +154,11 @@ struct demux_sys_t
     IDeckLinkConfiguration *config;
     IDeckLinkProfileAttributes *attributes;
 
+#ifdef _WIN32
+    BOOL autodetect;
+#else
     bool autodetect;
+#endif
 
     es_out_id_t *video_es;
     es_format_t video_fmt;
@@ -620,7 +626,7 @@ static int Open(vlc_object_t *p_this)
         char str[4];
     } u;
 
-    u.id = 0;
+    u.id = bmdModeUnknown;
 
     char *mode;
     mode = var_CreateGetNonEmptyString(demux, "decklink-mode");
@@ -631,7 +637,7 @@ static int Open(vlc_object_t *p_this)
         msg_Dbg(demux, "Card supports input format detection");
         flags |= bmdVideoInputEnableFormatDetection;
         /* Enable a random format, we will reconfigure on format detection */
-        u.id = htonl(bmdModeHD1080p2997);
+        u.id = bmdModeHD1080p2997;
     } else {
         if (!mode || strlen(mode) < 3 || strlen(mode) > 4) {
             msg_Err(demux, "Invalid mode: \'%s\'", mode ? mode : "");
@@ -656,7 +662,11 @@ static int Open(vlc_object_t *p_this)
         BMDTimeValue frame_duration, time_scale;
         uint32_t field_flags;
         const char *field = GetFieldDominance(m->GetFieldDominance(), &field_flags);
-        BMDDisplayMode id = ntohl(m->GetDisplayMode());
+        union {
+            BMDDisplayMode id;
+            char str[4];
+        } mode;
+        mode.id = m->GetDisplayMode();
 
         if (m->GetName(&tmp_name) != S_OK) {
             mode_name = "unknown";
@@ -670,11 +680,11 @@ static int Open(vlc_object_t *p_this)
         }
 
         msg_Dbg(demux, "Found mode '%4.4s': %s (%dx%d, %.3f fps%s)",
-                 (char*)&id, mode_name,
+                 mode.str, mode_name,
                  (int)m->GetWidth(), (int)m->GetHeight(),
                  double(time_scale) / frame_duration, field);
 
-        if (u.id == id) {
+        if (u.id == mode.id) {
             sys->video_fmt = GetModeSettings(demux, m, bmdDetectedVideoInputYCbCr422);
             msg_Dbg(demux, "Using that mode");
         }
@@ -683,11 +693,11 @@ static int Open(vlc_object_t *p_this)
     mode_it->Release();
 
     if (sys->video_fmt.video.i_width == 0) {
-        msg_Err(demux, "Unknown video mode `%4.4s\' specified.", (char*)&u.id);
+        msg_Err(demux, "Unknown video mode `%4.4s\' specified.", u.str);
         goto finish;
     }
 
-    if (sys->input->EnableVideoInput(htonl(u.id), fmt, flags) != S_OK) {
+    if (sys->input->EnableVideoInput(u.id, fmt, flags) != S_OK) {
         msg_Err(demux, "Failed to enable video input");
         goto finish;
     }
@@ -716,7 +726,7 @@ static int Open(vlc_object_t *p_this)
     }
     rate = var_InheritInteger(demux, "decklink-audio-rate");
     if (rate > 0 && sys->channels > 0) {
-        if (sys->input->EnableAudioInput(rate, bmdAudioSampleType16bitInteger, sys->channels) != S_OK) {
+        if (sys->input->EnableAudioInput(BMDAudioSampleRate(rate), bmdAudioSampleType16bitInteger, sys->channels) != S_OK) {
             msg_Err(demux, "Failed to enable audio input");
             goto finish;
         }

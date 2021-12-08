@@ -59,6 +59,19 @@ struct priv
         picture_t *                 pic;
         EGLImageKHR images[IMAGES_MAX];
     } last;
+
+    struct {
+        EGLDisplay display;
+        EGLDisplay (*getCurrentDisplay)();
+        /* call eglQueryString() with current display */
+        const char *(*queryString)(vlc_gl_t *, int32_t name);
+        EGLImage (*createImageKHR)(EGLDisplay, EGLContext, EGLenum target, EGLClientBuffer buffer,
+                const EGLint *attrib_list);
+        void (*destroyImageKHR)(EGLDisplay, EGLImage image);
+        int (*getError)(void);
+        int (*debugMessageControlKHR)(void * fn, const int32_t * attrs);
+    } egl;
+
 };
 
 static inline bool
@@ -70,12 +83,14 @@ vlc_drm_prime_IsChromaOpaque(const int i_vlc_chroma)
 static void destroy_images(const struct vlc_gl_interop *interop, EGLImageKHR imgs[IMAGES_MAX])
 {
     unsigned int i;
+    struct priv * const priv = interop->priv;
+
     for (i = 0; i != IMAGES_MAX; ++i)
     {
         const EGLImageKHR img = imgs[i];
         imgs[i] = NULL;
         if (img)
-            interop->gl->egl.destroyImageKHR(interop->gl, img);
+            priv->egl.destroyImageKHR(priv->egl.display, img);
     }
 }
 
@@ -165,12 +180,12 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
             *a++ = EGL_NONE;
             *a++ = 0;
 
-            if ((images[n] = interop->gl->egl.createImageKHR(interop->gl, EGL_LINUX_DMA_BUF_EXT,
+            if ((images[n] = priv->egl.createImageKHR(priv->egl.display, EGL_LINUX_DMA_BUF_EXT,
                                                    NULL, attribs)) == NULL)
             {
                 msg_Err(o, "Failed create %08x image %d KHR %dx%d fd=%d, offset=%d, pitch=%d, mod=%#" PRIx64 ": err=%#x",
                         fourccs[n], n, tex_width[n], tex_height[n],
-                        obj->fd, plane->offset, plane->pitch, obj->format_modifier, interop->gl->egl.getError());
+                        obj->fd, plane->offset, plane->pitch, obj->format_modifier, priv->egl.getError());
                 goto fail;
             }
 
@@ -221,7 +236,7 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
     *a++ = EGL_NONE;
     *a++ = 0;
 
-    if ((images[0] = interop->gl->egl.createImageKHR(interop->gl, EGL_LINUX_DMA_BUF_EXT,
+    if ((images[0] = priv->egl.createImageKHR(priv->egl.display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT,
                                            NULL, attribs)) == NULL)
     {
         msg_Err(o, "Failed create image KHR");
@@ -265,13 +280,74 @@ static void egl_err_cb(EGLenum error,const char *command,EGLint messageType,EGLL
 }
 
 static int
+init_egl(struct vlc_gl_interop * const interop, struct priv * const priv)
+{
+    if (!(priv->egl.getCurrentDisplay = vlc_gl_GetProcAddress(interop->gl, "eglGetCurrentDisplay")))
+        return VLC_EGENERIC;
+
+    priv->egl.display = priv->egl.getCurrentDisplay();
+    if (priv->egl.display == EGL_NO_DISPLAY)
+        return VLC_EGENERIC;
+
+    if (!(priv->egl.queryString = vlc_gl_GetProcAddress(interop->gl, "eglQueryString")))
+        return VLC_EGENERIC;
+
+    /* EGL_EXT_image_dma_buf_import implies EGL_KHR_image_base */
+    const char *eglexts = priv->egl.queryString(priv->egl.display, EGL_EXTENSIONS);
+    if (eglexts == NULL || !vlc_gl_StrHasToken(eglexts, "EGL_EXT_image_dma_buf_import"))
+        return VLC_EGENERIC;
+
+    if (!(priv->egl.createImageKHR           = vlc_gl_GetProcAddress(interop->gl, "eglCreateImageKHR")) ||
+        !(priv->egl.destroyImageKHR          = vlc_gl_GetProcAddress(interop->gl, "eglDestroyImageKHR")) ||
+        !(priv->glEGLImageTargetTexture2DOES = vlc_gl_GetProcAddress(interop->gl, "glEGLImageTargetTexture2DOES")))
+        return VLC_EGENERIC;
+
+    priv->egl.getError               = vlc_gl_GetProcAddress(interop->gl, "eglGetError");
+    priv->egl.debugMessageControlKHR = vlc_gl_GetProcAddress(interop->gl, "eglDebugMessageControlKHR");
+
+    return VLC_SUCCESS;
+}
+
+static int
 Open(vlc_object_t *obj)
 {
     struct vlc_gl_interop *interop = (void *) obj;
+    struct priv *priv = NULL;
+
+    if (!interop->vctx) {
+        msg_Err(obj, "No vctx");
+        return VLC_EGENERIC;
+    }
+
+    vlc_decoder_device * const dec_device = vlc_video_context_HoldDevice(interop->vctx);
+    if (!dec_device) {
+        msg_Err(obj, "No device");
+        return VLC_EGENERIC;
+    }
+
+    if (dec_device->type != VLC_DECODER_DEVICE_DRM_PRIME
+        || !vlc_drm_prime_IsChromaOpaque(interop->fmt_in.i_chroma))
+    {
+        msg_Err(obj, "DRM_PRIME no interop - device=%d", dec_device->type);
+        goto error;
+    }
 
     msg_Info(obj, "Try DRM_PRIME: Chroma=%s", fourcc2str(interop->fmt_in.i_chroma));
 
-    if (!interop->gl->egl.debugMessageControlKHR)
+    interop->priv = priv = calloc(1, sizeof(struct priv));
+    if (unlikely(priv == NULL)) {
+        msg_Err(obj, "Calloc fail!");
+        goto error;
+    }
+
+
+    if (init_egl(interop, priv) != VLC_SUCCESS)
+    {
+        msg_Warn(obj, "EGL extensions missing");
+        goto error;
+    }
+
+    if (!priv->egl.debugMessageControlKHR)
     {
         msg_Err(obj, "No EGL debug");
     }
@@ -284,83 +360,17 @@ Open(vlc_object_t *obj)
          EGL_DEBUG_MSG_INFO_KHR, 1,
          EGL_NONE, 0
         };
-        interop->gl->egl.debugMessageControlKHR((void *)egl_err_cb, atts);
-    }
-
-    if (interop->vctx == NULL) {
-        msg_Info(obj, "DRM PRIME no context");
-        return VLC_EGENERIC;
-    }
-    vlc_decoder_device *dec_device = vlc_video_context_HoldDevice(interop->vctx);
-    if (dec_device->type != VLC_DECODER_DEVICE_DRM_PRIME
-     || !vlc_drm_prime_IsChromaOpaque(interop->fmt_in.i_chroma)
-     || interop->gl->ext != VLC_GL_EXT_EGL
-     || interop->gl->egl.createImageKHR == NULL
-     || interop->gl->egl.destroyImageKHR == NULL)
-    {
-        msg_Err(obj, "DRM_PRIME no interop - device=%d, gl=%d", dec_device->type, interop->gl->ext);
-        vlc_decoder_device_Release(dec_device);
-        return VLC_EGENERIC;
+        priv->egl.debugMessageControlKHR((void *)egl_err_cb, atts);
     }
 
     if (!vlc_gl_StrHasToken(interop->api->extensions, "GL_OES_EGL_image"))
     {
         msg_Err(obj, "GL missing GL_OES_EGL_image");
-        vlc_decoder_device_Release(dec_device);
-        return VLC_EGENERIC;
+        goto error;
     }
-
-#if 1
-    const char *eglexts = interop->gl->egl.queryString(interop->gl, EGL_EXTENSIONS);
-    if (eglexts == NULL || !vlc_gl_StrHasToken(eglexts, "EGL_EXT_image_dma_buf_import"))
-    {
-        if (eglexts == NULL)
-            msg_Err(obj, "No EGL extensions");
-        else
-            msg_Err(obj, "GL missing EGL_EXT_image_dma_buf_import");
-
-        vlc_decoder_device_Release(dec_device);
-        return VLC_EGENERIC;
-    }
-#endif
 
     msg_Info(obj, "DRM_PRIME looks good");
 
-    struct priv *priv = interop->priv = calloc(1, sizeof(struct priv));
-    if (unlikely(priv == NULL))
-        goto error;
-#if 0
-    priv->fourcc = 0;
-
-    int va_fourcc;
-    int vlc_sw_chroma;
-    switch (interop->fmt_in.i_chroma)
-    {
-        case VLC_CODEC_VAAPI_420:
-            va_fourcc = VA_FOURCC_NV12;
-            vlc_sw_chroma = VLC_CODEC_NV12;
-            break;
-        case VLC_CODEC_VAAPI_420_10BPP:
-            va_fourcc = VA_FOURCC_P010;
-            vlc_sw_chroma = VLC_CODEC_P010;
-            break;
-        default:
-            vlc_assert_unreachable();
-    }
-
-    if (vaegl_init_fourcc(priv, va_fourcc))
-        goto error;
-
-    priv->vadpy = dec_device->opaque;
-    assert(priv->vadpy != NULL);
-
-    if (tc_va_check_interop_blacklist(interop, priv->vadpy))
-        goto error;
-
-    if (tc_va_check_derive_image(interop))
-        goto error;
-
-#endif
     priv->glEGLImageTargetTexture2DOES =
         vlc_gl_GetProcAddress(interop->gl, "glEGLImageTargetTexture2DOES");
     if (priv->glEGLImageTargetTexture2DOES == NULL) {

@@ -50,7 +50,7 @@ FocusScope {
 
     Component.onCompleted: {
         loadView()
-        if (medialib && !mainInterface.hasFirstrun)
+        if (medialib && !MainCtx.hasFirstrun)
             // asynchronous call
             medialib.reload()
     }
@@ -62,7 +62,7 @@ FocusScope {
         stackView.currentItem.Navigation.upItem = sourcesBanner
         stackView.currentItem.Navigation.rightItem = playlistColumn
         stackView.currentItem.Navigation.downItem = Qt.binding(function() {
-            return miniPlayer.expanded ? miniPlayer : medialibId
+            return miniPlayer.visible ? miniPlayer : medialibId
         })
 
         sourcesBanner.localMenuDelegate = Qt.binding(function () { return !!stackView.currentItem.localMenuDelegate ? stackView.currentItem.localMenuDelegate : null })
@@ -83,7 +83,7 @@ FocusScope {
                 return e.name === stackView.currentItem.view
             })
 
-        if (player.hasVideoOutput && mainInterface.hasEmbededVideo)
+        if (player.hasVideoOutput && MainCtx.hasEmbededVideo)
             _showMiniPlayer = true
     }
 
@@ -98,7 +98,7 @@ FocusScope {
         }
         //unhandled keys are forwarded as hotkeys
         if (!event.accepted)
-            mainInterface.sendHotkey(event.key, event.modifiers);
+            MainCtx.sendHotkey(event.key, event.modifiers);
     }
 
     readonly property var pageModel: [
@@ -228,7 +228,7 @@ FocusScope {
                             bottom: parent.bottom
                             bottomMargin: miniPlayer.height
                             right: playlistColumn.visible ? playlistColumn.left : playlistColumn.right
-                            rightMargin: (mainInterface.playlistDocked && mainInterface.playlistVisible)
+                            rightMargin: (MainCtx.playlistDocked && MainCtx.playlistVisible)
                                          ? 0
                                          : VLCStyle.applicationHorizontalMargin
                             leftMargin: VLCStyle.applicationHorizontalMargin
@@ -260,7 +260,7 @@ FocusScope {
 
                         height: parent.height - miniPlayer.height
 
-                        property bool expanded: mainInterface.playlistDocked && mainInterface.playlistVisible
+                        property bool expanded: MainCtx.playlistDocked && MainCtx.playlistVisible
 
                         state: playlistColumn.expanded ? "expanded" : "collapsed"
 
@@ -330,11 +330,15 @@ FocusScope {
                             bottomPadding: topPadding + Math.max(VLCStyle.applicationVerticalMargin - miniPlayer.height, 0)
 
                             Navigation.parentItem: medialibId
-                            Navigation.leftItem: stackView
                             Navigation.upItem: sourcesBanner
-                            Navigation.downItem: miniPlayer.expanded ? miniPlayer : null
+                            Navigation.downItem: miniPlayer.visible ? miniPlayer : null
+
+                            Navigation.leftAction: function() {
+                                stackView.currentItem.setCurrentItemFocus(Qt.TabFocusReason);
+                            }
+
                             Navigation.cancelAction: function() {
-                                mainInterface.playlistVisible = false
+                                MainCtx.playlistVisible = false
                                 stackView.forceActiveFocus()
                             }
 
@@ -351,22 +355,41 @@ FocusScope {
 
                             Widgets.HorizontalResizeHandle {
                                 id: resizeHandle
+
+                                property bool _inhibitMainInterfaceUpdate: false
+
                                 anchors {
                                     top: parent.top
                                     bottom: parent.bottom
                                     left: parent.left
-
-                                    leftMargin: -(width / 2)
                                 }
 
                                 atRight: false
                                 targetWidth: playlistColumn.width
                                 sourceWidth: root.width
 
-                                onWidthFactorChanged: mainInterface.setPlaylistWidthFactor(widthFactor)
-                                Component.onCompleted:  {
-                                    //don't bind just provide the initial value, HorizontalResizeHandle.widthFactor updates itself
-                                    widthFactor = mainInterface.playlistWidthFactor
+                                onWidthFactorChanged: {
+                                    if (!_inhibitMainInterfaceUpdate)
+                                        MainCtx.setPlaylistWidthFactor(widthFactor)
+                                }
+
+                                Component.onCompleted:  _updateFromMainInterface()
+
+                                function _updateFromMainInterface() {
+                                    if (widthFactor == MainCtx.playlistWidthFactor)
+                                        return
+
+                                    _inhibitMainInterfaceUpdate = true
+                                    widthFactor = MainCtx.playlistWidthFactor
+                                    _inhibitMainInterfaceUpdate = false
+                                }
+
+                                Connections {
+                                    target: MainCtx
+
+                                    onPlaylistWidthFactorChanged: {
+                                        resizeHandle._updateFromMainInterface()
+                                    }
                                 }
                             }
                         }
@@ -386,8 +409,8 @@ FocusScope {
                 width: VLCStyle.dp(320, VLCStyle.scale)
                 height: VLCStyle.dp(180, VLCStyle.scale)
                 z: 2
-                visible: !root._inhibitMiniPlayer && root._showMiniPlayer && mainInterface.hasEmbededVideo
-                enabled: !root._inhibitMiniPlayer && root._showMiniPlayer && mainInterface.hasEmbededVideo
+                visible: !root._inhibitMiniPlayer && root._showMiniPlayer && MainCtx.hasEmbededVideo
+                enabled: !root._inhibitMiniPlayer && root._showMiniPlayer && MainCtx.hasEmbededVideo
 
                 dragXMin: 0
                 dragXMax: root.width - playerPip.width
@@ -412,7 +435,10 @@ FocusScope {
             Player.MiniPlayer {
                 id: miniPlayer
 
-                visible: !root._inhibitMiniPlayer
+                Binding on state {
+                    when: root._inhibitMiniPlayer && !miniPlayer.visible
+                    value: ""
+                }
 
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -422,18 +448,18 @@ FocusScope {
                 Navigation.parentItem: medialibId
                 Navigation.upItem: stackView
                 Navigation.cancelItem:sourcesBanner
-                onExpandedChanged: {
-                    if (!expanded && miniPlayer.activeFocus)
+                onVisibleChanged: {
+                    if (!visible && miniPlayer.activeFocus)
                         stackView.forceActiveFocus()
                 }
 
-                mainContent: mainColumn
+                effectSource: mainColumn
             }
 
             Connections {
                 target: player
                 onHasVideoOutputChanged: {
-                    if (player.hasVideoOutput && mainInterface.hasEmbededVideo) {
+                    if (player.hasVideoOutput && MainCtx.hasEmbededVideo) {
                         if (history.current.view !== "player")
                             g_mainDisplay.showPlayer()
                     } else {

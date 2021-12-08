@@ -21,15 +21,38 @@
 #ifndef LIBVLC_CONFIGURATION_H
 # define LIBVLC_CONFIGURATION_H 1
 
-# ifdef __cplusplus
-extern "C" {
-# endif
-
 /* Internal configuration prototypes and structures */
+
+struct vlc_plugin_t;
+
+struct vlc_param {
+    union {
+        _Atomic int64_t i; /**< Current value (if integer or boolean) */
+        _Atomic float f; /**< Current value (if floating point) */
+        char *_Atomic str; /**< Current value (if character string) */
+    } value;
+
+    struct vlc_plugin_t *owner;
+    unsigned char shortname; /**< Optional short option name */
+    unsigned internal:1; /**< Hidden from preferences and help */
+    unsigned unsaved:1; /**< Not stored in persistent configuration */
+    unsigned safe:1; /**< Safe for untrusted provisioning (playlists) */
+    unsigned obsolete:1; /**< Ignored for backward compatibility */
+    struct module_config_t item;
+};
+
+/**
+ * Looks up a configuration parameter by name.
+ *
+ * \return the configuration parameter, or NULL if not found
+ */
+struct vlc_param *vlc_param_Find(const char *name);
+
+int vlc_param_SetString(struct vlc_param *param, const char *value);
 
 int  config_AutoSaveConfigFile( vlc_object_t * );
 
-void config_Free (module_config_t *, size_t);
+void config_Free(struct vlc_param *, size_t);
 
 int config_LoadCmdLine   ( vlc_object_t *, int, const char *[], int * );
 int config_LoadConfigFile( vlc_object_t * );
@@ -40,8 +63,8 @@ bool config_PrintHelp (vlc_object_t *);
 int config_SortConfig (void);
 void config_UnsortConfig (void);
 
-extern vlc_rwlock_t config_lock;
-extern bool config_dirty;
+extern vlc_mutex_t config_lock;
+extern _Atomic bool config_dirty;
 
 bool config_IsSafe (const char *);
 
@@ -58,7 +81,4 @@ char *config_GetLibDir(void) VLC_USED VLC_MALLOC;
 /* The configuration file */
 #define CONFIG_FILE                     "vlcrc"
 
-# ifdef __cplusplus
-}
-# endif
 #endif

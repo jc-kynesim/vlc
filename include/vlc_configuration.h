@@ -75,11 +75,6 @@ typedef int (*vlc_integer_list_cb)(const char *, int64_t **, char ***);
 struct module_config_t
 {
     uint8_t     i_type; /**< Configuration type */
-    char        i_short; /**< Optional short option name */
-    unsigned    b_internal:1; /**< Hidden from preferences and help */
-    unsigned    b_unsaveable:1; /**< Not stored in configuration */
-    unsigned    b_safe:1; /**< Safe for web plugins and playlist files */
-    unsigned    b_removed:1; /**< Obsolete */
 
     const char *psz_type; /**< Configuration subtype */
     const char *psz_name; /**< Option name */
@@ -99,7 +94,6 @@ struct module_config_t
         const int  *i; /**< Table of possible integer choices */
     } list; /**< Possible choices */
     const char **list_text; /**< Human-readable names for list values */
-    void *owner; /**< Origin run-time linker module handle */
 };
 
 /**

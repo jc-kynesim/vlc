@@ -54,8 +54,6 @@ typedef struct vlc_gl_sys_t
 #if defined (USE_PLATFORM_WAYLAND)
     struct wl_egl_window *window;
 #endif
-    PFNEGLCREATEIMAGEKHRPROC    eglCreateImageKHR;
-    PFNEGLDESTROYIMAGEKHRPROC   eglDestroyImageKHR;
 } vlc_gl_sys_t;
 
 static int MakeCurrent (vlc_gl_t *gl)
@@ -98,29 +96,6 @@ static void *GetSymbol(vlc_gl_t *gl, const char *procname)
 {
     (void) gl;
     return (void *)eglGetProcAddress (procname);
-}
-
-static const char *QueryString(vlc_gl_t *gl, int32_t name)
-{
-    vlc_gl_sys_t *sys = gl->sys;
-
-    return eglQueryString(sys->display, name);
-}
-
-static void *CreateImageKHR(vlc_gl_t *gl, unsigned target, void *buffer,
-                            const int32_t *attrib_list)
-{
-    vlc_gl_sys_t *sys = gl->sys;
-
-    return sys->eglCreateImageKHR(sys->display, NULL, target, buffer,
-                                  attrib_list);
-}
-
-static bool DestroyImageKHR(vlc_gl_t *gl, void *image)
-{
-    vlc_gl_sys_t *sys = gl->sys;
-
-    return sys->eglDestroyImageKHR(sys->display, image);
 }
 
 static bool CheckAPI (EGLDisplay dpy, const char *api)
@@ -217,13 +192,21 @@ static int Open(vlc_gl_t *gl, const struct gl_api *api,
     sys->display = EGL_NO_DISPLAY;
     sys->surface = EGL_NO_SURFACE;
     sys->context = EGL_NO_CONTEXT;
-    sys->eglCreateImageKHR = NULL;
-    sys->eglDestroyImageKHR = NULL;
 
     vout_window_t *wnd = gl->surface;
     EGLSurface (*createSurface)(EGLDisplay, EGLConfig, void *, const EGLint *)
         = CreateWindowSurface;
     void *window;
+    EGLAttrib refs_name = EGL_NONE;
+    EGLAttrib refs_value = EGL_FALSE;
+
+#ifdef EGL_KHR_display_reference
+    if (CheckClientExt("EGL_KHR_display_reference"))
+    {
+        refs_name = EGL_TRACK_REFERENCES_KHR;
+        refs_value = EGL_TRUE;
+    }
+#endif
 
 #ifdef USE_PLATFORM_X11
     sys->x11 = NULL;
@@ -340,6 +323,7 @@ static int Open(vlc_gl_t *gl, const struct gl_api *api,
         EGL_GREEN_SIZE, 5,
         EGL_BLUE_SIZE, 5,
         EGL_RENDERABLE_TYPE, api->render_bit,
+        refs_name, refs_value,
         EGL_NONE
     };
     EGLConfig cfgv[1];
@@ -376,24 +360,12 @@ static int Open(vlc_gl_t *gl, const struct gl_api *api,
     sys->context = ctx;
 
     /* Initialize OpenGL callbacks */
-    gl->ext = VLC_GL_EXT_EGL;
     gl->make_current = MakeCurrent;
     gl->release_current = ReleaseCurrent;
     gl->resize = Resize;
     gl->swap = SwapBuffers;
     gl->get_proc_address = GetSymbol;
     gl->destroy = Close;
-    gl->egl.queryString = QueryString;
-
-    sys->eglCreateImageKHR = (void *)eglGetProcAddress("eglCreateImageKHR");
-    sys->eglDestroyImageKHR = (void *)eglGetProcAddress("eglDestroyImageKHR");
-    if (sys->eglCreateImageKHR != NULL && sys->eglDestroyImageKHR != NULL)
-    {
-        gl->egl.createImageKHR = CreateImageKHR;
-        gl->egl.destroyImageKHR = DestroyImageKHR;
-        gl->egl.getError = (void *)eglGetProcAddress("eglGetError");
-        gl->egl.debugMessageControlKHR = (void *)eglGetProcAddress("eglDebugMessageControlKHR");
-    }
 
     return VLC_SUCCESS;
 

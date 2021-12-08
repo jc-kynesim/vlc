@@ -19,7 +19,7 @@
  *****************************************************************************/
 
 import QtQuick 2.11
-import QtQuick.Controls 2.4
+import QtQuick.Templates 2.4 as T
 import QtQuick.Layouts 1.11
 
 import org.videolan.controls 0.1
@@ -27,7 +27,7 @@ import org.videolan.controls 0.1
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-Control {
+T.Control {
     id: root
 
     // Properties
@@ -49,7 +49,7 @@ Control {
 
     // Settings
 
-    height: VLCStyle.play_cover_small + (VLCStyle.margin_xsmall * 2)
+    implicitHeight: VLCStyle.play_cover_small + (VLCStyle.margin_xsmall * 2)
 
     // Childs
 
@@ -76,20 +76,16 @@ Control {
         drag.axis: Drag.XAndYAxis
 
         drag.target: Widgets.DragItem {
-            function updateComponents(maxCovers) {
-                return {
-                    covers: [{ artwork: (model.cover) ? model.cover
-                                                      : VLCStyle.noArtArtistSmall }],
+            indexes: [index]
 
-                    title: (model.name) ? model.name
-                                        : i18n.qtr("Unknown artist"),
+            titleRole: "name"
 
-                    count: 1
-                }
+            onRequestData: {
+                setData(identifier, [model])
             }
 
             function getSelectedInputItem() {
-                return mlModel.getItemsForIndexes([mlModel.index(index, 0)]);
+                return medialib.mlInputItem(model.id)
             }
         }
 

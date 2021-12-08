@@ -32,6 +32,7 @@
 #include "gl_api.h"
 #include "gl_common.h"
 #include "gl_util.h"
+#include "sampler.h"
 
 #define DRAW_VFLIP_SHORTTEXT "VFlip the video"
 #define DRAW_VFLIP_LONGTEXT \
@@ -42,6 +43,8 @@
 static const char *const filter_options[] = { "vflip", NULL };
 
 struct sys {
+    struct vlc_gl_sampler *sampler;
+
     GLuint program_id;
 
     GLuint vbo;
@@ -55,7 +58,8 @@ struct sys {
 };
 
 static int
-Draw(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
+Draw(struct vlc_gl_filter *filter, const struct vlc_gl_picture *pic,
+     const struct vlc_gl_input_meta *meta)
 {
     (void) meta;
 
@@ -65,12 +69,13 @@ Draw(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
 
     vt->UseProgram(sys->program_id);
 
-    struct vlc_gl_sampler *sampler = vlc_gl_filter_GetSampler(filter);
+    struct vlc_gl_sampler *sampler = sys->sampler;
+    vlc_gl_sampler_Update(sampler, pic);
     vlc_gl_sampler_Load(sampler);
 
     vt->BindBuffer(GL_ARRAY_BUFFER, sys->vbo);
 
-    if (vlc_gl_sampler_MustRecomputeCoords(sampler))
+    if (pic->mtx_has_changed)
     {
         float coords[] = {
             0, sys->vflip ? 0 : 1,
@@ -80,7 +85,7 @@ Draw(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
         };
 
         /* Transform coordinates in place */
-        vlc_gl_sampler_PicToTexCoords(sampler, 4, coords, coords);
+        vlc_gl_picture_ToTexCoords(pic, 4, coords, coords);
 
         const float data[] = {
             -1,  1, coords[0], coords[1],
@@ -113,6 +118,8 @@ Close(struct vlc_gl_filter *filter)
 {
     struct sys *sys = filter->sys;
 
+    vlc_gl_sampler_Delete(sys->sampler);
+
     const opengl_vtable_t *vt = &filter->api->vt;
     vt->DeleteProgram(sys->program_id);
     vt->DeleteBuffers(1, &sys->vbo);
@@ -122,17 +129,23 @@ Close(struct vlc_gl_filter *filter)
 
 static int
 Open(struct vlc_gl_filter *filter, const config_chain_t *config,
-     struct vlc_gl_tex_size *size_out)
+     const struct vlc_gl_format *glfmt, struct vlc_gl_tex_size *size_out)
 {
     (void) size_out;
 
-    struct vlc_gl_sampler *sampler = vlc_gl_filter_GetSampler(filter);
+    struct vlc_gl_sampler *sampler =
+        vlc_gl_sampler_New(filter->gl, filter->api, glfmt, false);
     if (!sampler)
         return VLC_EGENERIC;
 
     struct sys *sys = filter->sys = malloc(sizeof(*sys));
     if (!sys)
+    {
+        vlc_gl_sampler_Delete(sampler);
         return VLC_EGENERIC;
+    }
+
+    sys->sampler = sampler;
 
     static const char *const VERTEX_SHADER_BODY =
         "attribute vec2 vertex_pos;\n"
@@ -218,7 +231,7 @@ vlc_module_begin()
     add_shortcut("draw");
     set_shortname("draw")
     set_capability("opengl filter", 0)
-    set_callback(Open)
+    set_callback_opengl_filter(Open)
     add_bool(DRAW_CFG_PREFIX "vflip", false, \
              DRAW_VFLIP_SHORTTEXT, DRAW_VFLIP_LONGTEXT)
 vlc_module_end()

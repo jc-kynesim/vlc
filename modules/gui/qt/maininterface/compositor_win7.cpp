@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 #include "compositor_win7.hpp"
-#include "main_interface_win32.hpp"
+#include "mainctx_win32.hpp"
 #include "mainui.hpp"
 
 #include <d3d11.h>
@@ -26,63 +26,20 @@
 
 using namespace vlc;
 
-int CompositorWin7::window_enable(struct vout_window_t * p_wnd, const vout_window_cfg_t *)
+int CompositorWin7::windowEnable(const vout_window_cfg_t *)
 {
-    CompositorWin7* that = static_cast<CompositorWin7*>(p_wnd->sys);
-    msg_Dbg(that->m_intf, "window_enable");
-    that->m_videoSurfaceProvider->enable(p_wnd);
-    that->m_videoSurfaceProvider->setVideoEmbed(true);
+    commonWindowEnable();
     return VLC_SUCCESS;
 }
 
-void CompositorWin7::window_disable(struct vout_window_t * p_wnd)
+void CompositorWin7::windowDisable()
 {
-    CompositorWin7* that = static_cast<CompositorWin7*>(p_wnd->sys);
-    that->m_videoSurfaceProvider->setVideoEmbed(false);
-    that->m_videoSurfaceProvider->disable();
-    that->m_videoWindowHandler->disable();
-    msg_Dbg(that->m_intf, "window_disable");
-}
-
-void CompositorWin7::window_resize(struct vout_window_t * p_wnd, unsigned width, unsigned height)
-{
-    CompositorWin7* that = static_cast<CompositorWin7*>(p_wnd->sys);
-    msg_Dbg(that->m_intf, "window_resize %ux%u", width, height);
-    that->m_videoWindowHandler->requestResizeVideo(width, height);
-}
-
-void CompositorWin7::window_destroy(struct vout_window_t * p_wnd)
-{
-    CompositorWin7* that = static_cast<CompositorWin7*>(p_wnd->sys);
-    msg_Dbg(that->m_intf, "window_destroy");
-    that->onWindowDestruction(p_wnd);
-}
-
-void CompositorWin7::window_set_state(struct vout_window_t * p_wnd, unsigned state)
-{
-    CompositorWin7* that = static_cast<CompositorWin7*>(p_wnd->sys);
-    msg_Dbg(that->m_intf, "window_set_state");
-    that->m_videoWindowHandler->requestVideoState(static_cast<vout_window_state>(state));
-}
-
-void CompositorWin7::window_unset_fullscreen(struct vout_window_t * p_wnd)
-{
-    CompositorWin7* that = static_cast<CompositorWin7*>(p_wnd->sys);
-    msg_Dbg(that->m_intf, "window_unset_fullscreen");
-    that->m_videoWindowHandler->requestVideoWindowed();
-}
-
-void CompositorWin7::window_set_fullscreen(struct vout_window_t * p_wnd, const char *id)
-{
-    CompositorWin7* that = static_cast<CompositorWin7*>(p_wnd->sys);
-    msg_Dbg(that->m_intf, "window_set_fullscreen");
-    that->m_videoWindowHandler->requestVideoFullScreen(id);
+    commonWindowDisable();
 }
 
 
 CompositorWin7::CompositorWin7(qt_intf_t *p_intf, QObject* parent)
-    : QObject(parent)
-    , m_intf(p_intf)
+    : CompositorVideo(p_intf, parent)
 {
 }
 
@@ -140,13 +97,12 @@ bool CompositorWin7::init()
     return true;
 }
 
-MainInterface* CompositorWin7::makeMainInterface()
+bool CompositorWin7::makeMainInterface(MainCtx* mainCtx)
 {
-    MainInterfaceWin32* mainInterfaceW32 =  new MainInterfaceWin32(m_intf);
-    m_mainInterface = mainInterfaceW32;
+    m_mainCtx = mainCtx;
 
     /*
-     * m_stable is not attached to the main interface because dialogs are attached to the mainInterface
+     * m_stable is not attached to the main interface because dialogs are attached to the mainCtx
      * and showing them would raise the video widget above the interface
      */
     m_videoWidget = new QWidget(nullptr, Qt::Tool | Qt::FramelessWindowHint);
@@ -171,22 +127,13 @@ MainInterface* CompositorWin7::makeMainInterface()
     DwmSetWindowAttribute(m_videoWindowHWND, DWMWA_EXCLUDED_FROM_PEEK, &excluseFromPeek, sizeof(excluseFromPeek));
     DwmSetWindowAttribute(m_videoWindowHWND, DWMWA_DISALLOW_PEEK, &excluseFromPeek, sizeof(excluseFromPeek));
 
-    m_videoSurfaceProvider = std::make_unique<VideoSurfaceProvider>();
-    m_mainInterface->setVideoSurfaceProvider(m_videoSurfaceProvider.get());
-    m_mainInterface->setCanShowVideoPIP(true);
-
-    connect(m_videoSurfaceProvider.get(), &VideoSurfaceProvider::surfacePositionChanged,
-            this, &CompositorWin7::onSurfacePositionChanged);
-    connect(m_videoSurfaceProvider.get(), &VideoSurfaceProvider::surfaceSizeChanged,
-            this, &CompositorWin7::onSurfaceSizeChanged);
-
     m_qmlView = std::make_unique<QQuickView>();
     m_qmlView->setResizeMode(QQuickView::SizeRootObjectToView);
     m_qmlView->setClearBeforeRendering(true);
     m_qmlView->setColor(QColor(Qt::transparent));
 
     m_qmlView->installEventFilter(this);
-    m_nativeEventFilter = std::make_unique<Win7NativeEventFilter>(this);
+    m_nativeEventFilter = std::make_unique<Win7NativeEventFilter>();
     qApp->installNativeEventFilter(m_nativeEventFilter.get());
     connect(m_nativeEventFilter.get(), &Win7NativeEventFilter::windowStyleChanged,
             this, &CompositorWin7::resetVideoZOrder);
@@ -195,26 +142,14 @@ MainInterface* CompositorWin7::makeMainInterface()
 
     m_qmlWindowHWND = (HWND)m_qmlView->winId();
 
-    m_videoWindowHandler = std::make_unique<VideoWindowHandler>(m_intf, m_mainInterface);
-    m_videoWindowHandler->setWindow( m_qmlView.get() );
+    commonGUICreate(m_qmlView.get(), m_qmlView.get(), CompositorVideo::CAN_SHOW_PIP);
 
-    m_interfaceWindowHandler = std::make_unique<InterfaceWindowHandlerWin32>(m_intf, m_mainInterface, m_qmlView.get());
-
-    m_taskbarWidget = std::make_unique<WinTaskbarWidget>(m_intf, m_qmlView.get());
-    qApp->installNativeEventFilter(m_taskbarWidget.get());
-
-    MainUI* m_ui = new MainUI(m_intf, m_mainInterface, m_qmlView.get(), this);
-    m_ui->setup(m_qmlView->engine());
-
-
-    m_qmlView->setContent(QUrl(), m_ui->getComponent(), m_ui->createRootItem());
-
-    return m_mainInterface;
+    return true;
 }
 
 void CompositorWin7::destroyMainInterface()
 {
-    unloadGUI();
+    commonIntfDestroy();
     if (m_videoWidget)
     {
         delete m_videoWidget;
@@ -224,16 +159,8 @@ void CompositorWin7::destroyMainInterface()
 
 void CompositorWin7::unloadGUI()
 {
-    m_videoSurfaceProvider.reset();
-    m_videoWindowHandler.reset();
-    m_interfaceWindowHandler.reset();
+    commonGUIDestroy();
     m_qmlView.reset();
-    m_taskbarWidget.reset();
-    if (m_mainInterface)
-    {
-        delete m_mainInterface;
-        m_mainInterface = nullptr;
-    }
 }
 
 bool CompositorWin7::setupVoutWindow(vout_window_t *p_wnd, VoutDestroyCb destroyCb)
@@ -246,24 +173,10 @@ bool CompositorWin7::setupVoutWindow(vout_window_t *p_wnd, VoutDestroyCb destroy
     if (FAILED(hr) || !isCompositionEnabled)
         return false;
 
-    static const struct vout_window_operations ops = {
-        CompositorWin7::window_enable,
-        CompositorWin7::window_disable,
-        CompositorWin7::window_resize,
-        CompositorWin7::window_destroy,
-        CompositorWin7::window_set_state,
-        CompositorWin7::window_unset_fullscreen,
-        CompositorWin7::window_set_fullscreen,
-        nullptr, //window_set_title
-    };
-
-    m_destroyCb = destroyCb;
-    p_wnd->sys = this;
+    commonSetupVoutWindow(p_wnd, destroyCb);
     p_wnd->type = VOUT_WINDOW_TYPE_HWND;
     p_wnd->handle.hwnd = (HWND)m_stable->winId();
     p_wnd->display.x11 = nullptr;
-    p_wnd->ops = &ops;
-    p_wnd->info.has_double_click = true;
     return true;
 }
 
@@ -272,7 +185,6 @@ QWindow *CompositorWin7::interfaceMainWindow() const
     return m_qmlView.get();
 }
 
-
 Compositor::Type CompositorWin7::type() const
 {
     return Compositor::Win7Compositor;
@@ -280,6 +192,9 @@ Compositor::Type CompositorWin7::type() const
 
 bool CompositorWin7::eventFilter(QObject*, QEvent* ev)
 {
+    if (!m_videoWidget || !m_qmlView)
+        return false;
+
     switch (ev->type())
     {
     case QEvent::Move:
@@ -335,12 +250,12 @@ void CompositorWin7::resetVideoZOrder()
     );
 }
 
-void CompositorWin7::onSurfacePositionChanged(QPointF position)
+void CompositorWin7::onSurfacePositionChanged(const QPointF& position)
 {
     m_stable->move((position / m_stable->window()->devicePixelRatioF()).toPoint());
 }
 
-void CompositorWin7::onSurfaceSizeChanged(QSizeF size)
+void CompositorWin7::onSurfaceSizeChanged(const QSizeF& size)
 {
     m_stable->resize((size / m_stable->window()->devicePixelRatioF()).toSize());
 }

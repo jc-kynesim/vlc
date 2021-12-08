@@ -90,15 +90,12 @@ static bool convertThumbnails( const T input, vlc_ml_thumbnail_t *output )
             output[i].psz_mrl = nullptr;
             continue;
         }
+
         const auto thumbnailMrl = input->thumbnailMrl( sizeType );
-        if ( thumbnailMrl.empty() == false )
-        {
-            output[i].psz_mrl = strdup( thumbnailMrl.c_str() );
-            if ( output[i].psz_mrl == nullptr )
-                return false;
-        }
-        else
-            output[i].psz_mrl = nullptr;
+        assert( !thumbnailMrl.empty() );
+
+        if ( !strdup_helper(thumbnailMrl, output[i].psz_mrl ))
+            return false;
     }
     return true;
 }
@@ -385,7 +382,24 @@ bool Convert( const medialibrary::IGenre* input, vlc_ml_genre_t& output )
     output.i_id = input->id();
     output.i_nb_tracks = input->nbTracks();
     assert( input->name().empty() == false );
-    return strdup_helper( input->name(), output.psz_name );
+
+    if  ( !strdup_helper( input->name(), output.psz_name ) )
+        return false;
+
+    for (int i = VLC_ML_THUMBNAIL_SMALL; i < VLC_ML_THUMBNAIL_SIZE_COUNT; ++i)
+    {
+        const auto sizeType = static_cast<medialibrary::ThumbnailSizeType>(i);
+        if ( input->hasThumbnail( sizeType ) )
+        {
+            const auto thumbnailMrl = input->thumbnailMrl( sizeType );
+            assert( !thumbnailMrl.empty() );
+
+            if ( !strdup_helper( thumbnailMrl, output.thumbnails[i].psz_mrl )  )
+                    return false;
+        }
+    }
+
+    return true;
 }
 
 bool Convert( const medialibrary::IShow* input, vlc_ml_show_t& output )

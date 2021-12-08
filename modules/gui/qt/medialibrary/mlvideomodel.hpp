@@ -38,6 +38,8 @@ class MLVideoModel : public MLBaseModel
 public:
     enum Role {
         VIDEO_ID = Qt::UserRole + 1,
+        VIDEO_IS_NEW,
+        VIDEO_FILENAME,
         VIDEO_TITLE,
         VIDEO_THUMBNAIL,
         VIDEO_DURATION,
@@ -58,10 +60,11 @@ public:
     explicit MLVideoModel(QObject* parent = nullptr);
     virtual ~MLVideoModel() = default;
 
-    QVariant data(const QModelIndex& index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
 
 protected:
+    QVariant itemRoleData(MLItem *item, int role) const override;
+
     ListCacheLoader<std::unique_ptr<MLItem>> *createLoader() const override;
 
 private:

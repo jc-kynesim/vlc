@@ -17,6 +17,8 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
+import QtQuick.Layouts 1.11
+
 import QtGraphicalEffects 1.0
 
 import org.videolan.vlc 0.1
@@ -25,7 +27,7 @@ import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
 
-Control {
+AbstractButton {
     id: artworkInfoItem
 
     property bool paintOnly: false
@@ -33,7 +35,6 @@ Control {
     property VLCColors colors: VLCStyle.colors
 
     readonly property real minimumWidth: cover.width + (leftPadding + rightPadding)
-    property real extraWidth: 0
 
     padding: VLCStyle.focus_border
 
@@ -51,12 +52,8 @@ Control {
         }
     }
 
-    MouseArea {
-        id: artworkInfoMouseArea
-        anchors.fill: parent
-        visible: !paintOnly
-        onClicked: g_mainDisplay.showPlayer()
-        hoverEnabled: true
+    onClicked: {
+        g_mainDisplay.showPlayer()
     }
 
     background: Widgets.AnimatedBackground {
@@ -64,27 +61,24 @@ Control {
         activeBorderColor: colors.bgFocus
     }
 
-    contentItem: Row {
+    contentItem: RowLayout {
         spacing: infoColumn.visible ? VLCStyle.margin_xsmall : 0
 
         Item {
             id: coverItem
 
-            anchors.verticalCenter: parent.verticalCenter
-
-            implicitHeight: childrenRect.height
-            implicitWidth:  childrenRect.width
+            implicitHeight: cover.height
+            implicitWidth: cover.width
 
             Rectangle {
                 id: coverRect
-
-                anchors.fill: cover
+                anchors.fill: parent
 
                 color: colors.bg
             }
 
             DropShadow {
-                anchors.fill: coverRect
+                anchors.fill: parent
 
                 source: coverRect
                 radius: 8
@@ -104,45 +98,42 @@ Control {
                                                         ? mainPlaylistController.currentItem.artwork
                                                         : VLCStyle.noArtAlbum
                 }
+
                 fillMode: Image.PreserveAspectFit
 
                 width: VLCStyle.dp(60)
                 height: VLCStyle.dp(60)
 
-                ToolTip {
+                mipmap: true
+
+                Widgets.ToolTipExt {
                     x: parent.x
 
                     visible: artworkInfoItem.visible
-                             && infoColumn.width < infoColumn.preferredWidth
-                             && (artworkInfoMouseArea.containsMouse || artworkInfoItem.visualFocus)
+                             && infoColumn.width < infoColumn.implicitWidth
+                             && (artworkInfoItem.hovered || artworkInfoItem.visualFocus)
                     delay: 500
 
-                    contentItem: Text {
-                        text: i18n.qtr("%1\n%2\n%3").arg(titleLabel.text).arg(artistLabel.text).arg(progressIndicator.text)
-                        color: colors.tooltipTextColor
-                    }
+                    text: i18n.qtr("%1\n%2\n%3").arg(titleLabel.text).arg(artistLabel.text).arg(progressIndicator.text)
 
-                    background: Rectangle {
-                        color: colors.tooltipColor
-                    }
+                    colors: artworkInfoItem.colors
                 }
             }
         }
 
-        Column {
+        ColumnLayout {
             id: infoColumn
-            anchors.verticalCenter: parent.verticalCenter
 
-            readonly property real preferredWidth: Math.max(titleLabel.implicitWidth, artistLabel.implicitWidth, progressIndicator.implicitWidth)
-            width: ((extraWidth > preferredWidth)) ? preferredWidth
-                                                   : extraWidth
+            Layout.preferredHeight: coverItem.implicitHeight
+            Layout.fillWidth: true
 
-            visible: width > VLCStyle.dp(15, VLCStyle.scale)
+            clip: true
 
             Widgets.MenuLabel {
                 id: titleLabel
 
-                width: parent.width
+                Layout.fillWidth: true
+                Layout.fillHeight: true
 
                 text: {
                     if (paintOnly)
@@ -156,7 +147,8 @@ Control {
             Widgets.MenuCaption {
                 id: artistLabel
 
-                width: parent.width
+                Layout.fillWidth: true
+                Layout.fillHeight: true
 
                 text: {
                     if (paintOnly)
@@ -170,7 +162,8 @@ Control {
             Widgets.MenuCaption {
                 id: progressIndicator
 
-                width: parent.width
+                Layout.fillWidth: true
+                Layout.fillHeight: true
 
                 text: {
                     if (paintOnly)

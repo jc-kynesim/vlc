@@ -28,7 +28,7 @@
 
 #include "simple_preferences.hpp"
 #include "preferences_widgets.hpp"
-#include "maininterface/main_interface.hpp"
+#include "maininterface/mainctx.hpp"
 #include "util/color_scheme_model.hpp"
 #include "util/qvlcapp.hpp"
 #include "util/proxycolumnmodel.hpp"
@@ -850,7 +850,7 @@ SPrefsPanel::SPrefsPanel( qt_intf_t *_p_intf, QWidget *_parent,
 
             ui.pinVideoControlsCheckbox->setChecked( p_intf->p_mi->pinVideoControls() );
             m_resetters.push_back(std::make_unique<PropertyResetter>(ui.pinVideoControlsCheckbox, "checked"));
-            QObject::connect( ui.pinVideoControlsCheckbox, &QCheckBox::stateChanged, p_intf->p_mi, &MainInterface::setPinVideoControls );
+            QObject::connect( ui.pinVideoControlsCheckbox, &QCheckBox::stateChanged, p_intf->p_mi, &MainCtx::setPinVideoControls );
 
             ui.colorSchemeComboBox->setModel( p_intf->p_mi->getColorScheme() );
             ui.colorSchemeComboBox->setCurrentText( p_intf->p_mi->getColorScheme()->currentText() );
@@ -1023,12 +1023,12 @@ SPrefsPanel::SPrefsPanel( qt_intf_t *_p_intf, QWidget *_parent,
             if ( vlc_ml_instance_get( p_intf ) != NULL )
             {
                 auto foldersModel = new MLFoldersModel( this );
-                foldersModel->setMl( vlc_ml_instance_get( p_intf ) );
+                foldersModel->setCtx( p_intf->p_mi );
                 ui.entryPoints->setMLFoldersModel( foldersModel );
                 mlFoldersEditor = ui.entryPoints;
 
                 auto bannedFoldersModel = new MLBannedFoldersModel( this );
-                bannedFoldersModel->setMl( vlc_ml_instance_get( p_intf ));
+                bannedFoldersModel->setCtx( p_intf->p_mi );
                 ui.bannedEntryPoints->setMLFoldersModel( bannedFoldersModel );
                 mlBannedFoldersEditor = ui.bannedEntryPoints;
 

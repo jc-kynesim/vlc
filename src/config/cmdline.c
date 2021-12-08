@@ -116,7 +116,8 @@ int config_LoadCmdLine( vlc_object_t *p_this, int i_argc,
     {
         for (size_t i = 0; i < p->conf.size; i++)
         {
-            const module_config_t *p_item = p->conf.items + i;
+            const struct vlc_param *param = p->conf.params + i;
+            const module_config_t *p_item = &param->item;
 
             /* Ignore hints */
             if( !CONFIG_ITEM(p_item->i_type) )
@@ -156,13 +157,13 @@ int config_LoadCmdLine( vlc_object_t *p_this, int i_argc,
             i_index++;
 
             /* If item also has a short option, add it */
-            if( p_item->i_short )
+            if (param->shortname)
             {
-                pp_shortopts[(int)p_item->i_short] = p_item;
-                psz_shortopts[i_shortopts] = p_item->i_short;
-                i_shortopts++;
+                pp_shortopts[param->shortname] = p_item;
+                psz_shortopts[i_shortopts++] = param->shortname;
+
                 if( p_item->i_type != CONFIG_ITEM_BOOL
-                 && p_item->i_short != 'v' )
+                 && param->shortname != 'v' )
                 {
                     psz_shortopts[i_shortopts] = ':';
                     i_shortopts++;
@@ -199,8 +200,10 @@ int config_LoadCmdLine( vlc_object_t *p_this, int i_argc,
             p_conf = config_FindConfig( psz_name );
             if( p_conf )
             {
+                struct vlc_param *param = container_of(p_conf,
+                                                       struct vlc_param, item);
                 /* Check if the option is deprecated */
-                if( p_conf->b_removed )
+                if (param->obsolete)
                 {
                     fprintf(stderr,
                             "Warning: option --%s no longer exists.\n",

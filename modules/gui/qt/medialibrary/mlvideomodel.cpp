@@ -18,6 +18,19 @@
 
 #include "mlvideomodel.hpp"
 
+template<typename T>
+QVariantList getVariantList(const QList<T> & desc)
+{
+    QVariantList list;
+
+    for (const T & item : desc)
+    {
+        list.append(QVariant::fromValue(item));
+    }
+
+    return list;
+}
+
 QHash<QByteArray, vlc_ml_sorting_criteria_t> MLVideoModel::M_names_to_criteria = {
     {"id", VLC_ML_SORTING_DEFAULT},
     {"title", VLC_ML_SORTING_ALPHA},
@@ -30,15 +43,20 @@ MLVideoModel::MLVideoModel(QObject* parent)
 {
 }
 
-QVariant MLVideoModel::data(const QModelIndex& index, int role) const
+QVariant MLVideoModel::itemRoleData(MLItem *item, int role) const
 {
-    const auto video = static_cast<MLVideo *>(item(index.row()));
+    const auto video = static_cast<MLVideo *>(item);
     if ( video == nullptr )
         return {};
+
     switch (role)
     {
         case VIDEO_ID:
             return QVariant::fromValue( video->getId() );
+        case VIDEO_IS_NEW:
+            return QVariant::fromValue( video->isNew() );
+        case VIDEO_FILENAME:
+            return QVariant::fromValue( video->getFileName() );
         case VIDEO_TITLE:
             return QVariant::fromValue( video->getTitle() );
         case VIDEO_THUMBNAIL:
@@ -58,9 +76,9 @@ QVariant MLVideoModel::data(const QModelIndex& index, int role) const
         case VIDEO_DISPLAY_MRL:
             return QVariant::fromValue( video->getDisplayMRL() );
         case VIDEO_VIDEO_TRACK:
-            return QVariant::fromValue( video->getVideoDesc() );
+            return getVariantList( video->getVideoDesc() );
         case VIDEO_AUDIO_TRACK:
-            return QVariant::fromValue( video->getAudioDesc() );
+            return getVariantList( video->getAudioDesc() );
         case VIDEO_TITLE_FIRST_SYMBOL:
             return QVariant::fromValue( getFirstSymbol( video->getTitle() ) );
 
@@ -73,6 +91,8 @@ QHash<int, QByteArray> MLVideoModel::roleNames() const
 {
     return {
         { VIDEO_ID, "id" },
+        { VIDEO_IS_NEW, "isNew" },
+        { VIDEO_FILENAME, "fileName" },
         { VIDEO_TITLE, "title" },
         { VIDEO_THUMBNAIL, "thumbnail" },
         { VIDEO_DURATION, "duration" },

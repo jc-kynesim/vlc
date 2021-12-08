@@ -18,15 +18,25 @@
 
 #include "compositor.hpp"
 #include "compositor_dummy.hpp"
+#include "mainctx.hpp"
+#include "video_window_handler.hpp"
+#include "videosurface.hpp"
+#include "interface_window_handler.hpp"
+#include "mainui.hpp"
 
 #ifdef _WIN32
+#include "mainctx_win32.hpp"
 #ifdef HAVE_DCOMP_H
 #  include "compositor_dcomp.hpp"
 #endif
 #  include "compositor_win7.hpp"
 #endif
 
-namespace vlc {
+#ifdef QT5_HAS_XCB
+#  include "compositor_x11.hpp"
+#endif
+
+using namespace vlc;
 
 template<typename T>
 static Compositor* instanciateCompositor(qt_intf_t *p_intf) {
@@ -48,6 +58,9 @@ struct {
     {"dcomp", &instanciateCompositor<CompositorDirectComposition>, &preInit<CompositorDirectComposition> },
 #endif
     {"win7", &instanciateCompositor<CompositorWin7>, &preInit<CompositorWin7> },
+#endif
+#ifdef QT5_HAS_X11_COMPOSITOR
+    {"x11", &instanciateCompositor<CompositorX11>, &preInit<CompositorX11> },
 #endif
     {"dummy", &instanciateCompositor<CompositorDummy>, &preInit<CompositorDummy> }
 };
@@ -79,17 +92,218 @@ Compositor* CompositorFactory::createCompositor()
         {
             Compositor* compositor = compositorList[m_compositorIndex].instanciate(m_intf);
             if (compositor->init())
+            {
+                //avoid looping over the same compositor if the current ones fails further initialisation steps
+                m_compositorIndex++;
                 return compositor;
+            }
         }
     }
     msg_Err(m_intf, "no suitable compositor found");
     return nullptr;
 }
 
-void Compositor::onWindowDestruction(vout_window_t *p_wnd)
+
+extern "C"
 {
-    if (m_destroyCb)
-        m_destroyCb(p_wnd);
+
+static int windowEnableCb(vout_window_t* p_wnd, const vout_window_cfg_t * cfg)
+{
+    assert(p_wnd->sys);
+    auto that = static_cast<vlc::CompositorVideo*>(p_wnd->sys);
+    int ret = VLC_EGENERIC;
+    QMetaObject::invokeMethod(that, [&](){
+        ret = that->windowEnable(cfg);
+    }, Qt::BlockingQueuedConnection);
+    return ret;
 }
 
+static void windowDisableCb(vout_window_t* p_wnd)
+{
+    assert(p_wnd->sys);
+    auto that = static_cast<vlc::CompositorVideo*>(p_wnd->sys);
+    QMetaObject::invokeMethod(that, [that](){
+        that->windowDisable();
+    }, Qt::BlockingQueuedConnection);
+}
+
+static void windowResizeCb(vout_window_t* p_wnd, unsigned width, unsigned height)
+{
+    assert(p_wnd->sys);
+    auto that = static_cast<vlc::CompositorVideo*>(p_wnd->sys);
+    that->windowResize(width, height);
+}
+
+static void windowDestroyCb(struct vout_window_t * p_wnd)
+{
+    assert(p_wnd->sys);
+    auto that = static_cast<vlc::CompositorVideo*>(p_wnd->sys);
+    that->windowDestroy();
+}
+
+static void windowSetStateCb(vout_window_t* p_wnd, unsigned state)
+{
+    assert(p_wnd->sys);
+    auto that = static_cast<vlc::CompositorVideo*>(p_wnd->sys);
+    that->windowSetState(state);
+}
+
+static void windowUnsetFullscreenCb(vout_window_t* p_wnd)
+{
+    assert(p_wnd->sys);
+    auto that = static_cast<vlc::CompositorVideo*>(p_wnd->sys);
+    that->windowUnsetFullscreen();
+}
+
+static void windowSetFullscreenCb(vout_window_t* p_wnd, const char *id)
+{
+    assert(p_wnd->sys);
+    auto that = static_cast<vlc::CompositorVideo*>(p_wnd->sys);
+    that->windowSetFullscreen(id);
+}
+
+}
+
+CompositorVideo::CompositorVideo(qt_intf_t *p_intf, QObject* parent)
+    : QObject(parent)
+    , m_intf(p_intf)
+{
+}
+
+CompositorVideo::~CompositorVideo()
+{
+
+}
+
+void CompositorVideo::commonSetupVoutWindow(vout_window_t* p_wnd, VoutDestroyCb destroyCb)
+{
+    static const struct vout_window_operations ops = {
+        windowEnableCb,
+        windowDisableCb,
+        windowResizeCb,
+        windowDestroyCb,
+        windowSetStateCb,
+        windowUnsetFullscreenCb,
+        windowSetFullscreenCb,
+        nullptr, //window_set_title
+    };
+
+    m_wnd = p_wnd;
+    m_destroyCb = destroyCb;
+    p_wnd->sys = this;
+    p_wnd->ops = &ops;
+    p_wnd->info.has_double_click = true;
+}
+
+void CompositorVideo::windowDestroy()
+{
+    if (m_destroyCb)
+        m_destroyCb(m_wnd);
+}
+
+void CompositorVideo::windowResize(unsigned width, unsigned height)
+{
+    m_videoWindowHandler->requestResizeVideo(width, height);
+}
+
+void CompositorVideo::windowSetState(unsigned state)
+{
+    m_videoWindowHandler->requestVideoState(static_cast<vout_window_state>(state));
+}
+
+void CompositorVideo::windowUnsetFullscreen()
+{
+    m_videoWindowHandler->requestVideoWindowed();
+}
+
+void CompositorVideo::windowSetFullscreen(const char *id)
+{
+    m_videoWindowHandler->requestVideoFullScreen(id);
+}
+
+void CompositorVideo::commonWindowEnable()
+{
+    m_videoSurfaceProvider->enable(m_wnd);
+    m_videoSurfaceProvider->setVideoEmbed(true);
+}
+
+void CompositorVideo::commonWindowDisable()
+{
+    m_videoSurfaceProvider->setVideoEmbed(false);
+    m_videoSurfaceProvider->disable();
+    m_videoWindowHandler->disable();
+}
+
+
+bool CompositorVideo::commonGUICreateImpl(QWindow* window, CompositorVideo::Flags flags)
+{
+    assert(m_mainCtx);
+
+    m_videoSurfaceProvider = std::make_unique<VideoSurfaceProvider>();
+    m_mainCtx->setVideoSurfaceProvider(m_videoSurfaceProvider.get());
+    if (flags & CompositorVideo::CAN_SHOW_PIP)
+    {
+        m_mainCtx->setCanShowVideoPIP(true);
+        connect(m_videoSurfaceProvider.get(), &VideoSurfaceProvider::surfacePositionChanged,
+                this, &CompositorVideo::onSurfacePositionChanged);
+        connect(m_videoSurfaceProvider.get(), &VideoSurfaceProvider::surfaceSizeChanged,
+                this, &CompositorVideo::onSurfaceSizeChanged);
+    }
+    m_videoWindowHandler = std::make_unique<VideoWindowHandler>(m_intf);
+    m_videoWindowHandler->setWindow( window );
+
+#ifdef _WIN32
+    m_interfaceWindowHandler = std::make_unique<InterfaceWindowHandlerWin32>(m_intf, m_mainCtx, window);
+#else
+    m_interfaceWindowHandler = std::make_unique<InterfaceWindowHandler>(m_intf, m_mainCtx, window);
+#endif
+    m_mainCtx->setHasAcrylicSurface(flags & CompositorVideo::HAS_ACRYLIC);
+
+#ifdef _WIN32
+    m_taskbarWidget = std::make_unique<WinTaskbarWidget>(m_intf, window);
+    qApp->installNativeEventFilter(m_taskbarWidget.get());
+#endif
+    m_ui = std::make_unique<MainUI>(m_intf, m_mainCtx, window);
+    return true;
+}
+
+bool CompositorVideo::commonGUICreate(QWindow* window, QmlUISurface* qmlSurface, CompositorVideo::Flags flags)
+{
+    bool ret = commonGUICreateImpl(window, flags);
+    if (!ret)
+        return false;
+    ret = m_ui->setup(qmlSurface->engine());
+    if (! ret)
+        return false;
+    qmlSurface->setContent(m_ui->getComponent(), m_ui->createRootItem());
+    return true;
+}
+
+bool CompositorVideo::commonGUICreate(QWindow* window, QQuickView* qmlView, CompositorVideo::Flags flags)
+{
+    bool ret = commonGUICreateImpl(window, flags);
+    if (!ret)
+        return false;
+    ret = m_ui->setup(qmlView->engine());
+    if (! ret)
+        return false;
+    qmlView->setContent(QUrl(), m_ui->getComponent(), m_ui->createRootItem());
+    return true;
+}
+
+void CompositorVideo::commonGUIDestroy()
+{
+    m_ui.reset();
+#ifdef _WIN32
+    qApp->removeNativeEventFilter(m_taskbarWidget.get());
+    m_taskbarWidget.reset();
+#endif
+    m_interfaceWindowHandler.reset();
+}
+
+void CompositorVideo::commonIntfDestroy()
+{
+    unloadGUI();
+    m_videoWindowHandler.reset();
+    m_videoSurfaceProvider.reset();
 }

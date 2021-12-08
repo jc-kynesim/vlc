@@ -31,7 +31,7 @@
 #include <QUrl>
 
 // Forward declarations
-class vlc_medialibrary_t;
+struct vlc_medialibrary_t;
 
 class MLPlaylistMedia : public MLItem
 {
@@ -39,6 +39,8 @@ public:
     MLPlaylistMedia(vlc_medialibrary_t * ml, const vlc_ml_media_t * data);
 
 public: // Interface
+    bool isNew() const;
+
     QString getTitle() const;
 
     QString getThumbnail();

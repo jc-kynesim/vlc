@@ -47,14 +47,9 @@ MLGenreModel::MLGenreModel(QObject *parent)
 {
 }
 
-QVariant MLGenreModel::data(const QModelIndex &index, int role) const
+QVariant MLGenreModel::itemRoleData(MLItem *item, const int role) const
 {
-    int row = index.row();
-
-    if (!index.isValid() || row < 0)
-        return QVariant();
-
-    MLGenre* ml_genre = static_cast<MLGenre *>(item(row));
+    MLGenre* ml_genre = static_cast<MLGenre *>(item);
     if (!ml_genre)
         return QVariant();
 
@@ -68,7 +63,7 @@ QVariant MLGenreModel::data(const QModelIndex &index, int role) const
     case GENRE_NB_TRACKS:
         return QVariant::fromValue( ml_genre->getNbTracks() );
     case GENRE_COVER:
-        return getCover(ml_genre, row);
+        return getCover(ml_genre);
     default :
         return QVariant();
     }
@@ -121,7 +116,7 @@ vlc_ml_sorting_criteria_t MLGenreModel::nameToCriteria(QByteArray name) const
     return M_names_to_criteria.value(name, VLC_ML_SORTING_DEFAULT);
 }
 
-QString MLGenreModel::getCover(MLGenre * genre, int index) const
+QString MLGenreModel::getCover(MLGenre * genre) const
 {
     QString cover = genre->getCover();
 
@@ -129,7 +124,7 @@ QString MLGenreModel::getCover(MLGenre * genre, int index) const
     if (cover.isNull() == false || genre->hasGenerator())
         return cover;
 
-    CoverGenerator * generator = new CoverGenerator(m_ml, genre->getId(), index);
+    CoverGenerator * generator = new CoverGenerator(m_ml, genre->getId());
 
     generator->setSize(QSize(MLGENREMODEL_COVER_WIDTH,
                              MLGENREMODEL_COVER_HEIGHT));
@@ -142,6 +137,13 @@ QString MLGenreModel::getCover(MLGenre * genre, int index) const
     generator->setBlur(MLGENREMODEL_COVER_BLUR);
 
     generator->setDefaultThumbnail(":/noart_album.svg");
+
+    if (generator->cachedFileAvailable())
+    {
+        genre->setCover(generator->cachedFileURL());
+        generator->deleteLater();
+        return genre->getCover();
+    }
 
     // NOTE: We'll apply the new cover once it's loaded.
     connect(generator, &CoverGenerator::result, this, &MLGenreModel::onCover);
@@ -161,26 +163,26 @@ void MLGenreModel::onCover()
 {
     CoverGenerator * generator = static_cast<CoverGenerator *> (sender());
 
-    int index = generator->getIndex();
+    const int mlId = generator->getId().id;
 
-    // NOTE: We want to avoid calling 'MLBaseModel::item' for performance issues.
-    MLItem * item = this->itemCache(index);
+    int itemIndex = 0;
 
-    // NOTE: When the item is no longer cached or has been moved we return right away.
-    if (item == nullptr || item->getId() != generator->getId())
+    auto genre = static_cast<MLGenre *>(findInCache(mlId, &itemIndex));
+
+    if (!genre)
     {
+        // item is not in the cache anymore
         generator->deleteLater();
-
         return;
     }
 
-    MLGenre * genre = static_cast<MLGenre *> (item);
-
     genre->setCover(generator->takeResult());
-
     genre->setGenerator(nullptr);
 
-    thumbnailUpdated(index);
+    vlc_ml_media_set_genre_thumbnail(ml()->vlcMl(), mlId
+                                    , qtu(genre->getCover()), VLC_ML_THUMBNAIL_SMALL);
+
+    thumbnailUpdated(itemIndex);
 }
 
 //-------------------------------------------------------------------------------------------------

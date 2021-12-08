@@ -79,21 +79,24 @@ FocusScope {
     Widgets.DragItem {
         id: networkDragItem
 
-        function updateComponents(maxCovers) {
-          var items = selectionModel.selectedIndexes.slice(0, maxCovers).map(function (x){
-            return filterModel.getDataAt(x.row)
-          })
-          var title = items.map(function (item){ return item.name || i18n.qtr("Unknown share")}).join(", ")
-          var covers = items.map(function (item) { return {artwork: item.artwork, cover: custom_cover, type: item.type}})
-          return {
-            covers: covers,
-            title: title,
-            count: selectionModel.selectedIndexes.length
-          }
+        indexes: selectionModel.selectedIndexes
+
+        titleRole: "name"
+
+        defaultText:  i18n.qtr("Unknown Share")
+
+        coverProvider: function(index, data) {
+            return {artwork: data.artwork, cover: custom_cover, type: data.type}
+        }
+
+        onRequestData: {
+            setData(identifier, selectionModel.selectedIndexes.map(function (x){
+                return filterModel.getDataAt(x.row)
+            }))
         }
 
         function getSelectedInputItem() {
-            return providerModel.getItemsForIndexes(selectionModel.selectedIndexes);
+            return providerModel.getItemsForIndexes(filterModel.mapIndexesToSource(selectionModel.selectedIndexes));
         }
 
         Component {
@@ -336,12 +339,12 @@ FocusScope {
 
         anchors.fill:parent
         focus: true
-        initialItem: mainInterface.gridView ? gridComponent : tableComponent
+        initialItem: MainCtx.gridView ? gridComponent : tableComponent
 
         Connections {
-            target: mainInterface
+            target: MainCtx
             onGridViewChanged: {
-                if (mainInterface.gridView)
+                if (MainCtx.gridView)
                     view.replace(gridComponent)
                 else
                     view.replace(tableComponent)

@@ -42,7 +42,7 @@ FocusScope {
     readonly property int currentIndex: {
         if (!_currentView)
            return -1
-        else if (mainInterface.gridView)
+        else if (MainCtx.gridView)
            return _currentView.currentIndex
         else
            return headerItem.albumsListView.currentIndex
@@ -93,7 +93,7 @@ FocusScope {
             Loader {
                 id: albumsLoader
 
-                active: !mainInterface.gridView
+                active: !MainCtx.gridView
                 focus: true
                 sourceComponent: Column {
                     property alias albumsListView: albumsList
@@ -199,7 +199,7 @@ FocusScope {
     onActiveFocusChanged: {
         if (activeFocus && albumModel.count > 0 && !albumSelectionModel.hasSelection) {
             var initialIndex = 0
-            var albumsListView = mainInterface.gridView ? _currentView : headerItem.albumsListView
+            var albumsListView = MainCtx.gridView ? _currentView : headerItem.albumsListView
             if (albumsListView.currentIndex !== -1)
                 initialIndex = albumsListView.currentIndex
             albumSelectionModel.select(albumModel.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect)
@@ -219,7 +219,7 @@ FocusScope {
         if (initialIndex >= albumModel.count)
             initialIndex = 0
         albumSelectionModel.select(albumModel.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect)
-        var albumsListView = mainInterface.gridView ? _currentView : headerItem.albumsListView
+        var albumsListView = MainCtx.gridView ? _currentView : headerItem.albumsListView
         if (albumsListView) {
             albumsListView.currentIndex = initialIndex
             albumsListView.positionViewAtIndex(initialIndex, ItemView.Contain)
@@ -266,25 +266,12 @@ FocusScope {
         model: albumModel
     }
 
-    Widgets.DragItem {
+    Widgets.MLDragItem {
         id: albumDragItem
 
-        function updateComponents(maxCovers) {
-          var items = albumSelectionModel.selectedIndexes.slice(0, maxCovers).map(function (x){
-            return albumModel.getDataAt(x.row)
-          })
-          var title = items.map(function (item){ return item.title}).join(", ")
-          var covers = items.map(function (item) { return {artwork: item.cover || VLCStyle.noArtAlbum}})
-          return {
-            covers: covers,
-            title: title,
-            count: albumSelectionModel.selectedIndexes.length
-          }
-        }
-
-        function getSelectedInputItem() {
-            return albumModel.getItemsForIndexes(albumSelectionModel.selectedIndexes);
-        }
+        mlModel: albumModel
+        indexes: albumSelectionModel.selectedIndexes
+        defaultCover: VLCStyle.noArtAlbum
     }
 
     MLAlbumTrackModel {
@@ -440,23 +427,15 @@ FocusScope {
             onItemDoubleClicked: medialib.addAndPlay(model.id)
             onContextMenuButtonClicked: trackContextMenu.popup(trackSelectionModel.selectedIndexes, menuParent.mapToGlobal(0,0))
             onRightClick: trackContextMenu.popup(trackSelectionModel.selectedIndexes, globalMousePos)
-            dragItem: Widgets.DragItem {
-                function updateComponents(maxCovers) {
-                  var items = trackSelectionModel.selectedIndexes.slice(0, maxCovers).map(function (x){
-                    return trackModel.getDataAt(x.row)
-                  })
-                  var title = items.map(function (item){ return item.title}).join(", ")
-                  var covers = items.map(function (item) { return {artwork: item.cover || VLCStyle.noArtCover}})
-                  return {
-                    covers: covers,
-                    title: title,
-                    count: trackSelectionModel.selectedIndexes.length
-                  }
-                }
 
-                function getSelectedInputItem() {
-                    return trackModel.getItemsForIndexes(trackSelectionModel.selectedIndexes);
-                }
+            dragItem: Widgets.MLDragItem {
+                mlModel: trackModel
+
+                indexes: trackSelectionModel.selectedIndexes
+
+                titleRole: "name"
+
+                defaultCover: VLCStyle.noArtCover
             }
 
             Widgets.TableColumns {
@@ -476,12 +455,12 @@ FocusScope {
 
         anchors.fill: parent
         focus: albumModel.count !== 0
-        initialItem: mainInterface.gridView ? gridComponent : tableComponent
+        initialItem: MainCtx.gridView ? gridComponent : tableComponent
 
         Connections {
-            target: mainInterface
+            target: MainCtx
             onGridViewChanged: {
-                if (mainInterface.gridView)
+                if (MainCtx.gridView)
                     view.replace(gridComponent)
                 else
                     view.replace(tableComponent)

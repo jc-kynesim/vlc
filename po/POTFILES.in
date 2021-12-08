@@ -157,6 +157,7 @@ modules/access/avio.h
 modules/access/bluray.c
 modules/access/cdda.c
 modules/access/concat.c
+modules/access/data.c
 modules/access/dc1394.c
 modules/access/dcp/dcp.cpp
 modules/access/decklink.cpp
@@ -220,7 +221,6 @@ modules/access_output/livehttp.c
 modules/access_output/rist.c
 modules/access_output/shout.c
 modules/access_output/srt.c
-modules/access_output/udp.c
 modules/arm_neon/chroma_yuv.c
 modules/arm_neon/volume.c
 modules/arm_neon/yuv_rgb.c
@@ -763,10 +763,10 @@ modules/gui/qt/dialogs/playlists/playlists.cpp
 modules/gui/qt/dialogs/playlists/playlists.hpp
 modules/gui/qt/dialogs/toolbar/controlbar_profile_model.cpp
 modules/gui/qt/dialogs/toolbar/controlbar_profile_model.hpp
-modules/gui/qt/maininterface/main_interface.cpp
-modules/gui/qt/maininterface/main_interface.hpp
-modules/gui/qt/maininterface/main_interface_win32.cpp
-modules/gui/qt/maininterface/main_interface_win32.hpp
+modules/gui/qt/maininterface/mainctx.cpp
+modules/gui/qt/maininterface/mainctx.hpp
+modules/gui/qt/maininterface/mainctx_win32.cpp
+modules/gui/qt/maininterface/mainctx_win32.hpp
 modules/gui/qt/dialogs/plugins/addons_manager.cpp
 modules/gui/qt/dialogs/plugins/addons_manager.hpp
 modules/gui/qt/medialibrary/mlbookmarkmodel.cpp
@@ -1256,6 +1256,7 @@ modules/stream_out/smem.c
 modules/stream_out/stats.c
 modules/stream_out/standard.c
 modules/stream_out/transcode/transcode.c
+modules/stream_out/udp.c
 modules/text_renderer/freetype/fonts/fontconfig.c
 modules/text_renderer/freetype/freetype.c
 modules/text_renderer/nsspeechsynthesizer.m
@@ -1301,6 +1302,7 @@ modules/video_filter/edgedetection.c
 modules/video_filter/erase.c
 modules/video_filter/extract.c
 modules/video_filter/fps.c
+modules/video_filter/formatcrop.c
 modules/video_filter/freeze.c
 modules/video_filter/gaussianblur.c
 modules/video_filter/gradfun.c

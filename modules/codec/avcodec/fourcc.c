@@ -186,7 +186,7 @@ static const struct vlc_avcodec_fourcc video_codecs[] =
     /* AV_CODEC_ID_V210X */
     { VLC_CODEC_TMV, AV_CODEC_ID_TMV },
     { VLC_CODEC_V210, AV_CODEC_ID_V210 },
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT( 54, 50, 100 ) && LIBAVCODEC_VERSION_MICRO >= 100
+#if LIBAVCODEC_VERSION_CHECK( 54, 50, 100 )
     { VLC_CODEC_VUYA, AV_CODEC_ID_AYUV },
 #endif
     /* AV_CODEC_ID_DPX */
@@ -201,7 +201,7 @@ static const struct vlc_avcodec_fourcc video_codecs[] =
     /* AV_CODEC_ID_IFF_BYTERUN1 */
     { VLC_CODEC_KGV1, AV_CODEC_ID_KGV1 },
     { VLC_CODEC_YOP, AV_CODEC_ID_YOP },
-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT( 58, 53, 100 ) && LIBAVCODEC_VERSION_MICRO >= 100
+#if LIBAVCODEC_VERSION_CHECK( 58, 53, 100 )
     { VLC_CODEC_VP4, AV_CODEC_ID_VP4 },
 #endif
     { VLC_CODEC_VP8, AV_CODEC_ID_VP8 },
@@ -233,7 +233,7 @@ static const struct vlc_avcodec_fourcc video_codecs[] =
     { VLC_CODEC_CLLC, AV_CODEC_ID_CLLC },
     { VLC_CODEC_MSS2, AV_CODEC_ID_MSS2 },
     { VLC_CODEC_VP9, AV_CODEC_ID_VP9 },
-#if LIBAVCODEC_VERSION_CHECK( 57, 26, 0, 83, 101 )
+#if LIBAVCODEC_VERSION_CHECK( 57, 83, 101 )
     { VLC_CODEC_AV1, AV_CODEC_ID_AV1 },
 #endif
     { VLC_CODEC_ICOD, AV_CODEC_ID_AIC },
@@ -274,11 +274,11 @@ static const struct vlc_avcodec_fourcc video_codecs[] =
     /* ffmpeg only: AV_CODEC_ID_012V */
     /* ffmpeg only: AV_CODEC_ID_AVUI */
     /* ffmpeg only: AV_CODEC_ID_TARGA_Y216 */
-#if LIBAVCODEC_VERSION_MICRO >= 100
+
     { VLC_CODEC_V308, AV_CODEC_ID_V308 },
     { VLC_CODEC_V408, AV_CODEC_ID_V408 },
     { VLC_CODEC_YUV4, AV_CODEC_ID_YUV4 },
-#endif
+
     /* ffmpeg only: AV_CODEC_ID_SANM */
     /* ffmpeg only: AV_CODEC_ID_PAF_VIDEO */
     /* ffmpeg only: AV_CODEC_ID_AVRN */
@@ -290,11 +290,10 @@ static const struct vlc_avcodec_fourcc video_codecs[] =
     /* ffmpeg only: AV_CODEC_ID_SNOW */
     /* ffmpeg only: AV_CODEC_ID_SMVJPEG */
 
-#if LIBAVCODEC_VERSION_CHECK( 58, 0, 0, 1, 100 )
+#if LIBAVCODEC_VERSION_CHECK( 58, 1, 100 )
     { VLC_CODEC_MAGICYUV, AV_CODEC_ID_MAGICYUV },
 #endif
 
-#if LIBAVCODEC_VERSION_MICRO >= 100 /* FFmpeg only */
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT( 57, 24, 102 )
     { VLC_CODEC_CINEFORM, AV_CODEC_ID_CFHD },
 #endif
@@ -322,7 +321,11 @@ static const struct vlc_avcodec_fourcc video_codecs[] =
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT( 58, 56, 100 )
     { VLC_CODEC_IMM5, AV_CODEC_ID_IMM5 },
 #endif
-#endif /* FFmpeg only */
+
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT( 58, 85, 100 )
+    { VLC_CODEC_NOTCHLC, AV_CODEC_ID_NOTCHLC },
+#endif
+
 };
 
 /*
@@ -376,6 +379,7 @@ static const struct vlc_avcodec_fourcc audio_codecs[] =
     { VLC_CODEC_ADPCM_ADX, AV_CODEC_ID_ADPCM_ADX },
     { VLC_CODEC_ADPCM_EA, AV_CODEC_ID_ADPCM_EA },
     { VLC_CODEC_ADPCM_G726, AV_CODEC_ID_ADPCM_G726 },
+    { VLC_CODEC_ADPCM_G726_LE, AV_CODEC_ID_ADPCM_G726LE },
     { VLC_CODEC_ADPCM_CREATIVE, AV_CODEC_ID_ADPCM_CT },
     { VLC_CODEC_ADPCM_SWF, AV_CODEC_ID_ADPCM_SWF },
     { VLC_CODEC_ADPCM_YAMAHA, AV_CODEC_ID_ADPCM_YAMAHA },
@@ -437,7 +441,7 @@ static const struct vlc_avcodec_fourcc audio_codecs[] =
     /* AV_CODEC_ID_WESTWOOD_SND1 */
     { VLC_CODEC_GSM, AV_CODEC_ID_GSM },
     { VLC_CODEC_QDM2, AV_CODEC_ID_QDM2 },
-#if (LIBAVCODEC_VERSION_MICRO >= 100) && (LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 71, 100))
+#if (LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 71, 100))
     { VLC_CODEC_QDMC, AV_CODEC_ID_QDMC },
 #endif
     { VLC_CODEC_COOK, AV_CODEC_ID_COOK },
@@ -488,13 +492,11 @@ static const struct vlc_avcodec_fourcc audio_codecs[] =
     /* AV_CODEC_ID_PAF_AUDIO */
     { VLC_CODEC_ON2AVC, AV_CODEC_ID_ON2AVC },
 
-    /* DSD (FFmpeg only) */
-#if LIBAVCODEC_VERSION_MICRO >= 100
+    /* DSD */
     { VLC_CODEC_DSD_LSBF, AV_CODEC_ID_DSD_LSBF },
     { VLC_CODEC_DSD_MSBF, AV_CODEC_ID_DSD_MSBF },
     { VLC_CODEC_DSD_LSBF_PLANAR, AV_CODEC_ID_DSD_LSBF_PLANAR },
     { VLC_CODEC_DSD_MSBF_PLANAR, AV_CODEC_ID_DSD_MSBF_PLANAR },
-#endif
 
     /* ffmpeg only: AV_CODEC_ID_FFWAVESYNTH */
     /* ffmpeg only: AV_CODEC_ID_SONIC */
@@ -514,7 +516,7 @@ static const struct vlc_avcodec_fourcc spu_codecs[] =
     { VLC_CODEC_SSA, AV_CODEC_ID_SSA },
     { VLC_CODEC_TX3G, AV_CODEC_ID_MOV_TEXT },
     { VLC_CODEC_BD_PG, AV_CODEC_ID_HDMV_PGS_SUBTITLE },
-#if (LIBAVCODEC_VERSION_MICRO >= 100) && (LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 71, 100))
+#if (LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 71, 100))
     { VLC_CODEC_BD_TEXT, AV_CODEC_ID_HDMV_TEXT_SUBTITLE },
 #endif
     { VLC_CODEC_TELETEXT, AV_CODEC_ID_DVB_TELETEXT },

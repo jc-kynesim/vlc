@@ -19,6 +19,8 @@
 import QtQuick 2.11
 import QtQuick.Layouts 1.11
 import QtQuick.Controls 2.4
+import QtQuick.Window 2.11
+
 import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
@@ -51,18 +53,18 @@ Rectangle {
     Loader {
         id: playlistWindowLoader
         asynchronous: true
-        active: !mainInterface.playlistDocked && mainInterface.playlistVisible
+        active: !MainCtx.playlistDocked && MainCtx.playlistVisible
         source: "qrc:///playlist/PlaylistDetachedWindow.qml"
     }
     Connections {
         target: playlistWindowLoader.item
-        onClosing: mainInterface.playlistVisible = false
+        onClosing: MainCtx.playlistVisible = false
     }
 
 
     PlaylistControllerModel {
         id: mainPlaylistController
-        playlistPtr: mainctx.playlist
+        playlistPtr: MainCtx.mainPlaylist
 
         onPlaylistInitialized: {
             root._playlistReady = true
@@ -175,7 +177,11 @@ Rectangle {
     }
 
     Loader {
-        active: mainInterface.clientSideDecoration
+        active: (MainCtx.clientSideDecoration
+                 &&
+                 // NOTE: We don't want to steal the mouse when we are maximized or in fullscreen
+                 !((topWindow.visibility & Window.Maximized) || MainCtx.interfaceFullScreen))
+
         source: "qrc:///widgets/CSDMouseStealer.qml"
     }
 }

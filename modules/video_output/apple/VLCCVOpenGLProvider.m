@@ -50,7 +50,7 @@
 #import "../codec/vt_utils.h"
 #import "../video_output/opengl/vout_helper.h"
 
-#define BUFFER_COUNT 2
+#define BUFFER_COUNT 3
 
 struct vlc_cvbuffer {
     CVPixelBufferRef cvpx;
@@ -411,6 +411,7 @@ static void FreeCVBuffer(picture_t *picture)
 
     _currentPicture = next_picture;
     // TODO: rebind at makeCurrent instead, if not binded?
+    glFinish();
     glBindFramebuffer(GL_FRAMEBUFFER, buffer->fbo);
 
     [self releaseCurrent];

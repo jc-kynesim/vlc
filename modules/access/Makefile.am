@@ -5,6 +5,9 @@ AM_CPPFLAGS += -I$(srcdir)/access
 
 ### Files ###
 
+libdata_plugin_la_SOURCES = access/data.c
+access_LTLIBRARIES += libdata_plugin.la
+
 libdcp_plugin_la_SOURCES = access/dcp/dcpparser.h access/dcp/dcp.cpp access/dcp/dcpparser.cpp access/dcp/dcpdecrypt.cpp
 if HAVE_ASDCP
 libdcp_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(ASDCP_CFLAGS)
@@ -124,7 +127,13 @@ EXTRA_LTLIBRARIES += liblinsys_hdsdi_plugin.la liblinsys_sdi_plugin.la
 
 libdecklink_plugin_la_SOURCES = access/decklink.cpp access/sdi.c access/sdi.h access/vlc_decklink.h
 libdecklink_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) $(CPPFLAGS_decklink)
-libdecklink_plugin_la_LIBADD = $(LIBS_decklink) $(LIBDL) -lpthread
+libdecklink_plugin_la_LIBADD = $(LIBS_decklink)
+if HAVE_WIN32
+libdecklink_plugin_la_LIBADD += $(LIBCOM)
+endif
+if HAVE_LINUX
+libdecklink_plugin_la_LIBADD += $(LIBDL) -lpthread
+endif
 if HAVE_DECKLINK
 access_LTLIBRARIES += libdecklink_plugin.la
 endif
@@ -332,7 +341,7 @@ libhttp_plugin_la_LIBADD = $(SOCKET_LIBS)
 access_LTLIBRARIES += libhttp_plugin.la
 
 liblive555_plugin_la_SOURCES = access/live555.cpp access/mms/asf.c access/mms/buffer.c \
-                               access/live555_dtsgen.h
+                               access/live555_dtsgen.h codec/opus_header.c codec/opus_header.h
 liblive555_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) $(CXXFLAGS_live555)
 liblive555_plugin_la_LIBADD = $(LIBS_live555) $(SOCKET_LIBS)
 liblive555_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(accessdir)' \

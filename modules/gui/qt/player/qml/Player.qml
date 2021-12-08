@@ -38,15 +38,15 @@ FocusScope {
                                       && player.hasVideoOutput
                                       && playlistpopup.state !== "visible"
 
-    property bool pinVideoControls: rootPlayer.hasEmbededVideo && mainInterface.pinVideoControls
-    property bool hasEmbededVideo: mainInterface.hasEmbededVideo
+    property bool pinVideoControls: rootPlayer.hasEmbededVideo && MainCtx.pinVideoControls
+    property bool hasEmbededVideo: MainCtx.hasEmbededVideo
     readonly property int positionSliderY: controlBarView.y + controlBarView.sliderY
     readonly property string coverSource: (mainPlaylistController.currentItem.artwork && mainPlaylistController.currentItem.artwork.toString())
                                           ? mainPlaylistController.currentItem.artwork
                                           : VLCStyle.noArtCover
 
     // NOTE: We force the night theme when playing a video.
-    readonly property VLCColors colors: (mainInterface.hasEmbededVideo) ? VLCStyle.nightColors
+    readonly property VLCColors colors: (MainCtx.hasEmbededVideo) ? VLCStyle.nightColors
                                                                         : VLCStyle.colors
 
     Keys.priority: Keys.AfterItem
@@ -57,7 +57,7 @@ FocusScope {
 
         //unhandled keys are forwarded as hotkeys
         if (!event.accepted || controlBarView.state !== "visible")
-            mainInterface.sendHotkey(event.key, event.modifiers);
+            MainCtx.sendHotkey(event.key, event.modifiers);
     }
 
     Keys.onReleased: {
@@ -100,7 +100,7 @@ FocusScope {
         if (rootPlayer.hasEmbededVideo && controlBarView.state === "visible") {
             toolbarAutoHide.setVisibleControlBar(false)
         } else {
-            if (mainInterface.hasEmbededVideo && !mainInterface.canShowVideoPIP) {
+            if (MainCtx.hasEmbededVideo && !MainCtx.canShowVideoPIP) {
                mainPlaylistController.stop()
             }
             history.previous()
@@ -110,7 +110,7 @@ FocusScope {
     VideoSurface {
         id: videoSurface
 
-        ctx: mainctx
+        ctx: MainCtx
         visible: rootPlayer.hasEmbededVideo
         enabled: rootPlayer.hasEmbededVideo
         anchors.fill: parent
@@ -335,10 +335,10 @@ FocusScope {
                 Navigation.downItem: playlistpopup.showPlaylist ? playlistpopup : (audioControls.visible ? audioControls : controlBarView)
 
                 onTooglePlaylistVisibility: {
-                    if (mainInterface.playlistDocked)
+                    if (MainCtx.playlistDocked)
                         playlistpopup.showPlaylist = !playlistpopup.showPlaylist
                     else
-                        mainInterface.playlistVisible = !mainInterface.playlistVisible
+                        MainCtx.playlistVisible = !MainCtx.playlistVisible
                 }
 
                 onRequestLockUnlockAutoHide: {
@@ -555,7 +555,7 @@ FocusScope {
         }
         focus: false
         edge: Widgets.DrawerExt.Edges.Right
-        state: showPlaylist && mainInterface.playlistDocked ? "visible" : "hidden"
+        state: showPlaylist && MainCtx.playlistDocked ? "visible" : "hidden"
         component: Rectangle {
             color: rootPlayer.colors.setColorAlpha(rootPlayer.colors.topBanner, 0.8)
             width: (rootPlayer.width + playlistView.rightPadding) / 4
@@ -635,18 +635,18 @@ FocusScope {
 
     }
 
-    //filter global events to keep toolbar
+    //filter key events to keep toolbar
     //visible when user navigates within the control bar
-    EventFilter {
+    KeyEventFilter {
         id: filter
-        source: topWindow
-        filterEnabled: controlBarView.state === "visible"
-                       && (controlBarView.focus || topcontrolView.focus)
+        target: topWindow
+        enabled: controlBarView.state === "visible"
+                 && (controlBarView.focus || topcontrolView.focus)
         Keys.onPressed: toolbarAutoHide.setVisible(5000)
     }
 
     Connections {
-        target: mainInterface
+        target: MainCtx
         onAskShow: {
             toolbarAutoHide.toggleForceVisible()
         }

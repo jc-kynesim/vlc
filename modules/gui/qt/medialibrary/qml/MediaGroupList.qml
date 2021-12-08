@@ -74,10 +74,10 @@ FocusScope {
     //---------------------------------------------------------------------------------------------
 
     Connections {
-        target: mainInterface
+        target: MainCtx
 
         onGridViewChanged: {
-            if (mainInterface.gridView) view.replace(grid);
+            if (MainCtx.gridView) view.replace(grid);
             else                        view.replace(list);
         }
     }
@@ -181,7 +181,7 @@ FocusScope {
 
         anchors.fill: parent
 
-        initialItem: (mainInterface.gridView) ? grid : list
+        initialItem: (MainCtx.gridView) ? grid : list
 
         focus: (model.count !== 0)
     }
@@ -192,32 +192,16 @@ FocusScope {
         model: root.model
     }
 
-    Widgets.DragItem {
+    Widgets.MLDragItem {
         id: dragItemGroup
 
-        function updateComponents(maxCovers) {
-            var items = modelSelect.selectedIndexes.slice(0, maxCovers).map(function (x){
-                return model.getDataAt(x.row);
-            })
+        mlModel: model
 
-            var covers = items.map(function (item) {
-                return { artwork: item.thumbnail || VLCStyle.noArtCover }
-            });
+        indexes: modelSelect.selectedIndexes
 
-            var name = items.map(function (item) {
-                return item.name
-            }).join(", ");
+        coverRole: "thumbnail"
 
-            return {
-                covers: covers,
-                title: name,
-                count: modelSelect.selectedIndexes.length
-            }
-        }
-
-        function getSelectedInputItem() {
-            return model.getItemsForIndexes(modelSelect.selectedIndexes);
-        }
+        titleRole: "name"
     }
 
     //---------------------------------------------------------------------------------------------
@@ -252,6 +236,8 @@ FocusScope {
 
                 x: 0
 
+                model: root.model
+
                 Navigation.parentItem: gridView
 
                 Navigation.upAction    : function() { gridView.retract() }
@@ -283,7 +269,8 @@ FocusScope {
                 labels: _getLabels(model, i18n.qtr("%1 Videos"))
 
                 // NOTE: We don't want to show the indicator for a group.
-                showNewIndicator: (model.count === 1)
+                // FIXME: Sometimes MLBaseModel::getDataAt returns {} so we use 'isNew === true'.
+                showNewIndicator: (model.count === 1 && model.isNew === true)
 
                 dragItem: dragItemGroup
 

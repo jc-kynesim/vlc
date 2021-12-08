@@ -9,13 +9,17 @@ OPENGL_COMMONSOURCES = \
        video_output/opengl/gl_common.h \
        video_output/opengl/gl_util.c \
        video_output/opengl/gl_util.h \
+       video_output/opengl/importer.c \
+       video_output/opengl/importer.h \
+       video_output/opengl/importer_priv.h \
        video_output/opengl/interop.h \
        video_output/opengl/interop.c \
        video_output/opengl/interop_sw.c \
        video_output/opengl/interop_sw.h \
+       video_output/opengl/picture.c \
+       video_output/opengl/picture.h \
        video_output/opengl/sampler.c \
-       video_output/opengl/sampler.h \
-       video_output/opengl/sampler_priv.h
+       video_output/opengl/sampler.h
 
 OPENGL_COMMONCFLAGS = $(LIBPLACEBO_CFLAGS)
 OPENGL_COMMONLIBS = $(LIBPLACEBO_LIBS)
@@ -25,6 +29,7 @@ OPENGL_COMMONLIBS += libplacebo_utils.la
 endif
 
 OPENGL_VOUT_COMMONSOURCES = \
+    video_output/opengl/gl_scale.h \
     video_output/opengl/renderer.c \
     video_output/opengl/renderer.h \
     video_output/opengl/sub_renderer.c \
@@ -78,15 +83,17 @@ if HAVE_GL
 libglfilter_draw_plugin_la_LIBADD = libvlc_opengl.la $(GL_LIBS)
 vout_LTLIBRARIES += libglfilter_draw_plugin.la
 endif
+
+if HAVE_DARWIN
+vout_LTLIBRARIES += libglfilter_draw_plugin.la
 if HAVE_OSX
 libglfilter_draw_plugin_la_LIBADD = libvlc_opengl.la
-vout_LTLIBRARIES += libglfilter_draw_plugin.la
-endif
-if HAVE_IOS
+else
 libglfilter_draw_plugin_la_LIBADD = libvlc_opengles.la $(GLES2_LIBS)
 libglfilter_draw_plugin_la_CFLAGS = -DUSE_OPENGL_ES2=1
-vout_LTLIBRARIES += libglfilter_draw_plugin.la
 endif
+endif
+
 if HAVE_ANDROID
 libglfilter_draw_plugin_la_LIBADD = libvlc_opengles.la $(GLES2_LIBS)
 libglfilter_draw_plugin_la_CFLAGS = -DUSE_OPENGL_ES2=1
@@ -116,6 +123,36 @@ if HAVE_ANDROID
 libglfilter_mock_plugin_la_LIBADD += libvlc_opengles.la $(GLES2_LIBS)
 libglfilter_mock_plugin_la_CFLAGS = -DUSE_OPENGL_ES2=1
 noinst_LTLIBRARIES += libglfilter_mock_plugin.la
+endif
+
+if HAVE_LIBPLACEBO
+if HAVE_LIBPLACEBO_SCALE
+
+libpl_scale_plugin_la_SOURCES = video_output/opengl/pl_scale.c
+libpl_scale_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(LIBPLACEBO_CFLAGS)
+libpl_scale_plugin_la_LIBADD = $(LIBPLACEBO_LIBS)
+if HAVE_GL
+libpl_scale_plugin_la_LIBADD += libvlc_opengl.la
+video_filter_LTLIBRARIES += libpl_scale_plugin.la
+endif
+
+if HAVE_DARWIN
+video_filter_LTLIBRARIES += libpl_scale_plugin.la
+if HAVE_OSX
+libpl_scale_plugin_la_LIBADD += libvlc_opengl.la
+else
+libpl_scale_plugin_la_LIBADD += libvlc_opengles.la
+libpl_scale_plugin_la_CPPFLAGS += -DUSE_OPENGL_ES2=1
+endif
+endif
+
+if HAVE_ANDROID
+libpl_scale_plugin_la_LIBADD += libvlc_opengles.la
+libpl_scale_plugin_la_CPPFLAGS += -DUSE_OPENGL_ES2=1
+video_filter_LTLIBRARIES += libpl_scale_plugin.la
+endif
+
+endif
 endif
 
 libegl_display_generic_plugin_la_SOURCES = video_output/opengl/egl_display_generic.c

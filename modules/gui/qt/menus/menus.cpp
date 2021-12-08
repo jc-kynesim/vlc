@@ -37,7 +37,7 @@
 
 #include "menus.hpp"
 
-#include "maininterface/main_interface.hpp"                     /* View modifications */
+#include "maininterface/mainctx.hpp"                     /* View modifications */
 #include "dialogs/dialogs_provider.hpp"                   /* Dialogs display */
 #include "player/player_controller.hpp"                      /* Input Management */
 #include "playlist/playlist_controller.hpp"
@@ -159,11 +159,6 @@ static QAction* addMPLStaticEntry( qt_intf_t *p_intf,
  * Simple Code
  *****************************************************************************/
 
-// Static menu
-static inline void addMenuToMainbar( QMenu *func, QString title, QMenuBar *bar ) {
-    func->setTitle( title );
-    bar->addMenu( func);
-}
 /**
  * Main Menu Bar Creation
  **/
@@ -176,7 +171,7 @@ VLCMenuBar::VLCMenuBar(QObject* parent)
  * Media ( File ) Menu
  * Opening, streaming and quit
  **/
-QMenu *VLCMenuBar::FileMenu(qt_intf_t *p_intf, QMenu *menu)
+void VLCMenuBar::FileMenu(qt_intf_t *p_intf, QMenu *menu)
 {
     auto mi = p_intf->p_mi;
     QAction *action;
@@ -230,18 +225,17 @@ QMenu *VLCMenuBar::FileMenu(qt_intf_t *p_intf, QMenu *menu)
     if( mi && mi->getSysTray() )
     {
         action = menu->addAction( qtr( "Close to systray"), mi,
-                                 &MainInterface::toggleUpdateSystrayMenu );
+                                 &MainCtx::toggleUpdateSystrayMenu );
     }
 
     addDPStaticEntry( menu, qtr( "&Quit" ) ,
         ":/menu/exit.svg", &DialogsProvider::quit, "Ctrl+Q" );
-    return menu;
 }
 
 /**
  * Tools, like Media Information, Preferences or Messages
  **/
-QMenu *VLCMenuBar::ToolsMenu( qt_intf_t *p_intf, QMenu *menu )
+void VLCMenuBar::ToolsMenu( qt_intf_t *p_intf, QMenu *menu )
 {
     addDPStaticEntry( menu, qtr( "&Effects and Filters"), ":/menu/settings.svg",
             &DialogsProvider::extendedDialog, "Ctrl+E" );
@@ -276,8 +270,6 @@ QMenu *VLCMenuBar::ToolsMenu( qt_intf_t *p_intf, QMenu *menu )
 
     addDPStaticEntry( menu, qtr( "&Preferences" ),
         ":/menu/preferences.svg", &DialogsProvider::prefsDialog, "Ctrl+P", QAction::PreferencesRole );
-
-    return menu;
 }
 
 /**
@@ -285,32 +277,23 @@ QMenu *VLCMenuBar::ToolsMenu( qt_intf_t *p_intf, QMenu *menu )
  * Interface modification, load other interfaces, activate Extensions
  * \param current, set to NULL for menu creation, else for menu update
  **/
-QMenu *VLCMenuBar::ViewMenu( qt_intf_t *p_intf, QMenu *current )
+void VLCMenuBar::ViewMenu( qt_intf_t *p_intf, QMenu *menu )
 {
     QAction *action;
-    QMenu *menu;
 
-    MainInterface *mi = p_intf->p_mi;
+    MainCtx *mi = p_intf->p_mi;
     assert( mi );
+    assert(menu);
 
-    if( !current )
+    //menu->clear();
+    //HACK menu->clear() does not delete submenus
+    QList<QAction*> actions = menu->actions();
+    foreach( QAction *a, actions )
     {
-        menu = new QMenu( qtr( "&View" ) );
-        menu->setAttribute(Qt::WA_DeleteOnClose);
-    }
-    else
-    {
-        menu = current;
-        //menu->clear();
-        //HACK menu->clear() does not delete submenus
-        QList<QAction*> actions = menu->actions();
-        foreach( QAction *a, actions )
-        {
-            QMenu *m = a->menu();
-            if( a->parent() == menu ) delete a;
-            else menu->removeAction( a );
-            if( m && m->parent() == menu ) delete m;
-        }
+        QMenu *m = a->menu();
+        if( a->parent() == menu ) delete a;
+        else menu->removeAction( a );
+        if( m && m->parent() == menu ) delete m;
     }
 
     action = menu->addAction(
@@ -320,13 +303,13 @@ QMenu *VLCMenuBar::ViewMenu( qt_intf_t *p_intf, QMenu *current )
             qtr( "Play&list" ));
     action->setShortcut(QString( "Ctrl+L" ));
     action->setCheckable( true );
-    connect( action, &QAction::triggered, mi, &MainInterface::setPlaylistVisible );
+    connect( action, &QAction::triggered, mi, &MainCtx::setPlaylistVisible );
     action->setChecked( mi->isPlaylistVisible() );
 
     /* Docked Playlist */
     action = menu->addAction( qtr( "Docked Playlist" ) );
     action->setCheckable( true );
-    connect( action, &QAction::triggered, mi, &MainInterface::setPlaylistDocked );
+    connect( action, &QAction::triggered, mi, &MainCtx::setPlaylistDocked );
     action->setChecked( mi->isPlaylistDocked() );
 
     menu->addSeparator();
@@ -334,22 +317,22 @@ QMenu *VLCMenuBar::ViewMenu( qt_intf_t *p_intf, QMenu *current )
     action = menu->addAction( qtr( "Always on &top" ) );
     action->setCheckable( true );
     action->setChecked( mi->isInterfaceAlwaysOnTop() );
-    connect( action, &QAction::triggered, mi, &MainInterface::setInterfaceAlwaysOnTop );
+    connect( action, &QAction::triggered, mi, &MainCtx::setInterfaceAlwaysOnTop );
 
     menu->addSeparator();
 
     /* FullScreen View */
     action = menu->addAction( qtr( "&Fullscreen Interface" ), mi,
-            &MainInterface::toggleInterfaceFullScreen, QString( "F11" ) );
+            &MainCtx::toggleInterfaceFullScreen, QString( "F11" ) );
     action->setCheckable( true );
     action->setChecked( mi->isInterfaceFullScreen() );
 
     action = menu->addAction( qtr( "&View Items as Grid" ), mi,
-            &MainInterface::setGridView );
+            &MainCtx::setGridView );
     action->setCheckable( true );
     action->setChecked( mi->hasGridView() );
 
-    menu->addMenu( new CheckableListMenu(qtr( "&Color Scheme" ), mi->getColorScheme(), CheckableListMenu::GROUPED, current) );
+    menu->addMenu( new CheckableListMenu(qtr( "&Color Scheme" ), mi->getColorScheme(), CheckableListMenu::GROUPED, menu) );
 
     menu->addSeparator();
 
@@ -358,20 +341,17 @@ QMenu *VLCMenuBar::ViewMenu( qt_intf_t *p_intf, QMenu *current )
 
     /* Extensions */
     ExtensionsMenu( p_intf, menu );
-
-    return menu;
 }
 
 /**
  * Interface Sub-Menu, to list extras interface and skins
  **/
-QMenu *VLCMenuBar::InterfacesMenu( qt_intf_t *p_intf, QMenu *current )
+void VLCMenuBar::InterfacesMenu( qt_intf_t *p_intf, QMenu *current )
 {
     assert(current);
     VLCVarChoiceModel* model = new VLCVarChoiceModel(VLC_OBJECT(p_intf->intf), "intf-add", current);
     CheckableListMenu* submenu = new CheckableListMenu(qtr("Interfaces"), model, CheckableListMenu::UNGROUPED, current);
     current->addMenu(submenu);
-    return current;
 }
 
 /**
@@ -410,7 +390,7 @@ static inline void VolumeEntries( qt_intf_t *p_intf, QMenu *current )
 /**
  * Main Audio Menu
  **/
-QMenu *VLCMenuBar::AudioMenu( qt_intf_t *p_intf, QMenu * current )
+void VLCMenuBar::AudioMenu( qt_intf_t *p_intf, QMenu * current )
 {
     if( current->isEmpty() )
     {
@@ -434,12 +414,10 @@ QMenu *VLCMenuBar::AudioMenu( qt_intf_t *p_intf, QMenu * current )
         current->addMenu( new CheckableListMenu(qtr( "&Visualizations" ), THEMIM->getAudioVisualizations(), CheckableListMenu::GROUPED, current) );
         VolumeEntries( p_intf, current );
     }
-
-    return current;
 }
 
 /* Subtitles */
-QMenu *VLCMenuBar::SubtitleMenu( qt_intf_t *p_intf, QMenu *current, bool b_popup )
+void VLCMenuBar::SubtitleMenu( qt_intf_t *p_intf, QMenu *current, bool b_popup )
 {
     if( current->isEmpty() || b_popup )
     {
@@ -448,14 +426,13 @@ QMenu *VLCMenuBar::SubtitleMenu( qt_intf_t *p_intf, QMenu *current, bool b_popup
         current->addMenu(new CheckableListMenu(qtr( "Sub &Track" ), THEMIM->getSubtitleTracks(), CheckableListMenu::GROUPED, current));
         current->addSeparator();
     }
-    return current;
 }
 
 /**
  * Main Video Menu
  * Subtitles are part of Video.
  **/
-QMenu *VLCMenuBar::VideoMenu( qt_intf_t *p_intf, QMenu *current )
+void VLCMenuBar::VideoMenu( qt_intf_t *p_intf, QMenu *current )
 {
     if( current->isEmpty() )
     {
@@ -487,15 +464,13 @@ QMenu *VLCMenuBar::VideoMenu( qt_intf_t *p_intf, QMenu *current )
         connect(snapshotAction, &QAction::triggered, THEMIM, &PlayerController::snapshot);
         current->addAction(snapshotAction);
     }
-
-    return current;
 }
 
 /**
  * Navigation Menu
  * For DVD, MP4, MOV and other chapter based format
  **/
-QMenu *VLCMenuBar::NavigMenu( qt_intf_t *p_intf, QMenu *menu )
+void VLCMenuBar::NavigMenu( qt_intf_t *p_intf, QMenu *menu )
 {
     QAction *action;
     QMenu *submenu;
@@ -528,10 +503,10 @@ QMenu *VLCMenuBar::NavigMenu( qt_intf_t *p_intf, QMenu *menu )
 
     PopupMenuControlEntries( menu, p_intf );
 
-    return RebuildNavigMenu( p_intf, menu );
+    RebuildNavigMenu( p_intf, menu );
 }
 
-QMenu *VLCMenuBar::RebuildNavigMenu( qt_intf_t *p_intf, QMenu *menu )
+void VLCMenuBar::RebuildNavigMenu( qt_intf_t *p_intf, QMenu *menu )
 {
     QAction* action;
 
@@ -549,14 +524,12 @@ QMenu *VLCMenuBar::RebuildNavigMenu( qt_intf_t *p_intf, QMenu *menu )
 #undef ADD_ACTION
 
     PopupMenuPlaylistEntries( menu, p_intf );
-
-    return menu;
 }
 
 /**
  * Help/About Menu
 **/
-QMenu *VLCMenuBar::HelpMenu( QMenu *menu )
+void VLCMenuBar::HelpMenu( QMenu *menu )
 {
     addDPStaticEntry( menu, qtr( "&Help" ) ,
         ":/menu/help.svg", &DialogsProvider::helpDialog, "F1" );
@@ -567,19 +540,11 @@ QMenu *VLCMenuBar::HelpMenu( QMenu *menu )
     menu->addSeparator();
     addDPStaticEntry( menu, qfut( I_MENU_ABOUT ), ":/menu/info.svg",
             &DialogsProvider::aboutDialog, "Shift+F1", QAction::AboutRole );
-    return menu;
 }
 
 /*****************************************************************************
  * Popup menus - Right Click menus                                           *
  *****************************************************************************/
-#define POPUP_BOILERPLATE \
-    QMenu* menu;
-
-#define CREATE_POPUP \
-    menu = new QMenu(); \
-    if( show ) \
-        menu->popup( QCursor::pos() ); \
 
 void VLCMenuBar::PopupMenuPlaylistEntries( QMenu *menu, qt_intf_t *p_intf )
 {
@@ -704,11 +669,6 @@ void VLCMenuBar::PopupMenuStaticEntries( QMenu *menu )
     menu->addMenu( openmenu );
 
     menu->addSeparator();
-#if 0
-    QMenu *helpmenu = HelpMenu( menu );
-    helpmenu->setTitle( qtr( "Help" ) );
-    menu->addMenu( helpmenu );
-#endif
 
     addDPStaticEntry( menu, qtr( "Quit" ), ":/menu/exit.svg",
                       &DialogsProvider::quit, "Ctrl+Q", QAction::QuitRole );
@@ -761,7 +721,6 @@ QMenu* VLCMenuBar::PopupMenu( qt_intf_t *p_intf, bool show )
     input_item_t* p_input = THEMIM->getInput();
     QAction *action;
     bool b_isFullscreen = false;
-    MainInterface *mi = p_intf->p_mi;
 
     PopupMenuPlaylistEntries( menu, p_intf );
     menu->addSeparator();
@@ -787,26 +746,30 @@ QMenu* VLCMenuBar::PopupMenu( qt_intf_t *p_intf, bool show )
 
         /* Audio menu */
         submenu = new QMenu( menu );
-        action = menu->addMenu( AudioMenu( p_intf, submenu ) );
+        AudioMenu( p_intf, submenu );
+        action = menu->addMenu( submenu );
         action->setText( qtr( "&Audio" ) );
         if( action->menu()->isEmpty() )
             action->setEnabled( false );
 
         /* Video menu */
         submenu = new QMenu( menu );
-        action = menu->addMenu( VideoMenu( p_intf, submenu ) );
+        VideoMenu( p_intf, submenu );
+        action = menu->addMenu( submenu );
         action->setText( qtr( "&Video" ) );
         if( action->menu()->isEmpty() )
             action->setEnabled( false );
 
         /* Subtitles menu */
         submenu = new QMenu( menu );
-        action = menu->addMenu( SubtitleMenu( p_intf, submenu, true ) );
+        SubtitleMenu( p_intf, submenu, true );
+        action = menu->addMenu( submenu );
         action->setText( qtr( "Subti&tle") );
 
         /* Playback menu for chapters */
         submenu = new QMenu( menu );
-        action = menu->addMenu( NavigMenu( p_intf, submenu ) );
+        NavigMenu( p_intf, submenu );
+        action = menu->addMenu( submenu );
         action->setText( qtr( "&Playback" ) );
         if( action->menu()->isEmpty() )
             action->setEnabled( false );
@@ -817,22 +780,14 @@ QMenu* VLCMenuBar::PopupMenu( qt_intf_t *p_intf, bool show )
     /* Add some special entries for windowed mode: Interface Menu */
     if( !b_isFullscreen )
     {
-        QMenu *submenu = new QMenu( qtr( "Tool&s" ), menu );
-        /*QMenu *tools =*/ ToolsMenu( p_intf, submenu );
-        submenu->addSeparator();
-
-        if( mi )
-        {
-            QMenu* viewMenu = ViewMenu( p_intf, NULL );
-            viewMenu->setTitle( qtr( "V&iew" ) );
-            submenu->addMenu( viewMenu );
-        }
-
-        /* In skins interface, append some items */
         if( p_intf->b_isDialogProvider )
         {
+            // same as Tool menu but with extra entries
+            QMenu* submenu = new QMenu( qtr( "Interface" ), menu );
+            ToolsMenu( p_intf, submenu );
+            submenu->addSeparator();
+
             vlc_object_t* p_object = vlc_object_parent(p_intf->intf);
-            submenu->setTitle( qtr( "Interface" ) );
 
             /* Open skin dialog box */
             if (var_Type(p_object, "intf-skins-interactive") & VLC_VAR_ISCOMMAND)
@@ -853,22 +808,33 @@ QMenu* VLCMenuBar::PopupMenu( qt_intf_t *p_intf, bool show )
 
             /* list of extensions */
             ExtensionsMenu( p_intf, submenu );
-        }
 
-        menu->addMenu( submenu );
+            menu->addMenu( submenu );
+        }
+        else
+        {
+            QMenu* toolsMenu = new QMenu( qtr( "Tool&s" ), menu );
+            ToolsMenu( p_intf, toolsMenu );
+            menu->addMenu( toolsMenu );
+
+            QMenu* viewMenu = new QMenu( qtr( "V&iew" ), menu );
+            ViewMenu( p_intf, viewMenu );
+            menu->addMenu( viewMenu );
+        }
     }
 
     /* Static entries for ending, like open */
     if( p_intf->b_isDialogProvider )
     {
-        QMenu *openmenu = FileMenu( p_intf, menu );
-        openmenu->setTitle( qtr( "Open Media" ) );
+
+        QMenu* openmenu = new QMenu( qtr( "Open Media" ), menu );
+        FileMenu( p_intf, openmenu );
         menu->addMenu( openmenu );
 
         menu->addSeparator();
 
-        QMenu *helpmenu = HelpMenu( menu );
-        helpmenu->setTitle( qtr( "Help" ) );
+        QMenu* helpmenu = new QMenu( qtr( "Help" ), menu );
+        HelpMenu( helpmenu );
         menu->addMenu( helpmenu );
 
         addDPStaticEntry( menu, qtr( "Quit" ), ":/menu/exit.svg",
@@ -882,15 +848,11 @@ QMenu* VLCMenuBar::PopupMenu( qt_intf_t *p_intf, bool show )
     return menu;
 }
 
-#undef CREATE_POPUP
-#undef POPUP_BOILERPLATE
-#undef BAR_DADD
-
 /************************************************************************
  * Systray Menu                                                         *
  ************************************************************************/
 
-void VLCMenuBar::updateSystrayMenu( MainInterface *mi,
+void VLCMenuBar::updateSystrayMenu( MainCtx *mi,
                                   qt_intf_t *p_intf,
                                   bool b_force_visible )
 {
@@ -904,13 +866,13 @@ void VLCMenuBar::updateSystrayMenu( MainInterface *mi,
     {
         sysMenu->addAction( QIcon( ":/logo/vlc16.png" ),
                             qtr( "&Hide VLC media player in taskbar" ), mi,
-                            &MainInterface::hideUpdateSystrayMenu);
+                            &MainCtx::hideUpdateSystrayMenu);
     }
     else
     {
         sysMenu->addAction( QIcon( ":/logo/vlc16.png" ),
                             qtr( "Sho&w VLC media player" ), mi,
-                            &MainInterface::showUpdateSystrayMenu);
+                            &MainCtx::showUpdateSystrayMenu);
     }
     sysMenu->addSeparator();
 #endif

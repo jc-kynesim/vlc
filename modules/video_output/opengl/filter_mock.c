@@ -72,6 +72,7 @@
 #include "gl_api.h"
 #include "gl_common.h"
 #include "gl_util.h"
+#include "sampler.h"
 
 #define MOCK_CFG_PREFIX "mock-"
 
@@ -80,6 +81,8 @@ static const char *const filter_options[] = {
 };
 
 struct sys {
+    struct vlc_gl_sampler *sampler;
+
     GLuint program_id;
 
     GLuint vbo;
@@ -120,9 +123,13 @@ InitMatrix(struct sys *sys, vlc_tick_t pts)
 }
 
 static int
-DrawBlend(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
+DrawBlend(struct vlc_gl_filter *filter, const struct vlc_gl_picture *pic,
+          const struct vlc_gl_input_meta *meta)
 {
     struct sys *sys = filter->sys;
+
+    (void) pic;
+    assert(!pic); /* A blend filter should not receive picture */
 
     const opengl_vtable_t *vt = &filter->api->vt;
 
@@ -166,7 +173,8 @@ DrawBlend(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
 }
 
 static int
-DrawMask(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
+DrawMask(struct vlc_gl_filter *filter, const struct vlc_gl_picture *pic,
+         const struct vlc_gl_input_meta *meta)
 {
     struct sys *sys = filter->sys;
 
@@ -174,7 +182,8 @@ DrawMask(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
 
     vt->UseProgram(sys->program_id);
 
-    struct vlc_gl_sampler *sampler = vlc_gl_filter_GetSampler(filter);
+    struct vlc_gl_sampler *sampler = sys->sampler;
+    vlc_gl_sampler_Update(sampler, pic);
     vlc_gl_sampler_Load(sampler);
 
     vt->BindBuffer(GL_ARRAY_BUFFER, sys->vbo);
@@ -186,10 +195,9 @@ DrawMask(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
     vt->UniformMatrix4fv(sys->loc.rotation_matrix, 1, GL_FALSE,
                          sys->rotation_matrix);
 
-    const float *mtx = sampler->pic_to_tex_matrix;
-    assert(mtx);
+    const float *mtx = pic->mtx;
 
-    /* Expand the 3x2 matrix to 3x3 to store it in a mat3 uniform (for better
+    /* Expand the 2x3 matrix to 3x3 to store it in a mat3 uniform (for better
      * compatibility). Both are in column-major order. */
     float pic_to_tex[] = { mtx[0], mtx[1], 0,
                            mtx[2], mtx[3], 0,
@@ -203,22 +211,27 @@ DrawMask(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
 }
 
 static int
-DrawPlane(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
+DrawPlane(struct vlc_gl_filter *filter, const struct vlc_gl_picture *pic,
+          const struct vlc_gl_input_meta *meta)
 {
+    (void) pic; /* TODO not used yet */
+
     struct sys *sys = filter->sys;
 
     const opengl_vtable_t *vt = &filter->api->vt;
 
     vt->UseProgram(sys->program_id);
 
-    struct vlc_gl_sampler *sampler = vlc_gl_filter_GetSampler(filter);
+    struct vlc_gl_sampler *sampler = sys->sampler;
+    vlc_gl_sampler_Update(sampler, pic);
+    vlc_gl_sampler_SelectPlane(sampler, meta->plane);
     vlc_gl_sampler_Load(sampler);
 
     vt->Uniform1f(sys->loc.offset, 0.02 * meta->plane);
 
     vt->BindBuffer(GL_ARRAY_BUFFER, sys->vbo);
 
-    if (vlc_gl_sampler_MustRecomputeCoords(sampler))
+    if (pic->mtx_has_changed)
     {
         float coords[] = {
             0, 1,
@@ -228,7 +241,7 @@ DrawPlane(struct vlc_gl_filter *filter, const struct vlc_gl_input_meta *meta)
         };
 
         /* Transform coordinates in place */
-        vlc_gl_sampler_PicToTexCoords(sampler, 4, coords, coords);
+        vlc_gl_picture_ToTexCoords(pic, 4, coords, coords);
 
         const float data[] = {
             -1,  1, coords[0], coords[1],
@@ -260,6 +273,9 @@ static void
 Close(struct vlc_gl_filter *filter)
 {
     struct sys *sys = filter->sys;
+
+    if (sys->sampler)
+        vlc_gl_sampler_Delete(sys->sampler);
 
     const opengl_vtable_t *vt = &filter->api->vt;
     vt->DeleteProgram(sys->program_id);
@@ -358,14 +374,17 @@ InitBlend(struct vlc_gl_filter *filter)
 }
 
 static int
-InitMask(struct vlc_gl_filter *filter)
+InitMask(struct vlc_gl_filter *filter, const struct vlc_gl_format *glfmt)
 {
     struct sys *sys = filter->sys;
     const opengl_vtable_t *vt = &filter->api->vt;
 
-    struct vlc_gl_sampler *sampler = vlc_gl_filter_GetSampler(filter);
+    struct vlc_gl_sampler *sampler =
+        vlc_gl_sampler_New(filter->gl, filter->api, glfmt, false);
     if (!sampler)
         return VLC_EGENERIC;
+
+    sys->sampler = sampler;
 
     static const char *const VERTEX_SHADER_BODY =
         "attribute vec2 vertex_pos;\n"
@@ -459,17 +478,19 @@ InitMask(struct vlc_gl_filter *filter)
 }
 
 static int
-InitPlane(struct vlc_gl_filter *filter)
+InitPlane(struct vlc_gl_filter *filter, const struct vlc_gl_format *glfmt)
 {
     struct sys *sys = filter->sys;
     const opengl_vtable_t *vt = &filter->api->vt;
 
-    /* Must be initialized before calling vlc_gl_filter_GetSampler() */
     filter->config.filter_planes = true;
 
-    struct vlc_gl_sampler *sampler = vlc_gl_filter_GetSampler(filter);
-    if (!sampler)
+    struct vlc_gl_sampler *sampler =
+        vlc_gl_sampler_New(filter->gl, filter->api, glfmt, true);
+    if (!sys->sampler)
         return VLC_EGENERIC;
+
+    sys->sampler = sampler;
 
     static const char *const VERTEX_SHADER_BODY =
         "attribute vec2 vertex_pos;\n"
@@ -547,13 +568,10 @@ InitPlane(struct vlc_gl_filter *filter)
     return VLC_SUCCESS;
 }
 
-static vlc_gl_filter_open_fn Open;
 static int
 Open(struct vlc_gl_filter *filter, const config_chain_t *config,
-     struct vlc_gl_tex_size *size_out)
+     const struct vlc_gl_format *glfmt, struct vlc_gl_tex_size *size_out)
 {
-    (void) config;
-
     config_ChainParse(filter, MOCK_CFG_PREFIX, filter_options, config);
 
     bool mask = var_InheritBool(filter, MOCK_CFG_PREFIX "mask");
@@ -566,11 +584,13 @@ Open(struct vlc_gl_filter *filter, const config_chain_t *config,
     if (!sys)
         return VLC_EGENERIC;
 
+    sys->sampler = NULL;
+
     int ret;
     if (plane)
-        ret = InitPlane(filter);
+        ret = InitPlane(filter, glfmt);
     else if (mask)
-        ret = InitMask(filter);
+        ret = InitMask(filter, glfmt);
     else
         ret = InitBlend(filter);
 
@@ -597,7 +617,7 @@ vlc_module_begin()
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
     set_capability("opengl filter", 0)
-    set_callback(Open)
+    set_callback_opengl_filter(Open)
     add_shortcut("mock");
     add_float(MOCK_CFG_PREFIX "angle", 0.f, NULL, NULL) /* in degrees */
     add_float(MOCK_CFG_PREFIX "speed", 0.f, NULL, NULL) /* in rotations per minute */

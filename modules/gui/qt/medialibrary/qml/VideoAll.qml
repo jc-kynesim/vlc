@@ -34,6 +34,10 @@ FocusScope {
 
     // Properties
 
+    readonly property int contentMargin: (MainCtx.gridView
+                                          &&
+                                          _currentView) ? _currentView.contentMargin : 0
+
     // NOTE: Specify an optionnal header for the view.
     property Component header: undefined
 
@@ -67,10 +71,10 @@ FocusScope {
     // Connections
 
     Connections {
-        target: mainInterface
+        target: MainCtx
 
         onGridViewChanged: {
-            if (mainInterface.gridView) view.replace(grid);
+            if (MainCtx.gridView) view.replace(grid);
             else                        view.replace(list);
         }
     }
@@ -100,10 +104,10 @@ FocusScope {
         if (initialIndex >= model.count)
             initialIndex = 0
 
-        modelSelect.select(model.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect);
+        modelSelect.select(model.index(initialIndex, 0), ItemSelectionModel.ClearAndSelect)
 
         if (_currentView)
-            _currentView.positionViewAtIndex(initialIndex, ItemView.Contain);
+            _currentView.positionViewAtIndex(initialIndex, ItemView.Contain)
     }
 
     // Private
@@ -114,9 +118,18 @@ FocusScope {
         medialib.addAndPlay(model.getIdsForIndexes(modelSelect.selectedIndexes));
     }
 
+    // Events
+
+    function _onNavigationUp() {
+        if (headerItem && headerItem.focus)
+            headerItem.setCurrentItemFocus(Qt.TabFocusReason);
+        else
+            Navigation.defaultNavigationUp();
+    }
+
     function _onNavigationCancel() {
         if (_currentView.currentIndex <= 0) {
-            Navigation.defaultNavigationCancel()
+            Navigation.defaultNavigationCancel();
         } else {
             _currentView.currentIndex = 0;
 
@@ -133,35 +146,17 @@ FocusScope {
 
         focus: (model.count !== 0)
 
-        initialItem: (mainInterface.gridView) ? grid : list
+        initialItem: (MainCtx.gridView) ? grid : list
     }
 
-    Widgets.DragItem {
+    Widgets.MLDragItem {
         id: dragItem
 
-        function updateComponents(maxCovers) {
-            var items = modelSelect.selectedIndexes.slice(0, maxCovers).map(function (x){
-                return model.getDataAt(x.row);
-            })
+        mlModel: root.model
 
-            var covers = items.map(function (item) {
-                return { artwork: item.thumbnail || VLCStyle.noArtCover }
-            });
+        indexes: modelSelect.selectedIndexes
 
-            var title = items.map(function (item) {
-                return item.title
-            }).join(", ");
-
-            return {
-                covers: covers,
-                title: title,
-                count: modelSelect.selectedIndexes.length
-            }
-        }
-
-        function getSelectedInputItem() {
-            return model.getItemsForIndexes(modelSelect.selectedIndexes);
-        }
+        coverRole: "thumbnail"
     }
 
     Util.SelectableDelegateModel {
@@ -200,7 +195,8 @@ FocusScope {
             activeFocusOnTab: true
 
             Navigation.parentItem: root
-            Navigation.upItem: (headerItem) ? headerItem.focusItem : null
+
+            Navigation.upAction: _onNavigationUp
 
             //cancelAction takes a *function* pass it directly
             Navigation.cancelAction: root._onNavigationCancel
@@ -209,6 +205,8 @@ FocusScope {
                 width: gridView.width
 
                 x: 0
+
+                model: root.model
 
                 Navigation.parentItem: gridView
 
@@ -268,7 +266,11 @@ FocusScope {
                           &&
                           gridView.expandIndex !== gridItem.index) ? 0.7 : 1
 
+                // FIXME: Sometimes MLBaseModel::getDataAt returns {} so we use 'isNew === true'.
+                showNewIndicator: (model.isNew === true)
+
                 dragItem: root.dragItem
+
                 unselectedUnderlay: shadows.unselected
                 selectedUnderlay: shadows.selected
 
@@ -316,7 +318,8 @@ FocusScope {
             activeFocusOnTab: true
 
             Navigation.parentItem: root
-            Navigation.upItem: (headerItem) ? headerItem.focusItem : null
+
+            Navigation.upAction: _onNavigationUp
 
             //cancelAction takes a *function* pass it directly
             Navigation.cancelAction: root._onNavigationCancel
