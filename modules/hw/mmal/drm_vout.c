@@ -85,7 +85,7 @@ enum hdmi_eotf
 };
 
 #define TRACE_ALL 0
-#define TRACE_PROP_NEW 1
+#define TRACE_PROP_NEW 0
 
 #define SUBPICS_MAX 4
 
@@ -3309,131 +3309,132 @@ drmu_env_new_open(vlc_object_t * const log, const char * name)
 
 
 static int
-get_lease_fd(vlc_object_t * const log, int *pCrtcId)
+get_lease_fd(vlc_object_t * const log)
 {
-    xcb_connection_t        *connection;
     xcb_generic_error_t *xerr;
-    int                     screen;
 
-    connection = xcb_connect(NULL, &screen);
+    int screen = 0;
+    xcb_connection_t * const connection = xcb_connect(NULL, &screen);
     if (!connection) {
-        fprintf(stderr, "Connection to X server failed\n");
-        return -1;
-    }
-    fprintf(stderr, "--- (1)\n");
-    xcb_randr_query_version_cookie_t rqv_c = xcb_randr_query_version(connection,
-                                                                     XCB_RANDR_MAJOR_VERSION,
-                                                                     XCB_RANDR_MINOR_VERSION);
-    xcb_randr_query_version_reply_t *rqv_r = xcb_randr_query_version_reply(connection, rqv_c, NULL);
-
-    if (!rqv_r || rqv_r->minor_version < 6) {
-        fprintf(stderr, "No new-enough RandR version - XXX\n");
+        drmu_warn_log(log, "Connection to X server failed");
         return -1;
     }
 
-    xcb_screen_iterator_t s_i;
+    {
+        xcb_randr_query_version_cookie_t rqv_c = xcb_randr_query_version(connection,
+                                                                         XCB_RANDR_MAJOR_VERSION,
+                                                                         XCB_RANDR_MINOR_VERSION);
+        xcb_randr_query_version_reply_t *rqv_r = xcb_randr_query_version_reply(connection, rqv_c, NULL);
 
-    int i_s = 0;
-
-    for (s_i = xcb_setup_roots_iterator(xcb_get_setup(connection));
-         s_i.rem;
-         xcb_screen_next(&s_i), i_s++) {
-        printf("index %d screen %d\n", s_i.index, screen);
-        if (i_s == screen) break;
-    }
-
-    xcb_window_t root = s_i.data->root;
-
-    fprintf(stderr, "root %x\n", root);
-
-    xcb_randr_get_screen_resources_cookie_t gsr_c = xcb_randr_get_screen_resources(connection, root);
-
-    xcb_randr_get_screen_resources_reply_t *gsr_r = xcb_randr_get_screen_resources_reply(connection, gsr_c, NULL);
-
-    if (!gsr_r) {
-        fprintf(stderr, "get_screen_resources failed\n");
-        return -1;
-    }
-
-    xcb_randr_output_t *ro = xcb_randr_get_screen_resources_outputs(gsr_r);
-    int o, c;
-
-    xcb_randr_output_t output = 0;
-
-    /* Find a connected but idle output */
-    for (o = 0; output == 0 && o < gsr_r->num_outputs; o++) {
-        xcb_randr_get_output_info_cookie_t goi_c = xcb_randr_get_output_info(connection, ro[o], gsr_r->config_timestamp);
-
-        xcb_randr_get_output_info_reply_t *goi_r = xcb_randr_get_output_info_reply(connection, goi_c, NULL);
-
-        fprintf(stderr, "output[%d/%d] %d: conn %d/%d crtc %d\n", o, gsr_r->num_outputs, ro[o], goi_r->connection, XCB_RANDR_CONNECTION_CONNECTED, goi_r->crtc);
-
-        /* Find the first connected but unused output */
-        if (goi_r->connection == XCB_RANDR_CONNECTION_CONNECTED &&
-            goi_r->crtc == 0) {
-            output = ro[o];
+        if (!rqv_r) {
+            drmu_warn_log(log, "Failed to get XCB RandR version");
+            return -1;
         }
 
-        free(goi_r);
+        uint32_t major = rqv_r->major_version;
+        uint32_t minor = rqv_r->minor_version;
+        free(rqv_r);
+
+        if (minor < 6) {
+            drmu_warn_log(log, "XCB RandR version %d.%d too low for lease support", major, minor);
+            return -1;
+        }
     }
-    output = ro[0]; //**************
 
-    xcb_randr_crtc_t *rc = xcb_randr_get_screen_resources_crtcs(gsr_r);
+    xcb_window_t root;
 
+    {
+        xcb_screen_iterator_t s_i = xcb_setup_roots_iterator(xcb_get_setup(connection));
+        int i;
+
+        for (i = 0; i != screen && s_i.rem != 0; ++i) {
+             xcb_screen_next(&s_i);
+        }
+
+        if (s_i.rem == 0) {
+            drmu_err_log(log, "Failed to get root for screen %d", screen);
+            return -1;
+        }
+
+        drmu_debug_log(log, "index %d screen %d rem %d", s_i.index, screen, s_i.rem);
+        root = s_i.data->root;
+    }
+
+    xcb_randr_output_t output = 0;
     xcb_randr_crtc_t crtc = 0;
 
-    /* Find an idle crtc */
-    for (c = 0; crtc == 0 && c < gsr_r->num_crtcs; c++) {
-        xcb_randr_get_crtc_info_cookie_t gci_c = xcb_randr_get_crtc_info(connection, rc[c], gsr_r->config_timestamp);
+    /* Find a connected in-use output */
+    {
+        xcb_randr_get_screen_resources_cookie_t gsr_c = xcb_randr_get_screen_resources(connection, root);
 
-        xcb_randr_get_crtc_info_reply_t *gci_r = xcb_randr_get_crtc_info_reply(connection, gci_c, NULL);
+        xcb_randr_get_screen_resources_reply_t *gsr_r = xcb_randr_get_screen_resources_reply(connection, gsr_c, NULL);
 
-        fprintf(stderr, "crtc[%d/%d] %d: mode %d\n", c, gsr_r->num_crtcs, rc[c], gci_r->mode);
+        if (!gsr_r) {
+            drmu_err_log(log, "get_screen_resources failed");
+            return -1;
+        }
 
-        /* Find the first connected but unused crtc */
-//        if (gci_r->mode == 0) crtc = rc[c];
+        xcb_randr_output_t * const ro = xcb_randr_get_screen_resources_outputs(gsr_r);
 
-        free(gci_r);
-    }
-    crtc = rc[0]; //*****************
+        for (int o = 0; output == 0 && o < gsr_r->num_outputs; o++) {
+            xcb_randr_get_output_info_cookie_t goi_c = xcb_randr_get_output_info(connection, ro[o], gsr_r->config_timestamp);
 
-    free(gsr_r);
+            xcb_randr_get_output_info_reply_t *goi_r = xcb_randr_get_output_info_reply(connection, goi_c, NULL);
 
-    fprintf(stderr, "output %x crtc %x\n", output, crtc);
+            drmu_debug_log(log, "output[%d/%d] %d: conn %d/%d crtc %d", o, gsr_r->num_outputs, ro[o], goi_r->connection, XCB_RANDR_CONNECTION_CONNECTED, goi_r->crtc);
 
-    xcb_randr_lease_t lease = xcb_generate_id(connection);
+            /* Find the first connected and used output */
+            if (goi_r->connection == XCB_RANDR_CONNECTION_CONNECTED &&
+                goi_r->crtc != 0) {
+                output = ro[o];
+                crtc = goi_r->crtc;
+            }
 
-    xcb_randr_create_lease_cookie_t rcl_c = xcb_randr_create_lease(connection,
-                                                                   root,
-                                                                   lease,
-                                                                   1,
-                                                                   1,
-                                                                   &crtc,
-                                                                   &output);
-    xcb_randr_create_lease_reply_t *rcl_r = xcb_randr_create_lease_reply(connection, rcl_c, &xerr);
+            free(goi_r);
+        }
 
-    if (!rcl_r) {
-        fprintf(stderr, "create_lease failed: Xerror %d\n", xerr->error_code);
-        return -1;
-    }
+        free(gsr_r);
 
-    int *rcl_f = xcb_randr_create_lease_reply_fds(connection, rcl_r);
-
-    if (drmSetClientCap(rcl_f[0], DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1)) {
-        fprintf(stderr, "Set universal failed\n");
+        if (output == 0) {
+            drmu_warn_log(log, "Failed to find active output (outputs=%d)", gsr_r->num_outputs);
+            return -1;
+        }
     }
 
-    fprintf(stderr, "fd %d, crtc=%d\n", rcl_f[0], crtc);
-    *pCrtcId = crtc;
-    return rcl_f[0];
+    int fd = -1;
+
+    {
+        xcb_randr_lease_t lease = xcb_generate_id(connection);
+
+        xcb_randr_create_lease_cookie_t rcl_c = xcb_randr_create_lease(connection,
+                                                                       root,
+                                                                       lease,
+                                                                       1,
+                                                                       1,
+                                                                       &crtc,
+                                                                       &output);
+        xcb_randr_create_lease_reply_t *rcl_r = xcb_randr_create_lease_reply(connection, rcl_c, &xerr);
+
+        if (!rcl_r) {
+            drmu_err_log(log, "create_lease failed: Xerror %d", xerr->error_code);
+            return -1;
+        }
+
+        int *rcl_f = xcb_randr_create_lease_reply_fds(connection, rcl_r);
+
+        fd = rcl_f[0];
+
+        free(rcl_r);
+    }
+
+    drmu_debug_log(log, "%s OK: fd=%d", __func__, fd);
+    return fd;
 }
 
 static drmu_env_t *
 drmu_env_new_xlease(vlc_object_t * const log)
 {
-    int crtcid = 0;
-
-    int fd = get_lease_fd(log, &crtcid);
+    const int fd = get_lease_fd(log);
 
     if (fd == -1) {
         drmu_err_log(log, "Failed to get xlease");
@@ -3540,8 +3541,8 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *pic,
             subpic_ent_t * const dst = sys->subpics + n;
 
             // If we've run out of subplanes we could allocate - give up now
-//            if (!sys->subplanes[n])
-//                goto subpics_done;
+            if (!sys->subplanes[n])
+                goto subpics_done;
 
             // If the same picture then assume the same contents
             // We keep a ref to the previous pic to ensure that teh same picture
