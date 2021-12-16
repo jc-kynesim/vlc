@@ -12,7 +12,7 @@ libmmal_vout_plugin_la_LIBADD = $(LIBM) libvlc_mmal.la
 
 libdrm_vout_plugin_la_SOURCES = hw/mmal/drm_vout.c hw/mmal/pollqueue.c
 libdrm_vout_plugin_la_CFLAGS = $(AM_CFLAGS) -I/usr/include/libdrm
-libdrm_vout_plugin_la_LIBADD = -ldrm
+libdrm_vout_plugin_la_LIBADD = -ldrm -lxcb-randr -lxcb
 
 libmmal_codec_plugin_la_SOURCES = hw/mmal/codec.c
 libmmal_codec_plugin_la_CFLAGS = $(AM_CFLAGS) $(MMAL_CFLAGS)

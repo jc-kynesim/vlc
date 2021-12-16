@@ -47,6 +47,10 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
+#include <xcb/xcb.h>
+#include <xcb/randr.h>
+
+
 #include "pollqueue.h"
 #include "../codec/avcodec/drm_pic.h"
 
@@ -81,7 +85,7 @@ enum hdmi_eotf
 };
 
 #define TRACE_ALL 0
-#define TRACE_PROP_NEW 0
+#define TRACE_PROP_NEW 1
 
 #define SUBPICS_MAX 4
 
@@ -3304,6 +3308,141 @@ drmu_env_new_open(vlc_object_t * const log, const char * name)
 }
 
 
+static int
+get_lease_fd(vlc_object_t * const log, int *pCrtcId)
+{
+    xcb_connection_t        *connection;
+    xcb_generic_error_t *xerr;
+    int                     screen;
+
+    connection = xcb_connect(NULL, &screen);
+    if (!connection) {
+        fprintf(stderr, "Connection to X server failed\n");
+        return -1;
+    }
+    fprintf(stderr, "--- (1)\n");
+    xcb_randr_query_version_cookie_t rqv_c = xcb_randr_query_version(connection,
+                                                                     XCB_RANDR_MAJOR_VERSION,
+                                                                     XCB_RANDR_MINOR_VERSION);
+    xcb_randr_query_version_reply_t *rqv_r = xcb_randr_query_version_reply(connection, rqv_c, NULL);
+
+    if (!rqv_r || rqv_r->minor_version < 6) {
+        fprintf(stderr, "No new-enough RandR version - XXX\n");
+        return -1;
+    }
+
+    xcb_screen_iterator_t s_i;
+
+    int i_s = 0;
+
+    for (s_i = xcb_setup_roots_iterator(xcb_get_setup(connection));
+         s_i.rem;
+         xcb_screen_next(&s_i), i_s++) {
+        printf("index %d screen %d\n", s_i.index, screen);
+        if (i_s == screen) break;
+    }
+
+    xcb_window_t root = s_i.data->root;
+
+    fprintf(stderr, "root %x\n", root);
+
+    xcb_randr_get_screen_resources_cookie_t gsr_c = xcb_randr_get_screen_resources(connection, root);
+
+    xcb_randr_get_screen_resources_reply_t *gsr_r = xcb_randr_get_screen_resources_reply(connection, gsr_c, NULL);
+
+    if (!gsr_r) {
+        fprintf(stderr, "get_screen_resources failed\n");
+        return -1;
+    }
+
+    xcb_randr_output_t *ro = xcb_randr_get_screen_resources_outputs(gsr_r);
+    int o, c;
+
+    xcb_randr_output_t output = 0;
+
+    /* Find a connected but idle output */
+    for (o = 0; output == 0 && o < gsr_r->num_outputs; o++) {
+        xcb_randr_get_output_info_cookie_t goi_c = xcb_randr_get_output_info(connection, ro[o], gsr_r->config_timestamp);
+
+        xcb_randr_get_output_info_reply_t *goi_r = xcb_randr_get_output_info_reply(connection, goi_c, NULL);
+
+        fprintf(stderr, "output[%d/%d] %d: conn %d/%d crtc %d\n", o, gsr_r->num_outputs, ro[o], goi_r->connection, XCB_RANDR_CONNECTION_CONNECTED, goi_r->crtc);
+
+        /* Find the first connected but unused output */
+        if (goi_r->connection == XCB_RANDR_CONNECTION_CONNECTED &&
+            goi_r->crtc == 0) {
+            output = ro[o];
+        }
+
+        free(goi_r);
+    }
+    output = ro[0]; //**************
+
+    xcb_randr_crtc_t *rc = xcb_randr_get_screen_resources_crtcs(gsr_r);
+
+    xcb_randr_crtc_t crtc = 0;
+
+    /* Find an idle crtc */
+    for (c = 0; crtc == 0 && c < gsr_r->num_crtcs; c++) {
+        xcb_randr_get_crtc_info_cookie_t gci_c = xcb_randr_get_crtc_info(connection, rc[c], gsr_r->config_timestamp);
+
+        xcb_randr_get_crtc_info_reply_t *gci_r = xcb_randr_get_crtc_info_reply(connection, gci_c, NULL);
+
+        fprintf(stderr, "crtc[%d/%d] %d: mode %d\n", c, gsr_r->num_crtcs, rc[c], gci_r->mode);
+
+        /* Find the first connected but unused crtc */
+//        if (gci_r->mode == 0) crtc = rc[c];
+
+        free(gci_r);
+    }
+    crtc = rc[0]; //*****************
+
+    free(gsr_r);
+
+    fprintf(stderr, "output %x crtc %x\n", output, crtc);
+
+    xcb_randr_lease_t lease = xcb_generate_id(connection);
+
+    xcb_randr_create_lease_cookie_t rcl_c = xcb_randr_create_lease(connection,
+                                                                   root,
+                                                                   lease,
+                                                                   1,
+                                                                   1,
+                                                                   &crtc,
+                                                                   &output);
+    xcb_randr_create_lease_reply_t *rcl_r = xcb_randr_create_lease_reply(connection, rcl_c, &xerr);
+
+    if (!rcl_r) {
+        fprintf(stderr, "create_lease failed: Xerror %d\n", xerr->error_code);
+        return -1;
+    }
+
+    int *rcl_f = xcb_randr_create_lease_reply_fds(connection, rcl_r);
+
+    if (drmSetClientCap(rcl_f[0], DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1)) {
+        fprintf(stderr, "Set universal failed\n");
+    }
+
+    fprintf(stderr, "fd %d, crtc=%d\n", rcl_f[0], crtc);
+    *pCrtcId = crtc;
+    return rcl_f[0];
+}
+
+static drmu_env_t *
+drmu_env_new_xlease(vlc_object_t * const log)
+{
+    int crtcid = 0;
+
+    int fd = get_lease_fd(log, &crtcid);
+
+    if (fd == -1) {
+        drmu_err_log(log, "Failed to get xlease");
+        return NULL;
+    }
+    return drmu_env_new_fd(log, fd);
+}
+
+
 struct drm_setup {
     int conId;
     uint32_t crtcId;
@@ -3399,6 +3538,10 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *pic,
         for (subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
             picture_t * const src = sreg->p_picture;
             subpic_ent_t * const dst = sys->subpics + n;
+
+            // If we've run out of subplanes we could allocate - give up now
+//            if (!sys->subplanes[n])
+//                goto subpics_done;
 
             // If the same picture then assume the same contents
             // We keep a ref to the previous pic to ensure that teh same picture
@@ -3503,7 +3646,8 @@ subpics_done:
 //                 spe->space.w, spe->space.h, spe->space.x, spe->space.y);
 
         // Rescale from sub-space
-        if ((ret = drmu_atomic_plane_set(da, sys->subplanes[i], spe->fb,
+        if (sys->subplanes[i] &&
+            (ret = drmu_atomic_plane_set(da, sys->subplanes[i], spe->fb,
                                   drmu_rect_rescale(spe->pos, r, spe->space))) != 0) {
             msg_Err(vd, "drmModeSetPlane for subplane %d failed: %s", i, strerror(-ret));
         }
@@ -3734,7 +3878,10 @@ static int OpenDrmVout(vout_display_t *vd,
         goto fail;
     }
 
-    if ((sys->du = drmu_env_new_open(VLC_OBJECT(vd), DRM_MODULE)) == NULL)
+    ;
+
+    if ((sys->du = drmu_env_new_xlease(VLC_OBJECT(vd))) == NULL &&
+        (sys->du = drmu_env_new_open(VLC_OBJECT(vd), DRM_MODULE)) == NULL)
         goto fail;
 
     drmu_env_modeset_allow(sys->du, !var_InheritBool(vd, DRM_VOUT_NO_MODESET_NAME));
