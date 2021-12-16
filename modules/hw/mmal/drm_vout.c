@@ -3138,7 +3138,7 @@ drmu_env_planes_populate(drmu_env_t * const du)
         dp->pid.color_range    = drmu_prop_enum_new(du, props_name_to_id(props, "COLOR_RANGE"));
 
         props_free(props);
-        du->plane_count = i;
+        du->plane_count = i + 1;
     }
 
     return 0;
