@@ -1648,7 +1648,7 @@ no_reuse:
         return swfmt;
     }
 
-#if LIBAVCODEC_VERSION_CHECK(57, 83, 101)
+#if LIBAVCODEC_VERSION_CHECK(57, 83, 101) && 0
     if (p_context->active_thread_type)
     {
         msg_Warn(p_dec, "thread type %d: disabling hardware acceleration",
