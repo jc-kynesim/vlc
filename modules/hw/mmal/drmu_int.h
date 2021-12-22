@@ -11,42 +11,17 @@
 
 #include <vlc_common.h>
 
-#define drmu_err_log(...)       msg_Err(__VA_ARGS__)
-#define drmu_warn_log(...)      msg_Warn(__VA_ARGS__)
-#define drmu_info_log(...)      msg_Info(__VA_ARGS__)
-#define drmu_debug_log(...)     msg_Dbg(__VA_ARGS__)
+#define drmu_err_log(_log, ...)       msg_Err((vlc_object_t *)(_log), __VA_ARGS__)
+#define drmu_warn_log(_log, ...)      msg_Warn((vlc_object_t *)(_log), __VA_ARGS__)
+#define drmu_info_log(_log, ...)      msg_Info((vlc_object_t *)(_log), __VA_ARGS__)
+#define drmu_debug_log(_log, ...)     msg_Dbg((vlc_object_t *)(_log), __VA_ARGS__)
 
 #define drmu_err(_du, ...)      drmu_err_log((_du)->log, __VA_ARGS__)
 #define drmu_warn(_du, ...)     drmu_warn_log((_du)->log, __VA_ARGS__)
 #define drmu_info(_du, ...)     drmu_info_log((_du)->log, __VA_ARGS__)
 #define drmu_debug(_du, ...)    drmu_debug_log((_du)->log, __VA_ARGS__)
 
-typedef struct drmu_props_s {
-    struct drmu_env_s * du;
-    unsigned int prop_count;
-    drmModePropertyPtr * props;
-} drmu_props_t;
-
-typedef struct drmu_prop_enum_s {
-    uint32_t id;
-    uint32_t flags;
-    unsigned int n;
-    const struct drm_mode_property_enum * enums;
-    char name[DRM_PROP_NAME_LEN];
-} drmu_prop_enum_t;
-
-typedef struct drmu_prop_range_s {
-    uint32_t id;
-    uint32_t flags;
-    uint64_t range[2];
-    char name[DRM_PROP_NAME_LEN];
-} drmu_prop_range_t;
-
-typedef struct drmu_blob_s {
-    atomic_int ref_count;  // 0 == 1 ref for ease of init
-    struct drmu_env_s * du;
-    uint32_t blob_id;
-} drmu_blob_t;
+#define TRACE_PROP_NEW 1
 
 enum drmu_bo_type_e {
     BO_TYPE_NONE = 0,
@@ -159,35 +134,6 @@ typedef struct drmu_plane_s {
 
 } drmu_plane_t;
 
-typedef int (* drmu_mode_score_fn)(void * v, const drmModeModeInfo * mode);
-
-typedef struct drmu_crtc_s {
-    struct drmu_env_s * du;
-//    drmModeCrtcPtr crtc;
-    drmModeEncoderPtr enc;
-    drmModeConnectorPtr con;
-    int crtc_idx;
-    bool hi_bpc_ok;
-    drmu_ufrac_t sar;
-    drmu_ufrac_t par;
-
-    struct drm_mode_crtc crtc;
-
-    struct {
-        // crtc
-        uint32_t mode_id;
-        // connection
-        drmu_prop_range_t * max_bpc;
-        drmu_prop_enum_t * colorspace;
-        uint32_t hdr_output_metadata;
-    } pid;
-
-    int cur_mode_id;
-    drmu_blob_t * mode_id_blob;
-    drmu_blob_t * hdr_metadata_blob;
-    struct hdr_output_metadata hdr_metadata;
-
-} drmu_crtc_t;
 
 typedef struct drmu_atomic_q_s {
     pthread_mutex_t lock;
@@ -199,7 +145,7 @@ typedef struct drmu_atomic_q_s {
 } drmu_atomic_q_t;
 
 typedef struct drmu_env_s {
-    vlc_object_t * log;
+    void * log;
     int fd;
     uint32_t plane_count;
     drmu_plane_t * planes;

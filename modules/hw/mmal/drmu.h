@@ -1,12 +1,22 @@
 #ifndef _DRMU_DRMU_H
 #define _DRMU_DRMU_H
 
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct drmu_blob_s;
+typedef struct drmu_blob_s drmu_blob_t;
+
+struct drmu_prop_enum_s;
+typedef struct drmu_prop_enum_s drmu_prop_enum_t;
+
+struct drmu_prop_range_s;
+typedef struct drmu_prop_range_s drmu_prop_range_t;
 
 struct drmu_bo_s;
 typedef struct drmu_bo_s drmu_bo_t;
@@ -21,6 +31,11 @@ typedef struct drmu_pool_s drmu_pool_t;
 
 struct drmu_crtc_s;
 typedef struct drmu_crtc_s drmu_crtc_t;
+
+struct drmu_plane_s;
+typedef struct drmu_plane_s drmu_plane_t;
+
+struct drmu_atomic_s;
 
 struct drmu_env_s;
 typedef struct drmu_env_s drmu_env_t;
@@ -76,7 +91,31 @@ drmu_rect_wh(const unsigned int w, const unsigned int h)
     };
 }
 
+// Blob
 
+void drmu_blob_unref(drmu_blob_t ** const ppBlob);
+uint32_t drmu_blob_id(const drmu_blob_t * const blob);
+drmu_blob_t * drmu_blob_ref(drmu_blob_t * const blob);
+drmu_blob_t * drmu_blob_new(drmu_env_t * const du, const void * const data, const size_t len);
+int drmu_atomic_add_prop_blob(struct drmu_atomic_s * const da, const uint32_t obj_id, const uint32_t prop_id, drmu_blob_t * const blob);
+
+// Enum
+
+const uint64_t * drmu_prop_enum_value(const drmu_prop_enum_t * const pen, const char * const name);
+uint32_t drmu_prop_enum_id(const drmu_prop_enum_t * const pen);
+void drmu_prop_enum_delete(drmu_prop_enum_t ** const pppen);
+drmu_prop_enum_t * drmu_prop_enum_new(drmu_env_t * const du, const uint32_t id);
+int drmu_atomic_add_prop_enum(struct drmu_atomic_s * const da, const uint32_t obj_id, const drmu_prop_enum_t * const pen, const char * const name);
+
+// Range
+
+void drmu_prop_range_delete(drmu_prop_range_t ** pppra);
+bool drmu_prop_range_validate(const drmu_prop_range_t * const pra, const uint64_t x);
+uint32_t drmu_prop_range_id(const drmu_prop_range_t * const pra);
+drmu_prop_range_t * drmu_prop_range_new(drmu_env_t * const du, const uint32_t id);
+int drmu_atomic_add_prop_range(struct drmu_atomic_s * const da, const uint32_t obj_id, const drmu_prop_range_t * const pra, const uint64_t x);
+
+// BO
 
 void drmu_bo_unref(drmu_bo_t ** const ppbo);
 drmu_bo_t * drmu_bo_ref(drmu_bo_t * const bo);
@@ -102,6 +141,7 @@ void drmu_fb_pre_delete_unset(drmu_fb_t *const dfb);
 unsigned int drmu_fb_pixel_bits(const drmu_fb_t * const dfb);
 drmu_fb_t * drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format);
 drmu_fb_t * drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format);
+int drmu_atomic_add_prop_fb(struct drmu_atomic_s * const da, const uint32_t obj_id, const uint32_t prop_id, drmu_fb_t * const dfb);
 
 // fb pool
 
@@ -110,6 +150,52 @@ drmu_pool_t * drmu_pool_ref(drmu_pool_t * const pool);
 drmu_pool_t * drmu_pool_new(drmu_env_t * const du, unsigned int total_fbs_max);
 drmu_fb_t * drmu_pool_fb_new_dumb(drmu_pool_t * const pool, uint32_t w, uint32_t h, const uint32_t format);
 void drmu_pool_delete(drmu_pool_t ** const pppool);
+
+// CRTC
+
+struct _drmModeModeInfo;
+struct hdr_output_metadata;
+
+void drmu_crtc_delete(drmu_crtc_t ** ppdc);
+drmu_env_t * drmu_crtc_env(const drmu_crtc_t * const dc);
+uint32_t drmu_crtc_id(const drmu_crtc_t * const dc);
+int drmu_crtc_idx(const drmu_crtc_t * const dc);
+uint32_t drmu_crtc_x(const drmu_crtc_t * const dc);
+uint32_t drmu_crtc_y(const drmu_crtc_t * const dc);
+uint32_t drmu_crtc_width(const drmu_crtc_t * const dc);
+uint32_t drmu_crtc_height(const drmu_crtc_t * const dc);
+drmu_ufrac_t drmu_crtc_sar(const drmu_crtc_t * const dc);
+void drmu_crtc_max_bpc_allow(drmu_crtc_t * const dc, const bool max_bpc_allowed);
+
+typedef int (* drmu_mode_score_fn)(void * v, const struct _drmModeModeInfo * mode);
+int drmu_crtc_mode_pick(drmu_crtc_t * const dc, drmu_mode_score_fn score_fn, void * const score_v);
+
+drmu_crtc_t * drmu_crtc_new_find(drmu_env_t * const du);
+
+int drmu_atomic_crtc_colorspace_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const char * colorspace, int hi_bpc);
+int drmu_atomic_crtc_mode_id_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const int mode_id);
+int drmu_atomic_crtc_hdr_metadata_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const struct hdr_output_metadata * const m);
+
+// Plane
+
+uint32_t drmu_plane_id(const drmu_plane_t * const dp);
+const uint32_t * drmu_plane_formats(const drmu_plane_t * const dp, unsigned int * const pCount);
+void drmu_plane_delete(drmu_plane_t ** const ppdp);
+drmu_plane_t * drmu_plane_new_find(drmu_crtc_t * const dc, const uint32_t fmt);
+
+int drmu_atomic_plane_set(struct drmu_atomic_s * const da, drmu_plane_t * const dp, drmu_fb_t * const dfb, const drmu_rect_t pos);
+
+// Env
+
+// Q the atomic on its associated env
+int drmu_atomic_queue(struct drmu_atomic_s ** ppda);
+
+int drmu_fd(const drmu_env_t * const du);
+void drmu_env_delete(drmu_env_t ** const ppdu);
+void drmu_env_modeset_allow(drmu_env_t * const du, const bool modeset_allowed);
+drmu_env_t * drmu_env_new_open(void * const log, const char * name);
+drmu_env_t * drmu_env_new_fd(void * const log, const int fd);
+
 
 // drmu_atomic
 
@@ -122,7 +208,7 @@ void drmu_atomic_unref(drmu_atomic_t ** const ppda);
 drmu_atomic_t * drmu_atomic_ref(drmu_atomic_t * const da);
 drmu_atomic_t * drmu_atomic_new(drmu_env_t * const du);
 int drmu_atomic_merge(drmu_atomic_t * const a, drmu_atomic_t ** const ppb);
-int drmu_atomic_commit(drmu_atomic_t * const da, uint32_t flags);
+int drmu_atomic_commit(const drmu_atomic_t * const da, uint32_t flags);
 
 typedef void (* drmu_prop_del_fn)(void * v);
 typedef void (* drmu_prop_ref_fn)(void * v);
@@ -130,6 +216,7 @@ typedef void (* drmu_prop_ref_fn)(void * v);
 int drmu_atomic_add_prop_generic(drmu_atomic_t * const da,
         const uint32_t obj_id, const uint32_t prop_id, const uint64_t value,
         const drmu_prop_ref_fn ref_fn, const drmu_prop_del_fn del_fn, void * const v);
+int drmu_atomic_add_prop_value(drmu_atomic_t * const da, const uint32_t obj_id, const uint32_t prop_id, const uint64_t value);
 
 #ifdef __cplusplus
 }

@@ -402,6 +402,15 @@ drmu_atomic_add_prop_generic(drmu_atomic_t * const da,
     }
 }
 
+int
+drmu_atomic_add_prop_value(drmu_atomic_t * const da, const uint32_t obj_id, const uint32_t prop_id, const uint64_t value)
+{
+    if (drmu_atomic_add_prop_generic(da, obj_id, prop_id, value, 0, 0, NULL) < 0)
+        drmu_warn(drmu_atomic_env(da), "%s: Failed to set obj_id=%#x, prop_id=%#x, val=%" PRId64, __func__,
+                 obj_id, prop_id, value);
+    return 0;
+}
+
 void
 drmu_atomic_dump(const drmu_atomic_t * const da)
 {
@@ -500,7 +509,7 @@ drmu_atomic_merge(drmu_atomic_t * const a, drmu_atomic_t ** const ppb)
 }
 
 int
-drmu_atomic_commit(drmu_atomic_t * const da, uint32_t flags)
+drmu_atomic_commit(const drmu_atomic_t * const da, uint32_t flags)
 {
     drmu_env_t * const du = da->du;
     const unsigned int n_objs = aprop_hdr_objs_count(&da->props);
