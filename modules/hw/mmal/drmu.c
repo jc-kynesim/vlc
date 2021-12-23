@@ -652,6 +652,36 @@ drmu_fb_pre_delete_unset(drmu_fb_t *const dfb)
     dfb->pre_delete_v  = NULL;
 }
 
+uint32_t
+drmu_fb_pitch(const drmu_fb_t *const dfb, const unsigned int layer)
+{
+    return layer >= 4 ? 0 : dfb->fb.pitches[layer];
+}
+
+void *
+drmu_fb_data(const drmu_fb_t *const dfb, const unsigned int layer)
+{
+    return (layer >= 4 || dfb->map_ptr == NULL) ? NULL : (uint8_t * )dfb->map_ptr + dfb->fb.offsets[layer];
+}
+
+uint32_t
+drmu_fb_width(const drmu_fb_t *const dfb)
+{
+    return dfb->fb.width;
+}
+
+uint32_t
+drmu_fb_height(const drmu_fb_t *const dfb)
+{
+    return dfb->fb.height;
+}
+
+const drmu_rect_t *
+drmu_fb_crop(const drmu_fb_t *const dfb)
+{
+    return &dfb->cropped;
+}
+
 void
 drmu_fb_int_fmt_size_set(drmu_fb_t *const dfb, uint32_t fmt, uint32_t w, uint32_t h, const drmu_rect_t crop)
 {
@@ -702,6 +732,18 @@ drmu_fb_int_make(drmu_fb_t *const dfb)
     if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_ADDFB2, &dfb->fb)) != 0)
         drmu_err(du, "AddFB2 failed: %s", strerror(-rv));
     return rv;
+}
+
+void
+drmu_fb_int_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta)
+{
+    if (meta == NULL) {
+        dfb->hdr_metadata_isset = DRMU_ISSET_NULL;
+    }
+    else {
+        dfb->hdr_metadata_isset = DRMU_ISSET_SET;
+        dfb->hdr_metadata = *meta;
+    }
 }
 
 drmu_fb_t *
@@ -2034,6 +2076,12 @@ int
 drmu_fd(const drmu_env_t * const du)
 {
     return du->fd;
+}
+
+void *
+drmu_env_log(const drmu_env_t * const du)
+{
+    return du->log;
 }
 
 void

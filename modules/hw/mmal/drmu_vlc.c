@@ -1,9 +1,14 @@
 #include "drmu_vlc.h"
-#include "drmu_int.h"
+#include "drmu_log.h"
+
 #include "../codec/avcodec/drm_pic.h"
 
 #include <libavutil/buffer.h>
 #include <libavutil/hwcontext_drm.h>
+
+#include <libdrm/drm.h>
+#include <libdrm/drm_mode.h>
+#include <libdrm/drm_fourcc.h>
 
 // N.B. DRM seems to order its format descriptor names the opposite way round to VLC
 // DRM is hi->lo within a little-endian word, VLC is byte order
@@ -233,7 +238,6 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
     drmu_fb_t * const dfb = drmu_fb_int_alloc(du);
     const AVDRMFrameDescriptor * const desc = drm_prime_get_desc(pic);
     fb_aux_pic_t * aux = NULL;
-    int rv;
 
     if (dfb == NULL) {
         drmu_err(du, "%s: Alloc failure", __func__);
@@ -294,11 +298,11 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
     }
 
     if (pic->format.mastering.max_luminance == 0) {
-        dfb->hdr_metadata_isset = DRMU_ISSET_NULL;
+        drmu_fb_int_hdr_metadata_set(dfb, NULL);
     }
     else {
-        dfb->hdr_metadata_isset = DRMU_ISSET_SET;
-        dfb->hdr_metadata = pic_hdr_metadata(&pic->format);
+        const struct hdr_output_metadata meta = pic_hdr_metadata(&pic->format);
+        drmu_fb_int_hdr_metadata_set(dfb, &meta);
     }
 
     if (drmu_fb_int_make(dfb) != 0)
@@ -316,24 +320,26 @@ drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
     const unsigned int bpp = drmu_fb_pixel_bits(dfb);
     unsigned int hdiv = 1;
     unsigned int wdiv = 1;
+    const uint32_t pitch_n = drmu_fb_pitch(dfb, plane_n);
+    const drmu_rect_t * crop = drmu_fb_crop(dfb);
 
-    if (plane_n > 4 || dfb->fb.pitches[plane_n] == 0) {
+    if (pitch_n == 0) {
         return (plane_t) {.p_pixels = NULL };
     }
 
     // Slightly kludgy derivation of height & width divs
     if (plane_n > 0) {
-        wdiv = dfb->fb.pitches[0] / dfb->fb.pitches[plane_n];
+        wdiv = drmu_fb_pitch(dfb, 0) / pitch_n;
         hdiv = 2;
     }
 
     return (plane_t){
-        .p_pixels = (uint8_t *)dfb->map_ptr + dfb->fb.offsets[plane_n],
-        .i_lines = dfb->fb.height / hdiv,
-        .i_pitch = dfb->fb.pitches[plane_n],
+        .p_pixels = drmu_fb_data(dfb, plane_n),
+        .i_lines = drmu_fb_height(dfb) / hdiv,
+        .i_pitch = pitch_n,
         .i_pixel_pitch = bpp / 8,
-        .i_visible_lines = dfb->cropped.h / hdiv,
-        .i_visible_pitch = (dfb->cropped.w * bpp / 8) / wdiv
+        .i_visible_lines = crop->h / hdiv,
+        .i_visible_pitch = (crop->w * bpp / 8) / wdiv
     };
 }
 

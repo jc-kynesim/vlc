@@ -137,10 +137,8 @@ drmu_bo_t * drmu_bo_new_dumb(drmu_env_t *const du, struct drm_mode_create_dumb *
 void drmu_bo_env_uninit(drmu_bo_env_t * const boe);
 void drmu_bo_env_init(drmu_bo_env_t * boe);
 
-void drmu_fb_unref(drmu_fb_t ** const ppdfb);
-drmu_fb_t * drmu_fb_ref(drmu_fb_t * const dfb);
-
 // fb
+struct hdr_output_metadata;
 
 // Called pre delete.
 // Zero returned means continue delete.
@@ -154,7 +152,28 @@ void drmu_fb_pre_delete_unset(drmu_fb_t *const dfb);
 unsigned int drmu_fb_pixel_bits(const drmu_fb_t * const dfb);
 drmu_fb_t * drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format);
 drmu_fb_t * drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format);
+void drmu_fb_unref(drmu_fb_t ** const ppdfb);
+drmu_fb_t * drmu_fb_ref(drmu_fb_t * const dfb);
+
+uint32_t drmu_fb_pitch(const drmu_fb_t *const dfb, const unsigned int layer);
+void * drmu_fb_data(const drmu_fb_t *const dfb, const unsigned int layer);
+uint32_t drmu_fb_width(const drmu_fb_t *const dfb);
+uint32_t drmu_fb_height(const drmu_fb_t *const dfb);
+const drmu_rect_t * drmu_fb_crop(const drmu_fb_t *const dfb);
+
 int drmu_atomic_add_prop_fb(struct drmu_atomic_s * const da, const uint32_t obj_id, const uint32_t prop_id, drmu_fb_t * const dfb);
+
+// FB creation helpers - only use for creatino of new FBs
+drmu_fb_t * drmu_fb_int_alloc(drmu_env_t * const du);
+void drmu_fb_int_free(drmu_fb_t * const dfb);
+void drmu_fb_int_fmt_size_set(drmu_fb_t *const dfb, uint32_t fmt, uint32_t w, uint32_t h, const drmu_rect_t crop);
+// All assumed to be const strings that do not need freed
+void drmu_fb_int_color_set(drmu_fb_t *const dfb, const char * const enc, const char * const range, const char * const space);
+void drmu_fb_int_on_delete_set(drmu_fb_t *const dfb, drmu_fb_on_delete_fn fn, void * v);
+void drmu_fb_int_bo_set(drmu_fb_t *const dfb, unsigned int i, drmu_bo_t * const bo);
+void drmu_fb_int_layer_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset, uint64_t modifier);
+void drmu_fb_int_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta);
+int drmu_fb_int_make(drmu_fb_t *const dfb);
 
 // fb pool
 
@@ -207,6 +226,7 @@ int drmu_atomic_queue(struct drmu_atomic_s ** ppda);
 // deals with recalling the ioctl when required
 int drmu_ioctl(const drmu_env_t * const du, unsigned long req, void * arg);
 int drmu_fd(const drmu_env_t * const du);
+void * drmu_env_log(const drmu_env_t * const du);
 void drmu_env_delete(drmu_env_t ** const ppdu);
 void drmu_env_modeset_allow(drmu_env_t * const du, const bool modeset_allowed);
 drmu_env_t * drmu_env_new_open(void * const log, const char * name);
