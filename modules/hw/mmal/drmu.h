@@ -50,9 +50,20 @@ typedef struct drmu_ufrac_s {
     unsigned int den;
 } drmu_ufrac_t;
 
-drmu_ufrac_t drmu_ufrac_reduce(drmu_ufrac_t x);
+// HDR enums is copied from linux include/linux/hdmi.h (strangely not part of uapi)
+enum hdmi_metadata_type
+{
+    HDMI_STATIC_METADATA_TYPE1 = 0,
+};
+enum hdmi_eotf
+{
+    HDMI_EOTF_TRADITIONAL_GAMMA_SDR,
+    HDMI_EOTF_TRADITIONAL_GAMMA_HDR,
+    HDMI_EOTF_SMPTE_ST2084,
+    HDMI_EOTF_BT_2100_HLG,
+};
 
-struct drm_mode_create_dumb;
+drmu_ufrac_t drmu_ufrac_reduce(drmu_ufrac_t x);
 
 static inline int
 drmu_rect_rescale_1(int x, int mul, int div)
@@ -116,6 +127,8 @@ drmu_prop_range_t * drmu_prop_range_new(drmu_env_t * const du, const uint32_t id
 int drmu_atomic_add_prop_range(struct drmu_atomic_s * const da, const uint32_t obj_id, const drmu_prop_range_t * const pra, const uint64_t x);
 
 // BO
+
+struct drm_mode_create_dumb;
 
 void drmu_bo_unref(drmu_bo_t ** const ppbo);
 drmu_bo_t * drmu_bo_ref(drmu_bo_t * const bo);
@@ -190,6 +203,9 @@ int drmu_atomic_plane_set(struct drmu_atomic_s * const da, drmu_plane_t * const 
 // Q the atomic on its associated env
 int drmu_atomic_queue(struct drmu_atomic_s ** ppda);
 
+// Do ioctl - returns -errno on error, 0 on success
+// deals with recalling the ioctl when required
+int drmu_ioctl(const drmu_env_t * const du, unsigned long req, void * arg);
 int drmu_fd(const drmu_env_t * const du);
 void drmu_env_delete(drmu_env_t ** const ppdu);
 void drmu_env_modeset_allow(drmu_env_t * const du, const bool modeset_allowed);
@@ -217,6 +233,11 @@ int drmu_atomic_add_prop_generic(drmu_atomic_t * const da,
         const uint32_t obj_id, const uint32_t prop_id, const uint64_t value,
         const drmu_prop_ref_fn ref_fn, const drmu_prop_del_fn del_fn, void * const v);
 int drmu_atomic_add_prop_value(drmu_atomic_t * const da, const uint32_t obj_id, const uint32_t prop_id, const uint64_t value);
+
+// drmu_xlease
+
+drmu_env_t * drmu_env_new_xlease(void * const log);
+
 
 #ifdef __cplusplus
 }

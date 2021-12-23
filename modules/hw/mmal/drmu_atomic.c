@@ -533,10 +533,9 @@ drmu_atomic_commit(const drmu_atomic_t * const da, uint32_t flags)
 
         aprop_hdr_atomic_fill(&da->props, obj_ids, prop_counts, prop_ids, prop_values);
 
-        if (drmIoctl(du->fd, DRM_IOCTL_MODE_ATOMIC, &atomic) == 0)
+        if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_ATOMIC, &atomic)) == 0)
             return 0;
 
-        rv = -errno;
         if (rv == -EINVAL && du->modeset_allow) {
             drmu_debug(du, "%s: EINVAL try ALLOW_MODESET", __func__);
             atomic.flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;

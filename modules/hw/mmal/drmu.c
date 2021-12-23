@@ -2,6 +2,7 @@
 #include "pollqueue.h"
 
 #include <assert.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 
 
@@ -38,7 +39,7 @@ blob_free(drmu_blob_t * const blob)
         struct drm_mode_destroy_blob dblob = {
             .blob_id = blob->blob_id
         };
-        if (drmIoctl(du->fd, DRM_IOCTL_MODE_DESTROYPROPBLOB, &dblob) != 0)
+        if (drmu_ioctl(du, DRM_IOCTL_MODE_DESTROYPROPBLOB, &dblob) != 0)
             drmu_err(du, "%s: Failed to destroy blob: %s", __func__, strerror(errno));
     }
     free(blob);
@@ -90,9 +91,9 @@ drmu_blob_new(drmu_env_t * const du, const void * const data, const size_t len)
     }
     blob->du = du;
 
-    if ((rv = drmIoctl(du->fd, DRM_IOCTL_MODE_CREATEPROPBLOB, &cblob)) != 0) {
+    if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_CREATEPROPBLOB, &cblob)) != 0) {
         drmu_err(du, "%s: Unable to create blob: data=%p, len=%zu: %s", __func__,
-                 data, len, strerror(errno));
+                 data, len, strerror(-rv));
         blob_free(blob);
         return NULL;
     }
@@ -210,6 +211,7 @@ drmu_prop_enum_new(drmu_env_t * const du, const uint32_t id)
     drmu_prop_enum_t * pen;
     struct drm_mode_property_enum * enums = NULL;
     unsigned int retries;
+    int rv;
 
     // If id 0 return without warning for ease of getting props on init
     if (id == 0 || (pen = calloc(1, sizeof(*pen))) == NULL)
@@ -224,8 +226,8 @@ drmu_prop_enum_new(drmu_env_t * const du, const uint32_t id)
             .enum_blob_ptr = (uintptr_t)enums
         };
 
-        if (drmIoctl(du->fd, DRM_IOCTL_MODE_GETPROPERTY, &prop) != 0) {
-            drmu_err(du, "%s: get property failed: %s", __func__, strerror(errno));
+        if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_GETPROPERTY, &prop)) != 0) {
+            drmu_err(du, "%s: get property failed: %s", __func__, strerror(-rv));
             goto fail;
         }
 
@@ -339,6 +341,7 @@ drmu_prop_range_t *
 drmu_prop_range_new(drmu_env_t * const du, const uint32_t id)
 {
     drmu_prop_range_t * pra;
+    int rv;
 
     // If id 0 return without warning for ease of getting props on init
     if (id == 0 || (pra = calloc(1, sizeof(*pra))) == NULL)
@@ -353,8 +356,8 @@ drmu_prop_range_new(drmu_env_t * const du, const uint32_t id)
             .values_ptr = (uintptr_t)pra->range
         };
 
-        if (drmIoctl(du->fd, DRM_IOCTL_MODE_GETPROPERTY, &prop) != 0) {
-            drmu_err(du, "%s: get property failed: %s", __func__, strerror(errno));
+        if ((rv = drmIoctl(du->fd, DRM_IOCTL_MODE_GETPROPERTY, &prop)) != 0) {
+            drmu_err(du, "%s: get property failed: %s", __func__, strerror(-rv));
             goto fail;
         }
 
@@ -411,7 +414,7 @@ bo_close(drmu_env_t * const du, uint32_t * const ph)
         return 0;
     *ph = 0;
 
-    return drmIoctl(du->fd, DRM_IOCTL_GEM_CLOSE, &gem_close);
+    return drmu_ioctl(du, DRM_IOCTL_GEM_CLOSE, &gem_close);
 }
 
 // BOE lock expected
@@ -422,7 +425,7 @@ bo_free_dumb(drmu_bo_t * const bo)
         drmu_env_t * const du = bo->du;
         struct drm_mode_destroy_dumb destroy_env = {.handle = bo->handle};
 
-        if (drmIoctl(du->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_env) != 0)
+        if (drmu_ioctl(du, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_env) != 0)
             drmu_warn(du, "%s: Failed to destroy dumb handle %d", __func__, bo->handle);
     }
     free(bo);
@@ -548,14 +551,15 @@ drmu_bo_t *
 drmu_bo_new_dumb(drmu_env_t *const du, struct drm_mode_create_dumb * const d)
 {
     drmu_bo_t *bo = bo_alloc(du, BO_TYPE_DUMB);
+    int rv;
 
     if (bo == NULL)
         return NULL;
 
-    if (drmIoctl(du->fd, DRM_IOCTL_MODE_CREATE_DUMB, d) != 0)
+    if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_CREATE_DUMB, d)) != 0)
     {
         drmu_err(du, "%s: Create dumb %dx%dx%d failed: %s", __func__,
-                 d->width, d->height, d->bpp, strerror(errno));
+                 d->width, d->height, d->bpp, strerror(-rv));
         drmu_bo_unref(&bo);  // After this point aux is bound to dfb and gets freed with it
         return NULL;
     }
@@ -750,6 +754,7 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
 {
     drmu_fb_t * const dfb = drmu_fb_int_alloc(du);
     uint32_t bpp;
+    int rv;
 
     if (dfb == NULL) {
         drmu_err(du, "%s: Alloc failure", __func__);
@@ -782,9 +787,9 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
         struct drm_mode_map_dumb map_dumb = {
             .handle = dfb->bo_list[0]->handle
         };
-        if (drmIoctl(du->fd, DRM_IOCTL_MODE_MAP_DUMB, &map_dumb) != 0)
+        if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_MAP_DUMB, &map_dumb)) != 0)
         {
-            drmu_err(du, "%s: map dumb failed: %s", __func__, strerror(errno));
+            drmu_err(du, "%s: map dumb failed: %s", __func__, strerror(-rv));
             goto fail;
         }
 
@@ -1208,7 +1213,7 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
     }
 
     dc->crtc.crtc_id = dc->enc->crtc_id;
-    if (drmIoctl(du->fd, DRM_IOCTL_MODE_GETCRTC, &dc->crtc) != 0) {
+    if (drmu_ioctl(du, DRM_IOCTL_MODE_GETCRTC, &dc->crtc) != 0) {
         drmu_err(du, "%s: Failed to find crtc %d", __func__, dc->enc->crtc_id);
         goto fail;
     }
@@ -1889,6 +1894,19 @@ free_planes(drmu_env_t * const du)
 //----------------------------------------------------------------------------
 //
 // Env fns
+
+int
+drmu_ioctl(const drmu_env_t * const du, unsigned long req, void * arg)
+{
+    while (ioctl(du->fd, req, arg)) {
+        const int err = errno;
+        // DRM docn suggests we should try again on EAGAIN as well as EINTR
+        // and drm userspace does this.
+        if (err != EINTR && err != EAGAIN)
+            return -err;
+    }
+    return 0;
+}
 
 static int
 drmu_env_planes_populate(drmu_env_t * const du)
