@@ -293,7 +293,7 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
             const AVDRMPlaneDescriptor *const p = desc->layers[i].planes + j;
             const AVDRMObjectDescriptor *const obj = desc->objects + p->object_index;
 
-            drmu_fb_int_layer_set(dfb, n++, p->object_index, p->pitch, p->offset, obj->format_modifier);
+            drmu_fb_int_layer_mod_set(dfb, n++, p->object_index, p->pitch, p->offset, obj->format_modifier);
         }
     }
 

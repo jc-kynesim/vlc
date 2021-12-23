@@ -171,7 +171,8 @@ void drmu_fb_int_fmt_size_set(drmu_fb_t *const dfb, uint32_t fmt, uint32_t w, ui
 void drmu_fb_int_color_set(drmu_fb_t *const dfb, const char * const enc, const char * const range, const char * const space);
 void drmu_fb_int_on_delete_set(drmu_fb_t *const dfb, drmu_fb_on_delete_fn fn, void * v);
 void drmu_fb_int_bo_set(drmu_fb_t *const dfb, unsigned int i, drmu_bo_t * const bo);
-void drmu_fb_int_layer_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset, uint64_t modifier);
+void drmu_fb_int_layer_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset);
+void drmu_fb_int_layer_mod_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset, uint64_t modifier);
 void drmu_fb_int_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta);
 int drmu_fb_int_make(drmu_fb_t *const dfb);
 
