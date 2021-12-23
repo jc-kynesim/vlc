@@ -597,8 +597,8 @@ drmu_fb_int_free(drmu_fb_t * const dfb)
     if (dfb->pre_delete_fn && dfb->pre_delete_fn(dfb, dfb->pre_delete_v) != 0)
         return;
 
-    if (dfb->handle != 0)
-        drmModeRmFB(du->fd, dfb->handle);
+    if (dfb->fb.fb_id != 0)
+        drmModeRmFB(du->fd, dfb->fb.fb_id);
 
     if (dfb->map_ptr != NULL && dfb->map_ptr != MAP_FAILED)
         munmap(dfb->map_ptr, dfb->map_size);
@@ -652,6 +652,58 @@ drmu_fb_pre_delete_unset(drmu_fb_t *const dfb)
     dfb->pre_delete_v  = NULL;
 }
 
+void
+drmu_fb_int_fmt_size_set(drmu_fb_t *const dfb, uint32_t fmt, uint32_t w, uint32_t h, const drmu_rect_t crop)
+{
+    dfb->fb.pixel_format = fmt;
+    dfb->fb.width        = w;
+    dfb->fb.height       = h;
+    dfb->cropped         = crop;
+}
+
+void
+drmu_fb_int_color_set(drmu_fb_t *const dfb, const char * const enc, const char * const range, const char * const space)
+{
+    dfb->color_encoding = enc;
+    dfb->color_range    = range;
+    dfb->colorspace     = space;
+}
+
+void
+drmu_fb_int_on_delete_set(drmu_fb_t *const dfb, drmu_fb_on_delete_fn fn, void * v)
+{
+    dfb->on_delete_fn = fn;
+    dfb->on_delete_v  = v;
+}
+
+void
+drmu_fb_int_bo_set(drmu_fb_t *const dfb, unsigned int i, drmu_bo_t * const bo)
+{
+    dfb->bo_list[i] = bo;
+}
+
+void
+drmu_fb_int_layer_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset, uint64_t modifier)
+{
+    dfb->fb.handles[i] = dfb->bo_list[obj_idx]->handle;
+    dfb->fb.pitches[i] = pitch;
+    dfb->fb.offsets[i] = offset;
+    dfb->fb.modifier[i] = modifier;
+}
+
+int
+drmu_fb_int_make(drmu_fb_t *const dfb)
+{
+    drmu_env_t * du = dfb->du;
+    int rv;
+
+    dfb->fb.flags = (dfb->fb.modifier[0] == DRM_FORMAT_MOD_INVALID) ? 0 : DRM_MODE_FB_MODIFIERS;
+
+    if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_ADDFB2, &dfb->fb)) != 0)
+        drmu_err(du, "AddFB2 failed: %s", strerror(-rv));
+    return rv;
+}
+
 drmu_fb_t *
 drmu_fb_int_alloc(drmu_env_t * const du)
 {
@@ -667,7 +719,7 @@ drmu_fb_int_alloc(drmu_env_t * const du)
 unsigned int
 drmu_fb_pixel_bits(const drmu_fb_t * const dfb)
 {
-    switch (dfb->format) {
+    switch (dfb->fb.pixel_format) {
         case DRM_FORMAT_XRGB8888:
         case DRM_FORMAT_XBGR8888:
         case DRM_FORMAT_RGBX8888:
@@ -698,7 +750,7 @@ drmu_fb_pixel_bits(const drmu_fb_t * const dfb)
 static unsigned int
 fb_total_height(const drmu_fb_t * const dfb, unsigned int h)
 {
-    switch (dfb->format) {
+    switch (dfb->fb.pixel_format) {
         case DRM_FORMAT_NV12:
         case DRM_FORMAT_NV21:
         case DRM_FORMAT_YUV420:
@@ -712,10 +764,10 @@ fb_total_height(const drmu_fb_t * const dfb, unsigned int h)
 static void
 fb_pitches_set(drmu_fb_t * const dfb)
 {
-    memset(dfb->offsets, 0, sizeof(dfb->offsets));
-    memset(dfb->pitches, 0, sizeof(dfb->pitches));
+    memset(dfb->fb.offsets, 0, sizeof(dfb->fb.offsets));
+    memset(dfb->fb.pitches, 0, sizeof(dfb->fb.pitches));
 
-    switch (dfb->format) {
+    switch (dfb->fb.pixel_format) {
         case DRM_FORMAT_XRGB8888:
         case DRM_FORMAT_XBGR8888:
         case DRM_FORMAT_RGBX8888:
@@ -729,20 +781,20 @@ fb_pitches_set(drmu_fb_t * const dfb)
         case DRM_FORMAT_YVYU:
         case DRM_FORMAT_VYUY:
         case DRM_FORMAT_UYVY:
-            dfb->pitches[0] = dfb->map_pitch;
+            dfb->fb.pitches[0] = dfb->map_pitch;
             break;
         case DRM_FORMAT_NV12:
         case DRM_FORMAT_NV21:
-            dfb->pitches[0] = dfb->map_pitch;
-            dfb->pitches[1] = dfb->map_pitch;
-            dfb->offsets[1] = dfb->pitches[0] * dfb->height;
+            dfb->fb.pitches[0] = dfb->map_pitch;
+            dfb->fb.pitches[1] = dfb->map_pitch;
+            dfb->fb.offsets[1] = dfb->fb.pitches[0] * dfb->fb.height;
             break;
         case DRM_FORMAT_YUV420:
-            dfb->pitches[0] = dfb->map_pitch;
-            dfb->pitches[1] = dfb->map_pitch / 2;
-            dfb->pitches[2] = dfb->map_pitch / 2;
-            dfb->offsets[1] = dfb->pitches[0] * dfb->height;
-            dfb->offsets[2] = dfb->offsets[1] + dfb->pitches[1] * dfb->height / 2;
+            dfb->fb.pitches[0] = dfb->map_pitch;
+            dfb->fb.pitches[1] = dfb->map_pitch / 2;
+            dfb->fb.pitches[2] = dfb->map_pitch / 2;
+            dfb->fb.offsets[1] = dfb->fb.pitches[0] * dfb->fb.height;
+            dfb->fb.offsets[2] = dfb->fb.offsets[1] + dfb->fb.pitches[1] * dfb->fb.height / 2;
             break;
         default:
             break;
@@ -760,10 +812,10 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
         drmu_err(du, "%s: Alloc failure", __func__);
         return NULL;
     }
-    dfb->width = (w + 63) & ~63;
-    dfb->height = (h + 63) & ~63;
+    dfb->fb.width = (w + 63) & ~63;
+    dfb->fb.height = (h + 63) & ~63;
     dfb->cropped = drmu_rect_wh(w, h);
-    dfb->format = format;
+    dfb->fb.pixel_format = format;
 
     if ((bpp = drmu_fb_pixel_bits(dfb)) == 0) {
         drmu_err(du, "%s: Unexpected format %#x", __func__, format);
@@ -772,8 +824,8 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
 
     {
         struct drm_mode_create_dumb dumb = {
-            .height = fb_total_height(dfb, dfb->height),
-            .width = dfb->width,
+            .height = fb_total_height(dfb, dfb->fb.height),
+            .width = dfb->fb.width,
             .bpp = bpp
         };
         if ((dfb->bo_list[0] = drmu_bo_new_dumb(du, &dumb)) == NULL)
@@ -795,7 +847,7 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
 
         if ((dfb->map_ptr = mmap(NULL, dfb->map_size,
                                  PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE,
-                                 du->fd, (off_t)map_dumb.offset)) == MAP_FAILED) {
+                                 drmu_fd(du), (off_t)map_dumb.offset)) == MAP_FAILED) {
             drmu_err(du, "%s: mmap failed (size=%zd, fd=%d, off=%zd): %s", __func__,
                      dfb->map_size, du->fd, (size_t)map_dumb.offset, strerror(errno));
             goto fail;
@@ -807,22 +859,22 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
 
         fb_pitches_set(dfb);
 
-        if (dfb->pitches[1] != 0)
+        if (dfb->fb.pitches[1] != 0)
             bo_handles[1] = bo_handles[0];
-        if (dfb->pitches[2] != 0)
+        if (dfb->fb.pitches[2] != 0)
             bo_handles[2] = bo_handles[0];
 
         if (drmModeAddFB2WithModifiers(du->fd,
-                                       dfb->width, dfb->height, dfb->format,
-                                       bo_handles, dfb->pitches, dfb->offsets, NULL,
-                                       &dfb->handle, 0) != 0)
+                                       dfb->fb.width, dfb->fb.height, dfb->fb.pixel_format,
+                                       bo_handles, dfb->fb.pitches, dfb->fb.offsets, NULL,
+                                       &dfb->fb.fb_id, 0) != 0)
         {
             drmu_err(du, "%s: drmModeAddFB2WithModifiers failed: %s\n", __func__, strerror(errno));
             goto fail;
         }
     }
 
-    drmu_debug(du, "Create dumb %p %dx%d / %dx%d size: %zd", dfb, dfb->width, dfb->height, dfb->cropped.w, dfb->cropped.h, dfb->map_size);
+    drmu_debug(du, "Create dumb %p %dx%d / %dx%d size: %zd", dfb, dfb->fb.width, dfb->fb.height, dfb->cropped.w, dfb->cropped.h, dfb->map_size);
 
     return dfb;
 
@@ -834,7 +886,7 @@ fail:
 static int
 fb_try_reuse(drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format)
 {
-    if (w > dfb->width || h > dfb->height || format != dfb->format)
+    if (w > dfb->fb.width || h > dfb->fb.height || format != dfb->fb.pixel_format)
         return 0;
 
     dfb->cropped = drmu_rect_wh(w, h);
@@ -875,7 +927,7 @@ drmu_atomic_add_prop_fb(drmu_atomic_t * const da, const uint32_t obj_id, const u
     if (dfb == NULL)
         return drmu_atomic_add_prop_value(da, obj_id, prop_id, 0);
 
-    rv = drmu_atomic_add_prop_generic(da, obj_id, prop_id, dfb->handle, atomic_prop_fb_ref, atomic_prop_fb_unref, dfb);
+    rv = drmu_atomic_add_prop_generic(da, obj_id, prop_id, dfb->fb.fb_id, atomic_prop_fb_ref, atomic_prop_fb_unref, dfb);
     if (rv != 0)
         drmu_warn(drmu_atomic_env(da), "%s: Failed to add fb obj_id=%#x, prop_id=%#x: %s", __func__, obj_id, prop_id, strerror(-rv));
 

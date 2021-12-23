@@ -51,18 +51,22 @@ typedef struct drmu_fb_s {
     struct drmu_fb_s * next;
 
     struct drmu_env_s * du;
-    uint32_t width;
-    uint32_t height;
-    uint32_t format;
+
+    struct drm_mode_fb_cmd2 fb;
+
+//    uint32_t width;
+//    uint32_t height;
+//    uint32_t format;
     drmu_rect_t cropped;
-    unsigned int handle;
+//    unsigned int handle;
 
     void * map_ptr;
     size_t map_size;
     size_t map_pitch;
 
-    uint32_t pitches[4];
-    uint32_t offsets[4];
+//    uint32_t pitches[4];
+//    uint32_t offsets[4];
+//    uint64_t modifiers[4];
     drmu_bo_t * bo_list[4];
 
     const char * color_encoding; // Assumed to be constant strings that don't need freeing
@@ -153,5 +157,13 @@ typedef struct drmu_env_s {
 
 drmu_fb_t * drmu_fb_int_alloc(drmu_env_t * const du);
 void drmu_fb_int_free(drmu_fb_t * const dfb);
+void drmu_fb_int_fmt_size_set(drmu_fb_t *const dfb, uint32_t fmt, uint32_t w, uint32_t h, const drmu_rect_t crop);
+// All assumed to be const strings that do not need freed
+void drmu_fb_int_color_set(drmu_fb_t *const dfb, const char * const enc, const char * const range, const char * const space);
+void drmu_fb_int_on_delete_set(drmu_fb_t *const dfb, drmu_fb_on_delete_fn fn, void * v);
+void drmu_fb_int_bo_set(drmu_fb_t *const dfb, unsigned int i, drmu_bo_t * const bo);
+void drmu_fb_int_layer_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset, uint64_t modifier);
+int drmu_fb_int_make(drmu_fb_t *const dfb);
+
 
 

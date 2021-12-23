@@ -229,12 +229,11 @@ fb_vlc_colorspace(const video_format_t * const fmt)
 drmu_fb_t *
 drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
 {
-    uint64_t modifiers[4] = { 0 };
-    uint32_t bo_handles[4] = { 0 };
     int i, j, n;
     drmu_fb_t * const dfb = drmu_fb_int_alloc(du);
     const AVDRMFrameDescriptor * const desc = drm_prime_get_desc(pic);
     fb_aux_pic_t * aux = NULL;
+    int rv;
 
     if (dfb == NULL) {
         drmu_err(du, "%s: Alloc failure", __func__);
@@ -250,19 +249,20 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
         goto fail;
     }
 
-    dfb->format  = desc->layers[0].format;
-    dfb->width   = pic->format.i_width;
-    dfb->height  = pic->format.i_height;
-    dfb->cropped = (drmu_rect_t){
-        .x = pic->format.i_x_offset,
-        .y = pic->format.i_y_offset,
-        .w = pic->format.i_visible_width,
-        .h = pic->format.i_visible_height
-    };
+    drmu_fb_int_fmt_size_set(dfb,
+                             desc->layers[0].format,
+                             pic->format.i_width,
+                             pic->format.i_height,
+                             (drmu_rect_t){
+                                 .x = pic->format.i_x_offset,
+                                 .y = pic->format.i_y_offset,
+                                 .w = pic->format.i_visible_width,
+                                 .h = pic->format.i_visible_height});
 
-    dfb->color_encoding = fb_vlc_color_encoding(&pic->format);
-    dfb->color_range    = fb_vlc_color_range(&pic->format);
-    dfb->colorspace     = fb_vlc_colorspace(&pic->format);
+    drmu_fb_int_color_set(dfb,
+                          fb_vlc_color_encoding(&pic->format),
+                          fb_vlc_color_range(&pic->format),
+                          fb_vlc_colorspace(&pic->format));
 
     // Set delete callback & hold this pic
     // Aux attached to dfb immediately so no fail cleanup required
@@ -271,14 +271,14 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
         goto fail;
     }
     aux->pic = picture_Hold(pic);
-
-    dfb->on_delete_v = aux;
-    dfb->on_delete_fn = pic_fb_delete_cb;
+    drmu_fb_int_on_delete_set(dfb, pic_fb_delete_cb, aux);
 
     for (i = 0; i < desc->nb_objects; ++i)
     {
-        if ((dfb->bo_list[i] = drmu_bo_new_fd(du, desc->objects[i].fd)) == NULL)
+        drmu_bo_t * bo = drmu_bo_new_fd(du, desc->objects[i].fd);
+        if (bo == NULL)
             goto fail;
+        drmu_fb_int_bo_set(dfb, i, bo);
     }
 
     n = 0;
@@ -288,11 +288,8 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
         {
             const AVDRMPlaneDescriptor *const p = desc->layers[i].planes + j;
             const AVDRMObjectDescriptor *const obj = desc->objects + p->object_index;
-            dfb->pitches[n] = p->pitch;
-            dfb->offsets[n] = p->offset;
-            modifiers[n] = obj->format_modifier;
-            bo_handles[n] = dfb->bo_list[p->object_index]->handle;
-            ++n;
+
+            drmu_fb_int_layer_set(dfb, n++, p->object_index, p->pitch, p->offset, obj->format_modifier);
         }
     }
 
@@ -304,40 +301,8 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
         dfb->hdr_metadata = pic_hdr_metadata(&pic->format);
     }
 
-#if 0
-    drmu_debug(du, "%dx%d, fmt: %x, boh=%d,%d,%d,%d, pitch=%d,%d,%d,%d,"
-           " offset=%d,%d,%d,%d, mod=%llx,%llx,%llx,%llx\n",
-           av_frame_cropped_width(frame),
-           av_frame_cropped_height(frame),
-           desc->layers[0].format,
-           bo_handles[0],
-           bo_handles[1],
-           bo_handles[2],
-           bo_handles[3],
-           pitches[0],
-           pitches[1],
-           pitches[2],
-           pitches[3],
-           offsets[0],
-           offsets[1],
-           offsets[2],
-           offsets[3],
-           (long long)modifiers[0],
-           (long long)modifiers[1],
-           (long long)modifiers[2],
-           (long long)modifiers[3]
-          );
-#endif
-
-    if (drmModeAddFB2WithModifiers(du->fd,
-                                   dfb->width, dfb->height, dfb->format,
-                                   bo_handles, dfb->pitches, dfb->offsets, modifiers,
-                                   &dfb->handle, DRM_MODE_FB_MODIFIERS /** 0 if no mods */) != 0)
-    {
-        drmu_err(du, "drmModeAddFB2WithModifiers failed: %s", strerror(errno));
+    if (drmu_fb_int_make(dfb) != 0)
         goto fail;
-    }
-
     return dfb;
 
 fail:
@@ -352,20 +317,20 @@ drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
     unsigned int hdiv = 1;
     unsigned int wdiv = 1;
 
-    if (plane_n > 4 || dfb->pitches[plane_n] == 0) {
+    if (plane_n > 4 || dfb->fb.pitches[plane_n] == 0) {
         return (plane_t) {.p_pixels = NULL };
     }
 
     // Slightly kludgy derivation of height & width divs
     if (plane_n > 0) {
-        wdiv = dfb->pitches[0] / dfb->pitches[plane_n];
+        wdiv = dfb->fb.pitches[0] / dfb->fb.pitches[plane_n];
         hdiv = 2;
     }
 
     return (plane_t){
-        .p_pixels = (uint8_t *)dfb->map_ptr + dfb->offsets[plane_n],
-        .i_lines = dfb->height / hdiv,
-        .i_pitch = dfb->pitches[plane_n],
+        .p_pixels = (uint8_t *)dfb->map_ptr + dfb->fb.offsets[plane_n],
+        .i_lines = dfb->fb.height / hdiv,
+        .i_pitch = dfb->fb.pitches[plane_n],
         .i_pixel_pitch = bpp / 8,
         .i_visible_lines = dfb->cropped.h / hdiv,
         .i_visible_pitch = (dfb->cropped.w * bpp / 8) / wdiv
