@@ -30,6 +30,7 @@
 #include <pthread.h>
 
 #include "drmu.h"
+#include "drmu_log.h"
 #include "drmu_vlc.h"
 
 #include <vlc_common.h>
@@ -464,7 +465,6 @@ static int OpenDrmVout(vout_display_t *vd,
 {
     vout_display_sys_t *sys;
     int ret = VLC_EGENERIC;
-
     msg_Info(vd, "<<< %s: Fmt=%4.4s, fmtp_chroma=%4.4s", __func__,
              (const char *)&vd->fmt->i_chroma, (const char *)&fmtp->i_chroma);
 
@@ -490,11 +490,17 @@ static int OpenDrmVout(vout_display_t *vd,
         goto fail;
     }
 
-    ;
 
-    if ((sys->du = drmu_env_new_xlease(VLC_OBJECT(vd))) == NULL &&
-        (sys->du = drmu_env_new_open(VLC_OBJECT(vd), DRM_MODULE)) == NULL)
-        goto fail;
+    {
+        const drmu_log_env_t log = {
+            .fn = drmu_log_vlc_cb,
+            .v = vd,
+            .max_level = DRMU_LOG_LEVEL_ALL
+        };
+        if ((sys->du = drmu_env_new_xlease(&log)) == NULL &&
+            (sys->du = drmu_env_new_open(DRM_MODULE, &log)) == NULL)
+            goto fail;
+    }
 
     drmu_env_modeset_allow(sys->du, !var_InheritBool(vd, DRM_VOUT_NO_MODESET_NAME));
 

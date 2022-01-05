@@ -1,9 +1,10 @@
 #ifndef _DRMU_DRMU_H
 #define _DRMU_DRMU_H
 
-#include <stdlib.h>
-#include <stdint.h>
+#include <stdarg.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -219,6 +220,7 @@ drmu_plane_t * drmu_plane_new_find(drmu_crtc_t * const dc, const uint32_t fmt);
 int drmu_atomic_plane_set(struct drmu_atomic_s * const da, drmu_plane_t * const dp, drmu_fb_t * const dfb, const drmu_rect_t pos);
 
 // Env
+struct drmu_log_env_s;
 
 // Q the atomic on its associated env
 int drmu_atomic_queue(struct drmu_atomic_s ** ppda);
@@ -227,12 +229,33 @@ int drmu_atomic_queue(struct drmu_atomic_s ** ppda);
 // deals with recalling the ioctl when required
 int drmu_ioctl(const drmu_env_t * const du, unsigned long req, void * arg);
 int drmu_fd(const drmu_env_t * const du);
-void * drmu_env_log(const drmu_env_t * const du);
+const struct drmu_log_env_s * drmu_env_log(const drmu_env_t * const du);
 void drmu_env_delete(drmu_env_t ** const ppdu);
 void drmu_env_modeset_allow(drmu_env_t * const du, const bool modeset_allowed);
-drmu_env_t * drmu_env_new_open(void * const log, const char * name);
-drmu_env_t * drmu_env_new_fd(void * const log, const int fd);
+drmu_env_t * drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log);
+drmu_env_t * drmu_env_new_open(const char * name, const struct drmu_log_env_s * const log);
 
+// Logging
+
+enum drmu_log_level_e {
+        DRMU_LOG_LEVEL_NONE = -1,     // Max level specifier for nothing (not a real level)
+        DRMU_LOG_LEVEL_MESSAGE = 0,   // (Nearly) always printed info
+        DRMU_LOG_LEVEL_ERROR,         // Error
+        DRMU_LOG_LEVEL_WARNING,
+        DRMU_LOG_LEVEL_INFO,          // Interesting but not critical info
+        DRMU_LOG_LEVEL_DEBUG,         // Info only useful for debug
+        DRMU_LOG_LEVEL_ALL,           // Max level specifier for everything (not a real level)
+};
+
+typedef void drmu_log_fn(void * v, enum drmu_log_level_e level, const char * fmt, va_list vl);
+
+typedef struct drmu_log_env_s {
+        drmu_log_fn * fn;
+        void * v;
+        enum drmu_log_level_e max_level;
+} drmu_log_env_t;
+
+extern const struct drmu_log_env_s drmu_log_env_none;   // pre-built do-nothing log structure
 
 // drmu_atomic
 
@@ -257,7 +280,7 @@ int drmu_atomic_add_prop_value(drmu_atomic_t * const da, const uint32_t obj_id, 
 
 // drmu_xlease
 
-drmu_env_t * drmu_env_new_xlease(void * const log);
+drmu_env_t * drmu_env_new_xlease(const struct drmu_log_env_s * const log);
 
 
 #ifdef __cplusplus

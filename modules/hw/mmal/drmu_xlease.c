@@ -5,7 +5,7 @@
 #include <xcb/randr.h>
 
 static int
-get_lease_fd(void * const log)
+get_lease_fd(const drmu_log_env_t * const log)
 {
     xcb_generic_error_t *xerr;
 
@@ -128,7 +128,7 @@ get_lease_fd(void * const log)
 }
 
 drmu_env_t *
-drmu_env_new_xlease(void * const log)
+drmu_env_new_xlease(const drmu_log_env_t * const log)
 {
     const int fd = get_lease_fd(log);
 
@@ -136,6 +136,6 @@ drmu_env_new_xlease(void * const log)
         drmu_err_log(log, "Failed to get xlease");
         return NULL;
     }
-    return drmu_env_new_fd(log, fd);
+    return drmu_env_new_fd(fd, log);
 }
 

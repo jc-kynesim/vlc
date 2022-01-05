@@ -2,9 +2,12 @@
 #include "pollqueue.h"
 
 #include <assert.h>
+#include <errno.h>
+#include <inttypes.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-
+#include <unistd.h>
 
 drmu_ufrac_t
 drmu_ufrac_reduce(drmu_ufrac_t x)
@@ -2068,10 +2071,10 @@ drmu_fd(const drmu_env_t * const du)
     return du->fd;
 }
 
-void *
+const struct drmu_log_env_s *
 drmu_env_log(const drmu_env_t * const du)
 {
-    return du->log;
+    return &du->log;
 }
 
 void
@@ -2124,7 +2127,7 @@ drmu_env_polltask_cb(void * v, short revents)
 
 // Closes fd on failure
 drmu_env_t *
-drmu_env_new_fd(void * const log, const int fd)
+drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log)
 {
     drmu_env_t * du = calloc(1, sizeof(*du));
     if (!du) {
@@ -2133,7 +2136,7 @@ drmu_env_new_fd(void * const log, const int fd)
         return NULL;
     }
 
-    du->log = log;
+    du->log = *log;
     du->fd = fd;
     du->modeset_allow = true;
 
@@ -2171,14 +2174,43 @@ fail1:
 }
 
 drmu_env_t *
-drmu_env_new_open(void * const log, const char * name)
+drmu_env_new_open(const char * name, const struct drmu_log_env_s * const log)
 {
     int fd = drmOpen(name, NULL);
     if (fd == -1) {
         drmu_err_log(log, "Failed to open %s", name);
         return NULL;
     }
-    return drmu_env_new_fd(log, fd);
+    return drmu_env_new_fd(fd, log);
+}
+
+//----------------------------------------------------------------------------
+//
+// Logging
+
+static void
+log_none_cb(void * v, enum drmu_log_level_e level, const char * fmt, va_list vl)
+{
+    (void)v;
+    (void)level;
+    (void)fmt;
+    (void)vl;
+}
+
+const struct drmu_log_env_s drmu_log_env_none = {
+    .fn = log_none_cb,
+    .v = NULL,
+    .max_level = DRMU_LOG_LEVEL_NONE
+};
+
+void
+drmu_log_generic(const struct drmu_log_env_s * const log, const enum drmu_log_level_e level,
+                 const char * const fmt, ...)
+{
+    va_list vl;
+    va_start(vl, fmt);
+    log->fn(log->v, level, fmt, vl);
+    va_end(vl);
 }
 
 

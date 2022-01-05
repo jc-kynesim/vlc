@@ -343,3 +343,19 @@ drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
     };
 }
 
+void
+drmu_log_vlc_cb(void * v, enum drmu_log_level_e level_drmu, const char * fmt, va_list vl)
+{
+    const char * const file_name = va_arg(vl, const char *);
+    const unsigned int line_no = va_arg(vl, unsigned int);
+    const char * const function_name = va_arg(vl, const char *);
+    const int level_vlc =
+        level_drmu <= DRMU_LOG_LEVEL_MESSAGE ? VLC_MSG_INFO :
+        level_drmu <= DRMU_LOG_LEVEL_ERROR   ? VLC_MSG_ERR :
+        level_drmu <= DRMU_LOG_LEVEL_WARNING ? VLC_MSG_WARN :
+            VLC_MSG_DBG;
+
+    vlc_object_vaLog((vlc_object_t *)v, level_vlc, vlc_module_name, file_name, line_no,
+                     function_name, fmt + DRMU_LOG_FMT_OFFSET_FMT, vl);
+}
+

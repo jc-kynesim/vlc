@@ -1,6 +1,9 @@
 #include "drmu_int.h"
 
 #include <assert.h>
+#include <errno.h>
+#include <inttypes.h>
+#include <string.h>
 
 // Atomic property chain structures - no external visibility
 typedef struct aprop_prop_s {

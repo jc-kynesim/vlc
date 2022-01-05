@@ -138,11 +138,12 @@ typedef struct drmu_atomic_q_s {
 } drmu_atomic_q_t;
 
 typedef struct drmu_env_s {
-    void * log;
     int fd;
     uint32_t plane_count;
     drmu_plane_t * planes;
     drmModeResPtr res;
+
+    drmu_log_env_t log;
 
     bool modeset_allow;
 

@@ -49,4 +49,7 @@ vlc_fourcc_t drmu_format_vlc_to_vlc(const uint32_t vf_drm);
 drmu_fb_t * drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic);
 plane_t drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n);
 
+// Logging function callback for VLC
+enum drmu_log_level_e;
+void drmu_log_vlc_cb(void * v, enum drmu_log_level_e level_drmu, const char * fmt, va_list vl);
 
