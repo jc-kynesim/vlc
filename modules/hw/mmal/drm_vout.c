@@ -126,7 +126,7 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *pic,
 {
     vout_display_sys_t * const sys = vd->sys;
     unsigned int n = 0;
-    drmu_atomic_t * da = drmu_atomic_new(sys->du);;
+    drmu_atomic_t * da = drmu_atomic_new(sys->du);
     drmu_fb_t * dfb = NULL;
     drmu_rect_t r;
     unsigned int i;
@@ -430,10 +430,6 @@ mode_pick_cb(void * v, const drmModeModeInfo * mode)
     const unsigned int r_m = (uint32_t)(((uint64_t)mode->clock * 1000000) / (mode->htotal * mode->vtotal));
     const unsigned int r_f = fmt->i_frame_rate_base == 0 ? 0 :
         (uint32_t)(((uint64_t)fmt->i_frame_rate * 1000) / fmt->i_frame_rate_base);
-
-    printf("Fmt %dx%d @ %d, Mode %dx%d @ %d/%d flags %#x, pref %d\n",
-           fmt->i_visible_width, fmt->i_visible_height, r_f,
-           mode->hdisplay, mode->vdisplay, mode->vrefresh, r_m, mode->flags, pref);
 
     // We don't understand interlace
     if ((mode->flags & DRM_MODE_FLAG_INTERLACE) != 0)
