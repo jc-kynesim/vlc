@@ -421,41 +421,6 @@ subpic_make_chromas_from_drm(const uint32_t * const drm_chromas, const unsigned 
     return c;
 }
 
-static int
-mode_pick_cb(void * v, const drmModeModeInfo * mode)
-{
-    const video_format_t * const fmt = v;
-
-    const int pref = (mode->type & DRM_MODE_TYPE_PREFERRED) != 0;
-    const unsigned int r_m = (uint32_t)(((uint64_t)mode->clock * 1000000) / (mode->htotal * mode->vtotal));
-    const unsigned int r_f = fmt->i_frame_rate_base == 0 ? 0 :
-        (uint32_t)(((uint64_t)fmt->i_frame_rate * 1000) / fmt->i_frame_rate_base);
-
-    // We don't understand interlace
-    if ((mode->flags & DRM_MODE_FLAG_INTERLACE) != 0)
-        return -1;
-
-    if (fmt->i_visible_width == mode->hdisplay &&
-        fmt->i_visible_height == mode->vdisplay)
-    {
-        // Prefer a good match to 29.97 / 30 but allow the other
-        if ((r_m + 10 >= r_f && r_m <= r_f + 10))
-            return 100;
-        if ((r_m + 100 >= r_f && r_m <= r_f + 100))
-            return 95;
-        // Double isn't bad
-        if ((r_m + 10 >= r_f * 2 && r_m <= r_f * 2 + 10))
-            return 90;
-        if ((r_m + 100 >= r_f * 2 && r_m <= r_f * 2 + 100))
-            return 85;
-    }
-
-    if (pref)
-        return 50;
-
-    return -1;
-}
-
 static int OpenDrmVout(vout_display_t *vd,
                         video_format_t *fmtp, vlc_video_context *vctx)
 {
@@ -540,7 +505,13 @@ static int OpenDrmVout(vout_display_t *vd,
         sys->mode_id = -1;
     }
     else {
-        sys->mode_id = drmu_crtc_mode_pick(sys->dc, mode_pick_cb, fmtp);
+        drmu_mode_pick_simple_params_t pick = {
+            .width = fmtp->i_visible_width,
+            .height = fmtp->i_visible_height,
+            .hz_x_1000 = fmtp->i_frame_rate_base == 0 ? 0 :
+                (unsigned int)(((uint64_t)fmtp->i_frame_rate * 1000) / fmtp->i_frame_rate_base),
+        };
+        sys->mode_id = drmu_crtc_mode_pick(sys->dc, drmu_mode_pick_simple_cb, &pick);
 
         msg_Dbg(vd, "Mode id=%d", sys->mode_id);
 
@@ -550,6 +521,8 @@ static int OpenDrmVout(vout_display_t *vd,
             if (da != NULL) {
                 drmu_atomic_crtc_mode_id_set(da, sys->dc, sys->mode_id);
                 drmu_atomic_unref(&da);
+                drmu_ufrac_t sar = drmu_crtc_sar(sys->dc);
+                msg_Dbg(vd, "Mode: %dx%d %d/%d - req %dx%d", drmu_crtc_width(sys->dc), drmu_crtc_height(sys->dc), sar.num, sar.den, pick.width, pick.height);
             }
         }
     }

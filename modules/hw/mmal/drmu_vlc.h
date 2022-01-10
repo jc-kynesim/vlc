@@ -1,3 +1,6 @@
+#ifndef _DRMU_DRMU_VLC_H
+#define _DRMU_DRMU_VLC_H
+
 #include <stdint.h>
 
 #include <vlc_common.h>
@@ -5,6 +8,10 @@
 #include <vlc_vout_display.h>
 
 #include "drmu.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Get cropping rectangle from a vlc format
 static inline drmu_rect_t
@@ -52,4 +59,9 @@ plane_t drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n);
 // Logging function callback for VLC
 enum drmu_log_level_e;
 void drmu_log_vlc_cb(void * v, enum drmu_log_level_e level_drmu, const char * fmt, va_list vl);
+
+#ifdef __cplusplus
+}
+#endif
+#endif
 
