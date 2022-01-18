@@ -55,4 +55,14 @@ libmmal_avcodec_plugin_la_LIBADD = $(AVFORMAT_LIBS) $(AVUTIL_LIBS) $(LIBS_mmal)
 mmal_LTLIBRARIES += libmmal_avcodec_plugin.la
 endif
 
+libdrm_vout_plugin_la_SOURCES = drm_vout.c \
+	drmu_vlc_cma.c drmu_vlc_cma.h drmu_log.h\
+	drmu.c drmu_xlease.c drmu_atomic.c drmu.h drmu_int.h\
+	pollqueue.c pollqueue.h\
+	mmal_cma.c mmal_picture.c\
+	mmal_cma.h mmal_cma_int.h mmal_picture.h\
+	mmal_piccpy_neon.S
+libdrm_vout_plugin_la_CFLAGS = $(AM_CFLAGS) -I/usr/include/libdrm
+libdrm_vout_plugin_la_LIBADD = -ldrm -lxcb-randr -lxcb $(LIBS_mmal)
+mmal_LTLIBRARIES += libdrm_vout_plugin.la
 

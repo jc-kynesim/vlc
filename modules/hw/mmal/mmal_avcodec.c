@@ -59,6 +59,8 @@
 #include "mmal_cma_drmprime.h"
 #include "mmal_picture.h"
 
+#include <libdrm/drm_fourcc.h>
+
 #define TRACE_ALL 0
 
 #define BUFFERS_IN_FLIGHT       5       // Default max value for in flight buffers
@@ -293,7 +295,6 @@ static int set_pic_from_frame(picture_t * const pic, const AVFrame * const frame
     const uint8_t * hs = shift_01;
     const uint8_t * ws = shift_01;
     const uint8_t * pb = pb_1;
-    int set_pitch = 0;
 
     switch (pic->format.i_chroma)
     {
@@ -307,13 +308,11 @@ static int set_pic_from_frame(picture_t * const pic, const AVFrame * const frame
         case VLC_CODEC_MMAL_ZC_SAND8:
             pic->i_planes = 2;
             pb = pb_12;
-            set_pitch = 128;
             break;
         case VLC_CODEC_MMAL_ZC_SAND10:
         case VLC_CODEC_MMAL_ZC_SAND30:  // Lies: SAND30 is "special"
             pic->i_planes = 2;
             pb = pb_24;
-            set_pitch = 128;
             break;
         default:
             return VLC_EGENERIC;
@@ -330,6 +329,8 @@ static int set_pic_from_frame(picture_t * const pic, const AVFrame * const frame
         const AVDRMFrameDescriptor * const desc = (AVDRMFrameDescriptor*)frame->data[0];
         const AVDRMLayerDescriptor * layer = desc->layers + 0;
         const AVDRMPlaneDescriptor * plane = layer->planes + 0;
+        const uint64_t mod = desc->objects[0].format_modifier;
+        const int set_pitch = (mod == 0 || mod == DRM_FORMAT_MOD_INVALID) ? 0 : (fourcc_mod_broadcom_param(mod) << 7);
         int nb_plane = 0;
 
         if (desc->nb_objects != 1)
