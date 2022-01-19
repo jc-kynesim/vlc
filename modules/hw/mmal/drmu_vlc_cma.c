@@ -402,7 +402,7 @@ drmu_fb_vlc_new_pic_cma_attach(drmu_env_t * const du, picture_t * const pic)
         for (i = 0; i < pic->i_planes; ++i) {
             if (is_sand)
                 drmu_fb_int_layer_mod_set(dfb, i, 0, pic->format.i_width, pic->p[i].p_pixels - base_addr,
-                                          DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(pic->p[i].i_pitch >> 7));
+                                          DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(pic->p[i].i_pitch));
             else
                 drmu_fb_int_layer_mod_set(dfb, i, 0, pic->p[i].i_pitch, pic->p[i].p_pixels - base_addr, 0);
         }

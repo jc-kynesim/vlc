@@ -153,7 +153,7 @@ static tex_context_t * get_tex_context(const opengl_tex_converter_t * const tc, 
 
             for (int i = 0; i < pic->i_planes; ++i)
             {
-                const uint64_t mod = DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(pic->p[i].i_pitch >> 7);
+                const uint64_t mod = DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(pic->p[i].i_pitch);
 
                 *a++ = *n++;
                 *a++ = fd;

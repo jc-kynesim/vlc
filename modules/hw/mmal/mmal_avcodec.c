@@ -290,6 +290,12 @@ static const uint8_t pb_12[] = {1,2,2,2};
 static const uint8_t pb_24[] = {2,4,4,4};
 static const uint8_t pb_4[] = {4,4,4,4};
 
+static inline int pitch_from_mod(const uint64_t mod)
+{
+    return fourcc_mod_broadcom_mod(mod) != DRM_FORMAT_MOD_BROADCOM_SAND128 ? 0 :
+        fourcc_mod_broadcom_param(mod);
+}
+
 static int set_pic_from_frame(picture_t * const pic, const AVFrame * const frame)
 {
     const uint8_t * hs = shift_01;
@@ -330,7 +336,7 @@ static int set_pic_from_frame(picture_t * const pic, const AVFrame * const frame
         const AVDRMLayerDescriptor * layer = desc->layers + 0;
         const AVDRMPlaneDescriptor * plane = layer->planes + 0;
         const uint64_t mod = desc->objects[0].format_modifier;
-        const int set_pitch = (mod == 0 || mod == DRM_FORMAT_MOD_INVALID) ? 0 : (fourcc_mod_broadcom_param(mod) << 7);
+        const int set_pitch = pitch_from_mod(mod);
         int nb_plane = 0;
 
         if (desc->nb_objects != 1)
@@ -374,7 +380,7 @@ static int set_pic_from_frame(picture_t * const pic, const AVFrame * const frame
             pic->p[i] = (plane_t){
                 .p_pixels = data + (frame->data[i] - frame->data[0]),
                 .i_lines = lines,
-                .i_pitch = frame->linesize[i],
+                .i_pitch = av_rpi_is_sand_frame(frame) ? av_rpi_sand_frame_stride2(frame) : frame->linesize[i],
                 .i_pixel_pitch = pb[i],
                 .i_visible_lines = av_frame_cropped_height(frame) >> hs[i],
                 .i_visible_pitch = av_frame_cropped_width(frame) >> ws[i]
