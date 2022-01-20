@@ -191,6 +191,14 @@ drmu_prop_enum_value(const drmu_prop_enum_t * const pen, const char * const name
     return NULL;
 }
 
+uint64_t
+drmu_prop_bitmask_value(const drmu_prop_enum_t * const pen, const char * const name)
+{
+    const uint64_t *const p = drmu_prop_enum_value(pen, name);
+    return p == NULL || *p >= 64 || (pen->flags & DRM_MODE_PROP_BITMASK) == 0 ?
+        (uint64_t)0 : (uint64_t)1 << *p;
+}
+
 uint32_t
 drmu_prop_enum_id(const drmu_prop_enum_t * const pen)
 {
@@ -290,6 +298,22 @@ drmu_atomic_add_prop_enum(drmu_atomic_t * const da, const uint32_t obj_id, const
     if (rv != 0 && name != NULL)
         drmu_warn(drmu_atomic_env(da), "%s: Failed to add enum obj_id=%#x, prop_id=%#x, name='%s': %s", __func__,
                   obj_id, drmu_prop_enum_id(pen), name, strerror(-rv));
+
+    return rv;
+}
+
+int
+drmu_atomic_add_prop_bitmask(struct drmu_atomic_s * const da, const uint32_t obj_id, const drmu_prop_enum_t * const pen, const uint64_t val)
+{
+    int rv;
+
+    rv = !pen ? -ENOENT :
+        ((pen->flags & DRM_MODE_PROP_BITMASK) == 0) ? -EINVAL :
+            drmu_atomic_add_prop_generic(da, obj_id, drmu_prop_enum_id(pen), val, 0, 0, NULL);
+
+    if (rv != 0)
+        drmu_warn(drmu_atomic_env(da), "%s: Failed to add bitmask obj_id=%#x, prop_id=%#x, val=%#"PRIx64": %s", __func__,
+                  obj_id, drmu_prop_enum_id(pen), val, strerror(-rv));
 
     return rv;
 }
@@ -1504,8 +1528,6 @@ drmu_atomic_crtc_mode_id_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, c
     if (dc->cur_mode_id == mode_id && dc->mode_id_blob != NULL)
         return 0;
 
-    drmu_info(du, "Set mode_id");
-
     mode = (const struct drm_mode_modeinfo *)(dc->con->modes + mode_id);
     if ((blob = drmu_blob_new(du, mode, sizeof(*mode))) == NULL) {
         return -ENOMEM;
@@ -1911,11 +1933,21 @@ plane_set_atomic(drmu_atomic_t * const da,
 }
 
 int
-drmu_atomic_plane_alpha_set(struct drmu_atomic_s * const da, drmu_plane_t * const dp, const int alpha)
+drmu_atomic_add_plane_alpha(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int alpha)
 {
     if (alpha == DRMU_PLANE_ALPHA_UNSET)
         return 0;
     return drmu_atomic_add_prop_range(da, dp->plane->plane_id, dp->pid.alpha, alpha);
+}
+
+int
+drmu_atomic_add_plane_rotation(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int rot)
+{
+    if (!dp->pid.rotation)
+        return rot == DRMU_PLANE_ROTATION_0 ? 0 : -EINVAL;
+    if (rot < 0 || rot >= 8 || !dp->rot_vals[rot])
+        return -EINVAL;
+    return drmu_atomic_add_prop_bitmask(da, dp->plane->plane_id, dp->pid.rotation, dp->rot_vals[rot]);
 }
 
 int
@@ -1980,8 +2012,11 @@ drmu_plane_delete(drmu_plane_t ** const ppdp)
         return;
     *ppdp = NULL;
 
+    drmu_prop_range_delete(&dp->pid.alpha);
     drmu_prop_enum_delete(&dp->pid.color_encoding);
     drmu_prop_enum_delete(&dp->pid.color_range);
+    drmu_prop_enum_delete(&dp->pid.pixel_blend_mode);
+    drmu_prop_enum_delete(&dp->pid.rotation);
     dp->dc = NULL;
 }
 
@@ -2106,10 +2141,23 @@ drmu_env_planes_populate(drmu_env_t * const du)
             goto fail2;
         }
 
-        dp->pid.alpha = drmu_prop_range_new(du, props_name_to_id(props, "alpha"));
+        dp->pid.alpha            = drmu_prop_range_new(du, props_name_to_id(props, "alpha"));
+        dp->pid.color_encoding   = drmu_prop_enum_new(du, props_name_to_id(props, "COLOR_ENCODING"));
+        dp->pid.color_range      = drmu_prop_enum_new(du, props_name_to_id(props, "COLOR_RANGE"));
         dp->pid.pixel_blend_mode = drmu_prop_enum_new(du, props_name_to_id(props, "pixel blend mode"));
-        dp->pid.color_encoding = drmu_prop_enum_new(du, props_name_to_id(props, "COLOR_ENCODING"));
-        dp->pid.color_range    = drmu_prop_enum_new(du, props_name_to_id(props, "COLOR_RANGE"));
+        dp->pid.rotation         = drmu_prop_enum_new(du, props_name_to_id(props, "rotation"));
+
+        dp->rot_vals[DRMU_PLANE_ROTATION_0] = drmu_prop_bitmask_value(dp->pid.rotation, "rotate-0");
+        if (dp->rot_vals[DRMU_PLANE_ROTATION_0]) {
+            // Flips MUST be combined with a rotate
+            if ((dp->rot_vals[DRMU_PLANE_ROTATION_X_FLIP] = drmu_prop_bitmask_value(dp->pid.rotation, "reflect-x")) != 0)
+                dp->rot_vals[DRMU_PLANE_ROTATION_X_FLIP] |= dp->rot_vals[DRMU_PLANE_ROTATION_0];
+            if ((dp->rot_vals[DRMU_PLANE_ROTATION_Y_FLIP] = drmu_prop_bitmask_value(dp->pid.rotation, "reflect-y")) != 0)
+                dp->rot_vals[DRMU_PLANE_ROTATION_Y_FLIP] |= dp->rot_vals[DRMU_PLANE_ROTATION_0];
+        }
+        dp->rot_vals[DRMU_PLANE_ROTATION_180] = drmu_prop_bitmask_value(dp->pid.rotation, "rotate-180");
+        if (!dp->rot_vals[DRMU_PLANE_ROTATION_180] && dp->rot_vals[DRMU_PLANE_ROTATION_X_FLIP] && dp->rot_vals[DRMU_PLANE_ROTATION_Y_FLIP])
+            dp->rot_vals[DRMU_PLANE_ROTATION_180] = dp->rot_vals[DRMU_PLANE_ROTATION_X_FLIP] | dp->rot_vals[DRMU_PLANE_ROTATION_Y_FLIP];
 
         props_free(props);
         du->plane_count = i + 1;

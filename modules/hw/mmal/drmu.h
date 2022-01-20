@@ -111,13 +111,23 @@ drmu_blob_t * drmu_blob_ref(drmu_blob_t * const blob);
 drmu_blob_t * drmu_blob_new(drmu_env_t * const du, const void * const data, const size_t len);
 int drmu_atomic_add_prop_blob(struct drmu_atomic_s * const da, const uint32_t obj_id, const uint32_t prop_id, drmu_blob_t * const blob);
 
-// Enum
+// Enum & bitmask
+// These are very close to the same thing so we use the same struct
+typedef drmu_prop_enum_t drmu_prop_bitmask_t;
 
+// Ptr to value of the named enum/bit, NULL if not found or pen == NULL. If bitmask then bit number
 const uint64_t * drmu_prop_enum_value(const drmu_prop_enum_t * const pen, const char * const name);
+// Bitmask only - value as a (single-bit) bitmask - 0 if not found or not bitmask or pen == NULL
+uint64_t drmu_prop_bitmask_value(const drmu_prop_enum_t * const pen, const char * const name);
+
 uint32_t drmu_prop_enum_id(const drmu_prop_enum_t * const pen);
+#define drmu_prop_bitmask_id drmu_prop_enum_id
 void drmu_prop_enum_delete(drmu_prop_enum_t ** const pppen);
+#define drmu_prop_bitmask_delete drmu_prop_enum_delete
 drmu_prop_enum_t * drmu_prop_enum_new(drmu_env_t * const du, const uint32_t id);
+#define drmu_prop_bitmask_new drmu_prop_enum_new
 int drmu_atomic_add_prop_enum(struct drmu_atomic_s * const da, const uint32_t obj_id, const drmu_prop_enum_t * const pen, const char * const name);
+int drmu_atomic_add_prop_bitmask(struct drmu_atomic_s * const da, const uint32_t obj_id, const drmu_prop_enum_t * const pen, const uint64_t value);
 
 // Range
 
@@ -237,7 +247,19 @@ drmu_plane_t * drmu_plane_new_find(drmu_crtc_t * const dc, const uint32_t fmt);
 #define DRMU_PLANE_ALPHA_UNSET                  (-1)
 #define DRMU_PLANE_ALPHA_TRANSPARENT            0
 #define DRMU_PLANE_ALPHA_OPAQUE                 0xffff
-int drmu_atomic_plane_alpha_set(struct drmu_atomic_s * const da, drmu_plane_t * const dp, const int alpha);
+int drmu_atomic_add_plane_alpha(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int alpha);
+
+// X, Y & TRANSPOSE can be ORed to get all others
+#define DRMU_PLANE_ROTATION_0                   0
+#define DRMU_PLANE_ROTATION_X_FLIP              1
+#define DRMU_PLANE_ROTATION_Y_FLIP              2
+#define DRMU_PLANE_ROTATION_180                 3
+// *** These don't exist on Pi - no inherent transpose
+#define DRMU_PLANE_ROTATION_TRANSPOSE           4
+#define DRMU_PLANE_ROTATION_90                  5  // Rotate 90 clockwise
+#define DRMU_PLANE_ROTATION_270                 6  // Rotate 90 anti-cockwise
+#define DRMU_PLANE_ROTATION_180_TRANSPOSE       7  // Rotate 180 & transpose
+int drmu_atomic_add_plane_rotation(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int rot);
 
 int drmu_atomic_plane_set(struct drmu_atomic_s * const da, drmu_plane_t * const dp, drmu_fb_t * const dfb, const drmu_rect_t pos);
 

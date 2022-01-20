@@ -123,10 +123,12 @@ typedef struct drmu_plane_s {
         uint32_t src_x;
         uint32_t src_y;
         drmu_prop_range_t * alpha;
-        drmu_prop_enum_t * pixel_blend_mode;
         drmu_prop_enum_t * color_encoding;
         drmu_prop_enum_t * color_range;
+        drmu_prop_enum_t * pixel_blend_mode;
+        drmu_prop_bitmask_t * rotation;
     } pid;
+    uint64_t rot_vals[8];
 
 } drmu_plane_t;
 

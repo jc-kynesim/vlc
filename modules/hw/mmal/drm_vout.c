@@ -275,7 +275,7 @@ subpics_done:
                                   drmu_rect_rescale(spe->pos, r, spe->space))) != 0) {
                  msg_Err(vd, "drmModeSetPlane for subplane %d failed: %s", i, strerror(-ret));
             }
-            drmu_atomic_plane_alpha_set(da, sys->subplanes[i], (spe->alpha * DRMU_PLANE_ALPHA_OPAQUE) / 0xff);
+            drmu_atomic_add_plane_alpha(da, sys->subplanes[i], (spe->alpha * DRMU_PLANE_ALPHA_OPAQUE) / 0xff);
         }
     }
 
