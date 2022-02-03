@@ -318,9 +318,13 @@ static int lavc_UpdateVideoFormat(decoder_t *dec, AVCodecContext *ctx,
     video_format_t fmt_out;
     int val;
 
+    msg_Info(dec, "%s", __func__);
+
     val = lavc_GetVideoFormat(dec, &fmt_out, ctx, fmt, swfmt);
-    if (val)
+    if (val) {
+        msg_Info(dec, "%s: FAIL1", __func__);
         return val;
+    }
 
     /* always have date in fields/ticks units */
     if(dec->p_sys->pts.i_divider_num)
@@ -345,7 +349,9 @@ static int lavc_UpdateVideoFormat(decoder_t *dec, AVCodecContext *ctx,
         dec->fmt_out.video.mastering = dec->fmt_in.video.mastering;
     dec->fmt_out.video.lighting = dec->fmt_in.video.lighting;
 
-    return decoder_UpdateVideoFormat(dec);
+    val = decoder_UpdateVideoFormat(dec);
+    msg_Info(dec, "%s: ret %d", __func__, val);
+    return val;
 }
 
 /**
@@ -1608,6 +1614,7 @@ no_reuse:
 
     static const enum PixelFormat hwfmts[] =
     {
+        AV_PIX_FMT_DRM_PRIME,
 #ifdef _WIN32
 #if LIBAVUTIL_VERSION_CHECK(54, 13, 1, 24, 100)
         AV_PIX_FMT_D3D11VA_VLD,
@@ -1639,11 +1646,15 @@ no_reuse:
             msg_Err(p_dec, "unspecified video dimensions");
             continue;
         }
+        msg_Info(p_dec, "%s: 1", __func__);
         const AVPixFmtDescriptor *dsc = av_pix_fmt_desc_get(hwfmt);
-        msg_Dbg(p_dec, "trying format %s", dsc ? dsc->name : "unknown");
-        if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt))
+        msg_Dbg(p_dec, "trying format %s **********************", dsc ? dsc->name : "unknown");
+        if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt)) {
+            msg_Info(p_dec, "%s: 1 FAIL", __func__);
             continue; /* Unsupported brand of hardware acceleration */
+        }
         post_mt(p_sys);
+        msg_Info(p_dec, "%s: 2", __func__);
 
         picture_t *test_pic = decoder_NewPicture(p_dec);
         assert(!test_pic || test_pic->format.i_chroma == p_dec->fmt_out.video.i_chroma);

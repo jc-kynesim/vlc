@@ -57,6 +57,14 @@ vlc_fourcc_t vlc_va_GetChroma(enum PixelFormat hwfmt, enum PixelFormat swfmt)
                     return VLC_CODEC_D3D9_OPAQUE;
             }
             break;
+        case AV_PIX_FMT_DRM_PRIME:
+            switch (swfmt)
+            {
+                case AV_PIX_FMT_RPI4_8:
+                case AV_PIX_FMT_RPI4_10:
+                default:
+                    return VLC_CODEC_DRM_PRIME_OPAQUE;
+            }
 
 #if LIBAVUTIL_VERSION_CHECK(54, 13, 1, 24, 100)
         case AV_PIX_FMT_D3D11VA_VLD:
@@ -118,11 +126,15 @@ vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *avctx,
                      enum PixelFormat pix_fmt, const es_format_t *fmt,
                      picture_sys_t *p_sys)
 {
+    msg_Info(obj, "%s", __func__);
+
     vlc_va_t *va = vlc_object_create(obj, sizeof (*va));
     if (unlikely(va == NULL))
         return NULL;
 
     char *modlist = var_InheritString(obj, "avcodec-hw");
+
+    msg_Info(obj, "VA modules: '%s'", modlist);
 
     va->module = vlc_module_load(va, "hw decoder", modlist, true,
                                  vlc_va_Start, va, avctx, pix_fmt, fmt, p_sys);

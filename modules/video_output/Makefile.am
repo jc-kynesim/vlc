@@ -182,6 +182,28 @@ vout_LTLIBRARIES += libglx_plugin.la
 endif
 endif
 
+### DRM ###
+
+libdrm_vout_plugin_la_SOURCES = video_output/drm/drm_vout.c \
+	video_output/drm/drmu_vlc_cma.c video_output/drm/drmu_vlc_cma.h \
+	video_output/drm/drmu_log.h video_output/drm/drmu.c \
+	video_output/drm/drmu_xlease.c video_output/drm/drmu_atomic.c \
+	video_output/drm/drmu.h video_output/drm/drmu_int.h \
+	video_output/drm/pollqueue.c video_output/drm/pollqueue.h
+#	mmal_cma.c mmal_picture.c\
+#	mmal_cma.h mmal_cma_int.h mmal_picture.h\
+#	mmal_piccpy_neon.S
+libdrm_vout_plugin_la_CFLAGS = $(AM_CFLAGS) -pthread -I/usr/include/libdrm
+libdrm_vout_plugin_la_LDFLAGS = $(AM_LDFLAGS) -pthread
+libdrm_vout_plugin_la_LIBADD = -ldrm -lxcb-randr -lxcb
+if HAVE_MMAL
+libdrm_vout_plugin_la_CFLAGS += -DHAS_ZC_CMA=1
+libdrm_vout_plugin_la_LIBADD += $(LIBS_mmal)
+libdrm_vout_plugin_la_LDFLAGS += $(LDFLAGS_mmal)
+endif
+if HAVE_DRM
+vout_LTLIBRARIES += libdrm_vout_plugin.la
+endif
 
 ### Wayland ###
 libwl_shm_plugin_la_SOURCES = video_output/wayland/shm.c

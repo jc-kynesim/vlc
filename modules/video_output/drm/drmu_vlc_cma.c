@@ -5,8 +5,10 @@
 #include "mmal_picture.h"
 #endif
 #if HAS_DRMPRIME
-#include "../codec/avcodec/drm_pic.h"
+#include "../../hw/drm/drm_pic.h"
 #endif
+
+#include <errno.h>
 
 #include <libavutil/buffer.h>
 #include <libavutil/hwcontext_drm.h>

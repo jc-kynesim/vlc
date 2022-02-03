@@ -1,9 +1,13 @@
 #ifndef _DRMU_DRMU_VLC_H
 #define _DRMU_DRMU_VLC_H
 
+#include "config.h"
+
 #define HAS_VLC4     0
-#define HAS_ZC_CMA   1
-#define HAS_DRMPRIME 0
+#ifndef HAS_ZC_CMA
+#define HAS_ZC_CMA   0
+#endif
+#define HAS_DRMPRIME 1
 
 #include <stdint.h>
 

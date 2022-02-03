@@ -239,7 +239,7 @@ subpics_done:
 #endif
 #if HAS_DRMPRIME
     if (pic->format.i_chroma == VLC_CODEC_DRM_PRIME_OPAQUE) {
-        dfb = drmu_fb_vlc_new_pic_cma_attach(sys->du, pic);
+        dfb = drmu_fb_vlc_new_pic_attach(sys->du, pic);
     }
     else
 #endif
@@ -527,11 +527,20 @@ static int OpenDrmVout(vlc_object_t *object)
         }
     }
 
+#if HAS_DRMPRIME
+    if (vd->fmt.i_chroma == VLC_CODEC_DRM_PRIME_OPAQUE) {
+        // Hurrah!
+    }
+    else
+#endif
+#if HAS_ZC_CMA
     if (vd->fmt.i_chroma == VLC_CODEC_MMAL_OPAQUE) {
         // Can't deal directly with opaque - but we can always convert it to ZC I420
         vd->fmt.i_chroma = VLC_CODEC_MMAL_ZC_I420;
     }
-    else if (drmu_format_vlc_to_drm(&vd->fmt) == 0) {
+    else
+#endif
+    if (drmu_format_vlc_to_drm(&vd->fmt) == 0) {
         // no conversion - ask for something we know we can deal with
         vd->fmt.i_chroma = VLC_CODEC_I420;
     }
