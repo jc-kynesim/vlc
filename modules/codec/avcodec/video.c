@@ -46,6 +46,8 @@
 #include "avcodec.h"
 #include "va.h"
 
+#include "drm_pic.h"
+
 #include "../codec/cc.h"
 
 /*****************************************************************************
@@ -361,6 +363,13 @@ static int lavc_UpdateVideoFormat(decoder_t *dec, AVCodecContext *ctx,
 static int lavc_CopyPicture(decoder_t *dec, picture_t *pic, AVFrame *frame)
 {
     decoder_sys_t *sys = dec->p_sys;
+
+    // DRM prime frames are alloced by the decoder
+    // To copy out just attach the buf to the pic
+    if (frame->format == AV_PIX_FMT_DRM_PRIME)
+    {
+        return drm_prime_attach_buf_to_pic(dec, pic, frame);
+    }
 
     vlc_fourcc_t fourcc = FindVlcChroma(frame->format);
     if (!fourcc)
@@ -1179,9 +1188,10 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         {   /* When direct rendering is not used, get_format() and get_buffer()
              * might not be called. The output video format must be set here
              * then picture buffer can be allocated. */
-            if (p_sys->p_va == NULL
+            if (frame->format == AV_PIX_FMT_DRM_PRIME ||
+                (p_sys->p_va == NULL
              && lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
-                                       p_context->pix_fmt) == 0)
+                                       p_context->pix_fmt) == 0))
                 p_pic = decoder_NewPicture(p_dec);
 
             if( !p_pic )

@@ -24,59 +24,64 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <stdio.h>
-#include <assert.h>
 
-#include <libavutil/mem.h>
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_fourcc.h>
 #include <vlc_picture.h>
-#include <vlc_atomic.h>
 #include "../../codec/avcodec/va.h"
 
-struct vlc_va_sys_t
+// Dummy - not expected to be called
+static int drm_va_get(vlc_va_t *va, picture_t *pic, uint8_t **data)
 {
-    int dummy;
-};
+    VLC_UNUSED(va);
+    VLC_UNUSED(pic);
+    VLC_UNUSED(data);
 
-static int Lock(vlc_va_t *va, picture_t *pic, uint8_t **data)
-{
-    msg_Info(va, "%s", __func__);
     return VLC_SUCCESS;
 }
 
 static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
                 const es_format_t *fmt, picture_sys_t *p_sys)
 {
-    msg_Info(va, "%s: pix_fmt=%d", __func__, pix_fmt);
+    int err;
+    VLC_UNUSED(fmt);
+    VLC_UNUSED(p_sys);
 
-    (void) fmt;
-    (void) p_sys;
+    msg_Dbg(va, "%s: pix_fmt=%d", __func__, pix_fmt);
 
     if (pix_fmt != AV_PIX_FMT_DRM_PRIME)
         return VLC_EGENERIC;
 
-    vlc_va_sys_t *sys = malloc(sizeof (*sys));
-    if (unlikely(sys == NULL))
-       return VLC_ENOMEM;
+    enum AVHWDeviceType devtype = av_hwdevice_find_type_by_name("drm");
+    if (devtype == AV_HWDEVICE_TYPE_NONE) {
+        msg_Dbg(va, "No DRM device found in ffmpeg");
+        return VLC_EGENERIC;
+    }
+
+    // ctx->hw_device_ctx gets freed when we call avcodec_free_context
+    if ((err = av_hwdevice_ctx_create(&avctx->hw_device_ctx, devtype, NULL, NULL, 0)) < 0) {
+        msg_Err(va, "Failed to create specified HW device: %s", av_err2str(err));
+        goto error;
+    }
+
+    // This gives us whatever the decode requires + 6 frames that will be
+    // alloced by ffmpeg before it blocks (at least for Pi HEVC)
+    avctx->extra_hw_frames = 6;
 
     va->description = "DRM Video Accel";
-    va->get = Lock;
+    va->get = drm_va_get;
     return VLC_SUCCESS;
 
 error:
-    free(sys);
     return VLC_EGENERIC;
 }
 
 static void Close(vlc_va_t *va, void **hwctx)
 {
-    vlc_va_sys_t *sys = va->sys;
+    VLC_UNUSED(hwctx);
 
-    msg_Info(va, "%s", __func__);
-
-    free(sys);
+    msg_Dbg(va, "%s", __func__);
 }
 
 vlc_module_begin()
