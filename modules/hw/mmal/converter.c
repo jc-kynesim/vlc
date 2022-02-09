@@ -785,7 +785,7 @@ static int OpenConverter(filter_t *p_filter)
 {
     int ret = VLC_EGENERIC;
     converter_sys_t *sys;
-    MMAL_STATUS_T status;
+    MMAL_STATUS_T status = MMAL_SUCCESS;
     if (p_filter->fmt_out.video.i_chroma == VLC_CODEC_I420)
         return VLC_EGENERIC;
     const MMAL_FOURCC_T enc_out = vlc_to_mmal_video_fourcc(&p_filter->fmt_out.video);

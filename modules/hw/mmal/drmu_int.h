@@ -10,7 +10,7 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-#define TRACE_PROP_NEW 1
+#define TRACE_PROP_NEW 0
 
 enum drmu_bo_type_e {
     BO_TYPE_NONE = 0,
