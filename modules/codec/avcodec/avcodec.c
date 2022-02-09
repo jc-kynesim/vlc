@@ -279,6 +279,15 @@ AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
         }
         free( psz_decoder );
     }
+    if( i_codec_id == AV_CODEC_ID_H264 )
+        p_codec = avcodec_find_decoder_by_name("h264_v4l2m2m");
+    if( !p_codec )
+        p_codec = avcodec_find_decoder( i_codec_id );
+    if( !p_codec )
+    {
+        msg_Dbg( p_dec, "codec not found (%s)", psz_namecodec );
+        return NULL;
+    }
     if( !p_codec )
         p_codec = avcodec_find_decoder( i_codec_id );
     if( !p_codec )
