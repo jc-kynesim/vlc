@@ -10,13 +10,6 @@ libmmal_vout_plugin_la_SOURCES = hw/mmal/vout.c
 libmmal_vout_plugin_la_CFLAGS = $(AM_CFLAGS) $(MMAL_CFLAGS)
 libmmal_vout_plugin_la_LIBADD = $(LIBM) libvlc_mmal.la
 
-libdrm_vout_plugin_la_SOURCES = hw/mmal/drm_vout.c \
-	hw/mmal/drmu_vlc.c hw/mmal/drmu_vlc.h hw/mmal/drmu_log.h\
-	hw/mmal/drmu.c hw/mmal/drmu_xlease.c hw/mmal/drmu_atomic.c hw/mmal/drmu.h hw/mmal/drmu_int.h\
-	hw/mmal/pollqueue.c hw/mmal/pollqueue.h
-libdrm_vout_plugin_la_CFLAGS = $(AM_CFLAGS) -I/usr/include/libdrm
-libdrm_vout_plugin_la_LIBADD = -ldrm -lxcb-randr -lxcb
-
 libmmal_codec_plugin_la_SOURCES = hw/mmal/codec.c
 libmmal_codec_plugin_la_CFLAGS = $(AM_CFLAGS) $(MMAL_CFLAGS)
 libmmal_codec_plugin_la_LIBADD = libvlc_mmal.la
@@ -40,6 +33,5 @@ mmal_LTLIBRARIES = \
 	libmmal_deinterlace_plugin.la \
 	libmmal_converter_plugin.la \
 	libmmal_codec_plugin.la \
-	libmmal_vout_plugin.la \
-	libdrm_vout_plugin.la
+	libmmal_vout_plugin.la
 endif

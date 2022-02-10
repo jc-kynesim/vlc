@@ -15,6 +15,6 @@ OUT=$BASE/out/$ARM-`lsb_release -sc`-rel
 echo "Configuring in $OUT"
 mkdir -p $OUT
 cd $OUT
-LIBS=-latomic $BASE/configure  --disable-vdpau --enable-gles2
+LIBS=-latomic $BASE/configure  --disable-vdpau --enable-gles2 --disable-mmal
 echo "Configured in $OUT"
 

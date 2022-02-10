@@ -29,6 +29,7 @@ include gui/Makefile.am
 include hw/nvdec/Makefile.am
 include hw/d3d9/Makefile.am
 include hw/d3d11/Makefile.am
+include hw/drm/Makefile.am
 include hw/vaapi/Makefile.am
 include hw/vdpau/Makefile.am
 include hw/mmal/Makefile.am
