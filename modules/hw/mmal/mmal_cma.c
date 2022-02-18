@@ -618,16 +618,6 @@ unsigned int cma_buf_vc_handle(cma_buf_t *const cb)
     return cb->vc_h;
 }
 
-int cma_buf_fd(const cma_buf_t *const cb)
-{
-    return cb->fd;
-}
-
-void * cma_buf_addr(const cma_buf_t *const cb)
-{
-    return cb->mmap;
-}
-
 unsigned int cma_buf_vc_addr(cma_buf_t *const cb)
 {
     if (cb->vc_addr == 0)

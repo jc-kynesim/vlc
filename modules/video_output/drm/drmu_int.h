@@ -12,6 +12,10 @@
 
 #define TRACE_PROP_NEW 1
 
+#ifndef DRM_FORMAT_P030
+#define DRM_FORMAT_P030 fourcc_code('P', '0', '3', '0')
+#endif
+
 enum drmu_bo_type_e {
     BO_TYPE_NONE = 0,
     BO_TYPE_FD,
@@ -45,6 +49,8 @@ typedef enum drmu_isset_e {
     DRMU_ISSET_SET,        // Thing has valid data
 } drmu_isset_t;
 
+struct drmu_format_info_s;
+
 typedef struct drmu_fb_s {
     atomic_int ref_count;  // 0 == 1 ref for ease of init
     struct drmu_fb_s * prev;
@@ -52,21 +58,16 @@ typedef struct drmu_fb_s {
 
     struct drmu_env_s * du;
 
+    const struct drmu_format_info_s * fmt_info;
+
     struct drm_mode_fb_cmd2 fb;
 
-//    uint32_t width;
-//    uint32_t height;
-//    uint32_t format;
     drmu_rect_t cropped;
-//    unsigned int handle;
 
     void * map_ptr;
     size_t map_size;
     size_t map_pitch;
 
-//    uint32_t pitches[4];
-//    uint32_t offsets[4];
-//    uint64_t modifiers[4];
     drmu_bo_t * bo_list[4];
 
     const char * color_encoding; // Assumed to be constant strings that don't need freeing

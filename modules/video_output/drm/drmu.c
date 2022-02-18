@@ -4,23 +4,96 @@
 #include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
+// Update return value with a new one for cases where we don't stop on error
+static inline int rvup(int rv1, int rv2)
+{
+    return rv2 ? rv2 : rv1;
+}
+
 drmu_ufrac_t
 drmu_ufrac_reduce(drmu_ufrac_t x)
 {
-    static const unsigned int primes[] = {2,3,5,7,11,13,17,19,23,0};
+    // UINT_MAX guarantees x.den/UINT_MAX < UINT_MAX and so exits
+    static const unsigned int primes[] = {2,3,5,7,11,13,17,19,23,29,31,UINT_MAX};
     const unsigned int * p;
-    for (p = primes; *p != 0; ++p) {
-        while (x.den % *p == 0 && x.num % *p ==0) {
-            x.den /= *p;
-            x.num /= *p;
+    for (p = primes;; ++p) {
+        const unsigned int n = *p;
+        for (;;) {
+            const unsigned int xd = x.den / n;
+            const unsigned int xn = x.num / n;
+            if (xn < n || xd < n)
+                return x;
+            if (xn * n != x.num || xd * n != x.den)
+                break;
+            x.num = xn;
+            x.den = xd;
         }
     }
-    return x;
+}
+
+//----------------------------------------------------------------------------
+//
+// Format properties
+
+typedef struct drmu_format_info_s {
+    uint32_t fourcc;
+    uint8_t  bpp;  // For dumb BO alloc
+    uint8_t  bit_depth;  // For display
+    uint8_t  plane_count;
+    struct {
+        uint8_t wdiv;
+        uint8_t hdiv;
+    } planes[4];
+} drmu_format_info_t;
+
+static const drmu_format_info_t format_info[] = {
+    { .fourcc = DRM_FORMAT_XRGB8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_XBGR8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_RGBX8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_BGRX8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_ARGB8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_ABGR8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_RGBA8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_BGRA8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_XRGB2101010, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_XBGR2101010, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_RGBX1010102, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_BGRX1010102, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_ARGB2101010, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_ABGR2101010, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_RGBA1010102, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_BGRA1010102, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_AYUV, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
+
+    { .fourcc = DRM_FORMAT_YUYV, .bpp = 16, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_YVYU, .bpp = 16, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_VYUY, .bpp = 16, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
+    { .fourcc = DRM_FORMAT_UYVY, .bpp = 16, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
+
+    { .fourcc = DRM_FORMAT_NV12,   .bpp = 8, .bit_depth = 8, .plane_count = 2, .planes = {{.wdiv = 1, .hdiv = 1}, {.wdiv = 1, .hdiv = 2}}},
+    { .fourcc = DRM_FORMAT_NV21,   .bpp = 8, .bit_depth = 8, .plane_count = 2, .planes = {{.wdiv = 1, .hdiv = 1}, {.wdiv = 1, .hdiv = 2}}},
+    { .fourcc = DRM_FORMAT_YUV420, .bpp = 8, .bit_depth = 8, .plane_count = 3, .planes = {{.wdiv = 1, .hdiv = 1}, {.wdiv = 2, .hdiv = 2}, {.wdiv = 2, .hdiv = 2}}},
+
+    // 3 pel in 32 bits. So code as 32bpp with wdiv 3.
+    { .fourcc = DRM_FORMAT_P030,   .bpp = 32, .bit_depth = 10, .plane_count = 2, .planes = {{.wdiv = 3, .hdiv = 1}, {.wdiv = 3, .hdiv = 2}}},
+
+    { .fourcc = 0 }
+};
+
+static const drmu_format_info_t *
+format_info_find(const uint32_t fourcc)
+{
+    for (const drmu_format_info_t * p = format_info; p->fourcc; ++p) {
+        if (p->fourcc == fourcc)
+            return p;
+    }
+    return NULL;
 }
 
 //----------------------------------------------------------------------------
@@ -177,7 +250,7 @@ drmu_prop_enum_value(const drmu_prop_enum_t * const pen, const char * const name
             const int r = strcmp(name, pen->enums[i].name);
 
             if (r == 0)
-                return &pen->enums[i].value;
+                return (const uint64_t *)&pen->enums[i].value;  // __u64 defn != uint64_t defn always :-(
 
             if (r < 0) {
                 b = i;
@@ -356,6 +429,18 @@ drmu_prop_range_validate(const drmu_prop_range_t * const pra, const uint64_t x)
         return (int64_t)pra->range[0] <= (int64_t)x && (int64_t)pra->range[1] >= (int64_t)x;
     }
     return pra->range[0] <= x && pra->range[1] >= x;
+}
+
+uint64_t
+drmu_prop_range_max(const drmu_prop_range_t * const pra)
+{
+    return pra == NULL ? 0 : pra->range[1];
+}
+
+uint64_t
+drmu_prop_range_min(const drmu_prop_range_t * const pra)
+{
+    return pra == NULL ? 0 : pra->range[0];
 }
 
 uint32_t
@@ -719,6 +804,7 @@ drmu_fb_crop(const drmu_fb_t *const dfb)
 void
 drmu_fb_int_fmt_size_set(drmu_fb_t *const dfb, uint32_t fmt, uint32_t w, uint32_t h, const drmu_rect_t crop)
 {
+    dfb->fmt_info = format_info_find(fmt);
     dfb->fb.pixel_format = fmt;
     dfb->fb.width        = w;
     dfb->fb.height       = h;
@@ -777,7 +863,7 @@ drmu_fb_int_make(drmu_fb_t *const dfb)
 }
 
 void
-drmu_fb_int_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta)
+drmu_fb_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta)
 {
     if (meta == NULL) {
         dfb->hdr_metadata_isset = DRMU_ISSET_NULL;
@@ -786,6 +872,30 @@ drmu_fb_int_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metad
         dfb->hdr_metadata_isset = DRMU_ISSET_SET;
         dfb->hdr_metadata = *meta;
     }
+}
+
+bool
+drmu_fb_hdr_metadata_isset(const drmu_fb_t *const dfb)
+{
+    return dfb->hdr_metadata_isset != DRMU_ISSET_UNSET;
+}
+
+const struct hdr_output_metadata *
+drmu_fb_hdr_metadata_get(const drmu_fb_t *const dfb)
+{
+    return dfb->hdr_metadata_isset == DRMU_ISSET_SET ? &dfb->hdr_metadata : NULL;
+}
+
+const char *
+drmu_fb_colorspace_get(const drmu_fb_t * const dfb)
+{
+    return dfb->colorspace;
+}
+
+const struct drmu_format_info_s *
+drmu_fb_format_info_get(const drmu_fb_t * const dfb)
+{
+    return dfb->fmt_info;
 }
 
 drmu_fb_t *
@@ -803,82 +913,37 @@ drmu_fb_int_alloc(drmu_env_t * const du)
 unsigned int
 drmu_fb_pixel_bits(const drmu_fb_t * const dfb)
 {
-    switch (dfb->fb.pixel_format) {
-        case DRM_FORMAT_XRGB8888:
-        case DRM_FORMAT_XBGR8888:
-        case DRM_FORMAT_RGBX8888:
-        case DRM_FORMAT_BGRX8888:
-        case DRM_FORMAT_ARGB8888:
-        case DRM_FORMAT_ABGR8888:
-        case DRM_FORMAT_RGBA8888:
-        case DRM_FORMAT_BGRA8888:
-        case DRM_FORMAT_AYUV:
-            return 32;
-        case DRM_FORMAT_YUYV:
-        case DRM_FORMAT_YVYU:
-        case DRM_FORMAT_VYUY:
-        case DRM_FORMAT_UYVY:
-            return 16;
-        case DRM_FORMAT_NV12:
-        case DRM_FORMAT_NV21:
-        case DRM_FORMAT_YUV420:
-            return 8;
-        default:
-            break;
-    }
-    return 0;
+    return dfb->fmt_info->bpp;
 }
 
 // For allocation purposes given fb_pixel bits how tall
-// does the frame have to be to fit all planes
+// does the frame have to be to fit all planes if constant width
 static unsigned int
-fb_total_height(const drmu_fb_t * const dfb, unsigned int h)
+fb_total_height(const drmu_fb_t * const dfb, const unsigned int h)
 {
-    switch (dfb->fb.pixel_format) {
-        case DRM_FORMAT_NV12:
-        case DRM_FORMAT_NV21:
-        case DRM_FORMAT_YUV420:
-            return h * 3 / 2;
-        default:
-            break;
-    }
-    return h;
+    unsigned int i;
+    const drmu_format_info_t *const f = dfb->fmt_info;
+    unsigned int t = 0;
+    unsigned int h0 = h * f->planes[0].wdiv;
+
+    for (i = 0; i != f->plane_count; ++i)
+        t += h0 / (f->planes[i].hdiv * f->planes[i].wdiv);
+
+    return t;
 }
 
 static void
 fb_pitches_set(drmu_fb_t * const dfb)
 {
-    const uint32_t pitch0 = dfb->map_pitch;
+    const drmu_format_info_t *const f = dfb->fmt_info;
+    const uint32_t pitch0 = dfb->map_pitch * f->planes[0].wdiv;
     const uint32_t h = drmu_fb_height(dfb);
+    uint32_t t = 0;
+    unsigned int i;
 
-    switch (dfb->fb.pixel_format) {
-        case DRM_FORMAT_XRGB8888:
-        case DRM_FORMAT_XBGR8888:
-        case DRM_FORMAT_RGBX8888:
-        case DRM_FORMAT_BGRX8888:
-        case DRM_FORMAT_ARGB8888:
-        case DRM_FORMAT_ABGR8888:
-        case DRM_FORMAT_RGBA8888:
-        case DRM_FORMAT_BGRA8888:
-        case DRM_FORMAT_AYUV:
-        case DRM_FORMAT_YUYV:
-        case DRM_FORMAT_YVYU:
-        case DRM_FORMAT_VYUY:
-        case DRM_FORMAT_UYVY:
-            drmu_fb_int_layer_set(dfb, 0, 0, pitch0, 0);
-            break;
-        case DRM_FORMAT_NV12:
-        case DRM_FORMAT_NV21:
-            drmu_fb_int_layer_set(dfb, 0, 0, pitch0, 0);
-            drmu_fb_int_layer_set(dfb, 1, 0, pitch0, pitch0 * h);
-            break;
-        case DRM_FORMAT_YUV420:
-            drmu_fb_int_layer_set(dfb, 0, 0, pitch0, 0);
-            drmu_fb_int_layer_set(dfb, 1, 0, pitch0 / 2, pitch0 * h);
-            drmu_fb_int_layer_set(dfb, 2, 0, pitch0 / 2, pitch0 * h * 5 / 4);
-            break;
-        default:
-            break;
+    for (i = 0; i != f->plane_count; ++i) {
+        drmu_fb_int_layer_set(dfb, i, 0, pitch0 / f->planes[i].wdiv, t);
+        t += (pitch0 * h) / (f->planes[i].hdiv * f->planes[i].wdiv);
     }
 }
 
@@ -904,7 +969,7 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
     {
         struct drm_mode_create_dumb dumb = {
             .height = fb_total_height(dfb, dfb->fb.height),
-            .width = dfb->fb.width,
+            .width = dfb->fb.width / dfb->fmt_info->planes[0].wdiv,
             .bpp = bpp
         };
 
@@ -1005,33 +1070,38 @@ drmu_atomic_add_prop_fb(drmu_atomic_t * const da, const uint32_t obj_id, const u
 //
 // props fns (internal)
 
+typedef struct drmu_propinfo_s {
+    uint64_t val;
+    struct drm_mode_get_property prop;
+} drmu_propinfo_t;
+
 typedef struct drmu_props_s {
     struct drmu_env_s * du;
-    unsigned int prop_count;
-    drmModePropertyPtr * props;
+    unsigned int n;
+    drmu_propinfo_t * info;
+    const drmu_propinfo_t ** by_name;
 } drmu_props_t;
 
 static void
 props_free(drmu_props_t * const props)
 {
-    unsigned int i;
-    for (i = 0; i != props->prop_count; ++i)
-        drmModeFreeProperty(props->props[i]);
+    free(props->info);  // As yet nothing else is allocated off this
+    free(props->by_name);
     free(props);
 }
 
 static uint32_t
-props_name_to_id(drmu_props_t * const props, const char * const name)
+props_name_to_id(const drmu_props_t * const props, const char * const name)
 {
-    unsigned int i = props->prop_count / 2;
+    unsigned int i = props->n / 2;
     unsigned int a = 0;
-    unsigned int b = props->prop_count;
+    unsigned int b = props->n;
 
     while (a < b) {
-        const int r = strcmp(name, props->props[i]->name);
+        const int r = strcmp(name, props->by_name[i]->prop.name);
 
         if (r == 0)
-            return props->props[i]->prop_id;
+            return props->by_name[i]->prop.prop_id;
 
         if (r < 0) {
             b = i;
@@ -1052,32 +1122,85 @@ props_dump(const drmu_props_t * const props)
         unsigned int i;
         drmu_env_t * const du = props->du;
 
-        for (i = 0; i != props->prop_count; ++i) {
-            drmModePropertyPtr p = props->props[i];
-            drmu_info(du, "Prop%02d/%02d: id=%#02x, name=%s, flags=%#x, values=%d, value[0]=%#"PRIx64", blobs=%d, blob[0]=%#x", i, props->prop_count, p->prop_id,
-                      p->name, p->flags,
-                      p->count_values, !p->values ? (uint64_t)0 : p->values[0],
-                      p->count_blobs, !p->blob_ids ? 0 : p->blob_ids[0]);
+        for (i = 0; i != props->n; ++i) {
+            const drmu_propinfo_t * const inf = props->info + i;
+            const struct drm_mode_get_property * const p = &inf->prop;
+            char flagbuf[256];
+
+            flagbuf[0] = 0;
+            if (p->flags & DRM_MODE_PROP_PENDING)
+                strcat(flagbuf, ":pending");
+            if (p->flags & DRM_MODE_PROP_RANGE)
+                strcat(flagbuf, ":urange");
+            if (p->flags & DRM_MODE_PROP_IMMUTABLE)
+                strcat(flagbuf, ":immutable");
+            if (p->flags & DRM_MODE_PROP_ENUM)
+                strcat(flagbuf, ":enum");
+            if (p->flags & DRM_MODE_PROP_BLOB)
+                strcat(flagbuf, ":blob");
+            if (p->flags & DRM_MODE_PROP_BITMASK)
+                strcat(flagbuf, ":bitmask");
+            if ((p->flags & DRM_MODE_PROP_EXTENDED_TYPE) == DRM_MODE_PROP_OBJECT)
+                strcat(flagbuf, ":object");
+            else if ((p->flags & DRM_MODE_PROP_EXTENDED_TYPE) == DRM_MODE_PROP_SIGNED_RANGE)
+                strcat(flagbuf, ":srange");
+            else if ((p->flags & DRM_MODE_PROP_EXTENDED_TYPE) != 0)
+                strcat(flagbuf, ":?xtype?");
+            if (p->flags & ~(DRM_MODE_PROP_LEGACY_TYPE |
+                             DRM_MODE_PROP_EXTENDED_TYPE |
+                             DRM_MODE_PROP_PENDING |
+                             DRM_MODE_PROP_IMMUTABLE |
+                             DRM_MODE_PROP_ATOMIC))
+                strcat(flagbuf, ":?other?");
+            if (p->flags & DRM_MODE_PROP_ATOMIC)
+                strcat(flagbuf, ":atomic");
+
+
+            drmu_info(du, "Prop%02d/%02d: %#-4x %-16s val=%#-4"PRIx64" flags=%#x%s, values=%d, blobs=%d",
+                      i, props->n, p->prop_id,
+                      p->name, inf->val,
+                      p->flags, flagbuf,
+                      p->count_values,
+                      p->count_enum_blobs);
         }
     }
 }
 #endif
 
 static int
-props_qsort_cb(const void * va, const void * vb)
+props_qsort_by_name_cb(const void * va, const void * vb)
 {
-    const drmModePropertyPtr a = *(drmModePropertyPtr *)va;
-    const drmModePropertyPtr b = *(drmModePropertyPtr *)vb;
-    return strcmp(a->name, b->name);
+    const drmu_propinfo_t * const a = *(drmu_propinfo_t **)va;
+    const drmu_propinfo_t * const b = *(drmu_propinfo_t **)vb;
+    return strcmp(a->prop.name, b->prop.name);
+}
+
+// At the moment we don't need / want to fill in the values / blob arrays
+// we just want the name - will get the extra info if we need it
+static int
+propinfo_fill(drmu_env_t * const du, drmu_propinfo_t * const inf, uint32_t propid, uint64_t val)
+{
+    int rv;
+
+    inf->val = val;
+    inf->prop.prop_id = propid;
+    if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_GETPROPERTY, &inf->prop)) != 0)
+        drmu_err(du, "Failed to get property %d: %s", propid, strerror(-rv));
+    return rv;
 }
 
 static drmu_props_t *
 props_new(drmu_env_t * const du, const uint32_t objid, const uint32_t objtype)
 {
     drmu_props_t * const props = calloc(1, sizeof(*props));
-    drmModeObjectProperties * objprops;
-    int err;
-    unsigned int i;
+    int rv;
+	struct drm_mode_obj_get_properties obj_props = {
+        .obj_id = objid,
+        .obj_type = objtype,
+    };
+    uint64_t * values = NULL;
+    uint32_t * propids = NULL;
+    unsigned int n = 0;
 
     if (props == NULL) {
         drmu_err(du, "%s: Failed struct alloc", __func__);
@@ -1085,35 +1208,53 @@ props_new(drmu_env_t * const du, const uint32_t objid, const uint32_t objtype)
     }
     props->du = du;
 
-    if ((objprops = drmModeObjectGetProperties(du->fd, objid, objtype)) == NULL) {
-        err = errno;
-        drmu_err(du, "%s: drmModeObjectGetProperties failed: %s", __func__, strerror(err));
-        return NULL;
-    }
-
-    if ((props->props = calloc(objprops->count_props, sizeof(*props))) == NULL) {
-        drmu_err(du, "%s: Failed array alloc", __func__);
-        goto fail1;
-    }
-
-    for (i = 0; i != objprops->count_props; ++i) {
-        if ((props->props[i] = drmModeGetProperty(du->fd, objprops->props[i])) == NULL) {
-            err = errno;
-            drmu_err(du, "%s: drmModeGetPropertiy %#x failed: %s", __func__, objprops->props[i], strerror(err));
-            goto fail2;
+    for (;;) {
+        if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_OBJ_GETPROPERTIES, &obj_props)) != 0) {
+            drmu_err(du, "drmModeObjectGetProperties failed: %s", strerror(-rv));
+            goto fail;
         }
-        ++props->prop_count;
+
+        if (obj_props.count_props <= n)
+            break;
+
+        free(values);
+        values = NULL;
+        free(propids);
+        propids = NULL;
+        n = obj_props.count_props;
+        if ((values = malloc(n * sizeof(*values))) == NULL ||
+            (propids = malloc(n * sizeof(*propids))) == NULL) {
+            drmu_err(du, "obj/value array alloc failed");
+            goto fail;
+        }
+        obj_props.prop_values_ptr = (uintptr_t)values;
+        obj_props.props_ptr = (uintptr_t)propids;
+    }
+
+    if ((props->info = calloc(n, sizeof(*props->info))) == NULL ||
+        (props->by_name = malloc(n * sizeof(*props->by_name))) == NULL) {
+        drmu_err(du, "info/name array alloc failed");
+        goto fail;
+    }
+    props->n = n;
+
+    for (unsigned int i = 0; i < n; ++i) {
+        drmu_propinfo_t * const inf = props->info + i;
+
+        props->by_name[i] = inf;
+        if ((rv = propinfo_fill(du, inf, propids[i], values[i])) != 0)
+            goto fail;
     }
 
     // Sort into name order for faster lookup
-    qsort(props->props, props->prop_count, sizeof(*props->props), props_qsort_cb);
+    qsort(props->by_name, n, sizeof(*props->by_name), props_qsort_by_name_cb);
 
     return props;
 
-fail2:
+fail:
     props_free(props);
-fail1:
-    drmModeFreeObjectProperties(objprops);
+    free(values);
+    free(propids);
     return NULL;
 }
 
@@ -1474,6 +1615,9 @@ drmu_atomic_crtc_hdr_metadata_set(drmu_atomic_t * const da, drmu_crtc_t * const 
     drmu_env_t * const du = drmu_atomic_env(da);
     int rv;
 
+    if (!du || !dc)  // du will be null if da is null
+        return -ENOENT;
+
     if (dc->pid.hdr_output_metadata == 0 || !du->modeset_allow)
         return 0;
 
@@ -1544,14 +1688,40 @@ drmu_atomic_crtc_mode_id_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, c
 }
 
 int
-drmu_atomic_crtc_colorspace_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, const char * colorspace, int hi_bpc)
+drmu_atomic_crtc_hi_bpc_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, bool hi_bpc)
 {
-    if (!hi_bpc || !dc->hi_bpc_ok || !colorspace || strcmp(colorspace, "BT2020_RGB") != 0) {
-        return atomic_crtc_bpc_set(da, dc, colorspace, 8);
-    }
-    else {
-        return atomic_crtc_hi_bpc_set(da, dc);
-    }
+    if (!dc->du->modeset_allow || !dc->hi_bpc_ok || !dc->pid.max_bpc)
+        return 0;
+    return drmu_atomic_add_prop_range(da, dc->con->connector_id, dc->pid.max_bpc, !hi_bpc ? 8 :
+                                      drmu_prop_range_max(dc->pid.max_bpc));
+}
+
+int
+drmu_atomic_crtc_colorspace_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, const char * colorspace)
+{
+    if (!dc->du->modeset_allow || !dc->pid.colorspace)
+        return 0;
+
+    return drmu_atomic_add_prop_enum(da, dc->con->connector_id, dc->pid.colorspace, colorspace);
+}
+
+// Set all the fb info props that might apply to a crtc on the crtc
+// (e.g. hdr_metadata, colorspace) but do not set the mode (resolution
+// and refresh)
+int
+drmu_atomic_crtc_fb_info_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, const drmu_fb_t * const fb)
+{
+    const drmu_format_info_t * const fmt_info = drmu_fb_format_info_get(fb);
+    const char * const colorspace = drmu_fb_colorspace_get(fb);
+    int rv = 0;
+
+    if (fmt_info)
+        rv = rvup(rv, drmu_atomic_crtc_hi_bpc_set(da, dc, (fmt_info->bit_depth > 8)));
+    if (colorspace)
+        rv = rvup(rv, drmu_atomic_crtc_colorspace_set(da, dc, colorspace));
+    if (drmu_fb_hdr_metadata_isset(fb))
+        rv = rvup(rv, drmu_atomic_crtc_hdr_metadata_set(da, dc, drmu_fb_hdr_metadata_get(fb)));
+    return rv;
 }
 
 //----------------------------------------------------------------------------
@@ -1951,7 +2121,7 @@ drmu_atomic_add_plane_rotation(struct drmu_atomic_s * const da, const drmu_plane
 }
 
 int
-drmu_atomic_plane_set(drmu_atomic_t * const da, drmu_plane_t * const dp,
+drmu_atomic_plane_fb_set(drmu_atomic_t * const da, drmu_plane_t * const dp,
     drmu_fb_t * const dfb, const drmu_rect_t pos)
 {
     int rv;
@@ -1973,19 +2143,6 @@ drmu_atomic_plane_set(drmu_atomic_t * const da, drmu_plane_t * const dp,
     drmu_atomic_add_prop_enum(da, plid, dp->pid.pixel_blend_mode, dfb->pixel_blend_mode);
     drmu_atomic_add_prop_enum(da, plid, dp->pid.color_encoding, dfb->color_encoding);
     drmu_atomic_add_prop_enum(da, plid, dp->pid.color_range,    dfb->color_range);
-
-    // *** Need to rethink this
-    if (dp->dc != NULL) {
-        drmu_crtc_t * const dc = dp->dc;
-
-        if (dfb->colorspace != NULL) {
-            drmu_atomic_crtc_colorspace_set(da, dc, dfb->colorspace, 1);
-        }
-        if (dfb->hdr_metadata_isset == DRMU_ISSET_NULL)
-            drmu_atomic_crtc_hdr_metadata_set(da, dc, NULL);
-        else if (dfb->hdr_metadata_isset == DRMU_ISSET_SET)
-            drmu_atomic_crtc_hdr_metadata_set(da, dc, &dfb->hdr_metadata);
-    }
 
     return rv != 0 ? -errno : 0;
 }

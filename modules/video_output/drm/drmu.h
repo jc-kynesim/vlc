@@ -133,6 +133,8 @@ int drmu_atomic_add_prop_bitmask(struct drmu_atomic_s * const da, const uint32_t
 
 void drmu_prop_range_delete(drmu_prop_range_t ** pppra);
 bool drmu_prop_range_validate(const drmu_prop_range_t * const pra, const uint64_t x);
+uint64_t drmu_prop_range_max(const drmu_prop_range_t * const pra);
+uint64_t drmu_prop_range_min(const drmu_prop_range_t * const pra);
 uint32_t drmu_prop_range_id(const drmu_prop_range_t * const pra);
 drmu_prop_range_t * drmu_prop_range_new(drmu_env_t * const du, const uint32_t id);
 int drmu_atomic_add_prop_range(struct drmu_atomic_s * const da, const uint32_t obj_id, const drmu_prop_range_t * const pra, const uint64_t x);
@@ -150,6 +152,7 @@ void drmu_bo_env_init(drmu_bo_env_t * boe);
 
 // fb
 struct hdr_output_metadata;
+struct drmu_format_info_s;
 
 // Called pre delete.
 // Zero returned means continue delete.
@@ -190,7 +193,11 @@ void drmu_fb_int_on_delete_set(drmu_fb_t *const dfb, drmu_fb_on_delete_fn fn, vo
 void drmu_fb_int_bo_set(drmu_fb_t *const dfb, unsigned int i, drmu_bo_t * const bo);
 void drmu_fb_int_layer_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset);
 void drmu_fb_int_layer_mod_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset, uint64_t modifier);
-void drmu_fb_int_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta);
+bool drmu_fb_hdr_metadata_isset(const drmu_fb_t *const dfb);
+const struct hdr_output_metadata * drmu_fb_hdr_metadata_get(const drmu_fb_t *const dfb);
+const char * drmu_fb_colorspace_get(const drmu_fb_t * const dfb);
+const struct drmu_format_info_s * drmu_fb_format_info_get(const drmu_fb_t * const dfb);
+void drmu_fb_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta);
 int drmu_fb_int_make(drmu_fb_t *const dfb);
 
 // fb pool
@@ -232,9 +239,20 @@ drmu_mode_score_fn drmu_mode_pick_simple_cb;
 
 drmu_crtc_t * drmu_crtc_new_find(drmu_env_t * const du);
 
-int drmu_atomic_crtc_colorspace_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const char * colorspace, int hi_bpc);
+// False set max_bpc to 8, true max value
+int drmu_atomic_crtc_hi_bpc_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, bool hi_bpc);
+
+#define DRMU_CRTC_COLORSPACE_DEFAULT            "Default"
+int drmu_atomic_crtc_colorspace_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const char * colorspace);
 int drmu_atomic_crtc_mode_id_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const int mode_id);
+
+// Set none if m=NULL
 int drmu_atomic_crtc_hdr_metadata_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const struct hdr_output_metadata * const m);
+
+// Set all the fb info props that might apply to a crtc on the crtc
+// (e.g. hdr_metadata, colorspace) but do not set the mode (resolution
+// and refresh)
+int drmu_atomic_crtc_fb_info_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const drmu_fb_t * const fb);
 
 // Plane
 
@@ -261,7 +279,7 @@ int drmu_atomic_add_plane_alpha(struct drmu_atomic_s * const da, const drmu_plan
 #define DRMU_PLANE_ROTATION_180_TRANSPOSE       7  // Rotate 180 & transpose
 int drmu_atomic_add_plane_rotation(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int rot);
 
-int drmu_atomic_plane_set(struct drmu_atomic_s * const da, drmu_plane_t * const dp, drmu_fb_t * const dfb, const drmu_rect_t pos);
+int drmu_atomic_plane_fb_set(struct drmu_atomic_s * const da, drmu_plane_t * const dp, drmu_fb_t * const dfb, const drmu_rect_t pos);
 
 // Env
 struct drmu_log_env_s;
@@ -326,6 +344,9 @@ int drmu_atomic_add_prop_value(drmu_atomic_t * const da, const uint32_t obj_id, 
 
 drmu_env_t * drmu_env_new_xlease(const struct drmu_log_env_s * const log);
 
+// drmu_xdri3
+
+drmu_env_t * drmu_env_new_xdri3(const drmu_log_env_t * const log);
 
 #ifdef __cplusplus
 }

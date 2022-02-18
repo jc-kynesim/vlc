@@ -3489,6 +3489,7 @@ AM_CONDITIONAL([HAVE_KVA], [test "${have_kva}" = "yes"])
 dnl
 dnl MMAL plugin
 dnl
+have_mmal="no"
 AC_ARG_ENABLE(mmal,
   AS_HELP_STRING([--enable-mmal],
     [Multi-Media Abstraction Layer (MMAL) hardware plugin (default enable)]))

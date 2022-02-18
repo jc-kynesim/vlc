@@ -1,8 +1,11 @@
 set -e
 BASE=`pwd`
 
+CONF_MMAL=--disable-mmal
+
 MC=`uname -m`
 if [ "$MC" == "armv7l" ]; then
+  CONF_MMAL=--enable-mmal-avcodec
   ARM=armv7
 elif [ "$MC" == "aarch64" ]; then
   ARM=arm64
@@ -15,6 +18,6 @@ OUT=$BASE/out/$ARM-`lsb_release -sc`-rel
 echo "Configuring in $OUT"
 mkdir -p $OUT
 cd $OUT
-$BASE/configure  --disable-vdpau --enable-gles2 --enable-mmal-avcodec
+$BASE/configure  --disable-vdpau --enable-gles2 $CONF_MMAL
 echo "Configured in $OUT"
 

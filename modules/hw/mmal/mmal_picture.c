@@ -1476,12 +1476,6 @@ int cma_buf_pic_attach(cma_buf_t * const cb, picture_t * const pic)
     return VLC_SUCCESS;
 }
 
-cma_buf_t * cma_buf_pic_get(picture_t * const pic)
-{
-    pic_ctx_mmal_t * const ctx = (pic_ctx_mmal_t *)pic->context;
-    return !is_cma_buf_pic_chroma(pic->format.i_chroma) || ctx  == NULL ? 0 : ctx->cb;
-}
-
 
 //----------------------------------------------------------------------------
 

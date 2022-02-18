@@ -252,7 +252,8 @@ subpics_done:
         return;
     }
 
-    ret = drmu_atomic_plane_set(da, sys->dp, dfb, r);
+    ret = drmu_atomic_plane_fb_set(da, sys->dp, dfb, r);
+    drmu_atomic_crtc_fb_info_set(da, sys->dc, dfb);  // **** Rationalize initial mode change
     drmu_fb_unref(&dfb);
 
     if (ret != 0) {
@@ -271,7 +272,7 @@ subpics_done:
         // Rescale from sub-space
         if (sys->subplanes[i])
         {
-            if ((ret = drmu_atomic_plane_set(da, sys->subplanes[i], spe->fb,
+            if ((ret = drmu_atomic_plane_fb_set(da, sys->subplanes[i], spe->fb,
                                   drmu_rect_rescale(spe->pos, r, spe->space))) != 0) {
                  msg_Err(vd, "drmModeSetPlane for subplane %d failed: %s", i, strerror(-ret));
             }
