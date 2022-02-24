@@ -3649,6 +3649,21 @@ AC_SUBST([MMAL_LIBS])
 AM_CONDITIONAL([HAVE_MMAL], [test "${have_mmal}" = "yes"])
 
 dnl
+dnl DRM
+dnl
+AC_ARG_ENABLE(drm,
+  [  --enable-drm            DRM output support (default enabled)],, [
+    enable_drm="yes"
+])
+
+have_drm="no"
+AS_IF([test "${enable_drm}" != "no"], [
+  PKG_CHECK_MODULES(DRM, [libdrm])
+  have_drm="yes"
+])
+AM_CONDITIONAL([HAVE_DRM], [test "${have_drm}" = "yes"])
+
+dnl
 dnl DRM_PRIME plugin
 dnl
 AC_ARG_ENABLE([avcodec_drm_prime],
