@@ -242,7 +242,8 @@ subpics_done:
         return;
     }
 
-    ret = drmu_atomic_plane_set(da, sys->dp, dfb, r);
+    ret = drmu_atomic_plane_fb_set(da, sys->dp, dfb, r);
+    drmu_atomic_crtc_fb_info_set(da, sys->dc, dfb);
     drmu_fb_unref(&dfb);
 
     if (ret != 0) {
@@ -260,7 +261,7 @@ subpics_done:
 
         // Rescale from sub-space
         if (sys->subplanes[i] &&
-            (ret = drmu_atomic_plane_set(da, sys->subplanes[i], spe->fb,
+            (ret = drmu_atomic_plane_fb_set(da, sys->subplanes[i], spe->fb,
                                   drmu_rect_rescale(spe->pos, r, spe->space))) != 0) {
             msg_Err(vd, "drmModeSetPlane for subplane %d failed: %s", i, strerror(-ret));
         }
@@ -463,6 +464,7 @@ static int OpenDrmVout(vout_display_t *vd,
             goto fail;
     }
 
+    drmu_env_restore_enable(sys->du);
     drmu_env_modeset_allow(sys->du, !var_InheritBool(vd, DRM_VOUT_NO_MODESET_NAME));
 
     if ((sys->dc = drmu_crtc_new_find(sys->du)) == NULL)

@@ -111,18 +111,30 @@ drmu_blob_t * drmu_blob_ref(drmu_blob_t * const blob);
 drmu_blob_t * drmu_blob_new(drmu_env_t * const du, const void * const data, const size_t len);
 int drmu_atomic_add_prop_blob(struct drmu_atomic_s * const da, const uint32_t obj_id, const uint32_t prop_id, drmu_blob_t * const blob);
 
-// Enum
+// Enum & bitmask
+// These are very close to the same thing so we use the same struct
+typedef drmu_prop_enum_t drmu_prop_bitmask_t;
 
+// Ptr to value of the named enum/bit, NULL if not found or pen == NULL. If bitmask then bit number
 const uint64_t * drmu_prop_enum_value(const drmu_prop_enum_t * const pen, const char * const name);
+// Bitmask only - value as a (single-bit) bitmask - 0 if not found or not bitmask or pen == NULL
+uint64_t drmu_prop_bitmask_value(const drmu_prop_enum_t * const pen, const char * const name);
+
 uint32_t drmu_prop_enum_id(const drmu_prop_enum_t * const pen);
+#define drmu_prop_bitmask_id drmu_prop_enum_id
 void drmu_prop_enum_delete(drmu_prop_enum_t ** const pppen);
+#define drmu_prop_bitmask_delete drmu_prop_enum_delete
 drmu_prop_enum_t * drmu_prop_enum_new(drmu_env_t * const du, const uint32_t id);
+#define drmu_prop_bitmask_new drmu_prop_enum_new
 int drmu_atomic_add_prop_enum(struct drmu_atomic_s * const da, const uint32_t obj_id, const drmu_prop_enum_t * const pen, const char * const name);
+int drmu_atomic_add_prop_bitmask(struct drmu_atomic_s * const da, const uint32_t obj_id, const drmu_prop_enum_t * const pen, const uint64_t value);
 
 // Range
 
 void drmu_prop_range_delete(drmu_prop_range_t ** pppra);
 bool drmu_prop_range_validate(const drmu_prop_range_t * const pra, const uint64_t x);
+uint64_t drmu_prop_range_max(const drmu_prop_range_t * const pra);
+uint64_t drmu_prop_range_min(const drmu_prop_range_t * const pra);
 uint32_t drmu_prop_range_id(const drmu_prop_range_t * const pra);
 drmu_prop_range_t * drmu_prop_range_new(drmu_env_t * const du, const uint32_t id);
 int drmu_atomic_add_prop_range(struct drmu_atomic_s * const da, const uint32_t obj_id, const drmu_prop_range_t * const pra, const uint64_t x);
@@ -140,6 +152,7 @@ void drmu_bo_env_init(drmu_bo_env_t * boe);
 
 // fb
 struct hdr_output_metadata;
+struct drmu_format_info_s;
 
 // Called pre delete.
 // Zero returned means continue delete.
@@ -155,6 +168,12 @@ drmu_fb_t * drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, cons
 drmu_fb_t * drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format);
 void drmu_fb_unref(drmu_fb_t ** const ppdfb);
 drmu_fb_t * drmu_fb_ref(drmu_fb_t * const dfb);
+
+#define DRMU_FB_PIXEL_BLEND_UNSET               NULL
+#define DRMU_FB_PIXEL_BLEND_PRE_MULTIPLIED      "Pre-multiplied"  // Default
+#define DRMU_FB_PIXEL_BLEND_COVERAGE            "Coverage"        // Not premultipled
+#define DRMU_FB_PIXEL_BLEND_NONE                "None"            // Ignore pixel alpha (opaque)
+int drmu_fb_pixel_blend_mode_set(drmu_fb_t *const dfb, const char * const mode);
 
 uint32_t drmu_fb_pitch(const drmu_fb_t *const dfb, const unsigned int layer);
 void * drmu_fb_data(const drmu_fb_t *const dfb, const unsigned int layer);
@@ -174,7 +193,11 @@ void drmu_fb_int_on_delete_set(drmu_fb_t *const dfb, drmu_fb_on_delete_fn fn, vo
 void drmu_fb_int_bo_set(drmu_fb_t *const dfb, unsigned int i, drmu_bo_t * const bo);
 void drmu_fb_int_layer_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset);
 void drmu_fb_int_layer_mod_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset, uint64_t modifier);
-void drmu_fb_int_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta);
+bool drmu_fb_hdr_metadata_isset(const drmu_fb_t *const dfb);
+const struct hdr_output_metadata * drmu_fb_hdr_metadata_get(const drmu_fb_t *const dfb);
+const char * drmu_fb_colorspace_get(const drmu_fb_t * const dfb);
+const struct drmu_format_info_s * drmu_fb_format_info_get(const drmu_fb_t * const dfb);
+void drmu_fb_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta);
 int drmu_fb_int_make(drmu_fb_t *const dfb);
 
 // fb pool
@@ -184,6 +207,14 @@ drmu_pool_t * drmu_pool_ref(drmu_pool_t * const pool);
 drmu_pool_t * drmu_pool_new(drmu_env_t * const du, unsigned int total_fbs_max);
 drmu_fb_t * drmu_pool_fb_new_dumb(drmu_pool_t * const pool, uint32_t w, uint32_t h, const uint32_t format);
 void drmu_pool_delete(drmu_pool_t ** const pppool);
+
+// Props
+
+// Grab all the props of an object and add to an atomic
+// * Does not add references to any properties (BO or FB) currently, it maybe
+//   should but if so we need to avoid accidentally closing BOs that we inherit
+//   from outside when we delete the atomic.
+int drmu_atomic_obj_add_snapshot(struct drmu_atomic_s * const da, const uint32_t objid, const uint32_t objtype);
 
 // CRTC
 
@@ -216,9 +247,20 @@ drmu_mode_score_fn drmu_mode_pick_simple_cb;
 
 drmu_crtc_t * drmu_crtc_new_find(drmu_env_t * const du);
 
-int drmu_atomic_crtc_colorspace_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const char * colorspace, int hi_bpc);
+// False set max_bpc to 8, true max value
+int drmu_atomic_crtc_hi_bpc_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, bool hi_bpc);
+
+#define DRMU_CRTC_COLORSPACE_DEFAULT            "Default"
+int drmu_atomic_crtc_colorspace_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const char * colorspace);
 int drmu_atomic_crtc_mode_id_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const int mode_id);
+
+// Set none if m=NULL
 int drmu_atomic_crtc_hdr_metadata_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const struct hdr_output_metadata * const m);
+
+// Set all the fb info props that might apply to a crtc on the crtc
+// (e.g. hdr_metadata, colorspace) but do not set the mode (resolution
+// and refresh)
+int drmu_atomic_crtc_fb_info_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const drmu_fb_t * const fb);
 
 // Plane
 
@@ -227,7 +269,25 @@ const uint32_t * drmu_plane_formats(const drmu_plane_t * const dp, unsigned int 
 void drmu_plane_delete(drmu_plane_t ** const ppdp);
 drmu_plane_t * drmu_plane_new_find(drmu_crtc_t * const dc, const uint32_t fmt);
 
-int drmu_atomic_plane_set(struct drmu_atomic_s * const da, drmu_plane_t * const dp, drmu_fb_t * const dfb, const drmu_rect_t pos);
+// Alpha: -1 = no not set, 0 = transparent, 0xffff = opaque
+#define DRMU_PLANE_ALPHA_UNSET                  (-1)
+#define DRMU_PLANE_ALPHA_TRANSPARENT            0
+#define DRMU_PLANE_ALPHA_OPAQUE                 0xffff
+int drmu_atomic_add_plane_alpha(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int alpha);
+
+// X, Y & TRANSPOSE can be ORed to get all others
+#define DRMU_PLANE_ROTATION_0                   0
+#define DRMU_PLANE_ROTATION_X_FLIP              1
+#define DRMU_PLANE_ROTATION_Y_FLIP              2
+#define DRMU_PLANE_ROTATION_180                 3
+// *** These don't exist on Pi - no inherent transpose
+#define DRMU_PLANE_ROTATION_TRANSPOSE           4
+#define DRMU_PLANE_ROTATION_90                  5  // Rotate 90 clockwise
+#define DRMU_PLANE_ROTATION_270                 6  // Rotate 90 anti-cockwise
+#define DRMU_PLANE_ROTATION_180_TRANSPOSE       7  // Rotate 180 & transpose
+int drmu_atomic_add_plane_rotation(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int rot);
+
+int drmu_atomic_plane_fb_set(struct drmu_atomic_s * const da, drmu_plane_t * const dp, drmu_fb_t * const dfb, const drmu_rect_t pos);
 
 // Env
 struct drmu_log_env_s;
@@ -242,6 +302,14 @@ int drmu_fd(const drmu_env_t * const du);
 const struct drmu_log_env_s * drmu_env_log(const drmu_env_t * const du);
 void drmu_env_delete(drmu_env_t ** const ppdu);
 void drmu_env_modeset_allow(drmu_env_t * const du, const bool modeset_allowed);
+// Restore state on env close
+int drmu_env_restore_enable(drmu_env_t * const du);
+bool drmu_env_restore_is_enabled(const drmu_env_t * const du);
+// Add an object snapshot to the restore state
+// Tests for commitability and removes any props that won't commit
+int drmu_atomic_env_restore_add_snapshot(struct drmu_atomic_s ** const ppda);
+
+
 drmu_env_t * drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log);
 drmu_env_t * drmu_env_new_open(const char * name, const struct drmu_log_env_s * const log);
 
@@ -278,7 +346,16 @@ void drmu_atomic_unref(drmu_atomic_t ** const ppda);
 drmu_atomic_t * drmu_atomic_ref(drmu_atomic_t * const da);
 drmu_atomic_t * drmu_atomic_new(drmu_env_t * const du);
 int drmu_atomic_merge(drmu_atomic_t * const a, drmu_atomic_t ** const ppb);
+
+// Remove all els in a that are also in b
+// b may be sorted (if not already) but is otherwise unchanged
+void drmu_atomic_sub(drmu_atomic_t * const a, drmu_atomic_t * const b);
+
+// flags are DRM_MODE_ATOMIC_xxx (e.g. DRM_MODE_ATOMIC_TEST_ONLY) and DRM_MODE_PAGE_FLIP_xxx
 int drmu_atomic_commit(const drmu_atomic_t * const da, uint32_t flags);
+// Attempt commit - if it fails add failing members to da_fail
+// This does NOT remove failing props from da.  If da_fail == NULL then same as _commit
+int drmu_atomic_commit_test(const drmu_atomic_t * const da, uint32_t flags, drmu_atomic_t * const da_fail);
 
 typedef void (* drmu_prop_del_fn)(void * v);
 typedef void (* drmu_prop_ref_fn)(void * v);
@@ -292,6 +369,9 @@ int drmu_atomic_add_prop_value(drmu_atomic_t * const da, const uint32_t obj_id, 
 
 drmu_env_t * drmu_env_new_xlease(const struct drmu_log_env_s * const log);
 
+// drmu_xdri3
+
+drmu_env_t * drmu_env_new_xdri3(const drmu_log_env_t * const log);
 
 #ifdef __cplusplus
 }

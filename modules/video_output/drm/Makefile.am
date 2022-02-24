@@ -6,7 +6,7 @@ libdrm_vout_plugin_la_SOURCES = video_output/drm/drm_vout.c \
 	video_output/drm/drmu_xlease.c video_output/drm/drmu_atomic.c \
 	video_output/drm/drmu.h video_output/drm/drmu_int.h \
 	video_output/drm/pollqueue.c video_output/drm/pollqueue.h
-libdrm_vout_plugin_la_CFLAGS = $(AM_CFLAGS) -pthread -I/usr/include/libdrm
+libdrm_vout_plugin_la_CFLAGS = $(AM_CFLAGS) -DHAS_VLC4=1 -pthread -I/usr/include/libdrm
 libdrm_vout_plugin_la_LDFLAGS = $(AM_LDFLAGS) -pthread
 libdrm_vout_plugin_la_LIBADD = -ldrm -lxcb-randr -lxcb
 if HAVE_MMAL

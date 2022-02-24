@@ -1,7 +1,14 @@
 #include "drmu_vlc.h"
 #include "drmu_log.h"
 
-#include "../codec/avcodec/drm_pic.h"
+#if HAS_ZC_CMA
+#include "../../hw/mmal/mmal_cma_pic.h"
+#endif
+#if HAS_DRMPRIME
+#include "../../codec/avcodec/drm_pic.h"
+#endif
+
+#include <errno.h>
 
 #include <libavutil/buffer.h>
 #include <libavutil/hwcontext_drm.h>
@@ -10,8 +17,30 @@
 #include <libdrm/drm_mode.h>
 #include <libdrm/drm_fourcc.h>
 
+#ifndef DRM_FORMAT_P030
+#define DRM_FORMAT_P030 fourcc_code('P', '0', '3', '0')
+#endif
+
 // N.B. DRM seems to order its format descriptor names the opposite way round to VLC
 // DRM is hi->lo within a little-endian word, VLC is byte order
+
+#if HAS_ZC_CMA
+uint32_t
+drmu_format_vlc_to_drm_cma(const vlc_fourcc_t chroma_in)
+{
+    switch (chroma_in) {
+        case VLC_CODEC_MMAL_ZC_I420:
+            return DRM_FORMAT_YUV420;
+        case VLC_CODEC_MMAL_ZC_SAND8:
+            return DRM_FORMAT_NV12;
+        case VLC_CODEC_MMAL_ZC_SAND30:
+            return DRM_FORMAT_P030;
+        case VLC_CODEC_MMAL_ZC_RGB32:
+            return DRM_FORMAT_RGBX8888;
+    }
+    return 0;
+}
+#endif
 
 uint32_t
 drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc)
@@ -72,7 +101,11 @@ drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc)
         default:
             break;
     }
+#if HAS_ZC_CMA
+    return drmu_format_vlc_to_drm_cma(vf_vlc->i_chroma);
+#else
     return 0;
+#endif
 }
 
 vlc_fourcc_t
@@ -169,12 +202,6 @@ pic_hdr_metadata(struct hdr_output_metadata * const m, const struct video_format
     return 0;
 }
 
-
-// VLC specific helper fb fns
-// *** If we make a lib from the drmu fns this should be separated to avoid
-//     unwanted library dependancies - For the general case we will need to
-//     think harder about how we split this
-
 static const char *
 fb_vlc_color_encoding(const video_format_t * const fmt)
 {
@@ -199,6 +226,7 @@ fb_vlc_color_encoding(const video_format_t * const fmt)
 static const char *
 fb_vlc_color_range(const video_format_t * const fmt)
 {
+#if HAS_VLC4
     switch (fmt->color_range)
     {
         case COLOR_RANGE_FULL:
@@ -208,6 +236,10 @@ fb_vlc_color_range(const video_format_t * const fmt)
         default:
             break;
     }
+#else
+    if (fmt->b_color_range_full)
+        return "YCbCr full range";
+#endif
     return "YCbCr limited range";
 }
 
@@ -224,6 +256,7 @@ fb_vlc_colorspace(const video_format_t * const fmt)
     return "Default";
 }
 
+#if HAS_DRMPRIME
 // Create a new fb from a VLC DRM_PRIME picture.
 // Picture is held reffed by the fb until the fb is deleted
 drmu_fb_t *
@@ -294,7 +327,7 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
 
     {
         struct hdr_output_metadata meta;
-        drmu_fb_int_hdr_metadata_set(dfb, pic_hdr_metadata(&meta, &pic->format) == 0 ? &meta : NULL);
+        drmu_fb_hdr_metadata_set(dfb, pic_hdr_metadata(&meta, &pic->format) == 0 ? NULL :&meta);
     }
 
     if (drmu_fb_int_make(dfb) != 0)
@@ -305,6 +338,91 @@ fail:
     drmu_fb_int_free(dfb);
     return NULL;
 }
+#endif
+
+#if HAS_ZC_CMA
+drmu_fb_t *
+drmu_fb_vlc_new_pic_cma_attach(drmu_env_t * const du, picture_t * const pic)
+{
+    int i;
+    drmu_fb_t * const dfb = drmu_fb_int_alloc(du);
+    fb_aux_pic_t * aux = NULL;
+    uint32_t fmt = drmu_format_vlc_to_drm_cma(pic->format.i_chroma);
+    const bool is_sand = (pic->format.i_chroma == VLC_CODEC_MMAL_ZC_SAND8 ||
+                          pic->format.i_chroma == VLC_CODEC_MMAL_ZC_SAND30);
+    cma_buf_t * const cb = cma_buf_pic_get(pic);
+
+    if (dfb == NULL) {
+        drmu_err(du, "%s: Alloc failure", __func__);
+        return NULL;
+    }
+
+    if (fmt == 0) {
+        drmu_err(du, "Pic bad format for cma");
+        goto fail;
+    }
+
+    if (cb == NULL) {
+        drmu_err(du, "Pic missing cma block");
+        goto fail;
+    }
+
+    drmu_fb_int_fmt_size_set(dfb,
+                             fmt,
+                             pic->format.i_width,
+                             pic->format.i_height,
+                             (drmu_rect_t){
+                                 .x = pic->format.i_x_offset,
+                                 .y = pic->format.i_y_offset,
+                                 .w = pic->format.i_visible_width,
+                                 .h = pic->format.i_visible_height});
+
+    drmu_fb_int_color_set(dfb,
+                          fb_vlc_color_encoding(&pic->format),
+                          fb_vlc_color_range(&pic->format),
+                          fb_vlc_colorspace(&pic->format));
+
+    // Set delete callback & hold this pic
+    // Aux attached to dfb immediately so no fail cleanup required
+    if ((aux = calloc(1, sizeof(*aux))) == NULL) {
+        drmu_err(du, "%s: Aux alloc failure", __func__);
+        goto fail;
+    }
+    aux->pic = picture_Hold(pic);
+    drmu_fb_int_on_delete_set(dfb, pic_fb_delete_cb, aux);
+
+    {
+        drmu_bo_t * bo = drmu_bo_new_fd(du, cma_buf_fd(cb));
+        if (bo == NULL)
+            goto fail;
+        drmu_fb_int_bo_set(dfb, 0, bo);
+    }
+
+    {
+        uint8_t * const base_addr = cma_buf_addr(cb);
+        for (i = 0; i < pic->i_planes; ++i) {
+            if (is_sand)
+                drmu_fb_int_layer_mod_set(dfb, i, 0, pic->format.i_width, pic->p[i].p_pixels - base_addr,
+                                          DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(pic->p[i].i_pitch));
+            else
+                drmu_fb_int_layer_mod_set(dfb, i, 0, pic->p[i].i_pitch, pic->p[i].p_pixels - base_addr, 0);
+        }
+    }
+
+    {
+        struct hdr_output_metadata meta;
+        drmu_fb_hdr_metadata_set(dfb, pic_hdr_metadata(&meta, &pic->format) == 0 ? NULL : &meta);
+    }
+
+    if (drmu_fb_int_make(dfb) != 0)
+        goto fail;
+    return dfb;
+
+fail:
+    drmu_fb_int_free(dfb);
+    return NULL;
+}
+#endif
 
 plane_t
 drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
@@ -334,6 +452,10 @@ drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
         .i_visible_pitch = (crop->w * bpp / 8) / wdiv
     };
 }
+
+#if !HAS_VLC4
+#define vlc_object_vaLog vlc_vaLog
+#endif
 
 void
 drmu_log_vlc_cb(void * v, enum drmu_log_level_e level_drmu, const char * fmt, va_list vl)

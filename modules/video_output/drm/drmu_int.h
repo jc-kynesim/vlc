@@ -12,6 +12,10 @@
 
 #define TRACE_PROP_NEW 0
 
+#ifndef DRM_FORMAT_P030
+#define DRM_FORMAT_P030 fourcc_code('P', '0', '3', '0')
+#endif
+
 enum drmu_bo_type_e {
     BO_TYPE_NONE = 0,
     BO_TYPE_FD,
@@ -45,6 +49,8 @@ typedef enum drmu_isset_e {
     DRMU_ISSET_SET,        // Thing has valid data
 } drmu_isset_t;
 
+struct drmu_format_info_s;
+
 typedef struct drmu_fb_s {
     atomic_int ref_count;  // 0 == 1 ref for ease of init
     struct drmu_fb_s * prev;
@@ -52,25 +58,21 @@ typedef struct drmu_fb_s {
 
     struct drmu_env_s * du;
 
+    const struct drmu_format_info_s * fmt_info;
+
     struct drm_mode_fb_cmd2 fb;
 
-//    uint32_t width;
-//    uint32_t height;
-//    uint32_t format;
     drmu_rect_t cropped;
-//    unsigned int handle;
 
     void * map_ptr;
     size_t map_size;
     size_t map_pitch;
 
-//    uint32_t pitches[4];
-//    uint32_t offsets[4];
-//    uint64_t modifiers[4];
     drmu_bo_t * bo_list[4];
 
     const char * color_encoding; // Assumed to be constant strings that don't need freeing
     const char * color_range;
+    const char * pixel_blend_mode;
 
     // Do not set colorspace or metadata if not the "master" plane
     const char * colorspace;
@@ -121,9 +123,13 @@ typedef struct drmu_plane_s {
         uint32_t src_w;
         uint32_t src_x;
         uint32_t src_y;
+        drmu_prop_range_t * alpha;
         drmu_prop_enum_t * color_encoding;
         drmu_prop_enum_t * color_range;
+        drmu_prop_enum_t * pixel_blend_mode;
+        drmu_prop_bitmask_t * rotation;
     } pid;
+    uint64_t rot_vals[8];
 
 } drmu_plane_t;
 
@@ -151,6 +157,8 @@ typedef struct drmu_env_s {
     drmu_atomic_q_t aq;
     // global env for bo tracking
     drmu_bo_env_t boe;
+    // global atomic for restore op
+    drmu_atomic_t * da_restore;
 
     struct pollqueue * pq;
     struct polltask * pt;
