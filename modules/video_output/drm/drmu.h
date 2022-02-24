@@ -208,6 +208,14 @@ drmu_pool_t * drmu_pool_new(drmu_env_t * const du, unsigned int total_fbs_max);
 drmu_fb_t * drmu_pool_fb_new_dumb(drmu_pool_t * const pool, uint32_t w, uint32_t h, const uint32_t format);
 void drmu_pool_delete(drmu_pool_t ** const pppool);
 
+// Props
+
+// Grab all the props of an object and add to an atomic
+// * Does not add references to any properties (BO or FB) currently, it maybe
+//   should but if so we need to avoid accidentally closing BOs that we inherit
+//   from outside when we delete the atomic.
+int drmu_atomic_obj_add_snapshot(struct drmu_atomic_s * const da, const uint32_t objid, const uint32_t objtype);
+
 // CRTC
 
 struct _drmModeModeInfo;
@@ -294,6 +302,14 @@ int drmu_fd(const drmu_env_t * const du);
 const struct drmu_log_env_s * drmu_env_log(const drmu_env_t * const du);
 void drmu_env_delete(drmu_env_t ** const ppdu);
 void drmu_env_modeset_allow(drmu_env_t * const du, const bool modeset_allowed);
+// Restore state on env close
+int drmu_env_restore_enable(drmu_env_t * const du);
+bool drmu_env_restore_is_enabled(const drmu_env_t * const du);
+// Add an object snapshot to the restore state
+// Tests for commitability and removes any props that won't commit
+int drmu_atomic_env_restore_add_snapshot(struct drmu_atomic_s ** const ppda);
+
+
 drmu_env_t * drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log);
 drmu_env_t * drmu_env_new_open(const char * name, const struct drmu_log_env_s * const log);
 
@@ -330,7 +346,16 @@ void drmu_atomic_unref(drmu_atomic_t ** const ppda);
 drmu_atomic_t * drmu_atomic_ref(drmu_atomic_t * const da);
 drmu_atomic_t * drmu_atomic_new(drmu_env_t * const du);
 int drmu_atomic_merge(drmu_atomic_t * const a, drmu_atomic_t ** const ppb);
+
+// Remove all els in a that are also in b
+// b may be sorted (if not already) but is otherwise unchanged
+void drmu_atomic_sub(drmu_atomic_t * const a, drmu_atomic_t * const b);
+
+// flags are DRM_MODE_ATOMIC_xxx (e.g. DRM_MODE_ATOMIC_TEST_ONLY) and DRM_MODE_PAGE_FLIP_xxx
 int drmu_atomic_commit(const drmu_atomic_t * const da, uint32_t flags);
+// Attempt commit - if it fails add failing members to da_fail
+// This does NOT remove failing props from da.  If da_fail == NULL then same as _commit
+int drmu_atomic_commit_test(const drmu_atomic_t * const da, uint32_t flags, drmu_atomic_t * const da_fail);
 
 typedef void (* drmu_prop_del_fn)(void * v);
 typedef void (* drmu_prop_ref_fn)(void * v);
