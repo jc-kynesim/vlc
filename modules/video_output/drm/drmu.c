@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <time.h>
 #include <unistd.h>
 
 // Update return value with a new one for cases where we don't stop on error
@@ -176,6 +177,35 @@ drmu_blob_new(drmu_env_t * const du, const void * const data, const size_t len)
 
     atomic_init(&blob->ref_count, 0);
     blob->blob_id = cblob.blob_id;
+    return blob;
+}
+
+// Copy existing blob into a new one
+// Useful when saving preexisiting values
+drmu_blob_t *
+drmu_blob_copy_id(drmu_env_t * const du, uint32_t blob_id)
+{
+    drmu_blob_t * blob = NULL;
+    void * data;
+    struct drm_mode_get_blob gblob = {.blob_id = blob_id};
+
+    if (blob_id == 0)
+        return NULL;
+
+    if (drmu_ioctl(du, DRM_IOCTL_MODE_GETPROPBLOB, &gblob) != 0)
+        return NULL;
+
+    if (gblob.length == 0)
+        return NULL;
+
+    if ((data = malloc(gblob.length)) == NULL)
+        return NULL;
+
+    gblob.data = (uintptr_t)data;
+    if (drmu_ioctl(du, DRM_IOCTL_MODE_GETPROPBLOB, &gblob) == 0)
+        blob = drmu_blob_new(du, data, gblob.length);
+
+    free(data);
     return blob;
 }
 
@@ -1114,7 +1144,7 @@ props_name_to_id(const drmu_props_t * const props, const char * const name)
     return 0;
 }
 
-#if TRACE_PROP_NEW || 1
+#if TRACE_PROP_NEW
 static void
 props_dump(const drmu_props_t * const props)
 {
@@ -1189,11 +1219,10 @@ propinfo_fill(drmu_env_t * const du, drmu_propinfo_t * const inf, uint32_t propi
     return rv;
 }
 
-static drmu_props_t *
-props_new(drmu_env_t * const du, const uint32_t objid, const uint32_t objtype)
+static int
+props_get_properties(drmu_env_t * const du, const uint32_t objid, const uint32_t objtype,
+                     uint32_t ** const ppPropids, uint64_t ** const ppValues)
 {
-    drmu_props_t * const props = calloc(1, sizeof(*props));
-    int rv;
 	struct drm_mode_obj_get_properties obj_props = {
         .obj_id = objid,
         .obj_type = objtype,
@@ -1201,12 +1230,7 @@ props_new(drmu_env_t * const du, const uint32_t objid, const uint32_t objtype)
     uint64_t * values = NULL;
     uint32_t * propids = NULL;
     unsigned int n = 0;
-
-    if (props == NULL) {
-        drmu_err(du, "%s: Failed struct alloc", __func__);
-        return NULL;
-    }
-    props->du = du;
+    int rv;
 
     for (;;) {
         if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_OBJ_GETPROPERTIES, &obj_props)) != 0) {
@@ -1225,20 +1249,50 @@ props_new(drmu_env_t * const du, const uint32_t objid, const uint32_t objtype)
         if ((values = malloc(n * sizeof(*values))) == NULL ||
             (propids = malloc(n * sizeof(*propids))) == NULL) {
             drmu_err(du, "obj/value array alloc failed");
+            rv = -ENOMEM;
             goto fail;
         }
         obj_props.prop_values_ptr = (uintptr_t)values;
         obj_props.props_ptr = (uintptr_t)propids;
     }
 
-    if ((props->info = calloc(n, sizeof(*props->info))) == NULL ||
-        (props->by_name = malloc(n * sizeof(*props->by_name))) == NULL) {
+    *ppValues = values;
+    *ppPropids = propids;
+    return (int)n;
+
+fail:
+    free(values);
+    free(propids);
+    *ppPropids = NULL;
+    *ppValues = NULL;
+    return rv;
+}
+
+static drmu_props_t *
+props_new(drmu_env_t * const du, const uint32_t objid, const uint32_t objtype)
+{
+    drmu_props_t * const props = calloc(1, sizeof(*props));
+    int rv;
+    uint64_t * values;
+    uint32_t * propids;
+
+    if (props == NULL) {
+        drmu_err(du, "%s: Failed struct alloc", __func__);
+        return NULL;
+    }
+    props->du = du;
+
+    if ((rv = props_get_properties(du, objid, objtype, &propids, &values)) < 0)
+        goto fail;
+
+    props->n = rv;
+    if ((props->info = calloc(props->n, sizeof(*props->info))) == NULL ||
+        (props->by_name = malloc(props->n * sizeof(*props->by_name))) == NULL) {
         drmu_err(du, "info/name array alloc failed");
         goto fail;
     }
-    props->n = n;
 
-    for (unsigned int i = 0; i < n; ++i) {
+    for (unsigned int i = 0; i < props->n; ++i) {
         drmu_propinfo_t * const inf = props->info + i;
 
         props->by_name[i] = inf;
@@ -1247,8 +1301,10 @@ props_new(drmu_env_t * const du, const uint32_t objid, const uint32_t objtype)
     }
 
     // Sort into name order for faster lookup
-    qsort(props->by_name, n, sizeof(*props->by_name), props_qsort_by_name_cb);
+    qsort(props->by_name, props->n, sizeof(*props->by_name), props_qsort_by_name_cb);
 
+    free(values);
+    free(propids);
     return props;
 
 fail:
@@ -1256,6 +1312,94 @@ fail:
     free(values);
     free(propids);
     return NULL;
+}
+
+int
+drmu_atomic_obj_add_snapshot(drmu_atomic_t * const da, const uint32_t objid, const uint32_t objtype)
+{
+#if 0
+    drmu_env_t * const du = drmu_atomic_env(da);
+    drmu_props_t * props = NULL;
+    unsigned int i;
+    int rv;
+
+    if (!du)
+        return -EINVAL;
+
+    if ((props = props_new(du, objid, objtype)) == NULL)
+        return -ENOENT;
+
+    for (i = 0; i != props->n; ++i) {
+        if ((props->info[i].prop.flags & (DRM_MODE_PROP_IMMUTABLE | DRM_MODE_PROP_ATOMIC)) != 0 || props->info[i].prop.prop_id == 2)
+            continue;
+        if ((rv = drmu_atomic_add_prop_generic(da, objid, props->info[i].prop.prop_id, props->info[i].val, 0, 0, NULL)) != 0)
+            goto fail;
+    }
+    rv = 0;
+
+fail:
+    props_free(props);
+    return rv;
+#else
+    uint64_t * values;
+    uint32_t * propids;
+    int rv;
+    unsigned int i, n;
+    drmu_env_t * const du = drmu_atomic_env(da);
+
+    if (!du)
+        return -EINVAL;
+
+    if ((rv = props_get_properties(du, objid, objtype, &propids, &values)) < 0)
+        goto fail;
+    n = rv;
+
+    for (i = 0; i != n; ++i) {
+        if ((rv = drmu_atomic_add_prop_generic(da, objid, propids[i], values[i], 0, 0, NULL)) != 0)
+            goto fail;
+    }
+
+fail:
+    free(values);
+    free(propids);
+    return rv;
+#endif
+}
+
+static int
+drmu_atomic_props_add_save(drmu_atomic_t * const da, const uint32_t objid, const drmu_props_t * props)
+{
+    unsigned int i;
+    int rv;
+    drmu_env_t * const du = drmu_atomic_env(da);
+
+    if (props == NULL)
+        return 0;
+    if (du == NULL)
+        return -EINVAL;
+
+    for (i = 0; i != props->n; ++i) {
+        if ((props->info[i].prop.flags & DRM_MODE_PROP_IMMUTABLE) != 0)
+            continue;
+
+        // Blobs, if set, are prone to running out of refs and vanishing, so we
+        // must copy. If we fail to copy the blob for any reason drop through
+        // to the generic add and hope that that will do
+        if ((props->info[i].prop.flags & DRM_MODE_PROP_BLOB) != 0) {
+            drmu_blob_t * b = drmu_blob_copy_id(du, (uint32_t)props->info[i].val);
+            if (b != NULL) {
+                rv = drmu_atomic_add_prop_blob(da, objid, props->info[i].prop.prop_id, b);
+                drmu_blob_unref(&b);
+                if (rv == 0)
+                    continue;
+            }
+        }
+
+        // Generic value
+        if ((rv = drmu_atomic_add_prop_generic(da, objid, props->info[i].prop.prop_id, props->info[i].val, 0, 0, NULL)) != 0)
+            return rv;
+    }
+    return 0;
 }
 
 //----------------------------------------------------------------------------
@@ -1487,6 +1631,13 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
 #endif
 
             dc->pid.mode_id = props_name_to_id(props, "MODE_ID");
+
+            if (drmu_env_restore_is_enabled(du)) {
+                drmu_atomic_t * da = drmu_atomic_new(du);
+                drmu_atomic_props_add_save(da, dc->crtc.crtc_id, props);
+                drmu_atomic_env_restore_add_snapshot(&da);
+            }
+
             props_free(props);
         }
     }
@@ -1502,6 +1653,14 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
             dc->pid.max_bpc             = drmu_prop_range_new(du, props_name_to_id(props, "max bpc"));
             dc->pid.colorspace          = drmu_prop_enum_new(du, props_name_to_id(props, "Colorspace"));
             dc->pid.hdr_output_metadata = props_name_to_id(props, "HDR_OUTPUT_METADATA");
+
+            // DPMS can't be set but that should be dealt with in general logic
+            if (drmu_env_restore_is_enabled(du)) {
+                drmu_atomic_t * da = drmu_atomic_new(du);
+                drmu_atomic_props_add_save(da, dc->con->connector_id, props);
+                drmu_atomic_env_restore_add_snapshot(&da);
+            }
+
             props_free(props);
         }
     }
@@ -1510,7 +1669,7 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
         drmu_atomic_t * da = drmu_atomic_new(du);
         if (da != NULL &&
             atomic_crtc_hi_bpc_set(da, dc) == 0 &&
-            drmu_atomic_commit(da, DRM_MODE_ATOMIC_TEST_ONLY) == 0) {
+                drmu_atomic_commit(da, DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_ATOMIC_ALLOW_MODESET) == 0) {
             dc->hi_bpc_ok = true;
         }
         drmu_atomic_unref(&da);
@@ -1525,6 +1684,22 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
 fail:
     free_crtc(dc);
     return NULL;
+}
+
+drmu_mode_pick_simple_params_t
+drmu_crtc_mode_simple_params(const drmu_crtc_t * const dc, const int mode_id)
+{
+    drmu_mode_pick_simple_params_t params = { 0 };
+
+    if (mode_id >= -1 && mode_id < dc->con->count_modes) {
+        const struct drm_mode_modeinfo * const mode = mode_id == -1 ?
+            &dc->crtc.mode :
+            (const struct drm_mode_modeinfo *)(dc->con->modes + mode_id);
+        params.width = mode->hdisplay;
+        params.height = mode->vdisplay;
+        params.hz_x_1000 = (uint32_t)(((uint64_t)mode->clock * 1000000) / (mode->htotal * mode->vtotal));
+    }
+    return params;
 }
 
 int
@@ -1587,7 +1762,7 @@ drmu_crtc_t *
 drmu_crtc_new_find(drmu_env_t * const du)
 {
     int i;
-    drmu_crtc_t * dc;
+    drmu_crtc_t * dc = NULL;
 
     if (du->res->count_crtcs <= 0) {
         drmu_err(du, "%s: no crts", __func__);
@@ -1735,9 +1910,13 @@ static int
 atomic_q_attempt_commit_next(drmu_atomic_q_t * const aq)
 {
     drmu_env_t * const du = drmu_atomic_env(aq->next_flip);
+    uint32_t flags = DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT;
     int rv;
 
-    if ((rv = drmu_atomic_commit(aq->next_flip, DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT)) == 0) {
+    if (du->modeset_allow)
+        flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
+
+    if ((rv = drmu_atomic_commit(aq->next_flip, flags)) == 0) {
         if (aq->retry_count != 0)
             drmu_warn(du, "%s: Atomic commit OK", __func__);
         aq->cur_flip = aq->next_flip;
@@ -1820,7 +1999,31 @@ drmu_atomic_page_flip_cb(int fd, unsigned int sequence, unsigned int tv_sec, uns
     if (aq->next_flip != NULL)
         atomic_q_attempt_commit_next(aq);
 
+    pthread_cond_broadcast(&aq->cond);
     pthread_mutex_unlock(&aq->lock);
+}
+
+static int
+atomic_q_flush(drmu_atomic_q_t * const aq)
+{
+    struct timespec ts;
+    int rv = 0;
+
+    pthread_mutex_lock(&aq->lock);
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    ts.tv_sec += 1;  // We should never timeout if all is well - 1 sec is plenty
+
+    // Can flush next safely
+    drmu_atomic_unref(&aq->next_flip);
+
+    // Wait for cur to finish - seems to confuse the world otherwise
+    while (aq->cur_flip != NULL) {
+        if ((rv = pthread_cond_timedwait(&aq->cond, &aq->lock, &ts)) != 0)
+            break;
+    }
+
+    pthread_mutex_unlock(&aq->lock);
+    return rv;
 }
 
 // 'consumes' da
@@ -1861,21 +2064,51 @@ drmu_atomic_queue(drmu_atomic_t ** ppda)
     return atomic_q_queue(&drmu_atomic_env(da)->aq, da);
 }
 
+int
+drmu_env_queue_wait(drmu_env_t * const du)
+{
+
+    drmu_atomic_q_t *const aq = &du->aq;
+    struct timespec ts;
+    int rv = 0;
+
+    pthread_mutex_lock(&aq->lock);
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    ts.tv_sec += 1;  // We should never timeout if all is well - 1 sec is plenty
+
+    // Next should clear quickly
+    while (aq->next_flip != NULL) {
+        if ((rv = pthread_cond_timedwait(&aq->cond, &aq->lock, &ts)) != 0)
+            break;
+    }
+
+    pthread_mutex_unlock(&aq->lock);
+    return rv;
+}
+
 static void
-drmu_atomic_q_uninit(drmu_atomic_q_t * const aq)
+atomic_q_uninit(drmu_atomic_q_t * const aq)
 {
     polltask_delete(&aq->retry_task);
     drmu_atomic_unref(&aq->next_flip);
     drmu_atomic_unref(&aq->cur_flip);
     drmu_atomic_unref(&aq->last_flip);
+    pthread_cond_destroy(&aq->cond);
     pthread_mutex_destroy(&aq->lock);
 }
 
 static void
-drmu_atomic_q_init(drmu_atomic_q_t * const aq)
+atomic_q_init(drmu_atomic_q_t * const aq)
 {
+    pthread_condattr_t condattr;
+
     aq->next_flip = NULL;
     pthread_mutex_init(&aq->lock, NULL);
+
+    pthread_condattr_init(&condattr);
+    pthread_condattr_setclock(&condattr, CLOCK_MONOTONIC);
+    pthread_cond_init(&aq->cond, &condattr);
+    pthread_condattr_destroy(&condattr);
 }
 
 //----------------------------------------------------------------------------
@@ -2210,6 +2443,14 @@ drmu_plane_new_find(drmu_crtc_t * const dc, const uint32_t fmt)
         return NULL;
     }
 
+    if (drmu_env_restore_is_enabled(du)) {
+        drmu_props_t * props = props_new(du, drmu_plane_id(dp), DRM_MODE_OBJECT_PLANE);
+        drmu_atomic_t * da = drmu_atomic_new(du);
+        drmu_atomic_props_add_save(da, dc->crtc.crtc_id, props);
+        props_free(props);
+        drmu_atomic_env_restore_add_snapshot(&da);
+    }
+
     dp->dc = dc;
     return dp;
 }
@@ -2279,8 +2520,10 @@ drmu_env_planes_populate(drmu_env_t * const du)
             goto fail2;
         }
 
+#if TRACE_PROP_NEW
         drmu_info(du, "Plane %d:", i);
         props_dump(props);
+#endif
 
         if ((dp->pid.crtc_id = props_name_to_id(props, "CRTC_ID")) == 0 ||
             (dp->pid.fb_id  = props_name_to_id(props, "FB_ID")) == 0 ||
@@ -2351,13 +2594,34 @@ drmu_env_delete(drmu_env_t ** const ppdu)
         return;
     *ppdu = NULL;
 
+    atomic_q_flush(&du->aq);
+
     pollqueue_unref(&du->pq);
     polltask_delete(&du->pt);
+
+    atomic_q_uninit(&du->aq);
+
+    if (du->da_restore) {
+        int rv;
+        if ((rv = drmu_atomic_commit(du->da_restore, DRM_MODE_ATOMIC_ALLOW_MODESET)) != 0) {
+            drmu_atomic_t * bad = drmu_atomic_new(du);
+            drmu_atomic_commit_test(du->da_restore, DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_ATOMIC_ALLOW_MODESET, bad);
+            drmu_atomic_sub(du->da_restore, bad);
+            if ((rv = drmu_atomic_commit(du->da_restore, DRM_MODE_ATOMIC_ALLOW_MODESET)) != 0)
+                drmu_err(du, "Failed to restore old mode on exit: %s", strerror(-rv));
+            else
+                drmu_err(du, "Failed to completely restore old mode on exit");
+
+            if (drmu_env_log(du)->max_level >= DRMU_LOG_LEVEL_DEBUG)
+                drmu_atomic_dump(bad);
+            drmu_atomic_unref(&bad);
+        }
+        drmu_atomic_unref(&du->da_restore);
+    }
 
     if (du->res != NULL)
         drmModeFreeResources(du->res);
     free_planes(du);
-    drmu_atomic_q_uninit(&du->aq);
     drmu_bo_env_uninit(&du->boe);
 
     close(du->fd);
@@ -2371,6 +2635,45 @@ drmu_env_modeset_allow(drmu_env_t * const du, const bool modeset_allowed)
     du->modeset_allow = modeset_allowed;
 }
 
+int
+drmu_env_restore_enable(drmu_env_t * const du)
+{
+    if (du->da_restore)
+        return 0;
+    if ((du->da_restore = drmu_atomic_new(du)) == NULL)
+        return -ENOMEM;
+    return 0;
+}
+
+bool
+drmu_env_restore_is_enabled(const drmu_env_t * const du)
+{
+    return du->da_restore != NULL;
+}
+
+int
+drmu_atomic_env_restore_add_snapshot(drmu_atomic_t ** const ppda)
+{
+    drmu_atomic_t * da = *ppda;
+    drmu_atomic_t * fails = NULL;
+    drmu_env_t * const du = drmu_atomic_env(da);
+
+    *ppda = NULL;
+
+    if (!du || !du->da_restore) {
+        drmu_atomic_unref(&da);
+        return 0;
+    }
+
+    // Lose anything we can't restore
+    fails = drmu_atomic_new(du);
+    if (drmu_atomic_commit_test(da, DRM_MODE_ATOMIC_ALLOW_MODESET | DRM_MODE_ATOMIC_TEST_ONLY, fails) != 0)
+        drmu_atomic_sub(da, fails);
+    drmu_atomic_unref(&fails);
+
+    return drmu_atomic_merge(du->da_restore, &da);
+}
+
 static void
 drmu_env_polltask_cb(void * v, short revents)
 {
@@ -2381,7 +2684,7 @@ drmu_env_polltask_cb(void * v, short revents)
     };
 
     if (revents == 0) {
-        drmu_warn(du, "%s: Timeout", __func__);
+        drmu_debug(du, "%s: Timeout", __func__);
     }
     else {
         drmHandleEvent(du->fd, &ctx);
@@ -2406,7 +2709,7 @@ drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log)
     du->modeset_allow = true;
 
     drmu_bo_env_init(&du->boe);
-    drmu_atomic_q_init(&du->aq);
+    atomic_q_init(&du->aq);
 
     if ((du->pq = pollqueue_new()) == NULL) {
         drmu_err(du, "Failed to create pollqueue");

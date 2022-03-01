@@ -10,7 +10,7 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-#define TRACE_PROP_NEW 1
+#define TRACE_PROP_NEW 0
 
 #ifndef DRM_FORMAT_P030
 #define DRM_FORMAT_P030 fourcc_code('P', '0', '3', '0')
@@ -136,6 +136,7 @@ typedef struct drmu_plane_s {
 
 typedef struct drmu_atomic_q_s {
     pthread_mutex_t lock;
+    pthread_cond_t cond;
     drmu_atomic_t * next_flip;
     drmu_atomic_t * cur_flip;
     drmu_atomic_t * last_flip;
@@ -157,6 +158,8 @@ typedef struct drmu_env_s {
     drmu_atomic_q_t aq;
     // global env for bo tracking
     drmu_bo_env_t boe;
+    // global atomic for restore op
+    drmu_atomic_t * da_restore;
 
     struct pollqueue * pq;
     struct polltask * pt;
