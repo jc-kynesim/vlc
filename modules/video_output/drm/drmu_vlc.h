@@ -3,7 +3,9 @@
 
 #include "config.h"
 
+#ifndef HAS_VLC4
 #define HAS_VLC4     0
+#endif
 #ifndef HAS_ZC_CMA
 #define HAS_ZC_CMA   0
 #endif

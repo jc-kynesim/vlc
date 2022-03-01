@@ -31,7 +31,7 @@
 
 #include "drmu.h"
 #include "drmu_log.h"
-#include "drmu_vlc_cma.h"
+#include "drmu_vlc.h"
 
 #include <vlc_common.h>
 
@@ -460,6 +460,7 @@ static int OpenDrmVout(vlc_object_t *object)
             goto fail;
     }
 
+    drmu_env_restore_enable(sys->du);
     drmu_env_modeset_allow(sys->du, !var_InheritBool(vd, DRM_VOUT_NO_MODESET_NAME));
 
     if ((sys->dc = drmu_crtc_new_find(sys->du)) == NULL)
