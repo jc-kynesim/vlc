@@ -521,10 +521,14 @@ static int OpenDrmVout(vout_display_t *vd,
         if (sys->mode_id >= 0) {
             drmu_atomic_t * da = drmu_atomic_new(sys->du);
             if (da != NULL) {
+                const drmu_mode_pick_simple_params_t got = drmu_crtc_mode_simple_params(sys->dc, sys->mode_id);
                 drmu_atomic_crtc_mode_id_set(da, sys->dc, sys->mode_id);
                 drmu_atomic_unref(&da);
                 drmu_ufrac_t sar = drmu_crtc_sar(sys->dc);
-                msg_Dbg(vd, "Mode: %dx%d %d/%d - req %dx%d", drmu_crtc_width(sys->dc), drmu_crtc_height(sys->dc), sar.num, sar.den, pick.width, pick.height);
+                msg_Info(vd, "Mode %d: %dx%d@%d.%03d %d/%d - req %dx%d@%d.%d", sys->mode_id,
+                        got.width, got.height, got.hz_x_1000 / 1000, got.hz_x_1000 % 1000,
+                        sar.num, sar.den,
+                        pick.width, pick.height, pick.hz_x_1000 / 1000, pick.hz_x_1000 % 1000);
             }
         }
     }
