@@ -514,7 +514,7 @@ static int OpenDrmVout(vout_display_t *vd,
     if (var_InheritBool(vd, DRM_VOUT_SOURCE_MODESET_NAME))
         modestr = "source";
 
-    if (*modestr != 0) {
+    if (modestr != NULL && strcmp(modestr, "none") != 0) {
         drmu_mode_pick_simple_params_t pick = {
             .width = fmtp->i_visible_width,
             .height = fmtp->i_visible_height,
@@ -576,7 +576,7 @@ vlc_module_begin()
     add_bool(DRM_VOUT_SOURCE_MODESET_NAME, false, DRM_VOUT_SOURCE_MODESET_TEXT, DRM_VOUT_SOURCE_MODESET_LONGTEXT)
     add_bool(DRM_VOUT_NO_MODESET_NAME,     false, DRM_VOUT_NO_MODESET_TEXT, DRM_VOUT_NO_MODESET_LONGTEXT)
     add_bool(DRM_VOUT_NO_MAX_BPC,          false, DRM_VOUT_NO_MAX_BPC_TEXT, DRM_VOUT_NO_MAX_BPC_LONGTEXT)
-    add_string(DRM_VOUT_MODE_NAME,         "", DRM_VOUT_MODE_TEXT, DRM_VOUT_MODE_LONGTEXT)
+    add_string(DRM_VOUT_MODE_NAME,         "none", DRM_VOUT_MODE_TEXT, DRM_VOUT_MODE_LONGTEXT)
 
     set_callback_display(OpenDrmVout, 16)  // 1 point better than ASCII art
 vlc_module_end()
