@@ -31,6 +31,7 @@
 
 #include "drmu.h"
 #include "drmu_log.h"
+#include "drmu_util.h"
 #include "drmu_vlc.h"
 
 #include <vlc_common.h>
@@ -51,6 +52,10 @@
 #define DRM_VOUT_SOURCE_MODESET_LONGTEXT N_("Attempt to match display resolution and refresh rate to source.\
  Defaults to the 'preferred' mode if no good enough match found. \
  If unset then resolution & refresh will not be set.")
+
+#define DRM_VOUT_MODE_NAME "drm-vout-mode"
+#define DRM_VOUT_MODE_TEXT N_("Set this mode for display")
+#define DRM_VOUT_MODE_LONGTEXT N_("arg: <w>x<h>@<hz> Force mode to arg")
 
 #define DRM_VOUT_NO_MODESET_NAME "drm-vout-no-modeset"
 #define DRM_VOUT_NO_MODESET_TEXT N_("Do not modeset")
@@ -503,16 +508,35 @@ static int OpenDrmVout(vout_display_t *vd,
 
     vd->ops = &ops;
 
-    if (!var_InheritBool(vd, DRM_VOUT_SOURCE_MODESET_NAME)) {
-        sys->mode_id = -1;
-    }
-    else {
+    const char *modestr = var_InheritString(vd, DRM_VOUT_MODE_NAME);
+    sys->mode_id = -1;
+
+    if (var_InheritBool(vd, DRM_VOUT_SOURCE_MODESET_NAME))
+        modestr = "source";
+
+    if (*modestr != 0) {
         drmu_mode_pick_simple_params_t pick = {
             .width = fmtp->i_visible_width,
             .height = fmtp->i_visible_height,
             .hz_x_1000 = fmtp->i_frame_rate_base == 0 ? 0 :
                 (unsigned int)(((uint64_t)fmtp->i_frame_rate * 1000) / fmtp->i_frame_rate_base),
         };
+
+        if (strcmp(modestr, "source") != 0) {
+            unsigned int w, h, hz;
+            if (*drmu_util_parse_mode(modestr, &w, &h, &hz) != 0) {
+                msg_Err(vd, "Bad mode string: '%s'", modestr);
+                ret = VLC_EGENERIC;
+                goto fail;
+            }
+            if (w && h) {
+                pick.width = w;
+                pick.height = h;
+            }
+            if (hz)
+                pick.hz_x_1000 = hz;
+        }
+
         sys->mode_id = drmu_crtc_mode_pick(sys->dc, drmu_mode_pick_simple_cb, &pick);
 
         msg_Dbg(vd, "Mode id=%d", sys->mode_id);
@@ -552,6 +576,7 @@ vlc_module_begin()
     add_bool(DRM_VOUT_SOURCE_MODESET_NAME, false, DRM_VOUT_SOURCE_MODESET_TEXT, DRM_VOUT_SOURCE_MODESET_LONGTEXT)
     add_bool(DRM_VOUT_NO_MODESET_NAME,     false, DRM_VOUT_NO_MODESET_TEXT, DRM_VOUT_NO_MODESET_LONGTEXT)
     add_bool(DRM_VOUT_NO_MAX_BPC,          false, DRM_VOUT_NO_MAX_BPC_TEXT, DRM_VOUT_NO_MAX_BPC_LONGTEXT)
+    add_string(DRM_VOUT_MODE_NAME,         "", DRM_VOUT_MODE_TEXT, DRM_VOUT_MODE_LONGTEXT)
 
     set_callback_display(OpenDrmVout, 16)  // 1 point better than ASCII art
 vlc_module_end()
