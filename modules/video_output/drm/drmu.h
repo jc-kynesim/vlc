@@ -167,6 +167,7 @@ void drmu_fb_pre_delete_set(drmu_fb_t *const dfb, drmu_fb_pre_delete_fn fn, void
 void drmu_fb_pre_delete_unset(drmu_fb_t *const dfb);
 unsigned int drmu_fb_pixel_bits(const drmu_fb_t * const dfb);
 drmu_fb_t * drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format);
+drmu_fb_t * drmu_fb_new_dumb_mod(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format, const uint64_t mod);
 drmu_fb_t * drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format);
 void drmu_fb_unref(drmu_fb_t ** const ppdfb);
 drmu_fb_t * drmu_fb_ref(drmu_fb_t * const dfb);
@@ -178,6 +179,8 @@ drmu_fb_t * drmu_fb_ref(drmu_fb_t * const dfb);
 int drmu_fb_pixel_blend_mode_set(drmu_fb_t *const dfb, const char * const mode);
 
 uint32_t drmu_fb_pitch(const drmu_fb_t *const dfb, const unsigned int layer);
+// Pitch2 is only a sand thing
+uint32_t drmu_fb_pitch2(const drmu_fb_t *const dfb, const unsigned int layer);
 void * drmu_fb_data(const drmu_fb_t *const dfb, const unsigned int layer);
 uint32_t drmu_fb_width(const drmu_fb_t *const dfb);
 uint32_t drmu_fb_height(const drmu_fb_t *const dfb);
@@ -197,7 +200,9 @@ void drmu_fb_int_layer_set(drmu_fb_t *const dfb, unsigned int i, unsigned int ob
 void drmu_fb_int_layer_mod_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset, uint64_t modifier);
 bool drmu_fb_hdr_metadata_isset(const drmu_fb_t *const dfb);
 const struct hdr_output_metadata * drmu_fb_hdr_metadata_get(const drmu_fb_t *const dfb);
+const char * drmu_color_range_to_broadcast_rgb(const char * const range);
 const char * drmu_fb_colorspace_get(const drmu_fb_t * const dfb);
+const char * drmu_fb_color_range_get(const drmu_fb_t * const dfb);
 const struct drmu_format_info_s * drmu_fb_format_info_get(const drmu_fb_t * const dfb);
 void drmu_fb_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta);
 int drmu_fb_int_make(drmu_fb_t *const dfb);
@@ -258,6 +263,10 @@ int drmu_atomic_crtc_hi_bpc_set(struct drmu_atomic_s * const da, drmu_crtc_t * c
 
 #define DRMU_CRTC_COLORSPACE_DEFAULT            "Default"
 int drmu_atomic_crtc_colorspace_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const char * colorspace);
+#define DRMU_CRTC_BROADCAST_RGB_AUTOMATIC       "Automatic"
+#define DRMU_CRTC_BROADCAST_RGB_FULL            "Full"
+#define DRMU_CRTC_BROADCAST_RGB_LIMITED_16_235  "Limited 16:235"
+int drmu_atomic_crtc_broadcast_rgb_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const char * bcrgb);
 int drmu_atomic_crtc_mode_id_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const int mode_id);
 
 // Set none if m=NULL

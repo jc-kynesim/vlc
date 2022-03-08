@@ -826,6 +826,21 @@ drmu_fb_pitch(const drmu_fb_t *const dfb, const unsigned int layer)
     return layer >= 4 ? 0 : dfb->fb.pitches[layer];
 }
 
+uint32_t
+drmu_fb_pitch2(const drmu_fb_t *const dfb, const unsigned int layer)
+{
+    if (layer < 4){
+        const uint64_t m = dfb->fb.modifier[layer];
+        const uint64_t s2 = fourcc_mod_broadcom_param(m);
+
+        // No good masks to check modifier so check if we convert back it matches
+        if (m != 0 && m != DRM_FORMAT_MOD_INVALID &&
+            DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(s2) == m)
+            return (uint32_t)s2;
+    }
+    return 0;
+}
+
 void *
 drmu_fb_data(const drmu_fb_t *const dfb, const unsigned int layer)
 {
@@ -941,6 +956,24 @@ drmu_fb_colorspace_get(const drmu_fb_t * const dfb)
     return dfb->colorspace;
 }
 
+const char *
+drmu_color_range_to_broadcast_rgb(const char * const range)
+{
+    if (range == NULL)
+        return NULL;
+    else if (strcmp(range, "YCbCr full range") == 0)
+        return DRMU_CRTC_BROADCAST_RGB_FULL;
+    else if (strcmp(range, "YCbCr limited range") == 0)
+        return DRMU_CRTC_BROADCAST_RGB_LIMITED_16_235;
+    return NULL;
+}
+
+const char *
+drmu_fb_color_range_get(const drmu_fb_t * const dfb)
+{
+    return dfb->color_range;
+}
+
 const struct drmu_format_info_s *
 drmu_fb_format_info_get(const drmu_fb_t * const dfb)
 {
@@ -982,7 +1015,7 @@ fb_total_height(const drmu_fb_t * const dfb, const unsigned int h)
 }
 
 static void
-fb_pitches_set(drmu_fb_t * const dfb)
+fb_pitches_set_mod(drmu_fb_t * const dfb, uint64_t mod)
 {
     const drmu_format_info_t *const f = dfb->fmt_info;
     const uint32_t pitch0 = dfb->map_pitch * f->planes[0].wdiv;
@@ -990,25 +1023,49 @@ fb_pitches_set(drmu_fb_t * const dfb)
     uint32_t t = 0;
     unsigned int i;
 
+    // This should be true for anything we've allocated
+    if (mod == DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(0)) {
+        // Cope with the joy that is sand
+        mod = DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(h * 3/2);
+        drmu_fb_int_layer_mod_set(dfb, 0, 0, dfb->map_pitch, 0, mod);
+        drmu_fb_int_layer_mod_set(dfb, 1, 0, dfb->map_pitch, h * 128, mod);
+        return;
+    }
+
     for (i = 0; i != f->plane_count; ++i) {
-        drmu_fb_int_layer_set(dfb, i, 0, pitch0 / f->planes[i].wdiv, t);
+        drmu_fb_int_layer_mod_set(dfb, i, 0, pitch0 / f->planes[i].wdiv, t, mod);
         t += (pitch0 * h) / (f->planes[i].hdiv * f->planes[i].wdiv);
     }
 }
 
 drmu_fb_t *
-drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format)
+drmu_fb_new_dumb_mod(drmu_env_t * const du, uint32_t w, uint32_t h,
+                     const uint32_t format, const uint64_t mod)
 {
     drmu_fb_t * const dfb = drmu_fb_int_alloc(du);
     uint32_t bpp;
     int rv;
+    uint32_t w2;
+    const uint32_t s30_cw = 128 / 4 * 3;
 
     if (dfb == NULL) {
         drmu_err(du, "%s: Alloc failure", __func__);
         return NULL;
     }
 
-    drmu_fb_int_fmt_size_set(dfb, format, (w + 63) & ~63, (h + 63) & ~63, drmu_rect_wh(w, h));
+    if (mod != DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(0))
+        w2 = (w + 15) & ~15;
+    else if (format == DRM_FORMAT_NV12)
+        w2 = (w + 127) & ~127;
+    else if (format == DRM_FORMAT_P030)
+        w2 = ((w + s30_cw - 1) / s30_cw) * s30_cw;
+    else {
+        // Unknown form of sand128
+        drmu_err(du, "Sand modifier on unexpected format");
+        goto fail;
+    }
+
+    drmu_fb_int_fmt_size_set(dfb, format, w2, (h + 15) & ~15, drmu_rect_wh(w, h));
 
     if ((bpp = drmu_fb_pixel_bits(dfb)) == 0) {
         drmu_err(du, "%s: Unexpected format %#x", __func__, format);
@@ -1050,7 +1107,7 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
         }
     }
 
-    fb_pitches_set(dfb);
+    fb_pitches_set_mod(dfb, mod);
 
     if (drmu_fb_int_make(dfb))
         goto fail;
@@ -1062,6 +1119,12 @@ drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t f
 fail:
     drmu_fb_int_free(dfb);
     return NULL;
+}
+
+drmu_fb_t *
+drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format)
+{
+    return drmu_fb_new_dumb_mod(du, w, h, format, DRM_FORMAT_MOD_INVALID);
 }
 
 static int
@@ -1242,7 +1305,7 @@ static int
 props_get_properties(drmu_env_t * const du, const uint32_t objid, const uint32_t objtype,
                      uint32_t ** const ppPropids, uint64_t ** const ppValues)
 {
-	struct drm_mode_obj_get_properties obj_props = {
+    struct drm_mode_obj_get_properties obj_props = {
         .obj_id = objid,
         .obj_type = objtype,
     };
@@ -1442,6 +1505,7 @@ typedef struct drmu_crtc_s {
         // connection
         drmu_prop_range_t * max_bpc;
         drmu_prop_enum_t * colorspace;
+        drmu_prop_enum_t * broadcast_rgb;
         uint32_t hdr_output_metadata;
     } pid;
 
@@ -1671,6 +1735,7 @@ crtc_from_con_id(drmu_env_t * const du, const uint32_t con_id)
 #endif
             dc->pid.max_bpc             = drmu_prop_range_new(du, props_name_to_id(props, "max bpc"));
             dc->pid.colorspace          = drmu_prop_enum_new(du, props_name_to_id(props, "Colorspace"));
+            dc->pid.broadcast_rgb       = drmu_prop_enum_new(du, props_name_to_id(props, "Broadcast RGB"));
             dc->pid.hdr_output_metadata = props_name_to_id(props, "HDR_OUTPUT_METADATA");
 
             // DPMS can't be set but that should be dealt with in general logic
@@ -1898,6 +1963,15 @@ drmu_atomic_crtc_colorspace_set(drmu_atomic_t * const da, drmu_crtc_t * const dc
     return drmu_atomic_add_prop_enum(da, dc->con->connector_id, dc->pid.colorspace, colorspace);
 }
 
+int
+drmu_atomic_crtc_broadcast_rgb_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, const char * bcrgb)
+{
+    if (!dc->du->modeset_allow || !dc->pid.broadcast_rgb)
+        return 0;
+
+    return drmu_atomic_add_prop_enum(da, dc->con->connector_id, dc->pid.broadcast_rgb, bcrgb);
+}
+
 // Set all the fb info props that might apply to a crtc on the crtc
 // (e.g. hdr_metadata, colorspace) but do not set the mode (resolution
 // and refresh)
@@ -1906,12 +1980,16 @@ drmu_atomic_crtc_fb_info_set(drmu_atomic_t * const da, drmu_crtc_t * const dc, c
 {
     const drmu_format_info_t * const fmt_info = drmu_fb_format_info_get(fb);
     const char * const colorspace = drmu_fb_colorspace_get(fb);
+    const char * const color_range = drmu_fb_color_range_get(fb);
     int rv = 0;
 
     if (fmt_info)
         rv = rvup(rv, drmu_atomic_crtc_hi_bpc_set(da, dc, (fmt_info->bit_depth > 8)));
     if (colorspace)
         rv = rvup(rv, drmu_atomic_crtc_colorspace_set(da, dc, colorspace));
+    if (color_range)
+        rv = rvup(rv, drmu_atomic_crtc_broadcast_rgb_set(da, dc,
+            drmu_color_range_to_broadcast_rgb(color_range)));
     if (drmu_fb_hdr_metadata_isset(fb))
         rv = rvup(rv, drmu_atomic_crtc_hdr_metadata_set(da, dc, drmu_fb_hdr_metadata_get(fb)));
     return rv;
