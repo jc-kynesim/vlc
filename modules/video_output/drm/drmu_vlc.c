@@ -256,6 +256,29 @@ fb_vlc_colorspace(const video_format_t * const fmt)
     return "Default";
 }
 
+static const char *
+fb_vlc_chroma_siting(const video_format_t * const fmt)
+{
+    switch (fmt->chroma_location) {
+        case CHROMA_LOCATION_LEFT:
+            return DRMU_PLANE_CHROMA_SITING_LEFT;
+        case CHROMA_LOCATION_CENTER:
+            return DRMU_PLANE_CHROMA_SITING_CENTER;
+        case CHROMA_LOCATION_TOP_LEFT:
+            return DRMU_PLANE_CHROMA_SITING_TOP_LEFT;
+        case CHROMA_LOCATION_TOP_CENTER:
+            return DRMU_PLANE_CHROMA_SITING_TOP;
+        case CHROMA_LOCATION_BOTTOM_LEFT:
+            return DRMU_PLANE_CHROMA_SITING_BOTTOM_LEFT;
+        case CHROMA_LOCATION_BOTTOM_CENTER:
+            return DRMU_PLANE_CHROMA_SITING_BOTTOM;
+        default:
+        case CHROMA_LOCATION_UNDEF:
+            break;
+    }
+    return DRMU_PLANE_CHROMA_SITING_UNSPECIFIED;
+}
+
 #if HAS_DRMPRIME
 // Create a new fb from a VLC DRM_PRIME picture.
 // Picture is held reffed by the fb until the fb is deleted
@@ -295,6 +318,8 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
                           fb_vlc_color_encoding(&pic->format),
                           fb_vlc_color_range(&pic->format),
                           fb_vlc_colorspace(&pic->format));
+
+    drmu_fb_int_chroma_siting_set(dfb, fb_vlc_chroma_siting(&pic->format));
 
     // Set delete callback & hold this pic
     // Aux attached to dfb immediately so no fail cleanup required
@@ -381,6 +406,8 @@ drmu_fb_vlc_new_pic_cma_attach(drmu_env_t * const du, picture_t * const pic)
                           fb_vlc_color_encoding(&pic->format),
                           fb_vlc_color_range(&pic->format),
                           fb_vlc_colorspace(&pic->format));
+
+    drmu_fb_int_chroma_siting_set(dfb fb_vlc_chroma_siting(&pic->format));
 
     // Set delete callback & hold this pic
     // Aux attached to dfb immediately so no fail cleanup required
