@@ -248,7 +248,12 @@ subpics_done:
     }
 
     ret = drmu_atomic_plane_fb_set(da, sys->dp, dfb, r);
+    // Set mode stuff associated with the video fb attributes
     drmu_atomic_crtc_fb_info_set(da, sys->dc, dfb);
+    // Always ask for hi bpc - results of even 8-bit YUV->RGB will have >8
+    // bits of info
+    // If options are set that disallow hi-bpc then this will fail silently
+    drmu_atomic_crtc_hi_bpc_set(da, sys->dc, true);
     drmu_fb_unref(&dfb);
 
     if (ret != 0) {
