@@ -256,27 +256,27 @@ fb_vlc_colorspace(const video_format_t * const fmt)
     return "Default";
 }
 
-static const char *
+static drmu_chroma_siting_t
 fb_vlc_chroma_siting(const video_format_t * const fmt)
 {
     switch (fmt->chroma_location) {
         case CHROMA_LOCATION_LEFT:
-            return DRMU_PLANE_CHROMA_SITING_LEFT;
+            return DRMU_CHROMA_SITING_LEFT;
         case CHROMA_LOCATION_CENTER:
-            return DRMU_PLANE_CHROMA_SITING_CENTER;
+            return DRMU_CHROMA_SITING_CENTER;
         case CHROMA_LOCATION_TOP_LEFT:
-            return DRMU_PLANE_CHROMA_SITING_TOP_LEFT;
+            return DRMU_CHROMA_SITING_TOP_LEFT;
         case CHROMA_LOCATION_TOP_CENTER:
-            return DRMU_PLANE_CHROMA_SITING_TOP;
+            return DRMU_CHROMA_SITING_TOP;
         case CHROMA_LOCATION_BOTTOM_LEFT:
-            return DRMU_PLANE_CHROMA_SITING_BOTTOM_LEFT;
+            return DRMU_CHROMA_SITING_BOTTOM_LEFT;
         case CHROMA_LOCATION_BOTTOM_CENTER:
-            return DRMU_PLANE_CHROMA_SITING_BOTTOM;
+            return DRMU_CHROMA_SITING_BOTTOM;
         default:
         case CHROMA_LOCATION_UNDEF:
             break;
     }
-    return DRMU_PLANE_CHROMA_SITING_UNSPECIFIED;
+    return DRMU_CHROMA_SITING_UNSPECIFIED;
 }
 
 #if HAS_DRMPRIME
@@ -458,7 +458,7 @@ drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
     unsigned int hdiv = 1;
     unsigned int wdiv = 1;
     const uint32_t pitch_n = drmu_fb_pitch(dfb, plane_n);
-    const drmu_rect_t * crop = drmu_fb_crop(dfb);
+    const drmu_rect_t crop = drmu_fb_crop_frac(dfb);
 
     if (pitch_n == 0) {
         return (plane_t) {.p_pixels = NULL };
@@ -475,8 +475,8 @@ drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
         .i_lines = drmu_fb_height(dfb) / hdiv,
         .i_pitch = pitch_n,
         .i_pixel_pitch = bpp / 8,
-        .i_visible_lines = crop->h / hdiv,
-        .i_visible_pitch = (crop->w * bpp / 8) / wdiv
+        .i_visible_lines = (crop.h >> 16) / hdiv,
+        .i_visible_pitch = ((crop.w >> 16) * bpp / 8) / wdiv
     };
 }
 
