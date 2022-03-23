@@ -46,6 +46,10 @@ typedef struct drmu_rect_s {
     uint32_t w, h;
 } drmu_rect_t;
 
+typedef struct drmu_chroma_siting_s {
+    int32_t x, y;
+} drmu_chroma_siting_t;
+
 typedef struct drmu_ufrac_s {
     unsigned int num;
     unsigned int den;
@@ -101,6 +105,12 @@ drmu_rect_wh(const unsigned int w, const unsigned int h)
         .w = w,
         .h = h
     };
+}
+
+static inline bool
+drmu_chroma_siting_eq(const drmu_chroma_siting_t a, const drmu_chroma_siting_t b)
+{
+    return a.x == b.x && a.y == b.y;
 }
 
 // Blob
@@ -167,6 +177,7 @@ void drmu_fb_pre_delete_set(drmu_fb_t *const dfb, drmu_fb_pre_delete_fn fn, void
 void drmu_fb_pre_delete_unset(drmu_fb_t *const dfb);
 unsigned int drmu_fb_pixel_bits(const drmu_fb_t * const dfb);
 drmu_fb_t * drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format);
+drmu_fb_t * drmu_fb_new_dumb_mod(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format, const uint64_t mod);
 drmu_fb_t * drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format);
 void drmu_fb_unref(drmu_fb_t ** const ppdfb);
 drmu_fb_t * drmu_fb_ref(drmu_fb_t * const dfb);
@@ -178,26 +189,40 @@ drmu_fb_t * drmu_fb_ref(drmu_fb_t * const dfb);
 int drmu_fb_pixel_blend_mode_set(drmu_fb_t *const dfb, const char * const mode);
 
 uint32_t drmu_fb_pitch(const drmu_fb_t *const dfb, const unsigned int layer);
+// Pitch2 is only a sand thing
+uint32_t drmu_fb_pitch2(const drmu_fb_t *const dfb, const unsigned int layer);
 void * drmu_fb_data(const drmu_fb_t *const dfb, const unsigned int layer);
 uint32_t drmu_fb_width(const drmu_fb_t *const dfb);
 uint32_t drmu_fb_height(const drmu_fb_t *const dfb);
-const drmu_rect_t * drmu_fb_crop(const drmu_fb_t *const dfb);
+// Set cropping (fractional) - x, y, relative to active x, y (and must be +ve)
+int drmu_fb_crop_frac_set(drmu_fb_t *const dfb, drmu_rect_t crop_frac);
+// get cropping (fractional 16.16) x, y relative to active area
+drmu_rect_t drmu_fb_crop_frac(const drmu_fb_t *const dfb);
+// get active area (all valid pixels - buffer can/will contain padding outside this)
+// rect in pixels (not fractional)
+drmu_rect_t drmu_fb_active(const drmu_fb_t *const dfb);
 
 int drmu_atomic_add_prop_fb(struct drmu_atomic_s * const da, const uint32_t obj_id, const uint32_t prop_id, drmu_fb_t * const dfb);
 
 // FB creation helpers - only use for creatino of new FBs
 drmu_fb_t * drmu_fb_int_alloc(drmu_env_t * const du);
 void drmu_fb_int_free(drmu_fb_t * const dfb);
-void drmu_fb_int_fmt_size_set(drmu_fb_t *const dfb, uint32_t fmt, uint32_t w, uint32_t h, const drmu_rect_t crop);
+// Set size
+// w, h are buffer sizes, active is the valid pixel area inside that
+// crop will be set to the whole active area
+void drmu_fb_int_fmt_size_set(drmu_fb_t *const dfb, uint32_t fmt, uint32_t w, uint32_t h, const drmu_rect_t active);
 // All assumed to be const strings that do not need freed
 void drmu_fb_int_color_set(drmu_fb_t *const dfb, const char * const enc, const char * const range, const char * const space);
+void drmu_fb_int_chroma_siting_set(drmu_fb_t *const dfb, const drmu_chroma_siting_t siting);
 void drmu_fb_int_on_delete_set(drmu_fb_t *const dfb, drmu_fb_on_delete_fn fn, void * v);
 void drmu_fb_int_bo_set(drmu_fb_t *const dfb, unsigned int i, drmu_bo_t * const bo);
 void drmu_fb_int_layer_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset);
 void drmu_fb_int_layer_mod_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset, uint64_t modifier);
 bool drmu_fb_hdr_metadata_isset(const drmu_fb_t *const dfb);
 const struct hdr_output_metadata * drmu_fb_hdr_metadata_get(const drmu_fb_t *const dfb);
+const char * drmu_color_range_to_broadcast_rgb(const char * const range);
 const char * drmu_fb_colorspace_get(const drmu_fb_t * const dfb);
+const char * drmu_fb_color_range_get(const drmu_fb_t * const dfb);
 const struct drmu_format_info_s * drmu_fb_format_info_get(const drmu_fb_t * const dfb);
 void drmu_fb_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta);
 int drmu_fb_int_make(drmu_fb_t *const dfb);
@@ -258,6 +283,10 @@ int drmu_atomic_crtc_hi_bpc_set(struct drmu_atomic_s * const da, drmu_crtc_t * c
 
 #define DRMU_CRTC_COLORSPACE_DEFAULT            "Default"
 int drmu_atomic_crtc_colorspace_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const char * colorspace);
+#define DRMU_CRTC_BROADCAST_RGB_AUTOMATIC       "Automatic"
+#define DRMU_CRTC_BROADCAST_RGB_FULL            "Full"
+#define DRMU_CRTC_BROADCAST_RGB_LIMITED_16_235  "Limited 16:235"
+int drmu_atomic_crtc_broadcast_rgb_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const char * bcrgb);
 int drmu_atomic_crtc_mode_id_set(struct drmu_atomic_s * const da, drmu_crtc_t * const dc, const int mode_id);
 
 // Set none if m=NULL
@@ -293,6 +322,28 @@ int drmu_atomic_add_plane_alpha(struct drmu_atomic_s * const da, const drmu_plan
 #define DRMU_PLANE_ROTATION_180_TRANSPOSE       7  // Rotate 180 & transpose
 int drmu_atomic_add_plane_rotation(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int rot);
 
+// Init constants - C winges if the struct is specified in a const init (which seems like a silly error)
+#define drmu_chroma_siting_float_i(_x, _y) {.x = (int32_t)((double)(_x) * 65536 + .5), .y = (int32_t)((double)(_y) * 65536 + .5)}
+#define DRMU_CHROMA_SITING_BOTTOM_I             drmu_chroma_siting_float_i(0.5, 1.0)
+#define DRMU_CHROMA_SITING_BOTTOM_LEFT_I        drmu_chroma_siting_float_i(0.0, 1.0)
+#define DRMU_CHROMA_SITING_CENTER_I             drmu_chroma_siting_float_i(0.5, 0.5)
+#define DRMU_CHROMA_SITING_LEFT_I               drmu_chroma_siting_float_i(0.0, 0.5)
+#define DRMU_CHROMA_SITING_TOP_I                drmu_chroma_siting_float_i(0.5, 0.0)
+#define DRMU_CHROMA_SITING_TOP_LEFT_I           drmu_chroma_siting_float_i(0.0, 0.0)
+#define DRMU_CHROMA_SITING_UNSPECIFIED_I        {INT32_MIN, INT32_MIN}
+// Inline constants
+#define drmu_chroma_siting_float(_x, _y) (drmu_chroma_siting_t){.x = (int32_t)((double)(_x) * 65536 + .5), .y = (int32_t)((double)(_y) * 65536 + .5)}
+#define DRMU_CHROMA_SITING_BOTTOM               drmu_chroma_siting_float(0.5, 1.0)
+#define DRMU_CHROMA_SITING_BOTTOM_LEFT          drmu_chroma_siting_float(0.0, 1.0)
+#define DRMU_CHROMA_SITING_CENTER               drmu_chroma_siting_float(0.5, 0.5)
+#define DRMU_CHROMA_SITING_LEFT                 drmu_chroma_siting_float(0.0, 0.5)
+#define DRMU_CHROMA_SITING_TOP                  drmu_chroma_siting_float(0.5, 0.0)
+#define DRMU_CHROMA_SITING_TOP_LEFT             drmu_chroma_siting_float(0.0, 0.0)
+#define DRMU_CHROMA_SITING_UNSPECIFIED          (drmu_chroma_siting_t){INT32_MIN, INT32_MIN}
+int drmu_atomic_plane_add_chroma_siting(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const drmu_chroma_siting_t siting);
+
+#define DRMU_PLANE_RANGE_FULL                   "YCbCr full range"
+#define DRMU_PLANE_RANGE_LIMITED                "YCbCr limited range"
 int drmu_atomic_plane_fb_set(struct drmu_atomic_s * const da, drmu_plane_t * const dp, drmu_fb_t * const dfb, const drmu_rect_t pos);
 
 // Env
