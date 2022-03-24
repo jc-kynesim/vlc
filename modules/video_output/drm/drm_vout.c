@@ -371,6 +371,7 @@ static void CloseDrmVout(vout_display_t *vd)
     free(sys->subpic_chromas);
     vd->info.subpicture_chromas = NULL;
 
+    vd->sys = NULL;
     free(sys);
 #if TRACE_ALL
     msg_Dbg(vd, ">>> %s", __func__);
@@ -441,6 +442,11 @@ static int OpenDrmVout(vlc_object_t *object)
     vout_display_sys_t *sys;
     int ret = VLC_EGENERIC;
     msg_Info(vd, "<<< %s: Fmt=%4.4s", __func__, (const char *)&fmtp->i_chroma);
+
+    if (!var_InheritBool(vd, "fullscreen")) {
+        msg_Dbg(vd, ">>> %s: Not fullscreen", __func__);
+        return ret;
+    }
 
     sys = calloc(1, sizeof(*sys));
     if (!sys)
