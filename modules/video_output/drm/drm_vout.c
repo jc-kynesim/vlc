@@ -31,6 +31,7 @@
 
 #include "drmu.h"
 #include "drmu_log.h"
+#include "drmu_output.h"
 #include "drmu_vlc.h"
 
 #include <vlc_common.h>
@@ -43,8 +44,6 @@
 #include <libdrm/drm.h>
 #include <libdrm/drm_mode.h>
 #include <libdrm/drm_fourcc.h>
-#include <xf86drm.h>
-#include <xf86drmMode.h>
 
 #define DRM_VOUT_SOURCE_MODESET_NAME "drm-vout-source-modeset"
 #define DRM_VOUT_SOURCE_MODESET_TEXT N_("Attempt to match display to source")
@@ -79,7 +78,7 @@ typedef struct subpic_ent_s {
 
 typedef struct vout_display_sys_t {
     drmu_env_t * du;
-    drmu_crtc_t * dc;
+    drmu_output_t * dout;
     drmu_plane_t * dp;
     drmu_pool_t * pic_pool;
     drmu_pool_t * sub_fb_pool;
@@ -141,8 +140,7 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *pic,
         drmu_atomic_unref(&sys->display_set);
     }
 
-    // Set mode early so w/h are correct
-    drmu_atomic_crtc_mode_id_set(da, sys->dc, sys->mode_id);
+    // * Mode (currently) doesn't change whilst running so no need to set here
 
     // Attempt to import the subpics
     for (subpicture_t * spic = subpicture; spic != NULL; spic = spic->p_next)
@@ -204,10 +202,11 @@ subpics_done:
     {
         vout_display_place_t place;
         vout_display_cfg_t cfg = *vd->cfg;
+        const drmu_mode_simple_params_t * const mode = drmu_output_mode_simple_params(sys->dout);
 
-        cfg.display.width  = drmu_crtc_width(sys->dc);
-        cfg.display.height = drmu_crtc_height(sys->dc);
-        cfg.display.sar    = drmu_ufrac_vlc_to_rational(drmu_crtc_sar(sys->dc));
+        cfg.display.width  = mode->width;
+        cfg.display.height = mode->height;
+        cfg.display.sar    = drmu_ufrac_vlc_to_rational(mode->sar);
 
         vout_display_PlacePicture(&place, &pic->format, &cfg, false);
         r = drmu_rect_vlc_place(&place);
@@ -253,7 +252,7 @@ subpics_done:
     }
 
     ret = drmu_atomic_plane_fb_set(da, sys->dp, dfb, r);
-    drmu_atomic_crtc_fb_info_set(da, sys->dc, dfb);  // **** Rationalize initial mode change
+    drmu_atomic_add_output_props(da, sys->dout);
     drmu_fb_unref(&dfb);
 
     if (ret != 0) {
@@ -357,15 +356,15 @@ static void CloseDrmVout(vout_display_t *vd)
     drmu_pool_delete(&sys->sub_fb_pool);
 
     for (i = 0; i != SUBPICS_MAX; ++i)
-        drmu_plane_delete(sys->subplanes + i);
+        drmu_plane_unref(sys->subplanes + i);
     for (i = 0; i != SUBPICS_MAX; ++i) {
         if (sys->subpics[i].pic != NULL)
             picture_Release(sys->subpics[i].pic);
         drmu_fb_unref(&sys->subpics[i].fb);
     }
 
-    drmu_plane_delete(&sys->dp);
-    drmu_crtc_delete(&sys->dc);
+    drmu_plane_unref(&sys->dp);
+    drmu_output_unref(&sys->dout);
     drmu_env_delete(&sys->du);
 
     free(sys->subpic_chromas);
@@ -441,6 +440,7 @@ static int OpenDrmVout(vlc_object_t *object)
     video_format_t * const fmtp = &vd->fmt;
     vout_display_sys_t *sys;
     int ret = VLC_EGENERIC;
+    int rv;
     msg_Info(vd, "<<< %s: Fmt=%4.4s", __func__, (const char *)&fmtp->i_chroma);
 
     if (!var_InheritBool(vd, "fullscreen")) {
@@ -467,25 +467,31 @@ static int OpenDrmVout(vlc_object_t *object)
     }
 
     drmu_env_restore_enable(sys->du);
-    drmu_env_modeset_allow(sys->du, !var_InheritBool(vd, DRM_VOUT_NO_MODESET_NAME));
 
-    if ((sys->dc = drmu_crtc_new_find(sys->du)) == NULL)
+    if ((sys->dout = drmu_output_new(sys->du)) == NULL) {
+        msg_Err(vd, "Failed to allocate new drmu output");
         goto fail;
+    }
 
-    drmu_crtc_max_bpc_allow(sys->dc, !var_InheritBool(vd, DRM_VOUT_NO_MAX_BPC));
+    drmu_output_modeset_allow(sys->dout, !var_InheritBool(vd, DRM_VOUT_NO_MODESET_NAME));
+    drmu_output_max_bpc_allow(sys->dout, !var_InheritBool(vd, DRM_VOUT_NO_MAX_BPC));
+
+    if ((rv = drmu_output_add_output(sys->dout, NULL)) != 0) {  // **** HDMI name here
+        msg_Err(vd, "Failed to find output: %s", strerror(-rv));
+        goto fail;
+    }
 
     if ((sys->sub_fb_pool = drmu_pool_new(sys->du, 10)) == NULL)
         goto fail;
     if ((sys->pic_pool = drmu_pool_new(sys->du, 5)) == NULL)
         goto fail;
 
-    // **** Plane selection needs noticable improvement
     // This wants to be the primary
-    if ((sys->dp = drmu_plane_new_find(sys->dc, DRM_FORMAT_NV12)) == NULL)
+    if ((sys->dp = drmu_output_plane_ref_primary(sys->dout)) == NULL)
         goto fail;
 
     for (unsigned int i = 0; i != SUBPICS_MAX; ++i) {
-        if ((sys->subplanes[i] = drmu_plane_new_find(sys->dc, DRM_FORMAT_ARGB8888)) == NULL) {
+        if ((sys->subplanes[i] = drmu_output_plane_ref_other(sys->dout)) == NULL) {
             msg_Warn(vd, "Cannot allocate subplane %d", i);
             break;
         }
@@ -513,25 +519,23 @@ static int OpenDrmVout(vlc_object_t *object)
         sys->mode_id = -1;
     }
     else {
-        drmu_mode_pick_simple_params_t pick = {
+        drmu_mode_simple_params_t pick = {
             .width = fmtp->i_visible_width,
             .height = fmtp->i_visible_height,
             .hz_x_1000 = fmtp->i_frame_rate_base == 0 ? 0 :
                 (unsigned int)(((uint64_t)fmtp->i_frame_rate * 1000) / fmtp->i_frame_rate_base),
         };
-        sys->mode_id = drmu_crtc_mode_pick(sys->dc, drmu_mode_pick_simple_cb, &pick);
+        sys->mode_id = drmu_output_mode_pick_simple(sys->dout, drmu_mode_pick_simple_cb, &pick);
 
         msg_Dbg(vd, "Mode id=%d", sys->mode_id);
 
         // This will set the mode on the crtc var but won't actually change the output
         if (sys->mode_id >= 0) {
-            drmu_atomic_t * da = drmu_atomic_new(sys->du);
-            if (da != NULL) {
-                drmu_atomic_crtc_mode_id_set(da, sys->dc, sys->mode_id);
-                drmu_atomic_unref(&da);
-                drmu_ufrac_t sar = drmu_crtc_sar(sys->dc);
-                msg_Dbg(vd, "Mode: %dx%d %d/%d - req %dx%d", drmu_crtc_width(sys->dc), drmu_crtc_height(sys->dc), sar.num, sar.den, pick.width, pick.height);
-            }
+            const drmu_mode_simple_params_t * mode;
+
+            drmu_output_mode_id_set(sys->dout, sys->mode_id);
+            mode = drmu_output_mode_simple_params(sys->dout);
+            msg_Dbg(vd, "Mode: %dx%d %d/%d - req %dx%d", mode->width, mode->height, mode->sar.num, mode->sar.den, pick.width, pick.height);
         }
     }
 

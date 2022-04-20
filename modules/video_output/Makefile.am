@@ -189,7 +189,8 @@ libdrm_vout_plugin_la_SOURCES = video_output/drm/drm_vout.c \
 	video_output/drm/drmu_log.h video_output/drm/drmu.c \
 	video_output/drm/drmu_xlease.c video_output/drm/drmu_atomic.c \
 	video_output/drm/drmu_util.c video_output/drm/drmu_util.h \
-	video_output/drm/drmu.h video_output/drm/drmu_int.h \
+	video_output/drm/drmu_output.c video_output/drm/drmu_output.h \
+	video_output/drm/drmu.h\
 	video_output/drm/pollqueue.c video_output/drm/pollqueue.h
 libdrm_vout_plugin_la_CFLAGS = $(AM_CFLAGS) -pthread -I/usr/include/libdrm
 libdrm_vout_plugin_la_LDFLAGS = $(AM_LDFLAGS) -pthread
