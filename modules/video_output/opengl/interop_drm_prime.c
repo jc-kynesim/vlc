@@ -72,6 +72,10 @@ struct priv
         int (*debugMessageControlKHR)(void * fn, const int32_t * attrs);
     } egl;
 
+    struct
+    {
+        PFNGLBINDTEXTUREPROC BindTexture;
+    } gl;
 };
 
 static inline bool
@@ -189,7 +193,7 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
                 goto fail;
             }
 
-            interop->vt->BindTexture(interop->tex_target, textures[n]);
+            priv->gl.BindTexture(interop->tex_target, textures[n]);
             priv->glEGLImageTargetTexture2DOES(interop->tex_target, images[n]);
 
             ++n;
@@ -243,7 +247,7 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
         goto fail;
     }
 
-    interop->vt->BindTexture(interop->tex_target, textures[0]);
+    priv->gl.BindTexture(interop->tex_target, textures[0]);
     priv->glEGLImageTargetTexture2DOES(interop->tex_target, images[0]);
 #endif
 
@@ -363,7 +367,8 @@ Open(vlc_object_t *obj)
         priv->egl.debugMessageControlKHR((void *)egl_err_cb, atts);
     }
 
-    if (!vlc_gl_StrHasToken(interop->api->extensions, "GL_OES_EGL_image"))
+    const char *eglexts = priv->egl.queryString(priv->egl.display, EGL_EXTENSIONS);
+    if (!eglexts || !vlc_gl_StrHasToken(eglexts, "GL_OES_EGL_image"))
     {
         msg_Err(obj, "GL missing GL_OES_EGL_image");
         goto error;
@@ -377,23 +382,28 @@ Open(vlc_object_t *obj)
         msg_Err(obj, "glEGLImageTargetTexture2DOES missing");
         goto error;
     }
+    priv->gl.BindTexture =
+        vlc_gl_GetProcAddress(interop->gl, "glBindTexture");
+    if (priv->gl.BindTexture == NULL)
+        goto error;
 
     /* The pictures are uploaded upside-down */
     video_format_TransformBy(&interop->fmt_out, TRANSFORM_VFLIP);
 
 #if OPT_MULTIPLANE
-    int ret = opengl_interop_init(interop, GL_TEXTURE_2D, VLC_CODEC_I420, interop->fmt_in.space);
+    interop->tex_target = GL_TEXTURE_2D;
+    interop->fmt_out.i_chroma = vlc_sw_chroma;
+    interop->fmt_out.space = interop->fmt_in.space;
 #else
     // If using EXTERNAL_OES then color space must be UNDEFINED with VLCs
     // current shader code.  It doesn't do RGB->RGB colour conversions.
 //    int ret = opengl_interop_init(interop, GL_TEXTURE_EXTERNAL_OES, VLC_CODEC_DRM_PRIME_OPAQUE, COLOR_SPACE_UNDEF);
-    int ret = opengl_interop_init(interop, GL_TEXTURE_EXTERNAL_OES, VLC_CODEC_RGB24, COLOR_SPACE_UNDEF);
+//    int ret = opengl_interop_init(interop, GL_TEXTURE_EXTERNAL_OES, VLC_CODEC_RGB24, COLOR_SPACE_UNDEF);
+    interop->tex_target = GL_TEXTURE_EXTERNAL_OES;
+    interop->fmt_out.i_chroma = VLC_CODEC_RGB24,
+    interop->fmt_out.space = COLOR_SPACE_UNDEF;
 #endif
-    if (ret != VLC_SUCCESS)
-    {
-        msg_Err(obj, "Interop Init failed");
-        goto error;
-    }
+
     static const struct vlc_gl_interop_ops ops = {
         .update_textures = tc_vaegl_update,
         .close = Close,
@@ -413,7 +423,6 @@ vlc_module_begin ()
     set_description("DRM PRIME OpenGL surface converter")
     set_capability("glinterop", 1)
     set_callback(Open)
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     add_shortcut("drm_prime")
 vlc_module_end ()

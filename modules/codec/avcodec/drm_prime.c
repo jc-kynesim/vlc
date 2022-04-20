@@ -42,9 +42,6 @@ static const AVCodecHWConfig* find_hw_config(const AVCodecContext * const ctx)
 
 static int DrmPrimeGet(vlc_va_t *va, picture_t *pic, AVCodecContext * avctx, AVFrame * frame)
 {
-    vlc_drm_prime_sys_t * const sys = va->sys;
-    int rv;
-
     msg_Info(va, "%s: frame=%p", __func__, frame);
 
     if (avcodec_default_get_buffer2(avctx, frame, 0))
@@ -201,7 +198,6 @@ vlc_module_begin ()
     set_description( N_("DRM-PRIME video decoder") )
     set_va_callback( DrmPrimeCreate, 100 )
     add_shortcut( "drm_prime" )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_VCODEC )
 
     add_submodule()

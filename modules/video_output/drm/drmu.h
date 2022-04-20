@@ -456,6 +456,8 @@ bool drmu_env_restore_is_enabled(const drmu_env_t * const du);
 // Tests for commitability and removes any props that won't commit
 int drmu_atomic_env_restore_add_snapshot(struct drmu_atomic_s ** const ppda);
 
+int drmu_env_set_client_cap(drmu_env_t * const du, uint64_t cap_id, uint64_t cap_val);
+
 // Open a drmu environment with the drm fd
 // Takes a logging structure so early errors can be reported.
 // If log = NULL logging is disabled (set to drmu_log_env_none).

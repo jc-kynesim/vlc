@@ -617,7 +617,6 @@ vlc_module_begin()
     set_shortname(N_("DRM vout"))
     set_description(N_("DRM vout plugin"))
     add_shortcut("drm_vout")
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
 
     add_bool(DRM_VOUT_SOURCE_MODESET_NAME, false, DRM_VOUT_SOURCE_MODESET_TEXT, DRM_VOUT_SOURCE_MODESET_LONGTEXT)
