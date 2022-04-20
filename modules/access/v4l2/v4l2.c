@@ -274,7 +274,6 @@ static const char *const psz_tuner_audio_modes_list_text[] = {
 vlc_module_begin ()
     set_shortname( N_("V4L") )
     set_description( N_("Video4Linux input") )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACCESS )
 
     set_section( N_( "Video input" ), NULL )
@@ -469,7 +468,7 @@ int OpenDevice (vlc_object_t *obj, const char *path, uint32_t *restrict caps)
         fd = rawfd;
     }
 
-    /* Get device capabilites */
+    /* Get device capabilities */
     struct v4l2_capability cap;
     if (v4l2_ioctl (fd, VIDIOC_QUERYCAP, &cap) < 0)
     {

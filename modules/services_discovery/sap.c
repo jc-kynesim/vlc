@@ -79,7 +79,7 @@
 
 static int Decompress( const unsigned char *psz_src, unsigned char **_dst, int i_len )
 {
-#ifdef HAVE_ZLIB_H
+#ifdef HAVE_ZLIB
     int i_result, i_dstsize, n = 0;
     unsigned char *psz_dst = NULL;
     z_stream d_stream;
@@ -364,7 +364,7 @@ static int ParseSAP( services_discovery_t *p_sd, const uint8_t *buf,
          && memcmp(p_announce->i_source, i_source, sizeof (i_source)) == 0)
         {
             /* We don't support delete announcement as they can easily
-             * Be used to highjack an announcement by a third party.
+             * Be used to hijack an announcement by a third party.
              * Instead we cleverly implement Implicit Announcement removal.
              *
              * if( b_need_delete )
@@ -440,7 +440,7 @@ static void *Run( void *data )
         if_freenameindex (l);
     }
 #else
-        /* this is the Winsock2 equivalant of SIOCGIFCONF on BSD stacks,
+        /* this is the Winsock2 equivalent of SIOCGIFCONF on BSD stacks,
            which if_nameindex uses internally anyway */
 
         // first create a dummy socket to pin down the protocol family
@@ -639,7 +639,6 @@ VLC_SD_PROBE_HELPER("sap", N_("Network streams (SAP)"), SD_CAT_LAN)
 vlc_module_begin()
     set_shortname(N_("SAP"))
     set_description(N_("Network streams (SAP)") )
-    set_category(CAT_PLAYLIST)
     set_subcategory(SUBCAT_PLAYLIST_SD)
 
     add_string("sap-addr", NULL, SAP_ADDR_TEXT, SAP_ADDR_LONGTEXT)

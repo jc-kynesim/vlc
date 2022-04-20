@@ -52,7 +52,6 @@ vlc_module_begin ()
     set_shortname("auhal")
     set_description(N_("HAL AudioUnit output"))
     set_capability("audio output", 101)
-    set_category(CAT_AUDIO)
     set_subcategory(SUBCAT_AUDIO_AOUT)
     set_callbacks(Open, Close)
     add_integer("auhal-volume", AOUT_VOLUME_DEFAULT,
@@ -526,11 +525,19 @@ RebuildDeviceList(audio_output_t * p_aout, UInt32 *p_id_exists)
         CFArrayAppendValue(currentListOfDevices, deviceNumber);
         CFRelease(deviceNumber);
 
+        // TODO: only register once for each device
+        ManageAudioStreamsCallback(p_aout, i_id, true);
+
         if (AudioDeviceSupportsDigital(p_aout, i_id))
         {
             msg_Dbg(p_aout, "'%s' supports digital output", psz_name);
-            char *psz_encoded_name = nil;
-            asprintf(&psz_encoded_name, _("%s (Encoded Output)"), psz_name);
+            char *psz_encoded_name;
+            if( asprintf(&psz_encoded_name, _("%s (Encoded Output)"), psz_name) == -1 )
+            {
+                free(psz_name);
+                continue;
+            }
+
             i_id = i_id | AOUT_VAR_SPDIF_FLAG;
             ReportDevice(p_aout, i_id, psz_encoded_name);
             deviceNumber = CFNumberCreate(kCFAllocatorDefault,
@@ -543,10 +550,6 @@ RebuildDeviceList(audio_output_t * p_aout, UInt32 *p_id_exists)
             if (p_id_exists && i_id == i_id_exists)
                 *p_id_exists = i_id;
         }
-
-        // TODO: only register once for each device
-        ManageAudioStreamsCallback(p_aout, p_devices[i], true);
-
         free(psz_name);
     }
 
@@ -801,7 +804,7 @@ AudioStreamChangeFormat(audio_output_t *p_aout, AudioStreamID i_stream_id,
 
     msg_Dbg(p_aout, STREAM_FORMAT_MSG("setting stream format: ", change_format));
 
-    /* Condition because SetProperty is asynchronious */
+    /* Condition because SetProperty is asynchronous */
     vlc_cond_init(&w.cond);
     vlc_mutex_init(&w.lock);
     vlc_mutex_lock(&w.lock);
@@ -827,7 +830,7 @@ AudioStreamChangeFormat(audio_output_t *p_aout, AudioStreamID i_stream_id,
         goto out;
     }
 
-    /* The AudioStreamSetProperty is not only asynchronious (requiring the
+    /* The AudioStreamSetProperty is not only asynchronous (requiring the
      * locks) it is also not atomic in its behaviour.  Therefore we check 9
      * times before we really give up.
      */
@@ -1155,7 +1158,7 @@ StartSPDIF(audio_output_t * p_aout, audio_sample_format_t *fmt)
     AudioStreamBasicDescription desired_stream_format;
     memset(&desired_stream_format, 0, sizeof(desired_stream_format));
 
-    /* Start doing the SPDIF setup proces */
+    /* Start doing the SPDIF setup process */
     p_sys->b_digital = true;
 
     /* Hog the device */
@@ -1475,7 +1478,6 @@ Stop(audio_output_t *p_aout)
 static int
 Start(audio_output_t *p_aout, audio_sample_format_t *restrict fmt)
 {
-    UInt32                  i_param_size = 0;
     aout_sys_t              *p_sys = NULL;
 
     /* Use int here, to match kAudioDevicePropertyDeviceIsAlive
@@ -1525,7 +1527,6 @@ Start(audio_output_t *p_aout, audio_sample_format_t *restrict fmt)
                                  CFRangeMake(0, count), deviceNumber))
         {
             /* Check if the desired device is alive and usable */
-            i_param_size = sizeof(b_alive);
             int ret = AO_GET1PROP(p_sys->i_selected_dev, int, &b_alive,
                                   kAudioDevicePropertyDeviceIsAlive,
                                   kAudioObjectPropertyScopeGlobal);

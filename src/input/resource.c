@@ -49,6 +49,7 @@ struct vout_resource
     vout_thread_t *vout;
     enum vlc_vout_order order;
     bool started;
+    char *psz_prev_title;
 
     struct vlc_list node;
 };
@@ -109,6 +110,7 @@ vout_resource_Create(vout_thread_t *vout)
 
     vout_rsc->started = false;
     vout_rsc->vout = vout;
+    vout_rsc->psz_prev_title = NULL;
     return vout_rsc;
 }
 
@@ -123,6 +125,7 @@ vout_resource_Remove(struct vout_resource *vout_rsc)
 {
     vlc_list_remove(&vout_rsc->node);
     vout_thread_t *vout = vout_rsc->vout;
+    free(vout_rsc->psz_prev_title);
     free(vout_rsc);
 
     assert(vout);
@@ -160,8 +163,22 @@ static void DestroyVout( input_resource_t *p_resource )
     }
 }
 
+static void VoutSetAndDeduplicateTitle( vout_thread_t *p_vout,
+                                        char **ppsz_title,
+                                        char **ppsz_prev_title )
+{
+    if( !*ppsz_prev_title || strcmp( *ppsz_prev_title, *ppsz_title ) )
+    {
+        vout_DisplayTitle( p_vout, *ppsz_title );
+        free( *ppsz_prev_title );
+        *ppsz_prev_title = *ppsz_title;
+        *ppsz_title = NULL;
+    }
+}
+
 static void DisplayVoutTitle( input_resource_t *p_resource,
-                              vout_thread_t *p_vout )
+                              vout_thread_t *p_vout,
+                              char ** ppsz_prev_title )
 {
     if( p_resource->p_input == NULL )
         return;
@@ -173,7 +190,7 @@ static void DisplayVoutTitle( input_resource_t *p_resource,
     char *psz_nowplaying = input_item_GetNowPlayingFb( p_item );
     if( psz_nowplaying && *psz_nowplaying )
     {
-        vout_DisplayTitle( p_vout, psz_nowplaying );
+        VoutSetAndDeduplicateTitle( p_vout, &psz_nowplaying, ppsz_prev_title );
     }
     else
     {
@@ -187,16 +204,16 @@ static void DisplayVoutTitle( input_resource_t *p_resource,
         }
         if( psz_artist && *psz_artist )
         {
-            char *psz_string;
-            if( asprintf( &psz_string, "%s - %s", psz_name, psz_artist ) != -1 )
+            char *psz_string = NULL;
+            if( asprintf( &psz_string, "%s - %s", psz_name, psz_artist ) > 0 )
             {
-                vout_DisplayTitle( p_vout, psz_string );
+                VoutSetAndDeduplicateTitle( p_vout, &psz_string, ppsz_prev_title );
                 free( psz_string );
             }
         }
         else if( psz_name )
         {
-            vout_DisplayTitle( p_vout, psz_name );
+            VoutSetAndDeduplicateTitle( p_vout, &psz_name, ppsz_prev_title );
         }
         free( psz_name );
         free( psz_artist );
@@ -255,7 +272,7 @@ void input_resource_PutAout( input_resource_t *p_resource,
     vlc_mutex_unlock( &p_resource->lock_hold );
 
     if( p_aout != NULL )
-        aout_Destroy( p_aout );
+        aout_Release( p_aout );
 }
 
 audio_output_t *input_resource_HoldAout( input_resource_t *p_resource )
@@ -284,7 +301,7 @@ void input_resource_ResetAout( input_resource_t *p_resource )
     vlc_mutex_unlock( &p_resource->lock_hold );
 
     if( p_aout != NULL )
-        aout_Destroy( p_aout );
+        aout_Release( p_aout );
 }
 
 /* Common */
@@ -318,7 +335,7 @@ void input_resource_Release( input_resource_t *p_resource )
     DestroySout( p_resource );
     DestroyVout( p_resource );
     if( p_resource->p_aout != NULL )
-        aout_Destroy( p_resource->p_aout );
+        aout_Release( p_resource->p_aout );
 
     vout_Release( p_resource->p_vout_dummy );
     free( p_resource );
@@ -345,14 +362,16 @@ void input_resource_SetInput( input_resource_t *p_resource, input_thread_t *p_in
 }
 
 static void input_resource_PutVoutLocked(input_resource_t *p_resource,
-                                         vout_thread_t *vout, bool *has_stopped)
+                                         vout_thread_t *vout,
+                                         enum input_resource_vout_state *vout_state)
 {
     assert(vout != NULL);
     struct vout_resource *vout_rsc = resource_GetVoutRsc(p_resource, vout);
     assert(vout_rsc != NULL);
 
-    if (has_stopped != NULL)
-        *has_stopped = vout_rsc->started;
+    if (vout_state != NULL)
+        *vout_state = vout_rsc->started ? INPUT_RESOURCE_VOUT_STOPPED
+                                        : INPUT_RESOURCE_VOUT_NOTCHANGED;
 
     if (vout_rsc->started)
     {
@@ -381,10 +400,11 @@ static void input_resource_PutVoutLocked(input_resource_t *p_resource,
 }
 
 void input_resource_PutVout(input_resource_t *p_resource,
-                                   vout_thread_t *vout, bool *stopped)
+                            vout_thread_t *vout,
+                            enum input_resource_vout_state *vout_state)
 {
     vlc_mutex_lock( &p_resource->lock );
-    input_resource_PutVoutLocked( p_resource, vout, stopped );
+    input_resource_PutVoutLocked( p_resource, vout, vout_state );
     vlc_mutex_unlock( &p_resource->lock );
 }
 
@@ -434,13 +454,13 @@ vout_thread_t *input_resource_RequestVout(input_resource_t *p_resource,
                                           vlc_video_context *vctx,
                                           const vout_configuration_t *cfg,
                                           enum vlc_vout_order *order,
-                                          bool *has_started)
+                                          enum input_resource_vout_state *vout_state)
 {
     vlc_mutex_lock( &p_resource->lock );
     struct vout_resource *vout_rsc = NULL;
 
-    if (has_started != NULL)
-        *has_started = false;
+    if (vout_state != NULL)
+        *vout_state = INPUT_RESOURCE_VOUT_NOTCHANGED;
 
     vout_configuration_t dcfg = *cfg;
     if (dcfg.vout == NULL)
@@ -474,35 +494,31 @@ vout_thread_t *input_resource_RequestVout(input_resource_t *p_resource,
         return dcfg.vout;
     }
 
-    if (vout_rsc->started)
-    {
-        assert(cfg->vout != NULL);
-        int ret = vout_ChangeSource(dcfg.vout, dcfg.fmt);
-        if (ret == 0)
-        {
-            vlc_mutex_unlock(&p_resource->lock);
-            return dcfg.vout;
-        }
-    }
-
     if (vout_Request(&dcfg, vctx, p_resource->p_input)) {
+        if (vout_rsc->started && vout_state != NULL)
+            *vout_state = INPUT_RESOURCE_VOUT_STOPPED;
+
+        vout_rsc->started = false;
         input_resource_PutVoutLocked(p_resource, dcfg.vout, NULL);
         vlc_mutex_unlock(&p_resource->lock);
         return NULL;
     }
 
-    vout_rsc->started = true;
-    if (has_started != NULL)
-        *has_started = true;
-
-    DisplayVoutTitle(p_resource, cfg->vout);
-
-    /* Send original viewpoint to the input in order to update other ESes */
-    if (p_resource->p_input != NULL)
+    if (!vout_rsc->started)
     {
-        input_control_param_t param = { .viewpoint = cfg->fmt->pose };
-        input_ControlPush(p_resource->p_input, INPUT_CONTROL_SET_INITIAL_VIEWPOINT,
-                          &param);
+        vout_rsc->started = true;
+        if (vout_state != NULL)
+            *vout_state = INPUT_RESOURCE_VOUT_STARTED;
+
+        DisplayVoutTitle(p_resource, cfg->vout, &vout_rsc->psz_prev_title);
+
+        /* Send original viewpoint to the input in order to update other ESes */
+        if (p_resource->p_input != NULL)
+        {
+            input_control_param_t param = { .viewpoint = cfg->fmt->pose };
+            input_ControlPush(p_resource->p_input, INPUT_CONTROL_SET_INITIAL_VIEWPOINT,
+                              &param);
+        }
     }
     vlc_mutex_unlock( &p_resource->lock );
 

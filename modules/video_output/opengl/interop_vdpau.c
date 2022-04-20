@@ -36,13 +36,14 @@
 #include <vlc_plugin.h>
 
 #include "gl_api.h"
+#include "gl_util.h"
 #include "../../hw/vdpau/vlc_vdpau.h"
 #include "interop.h"
 
-#define INTEROP_CALL(fct, ...) \
+#define INTEROP_CALL(sys, fct, ...) \
     _##fct(__VA_ARGS__); \
     { \
-        GLenum ret = interop->vt->GetError(); \
+        GLenum ret = ((converter_sys_t*)sys)->gl.GetError(); \
         if (ret != GL_NO_ERROR) \
         { \
             msg_Err(interop->gl, #fct " failed: 0x%x", ret); \
@@ -62,11 +63,14 @@ static PFNGLVDPAUUNMAPSURFACESNVPROC            _glVDPAUUnmapSurfacesNV;
 
 typedef struct {
     vlc_decoder_device *dec_device;
+    struct {
+        PFNGLGETERRORPROC GetError;
+    } gl;
 } converter_sys_t;
 
 static int
-tc_vdpau_gl_update(const struct vlc_gl_interop *interop, GLuint textures[],
-                   GLsizei const tex_widths[], GLsizei const tex_heights[],
+tc_vdpau_gl_update(const struct vlc_gl_interop *interop, uint32_t textures[],
+                   int32_t const tex_widths[], int32_t const tex_heights[],
                    picture_t *pic, size_t const plane_offsets[])
 {
     VLC_UNUSED(tex_widths);
@@ -74,6 +78,7 @@ tc_vdpau_gl_update(const struct vlc_gl_interop *interop, GLuint textures[],
     VLC_UNUSED(plane_offsets);
 
     vlc_vdp_output_surface_t *p_sys = pic->p_sys;
+    converter_sys_t *convsys = interop->priv;
     GLvdpauSurfaceNV gl_nv_surface = p_sys->gl_nv_surface;
 
     static_assert (sizeof (gl_nv_surface) <= sizeof (p_sys->gl_nv_surface),
@@ -85,20 +90,20 @@ tc_vdpau_gl_update(const struct vlc_gl_interop *interop, GLuint textures[],
 
         GLint state;
         GLsizei num_val;
-        INTEROP_CALL(glVDPAUGetSurfaceivNV, gl_nv_surface,
+        INTEROP_CALL(convsys, glVDPAUGetSurfaceivNV, gl_nv_surface,
                      GL_SURFACE_STATE_NV, 1, &num_val, &state);
         assert(num_val == 1); assert(state == GL_SURFACE_MAPPED_NV);
 
-        INTEROP_CALL(glVDPAUUnmapSurfacesNV, 1, &gl_nv_surface);
-        INTEROP_CALL(glVDPAUUnregisterSurfaceNV, gl_nv_surface);
+        INTEROP_CALL(convsys, glVDPAUUnmapSurfacesNV, 1, &gl_nv_surface);
+        INTEROP_CALL(convsys, glVDPAUUnregisterSurfaceNV, gl_nv_surface);
     }
 
     gl_nv_surface =
-        INTEROP_CALL(glVDPAURegisterOutputSurfaceNV,
+        INTEROP_CALL(convsys, glVDPAURegisterOutputSurfaceNV,
                      (void *)(size_t)p_sys->surface,
                      GL_TEXTURE_2D, interop->tex_count, textures);
-    INTEROP_CALL(glVDPAUSurfaceAccessNV, gl_nv_surface, GL_READ_ONLY);
-    INTEROP_CALL(glVDPAUMapSurfacesNV, 1, &gl_nv_surface);
+    INTEROP_CALL(convsys, glVDPAUSurfaceAccessNV, gl_nv_surface, GL_READ_ONLY);
+    INTEROP_CALL(convsys, glVDPAUMapSurfacesNV, 1, &gl_nv_surface);
 
     p_sys->gl_nv_surface = gl_nv_surface;
     return VLC_SUCCESS;
@@ -107,8 +112,10 @@ tc_vdpau_gl_update(const struct vlc_gl_interop *interop, GLuint textures[],
 static void
 Close(struct vlc_gl_interop *interop)
 {
-    _glVDPAUFiniNV(); assert(interop->vt->GetError() == GL_NO_ERROR);
     converter_sys_t *sys = interop->priv;
+
+    _glVDPAUFiniNV();
+    assert(sys->gl.GetError() == GL_NO_ERROR);
     vlc_decoder_device *dec_device = sys->dec_device;
     vlc_decoder_device_Release(dec_device);
 }
@@ -119,13 +126,16 @@ Open(vlc_object_t *obj)
     struct vlc_gl_interop *interop = (void *) obj;
     if (interop->vctx == NULL)
         return VLC_EGENERIC;
+
+    struct vlc_gl_extension_vt extension_vt;
+    vlc_gl_LoadExtensionFunctions(interop->gl, &extension_vt);
+
     vlc_decoder_device *dec_device = vlc_video_context_HoldDevice(interop->vctx);
     if (GetVDPAUOpaqueDevice(dec_device) == NULL
      || (interop->fmt_in.i_chroma != VLC_CODEC_VDPAU_VIDEO_420
       && interop->fmt_in.i_chroma != VLC_CODEC_VDPAU_VIDEO_422
       && interop->fmt_in.i_chroma != VLC_CODEC_VDPAU_VIDEO_444)
-     || !vlc_gl_StrHasToken(interop->api->extensions, "GL_NV_vdpau_interop")
-     || interop->gl->surface->type != VOUT_WINDOW_TYPE_XID)
+     || !vlc_gl_HasExtension(&extension_vt, "GL_NV_vdpau_interop"))
     {
         vlc_decoder_device_Release(dec_device);
         return VLC_EGENERIC;
@@ -138,6 +148,8 @@ Open(vlc_object_t *obj)
         return VLC_ENOMEM;
     }
     sys->dec_device = dec_device;
+    sys->gl.GetError = vlc_gl_GetProcAddress(interop->gl, "glGetError");
+    assert(sys->gl.GetError != NULL);
 
     /* Request to change the input chroma to the core */
     interop->fmt_in.i_chroma = VLC_CODEC_VDPAU_OUTPUT;
@@ -174,18 +186,23 @@ Open(vlc_object_t *obj)
     SAFE_GPA(glVDPAUUnmapSurfacesNV);
 #undef SAFE_GPA
 
-    INTEROP_CALL(glVDPAUInitNV, (void *)(uintptr_t)device, vdp_gpa);
+    INTEROP_CALL(sys, glVDPAUInitNV, (void *)(uintptr_t)device, vdp_gpa);
 
     /* The pictures are uploaded upside-down */
     video_format_TransformBy(&interop->fmt_out, TRANSFORM_VFLIP);
 
-    int ret = opengl_interop_init(interop, GL_TEXTURE_2D, VLC_CODEC_RGB32,
-                                  COLOR_SPACE_UNDEF);
-    if (ret != VLC_SUCCESS)
-    {
-        Close(interop);
-        return VLC_EGENERIC;
-    }
+    interop->tex_target = GL_TEXTURE_2D;
+    interop->fmt_out.i_chroma = VLC_CODEC_RGB32;
+    interop->fmt_out.space = COLOR_SPACE_UNDEF;
+
+    interop->tex_count = 1;
+    interop->texs[0] = (struct vlc_gl_tex_cfg) {
+        .w = {1, 1},
+        .h = {1, 1},
+        .internal = GL_RGBA,
+        .format = GL_RGBA,
+        .type = GL_UNSIGNED_BYTE,
+    };
 
     static const struct vlc_gl_interop_ops ops = {
         .update_textures = tc_vdpau_gl_update,
@@ -197,50 +214,11 @@ Open(vlc_object_t *obj)
     return VLC_SUCCESS;
 }
 
-static void
-DecoderDeviceClose(vlc_decoder_device *device)
-{
-    vdpau_decoder_device_t *vdpau_dev = GetVDPAUOpaqueDevice(device);
-    vdp_release_x11(vdpau_dev->vdp);
-}
-
-static const struct vlc_decoder_device_operations dev_ops = {
-    .close = DecoderDeviceClose,
-};
-
-static int
-DecoderDeviceOpen(vlc_decoder_device *device, vout_window_t *window)
-{
-    if (!window || window->type != VOUT_WINDOW_TYPE_XID)
-        return VLC_EGENERIC;
-
-    if (!vlc_xlib_init(VLC_OBJECT(window)))
-        return VLC_EGENERIC;
-
-    vdpau_decoder_device_t *sys = vlc_obj_malloc(VLC_OBJECT(device), sizeof(*sys));
-    if (unlikely(sys == NULL))
-        return VLC_ENOMEM;
-
-    if (vdp_get_x11(window->display.x11, -1,
-                    &sys->vdp, &sys->device) != VDP_STATUS_OK)
-    {
-        vlc_obj_free(VLC_OBJECT(device), sys);
-        return VLC_EGENERIC;
-    }
-
-    device->ops = &dev_ops;
-    device->type = VLC_DECODER_DEVICE_VDPAU;
-    device->opaque = sys;
-    return VLC_SUCCESS;
-}
 
 vlc_module_begin ()
     set_description("VDPAU OpenGL surface converter")
     set_capability("glinterop", 2)
     set_callback(Open)
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     add_shortcut("vdpau")
-    add_submodule()
-        set_callback_dec_device(DecoderDeviceOpen, 3)
 vlc_module_end ()

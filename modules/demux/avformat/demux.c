@@ -51,6 +51,19 @@
 
 # define HAVE_AVUTIL_CODEC_ATTACHMENT 1
 
+#if LIBAVFORMAT_VERSION_CHECK(59, 0, 100)
+# define AVF_MAYBE_CONST const
+#else
+# define AVF_MAYBE_CONST
+#endif
+
+#if (LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(57, 80, 100))
+static void avio_context_free(AVIOContext **io)
+{
+    av_freep(io);
+}
+#endif
+
 struct avformat_track_s
 {
     es_out_id_t *p_es;
@@ -63,7 +76,7 @@ struct avformat_track_s
  *****************************************************************************/
 typedef struct
 {
-    AVInputFormat  *fmt;
+    AVF_MAYBE_CONST AVInputFormat *fmt;
     AVFormatContext *ic;
 
     struct avformat_track_s *tracks;
@@ -221,7 +234,8 @@ static void FindStreamInfo( demux_t *p_demux, AVDictionary *options )
 }
 
 static int avformat_ProbeDemux( vlc_object_t *p_this,
-                                AVInputFormat **pp_fmt, const char *psz_url )
+                                AVF_MAYBE_CONST AVInputFormat **pp_fmt,
+                                const char *psz_url )
 {
     demux_t       *p_demux = (demux_t*)p_this;
     AVProbeData   pd = { 0 };
@@ -316,7 +330,7 @@ int avformat_OpenDemux( vlc_object_t *p_this )
 {
     demux_t       *p_demux = (demux_t*)p_this;
     demux_sys_t   *p_sys;
-    AVInputFormat *fmt = NULL;
+    AVF_MAYBE_CONST AVInputFormat *fmt = NULL;
     vlc_tick_t    i_start_time = VLC_TICK_INVALID;
     bool          b_can_seek;
     const char    *psz_url;
@@ -385,7 +399,7 @@ int avformat_OpenDemux( vlc_object_t *p_this )
                  vlc_strerror_c(AVUNERROR(error)) );
         av_dict_free( &options );
         av_free( pb->buffer );
-        av_free( pb );
+        avio_context_free( &pb );
         p_sys->ic = NULL;
         avformat_CloseDemux( p_this );
         return VLC_EGENERIC;
@@ -694,6 +708,11 @@ int avformat_OpenDemux( vlc_object_t *p_this )
                     memcpy( es_fmt.p_extra, p_extra, i_extra );
                 }
             }
+            else if ( cp->codec_id == AV_CODEC_ID_AV1 )
+            {
+                // raw AV1, we need a packetizer to detect configuration changes
+                es_fmt.b_packetized = false;
+            }
 
             es_fmt.i_id = i;
             p_track->p_es = es_out_Add( p_demux->out, &es_fmt );
@@ -763,7 +782,7 @@ void avformat_CloseDemux( vlc_object_t *p_this )
         if( p_sys->ic->pb )
         {
             av_free( p_sys->ic->pb->buffer );
-            av_free( p_sys->ic->pb );
+            avio_context_free( &p_sys->ic->pb );
         }
         avformat_close_input( &p_sys->ic );
     }
@@ -813,7 +832,11 @@ static int Demux( demux_t *p_demux )
     }
 
     // handle extra data change, this can happen for FLV
+#if LIBAVUTIL_VERSION_MAJOR < 57
     int side_data_size;
+#else
+    size_t side_data_size;
+#endif
     uint8_t *side_data = av_packet_get_side_data( &pkt, AV_PKT_DATA_NEW_EXTRADATA, &side_data_size );
     if( side_data_size > 0 ) {
         // ignore new extradata which is the same as previous version
@@ -876,7 +899,7 @@ static int Demux( demux_t *p_demux )
     if( pkt.flags & AV_PKT_FLAG_KEY )
         p_frame->i_flags |= BLOCK_FLAG_TYPE_I;
 
-    /* Used to avoid timestamps overlow */
+    /* Used to avoid timestamps overflow */
     if( p_sys->ic->start_time != (int64_t)AV_NOPTS_VALUE )
     {
         i_start_time = FROM_AV_TS_NZ(p_sys->ic->start_time);

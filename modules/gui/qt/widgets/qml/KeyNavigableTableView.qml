@@ -34,31 +34,56 @@ FocusScope {
 
     property var sortModel: []
 
-    property Component colDelegate: Widgets.ListLabel {
+    property Component colDelegate: Widgets.ScrollingText {
+        id: textRect
+
         property var rowModel: parent.rowModel
         property var model: parent.colModel
+        property color foregroundColor: parent.foregroundColor
 
-        anchors.fill: parent
-        text: !rowModel ? "" : (rowModel[model.criteria] || "")
-        color: parent.foregroundColor
+        label: text
+        forceScroll: parent.currentlyFocused
+        width: parent.width
+        clip: scrolling
+
+        Widgets.ListLabel {
+            id: text
+
+            anchors.verticalCenter: parent.verticalCenter
+            text: !rowModel ? "" : (rowModel[model.criteria] || "")
+            color: textRect.foregroundColor
+        }
     }
 
     property Component tableHeaderDelegate: Widgets.CaptionLabel {
         text: model.text || ""
     }
 
+    readonly property real sectionWidth: !!section.property ? VLCStyle.table_section_width : 0
+
+    readonly property real usedRowSpace: {
+        var s = 0
+        for (var i in sortModel)
+            s += sortModel[i].width + root.horizontalSpacing
+        return s + root._contextButtonHorizontalSpace + (VLCStyle.margin_xxxsmall * 2)
+    }
+
     property Component header: Item{}
-    property var headerItem: view.headerItem.loadedHeader
+    property Item headerItem: view.headerItem.loadedHeader
     property color headerColor
     property int headerTopPadding: 0
 
-    property var selectionDelegateModel
+    property Util.SelectableDelegateModel selectionDelegateModel
     property real rowHeight: VLCStyle.tableRow_height
-    readonly property int _contextButtonHorizontalSpace: VLCStyle.icon_normal + VLCStyle.margin_xxsmall * 2
+    readonly property int _contextButtonHorizontalSpace: VLCStyle.icon_normal
     property int horizontalSpacing: VLCStyle.column_margin_width
 
     property real availableRowWidth: 0
     property real _availabeRowWidthLastUpdateTime: Date.now()
+    readonly property real _currentAvailableRowWidth: root.width
+                                                      - root.sectionWidth * 2
+                                                      - (root.horizontalSpacing + _contextButtonHorizontalSpace)
+                                                      - (VLCStyle.margin_xxxsmall * 2)
 
     property Item dragItem
 
@@ -87,15 +112,14 @@ FocusScope {
     property alias footerItem: view.footerItem
     property alias footer: view.footer
 
-    property alias fadeColor:             view.fadeColor
-    property alias fadeRectBottomHovered: view.fadeRectBottomHovered
-    property alias fadeRectTopHovered:    view.fadeRectTopHovered
+    property alias fadeColor: view.fadeColor
+    property alias fadeSize: view.fadeSize
 
     property alias add:       view.add
     property alias displaced: view.displaced
 
     property alias listScrollBar: view.listScrollBar
-    property alias listView: view.listView
+    property alias listView: view
 
     property alias displayMarginEnd: view.displayMarginEnd
 
@@ -103,8 +127,8 @@ FocusScope {
 
     //forwarded from subview
     signal actionForSelection( var selection )
-    signal contextMenuButtonClicked(Item menuParent, var menuModel)
-    signal rightClick(Item menuParent, var menuModel, var globalMousePos)
+    signal contextMenuButtonClicked(Item menuParent, var menuModel, point globalMousePos)
+    signal rightClick(Item menuParent, var menuModel, point globalMousePos)
     signal itemDoubleClicked(var index, var model)
 
     // Settings
@@ -117,21 +141,15 @@ FocusScope {
         _qtAvoidSectionUpdate()
     }
 
-    onWidthChanged: {
-        availableRowWidthUpdater.enqueueUpdate()
-    }
-
-    onSectionChanged: {
-        availableRowWidthUpdater.enqueueUpdate()
-    }
+    on_CurrentAvailableRowWidthChanged: availableRowWidthUpdater.enqueueUpdate()
 
     /*
-     *define the intial position/selection
+     *define the initial position/selection
      * This is done on activeFocus rather than Component.onCompleted because delegateModel.
      * selectedGroup update itself after this event
      */
     onActiveFocusChanged: {
-        if (activeFocus == false || view.modelCount == 0)
+        if (activeFocus == false || view.count == 0)
             return;
 
         if (view.currentIndex == -1)
@@ -155,7 +173,7 @@ FocusScope {
     }
 
     function positionViewAtBeginning() {
-        view.listView.positionViewAtBeginning()
+        view.positionViewAtBeginning()
     }
 
     function _qtAvoidSectionUpdate() {
@@ -196,9 +214,7 @@ FocusScope {
         }
 
         function _update() {
-            root.availableRowWidth = root.width
-                    - ( !!section.property ? VLCStyle.table_section_width * 2 : 0 )
-                    - _contextButtonHorizontalSpace
+            root.availableRowWidth = root._currentAvailableRowWidth
             root._availabeRowWidthLastUpdateTime = Date.now()
         }
 
@@ -225,6 +241,8 @@ FocusScope {
 
         headerPositioning: ListView.OverlayHeader
 
+        fadeColor: VLCStyle.colors.bg
+
         onDeselectAll: {
             if (selectionDelegateModel) {
                 selectionDelegateModel.clear()
@@ -242,10 +260,10 @@ FocusScope {
             readonly property alias contentWidth: row.width
             property alias loadedHeader: headerLoader.item
 
-            width: parent.width
+            width: Math.max(view.width, root.usedRowSpace + root.sectionWidth)
             height: col.height
             color: headerColor
-            visible: view.modelCount > 0
+            visible: view.count > 0
             z: 3
 
             // with inline header positioning and for `root.header` which changes it's height after loading,
@@ -283,15 +301,12 @@ FocusScope {
                 Row {
                     id: row
 
-                    anchors {
-                        leftMargin: VLCStyle.margin_xxxsmall
-                        rightMargin: VLCStyle.margin_xxxsmall
-                        horizontalCenter: parent.horizontalCenter
-                        horizontalCenterOffset: - root._contextButtonHorizontalSpace / 2
-                    }
-                    height: implicitHeight
+                    x: Math.max(0, view.width - root.usedRowSpace) / 2 + root.sectionWidth
+                    leftPadding: VLCStyle.margin_xxxsmall
+                    rightPadding: VLCStyle.margin_xxxsmall
                     topPadding: root.headerTopPadding
                     bottomPadding: VLCStyle.margin_xsmall
+
                     spacing: root.horizontalSpacing
 
                     Repeater {
@@ -326,6 +341,14 @@ FocusScope {
                             }
                         }
                     }
+
+                    Item {
+                        // placeholder for context button
+
+                        width: root._contextButtonHorizontalSpace
+
+                        height: 1
+                    }
                 }
             }
         }
@@ -340,6 +363,9 @@ FocusScope {
         }
 
         delegate: TableViewDelegate {}
+
+        flickableDirection: Flickable.AutoFlickDirection
+        contentWidth: root.usedRowSpace + root.sectionWidth
 
         onSelectAll: selectionDelegateModel.selectAll()
         onSelectionUpdated: selectionDelegateModel.updateSelection( keyModifiers, oldIndex, newIndex )

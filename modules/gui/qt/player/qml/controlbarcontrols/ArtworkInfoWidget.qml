@@ -91,12 +91,12 @@ AbstractButton {
                 id: cover
 
                 source: {
-                    if (paintOnly)
-                        VLCStyle.noArtAlbum
+                    if (!paintOnly
+                        && mainPlaylistController.currentItem.artwork
+                        && mainPlaylistController.currentItem.artwork.toString())
+                        mainPlaylistController.currentItem.artwork
                     else
-                        (mainPlaylistController.currentItem.artwork && mainPlaylistController.currentItem.artwork.toString())
-                                                        ? mainPlaylistController.currentItem.artwork
-                                                        : VLCStyle.noArtAlbum
+                        VLCStyle.noArtAlbumCover
                 }
 
                 fillMode: Image.PreserveAspectFit
@@ -114,7 +114,7 @@ AbstractButton {
                              && (artworkInfoItem.hovered || artworkInfoItem.visualFocus)
                     delay: 500
 
-                    text: i18n.qtr("%1\n%2\n%3").arg(titleLabel.text).arg(artistLabel.text).arg(progressIndicator.text)
+                    text: I18n.qtr("%1\n%2\n%3").arg(titleLabel.text).arg(artistLabel.text).arg(progressIndicator.text)
 
                     colors: artworkInfoItem.colors
                 }
@@ -137,7 +137,7 @@ AbstractButton {
 
                 text: {
                     if (paintOnly)
-                        i18n.qtr("Title")
+                        I18n.qtr("Title")
                     else
                         mainPlaylistController.currentItem.title
                 }
@@ -152,7 +152,7 @@ AbstractButton {
 
                 text: {
                     if (paintOnly)
-                        i18n.qtr("Artist")
+                        I18n.qtr("Artist")
                     else
                         mainPlaylistController.currentItem.artist
                 }
@@ -169,7 +169,7 @@ AbstractButton {
                     if (paintOnly)
                         " -- / -- "
                     else
-                        player.time.toString() + " / " + player.length.toString()
+                        Player.time.toString() + " / " + Player.length.toString()
                 }
                 color: colors.menuCaption
             }

@@ -23,7 +23,6 @@
 #include "config.h"
 #endif
 
-#include <QObject>
 #include "mlbasemodel.hpp"
 #include "mlartist.hpp"
 
@@ -50,22 +49,22 @@ public:
 protected:
     QVariant itemRoleData(MLItem *item, int role) const override;
 
-    ListCacheLoader<std::unique_ptr<MLItem>> *createLoader() const override;
+    std::unique_ptr<MLBaseModel::BaseLoader> createLoader() const override;
 
 private:
     vlc_ml_sorting_criteria_t roleToCriteria(int role) const override;
     vlc_ml_sorting_criteria_t nameToCriteria(QByteArray name) const override;
     QByteArray criteriaToName(vlc_ml_sorting_criteria_t criteria) const override;
     virtual void onVlcMlEvent(const MLEvent &event) override;
-    void thumbnailUpdated(int idx) override;
 
     static QHash<QByteArray, vlc_ml_sorting_criteria_t> M_names_to_criteria;
 
     struct Loader : public BaseLoader
     {
         Loader(const MLArtistModel &model) : BaseLoader(model) {}
-        size_t count() const override;
-        std::vector<std::unique_ptr<MLItem>> load(size_t index, size_t count) const override;
+        size_t count(vlc_medialibrary_t* ml) const override;
+        std::vector<std::unique_ptr<MLItem>> load(vlc_medialibrary_t* ml, size_t index, size_t count) const override;
+        std::unique_ptr<MLItem> loadItemById(vlc_medialibrary_t* ml, MLItemId itemId) const override;
     };
 };
 

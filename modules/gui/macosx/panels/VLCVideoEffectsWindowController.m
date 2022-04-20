@@ -92,7 +92,7 @@ NSString *VLCVideoEffectsProfileNamesKey = @"VideoEffectProfileNames";
 
             NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
             if ([defaults boolForKey:@"VideoEffectApplyProfileOnStartup"]) {
-                // This does not reset the UI (which does not exist yet), but it initalizes needed playlist vars
+                // This does not reset the UI (which does not exist yet), but it initializes needed playlist vars
                 [self resetValues];
 
                 [self loadProfile];
@@ -168,7 +168,7 @@ NSString *VLCVideoEffectsProfileNamesKey = @"VideoEffectProfileNames";
     [VLCVideoFilterHelper setVideoFilterProperty: "sepia-intensity" forFilter: "sepia" withValue: getWidgetIntValue([items objectAtIndex:17])];
     [VLCVideoFilterHelper setVideoFilterProperty: "gradient-mode" forFilter: "gradient" withValue: (vlc_value_t){ .psz_string = (char *)[B64DecNSStr([items objectAtIndex:18]) UTF8String] }];
     [VLCVideoFilterHelper setVideoFilterProperty: "gradient-cartoon" forFilter: "gradient" withValue: (vlc_value_t){ .b_bool = [[items objectAtIndex:19] intValue] }];
-    [VLCVideoFilterHelper setVideoFilterProperty: "gradient-type" forFilter: "gradient" withValue: getWidgetIntValue([items objectAtIndex:20])];
+    [VLCVideoFilterHelper setVideoFilterProperty: "gradient-color" forFilter: "gradient" withValue: (vlc_value_t){ .b_bool = [[items objectAtIndex:20] intValue] }];
     [VLCVideoFilterHelper setVideoFilterProperty: "extract-component" forFilter: "extract" withValue: getWidgetIntValue([items objectAtIndex:21])];
     [VLCVideoFilterHelper setVideoFilterProperty: "posterize-level" forFilter: "posterize" withValue: getWidgetIntValue([items objectAtIndex:22])];
     [VLCVideoFilterHelper setVideoFilterProperty: "blur-factor" forFilter: "motionblur" withValue: getWidgetIntValue([items objectAtIndex:23])];
@@ -182,7 +182,7 @@ NSString *VLCVideoEffectsProfileNamesKey = @"VideoEffectProfileNames";
     [VLCVideoFilterHelper setVideoFilterProperty: "wall-cols" forFilter: "wall" withValue: getWidgetIntValue([items objectAtIndex:31])];
 
     if ([items count] >= 33) { // version >=2 of profile string
-        [VLCVideoFilterHelper setVideoFilterProperty: "brightness-threshold" forFilter: "adjust" withValue: (vlc_value_t){ .b_bool = [[items objectAtIndex:32] intValue] }];
+        /* "brightness-threshold" at 32 */
     }
 
     vlc_value_t hueValue;
@@ -571,7 +571,6 @@ NSString *VLCVideoEffectsProfileNamesKey = @"VideoEffectProfileNames";
     [self setWidgetValue: _adjustContrastSlider forOption: "contrast" enabled: b_state];
     [self setWidgetValue: _adjustBrightnessSlider forOption: "brightness" enabled: b_state];
     [self setWidgetValue: _adjustSaturationSlider forOption: "saturation" enabled: b_state];
-    [self setWidgetValue: _adjustBrightnessCheckbox forOption: "brightness-threshold" enabled: b_state];
     [self setWidgetValue: _adjustGammaSlider forOption: "gamma" enabled: b_state];
     [_adjustBrightnessLabel setEnabled: b_state];
     [_adjustContrastLabel setEnabled: b_state];
@@ -635,7 +634,7 @@ NSString *VLCVideoEffectsProfileNamesKey = @"VideoEffectProfileNames";
     b_state = [_gradientCheckbox state];
     [self setWidgetValue: _gradientModePopup forOption: "gradient-mode" enabled: b_state];
     [self setWidgetValue: _gradientCartoonCheckbox forOption: "gradient-cartoon" enabled: b_state];
-    [self setWidgetValue: _gradientColorCheckbox forOption: "gradient-type" enabled: b_state];
+    [self setWidgetValue: _gradientColorCheckbox forOption: "gradient-color" enabled: b_state];
     [_gradientModeLabel setEnabled: b_state];
 
     [self setWidgetValue: _extractTextField forOption: "extract-component" enabled: [_extractCheckbox state]];
@@ -691,7 +690,7 @@ NSString *VLCVideoEffectsProfileNamesKey = @"VideoEffectProfileNames";
                      var_InheritInteger(vout, "sepia-intensity"),
                      B64EncAndFree(var_InheritString(vout, "gradient-mode")),
                      (int64_t)var_InheritBool(vout, "gradient-cartoon"),
-                     var_InheritInteger(vout, "gradient-type"),
+                     (int64_t)var_InheritBool(vout, "gradient-color"),
                      var_InheritInteger(vout, "extract-component"),
                      var_InheritInteger(vout, "posterize-level"),
                      var_InheritInteger(vout, "blur-factor"),
@@ -704,7 +703,7 @@ NSString *VLCVideoEffectsProfileNamesKey = @"VideoEffectProfileNames";
                      var_InheritInteger(vout, "wall-rows"),
                      var_InheritInteger(vout, "wall-cols"),
                      // version 2 of profile string:
-                     (int64_t)var_InheritBool(vout, "brightness-threshold"), // index: 32
+                     0LL /* "brightness-threshold" */, // index: 32
                      // version 3 of profile string: (vlc-3.0.0)
                      var_InheritFloat(vout, "hue") // index: 33
             ];
@@ -927,7 +926,7 @@ NSString *VLCVideoEffectsProfileNamesKey = @"VideoEffectProfileNames";
 
         [VLCVideoFilterHelper setVideoFilter: "adjust" on: b_state];
         [_adjustBrightnessSlider setEnabled: b_state];
-        [_adjustBrightnessCheckbox setEnabled: b_state];
+        [_adjustBrightnessCheckbox setEnabled: NO];
         [_adjustBrightnessLabel setEnabled: b_state];
         [_adjustContrastSlider setEnabled: b_state];
         [_adjustContrastLabel setEnabled: b_state];
@@ -962,13 +961,6 @@ NSString *VLCVideoEffectsProfileNamesKey = @"VideoEffectProfileNames";
         [_adjustHueSlider setToolTip: [NSString stringWithFormat:@"%.0f", [_adjustHueSlider floatValue]]];
     else
         [sender setToolTip: [NSString stringWithFormat:@"%0.3f", [sender floatValue]]];
-}
-
-- (IBAction)enableAdjustBrightnessThreshold:(id)sender
-{
-    [VLCVideoFilterHelper setVideoFilterProperty: "brightness-threshold"
-                                                      forFilter: "adjust"
-                                                      withValue: getWidgetBoolValue(sender)];
 }
 
 - (IBAction)enableSharpen:(id)sender
@@ -1195,7 +1187,7 @@ NSString *VLCVideoEffectsProfileNamesKey = @"VideoEffectProfileNames";
         vlc_value_t value = { .psz_string = (char *)[[[sender selectedItem] representedObject] UTF8String] };
         [VLCVideoFilterHelper setVideoFilterProperty: "gradient-mode" forFilter: "gradient" withValue: value];
     } else if (sender == _gradientColorCheckbox)
-        [VLCVideoFilterHelper setVideoFilterProperty: "gradient-type" forFilter: "gradient" withValue: getWidgetBoolValue(sender)];
+        [VLCVideoFilterHelper setVideoFilterProperty: "gradient-color" forFilter: "gradient" withValue: getWidgetBoolValue(sender)];
     else
         [VLCVideoFilterHelper setVideoFilterProperty: "gradient-cartoon" forFilter: "gradient" withValue: getWidgetBoolValue(sender)];
 }

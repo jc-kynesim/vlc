@@ -51,7 +51,7 @@ Popup {
         spacing: VLCStyle.margin_xsmall
 
         Widgets.ListLabel {
-            text: i18n.qtr("Playback Speed")
+            text: I18n.qtr("Playback Speed")
             color: root.colors.text
             font.pixelSize: VLCStyle.fontSize_large
 
@@ -62,14 +62,17 @@ Popup {
         Slider {
             id: speedSlider
 
-            property bool _inhibitUpdate: false
+            // '_inhibitPlayerUpdate' is used to guard against double update
+            // initialize with true so that we don't update the Player till
+            // we initialize `value` property
+            property bool _inhibitPlayerUpdate: true
 
             from: 0.25
             to: 4
             clip: true
             implicitHeight: VLCStyle.heightBar_small
 
-            Navigation.parentItem: root
+            Navigation.parentItem: root.Navigation.parentItem
             Navigation.downItem: resetButton
             Keys.priority: Keys.AfterItem
             Keys.onPressed: Navigation.defaultKeyAction(event)
@@ -88,7 +91,7 @@ Popup {
                     width: speedSlider.visualPosition * parent.width
                     height: parent.height
                     radius: 2
-                    color: (speedSlider.activeFocus || speedSlider.pressed)
+                    color: (speedSlider.visualFocus || speedSlider.pressed)
                            ? root.colors.accent
                            : root.colors.text
                 }
@@ -100,23 +103,23 @@ Popup {
                 width: speedSlider.implicitHeight
                 height: speedSlider.implicitHeight
                 radius: speedSlider.implicitHeight
-                color: (speedSlider.activeFocus || speedSlider.pressed) ? root.colors.accent : root.colors.text
+                color: (speedSlider.visualFocus || speedSlider.pressed) ? root.colors.accent : root.colors.text
             }
 
             onValueChanged:  {
-                if (_inhibitUpdate)
+                if (_inhibitPlayerUpdate)
                     return
-                player.rate = value
+                Player.rate = value
             }
 
             function _updateFromPlayer() {
-                _inhibitUpdate = true
-                value = player.rate
-                _inhibitUpdate = false
+                _inhibitPlayerUpdate = true
+                value = Player.rate
+                _inhibitPlayerUpdate = false
             }
 
             Connections {
-                target: player
+                target: Player
                 onRateChanged: speedSlider._updateFromPlayer()
             }
 
@@ -130,7 +133,7 @@ Popup {
 
             spacing: 0
 
-            Navigation.parentItem: root
+            Navigation.parentItem: root.Navigation.parentItem
             Navigation.upItem: speedSlider
 
             Widgets.IconControlButton {
@@ -165,7 +168,7 @@ Popup {
                 T.Label {
                     anchors.centerIn: parent
                     font.pixelSize: VLCStyle.fontSize_normal
-                    text: i18n.qtr("1x")
+                    text: I18n.qtr("1x")
                     color: resetButton.background.foregroundColor // IconToolButton.background is a AnimatedBackground
                 }
             }

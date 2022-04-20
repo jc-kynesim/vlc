@@ -44,6 +44,16 @@
 
 #include "../packetizer/iso_color_tables.h"
 
+#ifndef AOM_USAGE_GOOD_QUALITY
+# define AOM_USAGE_GOOD_QUALITY 0
+#endif
+#ifndef AOM_USAGE_REALTIME
+# define AOM_USAGE_REALTIME 1
+#endif
+#ifndef AOM_USAGE_ALL_INTRA
+# define AOM_USAGE_ALL_INTRA 2
+#endif
+
 /****************************************************************************
  * Local prototypes
  ****************************************************************************/
@@ -51,54 +61,74 @@ static int OpenDecoder(vlc_object_t *);
 static void CloseDecoder(vlc_object_t *);
 #ifdef ENABLE_SOUT
 static int OpenEncoder(vlc_object_t *);
-static void CloseEncoder(vlc_object_t *);
+static void CloseEncoder(encoder_t *);
 static block_t *Encode(encoder_t *p_enc, picture_t *p_pict);
+
+static const int pi_profile_values_list[] =
+  { 0, 1, 2 };
+static const char *const ppsz_profile_text [] =
+  { N_("Main"), N_("High"), N_("Professional") };
 
 static const int pi_enc_bitdepth_values_list[] =
   { 8, 10, 12 };
 static const char *const ppsz_enc_bitdepth_text [] =
   { N_("8 bpp"), N_("10 bpp"), N_("12 bpp") };
-#endif
 
-/* Range of values for cpu-used was increased to 10 in libaom 3.2.0 */
-static bool aom_has_max_speed_10()
-{
-    return aom_codec_version() >= 197120;
-}
+static const int pi_usage_values_list[] =
+  { AOM_USAGE_GOOD_QUALITY, AOM_USAGE_REALTIME, AOM_USAGE_ALL_INTRA };
+static const char *const ppsz_usage_text [] =
+  { N_("Good quality"), N_("Realtime"), N_("All intra") };
+
+static const int pi_rc_end_usage_values_list[] =
+  { AOM_VBR, AOM_CBR, AOM_CQ, AOM_Q };
+static const char *const ppsz_rc_end_usage_text [] =
+  { N_("VBR"), N_("CBR"), N_("CQ"), N_("Q") };
+#endif
 
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
+
+#define PROFILE_LONGTEXT \
+    "Main Profile: 8 and 10-bit 4:2:0. " \
+    "High Profile: 8 and 10-bit 4:4:4. " \
+    "Professional Profile: 8, 10 and 12-bit for 4:2:2, otherwise 12-bit."
+
+#define CPU_USED_LONGTEXT "CPU speed setting. Ranges differ depending upon usage mode (good quality: 0-5, realtime: 6-10, all-intra: 7-9)."
 
 vlc_module_begin ()
     set_shortname("aom")
     set_description(N_("AOM video decoder"))
     set_capability("video decoder", 100)
     set_callbacks(OpenDecoder, CloseDecoder)
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_VCODEC)
 #ifdef ENABLE_SOUT
     add_submodule()
         set_shortname("aom")
-        set_capability("encoder", 101)
+        set_capability("video encoder", 101)
         set_description(N_("AOM video encoder"))
-        set_callbacks(OpenEncoder, CloseEncoder)
-        add_integer( SOUT_CFG_PREFIX "profile", 0, "Profile", NULL )
-            change_integer_range( 0, 3 )
+        set_callback(OpenEncoder)
+        /* Note: Skip label translation for these - too technical */
+        add_integer( SOUT_CFG_PREFIX "profile", 0, "Profile", PROFILE_LONGTEXT )
+            change_integer_range( 0, 2 )
+            change_integer_list( pi_profile_values_list, ppsz_profile_text )
         add_integer( SOUT_CFG_PREFIX "bitdepth", 8, "Bit Depth", NULL )
             change_integer_list( pi_enc_bitdepth_values_list, ppsz_enc_bitdepth_text )
         add_integer( SOUT_CFG_PREFIX "tile-rows", 0, "Tile Rows (in log2 units)", NULL )
             change_integer_range( 0, 6 ) /* 1 << 6 == MAX_TILE_ROWS */
         add_integer( SOUT_CFG_PREFIX "tile-columns", 0, "Tile Columns (in log2 units)", NULL )
             change_integer_range( 0, 6 ) /* 1 << 6 == MAX_TILE_COLS */
-        add_integer( SOUT_CFG_PREFIX "cpu-used", 1, "Speed setting", NULL )
-            change_integer_range( 0, aom_has_max_speed_10() ? 10 : 8 ) /* good: 0-5, realtime: 6-8 (or 10 for libaom >= 3.2.0) */
-        add_integer( SOUT_CFG_PREFIX "lag-in-frames", 16, "Maximum number of lookahead frames", NULL )
+        add_integer( SOUT_CFG_PREFIX "cpu-used", 1, "Speed setting", CPU_USED_LONGTEXT )
+            change_integer_range( 0, 10 )
+        add_integer( SOUT_CFG_PREFIX "lag-in-frames", 19, "Maximum number of lookahead frames", NULL )
             change_integer_range(0, 70 /* MAX_LAG_BUFFERS + MAX_LAP_BUFFERS */ )
-        add_integer( SOUT_CFG_PREFIX "usage", 0, "Usage (0: good, 1: realtime)", NULL )
-            change_integer_range( 0, 1 )
-        add_integer( SOUT_CFG_PREFIX "rc-end-usage", 1, "Usage (0: VBR, 1: CBR, 2: CQ, 3: Q)", NULL )
-            change_integer_range( 0, 4 )
+        add_integer( SOUT_CFG_PREFIX "usage", 0, "Usage", NULL )
+            change_integer_range( 0, 2 )
+            change_integer_list( pi_usage_values_list, ppsz_usage_text )
+        add_obsolete_integer( "sout-aom-rc-end-usage" ) /* since 4.0.0 */
+        add_integer( SOUT_CFG_PREFIX "rate-control", AOM_CBR, "Rate control mode", NULL )
+            change_integer_range( 0, 3 )
+            change_integer_list( pi_rc_end_usage_values_list, ppsz_rc_end_usage_text )
 #ifdef AOM_CTRL_AV1E_SET_ROW_MT
         add_bool( SOUT_CFG_PREFIX "row-mt", false, "Row Multithreading", NULL )
 #endif
@@ -546,12 +576,6 @@ static int OpenEncoder(vlc_object_t *p_this)
 #endif
 
     int i_cpu_used = var_InheritInteger( p_enc, SOUT_CFG_PREFIX "cpu-used" );
-    if( aom_has_max_speed_10() && i_cpu_used == 10 && enccfg.g_usage != AOM_USAGE_REALTIME )
-    {
-        msg_Warn( p_enc, "CPU speed 10 only valid for realtime, clamping to 9" );
-        i_cpu_used = 9;
-    }
-
     if (aom_codec_control(ctx, AOME_SET_CPUUSED, i_cpu_used))
     {
         AOM_ERR(p_this, ctx, "Failed to set cpu-used");
@@ -560,7 +584,12 @@ static int OpenEncoder(vlc_object_t *p_this)
         return VLC_EGENERIC;
     }
 
-    p_enc->pf_encode_video = Encode;
+    static const struct vlc_encoder_operations ops =
+    {
+        .close = CloseEncoder,
+        .encode_video = Encode,
+    };
+    p_enc->ops = &ops;
 
     return VLC_SUCCESS;
 }
@@ -631,11 +660,10 @@ static block_t *Encode(encoder_t *p_enc, picture_t *p_pict)
 /*****************************************************************************
  * CloseEncoder: encoder destruction
  *****************************************************************************/
-static void CloseEncoder(vlc_object_t *p_this)
+static void CloseEncoder(encoder_t *p_enc)
 {
-    encoder_t *p_enc = (encoder_t *)p_this;
     encoder_sys_t *p_sys = p_enc->p_sys;
-    destroy_context(p_this, &p_sys->ctx);
+    destroy_context(&p_enc->obj, &p_sys->ctx);
     free(p_sys);
 }
 

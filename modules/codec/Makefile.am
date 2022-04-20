@@ -91,6 +91,13 @@ codec_LTLIBRARIES += libuleaddvaudio_plugin.la
 libcdg_plugin_la_SOURCES = codec/cdg.c
 codec_LTLIBRARIES += libcdg_plugin.la
 
+libdavs2_plugin_la_SOURCES = codec/davs2.c
+libdavs2_plugin_la_CFLAGS = $(AM_CFLAGS) $(DAVS2_CFLAGS)
+libdavs2_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(codecdir)'
+libdavs2_plugin_la_LIBADD = $(DAVS2_LIBS) $(LIBM)
+EXTRA_LTLIBRARIES += libdavs2_plugin.la
+codec_LTLIBRARIES += $(LTLIBdavs2)
+
 liblibmpeg2_plugin_la_SOURCES = codec/libmpeg2.c \
 	codec/synchro.c codec/synchro.h
 liblibmpeg2_plugin_la_CFLAGS = $(AM_CFLAGS) $(CFLAGS_libmpeg2)
@@ -114,6 +121,9 @@ libschroedinger_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(codecdir)'
 libschroedinger_plugin_la_LIBADD = $(LIBS_schroedinger)
 EXTRA_LTLIBRARIES += libschroedinger_plugin.la
 codec_LTLIBRARIES += $(LTLIBschroedinger)
+
+librtp_rawvid_plugin_la_SOURCES = codec/rtp-rawvid.c
+codec_LTLIBRARIES += librtp_rawvid_plugin.la
 
 
 ### Image codecs ###
@@ -174,6 +184,13 @@ codec_LTLIBRARIES += libcvdsub_plugin.la
 
 libdvbsub_plugin_la_SOURCES = codec/dvbsub.c
 codec_LTLIBRARIES += libdvbsub_plugin.la
+
+libaribcaption_plugin_la_SOURCES = codec/arib/libaribcaption.c
+libaribcaption_plugin_la_CFLAGS = $(AM_CFLAGS) $(ARIBCAPTION_CFLAGS)
+libaribcaption_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(codecdir)'
+libaribcaption_plugin_la_LIBADD = $(ARIBCAPTION_LIBS) $(LIBS_freetype) $(FREETYPE_LIBS)
+EXTRA_LTLIBRARIES += libaribcaption_plugin.la
+codec_LTLIBRARIES += $(LTLIBaribcaption)
 
 libaribsub_plugin_la_SOURCES = codec/arib/aribsub.c codec/arib/substext.h
 libaribsub_plugin_la_CFLAGS = $(AM_CFLAGS) $(ARIBB24_CFLAGS)
@@ -389,8 +406,10 @@ libvaapi_plugin_la_SOURCES = \
 libvaapi_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)
 libvaapi_plugin_la_CFLAGS = $(AM_CFLAGS) $(AVCODEC_CFLAGS)
 libvaapi_plugin_la_LIBADD = $(LIBVA_LIBS) $(AVCODEC_LIBS)
-if HAVE_AVCODEC_VAAPI
+if HAVE_AVCODEC
+if HAVE_VAAPI
 codec_LTLIBRARIES += libvaapi_plugin.la
+endif
 endif
 
 libdrm_prime_plugin_la_SOURCES = \
@@ -582,11 +601,9 @@ libqsv_plugin_la_LIBADD = $(MFX_LIBS)
 EXTRA_LTLIBRARIES += libqsv_plugin.la
 codec_LTLIBRARIES += $(LTLIBqsv)
 
-
 ### External frameworks ###
 
 libdmo_plugin_la_SOURCES = codec/dmo/dmo.c codec/dmo/dmo.h codec/dmo/buffer.c
-libqsv_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)
 libdmo_plugin_la_LIBADD = $(LIBM)
 if HAVE_WIN32
 libdmo_plugin_la_LIBADD += $(LIBCOM) -luuid
@@ -595,10 +612,14 @@ codec_LTLIBRARIES += libdmo_plugin.la
 endif
 endif
 
-libmft_plugin_la_SOURCES = codec/mft.c packetizer/h264_nal.c packetizer/h264_nal.h
+libmft_plugin_la_SOURCES = codec/mft.cpp
+libmft_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) $(LIBCOMCXXFLAGS)
 if HAVE_WIN32
-libmft_plugin_la_LIBADD = $(LIBCOM) -luuid -lmfuuid -lmfplat
+libmft_plugin_la_LIBADD = $(LIBCOM) -luuid -lmfuuid -lmfplat libvlc_hxxxhelper.la libd3d11_common.la
 codec_LTLIBRARIES += libmft_plugin.la
+if HAVE_WINSTORE
+libmft_plugin_la_LIBADD += -ld3d11
+endif
 endif
 
 libgstdecode_plugin_la_SOURCES = codec/gstreamer/gstdecode.c \

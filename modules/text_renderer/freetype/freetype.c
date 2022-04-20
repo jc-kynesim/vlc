@@ -125,7 +125,6 @@ static const char *const ppsz_text_direction[] = {
 vlc_module_begin ()
     set_shortname( N_("Text renderer"))
     set_description( N_("Freetype2 font renderer") )
-    set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_SUBPIC )
 
 #ifdef HAVE_GET_FONT_BY_FAMILY_NAME
@@ -146,7 +145,6 @@ vlc_module_begin ()
     /* hook to the color values list, with default 0x00ffffff = white */
     add_rgb("freetype-color", 0x00FFFFFF, COLOR_TEXT, COLOR_LONGTEXT)
         change_integer_list( pi_color_values, ppsz_color_descriptions )
-        change_integer_range( 0x000000, 0xFFFFFF )
         change_safe()
 
     add_bool( "freetype-bold", false, BOLD_TEXT, NULL )
@@ -157,7 +155,6 @@ vlc_module_begin ()
         change_safe()
     add_rgb("freetype-background-color", 0x00000000, BG_COLOR_TEXT, NULL)
         change_integer_list( pi_color_values, ppsz_color_descriptions )
-        change_integer_range( 0x000000, 0xFFFFFF )
         change_safe()
 
     add_integer_with_range( "freetype-outline-opacity", 255, 0, 255,
@@ -165,7 +162,6 @@ vlc_module_begin ()
         change_safe()
     add_rgb("freetype-outline-color", 0x00000000, OUTLINE_COLOR_TEXT, NULL)
         change_integer_list( pi_color_values, ppsz_color_descriptions )
-        change_integer_range( 0x000000, 0xFFFFFF )
         change_safe()
     add_integer_with_range( "freetype-outline-thickness", 4, 0, 50, OUTLINE_THICKNESS_TEXT,
              NULL )
@@ -177,7 +173,6 @@ vlc_module_begin ()
         change_safe()
     add_rgb("freetype-shadow-color", 0x00000000, SHADOW_COLOR_TEXT, NULL)
         change_integer_list( pi_color_values, ppsz_color_descriptions )
-        change_integer_range( 0x000000, 0xFFFFFF )
         change_safe()
     add_float_with_range( "freetype-shadow-angle", -45, -360, 360,
                           SHADOW_ANGLE_TEXT, NULL )
@@ -214,20 +209,22 @@ static FT_Vector GetAlignedOffset( const line_desc_t *p_line,
                                    int i_align )
 {
     FT_Vector offsets = { 0, 0 };
+
+    /* aligns left to textbbox's min first */
+    offsets.x = p_textbbox->xMin - p_line->bbox.xMin;
+
     const int i_text_width = p_textbbox->xMax - p_textbbox->xMin;
     if ( p_line->i_width < i_text_width &&
         (i_align & SUBPICTURE_ALIGN_LEFT) == 0 )
     {
         /* Left offset to take into account alignment */
         if( i_align & SUBPICTURE_ALIGN_RIGHT )
-            offsets.x = ( i_text_width - p_line->i_width );
+            offsets.x += ( i_text_width - p_line->i_width );
         else /* center */
-            offsets.x = ( i_text_width - p_line->i_width ) / 2;
+            offsets.x += ( i_text_width - p_line->i_width ) / 2;
     }
-    else
-    {
-        offsets.x = p_textbbox->xMin - p_line->bbox.xMin;
-    }
+    /* else already left aligned */
+
     return offsets;
 }
 
@@ -853,6 +850,8 @@ static size_t AddTextAndStyles( filter_sys_t *p_sys,
                                 const text_style_t *p_style,
                                 layout_text_block_t *p_text_block )
 {
+    text_style_t *p_mgstyle = NULL;
+
     /* Convert chars to unicode */
     size_t i_bytes;
     uni_char_t *p_ucs4 = ToUCS4( psz_text, &i_bytes );
@@ -860,40 +859,39 @@ static size_t AddTextAndStyles( filter_sys_t *p_sys,
         return 0;
 
     const size_t i_newchars = i_bytes / 4;
-    if( SIZE_MAX / 4 < p_text_block->i_count + i_newchars )
-    {
-        free( p_ucs4 );
-        return 0;
-    }
-    size_t i_realloc = (p_text_block->i_count + i_newchars) * 4;
+    const size_t i_new_count = p_text_block->i_count + i_newchars;
+    if( SIZE_MAX / 4 < i_new_count )
+        goto error;
+
+    size_t i_realloc = i_new_count * 4;
     void *p_realloc = realloc( p_text_block->p_uchars, i_realloc );
     if( unlikely(!p_realloc) )
-        return 0;
+        goto error;
     p_text_block->p_uchars = p_realloc;
 
     /* We want one per segment shared text_style_t* per unicode character */
-    if( SIZE_MAX / sizeof(text_style_t *) < p_text_block->i_count + i_newchars )
-        return 0;
-    i_realloc = (p_text_block->i_count + i_newchars) * sizeof(text_style_t *);
+    if( SIZE_MAX / sizeof(text_style_t *) < i_new_count )
+        goto error;
+    i_realloc = i_new_count * sizeof(text_style_t *);
     p_realloc = realloc( p_text_block->pp_styles, i_realloc );
     if ( unlikely(!p_realloc) )
-        return 0;
+        goto error;
     p_text_block->pp_styles = p_realloc;
 
     /* Same for ruby text */
-    if( SIZE_MAX / sizeof(text_segment_ruby_t *) < p_text_block->i_count + i_newchars )
-        return 0;
-    i_realloc = (p_text_block->i_count + i_newchars) * sizeof(text_segment_ruby_t *);
+    if( SIZE_MAX / sizeof(text_segment_ruby_t *) < i_new_count )
+        goto error;
+    i_realloc = i_new_count * sizeof(text_segment_ruby_t *);
     p_realloc = realloc( p_text_block->pp_ruby, i_realloc );
     if ( unlikely(!p_realloc) )
-        return 0;
+        goto error;
     p_text_block->pp_ruby = p_realloc;
 
     /* Copy data */
     memcpy( &p_text_block->p_uchars[p_text_block->i_count], p_ucs4, i_newchars * 4 );
     free( p_ucs4 );
 
-    text_style_t *p_mgstyle = text_style_Duplicate( p_sys->p_default_style );
+    p_mgstyle = text_style_Duplicate( p_sys->p_default_style );
     if ( p_mgstyle == NULL )
         return 0;
 
@@ -913,16 +911,15 @@ static size_t AddTextAndStyles( filter_sys_t *p_sys,
     {
         p_ucs4 = ToUCS4( psz_rt, &i_bytes );
         if( !p_ucs4 )
-            return 0;
+            goto error;
         p_rubyblock = malloc(sizeof(ruby_block_t));
         if( p_rubyblock )
         {
             p_rubyblock->p_style = text_style_Duplicate( p_mgstyle );
             if( !p_rubyblock->p_style )
             {
-                free( p_ucs4 );
                 free( p_rubyblock );
-                return 0;
+                goto error;
             }
             p_rubyblock->p_style->i_font_size *= 0.4;
             p_rubyblock->p_style->f_font_relsize *= 0.4;
@@ -939,6 +936,10 @@ static size_t AddTextAndStyles( filter_sys_t *p_sys,
     p_text_block->i_count += i_newchars;
 
     return i_newchars;
+error:
+    free( p_ucs4 );
+    text_style_Delete( p_mgstyle );
+    return 0;
 }
 
 static size_t SegmentsToTextAndStyles( filter_t *p_filter, const text_segment_t *p_segment,
@@ -1037,7 +1038,7 @@ static int Render( filter_t *p_filter, subpicture_region_t *p_region_out,
     text_block.i_max_height = i_max_height;
     rv = LayoutTextBlock( p_filter, &text_block, &text_block.p_laid, &bbox, &i_max_face_height );
 
-    /* Don't attempt to render text that couldn't be layed out
+    /* Don't attempt to render text that couldn't be laid out
      * properly. */
     if( !rv && text_block.i_count > 0 && bbox.xMin < bbox.xMax && bbox.yMin < bbox.yMax )
     {
@@ -1231,7 +1232,7 @@ static int Create( filter_t *p_filter )
 
     p_sys->i_scale = 100;
 
-    /* default style to apply to uncomplete segmeents styles */
+    /* default style to apply to incomplete segments styles */
     p_sys->p_default_style = text_style_Create( STYLE_FULLY_SET );
     if(unlikely(!p_sys->p_default_style))
         goto error;

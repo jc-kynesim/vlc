@@ -24,6 +24,10 @@
 #ifndef VLC_GL_H
 #define VLC_GL_H 1
 
+# ifdef __cplusplus
+extern "C" {
+# endif
+
 /**
  * \file
  * This file defines GL structures and functions.
@@ -97,8 +101,7 @@ VLC_API vlc_gl_t *vlc_gl_CreateOffscreen(vlc_object_t *parent,
                                          unsigned width, unsigned height,
                                          unsigned flags, const char *name);
 
-VLC_API void vlc_gl_Release(vlc_gl_t *);
-VLC_API void vlc_gl_Hold(vlc_gl_t *);
+VLC_API void vlc_gl_Delete(vlc_gl_t *);
 
 static inline int vlc_gl_MakeCurrent(vlc_gl_t *gl)
 {
@@ -149,5 +152,9 @@ static inline bool vlc_gl_StrHasToken(const char *apis, const char *api)
     }
     return false;
 }
+
+#ifdef __cplusplus
+}
+#endif /* C++ */
 
 #endif /* VLC_GL_H */

@@ -94,7 +94,6 @@ vlc_module_begin ()
     set_description( N_("VBI and Teletext decoder") )
     set_shortname( N_("VBI & Teletext") )
     set_capability( "spu decoder", 51 )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_SCODEC )
     set_callbacks( Open, Close )
 
@@ -485,7 +484,7 @@ static int Decode( decoder_t *p_dec, block_t *p_block )
         /* ZVBI is stupid enough to assume pitch == width */
         p_pic->p->i_pitch = 4 * fmt.i_width;
 
-        /* Maintain subtitle postion */
+        /* Maintain subtitle position */
         p_spu->p_region->i_y = i_first_row*10;
         p_spu->i_original_picture_width = p_page.columns*12;
         p_spu->i_original_picture_height = p_page.rows*10;

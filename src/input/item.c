@@ -1142,6 +1142,7 @@ static enum input_item_type_e GuessType( const input_item_t *p_item, bool *p_net
         /* Short match work, not just exact match */
         { "alsa",   ITEM_TYPE_CARD, false },
         { "atsc",   ITEM_TYPE_CARD, false },
+        { "avcapt", ITEM_TYPE_CARD, false }, /* AVCapture */
         { "bd",     ITEM_TYPE_DISC, false },
         { "bluray", ITEM_TYPE_DISC, false },
         { "cable",  ITEM_TYPE_CARD, false },
@@ -1155,7 +1156,6 @@ static enum input_item_type_e GuessType( const input_item_t *p_item, bool *p_net
         { "dtv",    ITEM_TYPE_CARD, false },
         { "dvb",    ITEM_TYPE_CARD, false },
         { "dvd",    ITEM_TYPE_DISC, false },
-        { "eyetv",  ITEM_TYPE_CARD, false },
         { "fd",     ITEM_TYPE_UNKNOWN, false },
         { "file",   ITEM_TYPE_FILE, false },
         { "ftp",    ITEM_TYPE_FILE, true },
@@ -1177,7 +1177,6 @@ static enum input_item_type_e GuessType( const input_item_t *p_item, bool *p_net
         { "pulse",  ITEM_TYPE_CARD, false },
         { "qam",    ITEM_TYPE_CARD, false },
         { "qpsk",   ITEM_TYPE_CARD, false },
-        { "qtcapt", ITEM_TYPE_CARD, false }, /* qtcapture */
         { "qtsound",ITEM_TYPE_CARD, false },
         { "raw139", ITEM_TYPE_CARD, false }, /* raw1394 */
         { "rt",     ITEM_TYPE_STREAM, true }, /* rtp, rtsp, rtmp */
@@ -1195,7 +1194,6 @@ static enum input_item_type_e GuessType( const input_item_t *p_item, bool *p_net
         { "udp",    ITEM_TYPE_STREAM, true },  /* udplite too */
         { "unsv",   ITEM_TYPE_STREAM, true },
         { "upnp",   ITEM_TYPE_FILE, true },
-        { "usdigi", ITEM_TYPE_CARD, false }, /* usdigital */
         { "v4l",    ITEM_TYPE_CARD, false },
         { "vcd",    ITEM_TYPE_DISC, false },
         { "vdr",    ITEM_TYPE_STREAM, true },
@@ -1384,8 +1382,8 @@ input_item_Parse(input_item_t *item, vlc_object_t *obj,
     parser->state = INIT_S;
     parser->cbs = cbs;
     parser->userdata = userdata;
-    parser->input = input_CreatePreparser(obj, input_item_parser_InputEvent,
-                                          parser, item);
+    parser->input = input_Create(obj, input_item_parser_InputEvent, parser,
+                                 item, INPUT_TYPE_PREPARSING, NULL, NULL);
     if (!parser->input || input_Start(parser->input))
     {
         if (parser->input)
@@ -1770,7 +1768,7 @@ void vlc_readdir_helper_init(struct vlc_readdir_helper *p_rdh,
                              vlc_object_t *p_obj, input_item_node_t *p_node)
 {
     /* Read options from the parent item. This allows vlc_stream_ReadDir()
-     * users to specify options without affecting any exisitng vlc_object_t.
+     * users to specify options without affecting any existing vlc_object_t.
      * Apply options on a temporary object in order to not apply options (which
      * can be insecure) to the current object. */
     vlc_object_t *p_var_obj = vlc_object_create(p_obj, sizeof(vlc_object_t));
@@ -1823,7 +1821,8 @@ void vlc_readdir_helper_finish(struct vlc_readdir_helper *p_rdh, bool b_success)
 
 int vlc_readdir_helper_additem(struct vlc_readdir_helper *p_rdh,
                                const char *psz_uri, const char *psz_flatpath,
-                               const char *psz_filename, int i_type, int i_net)
+                               const char *psz_filename, int i_type, int i_net,
+                               input_item_t **restrict created_item)
 {
     enum slave_type i_slave_type;
     struct rdh_slave *p_rdh_slave = NULL;
@@ -1869,7 +1868,11 @@ int vlc_readdir_helper_additem(struct vlc_readdir_helper *p_rdh,
     }
 
     if (rdh_file_is_ignored(p_rdh, psz_filename))
+    {
+        if (created_item != NULL)
+            *created_item = NULL;
         return VLC_SUCCESS;
+    }
 
     input_item_node_t *p_node = p_rdh->p_node;
 
@@ -1896,5 +1899,8 @@ int vlc_readdir_helper_additem(struct vlc_readdir_helper *p_rdh,
      * slaves will be ignored by rdh_file_is_ignored() */
     if (p_rdh_slave != NULL)
         p_rdh_slave->p_node = p_node;
+
+    if (created_item != NULL)
+        *created_item = p_item;
     return VLC_SUCCESS;
 }

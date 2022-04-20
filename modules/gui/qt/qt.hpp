@@ -39,10 +39,19 @@
 
 #define QT_NO_CAST_TO_ASCII
 #include <QString>
-#include <QUrl>
 
 #if ( QT_VERSION < QT_VERSION_CHECK(5, 11, 0) )
 # error Update your Qt version to at least 5.11.0
+#endif
+
+#if ( QT_VERSION < QT_VERSION_CHECK(5, 15, 0) )
+# define QSIGNALMAPPER_MAPPEDINT_SIGNAL QOverload<int>::of(&QSignalMapper::mapped)
+# define QSIGNALMAPPER_MAPPEDSTR_SIGNAL QOverload<const QString &>::of(&QSignalMapper::mapped)
+# define QSIGNALMAPPER_MAPPEDOBJ_SIGNAL QOverload<QObject *>::of(&QSignalMapper::mapped)
+#else
+# define QSIGNALMAPPER_MAPPEDINT_SIGNAL &QSignalMapper::mappedInt
+# define QSIGNALMAPPER_MAPPEDSTR_SIGNAL &QSignalMapper::mappedString
+# define QSIGNALMAPPER_MAPPEDOBJ_SIGNAL &QSignalMapper::mappedObject
 #endif
 
 
@@ -62,6 +71,7 @@ enum{
 extern "C" {
 typedef struct intf_dialog_args_t intf_dialog_args_t;
 typedef struct vlc_playlist vlc_playlist_t;
+typedef struct intf_thread_t intf_thread_t;
 }
 
 namespace vlc {
@@ -110,8 +120,6 @@ struct qt_intf_t
     bool isShuttingDown;
 };
 
-vlc_object_cast(qt_intf_t)
-
 /**
  * This class may be used for scope-bound locking/unlocking
  * of a player_t*. As hinted, the player is locked when
@@ -146,11 +154,7 @@ struct vlc_player_locker {
 /* For marking translatable static strings (like `_()`) */
 #define qtr( i ) qfut( i )
 
-#define CONNECT( a, b, c, d ) \
-        connect( a, SIGNAL(b), c, SLOT(d) )
-#define DCONNECT( a, b, c, d ) \
-        connect( a, SIGNAL(b), c, SLOT(d), Qt::DirectConnection )
-#define BUTTONACT( b, a ) connect( b, SIGNAL(clicked()), this, SLOT(a) )
+#define BUTTONACT( b, a ) connect( b, &QAbstractButton::clicked, this, a )
 
 #define BUTTON_SET( button, text, tooltip )  \
     button->setText( text );                 \
@@ -167,9 +171,6 @@ struct vlc_player_locker {
 #define BUTTON_SET_ACT_I( button, text, image, tooltip, thisslot ) \
     BUTTON_SET_IMG( button, text, image, tooltip );                \
     BUTTONACT( button, thisslot );
-
-/* for widgets which must not follow the RTL auto layout changes */
-#define RTL_UNAFFECTED_WIDGET setLayoutDirection( Qt::LeftToRight );
 
 #define getSettings() p_intf->mainSettings
 

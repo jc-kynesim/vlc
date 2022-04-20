@@ -24,11 +24,9 @@
 #include "ui_fingerprintdialog.h"
 
 #include "dialogs/fingerprint/chromaprint.hpp"
-#include <vlc_url.h>
 
 #include <QLabel>
 #include <QListWidgetItem>
-#include <new>
 
 FingerprintDialog::FingerprintDialog(QWidget *parent, qt_intf_t *p_intf,
                                      input_item_t *p_item ) :
@@ -48,14 +46,14 @@ FingerprintDialog::FingerprintDialog(QWidget *parent, qt_intf_t *p_intf,
     ui->buttonsBox->addButton( "&Discard all identities",
                                 QDialogButtonBox::RejectRole );
 
-    CONNECT( ui->buttonsBox, accepted(), this, applyIdentity() );
-    CONNECT( ui->buttonBox, rejected(), this, close() );
-    CONNECT( ui->buttonsBox, rejected(), this, close() );
+    connect( ui->buttonsBox, &QDialogButtonBox::accepted, this, &FingerprintDialog::applyIdentity );
+    connect( ui->buttonBox, &QDialogButtonBox::rejected, this, &FingerprintDialog::close );
+    connect( ui->buttonsBox, &QDialogButtonBox::rejected, this, &FingerprintDialog::close );
 
     t = new (std::nothrow) Chromaprint( p_intf );
     if ( t )
     {
-        CONNECT( t, finished(), this, handleResults() );
+        connect( t, &Chromaprint::finished, this, &FingerprintDialog::handleResults );
         t->enqueue( p_item );
     }
 }
@@ -99,7 +97,7 @@ void FingerprintDialog::handleResults()
         QLabel *label = new QLabel(
                     QString( "<h3 style=\"margin: 0\"><a style=\"text-decoration:none\" href=\"%1\">%2</a></h3>"
                              "<span style=\"padding-left:20px\">%3</span>" )
-                    .arg( QString( "http://mb.videolan.org/recording/%1" ).arg( mb_id ) )
+                    .arg( QString( "https://mb.videolan.org/recording/%1" ).arg( mb_id ) )
                     .arg( qfu( vlc_meta_Get( p_meta, vlc_meta_Title ) ) )
                     .arg( qfu( vlc_meta_Get( p_meta, vlc_meta_Artist ) ) )
         );

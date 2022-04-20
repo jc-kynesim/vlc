@@ -8,7 +8,7 @@
     <x>0</x>
     <y>0</y>
     <width>700</width>
-    <height>1069</height>
+    <height>808</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -48,77 +48,95 @@
      <property name="title">
       <string>Look and feel</string>
      </property>
-     <layout class="QGridLayout" name="gridLayout">
+     <layout class="QVBoxLayout" name="LooknfeelLayout">
       <property name="bottomMargin">
        <number>0</number>
       </property>
-      <item row="0" column="4">
-       <widget class="QRadioButton" name="skins">
-        <property name="text">
-         <string>Use custom skin</string>
-        </property>
+      <item>
+       <widget class="QWidget" name="LooknfeelSelection" native="true">
+        <layout class="QGridLayout" name="LooknfeelSelection_l">
+         <property name="leftMargin">
+          <number>0</number>
+         </property>
+         <property name="topMargin">
+          <number>0</number>
+         </property>
+         <property name="rightMargin">
+          <number>0</number>
+         </property>
+         <property name="bottomMargin">
+          <number>0</number>
+         </property>
+         <item row="0" column="4">
+          <widget class="QRadioButton" name="skins">
+           <property name="text">
+            <string>Use custom skin</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="5">
+          <spacer name="horizontalSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item row="0" column="1">
+          <spacer name="horizontalSpacer_4">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item row="0" column="2">
+          <widget class="QRadioButton" name="qt">
+           <property name="toolTip">
+            <string>This is VLC's default interface, with a native look and feel.</string>
+           </property>
+           <property name="text">
+            <string>Use native style</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="3">
+          <spacer name="horizontalSpacer_5">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item row="1" column="2" colspan="3">
+          <widget class="Line" name="line">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </widget>
       </item>
-      <item row="0" column="6">
-       <spacer name="horizontalSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="0" column="1">
-       <spacer name="horizontalSpacer_4">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="0" column="2">
-       <widget class="QRadioButton" name="qt">
-        <property name="toolTip">
-         <string>This is VLC's default interface, with a native look and feel.</string>
-        </property>
-        <property name="text">
-         <string>Use native style</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="3">
-       <spacer name="horizontalSpacer_5">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>40</width>
-          <height>20</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="1" column="2" colspan="3">
-       <widget class="Line" name="line">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="0" rowspan="6" colspan="7">
+      <item>
        <widget class="QStackedWidget" name="styleStackedWidget">
         <property name="currentIndex">
          <number>0</number>
@@ -287,7 +305,7 @@
              <item row="13" column="0">
               <widget class="QLabel" name="colorSchemeLabel">
                <property name="text">
-                <string>Color Scheme:</string>
+                <string>Color scheme:</string>
                </property>
                <property name="buddy">
                 <cstring>colorSchemeComboBox</cstring>
@@ -491,7 +509,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="OneInterfaceBox">
+    <widget class="QGroupBox" name="PlaylistAndInstancesBox">
      <property name="title">
       <string>Playlist and Instances</string>
      </property>
@@ -557,6 +575,13 @@
       <string>Privacy / Network Interaction</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_3">
+      <item row="2" column="0">
+       <widget class="QCheckBox" name="MetadataNetworkAccessMode">
+        <property name="text">
+         <string>Allow metadata network access</string>
+        </property>
+       </widget>
+      </item>
       <item row="0" column="0">
        <widget class="QCheckBox" name="updatesBox">
         <property name="text">
@@ -564,7 +589,14 @@
         </property>
        </widget>
       </item>
-      <item row="0" column="1">
+      <item row="1" column="0">
+       <widget class="QCheckBox" name="saveRecentlyPlayed">
+        <property name="text">
+         <string>Save recently played items</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="2">
        <widget class="QSpinBox" name="updatesDays">
         <property name="alignment">
          <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -577,52 +609,25 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="0">
-       <layout class="QHBoxLayout" name="horizontalLayout_3">
-        <item>
-         <widget class="QCheckBox" name="saveRecentlyPlayed">
-          <property name="text">
-           <string>Save recently played items</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QLabel" name="filterLabel">
-          <property name="text">
-           <string>Filter:</string>
-          </property>
-          <property name="alignment">
-           <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-          </property>
-          <property name="margin">
-           <number>5</number>
-          </property>
-          <property name="buddy">
-           <cstring>recentlyPlayedFilters</cstring>
-          </property>
-         </widget>
-        </item>
-       </layout>
+      <item row="1" column="2">
+       <widget class="QPushButton" name="clearRecent">
+        <property name="text">
+         <string>Clear Recently Played Items</string>
+        </property>
+       </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QLineEdit" name="recentlyPlayedFilters">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
+       <spacer name="clearRecentSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
         </property>
-        <property name="toolTip">
-         <string>Separate words by | (without space)</string>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
         </property>
-       </widget>
-      </item>
-      <item row="2" column="0">
-       <widget class="QCheckBox" name="MetadataNetworkAccessMode">
-        <property name="text">
-         <string>Allow metadata network access</string>
-        </property>
-       </widget>
+       </spacer>
       </item>
      </layout>
     </widget>
@@ -749,7 +754,7 @@
   <tabstop>updatesBox</tabstop>
   <tabstop>updatesDays</tabstop>
   <tabstop>saveRecentlyPlayed</tabstop>
-  <tabstop>recentlyPlayedFilters</tabstop>
+  <tabstop>clearRecent</tabstop>
   <tabstop>MetadataNetworkAccessMode</tabstop>
   <tabstop>assoButton</tabstop>
  </tabstops>

@@ -53,6 +53,13 @@ else
 FFMPEGCONF += --disable-encoders --disable-muxers
 endif
 
+# Postproc
+MAYBE_POSTPROC =
+ifdef GPL
+FFMPEGCONF += --enable-gpl --enable-postproc
+MAYBE_POSTPROC = libpostproc
+endif
+
 # Small size
 ifdef WITH_OPTIMIZATION
 ifdef ENABLE_SMALL
@@ -99,6 +106,11 @@ FFMPEGCONF += --arch=mips
 endif
 ifeq ($(ARCH),mips64el)
 FFMPEGCONF += --arch=mips64
+endif
+
+# RISC-V stuff
+ifneq ($(findstring $(ARCH),riscv32 riscv64),)
+FFMPEGCONF += --arch=riscv
 endif
 
 # x86 stuff
@@ -189,7 +201,7 @@ endif
 
 # Build
 PKGS += ffmpeg
-ifeq ($(call need_pkg,"libavcodec >= $(FFMPEG_LAVC_MIN) libavformat >= 53.21.0 libswscale"),)
+ifeq ($(call need_pkg,"libavcodec >= $(FFMPEG_LAVC_MIN) libavformat >= 53.21.0 libswscale $(MAYBE_POSTPROC)"),)
 PKGS_FOUND += ffmpeg
 endif
 
@@ -215,6 +227,7 @@ ffmpeg: ffmpeg-$(FFMPEG_BASENAME).tar.xz .sum-ffmpeg
 	$(APPLY) $(SRC)/ffmpeg/0001-fix-mf_utils-compilation-with-mingw64.patch
 	$(APPLY) $(SRC)/ffmpeg/0001-avcodec-vp9-Do-not-destroy-uninitialized-mutexes-con.patch
 	$(APPLY) $(SRC)/ffmpeg/0001-ffmpeg-add-target_os-support-for-emscripten.patch
+	$(APPLY) $(SRC)/ffmpeg/0001-dxva2_hevc-don-t-use-frames-as-reference-if-they-are.patch
 	$(MOVE)
 
 .ffmpeg: ffmpeg

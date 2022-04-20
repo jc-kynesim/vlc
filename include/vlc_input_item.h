@@ -55,6 +55,16 @@ struct info_category_t
     struct vlc_list infos; /**< Infos in the category */
 };
 
+/**
+ * Returns true if the category is hidden
+ *
+ * Infos from hidden categories should not be displayed directly by UI modules.
+ */
+static inline bool info_category_IsHidden(info_category_t *cat)
+{
+    return cat->psz_name[0] == '.';
+}
+
 enum input_item_type_e
 {
     ITEM_TYPE_UNKNOWN,
@@ -335,6 +345,9 @@ VLC_API int input_item_DelInfo( input_item_t *p_i, const char *psz_cat, const ch
 VLC_API void input_item_ReplaceInfos( input_item_t *, info_category_t * );
 VLC_API void input_item_MergeInfos( input_item_t *, info_category_t * );
 
+#define input_item_AddStat(item, type, value) \
+    input_item_AddInfo(item, ".stat", type, "%" PRIu64, (uint64_t) value)
+
 /**
  * This function creates a new input_item_t with the provided information.
  *
@@ -582,10 +595,14 @@ VLC_API void vlc_readdir_helper_finish(struct vlc_readdir_helper *p_rdh, bool b_
  *        be valid.
  * \param i_type see \ref input_item_type_e
  * \param i_net see \ref input_item_net_type
+ * \param[out] created_item if an input item is created. The item should not be
+ * released and is valid until vlc_readdir_helper_finish() is called.
+ * \param status VLC_SUCCESS in case of success, an error otherwise. Parsing
+ * should be aborted in case of error.
  */
 VLC_API int vlc_readdir_helper_additem(struct vlc_readdir_helper *p_rdh,
                                        const char *psz_uri, const char *psz_flatpath,
                                        const char *psz_filename,
-                                       int i_type, int i_net);
+                                       int i_type, int i_net, input_item_t **created_item);
 
 #endif

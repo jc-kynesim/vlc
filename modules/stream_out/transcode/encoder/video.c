@@ -303,6 +303,7 @@ int transcode_encoder_video_test( encoder_t *p_encoder,
 {
     p_encoder->i_threads = p_cfg->video.threads.i_count;
     p_encoder->p_cfg = p_cfg->p_config_chain;
+    p_encoder->ops = NULL;
 
     es_format_Init( &p_encoder->fmt_in, VIDEO_ES, i_codec_in );
     es_format_Init( &p_encoder->fmt_out, VIDEO_ES, p_cfg->i_codec );
@@ -325,19 +326,13 @@ int transcode_encoder_video_test( encoder_t *p_encoder,
     p_vfmt_out->i_width  = p_vfmt_in->i_width & ~1;
     p_vfmt_out->i_height = p_vfmt_in->i_height & ~1;
 
-    module_t *p_module = module_need( p_encoder, "encoder", p_cfg->psz_name, true );
+    module_t *p_module = module_need( p_encoder, "video encoder", p_cfg->psz_name, true );
     if( !p_module )
     {
         msg_Err( p_encoder, "cannot find video encoder (module:%s fourcc:%4.4s). "
                            "Take a look few lines earlier to see possible reason.",
                  p_cfg->psz_name ? p_cfg->psz_name : "any",
                  (char *)&p_cfg->i_codec );
-    }
-    else
-    {
-        /* Close the encoder.
-         * We'll open it only when we have the first frame. */
-        module_unneed( p_encoder, p_module );
     }
 
     if( likely(!p_encoder->fmt_in.video.i_chroma) ) /* always missing, and required by filter chain */
@@ -347,10 +342,7 @@ int transcode_encoder_video_test( encoder_t *p_encoder,
     es_format_Copy( p_enc_wanted_in, &p_encoder->fmt_in );
     video_format_FixRgb( &p_enc_wanted_in->video ); /* set masks when RGB */
 
-    es_format_Clean( &p_encoder->fmt_in );
-    es_format_Clean( &p_encoder->fmt_out );
-
-    vlc_object_delete(p_encoder);
+    vlc_encoder_Destroy(p_encoder);
 
     return p_module != NULL ? VLC_SUCCESS : VLC_EGENERIC;
 }
@@ -375,7 +367,7 @@ static void* EncoderThread( void *obj )
         {
             /* release lock while encoding */
             vlc_mutex_unlock( &p_enc->lock_out );
-            p_block = p_enc->p_encoder->pf_encode_video( p_enc->p_encoder, p_pic );
+            p_block = vlc_encoder_EncodeVideo( p_enc->p_encoder, p_pic );
             picture_Release( p_pic );
             vlc_mutex_lock( &p_enc->lock_out );
 
@@ -390,14 +382,14 @@ static void* EncoderThread( void *obj )
     while( (p_pic = picture_fifo_Pop( p_enc->pp_pics )) != NULL )
     {
         vlc_sem_post( &p_enc->picture_pool_has_room );
-        p_block = p_enc->p_encoder->pf_encode_video( p_enc->p_encoder, p_pic );
+        p_block = vlc_encoder_EncodeVideo( p_enc->p_encoder, p_pic );
         picture_Release( p_pic );
         block_ChainAppend( &p_enc->p_buffers, p_block );
     }
 
     /*Now flush encoder*/
     do {
-        p_block = p_enc->p_encoder->pf_encode_video(p_enc->p_encoder, NULL );
+        p_block = vlc_encoder_EncodeVideo(p_enc->p_encoder, NULL );
         block_ChainAppend( &p_enc->p_buffers, p_block );
     } while( p_block );
 
@@ -454,11 +446,14 @@ int transcode_encoder_video_open( transcode_encoder_t *p_enc,
 {
     p_enc->p_encoder->i_threads = p_cfg->video.threads.i_count;
     p_enc->p_encoder->p_cfg = p_cfg->p_config_chain;
+    p_enc->p_encoder->ops = NULL;
 
     p_enc->p_encoder->p_module =
-        module_need( p_enc->p_encoder, "encoder", p_cfg->psz_name, true );
+        module_need( p_enc->p_encoder, "video encoder", p_cfg->psz_name, true );
     if( !p_enc->p_encoder->p_module )
         return VLC_EGENERIC;
+
+    assert( p_enc->p_encoder->ops != NULL );
 
     p_enc->p_encoder->fmt_in.video.i_chroma = p_enc->p_encoder->fmt_in.i_codec;
 
@@ -489,7 +484,7 @@ block_t * transcode_encoder_video_encode( transcode_encoder_t *p_enc, picture_t 
 {
     if( !p_enc->b_threaded )
     {
-        return p_enc->p_encoder->pf_encode_video( p_enc->p_encoder, p_pic );
+        return vlc_encoder_EncodeVideo( p_enc->p_encoder, p_pic );
     }
 
     vlc_sem_wait( &p_enc->picture_pool_has_room );

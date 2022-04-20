@@ -84,6 +84,10 @@ typedef struct vout_display_sys_t
 
     const struct pl_hook *hook;
     char *hook_path;
+
+#if PL_API_VER >= 185
+    struct pl_dovi_metadata dovi_metadata;
+#endif
 } vout_display_sys_t;
 
 // Display callbacks
@@ -92,6 +96,7 @@ static void PictureDisplay(vout_display_t *, picture_t *);
 static int Control(vout_display_t *, int);
 static void Close(vout_display_t *);
 static void UpdateParams(vout_display_t *);
+static void UpdateColorspaceHint(vout_display_t *, const video_format_t *);
 
 static const struct vlc_display_operations ops = {
     .close = Close,
@@ -121,6 +126,15 @@ static int Open(vout_display_t *vd,
         goto error;
 
     if (vlc_placebo_MakeCurrent(sys->pl) != VLC_SUCCESS)
+        goto error;
+
+    // Set colorsapce hint *before* first swapchain resize
+    UpdateColorspaceHint(vd, fmt);
+
+    // Set initial framebuffer size
+    int width = (int) vd->cfg->display.width;
+    int height = (int) vd->cfg->display.height;
+    if (!pl_swapchain_resize(sys->pl->swapchain, &width, &height))
         goto error;
 
     const struct pl_gpu *gpu = sys->pl->gpu;
@@ -227,6 +241,12 @@ static void PictureRender(vout_display_t *vd, picture_t *pic,
         return; // Probably benign error, ignore it
     }
 
+#if PL_API_VER >= 199
+    bool need_vflip = false;
+#else
+    bool need_vflip = frame.flipped;
+#endif
+
     struct pl_image img = {
         .num_planes = pic->i_planes,
         .color      = vlc_placebo_ColorSpace(vd->fmt),
@@ -238,6 +258,10 @@ static void PictureRender(vout_display_t *vd, picture_t *pic,
             .y1 = pic->format.i_y_offset + pic->format.i_visible_height,
         },
     };
+
+#if PL_API_VER >= 185
+    vlc_placebo_DoviMetadata(&img, pic, &sys->dovi_metadata);
+#endif
 
     // Upload the image data for each plane
     struct pl_plane_data data[4];
@@ -268,7 +292,7 @@ static void PictureRender(vout_display_t *vd, picture_t *pic,
     vout_display_cfg_t cfg = *vd->cfg;
     cfg.display.width = frame.fbo->params.w;
     cfg.display.height = frame.fbo->params.h;
-    if (frame.flipped) {
+    if (need_vflip) {
         switch (cfg.align.vertical) {
         case VLC_VIDEO_ALIGN_TOP: cfg.align.vertical = VLC_VIDEO_ALIGN_BOTTOM; break;
         case VLC_VIDEO_ALIGN_BOTTOM: cfg.align.vertical = VLC_VIDEO_ALIGN_TOP; break;
@@ -276,7 +300,7 @@ static void PictureRender(vout_display_t *vd, picture_t *pic,
         }
     }
     vout_display_PlacePicture(&place, vd->fmt, &cfg);
-    if (frame.flipped) {
+    if (need_vflip) {
         place.y = frame.fbo->params.h - place.y;
         place.height = -place.height;
     }
@@ -330,8 +354,6 @@ static void PictureRender(vout_display_t *vd, picture_t *pic,
         target.color.transfer = sys->target.transfer;
         target.color.light = PL_COLOR_LIGHT_UNKNOWN; // re-infer
     }
-    if (sys->target.sig_avg > 0.0)
-        target.color.sig_avg = sys->target.sig_avg;
     if (sys->dither_depth > 0) {
         // override the sample depth without affecting the color encoding
         struct pl_bit_encoding *bits = &target.repr.bits;
@@ -370,7 +392,7 @@ static void PictureRender(vout_display_t *vd, picture_t *pic,
                 assert(!"Failed processing the subpicture_t into pl_plane_data!?");
 
             struct pl_overlay *overlay = &sys->overlays[i];
-            int ysign = frame.flipped ? (-1) : 1;
+            int ysign = need_vflip ? (-1) : 1;
             *overlay = (struct pl_overlay) {
                 .rect = {
                     .x0 = place.x + r->i_x,
@@ -443,6 +465,53 @@ static void PictureDisplay(vout_display_t *vd, picture_t *pic)
         pl_swapchain_swap_buffers(sys->pl->swapchain);
         vlc_placebo_ReleaseCurrent(sys->pl);
     }
+}
+
+static void UpdateColorspaceHint(vout_display_t *vd, const video_format_t *fmt)
+{
+#if PL_API_VER >= 155
+
+    vout_display_sys_t *sys = vd->sys;
+    struct pl_swapchain_colors hint = {0};
+
+    switch (var_InheritInteger(vd, "pl-output-hint")) {
+    case OUTPUT_AUTO: ;
+        const struct pl_color_space csp = vlc_placebo_ColorSpace(fmt);
+        hint.primaries = csp.primaries;
+        hint.transfer = csp.transfer;
+        hint.hdr = (struct pl_hdr_metadata) {
+            .prim.green.x   = fmt->mastering.primaries[0] / 50000.0f,
+            .prim.green.y   = fmt->mastering.primaries[1] / 50000.0f,
+            .prim.blue.x    = fmt->mastering.primaries[2] / 50000.0f,
+            .prim.blue.y    = fmt->mastering.primaries[3] / 50000.0f,
+            .prim.red.x     = fmt->mastering.primaries[4] / 50000.0f,
+            .prim.red.y     = fmt->mastering.primaries[5] / 50000.0f,
+            .prim.white.x   = fmt->mastering.white_point[0] / 50000.0f,
+            .prim.white.y   = fmt->mastering.white_point[1] / 50000.0f,
+            .max_luma       = fmt->mastering.max_luminance / 10000.0f,
+            .min_luma       = fmt->mastering.min_luminance / 10000.0f,
+            .max_cll        = fmt->lighting.MaxCLL,
+            .max_fall       = fmt->lighting.MaxFALL,
+        };
+        break;
+    case OUTPUT_SDR:
+        break;
+    case OUTPUT_HDR10:
+        hint.primaries = PL_COLOR_PRIM_BT_2020;
+        hint.transfer = PL_COLOR_TRC_PQ;
+        break;
+    case OUTPUT_HLG:
+        hint.primaries = PL_COLOR_PRIM_BT_2020;
+        hint.transfer = PL_COLOR_TRC_HLG;
+        break;
+    }
+
+    pl_swapchain_colorspace_hint(sys->pl->swapchain, &hint);
+
+#else // PL_API_VER
+    VLC_UNUSED(vd);
+    VLC_UNUSED(fmt);
+#endif
 }
 
 static int Control(vout_display_t *vd, int query)
@@ -596,11 +665,10 @@ error:
 vlc_module_begin ()
     set_shortname ("libplacebo")
     set_description (N_("libplacebo video output"))
-    set_category (CAT_VIDEO)
     set_subcategory (SUBCAT_VIDEO_VOUT)
     set_callback_display(Open, 0)
     add_shortcut ("libplacebo", "pl")
-    add_module ("pl-gpu", "libplacebo gpu", NULL, PROVIDER_TEXT, PROVIDER_LONGTEXT)
+    add_module ("pl-gpu", "libplacebo gpu", "any", PROVIDER_TEXT, PROVIDER_LONGTEXT)
 
     set_section("Custom shaders", NULL)
     add_loadfile("pl-user-shader", NULL, USER_SHADER_FILE_TEXT, USER_SHADER_FILE_LONGTEXT)
@@ -635,9 +703,11 @@ vlc_module_begin ()
             DEBAND_GRAIN_TEXT, DEBAND_GRAIN_LONGTEXT)
 
     set_section("Colorspace conversion", NULL)
-    add_integer("pl-intent", pl_color_map_default_params.intent,
-            RENDER_INTENT_TEXT, RENDER_INTENT_LONGTEXT)
-            change_integer_list(intent_values, intent_text)
+#if PL_API_VER >= 155
+    add_integer("pl-output-hint", true, OUTPUT_HINT_TEXT, OUTPUT_HINT_LONGTEXT)
+            change_integer_list(output_values, output_text)
+#endif
+    add_placebo_color_map_opts("pl")
     add_integer("pl-target-prim", PL_COLOR_PRIM_UNKNOWN, PRIM_TEXT, PRIM_LONGTEXT)
             change_integer_list(prim_values, prim_text)
     add_integer("pl-target-trc", PL_COLOR_TRC_UNKNOWN, TRC_TEXT, TRC_LONGTEXT)
@@ -651,34 +721,12 @@ vlc_module_begin ()
 
     // TODO: support for ICC profiles
 
-    set_section("Tone mapping", NULL)
-    add_integer("pl-tone-mapping", pl_color_map_default_params.tone_mapping_algo,
-            TONEMAPPING_TEXT, TONEMAPPING_LONGTEXT)
-            change_integer_list(tone_values, tone_text)
-    add_float("pl-tone-mapping-param", pl_color_map_default_params.tone_mapping_param,
-            TONEMAP_PARAM_TEXT, TONEMAP_PARAM_LONGTEXT)
-    add_float("pl-desat-strength", pl_color_map_default_params.desaturation_strength,
-            DESAT_STRENGTH_TEXT, DESAT_STRENGTH_LONGTEXT)
-    add_float("pl-desat-exponent", pl_color_map_default_params.desaturation_exponent,
-            DESAT_EXPONENT_TEXT, DESAT_EXPONENT_LONGTEXT)
-    add_float("pl-desat-base", pl_color_map_default_params.desaturation_base,
-            DESAT_BASE_TEXT, DESAT_BASE_LONGTEXT)
-    add_float("pl-max-boost", pl_color_map_default_params.max_boost,
-            MAX_BOOST_TEXT, MAX_BOOST_LONGTEXT)
-#if PL_API_VER >= 80
-    add_bool("pl-gamut-clipping", false, GAMUT_CLIPPING_TEXT, GAMUT_CLIPPING_LONGTEXT)
-#endif
-    add_bool("pl-gamut-warning", false, GAMUT_WARN_TEXT, GAMUT_WARN_LONGTEXT)
-
     add_float_with_range("pl-peak-period", pl_peak_detect_default_params.smoothing_period,
             0., 1000., PEAK_PERIOD_TEXT, PEAK_PERIOD_LONGTEXT)
     add_float("pl-scene-threshold-low", pl_peak_detect_default_params.scene_threshold_low,
             SCENE_THRESHOLD_LOW_TEXT, SCENE_THRESHOLD_LOW_LONGTEXT)
     add_float("pl-scene-threshold-high", pl_peak_detect_default_params.scene_threshold_high,
             SCENE_THRESHOLD_HIGH_TEXT, SCENE_THRESHOLD_HIGH_LONGTEXT)
-
-    add_float_with_range("pl-target-avg", 0.25,
-            0.0, 1.0, TARGET_AVG_TEXT, TARGET_AVG_LONGTEXT)
 
     set_section("Dithering", NULL)
     add_integer("pl-dither", -1,
@@ -740,6 +788,7 @@ vlc_module_end ()
 static void UpdateParams(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
+    vlc_placebo_ColorMapParams(VLC_OBJECT(vd), "pl", &sys->color_map);
 
     sys->deband = pl_deband_default_params;
     sys->deband.iterations = var_InheritInteger(vd, "pl-iterations");
@@ -753,19 +802,6 @@ static void UpdateParams(vout_display_t *vd)
     sys->sigmoid.center = var_InheritFloat(vd, "pl-sigmoid-center");
     sys->sigmoid.slope = var_InheritFloat(vd, "pl-sigmoid-slope");
     bool use_sigmoid = var_InheritBool(vd, "pl-sigmoid");
-
-    sys->color_map = pl_color_map_default_params;
-    sys->color_map.intent = var_InheritInteger(vd, "pl-intent");
-    sys->color_map.tone_mapping_algo = var_InheritInteger(vd, "pl-tone-mapping");
-    sys->color_map.tone_mapping_param = var_InheritFloat(vd, "pl-tone-mapping-param");
-    sys->color_map.desaturation_strength = var_InheritFloat(vd, "pl-desat-strength");
-    sys->color_map.desaturation_exponent = var_InheritFloat(vd, "pl-desat-exponent");
-    sys->color_map.desaturation_base = var_InheritFloat(vd, "pl-desat-base");
-    sys->color_map.max_boost = var_InheritFloat(vd, "pl-max-boost");
-#if PL_API_VER >= 80
-    sys->color_map.gamut_clipping = var_InheritBool(vd, "pl-gamut-clipping");
-#endif
-    sys->color_map.gamut_warning = var_InheritBool(vd, "pl-gamut-warning");
 
     sys->dither = pl_dither_default_params;
     int method = var_InheritInteger(vd, "pl-dither");
@@ -837,7 +873,6 @@ static void UpdateParams(vout_display_t *vd)
     sys->target = (struct pl_color_space) {
         .primaries = var_InheritInteger(vd, "pl-target-prim"),
         .transfer = var_InheritInteger(vd, "pl-target-trc"),
-        .sig_avg = var_InheritFloat(vd, "pl-target-avg"),
     };
 
 #if PL_API_VER >= 113

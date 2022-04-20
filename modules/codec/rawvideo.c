@@ -61,7 +61,6 @@ static int  OpenPacketizer( vlc_object_t * );
 vlc_module_begin ()
     set_description( N_("Pseudo raw video decoder") )
     set_capability( "video decoder", 50 )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_VCODEC )
     set_callback( OpenDecoder )
 
@@ -171,18 +170,21 @@ static block_t *DecodeBlock( decoder_t *p_dec, block_t *p_block )
         return NULL;
     }
 
-    /* Date management: If there is a pts avaliable, use that. */
+    /* Date management: If there is a pts available, use that. */
     if( p_block->i_pts != VLC_TICK_INVALID )
     {
         date_Set( &p_sys->pts, p_block->i_pts );
     }
-    else if( p_block->i_dts != VLC_TICK_INVALID )
+    else
     {
-        /* NB, davidf doesn't quite agree with this in general, it is ok
-         * for rawvideo since it is in order (ie pts=dts), however, it
-         * may not be ok for an out-of-order codec, so don't copy this
-         * without thinking */
-        date_Set( &p_sys->pts, p_block->i_dts );
+        if( p_block->i_dts != VLC_TICK_INVALID )
+            /* NB, davidf doesn't quite agree with this in general, it is ok
+             * for rawvideo since it is in order (ie pts=dts), however, it
+             * may not be ok for an out-of-order codec, so don't copy this
+             * without thinking */
+            date_Set( &p_sys->pts, p_block->i_dts );
+
+        p_block->i_pts = date_Get( &p_sys->pts );
     }
 
     if( p_block->i_buffer < p_sys->size )
@@ -193,6 +195,9 @@ static block_t *DecodeBlock( decoder_t *p_dec, block_t *p_block )
         block_Release( p_block );
         return NULL;
     }
+
+    /* Date management: 1 frame per packet */
+    date_Increment( &p_sys->pts, 1 );
 
     return p_block;
 }
@@ -239,8 +244,6 @@ static int DecodeFrame( decoder_t *p_dec, block_t *p_block )
     if( p_block == NULL )
         return VLCDEC_SUCCESS;
 
-    decoder_sys_t *p_sys = p_dec->p_sys;
-
     /* Get a new picture */
     picture_t *p_pic = NULL;
     if( !decoder_UpdateVideoFormat( p_dec ) )
@@ -252,10 +255,7 @@ static int DecodeFrame( decoder_t *p_dec, block_t *p_block )
     }
 
     FillPicture( p_dec, p_block, p_pic );
-
-    /* Date management: 1 frame per packet */
-    p_pic->date = date_Get( &p_sys->pts );
-    date_Increment( &p_sys->pts, 1 );
+    p_pic->date = p_block->i_pts;
 
     if( p_block->i_flags & BLOCK_FLAG_INTERLACED_MASK )
     {
@@ -301,14 +301,8 @@ static block_t *SendFrame( decoder_t *p_dec, block_t **pp_block )
     *pp_block = NULL;
 
     p_block = DecodeBlock( p_dec, p_block );
-    if( p_block == NULL )
-        return NULL;
-
-    decoder_sys_t *p_sys = p_dec->p_sys;
-
-    /* Date management: 1 frame per packet */
-    p_block->i_dts = p_block->i_pts = date_Get( &p_sys->pts );
-    date_Increment( &p_sys->pts, 1 );
+    if( p_block != NULL )
+        p_block->i_dts = p_block->i_pts;
     return p_block;
 }
 

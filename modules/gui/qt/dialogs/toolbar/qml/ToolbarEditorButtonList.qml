@@ -25,8 +25,11 @@ import org.videolan.vlc 0.1
 import "qrc:///player/"
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
+import "qrc:///util/" as Util
 
 GridView {
+    id: root
+
     clip: true
 
     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }
@@ -38,10 +41,13 @@ GridView {
     cellWidth: VLCStyle.cover_small
     cellHeight: cellWidth
 
-    boundsBehavior: Flickable.StopAtBounds
-    boundsMovement: Flickable.StopAtBounds
-
     property alias removeInfoRectVisible: removeInfoRect.visible
+
+    MouseEventFilter {
+        target: root
+    }
+
+    Util.FlickableScrollHandler { }
 
     DropArea {
         id: dropArea
@@ -121,7 +127,7 @@ GridView {
 
         drag.onActiveChanged: {
             if (drag.active) {
-                root.dragStarted(mIndex)
+                dragStarted(mIndex)
 
                 buttonDragItem.text = PlayerControlbarControls.controlList[model.index].label
                 buttonDragItem.Drag.source = this
@@ -131,7 +137,7 @@ GridView {
             } else {
                 buttonDragItem.Drag.drop()
 
-                root.dragStopped(mIndex)
+                dragStopped(mIndex)
 
                 GridView.delayRemove = false
             }

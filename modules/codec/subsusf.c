@@ -49,7 +49,6 @@ vlc_module_begin ()
     set_shortname( N_("USFSubs"))
     set_description( N_("USF subtitles decoder") )
     set_callbacks( OpenDecoder, CloseDecoder )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_SCODEC )
     add_bool( "subsdec-formatted", true, FORMAT_TEXT, FORMAT_LONGTEXT )
 vlc_module_end ()
@@ -436,8 +435,8 @@ static subpicture_region_t *CreateTextRegion( decoder_t *p_dec,
             }
         }
 
-        /* Set default or user align/magin.
-         * Style overriden if no user value. */
+        /* Set default or user align/margin.
+         * Style overridden if no user value. */
         p_text_region->i_x = i_sys_align > 0 ? 20 : 0;
         p_text_region->i_y = 10;
         p_text_region->i_align = SUBPICTURE_ALIGN_BOTTOM |

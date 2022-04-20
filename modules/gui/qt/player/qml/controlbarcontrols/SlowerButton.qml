@@ -17,6 +17,8 @@
  *****************************************************************************/
 import QtQuick 2.11
 
+import org.videolan.vlc 0.1
+
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
@@ -24,7 +26,10 @@ import "qrc:///style/"
 Widgets.IconControlButton {
     id: slowerBtn
     size: VLCStyle.icon_medium
+
+    enabled: Player.ratechangable
+
     iconText: VLCIcons.slower
-    onClicked: player.slower()
-    text: i18n.qtr("Slower")
+    onClicked: Player.slower()
+    text: I18n.qtr("Slower")
 }

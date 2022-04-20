@@ -46,14 +46,13 @@ vlc_module_begin ()
     set_description( N_("tx3g subtitles decoder") )
     set_shortname( N_("tx3g subtitles") )
     set_capability( "spu decoder", 100 )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_SCODEC )
     set_callbacks( OpenDecoder, CloseDecoder )
 #ifdef ENABLE_SOUT
     add_submodule ()
         set_description( N_("tx3g subtitles encoder") )
         set_shortname( N_("tx3g subtitles encoder") )
-        set_capability( "encoder", 101 )
+        set_capability( "spu encoder", 101 )
         set_callback( OpenEncoder )
 #endif
 vlc_module_end ()
@@ -616,11 +615,16 @@ static int OpenEncoder( vlc_object_t *p_this )
 
     p_enc->p_sys = NULL;
 
-    p_enc->pf_encode_sub = Encode;
     p_enc->fmt_out.i_cat = SPU_ES;
 
     if( !p_enc->fmt_out.i_extra )
         FillExtradataTx3g( &p_enc->fmt_out.p_extra, &p_enc->fmt_out.i_extra );
+
+    static const struct vlc_encoder_operations ops =
+    {
+        .encode_sub = Encode,
+    };
+    p_enc->ops = &ops;
 
     return VLC_SUCCESS;
 }

@@ -13,7 +13,8 @@
 #include "medialibrary/mlrecentsmodel.hpp"
 #include "medialibrary/mlrecentsvideomodel.hpp"
 #include "medialibrary/mlfoldersmodel.hpp"
-#include "medialibrary/mlgrouplistmodel.hpp"
+#include "medialibrary/mlvideogroupsmodel.hpp"
+#include "medialibrary/mlvideofoldersmodel.hpp"
 #include "medialibrary/mlplaylistlistmodel.hpp"
 #include "medialibrary/mlplaylistmodel.hpp"
 #include "medialibrary/mlplaylist.hpp"
@@ -21,6 +22,7 @@
 #include "player/player_controller.hpp"
 #include "player/player_controlbar_model.hpp"
 #include "player/control_list_model.hpp"
+#include "player/control_list_filter.hpp"
 
 #include "dialogs/toolbar/controlbar_profile_model.hpp"
 #include "dialogs/toolbar/controlbar_profile.hpp"
@@ -37,6 +39,7 @@
 #include "util/navigation_history.hpp"
 #include "util/qmlinputitem.hpp"
 #include "util/mouse_event_filter.hpp"
+#include "util/flickable_scroll_handler.hpp"
 
 #include "dialogs/help/aboutmodel.hpp"
 #include "dialogs/dialogs_provider.hpp"
@@ -54,13 +57,38 @@
 
 #include "videosurface.hpp"
 
-#include <QQuickWindow>
-#include <QQmlContext>
-#include <QQmlFileSelector>
+#include <QScreen>
 
 using  namespace vlc::playlist;
 
 namespace {
+
+template<class T>
+class SingletonRegisterHelper
+{
+    static QPointer<T> m_instance;
+
+public:
+    static QObject* callback(QQmlEngine *engine, QJSEngine *)
+    {
+        assert(m_instance);
+        engine->setObjectOwnership(m_instance, QQmlEngine::ObjectOwnership::CppOwnership);
+        return m_instance;
+    }
+
+    static void setInstance(T* instance)
+    {
+        assert(!m_instance);
+        m_instance = instance;
+    }
+
+    static T* getInstance()
+    {
+        return m_instance;
+    }
+};
+template<class T>
+QPointer<T> SingletonRegisterHelper<T>::m_instance = nullptr;
 
 template<class T>
 void registerAnonymousType( const char *uri, int versionMajor )
@@ -73,8 +101,6 @@ void registerAnonymousType( const char *uri, int versionMajor )
     VLC_UNUSED( versionMajor );
 #endif
 }
-
-MainCtx* g_mainCtx = nullptr;
 
 } // anonymous namespace
 
@@ -89,36 +115,38 @@ MainUI::MainUI(qt_intf_t *p_intf, MainCtx *mainCtx, QWindow* interfaceWindow,  Q
     assert(m_mainCtx);
     assert(m_interfaceWindow);
 
-    assert(g_mainCtx == nullptr);
-    g_mainCtx = mainCtx;
+    SingletonRegisterHelper<MainCtx>::setInstance(mainCtx);
+
+    assert(m_intf->p_mainPlayerController);
+    SingletonRegisterHelper<PlayerController>::setInstance(m_intf->p_mainPlayerController);
+
+    assert(DialogsProvider::getInstance());
+    SingletonRegisterHelper<DialogsProvider>::setInstance(DialogsProvider::getInstance());
+
+    SingletonRegisterHelper<NavigationHistory>::setInstance( new NavigationHistory(this) );
+    SingletonRegisterHelper<I18n>::setInstance( new I18n(this) );
+    SingletonRegisterHelper<SystemPalette>::setInstance( new SystemPalette(this) );
+    SingletonRegisterHelper<DialogModel>::setInstance( new DialogModel(m_intf, this));
+    SingletonRegisterHelper<QmlKeyHelper>::setInstance( new QmlKeyHelper(this) );
+
+    if (m_mainCtx->hasMediaLibrary())
+    {
+        assert(m_mainCtx->getMediaLibrary());
+        SingletonRegisterHelper<MediaLib>::setInstance(m_mainCtx->getMediaLibrary());
+    }
 
     registerQMLTypes();
 }
 
 MainUI::~MainUI()
 {
-    g_mainCtx = nullptr;
+
 }
 
 bool MainUI::setup(QQmlEngine* engine)
 {
     engine->setOutputWarningsToStandardError(false);
     connect(engine, &QQmlEngine::warnings, this, &MainUI::onQmlWarning);
-
-    QQmlContext *rootCtx = engine->rootContext();
-
-    rootCtx->setContextProperty( "history", new NavigationHistory(this) );
-    rootCtx->setContextProperty( "player", m_intf->p_mainPlayerController );
-    rootCtx->setContextProperty( "i18n", new I18n(this) );
-    rootCtx->setContextProperty( "topWindow", m_interfaceWindow);
-    rootCtx->setContextProperty( "dialogProvider", DialogsProvider::getInstance());
-    rootCtx->setContextProperty( "systemPalette", new SystemPalette(this));
-    rootCtx->setContextProperty( "dialogModel", new DialogModel(m_intf, this));
-
-    if (m_mainCtx->hasMediaLibrary())
-        rootCtx->setContextProperty( "medialib", m_mainCtx->getMediaLibrary() );
-    else
-        rootCtx->setContextProperty( "medialib", nullptr );
 
     m_component  = new QQmlComponent(engine, QStringLiteral("qrc:/main/MainInterface.qml"), QQmlComponent::PreferSynchronous, engine);
     if (m_component->isLoading())
@@ -166,7 +194,6 @@ QQuickItem* MainUI::createRootItem()
     return m_rootItem;
 }
 
-
 void MainUI::registerQMLTypes()
 {
     {
@@ -174,7 +201,18 @@ void MainUI::registerQMLTypes()
         const int versionMajor = 0;
         const int versionMinor = 1;
 
-        qmlRegisterSingletonType<MainCtx>(uri, versionMajor, versionMinor, "MainCtx", MainUI::getMainCtxInstance);
+        qmlRegisterSingletonType<MainCtx>(uri, versionMajor, versionMinor, "MainCtx", SingletonRegisterHelper<MainCtx>::callback);
+        qmlRegisterSingletonType<NavigationHistory>(uri, versionMajor, versionMinor, "History", SingletonRegisterHelper<NavigationHistory>::callback);
+        qmlRegisterSingletonType<PlayerController>(uri, versionMajor, versionMinor, "Player", SingletonRegisterHelper<PlayerController>::callback);
+        qmlRegisterSingletonType<I18n>(uri, versionMajor, versionMinor, "I18n", SingletonRegisterHelper<I18n>::callback);
+        qmlRegisterSingletonType<DialogsProvider>(uri, versionMajor, versionMinor, "DialogsProvider", SingletonRegisterHelper<DialogsProvider>::callback);
+        qmlRegisterSingletonType<SystemPalette>(uri, versionMajor, versionMinor, "SystemPalette", SingletonRegisterHelper<SystemPalette>::callback);
+        qmlRegisterSingletonType<DialogModel>(uri, versionMajor, versionMinor, "DialogModel", SingletonRegisterHelper<DialogModel>::callback);
+        qmlRegisterSingletonType<QmlKeyHelper>(uri, versionMajor, versionMinor, "KeyHelper", SingletonRegisterHelper<QmlKeyHelper>::callback);
+
+        qmlRegisterUncreatableType<QAbstractItemModel>(uri, versionMajor, versionMinor, "QtAbstractItemModel", "");
+        qmlRegisterUncreatableType<QWindow>(uri, versionMajor, versionMinor, "QtWindow", "");
+        qmlRegisterUncreatableType<QScreen>(uri, versionMajor, versionMinor, "QtScreen", "");
 
         qRegisterMetaType<VLCTick>();
         qmlRegisterUncreatableType<VLCTick>(uri, versionMajor, versionMinor, "VLCTick", "");
@@ -192,14 +230,11 @@ void MainUI::registerQMLTypes()
         qmlRegisterType<MLFoldersModel>( uri, versionMajor, versionMinor, "MLFolderModel");
         qmlRegisterType<ImageLuminanceExtractor>( uri, versionMajor, versionMinor, "ImageLuminanceExtractor");
 
-        qmlRegisterUncreatableType<NavigationHistory>(uri, versionMajor, versionMinor, "History", "Type of global variable history" );
-
         qmlRegisterUncreatableType<TrackListModel>(uri, versionMajor, versionMinor, "TrackListModel", "available tracks of a media (audio/video/sub)" );
         qmlRegisterUncreatableType<TitleListModel>(uri, versionMajor, versionMinor, "TitleListModel", "available titles of a media" );
         qmlRegisterUncreatableType<ChapterListModel>(uri, versionMajor, versionMinor, "ChapterListModel", "available titles of a media" );
         qmlRegisterUncreatableType<ProgramListModel>(uri, versionMajor, versionMinor, "ProgramListModel", "available programs of a media" );
         qmlRegisterUncreatableType<VLCVarChoiceModel>(uri, versionMajor, versionMinor, "VLCVarChoiceModel", "generic variable with choice model" );
-        qmlRegisterUncreatableType<PlayerController>(uri, versionMajor, versionMinor, "PlayerController", "player controller" );
 
         qRegisterMetaType<PlaylistPtr>();
         qRegisterMetaType<PlaylistItem>();
@@ -209,23 +244,28 @@ void MainUI::registerQMLTypes()
 
         qmlRegisterType<AboutModel>( uri, versionMajor, versionMinor, "AboutModel" );
 
-        qmlRegisterUncreatableType<DialogModel>(uri, versionMajor, versionMinor, "DialogModel", "");
         qmlRegisterUncreatableType<DialogErrorModel>( uri, versionMajor, versionMinor, "DialogErrorModel", "");
         qRegisterMetaType<DialogId>();
+        qmlRegisterUncreatableType<DialogId>( uri, versionMajor, versionMinor, "DialogId", "");
 
         qmlRegisterType<ItemKeyEventFilter>( uri, versionMajor, versionMinor, "KeyEventFilter" );
         qmlRegisterType<MouseEventFilter>( uri, versionMajor, versionMinor, "MouseEventFilter" );
+        qmlRegisterType<FlickableScrollHandler>( uri, versionMajor, versionMinor, "FlickableScrollHandler" );
 
         qmlRegisterUncreatableType<ControlbarProfileModel>(uri, versionMajor, versionMinor, "ControlbarProfileModel", "");
         qmlRegisterUncreatableType<ControlbarProfile>(uri, versionMajor, versionMinor, "ControlbarProfile", "");
         qmlRegisterUncreatableType<PlayerControlbarModel>(uri, versionMajor, versionMinor, "PlayerControlbarModel", "");
         qmlRegisterUncreatableType<ControlListModel>( uri, versionMajor, versionMinor, "ControlListModel", "" );
+        qmlRegisterType<ControlListFilter>(uri, versionMajor, versionMinor, "ControlListFilter");
         qmlRegisterSingletonType(uri, versionMajor, versionMinor, "PlayerListModel", PlayerControlbarModel::getPlaylistIdentifierListModel);
 
         qmlRegisterType<StringListMenu>( uri, versionMajor, versionMinor, "StringListMenu" );
         qmlRegisterType<SortMenu>( uri, versionMajor, versionMinor, "SortMenu" );
+        qmlRegisterType<SortMenuVideo>( uri, versionMajor, versionMinor, "SortMenuVideo" );
         qmlRegisterType<QmlGlobalMenu>( uri, versionMajor, versionMinor, "QmlGlobalMenu" );
         qmlRegisterType<QmlMenuBar>( uri, versionMajor, versionMinor, "QmlMenuBar" );
+        qmlRegisterType<QmlBookmarkMenu>( uri, versionMajor, versionMinor, "QmlBookmarkMenu" );
+        qmlRegisterType<QmlRendererMenu>( uri, versionMajor, versionMinor, "QmlRendererMenu" );
         qmlRegisterType<NetworkMediaContextMenu>( uri, versionMajor, versionMinor, "NetworkMediaContextMenu" );
         qmlRegisterType<NetworkDeviceContextMenu>( uri, versionMajor, versionMinor, "NetworkDeviceContextMenu" );
         qmlRegisterType<PlaylistContextMenu>( uri, versionMajor, versionMinor, "PlaylistContextMenu" );
@@ -234,7 +274,25 @@ void MainUI::registerQMLTypes()
         qRegisterMetaType<QList<QQmlError>>("QList<QQmlError>");
 
         qmlRegisterUncreatableType<NavigationAttached>( uri, versionMajor, versionMinor, "Navigation", "Navigation is only available via attached properties");
-        qmlRegisterSingletonType<QmlKeyHelper>(uri, versionMajor, versionMinor, "KeyHelper", &QmlKeyHelper::getSingletonInstance);
+
+
+        qmlProtectModule(uri, versionMajor);
+    }
+
+    {
+        const char* const uri = "org.videolan.compat";
+        const int versionMajor = 0;
+        const int versionMinor = 1;
+
+        qmlRegisterModule(uri, versionMajor, versionMinor);
+
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
+        qmlRegisterType(QUrl("qrc:///util/BindingRev14.qml"), uri, versionMajor, versionMinor, "BindingCompat");
+#else
+        qmlRegisterType(QUrl("qrc:///util/BindingRev8.qml"), uri, versionMajor, versionMinor, "BindingCompat");
+#endif
+
+        qmlProtectModule(uri, versionMajor);
     }
 
     {
@@ -245,6 +303,9 @@ void MainUI::registerQMLTypes()
         const int versionMinor = 1;
 
         qmlRegisterType<RoundImage>( uri, versionMajor, versionMinor, "RoundImage" );
+
+
+        qmlProtectModule(uri, versionMajor);
     }
 
     if (m_mainCtx->hasMediaLibrary())
@@ -253,7 +314,11 @@ void MainUI::registerQMLTypes()
         const int versionMajor = 0;
         const int versionMinor = 1;
 
+        qmlRegisterSingletonType<MediaLib>(uri, versionMajor, versionMinor, "MediaLib", SingletonRegisterHelper<MediaLib>::callback);
+
         qRegisterMetaType<MLItemId>();
+        qmlRegisterUncreatableType<MLItemId>( uri, versionMajor, versionMinor, "MLItemId", "");
+        qmlRegisterUncreatableType<MLBaseModel>( uri, versionMajor, versionMinor, "MLModel", "ML Base Model is uncreatable." );
         qmlRegisterType<MLAlbumModel>( uri, versionMajor, versionMinor, "MLAlbumModel" );
         qmlRegisterType<MLArtistModel>( uri, versionMajor, versionMinor, "MLArtistModel" );
         qmlRegisterType<MLAlbumTrackModel>( uri, versionMajor, versionMinor, "MLAlbumTrackModel" );
@@ -261,7 +326,8 @@ void MainUI::registerQMLTypes()
         qmlRegisterType<MLUrlModel>( uri, versionMajor, versionMinor, "MLUrlModel" );
         qmlRegisterType<MLVideoModel>( uri, versionMajor, versionMinor, "MLVideoModel" );
         qmlRegisterType<MLRecentsVideoModel>( uri, versionMajor, versionMinor, "MLRecentsVideoModel" );
-        qmlRegisterType<MLGroupListModel>( uri, versionMajor, versionMinor, "MLGroupListModel" );
+        qmlRegisterType<MLVideoGroupsModel>( uri, versionMajor, versionMinor, "MLVideoGroupsModel" );
+        qmlRegisterType<MLVideoFoldersModel>( uri, versionMajor, versionMinor, "MLVideoFoldersModel" );
         qmlRegisterType<MLPlaylistListModel>( uri, versionMajor, versionMinor, "MLPlaylistListModel" );
         qmlRegisterType<MLPlaylistModel>( uri, versionMajor, versionMinor, "MLPlaylistModel" );
 
@@ -284,9 +350,13 @@ void MainUI::registerQMLTypes()
         qmlRegisterType<AlbumTrackContextMenu>( uri, versionMajor, versionMinor, "AlbumTrackContextMenu" );
         qmlRegisterType<URLContextMenu>( uri, versionMajor, versionMinor, "URLContextMenu" );
         qmlRegisterType<VideoContextMenu>( uri, versionMajor, versionMinor, "VideoContextMenu" );
-        qmlRegisterType<GroupListContextMenu>( uri, versionMajor, versionMinor, "GroupListContextMenu" );
+        qmlRegisterType<VideoGroupsContextMenu>( uri, versionMajor, versionMinor, "VideoGroupsContextMenu" );
+        qmlRegisterType<VideoFoldersContextMenu>( uri, versionMajor, versionMinor, "VideoFoldersContextMenu" );
         qmlRegisterType<PlaylistListContextMenu>( uri, versionMajor, versionMinor, "PlaylistListContextMenu" );
         qmlRegisterType<PlaylistMediaContextMenu>( uri, versionMajor, versionMinor, "PlaylistMediaContextMenu" );
+
+
+        qmlProtectModule(uri, versionMajor);
     }
 }
 
@@ -296,10 +366,4 @@ void MainUI::onQmlWarning(const QList<QQmlError>& qmlErrors)
     {
         msg_Warn( m_intf, "qml error %s:%i %s", qtu(error.url().toString()), error.line(), qtu(error.description()) );
     }
-}
-
-QObject* MainUI::getMainCtxInstance(QQmlEngine *, QJSEngine *)
-{
-    assert(g_mainCtx != nullptr);
-    return g_mainCtx;
 }

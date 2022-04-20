@@ -28,13 +28,7 @@
 #include <vlc_plugin.h>
 #include <vlc_codec.h>
 #include <vlc_messages.h>
-#include <vlc_picture_pool.h>
-#include <vlc_atomic.h>
 
-#define FFNV_LOG_FUNC(logctx, msg, ...)        msg_Err((vlc_object_t*)logctx, msg, __VA_ARGS__)
-#define FFNV_DEBUG_LOG_FUNC(logctx, msg, ...)  msg_Dbg((vlc_object_t*)logctx, msg, __VA_ARGS__)
-
-#include <ffnvcodec/dynlink_loader.h>
 #include "../../codec/hxxx_helper.h"
 #include "nvdec_fmt.h"
 #include "hw_pool.h"
@@ -61,7 +55,6 @@ vlc_module_begin ()
     set_description(N_("NVDEC video decoder"))
     set_shortname("nvdec")
     set_capability("video decoder", 60)
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_VCODEC)
     add_integer( "nvdec-deint", cudaVideoDeinterlaceMode_Bob,
                  DEINTERLACE_MODULE_TEXT, DEINTERLACE_MODULE_LONGTEXT )
@@ -83,7 +76,7 @@ typedef struct nvdec_ctx  nvdec_ctx_t;
 
 typedef struct pic_pool_context_nvdec_t {
   pic_context_nvdec_t ctx;
-  nvdec_pool_t        *pool;
+  hw_pool_t           *pool;
 } pic_pool_context_nvdec_t;
 
 struct nvdec_ctx {
@@ -97,7 +90,6 @@ struct nvdec_ctx {
         int                     vc1_header_offset;
     };
     bool                        b_is_hxxx;
-    int                         i_nb_surface; ///<  number of GPU surfaces allocated
     bool                        b_xps_pushed; ///< (for xvcC) parameter sets pushed (SPS/PPS/VPS)
     block_t *                   (*process_block)(decoder_t *, block_t *);
     cudaVideoDeinterlaceMode    deintMode;
@@ -106,20 +98,20 @@ struct nvdec_ctx {
     size_t                      decoderHeight;
 
     unsigned int                outputPitch;
-    nvdec_pool_t                *out_pool;
-    nvdec_pool_owner_t          pool_owner;
+    hw_pool_t                   *out_pool;
+    hw_pool_owner_t             pool_owner;
 
     vlc_video_context           *vctx_out;
 };
 
-#define CALL_CUDA_DEC(func, ...) CudaCheckErr(VLC_OBJECT(p_dec),  p_sys->devsys->cudaFunctions, p_sys->devsys->cudaFunctions->func(__VA_ARGS__), #func)
+#define CALL_CUDA_DEC(func, ...) CudaCheckErr(VLC_OBJECT(p_dec),  devsys->cudaFunctions, devsys->cudaFunctions->func(__VA_ARGS__), #func)
 #define CALL_CUDA_DEV(func, ...) CudaCheckErr(VLC_OBJECT(device), p_sys->cudaFunctions, p_sys->cudaFunctions->func(__VA_ARGS__), #func)
 #define CALL_CUVID(func, ...)    CudaCheckErr(VLC_OBJECT(p_dec),  p_sys->devsys->cudaFunctions, p_sys->cuvidFunctions->func(__VA_ARGS__), #func)
 
 #define NVDEC_PICPOOLCTX_FROM_PICCTX(pic_ctx)  \
     container_of(NVDEC_PICCONTEXT_FROM_PICCTX(pic_ctx), pic_pool_context_nvdec_t, ctx)
 
-static void PoolRelease(nvdec_pool_owner_t *owner, void *buffers[], size_t pics_count)
+static void PoolRelease(hw_pool_owner_t *owner, void *buffers[], size_t pics_count)
 {
     nvdec_ctx_t *p_sys = container_of(owner, nvdec_ctx_t, pool_owner);
     for (size_t i=0; i < pics_count; i++)
@@ -131,7 +123,7 @@ static void PoolRelease(nvdec_pool_owner_t *owner, void *buffers[], size_t pics_
 static void nvdec_picture_CtxDestroy(struct picture_context_t *picctx)
 {
     pic_pool_context_nvdec_t *srcpic = NVDEC_PICPOOLCTX_FROM_PICCTX(picctx);
-    nvdec_pool_Release(srcpic->pool);
+    hw_pool_Release(srcpic->pool);
     free(srcpic);
 }
 
@@ -144,11 +136,11 @@ static struct picture_context_t *nvdec_picture_CtxClone(struct picture_context_t
 
     *clonectx = *srcpic;
     vlc_video_context_Hold(clonectx->ctx.ctx.vctx);
-    nvdec_pool_AddRef(clonectx->pool);
+    hw_pool_AddRef(clonectx->pool);
     return &clonectx->ctx.ctx;
 }
 
-static picture_context_t * PoolAttachPicture(nvdec_pool_owner_t *owner, nvdec_pool_t *pool, void *surface)
+static picture_context_t * PoolAttachPicture(hw_pool_owner_t *owner, hw_pool_t *pool, void *surface)
 {
     nvdec_ctx_t *p_sys = container_of(owner, nvdec_ctx_t, pool_owner);
     pic_pool_context_nvdec_t *picctx = malloc(sizeof(*picctx));
@@ -164,7 +156,7 @@ static picture_context_t * PoolAttachPicture(nvdec_pool_owner_t *owner, nvdec_po
 
     picctx->ctx.devicePtr = (CUdeviceptr)surface;
     picctx->pool = pool;
-    nvdec_pool_AddRef(picctx->pool);
+    hw_pool_AddRef(picctx->pool);
 
     return &picctx->ctx.ctx;
 }
@@ -256,13 +248,14 @@ static int CUDAAPI HandleVideoSequence(void *p_opaque, CUVIDEOFORMAT *p_format)
 {
     decoder_t *p_dec = (decoder_t *) p_opaque;
     nvdec_ctx_t *p_sys = p_dec->p_sys;
+    decoder_device_nvdec_t *devsys = p_sys->devsys;
     int ret;
 
     if ( is_nvdec_opaque(p_dec->fmt_out.video.i_chroma) )
     {
         if (p_sys->out_pool)
         {
-            nvdec_pool_Release(p_sys->out_pool);
+            hw_pool_Release(p_sys->out_pool);
             p_sys->out_pool = NULL;
         }
     }
@@ -286,6 +279,28 @@ static int CUDAAPI HandleVideoSequence(void *p_opaque, CUVIDEOFORMAT *p_format)
         p_sys->cudecoder = NULL;
     }
 
+    int i_nb_surface;
+    switch (p_dec->fmt_in.i_codec) {
+        case VLC_CODEC_H264:
+        case VLC_CODEC_HEVC:
+        case VLC_CODEC_VC1:
+        case VLC_CODEC_WMV3:
+            i_nb_surface = MAX_HXXX_SURFACES;
+            break;
+        case VLC_CODEC_MP1V:
+        case VLC_CODEC_MP2V:
+        case VLC_CODEC_MPGV:
+        case VLC_CODEC_MP4V:
+        case VLC_CODEC_VP8:
+            i_nb_surface = 3;
+            break;
+        case VLC_CODEC_VP9:
+            i_nb_surface = 10;
+            break;
+        default:
+            vlc_assert_unreachable();
+    }
+
     CUVIDDECODECREATEINFO dparams = {
         .ulWidth             = p_format->coded_width,
         .ulHeight            = p_format->coded_height,
@@ -295,7 +310,7 @@ static int CUDAAPI HandleVideoSequence(void *p_opaque, CUVIDEOFORMAT *p_format)
         .OutputFormat        = MapSurfaceFmt(p_dec->fmt_out.video.i_chroma),
         .CodecType           = p_format->codec,
         .ChromaFormat        = p_format->chroma_format,
-        .ulNumDecodeSurfaces = p_sys->i_nb_surface,
+        .ulNumDecodeSurfaces = __MAX(i_nb_surface, p_format->min_num_decode_surfaces),
         .ulNumOutputSurfaces = 1,
         .DeinterlaceMode     = p_sys->deintMode
     };
@@ -306,16 +321,16 @@ static int CUDAAPI HandleVideoSequence(void *p_opaque, CUVIDEOFORMAT *p_format)
     // ensure the output surfaces have the same pitch so copies can work properly
     if ( is_nvdec_opaque(p_dec->fmt_out.video.i_chroma) )
     {
-        // get the real decoder pitch
-        CUdeviceptr frameDevicePtr = 0;
-        CUVIDPROCPARAMS params = {
-            .progressive_frame = 1,
-            .top_field_first = 1,
-        };
-        ret = CALL_CUVID( cuvidMapVideoFrame, p_sys->cudecoder, 0, &frameDevicePtr, &p_sys->outputPitch, &params );
+        int tex_alignment;
+        CUdevice cuDev;
+        ret = CALL_CUDA_DEC(cuDeviceGet, &cuDev, 0); // this should come from devsys
         if (ret != VLC_SUCCESS)
             goto cuda_error;
-        CALL_CUVID(cuvidUnmapVideoFrame, p_sys->cudecoder, frameDevicePtr);
+
+        ret = CALL_CUDA_DEC(cuDeviceGetAttribute, &tex_alignment, CU_DEVICE_ATTRIBUTE_TEXTURE_ALIGNMENT, cuDev);
+        if (ret != VLC_SUCCESS || tex_alignment < 0)
+            goto cuda_error;
+        p_sys->outputPitch = (p_dec->fmt_out.video.i_width + tex_alignment - 1) / tex_alignment * tex_alignment;
 
         unsigned int ByteWidth = p_sys->outputPitch;
         unsigned int Height = p_dec->fmt_out.video.i_height;
@@ -355,16 +370,16 @@ static int CUDAAPI HandleVideoSequence(void *p_opaque, CUVIDEOFORMAT *p_format)
         p_sys->out_pool = NULL;
         if (outputDevicePtr[0])
         {
-            p_sys->pool_owner = (nvdec_pool_owner_t) {
+            p_sys->pool_owner = (hw_pool_owner_t) {
                 p_dec, PoolRelease, PoolAttachPicture,
             };
 
             void *bufferPtr[ARRAY_SIZE(outputDevicePtr)];
             for (size_t i=0; i<ARRAY_SIZE(outputDevicePtr); i++)
                 bufferPtr[i] = (void*)(uintptr_t)outputDevicePtr[i];
-            p_sys->out_pool = nvdec_pool_Create(&p_sys->pool_owner,
-                                                &p_dec->fmt_out.video, p_sys->vctx_out,
-                                                bufferPtr, ARRAY_SIZE(outputDevicePtr));
+            p_sys->out_pool = hw_pool_Create(&p_sys->pool_owner,
+                                             &p_dec->fmt_out.video, p_sys->vctx_out,
+                                             bufferPtr, ARRAY_SIZE(outputDevicePtr));
             if (p_sys->out_pool == NULL)
                 PoolRelease(&p_sys->pool_owner, bufferPtr, ARRAY_SIZE(outputDevicePtr));
         }
@@ -378,7 +393,7 @@ static int CUDAAPI HandleVideoSequence(void *p_opaque, CUVIDEOFORMAT *p_format)
     CALL_CUDA_DEC(cuCtxPopCurrent, NULL);
 
     ret = decoder_UpdateVideoOutput(p_dec, p_sys->vctx_out);
-    return (ret == VLC_SUCCESS);
+    return (ret == VLC_SUCCESS) ? i_nb_surface : 0;
 
 cuda_error:
     CALL_CUDA_DEC(cuCtxPopCurrent, NULL);
@@ -391,9 +406,10 @@ static int CUDAAPI HandlePictureDecode(void *p_opaque, CUVIDPICPARAMS *p_picpara
 {
     decoder_t *p_dec = (decoder_t *) p_opaque;
     nvdec_ctx_t *p_sys = p_dec->p_sys;
+    decoder_device_nvdec_t *devsys = p_sys->devsys;
     int ret;
 
-    ret = CALL_CUDA_DEC(cuCtxPushCurrent, p_sys->devsys->cuCtx);
+    ret = CALL_CUDA_DEC(cuCtxPushCurrent, devsys->cuCtx);
     if (ret != VLC_SUCCESS)
         return 0;
 
@@ -407,6 +423,7 @@ static int CUDAAPI HandlePictureDisplay(void *p_opaque, CUVIDPARSERDISPINFO *p_d
 {
     decoder_t *p_dec = (decoder_t *) p_opaque;
     nvdec_ctx_t *p_sys = p_dec->p_sys;
+    decoder_device_nvdec_t *devsys = p_sys->devsys;
     picture_t *p_pic = NULL;
     CUdeviceptr frameDevicePtr = 0;
     CUVIDPROCPARAMS params = {
@@ -419,7 +436,7 @@ static int CUDAAPI HandlePictureDisplay(void *p_opaque, CUVIDPARSERDISPINFO *p_d
 
     if ( is_nvdec_opaque(p_dec->fmt_out.video.i_chroma) )
     {
-        p_pic = nvdec_pool_Wait(p_sys->out_pool);
+        p_pic = hw_pool_Wait(p_sys->out_pool);
         if (unlikely(p_pic == NULL))
             return 0;
         pic_context_nvdec_t *picctx = NVDEC_PICCONTEXT_FROM_PICCTX(p_pic->context);
@@ -610,22 +627,18 @@ static int CuvidPushBlock(decoder_t *p_dec, block_t *p_block)
 static block_t * HXXXProcessBlock(decoder_t *p_dec, block_t *p_block)
 {
     nvdec_ctx_t *p_sys = p_dec->p_sys;
-    if (p_sys->hh.b_is_xvcC && !p_sys->b_xps_pushed) {
-        block_t *p_xps_blocks;   // parameter set blocks (SPS/PPS/VPS)
-        if (p_dec->fmt_in.i_codec == VLC_CODEC_H264) {
-            p_xps_blocks = h264_helper_get_annexb_config(&p_sys->hh);
-        } else if (p_dec->fmt_in.i_codec == VLC_CODEC_HEVC) {
-            p_xps_blocks = hevc_helper_get_annexb_config(&p_sys->hh);
-        } else {
-            return NULL;
+    if (p_sys->hh.i_input_nal_length_size && !p_sys->b_xps_pushed) {
+        // parameter set blocks (SPS/PPS/VPS)
+        block_t *p_xps = hxxx_helper_get_extradata_block(&p_sys->hh);
+        if(p_xps)
+        {
+            CuvidPushRawBlock(p_dec, p_xps->p_buffer, p_xps->i_buffer);
+            block_Release(p_xps);
+            p_sys->b_xps_pushed = true;
         }
-        for (block_t *p_b = p_xps_blocks; p_b != NULL; p_b = p_b->p_next) {
-            CuvidPushRawBlock(p_dec, p_b->p_buffer, p_b->i_buffer);
-        }
-        p_sys->b_xps_pushed = true;
     }
 
-    return p_sys->hh.pf_process_block(&p_sys->hh, p_block, NULL);
+    return hxxx_helper_process_block(&p_sys->hh, p_block);
 }
 
 static block_t * ProcessVC1Block(decoder_t *p_dec, block_t *p_block)
@@ -719,7 +732,8 @@ static cudaVideoChromaFormat MapChomaIDC(uint8_t chroma_idc)
 static int ProbeDecoder(decoder_t *p_dec, uint8_t bitDepth, cudaVideoChromaFormat chroma)
 {
     nvdec_ctx_t *p_sys = p_dec->p_sys;
-    int result = CALL_CUDA_DEC(cuCtxPushCurrent, p_sys->devsys->cuCtx);
+    decoder_device_nvdec_t *devsys = p_sys->devsys;
+    int result = CALL_CUDA_DEC(cuCtxPushCurrent, devsys->cuCtx);
     if (unlikely(result != VLC_SUCCESS))
         return result;
 
@@ -760,9 +774,8 @@ static int OpenDecoder(vlc_object_t *p_this)
         case VLC_CODEC_H264:
         case VLC_CODEC_HEVC:
             p_sys->b_is_hxxx = true;
-            p_sys->i_nb_surface = MAX_HXXX_SURFACES;
             hxxx_helper_init(&p_sys->hh, VLC_OBJECT(p_dec),
-                             p_dec->fmt_in.i_codec, false);
+                             p_dec->fmt_in.i_codec, 0, 0);
             result = hxxx_helper_set_extra(&p_sys->hh, p_dec->fmt_in.p_extra,
                                            p_dec->fmt_in.i_extra);
             if (result != VLC_SUCCESS) {
@@ -777,7 +790,7 @@ static int OpenDecoder(vlc_object_t *p_this)
             {
                 uint8_t *p_extra = p_dec->fmt_in.p_extra;
                 /* Initialisation data starts with : 0x00 0x00 0x01 0x0f */
-                /* Skipping unecessary data */
+                /* Skipping unnecessary data */
                 static const uint8_t vc1_start_code[4] = {0x00, 0x00, 0x01, 0x0f};
                 for (; p_sys->vc1_header_offset < p_dec->fmt_in.i_extra - 4 ; ++p_sys->vc1_header_offset)
                 {
@@ -787,7 +800,6 @@ static int OpenDecoder(vlc_object_t *p_this)
                 if (p_sys->vc1_header_offset < p_dec->fmt_in.i_extra - 4)
                 {
                     p_sys->process_block = ProcessVC1Block;
-                    p_sys->i_nb_surface = MAX_HXXX_SURFACES;
                     break;
                 }
             }
@@ -797,7 +809,6 @@ static int OpenDecoder(vlc_object_t *p_this)
         case VLC_CODEC_MPGV:
         case VLC_CODEC_MP4V:
         case VLC_CODEC_VP8:
-            p_sys->i_nb_surface = 3;
             break;
         case VLC_CODEC_VP9:
             if (p_dec->fmt_in.i_profile != 0 && p_dec->fmt_in.i_profile != 2)
@@ -805,7 +816,6 @@ static int OpenDecoder(vlc_object_t *p_this)
                 msg_Warn(p_dec, "Unsupported VP9 profile %d", p_dec->fmt_in.i_profile);
                 goto early_exit;
             }
-            p_sys->i_nb_surface = 10;
             break;
         default:
             goto early_exit;
@@ -843,7 +853,7 @@ static int OpenDecoder(vlc_object_t *p_this)
         .CodecType               = MapCodecID(p_dec->fmt_in.i_codec),
         .ulClockRate             = CLOCK_FREQ,
         .ulMaxDisplayDelay       = NVDEC_DISPLAY_SURFACES,
-        .ulMaxNumDecodeSurfaces  = p_sys->i_nb_surface,
+        .ulMaxNumDecodeSurfaces  = 1,
         .pUserData               = p_dec,
         .pfnSequenceCallback     = HandleVideoSequence,
         .pfnDecodePicture        = HandlePictureDecode,
@@ -1021,7 +1031,8 @@ static void CloseDecoder(vlc_object_t *p_this)
 {
     decoder_t *p_dec = (decoder_t *) p_this;
     nvdec_ctx_t *p_sys = p_dec->p_sys;
-    CALL_CUDA_DEC(cuCtxPushCurrent, p_sys->devsys->cuCtx);
+    decoder_device_nvdec_t *devsys = p_sys->devsys;
+    CALL_CUDA_DEC(cuCtxPushCurrent, devsys->cuCtx);
     CALL_CUDA_DEC(cuCtxPopCurrent, NULL);
 
     if (p_sys->cudecoder)
@@ -1033,7 +1044,7 @@ static void CloseDecoder(vlc_object_t *p_this)
     if (p_sys->b_is_hxxx)
         hxxx_helper_clean(&p_sys->hh);
     if (p_sys->out_pool)
-        nvdec_pool_Release(p_sys->out_pool);
+        hw_pool_Release(p_sys->out_pool);
     else
     {
         cuvid_free_functions(&p_sys->cuvidFunctions);

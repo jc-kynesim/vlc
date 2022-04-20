@@ -28,7 +28,6 @@
 #include "qt.hpp"
 #include <QAbstractListModel>
 #include <QUrl>
-#include <QList>
 #include "mlhelper.hpp"
 
 #include <maininterface/mainctx.hpp>
@@ -56,6 +55,7 @@ public:
     };
 
     MLFoldersBaseModel( QObject *parent = nullptr );
+    virtual ~MLFoldersBaseModel() = default;
 
     void setCtx(MainCtx* ctx);
     inline MainCtx* getCtx() { return m_ctx; }
@@ -82,12 +82,12 @@ protected:
         bool banned;
     };
 
-    virtual std::vector<EntryPoint> entryPoints() const = 0;
     virtual bool failed( const vlc_ml_event_t* event ) const = 0; // will be called outside the main thread
 
 protected:
     static void onMlEvent( void* data , const vlc_ml_event_t* event );
-    void update();
+    virtual void update() = 0;
+    void updateImpl(vlc_ml_folder_list_t* (*folderListFunc)( vlc_medialibrary_t* p_ml, const vlc_ml_query_params_t* params));
 
     using EventCallbackPtr = std::unique_ptr<vlc_ml_event_callback_t, std::function<void( vlc_ml_event_callback_t* )>>;
 
@@ -95,6 +95,7 @@ protected:
     MediaLib *m_mediaLib = nullptr;
     MainCtx* m_ctx = nullptr;
     EventCallbackPtr m_ml_event_handle;
+    bool m_updatePending = false;
 };
 
 class MLFoldersModel : public MLFoldersBaseModel
@@ -106,7 +107,7 @@ public:
     void add( const QUrl &mrl ) override;
 
 private:
-    std::vector<EntryPoint> entryPoints() const final;
+    void update() override final;
     bool failed( const vlc_ml_event_t* event ) const override;
 };
 
@@ -119,7 +120,7 @@ public:
     void add( const QUrl &mrl ) override;
 
 private:
-    std::vector<EntryPoint> entryPoints() const final;
+    void update() override final;
     bool failed( const vlc_ml_event_t* event ) const override;
 };
 

@@ -31,22 +31,22 @@ FocusScope {
     id: root
 
     property var sortModel: [
-        { text: i18n.qtr("Alphabetic"),  criteria: "title"},
-        { text: i18n.qtr("Duration"),    criteria: "duration" },
-        { text: i18n.qtr("Date"),        criteria: "release_year" },
-        { text: i18n.qtr("Artist"),      criteria: "main_artist" },
+        { text: I18n.qtr("Alphabetic"),  criteria: "title"},
+        { text: I18n.qtr("Duration"),    criteria: "duration" },
+        { text: I18n.qtr("Date"),        criteria: "release_year" },
+        { text: I18n.qtr("Artist"),      criteria: "main_artist" },
     ]
 
     property alias model: albumModelId
     property alias parentId: albumModelId.parentId
     readonly property var currentIndex: _currentView.currentIndex
     //the index to "go to" when the view is loaded
-    property var initialIndex: 0
+    property int initialIndex: 0
     property int gridViewMarginTop: VLCStyle.margin_large
     property var gridViewRowX: MainCtx.gridView ? _currentView.rowX : undefined
 
     property Component header: Item{}
-    readonly property var headerItem: _currentView ? _currentView.headerItem : undefined
+    readonly property Item headerItem: _currentView ? _currentView.headerItem : null
 
     property alias _currentView: view.currentItem
 
@@ -72,9 +72,9 @@ FocusScope {
 
     function _actionAtIndex(index) {
         if (selectionModel.selectedIndexes.length > 1) {
-            medialib.addAndPlay( model.getIdsForIndexes( selectionModel.selectedIndexes ) )
+            MediaLib.addAndPlay( model.getIdsForIndexes( selectionModel.selectedIndexes ) )
         } else {
-            medialib.addAndPlay( model.getIdForIndex(index) )
+            MediaLib.addAndPlay( model.getIdForIndex(index) )
         }
     }
 
@@ -90,7 +90,7 @@ FocusScope {
 
     MLAlbumModel {
         id: albumModelId
-        ml: medialib
+        ml: MediaLib
 
         onCountChanged: {
             if (albumModelId.count > 0 && !selectionModel.hasSelection) {
@@ -109,7 +109,7 @@ FocusScope {
 
         mlModel: albumModelId
         indexes: selectionModel.selectedIndexes
-        defaultCover: VLCStyle.noArtAlbum
+        defaultCover: VLCStyle.noArtAlbumCover
     }
 
     AlbumContextMenu {
@@ -130,7 +130,7 @@ FocusScope {
 
             headerDelegate: root.header
 
-            delegateModel: selectionModel
+            selectionDelegateModel: selectionModel
             model: albumModelId
 
             Widgets.GridShadows {
@@ -197,9 +197,6 @@ FocusScope {
                 }
             }
 
-            onSelectAll: selectionModel.selectAll()
-            onSelectionUpdated: selectionModel.updateSelection( keyModifiers, oldIndex, newIndex )
-
             Navigation.parentItem: root
             Navigation.cancelAction: root._onNavigationCancel
 
@@ -230,16 +227,16 @@ FocusScope {
             headerTopPadding: VLCStyle.margin_normal
 
             sortModel:  [
-                { isPrimary: true, criteria: "title", width: VLCStyle.colWidth(2), text: i18n.qtr("Title"), headerDelegate: tableColumns.titleHeaderDelegate, colDelegate: tableColumns.titleDelegate },
-                { criteria: "main_artist", width: VLCStyle.colWidth(Math.max(tableView_id._nbCols - 3, 1)), text: i18n.qtr("Artist") },
+                { isPrimary: true, criteria: "title", width: VLCStyle.colWidth(2), text: I18n.qtr("Title"), headerDelegate: tableColumns.titleHeaderDelegate, colDelegate: tableColumns.titleDelegate, placeHolder: VLCStyle.noArtAlbumCover },
+                { criteria: "main_artist", width: VLCStyle.colWidth(Math.max(tableView_id._nbCols - 3, 1)), text: I18n.qtr("Artist") },
                 { criteria: "duration", width:VLCStyle.colWidth(1), showSection: "", headerDelegate: tableColumns.timeHeaderDelegate, colDelegate: tableColumns.timeColDelegate },
             ]
 
             Navigation.cancelAction: root._onNavigationCancel
 
-            onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes,  menuParent.mapToGlobal(0,0))
+            onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
             onRightClick: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
-            onItemDoubleClicked: medialib.addAndPlay( model.id )
+            onItemDoubleClicked: MediaLib.addAndPlay( model.id )
 
             Widgets.TableColumns {
                 id: tableColumns
@@ -284,7 +281,7 @@ FocusScope {
         anchors.fill: parent
         visible: albumModelId.count === 0
         focus: visible
-        text: i18n.qtr("No albums found\nPlease try adding sources, by going to the Network tab")
+        text: I18n.qtr("No albums found\nPlease try adding sources, by going to the Network tab")
         Navigation.parentItem: root
         cover: VLCStyle.noArtAlbumCover
     }

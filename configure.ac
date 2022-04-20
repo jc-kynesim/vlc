@@ -1,6 +1,6 @@
 dnl Autoconf settings for vlc
 
-AC_COPYRIGHT([Copyright 1999-2021 VLC authors and VideoLAN])
+AC_COPYRIGHT([Copyright 1999-2022 VLC authors and VideoLAN])
 
 AC_INIT([vlc], [4.0.0-dev])
 VERSION_MAJOR=4
@@ -14,7 +14,7 @@ AC_SUBST([PKGDIR])
 
 CONFIGURE_LINE="`echo "$0 $ac_configure_args" | sed -e 's/\\\/\\\\\\\/g'`"
 CODENAME="Otto Chriek"
-COPYRIGHT_YEARS="1996-2021"
+COPYRIGHT_YEARS="1996-2022"
 
 AC_CONFIG_SRCDIR([src/libvlc.c])
 AC_CONFIG_AUX_DIR([autotools])
@@ -154,14 +154,17 @@ case "${host_os}" in
   linux*)
     SYS=linux
     CFLAGS="${CFLAGS} -pthread"
+    CXXFLAGS="${CXXFLAGS} -pthread"
     ;;
   bsdi*)
     SYS=bsdi
     CFLAGS="${CFLAGS} -pthread"
+    CXXFLAGS="${CXXFLAGS} -pthread"
     ;;
   freebsd*)
     SYS=freebsd
     CFLAGS="${CFLAGS} -pthread"
+    CXXFLAGS="${CXXFLAGS} -pthread"
     CPPFLAGS="${CPPFLAGS} -I/usr/local/include"
     LDFLAGS="${LDFLAGS} -L/usr/local/lib"
     ac_cv_ld_z_defs=no
@@ -211,12 +214,12 @@ case "${host_os}" in
     dnl to disable the static bank loader.
     AC_MSG_CHECKING([if -Wl,-U is allowed])
     VLC_SAVE_FLAGS
-    AX_APPEND_FLAG([LDFLAGS],[-Wl,-U,_my_array -no-undefined])
+    AX_APPEND_FLAG([-Wl,-U,_my_array],[LDFLAGS])
     AC_LINK_IFELSE(
-       [AC_LANG_PROGRAM([], [dnl
+       [AC_LANG_PROGRAM([[
 __attribute__((visibility("default"))) extern int my_array[];
-__attribute__((visibility("default"))) int foo() { return my_array[0]; }
-])],
+int foo() { return my_array[0]; }
+]],[[return foo();]])],
        [
         VLC_ADD_LDFLAGS([libvlccore],[-Wl,-U,_vlc_static_modules])
         VLC_ADD_LDFLAGS([libvlc vlc],[-Wl,-undefined,dynamic_lookup])
@@ -275,7 +278,9 @@ __attribute__((visibility("default"))) int foo() { return my_array[0]; }
   *mingw32* | *cygwin* | *wince* | *mingwce*)
     dnl Force libtool to not link to (shared) libgcc_s when detecting C++ dependencies
     dnl When doing this test with -static-libgcc it will link on (static) libgcc_eh
-    CXXFLAGS="${CXXFLAGS} -static-libgcc"
+    AC_LANG_PUSH(C++)
+    AX_APPEND_COMPILE_FLAGS([-static-libgcc], [CXXFLAGS], [-Werror])
+    AC_LANG_POP(C++)
     AC_CHECK_TOOL(WINDRES, windres, :)
     AC_CHECK_TOOL(OBJCOPY, objcopy, :)
     AC_PREPROC_IFELSE([AC_LANG_PROGRAM(
@@ -409,6 +414,16 @@ AC_ARG_ENABLE([winstore_app],
 vlc_winstore_app=0
 AS_IF([test "${SYS}" = "mingw32"],[
   LIBCOM="-lole32 -loleaut32"
+  AC_LANG_PUSH(C++)
+  AX_CHECK_COMPILE_FLAG([-fno-strict-aliasing], [
+        LIBCOMCXXFLAGS="-fno-strict-aliasing"
+    ],[
+        # fno-strict-aliasing is necessary for WRL and IID_PPV_ARGS to work safely
+        # MSVC doesn't have this option but doesn't do pointer aliasing, so it
+        # should work too
+        AC_MSG_ERROR([-fno-strict-aliasing is necessary for Windows C++ modules])
+    ])
+  AC_LANG_POP(C++)
   AS_IF([test "${enable_winstore_app}" = "yes"], [
     vlc_winstore_app=1
     LIBCOM="-loleaut32"
@@ -421,6 +436,7 @@ AS_IF([test "${SYS}" = "mingw32"],[
     AC_DEFINE([VLC_WINSTORE_APP], [1], [Define to 1 if building for Windows Store.])
   ],[])
   AC_SUBST([LIBCOM])
+  AC_SUBST([LIBCOMCXXFLAGS])
   ])
 
 vlc_build_pdb=0
@@ -430,8 +446,7 @@ AC_ARG_ENABLE([pdb],
 AS_IF([test "${SYS}" = "mingw32"],[
   AS_IF([test "${enable_pdb}" = "yes"], [
     vlc_build_pdb=1
-    AX_APPEND_FLAG([-g -gcodeview],[CFLAGS])
-    AX_APPEND_FLAG([-g -gcodeview],[CXXFLAGS])
+    AX_APPEND_FLAG([-g -gcodeview],[CPPFLAGS])
     LDFLAGS="${LDFLAGS} -Wl,-pdb="
   ],[])
 ])
@@ -558,14 +573,22 @@ AS_IF([test -n "${CONTRIB_DIR}"], [
   LDFLAGS="${LDFLAGS} -L${CONTRIB_DIR}/lib"
 
   AS_IF([test -z "$LUAC"], [
-    dnl Old contribs mixed cross-tools and cross-compiled executables
-    AS_IF([test -x "${CONTRIB_DIR}/bin/luac${BUILDEXEEXT}"], [
-      LUAC="${CONTRIB_DIR}/bin/luac${BUILDEXEEXT}"
-    ])
-
-    dnl Newer contribs follow usual name space rules
+    AC_MSG_CHECKING([if contribs provide luac])
     AS_IF([test -x "${CONTRIB_DIR}/../bin/${host_alias}-luac${BUILDEXEEXT}"], [
       LUAC="${CONTRIB_DIR}/../bin/${host_alias}-luac${BUILDEXEEXT}"
+      AC_MSG_RESULT([yes])
+    ],[
+      AC_MSG_RESULT([no])
+    ])
+  ])
+
+  AS_IF([test -z "$PROTOC"], [
+    AC_MSG_CHECKING([if contribs provide protoc])
+    AS_IF([test -x "${CONTRIB_DIR}/../bin/${host_alias}-protoc${BUILDEXEEXT}"], [
+      PROTOC="${CONTRIB_DIR}/../bin/${host_alias}-protoc${BUILDEXEEXT}"
+      AC_MSG_RESULT([yes])
+    ],[
+      AC_MSG_RESULT([no])
     ])
   ])
 
@@ -614,7 +637,7 @@ AS_IF([test "${enable_shared}" = "no" -a "${enable_vlc}" != "no"], [
 dnl
 dnl Gettext stuff
 dnl
-AM_GNU_GETTEXT_VERSION([0.19.8])
+AM_GNU_GETTEXT_VERSION([0.21])
 AM_GNU_GETTEXT([external], [need-formatstring-macros])
 
 dnl
@@ -748,6 +771,7 @@ dnl Check for non-standard system calls
 case "$SYS" in
   "linux")
     AC_CHECK_FUNCS([eventfd vmsplice sched_getaffinity recvmmsg memfd_create])
+    AC_REPLACE_FUNCS([getauxval])
     ;;
   "mingw32")
     AC_CHECK_FUNCS([_lock_file])
@@ -979,7 +1003,7 @@ dnl  BSD
 AC_CHECK_HEADERS([netinet/tcp.h netinet/udplite.h sys/param.h sys/mount.h])
 
 dnl  GNU/Linux
-AC_CHECK_HEADERS([features.h getopt.h linux/dccp.h linux/magic.h sys/eventfd.h])
+AC_CHECK_HEADERS([features.h getopt.h linux/dccp.h linux/magic.h sys/auxv.h sys/eventfd.h])
 
 dnl  MacOS
 AC_CHECK_HEADERS([xlocale.h])
@@ -1028,12 +1052,16 @@ AS_IF([test -n "${PKG_CONFIG}" ],[
 dnl
 dnl Check for zlib.h and -lz if available
 dnl
-AC_CHECK_HEADERS([zlib.h], [ have_zlib=yes ], [ have_zlib=no ])
+have_zlib="no"
+AC_CHECK_HEADERS([zlib.h], [
+  AC_CHECK_LIB([z], [inflate], [
+    have_zlib=yes
+    AC_DEFINE([HAVE_ZLIB], 1, [Define to 1 if you have zlib.])
+    LIBZ="-lz"
+  ])
+])
+AC_SUBST([LIBZ])
 AM_CONDITIONAL([HAVE_ZLIB], [ test "${have_zlib}" = "yes" ])
-if test "${have_zlib}" = "yes"
-then
-  VLC_ADD_LIBS([sap],[-lz])
-fi
 
 
 dnl
@@ -1353,7 +1381,12 @@ esac
 
 dnl Check for backtrace() support
 AC_CHECK_HEADERS([execinfo.h])
-AC_CHECK_FUNCS([backtrace])
+AC_CHECK_FUNCS([backtrace],, [
+  AC_CHECK_LIB([execinfo], [backtrace], [
+    LIBEXECINFO="-lexecinfo"])
+])
+AC_SUBST(LIBEXECINFO)
+
 
 dnl
 dnl  default modules
@@ -1365,11 +1398,11 @@ dnl  Accelerated modules
 dnl
 
 dnl  Check for fully working SSE2 intrinsics
-dnl  We need support for -msse[2], we need <emmintrin.h>, and we also need a
+dnl  We need support for -msse2, we need <emmintrin.h>, and we also need a
 dnl  working compiler (http://gcc.gnu.org/bugzilla/show_bug.cgi?id=23963)
 AC_ARG_ENABLE([sse],
   AS_HELP_STRING([--disable-sse],
-    [disable SSE (1-4) optimizations (default auto)]),, [
+    [disable SSE (2-4) optimizations (default auto)]),, [
   case "${host_cpu}" in
     i?86|x86_64)
       enable_sse=yes
@@ -1381,7 +1414,7 @@ AC_ARG_ENABLE([sse],
 ])
 have_sse2="no"
 AS_IF([test "${enable_sse}" != "no"], [
-  ARCH="${ARCH} sse sse2"
+  ARCH="${ARCH} sse2"
 
   VLC_SAVE_FLAGS
   CFLAGS="${CFLAGS} -msse2"
@@ -1410,23 +1443,6 @@ frobzor = (uint64_t)_mm_movepi64_pi64(a);]])], [
   ])
 
   VLC_SAVE_FLAGS
-  CFLAGS="${CFLAGS} -msse"
-  AC_CACHE_CHECK([if $CC groks SSE inline assembly], [ac_cv_sse_inline], [
-    AC_COMPILE_IFELSE([AC_LANG_PROGRAM(,[[
-void *p;
-asm volatile("xorps %%xmm1,%%xmm2"::"r"(p):"xmm1", "xmm2");
-]])
-    ], [
-      ac_cv_sse_inline=yes
-    ], [
-      ac_cv_sse_inline=no
-    ])
-  ])
-
-  AS_IF([test "${ac_cv_sse_inline}" != "no" -a "${SYS}" != "solaris"], [
-    AC_DEFINE(CAN_COMPILE_SSE, 1, [Define to 1 if SSE inline assembly is available.])
-  ])
-
   AC_CACHE_CHECK([if $CC groks SSE2 inline assembly], [ac_cv_sse2_inline], [
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM(,[[
 void *p;
@@ -1492,38 +1508,7 @@ asm volatile("pmaxsb %%xmm1,%%xmm0"::"r"(p):"xmm0", "xmm1");
   AS_IF([test "${ac_cv_sse4_1_inline}" != "no"], [
     AC_DEFINE(CAN_COMPILE_SSE4_1, 1, [Define to 1 if SSE4_1 inline assembly is available.]) ])
 
-  # SSE4.2
-  AC_CACHE_CHECK([if $CC groks SSE4.2 inline assembly],
-                 [ac_cv_sse4_2_inline], [
-    AC_COMPILE_IFELSE([AC_LANG_PROGRAM(,[[
-void *p;
-asm volatile("pcmpgtq %%xmm1,%%xmm0"::"r"(p):"xmm0", "xmm1");
-]])
-    ], [
-      ac_cv_sse4_2_inline=yes
-    ], [
-      ac_cv_sse4_2_inline=no
-    ])
-  ])
-
-  AS_IF([test "${ac_cv_sse4_2_inline}" != "no"], [
-    AC_DEFINE(CAN_COMPILE_SSE4_2, 1, [Define to 1 if SSE4_2 inline assembly is available.]) ])
-
-  # SSE4A
-  AC_CACHE_CHECK([if $CC groks SSE4A inline assembly], [ac_cv_sse4a_inline], [
-    AC_COMPILE_IFELSE([AC_LANG_PROGRAM(,[[
-void *p;
-asm volatile("insertq %%xmm1,%%xmm0"::"r"(p):"xmm0", "xmm1");
-]])
-    ], [
-      ac_cv_sse4a_inline=yes
-    ], [
-      ac_cv_sse4a_inline=no
-    ])
-  ])
   VLC_RESTORE_FLAGS
-  AS_IF([test "${ac_cv_sse4a_inline}" != "no"], [
-    AC_DEFINE([CAN_COMPILE_SSE4A], [1], [Define to 1 if SSE4A inline assembly is available.]) ])
 ])
 AM_CONDITIONAL([HAVE_SSE2], [test "$have_sse2" = "yes"])
 
@@ -1751,19 +1736,31 @@ AS_IF([test "${enable_altivec}" = "yes"], [
     have_altivec="yes"
   ])
   AC_CHECK_HEADERS([altivec.h])
-
-  VLC_SAVE_FLAGS
-  LDFLAGS="${LDFLAGS} -Wl,-framework,vecLib"
-  AC_CACHE_CHECK([if linker needs -framework vecLib],
-    [ac_cv_ld_altivec],
-    [AC_LINK_IFELSE([AC_LANG_PROGRAM([[]], [[]])],[ac_cv_ld_altivec=yes],[ac_cv_ld_altivec=no])])
-  VLC_RESTORE_FLAGS
-  AS_IF([test "${ac_cv_ld_altivec}" != "no"], [
-    VLC_ADD_LIBS([libvlccore],[-Wl,-framework,vecLib])
-  ])
 ])
 AC_SUBST([ALTIVEC_CFLAGS])
 AM_CONDITIONAL([HAVE_ALTIVEC], [test "$have_altivec" = "yes"])
+
+
+AC_ARG_ENABLE([rvv],
+  AS_HELP_STRING([--disable-rvv],
+    [disable RISC-V Vector extension (default auto)]),, [
+  AS_CASE([${host_cpu}], [riscv*], [enable_rvv="yes"], [enable_rvv="no"])
+])
+AS_IF([test "${enable_rvv}" != "no"], [
+  AC_CACHE_CHECK([if $CCAS groks RISC-V V assembly], [ac_cv_riscv_v], [
+    AC_COMPILE_IFELSE([
+      AC_LANG_PROGRAM(,[[
+asm volatile(".option arch, +v\nvsetvli x0, x0, e8");
+]])
+    ], [
+      ac_cv_riscv_v="yes"
+    ], [
+      ac_cv_riscv_v="no"
+    ])
+  ])
+])
+AM_CONDITIONAL([HAVE_RVV], [test "${ac_cv_riscv_v}" = "yes"])
+
 
 dnl
 dnl  Memory usage
@@ -2035,14 +2032,7 @@ PKG_ENABLE_MODULES_VLC([SMBCLIENT], [smbc], [smbclient], (SMB/CIFS support), [au
 dnl
 dnl  liBDSM access module
 dnl
-AM_CONDITIONAL([HAVE_DSM], [test "$AS_TR_SH(with_dsm)" = "yes"])
-PKG_WITH_MODULES([DSM], [libdsm >= 0.2.0], [
-       VLC_ADD_PLUGIN([dsm])
-       VLC_ADD_CFLAGS([dsm], [$DSM_CFLAGS])
-       VLC_ADD_LIBS([dsm], [$DSM_LIBS])
-       have_dsm="yes"
-   ],,[libdsm SMB/CIFS access/sd module], [auto])
-AM_CONDITIONAL([HAVE_DSM], [test "${have_dsm}" = "yes"])
+PKG_HAVE_WITH_MODULES([DSM], [libdsm >= 0.2.0], [libdsm SMB/CIFS access/sd module], [auto])
 
 dnl
 dnl sftp access support
@@ -2066,7 +2056,7 @@ AC_ARG_ENABLE([v4l2], AS_HELP_STRING([--disable-v4l2],
   [disable Video4Linux version 2 (default auto)]))
 have_v4l2="no"
 AS_IF([test "$enable_v4l2" != "no"], [
-  AC_CHECK_HEADERS([linux/videodev2.h], [
+  AC_CHECK_HEADERS([linux/videodev2.h sys/videoio.h], [
     have_v4l2="yes"
   ])
 ])
@@ -2539,25 +2529,6 @@ AM_CONDITIONAL([HAVE_VAAPI_DRM], [test "${have_vaapi_drm}" = "yes"])
 AM_CONDITIONAL([HAVE_VAAPI_X11], [test "${have_vaapi_x11}" = "yes"])
 AM_CONDITIONAL([HAVE_VAAPI_WL], [test "${have_vaapi_wl}" = "yes"])
 
-have_avcodec_vaapi="no"
-AS_IF([test "${have_vaapi}" = "yes" -a "${have_avcodec}" = "yes"], [
-  VLC_SAVE_FLAGS
-  CPPFLAGS="${CPPFLAGS} ${AVCODEC_CFLAGS}"
-  CFLAGS="${CFLAGS} ${AVCODEC_CFLAGS}"
-  AC_CHECK_HEADERS([libavcodec/vaapi.h], [
-    AC_MSG_NOTICE([VA API acceleration activated])
-    have_avcodec_vaapi="yes"
-  ],[
-    AS_IF([test -n "${enable_libva}"], [
-      AC_MSG_ERROR([libva is present but libavcodec/vaapi.h is missing])
-    ], [
-      AC_MSG_WARN([libva is present but libavcodec/vaapi.h is missing ])
-    ])
-  ])
-  VLC_RESTORE_FLAGS
-])
-AM_CONDITIONAL([HAVE_AVCODEC_VAAPI], [test "${have_avcodec_vaapi}" = "yes"])
-
 dnl
 dnl dxva2 needs avcodec
 dnl
@@ -2973,7 +2944,7 @@ if test "${enable_x262}" != "no"; then
         VLC_ADD_PLUGIN([x262])
         VLC_ADD_LDFLAGS([x262],[${X262_LIBS}])
         AS_IF([test -n "${ac_cv_ld_bsymbolic}"], [
-          VLC_ADD_LIBS([x262],[${av_cv_ld_bsymbolic}])
+          VLC_ADD_LIBS([x262],[${ac_cv_ld_bsymbolic}])
         ])
         VLC_ADD_CFLAGS([x262],[${X262_CFLAGS}])
     ], [
@@ -3036,6 +3007,13 @@ dnl Intel QuickSync (aka MediaSDK) H264/H262 encoder
 dnl
 PKG_ENABLE_MODULES_VLC([MFX], [qsv], [libmfx], [Intel QuickSync MPEG4-Part10/MPEG2 (aka H.264/H.262) encoder], [auto])
 
+
+dnl
+dnl  AVS2 decoder module (davs2)
+dnl
+PKG_ENABLE_MODULES_VLC([DAVS2], [davs2], [davs2], [AVS2 video decoder with libdavs2], [auto])
+
+
 dnl
 dnl libfluidsynth (MIDI synthetizer) plugin
 dnl
@@ -3077,6 +3055,11 @@ AS_IF( [test "${enable_telx}" != "no" ],[
   AC_DEFINE(TELX_COMPILED, 1, [Define if the telx module is built])
   ])
 AM_CONDITIONAL([HAVE_TELX], [test "x${have_telx}" = x"yes"])
+
+dnl
+dnl ARIB caption rendering module
+dnl
+PKG_ENABLE_MODULES_VLC([ARIBCAPTION], [], [libaribcaption], [ARIB caption decoder/renderer], [auto])
 
 dnl
 dnl ARIB subtitles rendering module
@@ -3181,7 +3164,6 @@ have_gl="no"
 PKG_CHECK_MODULES([GL], [gl], [
   have_gl="yes"
 ], [
-  AC_MSG_CHECKING([for OpenGL])
   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
 #ifdef _WIN32
 # include <GL/glew.h>
@@ -3191,13 +3173,17 @@ PKG_CHECK_MODULES([GL], [gl], [
     [int t0 = GL_TEXTURE0;]])
   ], [
     GL_CFLAGS=""
-    have_gl="yes"
     AS_IF([test "${SYS}" != "mingw32"], [
-      GL_LIBS="-lGL"
+      AC_CHECK_LIB([GL], [glTexture2D], [
+        have_gl="yes"
+        GL_LIBS="-lGL"
+      ])
     ], [
+      have_gl="yes"
       GL_LIBS="-lopengl32"
     ])
   ])
+  AC_MSG_CHECKING([for OpenGL])
   AC_MSG_RESULT([${have_gl}])
 ])
 AM_CONDITIONAL([HAVE_GL], [test "${have_gl}" = "yes"])
@@ -3239,7 +3225,6 @@ dnl  Xlib
 dnl
 
 AC_PATH_XTRA()
-AC_CHECK_HEADERS([X11/Xlib.h])
 
 dnl
 dnl  X C Bindings modules
@@ -3257,6 +3242,7 @@ have_xcb="no"
 have_xkbcommon_x11="no"
 have_xcb_keysyms="no"
 have_xcb_damage="no"
+have_xcb_xfixes="no"
 AS_IF([test "${enable_xcb}" != "no"], [
   xcb_err=""
 
@@ -3303,12 +3289,21 @@ AS_IF([test "${enable_xcb}" != "no"], [
     AC_MSG_WARN([${XCB_DAMAGE_PKG_ERRORS}. Qt X11 composition disabled.])
   ])
 
+  dnl xcb-fixes
+  PKG_CHECK_MODULES([XCB_XFIXES], [xcb-xfixes], [
+      have_xcb_xfixes="yes"
+  ], [
+    AC_MSG_WARN([${XCB_XFIXES_PKG_ERRORS}. Qt X11 composition disabled.])
+  ])
+
+
   have_xcb="yes"
 ])
 AM_CONDITIONAL([HAVE_XCB], [test "${have_xcb}" = "yes"])
 AM_CONDITIONAL([HAVE_XKBCOMMON_X11], [test "${have_xkbcommon_x11}" = "yes"])
 AM_CONDITIONAL([HAVE_XCB_KEYSYMS], [test "${have_xcb_keysyms}" = "yes"])
 AM_CONDITIONAL([HAVE_XCB_DAMAGE], [test "${have_xcb_damage}" = "yes"])
+AM_CONDITIONAL([HAVE_XCB_XFIXES], [test "${have_xcb_xfixes}" = "yes"])
 
 dnl
 dnl VDPAU needs X11
@@ -3586,7 +3581,7 @@ AC_CHECK_HEADER([linux/fb.h], [
 dnl
 dnl  Linux kernel mode setting module
 dnl
-PKG_ENABLE_MODULES_VLC([KMS], [], [libdrm >= 2.4.83], [Linux kernel mode setting output], [auto])
+PKG_HAVE_WITH_MODULES([KMS], [libdrm >= 2.4.83], [Linux kernel mode setting output], [auto])
 
 dnl
 dnl  libcaca plugin
@@ -3756,8 +3751,12 @@ AC_ARG_ENABLE([sndio],
 ])
 have_sndio="no"
 AS_IF([test "$enable_sndio" != "no"], [
-  AC_CHECK_HEADER([sndio.h], [
+  PKG_CHECK_MODULES([SNDIO], [sndio], [
     have_sndio="yes"
+  ], [
+    AS_IF([test -n "$enable_sndio"], [
+      AC_MSG_ERROR([${SNDIO_PKG_ERRORS}.)])
+    ])
   ])
 ])
 AM_CONDITIONAL([HAVE_SNDIO], [test "${have_sndio}" = "yes"])
@@ -3864,10 +3863,16 @@ PKG_ENABLE_MODULES_VLC([CHROMAPRINT], [stream_out_chromaprint], [libchromaprint 
 dnl
 dnl  Chromecast streaming support
 dnl
-m4_pushdef([protobuf_lite_version], 2.5.0)
 AC_ARG_VAR(PROTOC, [protobuf compiler])
-AC_CHECK_PROGS(PROTOC, protoc, no)
-PKG_WITH_MODULES([CHROMECAST],[protobuf-lite >= protobuf_lite_version], [
+dnl Intentionally using prefixed binaries for native tool in contribs
+AC_CHECK_TOOL(PROTOC, protoc, no)
+AS_IF([test "x${PROTOC}" != "xno"], [
+    protoc_ver="$(eval ${PROTOC} --version 2>/dev/null | head -1 | sed s/'.* '//)"
+],[
+    protoc_ver="3.1.0"
+])
+m4_pushdef([protobuf_lite_version], ${protoc_ver})
+PKG_WITH_MODULES([CHROMECAST],[protobuf-lite = protobuf_lite_version], [
     AS_IF([test "x${PROTOC}" != "xno"], [
         build_chromecast="yes"
     ], [
@@ -3875,8 +3880,8 @@ PKG_WITH_MODULES([CHROMECAST],[protobuf-lite >= protobuf_lite_version], [
     ])
 ], [
     AS_IF([test "${enable_chromecast}" = "yes"],
-        AC_MSG_ERROR(Library [protobuf-lite >= protobuf_lite_version] needed for [chromecast] was not found),
-        AC_MSG_WARN(Library [protobuf-lite >= protobuf_lite_version] needed for [chromecast] was not found)
+        AC_MSG_ERROR(Library [protobuf-lite = protobuf_lite_version] needed for [chromecast] was not found),
+        AC_MSG_WARN(Library [protobuf-lite = protobuf_lite_version] needed for [chromecast] was not found)
     )
     enable_chromecast="no"
 ], [(Chromecast streaming support)], [auto])
@@ -4158,11 +4163,6 @@ AS_IF([test "${enable_lirc}" = "yes"], [
 AM_CONDITIONAL([HAVE_LIRC], [test "${have_lirc}" = "yes"])
 
 dnl
-dnl  Bitstream
-dnl
-PKG_HAVE_WITH_MODULES([BITSTREAM], [bitstream > 1.4])
-
-dnl
 dnl  SRT plugin
 dnl
 PKG_ENABLE_MODULES_VLC([SRT], [access_srt access_output_srt], [srt >= 1.3.0], [SRT input/output plugin], [auto], [], [], [-DENABLE_SRT])
@@ -4228,7 +4228,7 @@ PKG_ENABLE_MODULES_VLC([MTP], [mtp access_mtp], [libmtp >= 1.0.0], [MTP devices 
 dnl
 dnl UPnP Plugin (Intel SDK)
 dnl
-PKG_ENABLE_MODULES_VLC([UPNP], [upnp], [libupnp], [Intel UPNP SDK],[auto])
+PKG_ENABLE_MODULES_VLC([UPNP], [upnp], [libupnp >= 1.8.3], [Intel UPNP SDK],[auto])
 
 dnl
 dnl mDNS using libmicrodns
@@ -4366,7 +4366,7 @@ dnl Libnotify notification plugin
 dnl
 PKG_ENABLE_MODULES_VLC([NOTIFY], [], [libnotify], [libnotify notification], [auto])
 
-PKG_ENABLE_MODULES_VLC([MEDIALIBRARY], [medialibrary], [medialibrary >= 0.9.3], (medialibrary support), [auto])
+PKG_ENABLE_MODULES_VLC([MEDIALIBRARY], [medialibrary], [medialibrary >= 0.11.2], (medialibrary support), [auto])
 
 dnl
 dnl  Endianness check
@@ -4402,6 +4402,18 @@ AS_IF([test "${with_kde_solid}" != "no"], [
 ])
 AC_SUBST([soliddatadir])
 AM_CONDITIONAL([KDE_SOLID], [test "x${soliddatadir}" != "x"])
+
+dnl
+dnl Doxygen and documentation tools
+dnl
+doxygen_stylesheet=""
+AC_ARG_WITH([doxygen-stylesheet],
+    AS_HELP_STRING([--with-doxygen-stylesheet=PATH],
+                   [Doxygen stylesheet (default is doxygen default)]),
+                   [ doxygen_stylesheet="$with_doxygen_stylesheet" ], [])
+AC_SUBST([doxygen_stylesheet])
+
+
 
 dnl
 dnl  Find tools for win32 packaging

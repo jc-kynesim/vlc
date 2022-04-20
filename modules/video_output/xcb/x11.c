@@ -48,6 +48,7 @@ typedef struct vout_display_sys_t
     bool attached;
     uint8_t depth; /* useful bits per pixel */
     video_format_t fmt;
+    vout_display_place_t place;
 } vout_display_sys_t;
 
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic,
@@ -91,8 +92,44 @@ static void Display (vout_display_t *vd, picture_t *pic)
     xcb_shm_seg_t segment = sys->segment;
     xcb_void_cookie_t ck;
 
-    vlc_xcb_Manage(vd, sys->conn);
+    vlc_xcb_Manage(vd->obj.logger, sys->conn);
 
+    /* Black out the borders */
+    xcb_rectangle_t rectv[4], *rect;
+    unsigned int rectc = 0;
+
+    if (sys->place.x > 0) {
+        rect = &rectv[rectc++];
+        rect->x = 0;
+        rect->y = 0;
+        rect->width = sys->place.x;
+        rect->height = vd->cfg->display.height;
+    }
+    if (sys->place.x + sys->place.width < vd->cfg->display.width) {
+        rect = &rectv[rectc++];
+        rect->x = sys->place.x + sys->place.width;
+        rect->y = 0;
+        rect->width = vd->cfg->display.width - rect->x;
+        rect->height = vd->cfg->display.height;
+    }
+    if (sys->place.y > 0) {
+        rect = &rectv[rectc++];
+        rect->x = sys->place.x;
+        rect->y = 0;
+        rect->width = sys->place.width;
+        rect->height = sys->place.y;
+    }
+    if (sys->place.y + sys->place.height < vd->cfg->display.height) {
+        rect = &rectv[rectc++];
+        rect->x = sys->place.x;
+        rect->y = sys->place.y + sys->place.height;
+        rect->width = sys->place.width;
+        rect->height = vd->cfg->display.height - rect->y;
+    }
+
+    xcb_poly_fill_rectangle(conn, sys->window, sys->gc, rectc, rectv);
+
+    /* Draw the picture */
     if (sys->attached)
         ck = xcb_shm_put_image_checked(conn, sys->window, sys->gc,
               /* real width */ pic->p->i_pitch / pic->p->i_pixel_pitch,
@@ -101,18 +138,34 @@ static void Display (vout_display_t *vd, picture_t *pic)
                        /* y */ sys->fmt.i_y_offset,
                    /* width */ sys->fmt.i_visible_width,
                   /* height */ sys->fmt.i_visible_height,
-                               0, 0, sys->depth, XCB_IMAGE_FORMAT_Z_PIXMAP,
-                               0, segment, buf->offset);
+                               sys->place.x, sys->place.y, sys->depth,
+                               XCB_IMAGE_FORMAT_Z_PIXMAP, 0,
+                               segment, buf->offset);
     else {
-        const size_t offset = sys->fmt.i_y_offset * pic->p->i_pitch;
-        const unsigned lines = pic->p->i_lines - sys->fmt.i_y_offset;
+        const size_t offset = sys->fmt.i_x_offset * pic->p->i_pixel_pitch
+                            + sys->fmt.i_y_offset * pic->p->i_pitch;
+        unsigned int lines = pic->p->i_lines - sys->fmt.i_y_offset;
+
+        if (sys->fmt.i_x_offset > 0) {
+            /*
+             * Draw the last line separately as the scan line padding would
+             * potentially reach beyond the end of the picture buffer.
+             */
+            lines--;
+            xcb_put_image(conn, XCB_IMAGE_FORMAT_Z_PIXMAP, sys->window,
+                          sys->gc, pic->p->i_visible_pitch, 1,
+                          sys->place.x, sys->place.y + sys->place.height - 1,
+                          0, sys->depth, pic->p->i_visible_pitch,
+                          pic->p->p_pixels + offset + lines * pic->p->i_pitch);
+        }
 
         ck = xcb_put_image_checked(conn, XCB_IMAGE_FORMAT_Z_PIXMAP,
-                               sys->window, sys->gc,
-                               pic->p->i_pitch / pic->p->i_pixel_pitch,
-                               lines, -sys->fmt.i_x_offset, 0, 0, sys->depth,
-                               pic->p->i_pitch * lines,
-                               pic->p->p_pixels + offset);
+                                   sys->window, sys->gc,
+                                   pic->p->i_pitch / pic->p->i_pixel_pitch,
+                                   lines, sys->place.x, sys->place.y,
+                                   0, sys->depth, pic->p->i_pitch * lines,
+                                   pic->p->p_pixels + offset);
+
     }
 
     /* Wait for reply. This makes sure that the X server gets CPU time to
@@ -146,41 +199,38 @@ static int Control(vout_display_t *vd, int query)
     vout_display_sys_t *sys = vd->sys;
 
     switch (query) {
-    case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
+    case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE: {
+        uint32_t mask = XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+        const uint32_t values[] = {
+            vd->cfg->display.width, vd->cfg->display.height,
+        };
+
+        xcb_configure_window(sys->conn, sys->window, mask, values);
+    }
+        /* fall through */
     case VOUT_DISPLAY_CHANGE_ZOOM:
     case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
     case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
     case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
     {
         video_format_t src, *fmt = &sys->fmt;
-        vout_display_place_t place;
+        vout_display_place_t *place = &sys->place;
         int ret = VLC_SUCCESS;
 
-        vout_display_PlacePicture(&place, vd->source, vd->cfg);
+        vout_display_PlacePicture(place, vd->source, vd->cfg);
 
-        uint32_t mask = XCB_CONFIG_WINDOW_X | XCB_CONFIG_WINDOW_Y;
-        const uint32_t values[] = {
-            place.x, place.y, place.width, place.height
-        };
-
-        if (place.width  != sys->fmt.i_visible_width
-         || place.height != sys->fmt.i_visible_height)
-        {
-            mask |= XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+        if (place->width  != sys->fmt.i_visible_width
+         || place->height != sys->fmt.i_visible_height)
             ret = VLC_EGENERIC;
-        }
-
-        /* Move the picture within the window */
-        xcb_configure_window(sys->conn, sys->window, mask, values);
 
         video_format_ApplyRotation(&src, vd->source);
-        fmt->i_width  = src.i_width  * place.width / src.i_visible_width;
-        fmt->i_height = src.i_height * place.height / src.i_visible_height;
+        fmt->i_width  = src.i_width  * place->width / src.i_visible_width;
+        fmt->i_height = src.i_height * place->height / src.i_visible_height;
 
-        fmt->i_visible_width  = place.width;
-        fmt->i_visible_height = place.height;
-        fmt->i_x_offset = src.i_x_offset * place.width / src.i_visible_width;
-        fmt->i_y_offset = src.i_y_offset * place.height / src.i_visible_height;
+        fmt->i_visible_width  = place->width;
+        fmt->i_visible_height = place->height;
+        fmt->i_x_offset = src.i_x_offset * place->width / src.i_visible_width;
+        fmt->i_y_offset = src.i_y_offset * place->height / src.i_visible_height;
 
         return ret;
     }
@@ -271,12 +321,14 @@ static int Open (vout_display_t *vd,
     vd->sys = sys;
 
     /* Get window, connect to X server */
+    struct vlc_logger *log = vd->obj.logger;
     xcb_connection_t *conn;
     const xcb_screen_t *scr;
-    if (vlc_xcb_parent_Create(vd, vd->cfg->window, &conn, &scr) != VLC_SUCCESS)
+    int ret = vlc_xcb_parent_Create(log, vd->cfg->window, &conn, &scr);
+    if (ret != VLC_SUCCESS)
     {
         free (sys);
-        return VLC_EGENERIC;
+        return ret;
     }
     sys->conn = conn;
 
@@ -307,6 +359,7 @@ static int Open (vout_display_t *vd,
     const uint32_t mask =
         XCB_CW_BACK_PIXEL |
         XCB_CW_BORDER_PIXEL |
+        XCB_CW_BIT_GRAVITY |
         XCB_CW_EVENT_MASK |
         XCB_CW_COLORMAP;
     const uint32_t values[] = {
@@ -314,20 +367,22 @@ static int Open (vout_display_t *vd,
         scr->black_pixel,
         /* XCB_CW_BORDER_PIXEL */
         scr->black_pixel,
+        /* XCB_CW_BIT_GRAVITY */
+        XCB_GRAVITY_NORTH_WEST,
         /* XCB_CW_EVENT_MASK */
         0,
         /* XCB_CW_COLORMAP */
         cmap,
     };
-    vout_display_place_t place;
+    vout_display_place_t *place = &sys->place;
 
-    vout_display_PlacePicture(&place, vd->source, vd->cfg);
+    vout_display_PlacePicture(place, vd->source, vd->cfg);
     sys->window = xcb_generate_id (conn);
     sys->gc = xcb_generate_id (conn);
-
-    xcb_create_window(conn, sys->depth, sys->window, vd->cfg->window->handle.xid,
-        place.x, place.y, place.width, place.height, 0,
-        XCB_WINDOW_CLASS_INPUT_OUTPUT, vid, mask, values);
+    xcb_create_window(conn, sys->depth, sys->window,
+                      vd->cfg->window->handle.xid,
+                      0, 0, vd->cfg->display.width, vd->cfg->display.height, 0,
+                      XCB_WINDOW_CLASS_INPUT_OUTPUT, vid, mask, values);
     xcb_map_window(conn, sys->window);
     /* Create graphic context (I wonder why the heck do we need this) */
     xcb_create_gc(conn, sys->gc, sys->window, 0, NULL);
@@ -358,7 +413,6 @@ error:
 vlc_module_begin()
     set_shortname(N_("X11"))
     set_description(N_("X11 video output (XCB)"))
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     set_callback_display(Open, 100)
     add_shortcut("xcb-x11", "x11")

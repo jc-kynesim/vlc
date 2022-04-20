@@ -314,7 +314,7 @@ static inline NSString* CharsToNSString(char * _Nullable cStr)
         [notification setValue:@(YES) forKey:@"_showsButtons"];
     } @catch (NSException *exception) {
         if (exception.name == NSUndefinedKeyException)
-            NSLog(@"VLC macOS notifcations plugin failed to set private notification values.");
+            NSLog(@"VLC macOS notifications plugin failed to set private notification values.");
         else
             @throw exception;
     }
@@ -334,7 +334,6 @@ vlc_module_begin()
     set_shortname("OSX-Notifications")
     set_description(N_("macOS notifications plugin"))
     add_shortcut("growl") // Kept for backwards compatibility
-    set_category(CAT_INTERFACE)
     set_subcategory(SUBCAT_INTERFACE_CONTROL)
     set_capability("interface", 0)
     set_callbacks(Open, Close)

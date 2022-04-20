@@ -48,12 +48,10 @@ public:
     };
 
 public:
-    MLPlaylistListModel(vlc_medialibrary_t * ml, QObject * parent = nullptr);
-
     explicit MLPlaylistListModel(QObject * parent = nullptr);
 
 public: // Interface
-    Q_INVOKABLE MLItemId create(const QString & name);
+    Q_INVOKABLE void create(const QString & name, const QVariantList& initialItems);
 
     Q_INVOKABLE bool append(const MLItemId & playlistId, const QVariantList & ids);
 
@@ -73,18 +71,15 @@ protected: // MLBaseModel implementation
 
     vlc_ml_sorting_criteria_t roleToCriteria(int role) const override;
 
-    ListCacheLoader<std::unique_ptr<MLItem>> * createLoader() const override;
+    std::unique_ptr<MLBaseModel::BaseLoader> createLoader() const override;
 
 private: // Functions
     QString getCover(MLPlaylist * playlist) const;
 
+    void endTransaction();
+
 private: // MLBaseModel implementation
     void onVlcMlEvent(const MLEvent & event) override;
-
-    void thumbnailUpdated(int idx) override;
-
-private slots:
-    void onCover();
 
 signals:
     void coverSizeChanged   ();
@@ -106,14 +101,19 @@ private: // Variables
     QString m_coverDefault;
     QString m_coverPrefix;
 
+    bool m_transactionPending = false;
+    bool m_resetAfterTransaction = false;
+
 private:
     struct Loader : public MLBaseModel::BaseLoader
     {
         Loader(const MLPlaylistListModel & model);
 
-        size_t count() const override;
+        size_t count(vlc_medialibrary_t* ml) const override;
 
-        std::vector<std::unique_ptr<MLItem>> load(size_t index, size_t count) const override;
+        std::vector<std::unique_ptr<MLItem>> load(vlc_medialibrary_t* ml, size_t index, size_t count) const override;
+
+        std::unique_ptr<MLItem> loadItemById(vlc_medialibrary_t* ml, MLItemId itemId) const override;
     };
 };
 

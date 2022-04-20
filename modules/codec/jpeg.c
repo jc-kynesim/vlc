@@ -98,7 +98,7 @@ static const char * const ppsz_enc_options[] = {
 };
 
 static int  OpenEncoder(vlc_object_t *);
-static void CloseEncoder(vlc_object_t *);
+static void CloseEncoder(encoder_t *);
 
 static block_t *EncodeBlock(encoder_t *, picture_t *);
 
@@ -106,7 +106,6 @@ static block_t *EncodeBlock(encoder_t *, picture_t *);
  * Module descriptor
  */
 vlc_module_begin()
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_VCODEC)
     /* decoder main module */
     set_description(N_("JPEG image decoder"))
@@ -119,8 +118,8 @@ vlc_module_begin()
     add_shortcut("jpeg")
     set_section(N_("Encoding"), NULL)
     set_description(N_("JPEG image encoder"))
-    set_capability("encoder", 1000)
-    set_callbacks(OpenEncoder, CloseEncoder)
+    set_capability("video encoder", 1000)
+    set_callback(OpenEncoder)
     add_integer_with_range(ENC_CFG_PREFIX "quality", 95, 0, 100,
                            ENC_QUALITY_TEXT, ENC_QUALITY_LONGTEXT)
 vlc_module_end()
@@ -402,7 +401,7 @@ jpeg_GetOrientation( j_decompress_ptr cinfo )
     if ( exif_marker == NULL )
         return 0;
 
-    /* Check for TIFF header and catch endianess */
+    /* Check for TIFF header and catch endianness */
     i = 0;
 
     /* Just skip data until TIFF header - it should be within 16 bytes from marker start.
@@ -411,7 +410,7 @@ jpeg_GetOrientation( j_decompress_ptr cinfo )
             0x0002: APP1 length entry = 2 bytes
             0x0004: Exif Identifier entry = 6 bytes
             0x000A: Start of TIFF header (Byte order entry) - 4 bytes
-                    - This is what we look for, to determine endianess.
+                    - This is what we look for, to determine endianness.
             0x000E: 0th IFD offset pointer - 4 bytes
 
             exif_marker->data points to the first data after the APP1 marker
@@ -635,7 +634,13 @@ static int OpenEncoder(vlc_object_t *p_this)
     p_sys->i_blocksize = 3 * p_enc->fmt_in.video.i_visible_width * p_enc->fmt_in.video.i_visible_height;
 
     p_enc->fmt_in.i_codec = VLC_CODEC_J420;
-    p_enc->pf_encode_video = EncodeBlock;
+
+    static const struct vlc_encoder_operations ops =
+    {
+        .close = CloseEncoder,
+        .encode_video = EncodeBlock,
+    };
+    p_enc->ops = &ops;
 
     return VLC_SUCCESS;
 }
@@ -685,6 +690,21 @@ static block_t *EncodeBlock(encoder_t *p_enc, picture_t *p_pic)
     jpeg_set_quality(&p_sys->p_jpeg, p_sys->i_quality, TRUE);
 
     jpeg_start_compress(&p_sys->p_jpeg, TRUE);
+
+    unsigned char exif[] = "Exif\x00\x00"
+                           "\x4d\x4d\x00\x2a" /* TIFF BE header */
+                           "\x00\x00\x00\x08" /* IFD0 offset */
+                           "\x00\x01" /* IFD0 tags count */
+                           "\x01\x12" /* tagtype */
+                           "\x00\x03" /* value type (x03 == short) */
+                           "\x00\x00\x00\x01" /* value count */
+                           "\xFF\xFF\x00\x00" /* value if <= 4 bytes or value offset */
+                           "\x00\x00\x00\x00" /* 0 last IFD */
+                           "\x00\x00\x00\x00" /* 0 last IFD offset */
+            ;
+    exif[24] = 0x00;
+    exif[25] = ORIENT_TO_EXIF(p_pic->format.orientation);
+    jpeg_write_marker(&p_sys->p_jpeg, JPEG_APP0 + 1, exif, sizeof(exif) - 1);
 
     /* Encode picture */
     p_row_pointers = vlc_alloc(p_pic->i_planes, sizeof(JSAMPARRAY));
@@ -746,9 +766,8 @@ error:
 /*
  * jpeg encoder destruction
  */
-static void CloseEncoder(vlc_object_t *p_this)
+static void CloseEncoder(encoder_t *p_enc)
 {
-    encoder_t *p_enc = (encoder_t *)p_this;
     encoder_sys_t *p_sys = p_enc->p_sys;
 
     free(p_sys);

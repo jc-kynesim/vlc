@@ -21,6 +21,7 @@ import QtQuick.Layouts 1.11
 import QtQml.Models 2.11
 
 import org.videolan.vlc 0.1
+import org.videolan.compat 0.1
 
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
@@ -75,7 +76,6 @@ FocusScope {
     Component.onCompleted: {
         visibleChanged.connect(_handleFocus)
         activeFocusChanged.connect(_handleFocus)
-        model.countChanged.connect(_handleFocus)
     }
 
     RowLayout {
@@ -92,7 +92,13 @@ FocusScope {
         Repeater {
             id: repeater
 
+            // NOTE: We apply the 'navigation chain' after adding the item.
+            onItemAdded: item.applyNavigation()
+
             onItemRemoved: {
+                // NOTE: We update the 'navigation chain' after removing the item.
+                item.removeNavigation()
+
                 item.recoverFocus(index)
             }
 
@@ -122,30 +128,14 @@ FocusScope {
                 readonly property real minimumWidth: (expandable ? item.minimumWidth : item.implicitWidth)
                 readonly property bool expandable: (item.minimumWidth !== undefined)
 
-                Binding {
+                BindingCompat {
                     delayed: true // this is important
                     target: loader
                     property: "visible"
                     value: (loader.x + minimumWidth <= rowLayout.width)
                 }
 
-                function buildFocusChain() {
-                    // rebuild the focus chain:
-                    if (typeof repeater === "undefined")
-                        return
-
-                    var rightItem = repeater.itemAt(index + 1)
-                    var leftItem = repeater.itemAt(index - 1)
-
-                    item.Navigation.rightItem = !!rightItem ? rightItem.item : null
-                    item.Navigation.leftItem = !!leftItem ? leftItem.item : null
-                }
-
-                Component.onCompleted: {
-                    repeater.countChanged.connect(loader.buildFocusChain)
-                    MainCtx.controlbarProfileModel.selectedProfileChanged.connect(loader.buildFocusChain)
-                    MainCtx.controlbarProfileModel.currentModel.dirtyChanged.connect(loader.buildFocusChain)
-                }
+                Component.onCompleted: repeater.countChanged.connect(controlLayout._handleFocus)
 
                 onActiveFocusChanged: {
                     if (activeFocus && (!!item && !item.focus)) {
@@ -177,7 +167,8 @@ FocusScope {
                     // so it can be set here unlike leftItem and rightItem:
                     item.Navigation.parentItem = controlLayout
 
-                    if (item instanceof Widgets.IconToolButton)
+                    // FIXME: Do we really need to enforce a defaultSize ?
+                    if (item.size !== undefined)
                         item.size = Qt.binding(function() { return defaultSize; })
 
                     // force colors:
@@ -188,6 +179,47 @@ FocusScope {
                     item.width = Qt.binding(function() { return loader.width } )
 
                     item.visible = Qt.binding(function() { return loader.visible })
+                }
+
+                function applyNavigation() {
+                    var itemLeft  = repeater.itemAt(index - 1)
+                    var itemRight = repeater.itemAt(index + 1)
+
+                    if (itemLeft) {
+                        var componentLeft = itemLeft.item;
+
+                        item.Navigation.leftItem = componentLeft
+
+                        componentLeft.Navigation.rightItem = item
+                    }
+
+                    if (itemRight) {
+                        var componentRight = itemRight.item;
+
+                        item.Navigation.rightItem = componentRight
+
+                        componentRight.Navigation.leftItem = item
+                    }
+                }
+
+                function removeNavigation() {
+                    var itemLeft = repeater.itemAt(index - 1)
+
+                    // NOTE: The current item was removed from the repeater so we test against the
+                    //       same index.
+                    var itemRight = repeater.itemAt(index)
+
+                    if (itemLeft) {
+                        if (itemRight) {
+                            itemLeft.item.Navigation.rightItem = itemRight.item
+                            itemRight.item.Navigation.leftItem = itemLeft.item
+                        }
+                        else
+                            itemLeft.item.Navigation.rightItem = null
+                    }
+                    else if (itemRight) {
+                        itemRight.item.Navigation.leftItem = null
+                    }
                 }
 
                 function _focusIfFocusable(_loader) {
@@ -205,6 +237,9 @@ FocusScope {
                 }
 
                 function recoverFocus(_index) {
+                    if (!controlLayout.visible)
+                        return
+
                     if (_index === undefined)
                         _index = index
 

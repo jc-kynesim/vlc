@@ -38,6 +38,8 @@
 #include <vlc_image.h>
 #include <vlc_block.h>
 
+#include "ancillary.h"
+
 static void PictureDestroyContext( picture_t *p_picture )
 {
     picture_context_t *ctx = p_picture->context;
@@ -98,6 +100,9 @@ void picture_Reset( picture_t *p_picture )
     p_picture->i_nb_fields = 2;
     p_picture->b_top_field_first = false;
     PictureDestroyContext( p_picture );
+
+    picture_priv_t *priv = container_of(p_picture, picture_priv_t, picture);
+    vlc_ancillary_array_Clear(&priv->ancillaries);
 }
 
 /*****************************************************************************
@@ -219,6 +224,8 @@ static bool picture_InitPrivate(const video_format_t *restrict p_fmt,
         priv->gc.destroy = p_resource->pf_destroy;
     else
         priv->gc.destroy = picture_DestroyDummy;
+
+    vlc_ancillary_array_Init(&priv->ancillaries);
 
     return true;
 }
@@ -344,6 +351,7 @@ void picture_Destroy(picture_t *picture)
     picture_priv_t *priv = container_of(picture, picture_priv_t, picture);
     assert(priv->gc.destroy != NULL);
     priv->gc.destroy(picture);
+    vlc_ancillary_array_Clear(&priv->ancillaries);
     free(priv);
 }
 
@@ -395,6 +403,10 @@ void picture_CopyProperties( picture_t *p_dst, const picture_t *p_src )
     p_dst->b_progressive = p_src->b_progressive;
     p_dst->i_nb_fields = p_src->i_nb_fields;
     p_dst->b_top_field_first = p_src->b_top_field_first;
+
+    const picture_priv_t *src_priv = container_of(p_src, picture_priv_t, picture);
+    picture_priv_t *dst_priv = container_of(p_dst, picture_priv_t, picture);
+    vlc_ancillary_array_Dup(&dst_priv->ancillaries, &src_priv->ancillaries);
 }
 
 void picture_CopyPixels( picture_t *p_dst, const picture_t *p_src )
@@ -453,7 +465,46 @@ picture_t *picture_InternalClone(picture_t *picture,
 picture_t *picture_Clone(picture_t *picture)
 {
     picture_t *clone = picture_InternalClone(picture, picture_DestroyClone, picture);
+
+    const picture_priv_t *priv = container_of(picture, picture_priv_t, picture);
+    picture_priv_t *clone_priv = container_of(clone, picture_priv_t, picture);
+    vlc_ancillary_array_Dup(&clone_priv->ancillaries, &priv->ancillaries);
     return clone;
+}
+
+int
+picture_AttachAncillary(picture_t *pic, struct vlc_ancillary *ancillary)
+{
+    picture_priv_t *priv = container_of(pic, picture_priv_t, picture);
+    return vlc_ancillary_array_Insert(&priv->ancillaries, ancillary);
+}
+
+void *
+picture_AttachNewAncillary(picture_t *pic, vlc_ancillary_id id, size_t size)
+{
+    void *data = malloc(size);
+    if (!data)
+        return NULL;
+
+    struct vlc_ancillary *ancillary = vlc_ancillary_Create(data, id);
+    if (!ancillary) {
+        free(data);
+        return NULL;
+    }
+
+    if (picture_AttachAncillary(pic, ancillary) != 0) {
+        vlc_ancillary_Release(ancillary);
+        return NULL;
+    }
+
+    return data;
+}
+
+struct vlc_ancillary *
+picture_GetAncillary(const picture_t *pic, vlc_ancillary_id id)
+{
+    picture_priv_t *priv = container_of(pic, picture_priv_t, picture);
+    return vlc_ancillary_array_Get(&priv->ancillaries, id);
 }
 
 /*****************************************************************************

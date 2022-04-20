@@ -22,7 +22,6 @@
 #include <QQuickRenderControl>
 #include "compositor.hpp"
 
-class QOpenGLPaintDevice;
 class QQuickWindow;
 class QQmlEngine;
 class QQmlComponent;
@@ -58,6 +57,8 @@ public:
     //QmlUISurface API
     void setContent(QQmlComponent*,  QQuickItem* rootItem) override;
     QQmlEngine* engine() const override { return m_qmlEngine; }
+
+    QQuickItem * activeFocusItem() const override;
 
 signals:
     void beforeRendering();

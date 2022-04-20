@@ -128,7 +128,7 @@ static void vlc_interrupt_prepare(vlc_interrupt_t *ctx,
 
 /**
  * Cleans up after an interruptible wait: waits for any pending invocations of
- * the callback previously registed with vlc_interrupt_prepare(), and rechecks
+ * the callback previously registered with vlc_interrupt_prepare(), and rechecks
  * for any pending interruption.
  *
  * @warning As this function waits for ongoing callback invocation to complete,
@@ -546,12 +546,8 @@ static void CALLBACK vlc_poll_i11e_wake_self(ULONG_PTR data)
 
 static void vlc_poll_i11e_wake(void *opaque)
 {
-#if !defined(VLC_WINSTORE_APP) || _WIN32_WINNT >= 0x0A00
     HANDLE th = opaque;
     QueueUserAPC(vlc_poll_i11e_wake_self, th, 0);
-#else
-    (void) opaque;
-#endif
 }
 
 static void vlc_poll_i11e_cleanup(void *opaque)

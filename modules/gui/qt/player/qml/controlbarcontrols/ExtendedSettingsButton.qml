@@ -17,6 +17,8 @@
  *****************************************************************************/
 import QtQuick 2.11
 
+import org.videolan.vlc 0.1
+
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
@@ -25,6 +27,6 @@ Widgets.IconControlButton {
     id: extdSettingsBtn
     size: VLCStyle.icon_medium
     iconText: VLCIcons.extended
-    onClicked: dialogProvider.extendedDialog()
-    Accessible.name: i18n.qtr("Extended settings")
+    onClicked: DialogsProvider.extendedDialog()
+    Accessible.name: I18n.qtr("Extended settings")
 }

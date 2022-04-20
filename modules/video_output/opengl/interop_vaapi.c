@@ -33,7 +33,7 @@
 #include <vlc_codec.h>
 #include <vlc_plugin.h>
 
-#include "gl_api.h"
+#include "gl_util.h"
 #include "interop.h"
 #include "../../hw/vaapi/vlc_vaapi.h"
 
@@ -70,6 +70,11 @@ struct priv
                 const EGLint *attrib_list);
         void (*destroyImageKHR)(EGLDisplay, EGLImage image);
     } egl;
+
+    struct
+    {
+        PFNGLBINDTEXTUREPROC BindTexture;
+    } gl;
 
     unsigned fourcc;
     EGLint drm_fourccs[3];
@@ -184,8 +189,8 @@ vaegl_init_fourcc(struct priv *priv, unsigned va_fourcc)
 }
 
 static int
-tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
-                const GLsizei *tex_width, const GLsizei *tex_height,
+tc_vaegl_update(const struct vlc_gl_interop *interop, uint32_t textures[],
+                const int32_t tex_width[], const int32_t tex_height[],
                 picture_t *pic, const size_t *plane_offset)
 {
     (void) plane_offset;
@@ -255,7 +260,7 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
         if (egl_images[i] == NULL)
             goto error;
 
-        interop->vt->BindTexture(interop->tex_target, textures[i]);
+        priv->gl.BindTexture(interop->tex_target, textures[i]);
 
         priv->glEGLImageTargetTexture2DOES(interop->tex_target, egl_images[i]);
     }
@@ -270,7 +275,7 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
         if (egl_images[i] == NULL)
             goto error;
 
-        interop->vt->BindTexture(interop->tex_target, textures[i]);
+        priv->gl.BindTexture(interop->tex_target, textures[i]);
 
         priv->glEGLImageTargetTexture2DOES(interop->tex_target, egl_images[i]);
     }
@@ -441,7 +446,10 @@ Open(vlc_object_t *obj)
         goto error;
     }
 
-    if (!vlc_gl_StrHasToken(interop->api->extensions, "GL_OES_EGL_image"))
+    struct vlc_gl_extension_vt extension_vt;
+    vlc_gl_LoadExtensionFunctions(interop->gl, &extension_vt);
+
+    if (!vlc_gl_HasExtension(&extension_vt, "GL_OES_EGL_image"))
         goto error;
 
     priv = interop->priv = calloc(1, sizeof(struct priv));
@@ -456,10 +464,48 @@ Open(vlc_object_t *obj)
         case VLC_CODEC_VAAPI_420:
             va_fourcc = VA_FOURCC_NV12;
             vlc_sw_chroma = VLC_CODEC_NV12;
+
+            interop->tex_count = 2;
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 1},
+                .h = {1, 1},
+                .internal = GL_RED,
+                .format = GL_RED,
+                .type = GL_UNSIGNED_BYTE,
+            };
+            interop->texs[1] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 2},
+                .h = {1, 2},
+                .internal = GL_RG,
+                .format = GL_RG,
+                .type = GL_UNSIGNED_BYTE,
+            };
+
             break;
         case VLC_CODEC_VAAPI_420_10BPP:
             va_fourcc = VA_FOURCC_P010;
             vlc_sw_chroma = VLC_CODEC_P010;
+
+            if (vlc_gl_interop_GetTexFormatSize(interop, GL_TEXTURE_2D, GL_RG,
+                                                GL_RG16, GL_UNSIGNED_SHORT) != 16)
+                goto error;
+
+            interop->tex_count = 2;
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 1},
+                .h = {1, 1},
+                .internal = GL_R16,
+                .format = GL_RED,
+                .type = GL_UNSIGNED_BYTE,
+            };
+            interop->texs[1] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 1},
+                .h = {1, 2},
+                .internal = GL_RG16,
+                .format = GL_RG,
+                .type = GL_UNSIGNED_BYTE,
+            };
+
             break;
         default:
             vlc_assert_unreachable();
@@ -500,6 +546,11 @@ Open(vlc_object_t *obj)
     if (priv->glEGLImageTargetTexture2DOES == NULL)
         goto error;
 
+    priv->gl.BindTexture =
+        vlc_gl_GetProcAddress(interop->gl, "glBindTexture");
+    if (priv->gl.BindTexture == NULL)
+        goto error;
+
     priv->vadpy = dec_device->opaque;
     assert(priv->vadpy != NULL);
 
@@ -512,10 +563,9 @@ Open(vlc_object_t *obj)
     /* The pictures are uploaded upside-down */
     video_format_TransformBy(&interop->fmt_out, TRANSFORM_VFLIP);
 
-    int ret = opengl_interop_init(interop, GL_TEXTURE_2D, vlc_sw_chroma,
-                                  interop->fmt_in.space);
-    if (ret != VLC_SUCCESS)
-        goto error;
+    interop->tex_target = GL_TEXTURE_2D;
+    interop->fmt_out.i_chroma = vlc_sw_chroma;
+    interop->fmt_out.space = interop->fmt_in.space;
 
     static const struct vlc_gl_interop_ops ops = {
         .update_textures = tc_vaegl_update,
@@ -536,7 +586,6 @@ vlc_module_begin ()
     set_description("VA-API OpenGL surface converter")
     set_capability("glinterop", 1)
     set_callback(Open)
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     add_shortcut("vaapi")
 vlc_module_end ()

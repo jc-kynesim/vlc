@@ -16,11 +16,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 import QtQuick 2.11
+import QtQml.Models 2.11
 import QtQuick.Controls 2.4
+
 import org.videolan.vlc 0.1
 
 import "qrc:///style/"
 import "qrc:///util/Helpers.js" as Helpers
+import "qrc:///util/" as Util
 
 FocusScope {
     id: root
@@ -58,8 +61,8 @@ FocusScope {
                                                              /
                                                              _effectiveCellWidth), 1)
 
-    property var delegateModel
-    property var model
+    property Util.SelectableDelegateModel selectionDelegateModel
+    property QtAbstractItemModel model
 
     property int currentIndex: 0
 
@@ -80,9 +83,6 @@ FocusScope {
 
     //delegate to display the extended item
     property Component delegate: Item{}
-    property Component expandDelegate: Item{}
-
-    property Component headerDelegate: Item{}
 
     property var _idChildrenList: []
     property var _unusedItemList: []
@@ -95,18 +95,19 @@ FocusScope {
     property alias contentX: flickable.contentX
     property alias gridScrollBar: flickableScrollBar
 
+    property alias expandDelegate: expandItemLoader.sourceComponent
     property alias expandItem: expandItemLoader.item
 
+    property alias headerDelegate: headerItemLoader.sourceComponent
     property alias headerHeight: headerItemLoader.implicitHeight
     property alias headerItem: headerItemLoader.item
 
-    property alias footerItem: footerItemLoader.item
     property alias footerDelegate: footerItemLoader.sourceComponent
+    property alias footerItem: footerItemLoader.item
 
     // Signals
 
     //signals emitted when selected items is updated from keyboard
-    signal selectionUpdated( int keyModifiers, int oldIndex,int newIndex )
     signal selectAll()
     signal actionAtIndex(int index)
 
@@ -153,7 +154,7 @@ FocusScope {
                 newIndex = Math.min(_count - 1, currentIndex + 1)
             }
         } else if (KeyHelper.matchLeft(event)) {
-            if (currentIndex % _nbItemPerRow !== 0) {//are we not at the begining of line
+            if (currentIndex % _nbItemPerRow !== 0) {//are we not at the beginning of line
                 newIndex = Math.max(0, currentIndex - 1)
             }
         } else if (KeyHelper.matchDown(event)) {
@@ -185,7 +186,7 @@ FocusScope {
 
             var oldIndex = currentIndex;
             currentIndex = newIndex;
-            selectionUpdated(event.modifiers, oldIndex, newIndex);
+            selectionDelegateModel.updateSelection(event.modifiers, oldIndex, newIndex)
 
             // NOTE: We make sure we have the proper visual focus on components.
             if (oldIndex < currentIndex)
@@ -205,7 +206,7 @@ FocusScope {
 
         if (event.matches(StandardKey.SelectAll)) {
             event.accepted = true
-            selectAll()
+            selectionDelegateModel.select(model.index(0, 0), ItemSelectionModel.Select | ItemSelectionModel.Columns)
         } else if ( KeyHelper.matchOk(event) ) {
             event.accepted = true
             actionAtIndex(currentIndex)
@@ -231,7 +232,7 @@ FocusScope {
     }
 
     Connections {
-        target: delegateModel
+        target: selectionDelegateModel
 
         onSelectionChanged: {
             var i
@@ -377,8 +378,8 @@ FocusScope {
     }
 
     function leftClickOnItem(modifier, index) {
-        delegateModel.updateSelection(modifier, currentIndex, index)
-        if (delegateModel.isSelected(model.index(index, 0)))
+        selectionDelegateModel.updateSelection(modifier, currentIndex, index)
+        if (selectionDelegateModel.isSelected(model.index(index, 0)))
             currentIndex = index
         else if (currentIndex === index) {
             if (_containsItem(currentIndex))
@@ -391,7 +392,7 @@ FocusScope {
     }
 
     function rightClickOnItem(index) {
-        if (!delegateModel.isSelected(model.index(index, 0))) {
+        if (!selectionDelegateModel.isSelected(model.index(index, 0))) {
             leftClickOnItem(Qt.NoModifier, index)
         }
     }
@@ -417,27 +418,29 @@ FocusScope {
     }
 
     function _calculateCurrentRange() {
-        var myContentY = flickable.contentY - headerHeight - topMargin
-
+        var myContentY = flickable.contentY
         var contentYWithoutExpand = myContentY
         var heightWithoutExpand = flickable.height + displayMarginEnd
+
         if (expandIndex !== -1) {
-            if (myContentY >= expandItem.y && myContentY < expandItem.y + _expandItemVerticalSpace)
-                contentYWithoutExpand = expandItem.y
-            if (myContentY >= expandItem.y + _expandItemVerticalSpace)
+            var expandItemY = getItemPos(flickable.getExpandItemGridId())[1]
+
+            if (myContentY >= expandItemY && myContentY < expandItemY + _expandItemVerticalSpace)
+                contentYWithoutExpand = expandItemY
+            if (myContentY >= expandItemY + _expandItemVerticalSpace)
                 contentYWithoutExpand = myContentY - _expandItemVerticalSpace
 
-            var expandYStart = Math.max(myContentY, expandItem.y)
-            var expandYEnd = Math.min(myContentY + height, expandItem.y + _expandItemVerticalSpace)
+            var expandYStart = Math.max(myContentY, expandItemY)
+            var expandYEnd = Math.min(myContentY + height, expandItemY + _expandItemVerticalSpace)
             var expandDisplayedHeight = Math.max(expandYEnd - expandYStart, 0)
             heightWithoutExpand -= expandDisplayedHeight
         }
 
-        var rowId = Math.floor(contentYWithoutExpand / _effectiveCellHeight)
+        var onlyGridContentY = contentYWithoutExpand - headerHeight - topMargin
+        var rowId = Math.floor(onlyGridContentY / _effectiveCellHeight)
         var firstId = Math.max(rowId * _nbItemPerRow, 0)
 
-
-        rowId = Math.ceil((contentYWithoutExpand + heightWithoutExpand) / _effectiveCellHeight)
+        rowId = Math.ceil((onlyGridContentY + heightWithoutExpand) / _effectiveCellHeight)
         var lastId = Math.min(rowId * _nbItemPerRow, _count)
 
         return [firstId, lastId]
@@ -460,25 +463,23 @@ FocusScope {
 
     function _repositionItem(id, x, y) {
         var item = _getItem(id)
-        if (item === undefined)
-            throw "wrong child: " + id
+        console.assert(item !== undefined, "wrong child: " + id)
 
         //theses properties are always defined in Item
         item.x = x
         item.y = y
-        item.selected = delegateModel.isSelected(model.index(id, 0))
+        item.selected = selectionDelegateModel.isSelected(model.index(id, 0))
 
         return item
     }
 
     function _recycleItem(id, x, y) {
         var item = _unusedItemList.pop()
-        if (item === undefined)
-            throw "wrong toRecycle child " + id + ", len " + toUse.length
+        console.assert(item !== undefined, "incorrect _recycleItem call, id" + id + " ununsedItemList size" + _unusedItemList.length)
 
         item.index = id
         item.model = model.getDataAt(id)
-        item.selected = delegateModel.isSelected(model.index(id, 0))
+        item.selected = selectionDelegateModel.isSelected(model.index(id, 0))
         item.x = x
         item.y = y
         item.visible = true
@@ -490,16 +491,15 @@ FocusScope {
 
     function _createItem(id, x, y) {
         var item = delegate.createObject( flickable.contentItem, {
-                        selected: delegateModel.isSelected(model.index(id, 0)),
+                        selected: selectionDelegateModel.isSelected(model.index(id, 0)),
                         index: id,
                         model: model.getDataAt(id),
                         x: x,
                         y: y,
                         visible: true
-                    });
-        if (item === undefined)
-            throw "wrong unable to instantiate child " + id
+                    })
 
+        console.assert(item !== undefined, "unable to instantiate " + id)
         _setItem(id, item)
 
         return item
@@ -562,8 +562,6 @@ FocusScope {
         id: flickable
 
         flickableDirection: Flickable.VerticalFlick
-        boundsBehavior: Flickable.StopAtBounds
-        boundsMovement :Flickable.StopAtBounds
 
         ScrollBar.vertical: ScrollBar {
             id: flickableScrollBar
@@ -577,8 +575,8 @@ FocusScope {
                     Helpers.enforceFocus(flickable, Qt.MouseFocusReason)
 
                     if (!(modifiers & (Qt.ShiftModifier | Qt.ControlModifier))) {
-                        if (delegateModel)
-                            delegateModel.clear()
+                        if (selectionDelegateModel)
+                            selectionDelegateModel.clear()
                     }
                 }
             }
@@ -589,12 +587,14 @@ FocusScope {
                 }
             }
         }
+        
+        Util.FlickableScrollHandler { }
 
         Loader {
             id: headerItemLoader
+
             //load the header early (when the first row is visible)
             visible: flickable.contentY < (root.headerHeight + root._effectiveCellHeight + root.topMargin)
-            sourceComponent: headerDelegate
             focus: item.focus
             onFocusChanged: {
                 if (!focus)
@@ -635,7 +635,7 @@ FocusScope {
 
         Loader {
             id: expandItemLoader
-            sourceComponent: expandDelegate
+
             active: root.expandIndex !== -1
             focus: active
 
@@ -649,17 +649,7 @@ FocusScope {
 
         anchors.fill: parent
 
-        onContentYChanged: { scrollLayoutTimer.start() }
-
-        Timer {
-            id: scrollLayoutTimer
-
-            interval: 1
-            running: false
-            repeat: false
-            triggeredOnStart: false
-            onTriggered: flickable.layout(false)
-        }
+        onContentYChanged: { Qt.callLater(flickable.layout, false) }
 
         function getExpandItemGridId() {
             var ret
@@ -727,7 +717,6 @@ FocusScope {
 
             root.rowX = getItemPos(0)[0]
 
-            var i
             var expandItemGridId = getExpandItemGridId()
 
             var f_l = _calculateCurrentRange()
@@ -742,8 +731,6 @@ FocusScope {
 
             _updateChildrenMap(firstId, lastId)
 
-            var item
-            var pos
             // Place the delegates before the expandItem
             _setupIndexes(forceRelayout, [firstId, topGridEndId], 0)
 
@@ -757,11 +744,14 @@ FocusScope {
             // Place the delegates after the expandItem
             _setupIndexes(forceRelayout, [topGridEndId, lastId], root._expandItemVerticalSpace)
 
-            // Calculate and set the contentHeight
-            var newContentHeight = root.getItemPos(root._count - 1)[1] + root._effectiveCellHeight + root._expandItemVerticalSpace
-            contentHeight = newContentHeight + root.bottomMargin // topMargin is included from root.getItemPos
-            contentHeight += footerItemLoader.item ? footerItemLoader.item.height : 0
-            contentWidth = root._effectiveCellWidth * root._nbItemPerRow - root.horizontalSpacing
+            // update contentWidth and contentHeight
+            var gridContentWidth = root._effectiveCellWidth * root._nbItemPerRow - root.horizontalSpacing
+            contentWidth = root.leftMargin + gridContentWidth + root.rightMargin
+
+            var gridContentHeight = root.getItemPos(root._count - 1)[1] + root._effectiveCellHeight + root._expandItemVerticalSpace
+            contentHeight = gridContentHeight
+                    + (footerItemLoader.item ? footerItemLoader.item.height : 0)
+                    + root.bottomMargin // topMargin and headerHeight is included in root.getItemPos
         }
 
         Connections {

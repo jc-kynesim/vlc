@@ -62,7 +62,6 @@ static void CloseFrag  (vlc_object_t *);
 
 vlc_module_begin ()
     set_description(N_("MP4/MOV muxer"))
-    set_category(CAT_SOUT)
     set_subcategory(SUBCAT_SOUT_MUX)
     set_shortname("MP4")
 
@@ -74,7 +73,6 @@ vlc_module_begin ()
 
 add_submodule ()
     set_description(N_("Fragmented and streamable MP4 muxer"))
-    set_category(CAT_SOUT)
     set_subcategory(SUBCAT_SOUT_MUX)
     set_shortname("MP4 Frag")
     add_shortcut("mp4frag", "mp4stream")
@@ -879,7 +877,7 @@ static block_t *ConvertSUBT(block_t *p_block)
     p_block = block_Realloc(p_block, 2, p_block->i_buffer);
     if( !p_block )
         return NULL;
-    /* No trailling '\0' */
+    /* No trailing '\0' */
     if (p_block->i_buffer > 2 && p_block->p_buffer[p_block->i_buffer-1] == '\0')
         p_block->i_buffer--;
 

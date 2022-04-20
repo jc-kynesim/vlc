@@ -19,6 +19,7 @@
 #include "mainctx_win32.hpp"
 #include "mainui.hpp"
 
+#define D3D11_NO_HELPERS  // avoid tons of warnings
 #include <d3d11.h>
 
 #include <dwmapi.h>
@@ -159,8 +160,8 @@ void CompositorWin7::destroyMainInterface()
 
 void CompositorWin7::unloadGUI()
 {
-    commonGUIDestroy();
     m_qmlView.reset();
+    commonGUIDestroy();
 }
 
 bool CompositorWin7::setupVoutWindow(vout_window_t *p_wnd, VoutDestroyCb destroyCb)
@@ -188,6 +189,11 @@ QWindow *CompositorWin7::interfaceMainWindow() const
 Compositor::Type CompositorWin7::type() const
 {
     return Compositor::Win7Compositor;
+}
+
+QQuickItem * CompositorWin7::activeFocusItem() const /* override */
+{
+    return m_qmlView->activeFocusItem();
 }
 
 bool CompositorWin7::eventFilter(QObject*, QEvent* ev)

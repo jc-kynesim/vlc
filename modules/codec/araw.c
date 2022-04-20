@@ -48,7 +48,6 @@ vlc_module_begin ()
     /* audio decoder module */
     set_description( N_("Raw/Log Audio decoder") )
     set_capability( "audio decoder", 100 )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACODEC )
     set_callback( DecoderOpen )
 
@@ -56,7 +55,7 @@ vlc_module_begin ()
     /* audio encoder submodule */
     add_submodule ()
     set_description( N_("Raw audio encoder") )
-    set_capability( "encoder", 150 )
+    set_capability( "audio encoder", 150 )
     set_callback( EncoderOpen )
 #endif
 vlc_module_end ()
@@ -891,7 +890,6 @@ static int EncoderOpen( vlc_object_t *p_this )
     }
 
     p_enc->p_sys = (void *)encode;
-    p_enc->pf_encode_audio = Encode;
     p_enc->fmt_out.audio.i_bytes_per_frame =
         (p_enc->fmt_out.audio.i_bitspersample / 8) *
         p_enc->fmt_in.audio.i_channels;
@@ -903,6 +901,10 @@ static int EncoderOpen( vlc_object_t *p_this )
     msg_Dbg( p_enc, "samplerate:%dHz channels:%d bits/sample:%d",
              p_enc->fmt_out.audio.i_rate, p_enc->fmt_out.audio.i_channels,
              p_enc->fmt_out.audio.i_bitspersample );
+
+    static const struct vlc_encoder_operations ops =
+        { .encode_audio = Encode };
+    p_enc->ops = &ops;
 
     return VLC_SUCCESS;
 }

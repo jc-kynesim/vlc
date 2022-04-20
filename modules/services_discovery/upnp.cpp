@@ -1,7 +1,7 @@
 /*****************************************************************************
  * upnp.cpp :  UPnP discovery module (libupnp)
  *****************************************************************************
- * Copyright (C) 2004-2018 VLC authors and VideoLAN
+ * Copyright (C) 2004-2021 VLC authors and VideoLAN
  *
  * Authors: Rémi Denis-Courmont (original plugin)
  *          Christian Henz <henz # c-lab.de>
@@ -9,6 +9,9 @@
  *          Hugo Beauzée-Luyssen <hugo@beauzee.fr>
  *          Shaleen Jain <shaleen@jain.sh>
  *          William Ung <william1.ung@epitech.eu>
+ *          Felix Paul Kühne <fkuehne # videolan.org>
+ *          Bastien Penavayre <swac31@gmail.com>
+ *          Andreas Krug <akrug@arcor.de>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published by
@@ -135,7 +138,6 @@ VLC_RD_PROBE_HELPER( "upnp_renderer", N_("UPnP Renderer Discovery") )
 vlc_module_begin()
     set_shortname( "UPnP" );
     set_description( N_( "Universal Plug'n'Play" ) );
-    set_category( CAT_PLAYLIST );
     set_subcategory( SUBCAT_PLAYLIST_SD );
     set_capability( "services_discovery", 0 );
     set_callbacks( SD::OpenSD, SD::CloseSD );
@@ -147,7 +149,6 @@ vlc_module_begin()
                 nullptr )
 
     add_submodule()
-        set_category( CAT_INPUT )
         set_subcategory( SUBCAT_INPUT_ACCESS )
         set_callbacks( Access::OpenAccess, Access::CloseAccess )
         set_capability( "access", 0 )
@@ -156,7 +157,6 @@ vlc_module_begin()
 
     add_submodule()
         set_description( N_( "UPnP Renderer Discovery" ) )
-        set_category( CAT_SOUT )
         set_subcategory( SUBCAT_SOUT_RENDERER )
         set_callbacks( RD::OpenRD, RD::CloseRD )
         set_capability( "renderer_discovery", 0 )
@@ -169,7 +169,6 @@ vlc_module_begin()
         set_description(N_("UPnP/DLNA stream output"))
         set_capability("sout output", 0)
         add_shortcut("dlna")
-        set_category(CAT_SOUT)
         set_subcategory(SUBCAT_SOUT_STREAM)
         set_callbacks(DLNA::OpenSout, DLNA::CloseSout)
 
@@ -201,7 +200,7 @@ IXML_Document* parseBrowseResult( IXML_Document* p_doc )
     IXML_Document* p_result_doc = ixmlParseBuffer( psz_raw_didl );
     if( !p_result_doc ) {
         /* Missing namespaces confuse the ixml parser. This is a very ugly
-         * hack but it is needeed until devices start sending valid XML.
+         * hack but it is needed until devices start sending valid XML.
          *
          * It works that way:
          *
@@ -646,7 +645,7 @@ MediaServerList::parseSatipServer( IXML_Element* p_device_element, const char *p
 {
     SD::MediaServerDesc* p_server = NULL;
 
-    char *psz_satip_channellist = config_GetPsz("satip-channelist");
+    char *psz_satip_channellist = var_InheritString( m_sd, "satip-channelist");
 
     /* In Auto mode, default to MasterList list from satip.info */
     bool automode = false;
@@ -667,7 +666,7 @@ MediaServerList::parseSatipServer( IXML_Element* p_device_element, const char *p
 
     /* Part 1: a user may have provided a custom playlist url */
     if (strcmp(psz_satip_channellist, "CustomList") == 0) {
-        char *psz_satip_playlist_url = config_GetPsz( "satip-channellist-url" );
+        char *psz_satip_playlist_url = var_InheritString( m_sd, "satip-channellist-url" );
         if ( psz_satip_playlist_url ) {
             p_server = new(std::nothrow) SD::MediaServerDesc( psz_udn, psz_friendly_name, psz_satip_playlist_url, iconUrl );
 
@@ -734,7 +733,7 @@ MediaServerList::parseSatipServer( IXML_Element* p_device_element, const char *p
      * MasterList is a list of usual Satellites */
 
     char *psz_url;
-    if (asprintf( &psz_url, "http://www.satip.info/Playlists/%s.m3u",
+    if (asprintf( &psz_url, "https://www.satip.info/Playlists/%s.m3u",
                 psz_satip_channellist ) < 0 ) {
         vlc_UrlClean( &url );
         free( psz_satip_channellist );
@@ -910,13 +909,13 @@ namespace
             psz_album_artist = xml_getChildElementValue( itemElement, "upnp:albumArtist" );
             psz_albumArt = xml_getChildElementValue( itemElement, "upnp:albumArtURI" );
             const char *psz_media_type = xml_getChildElementValue( itemElement, "upnp:class" );
-            if (strcmp(psz_media_type, "object.item.videoItem") == 0)
+            if (strncmp(psz_media_type, "object.item.videoItem", 21) == 0)
                 media_type = VIDEO;
-            else if (strcmp(psz_media_type, "object.item.audioItem") == 0)
+            else if (strncmp(psz_media_type, "object.item.audioItem", 21) == 0)
                 media_type = AUDIO;
-            else if (strcmp(psz_media_type, "object.item.imageItem") == 0)
+            else if (strncmp(psz_media_type, "object.item.imageItem", 21) == 0)
                 media_type = IMAGE;
-            else if (strcmp(psz_media_type, "object.container") == 0)
+            else if (strncmp(psz_media_type, "object.container", 16 ) == 0)
                 media_type = CONTAINER;
             else
                 return false;

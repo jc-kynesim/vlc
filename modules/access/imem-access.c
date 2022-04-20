@@ -23,29 +23,38 @@
 #endif
 #include <assert.h>
 #include <stdint.h>
+#include <limits.h>
 
 #include <vlc_common.h>
 #include <vlc_access.h>
 #include <vlc_plugin.h>
 
+#include <vlc/libvlc.h>
+#include <vlc/libvlc_picture.h>
+#include <vlc/libvlc_media.h>
+
 typedef struct
 {
     void *opaque;
-    ssize_t (*read_cb)(void *, unsigned char *, size_t);
-    int (*seek_cb)(void *, uint64_t);
-    void (*close_cb)(void *);
+    libvlc_media_read_cb read_cb;
+    libvlc_media_seek_cb seek_cb;
+    libvlc_media_close_cb close_cb;
     uint64_t size;
 } access_sys_t;
 
 static ssize_t Read(stream_t *access, void *buf, size_t len)
 {
     access_sys_t *sys = access->p_sys;
+    static_assert(sizeof(ptrdiff_t) == sizeof(ssize_t),
+                  "libvlc_media_read_cb type mismatch");
+    static_assert(PTRDIFF_MAX == SSIZE_MAX,
+                  "libvlc_media_read_cb type mismatch");
 
-    ssize_t val = sys->read_cb(sys->opaque, buf, len);
+    ptrdiff_t val = sys->read_cb(sys->opaque, buf, len);
 
     if (val < 0) {
         msg_Err(access, "read error");
-        val = 0;
+        return 0; // end of stream (incl. fatal error)
     }
 
     return val;
@@ -116,7 +125,7 @@ static int Open(vlc_object_t *object)
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
 
-    int (*open_cb)(void *, void **, uint64_t *);
+    libvlc_media_open_cb open_cb;
     void *opaque;
 
     opaque = var_InheritAddress(access, "imem-data");
@@ -158,7 +167,6 @@ static void Close(vlc_object_t *object)
 vlc_module_begin()
     set_shortname(N_("Memory stream"))
     set_description(N_("In-memory stream input"))
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_ACCESS)
 
     add_shortcut("imem")

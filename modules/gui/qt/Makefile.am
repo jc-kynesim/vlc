@@ -6,9 +6,9 @@
 # For each UI
 #   - Add *.ui to ..._UI
 #   - Add *.h to nodist_..._SOURCES
-# For each ressource (icon, png, ...)
+# For each resource (icon, png, ...)
 #   - Add it to DEPS_res
-# For each qml and js ressource
+# For each qml and js resource
 #   - Add it to ..._QML
 
 SUFFIXES += .ui .h .hpp .moc.cpp .qml
@@ -41,9 +41,11 @@ if HAVE_XCB
 libqt_plugin_la_CXXFLAGS += -DQT5_HAS_XCB $(XCB_CFLAGS)
 libqt_plugin_la_LIBADD += $(XCB_LIBS)
 if HAVE_XCB_DAMAGE
+if HAVE_XCB_XFIXES
 libqt_plugin_la_CXXFLAGS += -DQT5_HAS_X11_COMPOSITOR \
-        $(XCB_RENDER_CFLAGS) $(XCB_COMPOSITE_CFLAGS) $(XLCB_DAMAGE_CFLAGS)
-libqt_plugin_la_LIBADD += $(XCB_RENDER_LIBS) $(XCB_COMPOSITE_LIBS) $(XCB_DAMAGE_LIBS)
+        $(XCB_RENDER_CFLAGS) $(XCB_COMPOSITE_CFLAGS) $(XLCB_DAMAGE_CFLAGS) $(XCB_XFIXES_CFLAGS)
+libqt_plugin_la_LIBADD += $(XCB_RENDER_LIBS) $(XCB_COMPOSITE_LIBS) $(XCB_DAMAGE_LIBS) $(XCB_XFIXES_LIBS)
+endif
 endif
 endif
 
@@ -54,6 +56,7 @@ libqt_plugin_la_CXXFLAGS += $(WAYLAND_CLIENT_CFLAGS)
 libqt_plugin_la_LIBADD += $(WAYLAND_CLIENT_LIBS)
 endif
 if HAVE_WIN32
+libqt_plugin_la_CXXFLAGS += $(LIBCOMCXXFLAGS)
 libqt_plugin_la_LIBADD += $(LIBCOM) -lcomctl32 -luuid -ld3d11
 endif
 if UPDATE_CHECK
@@ -108,6 +111,10 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/dialogs/podcast/podcast_configuration.hpp \
 	gui/qt/dialogs/preferences/complete_preferences.cpp \
 	gui/qt/dialogs/preferences/complete_preferences.hpp \
+	gui/qt/dialogs/preferences/expert_model.cpp \
+	gui/qt/dialogs/preferences/expert_model.hpp \
+	gui/qt/dialogs/preferences/expert_view.cpp \
+	gui/qt/dialogs/preferences/expert_view.hpp \
 	gui/qt/dialogs/preferences/preferences.cpp \
 	gui/qt/dialogs/preferences/preferences.hpp \
 	gui/qt/dialogs/preferences/preferences_widgets.cpp \
@@ -160,6 +167,8 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlbookmarkmodel.cpp \
 	gui/qt/medialibrary/mlbookmarkmodel.hpp \
 	gui/qt/medialibrary/mlevent.hpp \
+	gui/qt/medialibrary/mlfolder.cpp \
+	gui/qt/medialibrary/mlfolder.hpp \
 	gui/qt/medialibrary/mlfoldersmodel.cpp \
 	gui/qt/medialibrary/mlfoldersmodel.hpp \
 	gui/qt/medialibrary/mlgenre.cpp \
@@ -168,12 +177,14 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlgenremodel.hpp \
 	gui/qt/medialibrary/mlgroup.cpp \
 	gui/qt/medialibrary/mlgroup.hpp \
-	gui/qt/medialibrary/mlgrouplistmodel.cpp \
-	gui/qt/medialibrary/mlgrouplistmodel.hpp \
 	gui/qt/medialibrary/mlhelper.cpp \
 	gui/qt/medialibrary/mlhelper.hpp \
 	gui/qt/medialibrary/mlitemcover.cpp \
 	gui/qt/medialibrary/mlitemcover.hpp \
+	gui/qt/medialibrary/mllistcache.cpp \
+	gui/qt/medialibrary/mllistcache.hpp \
+	gui/qt/medialibrary/mlthreadpool.cpp \
+	gui/qt/medialibrary/mlthreadpool.hpp \
 	gui/qt/medialibrary/mlqmltypes.hpp \
 	gui/qt/medialibrary/mlqueryparams.cpp \
 	gui/qt/medialibrary/mlqueryparams.hpp \
@@ -185,6 +196,10 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlurlmodel.hpp \
 	gui/qt/medialibrary/mlvideo.cpp \
 	gui/qt/medialibrary/mlvideo.hpp \
+	gui/qt/medialibrary/mlvideofoldersmodel.cpp \
+	gui/qt/medialibrary/mlvideofoldersmodel.hpp \
+	gui/qt/medialibrary/mlvideogroupsmodel.cpp \
+	gui/qt/medialibrary/mlvideogroupsmodel.hpp \
 	gui/qt/medialibrary/mlvideomodel.cpp \
 	gui/qt/medialibrary/mlvideomodel.hpp \
 	gui/qt/medialibrary/mlplaylist.cpp \
@@ -214,6 +229,8 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/player/player_controller.cpp gui/qt/player/player_controller.hpp gui/qt/player/player_controller_p.hpp \
 	gui/qt/player/player_controlbar_model.cpp gui/qt/player/player_controlbar_model.hpp \
 	gui/qt/player/control_list_model.cpp gui/qt/player/control_list_model.hpp \
+	gui/qt/player/control_list_filter.cpp \
+	gui/qt/player/control_list_filter.hpp \
 	gui/qt/playlist/media.hpp \
 	gui/qt/playlist/playlist_common.cpp \
 	gui/qt/playlist/playlist_common.hpp \
@@ -235,11 +252,12 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/util/imagehelper.cpp gui/qt/util/imagehelper.hpp \
 	gui/qt/util/i18n.cpp gui/qt/util/i18n.hpp \
 	gui/qt/util/keyhelper.cpp gui/qt/util/keyhelper.hpp \
-	gui/qt/util/listcache.hpp \
 	gui/qt/util/listcacheloader.hpp \
 	gui/qt/util/navigation_history.cpp gui/qt/util/navigation_history.hpp \
 	gui/qt/util/item_key_event_filter.cpp \
 	gui/qt/util/item_key_event_filter.hpp \
+	gui/qt/util/flickable_scroll_handler.cpp \
+	gui/qt/util/flickable_scroll_handler.hpp \
 	gui/qt/util/qt_dirs.cpp gui/qt/util/qt_dirs.hpp \
 	gui/qt/util/qvlcapp.hpp \
 	gui/qt/util/proxycolumnmodel.hpp \
@@ -296,6 +314,7 @@ endif
 
 if HAVE_XCB
 if HAVE_XCB_DAMAGE
+if HAVE_XCB_XFIXES
 libqt_plugin_la_SOURCES += \
 	gui/qt/maininterface/compositor_x11.cpp \
 	gui/qt/maininterface/compositor_x11.hpp \
@@ -307,6 +326,7 @@ libqt_plugin_la_SOURCES += \
 	gui/qt/maininterface/compositor_x11_uisurface.hpp \
 	gui/qt/maininterface/compositor_x11_utils.cpp \
 	gui/qt/maininterface/compositor_x11_utils.hpp
+endif
 endif
 endif
 
@@ -355,6 +375,8 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/dialogs/plugins/plugins.moc.cpp \
 	gui/qt/dialogs/podcast/podcast_configuration.moc.cpp \
 	gui/qt/dialogs/preferences/complete_preferences.moc.cpp \
+	gui/qt/dialogs/preferences/expert_model.moc.cpp \
+	gui/qt/dialogs/preferences/expert_view.moc.cpp \
 	gui/qt/dialogs/preferences/preferences.moc.cpp \
 	gui/qt/dialogs/preferences/preferences_widgets.moc.cpp \
 	gui/qt/dialogs/preferences/simple_preferences.moc.cpp \
@@ -382,7 +404,8 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlbasemodel.moc.cpp \
 	gui/qt/medialibrary/mlfoldersmodel.moc.cpp \
 	gui/qt/medialibrary/mlgenremodel.moc.cpp \
-	gui/qt/medialibrary/mlgrouplistmodel.moc.cpp \
+	gui/qt/medialibrary/mllistcache.moc.cpp \
+	gui/qt/medialibrary/mlthreadpool.moc.cpp \
 	gui/qt/medialibrary/mlqmltypes.moc.cpp \
 	gui/qt/medialibrary/mlrecentsmodel.moc.cpp \
 	gui/qt/medialibrary/mlrecentsvideomodel.moc.cpp \
@@ -391,6 +414,8 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlvideomodel.moc.cpp \
 	gui/qt/medialibrary/mlplaylistlistmodel.moc.cpp \
 	gui/qt/medialibrary/mlplaylistmodel.moc.cpp \
+	gui/qt/medialibrary/mlvideofoldersmodel.moc.cpp \
+	gui/qt/medialibrary/mlvideogroupsmodel.moc.cpp \
 	gui/qt/menus/custom_menus.moc.cpp \
 	gui/qt/menus/qml_menu_wrapper.moc.cpp \
 	gui/qt/menus/menus.moc.cpp \
@@ -402,6 +427,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/player/player_controller.moc.cpp \
 	gui/qt/player/player_controlbar_model.moc.cpp \
 	gui/qt/player/control_list_model.moc.cpp \
+	gui/qt/player/control_list_filter.moc.cpp \
 	gui/qt/playlist/playlist_common.moc.cpp \
 	gui/qt/playlist/playlist_controller.moc.cpp \
 	gui/qt/playlist/playlist_item.moc.cpp \
@@ -409,14 +435,13 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/util/asynctask.moc.cpp \
 	gui/qt/util/audio_device_model.moc.cpp \
 	gui/qt/util/color_scheme_model.moc.cpp \
-	gui/qt/util/covergenerator.moc.cpp \
 	gui/qt/util/imageluminanceextractor.moc.cpp \
 	gui/qt/util/i18n.moc.cpp \
 	gui/qt/util/keyhelper.moc.cpp \
-	gui/qt/util/listcache.moc.cpp \
 	gui/qt/util/navigation_history.moc.cpp \
 	gui/qt/util/item_key_event_filter.moc.cpp \
 	gui/qt/util/mouse_event_filter.moc.cpp \
+	gui/qt/util/flickable_scroll_handler.moc.cpp \
 	gui/qt/util/qvlcapp.moc.cpp \
 	gui/qt/util/renderer_manager.moc.cpp \
 	gui/qt/util/selectable_list_model.moc.cpp \
@@ -450,12 +475,14 @@ endif
 
 if HAVE_XCB
 if HAVE_XCB_DAMAGE
+if HAVE_XCB_XFIXES
 nodist_libqt_plugin_la_SOURCES += \
 	gui/qt/maininterface/compositor_x11.moc.cpp \
 	gui/qt/maininterface/compositor_x11_renderclient.moc.cpp \
 	gui/qt/maininterface/compositor_x11_renderwindow.moc.cpp \
 	gui/qt/maininterface/compositor_x11_uisurface.moc.cpp \
 	gui/qt/maininterface/compositor_x11_utils.moc.cpp
+endif
 endif
 endif
 
@@ -726,13 +753,11 @@ libqt_plugin_la_QML = \
 	gui/qt/maininterface/qml/MainDisplay.qml \
 	gui/qt/maininterface/qml/MainGridView.qml \
 	gui/qt/maininterface/qml/MainTableView.qml \
-	gui/qt/maininterface/qml/MiniPlayerBottomMargin.qml \
 	gui/qt/maininterface/qml/NoMedialibHome.qml \
 	gui/qt/medialibrary/qml/ArtistTopBanner.qml \
 	gui/qt/medialibrary/qml/AudioGridItem.qml \
 	gui/qt/medialibrary/qml/EmptyLabel.qml \
 	gui/qt/medialibrary/qml/MediaGroupDisplay.qml \
-	gui/qt/medialibrary/qml/MediaGroupList.qml \
 	gui/qt/medialibrary/qml/MusicAlbums.qml \
 	gui/qt/medialibrary/qml/MusicAlbumsDisplay.qml \
 	gui/qt/medialibrary/qml/MusicAlbumsGridExpandDelegate.qml \
@@ -751,7 +776,7 @@ libqt_plugin_la_QML = \
 	gui/qt/medialibrary/qml/VideoDisplay.qml \
 	gui/qt/medialibrary/qml/VideoAll.qml \
 	gui/qt/medialibrary/qml/VideoAllDisplay.qml \
-	gui/qt/medialibrary/qml/VideoGroupsDisplay.qml \
+	gui/qt/medialibrary/qml/VideoAllSubDisplay.qml \
 	gui/qt/medialibrary/qml/PlaylistMediaList.qml \
 	gui/qt/medialibrary/qml/PlaylistMedia.qml \
 	gui/qt/medialibrary/qml/PlaylistMediaDelegate.qml \
@@ -798,8 +823,10 @@ libqt_plugin_la_QML = \
 	gui/qt/player/qml/controlbarcontrols/AspectRatioWidget.qml \
 	gui/qt/player/qml/controlbarcontrols/AtoBButton.qml \
 	gui/qt/player/qml/controlbarcontrols/BackButton.qml \
+	gui/qt/player/qml/controlbarcontrols/BookmarkButton.qml \
 	gui/qt/player/qml/controlbarcontrols/ChapterNextButton.qml \
 	gui/qt/player/qml/controlbarcontrols/ChapterPreviousButton.qml \
+	gui/qt/player/qml/controlbarcontrols/DvdMenuButton.qml \
 	gui/qt/player/qml/controlbarcontrols/ExpandingSpacerWidget.qml \
 	gui/qt/player/qml/controlbarcontrols/ExtendedSettingsButton.qml \
 	gui/qt/player/qml/controlbarcontrols/FasterButton.qml \
@@ -809,6 +836,7 @@ libqt_plugin_la_QML = \
 	gui/qt/player/qml/controlbarcontrols/LangButton.qml \
 	gui/qt/player/qml/controlbarcontrols/LoopButton.qml \
 	gui/qt/player/qml/controlbarcontrols/MenuButton.qml \
+	gui/qt/player/qml/controlbarcontrols/NavigationWidget.qml \
 	gui/qt/player/qml/controlbarcontrols/NextButton.qml \
 	gui/qt/player/qml/controlbarcontrols/OpenButton.qml \
 	gui/qt/player/qml/controlbarcontrols/PlaybackSpeedButton.qml \
@@ -818,7 +846,9 @@ libqt_plugin_la_QML = \
 	gui/qt/player/qml/controlbarcontrols/PreviousButton.qml \
 	gui/qt/player/qml/controlbarcontrols/QuitButton.qml \
 	gui/qt/player/qml/controlbarcontrols/RandomButton.qml \
+	gui/qt/player/qml/controlbarcontrols/RendererButton.qml \
 	gui/qt/player/qml/controlbarcontrols/RecordButton.qml \
+	gui/qt/player/qml/controlbarcontrols/ReverseButton.qml \
 	gui/qt/player/qml/controlbarcontrols/SkipBackButton.qml \
 	gui/qt/player/qml/controlbarcontrols/SkipForwardButton.qml \
 	gui/qt/player/qml/controlbarcontrols/SlowerButton.qml \
@@ -840,6 +870,12 @@ libqt_plugin_la_QML = \
 	gui/qt/style/qmldir \
 	gui/qt/util/qml/Helpers.js \
 	gui/qt/util/qml/SelectableDelegateModel.qml \
+	gui/qt/util/qml/ModelSortSettingHandler.qml \
+	gui/qt/util/qml/MultipleBinding.qml \
+	gui/qt/util/qml/FlickableScrollHandler.qml \
+	gui/qt/util/qml/ViewDragAutoScrollHandler.qml \
+	gui/qt/util/qml/BindingRev8.qml \
+	gui/qt/util/qml/BindingRev14.qml \
 	gui/qt/widgets/qml/ActionButtonOverlay.qml \
 	gui/qt/widgets/qml/ActionButtonPrimary.qml \
 	gui/qt/widgets/qml/BannerTabButton.qml \
@@ -847,7 +883,6 @@ libqt_plugin_la_QML = \
 	gui/qt/widgets/qml/CaptionLabel.qml \
 	gui/qt/widgets/qml/CheckedDelegate.qml \
 	gui/qt/widgets/qml/ComboBoxExt.qml \
-	gui/qt/widgets/qml/ContextButton.qml \
 	gui/qt/widgets/qml/AcrylicBackground.qml \
 	gui/qt/widgets/qml/AnimatedBackground.qml \
 	gui/qt/widgets/qml/CoverShadow.qml \
@@ -888,6 +923,7 @@ libqt_plugin_la_QML = \
 	gui/qt/widgets/qml/NavigableRow.qml \
 	gui/qt/widgets/qml/PlayCover.qml \
 	gui/qt/widgets/qml/RoundButton.qml \
+	gui/qt/widgets/qml/ScaledImage.qml \
 	gui/qt/widgets/qml/ScanProgressBar.qml \
 	gui/qt/widgets/qml/ScrollingText.qml \
 	gui/qt/widgets/qml/SearchBox.qml \

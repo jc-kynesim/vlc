@@ -36,7 +36,6 @@
 struct vlc_gl_priv_t
 {
     vlc_gl_t gl;
-    vlc_atomic_rc_t rc;
 };
 
 static int vlc_gl_start(void *func, bool forced, va_list ap)
@@ -84,6 +83,7 @@ vlc_gl_t *vlc_gl_Create(const struct vout_display_cfg *restrict cfg,
     gl->api_type = api_type;
     gl->surface = wnd;
     gl->device = NULL;
+
     gl->module = vlc_module_load(gl, type, name, true, vlc_gl_start, gl,
                                  cfg->display.width, cfg->display.height);
     if (gl->module == NULL)
@@ -93,7 +93,6 @@ vlc_gl_t *vlc_gl_Create(const struct vout_display_cfg *restrict cfg,
     }
     assert(gl->make_current && gl->release_current && gl->swap
         && gl->get_proc_address);
-    vlc_atomic_rc_init(&glpriv->rc);
 
     return &glpriv->gl;
 }
@@ -147,8 +146,6 @@ vlc_gl_t *vlc_gl_CreateOffscreen(vlc_object_t *parent,
     /* The implementation must initialize the output chroma */
     assert(gl->offscreen_chroma_out != VLC_CODEC_UNKNOWN);
 
-    vlc_atomic_rc_init(&glpriv->rc);
-
     assert(gl->make_current);
     assert(gl->release_current);
     assert(gl->swap_offscreen);
@@ -157,18 +154,8 @@ vlc_gl_t *vlc_gl_CreateOffscreen(vlc_object_t *parent,
     return &glpriv->gl;
 }
 
-void vlc_gl_Hold(vlc_gl_t *gl)
+void vlc_gl_Delete(vlc_gl_t *gl)
 {
-    struct vlc_gl_priv_t *glpriv = (struct vlc_gl_priv_t *)gl;
-    vlc_atomic_rc_inc(&glpriv->rc);
-}
-
-void vlc_gl_Release(vlc_gl_t *gl)
-{
-    struct vlc_gl_priv_t *glpriv = (struct vlc_gl_priv_t *)gl;
-    if (!vlc_atomic_rc_dec(&glpriv->rc))
-        return;
-
     if (gl->destroy != NULL)
         gl->destroy(gl);
 
@@ -226,11 +213,11 @@ vlc_gl_t *vlc_gl_surface_Create(vlc_object_t *obj,
     };
     char *modlist = var_InheritString(obj, "window");
 
-    vout_window_t *surface = vout_window_New(obj, modlist, &owner);
+    vout_window_t *surface = vout_window_New(obj, modlist, &owner, cfg);
     free(modlist);
     if (surface == NULL)
         goto error;
-    if (vout_window_Enable(surface, cfg)) {
+    if (vout_window_Enable(surface)) {
         vout_window_Delete(surface);
         goto error;
     }
@@ -302,7 +289,7 @@ void vlc_gl_surface_Destroy(vlc_gl_t *gl)
     vout_window_t *surface = gl->surface;
     vlc_gl_surface_t *sys = surface->owner.sys;
 
-    vlc_gl_Release(gl);
+    vlc_gl_Delete(gl);
     vout_window_Disable(surface);
     vout_window_Delete(surface);
     free(sys);

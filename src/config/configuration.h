@@ -54,6 +54,11 @@ int  config_AutoSaveConfigFile( vlc_object_t * );
 
 void config_Free(struct vlc_param *, size_t);
 
+#ifdef HAVE_DYNAMIC_PLUGINS
+void config_CmdLineEarlyScan( vlc_object_t *, int, const char *[] );
+#define config_CmdLineEarlyScan(a,b,c) config_CmdLineEarlyScan(VLC_OBJECT(a),b,c)
+#endif
+
 int config_LoadCmdLine   ( vlc_object_t *, int, const char *[], int * );
 int config_LoadConfigFile( vlc_object_t * );
 #define config_LoadCmdLine(a,b,c,d) config_LoadCmdLine(VLC_OBJECT(a),b,c,d)
@@ -64,7 +69,6 @@ int config_SortConfig (void);
 void config_UnsortConfig (void);
 
 extern vlc_mutex_t config_lock;
-extern _Atomic bool config_dirty;
 
 bool config_IsSafe (const char *);
 

@@ -25,6 +25,7 @@ pluginsinclude_HEADERS = \
 	../include/vlc_access.h \
 	../include/vlc_actions.h \
 	../include/vlc_addons.h \
+	../include/vlc_ancillary.h \
 	../include/vlc_aout.h \
 	../include/vlc_aout_volume.h \
 	../include/vlc_arrays.h \
@@ -45,6 +46,7 @@ pluginsinclude_HEADERS = \
 	../include/vlc_decoder.h \
 	../include/vlc_demux.h \
 	../include/vlc_dialog.h \
+	../include/vlc_diffutil.h \
 	../include/vlc_epg.h \
 	../include/vlc_es.h \
 	../include/vlc_es_out.h \
@@ -53,6 +55,7 @@ pluginsinclude_HEADERS = \
 	../include/vlc_filter.h \
 	../include/vlc_fingerprinter.h \
 	../include/vlc_fourcc.h \
+	../include/vlc_frame.h \
 	../include/vlc_fs.h \
 	../include/vlc_gcrypt.h \
 	../include/vlc_hash.h \
@@ -79,6 +82,7 @@ pluginsinclude_HEADERS = \
 	../include/vlc_network.h \
 	../include/vlc_objects.h \
 	../include/vlc_opengl.h \
+	../include/vlc_opengl_interop.h \
 	../include/vlc_picture.h \
 	../include/vlc_picture_fifo.h \
 	../include/vlc_picture_pool.h \
@@ -203,6 +207,7 @@ libvlccore_la_SOURCES = \
 	missing.c \
 	revision.c \
 	version.c \
+	config/ansi_term.h \
 	config/configuration.h \
 	config/core.c \
 	config/chain.c \
@@ -212,6 +217,8 @@ libvlccore_la_SOURCES = \
 	config/cmdline.c \
 	config/getopt.c \
 	config/vlc_getopt.h \
+	config/jaro_winkler.c \
+	config/vlc_jaro_winkler.h \
 	extras/libc.c \
 	media_source/media_source.c \
 	media_source/media_source.h \
@@ -329,8 +336,9 @@ libvlccore_la_SOURCES = \
 	video_output/vout_subpictures.c \
 	video_output/vout_spuregion_helper.h \
 	video_output/vout_wrapper.h \
+	video_output/video_window.c \
+	video_output/video_window.h \
 	video_output/window.c \
-	video_output/window.h \
 	video_output/opengl.c \
 	video_output/vout_intf.c \
 	video_output/vout_internal.h \
@@ -354,12 +362,14 @@ libvlccore_la_SOURCES = \
 	text/iso_lang.c \
 	text/iso-639_def.h \
 	misc/actions.c \
+	misc/ancillary.h \
+	misc/ancillary.c \
 	misc/executor.c \
 	misc/md5.c \
 	misc/probe.c \
 	misc/rand.c \
 	misc/mtime.c \
-	misc/block.c \
+	misc/frame.c \
 	misc/fifo.c \
 	misc/fourcc.c \
 	misc/fourcc_list.h \
@@ -376,6 +386,7 @@ libvlccore_la_SOURCES = \
 	misc/renderer_discovery.c \
 	misc/threads.c \
 	misc/cpu.c \
+	misc/diffutil.c \
 	misc/epg.c \
 	misc/exit.c \
 	misc/events.c \
@@ -403,7 +414,9 @@ libvlccore_la_SOURCES = \
 libvlccore_la_LIBADD = $(LIBS_libvlccore) \
 	../compat/libcompat.la \
 	$(LTLIBINTL) $(LTLIBICONV) \
-	$(IDN_LIBS) $(SOCKET_LIBS) $(ATOMIC_LIB) $(LIBRT) $(LIBDL) $(LIBM)
+	$(IDN_LIBS) $(SOCKET_LIBS) $(LIBRT) $(LIBDL) $(LIBM)
+
+libvlccore_la_CPPFLAGS = $(AM_CPPFLAGS) $(CPPFLAGS_libvlccore)
 
 if HAVE_WIN32
 libvlccore_la_SOURCES += \
@@ -461,6 +474,7 @@ endif
 
 if HAVE_FREEBSD
 libvlccore_la_SOURCES += \
+	freebsd/cpu.c \
 	freebsd/thread.c
 endif
 
@@ -496,6 +510,7 @@ libvlccore_la_SOURCES += posix/sort.c
 endif
 libvlccore_la_SOURCES += \
 	posix/thread.c
+libvlccore_la_LIBADD += $(LIBEXECINFO)
 if !HAVE_DARWIN
 libvlccore_la_SOURCES += \
 	posix/dirs.c \
@@ -543,7 +558,7 @@ libvlccore_la_LDFLAGS = \
 libvlccore_la_DEPENDENCIES = libvlccore.sym
 if HAVE_WIN32
 libvlccore_la_DEPENDENCIES += libvlc_win32_rc.$(OBJEXT)
-libvlccore_la_LDFLAGS += -Wl,libvlc_win32_rc.$(OBJEXT) -avoid-version -Wc,-static $(LIBCOM)
+libvlccore_la_LDFLAGS += -Wl,libvlc_win32_rc.$(OBJEXT) -avoid-version -Wc,-static
 endif
 if HAVE_OS2
 libvlccore_la_LDFLAGS += -avoid-version
@@ -560,7 +575,7 @@ libvlccore_la_LDFLAGS +=  -Wl,-framework,Foundation -Xlinker -install_name -Xlin
 endif
 
 # iOS and tvOS applications cannot install global shared libraries and
-# dylibs must be in frameworks so there's no need for libtool versionning.
+# dylibs must be in frameworks so there's no need for libtool versioning.
 if HAVE_IOS
 libvlccore_la_LDFLAGS += -avoid-version
 endif
@@ -593,6 +608,7 @@ check_PROGRAMS = \
 	test_executor \
 	test_i18n_atof \
 	test_interrupt \
+	test_jaro_winkler \
 	test_list \
 	test_md5 \
 	test_picture_pool \
@@ -610,7 +626,8 @@ check_PROGRAMS = \
 	test_randomizer \
 	test_media_source \
 	test_extensions \
-	test_thread
+	test_thread \
+	test_diffutil
 
 TESTS = $(check_PROGRAMS) check_symbols
 
@@ -623,6 +640,7 @@ test_executor_SOURCES = test/executor.c
 test_i18n_atof_SOURCES = test/i18n_atof.c
 test_interrupt_SOURCES = test/interrupt.c
 test_interrupt_LDADD = $(LDADD) $(LIBS_libvlccore)
+test_jaro_winkler_SOURCES = test/jaro_winkler.c config/jaro_winkler.c
 test_list_SOURCES = test/list.c
 test_md5_SOURCES = test/md5.c
 test_picture_pool_SOURCES = test/picture_pool.c
@@ -637,6 +655,7 @@ test_arrays_SOURCES = test/arrays.c
 test_vector_SOURCES = test/vector.c
 test_shared_data_ptr_SOURCES = test/shared_data_ptr.cpp
 test_extensions_SOURCES = test/extensions.c
+test_diffutil_SOURCES = test/diffutil.c
 test_playlist_SOURCES = playlist/test.c \
 	playlist/content.c \
 	playlist/control.c \

@@ -37,6 +37,9 @@
 #include <QPainterPath>
 #include <QQuickWindow>
 #include <QGuiApplication>
+#include <QSGImageNode>
+#include <QtQml>
+#include <QQmlFile>
 
 #ifdef QT_NETWORK_LIB
 #include <QNetworkAccessManager>
@@ -71,57 +74,51 @@ namespace
     // images are cached (result of RoundImageGenerator) with the cost calculated from QImage::sizeInBytes
     QCache<ImageCacheKey, QImage> imageCache(2 * 1024 * 1024); // 2 MiB
 
-    QString getPath(const QUrl &url)
-    {
-        QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
-        if (path.startsWith("qrc:///"))
-            path.replace(0, strlen("qrc:///"), ":/");
-        return path;
-    }
-
     std::unique_ptr<QIODevice> getReadable(const QUrl &url)
+    try
     {
-#ifdef QT_NETWORK_LIB
-        if (url.scheme() == "http" || url.scheme() == "https")
+        if (!QQmlFile::isLocalFile(url))
         {
+#ifdef QT_NETWORK_LIB
             QNetworkAccessManager networkMgr;
             networkMgr.setRedirectPolicy(QNetworkRequest::NoLessSafeRedirectPolicy);
             auto reply = networkMgr.get(QNetworkRequest(url));
             QEventLoop loop;
-            QObject::connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
+            QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
             loop.exec();
 
-            class DataOwningBuffer : public QBuffer
+            if (reply->error() != QNetworkReply::NoError)
+                throw std::runtime_error(reply->errorString().toStdString());
+
+            class DataOwningBuffer : private QByteArray, public QBuffer
             {
             public:
-                DataOwningBuffer(const QByteArray &data) : m_data {data}
-                {
-                    setBuffer(&m_data);
-                }
-
-                ~DataOwningBuffer()
-                {
-                    close();
-                    setBuffer(nullptr);
-                }
-
-            private:
-                QByteArray m_data;
+                explicit DataOwningBuffer(const QByteArray &data)
+                    : QByteArray(data), QBuffer(this, nullptr) { }
             };
 
             auto file = std::make_unique<DataOwningBuffer>(reply->readAll());
             file->open(QIODevice::ReadOnly);
             return file;
-        }
+#else
+            throw std::runtime_error("Qt Network Library is not available!");
 #endif
-
-        auto file = std::make_unique<QFile>(getPath(url));
-        file->open(QIODevice::ReadOnly);
-        return file;
+        }
+        else
+        {
+            auto file = std::make_unique<QFile>(QQmlFile::urlToLocalFileOrQrc(url));
+            file->open(QIODevice::ReadOnly);
+            return file;
+        }
+    }
+    catch (const std::exception& error)
+    {
+        qWarning() << "Could not load source image:" << url << error.what();
+        return {};
     }
 }
 
-RoundImage::RoundImage(QQuickItem *parent) : QQuickPaintedItem {parent}
+RoundImage::RoundImage(QQuickItem *parent) : QQuickItem {parent}
 {
     if (window() || qGuiApp)
         setDPR(window() ? window()->devicePixelRatio() : qGuiApp->devicePixelRatio());
@@ -130,30 +127,55 @@ RoundImage::RoundImage(QQuickItem *parent) : QQuickPaintedItem {parent}
     connect(this, &QQuickItem::widthChanged, this, &RoundImage::regenerateRoundImage);
 }
 
-void RoundImage::paint(QPainter *painter)
+QSGNode *RoundImage::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
 {
-    if (m_roundImage.isNull())
-        return;
-    painter->drawImage(QPointF {0., 0.}, m_roundImage, m_roundImage.rect());
-}
+    auto node = static_cast<QSGImageNode *>(oldNode);
 
-void RoundImage::classBegin()
-{
-    QQuickPaintedItem::classBegin();
+    if (!node)
+    {
+        assert(window());
+        node = window()->createImageNode();
+        assert(node);
+        node->setOwnsTexture(true);
+    }
 
-    m_isComponentComplete = false;
+    if (m_dirty)
+    {
+        if (!m_roundImage.isNull())
+        {
+            assert(window());
+
+            QSGTexture* texture = window()->createTextureFromImage(m_roundImage,
+                static_cast<QQuickWindow::CreateTextureOptions>((Q_LIKELY(m_roundImage.hasAlphaChannel()) ? QQuickWindow::TextureHasAlphaChannel
+                                                                                                          : 0) |
+                                                                QQuickWindow::TextureCanUseAtlas));
+
+            if (texture)
+            {
+                // No need to delete the old texture manually as it is owned by the node.
+                node->setTexture(texture);
+                node->markDirty(QSGNode::DirtyMaterial);
+            }
+            else
+            {
+                qmlWarning(this) << "Could not generate texture from " << m_roundImage;
+            }
+        }
+
+        m_dirty = false;
+    }
+
+    node->setRect(boundingRect());
+
+    return node;
 }
 
 void RoundImage::componentComplete()
 {
-    QQuickPaintedItem::componentComplete();
+    QQuickItem::componentComplete();
 
-    Q_ASSERT(!m_isComponentComplete); // classBegin is not called?
-    m_isComponentComplete = true;
     if (!m_source.isEmpty())
         regenerateRoundImage();
-    else
-        m_roundImage = {};
 }
 
 QUrl RoundImage::source() const
@@ -166,7 +188,7 @@ qreal RoundImage::radius() const
     return m_radius;
 }
 
-void RoundImage::setSource(QUrl source)
+void RoundImage::setSource(const QUrl& source)
 {
     if (m_source == source)
         return;
@@ -191,7 +213,7 @@ void RoundImage::itemChange(QQuickItem::ItemChange change, const QQuickItem::Ite
     if (change == QQuickItem::ItemDevicePixelRatioHasChanged)
         setDPR(value.realValue);
 
-    QQuickPaintedItem::itemChange(change, value);
+    QQuickItem::itemChange(change, value);
 }
 
 void RoundImage::setDPR(const qreal value)
@@ -205,8 +227,10 @@ void RoundImage::setDPR(const qreal value)
 
 void RoundImage::regenerateRoundImage()
 {
-    if (!m_isComponentComplete || m_enqueuedGeneration)
+    if (!isComponentComplete() || m_enqueuedGeneration)
         return;
+
+    m_roundImageGenerator.reset();
 
     // use Qt::QueuedConnection to delay generation, so that dependent properties
     // subsequent updates can be merged, f.e when VLCStyle.scale changes
@@ -215,30 +239,49 @@ void RoundImage::regenerateRoundImage()
     QMetaObject::invokeMethod(this, [this] ()
     {
         m_enqueuedGeneration = false;
+        assert(!m_roundImageGenerator);
 
-        const qreal scaleWidth = this->width() * m_dpr;
+        const qreal scaledWidth = this->width() * m_dpr;
         const qreal scaledHeight = this->height() * m_dpr;
         const qreal scaledRadius = this->radius() * m_dpr;
 
-        const ImageCacheKey key {source(), QSizeF {scaleWidth, scaledHeight}.toSize(), scaledRadius};
+        const ImageCacheKey key {source(), QSizeF {scaledWidth, scaledHeight}.toSize(), scaledRadius};
         if (auto image = imageCache.object(key)) // should only by called in mainthread
         {
             m_roundImage = *image;
+            m_dirty = true;
+            setFlag(ItemHasContents, true);
             update();
             return;
         }
 
         // Image is generated in size factor of `m_dpr` to avoid scaling artefacts when
         // generated image is set with device pixel ratio
-        m_roundImageGenerator.reset(new RoundImageGenerator(m_source, scaleWidth, scaledHeight, scaledRadius));
+        m_roundImageGenerator.reset(new RoundImageGenerator(m_source, scaledWidth, scaledHeight, scaledRadius));
         connect(m_roundImageGenerator.get(), &BaseAsyncTask::result, this, [this, key]()
         {
-            m_roundImage = m_roundImageGenerator->takeResult();
-            m_roundImage.setDevicePixelRatio(m_dpr);
+            const auto image = new QImage(m_roundImageGenerator->takeResult());
+
             m_roundImageGenerator.reset();
 
-            if (!m_roundImage.isNull())
-                imageCache.insert(key, new QImage(m_roundImage), m_roundImage.sizeInBytes());
+            if (!image->isNull())
+            {
+                image->setDevicePixelRatio(m_dpr);
+
+                imageCache.insert(key, image, image->sizeInBytes());
+
+                setFlag(ItemHasContents, true);
+
+                m_roundImage = *image;
+
+                m_dirty = true;
+            }
+            else
+            {
+                delete image;
+                m_dirty = false;
+                setFlag(ItemHasContents, false);
+            }
 
             update();
         });
@@ -260,6 +303,9 @@ QImage RoundImage::RoundImageGenerator::execute()
     if (width <= 0 || height <= 0)
         return {};
 
+    if (source.isEmpty())
+        return {};
+
     auto file = getReadable(source);
     if (!file || !file->isOpen())
         return {};
@@ -277,23 +323,28 @@ QImage RoundImage::RoundImageGenerator::execute()
     const QPointF alignedCenteredTopLeft {(size.width() - targetSize.width()) / 2., (size.height() - targetSize.height()) / 2.};
     sourceReader.setScaledSize(targetSize.toSize());
 
-    QImage target(width, height, QImage::Format_ARGB32);
+    if (Q_UNLIKELY(radius <= 0))
+    {
+        return sourceReader.read();
+    }
+
+    QImage target(width, height, QImage::Format_ARGB32_Premultiplied);
     if (target.isNull())
         return target;
 
     target.fill(Qt::transparent);
 
-    QPainter painter;
-    painter.begin(&target);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    {
+        QPainter painter(&target);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
-    QPainterPath path;
-    path.addRoundedRect(0, 0, width, height, radius, radius);
-    painter.setClipPath(path);
+        QPainterPath path;
+        path.addRoundedRect(0, 0, width, height, radius, radius);
+        painter.setClipPath(path);
 
-    painter.drawImage({alignedCenteredTopLeft, targetSize}, sourceReader.read());
-    painter.end();
+        painter.drawImage({alignedCenteredTopLeft, targetSize}, sourceReader.read());
+    }
 
     return target;
 }

@@ -17,6 +17,8 @@
  *****************************************************************************/
 import QtQuick 2.11
 
+import org.videolan.vlc 0.1
+
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
@@ -24,7 +26,10 @@ import "qrc:///style/"
 Widgets.IconControlButton {
     id: stepBackBtn
     size: VLCStyle.icon_medium
+
+    enabled: Player.seekable
+
     iconText: VLCIcons.skip_back
-    onClicked: player.jumpBwd()
-    text: i18n.qtr("Step back")
+    onClicked: Player.jumpBwd()
+    text: I18n.qtr("Step back")
 }

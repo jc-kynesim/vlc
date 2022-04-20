@@ -31,6 +31,35 @@
  * Merge (line blending) routines for the VLC deinterlacer.
  */
 
+/**
+ * Average two vectors.
+ *
+ * This callback shall compute the element-wise rounded average of two vectors.
+ * This is used for blending scan lines of two fields for deinterlacing.
+ *
+ * The size of element is specified by the context,
+ * namely \see deinterlace_functions.
+ * Currently 8-bit and 16-bit elements are supported.
+ *
+ * \param d Output vector
+ * \param s1 First source vector
+ * \param s2 Second source vector
+ * \param len size of vectors in bytes
+ */
+
+typedef void (*merge_cb)(void *d, const void *s1, const void *s2, size_t len);
+
+/**
+ * Deinterlacing optimisation callbacks.
+ */
+struct deinterlace_functions {
+    /** Element-wise vector average
+     *
+     * The first array entries are indexed by the binary order of magnitude
+     * of the element size in bytes: 0 for 8-bit, 1 for 16-bit. */
+    merge_cb merges[2];
+};
+
 /*****************************************************************************
  * Macros
  *****************************************************************************/
@@ -112,7 +141,7 @@ void Merge16BitGeneric( void *_p_dest, const void *_p_s1, const void *_p_s2,
 void MergeAltivec ( void *, const void *, const void *, size_t );
 #endif
 
-#if defined(CAN_COMPILE_SSE)
+#if defined(CAN_COMPILE_SSE2)
 /**
  * SSE2 routine to blend pixels from two picture lines.
  *
@@ -132,32 +161,6 @@ void Merge8BitSSE2( void *, const void *, const void *, size_t );
  */
 void Merge16BitSSE2( void *, const void *, const void *, size_t );
 #endif
-
-#if defined(CAN_COMPILE_ARM)
-/**
- * ARM NEON routine to blend pixels from two picture lines.
- */
-void merge8_arm_neon (void *, const void *, const void *, size_t);
-void merge16_arm_neon (void *, const void *, const void *, size_t);
-
-/**
- * ARMv6 SIMD routine to blend pixels from two picture lines.
- */
-void merge8_armv6 (void *, const void *, const void *, size_t);
-void merge16_armv6 (void *, const void *, const void *, size_t);
-#endif
-
-#if defined(CAN_COMPILE_ARM64)
-/**
- * ARM64 NEON routine to blend pixels from two picture lines.
- */
-void merge8_arm64_neon (void *, const void *, const void *, size_t);
-void merge16_arm64_neon (void *, const void *, const void *, size_t);
-
-#endif
-
-void merge8_arm_sve(void *, const void *, const void *, size_t);
-void merge16_arm_sve(void *, const void *, const void *, size_t);
 
 /*****************************************************************************
  * EndMerge routines

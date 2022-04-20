@@ -181,7 +181,7 @@ vlc_decoder_device *
 vlc_decoder_device_Create(vlc_object_t *o, vout_window_t *window)
 {
     struct vlc_decoder_device_priv *priv =
-            vlc_object_create(o, sizeof (*priv));
+            vlc_custom_create(o, sizeof (*priv), "decoder device");
     if (!priv)
         return NULL;
     char *name = var_InheritString(o, "dec-dev");
@@ -240,7 +240,7 @@ vlc_video_context * vlc_video_context_Create(vlc_decoder_device *device,
                                           size_t private_size,
                                           const struct vlc_video_context_operations *ops)
 {
-    assert(private_type != VLC_VIDEO_CONTEXT_NONE); // use a NULL video context for that
+    assert(private_type != 0);
     vlc_video_context *vctx = malloc(sizeof(*vctx) + private_size);
     if (unlikely(vctx == NULL))
         return NULL;
@@ -300,4 +300,16 @@ vlc_decoder_device *vlc_encoder_GetDecoderDevice( encoder_t *enc )
         return NULL;
 
     return enc->cbs->video.get_device( enc );
+}
+
+void vlc_encoder_Destroy(encoder_t *encoder)
+{
+    if (encoder->ops != NULL && encoder->ops->close != NULL)
+        encoder->ops->close(encoder);
+
+    es_format_Clean(&encoder->fmt_in);
+    es_format_Clean(&encoder->fmt_out);
+
+    vlc_objres_clear(VLC_OBJECT(encoder));
+    vlc_object_delete(encoder);
 }

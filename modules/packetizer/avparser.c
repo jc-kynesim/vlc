@@ -103,7 +103,7 @@ int avparser_OpenPacketizer( vlc_object_t *p_this )
     if( !p_ctx )
         return VLC_EGENERIC;
 
-    AVCodec * p_codec = avcodec_find_decoder( i_avcodec_id );
+    const AVCodec * p_codec = avcodec_find_decoder( i_avcodec_id );
     if( unlikely( !p_codec ) )
     {
         av_parser_close( p_ctx );
@@ -253,4 +253,3 @@ static block_t *PacketizeClosed ( decoder_t *p_dec, block_t **pp_block )
         block_Release( *pp_block );
     return NULL;
 }
-

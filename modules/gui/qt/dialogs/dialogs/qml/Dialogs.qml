@@ -32,12 +32,12 @@ Item {
     // Properties
     //---------------------------------------------------------------------------------------------
 
-    property var bgContent: undefined
+    property Item bgContent: null
 
     //---------------------------------------------------------------------------------------------
     // Private
 
-    property var _model: dialogModel.model
+    readonly property DialogErrorModel _model: DialogModel.model
 
     //---------------------------------------------------------------------------------------------
     // Signal
@@ -52,12 +52,12 @@ Item {
     Component.onCompleted: if (_model.count) errorPopup.state = "visible"
 
     Component.onDestruction: {
-        if (questionDialog.dialogId !== undefined) {
-            dialogModel.dismiss(questionDialog.dialogId)
-            questionDialog.dialogId = undefined
-        } if (loginDialog.dialogId !== undefined) {
-            dialogModel.dismiss(loginDialog.dialogId)
-            loginDialog.dialogId = undefined
+        if (questionDialog.dialogId !== null) {
+            DialogModel.dismiss(questionDialog.dialogId)
+            questionDialog.dialogId = null
+        } if (loginDialog.dialogId !== null) {
+            DialogModel.dismiss(loginDialog.dialogId)
+            loginDialog.dialogId = null
         }
     }
 
@@ -75,7 +75,7 @@ Item {
 
     Connections
     {
-        target: dialogModel
+        target: DialogModel
 
         onLogin: {
             loginDialog.dialogId = dialogId
@@ -105,14 +105,14 @@ Item {
         onCancelled: {
             if (questionDialog.dialogId === dialogId) {
                 questionDialog.close()
-                questionDialog.dialogId = undefined
-                dialogModel.dismiss(dialogId)
+                questionDialog.dialogId = null
+                DialogModel.dismiss(dialogId)
             } else if (loginDialog.dialogId === dialogId)  {
                 loginDialog.close()
-                loginDialog.dialogId = undefined
-                dialogModel.dismiss(dialogId)
+                loginDialog.dialogId = null
+                DialogModel.dismiss(dialogId)
             } else {
-                dialogModel.dismiss(dialogId)
+                DialogModel.dismiss(dialogId)
             }
         }
     }
@@ -189,7 +189,9 @@ Item {
 
     ModalDialog {
         id: loginDialog
-        property var dialogId: undefined
+
+        //use var here as DialogId is a QGadget and passed by value
+        property var dialogId: null
         property string defaultUsername: ""
 
         onAboutToHide: restoreFocus()
@@ -199,7 +201,7 @@ Item {
             columns: 2
 
             Text {
-                text: i18n.qtr("User")
+                text: I18n.qtr("User")
                 color: VLCStyle.colors.text
                 font.pixelSize: VLCStyle.fontSize_normal
             }
@@ -219,7 +221,7 @@ Item {
             }
 
             Text {
-                text: i18n.qtr("Password")
+                text: I18n.qtr("Password")
                 color: VLCStyle.colors.text
                 font.pixelSize: VLCStyle.fontSize_normal
             }
@@ -238,7 +240,7 @@ Item {
             }
 
             Text {
-                text: i18n.qtr("Save password")
+                text: I18n.qtr("Save password")
                 color: VLCStyle.colors.text
                 font.pixelSize: VLCStyle.fontSize_normal
             }
@@ -268,7 +270,7 @@ Item {
                     Widgets.TextToolButton {
                         id: loginCancel
                         Layout.fillWidth: true
-                        text: i18n.qtr("cancel")
+                        text: I18n.qtr("cancel")
 
                         Navigation.upItem: savePassword
                         Navigation.rightItem: loginOk
@@ -284,7 +286,7 @@ Item {
                     Widgets.TextToolButton {
                         id: loginOk
                         Layout.fillWidth: true
-                        text: i18n.qtr("Ok")
+                        text: I18n.qtr("Ok")
                         focus: true
 
                         Navigation.upItem: savePassword
@@ -302,15 +304,15 @@ Item {
         }
 
         onAccepted: {
-            if (loginDialog.dialogId !== undefined) {
-                dialogModel.post_login(loginDialog.dialogId, username.text, password.text, savePassword.checked)
-                loginDialog.dialogId = undefined
+            if (loginDialog.dialogId !== null) {
+                DialogModel.post_login(loginDialog.dialogId, username.text, password.text, savePassword.checked)
+                loginDialog.dialogId = null
             }
         }
         onRejected: {
-            if (loginDialog.dialogId !== undefined) {
-                dialogModel.dismiss(loginDialog.dialogId)
-                loginDialog.dialogId = undefined
+            if (loginDialog.dialogId !== null) {
+                DialogModel.dismiss(loginDialog.dialogId)
+                loginDialog.dialogId = null
             }
         }
     }
@@ -318,7 +320,8 @@ Item {
     ModalDialog {
         id: questionDialog
 
-        property var dialogId: undefined
+        //use var here as DialogId is a QGadget and passed by value
+        property var dialogId: null
         property alias text: content.text
         property alias cancelTxt: cancel.text
         property alias action1Txt: action1.text
@@ -363,8 +366,8 @@ Item {
                         Keys.onPressed: Navigation.defaultKeyAction(event)
 
                         onClicked: {
-                            dialogModel.dismiss(questionDialog.dialogId)
-                            questionDialog.dialogId = undefined
+                            DialogModel.dismiss(questionDialog.dialogId)
+                            questionDialog.dialogId = null
                             questionDialog.close()
                         }
                     }
@@ -382,8 +385,8 @@ Item {
                         Keys.onPressed: Navigation.defaultKeyAction(event)
 
                         onClicked: {
-                            dialogModel.post_action1(questionDialog.dialogId)
-                            questionDialog.dialogId = undefined
+                            DialogModel.post_action1(questionDialog.dialogId)
+                            questionDialog.dialogId = null
                             questionDialog.close()
                         }
                     }
@@ -399,8 +402,8 @@ Item {
                         Keys.onPressed: Navigation.defaultKeyAction(event)
 
                         onClicked: {
-                            dialogModel.post_action2(questionDialog.dialogId)
-                            questionDialog.dialogId = undefined
+                            DialogModel.post_action2(questionDialog.dialogId)
+                            questionDialog.dialogId = null
                             questionDialog.close()
                         }
                     }
@@ -429,7 +432,7 @@ Item {
         }
 
         Connections {
-            target: dialogProvider
+            target: DialogsProvider
 
             onShowToolbarEditorDialog: {
                 toolbarEditorDialogLoader.active = true

@@ -51,7 +51,7 @@ static const char *const ppsz_snap_formats[] =
 { "png", "jpg", "tiff" };
 
 /*****************************************************************************
- * Configuration options for the core module. Each module will also separatly
+ * Configuration options for the core module. Each module will also separately
  * define its own configuration options.
  * Look into configuration.h if you need to know more about the following
  * macros.
@@ -271,13 +271,13 @@ static const char *const ppsz_replay_gain_mode_text[] = {
 
 #define WIDTH_TEXT N_("Video width")
 #define WIDTH_LONGTEXT N_( \
-    "You can enforce the video width. By default (-1) VLC will " \
-    "adapt to the video characteristics.")
+    "This requests a specific pixel width for the video window. " \
+    "By default (-1), the width is requested according to the zoom setting.")
 
 #define HEIGHT_TEXT N_("Video height")
 #define HEIGHT_LONGTEXT N_( \
-    "You can enforce the video height. By default (-1) VLC will " \
-    "adapt to the video characteristics.")
+    "This requests a specific pixel height for the video window. " \
+    "By default (-1), the height is requested according to the zoom setting.")
 
 #define VIDEOX_TEXT N_("Video X coordinate")
 #define VIDEOX_LONGTEXT N_( \
@@ -356,7 +356,7 @@ static const int pi_deinterlace[] = {
     0, -1, 1
 };
 static const char * const  ppsz_deinterlace_text[] = {
-    "Off", "Automatic", "On"
+    N_("Off"), N_("Automatic"), N_("On")
 };
 
 #define DEINTERLACE_MODE_TEXT N_("Deinterlace mode")
@@ -709,6 +709,8 @@ static const char *const ppsz_prefres[] = {
     "the form \"{name=bookmark-name,time=optional-time-offset," \
     "bytes=optional-byte-offset},{...}\"")
 
+#define SAVE_RECENTPLAY N_("Save recently played items")
+
 #define RESTORE_PLAYBACK_POS_TEXT N_("Continue playback")
 #define RESTORE_PLAYBACK_POS_LONGTEXT N_("Should the playback resume where " \
     "it was left off?")
@@ -907,7 +909,7 @@ static const char* const ppsz_restore_playback_desc[] = {
 
 #define HTTP_CERT_TEXT N_("HTTP/TLS server certificate")
 #define CERT_LONGTEXT N_( \
-   "This X.509 certicate file (PEM format) is used for server-side TLS. " \
+   "This X.509 certificate file (PEM format) is used for server-side TLS. " \
    "On OS X, the string is used as a label to search the certificate in the keychain." )
 
 #define HTTP_KEY_TEXT N_("HTTP/TLS server private key")
@@ -1042,14 +1044,6 @@ static const char* const ppsz_restore_playback_desc[] = {
     "This allows you to select the order in which VLC will choose its " \
     "packetizers."  )
 
-#define MUX_TEXT N_("Mux module")
-#define MUX_LONGTEXT N_( \
-    "This is a legacy entry to let you configure mux modules")
-
-#define ACCESS_OUTPUT_TEXT N_("Access output module")
-#define ACCESS_OUTPUT_LONGTEXT N_( \
-    "This is a legacy entry to let you configure access output modules")
-
 #define ANN_SAPINTV_TEXT N_("SAP announcement interval")
 #define ANN_SAPINTV_LONGTEXT N_( \
     "When the SAP flow control is disabled, " \
@@ -1079,11 +1073,6 @@ static const char* const ppsz_restore_playback_desc[] = {
     "(like audio and video streams). You can use it if " \
     "the correct demuxer is not automatically detected. You should not "\
     "set this as a global option unless you really know what you are doing." )
-
-#define VOD_SERVER_TEXT N_("VoD server module")
-#define VOD_SERVER_LONGTEXT N_( \
-    "You can select which VoD server module you want to use. Set this " \
-    "to 'vod_rtsp' to switch back to the old, legacy module." )
 
 #define TRACER_TEXT N_("Tracer module")
 #define TRACER_LONGTEXT N_( \
@@ -1213,6 +1202,8 @@ static const char *const psz_recursive_list_text[] = {
 #define SHOW_HIDDENFILES_TEXT N_("Show hidden files")
 #define SHOW_HIDDENFILES_LONGTEXT N_( \
         "Ignore files starting with '.'" )
+
+#define EXTRACTOR_FLATTEN N_("Flatten files listed by extractors (archive)")
 
 #define SD_TEXT N_( "Services discovery modules")
 #define SD_LONGTEXT N_( \
@@ -1557,7 +1548,6 @@ vlc_module_begin ()
     set_description( N_("core program") )
 
 /* Audio options */
-    set_category( CAT_AUDIO )
     set_subcategory( SUBCAT_AUDIO_GENERAL )
     add_category_hint(N_("Audio"), AOUT_CAT_LONGTEXT)
 
@@ -1579,7 +1569,7 @@ vlc_module_begin ()
         change_integer_list( pi_force_dolby_values, ppsz_force_dolby_descriptions )
     add_integer( "stereo-mode", 0, STEREO_MODE_TEXT, NULL )
         change_integer_list( pi_stereo_mode_values, ppsz_stereo_mode_texts )
-    add_integer( "mix-mode", AOUT_MIX_MODE_UNSET, MIX_MODE_TEXT, MIX_MODE_TEXT )
+    add_integer( "mix-mode", AOUT_MIX_MODE_UNSET, MIX_MODE_TEXT, NULL )
         change_integer_list( pi_mix_mode_values, ppsz_mix_mode_texts )
     add_integer( "audio-desync", 0, DESYNC_TEXT,
                  DESYNC_LONGTEXT )
@@ -1600,7 +1590,7 @@ vlc_module_begin ()
               AUDIO_TIME_STRETCH_TEXT, AUDIO_TIME_STRETCH_LONGTEXT )
 
     set_subcategory( SUBCAT_AUDIO_AOUT )
-    add_module("aout", "audio output", NULL, AOUT_TEXT, AOUT_LONGTEXT)
+    add_module("aout", "audio output", "any", AOUT_TEXT, AOUT_LONGTEXT)
         change_short('A')
     add_string( "role", "video", ROLE_TEXT, ROLE_LONGTEXT )
         change_string_list( ppsz_roles, ppsz_roles_text )
@@ -1615,11 +1605,10 @@ vlc_module_begin ()
                AUDIO_VISUAL_TEXT, AUDIO_VISUAL_LONGTEXT)
 
     set_subcategory( SUBCAT_AUDIO_RESAMPLER )
-    add_module("audio-resampler", "audio resampler", NULL,
+    add_module("audio-resampler", "audio resampler", "any",
                AUDIO_RESAMPLER_TEXT, AUDIO_RESAMPLER_LONGTEXT)
 
 /* Video options */
-    set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_GENERAL )
     add_category_hint(N_("Video"), VOUT_CAT_LONGTEXT)
 
@@ -1727,14 +1716,12 @@ vlc_module_begin ()
         change_safe()
 
     set_subcategory( SUBCAT_VIDEO_VOUT )
-    add_module("vout", "vout display", NULL, VOUT_TEXT, VOUT_LONGTEXT)
+    add_module("vout", "vout display", "any", VOUT_TEXT, VOUT_LONGTEXT)
         change_short('V')
 
     set_subcategory( SUBCAT_VIDEO_VFILTER )
     add_module_list("video-filter", "video filter", NULL,
                     VIDEO_FILTER_TEXT, VIDEO_FILTER_LONGTEXT)
-
-    set_subcategory( SUBCAT_VIDEO_SPLITTER )
 
 #if 0
     add_string( "pixel-ratio", "1", PIXEL_RATIO_TEXT, PIXEL_RATIO_TEXT )
@@ -1748,7 +1735,7 @@ vlc_module_begin ()
     add_bool( "spu", true, SPU_TEXT, SPU_LONGTEXT )
         change_safe ()
     add_bool( "osd", true, OSD_TEXT, OSD_LONGTEXT )
-    add_module("text-renderer", "text renderer", NULL,
+    add_module("text-renderer", "text renderer", "any",
                TEXTRENDERER_TEXT, TEXTRENDERER_LONGTEXT)
 
     set_section( N_("Subtitles") , NULL )
@@ -1787,7 +1774,6 @@ vlc_module_begin ()
                  SECONDARY_SUB_MARGIN_LONGTEXT )
 
 /* Input options */
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_GENERAL )
     add_category_hint( N_("Input"), INPUT_CAT_LONGTEXT )
 
@@ -1865,6 +1851,8 @@ vlc_module_begin ()
     add_string( "bookmarks", NULL,
                  BOOKMARKS_TEXT, BOOKMARKS_LONGTEXT )
         change_safe ()
+
+    add_bool( "save-recentplay", true, SAVE_RECENTPLAY, NULL );
 
     add_integer( "restore-playback-pos", VLC_PLAYER_RESTORE_PLAYBACK_POS_ASK,
                  RESTORE_PLAYBACK_POS_TEXT, RESTORE_PLAYBACK_POS_LONGTEXT )
@@ -1988,31 +1976,30 @@ vlc_module_begin ()
 
 /* Decoder options */
     add_category_hint(N_("Input access and codecs"), CODEC_CAT_LONGTEXT)
-    set_subcategory( SUBCAT_INPUT_ACCESS )
 
-    add_module("access", "access", NULL, ACCESS_TEXT, ACCESS_LONGTEXT)
+    //set_subcategory( SUBCAT_INPUT_ACCESS )
+    add_obsolete_string("access") /* since 4.0.0 */
 
     set_subcategory( SUBCAT_INPUT_DEMUX )
 
     add_module("demux", "demux", "any", DEMUX_TEXT, DEMUX_LONGTEXT)
     add_string( "demux-filter", NULL, DEMUX_FILTER_TEXT, DEMUX_FILTER_LONGTEXT )
 
-    set_subcategory( SUBCAT_INPUT_ACODEC )
+    //set_subcategory( SUBCAT_INPUT_ACODEC )
     set_subcategory( SUBCAT_INPUT_VCODEC )
 
-    add_string( "codec", NULL, CODEC_TEXT, CODEC_LONGTEXT )
+    add_string( "codec", "any", CODEC_TEXT, CODEC_LONGTEXT )
     add_bool( "hw-dec", true, HW_DEC_TEXT, HW_DEC_LONGTEXT )
     add_obsolete_string( "encoder" ) /* since 4.0.0 */
     add_module("dec-dev", "decoder device", "any", DEC_DEV_TEXT, DEC_DEV_LONGTEXT)
 
-    set_subcategory( SUBCAT_INPUT_SCODEC )
+    //set_subcategory( SUBCAT_INPUT_SCODEC )
     set_subcategory( SUBCAT_INPUT_STREAM_FILTER )
 
     add_module_list("stream-filter", "stream_filter", NULL,
                     STREAM_FILTER_TEXT, STREAM_FILTER_LONGTEXT)
 
 /* Stream output options */
-    set_category( CAT_SOUT )
     set_subcategory( SUBCAT_SOUT_GENERAL )
     add_category_hint(N_("Stream output"), SOUT_CAT_LONGTEXT)
 
@@ -2040,29 +2027,23 @@ vlc_module_begin ()
     add_integer( "sap-interval", 5, ANN_SAPINTV_TEXT,
                                ANN_SAPINTV_LONGTEXT )
 
-    set_subcategory( SUBCAT_SOUT_MUX )
-    add_module("mux", "sout mux", NULL, MUX_TEXT, MUX_LONGTEXT)
+    add_obsolete_string("mux") /* since 0.5.0 (warning since 4.0) */
     set_subcategory( SUBCAT_SOUT_ACO )
-    add_module("access_output", "sout access", NULL,
-               ACCESS_OUTPUT_TEXT, ACCESS_OUTPUT_LONGTEXT)
+    add_obsolete_string("access_output") /* since 0.5.0 (warning since 4.0) */
     add_integer( "ttl", -1, TTL_TEXT, TTL_LONGTEXT )
     add_string( "miface", NULL, MIFACE_TEXT, MIFACE_LONGTEXT )
     add_integer( "dscp", 0, DSCP_TEXT, DSCP_LONGTEXT )
 
     set_subcategory( SUBCAT_SOUT_PACKETIZER )
-    add_module("packetizer", "packetizer", NULL,
+    add_module("packetizer", "packetizer", "any",
                PACKETIZER_TEXT, PACKETIZER_LONGTEXT)
 
-    set_subcategory( SUBCAT_SOUT_VOD )
-
 /* Advanced options */
-    set_category( CAT_ADVANCED )
     set_subcategory( SUBCAT_ADVANCED_MISC )
     add_category_hint(N_("Advanced"), NULL)
     set_section( N_("Special modules"), NULL )
-    add_module("vod-server", "vod server", NULL,
-               VOD_SERVER_TEXT, VOD_SERVER_LONGTEXT)
-    add_module("tracer", "tracer", NULL,
+    add_obsolete_string("vod-server") /* since 4.0.0 */
+    add_module("tracer", "tracer", "none",
                TRACER_TEXT, TRACER_LONGTEXT)
 
     set_section( N_("Plugins" ), NULL )
@@ -2098,10 +2079,7 @@ vlc_module_begin ()
         change_string_list( clock_sources, clock_sources_text )
 #endif
 
-    set_subcategory( SUBCAT_ADVANCED_NETWORK )
-
 /* Playlist options */
-    set_category( CAT_PLAYLIST )
     set_subcategory( SUBCAT_PLAYLIST_GENERAL )
     add_category_hint(N_("Playlist"), PLAYLIST_CAT_LONGTEXT)
     add_bool( "random", false, RANDOM_TEXT, RANDOM_LONGTEXT )
@@ -2153,8 +2131,7 @@ vlc_module_begin ()
     add_integer( "fetch-art-threads", 1, FETCH_ART_THREADS_TEXT,
                  FETCH_ART_THREADS_LONGTEXT )
 
-    add_bool( "metadata-network-access", false, METADATA_NETWORK_TEXT,
-                 METADATA_NETWORK_TEXT )
+    add_bool( "metadata-network-access", false, METADATA_NETWORK_TEXT, NULL )
 
     add_string( "recursive", "collapse" , RECURSIVE_TEXT,
                 RECURSIVE_LONGTEXT )
@@ -2165,8 +2142,7 @@ vlc_module_begin ()
                 IGNORE_TEXT, IGNORE_LONGTEXT )
     add_bool( "show-hiddenfiles", false,
               SHOW_HIDDENFILES_TEXT, SHOW_HIDDENFILES_LONGTEXT )
-    add_bool( "extractor-flatten", false,
-              "Flatten files listed by extractors (archive)", NULL )
+    add_bool( "extractor-flatten", false, EXTRACTOR_FLATTEN, NULL )
         change_volatile()
 
     set_subcategory( SUBCAT_PLAYLIST_SD )
@@ -2198,7 +2174,6 @@ vlc_module_begin ()
               BOOKMARK10_TEXT, BOOKMARK_LONGTEXT )
 
 /* Interface options */
-    set_category( CAT_INTERFACE )
     set_subcategory( SUBCAT_INTERFACE_GENERAL )
     add_category_hint( N_("Interface"), INTF_CAT_LONGTEXT )
     add_integer( "verbose", 0, VERBOSE_TEXT, VERBOSE_LONGTEXT )
@@ -2769,7 +2744,6 @@ vlc_module_begin ()
 
 /* Miscellaneous */
     /* Not displayed in GUI, listed in help output though */
-    set_category( CAT_HIDDEN )
     set_subcategory( SUBCAT_HIDDEN )
     add_category_hint(N_("Miscellaneous"), NULL)
 

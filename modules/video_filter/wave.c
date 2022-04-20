@@ -48,7 +48,6 @@ static int  Create    ( filter_t * );
 vlc_module_begin ()
     set_description( N_("Wave video filter") )
     set_shortname( N_( "Wave" ))
-    set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
 
     add_shortcut( "wave" )
@@ -134,7 +133,7 @@ static void Filter( filter_t *p_filter, picture_t *p_pic, picture_t *p_outpic )
                                                                             : 0x200;
                 break;
             CASE_PACKED_YUV_422
-                // Quick hack to fix u/v inversion occuring with 2 byte pixel pitch
+                // Quick hack to fix u/v inversion occurring with 2 byte pixel pitch
                 i_pixel_pitch *= 2;
                 /* fallthrough */
             CASE_PLANAR_YUV

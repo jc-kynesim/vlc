@@ -16,6 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 import QtQuick 2.11
+import QtQuick.Controls 2.4
 import QtQuick.Templates 2.4 as T
 import QtQuick.Layouts 1.11
 import QtQml.Models 2.2
@@ -23,6 +24,7 @@ import QtGraphicalEffects 1.0
 import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
+import "qrc:///util/Helpers.js" as Helpers
 import "qrc:///style/"
 
 T.Control {
@@ -66,7 +68,7 @@ T.Control {
     signal addToPlaylistClicked
     signal itemClicked(Item menuParent, int key, int modifier)
     signal itemDoubleClicked(Item menuParent, int keys, int modifier)
-    signal contextMenuButtonClicked(Item menuParent, var globalMousePos)
+    signal contextMenuButtonClicked(Item menuParent, point globalMousePos)
 
     // Settings
 
@@ -243,10 +245,11 @@ T.Control {
             }
         }
 
-        Column {
+        ColumnLayout {
             id: layout
 
             anchors.centerIn: parent
+            spacing: 0
 
             Widgets.MediaCover {
                 id: picture
@@ -264,18 +267,19 @@ T.Control {
                 id: titleTextRect
 
                 label: titleLabel
-                scroll: highlighted
-                height: titleLabel.height
-                width: titleLabel.width
+                forceScroll: highlighted
                 visible: root.title !== ""
+                clip: scrolling
+
+                Layout.preferredWidth: Math.min(titleLabel.implicitWidth, pictureWidth)
+                Layout.preferredHeight: titleLabel.height
+                Layout.topMargin: root.titleMargin
+                Layout.alignment: root.textAlignHCenter ? Qt.AlignCenter : Qt.AlignLeft
 
                 Widgets.ListLabel {
                     id: titleLabel
 
-                    elide: titleTextRect.scroll ?  Text.ElideNone : Text.ElideRight
-                    width: pictureWidth
-                    horizontalAlignment: root.textAlignHCenter && titleLabel.contentWidth <= titleLabel.width ? Text.AlignHCenter : Text.AlignLeft
-                    topPadding: root.titleMargin
+                    height: implicitHeight
                     color: background.foregroundColor
                 }
             }
@@ -285,15 +289,26 @@ T.Control {
 
                 visible: text !== ""
                 text: root.subtitle
-                width: pictureWidth
-                topPadding: VLCStyle.margin_xsmall
                 elide: Text.ElideRight
-                horizontalAlignment: root.textAlignHCenter && subtitleTxt.contentWidth <= subtitleTxt.width ? Text.AlignHCenter : Text.AlignLeft
                 color: background.foregroundColor
+
+                Layout.preferredWidth: Math.min(pictureWidth, implicitWidth)
+                Layout.alignment: root.textAlignHCenter ? Qt.AlignCenter : Qt.AlignLeft
+                Layout.topMargin: VLCStyle.margin_xsmall
 
                 // this is based on that MenuCaption.color.a == .6, color of this component is animated (via binding with background.foregroundColor),
                 // to save operation during animation, directly set the opacity
                 opacity: .6
+
+                ToolTip.delay: VLCStyle.delayToolTipAppear
+                ToolTip.text: subtitleTxt.text
+                ToolTip.visible: {
+                    if (!mouseArea.containsMouse)
+                        return false
+
+                    var pos = mouseArea.mapToItem(subtitleTxt, mouseArea.mouseX, mouseArea.mouseY)
+                    return Helpers.contains(Qt.rect(0, 0, width, height), pos)
+                }
             }
         }
     }

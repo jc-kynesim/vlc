@@ -55,7 +55,6 @@ static int vlc_sd_probe_Open (vlc_object_t *);
 vlc_module_begin ()
     set_shortname (N_("Video capture"))
     set_description (N_("Video capture (Video4Linux)"))
-    set_category (CAT_PLAYLIST)
     set_subcategory (SUBCAT_PLAYLIST_SD)
     set_capability ("services_discovery", 0)
     set_callbacks (OpenV4L, Close)
@@ -64,7 +63,6 @@ vlc_module_begin ()
     add_submodule ()
     set_shortname (N_("Audio capture"))
     set_description (N_("Audio capture (ALSA)"))
-    set_category (CAT_PLAYLIST)
     set_subcategory (SUBCAT_PLAYLIST_SD)
     set_capability ("services_discovery", 0)
     set_callbacks (OpenALSA, Close)
@@ -73,7 +71,6 @@ vlc_module_begin ()
     add_submodule ()
     set_shortname (N_("Discs"))
     set_description (N_("Discs"))
-    set_category (CAT_PLAYLIST)
     set_subcategory (SUBCAT_PLAYLIST_SD)
     set_capability ("services_discovery", 0)
     set_callbacks (OpenDisc, Close)
@@ -263,7 +260,7 @@ static int Open (vlc_object_t *obj, const struct subsys *subsys)
 
     udev_monitor_enable_receiving (mon);
     /* Note that we enumerate _after_ monitoring is enabled so that we do not
-     * loose device events occuring while we are enumerating. We could still
+     * loose device events occurring while we are enumerating. We could still
      * loose events if the Netlink socket receive buffer overflows. */
     udev_enumerate_scan_devices (devenum);
     struct udev_list_entry *devlist = udev_enumerate_get_list_entry (devenum);

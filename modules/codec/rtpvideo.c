@@ -42,8 +42,7 @@ static block_t *Encode( encoder_t *p_enc, picture_t *p_pict );
  *****************************************************************************/
 vlc_module_begin ()
     set_description( N_("Raw video encoder for RTP") )
-    set_capability( "encoder", 50 )
-    set_category( CAT_INPUT )
+    set_capability( "video encoder", 50 )
     set_subcategory( SUBCAT_INPUT_VCODEC )
     set_callback( OpenEncoder )
     add_shortcut( "rtpvideo" )
@@ -55,10 +54,13 @@ static int OpenEncoder( vlc_object_t *p_this )
     if( p_enc->fmt_out.i_codec != VLC_CODEC_R420 && !p_enc->obj.force )
         return VLC_EGENERIC;
 
-    p_enc->pf_encode_video = Encode;
     p_enc->fmt_in.i_codec = VLC_CODEC_I420;
     p_enc->fmt_out.i_codec = VLC_CODEC_R420;
 
+    static const struct vlc_encoder_operations ops =
+        { .encode_video = Encode };
+
+    p_enc->ops = &ops;
     return VLC_SUCCESS;
 }
 

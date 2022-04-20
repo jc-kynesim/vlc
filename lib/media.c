@@ -1,5 +1,5 @@
 /*****************************************************************************
- * media.c: Libvlc API media descripor management
+ * media.c: Libvlc API media descriptor management
  *****************************************************************************
  * Copyright (C) 2007 VLC authors and VideoLAN
  *
@@ -513,8 +513,6 @@ libvlc_media_t * libvlc_media_new_from_input_item(
     vlc_mutex_init(&p_md->subitems_lock);
     atomic_init(&p_md->worker_count, 0);
 
-    p_md->state = libvlc_NothingSpecial;
-
     /* A media descriptor can be a playlist. When you open a playlist
      * It can give a bunch of item to read. */
     p_md->p_subitems        = NULL;
@@ -736,31 +734,6 @@ int libvlc_media_save_meta( libvlc_media_t *p_md )
     return input_item_WriteMeta( p_obj, p_md->p_input_item ) == VLC_SUCCESS;
 }
 
-// Getter for state information
-libvlc_state_t
-libvlc_media_get_state( libvlc_media_t *p_md )
-{
-    assert( p_md );
-    return p_md->state;
-}
-
-// Setter for state information (LibVLC Internal)
-void
-libvlc_media_set_state( libvlc_media_t *p_md,
-                                   libvlc_state_t state )
-{
-    libvlc_event_t event;
-
-    p_md->state = state;
-
-    /* Construct the event */
-    event.type = libvlc_MediaStateChanged;
-    event.u.media_state_changed.new_state = state;
-
-    /* Send the event */
-    libvlc_event_send( &p_md->event_manager, &event );
-}
-
 // Get subitems of media descriptor object.
 libvlc_media_list_t *
 libvlc_media_subitems( libvlc_media_t * p_md )
@@ -836,6 +809,46 @@ libvlc_media_get_duration( libvlc_media_t * p_md )
         return -1;
 
     return from_mtime(input_item_GetDuration( p_md->p_input_item ));
+}
+
+int
+libvlc_media_get_filestat( libvlc_media_t *p_md, unsigned type, uint64_t *out )
+{
+    assert( p_md );
+    assert( out );
+
+    if( !p_md->p_input_item )
+    {
+        libvlc_printerr( "No input item" );
+        return -1;
+    }
+
+    const char *name;
+    switch (type)
+    {
+        case libvlc_media_filestat_mtime:   name = "mtime"; break;
+        case libvlc_media_filestat_size:    name = "size"; break;
+        default:
+            libvlc_printerr( "unknown libvlc_media_stat" );
+            return -1;
+    };
+
+    char *str = input_item_GetInfo( p_md->p_input_item, ".stat", name );
+    if( str == NULL )
+        return 0;
+
+    char *end;
+    unsigned long long val = strtoull( str, &end, 10 );
+
+    if( *end != '\0' )
+    {
+        free( str );
+        return -1;
+    }
+    free( str );
+
+    *out = val;
+    return 1;
 }
 
 static const input_preparser_callbacks_t input_preparser_callbacks = {

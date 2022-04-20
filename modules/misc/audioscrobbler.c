@@ -129,7 +129,6 @@ static void *Run            (void *);
 #define CLIENT_VERSION  VERSION
 
 vlc_module_begin ()
-    set_category(CAT_INTERFACE)
     set_subcategory(SUBCAT_INTERFACE_CONTROL)
     set_shortname(N_("Audioscrobbler"))
     set_description(N_("Submission of played songs to last.fm"))
@@ -719,7 +718,7 @@ static void *Run(void *data)
                         _("Last.fm username not set"),
                         "%s", _("Please set a username or disable the "
                         "audioscrobbler plugin, and restart VLC.\n"
-                        "Visit http://www.last.fm/join/ to get an account."));
+                        "Visit https://www.last.fm/join/ to get an account."));
                     goto out;
 
                 case VLC_SUCCESS:

@@ -56,7 +56,6 @@ static void Close(vlc_object_t *);
 vlc_module_begin()
     set_shortname(N_("NFS"))
     set_description(N_("NFS input"))
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_ACCESS)
     add_bool("nfs-auto-guid", true, AUTO_GUID_TEXT, AUTO_GUID_LONGTEXT)
     set_capability("access", 0)
@@ -214,11 +213,11 @@ FileRead(stream_t *p_access, void *p_buf, size_t i_len)
                        p_access) < 0)
     {
         msg_Err(p_access, "nfs_read_async failed");
-        return -1;
+        return 0;
     }
 
     if (vlc_nfs_mainloop(p_access, nfs_read_finished_cb) < 0)
-        return -1;
+        return 0;
 
     return p_sys->res.read.i_len;
 }
@@ -363,8 +362,16 @@ DirRead(stream_t *p_access, input_item_node_t *p_node)
         default:
             i_type = ITEM_TYPE_UNKNOWN;
         }
+
+        input_item_t *p_item;
+
         i_ret = vlc_readdir_helper_additem(&rdh, psz_url, NULL, p_nfsdirent->name,
-                                           i_type, ITEM_NET);
+                                           i_type, ITEM_NET, &p_item);
+        if (i_ret == VLC_SUCCESS && p_item && p_nfsdirent->mtime.tv_sec >= 0)
+        {
+            input_item_AddStat(p_item, "mtime", p_nfsdirent->mtime.tv_sec);
+            input_item_AddStat(p_item, "size", p_nfsdirent->size);
+        }
         free(psz_url);
     }
 
@@ -394,7 +401,7 @@ MountRead(stream_t *p_access, input_item_node_t *p_node)
             break;
         }
         i_ret = vlc_readdir_helper_additem(&rdh, psz_url, NULL, psz_name,
-                                            ITEM_TYPE_DIRECTORY, ITEM_NET);
+                                            ITEM_TYPE_DIRECTORY, ITEM_NET, NULL);
         free(psz_url);
     }
 

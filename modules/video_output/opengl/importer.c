@@ -23,6 +23,7 @@
 #endif
 
 #include <vlc_common.h>
+#include <vlc_picture.h>
 
 #include "importer_priv.h"
 
@@ -204,8 +205,6 @@ vlc_gl_importer_New(struct vlc_gl_interop *interop)
         return NULL;
 
     importer->interop = interop;
-    importer->api = interop->api;
-    importer->vt = &interop->api->vt;
 
     importer->mtx_transform_defined = false;
     importer->pic_mtx_defined = false;
@@ -227,21 +226,35 @@ vlc_gl_importer_New(struct vlc_gl_interop *interop)
 
     InitOrientationMatrix(importer->mtx_orientation, glfmt->fmt.orientation);
 
+    struct vlc_gl_extension_vt extension_vt;
+    vlc_gl_LoadExtensionFunctions(interop->gl, &extension_vt);
+
+    /* OpenGL ES 2 includes support for non-power of 2 textures by specification. */
+    bool supports_npot = interop->gl->api_type == VLC_OPENGL_ES2
+        || vlc_gl_HasExtension(&extension_vt, "GL_ARB_texture_non_power_of_two")
+        || vlc_gl_HasExtension(&extension_vt, "GL_APPLE_texture_2D_limited_npot");
+
     /* Texture size */
     for (unsigned j = 0; j < interop->tex_count; j++) {
-        GLsizei w = interop->fmt_out.i_visible_width  * interop->texs[j].w.num
+        GLsizei vw = interop->fmt_out.i_visible_width  * interop->texs[j].w.num
                   / interop->texs[j].w.den;
-        GLsizei h = interop->fmt_out.i_visible_height * interop->texs[j].h.num
+        GLsizei vh = interop->fmt_out.i_visible_height * interop->texs[j].h.num
                   / interop->texs[j].h.den;
-        glfmt->visible_widths[j] = w;
-        glfmt->visible_heights[j] = h;
-        if (interop->api->supports_npot) {
+        GLsizei w = (interop->fmt_out.i_visible_width + interop->fmt_out.i_x_offset) * interop->texs[j].w.num
+                  / interop->texs[j].w.den;
+        GLsizei h = (interop->fmt_out.i_visible_height + interop->fmt_out.i_y_offset) *  interop->texs[j].h.num
+                  / interop->texs[j].h.den;
+        glfmt->visible_widths[j] = vw;
+        glfmt->visible_heights[j] = vh;
+        if (supports_npot) {
             glfmt->tex_widths[j]  = w;
             glfmt->tex_heights[j] = h;
         } else {
             glfmt->tex_widths[j]  = vlc_align_pot(w);
             glfmt->tex_heights[j] = vlc_align_pot(h);
         }
+
+        glfmt->formats[j] = interop->texs[j].format;
     }
 
     if (!interop->handle_texs_gen)
@@ -263,10 +276,12 @@ void
 vlc_gl_importer_Delete(struct vlc_gl_importer *importer)
 {
     struct vlc_gl_interop *interop = importer->interop;
+
     if (interop && !interop->handle_texs_gen)
     {
-        const opengl_vtable_t *vt = interop->vt;
-        vt->DeleteTextures(interop->tex_count, importer->pic.textures);
+        void (*DeleteTextures)(uint32_t, uint32_t*) =
+            vlc_gl_GetProcAddress(interop->gl, "glDeleteTextures");
+        (*DeleteTextures)(interop->tex_count, importer->pic.textures);
     }
 
     free(importer);
@@ -328,8 +343,14 @@ vlc_gl_importer_Update(struct vlc_gl_importer *importer, picture_t *picture)
 
         /* The transformation is the same for all planes, even with power-of-two
          * textures. */
-        float scale_w = glfmt->tex_widths[0];
-        float scale_h = glfmt->tex_heights[0];
+        /* FIXME The first plane may have a ratio != 1:1, because with YUV 4:2:2
+         * formats, the Y2 value is ignored so half the horizontal resolution
+         * is lost, see interop_yuv_base_init(). Once this is fixed, the
+         * multiplication by den/num may be removed. */
+        float scale_w = glfmt->tex_widths[0] * interop->texs[0].w.den
+                                             / interop->texs[0].w.num;
+        float scale_h = glfmt->tex_heights[0] * interop->texs[0].h.den
+                                              / interop->texs[0].h.num;
 
         /* Warning: if NPOT is not supported a larger texture is
            allocated. This will cause right and bottom coordinates to
@@ -399,8 +420,8 @@ vlc_gl_importer_Update(struct vlc_gl_importer *importer, picture_t *picture)
 
     /* Update the texture */
     int ret = interop->ops->update_textures(interop, pic->textures,
-                                            glfmt->visible_widths,
-                                            glfmt->visible_heights, picture,
+                                            glfmt->tex_widths,
+                                            glfmt->tex_heights, picture,
                                             NULL);
 
     const float *tm = GetTransformMatrix(interop);

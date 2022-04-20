@@ -45,7 +45,6 @@ vlc_module_begin ()
     set_shortname( "MPJPEG" )
     set_description( N_("Multipart JPEG muxer") )
     set_capability( "sout mux", 5 )
-    set_category( CAT_SOUT )
     set_subcategory( SUBCAT_SOUT_MUX )
     set_callbacks( Open, Close )
     add_shortcut( "mpjpeg" )
@@ -88,7 +87,7 @@ static int Open( vlc_object_t *p_this )
 static void Close( vlc_object_t * p_this )
 {
     /* TODO: send the ending boundary ("\r\n--"BOUNDARY"--\r\n"),
-     * but is the access_output still useable?? */
+     * but is the access_output still usable?? */
     msg_Dbg( p_this, "Multipart jpeg muxer closed" );
 }
 

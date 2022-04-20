@@ -1,5 +1,5 @@
 /**
- * @file rtpxiph.c
+ * @file xiph.c
  * @brief Real-Time Protocol (RTP) Xiph payloads receival
  */
 /*****************************************************************************
@@ -311,7 +311,6 @@ static int theora_open(vlc_object_t *obj, struct vlc_rtp_pt *pt,
 vlc_module_begin()
     set_shortname(N_("RTP Xiph"))
     set_description(N_("RTP Xiph payload parser"))
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_DEMUX)
     set_capability("rtp audio parser", 0)
     set_callback(vorbis_open)

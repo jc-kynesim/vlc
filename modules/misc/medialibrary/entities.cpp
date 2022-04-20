@@ -31,7 +31,6 @@
 #include <medialibrary/IShowEpisode.h>
 #include <medialibrary/IArtist.h>
 #include <medialibrary/IAlbum.h>
-#include <medialibrary/IAlbumTrack.h>
 #include <medialibrary/IGenre.h>
 #include <medialibrary/ILabel.h>
 #include <medialibrary/IMediaGroup.h>
@@ -97,16 +96,6 @@ static bool convertThumbnails( const T input, vlc_ml_thumbnail_t *output )
         if ( !strdup_helper(thumbnailMrl, output[i].psz_mrl ))
             return false;
     }
-    return true;
-}
-
-bool Convert( const medialibrary::IAlbumTrack* input, vlc_ml_album_track_t& output )
-{
-    output.i_artist_id = input->artistId();
-    output.i_album_id = input->albumId();
-    output.i_disc_nb = input->discNumber();
-    output.i_genre_id = input->genreId();
-    output.i_track_nb = input->trackNumber();
     return true;
 }
 
@@ -194,11 +183,11 @@ bool Convert( const medialibrary::IMedia* input, vlc_ml_media_t& output )
                 case medialibrary::IMedia::SubType::AlbumTrack:
                 {
                     output.i_subtype = VLC_ML_MEDIA_SUBTYPE_ALBUMTRACK;
-                    auto albumTrack = input->albumTrack();
-                    if ( albumTrack == nullptr )
-                        return false;
-                    if ( Convert( albumTrack.get(), output.album_track ) == false )
-                        return false;
+                    output.album_track.i_artist_id = input->artistId();
+                    output.album_track.i_album_id = input->albumId();
+                    output.album_track.i_disc_nb = input->discNumber();
+                    output.album_track.i_genre_id = input->genreId();
+                    output.album_track.i_track_nb = input->trackNumber();
                     break;
                 }
                 case medialibrary::IMedia::SubType::Unknown:
@@ -316,6 +305,8 @@ bool Convert( const medialibrary::IAlbum* input, vlc_ml_album_t& output )
 {
     output.i_id = input->id();
     output.i_nb_tracks = input->nbTracks();
+    output.i_nb_present_tracks = input->nbPresentTracks();
+    output.i_nb_discs = input->nbDiscs();
     output.i_duration = input->duration();
     output.i_year = input->releaseYear();
 
@@ -366,6 +357,7 @@ bool Convert( const medialibrary::IArtist* input, vlc_ml_artist_t& output )
     output.i_id = input->id();
     output.i_nb_album = input->nbAlbums();
     output.i_nb_tracks = input->nbTracks();
+    output.i_nb_present_tracks = input->nbPresentTracks();
     output.psz_name = strdup( artistName( input ) );
     if ( unlikely( output.psz_name == nullptr ) )
         return false;
@@ -428,10 +420,21 @@ bool Convert( const medialibrary::IMediaGroup* input, vlc_ml_group_t& output )
     output.i_id = input->id();
 
     output.i_nb_total_media = input->nbTotalMedia();
+    output.i_nb_video = input->nbVideo();
+    output.i_nb_audio = input->nbAudio();
+    output.i_nb_unknown = input->nbUnknown();
+    output.i_nb_present_media = input->nbPresentMedia();
+    output.i_nb_present_video = input->nbPresentVideo();
+    output.i_nb_present_audio = input->nbPresentAudio();
+    output.i_nb_present_unknown = input->nbPresentUnknown();
+
+    output.i_nb_seen = input->nbSeen();
+    output.i_nb_present_seen = input->nbPresentSeen();
 
     output.i_duration = input->duration();
 
     output.i_creation_date = input->creationDate();
+    output.i_last_modification_date = input->lastModificationDate();
 
     if( strdup_helper( input->name(), output.psz_name ) == false )
         return false;
@@ -443,10 +446,19 @@ bool Convert( const medialibrary::IPlaylist* input, vlc_ml_playlist_t& output )
 {
     output.i_id = input->id();
 
-    output.i_nb_media         = input->nbMedia();
+    output.i_nb_media = input->nbMedia();
+    output.i_nb_video = input->nbVideo();
+    output.i_nb_audio = input->nbAudio();
+    output.i_nb_unknown = input->nbUnknown();
     output.i_nb_present_media = input->nbPresentMedia();
+    output.i_nb_present_video = input->nbPresentVideo();
+    output.i_nb_present_audio = input->nbPresentAudio();
+    output.i_nb_present_unknown = input->nbPresentUnknown();
 
     output.i_creation_date = input->creationDate();
+
+    output.i_duration = input->duration();
+    output.i_nb_duration_unknown = input->nbDurationUnknown();
 
     output.b_is_read_only = input->isReadOnly();
 
@@ -466,18 +478,28 @@ bool Convert( const medialibrary::IPlaylist* input, vlc_ml_playlist_t& output )
 bool Convert( const medialibrary::IFolder* input, vlc_ml_folder_t& output )
 {
     output.i_id = input->id();
+
+    output.i_nb_media = input->nbMedia();
+
     output.b_banned = input->isBanned();
+
+    if ( strdup_helper( input->name(), output.psz_name ) == false )
+        return false;
+
     try
     {
-        if ( strdup_helper( input->mrl(), output.psz_mrl ) == false )
+        if (strdup_helper(input->mrl(), output.psz_mrl) == false)
             return false;
+
         output.b_present = true;
     }
     catch ( const medialibrary::fs::errors::DeviceRemoved& )
     {
         output.psz_mrl = nullptr;
+
         output.b_present = false;
     }
+
     return true;
 }
 
@@ -533,21 +555,18 @@ input_item_t* MediaToInputItem( const medialibrary::IMedia* media )
         {
             if ( media->subType() != medialibrary::IMedia::SubType::AlbumTrack )
                 break;
-            auto track = media->albumTrack();
-            if ( track == nullptr )
-                return nullptr;
-            auto album = track->album();
+            auto album = media->album();
             if ( album == nullptr )
                 return nullptr;
-            auto artist = track->artist();
+            auto artist = media->artist();
             if ( artist == nullptr )
                 return nullptr;
             // From the track itself:
             input_item_SetTitle( inputItem.get(), media->title().c_str() );
             input_item_SetDiscNumber( inputItem.get(),
-                                      std::to_string( track->discNumber() ).c_str() );
+                                      std::to_string( media->discNumber() ).c_str() );
             input_item_SetTrackNumber( inputItem.get(),
-                                       std::to_string( track->trackNumber() ).c_str() );
+                                       std::to_string( media->trackNumber() ).c_str() );
 
             // From the album:
             input_item_SetTrackTotal( inputItem.get(),

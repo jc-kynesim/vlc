@@ -19,7 +19,8 @@
 #include "menus.hpp"
 #include "medialibrary/medialib.hpp"
 #include "medialibrary/mlvideomodel.hpp"
-#include "medialibrary/mlgrouplistmodel.hpp"
+#include "medialibrary/mlvideogroupsmodel.hpp"
+#include "medialibrary/mlvideofoldersmodel.hpp"
 #include "medialibrary/mlplaylistlistmodel.hpp"
 #include "medialibrary/mlplaylistmodel.hpp"
 #include "medialibrary/mlalbummodel.hpp"
@@ -27,13 +28,12 @@
 #include "medialibrary/mlgenremodel.hpp"
 #include "medialibrary/mlalbumtrackmodel.hpp"
 #include "medialibrary/mlurlmodel.hpp"
+#include "medialibrary/mlbookmarkmodel.hpp"
 #include "network/networkdevicemodel.hpp"
 #include "network/networkmediamodel.hpp"
 #include "playlist/playlist_controller.hpp"
 #include "playlist/playlist_model.hpp"
 #include "dialogs/dialogs_provider.hpp"
-#include "maininterface/mainctx.hpp"
-
 
 #include <QSignalMapper>
 
@@ -84,11 +84,15 @@ void StringListMenu::popup(const QPoint &point, const QVariantList &stringList)
     m->popup(point);
 }
 
+// SortMenu
+
 SortMenu::~SortMenu()
 {
     if (m_menu)
         delete m_menu;
 }
+
+// Functions
 
 void SortMenu::popup(const QPoint &point, const bool popupAbovePoint, const QVariantList &model)
 {
@@ -117,6 +121,8 @@ void SortMenu::popup(const QPoint &point, const bool popupAbovePoint, const QVar
         });
     }
 
+    onPopup(m_menu);
+
     // m_menu->height() returns invalid height until initial popup call
     // so in case of 'popupAbovePoint', first show the menu and then reposition it
     m_menu->popup(point);
@@ -131,6 +137,58 @@ void SortMenu::close()
 {
     if (m_menu)
         m_menu->close();
+}
+
+// Protected functions
+
+/* virtual */ void SortMenu::onPopup(QMenu *) {}
+
+// SortMenuVideo
+
+// Protected SortMenu reimplementation
+
+void SortMenuVideo::onPopup(QMenu * menu) /* override */
+{
+    if (!m_ctx)
+        return;
+
+    menu->addSeparator();
+
+    struct
+    {
+        const char * title;
+
+        MainCtx::Grouping grouping;
+    }
+    entries[] =
+    {
+        { N_("Do not group videos"), MainCtx::GROUPING_NONE },
+        { N_("Group by name"), MainCtx::GROUPING_NAME },
+        { N_("Group by folder"), MainCtx::GROUPING_FOLDER },
+    };
+
+    QActionGroup * group = new QActionGroup(this);
+
+    int index = m_ctx->grouping();
+
+    for (size_t i = 0; i < ARRAY_SIZE(entries); i++)
+    {
+        QAction * action = menu->addAction(qtr(entries[i].title));
+
+        action->setCheckable(true);
+
+        MainCtx::Grouping grouping = entries[i].grouping;
+
+        connect(action, &QAction::triggered, this, [this, grouping]()
+        {
+            emit this->grouping(grouping);
+        });
+
+        group->addAction(action);
+
+        if (index == grouping)
+            action->setChecked(true);
+    }
 }
 
 QmlGlobalMenu::QmlGlobalMenu(QObject *parent)
@@ -326,6 +384,121 @@ void QmlMenuBar::onMenuClosed()
         emit menuClosed();
 }
 
+// QmlBookmarkMenu
+
+/* explicit */ QmlBookmarkMenu::QmlBookmarkMenu(QObject * parent) : QObject(parent) {}
+
+QmlBookmarkMenu::~QmlBookmarkMenu()
+{
+    if (m_menu)
+        delete m_menu;
+}
+
+// Interface
+
+/* Q_INVOKABLE */ void QmlBookmarkMenu::popup(QPoint pos)
+{
+    if (m_ctx == nullptr || m_player == nullptr)
+        return;
+
+    if (m_menu)
+        delete m_menu;
+
+    m_menu = new QMenu;
+
+    connect(m_menu, &QMenu::aboutToHide, this, &QmlBookmarkMenu::aboutToHide);
+    connect(m_menu, &QMenu::aboutToShow, this, &QmlBookmarkMenu::aboutToShow);
+
+    QAction * sectionTitles    = m_menu->addSection(qtr("Titles"));
+    QAction * sectionChapters  = m_menu->addSection(qtr("Chapters"));
+    QAction * sectionBookmarks = m_menu->addSection(qtr("Bookmarks"));
+
+    // Titles
+
+    TitleListModel * titles = m_player->getTitles();
+
+    sectionTitles->setVisible(titles->rowCount() != 0);
+
+    ListMenuHelper * helper = new ListMenuHelper(m_menu, titles, sectionChapters, m_menu);
+
+    connect(helper, &ListMenuHelper::select, [titles](int index)
+    {
+        titles->setData(titles->index(index), true, Qt::CheckStateRole);
+    });
+
+    connect(helper, &ListMenuHelper::countChanged, [sectionTitles](int count)
+    {
+        // NOTE: The section should only be visible when the model has content.
+        sectionTitles->setVisible(count != 0);
+    });
+
+    // Chapters
+
+    ChapterListModel * chapters = m_player->getChapters();
+
+    sectionChapters->setVisible(chapters->rowCount() != 0);
+
+    helper = new ListMenuHelper(m_menu, chapters, sectionBookmarks, m_menu);
+
+    connect(helper, &ListMenuHelper::select, [chapters](int index)
+    {
+        chapters->setData(chapters->index(index), true, Qt::CheckStateRole);
+    });
+
+    connect(helper, &ListMenuHelper::countChanged, [sectionChapters](int count)
+    {
+        // NOTE: The section should only be visible when the model has content.
+        sectionChapters->setVisible(count != 0);
+    });
+
+    // Bookmarks
+
+    // FIXME: Do we really need a translation call for the string shortcut ?
+    m_menu->addAction(qtr("&Manage"), THEDP, &DialogsProvider::bookmarksDialog, qtr("Ctrl+B"));
+
+    m_menu->addSeparator();
+
+    MLBookmarkModel * bookmarks = new MLBookmarkModel(m_ctx->getMediaLibrary(),
+                                                      m_player->getPlayer(), m_menu);
+
+    helper = new ListMenuHelper(m_menu, bookmarks, nullptr, m_menu);
+
+    connect(helper, &ListMenuHelper::select, [bookmarks](int index)
+    {
+        bookmarks->select(bookmarks->index(index, 0));
+    });
+
+    m_menu->popup(pos);
+}
+
+// QmlRendererMenu
+
+/* explicit */ QmlRendererMenu::QmlRendererMenu(QObject * parent) : QObject(parent) {}
+
+QmlRendererMenu::~QmlRendererMenu()
+{
+    if (m_menu)
+        delete m_menu;
+}
+
+// Interface
+
+/* Q_INVOKABLE */ void QmlRendererMenu::popup(QPoint pos)
+{
+    if (m_ctx == nullptr)
+        return;
+
+    if (m_menu)
+        delete m_menu;
+
+    m_menu = new RendererMenu(nullptr, m_ctx->getIntf());
+
+    connect(m_menu, &QMenu::aboutToHide, this, &QmlRendererMenu::aboutToHide);
+    connect(m_menu, &QMenu::aboutToShow, this, &QmlRendererMenu::aboutToShow);
+
+    m_menu->popup(pos);
+}
+
 BaseMedialibMenu::BaseMedialibMenu(QObject* parent)
     : QObject(parent)
 {}
@@ -365,11 +538,8 @@ void BaseMedialibMenu::medialibAudioContextMenu(MediaLib* ml, const QVariantList
         QSignalMapper* sigmapper = new QSignalMapper(m_menu);
         connect(action, &QAction::triggered, sigmapper, QOverload<>::of(&QSignalMapper::map));
         sigmapper->setMapping(action, options["information"].toInt());
-#if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
-        connect(sigmapper, &QSignalMapper::mappedInt, this, &BaseMedialibMenu   ::showMediaInformation);
-#else
-        connect(sigmapper, QOverload<int>::of(&QSignalMapper::mapped), this, &BaseMedialibMenu::showMediaInformation);
-#endif
+        connect(sigmapper, QSIGNALMAPPER_MAPPEDINT_SIGNAL,
+                this, &BaseMedialibMenu::showMediaInformation);
     }
     m_menu->popup(pos);
 }
@@ -450,8 +620,8 @@ void VideoContextMenu::popup(const QModelIndexList& selected, QPoint pos, QVaria
 
     action = m_menu->addAction( qtr("Add and play") );
 
-    connect(action, &QAction::triggered, [ml, itemIdList]( ) {
-        ml->addAndPlay(itemIdList);
+    connect(action, &QAction::triggered, [ml, itemIdList, options]( ) {
+        ml->addAndPlay(itemIdList, options["player-options"].toStringList());
     });
 
     action = m_menu->addAction( qtr("Enqueue") );
@@ -465,8 +635,10 @@ void VideoContextMenu::popup(const QModelIndexList& selected, QPoint pos, QVaria
     });
 
     action = m_menu->addAction( qtr("Play as audio") );
-    connect(action, &QAction::triggered, [ml, itemIdList]( ) {
-        ml->addAndPlay(itemIdList, {":no-video"});
+    connect(action, &QAction::triggered, [ml, itemIdList, options]( ) {
+        QStringList list = options["player-options"].toStringList();
+        list.prepend(":no-video");
+        ml->addAndPlay(itemIdList, list);
     });
 
     if (options.contains("information") && options["information"].type() == QVariant::Int) {
@@ -474,29 +646,27 @@ void VideoContextMenu::popup(const QModelIndexList& selected, QPoint pos, QVaria
         QSignalMapper* sigmapper = new QSignalMapper(m_menu);
         connect(action, &QAction::triggered, sigmapper, QOverload<>::of(&QSignalMapper::map));
         sigmapper->setMapping(action, options["information"].toInt());
-#if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
-        connect(sigmapper, &QSignalMapper::mappedInt, this, &VideoContextMenu::showMediaInformation);
-#else
-        connect(sigmapper, QOverload<int>::of(&QSignalMapper::mapped), this, &VideoContextMenu::showMediaInformation);
-#endif
+        connect(sigmapper, QSIGNALMAPPER_MAPPEDINT_SIGNAL,
+                this, &VideoContextMenu::showMediaInformation);
     }
 
     m_menu->popup(pos);
 }
 
 //=================================================================================================
-// GroupListContextMenu
+// VideoGroupsContextMenu
 //=================================================================================================
 
-GroupListContextMenu::GroupListContextMenu(QObject * parent) : QObject(parent) {}
+VideoGroupsContextMenu::VideoGroupsContextMenu(QObject * parent) : QObject(parent) {}
 
-GroupListContextMenu::~GroupListContextMenu() /* override */
+VideoGroupsContextMenu::~VideoGroupsContextMenu() /* override */
 {
     if (m_menu)
         delete m_menu;
 }
 
-void GroupListContextMenu::popup(const QModelIndexList & selected, QPoint pos, QVariantMap)
+void VideoGroupsContextMenu::popup(const QModelIndexList & selected, QPoint pos,
+                                   QVariantMap options)
 {
     if (m_model == nullptr)
         return;
@@ -506,8 +676,8 @@ void GroupListContextMenu::popup(const QModelIndexList & selected, QPoint pos, Q
 
     QVariantList ids;
 
-    for (const QModelIndex & modelIndex : selected)
-        ids.push_back(m_model->data(modelIndex, MLGroupListModel::GROUP_ID));
+    for (const QModelIndex & index : selected)
+        ids.push_back(m_model->data(index, MLVideoModel::VIDEO_ID));
 
     m_menu = new QMenu();
 
@@ -515,14 +685,116 @@ void GroupListContextMenu::popup(const QModelIndexList & selected, QPoint pos, Q
 
     QAction * action = m_menu->addAction(qtr("Add and play"));
 
-    connect(action, &QAction::triggered, [ml, ids]() {
-        ml->addAndPlay(ids);
+    connect(action, &QAction::triggered, [ml, ids, options]()
+    {
+        ml->addAndPlay(ids, options["player-options"].toStringList());
     });
 
     action = m_menu->addAction(qtr("Enqueue"));
 
-    connect(action, &QAction::triggered, [ml, ids]() {
+    connect(action, &QAction::triggered, [ml, ids]()
+    {
         ml->addToPlaylist(ids);
+    });
+
+    action = m_menu->addAction(qtr("Add to playlist"));
+
+    connect(action, &QAction::triggered, [ids]()
+    {
+        DialogsProvider::getInstance()->playlistsDialog(ids);
+    });
+
+    action = m_menu->addAction(qtr("Play as audio"));
+
+    connect(action, &QAction::triggered, [ml, ids, options]()
+    {
+        QStringList list = options["player-options"].toStringList();
+
+        list.prepend(":no-video");
+
+        ml->addAndPlay(ids, list);
+    });
+
+    // NOTE: At the moment informations are only available for single video(s).
+    if (selected.count() == 1
+        &&
+        m_model->data(selected.first(), MLVideoGroupsModel::GROUP_IS_VIDEO) == true
+        &&
+        options.contains("information") && options["information"].type() == QVariant::Int)
+    {
+        action = m_menu->addAction(qtr("Information"));
+
+        QSignalMapper * mapper = new QSignalMapper(m_menu);
+
+        mapper->setMapping(action, options["information"].toInt());
+
+        connect(action, &QAction::triggered, mapper, QOverload<>::of(&QSignalMapper::map));
+
+        connect(mapper, QSIGNALMAPPER_MAPPEDINT_SIGNAL,
+                this, &VideoGroupsContextMenu::showMediaInformation);
+    }
+
+    m_menu->popup(pos);
+}
+
+// VideoFoldersContextMenu
+
+VideoFoldersContextMenu::VideoFoldersContextMenu(QObject * parent) : QObject(parent) {}
+
+VideoFoldersContextMenu::~VideoFoldersContextMenu() /* override */
+{
+    if (m_menu)
+        delete m_menu;
+}
+
+void VideoFoldersContextMenu::popup(const QModelIndexList & selected, QPoint pos,
+                                    QVariantMap options)
+{
+    if (m_model == nullptr)
+        return;
+
+    if (m_menu)
+        delete m_menu;
+
+    QVariantList ids;
+
+    for (const QModelIndex & index : selected)
+        ids.push_back(m_model->data(index, MLVideoFoldersModel::FOLDER_ID));
+
+    m_menu = new QMenu();
+
+    MediaLib * ml = m_model->ml();
+
+    QAction * action = m_menu->addAction(qtr("Add and play"));
+
+    connect(action, &QAction::triggered, [ml, ids, options]()
+    {
+        ml->addAndPlay(ids, options["player-options"].toStringList());
+    });
+
+    action = m_menu->addAction(qtr("Enqueue"));
+
+    connect(action, &QAction::triggered, [ml, ids]()
+    {
+        ml->addToPlaylist(ids);
+    });
+
+    action = m_menu->addAction(qtr("Add to playlist"));
+
+    connect(action, &QAction::triggered, [ids]()
+    {
+        DialogsProvider::getInstance()->playlistsDialog(ids);
+    });
+
+    action = m_menu->addAction(qtr("Play as audio"));
+
+    connect(action, &QAction::triggered, [ml, ids, options]()
+    {
+        QStringList list = options["player-options"].toStringList();
+
+        list.prepend(":no-video");
+
+        ml->addAndPlay(ids, list);
     });
 
     m_menu->popup(pos);
@@ -642,13 +914,8 @@ void PlaylistMediaContextMenu::popup(const QModelIndexList & selected, QPoint po
         connect(action, &QAction::triggered, mapper, QOverload<>::of(&QSignalMapper::map));
 
         mapper->setMapping(action, options["information"].toInt());
-#if QT_VERSION >= QT_VERSION_CHECK(5,15,0)
-        connect(mapper, &QSignalMapper::mappedInt, this,
-                &PlaylistMediaContextMenu::showMediaInformation);
-#else
-        connect(mapper, QOverload<int>::of(&QSignalMapper::mapped), this,
-                &PlaylistMediaContextMenu::showMediaInformation);
-#endif
+        connect(mapper, QSIGNALMAPPER_MAPPEDINT_SIGNAL,
+                this, &PlaylistMediaContextMenu::showMediaInformation);
     }
 
     m_menu->addSeparator();

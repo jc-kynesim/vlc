@@ -46,7 +46,6 @@ static void Close(vout_display_t *vd);
     "Extension through which to use the Open Graphics Library (OpenGL).")
 
 vlc_module_begin ()
-    set_category (CAT_VIDEO)
     set_subcategory (SUBCAT_VIDEO_VOUT)
 #if defined (USE_OPENGL_ES2)
 # define API VLC_OPENGL_ES2
@@ -55,7 +54,7 @@ vlc_module_begin ()
     set_description (N_("OpenGL for Embedded Systems 2 video output"))
     set_callback_display(Open, 275)
     add_shortcut ("opengles2", "gles2")
-    add_module("gles2", "opengl es2", NULL, GLES2_TEXT, PROVIDER_LONGTEXT)
+    add_module("gles2", "opengl es2", "any", GLES2_TEXT, PROVIDER_LONGTEXT)
 
 #else
 # define API VLC_OPENGL
@@ -64,7 +63,7 @@ vlc_module_begin ()
     set_description (N_("OpenGL video output"))
     set_callback_display(Open, 270)
     add_shortcut ("opengl", "gl")
-    add_module("gl", "opengl", NULL, GL_TEXT, PROVIDER_LONGTEXT)
+    add_module("gl", "opengl", "any", GL_TEXT, PROVIDER_LONGTEXT)
 #endif
     add_glopts ()
 
@@ -181,7 +180,7 @@ static int Open(vout_display_t *vd,
 
 error:
     if (sys->gl != NULL)
-        vlc_gl_Release (sys->gl);
+        vlc_gl_Delete(sys->gl);
     free (sys);
     return VLC_EGENERIC;
 }
@@ -198,7 +197,7 @@ static void Close(vout_display_t *vd)
     vout_display_opengl_Delete (sys->vgl);
     vlc_gl_ReleaseCurrent (gl);
 
-    vlc_gl_Release (gl);
+    vlc_gl_Delete(gl);
     free (sys);
 }
 

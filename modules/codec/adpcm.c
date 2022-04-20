@@ -46,7 +46,6 @@ static void Flush( decoder_t * );
 vlc_module_begin ()
     set_description( N_("ADPCM audio decoder") )
     set_capability( "audio decoder", 50 )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACODEC )
     set_callbacks( OpenDecoder, CloseDecoder )
 vlc_module_end ()
@@ -627,7 +626,7 @@ static void DecodeAdpcmImaQT( decoder_t *p_dec, int16_t *p_sample,
 
     for( i_ch = 0; i_ch < p_dec->fmt_out.audio.i_channels; i_ch++ )
     {
-        /* load preambule */
+        /* load preamble */
         channel[i_ch].i_predictor  = (int16_t)((( ( p_buffer[0] << 1 )|(  p_buffer[1] >> 7 ) ))<<7);
         channel[i_ch].i_step_index = p_buffer[1]&0x7f;
 

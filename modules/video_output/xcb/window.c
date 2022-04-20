@@ -46,9 +46,8 @@ typedef xcb_atom_t Atom;
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
+#include <vlc_actions.h>
 #include <vlc_vout_window.h>
-
-#include "events.h"
 
 typedef struct
 {
@@ -539,15 +538,6 @@ static int Enable(vout_window_t *wnd, const vout_window_cfg_t *restrict cfg)
     xcb_window_t window = wnd->handle.xid;
 
     /* Set initial window state */
-    xcb_atom_t state[1];
-    uint32_t len = 0;
-
-    if (cfg->is_fullscreen)
-        state[len++] = sys->wm_state_fullscreen;
-
-    xcb_change_property (sys->conn, XCB_PROP_MODE_REPLACE, wnd->handle.xid,
-                         sys->wm_state, XA_ATOM, 32, len, state);
-
     if (cfg->is_decorated)
         xcb_delete_property(sys->conn, wnd->handle.xid, sys->motif_wm_hints);
     else
@@ -558,12 +548,6 @@ static int Enable(vout_window_t *wnd, const vout_window_cfg_t *restrict cfg)
                             sys->motif_wm_hints, sys->motif_wm_hints, 32,
                             ARRAY_SIZE(motif_wm_hints), motif_wm_hints);
     }
-
-    const uint32_t values[] = { cfg->width, cfg->height };
-
-    xcb_configure_window(conn, window,
-                         XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT,
-                         values);
 
     /* Make the window visible */
     xcb_map_window(conn, window);
@@ -976,7 +960,6 @@ static void EmClose (vout_window_t *wnd)
 vlc_module_begin ()
     set_shortname (N_("X window"))
     set_description (N_("X11 video window (XCB)"))
-    set_category (CAT_VIDEO)
     set_subcategory (SUBCAT_VIDEO_VOUT)
     set_capability ("vout window", 10)
     set_callback(Open)
@@ -984,7 +967,6 @@ vlc_module_begin ()
     add_submodule ()
     set_shortname (N_("Drawable"))
     set_description (N_("Embedded window video"))
-    set_category (CAT_VIDEO)
     set_subcategory (SUBCAT_VIDEO_VOUT)
     set_capability ("vout window", 70)
     set_callback(EmOpen)

@@ -103,12 +103,12 @@ FocusScope {
             Layout.fillWidth: true
 
             Widgets.SubtitleLabel {
-                text: artist.name || i18n.qtr("No artist")
+                text: artist.name || I18n.qtr("No artist")
                 color: "white"
             }
 
             Widgets.MenuCaption {
-                text: i18n.qtr("%1 Songs").arg(artist.nb_tracks)
+                text: I18n.qtr("%1 Songs").arg(artist.nb_tracks)
                 color: "white"
                 opacity: .6
 
@@ -129,18 +129,18 @@ FocusScope {
                     Widgets.ActionButtonPrimary {
                         id: playActionBtn
                         iconTxt: VLCIcons.play
-                        text: i18n.qtr("Play all")
+                        text: I18n.qtr("Play all")
                         focus: true
                         // NOTE: In overlay, the focus rectangle is always white.
                         colorFocus: VLCStyle.colors.white
-                        onClicked: medialib.addAndPlay( artist.id )
+                        onClicked: MediaLib.addAndPlay( artist.id )
                     }
 
                     Widgets.ActionButtonOverlay {
                         id: enqueueActionBtn
                         iconTxt: VLCIcons.enqueue
-                        text: i18n.qtr("Enqueue all")
-                        onClicked: medialib.addToPlaylist( artist.id )
+                        text: I18n.qtr("Enqueue all")
+                        onClicked: MediaLib.addToPlaylist( artist.id )
                     }
                 }
             }

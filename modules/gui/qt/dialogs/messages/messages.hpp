@@ -29,11 +29,8 @@
 /* Auto-generated from .ui files */
 #include "ui_messages_panel.h"
 
-#include <stdarg.h>
 #include <QMutex>
-#include <atomic>
 
-class QPushButton;
 class QTreeWidget;
 class QTreeWidgetItem;
 class MsgEvent;
@@ -67,7 +64,7 @@ private:
     void buildTree( QTreeWidgetItem *, vlc_object_t * );
 
     friend class    Singleton<MessagesDialog>;
-    QPushButton *updateButton;
+    QToolButton *updateButton;
     QMutex messageLocker;
 #ifndef NDEBUG
     QTreeWidget *pldebugTree;

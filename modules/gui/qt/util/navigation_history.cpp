@@ -3,6 +3,7 @@
 #include "network/networkmediamodel.hpp"
 #include "medialibrary/mlqmltypes.hpp"
 
+
 NavigationHistory::NavigationHistory(QObject *parent)
     : QObject(parent)
 {
@@ -23,7 +24,10 @@ void NavigationHistory::push(QVariantMap item, PostAction postAction)
     m_history.push_back(item);
     emit previousEmptyChanged(false);
     if (postAction == PostAction::Go)
+    {
+        updateViewPath();
         emit currentChanged(m_history.back());
+    }
 }
 
 static void pushListRec(QVariantMap& itemMap, QVariantList::const_iterator it, QVariantList::const_iterator end )
@@ -46,6 +50,39 @@ static void pushListRec(QVariantMap& itemMap, QVariantList::const_iterator it, Q
             itemMap[kv.key()] = kv.value();
         pushListRec(itemMap, ++it, end);
     }
+}
+
+static void addLeafRec(QVariant &item, const QVariantMap &leaf)
+{
+    auto itemMap = item.toMap();
+    if (itemMap.contains("view"))
+    {
+        QVariant viewProps = itemMap.value("view");
+        addLeafRec(viewProps, leaf);
+        itemMap["view"] = viewProps;
+    }
+    else if (itemMap.contains("properties"))
+    {
+        QVariant propsVar = itemMap.value("properties");
+        const auto propsMap = propsVar.toMap();
+        if (propsMap.empty())
+        {
+            itemMap["properties"] = leaf;
+        }
+        else
+        {
+            addLeafRec(propsVar, leaf);
+            itemMap["properties"] = propsVar;
+        }
+    }
+    else
+    {
+        // invalid node?
+        return;
+    }
+
+    //overwrite item QVariant
+    item = itemMap;
 }
 
 
@@ -94,6 +131,15 @@ static bool isNodeValid(QVariant& value)
     return false;
 }
 
+static QString getViewPath(QVariantMap map)
+{
+    QString r;
+    if (map.contains("view"))
+        r = getViewPath(map.value("view").toMap());
+    else if (map.contains("name"))
+        r = "/" + map.value("name").toString() + getViewPath(map.value("properties").toMap());
+    return r;
+}
 
 void NavigationHistory::push(QVariantList itemList, NavigationHistory::PostAction postAction)
 {
@@ -113,6 +159,7 @@ void NavigationHistory::update(QVariantMap item)
     int length = m_history.length();
     assert(length >= 1);
     m_history.back() = item;
+    updateViewPath();
 }
 
 void NavigationHistory::update(QVariantList itemList)
@@ -125,6 +172,13 @@ void NavigationHistory::update(QVariantList itemList)
     if (!rootView.canConvert(QVariant::Map))
         return;
     update(rootView.toMap());
+}
+
+void NavigationHistory::addLeaf(QVariantMap itemMap)
+{
+    assert(m_history.size() >= 1);
+    addLeafRec(m_history.back(), itemMap);
+    updateViewPath();
 }
 
 void NavigationHistory::previous(PostAction postAction)
@@ -144,4 +198,19 @@ void NavigationHistory::previous(PostAction postAction)
 
     if (postAction == PostAction::Go)
         emit currentChanged( m_history.back() );
+}
+
+void NavigationHistory::updateViewPath()
+{
+    const auto viewPath = getViewPath(getCurrent().toMap());
+    if (viewPath == m_viewPath)
+        return;
+
+    m_viewPath = viewPath;
+    emit viewPathChanged( m_viewPath );
+}
+
+QString NavigationHistory::viewPath() const
+{
+    return m_viewPath;
 }

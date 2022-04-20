@@ -1049,6 +1049,7 @@ static int vlc_ceil_log2( const unsigned int val )
 static void OpusSetup(demux_t *demux, uint8_t *p, size_t len, es_format_t *p_fmt)
 {
     OpusHeader h;
+    opus_header_init(&h);
 
     /* default mapping */
     static const unsigned char map[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };
@@ -1130,6 +1131,7 @@ static void OpusSetup(demux_t *demux, uint8_t *p, size_t len, es_format_t *p_fmt
 
     if (!channels) {
         msg_Err(demux, "Opus channel configuration 0x%.2x not supported yet", p[1]);
+        opus_header_clean(&h);
         return;
     }
 
@@ -1152,10 +1154,12 @@ static void OpusSetup(demux_t *demux, uint8_t *p, size_t len, es_format_t *p_fmt
             p_fmt->audio.i_rate = 48000;
         }
     }
+    opus_header_clean(&h);
 
     return;
 
 explicit_config_too_short:
+    opus_header_clean(&h);
     msg_Err(demux, "Opus descriptor too short");
 }
 
@@ -1307,14 +1311,12 @@ static void PMTSetupEs0x06( demux_t *p_demux, ts_stream_t *p_pes,
                 PMTEsHasComponentTagBetween( p_dvbpsies, 0x30, 0x37 ) )
             {
                 es_format_Change( p_fmt, SPU_ES, VLC_CODEC_ARIB_A );
-                p_fmt->psz_language = strndup ( "jpn", 3 );
                 p_fmt->psz_description = strdup( _("ARIB subtitles") );
             }
             else if( i_data_component_id == 0x0012 &&
                      PMTEsHasComponentTagBetween( p_dvbpsies, 0x87, 0x88 ) )
             {
                 es_format_Change( p_fmt, SPU_ES, VLC_CODEC_ARIB_C );
-                p_fmt->psz_language = strndup ( "jpn", 3 );
                 p_fmt->psz_description = strdup( _("ARIB subtitles") );
             }
         }
@@ -1407,7 +1409,7 @@ static void PMTSetupEs0xD1( demux_t *p_demux, ts_es_t *p_es,
     }
 
     /* registration descriptor for Dirac
-     * (backwards compatable with VC-2 (SMPTE Sxxxx:2008)) */
+     * (backwards compatible with VC-2 (SMPTE Sxxxx:2008)) */
     es_format_Change( &p_es->fmt, VIDEO_ES, VLC_CODEC_DIRAC );
 }
 

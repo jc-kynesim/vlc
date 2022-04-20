@@ -15,11 +15,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
+#include <xcb/xfixes.h>
 #include <vlc_cxx_helpers.hpp>
 #include "compositor_x11_utils.hpp"
 
-namespace vlc {
+#include <QWindow>
 
+namespace vlc {
 
 DummyNativeWidget::DummyNativeWidget(QWidget* parent, Qt::WindowFlags f)
     : QWidget(parent, f)
@@ -28,6 +30,18 @@ DummyNativeWidget::DummyNativeWidget(QWidget* parent, Qt::WindowFlags f)
     setAttribute(Qt::WA_OpaquePaintEvent, true);
     setAttribute(Qt::WA_PaintOnScreen, true);
     setAttribute(Qt::WA_MouseTracking, true);
+    setAttribute(Qt::WA_TranslucentBackground, false);
+    QWindow* w =  window()->windowHandle();
+    assert(w);
+    /*
+     * force the window not to have an alpha channel, the  parent window
+     * may have an alpha channel and child widget would inhertit the format
+     * even if we set Qt::WA_TranslucentBackground to false. having an alpha
+     * in this surface would lead to the video begin semi-tranparent.
+     */
+    QSurfaceFormat format = w->format();
+    format.setAlphaBufferSize(0);
+    w->setFormat(format);
 }
 
 DummyNativeWidget::~DummyNativeWidget()
@@ -103,6 +117,17 @@ xcb_atom_t getInternAtom(xcb_connection_t* conn, const char* atomName)
     if (!atomReply)
         return 0;
     return atomReply->atom;
+}
+
+void setTransparentForMouseEvent(xcb_connection_t* conn, xcb_window_t window)
+{
+     xcb_rectangle_t *rect = 0;
+     int nrect = 0;
+
+     xcb_xfixes_region_t region = xcb_generate_id(conn);
+     xcb_xfixes_create_region(conn, region, nrect, rect);
+     xcb_xfixes_set_window_shape_region(conn, window, XCB_SHAPE_SK_INPUT, 0, 0, region);
+     xcb_xfixes_destroy_region(conn, region);
 }
 
 }

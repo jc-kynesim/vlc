@@ -56,7 +56,6 @@ vlc_module_begin()
     set_description(N_("AudioToolbox MIDI synthesizer"))
     set_capability("audio decoder", 100)
     set_shortname(N_("AUMIDI"))
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_ACODEC)
     set_callbacks(Open, Close)
     add_loadfile(CFG_PREFIX "soundfont", "",
@@ -283,7 +282,7 @@ static int Open(vlc_object_t *p_this)
     p_dec->pf_flush  = Flush;
 
 bailout:
-    // Cleanup if error occured
+    // Cleanup if error occurred
     if (ret != VLC_SUCCESS) {
         if (p_sys->graph)
             DisposeAUGraph(p_sys->graph);

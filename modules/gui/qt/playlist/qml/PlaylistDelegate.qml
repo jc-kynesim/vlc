@@ -35,9 +35,13 @@ T.Control {
 
     readonly property int selectionLength: root.model.selectedCount
 
-    readonly property bool isLastItem: (index === listView.modelCount - 1)
-
     readonly property bool selected : model.selected
+
+    readonly property bool topContainsDrag: higherDropArea.containsDrag
+
+    readonly property bool bottomContainsDrag: lowerDropArea.containsDrag
+
+    readonly property bool containsDrag: (topContainsDrag || bottomContainsDrag)
 
     // Settings
 
@@ -67,18 +71,6 @@ T.Control {
     onVisualFocusChanged: {
         if (visualFocus)
             adjustTooltip()
-    }
-
-    // Connections
-
-    Connections {
-        target: listView
-
-        onSetItemDropIndicatorVisible: {
-            if (index === model.index) {
-                topDropIndicator.visible = Qt.binding(function() { return visible || higherDropArea.containsDrag; })
-            }
-        }
     }
 
     // Functions
@@ -139,13 +131,12 @@ T.Control {
                 spread: 0.1
             }
 
-            Image {
+            Widgets.ScaledImage {
                 id: artwork
 
-                mipmap: true
                 anchors.fill: parent
                 fillMode: Image.PreserveAspectFit
-                source: (model.artwork && model.artwork.toString()) ? model.artwork : VLCStyle.noArtCover
+                source: (model.artwork && model.artwork.toString()) ? model.artwork : VLCStyle.noArtAlbumCover
                 visible: !statusIcon.visible
             }
 
@@ -160,9 +151,9 @@ T.Control {
                 verticalAlignment: Text.AlignVCenter
                 color: colors.accent
                 text: {
-                    if (player.playingState === PlayerController.PLAYING_STATE_PLAYING)
+                    if (Player.playingState === Player.PLAYING_STATE_PLAYING)
                         return VLCIcons.volume_high
-                    if (player.playingState === PlayerController.PLAYING_STATE_PAUSED)
+                    if (Player.playingState === Player.PLAYING_STATE_PAUSED)
                         return VLCIcons.pause
                     return ""
                 }
@@ -173,8 +164,8 @@ T.Control {
             id: textInfoColumn
 
             Layout.fillWidth: true
+            Layout.fillHeight: true
             Layout.leftMargin: VLCStyle.margin_large
-            Layout.preferredHeight: artworkItem.height * 1.25
             spacing: 0
 
             Widgets.ListLabel {
@@ -186,6 +177,7 @@ T.Control {
                 font.weight: model.isCurrent ? Font.Bold : Font.DemiBold
                 text: model.title
                 color: colors.text
+                verticalAlignment: Text.AlignTop
             }
 
             Widgets.ListSubtitleLabel {
@@ -195,8 +187,9 @@ T.Control {
                 Layout.fillWidth: true
 
                 font.weight: model.isCurrent ? Font.DemiBold : Font.Normal
-                text: (model.artist ? model.artist : i18n.qtr("Unknown Artist"))
+                text: (model.artist ? model.artist : I18n.qtr("Unknown Artist"))
                 color: colors.text
+                verticalAlignment: Text.AlignBottom
             }
         }
 
@@ -211,22 +204,6 @@ T.Control {
         }
     }
 
-    Rectangle {
-        id: topDropIndicator
-
-        anchors {
-            left: parent.left
-            right: parent.right
-            top: parent.top
-        }
-
-        visible: higherDropArea.containsDrag
-
-        height: VLCStyle.dp(1, VLCStyle.scale)
-
-        color: colors.accent
-    }
-
     MouseArea {
         id: mouseArea
 
@@ -236,26 +213,10 @@ T.Control {
 
         acceptedButtons: Qt.LeftButton | Qt.RightButton
 
-        onContainsMouseChanged: {
-            if (containsMouse) {
-                var bottomItemIndex = listView.listView.indexAt(delegate.width / 2, (listView.listView.contentY + listView.height) + 1)
-                var topItemIndex = listView.listView.indexAt(delegate.width / 2, listView.listView.contentY - 1)
-
-                if(bottomItemIndex !== -1 && model.index >= bottomItemIndex - 1)
-                {
-                    listView.fadeRectBottomHovered = Qt.binding(function() {return delegate.hovered})
-                }
-                if(model.index <= topItemIndex + 1)
-                {
-                    listView.fadeRectTopHovered = Qt.binding(function() {return delegate.hovered})
-                }
-            }
-        }
-
         onClicked: {
             /* to receive keys events */
             listView.forceActiveFocus()
-            if (listView.mode === PlaylistListView.Mode.Move) {
+            if (root.mode === PlaylistListView.Mode.Move) {
                 var selectedIndexes = root.model.getSelection()
                 if (selectedIndexes.length === 0)
                     return
@@ -267,7 +228,7 @@ T.Control {
                 listView.currentIndex = selectedIndexes[0]
                 root.model.moveItemsPre(selectedIndexes, preTarget)
                 return
-            } else if (listView.mode === PlaylistListView.Mode.Select) {
+            } else if (root.mode === PlaylistListView.Mode.Select) {
             } else if (!(root.model.isSelected(index) && mouse.button === Qt.RightButton)) {
                 listView.updateSelection(mouse.modifiers, listView.currentIndex, index)
                 listView.currentIndex = index
@@ -278,7 +239,7 @@ T.Control {
         }
 
         onDoubleClicked: {
-            if (mouse.button !== Qt.RightButton && listView.mode === PlaylistListView.Mode.Normal)
+            if (mouse.button !== Qt.RightButton && root.mode === PlaylistListView.Mode.Normal)
                 mainPlaylistController.goTo(index, true)
         }
 
@@ -310,7 +271,7 @@ T.Control {
                 // FIXME: Override dragItem's position
                 var pos = mapToItem(dragItem.parent, mouseX, mouseY)
                 dragItem.x = pos.x + VLCStyle.dp(15)
-                dragItem.y = pos.y // y should be changed after x
+                dragItem.y = pos.y
             }
         }
     }
@@ -343,29 +304,15 @@ T.Control {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
-            function handleDropIndicators(visible) {
-                if (isLastItem)
-                    listView.footerItem.setDropIndicatorVisible(visible)
-                else
-                    listView.setItemDropIndicatorVisible(index + 1, visible)
-            }
-
             onEntered: {
                 if (!isDropAcceptable(drag, index + 1)) {
                     drag.accepted = false
                     return
                 }
-
-                handleDropIndicators(true)
-            }
-
-            onExited: {
-                handleDropIndicators(false)
             }
 
             onDropped: {
                 root.acceptDrop(index + 1, drop)
-                handleDropIndicators(false)
             }
         }
     }

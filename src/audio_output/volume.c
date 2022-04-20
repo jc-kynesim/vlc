@@ -39,7 +39,7 @@ struct aout_volume
     audio_volume_t object;
     audio_replay_gain_t replay_gain;
     _Atomic float gain_factor;
-    float output_factor;
+    _Atomic float output_factor;
     module_t *module;
 };
 
@@ -58,7 +58,8 @@ aout_volume_t *aout_volume_New(vlc_object_t *parent,
     if (unlikely(vol == NULL))
         return NULL;
     vol->module = NULL;
-    vol->output_factor = 1.f;
+    atomic_init(&vol->gain_factor, 1.f);
+    atomic_init(&vol->output_factor, 1.f);
 
     //audio_volume_t *obj = &vol->object;
 
@@ -80,9 +81,6 @@ aout_volume_t *aout_volume_New(vlc_object_t *parent,
  */
 int aout_volume_SetFormat(aout_volume_t *vol, vlc_fourcc_t format)
 {
-    if (unlikely(vol == NULL))
-        return -1;
-
     audio_volume_t *obj = &vol->object;
     if (vol->module != NULL)
     {
@@ -107,9 +105,6 @@ int aout_volume_SetFormat(aout_volume_t *vol, vlc_fourcc_t format)
  */
 void aout_volume_Delete(aout_volume_t *vol)
 {
-    if (vol == NULL)
-        return;
-
     audio_volume_t *obj = &vol->object;
 
     if (vol->module != NULL)
@@ -121,10 +116,7 @@ void aout_volume_Delete(aout_volume_t *vol)
 
 void aout_volume_SetVolume(aout_volume_t *vol, float factor)
 {
-    if (unlikely(vol == NULL))
-        return;
-
-    vol->output_factor = factor;
+    atomic_store_explicit(&vol->output_factor, factor, memory_order_relaxed);
 }
 
 /**
@@ -132,10 +124,11 @@ void aout_volume_SetVolume(aout_volume_t *vol, float factor)
  */
 int aout_volume_Amplify(aout_volume_t *vol, block_t *block)
 {
-    if (unlikely(vol == NULL) || vol->module == NULL)
+    if (vol->module == NULL)
         return -1;
 
-    float amp = vol->output_factor * atomic_load(&vol->gain_factor);
+    float amp = atomic_load_explicit(&vol->output_factor, memory_order_relaxed)
+              * atomic_load_explicit(&vol->gain_factor, memory_order_relaxed);
 
     vol->object.amplify(&vol->object, block, amp);
     return 0;
@@ -197,7 +190,7 @@ static int ReplayGainCallback (vlc_object_t *obj, char const *var,
     aout_volume_t *vol = data;
     float multiplier = aout_ReplayGainSelect(obj, val.psz_string,
                                              &vol->replay_gain);
-    atomic_store(&vol->gain_factor, multiplier);
+    atomic_store_explicit(&vol->gain_factor, multiplier, memory_order_relaxed);
     VLC_UNUSED(var); VLC_UNUSED(oldval);
     return VLC_SUCCESS;
 }

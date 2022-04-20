@@ -90,7 +90,10 @@ static bool block_Differs(const block_t *a, const block_t *b)
 {\
     block_ChainLastAppend(&p_sys->name.pp_chain_last, b);\
     if(p_sys->tu.dts == VLC_TICK_INVALID)\
-        p_sys->tu.dts = b->i_dts; p_sys->tu.pts = b->i_pts;\
+    {\
+        p_sys->tu.dts = b->i_dts;\
+        p_sys->tu.pts = b->i_pts;\
+    }\
 }
 
 static void UpdateDecoderFormat(decoder_t *p_dec)
@@ -552,7 +555,6 @@ static int Open(vlc_object_t *p_this)
  *****************************************************************************/
 
 vlc_module_begin ()
-    set_category(CAT_SOUT)
     set_subcategory(SUBCAT_SOUT_PACKETIZER)
     set_description(N_("AV1 video packetizer"))
     set_capability("packetizer", 50)

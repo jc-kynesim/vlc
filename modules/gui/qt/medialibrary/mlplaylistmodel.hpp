@@ -67,24 +67,49 @@ protected: // MLBaseModel implementation
 
     QByteArray criteriaToName(vlc_ml_sorting_criteria_t criteria) const override;
 
-    ListCacheLoader<std::unique_ptr<MLItem>> * createLoader() const override;
+    std::unique_ptr<MLBaseModel::BaseLoader> createLoader() const override;
 
 protected: // MLBaseModel reimplementation
     void onVlcMlEvent(const MLEvent & event) override;
 
-    void thumbnailUpdated(int idx) override;
+    void thumbnailUpdated(const QModelIndex& idx, MLItem* item, const QString& mrl, vlc_ml_thumbnail_status_t status) override;
 
 private: // Functions
-    QList<int> getRows(const QModelIndexList & indexes) const;
+    struct HighLowRanges {
+        int lowTo;
+        int highTo;
+        std::vector<std::pair<int, int>> lowRanges;
+        size_t lowRangeIt;
+        std::vector<std::pair<int, int>> highRanges;
+        size_t highRangeIt;
+    };
+
+    /**
+     * returns list of row indexes in decreasing order
+     */
+    std::vector<std::pair<int, int>> getSortedRowsRanges(const QModelIndexList & indexes, bool asc) const;
+
+    void removeImpl(int64_t playlistId, const std::vector<std::pair<int, int> >&& rangeList, size_t index);
+
+    void moveImpl(int64_t playlistId, HighLowRanges&& ranges);
+
+    void endTransaction();
+
+    void generateThumbnail(const MLItemId& itemid) const;
+
+    bool m_transactionPending = false;
+    bool m_resetAfterTransaction = false;
 
 private:
     struct Loader : public MLBaseModel::BaseLoader
     {
         Loader(const MLPlaylistModel & model);
 
-        size_t count() const override;
+        size_t count(vlc_medialibrary_t* ml) const override;
 
-        std::vector<std::unique_ptr<MLItem>> load(size_t index, size_t count) const override;
+        std::vector<std::unique_ptr<MLItem>> load(vlc_medialibrary_t* ml, size_t index, size_t count) const override;
+
+        std::unique_ptr<MLItem> loadItemById(vlc_medialibrary_t* ml, MLItemId itemId) const override;
     };
 };
 

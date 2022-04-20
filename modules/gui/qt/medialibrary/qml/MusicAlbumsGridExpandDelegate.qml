@@ -58,9 +58,9 @@ FocusScope {
         var count = Helpers.get(model, "nb_tracks", 0);
 
         if (count < 2)
-            return i18n.qtr("%1 track").arg(count);
+            return I18n.qtr("%1 track").arg(count);
         else
-            return i18n.qtr("%1 tracks").arg(count);
+            return I18n.qtr("%1 tracks").arg(count);
     }
 
     Rectangle {
@@ -124,7 +124,7 @@ FocusScope {
                         height: VLCStyle.expandCover_music_height
                         width: VLCStyle.expandCover_music_width
                         radius: VLCStyle.expandCover_music_radius
-                        source: Helpers.get(model, "cover", VLCStyle.noArtAlbum)
+                        source: Helpers.get(model, "cover", VLCStyle.noArtAlbumCover)
                     }
 
                     Widgets.ListCoverShadow {
@@ -147,16 +147,16 @@ FocusScope {
                             id: playActionBtn
 
                             iconTxt: VLCIcons.play_outline
-                            text: i18n.qtr("Play")
-                            onClicked: medialib.addAndPlay( model.id )
+                            text: I18n.qtr("Play")
+                            onClicked: MediaLib.addAndPlay( model.id )
                         }
 
                         Widgets.TabButtonExt {
                             id: enqueueActionBtn
 
                             iconTxt: VLCIcons.enqueue
-                            text: i18n.qtr("Enqueue")
-                            onClicked: medialib.addToPlaylist( model.id )
+                            text: I18n.qtr("Enqueue")
+                            onClicked: MediaLib.addToPlaylist( model.id )
                         }
                     }
 
@@ -205,7 +205,7 @@ FocusScope {
                 }
 
                 Widgets.CaptionLabel {
-                    text: i18n.qtr("Title")
+                    text: I18n.qtr("Title")
                 }
             }
 
@@ -221,7 +221,7 @@ FocusScope {
                     Widgets.SubtitleLabel {
                         id: expand_infos_title_id
 
-                        text: Helpers.get(model, "title", i18n.qtr("Unknown title"))
+                        text: Helpers.get(model, "title", I18n.qtr("Unknown title"))
 
                         Layout.fillWidth: true
                     }
@@ -242,14 +242,15 @@ FocusScope {
                     id: expand_infos_subtitle_id
 
                     width: parent.width
-                    text: i18n.qtr("%1 - %2 - %3 - %4")
-                        .arg(Helpers.get(model, "main_artist", i18n.qtr("Unknown artist")))
+                    text: I18n.qtr("%1 - %2 - %3 - %4")
+                        .arg(Helpers.get(model, "main_artist", I18n.qtr("Unknown artist")))
                         .arg(Helpers.get(model, "release_year", ""))
                         .arg(_getStringTrack())
                         .arg(Helpers.msToString(Helpers.get(model, "duration", 0)))
                 }
             }
 
+            clip: true // content may overflow if not enough space is provided
             headerPositioning: ListView.InlineHeader
             section.property: ""
 
@@ -265,7 +266,7 @@ FocusScope {
             }
 
             sortModel: [
-                { isPrimary: true, criteria: "title", width: VLCStyle.colWidth(Math.max(tracks._nbCols - 1, 1)), visible: true, text: i18n.qtr("Title"), showSection: "", colDelegate: titleDelegate, headerDelegate: titleHeaderDelegate },
+                { isPrimary: true, criteria: "title", width: VLCStyle.colWidth(Math.max(tracks._nbCols - 1, 1)), visible: true, text: I18n.qtr("Title"), showSection: "", colDelegate: titleDelegate, headerDelegate: titleHeaderDelegate },
                 { criteria: "duration",               width: VLCStyle.colWidth(1), visible: true, showSection: "", colDelegate: tableColumns.timeColDelegate, headerDelegate: tableColumns.timeHeaderDelegate },
             ]
 

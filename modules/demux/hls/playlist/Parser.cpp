@@ -155,6 +155,7 @@ void M3U8Parser::createAndFillRepresentation(vlc_object_t *p_obj, BaseAdaptation
     HLSRepresentation *rep  = createRepresentation(adaptSet, tag);
     if(rep)
     {
+        rep->addAttribute(new TimescaleAttr(Timescale(1000000)));
         parseSegments(p_obj, rep, tagslist);
         adaptSet->addRepresentation(rep);
     }
@@ -218,16 +219,21 @@ static bool parseEncryption(const AttributesTag *keytag, const Url &playlistUrl,
 
 void M3U8Parser::parseSegments(vlc_object_t *, HLSRepresentation *rep, const std::list<Tag *> &tagslist)
 {
-    SegmentList *segmentList = new (std::nothrow) SegmentList(rep);
+    bool b_pdt = tagslist.cend() != std::find_if(tagslist.cbegin(), tagslist.cend(),
+                    [](const Tag *t){return t->getType() == SingleValueTag::EXTXPROGRAMDATETIME;});
+    bool b_vod = tagslist.size() && tagslist.back()->getType() == SingleValueTag::EXTXENDLIST;
 
-    Timescale timescale(1000000);
-    rep->addAttribute(new TimescaleAttr(timescale));
+    SegmentList *segmentList = new SegmentList(rep, !b_vod && !b_pdt);
+    const Timescale timescale = rep->inheritTimescale();
+
     rep->b_loaded = true;
+    rep->b_live = !b_vod;
 
     vlc_tick_t totalduration = 0;
     vlc_tick_t nzStartTime = 0;
     vlc_tick_t absReferenceTime = VLC_TICK_INVALID;
     uint64_t sequenceNumber = 0;
+    uint64_t discontinuitySequence = 0;
     bool discontinuity = false;
     std::size_t prevbyterangeoffset = 0;
     const SingleValueTag *ctx_byterange = nullptr;
@@ -301,12 +307,9 @@ void M3U8Parser::parseSegments(vlc_object_t *, HLSRepresentation *rep, const std
                     segment->setByteRange(range.first, prevbyterangeoffset - 1);
                     ctx_byterange = nullptr;
                 }
-
-                if(discontinuity)
-                {
-                    segment->discontinuity = true;
-                    discontinuity = false;
-                }
+                segment->setDiscontinuitySequenceNumber(discontinuitySequence);
+                segment->discontinuity = discontinuity;
+                discontinuity = false;
 
                 if(encryption.method != CommonEncryption::Method::None)
                     segment->setEncryption(encryption);
@@ -318,7 +321,7 @@ void M3U8Parser::parseSegments(vlc_object_t *, HLSRepresentation *rep, const std
                 break;
 
             case SingleValueTag::EXTXPLAYLISTTYPE:
-                rep->b_live = (static_cast<const SingleValueTag *>(tag)->getValue().value != "VOD");
+                rep->b_live = !b_vod && (static_cast<const SingleValueTag *>(tag)->getValue().value != "VOD");
                 break;
 
             case SingleValueTag::EXTXBYTERANGE:
@@ -326,7 +329,6 @@ void M3U8Parser::parseSegments(vlc_object_t *, HLSRepresentation *rep, const std
                 break;
 
             case SingleValueTag::EXTXPROGRAMDATETIME:
-                rep->b_consistent = false;
                 absReferenceTime = VLC_TICK_0 +
                         UTCTime(static_cast<const SingleValueTag *>(tag)->getValue().value).mtime();
                 /* Reverse apply UTC timespec from first discont */
@@ -373,12 +375,16 @@ void M3U8Parser::parseSegments(vlc_object_t *, HLSRepresentation *rep, const std
             }
             break;
 
+            case SingleValueTag::EXTXDISCONTINUITYSEQUENCE:
+                discontinuitySequence = static_cast<const SingleValueTag *>(tag)->getValue().decimal();
+                break;
+
             case Tag::EXTXDISCONTINUITY:
-                discontinuity  = true;
+                discontinuity = true;
+                discontinuitySequence++;
                 break;
 
             case Tag::EXTXENDLIST:
-                rep->b_live = false;
                 break;
         }
     }
@@ -557,7 +563,6 @@ M3U8 * M3U8Parser::parse(vlc_object_t *p_object, stream_t *p_stream, const std::
                 if(typeattr->value == "SUBTITLES")
                 {
                     altAdaptSet->setRole(Role(Role::Value::Subtitle));
-                    rep->streamFormat = StreamFormat(StreamFormat::Type::Unsupported);
                 }
                 else if(typeattr->value != "AUDIO" && typeattr->value != "VIDEO")
                 {

@@ -21,8 +21,10 @@ import QtQuick.Controls 2.4
 import QtQuick.Templates 2.4 as T
 import QtQuick.Layouts 1.11
 import QtGraphicalEffects 1.0
-import org.videolan.vlc 0.1
 import QtQml.Models 2.11
+
+import org.videolan.vlc 0.1
+import org.videolan.compat 0.1
 
 import "qrc:///style/"
 import "qrc:///widgets/" as Widgets
@@ -42,6 +44,7 @@ FocusScope {
 
     signal itemClicked(int index)
 
+    property alias sortMenu: sortControl.menu
     property alias sortModel: sortControl.model
     property var contentModel
     property alias isViewMultiView: list_grid_btn.visible
@@ -57,19 +60,34 @@ FocusScope {
     }
 
     function search() {
-        searchBox.reqExpand()
+        searchBox.state = "expanded"
     }
 
-    Binding {
-        target: !!contentModel ? contentModel : null
+    BindingCompat {
         property: "searchPattern"
         value: searchBox.searchPattern
         when: !!contentModel
+
+        Component.onCompleted: {
+            // restoreMode is only available in Qt >= 5.14
+            if ("restoreMode" in this)
+                this.restoreMode = Binding.RestoreBindingOrValue
+
+            target = Qt.binding(function() { return !!contentModel ? contentModel : null })
+        }
     }
 
     Widgets.AcrylicBackground {
         alternativeColor: VLCStyle.colors.topBanner
         anchors.fill: parent
+    }
+
+
+    MouseArea {
+        // don't tranfer mouse to underlying components (#26274)
+        anchors.fill: parent
+        hoverEnabled: true
+        preventStealing: true
     }
 
     Item {
@@ -130,12 +148,12 @@ FocusScope {
                                  id: history_back
                                  size: VLCStyle.banner_icon_size
                                  iconText: VLCIcons.topbar_previous
-                                 text: i18n.qtr("Previous")
+                                 text: I18n.qtr("Previous")
                                  height: VLCStyle.bannerButton_height
                                  width: VLCStyle.bannerButton_width
                                  colorDisabled: VLCStyle.colors.textDisabled
-                                 onClicked: history.previous()
-                                 enabled: !history.previousEmpty
+                                 onClicked: History.previous()
+                                 enabled: !History.previousEmpty
 
                                  Navigation.parentItem: root
                                  Navigation.rightItem: globalMenuGroup
@@ -254,7 +272,7 @@ FocusScope {
                                 height: VLCStyle.bannerButton_height
                                 size: VLCStyle.banner_icon_size
                                 iconText: MainCtx.gridView ? VLCIcons.list : VLCIcons.grid
-                                text: i18n.qtr("List/Grid")
+                                text: I18n.qtr("List/Grid")
                                 onClicked: MainCtx.gridView = !MainCtx.gridView
                                 enabled: true
                             }
@@ -262,30 +280,32 @@ FocusScope {
                             Widgets.SortControl {
                                 id: sortControl
 
-                                textRole: "text"
-                                criteriaRole: "criteria"
-
                                 width: VLCStyle.bannerButton_width
                                 height: VLCStyle.bannerButton_height
+
                                 iconSize: VLCStyle.banner_icon_size
 
                                 visible: root.sortModel !== undefined && root.sortModel.length > 1
+
                                 enabled: visible
 
+                                textRole: "text"
+                                criteriaRole: "criteria"
+
+                                sortKey: contentModel ? contentModel.sortCriteria
+                                                      : PlaylistControllerModel.SORT_KEY_NONE
+
+                                sortOrder: contentModel ? contentModel.sortOrder : undefined
+
                                 onSortSelected: {
-                                    if (contentModel !== undefined) {
-                                        contentModel.sortCriteria = type
-                                    }
+                                    if (contentModel !== undefined)
+                                        contentModel.sortCriteria = key
                                 }
 
                                 onSortOrderSelected: {
-                                    if (contentModel !== undefined) {
+                                    if (contentModel !== undefined)
                                         contentModel.sortOrder = type
-                                    }
                                 }
-
-                                sortKey: contentModel ? contentModel.sortCriteria : PlaylistControllerModel.SORT_KEY_NONE
-                                sortOrder: contentModel ? contentModel.sortOrder : undefined
                             }
                         }
 
@@ -323,9 +343,11 @@ FocusScope {
 
                         width: Math.min(contentWidth, availableWidth)
                         height: VLCStyle.localToolbar_height
-                        clip: true
+                        clip: contentWidth > width
                         contentWidth: localMenuGroup.width
                         contentHeight: VLCStyle.localToolbar_height // don't allow vertical flickering
+
+                        anchors.right: playlistGroup.left
                         anchors.rightMargin: VLCStyle.margin_xxsmall // only applied when right aligned
 
                         on_AlignHCenterChanged: {
@@ -385,10 +407,8 @@ FocusScope {
 
                             Widgets.SearchBox {
                                 id: searchBox
-                                visible: root.contentModel !== undefined
-                                enabled: visible
+                                visible: !!root.contentModel
                                 height: VLCStyle.bannerButton_height
-                                width: searchBox.implicitWith
                                 buttonWidth: VLCStyle.bannerButton_width
                             }
 
@@ -397,7 +417,7 @@ FocusScope {
 
                                 size: VLCStyle.banner_icon_size
                                 iconText: VLCIcons.playlist
-                                text: i18n.qtr("Playlist")
+                                text: I18n.qtr("Playlist")
                                 width: VLCStyle.bannerButton_width
                                 height: VLCStyle.bannerButton_height
                                 highlighted: MainCtx.playlistVisible
@@ -410,7 +430,7 @@ FocusScope {
 
                                 size: VLCStyle.banner_icon_size
                                 iconText: VLCIcons.ellipsis
-                                text: i18n.qtr("Menu")
+                                text: I18n.qtr("Menu")
                                 width: VLCStyle.bannerButton_width
                                 height: VLCStyle.bannerButton_height
 

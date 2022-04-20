@@ -34,11 +34,11 @@
 #include "widgets/native/customwidgets.hpp"
 #include "widgets/native/searchlineedit.hpp"
 #include "util/qt_dirs.hpp"
-#include <vlc_actions.h>
 #include <vlc_intf_strings.h>
 #include <vlc_modules.h>
 #include <vlc_plugin.h>
 
+#include <QWidget>
 #include <QString>
 #include <QStringList>
 #include <QVariant>
@@ -46,19 +46,27 @@
 #include <QSlider>
 #include <QFileDialog>
 #include <QGroupBox>
-#include <QTreeWidgetItem>
+#include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
-#include <QSignalMapper>
 #include <QDialogButtonBox>
 #include <QKeyEvent>
 #include <QColorDialog>
 #include <QAction>
 #include <QKeySequence>
+#include <QDoubleSpinBox>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QLineEdit>
+#include <QSpinBox>
+#include <QPushButton>
+#include <QFontComboBox>
+#include <QMenu>
+#include <QGuiApplication>
+#include <QClipboard>
+#include <QFont>
 
 #define MINWIDTH_BOX 90
 #define LAST_COLUMN 10
-
-#define HOTKEY_ITEM_HEIGHT 24
 
 QString formatTooltip(const QString & tooltip)
 {
@@ -77,8 +85,7 @@ QString formatTooltip(const QString & tooltip)
 }
 
 ConfigControl *ConfigControl::createControl( module_config_t *p_item,
-                                             QWidget *parent,
-                                             QGridLayout *l, int line )
+                                             QWidget *parent )
 {
     ConfigControl *p_control = NULL;
 
@@ -136,24 +143,27 @@ ConfigControl *ConfigControl::createControl( module_config_t *p_item,
     default:
         break;
     }
-    if ( p_control ) p_control->insertIntoExistingGrid( l, line );
     return p_control;
 }
 
-/* Inserts controls into layouts
-   This is sub-optimal in the OO way, as controls's code still
-   depends on Layout classes. We should use layout inserters [friend]
-   classes, but it's unlikely we had to deal with a different layout.*/
-void ConfigControl::insertInto( QBoxLayout *layout )
+ConfigControl *ConfigControl::createControl( module_config_t *item,
+                                             QWidget *parent,
+                                             QGridLayout *l, int line )
 {
-    QGridLayout *sublayout = new QGridLayout();
-    fillGrid( sublayout, 0 );
-    layout->addLayout( sublayout );
+    ConfigControl *control = createControl( item, parent );
+    if ( control )
+        control->insertInto( l, line );
+    return control;
 }
 
-void ConfigControl::insertIntoExistingGrid( QGridLayout *l, int line )
+ConfigControl *ConfigControl::createControl( module_config_t *item,
+                                             QWidget *parent,
+                                             QBoxLayout *l, int index )
 {
-    fillGrid( l, line );
+    ConfigControl *control = createControl( item, parent );
+    if ( control )
+        control->insertInto( l, index );
+    return control;
 }
 
 /*******************************************************
@@ -204,6 +214,13 @@ VStringConfigControl::doApply()
     config_PutPsz( getName(), qtu( getValue() ) );
 }
 
+void VStringConfigControl::storeValue()
+{
+    /* Note, this modifies our local copy of the item only */
+    free( p_item->value.psz );
+    p_item->value.psz = strdup( qtu( getValue() ) );
+}
+
 /*********** String **************/
 StringConfigControl::StringConfigControl( module_config_t *_p_item,
                                           QWidget *_parent ) :
@@ -223,11 +240,17 @@ StringConfigControl::StringConfigControl( module_config_t *_p_item,
     finish( );
 }
 
-void StringConfigControl::fillGrid( QGridLayout *l, int line )
+void StringConfigControl::insertInto( QGridLayout *l, int line )
 {
     l->addWidget( label, line, 0 );
     l->setColumnMinimumWidth( 1, 10 );
     l->addWidget( text, line, LAST_COLUMN, Qt::AlignRight );
+}
+
+void StringConfigControl::insertInto( QBoxLayout *l, int index )
+{
+    l->insertWidget( index, label );
+    l->insertWidget( index + 1, text );
 }
 
 void StringConfigControl::finish()
@@ -242,6 +265,17 @@ void StringConfigControl::finish()
     }
     if( label )
         label->setBuddy( text );
+}
+
+void StringConfigControl::changeVisibility( bool visible )
+{
+    text->setVisible( visible );
+    if ( label ) label->setVisible( visible );
+}
+
+QString StringConfigControl::getValue() const
+{
+    return text->text();
 }
 
 /********* String / Password **********/
@@ -272,7 +306,7 @@ FileConfigControl::FileConfigControl( module_config_t *_p_item, QWidget *p ) :
     text = new QLineEdit( qfu(p_item->value.psz), p );
     browse = new QPushButton( qtr( "Browse..." ), p );
 
-    BUTTONACT( browse, updateField() );
+    BUTTONACT( browse, &FileConfigControl::updateField );
 
     finish();
 }
@@ -286,12 +320,12 @@ FileConfigControl::FileConfigControl( module_config_t *_p_item,
     text = _text;
     label = _label;
 
-    BUTTONACT( browse, updateField() );
+    BUTTONACT( browse, &FileConfigControl::updateField );
 
     finish( );
 }
 
-void FileConfigControl::fillGrid( QGridLayout *l, int line )
+void FileConfigControl::insertInto( QGridLayout *l, int line )
 {
     l->addWidget( label, line, 0 );
     l->setColumnMinimumWidth( 1, 10 );
@@ -300,6 +334,16 @@ void FileConfigControl::fillGrid( QGridLayout *l, int line )
     textAndButton->addWidget( text, 2 );
     textAndButton->addWidget( browse, 0 );
     l->addLayout( textAndButton, line, LAST_COLUMN );
+}
+
+void FileConfigControl::insertInto( QBoxLayout *l, int index )
+{
+    l->insertWidget( index, label );
+    QHBoxLayout *textAndButton = new QHBoxLayout();
+    textAndButton->setMargin( 0 );
+    textAndButton->addWidget( text, 2 );
+    textAndButton->addWidget( browse, 0 );
+    l->insertLayout( index + 1, textAndButton );
 }
 
 void FileConfigControl::updateField()
@@ -329,6 +373,18 @@ void FileConfigControl::finish()
     }
     if( label )
         label->setBuddy( text );
+}
+
+void FileConfigControl::changeVisibility( bool visible )
+{
+    text->setVisible( visible );
+    browse->setVisible( visible );
+    if ( label ) label->setVisible( visible );
+}
+
+QString FileConfigControl::getValue() const
+{
+    return text->text();
 }
 
 /********* String / Directory **********/
@@ -385,10 +441,27 @@ FontConfigControl::FontConfigControl( module_config_t *_p_item,
     }
 }
 
-void FontConfigControl::fillGrid( QGridLayout *l, int line )
+void FontConfigControl::insertInto( QGridLayout *l, int line )
 {
     l->addWidget( label, line, 0 );
     l->addWidget( font, line, 1, 1, -1 );
+}
+
+void FontConfigControl::insertInto( QBoxLayout *l, int index )
+{
+    l->insertWidget( index, label );
+    l->insertWidget( index + 1, font );
+}
+
+void FontConfigControl::changeVisibility( bool visible )
+{
+    font->setVisible( visible );
+    if ( label ) label->setVisible( visible );
+}
+
+QString FontConfigControl::getValue() const
+{
+    return font->currentFont().family();
 }
 
 /********* String / choice list **********/
@@ -399,7 +472,7 @@ StringListConfigControl::StringListConfigControl( module_config_t *_p_item,
     label = new QLabel( qfut(p_item->psz_text), p );
     combo = new QComboBox( p );
     combo->setMinimumWidth( MINWIDTH_BOX );
-    combo->setSizePolicy( QSizePolicy::MinimumExpanding, QSizePolicy::Preferred );
+    combo->setSizePolicy( QSizePolicy::MinimumExpanding, QSizePolicy::Fixed );
 
     /* needed to see update from getting choice list where callback used */
     module_config_t *p_module_config = config_FindConfig( p_item->psz_name );
@@ -421,10 +494,16 @@ StringListConfigControl::StringListConfigControl( module_config_t *_p_item,
     finish( p_module_config );
 }
 
-void StringListConfigControl::fillGrid( QGridLayout *l, int line )
+void StringListConfigControl::insertInto( QGridLayout *l, int line )
 {
     l->addWidget( label, line, 0 );
     l->addWidget( combo, line, LAST_COLUMN, Qt::AlignRight );
+}
+
+void StringListConfigControl::insertInto( QBoxLayout *l, int index )
+{
+    l->insertWidget( index, label );
+    l->insertWidget( index + 1, combo );
 }
 
 void StringListConfigControl::comboIndexChanged( int i_index )
@@ -436,7 +515,8 @@ void StringListConfigControl::comboIndexChanged( int i_index )
 void StringListConfigControl::finish(module_config_t *p_module_config )
 {
     combo->setEditable( false );
-    CONNECT( combo, currentIndexChanged( int ), this, comboIndexChanged( int ) );
+    connect( combo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+             this, &StringListConfigControl::comboIndexChanged );
 
     if(!p_module_config) return;
 
@@ -465,6 +545,12 @@ void StringListConfigControl::finish(module_config_t *p_module_config )
     }
     if( label )
         label->setBuddy( combo );
+}
+
+void StringListConfigControl::changeVisibility( bool visible )
+{
+    combo->setVisible( visible );
+    if ( label ) label->setVisible( visible );
 }
 
 QString StringListConfigControl::getValue() const
@@ -533,10 +619,16 @@ ModuleConfigControl::ModuleConfigControl( module_config_t *_p_item,
     finish( );
 }
 
-void ModuleConfigControl::fillGrid( QGridLayout *l, int line )
+void ModuleConfigControl::insertInto( QGridLayout *l, int line )
 {
     l->addWidget( label, line, 0 );
     l->addWidget( combo, line, LAST_COLUMN );
+}
+
+void ModuleConfigControl::insertInto( QBoxLayout *l, int index )
+{
+    l->insertWidget( index, label );
+    l->insertWidget( index + 1, combo );
 }
 
 void ModuleConfigControl::finish( )
@@ -587,6 +679,12 @@ void ModuleConfigControl::finish( )
         label->setBuddy( combo );
 }
 
+void ModuleConfigControl::changeVisibility( bool visible )
+{
+    combo->setVisible( visible );
+    if ( label ) label->setVisible( visible );
+}
+
 QString ModuleConfigControl::getValue() const
 {
     return combo->itemData( combo->currentIndex() ).toString();
@@ -621,9 +719,14 @@ ModuleListConfigControl::ModuleListConfigControl( module_config_t *_p_item,
         text->setToolTip( formatTooltip( qfut( p_item->psz_longtext) ) );
 }
 
-void ModuleListConfigControl::fillGrid( QGridLayout *l, int line )
+void ModuleListConfigControl::insertInto( QGridLayout *l, int line )
 {
     l->addWidget( groupBox, line, 0, 1, -1 );
+}
+
+void ModuleListConfigControl::insertInto( QBoxLayout *l, int index )
+{
+    l->insertWidget( index, groupBox );
 }
 
 ModuleListConfigControl::~ModuleListConfigControl()
@@ -632,7 +735,6 @@ ModuleListConfigControl::~ModuleListConfigControl()
         free( it->psz_module );
     qDeleteAll( modules );
     modules.clear();
-    delete groupBox;
 }
 
 void ModuleListConfigControl::checkbox_lists( module_t *p_parser )
@@ -648,7 +750,7 @@ void ModuleListConfigControl::checkbox_lists( QString label, QString help, const
     QCheckBox *cb = new QCheckBox( label );
     checkBoxListItem *cbl = new checkBoxListItem;
 
-    CONNECT( cb, stateChanged( int ), this, onUpdate() );
+    connect( cb, &QCheckBox::stateChanged, this, &ModuleListConfigControl::onUpdate );
     if( !help.isEmpty() )
         cb->setToolTip( formatTooltip( help ) );
     cbl->checkBox = cb;
@@ -717,11 +819,11 @@ QString ModuleListConfigControl::getValue() const
     return text->text();
 }
 
-void ModuleListConfigControl::changeVisibility( bool b )
+void ModuleListConfigControl::changeVisibility( bool visible )
 {
     foreach ( checkBoxListItem *it, modules )
-        it->checkBox->setVisible( b );
-    groupBox->setVisible( b );
+        it->checkBox->setVisible( visible );
+    groupBox->setVisible( visible );
 }
 
 void ModuleListConfigControl::onUpdate()
@@ -756,6 +858,12 @@ VIntConfigControl::doApply()
     config_PutInt( getName(), getValue() );
 }
 
+void VIntConfigControl::storeValue()
+{
+    /* Note, this modifies our local copy of the item only */
+    p_item->value.i = getValue();
+}
+
 /*********** Integer **************/
 IntegerConfigControl::IntegerConfigControl( module_config_t *_p_item,
                                             QWidget *p ) :
@@ -778,10 +886,16 @@ IntegerConfigControl::IntegerConfigControl( module_config_t *_p_item,
     finish();
 }
 
-void IntegerConfigControl::fillGrid( QGridLayout *l, int line )
+void IntegerConfigControl::insertInto( QGridLayout *l, int line )
 {
     l->addWidget( label, line, 0 );
     l->addWidget( spin, line, LAST_COLUMN, Qt::AlignRight );
+}
+
+void IntegerConfigControl::insertInto( QBoxLayout *l, int index )
+{
+    l->insertWidget( index, label );
+    l->insertWidget( index + 1, spin );
 }
 
 void IntegerConfigControl::finish()
@@ -799,6 +913,12 @@ void IntegerConfigControl::finish()
     }
     if( label )
         label->setBuddy( spin );
+}
+
+void IntegerConfigControl::changeVisibility( bool visible )
+{
+    spin->setVisible( visible );
+    if ( label ) label->setVisible( visible );
 }
 
 int IntegerConfigControl::getValue() const
@@ -849,11 +969,16 @@ IntegerRangeSliderConfigControl::IntegerRangeSliderConfigControl(
         label->setBuddy( slider );
 }
 
+void IntegerRangeSliderConfigControl::changeVisibility( bool visible )
+{
+    slider->setVisible( visible );
+    if ( label ) label->setVisible( visible );
+}
+
 int IntegerRangeSliderConfigControl::getValue() const
 {
     return slider->value();
 }
-
 
 /********* Integer / choice list **********/
 IntegerListConfigControl::IntegerListConfigControl( module_config_t *_p_item,
@@ -884,13 +1009,19 @@ IntegerListConfigControl::IntegerListConfigControl( module_config_t *_p_item,
     finish( p_module_config );
 }
 
-void IntegerListConfigControl::fillGrid( QGridLayout *l, int line )
+void IntegerListConfigControl::insertInto( QGridLayout *l, int line )
 {
     l->addWidget( label, line, 0 );
     l->addWidget( combo, line, LAST_COLUMN, Qt::AlignRight );
 }
 
-void IntegerListConfigControl::finish(module_config_t *p_module_config )
+void IntegerListConfigControl::insertInto( QBoxLayout *l, int index )
+{
+    l->insertWidget( index, label );
+    l->insertWidget( index + 1, combo );
+}
+
+void IntegerListConfigControl::finish( module_config_t *p_module_config )
 {
     combo->setEditable( false );
 
@@ -920,6 +1051,12 @@ void IntegerListConfigControl::finish(module_config_t *p_module_config )
         label->setBuddy( combo );
 }
 
+void IntegerListConfigControl::changeVisibility( bool visible )
+{
+    combo->setVisible( visible );
+    if ( label ) label->setVisible( visible );
+}
+
 int IntegerListConfigControl::getValue() const
 {
     return combo->itemData( combo->currentIndex() ).toInt();
@@ -943,9 +1080,14 @@ BoolConfigControl::BoolConfigControl( module_config_t *_p_item,
     finish();
 }
 
-void BoolConfigControl::fillGrid( QGridLayout *l, int line )
+void BoolConfigControl::insertInto( QGridLayout *l, int line )
 {
     l->addWidget( checkbox, line, 0, 1, -1 );
+}
+
+void BoolConfigControl::insertInto( QBoxLayout *l, int index )
+{
+    l->insertWidget( index, checkbox );
 }
 
 void BoolConfigControl::finish()
@@ -953,6 +1095,11 @@ void BoolConfigControl::finish()
     checkbox->setChecked( p_item->value.i );
     if( p_item->psz_longtext )
         checkbox->setToolTip( formatTooltip(qfut(p_item->psz_longtext)) );
+}
+
+void BoolConfigControl::changeVisibility( bool visible )
+{
+    checkbox->setVisible( visible );
 }
 
 int BoolConfigControl::getValue() const
@@ -980,10 +1127,16 @@ ColorConfigControl::ColorConfigControl( module_config_t *_p_item,
     finish();
 }
 
-void ColorConfigControl::fillGrid( QGridLayout *l, int line )
+void ColorConfigControl::insertInto( QGridLayout *l, int line )
 {
     l->addWidget( label, line, 0 );
     l->addWidget( color_but, line, LAST_COLUMN, Qt::AlignRight );
+}
+
+void ColorConfigControl::insertInto( QBoxLayout *l, int index )
+{
+    l->insertWidget( index, label );
+    l->insertWidget( index + 1, color_but );
 }
 
 void ColorConfigControl::finish()
@@ -1002,7 +1155,13 @@ void ColorConfigControl::finish()
         color_but->setToolTip( formatTooltip(qfut(p_item->psz_longtext)) );
     }
 
-    BUTTONACT( color_but, selectColor() );
+    BUTTONACT( color_but, &ColorConfigControl::selectColor );
+}
+
+void ColorConfigControl::changeVisibility( bool visible )
+{
+    color_but->setVisible( visible );
+    if ( label ) label->setVisible( visible );
 }
 
 int ColorConfigControl::getValue() const
@@ -1033,6 +1192,12 @@ VFloatConfigControl::doApply()
     config_PutFloat( getName(), getValue() );
 }
 
+void VFloatConfigControl::storeValue()
+{
+    /* Note, this modifies our local copy of the item only */
+    p_item->value.f = getValue();
+}
+
 /*********** Float **************/
 FloatConfigControl::FloatConfigControl( module_config_t *_p_item,
                                         QWidget *p ) :
@@ -1056,10 +1221,16 @@ FloatConfigControl::FloatConfigControl( module_config_t *_p_item,
     finish();
 }
 
-void FloatConfigControl::fillGrid( QGridLayout *l, int line )
+void FloatConfigControl::insertInto( QGridLayout *l, int line )
 {
     l->addWidget( label, line, 0 );
     l->addWidget( spin, line, LAST_COLUMN, Qt::AlignRight );
+}
+
+void FloatConfigControl::insertInto( QBoxLayout *l, int index )
+{
+    l->insertWidget( index, label );
+    l->insertWidget( index + 1, spin );
 }
 
 void FloatConfigControl::finish()
@@ -1077,6 +1248,12 @@ void FloatConfigControl::finish()
     }
     if( label )
         label->setBuddy( spin );
+}
+
+void FloatConfigControl::changeVisibility( bool visible )
+{
+    spin->setVisible( visible );
+    if ( label ) label->setVisible( visible );
 }
 
 float FloatConfigControl::getValue() const
@@ -1112,9 +1289,7 @@ void FloatRangeConfigControl::finish()
  **********************************************************************/
 KeySelectorControl::KeySelectorControl( QWidget *p ) : ConfigControl( nullptr )
 {
-    label = new QLabel(
-        qtr( "Action hotkey mappings. Double-click (or select and press Enter) "
-             "to change an action's hotkey. The delete key will unset." ), p );
+    label = new QLabel( qtr( "Action hotkey mappings." ), p );
 
     label->setWordWrap( true );
     searchLabel = new QLabel( qtr( "Search" ), p );
@@ -1136,6 +1311,7 @@ KeySelectorControl::KeySelectorControl( QWidget *p ) : ConfigControl( nullptr )
     table->headerItem()->setToolTip( GLOBAL_HOTKEY_COL, qtr( "Desktop level hotkey" ) );
     table->setAlternatingRowColors( true );
     table->setSelectionBehavior( QAbstractItemView::SelectItems );
+    table->setStyleSheet( "QTreeView::item { padding: 5px 0; }" );
 
     table->installEventFilter( this );
 
@@ -1147,13 +1323,12 @@ KeySelectorControl::KeySelectorControl( QWidget *p ) : ConfigControl( nullptr )
 
     finish();
 
-    CONNECT( actionSearch, textChanged( const QString& ),
-             this, filter() );
+    connect( actionSearch, &SearchLineEdit::textChanged, this, &KeySelectorControl::filter );
     connect( searchOption, QOverload<int>::of(&QComboBox::activated),
              this, &KeySelectorControl::filter );
 }
 
-void KeySelectorControl::fillGrid( QGridLayout *l, int line )
+void KeySelectorControl::insertInto( QGridLayout *l, int line )
 {
     QGridLayout *gLayout = new QGridLayout();
     gLayout->addWidget( label, 0, 0, 1, 4 );
@@ -1178,16 +1353,6 @@ void KeySelectorControl::buildAppHotkeysList( QWidget *rootWidget )
 
 void KeySelectorControl::finish()
 {
-    /* Fill the table
-
-       Each table row (action) has the following:
-        - Non-global option name stored in data of column 0 (action name) field.
-        - Translated key assignment strings displayed in columns 1 & 2, global
-          and non-global respectively.
-        - Non-translated (stored) key assignment strings stored in data of
-          columns 1 & 2, global and non-global respectively.
-     */
-
     /* Get the main Module */
     module_t *p_main = module_get_main();
     assert( p_main );
@@ -1198,7 +1363,8 @@ void KeySelectorControl::finish()
 
     p_config = module_config_get (p_main, &confsize);
 
-    QMultiMap<QString, QString> global_keys;
+    QList<module_config_t *> global_keys;
+    global_keys.reserve( 112 );
     for (size_t i = 0; i < confsize; i++)
     {
         module_config_t *p_config_item = p_config + i;
@@ -1206,48 +1372,44 @@ void KeySelectorControl::finish()
         if( p_config_item->i_type != CONFIG_ITEM_KEY )
             continue;
 
-        /* If we are a (non-global) key option not empty */
-        if( strncmp( p_config_item->psz_name, "global-", 7 ) != 0 )
+        /* Capture global key items to fill in afterwards */
+        if( strncmp( p_config_item->psz_name, "global-", 7 ) == 0 )
         {
-            QTreeWidgetItem *treeItem = new QTreeWidgetItem();
-            treeItem->setText( ACTION_COL, p_config_item->psz_text ?
-                                           qfut( p_config_item->psz_text ) : qfu("") );
-            treeItem->setData( ACTION_COL, Qt::UserRole,
-                               QVariant( qfu( p_config_item->psz_name ) ) );
-            if (p_config_item->psz_longtext)
-                treeItem->setToolTip( ACTION_COL, qfut(p_config_item->psz_longtext) );
+            global_keys.append( p_config_item );
+            continue;
+        }
 
-            QString keys = p_config_item->value.psz ? qfut(p_config_item->value.psz) : qfu("");
-            treeItem->setText( HOTKEY_COL, keys.replace( "\t", ", " ) );
-            treeItem->setToolTip( HOTKEY_COL, qtr("Double click to change.\nDelete key to remove.") );
-            treeItem->setToolTip( GLOBAL_HOTKEY_COL, qtr("Double click to change.\nDelete key to remove.") );
-            treeItem->setData( HOTKEY_COL, Qt::UserRole, QVariant( p_config_item->value.psz ) );
-            table->addTopLevelItem( treeItem );
-        }
-        /* Capture global key option mappings to fill in afterwards */
-        else if( !EMPTY_STR( p_config_item->value.psz ) )
-        {
-            global_keys.insert( qfu( p_config_item->psz_name + 7 ),
-                                qfu( p_config_item->value.psz ) );
-        }
+        KeyTableItem *treeItem = new KeyTableItem();
+        treeItem->normal.config_name = p_config_item->psz_name;
+        treeItem->normal.default_keys = qfu( p_config_item->orig.psz );
+        treeItem->global.config_name = nullptr;
+        treeItem->global.default_keys = qfu( "" );
+
+        treeItem->setText( ACTION_COL, qfut( p_config_item->psz_text ) );
+        if (p_config_item->psz_longtext)
+            treeItem->setToolTip( ACTION_COL, qfut(p_config_item->psz_longtext) );
+
+        treeItem->set_keys( p_config_item->value.psz, HOTKEY_COL );
+        treeItem->setToolTip( HOTKEY_COL, qtr("Double click to change.\nDelete key to remove.") );
+        treeItem->setToolTip( GLOBAL_HOTKEY_COL, qtr("Double click to change.\nDelete key to remove.") );
+
+        table->addTopLevelItem( treeItem );
     }
 
-    QMap<QString, QString>::const_iterator i = global_keys.constBegin();
-    while (i != global_keys.constEnd())
+    for (int i = 0; i < global_keys.count(); i++)
     {
         for (QTreeWidgetItemIterator iter(table); *iter; ++iter)
         {
-            QTreeWidgetItem *item = *iter;
+            KeyTableItem *item = static_cast<KeyTableItem *>( *iter );
 
-            if( item->data( ACTION_COL, Qt::UserRole ) == i.key() )
+            if( strcmp( item->normal.config_name, global_keys[i]->psz_name + 7 ) == 0 )
             {
-                QString keys = i.value();
-                item->setText( GLOBAL_HOTKEY_COL, qfut(qtu(keys)).replace( "\t", ", " ) );
-                item->setData( GLOBAL_HOTKEY_COL, Qt::UserRole, keys );
+                item->global.config_name = global_keys[i]->psz_name;
+                item->global.default_keys = qfu( global_keys[i]->orig.psz );
+                item->set_keys( global_keys[i]->value.psz, GLOBAL_HOTKEY_COL );
                 break;
             }
         }
-        ++i;
     }
 
     module_config_free (p_config);
@@ -1256,10 +1418,15 @@ void KeySelectorControl::finish()
     table->resizeColumnToContents( HOTKEY_COL );
 
     table->setUniformRowHeights( true );
-    table->topLevelItem(0)->setSizeHint( 0, QSize( 0, HOTKEY_ITEM_HEIGHT ) );
 
-    CONNECT( table, itemActivated( QTreeWidgetItem *, int ),
-             this, selectKey( QTreeWidgetItem *, int ) );
+    connect( table, &QTreeWidget::itemActivated,
+             this, QOverload<QTreeWidgetItem *, int>::of(&KeySelectorControl::selectKey) );
+}
+
+void KeySelectorControl::changeVisibility( bool visible )
+{
+    table->setVisible( visible );
+    if ( label ) label->setVisible( visible );
 }
 
 void KeySelectorControl::filter()
@@ -1288,22 +1455,26 @@ void KeySelectorControl::filter()
     }
 }
 
-void KeySelectorControl::selectKey( QTreeWidgetItem *keyItem, int column )
+void KeySelectorControl::selectKey( QTreeWidgetItem *item, int column )
+{
+    selectKey( static_cast<KeyTableItem *>( item ), (enum ColumnIndex) column );
+}
+
+void KeySelectorControl::selectKey( KeyTableItem *item, enum ColumnIndex column )
 {
     /* This happens when triggered by ClickEater */
-    if( keyItem == NULL ) keyItem = table->currentItem();
+    if( item == NULL )
+        item = static_cast<KeyTableItem *>( table->currentItem() );
 
     /* This can happen when nothing is selected on the treeView
        and the shortcutValue is clicked */
-    if( !keyItem ) return;
+    if( !item ) return;
 
     /* If clicked on the first column, assuming user wants the normal hotkey */
     if( column == ACTION_COL ) column = HOTKEY_COL;
 
-    bool b_global = ( column == GLOBAL_HOTKEY_COL );
-
     /* Launch a small dialog to ask for a new key */
-    KeyInputDialog *d = new KeyInputDialog( table, keyItem, b_global );
+    KeyInputDialog *d = new KeyInputDialog( table, item, column );
     d->setExistingkeysSet( &existingkeys );
     d->exec();
 
@@ -1311,30 +1482,12 @@ void KeySelectorControl::selectKey( QTreeWidgetItem *keyItem, int column )
     {
         /* In case of conflict, reset other keys*/
         if( d->conflicts )
-        {
-            for (QTreeWidgetItemIterator iter(table); *iter; ++iter)
-            {
-                QTreeWidgetItem *it = *iter;
-                if( keyItem == it )
-                    continue;
-                QStringList it_keys = it->data( column, Qt::UserRole ).toString().split( "\t" );
-                if( it_keys.removeAll( d->vlckey ) )
-                {
-                    QString it_filteredkeys = it_keys.join( "\t" );
-                    it->setText( column, it_filteredkeys.replace( "\t", ", " ) );
-                    it->setData( column, Qt::UserRole, it_filteredkeys );
-                }
-            }
-        }
-
-        keyItem->setText( column, d->vlckey_tr );
-        keyItem->setData( column, Qt::UserRole, d->vlckey );
+            reassign_key( item, d->vlckey, column );
+        else
+            item->set_keys( d->vlckey, column );
     }
     else if( d->result() == 2 )
-    {
-        keyItem->setText( column, NULL );
-        keyItem->setData( column, Qt::UserRole, QVariant() );
-    }
+        unset( item, column );
 
     delete d;
 }
@@ -1343,67 +1496,278 @@ void KeySelectorControl::doApply()
 {
     for (QTreeWidgetItemIterator iter(table); *iter; ++iter)
     {
-        QTreeWidgetItem *it = *iter;
+        KeyTableItem *item = static_cast<KeyTableItem *>( *iter );
 
-        QString option = it->data( ACTION_COL, Qt::UserRole ).toString();
-
-        config_PutPsz( qtu( option ),
-                       qtu( it->data( HOTKEY_COL, Qt::UserRole ).toString() ) );
-
-        config_PutPsz( qtu( "global-" + option ),
-                       qtu( it->data( GLOBAL_HOTKEY_COL, Qt::UserRole ).toString() ) );
+        config_PutPsz( item->normal.config_name, qtu( item->normal.keys ) );
+        config_PutPsz( item->global.config_name, qtu( item->global.keys ) );
     }
 }
 
 bool KeySelectorControl::eventFilter( QObject *obj, QEvent *e )
 {
+#ifndef QT_NO_CONTEXTMENU
+    if( obj == table && e->type() == QEvent::ContextMenu )
+    {
+        tableContextMenuEvent( static_cast<QContextMenuEvent*>(e) );
+        return true;
+    }
+#endif
+
     if( obj != table || e->type() != QEvent::KeyPress )
         return ConfigControl::eventFilter(obj, e);
 
-    QKeyEvent *keyEv = static_cast<QKeyEvent*>(e);
-    QTreeWidget *aTable = static_cast<QTreeWidget *>(obj);
-    if( keyEv->key() == Qt::Key_Escape )
+    switch( static_cast<QKeyEvent*>(e)->key() )
     {
-        aTable->clearFocus();
-        return true;
+        case Qt::Key_Escape:
+            table->clearFocus();
+            return true;
+
+        case Qt::Key_Return:
+        case Qt::Key_Enter:
+            selectKey( table->currentItem(), table->currentColumn() );
+            return true;
+
+        case Qt::Key_Delete:
+            if( table->currentColumn() != ACTION_COL )
+                unset( table->currentItem(), table->currentColumn() );
+            return true;
+
+        default:
+            return false;
     }
-    else if( keyEv->key() == Qt::Key_Return ||
-             keyEv->key() == Qt::Key_Enter )
-    {
-        selectKey( aTable->currentItem(), aTable->currentColumn() );
-        return true;
-    }
-    else if( keyEv->key() == Qt::Key_Delete )
-    {
-        if( aTable->currentColumn() != ACTION_COL )
-        {
-            aTable->currentItem()->setText( aTable->currentColumn(), NULL );
-            aTable->currentItem()->setData( aTable->currentColumn(), Qt::UserRole, QVariant() );
-        }
-        return true;
-    }
-    else
-        return false;
 }
 
+#ifndef QT_NO_CONTEXTMENU
+void KeySelectorControl::tableContextMenuEvent( QContextMenuEvent *event )
+{
+    KeyTableItem *item = static_cast<KeyTableItem *>( this->table->currentItem() );
+    if( !item || item->isHidden() )
+        return;
+    /* Avoid menu from right-click on empty space after last item */
+    if( event->reason() == QContextMenuEvent::Mouse &&
+        !this->table->itemAt( this->table->viewport()->mapFromGlobal( event->globalPos() ) ) )
+        return;
+
+    enum ColumnIndex column = (enum ColumnIndex) this->table->currentColumn();
+
+    bool empty;
+    bool matches_default;
+    switch ( column )
+    {
+        case ACTION_COL:
+            empty = (item->normal.keys.isEmpty() && item->global.keys.isEmpty());
+            matches_default = (item->normal.matches_default && item->normal.matches_default);
+            break;
+        case HOTKEY_COL:
+            empty = item->normal.keys.isEmpty();
+            matches_default = item->normal.matches_default;
+            break;
+        case GLOBAL_HOTKEY_COL:
+            empty = item->global.keys.isEmpty();
+            matches_default = item->global.matches_default;
+            break;
+        default:
+            unreachable();
+    }
+
+    QMenu *menu = new QMenu();
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+
+    QAction *modify = new QAction( qtr( "&Modify" ), this->table );
+    connect( modify, &QAction::triggered, [=]() { this->selectKey( item, column ); } );
+    menu->addAction( modify );
+
+    if( column != ACTION_COL )
+    {
+        QAction *copy = new QAction( qtr( "&Copy value" ), this->table );
+        if( empty )
+            copy->setEnabled( false );
+        else
+            connect( copy, &QAction::triggered, [=]() {
+                this->copy_value( item, column );
+            } );
+        menu->addAction( copy );
+    }
+
+    QAction *unset = new QAction( qtr( "&Unset" ), this->table );
+    if( empty )
+        unset->setEnabled( false );
+    else
+        connect( unset, &QAction::triggered, [=]() { this->unset( item, column ); } );
+    menu->addAction( unset );
+
+    QAction *reset = new QAction( qtr( "&Reset" ), this->table );
+    if( matches_default )
+        reset->setEnabled( false );
+    else
+        connect( reset, &QAction::triggered, [=]() {
+            if( column != ACTION_COL )
+                this->reset( item, column );
+            else
+            {
+                this->reset( item, HOTKEY_COL );
+                this->reset( item, GLOBAL_HOTKEY_COL );
+            }
+        } );
+    menu->addAction( reset );
+
+    QString reset_all_label = (column == ACTION_COL) ? qtr( "Reset &all" )
+                                                     : qtr( "Reset &all (column)" );
+    QAction *reset_all = new QAction( reset_all_label, this->table );
+    connect( reset_all, &QAction::triggered, [=]() { this->reset_all( column ); } );
+    menu->addAction( reset_all );
+
+    menu->popup( event->globalPos() );
+}
+#endif // QT_NO_CONTEXTMENU
+
+void KeySelectorControl::unset( QTreeWidgetItem *item, int column )
+{
+    unset( static_cast<KeyTableItem*>( item ), (enum ColumnIndex) column );
+}
+
+void KeySelectorControl::unset( KeyTableItem *item,
+                                enum KeySelectorControl::ColumnIndex column )
+{
+    if( item == nullptr )
+        return;
+    if( column == ACTION_COL )
+        column = HOTKEY_COL;
+    item->set_keys( nullptr, column );
+}
+
+void KeySelectorControl::reset( KeyTableItem *item,
+                                enum KeySelectorControl::ColumnIndex column )
+{
+    QString item_default = item->get_default_keys( column );
+    KeyTableItem *conflict = find_conflict( table, item_default, item, column );
+    if( conflict != nullptr )
+    {
+        KeyConflictDialog *dialog = new KeyConflictDialog( this->table, conflict, column );
+        dialog->exec();
+        if( dialog->result() == QDialog::Accepted )
+            reassign_key( item, item_default, column );
+        delete dialog;
+    }
+    else
+        item->set_keys( item_default, column );
+}
+
+void KeySelectorControl::reset_all( enum KeySelectorControl::ColumnIndex column )
+{
+    for (QTreeWidgetItemIterator iter(table); *iter; ++iter)
+    {
+        KeyTableItem *item = static_cast<KeyTableItem *>( *iter );
+        if( column != GLOBAL_HOTKEY_COL )
+            item->set_keys( item->get_default_keys( HOTKEY_COL ), HOTKEY_COL );
+        if( column != HOTKEY_COL )
+            item->set_keys( item->get_default_keys( GLOBAL_HOTKEY_COL ), GLOBAL_HOTKEY_COL );
+    }
+}
+
+void KeySelectorControl::reassign_key( KeyTableItem *item, QString key,
+                                       enum KeySelectorControl::ColumnIndex column )
+{
+    for (QTreeWidgetItemIterator iter(table); *iter; ++iter)
+    {
+        KeyTableItem *iter_item = static_cast<KeyTableItem *>( *iter );
+        if( iter_item != item )
+            iter_item->remove_key( key, column );
+    }
+    item->set_keys( key, column );
+}
+
+void KeySelectorControl::copy_value( KeyTableItem *item,
+                                     enum KeySelectorControl::ColumnIndex column )
+{
+    QClipboard *clipboard = QGuiApplication::clipboard();
+    clipboard->setText( item->get_keys( column ) );
+}
+
+KeyTableItem * KeySelectorControl::find_conflict( QTreeWidget *table, QString key,
+                                                  KeyTableItem *ignore_item,
+                                                  enum KeySelectorControl::ColumnIndex column )
+{
+    if( key.isEmpty() )
+        return nullptr;
+    for (QTreeWidgetItemIterator iter(table); *iter; ++iter)
+    {
+        KeyTableItem *item = static_cast<KeyTableItem *>( *iter );
+
+        if( item == ignore_item )
+            continue;
+
+        if( item->contains_key( key, column ) )
+            return item;
+    }
+    return nullptr;
+}
+
+const QString &KeyTableItem::get_keys( enum KeySelectorControl::ColumnIndex column )
+{
+    if( column == KeySelectorControl::GLOBAL_HOTKEY_COL )
+        return global.keys;
+    return normal.keys;
+}
+
+QString KeyTableItem::get_default_keys( enum KeySelectorControl::ColumnIndex column )
+{
+    if( column == KeySelectorControl::GLOBAL_HOTKEY_COL )
+        return global.default_keys;
+    return normal.default_keys;
+}
+
+void KeyTableItem::set_keys( QString keys, enum KeySelectorControl::ColumnIndex column )
+{
+    bool matches_default;
+    if( column == KeySelectorControl::GLOBAL_HOTKEY_COL )
+    {
+        global.keys = keys;
+        matches_default = global.matches_default = ( keys == global.default_keys );
+    }
+    else
+    {
+        normal.keys = keys;
+        matches_default = normal.matches_default = ( keys ==  normal.default_keys );
+    }
+    setText( column, keys.replace( "\t", ", " ) );
+    QFont font = this->font( KeySelectorControl::ACTION_COL );
+    font.setWeight( matches_default ? QFont::Weight::Normal : QFont::Weight::Bold );
+    setFont( column,  font );
+    matches_default = (normal.matches_default && global.matches_default);
+    font.setWeight( matches_default ? QFont::Weight::Normal : QFont::Weight::Bold );
+    setFont( KeySelectorControl::ACTION_COL,  font );
+}
+
+bool KeyTableItem::contains_key( QString key, enum KeySelectorControl::ColumnIndex column )
+{
+    return get_keys( column ).split( "\t" ).contains( key );
+}
+
+void KeyTableItem::remove_key( QString key, enum KeySelectorControl::ColumnIndex column )
+{
+    QStringList keys_list = get_keys( column ).split( "\t" );
+    if( keys_list.removeAll( key ) )
+        set_keys( keys_list.join( "\t" ), column );
+}
 
 /**
  * Class KeyInputDialog
  **/
-KeyInputDialog::KeyInputDialog( QTreeWidget *_table,
-                                QTreeWidgetItem * _keyItem,
-                                bool b_global ) :
-                                QDialog( _table ), table( _table ), keyItem( _keyItem )
+KeyInputDialog::KeyInputDialog( QTreeWidget *table_,
+                                KeyTableItem * keyItem_,
+                                enum KeySelectorControl::ColumnIndex column_ ) :
+                                QDialog( table_ ), table( table_ ),
+                                keyItem( keyItem_ ), column( column_ )
 {
     setModal( true );
     conflicts = false;
     existingkeys = NULL;
 
-    column = b_global ? KeySelectorControl::GLOBAL_HOTKEY_COL
-                      : KeySelectorControl::HOTKEY_COL;
+    bool global = ( column == KeySelectorControl::GLOBAL_HOTKEY_COL );
 
-    setWindowTitle( b_global ? qtr( "Global Hotkey change" )
-                             : qtr( "Hotkey change" ) );
+    setWindowTitle( global ? qtr( "Global Hotkey change" )
+                           : qtr( "Hotkey change" ) );
     setWindowRole( "vlc-key-input" );
 
     QVBoxLayout *vLayout = new QVBoxLayout( this );
@@ -1431,9 +1795,9 @@ KeyInputDialog::KeyInputDialog( QTreeWidget *_table,
     vLayout->addWidget( buttonBox );
     ok->hide();
 
-    CONNECT( buttonBox, accepted(), this, accept() );
-    CONNECT( buttonBox, rejected(), this, reject() );
-    BUTTONACT( unset, unsetAction() );
+    connect( buttonBox, &QDialogButtonBox::accepted, this, &KeyInputDialog::accept );
+    connect( buttonBox, &QDialogButtonBox::rejected, this, &KeyInputDialog::reject );
+    BUTTONACT( unset, &KeyInputDialog::unsetAction );
 }
 
 void KeyInputDialog::setExistingkeysSet( const QSet<QString> *keyset )
@@ -1450,19 +1814,12 @@ void KeyInputDialog::checkForConflicts( const QString &sequence )
         return;
     }
 
-    for (QTreeWidgetItemIterator iter(table); *iter; ++iter)
+    KeyTableItem *conflict = KeySelectorControl::find_conflict( table, vlckey, keyItem, column );
+    if( conflict != nullptr )
     {
-        QTreeWidgetItem *item = *iter;
-
-        if( item == keyItem )
-            continue;
-
-        if( !item->data( column, Qt::UserRole ).toString().split( "\t" ).contains( vlckey ) )
-            continue;
-
         warning->setText(
                 qtr("Warning: this key or combination is already assigned to \"<b>%1</b>\"")
-                .arg( item->text( KeySelectorControl::ACTION_COL ) ) );
+                .arg( conflict->text( KeySelectorControl::ACTION_COL ) ) );
         warning->show();
         ok->show();
         unset->hide();
@@ -1514,3 +1871,35 @@ void KeyInputDialog::wheelEvent( QWheelEvent *e )
 }
 
 void KeyInputDialog::unsetAction() { done( 2 ); }
+
+KeyConflictDialog::KeyConflictDialog( QTreeWidget *table, KeyTableItem * item,
+                                      enum KeySelectorControl::ColumnIndex column ) :
+                                      QDialog( table )
+{
+    setModal( true );
+
+    bool global = ( column == KeySelectorControl::GLOBAL_HOTKEY_COL );
+
+    setWindowTitle( global ? qtr( "Global Hotkey assignment conflict" )
+                           : qtr( "Hotkey assignment conflict" ) );
+    setWindowRole( "vlc-key-conflict" );
+
+    QVBoxLayout *vLayout = new QVBoxLayout( this );
+    QLabel *warning = new QLabel;
+    warning->setText(
+            qtr("Warning: this key or combination is already assigned to \"<b>%1</b>\"")
+            .arg( item->text( KeySelectorControl::ACTION_COL ) ) );
+    vLayout->addWidget( warning , Qt::AlignCenter );
+
+    QDialogButtonBox *buttonBox = new QDialogButtonBox;
+    QPushButton *force = new QPushButton( qtr("Assign") );
+    QPushButton *cancel = new QPushButton( qtr("Cancel") );
+    buttonBox->addButton( force, QDialogButtonBox::AcceptRole );
+    buttonBox->addButton( cancel, QDialogButtonBox::RejectRole );
+    force->setDefault( true );
+
+    vLayout->addWidget( buttonBox );
+
+    connect( buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept );
+    connect( buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject );
+}

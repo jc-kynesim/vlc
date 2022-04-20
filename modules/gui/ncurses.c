@@ -79,7 +79,6 @@ vlc_module_begin ()
     set_shortname("Ncurses")
     set_description(N_("Ncurses interface"))
     set_capability("interface", 10)
-    set_category(CAT_INTERFACE)
     set_subcategory(SUBCAT_INTERFACE_MAIN)
     set_callbacks(Open, Close)
     add_shortcut("curses")
@@ -653,6 +652,9 @@ static int DrawInfo(intf_thread_t *intf)
     for (int i = 0; i < item->i_categories; i++) {
         info_category_t *p_category = item->pp_categories[i];
         info_t *p_info;
+
+        if (info_category_IsHidden(p_category))
+            continue;
 
         if (sys->color) color_set(C_CATEGORY, NULL);
         MainBoxWrite(sys, l++, _("  [%s]"), p_category->psz_name);

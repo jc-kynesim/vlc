@@ -290,7 +290,6 @@ static int Mouse( filter_t *p_filter,
 vlc_module_begin ()
     set_description( N_("Deinterlacing video filter") )
     set_shortname( N_("Deinterlace" ))
-    set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
 
     add_string( FILTER_CFG_PREFIX "mode", "blend", SOUT_MODE_TEXT,
@@ -489,6 +488,10 @@ static const struct vlc_filter_operations filter_ops = {
     .close = Close,
 };
 
+static struct deinterlace_functions funcs = {
+    { Merge8BitGeneric, Merge16BitGeneric, },
+};
+
 /*****************************************************************************
  * Open
  *****************************************************************************/
@@ -562,26 +565,9 @@ notsupp:
     }
     else
 #endif
-#if defined(CAN_COMPILE_ARM)
-    if( vlc_CPU_ARM_NEON() )
-        p_sys->pf_merge = pixel_size == 1 ? merge8_arm_neon : merge16_arm_neon;
-    else
-    if( vlc_CPU_ARMv6() )
-        p_sys->pf_merge = pixel_size == 1 ? merge8_armv6 : merge16_armv6;
-    else
-#endif
-#if defined(CAN_COMPILE_SVE)
-    if( vlc_CPU_ARM_SVE() )
-        p_sys->pf_merge = pixel_size == 1 ? merge8_arm_sve : merge16_arm_sve;
-    else
-#endif
-#if defined(CAN_COMPILE_ARM64)
-    if( vlc_CPU_ARM_NEON() )
-        p_sys->pf_merge = pixel_size == 1 ? merge8_arm64_neon : merge16_arm64_neon;
-    else
-#endif
     {
-        p_sys->pf_merge = pixel_size == 1 ? Merge8BitGeneric : Merge16BitGeneric;
+        vlc_CPU_functions_init_once("deinterlace functions", &funcs);
+        p_sys->pf_merge = funcs.merges[vlc_ctz(pixel_size)];
 #if defined(__i386__) || defined(__x86_64__)
         p_sys->pf_end_merge = NULL;
 #endif

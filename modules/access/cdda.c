@@ -186,7 +186,7 @@ static int Demux(demux_t *demux)
 
     block->i_nb_samples = block->i_buffer / 4;
     block->i_dts = block->i_pts = date_Get(&sys->pts);
-    date_Increment(&sys->pts, block->i_nb_samples);
+    date_Increment(&sys->pts, count);
 
     es_out_Send(demux->out, sys->es, block);
     es_out_SetPCR(demux->out, date_Get(&sys->pts));
@@ -219,6 +219,8 @@ static int DemuxControl(demux_t *demux, int query, va_list args)
 
         case DEMUX_SET_POSITION:
             sys->position = lround(va_arg(args, double) * sys->length);
+            date_Set(&sys->pts, VLC_TICK_0);
+            date_Increment(&sys->pts, sys->position);
             break;
 
         case DEMUX_GET_LENGTH:
@@ -229,6 +231,8 @@ static int DemuxControl(demux_t *demux, int query, va_list args)
             break;
         case DEMUX_SET_TIME:
             sys->position = samples_from_vlc_tick(va_arg(args, vlc_tick_t), CD_ROM_CDDA_FRAMES);
+            date_Set(&sys->pts, VLC_TICK_0);
+            date_Increment(&sys->pts, sys->position);
             break;
 
         default:
@@ -349,7 +353,7 @@ static int DemuxOpen(vlc_object_t *obj, vcddev_t *dev, unsigned track)
     fmt.audio.i_channels = 2;
     sys->es = es_out_Add(demux->out, &fmt);
 
-    date_Init(&sys->pts, 44100, 1);
+    date_Init(&sys->pts, CD_ROM_CDDA_FRAMES, 1);
     date_Set(&sys->pts, VLC_TICK_0);
 
     sys->position = 0;
@@ -996,7 +1000,7 @@ static void Close(vlc_object_t *obj)
 }
 
 /*****************************************************************************
- * Module descriptior
+ * Module descriptor
  *****************************************************************************/
 #define CDAUDIO_DEV_TEXT N_("Audio CD device")
 #if defined( _WIN32 ) || defined( __OS2__ )
@@ -1023,7 +1027,6 @@ vlc_module_begin ()
     set_description( N_("Audio CD input") )
     set_help( HELP_TEXT )
     set_capability( "access", 0 )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACCESS )
     set_callbacks(Open, Close)
 

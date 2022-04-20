@@ -35,6 +35,9 @@
 #include <vlc_filter.h>
 #include <vlc_url.h>
 #include "screen.h"
+#ifdef SCREEN_MOUSE
+#   include <vlc_image.h>
+#endif
 
 /*****************************************************************************
  * Module descriptor
@@ -75,7 +78,7 @@
     "capture." )
 #endif
 
-#ifdef SCREEN_DISPLAY_ID
+#ifdef __APPLE__
 #define DISPLAY_ID_TEXT N_( "Display ID" )
 #define DISPLAY_ID_LONGTEXT N_( \
     "Display ID. If not specified, main display ID is used." )
@@ -96,7 +99,6 @@ static void Close( vlc_object_t * );
 vlc_module_begin ()
     set_description( N_("Screen Input") )
     set_shortname( N_("Screen" ))
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACCESS )
 
     add_float( "screen-fps", SCREEN_FPS, FPS_TEXT, FPS_LONGTEXT )
@@ -119,7 +121,7 @@ vlc_module_begin ()
     add_integer( "screen-fragment-size", 0, FRAGS_TEXT, FRAGS_LONGTEXT )
 #endif
 
-#ifdef SCREEN_DISPLAY_ID
+#ifdef __APPLE__
     add_integer( "screen-display-id", 0, DISPLAY_ID_TEXT, DISPLAY_ID_LONGTEXT )
     add_integer( "screen-index", 0, INDEX_TEXT, INDEX_LONGTEXT )
 #endif
@@ -162,11 +164,6 @@ static int Open( vlc_object_t *p_this )
     p_sys->i_left = var_CreateGetInteger( p_demux, "screen-left" );
     p_sys->i_width = var_CreateGetInteger( p_demux, "screen-width" );
     p_sys->i_height = var_CreateGetInteger( p_demux, "screen-height" );
-#endif
-
-#ifdef SCREEN_DISPLAY_ID
-    p_sys->i_display_id = var_CreateGetInteger( p_demux, "screen-display-id" );
-    p_sys->i_screen_index = var_CreateGetInteger( p_demux, "screen-index" );
 #endif
 
     if( screen_InitCapture( p_demux ) != VLC_SUCCESS )
@@ -257,16 +254,11 @@ static void Close( vlc_object_t *p_this )
     demux_t     *p_demux = (demux_t*)p_this;
     demux_sys_t *p_sys = p_demux->p_sys;
 
-    screen_CloseCapture( p_demux );
+    if (p_sys->ops)
+        p_sys->ops->close( p_sys->p_data );
 #ifdef SCREEN_MOUSE
     if( p_sys->p_mouse )
         picture_Release( p_sys->p_mouse );
-    if( p_sys->p_blend )
-    {
-        filter_Close( p_sys->p_blend );
-        module_unneed( p_sys->p_blend, p_sys->p_blend->p_module );
-        vlc_object_delete(p_sys->p_blend);
-    }
 #endif
     free( p_sys );
 }
@@ -282,16 +274,21 @@ static int Demux( demux_t *p_demux )
     if( !p_sys->i_next_date ) p_sys->i_next_date = vlc_tick_now();
 
     /* Frame skipping if necessary */
-    while( vlc_tick_now() >= p_sys->i_next_date + p_sys->i_incr )
-        p_sys->i_next_date += p_sys->i_incr;
+    int64_t extra_frames;
+    extra_frames = (vlc_tick_now() - p_sys->i_next_date) / p_sys->i_incr;
+    p_sys->i_next_date += extra_frames * p_sys->i_incr;
 
     vlc_tick_wait( p_sys->i_next_date );
-    p_block = screen_Capture( p_demux );
+    p_block = p_sys->ops->capture( p_demux );
     if( !p_block )
     {
         p_sys->i_next_date += p_sys->i_incr;
         return 1;
     }
+
+    // ensure the output DTS matches our ticks if the capture took too long
+    extra_frames = (vlc_tick_now() - p_sys->i_next_date) / p_sys->i_incr;
+    p_sys->i_next_date += extra_frames * p_sys->i_incr;
 
     p_block->i_dts = p_block->i_pts = p_sys->i_next_date;
 
@@ -349,68 +346,5 @@ void FollowMouse( demux_sys_t *p_sys, int i_x, int i_y )
     if( i_y < 0 ) i_y = 0;
     p_sys->i_top = __MIN( (unsigned int)i_y,
     p_sys->i_screen_height - p_sys->i_height );
-}
-#endif
-
-#ifdef SCREEN_MOUSE
-void RenderCursor( demux_t *p_demux, int i_x, int i_y,
-                   uint8_t *p_dst )
-{
-    demux_sys_t *p_sys = p_demux->p_sys;
-    if( !p_sys->dst.i_planes )
-        picture_Setup( &p_sys->dst, &p_sys->fmt.video );
-
-    if( !p_sys->dst.i_planes )
-        return;
-
-#ifdef _WIN32
-    /* Bitmaps here created by CreateDIBSection: stride rounded up to the nearest DWORD */
-    p_sys->dst.p[ 0 ].i_pitch = p_sys->dst.p[ 0 ].i_visible_pitch =
-        ( ( ( ( p_sys->fmt.video.i_width * p_sys->fmt.video.i_bits_per_pixel ) + 31 ) & ~31 ) >> 3 );
-#endif
-
-    if( !p_sys->p_blend )
-    {
-        p_sys->p_blend = vlc_object_create( p_demux, sizeof(filter_t) );
-        if( p_sys->p_blend )
-        {
-            es_format_Init( &p_sys->p_blend->fmt_in, VIDEO_ES,
-                            VLC_CODEC_RGBA );
-            p_sys->p_blend->fmt_in.video = p_sys->p_mouse->format;
-            p_sys->p_blend->fmt_out = p_sys->fmt;
-            p_sys->p_blend->p_module =
-                module_need( p_sys->p_blend, "video blending", NULL, false );
-            if( !p_sys->p_blend->p_module )
-            {
-                msg_Err( p_demux, "Could not load video blending module" );
-                vlc_object_delete(p_sys->p_blend);
-                p_sys->p_blend = NULL;
-            }
-            assert( p_sys->p_blend->ops != NULL );
-        }
-    }
-    if( p_sys->p_blend )
-    {
-        p_sys->dst.p->p_pixels = p_dst;
-        p_sys->p_blend->ops->blend_video( p_sys->p_blend,
-                                        &p_sys->dst,
-                                        p_sys->p_mouse,
-#ifdef SCREEN_SUBSCREEN
-                                        i_x-p_sys->i_left,
-#else
-                                        i_x,
-#endif
-#ifdef SCREEN_SUBSCREEN
-                                        i_y-p_sys->i_top,
-#else
-                                        i_y,
-#endif
-                                        255 );
-    }
-    else
-    {
-        picture_Release( p_sys->p_mouse );
-        p_sys->p_mouse = NULL;
-    }
 }
 #endif

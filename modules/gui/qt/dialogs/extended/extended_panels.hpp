@@ -1,5 +1,5 @@
 /*****************************************************************************
- * extended_panels.hpp : Exentended Panels
+ * extended_panels.hpp : Extended Panels
  ****************************************************************************
  * Copyright (C) 2006 the VideoLAN team
  *
@@ -37,7 +37,7 @@
 #include "ui_equalizer.h"
 #include "ui_video_effects.h"
 
-#include <QTabWidget>
+class QTabWidget;
 
 #define BANDS 10
 

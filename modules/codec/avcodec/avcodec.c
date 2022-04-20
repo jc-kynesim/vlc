@@ -48,6 +48,10 @@ static const int  frame_skip_list[] = { -1, 0, 1, 2, 3, 4 };
 static const char *const frame_skip_list_text[] =
   { N_("None"), N_("Default"), N_("Non-ref"), N_("Bidir"), N_("Non-key"), N_("All") };
 
+static const int  idct_skip_list[] = { -1, 0, 1, 2, 3, 4 };
+static const char *const idct_skip_list_text[] =
+  { N_("None"), N_("Default"), N_("Non-ref"), N_("Bidir"), N_("Non-key"), N_("All") };
+
 static const int  nloopf_list[] = { 0, 1, 2, 3, 4 };
 static const char *const nloopf_list_text[] =
   { N_("None"), N_("Non-ref"), N_("Bidir"), N_("Non-key"), N_("All") };
@@ -73,7 +77,6 @@ static const char *const enc_hq_list_text[] = {
 
 vlc_module_begin ()
     set_shortname( "FFmpeg")
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_VCODEC )
     /* decoder main module */
     set_description( N_("FFmpeg audio/video decoder") )
@@ -105,7 +108,7 @@ vlc_module_begin ()
         change_integer_list( frame_skip_list, frame_skip_list_text )
     add_integer( "avcodec-skip-idct", 0, SKIP_IDCT_TEXT,
         SKIP_IDCT_LONGTEXT )
-        change_integer_range( -1, 4 )
+        change_integer_list( idct_skip_list, idct_skip_list_text )
     add_obsolete_integer( "avcodec-vismv" ) /* removed since 3.0.0 */
     add_obsolete_bool( "avcodec-fast" ) /* removed since 4.0.0 */
     add_integer ( "avcodec-skiploopfilter", 0, SKIPLOOPF_TEXT,
@@ -125,9 +128,16 @@ vlc_module_begin ()
     add_submodule ()
     add_shortcut( "ffmpeg" )
     set_section( N_("Encoding") , NULL )
-    set_description( N_("FFmpeg audio/video encoder") )
-    set_capability( "encoder", 100 )
-    set_callbacks( InitVideoEnc, EndVideoEnc )
+    set_description( N_("FFmpeg video encoder") )
+    set_capability( "video encoder", 100 )
+    set_callback( InitVideoEnc )
+
+    add_submodule()
+    add_shortcut( "ffmpeg" )
+    set_section( N_("Encoding") , NULL )
+    set_description( N_("FFmpeg audio encoder") )
+    set_capability( "audio encoder", 100 )
+    set_callback( InitVideoEnc )
 
     add_string( ENC_CFG_PREFIX "codec", NULL, CODEC_TEXT, CODEC_LONGTEXT )
     add_string( ENC_CFG_PREFIX "hq", "rd", ENC_HQ_TEXT,

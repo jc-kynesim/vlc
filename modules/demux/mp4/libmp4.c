@@ -343,7 +343,7 @@ static int MP4_PeekBoxHeader( stream_t *p_stream, MP4_Box_t *p_box )
     {
         if( i_read < 16 )
             return 0;
-        /* get extented type on 16 bytes */
+        /* get extended type on 16 bytes */
         GetUUID( &p_box->i_uuid, p_peek );
     }
 
@@ -448,7 +448,7 @@ static int MP4_ReadBoxContainerChildrenIndexed( stream_t *p_stream,
                MP4_Box_t *p_container, const uint32_t stoplist[],
                const uint32_t excludelist[], bool b_indexed )
 {
-    /* Size of root container is set to 0 when unknown, for exemple
+    /* Size of root container is set to 0 when unknown, for example
      * with a DASH stream. In that case, we skip the following check */
     if( (p_container->i_size || p_container->p_father)
             && ( vlc_stream_Tell( p_stream ) + ((b_indexed)?16:8) >
@@ -2496,6 +2496,20 @@ static int MP4_ReadBox_enda( stream_t *p_stream, MP4_Box_t *p_box )
     MP4_READBOX_EXIT( 1 );
 }
 
+static int MP4_ReadBox_pcmC( stream_t *p_stream, MP4_Box_t *p_box )
+{
+    MP4_READBOX_ENTER( MP4_Box_data_pcmC_t, NULL );
+    if(i_read != 6)
+        MP4_READBOX_EXIT( 0 );
+    uint32_t temp;
+    MP4_GET4BYTES(temp);
+    if(temp != 0) /* support only v0 */
+        MP4_READBOX_EXIT( 0 );
+    MP4_GET1BYTE(p_box->data.p_pcmC->i_format_flags);
+    MP4_GET1BYTE(p_box->data.p_pcmC->i_sample_size);
+    MP4_READBOX_EXIT( 1 );
+}
+
 static void MP4_FreeBox_sample_soun( MP4_Box_t *p_box )
 {
     free( p_box->data.p_sample_soun->p_qt_description );
@@ -2590,7 +2604,7 @@ static int MP4_ReadBox_sample_soun( stream_t *p_stream, MP4_Box_t *p_box )
         }
         /* !Checks */
 
-        MP4_GET4BYTES( i_extoffset ); /* offset to stsd extentions */
+        MP4_GET4BYTES( i_extoffset ); /* offset to stsd extensions */
         MP4_GET8BYTES( i_dummy64 );
         memcpy( &f_sample_rate, &i_dummy64, 8 );
         msg_Dbg( p_stream, "read box: %f Hz", f_sample_rate );
@@ -2970,6 +2984,8 @@ static int MP4_ReadBox_stz2( stream_t *p_stream, MP4_Box_t *p_box )
 
     uint32_t reserved;
     MP4_GET3BYTES( reserved );
+    (void) reserved;
+
     MP4_GET1BYTE(field_size);
 
     MP4_GET4BYTES( count );
@@ -3426,7 +3442,7 @@ static int MP4_ReadBox_cmov( stream_t *p_stream, MP4_Box_t *p_box )
     MP4_Box_t *p_dcom;
     MP4_Box_t *p_cmvd;
 
-#ifdef HAVE_ZLIB_H
+#ifdef HAVE_ZLIB
     stream_t *p_stream_memory;
     z_stream z_data;
     uint8_t *p_data;
@@ -3464,7 +3480,7 @@ static int MP4_ReadBox_cmov( stream_t *p_stream, MP4_Box_t *p_box )
         return 0;
     }
 
-#ifndef HAVE_ZLIB_H
+#ifndef HAVE_ZLIB
     msg_Dbg( p_stream, "read box: \"cmov\" zlib unsupported" );
     return 0;
 
@@ -3535,7 +3551,7 @@ static int MP4_ReadBox_cmov( stream_t *p_stream, MP4_Box_t *p_box )
 #endif
 
     return p_box->data.p_cmov->p_moov ? 1 : 0;
-#endif /* HAVE_ZLIB_H */
+#endif /* HAVE_ZLIB */
 }
 
 static void MP4_FreeBox_rdrf( MP4_Box_t *p_box )
@@ -4973,6 +4989,7 @@ static const struct
     { ATOM_fiel,    MP4_ReadBox_fiel,         0 },
     { ATOM_glbl,    MP4_ReadBox_Binary,       0 },
     { ATOM_enda,    MP4_ReadBox_enda,         0 },
+    { ATOM_pcmC,    MP4_ReadBox_pcmC,         0 }, /* ISO-IEC 23003-5 */
     { ATOM_iods,    MP4_ReadBox_iods,         0 },
     { ATOM_pasp,    MP4_ReadBox_pasp,         0 },
     { ATOM_btrt,    MP4_ReadBox_btrt,         0 }, /* codecs bitrate stsd/????/btrt */
@@ -5175,10 +5192,8 @@ static const struct
     { ATOM_uuid,    MP4_ReadBox_uuid,        0 },
 
     /* spatial/360°/VR */
-    { ATOM_st3d,    MP4_ReadBox_st3d,        ATOM_avc1 },
-    { ATOM_st3d,    MP4_ReadBox_st3d,        ATOM_mp4v },
-    { ATOM_sv3d,    MP4_ReadBoxContainer,    ATOM_avc1 },
-    { ATOM_sv3d,    MP4_ReadBoxContainer,    ATOM_mp4v },
+    { ATOM_st3d,    MP4_ReadBox_st3d,        0 },
+    { ATOM_sv3d,    MP4_ReadBoxContainer,    0 },
     { ATOM_proj,    MP4_ReadBoxContainer,    ATOM_sv3d },
     { ATOM_prhd,    MP4_ReadBox_prhd,        ATOM_proj },
     { ATOM_equi,    MP4_ReadBox_equi,        ATOM_proj },
@@ -5375,7 +5390,7 @@ MP4_Box_t *MP4_BoxGetNextChunk( stream_t *s )
  * MP4_BoxGetRoot : Parse the entire file, and create all boxes in memory
  *****************************************************************************
  *  The first box is a virtual box "root" and is the father for all first
- *  level boxes for the file, a sort of virtual contener
+ *  level boxes for the file, a sort of virtual container
  *****************************************************************************/
 MP4_Box_t *MP4_BoxGetRoot( stream_t *p_stream )
 {
@@ -5514,7 +5529,7 @@ void MP4_BoxDumpStructure( stream_t *s, const MP4_Box_t *p_box )
 /*****************************************************************************
  *****************************************************************************
  **
- **  High level methods to acces an MP4 file
+ **  High level methods to access an MP4 file
  **
  *****************************************************************************
  *****************************************************************************/

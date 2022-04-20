@@ -43,6 +43,7 @@
 static const int soxr_resampler_quality_vlclist[] = { 0, 1, 2, 3, 4 };
 static const char *const soxr_resampler_quality_vlctext[] =
 {
+     /* Note: Skip translation - too technical */
      "Quick cubic interpolation",
      "Low 16-bit with larger roll-off",
      "Medium 16-bit with medium roll-off",
@@ -65,7 +66,6 @@ static void Close( filter_t * );
 
 vlc_module_begin ()
     set_shortname( N_("SoX Resampler") )
-    set_category( CAT_AUDIO )
     set_subcategory( SUBCAT_AUDIO_RESAMPLER )
     add_integer( "soxr-resampler-quality", 2,
                 SOXR_QUALITY_TEXT, NULL )

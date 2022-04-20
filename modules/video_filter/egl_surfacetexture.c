@@ -28,12 +28,14 @@
 #include <vlc_filter.h>
 #include <vlc_opengl.h>
 #include <vlc_vout_display.h>
+#include <vlc_picture_pool.h>
 #include <vlc_atomic.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
 #include "../video_output/android/utils.h"
 #include "../video_output/opengl/gl_api.h"
+#include "../video_output/opengl/gl_util.h"
 
 #define BUFFER_COUNT 3
 
@@ -399,11 +401,15 @@ static int Open(vlc_gl_t *gl, unsigned width, unsigned height)
         vlc_gl_ReleaseCurrent(gl);
         goto error4;
     }
-    const char *extensions =
-        (const char *) sys->api.vt.GetString(GL_EXTENSIONS);
+
+    struct vlc_gl_extension_vt extension_vt;
+    vlc_gl_LoadExtensionFunctions(gl, &extension_vt);
+
+    bool has_image_external =
+        vlc_gl_HasExtension(&extension_vt, "GL_OES_EGL_image_external");
     vlc_gl_ReleaseCurrent(gl);
 
-    if (!vlc_gl_StrHasToken(extensions, "GL_OES_EGL_image_external"))
+    if (!has_image_external)
     {
         msg_Warn(gl, "GL_OES_EGL_image_external is not available,"
                 " disabling egl_surfacetexture.");

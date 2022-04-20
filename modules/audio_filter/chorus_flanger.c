@@ -75,7 +75,6 @@ vlc_module_begin ()
     set_description( N_("Sound Delay") )
     set_shortname( N_("Delay") )
     set_help( N_("Add a delay effect to the sound") )
-    set_category( CAT_AUDIO )
     set_subcategory( SUBCAT_AUDIO_AFILTER )
     add_shortcut( "delay" )
     add_float( "delay-time", 20, N_("Delay time"),
@@ -398,7 +397,7 @@ static int reallocate_buffer( filter_t *p_filter,  filter_sys_t *p_sys )
     float *temp = realloc( p_sys->p_delayLineStart, p_sys->i_bufferLength );
     if( unlikely( !temp ) )
     {
-        msg_Err( p_filter, "Couldnt reallocate buffer for new delay." );
+        msg_Err( p_filter, "Couldn't reallocate buffer for new delay." );
         return 0;
     }
     p_sys->p_delayLineStart = temp;

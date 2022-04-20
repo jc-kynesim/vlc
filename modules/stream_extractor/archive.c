@@ -47,7 +47,6 @@ static  int DirectoryOpen( vlc_object_t* );
 static void DirectoryClose( vlc_object_t* );
 
 vlc_module_begin()
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_STREAM_FILTER )
     set_capability( "stream_directory", 99 )
     set_description( N_( "libarchive based stream directory" ) )
@@ -547,11 +546,22 @@ static int ReadDir( stream_directory_t* p_directory, input_item_node_t* p_node )
         if( unlikely( !mrl ) )
             break;
 
+        input_item_t *p_item;
         if( vlc_readdir_helper_additem( &rdh, mrl, path, NULL, ITEM_TYPE_FILE,
-                                        ITEM_LOCAL ) )
+                                        ITEM_LOCAL, &p_item ) )
         {
             free( mrl );
             break;
+        }
+        if ( p_item )
+        {
+            time_t mtime = archive_entry_mtime( entry );
+            if( mtime >= 0 )
+                input_item_AddStat( p_item, "mtime", mtime );
+
+            int64_t size = archive_entry_size( entry );
+            if( size >= 0 )
+                input_item_AddStat( p_item, "size", size );
         }
         free( mrl );
 

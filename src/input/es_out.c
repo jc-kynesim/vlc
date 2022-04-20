@@ -173,6 +173,7 @@ typedef struct
 typedef struct
 {
     input_thread_t *p_input;
+    enum input_type input_type;
 
     input_source_t *main_source;
 
@@ -498,7 +499,7 @@ static void EsOutPropsCleanup( es_out_es_props_t *p_props )
 
 static void EsOutPropsInit( es_out_es_props_t *p_props,
                             bool autoselect,
-                            input_thread_t *p_input,
+                            input_thread_t *p_input, enum input_type input_type,
                             enum es_out_policy_e e_default_policy,
                             const char *psz_trackidvar,
                             const char *psz_trackvar,
@@ -513,7 +514,7 @@ static void EsOutPropsInit( es_out_es_props_t *p_props,
     p_props->i_demux_id = -1;
     p_props->p_main_es = NULL;
 
-    if( !input_priv(p_input)->b_preparsing && psz_langvar )
+    if( input_type != INPUT_TYPE_PREPARSING && psz_langvar )
     {
         char *psz_string = var_GetString( p_input, psz_langvar );
         p_props->ppsz_language = LanguageSplit( psz_string );
@@ -532,7 +533,8 @@ static const struct es_out_callbacks es_out_cbs;
 /*****************************************************************************
  * input_EsOutNew:
  *****************************************************************************/
-es_out_t *input_EsOutNew( input_thread_t *p_input, input_source_t *main_source, float rate )
+es_out_t *input_EsOutNew( input_thread_t *p_input, input_source_t *main_source, float rate,
+                          enum input_type input_type )
 {
     es_out_sys_t *p_sys = calloc( 1, sizeof( *p_sys ) );
     if( !p_sys )
@@ -546,17 +548,21 @@ es_out_t *input_EsOutNew( input_thread_t *p_input, input_source_t *main_source, 
 
     p_sys->b_active = false;
     p_sys->i_mode   = ES_OUT_MODE_NONE;
+    p_sys->input_type = input_type;
 
     vlc_list_init(&p_sys->programs);
     vlc_list_init(&p_sys->es);
     vlc_list_init(&p_sys->es_slaves);
 
     /* */
-    EsOutPropsInit( &p_sys->video, true, p_input, ES_OUT_ES_POLICY_AUTO,
+    EsOutPropsInit( &p_sys->video, true, p_input, input_type,
+                    ES_OUT_ES_POLICY_AUTO,
                     "video-track-id", "video-track", NULL, NULL );
-    EsOutPropsInit( &p_sys->audio, true, p_input, ES_OUT_ES_POLICY_EXCLUSIVE,
+    EsOutPropsInit( &p_sys->audio, true, p_input, input_type,
+                    ES_OUT_ES_POLICY_EXCLUSIVE,
                     "audio-track-id", "audio-track", "audio-language", "audio" );
-    EsOutPropsInit( &p_sys->sub,  false, p_input, ES_OUT_ES_POLICY_AUTO,
+    EsOutPropsInit( &p_sys->sub,  false, p_input, input_type,
+                    ES_OUT_ES_POLICY_AUTO,
                     "sub-track-id", "sub-track", "sub-language", "sub" );
 
     p_sys->cc_decoder = var_InheritInteger( p_input, "captions" );
@@ -849,7 +855,7 @@ static int EsOutSetRecord(  es_out_t *out, bool b_record )
                 vlc_input_decoder_New( VLC_OBJECT(p_input), &p_es->fmt,
                                        p_es->id.str_id, NULL,
                                        input_priv(p_input)->p_resource,
-                                       p_sys->p_sout_record, false,
+                                       p_sys->p_sout_record, INPUT_TYPE_NONE,
                                        &decoder_cbs, p_es );
 
             if( p_es->p_dec_record && p_sys->b_buffering )
@@ -1185,7 +1191,7 @@ static void EsOutFrameNext( es_out_t *out )
     vlc_tick_t i_duration;
     vlc_input_decoder_FrameNext( p_es_video->p_dec, &i_duration );
 
-    msg_Dbg( p_sys->p_input, "EsOutFrameNext consummed %d ms", (int)MS_FROM_VLC_TICK(i_duration) );
+    msg_Dbg( p_sys->p_input, "EsOutFrameNext consumed %d ms", (int)MS_FROM_VLC_TICK(i_duration) );
 
     if( i_duration <= 0 )
         i_duration = VLC_TICK_FROM_MS(40);
@@ -1311,17 +1317,19 @@ static void EsOutProgramHandleClockSource( es_out_t *out, es_out_pgrm_t *p_pgrm 
     /* XXX: The clock source selection depends on input_CanPaceControl() but
      * this variable is only initialized from the input_thread_t after the
      * demux is opened. Programs and ES tracks can be created from the demux
-     * open callback or midstream (from the demux callback). Therefore, we
-     * can't handle the clock source selection after the program is created
-     * since input_CanPaceControl() might not be initialized. To fix this
-     * issue, handle clock source selection after/when the es_out is activated
-     * (from ES_OUT_PRIV_SET_MODE) or when a program is created. */
-    assert( p_sys->b_active );
+     * open callback or midstream (from the demux callback). To fix this issue,
+     * handle clock source selection when the first PCR is sent (from
+     * ES_OUT_SET_PCR). */
 
     switch( p_sys->user_clock_source )
     {
         case VLC_CLOCK_MASTER_AUTO:
-            if (input_CanPaceControl(p_input))
+            /* If not active, input_CanPaceControl() returns an uninitialized
+             * value. If not active while sending a PCR, it means the demux
+             * module is pacing itself (via a thread or API callbacks).
+             * Therefore, we can assume that the input can't control its pace.
+             * */
+            if( p_sys->b_active && input_CanPaceControl( p_input ) )
             {
                 p_pgrm->active_clock_source = VLC_CLOCK_MASTER_AUDIO;
                 break;
@@ -1407,7 +1415,7 @@ static void EsOutProgramSelect( es_out_t *out, es_out_pgrm_t *p_pgrm )
                 EsOutUnselectEs(out, es, true);
 
             if( EsOutIsGroupSticky( out, es->id.source, es->fmt.i_group ) )
-                es->p_pgrm = NULL; /* Skip the DELETED event, cf. bellow */
+                es->p_pgrm = NULL; /* Skip the DELETED event, cf. below */
             else
             {
                 /* ES tracks are deleted (and unselected) when their programs
@@ -1515,9 +1523,6 @@ static es_out_pgrm_t *EsOutProgramAdd( es_out_t *out, input_source_t *source, in
         free( p_pgrm );
         return NULL;
     }
-
-    if( p_sys->b_active )
-        EsOutProgramHandleClockSource( out, p_pgrm );
 
     if( p_sys->b_paused )
         input_clock_ChangePause( p_pgrm->p_input_clock, p_sys->b_paused, p_sys->i_pause_date );
@@ -1788,7 +1793,7 @@ static void EsOutProgramMeta( es_out_t *out, input_source_t *source,
         input_item_MergeInfos( p_item, p_cat );
         b_has_new_infos = true;
     }
-    if( !input_priv(p_input)->b_preparsing && b_has_new_infos )
+    if( p_sys->input_type != INPUT_TYPE_PREPARSING && b_has_new_infos )
         input_SendEventMetaInfo( p_input );
 }
 
@@ -1883,7 +1888,7 @@ static void EsOutProgramEpg( es_out_t *out, input_source_t *source,
         else
             ret = input_item_DelInfo( p_item, psz_cat, now_playing_tr );
 
-        if( ret == VLC_SUCCESS && !input_priv(p_input)->b_preparsing  )
+        if( ret == VLC_SUCCESS && p_sys->input_type != INPUT_TYPE_PREPARSING  )
             input_SendEventMetaInfo( p_input );
     }
 
@@ -1927,7 +1932,7 @@ static void EsOutProgramUpdateScrambled( es_out_t *p_out, es_out_pgrm_t *p_pgrm 
         ret = input_item_DelInfo( p_item, psz_cat, _("Scrambled") );
     free( psz_cat );
 
-    if( ret == VLC_SUCCESS && !input_priv(p_input)->b_preparsing  )
+    if( ret == VLC_SUCCESS && p_sys->input_type != INPUT_TYPE_PREPARSING )
         input_SendEventMetaInfo( p_input );
     input_SendEventProgramScrambled( p_input, p_pgrm->i_id, b_scrambled );
 }
@@ -2088,7 +2093,7 @@ static char *EsOutCreateStrId( es_out_id_t *es, bool stable, const char *id,
     }
 
     if( !stable )
-        vlc_memstream_puts( &ms, "auto/" );
+        vlc_memstream_puts( &ms, "/auto" );
 
     vlc_memstream_printf( &ms, "/%d", es->fmt.i_id );
     ret = vlc_memstream_close( &ms );
@@ -2338,7 +2343,7 @@ static void EsOutCreateDecoder( es_out_t *out, es_out_id_t *p_es )
     dec = vlc_input_decoder_New( VLC_OBJECT(p_input), &p_es->fmt,
                                  p_es->id.str_id, p_es->p_clock,
                                  priv->p_resource, priv->p_sout,
-                                 priv->b_thumbnailing, &decoder_cbs, p_es );
+                                 p_sys->input_type, &decoder_cbs, p_es );
     if( dec != NULL )
     {
         vlc_input_decoder_ChangeRate( dec, p_sys->rate );
@@ -2352,7 +2357,7 @@ static void EsOutCreateDecoder( es_out_t *out, es_out_id_t *p_es )
                 vlc_input_decoder_New( VLC_OBJECT(p_input), &p_es->fmt,
                                        p_es->id.str_id, NULL,
                                        priv->p_resource, p_sys->p_sout_record,
-                                       false, &decoder_cbs, p_es );
+                                       INPUT_TYPE_NONE, &decoder_cbs, p_es );
             if( p_es->p_dec_record && p_sys->b_buffering )
                 vlc_input_decoder_StartWait( p_es->p_dec_record );
         }
@@ -2399,7 +2404,7 @@ static void EsOutSelectEs( es_out_t *out, es_out_id_t *es, bool b_force )
 {
     es_out_sys_t *p_sys = container_of(out, es_out_sys_t, out);
     input_thread_t *p_input = p_sys->p_input;
-    bool b_thumbnailing = input_priv(p_input)->b_thumbnailing;
+    bool b_thumbnailing = p_sys->input_type == INPUT_TYPE_THUMBNAILING;
 
     if( EsIsSelected( es ) )
     {
@@ -3348,6 +3353,12 @@ static int EsOutVaControlLocked( es_out_t *out, input_source_t *source,
         if( !p_pgrm )
             return VLC_EGENERIC;
 
+        if( p_pgrm->active_clock_source == VLC_CLOCK_MASTER_AUTO )
+        {
+            EsOutProgramHandleClockSource( out, p_pgrm );
+            assert( p_pgrm->active_clock_source != VLC_CLOCK_MASTER_AUTO );
+        }
+
         i_pcr = va_arg( args, vlc_tick_t );
         if( i_pcr == VLC_TICK_INVALID )
         {
@@ -3694,19 +3705,6 @@ static int EsOutVaPrivControlLocked( es_out_t *out, int query, va_list args )
         }
         p_sys->b_active = i_mode != ES_OUT_MODE_NONE;
         p_sys->i_mode = i_mode;
-
-        if( p_sys->b_active && i_mode != ES_OUT_MODE_END )
-        {
-            es_out_pgrm_t *p_pgrm;
-            vlc_list_foreach(p_pgrm, &p_sys->programs, node)
-            {
-                if( p_pgrm->active_clock_source == VLC_CLOCK_MASTER_AUTO )
-                {
-                    EsOutProgramHandleClockSource( out, p_pgrm );
-                    assert( p_pgrm->active_clock_source != VLC_CLOCK_MASTER_AUTO );
-                }
-            }
-        }
 
         /* Reapply policy mode */
         es_out_id_t *es;
@@ -4539,7 +4537,7 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const vlc_meta_t *p
     }
     /* */
     input_item_ReplaceInfos( p_item, p_cat );
-    if( !input_priv(p_input)->b_preparsing  )
+    if( p_sys->input_type != INPUT_TYPE_PREPARSING )
         input_SendEventMetaInfo( p_input );
 }
 
@@ -4555,7 +4553,7 @@ static void EsOutDeleteInfoEs( es_out_t *out, es_out_id_t *es )
         int ret = input_item_DelInfo( p_item, psz_info_category, NULL );
         free( psz_info_category );
 
-        if( ret == VLC_SUCCESS && !input_priv(p_input)->b_preparsing  )
+        if( ret == VLC_SUCCESS && p_sys->input_type != INPUT_TYPE_PREPARSING )
             input_SendEventMetaInfo( p_input );
     }
 }

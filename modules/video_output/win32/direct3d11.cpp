@@ -39,15 +39,10 @@
 #include <math.h>
 #include <new>
 
-#include <d3d11.h>
+#include "../../video_chroma/d3d11_fmt.h"
 #ifdef HAVE_D3D11_4_H
 #include <d3d11_4.h>
 #endif
-
-/* avoided until we can pass ISwapchainPanel without c++/cx mode
-# include <windows.ui.xaml.media.dxinterop.h> */
-
-#include "../../video_chroma/d3d11_fmt.h"
 
 #include "d3d11_quad.h"
 #include "d3d11_shaders.h"
@@ -71,7 +66,6 @@ vlc_module_begin ()
     set_shortname("Direct3D11")
     set_description(N_("Direct3D11 video output"))
     set_help(D3D11_HELP)
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
 
     add_bool("direct3d11-hw-blending", true, HW_BLENDING_TEXT, HW_BLENDING_LONGTEXT)
@@ -98,7 +92,7 @@ typedef struct vout_display_sys_t
 
     d3d11_device_t           *d3d_dev = NULL;
     d3d11_decoder_device_t   *local_d3d_dev = NULL; // when opened without a video context
-    d3d_shader_compiler_t    shaders = {};
+    d3d_shader_compiler_t    *shaders = nullptr;
     d3d11_quad_t             picQuad;
 
 #ifdef HAVE_D3D11_4_H
@@ -222,6 +216,7 @@ static int UpdateDisplayFormat(vout_display_t *vd, const video_format_t *fmt)
     new_display.transfer  = (video_transfer_func_t)   out.transfer;
     new_display.primaries = (video_color_primaries_t) out.primaries;
     new_display.b_full_range = out.full_range;
+    new_display.orientation = (video_orientation_t) out.orientation;
 
     /* guestimate the display peak luminance */
     switch (new_display.transfer)
@@ -244,7 +239,8 @@ static int UpdateDisplayFormat(vout_display_t *vd, const video_format_t *fmt)
            sys->display.color          != new_display.color ||
            sys->display.transfer       != new_display.transfer ||
            sys->display.primaries      != new_display.primaries ||
-           sys->display.b_full_range   != new_display.b_full_range ))
+           sys->display.b_full_range   != new_display.b_full_range ||
+           sys->display.orientation    != new_display.orientation ))
     {
         sys->display = new_display;
         /* TODO release the pixel shaders if the format changed */
@@ -271,7 +267,7 @@ static void UpdateSize(vout_display_t *vd)
     rect_dst.top    = sys->area.place.y;
     rect_dst.bottom = sys->area.place.y + sys->area.place.height;
 
-    D3D11_UpdateViewport( &sys->picQuad, &rect_dst, sys->display.pixelFormat );
+    sys->picQuad.UpdateViewport( &rect_dst, sys->display.pixelFormat );
 
     RECT source_rect;
     source_rect.left   = vd->source->i_x_offset;
@@ -281,7 +277,7 @@ static void UpdateSize(vout_display_t *vd)
     d3d11_device_lock( sys->d3d_dev );
 
     D3D11_UpdateQuadPosition(vd, sys->d3d_dev, &sys->picQuad, &source_rect,
-                             vd->source->orientation);
+                             video_format_GetTransform(vd->source->orientation, sys->display.orientation));
 
     D3D11_UpdateViewpoint( vd, sys->d3d_dev, &sys->picQuad, &vd->cfg->viewpoint,
                           (float) vd->cfg->display.width / vd->cfg->display.height );
@@ -322,7 +318,8 @@ static int UpdateStaging(vout_display_t *vd, const video_format_t *fmt)
         if (!is_d3d11_opaque(fmt->i_chroma))
             texture_fmt.i_chroma = sys->picQuad.generic.textureFormat->fourcc;
 
-        if (AllocateTextures(vd, sys->d3d_dev, sys->picQuad.generic.textureFormat, &texture_fmt, textures, sys->stagingPlanes))
+        if (AllocateTextures(vd, sys->d3d_dev, sys->picQuad.generic.textureFormat, &texture_fmt,
+                             false, textures, sys->stagingPlanes))
         {
             msg_Err(vd, "Failed to allocate the staging texture");
             return VLC_EGENERIC;
@@ -342,13 +339,15 @@ static int UpdateStaging(vout_display_t *vd, const video_format_t *fmt)
     return VLC_SUCCESS;
 }
 
-static const struct vlc_display_operations ops = {
-    .close = Close,
-    .prepare = Prepare,
-    .display = Display,
-    .control = Control,
-    .set_viewpoint = SetViewpoint,
-};
+static const auto ops = []{
+    struct vlc_display_operations ops {};
+    ops.close = Close;
+    ops.prepare = Prepare;
+    ops.display = Display;
+    ops.control = Control;
+    ops.set_viewpoint = SetViewpoint;
+    return ops;
+}();
 
 static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
@@ -360,7 +359,7 @@ static int Open(vout_display_t *vd,
 
     d3d11_decoder_device_t *dev_sys = NULL;
 
-    int ret = D3D_InitShaderCompiler(VLC_OBJECT(vd), &sys->shaders);
+    int ret = D3D_CreateShaderCompiler(VLC_OBJECT(vd), &sys->shaders);
     if (ret != VLC_SUCCESS)
         goto error;
 
@@ -456,7 +455,7 @@ error:
 static void Close(vout_display_t *vd)
 {
     vout_display_sys_t *sys = static_cast<vout_display_sys_t *>(vd->sys);
-    D3D_ReleaseShaderCompiler(&sys->shaders);
+    D3D_ReleaseShaderCompiler(sys->shaders);
 #ifndef VLC_WINSTORE_APP
     UnhookWindowsSensors(sys->p_sensors);
     CommonWindowClean(&sys->sys);
@@ -577,7 +576,7 @@ static void PreparePicture(vout_display_t *vd, picture_t *picture, subpicture_t 
             if (texDesc.BindFlags & D3D11_BIND_SHADER_RESOURCE)
             {
                 /* for performance reason we don't want to allocate this during
-                 * display, do it preferrably when creating the texture */
+                 * display, do it preferably when creating the texture */
                 assert(p_sys->renderSrc[0]!=NULL);
             }
             if ( sys->picQuad.generic.i_height != texDesc.Height ||
@@ -974,9 +973,11 @@ static bool CanUseTextureArray(vout_display_t *vd)
     // 15.200.1062.1004 is wrong - 2015/08/03 - 15.7.1 WHQL
     // 21.19.144.1281 is wrong   -
     // 22.19.165.3 is good       - 2017/05/04 - ReLive Edition 17.5.1
-    struct wddm_version WDDM_os = {
-        .wddm         = 21,  // starting with drivers designed for W10 Anniversary Update
-    };
+    const auto WDDM_os = []{
+        struct wddm_version wddm = {};
+        wddm.wddm         = 21;  // starting with drivers designed for W10 Anniversary Update
+        return wddm;
+    }();
     if (D3D11CheckDriverVersion(sys->d3d_dev, GPU_MANUFACTURER_AMD, &WDDM_os) != VLC_SUCCESS)
     {
         msg_Dbg(vd, "AMD driver too old, fallback to legacy shader mode");
@@ -984,9 +985,11 @@ static bool CanUseTextureArray(vout_display_t *vd)
     }
 
     // xx.xx.1000.xxx drivers can't happen here for WDDM > 2.0
-    struct wddm_version WDDM_build = {
-        .revision     = 162,
-    };
+    const auto WDDM_build = []{
+        struct wddm_version wddm = {};
+        wddm.revision      = 162;
+        return wddm;
+    }();
     if (D3D11CheckDriverVersion(sys->d3d_dev, GPU_MANUFACTURER_AMD, &WDDM_build) != VLC_SUCCESS)
     {
         msg_Dbg(vd, "Bogus AMD driver detected, fallback to legacy shader mode");
@@ -1010,9 +1013,11 @@ static bool BogusZeroCopy(const vout_display_t *vd)
     case 0x6863: // RX Vega Frontier Edition
     case 0x15DD: // RX Vega 8/11 (Ryzen iGPU)
     {
-        struct wddm_version WDDM = {
-            .revision     = 14011, // 18.10.2 - 2018/06/11
-        };
+        const auto WDDM = []{
+            struct wddm_version wddm = {};
+            wddm.revision     = 14011; // 18.10.2 - 2018/06/11
+            return wddm;
+        }();
         return D3D11CheckDriverVersion(sys->d3d_dev, GPU_MANUFACTURER_AMD, &WDDM) != VLC_SUCCESS;
     }
     default:
@@ -1021,7 +1026,7 @@ static bool BogusZeroCopy(const vout_display_t *vd)
 }
 
 /* TODO : handle errors better
-   TODO : seperate out into smaller functions like createshaders */
+   TODO : separate out into smaller functions like createshaders */
 static int Direct3D11CreateFormatResources(vout_display_t *vd, const video_format_t *fmt)
 {
     vout_display_sys_t *sys = static_cast<vout_display_sys_t *>(vd->sys);
@@ -1031,7 +1036,7 @@ static int Direct3D11CreateFormatResources(vout_display_t *vd, const video_forma
             BogusZeroCopy(vd) || !is_d3d11_opaque(fmt->i_chroma);
 
     d3d_shader_blob pPSBlob[DXGI_MAX_RENDER_TARGET] = { };
-    hr = D3D11_CompilePixelShaderBlob(vd, &sys->shaders, sys->d3d_dev,
+    hr = D3D11_CompilePixelShaderBlob(vd, sys->shaders, sys->d3d_dev,
                                   &sys->display, fmt->transfer,
                                   fmt->color_range == COLOR_RANGE_FULL,
                                   &sys->picQuad, pPSBlob);
@@ -1065,7 +1070,8 @@ static int Direct3D11CreateFormatResources(vout_display_t *vd, const video_forma
     source_rect.right  = fmt->i_x_offset + fmt->i_visible_width;
     source_rect.top    = fmt->i_y_offset;
     source_rect.bottom = fmt->i_y_offset + fmt->i_visible_height;
-    if (!D3D11_UpdateQuadPosition(vd, sys->d3d_dev, &sys->picQuad, &source_rect, vd->source->orientation))
+    if (!D3D11_UpdateQuadPosition(vd, sys->d3d_dev, &sys->picQuad, &source_rect,
+                                  video_format_GetTransform(vd->source->orientation, sys->display.orientation)))
     {
         msg_Err(vd, "Could not set quad picture position.");
         return VLC_EGENERIC;
@@ -1078,7 +1084,7 @@ static int Direct3D11CreateFormatResources(vout_display_t *vd, const video_forma
 
     if (is_d3d11_opaque(fmt->i_chroma)) {
         ComPtr<ID3D10Multithread> pMultithread;
-        hr = sys->d3d_dev->d3ddevice->QueryInterface(IID_GRAPHICS_PPV_ARGS(pMultithread.GetAddressOf()));
+        hr = sys->d3d_dev->d3ddevice->QueryInterface(IID_GRAPHICS_PPV_ARGS(&pMultithread));
         if (SUCCEEDED(hr))
             pMultithread->SetMultithreadProtected(TRUE);
     }
@@ -1091,13 +1097,13 @@ static HRESULT InitRenderFence(vout_display_sys_t *sys)
 {
     HRESULT hr;
     ComPtr<ID3D11Device5> d3ddev5;
-    hr = sys->d3d_dev->d3ddevice->QueryInterface(IID_GRAPHICS_PPV_ARGS(d3ddev5.GetAddressOf()));
+    hr = sys->d3d_dev->d3ddevice->QueryInterface(IID_GRAPHICS_PPV_ARGS(&d3ddev5));
     if (FAILED(hr))
         goto error;
-    hr = d3ddev5->CreateFence(sys->renderFence, D3D11_FENCE_FLAG_NONE, IID_GRAPHICS_PPV_ARGS(sys->d3dRenderFence.GetAddressOf()));
+    hr = d3ddev5->CreateFence(sys->renderFence, D3D11_FENCE_FLAG_NONE, IID_GRAPHICS_PPV_ARGS(&sys->d3dRenderFence));
     if (FAILED(hr))
         goto error;
-    hr = sys->d3d_dev->d3dcontext->QueryInterface(IID_GRAPHICS_PPV_ARGS(sys->d3dcontext4.GetAddressOf()));
+    hr = sys->d3d_dev->d3dcontext->QueryInterface(IID_GRAPHICS_PPV_ARGS(&sys->d3dcontext4));
     if (FAILED(hr))
         goto error;
     sys->renderFinished = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -1138,7 +1144,7 @@ static int Direct3D11CreateGenericResources(vout_display_t *vd)
     spuBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE; /* keep source intact */
     spuBlendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO; /* discard */
 
-    hr = sys->d3d_dev->d3ddevice->CreateBlendState(&spuBlendDesc, pSpuBlendState.GetAddressOf());
+    hr = sys->d3d_dev->d3ddevice->CreateBlendState(&spuBlendDesc, &pSpuBlendState);
     if (FAILED(hr)) {
        msg_Err(vd, "Could not create SPU blend state. (hr=0x%lX)", hr);
        return VLC_EGENERIC;
@@ -1152,14 +1158,14 @@ static int Direct3D11CreateGenericResources(vout_display_t *vd)
     D3D11_DEPTH_STENCIL_DESC stencilDesc = { };
 
     ComPtr<ID3D11DepthStencilState> pDepthStencilState;
-    hr = sys->d3d_dev->d3ddevice->CreateDepthStencilState(&stencilDesc, pDepthStencilState.GetAddressOf() );
+    hr = sys->d3d_dev->d3ddevice->CreateDepthStencilState(&stencilDesc, &pDepthStencilState );
     if (SUCCEEDED(hr))
         sys->d3d_dev->d3dcontext->OMSetDepthStencilState(pDepthStencilState.Get(), 0);
 
     if (sys->regionQuad.generic.textureFormat != NULL)
     {
         d3d_shader_blob pPSBlob[DXGI_MAX_RENDER_TARGET] = { };
-        hr = D3D11_CompilePixelShaderBlob(vd, &sys->shaders, sys->d3d_dev,
+        hr = D3D11_CompilePixelShaderBlob(vd, sys->shaders, sys->d3d_dev,
                                       &sys->display, TRANSFER_FUNC_SRGB, true,
                                       &sys->regionQuad, pPSBlob);
         if (FAILED(hr))
@@ -1177,7 +1183,7 @@ static int Direct3D11CreateGenericResources(vout_display_t *vd)
     }
 
     d3d_shader_blob VSBlob = { };
-    hr = D3D11_CompileVertexShaderBlob(VLC_OBJECT(vd), &sys->shaders, sys->d3d_dev, true, &VSBlob);
+    hr = D3D11_CompileVertexShaderBlob(VLC_OBJECT(vd), sys->shaders, sys->d3d_dev, true, &VSBlob);
     if(FAILED(hr)) {
       msg_Err(vd, "Failed to compile the flat vertex shader. (hr=0x%lX)", hr);
       return VLC_EGENERIC;
@@ -1189,7 +1195,7 @@ static int Direct3D11CreateGenericResources(vout_display_t *vd)
     }
 
 
-    hr = D3D11_CompileVertexShaderBlob(VLC_OBJECT(vd), &sys->shaders, sys->d3d_dev, false, &VSBlob);
+    hr = D3D11_CompileVertexShaderBlob(VLC_OBJECT(vd), sys->shaders, sys->d3d_dev, false, &VSBlob);
     if(FAILED(hr)) {
       msg_Err(vd, "Failed to compile the 360 vertex shader. (hr=0x%lX)", hr);
       return VLC_EGENERIC;
@@ -1206,7 +1212,7 @@ static int Direct3D11CreateGenericResources(vout_display_t *vd)
     rect_dst.top    = sys->area.place.y;
     rect_dst.bottom = sys->area.place.y + sys->area.place.height;
 
-    D3D11_UpdateViewport( &sys->picQuad, &rect_dst, sys->display.pixelFormat );
+    sys->picQuad.UpdateViewport( &rect_dst, sys->display.pixelFormat );
 
 #ifndef NDEBUG
     msg_Dbg( vd, "picQuad position (%.02f,%.02f) %.02fx%.02f",
@@ -1225,10 +1231,10 @@ static void Direct3D11DestroyResources(vout_display_t *vd)
 {
     vout_display_sys_t *sys = static_cast<vout_display_sys_t *>(vd->sys);
 
-    D3D11_ReleaseQuad(&sys->picQuad);
+    sys->picQuad.Reset();
     Direct3D11DeleteRegions(sys->d3dregion_count, sys->d3dregions);
     sys->d3dregion_count = 0;
-    D3D11_ReleaseQuad(&sys->regionQuad);
+    sys->regionQuad.Reset();
 
     ReleaseD3D11PictureSys(&sys->stagingSys);
 
@@ -1260,7 +1266,8 @@ static void Direct3D11DeleteRegions(int count, picture_t **region)
 
 static void DestroyPictureQuad(picture_t *p_picture)
 {
-    D3D11_ReleaseQuad( (d3d11_quad_t *) p_picture->p_sys );
+    d3d11_quad_t *quad = static_cast<d3d11_quad_t *>(p_picture->p_sys);
+    delete quad;
 }
 
 static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_count,
@@ -1291,8 +1298,9 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
 
         for (int j = 0; j < sys->d3dregion_count; j++) {
             picture_t *cache = sys->d3dregions[j];
-            if (cache != NULL && ((d3d11_quad_t *) cache->p_sys)->picSys.texture[KNOWN_DXGI_INDEX]) {
-                ((d3d11_quad_t *) cache->p_sys)->picSys.texture[KNOWN_DXGI_INDEX]->GetDesc(&texDesc );
+            d3d11_quad_t *cache_quad = cache ? static_cast<d3d11_quad_t *>(cache->p_sys) : nullptr;
+            if (cache_quad != nullptr && cache_quad->picSys.texture[KNOWN_DXGI_INDEX]) {
+                cache_quad->picSys.texture[KNOWN_DXGI_INDEX]->GetDesc(&texDesc );
                 if (texDesc.Format == sys->regionQuad.generic.textureFormat->formatTexture &&
                     texDesc.Width  == r->p_picture->format.i_width &&
                     texDesc.Height == r->p_picture->format.i_height) {
@@ -1309,18 +1317,19 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             quad = static_cast<d3d11_quad_t*>(quad_picture->p_sys);
         else
         {
-            d3d11_quad_t *d3dquad = static_cast<d3d11_quad_t *>(calloc(1, sizeof(*d3dquad)));
+            d3d11_quad_t *d3dquad = new (std::nothrow) d3d11_quad_t;
             if (unlikely(d3dquad==NULL)) {
                 continue;
             }
             quad = d3dquad;
-            if (AllocateTextures(vd, sys->d3d_dev, sys->regionQuad.generic.textureFormat, &r->p_picture->format, d3dquad->picSys.texture, NULL)) {
+            if (AllocateTextures(vd, sys->d3d_dev, sys->regionQuad.generic.textureFormat, &r->p_picture->format,
+                                 false, d3dquad->picSys.texture, NULL)) {
                 msg_Err(vd, "Failed to allocate %dx%d texture for OSD",
                         r->fmt.i_visible_width, r->fmt.i_visible_height);
                 for (int j=0; j<DXGI_MAX_SHADER_VIEW; j++)
                     if (d3dquad->picSys.texture[j])
                         d3dquad->picSys.texture[j]->Release();
-                free(d3dquad);
+                delete d3dquad;
                 continue;
             }
 
@@ -1329,7 +1338,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                                            d3dquad->picSys.renderSrc)) {
                 msg_Err(vd, "Failed to create %dx%d shader view for OSD",
                         r->fmt.i_visible_width, r->fmt.i_visible_height);
-                free(d3dquad);
+                delete d3dquad;
                 continue;
             }
             d3dquad->generic.i_width  = r->fmt.i_width;
@@ -1341,7 +1350,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             {
                 msg_Err(vd, "Failed to allocate %dx%d quad for OSD",
                              r->fmt.i_visible_width, r->fmt.i_visible_height);
-                free(d3dquad);
+                delete d3dquad;
                 continue;
             }
 
@@ -1349,18 +1358,20 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             if (err != VLC_SUCCESS) {
                 msg_Err(vd, "Failed to setup %dx%d quad for OSD",
                         r->fmt.i_visible_width, r->fmt.i_visible_height);
-                free(d3dquad);
+                delete d3dquad;
                 continue;
             }
-            picture_resource_t picres = {
-                .p_sys      = (picture_sys_d3d11_t *) d3dquad,
-                .pf_destroy = DestroyPictureQuad,
-            };
+            const auto picres = [](picture_sys_d3d11_t * p_sys){
+                picture_resource_t res = {};
+                res.p_sys      = p_sys;
+                res.pf_destroy = DestroyPictureQuad;
+                return res;
+            }((picture_sys_d3d11_t *) d3dquad);
             (*region)[i] = picture_NewFromResource(&r->p_picture->format, &picres);
             if ((*region)[i] == NULL) {
                 msg_Err(vd, "Failed to create %dx%d picture for OSD",
                         r->fmt.i_width, r->fmt.i_height);
-                D3D11_ReleaseQuad(d3dquad);
+                d3dquad->Reset();
                 continue;
             }
             quad_picture = (*region)[i];
@@ -1374,12 +1385,12 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
             }
         }
 
-        hr = sys->d3d_dev->d3dcontext->Map(((d3d11_quad_t *) quad_picture->p_sys)->picSys.resource[KNOWN_DXGI_INDEX], 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+        hr = sys->d3d_dev->d3dcontext->Map(quad->picSys.resource[KNOWN_DXGI_INDEX], 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
         if( SUCCEEDED(hr) ) {
             err = picture_UpdatePlanes(quad_picture, static_cast<uint8_t*>(mappedResource.pData), mappedResource.RowPitch);
             if (err != VLC_SUCCESS) {
                 msg_Err(vd, "Failed to set the buffer on the SPU picture" );
-                sys->d3d_dev->d3dcontext->Unmap(((d3d11_quad_t *) quad_picture->p_sys)->picSys.resource[KNOWN_DXGI_INDEX], 0);
+                sys->d3d_dev->d3dcontext->Unmap(quad->picSys.resource[KNOWN_DXGI_INDEX], 0);
                 picture_Release(quad_picture);
                 if ((*region)[i] == quad_picture)
                     (*region)[i] = NULL;
@@ -1388,7 +1399,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
 
             picture_CopyPixels(quad_picture, r->p_picture);
 
-            sys->d3d_dev->d3dcontext->Unmap(((d3d11_quad_t *) quad_picture->p_sys)->picSys.resource[KNOWN_DXGI_INDEX], 0);
+            sys->d3d_dev->d3dcontext->Unmap(quad->picSys.resource[KNOWN_DXGI_INDEX], 0);
         } else {
             msg_Err(vd, "Failed to map the SPU texture (hr=0x%lX)", hr );
             picture_Release(quad_picture);
@@ -1403,7 +1414,8 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         output.top    = r->fmt.i_y_offset;
         output.bottom = r->fmt.i_y_offset + r->fmt.i_visible_height;
 
-        D3D11_UpdateQuadPosition(vd, sys->d3d_dev, quad, &output, ORIENT_NORMAL);
+        D3D11_UpdateQuadPosition(vd, sys->d3d_dev, quad, &output,
+            video_format_GetTransform(ORIENT_NORMAL, sys->display.orientation));
 
         RECT spuViewport;
         spuViewport.left   = (FLOAT) r->i_x * sys->area.place.width  / subpicture->i_original_picture_width;
@@ -1428,7 +1440,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
         spuViewport.top    += sys->area.place.y;
         spuViewport.bottom += sys->area.place.y;
 
-        D3D11_UpdateViewport( quad, &spuViewport, sys->display.pixelFormat );
+        quad->UpdateViewport( &spuViewport, sys->display.pixelFormat );
 
         D3D11_UpdateQuadOpacity(vd, sys->d3d_dev, quad, r->i_alpha / 255.0f );
     }

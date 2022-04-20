@@ -110,7 +110,6 @@ vlc_module_begin ()
     set_description( N_("IceCAST output") )
     set_shortname( "Shoutcast" )
     set_capability( "sout access", 0 )
-    set_category( CAT_SOUT )
     set_subcategory( SUBCAT_SOUT_ACO )
     add_shortcut( "shout" )
     add_string( SOUT_CFG_PREFIX "name", "VLC media player - Live stream",
@@ -121,7 +120,7 @@ vlc_module_begin ()
                 MP3_TEXT, MP3_LONGTEXT )
     add_string( SOUT_CFG_PREFIX "genre", "Alternative",
                 GENRE_TEXT, GENRE_LONGTEXT )
-    add_string( SOUT_CFG_PREFIX "url", "http://www.videolan.org/vlc",
+    add_string( SOUT_CFG_PREFIX "url", "https://www.videolan.org/vlc",
                 URL_TEXT, URL_LONGTEXT )
     add_string( SOUT_CFG_PREFIX "bitrate", "",
                 BITRATE_TEXT, BITRATE_LONGTEXT )
@@ -454,7 +453,7 @@ static ssize_t Write( sout_access_out_t *p_access, block_t *p_buffer )
 
             /* The most common cause seems to be a server disconnect, resulting in a
                Socket Error which can only be fixed by closing and reconnecting.
-               Since we already began with a working connection, the most feasable
+               Since we already began with a working connection, the most feasible
                approach to get out of this error status is a (timed) reconnect approach. */
             shout_close( p_sys->p_shout );
             msg_Warn( p_access, "server unavailable? trying to reconnect..." );

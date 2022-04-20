@@ -1,5 +1,5 @@
 /*****************************************************************************
- * convert.cpp : Convertion dialogs
+ * convert.cpp : Conversion dialogs
  ****************************************************************************
  * Copyright (C) 2009 the VideoLAN team
  *
@@ -81,7 +81,7 @@ ConvertDialog::ConvertDialog( QWindow *parent, qt_intf_t *_p_intf,
     {
         QPushButton *fileSelectButton = new QPushButton( qtr( "Browse" ) );
         destLayout->addWidget( fileSelectButton, 0, 2);
-        BUTTONACT( fileSelectButton, fileBrowse() );
+        BUTTONACT( fileSelectButton, &ConvertDialog::fileBrowse );
     }
 
     // but multiple files follow a naming convention
@@ -116,7 +116,7 @@ ConvertDialog::ConvertDialog( QWindow *parent, qt_intf_t *_p_intf,
     QVBoxLayout *convertLayout = new QVBoxLayout( convertPanel );
 
     displayBox = new QCheckBox( qtr( "Display the output" ) );
-    displayBox->setToolTip( qtr( "This display the resulting media, but can "
+    displayBox->setToolTip( qtr( "This displays the resulting media, but can "
                                "slow things down." ) );
     convertLayout->addWidget( displayBox );
 
@@ -143,13 +143,13 @@ ConvertDialog::ConvertDialog( QWindow *parent, qt_intf_t *_p_intf,
 
     mainLayout->addWidget( buttonBox, 5, 3 );
 
-    BUTTONACT(okButton,close());
-    BUTTONACT(cancelButton,cancel());
+    BUTTONACT( okButton, &ConvertDialog::close );
+    BUTTONACT( cancelButton, &ConvertDialog::cancel );
 
-    CONNECT( convertRadio, toggled(bool), convertPanel, setEnabled(bool) );
-    CONNECT(profile, optionsChanged(), this, setDestinationFileExtension());
-    CONNECT(fileLine, editingFinished(), this, setDestinationFileExtension());
-    CONNECT(fileLine, textChanged(const QString&), this, validate());
+    connect( convertRadio, &QRadioButton::toggled, convertPanel, &QWidget::setEnabled );
+    connect( profile, &VLCProfileSelector::optionsChanged, this, &ConvertDialog::setDestinationFileExtension );
+    connect( fileLine, &QLineEdit::editingFinished, this, &ConvertDialog::setDestinationFileExtension );
+    connect( fileLine, &QLineEdit::textChanged, this, &ConvertDialog::validate );
 
     validate();
 }
@@ -210,7 +210,7 @@ void ConvertDialog::close()
                 // Remove the file:// from the front of our MRL
                 newFileName = QUrl(newFileName).toLocalFile();
 
-                // Remote the existing extention (if any)
+                // Remote the existing extension (if any)
                 int extentionPos = newFileName.lastIndexOf('.');
                 if(extentionPos >= 0)
                 {
@@ -223,7 +223,7 @@ void ConvertDialog::close()
                     newFileName = newFileName.append("-converted");
                 }
 
-                // Stick our new extention on
+                // Stick our new extension on
                 newFileName = newFileName.append(fileExtension);
             }
 

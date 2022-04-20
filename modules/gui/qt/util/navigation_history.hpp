@@ -2,7 +2,6 @@
 #define NAVIGATION_HISTORY_HPP
 
 #include <QObject>
-#include <QList>
 #include <QtQml/QQmlPropertyMap>
 
 class NavigationHistory : public QObject
@@ -11,6 +10,7 @@ class NavigationHistory : public QObject
 public:
     Q_PROPERTY(QVariant current READ getCurrent NOTIFY currentChanged FINAL)
     Q_PROPERTY(bool previousEmpty READ isPreviousEmpty NOTIFY previousEmptyChanged FINAL)
+    Q_PROPERTY(QString viewPath READ viewPath NOTIFY viewPathChanged FINAL)
 
     enum class PostAction{
         Stay,
@@ -23,10 +23,12 @@ public:
 
     QVariant getCurrent();
     bool isPreviousEmpty();
+    QString viewPath() const;
 
 signals:
     void currentChanged(QVariant current);
     void previousEmptyChanged(bool empty);
+    void viewPathChanged(QString viewPath);
 
 public slots:
     /**
@@ -49,7 +51,7 @@ public slots:
     Q_INVOKABLE void push( QVariantMap, PostAction = PostAction::Go );
 
     /**
-     * provide a short version of the history push({k:v}), wich implicitly create a dictonnary tree from the input list
+     * provide a short version of the history push({k:v}), which implicitly create a dictonnary tree from the input list
      *
      * List items are interpreted as
      *   * strings will push a dict with "view" key to the value of the string and
@@ -80,11 +82,22 @@ public slots:
      */
     Q_INVOKABLE void update(QVariantList itemList);
 
+    /**
+     * @brief same as @a push(QVariantList) but modify the last (current) item's tail instead of insterting a new one
+     *
+     * @see push
+     */
+    Q_INVOKABLE void addLeaf(QVariantMap itemMap);
+
+
     // Go to previous page
     void previous( PostAction = PostAction::Go );
 
 private:
+    void updateViewPath();
+
     QVariantList m_history;
+    QString m_viewPath;
 };
 
 #endif // NAVIGATION_HISTORY_HPP

@@ -49,6 +49,8 @@ typedef enum filter_resizer_e {
 
 #ifndef NDEBUG
 #define MMAL_CONVERTER_TYPE_NAME "mmal-hw-converter"
+
+/* Note: Skip translation of these - too technical */
 #define MMAL_CONVERTER_TYPE_TEXT "Hardware used for MMAL conversions"
 #define MMAL_CONVERTER_TYPE_LONGTEXT "Hardware component used for MMAL conversions. Hardware Video Scaler"\
         " (default) gives the best result and allows blending, Resizer is slower but uses less memory."
@@ -64,7 +66,6 @@ static const char * const  ppsz_converter_text[] = {
 static int OpenConverter(filter_t *);
 
 vlc_module_begin()
-    set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
     set_shortname(N_("MMAL resizer"))
     set_description(N_("MMAL resizing conversion filter"))
@@ -292,7 +293,7 @@ static void conv_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf)
         {
             buf_to_pic_copy_props(pic, buf);
 
-            buf->user_data = NULL;  // Responsability for this pic no longer with buffer
+            buf->user_data = NULL;  // Responsibility for this pic no longer with buffer
             conv_out_q_pic(sys, pic);
         }
     }
@@ -592,7 +593,7 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         }
     }
 
-    // Reenable stuff if the last thing we did was flush
+    // Re-enable stuff if the last thing we did was flush
     if ((err = conv_enable_out(p_filter, sys)) != MMAL_SUCCESS ||
         (err = conv_enable_in(p_filter, sys)) != MMAL_SUCCESS)
         goto fail;
@@ -835,7 +836,7 @@ retry:
     }
     p_filter->p_sys = sys;
 
-    // Init stuff the we destroy unconditionaly in Close first
+    // Init stuff the we destroy unconditionally in Close first
     vlc_mutex_init(&sys->lock);
     vlc_sem_init(&sys->sem, 0);
     sys->err_stream = MMAL_SUCCESS;

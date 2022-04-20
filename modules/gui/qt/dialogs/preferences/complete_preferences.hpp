@@ -28,9 +28,10 @@
 #endif
 
 #include <vlc_common.h>
-#include <vlc_interface.h>
+#include <vlc_config_cat.h>
 
 #include <QTreeWidget>
+#include <QTreeWidgetItem>
 #include <QSet>
 
 #include "qt.hpp"
@@ -38,50 +39,50 @@
 /**
  * Notes:
  *
- * 1) Core's use of set_category()/set_subcategory() defines the base tree,
- *    with its options spread across it.
+ * 1) Core's use of set_subcategory() defines the base tree, with its options
+ *    spread across it.
  * 2) Certain subcats ('general' type) are not given a node under their cat,
  *    they represent the top level cat's option panel itself (otherwise cat
  *    entries would just have empty panels).
- * 3) Other modules (currently) have their options located under a single tree
+ * 3) Plugins (currently) have their option sets located under a single tree
  *    node attached to one of the core cat/subcat nodes. The location for this
- *    is chosen based upon the first cat and subcat encountered in the module's
- *    option set. (If the subcat does not belong to the cat, then the node is
- *    attached directly to the cat; If the module's option set has options
- *    before the cat/subcat hint entries, this does not matter; If no cat or
- *    subcat hint is provided in the option set, then no node is created (i.e.
- *    that module's options will not be available in the prefs GUI).
+ *    is chosen based upon the first subcat encountered in the plugin's option
+ *    set (others are ignored). If the plugin's option set has options before
+ *    the cat/subcat hint entries, this does not matter; If no cat or subcat
+ *    hint is provided in the option set, then no node is created (i.e. that
+ *    plugins's options will not be shown).
  */
 
 class AdvPrefsPanel;
 class QVBoxLayout;
 
-class PrefsItemData : public QObject
+class PrefsTreeItem : public QTreeWidgetItem
 {
-    Q_OBJECT
 public:
-    PrefsItemData( QObject * );
-    virtual ~PrefsItemData() { free( psz_shortcut ); }
-    bool contains( const QString &text, Qt::CaseSensitivity cs );
-    AdvPrefsPanel *panel;
-    int i_object_id;
-    int i_subcat_id;
-    enum prefsType
+    enum PrefsTreeItemType
     {
-        TYPE_CATEGORY,
-        TYPE_CATSUBCAT,
-        TYPE_SUBCATEGORY,
-        TYPE_MODULE
+        CATEGORY_NODE = QTreeWidgetItem::UserType,
+        SUBCATEGORY_NODE,
+        PLUGIN_NODE
     };
-    prefsType i_type;
-    char *psz_shortcut;
-    bool b_loaded;
+    PrefsTreeItem( PrefsTreeItemType );
+    virtual ~PrefsTreeItem() { free( module_name ); }
+    PrefsTreeItem *child(int index) const
+    {
+        return static_cast<PrefsTreeItem *>( QTreeWidgetItem::child( index ) );
+    }
+    /* Search filter helper */
+    bool contains( const QString &text, Qt::CaseSensitivity cs );
+    PrefsTreeItemType node_type;
+    AdvPrefsPanel *panel;
     QString name;
     QString help;
+    enum vlc_config_cat cat_id;
+    enum vlc_config_subcat subcat_id;
     module_t *p_module;
+    char *module_name;
+    bool module_is_loaded;
 };
-
-Q_DECLARE_METATYPE( PrefsItemData* );
 
 class PrefsTree : public QTreeWidget
 {
@@ -91,17 +92,27 @@ public:
     PrefsTree( qt_intf_t *, QWidget *, module_t **, size_t );
 
     void applyAll();
-    void cleanAll();
     void filter( const QString &text );
     void setLoadedOnly( bool );
+    PrefsTreeItem *topLevelItem(int index) const
+    {
+        return static_cast<PrefsTreeItem *>( QTreeWidget::topLevelItem( index ) );
+    }
 
 private:
-    void doAll( bool );
-    bool filterItems( QTreeWidgetItem *item, const QString &text, Qt::CaseSensitivity cs );
-    bool collapseUnselectedItems( QTreeWidgetItem *item );
-    void updateLoadedStatus( QTreeWidgetItem *item , QSet<QString> *loaded );
+    QTreeWidgetItem *createCatNode( enum vlc_config_cat cat );
+    QTreeWidgetItem *createSubcatNode( QTreeWidgetItem * cat, enum vlc_config_subcat subcat );
+    void createPluginNode( QTreeWidgetItem * parent, module_t *mod );
+    QTreeWidgetItem *findCatItem( enum vlc_config_cat cat );
+    QTreeWidgetItem *findSubcatItem( enum vlc_config_subcat subcat );
+    bool filterItems( PrefsTreeItem *item, const QString &text, Qt::CaseSensitivity cs );
+    void unfilterItems( PrefsTreeItem *item );
+    void updateLoadedStatus( PrefsTreeItem *item , QSet<QString> *loaded );
     qt_intf_t *p_intf;
+    module_t *main_module;
     bool b_show_only_loaded;
+    QTreeWidgetItem *catMap[ARRAY_SIZE(categories_array)] = { nullptr };
+    QTreeWidgetItem *subcatMap[ARRAY_SIZE(subcategories_array)] = { nullptr };
 
 private slots:
     void resizeColumns();
@@ -113,7 +124,7 @@ class AdvPrefsPanel : public QWidget
 {
     Q_OBJECT
 public:
-    AdvPrefsPanel( qt_intf_t *, QWidget *, PrefsItemData * );
+    AdvPrefsPanel( qt_intf_t *, QWidget *, PrefsTreeItem * );
     virtual ~AdvPrefsPanel();
     void apply();
     void clean();

@@ -85,10 +85,10 @@ CI and discussions should be resolved before a Merge Request can be merged.
 **libVLC** is an embeddable engine for 3rd party applications and frameworks.
 
 It runs on the same platforms as VLC *(and sometimes on more)* and can provide playback,
-streaming and converting of multimedia files and streams.
+streaming and conversion of multimedia files and streams.
 
 
-**libVLC** has numerous bindings for other languages, like C++, Python and C#.
+**libVLC** has numerous bindings for other languages, such as C++, Python and C#.
 
 # Support
 
@@ -96,7 +96,7 @@ streaming and converting of multimedia files and streams.
 
 Some useful links that might help you:
 
-- [VLC web site](http://www.videolan.org/vlc/)
+- [VLC web site](https://www.videolan.org/vlc/)
 - [Support](https://www.videolan.org/support/)
 - [Forums](https://forum.videolan.org/)
 - [Wiki](https://wiki.videolan.org/)
@@ -137,4 +137,3 @@ share/             - Common resource files.
 src/               - libvlccore source code.
 test/              - Testing system.
 ```
-

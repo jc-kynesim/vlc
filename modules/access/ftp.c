@@ -83,7 +83,6 @@ vlc_module_begin ()
     set_shortname( "FTP" )
     set_description( N_("FTP input") )
     set_capability( "access", 0 )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACCESS )
     add_string( "ftp-user", NULL, USER_TEXT, USER_LONGTEXT )
     add_password( "ftp-pwd", NULL, PASS_TEXT, PASS_LONGTEXT )
@@ -97,7 +96,6 @@ vlc_module_begin ()
         set_shortname( "FTP" )
         set_description( N_("FTP upload output") )
         set_capability( "sout access", 0 )
-        set_category( CAT_SOUT )
         set_subcategory( SUBCAT_SOUT_ACO )
         add_shortcut( "ftp", "ftps", "ftpes" )
         set_callbacks( OutOpen, OutClose )
@@ -999,7 +997,7 @@ static int DirRead (stream_t *p_access, input_item_node_t *p_current_node)
             msg_Err(p_access, "%s -> %s", p_sys->url.psz_path, ms.ptr);
 
             i_ret = vlc_readdir_helper_additem( &rdh, ms.ptr, NULL, psz_file,
-                                                type, ITEM_NET );
+                                                type, ITEM_NET, NULL );
             free(ms.ptr);
         }
         free( psz_line );

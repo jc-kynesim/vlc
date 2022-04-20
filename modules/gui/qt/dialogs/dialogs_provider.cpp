@@ -62,11 +62,10 @@
 #include <QFileDialog>
 #include <QUrl>
 #include <QInputDialog>
+#include <QPointer>
 
 #define I_OP_DIR_WINTITLE I_DIR_OR_FOLDER( N_("Open Directory"), \
                                            N_("Open Folder") )
-
-DialogsProvider* DialogsProvider::instance = NULL;
 
 DialogsProvider::DialogsProvider( qt_intf_t *_p_intf )
     : QObject( NULL ), p_intf( _p_intf )
@@ -250,9 +249,18 @@ const QEvent::Type DialogEvent::DialogEvent_Type =
 
 void DialogsProvider::prefsDialog()
 {
-    PrefsDialog *p = new PrefsDialog( nullptr, p_intf );
-    p->setAttribute(Qt::WA_DeleteOnClose);
-    p->toggleVisible();
+    static QPointer<PrefsDialog> p;
+
+    if (Q_LIKELY(!p))
+    {
+        p = new PrefsDialog( nullptr, p_intf );
+        p->setAttribute(Qt::WA_DeleteOnClose);
+        p->open();
+    }
+    else
+    {
+        p->reject();
+    }
 }
 
 void DialogsProvider::firstRunDialog()
@@ -530,7 +538,7 @@ QStringList DialogsProvider::showSimpleOpen( const QString& help,
     }
     ADD_EXT_FILTER( fileTypes, EXTENSIONS_ALL );
     fileTypes.replace( ";*", " *");
-    fileTypes.chop(2); //remove trailling ";;"
+    fileTypes.chop(2); //remove trailing ";;"
 
     QList<QUrl> urls = QFileDialog::getOpenFileUrls( NULL,
         help.isEmpty() ? qfut(I_OP_SEL_FILES ) : help,

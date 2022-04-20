@@ -27,21 +27,22 @@ import "qrc:///style/"
 Window {
     visible: true
 
-    property var window: topWindow
+    // TODO: Qt >5.13 use transientParent
+    property QtWindow parentWindow: MainCtx.intfMainWindow
 
     width: 350
     minimumWidth: playlistView.minimumWidth
 
-    title: i18n.qtr("Playlist")
+    title: I18n.qtr("Playlist")
     color: VLCStyle.colors.bg
 
     Component.onCompleted: {
-        if (!!window) {
-            height = window.height
-            minimumHeight = window.minimumHeight
+        if (!!parentWindow) {
+            height = parentWindow.height
+            minimumHeight = parentWindow.minimumHeight
 
-            x = window.x + window.width + 10
-            y = window.y
+            x = parentWindow.x + parentWindow.width + 10
+            y = parentWindow.y
         } else {
             height = 400
             minimumHeight = 200
@@ -55,6 +56,6 @@ Window {
         focus: true
         anchors.fill: parent
 
-        readonly property var g_root: playlistView
+        readonly property PlaylistListView g_root: playlistView
     }
 }

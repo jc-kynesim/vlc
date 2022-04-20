@@ -17,6 +17,8 @@
  *****************************************************************************/
 import QtQuick 2.11
 
+import org.videolan.vlc 0.1
+
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
@@ -25,6 +27,6 @@ Widgets.IconControlButton {
     id: openMediaBtn
     size: VLCStyle.icon_medium
     iconText: VLCIcons.eject
-    onClicked: dialogProvider.openDialog()
-    text: i18n.qtr("Open media")
+    onClicked: DialogsProvider.openDialog()
+    text: I18n.qtr("Open media")
 }

@@ -33,10 +33,8 @@
 #include <playlist/playlist_common.hpp>
 
 #include <QSystemTrayIcon>
-#include <QStackedWidget>
 #include <QtQuick/QQuickView>
-#include <QtQuickWidgets/QQuickWidget>
-#include <QtQuick/QQuickWindow>
+#include <QApplication>
 
 #ifdef _WIN32
 # include <shobjidl.h>
@@ -152,7 +150,6 @@ class MainCtx : public QObject
     Q_PROPERTY(bool playlistVisible READ isPlaylistVisible WRITE setPlaylistVisible NOTIFY playlistVisibleChanged FINAL)
     Q_PROPERTY(double playlistWidthFactor READ getPlaylistWidthFactor WRITE setPlaylistWidthFactor NOTIFY playlistWidthFactorChanged FINAL)
     Q_PROPERTY(bool interfaceAlwaysOnTop READ isInterfaceAlwaysOnTop WRITE setInterfaceAlwaysOnTop NOTIFY interfaceAlwaysOnTopChanged FINAL)
-    Q_PROPERTY(bool interfaceFullScreen READ isInterfaceFullScreen WRITE setInterfaceFullScreen NOTIFY interfaceFullScreenChanged FINAL)
     Q_PROPERTY(bool hasEmbededVideo READ hasEmbededVideo NOTIFY hasEmbededVideoChanged FINAL)
     Q_PROPERTY(bool showRemainingTime READ isShowRemainingTime WRITE setShowRemainingTime NOTIFY showRemainingTimeChanged FINAL)
     Q_PROPERTY(VLCVarChoiceModel* extraInterfaces READ getExtraInterfaces CONSTANT FINAL)
@@ -160,6 +157,7 @@ class MainCtx : public QObject
     Q_PROPERTY(bool mediaLibraryAvailable READ hasMediaLibrary CONSTANT FINAL)
     Q_PROPERTY(MediaLib* mediaLibrary READ getMediaLibrary CONSTANT FINAL)
     Q_PROPERTY(bool gridView READ hasGridView WRITE setGridView NOTIFY gridViewChanged FINAL)
+    Q_PROPERTY(Grouping grouping READ grouping WRITE setGrouping NOTIFY groupingChanged FINAL)
     Q_PROPERTY(ColorSchemeModel* colorScheme READ getColorScheme CONSTANT FINAL)
     Q_PROPERTY(bool hasVLM READ hasVLM CONSTANT FINAL)
     Q_PROPERTY(bool clientSideDecoration READ useClientSideDecoration NOTIFY useClientSideDecorationChanged FINAL)
@@ -172,9 +170,15 @@ class MainCtx : public QObject
     Q_PROPERTY(bool hasAcrylicSurface READ hasAcrylicSurface NOTIFY hasAcrylicSurfaceChanged FINAL)
     Q_PROPERTY(PlaylistPtr mainPlaylist READ getMainPlaylist CONSTANT FINAL)
     Q_PROPERTY(vlc::playlist::PlaylistControllerModel* mainPlaylistController READ getMainPlaylistController CONSTANT FINAL)
+    Q_PROPERTY(bool smoothScroll READ smoothScroll NOTIFY smoothScrollChanged FINAL)
+    Q_PROPERTY(QWindow* intfMainWindow READ intfMainWindow CONSTANT FINAL)
+    Q_PROPERTY(QScreen* screen READ screen NOTIFY screenChanged)
 
     // This Property only works if hasAcrylicSurface is set
     Q_PROPERTY(bool acrylicActive READ acrylicActive WRITE setAcrylicActive NOTIFY acrylicActiveChanged FINAL)
+
+    // NOTE: This is useful when we want to prioritize player hotkeys over QML keyboard navigation.
+    Q_PROPERTY(bool preferHotkeys READ preferHotkeys WRITE setPreferHotkeys NOTIFY preferHotkeysChanged FINAL)
 
 public:
     /* tors */
@@ -190,6 +194,7 @@ public:
     inline qt_intf_t* getIntf() const { return p_intf; }
     inline PlaylistPtr getMainPlaylist() const { return PlaylistPtr(p_intf->p_playlist); }
     inline vlc::playlist::PlaylistControllerModel* getMainPlaylistController() const { return p_intf->p_mainPlaylistController; }
+    bool smoothScroll() const { return m_smoothScroll; };
 
     QSystemTrayIcon *getSysTray() { return sysTray; }
     QMenu *getSysTrayMenu() { return systrayMenu.get(); }
@@ -206,6 +211,16 @@ public:
         RAISE_AUDIO,
         RAISE_AUDIOVIDEO,
     };
+
+    enum Grouping
+    {
+        GROUPING_NONE,
+        GROUPING_NAME,
+        GROUPING_FOLDER
+    };
+
+    Q_ENUM(Grouping)
+
     inline bool isInterfaceFullScreen() const { return m_windowVisibility == QWindow::FullScreen; }
     inline bool isInterfaceVisible() const { return m_windowVisibility != QWindow::Hidden; }
     bool isPlaylistDocked() { return b_playlistDocked; }
@@ -222,6 +237,7 @@ public:
     inline bool hasMediaLibrary() const { return b_hasMedialibrary; }
     inline MediaLib* getMediaLibrary() const { return m_medialib; }
     inline bool hasGridView() const { return m_gridView; }
+    inline Grouping grouping() const { return m_grouping; }
     inline ColorSchemeModel* getColorScheme() const { return m_colorScheme; }
     bool hasVLM() const;
     bool useClientSideDecoration() const;
@@ -235,6 +251,7 @@ public:
     inline void setDialogFilePath(const QUrl& filepath ){ m_dialogFilepath = filepath; }
     inline bool hasAcrylicSurface() const { return m_hasAcrylicSurface; }
     inline void reloadFromSettings() { loadFromSettingsImpl(true); }
+    inline QScreen* screen() const { return intfMainWindow()->screen(); }
 
     bool hasEmbededVideo() const;
     VideoSurfaceProvider* getVideoSurfaceProvider() const;
@@ -242,6 +259,12 @@ public:
 
     Q_INVOKABLE static inline void setCursor(Qt::CursorShape cursor) { QApplication::setOverrideCursor(QCursor(cursor)); };
     Q_INVOKABLE static inline void restoreCursor(void) { QApplication::restoreOverrideCursor(); };
+
+    Q_INVOKABLE static /*constexpr*/ inline unsigned int qtVersion() { return QT_VERSION; };
+    Q_INVOKABLE static /*constexpr*/ inline unsigned int qtVersionCheck(unsigned char major,
+                                                                        unsigned char minor,
+                                                                        unsigned char patch)
+                                                                       { return QT_VERSION_CHECK(major, minor, patch); };
 
     void dropEventPlay( QDropEvent* event, bool b_play );
     /**
@@ -252,6 +275,14 @@ public:
 
     bool acrylicActive() const;
     void setAcrylicActive(bool newAcrylicActive);
+
+    bool preferHotkeys() const;
+    void setPreferHotkeys(bool enable);
+    
+    QWindow *intfMainWindow() const;
+
+    Q_INVOKABLE QVariant settingValue(const QString &key, const QVariant &defaultValue) const;
+    Q_INVOKABLE void setSettingValue(const QString &key, const QVariant &value);
 
 protected:
     /* Systray */
@@ -296,6 +327,7 @@ protected:
     bool                 b_hasMedialibrary = false;
     MediaLib*            m_medialib = nullptr;
     bool                 m_gridView = false;
+    Grouping             m_grouping = GROUPING_NONE;
     ColorSchemeModel*    m_colorScheme = nullptr;
     bool                 m_windowTitlebar = true;
     bool                 m_hasToolbarMenu = false;
@@ -314,6 +346,10 @@ protected:
     bool m_hasAcrylicSurface = false;
     bool m_acrylicActive = false;
 
+    bool m_smoothScroll = true;
+
+    bool m_preferHotkeys = false;
+
 public slots:
     void toggleUpdateSystrayMenu();
     void showUpdateSystrayMenu();
@@ -325,12 +361,15 @@ public slots:
     void setInterfaceAlwaysOnTop( bool );
     void setShowRemainingTime( bool );
     void setGridView( bool );
+    void setGrouping( Grouping );
     void incrementIntfUserScaleFactor( bool increment);
     void setIntfUserScaleFactor( double );
     void setPinVideoControls( bool );
     void updateIntfScaleFactor();
     void onWindowVisibilityChanged(QWindow::Visibility);
     void setHasAcrylicSurface(bool);
+
+    void sendHotkey(Qt::Key key, Qt::KeyboardModifiers modifiers );
 
     void emitBoss();
     void emitRaise();
@@ -345,8 +384,6 @@ protected slots:
     void updateSystrayTooltipStatus( PlayerController::PlayingState );
 
     void onInputChanged( bool );
-
-    void sendHotkey(Qt::Key key, Qt::KeyboardModifiers modifiers );
 
 signals:
     void minimalViewToggled( bool );
@@ -364,10 +401,10 @@ signals:
     void playlistVisibleChanged(bool);
     void playlistWidthFactorChanged(double);
     void interfaceAlwaysOnTopChanged(bool);
-    void interfaceFullScreenChanged(bool);
     void hasEmbededVideoChanged(bool);
     void showRemainingTimeChanged(bool);
     void gridViewChanged( bool );
+    void groupingChanged( Grouping );
     void colorSchemeChanged( QString );
     void useClientSideDecorationChanged();
     void hasToolbarMenuChanged();
@@ -384,6 +421,12 @@ signals:
     void hasAcrylicSurfaceChanged();
 
     void acrylicActiveChanged();
+
+    void smoothScrollChanged();
+
+    void preferHotkeysChanged();
+
+    void screenChanged();
 
 private:
     void loadPrefs(bool callSignals);

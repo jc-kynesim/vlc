@@ -17,6 +17,8 @@
  *****************************************************************************/
 import QtQuick 2.11
 
+import org.videolan.vlc 0.1
+
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
@@ -24,8 +26,8 @@ import "qrc:///style/"
 Widgets.IconControlButton {
     id: infoBtn
     size: VLCStyle.icon_medium
-    enabled: player.isPlaying
+    enabled: Player.isPlaying
     iconText: VLCIcons.info
-    onClicked: dialogProvider.mediaInfoDialog()
-    text: i18n.qtr("Informations")
+    onClicked: DialogsProvider.mediaInfoDialog()
+    text: I18n.qtr("Information")
 }

@@ -59,6 +59,7 @@ enum vtsession_status
     VTSESSION_STATUS_RESTART,
     VTSESSION_STATUS_RESTART_CHROMA,
     VTSESSION_STATUS_ABORT,
+    VTSESSION_STATUS_VOUT_FAILURE,
 };
 
 static int ConfigureVout(decoder_t *);
@@ -249,7 +250,7 @@ static bool FillReorderInfoH264(decoder_t *p_dec, const block_t *p_block,
     decoder_sys_t *p_sys = p_dec->p_sys;
     hxxx_iterator_ctx_t itctx;
     hxxx_iterator_init(&itctx, p_block->p_buffer, p_block->i_buffer,
-                       p_sys->hh.i_nal_length_size);
+                       p_sys->hh.i_output_nal_length_size);
 
     const uint8_t *p_nal; size_t i_nal;
     struct
@@ -343,7 +344,9 @@ static bool FillReorderInfoH264(decoder_t *p_dec, const block_t *p_block,
 static block_t *ProcessBlockH264(decoder_t *p_dec, block_t *p_block, bool *pb_config_changed)
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
-    return p_sys->hh.pf_process_block(&p_sys->hh, p_block, pb_config_changed);
+    p_block = hxxx_helper_process_block(&p_sys->hh, p_block);
+    *pb_config_changed = hxxx_helper_has_new_config(&p_sys->hh);
+    return p_block;
 }
 
 
@@ -352,7 +355,7 @@ static bool InitH264(decoder_t *p_dec)
     decoder_sys_t *p_sys = p_dec->p_sys;
     h264_poc_context_init(&p_sys->h264_pocctx);
     hxxx_helper_init(&p_sys->hh, VLC_OBJECT(p_dec),
-                     p_dec->fmt_in.i_codec, true);
+                     p_dec->fmt_in.i_codec, 0, 4);
     return hxxx_helper_set_extra(&p_sys->hh, p_dec->fmt_in.p_extra,
                                              p_dec->fmt_in.i_extra) == VLC_SUCCESS;
 }
@@ -368,17 +371,17 @@ static CFDictionaryRef CopyDecoderExtradataH264(decoder_t *p_dec)
     decoder_sys_t *p_sys = p_dec->p_sys;
 
     CFDictionaryRef extradata = NULL;
-    if (p_dec->fmt_in.i_extra && p_sys->hh.b_is_xvcC)
+    if (p_dec->fmt_in.i_extra && p_sys->hh.i_input_nal_length_size)
     {
         /* copy DecoderConfiguration */
         extradata = ExtradataInfoCreate(CFSTR("avcC"),
                                         p_dec->fmt_in.p_extra,
                                         p_dec->fmt_in.i_extra);
     }
-    else if (p_sys->hh.h264.i_pps_count && p_sys->hh.h264.i_sps_count)
+    else if (hxxx_helper_has_config(&p_sys->hh))
     {
         /* build DecoderConfiguration from gathered */
-        block_t *p_avcC = h264_helper_get_avcc_config(&p_sys->hh);
+        block_t *p_avcC = hxxx_helper_get_extradata_block(&p_sys->hh);
         if (p_avcC)
         {
             extradata = ExtradataInfoCreate(CFSTR("avcC"),
@@ -440,8 +443,7 @@ static bool CodecSupportedH264(decoder_t *p_dec)
 static bool LateStartH264(decoder_t *p_dec)
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
-    return (p_dec->fmt_in.i_extra == 0 &&
-            (!p_sys->hh.h264.i_pps_count || !p_sys->hh.h264.i_sps_count) );
+    return (p_dec->fmt_in.i_extra == 0 && !hxxx_helper_has_config(&p_sys->hh));
 }
 
 static bool ConfigureVoutH264(decoder_t *p_dec)
@@ -476,9 +478,9 @@ static bool ConfigureVoutH264(decoder_t *p_dec)
                                                 &i_vis_width, &i_vis_height))
         {
             p_dec->fmt_out.video.i_visible_width = i_vis_width;
-            p_dec->fmt_out.video.i_width = vlc_align( i_vis_width, VT_ALIGNMENT );
+            p_dec->fmt_out.video.i_width = vlc_align(i_width, VT_ALIGNMENT);
             p_dec->fmt_out.video.i_visible_height = i_vis_height;
-            p_dec->fmt_out.video.i_height = vlc_align( i_vis_height, VT_ALIGNMENT );
+            p_dec->fmt_out.video.i_height = vlc_align(i_height, VT_ALIGNMENT);
         }
         else return false;
     }
@@ -542,7 +544,7 @@ static bool InitHEVC(decoder_t *p_dec)
     decoder_sys_t *p_sys = p_dec->p_sys;
     hevc_poc_cxt_init(&p_sys->hevc_pocctx);
     hxxx_helper_init(&p_sys->hh, VLC_OBJECT(p_dec),
-                     p_dec->fmt_in.i_codec, true);
+                     p_dec->fmt_in.i_codec, 0, 4);
     return hxxx_helper_set_extra(&p_sys->hh, p_dec->fmt_in.p_extra,
                                              p_dec->fmt_in.i_extra) == VLC_SUCCESS;
 }
@@ -600,7 +602,7 @@ static bool FillReorderInfoHEVC(decoder_t *p_dec, const block_t *p_block,
     decoder_sys_t *p_sys = p_dec->p_sys;
     hxxx_iterator_ctx_t itctx;
     hxxx_iterator_init(&itctx, p_block->p_buffer, p_block->i_buffer,
-                       p_sys->hh.i_nal_length_size);
+                       p_sys->hh.i_output_nal_length_size);
 
     const uint8_t *p_nal; size_t i_nal;
     struct
@@ -720,19 +722,17 @@ static CFDictionaryRef CopyDecoderExtradataHEVC(decoder_t *p_dec)
     decoder_sys_t *p_sys = p_dec->p_sys;
 
     CFDictionaryRef extradata = NULL;
-    if (p_dec->fmt_in.i_extra && p_sys->hh.b_is_xvcC)
+    if (p_dec->fmt_in.i_extra && p_sys->hh.i_input_nal_length_size)
     {
         /* copy DecoderConfiguration */
         extradata = ExtradataInfoCreate(CFSTR("hvcC"),
                                         p_dec->fmt_in.p_extra,
                                         p_dec->fmt_in.i_extra);
     }
-    else if (p_sys->hh.hevc.i_pps_count &&
-             p_sys->hh.hevc.i_sps_count &&
-             p_sys->hh.hevc.i_vps_count)
+    else if (hxxx_helper_has_config(&p_sys->hh))
     {
         /* build DecoderConfiguration from gathered */
-        block_t *p_hvcC = hevc_helper_get_hvcc_config(&p_sys->hh);
+        block_t *p_hvcC = hxxx_helper_get_extradata_block(&p_sys->hh);
         if (p_hvcC)
         {
             extradata = ExtradataInfoCreate(CFSTR("hvcC"),
@@ -747,10 +747,7 @@ static CFDictionaryRef CopyDecoderExtradataHEVC(decoder_t *p_dec)
 static bool LateStartHEVC(decoder_t *p_dec)
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
-    return (p_dec->fmt_in.i_extra == 0 &&
-            (!p_sys->hh.hevc.i_pps_count ||
-             !p_sys->hh.hevc.i_sps_count ||
-             !p_sys->hh.hevc.i_vps_count) );
+    return (p_dec->fmt_in.i_extra == 0 && !hxxx_helper_has_config(&p_sys->hh));
 }
 
 static bool CodecSupportedHEVC(decoder_t *p_dec)
@@ -991,7 +988,7 @@ static CMVideoCodecType CodecPrecheck(decoder_t *p_dec)
 
             /* there are no DV or ProRes decoders on iOS, so bailout early */
         case VLC_CODEC_PRORES:
-            /* the VT decoder can't differenciate between the ProRes flavors, so we do it */
+            /* the VT decoder can't differentiate between the ProRes flavors, so we do it */
             switch (p_dec->fmt_in.i_original_fourcc) {
                 case VLC_FOURCC( 'a','p','4','c' ):
                 case VLC_FOURCC( 'a','p','4','h' ):
@@ -1012,7 +1009,7 @@ static CMVideoCodecType CodecPrecheck(decoder_t *p_dec)
             }
 
         case VLC_CODEC_DV:
-            /* the VT decoder can't differenciate between PAL and NTSC, so we need to do it */
+            /* the VT decoder can't differentiate between PAL and NTSC, so we need to do it */
             switch (p_dec->fmt_in.i_original_fourcc) {
                 case VLC_FOURCC( 'd', 'v', 'c', ' '):
                 case VLC_FOURCC( 'd', 'v', ' ', ' '):
@@ -1184,8 +1181,8 @@ static int StartVideoToolbox(decoder_t *p_dec)
     OSStatus status = CMVideoFormatDescriptionCreate(
                                             kCFAllocatorDefault,
                                             p_sys->codec,
-                                            p_dec->fmt_out.video.i_visible_width,
-                                            p_dec->fmt_out.video.i_visible_height,
+                                            p_dec->fmt_out.video.i_width,
+                                            p_dec->fmt_out.video.i_height,
                                             decoderConfiguration,
                                             &p_sys->videoFormatDescription);
     if (status)
@@ -1207,9 +1204,9 @@ static int StartVideoToolbox(decoder_t *p_dec)
 #endif
 
     cfdict_set_int32(destinationPixelBufferAttributes,
-                     kCVPixelBufferWidthKey, p_dec->fmt_out.video.i_visible_width);
+                     kCVPixelBufferWidthKey, p_dec->fmt_out.video.i_width);
     cfdict_set_int32(destinationPixelBufferAttributes,
-                     kCVPixelBufferHeightKey, p_dec->fmt_out.video.i_visible_height);
+                     kCVPixelBufferHeightKey, p_dec->fmt_out.video.i_height);
 
     if (p_sys->i_cvpx_format != 0)
     {
@@ -1606,8 +1603,8 @@ static int ConfigureVout(decoder_t *p_dec)
         p_dec->fmt_out.video.i_visible_height = p_dec->fmt_out.video.i_height;
     }
 
-    p_dec->fmt_out.video.i_width = vlc_align( p_dec->fmt_out.video.i_visible_width, VT_ALIGNMENT );
-    p_dec->fmt_out.video.i_height = vlc_align( p_dec->fmt_out.video.i_visible_height, VT_ALIGNMENT );
+    p_dec->fmt_out.video.i_width = vlc_align(p_dec->fmt_out.video.i_width, VT_ALIGNMENT);
+    p_dec->fmt_out.video.i_height = vlc_align(p_dec->fmt_out.video.i_height, VT_ALIGNMENT);
 
     return VLC_SUCCESS;
 }
@@ -1900,6 +1897,12 @@ static int DecodeBlock(decoder_t *p_dec, block_t *p_block)
         var_Create(p_dec, "videotoolbox-failed", VLC_VAR_VOID);
         return VLCDEC_RELOAD;
     }
+    else if (p_sys->vtsession_status == VTSESSION_STATUS_VOUT_FAILURE)
+    {
+        vlc_mutex_unlock(&p_sys->lock);
+        return VLCDEC_RELOAD;
+    }
+
     vlc_mutex_unlock(&p_sys->lock);
 
     if (unlikely(p_block->i_flags&(BLOCK_FLAG_CORRUPTED)))
@@ -2073,7 +2076,7 @@ static int UpdateVideoFormat(decoder_t *p_dec, CVPixelBufferRef imageBuffer)
 
     if (decoder_UpdateVideoOutput(p_dec, p_sys->vctx) != 0)
     {
-        p_sys->vtsession_status = VTSESSION_STATUS_ABORT;
+        p_sys->vtsession_status = VTSESSION_STATUS_VOUT_FAILURE;
         return -1;
     }
     return 0;
@@ -2266,7 +2269,7 @@ OpenDecDevice(vlc_decoder_device *device, vout_window_t *window)
 #define VT_FORCE_CVPX_CHROMA "Force the VideoToolbox output chroma"
 #define VT_FORCE_CVPX_CHROMA_LONG "Force the VideoToolbox decoder to output \
     CVPixelBuffers in the specified pixel format instead of the default. \
-    By Default, the best chroma is choosen by the VideoToolbox decoder."
+    By default, the best chroma is chosen by the VideoToolbox decoder."
 
 static const char *const chroma_list_values[] =
     {
@@ -2289,7 +2292,6 @@ static const char *const chroma_list_names[] =
     };
 
 vlc_module_begin()
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_VCODEC)
     set_description(N_("VideoToolbox video decoder"))
     set_capability("video decoder", 800)

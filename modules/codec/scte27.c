@@ -41,7 +41,6 @@ vlc_module_begin ()
     set_description(N_("SCTE-27 decoder"))
     set_shortname(N_("SCTE-27"))
     set_capability( "spu decoder", 51)
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_SCODEC)
     set_callbacks(Open, Close)
 vlc_module_end ()
@@ -304,7 +303,7 @@ static subpicture_region_t *DecodeSimpleBitmap(decoder_t *dec,
             }
         }
     } else if (outline_style == 2) {
-        /* Draw a shadow by drawing the character shifted by shaddow right/bottom */
+        /* Draw a shadow by drawing the character shifted by shadow right/bottom */
         for (int by = 0; by < bitmap_v; by++) {
             for (int bx = 0; bx < bitmap_h; bx++) {
                 if (bitmap[by * bitmap_h + bx])

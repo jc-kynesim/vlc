@@ -32,6 +32,7 @@
 #include <vlc_renderer_discovery.h>
 
 #import <Foundation/Foundation.h>
+#import <arpa/inet.h>
 
 #pragma mark Function declarations
 
@@ -60,7 +61,6 @@ struct vlc_renderer_discovery_sys
 vlc_module_begin()
     set_shortname( "Bonjour" )
     set_description( N_( "Bonjour Network Discovery" ) )
-    set_category( CAT_PLAYLIST )
     set_subcategory( SUBCAT_PLAYLIST_SD )
     set_capability( "services_discovery", 0 )
     set_callbacks( OpenSD, CloseSD )
@@ -68,7 +68,6 @@ vlc_module_begin()
     VLC_SD_PROBE_SUBMODULE
     add_submodule() \
         set_description( N_( "Bonjour Renderer Discovery" ) )
-        set_category( CAT_SOUT )
         set_subcategory( SUBCAT_SOUT_RENDERER )
         set_capability( "renderer_discovery", 0 )
         set_callbacks( OpenRD, CloseRD )
@@ -121,6 +120,43 @@ NSString *const VLCBonjourRendererDemux         = @"VLCBonjourRendererDemux";
 - (void)stopDiscovery;
 
 @end
+
+static NSString * ipAddressAsStringForData(NSData * data)
+{
+    char addressBuffer[INET6_ADDRSTRLEN] = { 0 };
+    NSString *returnValue = nil;
+
+    if (data == nil) {
+        return returnValue;
+    }
+
+    typedef union {
+        struct sockaddr sa;
+        struct sockaddr_in ipv4;
+        struct sockaddr_in6 ipv6;
+    } ip_socket_address;
+
+    ip_socket_address *socketAddress = (ip_socket_address *)[data bytes];
+
+    if (socketAddress) {
+        const char *addressStr;
+        if (socketAddress->sa.sa_family == AF_INET) {
+            addressStr = inet_ntop(socketAddress->sa.sa_family,
+                                           (void *)&(socketAddress->ipv4.sin_addr),
+                                           addressBuffer,
+                                           sizeof(addressBuffer));
+        } else if (socketAddress->sa.sa_family == AF_INET6) {
+            addressStr = inet_ntop(socketAddress->sa.sa_family,
+                                           (void *)&(socketAddress->ipv6.sin6_addr),
+                                           addressBuffer,
+                                           sizeof(addressBuffer));
+        }
+        if (addressStr != NULL) {
+            returnValue = [NSString stringWithUTF8String:addressStr];
+        }
+    }
+    return returnValue;
+}
 
 @implementation VLCNetServiceDiscoveryController
 
@@ -376,8 +412,13 @@ NSString *const VLCBonjourRendererDemux         = @"VLCBonjourRendererDemux";
 - (void)addResolvedInputItem:(NSNetService *)netService withProtocol:(NSString *)protocol
 {
     services_discovery_t *p_sd = (services_discovery_t *)_p_this;
+    NSString *host = netService.hostName;
 
-    NSString *uri = [NSString stringWithFormat:@"%@://%@:%ld", protocol, netService.hostName, netService.port];
+    if ([protocol isEqualToString:@"smb"]) {
+        host = ipAddressAsStringForData(netService.addresses.firstObject);
+    }
+    NSString *uri = [NSString stringWithFormat:@"%@://%@:%ld", protocol, host, netService.port];
+
     input_item_t *p_input_item = input_item_NewDirectory([uri UTF8String], [netService.name UTF8String], ITEM_NET );
     if (p_input_item != NULL) {
         services_discovery_AddItem(p_sd, p_input_item);

@@ -100,7 +100,6 @@ vlc_module_begin ()
     set_shortname( N_("projectM"))
     set_description( N_("libprojectM effect") )
     set_capability( "visualization", 0 )
-    set_category( CAT_AUDIO )
     set_subcategory( SUBCAT_AUDIO_VISUAL )
 #ifndef HAVE_PROJECTM2
     add_loadfile("projectm-config", "/usr/share/projectM/config.inp",
@@ -187,6 +186,7 @@ static int Open( vlc_object_t * p_this )
     vout_window_cfg_t cfg;
 
     memset(&cfg, 0, sizeof (cfg));
+    cfg.is_decorated = true;
     cfg.width = var_CreateGetInteger( p_filter, "projectm-width" );
     cfg.height = var_CreateGetInteger( p_filter, "projectm-height" );
 
@@ -230,7 +230,7 @@ static void Close( filter_t *p_filter )
 
     vlc_join( p_sys->thread, NULL );
 
-    /* Free the ressources */
+    /* Free the resources */
     vlc_gl_surface_Destroy( p_sys->gl );
     free( p_sys->p_buffer );
     free( p_sys );

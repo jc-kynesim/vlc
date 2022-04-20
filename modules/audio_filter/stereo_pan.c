@@ -84,7 +84,7 @@ static void Close (vlc_object_t *p_in)
 static int Open (filter_t *p_filter)
 {
     if (p_filter->fmt_out.audio.i_channels < 2) {
-        msg_Err( p_filter, "Atleast 2 audio channels are required" );
+        msg_Err( p_filter, "At least 2 audio channels are required" );
         return VLC_EGENERIC;
     }
     vlc_object_t *p_aout = vlc_object_parent(p_filter);
@@ -112,7 +112,6 @@ static int Open (filter_t *p_filter)
 vlc_module_begin()
     set_shortname ( N_("Stereo Pan") )
     set_description ( N_("Perform Stereo Panning") )
-    set_category ( CAT_AUDIO )
     set_subcategory ( SUBCAT_AUDIO_AFILTER )
     add_float_with_range( "pan-control", 0.5, 0, 1,
             PAN_CONTROL_TEXT, PAN_CONTROL_LONGTEXT )

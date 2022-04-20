@@ -22,7 +22,9 @@ import QtQuick 2.11
 import QtQuick.Templates 2.4 as T
 import QtQuick.Layouts 1.11
 
+import org.videolan.medialib 0.1
 import org.videolan.controls 0.1
+import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
@@ -32,7 +34,7 @@ T.Control {
 
     // Properties
 
-    /* required */ property var mlModel
+    /* required */ property MLModel mlModel
 
     property bool isCurrent: false
 
@@ -43,9 +45,9 @@ T.Control {
 
     // Signals
 
-    signal itemClicked(variant mouse)
+    signal itemClicked(var mouse)
 
-    signal itemDoubleClicked(variant mouse)
+    signal itemDoubleClicked(var mouse)
 
     // Settings
 
@@ -84,8 +86,8 @@ T.Control {
                 setData(identifier, [model])
             }
 
-            function getSelectedInputItem() {
-                return medialib.mlInputItem(model.id)
+            function getSelectedInputItem(cb) {
+                return MediaLib.mlInputItem([model.id], cb)
             }
         }
 
@@ -156,7 +158,7 @@ T.Control {
 
             Widgets.ListLabel {
                 text: (model.name) ? model.name
-                                   : i18n.qtr("Unknown artist")
+                                   : I18n.qtr("Unknown artist")
 
                 color: background.foregroundColor
 

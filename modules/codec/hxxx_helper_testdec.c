@@ -45,13 +45,12 @@ DecodeBlock(decoder_t *dec, block_t *block)
     if (block == NULL)
         return VLCDEC_SUCCESS;
 
-    bool config_changed;
-    block = sys->hh.pf_process_block(&sys->hh, block, &config_changed);
+    block = hxxx_helper_process_block(&sys->hh, block);
 
     if (block == NULL)
         return VLCDEC_SUCCESS;
 
-    if (config_changed)
+    if (hxxx_helper_has_new_config(&sys->hh))
     {
         int ret;
         video_color_primaries_t primaries;
@@ -127,8 +126,8 @@ OpenDecoder(vlc_object_t *this)
     if (sys == NULL)
         return VLC_EGENERIC;
 
-    hxxx_helper_init(&sys->hh, this, dec->fmt_in.i_codec,
-                     var_InheritBool(this, "hxxx-helper-testdec-xvcC"));
+    hxxx_helper_init(&sys->hh, this, dec->fmt_in.i_codec, 0,
+                     var_InheritBool(this, "hxxx-helper-testdec-xvcC") ? 4 : 0);
 
     int ret = hxxx_helper_set_extra(&sys->hh, dec->fmt_in.p_extra,
                                     dec->fmt_in.i_extra);
@@ -150,11 +149,11 @@ OpenDecoder(vlc_object_t *this)
 }
 
 vlc_module_begin()
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_VCODEC)
     set_description(N_("hxxx test decoder"))
     add_shortcut("hxxxhelper")
     set_capability("video decoder", 0)
     add_bool("hxxx-helper-testdec-xvcC", false, NULL, NULL)
+        change_volatile()
     set_callbacks(OpenDecoder, CloseDecoder)
 vlc_module_end()

@@ -26,6 +26,12 @@
         <file alias="wait4.svg">pixmaps/util/wait4.svg</file>
         <file alias="SelectableDelegateModel.qml">util/qml/SelectableDelegateModel.qml</file>
         <file alias="Helpers.js">util/qml/Helpers.js</file>
+        <file alias="MultipleBinding.qml">util/qml/MultipleBinding.qml</file>
+        <file alias="ModelSortSettingHandler.qml">util/qml/ModelSortSettingHandler.qml</file>
+        <file alias="FlickableScrollHandler.qml">util/qml/FlickableScrollHandler.qml</file>
+        <file alias="ViewDragAutoScrollHandler.qml">util/qml/ViewDragAutoScrollHandler.qml</file>
+        <file alias="BindingRev8.qml">util/qml/BindingRev8.qml</file>
+        <file alias="BindingRev14.qml">util/qml/BindingRev14.qml</file>
     </qresource>
     <qresource prefix="/toolbar">
         <file alias="faster.svg">pixmaps/faster.svg</file>
@@ -191,7 +197,6 @@
         <file alias="NoMedialibHome.qml">maininterface/qml/NoMedialibHome.qml</file>
         <file alias="MainTableView.qml">maininterface/qml/MainTableView.qml</file>
         <file alias="MainGridView.qml">maininterface/qml/MainGridView.qml</file>
-        <file alias="MiniPlayerBottomMargin.qml">maininterface/qml/MiniPlayerBottomMargin.qml</file>
     </qresource>
     <qresource prefix="/widgets">
         <file alias="ActionButtonOverlay.qml">widgets/qml/ActionButtonOverlay.qml</file>
@@ -230,7 +235,6 @@
         <file alias="SortControl.qml">widgets/qml/SortControl.qml</file>
         <file alias="RoundButton.qml">widgets/qml/RoundButton.qml</file>
         <file alias="LabelSeparator.qml">widgets/qml/LabelSeparator.qml</file>
-        <file alias="ContextButton.qml">widgets/qml/ContextButton.qml</file>
         <file alias="VideoQualityLabels.qml">widgets/qml/VideoQualityLabels.qml</file>
         <file alias="VideoProgressBar.qml">widgets/qml/VideoProgressBar.qml</file>
         <file alias="NavigableCol.qml">widgets/qml/NavigableCol.qml</file>
@@ -262,6 +266,7 @@
         <file alias="GridShadows.qml">widgets/qml/GridShadows.qml</file>
         <file alias="ToolTipExt.qml">widgets/qml/ToolTipExt.qml</file>
         <file alias="MLDragItem.qml">widgets/qml/MLDragItem.qml</file>
+        <file alias="ScaledImage.qml">widgets/qml/ScaledImage.qml</file>
     </qresource>
     <qresource prefix="/network">
         <file alias="AddressbarButton.qml">network/qml/AddressbarButton.qml</file>
@@ -281,14 +286,13 @@
     <qresource prefix="/medialibrary">
         <file alias="EmptyLabel.qml">medialibrary/qml/EmptyLabel.qml</file>
         <file alias="MediaGroupDisplay.qml">medialibrary/qml/MediaGroupDisplay.qml</file>
-        <file alias="MediaGroupList.qml">medialibrary/qml/MediaGroupList.qml</file>
         <file alias="MusicAlbums.qml">medialibrary/qml/MusicAlbums.qml</file>
         <file alias="MusicDisplay.qml">medialibrary/qml/MusicDisplay.qml</file>
         <file alias="MusicGenres.qml">medialibrary/qml/MusicGenres.qml</file>
         <file alias="VideoDisplay.qml">medialibrary/qml/VideoDisplay.qml</file>
         <file alias="VideoAll.qml">medialibrary/qml/VideoAll.qml</file>
         <file alias="VideoAllDisplay.qml">medialibrary/qml/VideoAllDisplay.qml</file>
-        <file alias="VideoGroupsDisplay.qml">medialibrary/qml/VideoGroupsDisplay.qml</file>
+        <file alias="VideoAllSubDisplay.qml">medialibrary/qml/VideoAllSubDisplay.qml</file>
         <file alias="PlaylistMediaList.qml">medialibrary/qml/PlaylistMediaList.qml</file>
         <file alias="PlaylistMedia.qml">medialibrary/qml/PlaylistMedia.qml</file>
         <file alias="PlaylistMediaDelegate.qml">medialibrary/qml/PlaylistMediaDelegate.qml</file>
@@ -356,8 +360,10 @@
         <file alias="AspectRatioWidget.qml">player/qml/controlbarcontrols/AspectRatioWidget.qml</file>
         <file alias="AtoBButton.qml">player/qml/controlbarcontrols/AtoBButton.qml</file>
         <file alias="BackButton.qml">player/qml/controlbarcontrols/BackButton.qml</file>
+        <file alias="BookmarkButton.qml">player/qml/controlbarcontrols/BookmarkButton.qml</file>
         <file alias="ChapterNextButton.qml">player/qml/controlbarcontrols/ChapterNextButton.qml</file>
         <file alias="ChapterPreviousButton.qml">player/qml/controlbarcontrols/ChapterPreviousButton.qml</file>
+        <file alias="DvdMenuButton.qml">player/qml/controlbarcontrols/DvdMenuButton.qml</file>
         <file alias="ExpandingSpacerWidget.qml">player/qml/controlbarcontrols/ExpandingSpacerWidget.qml</file>
         <file alias="ExtendedSettingsButton.qml">player/qml/controlbarcontrols/ExtendedSettingsButton.qml</file>
         <file alias="FasterButton.qml">player/qml/controlbarcontrols/FasterButton.qml</file>
@@ -367,6 +373,7 @@
         <file alias="LangButton.qml">player/qml/controlbarcontrols/LangButton.qml</file>
         <file alias="LoopButton.qml">player/qml/controlbarcontrols/LoopButton.qml</file>
         <file alias="MenuButton.qml">player/qml/controlbarcontrols/MenuButton.qml</file>
+        <file alias="NavigationWidget.qml">player/qml/controlbarcontrols/NavigationWidget.qml</file>
         <file alias="NextButton.qml">player/qml/controlbarcontrols/NextButton.qml</file>
         <file alias="OpenButton.qml">player/qml/controlbarcontrols/OpenButton.qml</file>
         <file alias="PlaybackSpeedButton.qml">player/qml/controlbarcontrols/PlaybackSpeedButton.qml</file>
@@ -376,7 +383,9 @@
         <file alias="PreviousButton.qml">player/qml/controlbarcontrols/PreviousButton.qml</file>
         <file alias="QuitButton.qml">player/qml/controlbarcontrols/QuitButton.qml</file>
         <file alias="RandomButton.qml">player/qml/controlbarcontrols/RandomButton.qml</file>
+        <file alias="RendererButton.qml">player/qml/controlbarcontrols/RendererButton.qml</file>
         <file alias="RecordButton.qml">player/qml/controlbarcontrols/RecordButton.qml</file>
+        <file alias="ReverseButton.qml">player/qml/controlbarcontrols/ReverseButton.qml</file>
         <file alias="SkipBackButton.qml">player/qml/controlbarcontrols/SkipBackButton.qml</file>
         <file alias="SkipForwardButton.qml">player/qml/controlbarcontrols/SkipForwardButton.qml</file>
         <file alias="SlowerButton.qml">player/qml/controlbarcontrols/SlowerButton.qml</file>

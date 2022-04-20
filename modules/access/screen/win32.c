@@ -29,8 +29,15 @@
 #endif
 
 #include <vlc_common.h>
+#include <vlc_plugin.h>
+#include <vlc_modules.h>                 /* module_need for "video blending" */
+#include <vlc_filter.h>
 
 #include "screen.h"
+
+
+static void screen_CloseCapture(screen_data_t *);
+static block_t *screen_Capture(demux_t *);
 
 struct screen_data_t
 {
@@ -44,8 +51,13 @@ struct screen_data_t
     int i_fragment_size;
     int i_fragment;
     block_t *p_block;
+
+#ifdef SCREEN_MOUSE
+    filter_t *p_blend;
+#endif
 };
 
+#if defined(SCREEN_SUBSCREEN) || defined(SCREEN_MOUSE)
 /*
  * In screen coordinates the origin is the upper-left corner of the primary
  * display, and points can have negative x/y when other displays are located
@@ -69,7 +81,9 @@ static inline void FromScreenCoordinates( demux_t *p_demux, POINT *p_point )
     p_point->x += p_data->ptl.x;
     p_point->y += p_data->ptl.y;
 }
+#endif
 
+#if defined(SCREEN_SUBSCREEN)
 static inline void ToScreenCoordinates( demux_t *p_demux, POINT *p_point )
 {
     demux_sys_t *p_sys = p_demux->p_sys;
@@ -77,8 +91,9 @@ static inline void ToScreenCoordinates( demux_t *p_demux, POINT *p_point )
     p_point->x -= p_data->ptl.x;
     p_point->y -= p_data->ptl.y;
 }
+#endif
 
-int screen_InitCapture( demux_t *p_demux )
+int screen_InitCaptureGDI( demux_t *p_demux )
 {
     demux_sys_t *p_sys = p_demux->p_sys;
     screen_data_t *p_data;
@@ -162,14 +177,16 @@ int screen_InitCapture( demux_t *p_demux )
     p_data->ptl.x = - GetSystemMetrics( SM_XVIRTUALSCREEN );
     p_data->ptl.y = - GetSystemMetrics( SM_YVIRTUALSCREEN );
 
+    static const struct screen_capture_operations ops = {
+        screen_Capture, screen_CloseCapture,
+    };
+    p_sys->ops = &ops;
+
     return VLC_SUCCESS;
 }
 
-int screen_CloseCapture( demux_t *p_demux )
+void screen_CloseCapture( screen_data_t *p_data )
 {
-    demux_sys_t *p_sys = p_demux->p_sys;
-    screen_data_t *p_data = p_sys->p_data;
-
     if( p_data->p_block ) block_Release( p_data->p_block );
 
     if( p_data->hgdi_backup)
@@ -177,9 +194,17 @@ int screen_CloseCapture( demux_t *p_demux )
 
     DeleteDC( p_data->hdc_dst );
     ReleaseDC( 0, p_data->hdc_src );
-    free( p_data );
 
-    return VLC_SUCCESS;
+#ifdef SCREEN_MOUSE
+    if( p_data->p_blend )
+    {
+        filter_Close( p_data->p_blend );
+        module_unneed( p_data->p_blend, p_data->p_blend->p_module );
+        vlc_object_delete(p_data->p_blend);
+    }
+#endif
+
+    free( p_data );
 }
 
 struct block_sys_t
@@ -275,6 +300,65 @@ error:
     return NULL;
 }
 
+#ifdef SCREEN_MOUSE
+static void RenderCursor( demux_t *p_demux, int i_x, int i_y,
+                          uint8_t *p_dst )
+{
+    demux_sys_t *p_sys = p_demux->p_sys;
+    screen_data_t *p_data = p_sys->p_data;
+    if( !p_sys->dst.i_planes )
+        picture_Setup( &p_sys->dst, &p_sys->fmt.video );
+
+    if( !p_sys->dst.i_planes )
+        return;
+
+    /* Bitmaps here created by CreateDIBSection: stride rounded up to the nearest DWORD */
+    p_sys->dst.p[ 0 ].i_pitch = p_sys->dst.p[ 0 ].i_visible_pitch =
+        ( ( ( ( p_sys->fmt.video.i_width * p_sys->fmt.video.i_bits_per_pixel ) + 31 ) & ~31 ) >> 3 );
+
+    if( !p_data->p_blend )
+    {
+        p_data->p_blend = vlc_object_create( p_demux, sizeof(filter_t) );
+        if( p_data->p_blend )
+        {
+            es_format_Init( &p_data->p_blend->fmt_in, VIDEO_ES,
+                            VLC_CODEC_RGBA );
+            p_data->p_blend->fmt_in.video = p_sys->p_mouse->format;
+            p_data->p_blend->fmt_out = p_sys->fmt;
+            p_data->p_blend->p_module =
+                module_need( p_data->p_blend, "video blending", NULL, false );
+            if( !p_data->p_blend->p_module )
+            {
+                msg_Err( p_demux, "Could not load video blending module" );
+                vlc_object_delete(p_data->p_blend);
+                p_data->p_blend = NULL;
+                picture_Release( p_sys->p_mouse );
+                p_sys->p_mouse = NULL;
+            }
+            assert( p_data->p_blend->ops != NULL );
+        }
+    }
+    if( p_data->p_blend )
+    {
+        p_sys->dst.p->p_pixels = p_dst;
+        p_data->p_blend->ops->blend_video( p_data->p_blend,
+                                        &p_sys->dst,
+                                        p_sys->p_mouse,
+#ifdef SCREEN_SUBSCREEN
+                                        i_x-p_sys->i_left,
+#else
+                                        i_x,
+#endif
+#ifdef SCREEN_SUBSCREEN
+                                        i_y-p_sys->i_top,
+#else
+                                        i_y,
+#endif
+                                        255 );
+    }
+}
+#endif
+
 block_t *screen_Capture( demux_t *p_demux )
 {
     demux_sys_t *p_sys = p_demux->p_sys;
@@ -289,16 +373,24 @@ block_t *screen_Capture( demux_t *p_demux )
         }
     }
 
+    POINT pos;
+#if defined(SCREEN_SUBSCREEN) || defined(SCREEN_MOUSE)
+    GetCursorPos( &pos );
+    FromScreenCoordinates( p_demux, &pos );
+#endif // SCREEN_SUBSCREEN || SCREEN_MOUSE
+#if defined(SCREEN_SUBSCREEN)
     if( p_sys->b_follow_mouse )
     {
-        POINT pos;
-        GetCursorPos( &pos );
-        FromScreenCoordinates( p_demux, &pos );
         FollowMouse( p_sys, pos.x, pos.y );
     }
+#endif // SCREEN_SUBSCREEN
 
+#if defined(SCREEN_SUBSCREEN)
     POINT top_left = { p_sys->i_left, p_sys->i_top };
     ToScreenCoordinates( p_demux, &top_left );
+#else // !SCREEN_SUBSCREEN
+    POINT top_left = { 0, 0 };
+#endif // !SCREEN_SUBSCREEN
 
     if( !BitBlt( p_data->hdc_dst, 0,
                  p_data->i_fragment * p_data->i_fragment_size,
@@ -320,6 +412,7 @@ block_t *screen_Capture( demux_t *p_demux )
         p_data->i_fragment = 0;
         p_data->p_block = 0;
 
+#ifdef SCREEN_MOUSE
         if( p_sys->p_mouse )
         {
             POINT pos;
@@ -329,6 +422,7 @@ block_t *screen_Capture( demux_t *p_demux )
             RenderCursor( p_demux, pos.x, pos.y,
                           p_block->p_buffer );
         }
+#endif
 
         return p_block;
     }

@@ -26,7 +26,6 @@
 
 
 #include <memory>
-#include <QObject>
 #include <QAbstractListModel>
 #include "vlc_media_library.h"
 #include "mlqmltypes.hpp"
@@ -34,15 +33,12 @@
 #include <memory>
 #include "mlevent.hpp"
 #include "mlqueryparams.hpp"
-#include "util/asynctask.hpp"
 #include "util/listcacheloader.hpp"
 
-template <typename T>
-class ListCache;
-
+// Fordward declarations
+class MLListCache;
 class MediaLib;
-
-class BulkTaskLoader;
+class MLItemCover;
 
 class MLBaseModel : public QAbstractListModel
 {
@@ -75,8 +71,6 @@ public: // Interface
     Q_INVOKABLE virtual QVariantList getIdsForIndexes(const QVariantList    & indexes) const;
     Q_INVOKABLE virtual QVariantList getIdsForIndexes(const QModelIndexList & indexes) const;
 
-    Q_INVOKABLE virtual QVariantList getItemsForIndexes(const QModelIndexList & indexes) const;
-
     Q_INVOKABLE QMap<QString, QVariant> getDataAt(const QModelIndex & index);
     Q_INVOKABLE QMap<QString, QVariant> getDataAt(int idx);
 
@@ -95,15 +89,12 @@ signals:
 
 protected slots:
     void onResetRequested();
-    void onLocalSizeAboutToBeChanged(size_t size);
     void onLocalSizeChanged(size_t size);
-    void onLocalDataChanged(size_t index, size_t count);
 
 private:
     static void onVlcMlEvent( void* data, const vlc_ml_event_t* event );
 
 protected:
-    virtual void clear();
     virtual vlc_ml_sorting_criteria_t roleToCriteria(int role) const = 0;
     static QString getFirstSymbol(QString str);
     virtual vlc_ml_sorting_criteria_t nameToCriteria(QByteArray) const {
@@ -115,6 +106,7 @@ protected:
     }
 
     void validateCache() const;
+    void resetCache();
     void invalidateCache();
 
     MLItem *item(int signedidx) const;
@@ -122,30 +114,42 @@ protected:
     // NOTE: This is faster because it only returns items available in cache.
     MLItem *itemCache(int signedidx) const;
 
-    MLItem *findInCache(int id, int *index = nullptr) const;
+    MLItem *findInCache(const MLItemId& id, int *index) const;
+
+    //update and notify changes on an item if this item is in the cache
+    void updateItemInCache(const MLItemId& id);
+
+    //delete and notify deletion of an item if this item is in the cache
+    //this is only to reflect changes from the ML, it won't alter the database
+    void deleteItemInCache(const MLItemId& mlid);
+
+    void moveRangeInCache(int first, int last, int to);
+    void deleteRangeInCache(int first, int last);
 
     virtual void onVlcMlEvent( const MLEvent &event );
 
-    virtual ListCacheLoader<std::unique_ptr<MLItem>> *createLoader() const = 0;
 
-    virtual void thumbnailUpdated( int ) {}
+    virtual void thumbnailUpdated(const QModelIndex& , MLItem* , const QString& , vlc_ml_thumbnail_status_t )  {}
 
     /* Data loader for the cache */
     struct BaseLoader : public ListCacheLoader<std::unique_ptr<MLItem>>
     {
-        BaseLoader(vlc_medialibrary_t *ml, MLItemId parent, QString searchPattern,
+        BaseLoader(MLItemId parent, QString searchPattern,
                    vlc_ml_sorting_criteria_t sort, bool sort_desc);
         BaseLoader(const MLBaseModel &model);
 
         MLQueryParams getParams(size_t index = 0, size_t count = 0) const;
 
+        virtual std::unique_ptr<MLItem> loadItemById(vlc_medialibrary_t* ml, MLItemId itemId) const = 0;
+
     protected:
-        vlc_medialibrary_t *m_ml;
         MLItemId m_parent;
         QString m_searchPattern;
         vlc_ml_sorting_criteria_t m_sort;
         bool m_sort_desc;
     };
+
+    virtual std::unique_ptr<BaseLoader> createLoader() const = 0;
 
 public:
     MLItemId parentId() const;
@@ -164,13 +168,18 @@ public:
     void setSortCriteria(const QString& criteria);
     void unsetSortCriteria();
 
-    int rowCount(const QModelIndex &parent = {}) const;
+    int rowCount(const QModelIndex &parent = {}) const override;
     virtual unsigned int getCount() const;
+
+private:
+    void onCacheDataChanged(int first, int last);
+    void onCacheBeginInsertRows(int first, int last);
+    void onCacheBeginRemoveRows(int first, int last);
+    void onCacheBeginMoveRows(int first, int last, int destination);
 
 protected:
     MLItemId m_parent;
 
-    vlc_medialibrary_t* m_ml = nullptr;
     MediaLib* m_mediaLib = nullptr;
     QString m_search_pattern;
     vlc_ml_sorting_criteria_t m_sort = VLC_ML_SORTING_DEFAULT;
@@ -180,8 +189,13 @@ protected:
                     std::function<void(vlc_ml_event_callback_t*)>> m_ml_event_handle;
     bool m_need_reset = false;
 
-    mutable std::unique_ptr<ListCache<std::unique_ptr<MLItem>>> m_cache;
-    std::vector<TaskHandle<BulkTaskLoader>> m_externalLoaders;
+    mutable std::unique_ptr<MLListCache> m_cache;
+
+    //loader used to load single items
+    std::shared_ptr<BaseLoader> m_itemLoader;
+
+private: // Friends
+    friend QString getVideoListCover(const MLBaseModel*, MLItemCover*, int, int, int);
 };
 
 #endif // MLBASEMODEL_HPP

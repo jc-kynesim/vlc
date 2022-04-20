@@ -27,12 +27,38 @@ decltype(ControlbarProfile::m_defaults)
     ControlbarProfile::m_defaults =
         {
             {
-                PlayerControlbarModel::Mainplayer,
+                PlayerControlbarModel::Videoplayer,
                 {
                     {
                         {
                             ControlListModel::LANG_BUTTON,
-                            ControlListModel::MENU_BUTTON
+                            ControlListModel::BOOKMARK_BUTTON,
+                            ControlListModel::EXTENDED_BUTTON,
+                            ControlListModel::NAVIGATION_BUTTONS
+                        },
+                        {
+                            ControlListModel::SKIP_BACK_BUTTON,
+                            ControlListModel::PREVIOUS_BUTTON,
+                            ControlListModel::PLAY_BUTTON,
+                            ControlListModel::NEXT_BUTTON,
+                            ControlListModel::SKIP_FW_BUTTON
+                        },
+                        {
+                            ControlListModel::VOLUME,
+                            ControlListModel::RENDERER_BUTTON,
+                            ControlListModel::FULLSCREEN_BUTTON
+                        }
+                    }
+                }
+            },
+            {
+                PlayerControlbarModel::Audioplayer,
+                {
+                    {
+                        {
+                            ControlListModel::LANG_BUTTON,
+                            ControlListModel::BOOKMARK_BUTTON,
+                            ControlListModel::EXTENDED_BUTTON
                         },
                         {
                             ControlListModel::RANDOM_BUTTON,
@@ -43,6 +69,7 @@ decltype(ControlbarProfile::m_defaults)
                         },
                         {
                             ControlListModel::VOLUME,
+                            ControlListModel::RENDERER_BUTTON,
                             ControlListModel::FULLSCREEN_BUTTON
                         }
                     }

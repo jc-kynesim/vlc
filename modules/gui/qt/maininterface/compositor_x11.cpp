@@ -16,7 +16,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 #include <QX11Info>
-#include <QWidget>
 #include <QScreen>
 
 #include "compositor_x11.hpp"
@@ -115,6 +114,13 @@ bool CompositorX11::init()
             "X11 Composite version is too old, 0.2+ is required");
     REGISTER_XCB_EXTENSION(m_conn, composite, XCB_COMPOSITE_MAJOR_VERSION, XCB_COMPOSITE_MINOR_VERSION);
 
+    if (!checkExtensionPresent(m_intf, m_conn, "XFIXES"))
+        return false;
+    //2.x is required for SetWindowShapeRegion
+    static_assert (XCB_XFIXES_MAJOR_VERSION >= 2,
+            "X11 Fixes version is too old, 2.0+ is required");
+    REGISTER_XCB_EXTENSION(m_conn, xfixes, XCB_XFIXES_MAJOR_VERSION, XCB_XFIXES_MINOR_VERSION);
+
     // check whether we're running under "XWAYLAND"
     auto screens = qApp->screens();
     bool isXWayland = std::any_of(screens.begin(), screens.end(), [](QScreen* screen){
@@ -146,22 +152,33 @@ bool CompositorX11::makeMainInterface(MainCtx* mainCtx)
 {
     m_mainCtx = mainCtx;
 
-    m_videoWidget = std::make_unique<DummyNativeWidget>();
-    m_videoWidget->setWindowFlag(Qt::WindowType::BypassWindowManagerHint);
-    m_videoWidget->setWindowFlag(Qt::WindowType::WindowTransparentForInput);
-    m_videoWidget->winId();
-    m_videoWidget->show();
 
     bool useCSD = m_mainCtx->useClientSideDecoration();
     m_renderWindow = std::make_unique<vlc::CompositorX11RenderWindow>(m_intf, m_conn, useCSD);
     if (!m_renderWindow->init())
         return false;
 
+    m_videoWidget = std::make_unique<DummyNativeWidget>(m_renderWindow.get());
+    // widget would normally require WindowTransparentForInput, without this
+    // we end up with an invisible area within our window that grabs our mouse events.
+    // But using this this causes rendering issues with some VoutDisplay
+    // (xcb_render for instance) instead, we manually, set a null input region afterwards
+    // see setTransparentForMouseEvent
+    m_videoWidget->winId();
+
+    //update manually EventMask as we don't use WindowTransparentForInput
+    const uint32_t mask = XCB_CW_EVENT_MASK;
+    const uint32_t values = XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_STRUCTURE_NOTIFY
+        | XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_FOCUS_CHANGE;
+    xcb_change_window_attributes(QX11Info::connection(), m_videoWidget->winId(), mask, &values);
+    setTransparentForMouseEvent(QX11Info::connection(), m_videoWidget->winId());
+    m_videoWidget->show();
+
     m_interfaceWindow = m_renderWindow->getWindow();
 
     m_qmlView = std::make_unique<CompositorX11UISurface>(m_interfaceWindow);
-    m_qmlView->setFlag(Qt::WindowType::BypassWindowManagerHint);
     m_qmlView->setFlag(Qt::WindowType::WindowTransparentForInput);
+    m_qmlView->setParent(m_interfaceWindow);
     m_qmlView->winId();
     m_qmlView->show();
 
@@ -188,8 +205,8 @@ void CompositorX11::destroyMainInterface()
 void CompositorX11::unloadGUI()
 {
     m_renderWindow->stopRendering();
-    commonGUIDestroy();
     m_qmlView.reset();
+    commonGUIDestroy();
 }
 
 void CompositorX11::onSurfacePositionChanged(const QPointF& position)
@@ -208,4 +225,9 @@ bool CompositorX11::setupVoutWindow(vout_window_t* p_wnd, VoutDestroyCb destroyC
     p_wnd->handle.xid = m_videoWidget->winId();
     commonSetupVoutWindow(p_wnd, destroyCb);
     return true;
+}
+
+QQuickItem * CompositorX11::activeFocusItem() const /* override */
+{
+    return m_qmlView->activeFocusItem();
 }

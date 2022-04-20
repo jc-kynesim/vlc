@@ -123,8 +123,6 @@ FocusScope {
             }
         }
 
-        onSelectAll: deviceSelection.selectAll()
-        onSelectionUpdated:  deviceSelection.updateSelection( keyModifiers, oldIndex, newIndex )
         onActionAtIndex: {
             _actionAtIndex(index, deviceModel, deviceSelection)
         }

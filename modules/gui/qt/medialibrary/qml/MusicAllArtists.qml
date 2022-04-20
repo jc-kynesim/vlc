@@ -71,7 +71,7 @@ FocusScope {
 
     MLArtistModel {
         id: artistModel
-        ml: medialib
+        ml: MediaLib
 
         onCountChanged: {
             if (artistModel.count > 0 && !selectionModel.hasSelection) {
@@ -107,7 +107,7 @@ FocusScope {
 
             anchors.fill: parent
             topMargin: VLCStyle.margin_large
-            delegateModel: selectionModel
+            selectionDelegateModel: selectionModel
             model: artistModel
             focus: true
             cellWidth: VLCStyle.colWidth(1)
@@ -116,11 +116,9 @@ FocusScope {
             Navigation.parentItem: root
             Navigation.cancelAction: root._onNavigationCancel
 
-            onSelectAll: selectionModel.selectAll()
-            onSelectionUpdated: selectionModel.updateSelection( keyModifiers, oldIndex, newIndex )
             onActionAtIndex: {
                 if (selectionModel.selectedIndexes.length > 1) {
-                    medialib.addAndPlay( artistModel.getIdsForIndexes( selectionModel.selectedIndexes ) )
+                    MediaLib.addAndPlay( artistModel.getIdsForIndexes( selectionModel.selectedIndexes ) )
                 } else {
                     _currentView.currentIndex = index
                     requestArtistAlbumView(Qt.TabFocusReason)
@@ -139,8 +137,9 @@ FocusScope {
             delegate: AudioGridItem {
                 id: gridItem
 
-                title: model.name || i18n.qtr("Unknown artist")
-                subtitle: model.nb_tracks > 1 ? i18n.qtr("%1 songs").arg(model.nb_tracks) : i18n.qtr("%1 song").arg(model.nb_tracks)
+                image: model.cover || VLCStyle.noArtArtistSmall
+                title: model.name || I18n.qtr("Unknown artist")
+                subtitle: model.nb_tracks > 1 ? I18n.qtr("%1 songs").arg(model.nb_tracks) : I18n.qtr("%1 song").arg(model.nb_tracks)
                 pictureRadius: VLCStyle.artistGridCover_radius
                 pictureHeight: VLCStyle.artistGridCover_radius
                 pictureWidth: VLCStyle.artistGridCover_radius
@@ -189,21 +188,21 @@ FocusScope {
 
             onActionForSelection: {
                 if (selection.length > 1) {
-                    medialib.addAndPlay( artistModel.getIdsForIndexes( selection ) )
+                    MediaLib.addAndPlay( artistModel.getIdsForIndexes( selection ) )
                 } else if ( selection.length === 1) {
                     requestArtistAlbumView(Qt.TabFocusReason)
-                    medialib.addAndPlay( artistModel.getIdForIndex( selection[0] ) )
+                    MediaLib.addAndPlay( artistModel.getIdForIndex( selection[0] ) )
                 }
             }
 
             sortModel:  [
-                { isPrimary: true, criteria: "name", width: VLCStyle.colWidth(Math.max(artistTable._nbCols - 1, 1)), text: i18n.qtr("Name"), headerDelegate: tableColumns.titleHeaderDelegate, colDelegate: tableColumns.titleDelegate },
-                { criteria: "nb_tracks", width: VLCStyle.colWidth(1), text: i18n.qtr("Tracks") }
+                { isPrimary: true, criteria: "name", width: VLCStyle.colWidth(Math.max(artistTable._nbCols - 1, 1)), text: I18n.qtr("Name"), headerDelegate: tableColumns.titleHeaderDelegate, colDelegate: tableColumns.titleDelegate, placeHolder: VLCStyle.noArtArtistSmall },
+                { criteria: "nb_tracks", width: VLCStyle.colWidth(1), text: I18n.qtr("Tracks") }
             ]
 
             onItemDoubleClicked: root.requestArtistAlbumView(Qt.MouseFocusReason)
 
-            onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes, menuParent.mapToGlobal(0,0))
+            onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
             onRightClick: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
 
             Widgets.TableColumns {
@@ -236,7 +235,7 @@ FocusScope {
         anchors.fill: parent
         visible: artistModel.count === 0
         focus: artistModel.count === 0
-        text: i18n.qtr("No artists found\nPlease try adding sources, by going to the Network tab")
+        text: I18n.qtr("No artists found\nPlease try adding sources, by going to the Network tab")
         Navigation.parentItem: root
         cover: VLCStyle.noArtArtistCover
     }

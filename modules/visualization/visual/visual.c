@@ -116,7 +116,6 @@ static void Close        ( filter_t * );
 
 vlc_module_begin ()
     set_shortname( N_("Visualizer"))
-    set_category( CAT_AUDIO )
     set_subcategory( SUBCAT_AUDIO_VISUAL )
     set_description( N_("Visualizer filter") )
     set_section( N_( "General") , NULL )
@@ -205,7 +204,7 @@ static int Open( vlc_object_t *p_this )
         return VLC_EGENERIC;
 
     int width = var_InheritInteger( p_filter , "effect-width");
-    int height = var_InheritInteger( p_filter , "effect-width");
+    int height = var_InheritInteger( p_filter , "effect-height");
     /* No resolution under 400x532 and no odd dimension */
     if( width < 532 )
         width  = 532;
@@ -406,7 +405,6 @@ static void Close( filter_t * p_filter )
 
     vlc_queue_Kill(&p_sys->queue, &p_sys->dead);
     vlc_join( p_sys->thread, NULL );
-    vout_Close( p_sys->p_vout );
 
     /* Free the list */
     for( int i = 0; i < p_sys->i_effect; i++ )

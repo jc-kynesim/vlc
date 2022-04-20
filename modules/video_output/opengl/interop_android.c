@@ -31,6 +31,7 @@
 #include "interop.h"
 #include "../android/utils.h"
 #include "gl_api.h"
+#include "gl_util.h"
 
 struct priv
 {
@@ -40,6 +41,12 @@ struct priv
     bool stex_attached;
     struct vlc_asurfacetexture *previous_texture;
     picture_t *current_picture;
+
+    struct {
+        PFNGLACTIVETEXTUREPROC ActiveTexture;
+        PFNGLBINDTEXTUREPROC BindTexture;
+        PFNGLGENTEXTURESPROC GenTextures;
+    } gl;
 };
 
 static void
@@ -74,8 +81,8 @@ ReductMatrix(float *mtx_2x3, const float *mtx_4x4)
 }
 
 static int
-tc_anop_allocate_textures(const struct vlc_gl_interop *interop, GLuint *textures,
-                          const GLsizei *tex_width, const GLsizei *tex_height)
+tc_anop_allocate_textures(const struct vlc_gl_interop *interop, uint32_t textures[],
+                          const int32_t tex_width[], const int32_t tex_height[])
 {
     (void) tex_width; (void) tex_height;
     struct priv *priv = interop->priv;
@@ -85,8 +92,8 @@ tc_anop_allocate_textures(const struct vlc_gl_interop *interop, GLuint *textures
 }
 
 static int
-tc_anop_update(struct vlc_gl_interop *interop, GLuint *textures,
-               const GLsizei *tex_width, const GLsizei *tex_height,
+tc_anop_update(struct vlc_gl_interop *interop, uint32_t textures[],
+               const int32_t tex_width[], const int32_t tex_height[],
                picture_t *pic, const size_t *plane_offset)
 {
     struct priv *priv = interop->priv;
@@ -119,7 +126,7 @@ tc_anop_update(struct vlc_gl_interop *interop, GLuint *textures,
             SurfaceTexture_detachFromGLContext(previous_texture);
             /* SurfaceTexture_detachFromGLContext will destroy the previous
              * texture name, so we need to regenerate it. */
-            interop->api->vt.GenTextures(1, &textures[0]);
+            priv->gl.GenTextures(1, &textures[0]);
         }
 
         if (SurfaceTexture_attachToGLContext(texture, textures[0]) != 0)
@@ -147,8 +154,8 @@ tc_anop_update(struct vlc_gl_interop *interop, GLuint *textures,
     ReductMatrix(priv->mtx_2x3, mtx_4x4);
     priv->transform_mtx = priv->mtx_2x3;
 
-    interop->vt->ActiveTexture(GL_TEXTURE0);
-    interop->vt->BindTexture(interop->tex_target, textures[0]);
+    priv->gl.ActiveTexture(GL_TEXTURE0);
+    priv->gl.BindTexture(interop->tex_target, textures[0]);
 
 success:
     if (previous_picture)
@@ -191,8 +198,10 @@ Open(vlc_object_t *obj)
      || !interop->vctx)
         return VLC_EGENERIC;
 
-    const char *extensions = interop->api->vt.GetString(GL_EXTENSIONS);
-    if (!vlc_gl_StrHasToken(extensions, "GL_OES_EGL_image_external"))
+    struct vlc_gl_extension_vt extension_vt;
+    vlc_gl_LoadExtensionFunctions(interop->gl, &extension_vt);
+
+    if (!vlc_gl_HasExtension(&extension_vt, "GL_OES_EGL_image_external"))
     {
         msg_Warn(&interop->obj, "GL_OES_EGL_image_external is not available,"
                 " disabling android interop.");
@@ -215,6 +224,14 @@ Open(vlc_object_t *obj)
     priv->previous_texture = NULL;
     priv->stex_attached = false;
 
+#define LOAD_SYMBOL(name) \
+    priv->gl.name = vlc_gl_GetProcAddress(interop->gl, "gl" # name); \
+    assert(priv->gl.name != NULL);
+
+    LOAD_SYMBOL(ActiveTexture);
+    LOAD_SYMBOL(BindTexture);
+    LOAD_SYMBOL(GenTextures);
+
     static const struct vlc_gl_interop_ops ops = {
         .allocate_textures = tc_anop_allocate_textures,
         .update_textures = tc_anop_update,
@@ -223,15 +240,18 @@ Open(vlc_object_t *obj)
     };
     interop->ops = &ops;
 
-    int ret = opengl_interop_init(interop, GL_TEXTURE_EXTERNAL_OES,
-                                  VLC_CODEC_RGB32,
-                                  COLOR_SPACE_UNDEF);
+    interop->tex_target = GL_TEXTURE_EXTERNAL_OES;
+    interop->fmt_out.i_chroma = VLC_CODEC_RGB32;
+    interop->fmt_out.space = COLOR_SPACE_UNDEF;
 
-    if (ret != VLC_SUCCESS)
-    {
-        free(priv);
-        return VLC_EGENERIC;
-    }
+    interop->tex_count = 1;
+    interop->texs[0] = (struct vlc_gl_tex_cfg) {
+        .w = {1, 1},
+        .h = {1, 1},
+        .internal = GL_RGBA,
+        .format = GL_RGBA,
+        .type = GL_UNSIGNED_BYTE,
+    };
 
     return VLC_SUCCESS;
 }
@@ -240,6 +260,5 @@ vlc_module_begin ()
     set_description("Android OpenGL SurfaceTexture converter")
     set_capability("glinterop", 1)
     set_callback(Open)
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
 vlc_module_end ()

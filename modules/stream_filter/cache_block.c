@@ -186,7 +186,7 @@ static int AStreamSeekBlock(stream_t *s, uint64_t i_pos)
     if( block_SkipBytes( &sys->cache, i_pos) == VLC_SUCCESS )
         return VLC_SUCCESS;
 
-    /* Not enought bytes, empty and seek */
+    /* Not enough bytes, empty and seek */
     /* Do the access seek */
     if (vlc_stream_Seek(s->s, i_pos)) return VLC_EGENERIC;
 
@@ -320,7 +320,6 @@ static void Close(vlc_object_t *obj)
 }
 
 vlc_module_begin()
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_STREAM_FILTER)
     set_capability("stream_filter", 0)
     add_shortcut("cache")

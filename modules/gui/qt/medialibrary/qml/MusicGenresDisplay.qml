@@ -28,7 +28,9 @@ import "qrc:///style/"
 Widgets.PageLoader {
     id: root
 
-    defaultPage: "all"
+    property var sortModel
+    property var model
+
     pageModel: [{
         name: "all",
         component: genresComponent
@@ -37,8 +39,10 @@ Widgets.PageLoader {
         component: albumGenreComponent
     }]
 
-    property var sortModel
-    property var model
+    loadDefaultView: function () {
+        History.update(["mc", "music", "genres", "all"])
+        loadPage("all")
+    }
 
     onCurrentItemChanged: {
         sortModel = currentItem.sortModel
@@ -47,11 +51,11 @@ Widgets.PageLoader {
 
 
     function _updateGenresAllHistory(currentIndex) {
-        history.update(["mc", "music", "genres", "all", { "initialIndex": currentIndex }])
+        History.update(["mc", "music", "genres", "all", { "initialIndex": currentIndex }])
     }
 
     function _updateGenresAlbumsHistory(currentIndex, parentId, genreName) {
-        history.update(["mc","music", "genres", "albums", {
+        History.update(["mc","music", "genres", "albums", {
             "initialIndex": currentIndex,
             "parentId": parentId,
             "genreName": genreName,
@@ -65,7 +69,7 @@ Widgets.PageLoader {
             onCurrentIndexChanged: _updateGenresAllHistory(currentIndex)
 
             onShowAlbumView: {
-                history.push(["mc", "music", "genres", "albums",
+                History.push(["mc", "music", "genres", "albums",
                              { parentId: id, genreName: name }]);
 
                 stackView.currentItem.setCurrentItemFocus(reason);
@@ -84,7 +88,7 @@ Widgets.PageLoader {
             gridViewMarginTop: 0
 
             header: Widgets.SubtitleLabel {
-                text: i18n.qtr("Genres - %1").arg(genreName)
+                text: I18n.qtr("Genres - %1").arg(genreName)
                 leftPadding: (albumsView.gridViewRowX || VLCStyle.margin_large)
                 topPadding: VLCStyle.margin_large
                 bottomPadding: VLCStyle.margin_normal

@@ -42,7 +42,6 @@ static int  Open( vlc_object_t * );
 static void Close( vlc_object_t * );
 
 vlc_module_begin ()
-    set_category( CAT_SOUT )
     set_subcategory( SUBCAT_SOUT_PACKETIZER )
     set_description( N_("DTS audio packetizer") )
     set_capability( "packetizer", 10 )
@@ -245,7 +244,7 @@ static block_t *PacketizeBlock( decoder_t *p_dec, block_t **pp_block )
             if( xssheader.syncword == DTS_SYNC_SUBSTREAM_LBR )
             {
                 /*
-                 * LBR exists as independant SUBSTREAM. It is seen valid
+                 * LBR exists as independent SUBSTREAM. It is seen valid
                  * only when SUBSTREAM[LBR]..SUBTREAM.
                  * CORE...SUBSTREAM is regular extension.
                  * SUBSTREAM...CORE is sync issue.

@@ -43,6 +43,8 @@ struct vlc_gl_format {
 
     GLsizei visible_widths[PICTURE_PLANE_MAX];
     GLsizei visible_heights[PICTURE_PLANE_MAX];
+
+    uint32_t formats[PICTURE_PLANE_MAX];
 };
 
 /**
@@ -141,6 +143,6 @@ vlc_gl_picture_ToTexCoords(const struct vlc_gl_picture *pic,
  */
 void
 vlc_gl_picture_ComputeDirectionMatrix(const struct vlc_gl_picture *pic,
-                                      float direction[static 2*2]);
+                                      float direction[2*2]);
 
 #endif

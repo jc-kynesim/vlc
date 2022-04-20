@@ -42,7 +42,7 @@ FocusScope {
 
     property int initialIndex: 0
 
-    property var sortModel: [{ text: i18n.qtr("Alphabetic"), criteria: "title" }]
+    property var sortModel: [{ text: I18n.qtr("Alphabetic"), criteria: "title" }]
 
     //---------------------------------------------------------------------------------------------
     // Private
@@ -58,6 +58,9 @@ FocusScope {
 
     property int _heightCover: (isMusic) ? VLCStyle.gridCover_music_height
                                          : VLCStyle.gridCover_video_height
+
+    property string _placeHolder: (isMusic) ? VLCStyle.noArtAlbumCover
+                                            : VLCStyle.noArtVideoCover
 
     //---------------------------------------------------------------------------------------------
     // Alias
@@ -138,7 +141,7 @@ FocusScope {
 
     function _actionAtIndex() {
         if (modelSelect.selectedIndexes.length > 1) {
-            medialib.addAndPlay(model.getIdsForIndexes(modelSelect.selectedIndexes));
+            MediaLib.addAndPlay(model.getIdsForIndexes(modelSelect.selectedIndexes));
         } else if (modelSelect.selectedIndexes.length === 1) {
             var index = modelSelect.selectedIndexes[0];
             showList(model.getDataAt(index), Qt.TabFocusReason);
@@ -152,7 +155,7 @@ FocusScope {
         if (count < 100)
             return count;
         else
-            return i18n.qtr("99+");
+            return I18n.qtr("99+");
     }
 
     function _onNavigationCancel() {
@@ -171,12 +174,12 @@ FocusScope {
     MLPlaylistListModel {
         id: model
 
-        ml: medialib
+        ml: MediaLib
 
         coverSize: (isMusic) ? Qt.size(512, 512)
                              : Qt.size(1024, 640)
 
-        coverDefault: (isMusic) ? ":/noart_album.svg" : ":/noart_videoCover.svg"
+        coverDefault: root._placeHolder
 
         coverPrefix: (isMusic) ? "playlist-music" : "playlist-video"
 
@@ -206,6 +209,8 @@ FocusScope {
         indexes: modelSelect.selectedIndexes
 
         coverRole: "thumbnail"
+
+        defaultCover: root._placeHolder
 
         titleRole: "name"
     }
@@ -239,7 +244,7 @@ FocusScope {
 
             model: root.model
 
-            delegateModel: modelSelect
+            selectionDelegateModel: modelSelect
 
             Navigation.parentItem: root
 
@@ -260,10 +265,10 @@ FocusScope {
                 pictureHeight: _heightCover
 
                 title: (model.name) ? model.name
-                                    : i18n.qtr("Unknown title")
+                                    : I18n.qtr("Unknown title")
 
-                labels: (model.count > 1) ? [ i18n.qtr("%1 Tracks").arg(_getCount(model)) ]
-                                          : [ i18n.qtr("%1 Track") .arg(_getCount(model)) ]
+                labels: (model.count > 1) ? [ I18n.qtr("%1 Tracks").arg(_getCount(model)) ]
+                                          : [ I18n.qtr("%1 Track") .arg(_getCount(model)) ]
 
                 dragItem: dragItemPlaylist
 
@@ -277,7 +282,7 @@ FocusScope {
 
                 onItemDoubleClicked: showList(model, Qt.MouseFocusReason)
 
-                onPlayClicked: if (model.id) medialib.addAndPlay(model.id)
+                onPlayClicked: if (model.id) MediaLib.addAndPlay(model.id)
 
                 onContextMenuButtonClicked: {
                     gridView.rightClickOnItem(index);
@@ -303,10 +308,6 @@ FocusScope {
 
                 modelSelect.select(model.index(0,0), ItemSelectionModel.ClearAndSelect)
             }
-
-            onSelectAll: modelSelect.selectAll()
-
-            onSelectionUpdated: modelSelect.updateSelection(keyModifiers, oldIndex, newIndex)
 
             onActionAtIndex: _actionAtIndex()
 
@@ -364,13 +365,13 @@ FocusScope {
 
                 width: VLCStyle.colWidth(_widthName),
 
-                text: i18n.qtr("Name")
+                text: I18n.qtr("Name")
             }, {
                 criteria: "count",
 
                 width: VLCStyle.colWidth(1),
 
-                text: i18n.qtr("Tracks")
+                text: I18n.qtr("Tracks")
             }]
 
             Navigation.parentItem: root
@@ -384,7 +385,7 @@ FocusScope {
             onItemDoubleClicked: showList(model, Qt.MouseFocusReason)
 
             onContextMenuButtonClicked: contextMenu.popup(modelSelect.selectedIndexes,
-                                                          menuParent.mapToGlobal(0,0))
+                                                          globalMousePos)
 
             onRightClick: contextMenu.popup(modelSelect.selectedIndexes, globalMousePos)
 
@@ -425,7 +426,7 @@ FocusScope {
 
         focus: visible
 
-        text: i18n.qtr("No playlists found")
+        text: I18n.qtr("No playlists found")
 
         cover: VLCStyle.noArtAlbumCover
 

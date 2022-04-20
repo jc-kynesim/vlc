@@ -168,7 +168,7 @@ static void Close(vlc_gl_t *gl)
 {
     _gl = gl;
 
-    _appActive = ([UIApplication sharedApplication].applicationState == UIApplicationStateActive);
+    _appActive = ([UIApplication sharedApplication].applicationState != UIApplicationStateBackground);
     if (unlikely(!_appActive))
         return nil;
 
@@ -517,7 +517,6 @@ static int Open(vlc_gl_t *gl, unsigned width, unsigned height)
 vlc_module_begin ()
     set_shortname (N_("CAEAGL"))
     set_description (N_("CAEAGL provider for OpenGL"))
-    set_category (CAT_VIDEO)
     set_subcategory (SUBCAT_VIDEO_VOUT)
     set_capability ("opengl es2", 50)
     set_callback(Open)

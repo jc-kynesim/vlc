@@ -57,17 +57,16 @@ static const char *const ppsz_scheme_values[] = {
     "magenta-cyan",
     };
 static const char *const ppsz_scheme_descriptions[] = {
-    "pure red (left)  pure green (right)",
-    "pure red (left)  pure blue (right)",
-    "pure red (left)  pure cyan (right)",
-    "pure green (left)  pure magenta (right)",
-    "magenta (left)  cyan (right)",
+    N_("pure red (left)  pure green (right)"),
+    N_("pure red (left)  pure blue (right)"),
+    N_("pure red (left)  pure cyan (right)"),
+    N_("pure green (left)  pure magenta (right)"),
+    N_("magenta (left)  cyan (right)"),
     };
 
 vlc_module_begin()
     set_description(N_("Convert 3D picture to anaglyph image video filter"));
     set_shortname(N_("Anaglyph"))
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VFILTER)
     add_string(FILTER_PREFIX "scheme", "red-cyan", SCHEME_TEXT, SCHEME_LONGTEXT)
         change_string_list(ppsz_scheme_values, ppsz_scheme_descriptions)

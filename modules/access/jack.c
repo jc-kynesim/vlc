@@ -73,7 +73,6 @@ vlc_module_begin ()
      set_description( N_("JACK audio input") )
      set_capability( "access", 0 )
      set_shortname( N_( "JACK Input" ) )
-     set_category( CAT_INPUT )
      set_subcategory( SUBCAT_INPUT_ACCESS )
 
      add_bool( "jack-input-use-vlc-pace", false,
@@ -196,7 +195,7 @@ static int Open( vlc_object_t *p_this )
     }
 
     /* allocate ringbuffer */
-    /* The length of the ringbuffer is critical, it must be large enought
+    /* The length of the ringbuffer is critical, it must be large enough
        to keep all data between 2 GrabJack() calls.  We assume 1 sec is ok */
     p_sys->p_jack_ringbuffer = jack_ringbuffer_create( p_sys->i_channels
          * jack_get_sample_rate( p_sys->p_jack_client )

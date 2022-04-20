@@ -29,6 +29,7 @@
 
 #include <windows.h>
 
+#define D3D11_NO_HELPERS  // avoid tons of warnings
 #include <d3d11_1.h>
 #include <dcomp.h>
 #include <wrl.h>
@@ -41,7 +42,6 @@
 
 #include <QObject>
 #include <QApplication>
-#include <QObject>
 #include <QBasicTimer>
 #include <QMainWindow>
 #include <QQuickWindow>
@@ -97,6 +97,8 @@ public:
 
     void setContent(QQmlComponent* component,  QQuickItem* rootItem) override;
 
+    QQuickItem * activeFocusItem() const override;
+
     void timerEvent(QTimerEvent *event) override;
     bool eventFilter(QObject* object, QEvent* event) override;
 
@@ -108,6 +110,7 @@ private:
 
     void requestUpdate();
     void render();
+    void forceRender();
 
     void handleScreenChange();
 

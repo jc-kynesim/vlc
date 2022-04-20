@@ -59,7 +59,7 @@
  * Module descriptor
  *****************************************************************************/
 static int  Open ( vlc_object_t * );
-static void Close( vlc_object_t * );
+static void CloseEncoder( encoder_t * );
 static void x264_log( void *, int i_level, const char *psz, va_list );
 
 /* Frame-type options */
@@ -435,18 +435,17 @@ static const char *const framepacking_list_text[] =
 vlc_module_begin ()
 #ifdef PLUGIN_X264_10B
     set_description( N_("H.264/MPEG-4 Part 10/AVC encoder (x264 10-bit)"))
-    set_capability( "encoder", 0 )
+    set_capability( "video encoder", 0 )
 #endif
 #ifdef PLUGIN_X262
     set_description( N_("H.262/MPEG-2 encoder (x262)"))
-    set_capability( "encoder", 0 )
+    set_capability( "video encoder", 0 )
 #endif
 #ifdef PLUGIN_X264
     set_description( N_("H.264/MPEG-4 Part 10/AVC encoder (x264)"))
-    set_capability( "encoder", 200 )
+    set_capability( "video encoder", 200 )
 #endif
-    set_callbacks( Open, Close )
-    set_category( CAT_INPUT )
+    set_callback( Open )
     set_subcategory( SUBCAT_INPUT_VCODEC )
 
 /* Frame-type options */
@@ -845,8 +844,6 @@ static int  Open ( vlc_object_t *p_this )
 # endif
     }
 
-    p_enc->pf_encode_video = Encode;
-    p_enc->pf_encode_audio = NULL;
     p_sys->psz_stat_name = NULL;
     p_sys->i_sei_size = 0;
     p_sys->p_sei = NULL;
@@ -1358,7 +1355,7 @@ static int  Open ( vlc_object_t *p_this )
     if( p_sys->h == NULL )
     {
         msg_Err( p_enc, "cannot open x264 encoder" );
-        Close( VLC_OBJECT(p_enc) );
+        CloseEncoder(p_enc);
         return VLC_EGENERIC;
     }
 
@@ -1367,7 +1364,7 @@ static int  Open ( vlc_object_t *p_this )
     uint8_t *p_extra = p_enc->fmt_out.p_extra = malloc( i_extra );
     if( !p_extra )
     {
-        Close( VLC_OBJECT(p_enc) );
+        CloseEncoder(p_enc);
         return VLC_ENOMEM;
     }
 
@@ -1392,7 +1389,7 @@ static int  Open ( vlc_object_t *p_this )
         if( !p_sys->p_sei )
         {
             free( p_extra );
-            Close( VLC_OBJECT(p_enc) );
+            CloseEncoder(p_enc);
             return VLC_ENOMEM;
         }
         memcpy( p_sys->p_sei, nal[i].p_payload, nal[i].i_payload );
@@ -1400,6 +1397,13 @@ static int  Open ( vlc_object_t *p_this )
 
     p_enc->fmt_out.i_extra = i_extra;
 
+    static const struct vlc_encoder_operations ops =
+    {
+        .close = CloseEncoder,
+        .encode_video = Encode,
+    };
+
+    p_enc->ops = &ops;
     return VLC_SUCCESS;
 }
 
@@ -1510,9 +1514,8 @@ static block_t *Encode( encoder_t *p_enc, picture_t *p_pict )
 /*****************************************************************************
  * CloseEncoder: x264 encoder destruction
  *****************************************************************************/
-static void Close( vlc_object_t *p_this )
+static void CloseEncoder( encoder_t *p_enc )
 {
-    encoder_t     *p_enc = (encoder_t *)p_this;
     encoder_sys_t *p_sys = p_enc->p_sys;
 
     free( p_sys->psz_stat_name );

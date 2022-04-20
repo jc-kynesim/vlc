@@ -355,7 +355,7 @@ vlc_AudioSessionEvents_OnSessionDisconnected(IAudioSessionEvents *this,
             msg_Err(aout, "session disconnected: %s", "session disconnected");
             return S_OK;
         case DisconnectReasonExclusiveModeOverride:
-            msg_Err(aout, "session disconnected: %s", "stream overriden");
+            msg_Err(aout, "session disconnected: %s", "stream overridden");
             return S_OK;
         default:
             msg_Warn(aout, "session disconnected: unknown reason %d", reason);
@@ -1119,7 +1119,7 @@ static int Start(audio_output_t *aout, audio_sample_format_t *restrict fmt)
             case MM_PASSTHROUGH_ENABLED:
                 if (b_hdmi)
                     return -1;
-                /* falltrough */
+                /* fallthrough */
             case MM_PASSTHROUGH_ENABLED_HD:
                 break;
         }
@@ -1467,7 +1467,6 @@ vlc_module_begin()
     set_shortname("MMDevice")
     set_description(N_("Windows Multimedia Device output"))
     set_capability("audio output", 150)
-    set_category(CAT_AUDIO)
     set_subcategory(SUBCAT_AUDIO_AOUT)
     set_callbacks(Open, Close)
     add_module("mmdevice-backend", "aout stream", "any",

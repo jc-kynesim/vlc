@@ -372,7 +372,7 @@ static int role2policy_cmp(const void *key, const void *val)
 static AVAudioSessionRouteSharingPolicy
 GetRouteSharingPolicy(audio_output_t *p_aout)
 {
-    /* LongFormAudio by defaut */
+    /* LongFormAudio by default */
     AVAudioSessionRouteSharingPolicy policy = AVAudioSessionRouteSharingPolicyLongFormAudio;
     AVAudioSessionRouteSharingPolicy video_policy;
 #if !TARGET_OS_TV
@@ -623,13 +623,6 @@ Start(audio_output_t *p_aout, audio_sample_format_t *restrict fmt)
     if (ret != VLC_SUCCESS)
         goto error;
 
-    if (AOUT_FMT_SPDIF(fmt))
-    {
-        if (p_sys->au_dev != AU_DEV_ENCODED
-         || (port_type != PORT_TYPE_USB && port_type != PORT_TYPE_HDMI))
-            goto error;
-    }
-
     p_aout->current_sink_info.headphones = port_type == PORT_TYPE_HEADPHONES;
 
     p_sys->au_unit = au_NewOutputInstance(p_aout, kAudioUnitSubType_RemoteIO);
@@ -773,7 +766,6 @@ vlc_module_begin ()
     set_shortname("audiounit_ios")
     set_description("AudioUnit output for iOS")
     set_capability("audio output", 101)
-    set_category(CAT_AUDIO)
     set_subcategory(SUBCAT_AUDIO_AOUT)
     add_sw_gain()
     set_callbacks(Open, Close)

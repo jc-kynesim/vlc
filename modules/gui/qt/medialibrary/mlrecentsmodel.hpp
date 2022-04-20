@@ -29,7 +29,6 @@
 #include "mlbasemodel.hpp"
 #include "mlvideo.hpp"
 
-#include <QObject>
 #include <QDateTime>
 
 class MLRecentMedia : public MLItem {
@@ -73,7 +72,7 @@ public:
 protected:
     QVariant itemRoleData(MLItem *item, int role) const override;
 
-    ListCacheLoader<std::unique_ptr<MLItem>> *createLoader() const override;
+    std::unique_ptr<MLBaseModel::BaseLoader> createLoader() const override;
 
 private:
     vlc_ml_sorting_criteria_t roleToCriteria( int /* role */ ) const override{
@@ -86,15 +85,11 @@ private:
 
     struct Loader : public BaseLoader
     {
-        Loader(const MLRecentsModel &model, int numberOfItemsToShow)
-            : BaseLoader(model)
-            , m_numberOfItemsToShow(numberOfItemsToShow)
-        {
-        }
+        Loader(const MLRecentsModel &model, int numberOfItemsToShow);
 
-        size_t count() const override;
-        std::vector<std::unique_ptr<MLItem>> load(size_t index, size_t count) const override;
-
+        size_t count(vlc_medialibrary_t* ml) const override;
+        std::vector<std::unique_ptr<MLItem>> load(vlc_medialibrary_t* ml, size_t index, size_t count) const override;
+        std::unique_ptr<MLItem> loadItemById(vlc_medialibrary_t* ml, MLItemId itemId) const override;
     private:
         int m_numberOfItemsToShow;
     };

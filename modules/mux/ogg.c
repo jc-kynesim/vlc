@@ -58,7 +58,6 @@ static void Close  ( vlc_object_t * );
 vlc_module_begin ()
     set_description( N_("Ogg/OGM muxer") )
     set_capability( "sout mux", 10 )
-    set_category( CAT_SOUT )
     set_subcategory( SUBCAT_SOUT_MUX )
     add_shortcut( "ogg", "ogm" )
     add_integer_with_range( SOUT_CFG_PREFIX "indexintvl", 1000, 0, INT_MAX,
@@ -1614,7 +1613,7 @@ static int MuxBlock( sout_mux_t *p_mux, sout_input_t *p_input )
             p_stream->fmt.i_codec == VLC_CODEC_OPUS ||
             p_stream->fmt.i_codec == VLC_CODEC_SPEEX )
         {
-            /* number of sample from begining + current packet */
+            /* number of sample from beginning + current packet */
             op.granulepos =
                 samples_from_vlc_tick( p_data->i_dts - p_sys->i_start_dts + p_data->i_length,
                                        p_input->p_fmt->audio.i_rate );
@@ -1624,7 +1623,7 @@ static int MuxBlock( sout_mux_t *p_mux, sout_input_t *p_input )
         }
         else if( p_stream->p_oggds_header )
         {
-            /* number of sample from begining */
+            /* number of sample from beginning */
             op.granulepos = samples_from_vlc_tick( p_data->i_dts - p_sys->i_start_dts,
                                   p_stream->p_oggds_header->i_samples_per_unit );
         }

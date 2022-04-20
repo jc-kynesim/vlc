@@ -23,7 +23,6 @@
 #include "config.h"
 #endif
 
-#include <QObject>
 #include "mlbasemodel.hpp"
 
 #include <vlc_media_library.h>
@@ -67,7 +66,7 @@ public:
 protected:
     QVariant itemRoleData(MLItem *item, int role) const override;
 
-    ListCacheLoader<std::unique_ptr<MLItem>> *createLoader() const override;
+    std::unique_ptr<MLBaseModel::BaseLoader> createLoader() const override;
 
 private:
     vlc_ml_sorting_criteria_t roleToCriteria(int role) const override;
@@ -76,8 +75,9 @@ private:
     struct Loader : public BaseLoader
     {
         Loader(const MLUrlModel &model) : BaseLoader(model) {}
-        size_t count() const override;
-        std::vector<std::unique_ptr<MLItem>> load(size_t index, size_t count) const override;
+        size_t count(vlc_medialibrary_t* ml) const override;
+        std::vector<std::unique_ptr<MLItem>> load(vlc_medialibrary_t* ml, size_t index, size_t count) const override;
+        std::unique_ptr<MLItem> loadItemById(vlc_medialibrary_t* ml, MLItemId itemId) const override;
     };
 };
 

@@ -56,7 +56,6 @@ static int  Open  ( vlc_object_t * );
 static void Close ( vlc_object_t * );
 
 vlc_module_begin ()
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_DEMUX )
     set_description( N_("ASF/WMV demuxer") )
     set_capability( "demux", 200 )
@@ -1328,7 +1327,7 @@ static int DemuxInit( demux_t *p_demux )
         }
     }
 
-    /// \tood Fix Child meta for ASF tracks
+    /// \todo Fix Child meta for ASF tracks
 #if 0
     for( i_stream = 0, i = 0; i < MAX_ASF_TRACKS; i++ )
     {

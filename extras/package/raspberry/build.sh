@@ -110,7 +110,7 @@ info "Building contribs"
 mkdir -p contrib/contrib-$SHORTARCH && cd contrib/contrib-$SHORTARCH
 
 # issue with arm detection of the target (detects i686)
-CONTRIBFLAGS="$CONTRIBFLAGS --disable-x265"
+CONTRIBFLAGS="$CONTRIBFLAGS --disable-x265 --disable-mpg123 --disable-xcb --disable-libaribcaption"
 
 ${SCRIPT_PATH}/../../../contrib/bootstrap --host=$TRIPLET $CONTRIBFLAGS
 
@@ -130,10 +130,10 @@ if [ "$PREBUILT" != "yes" ]; then
     fi
 elif [ -n "$VLC_PREBUILT_CONTRIBS_URL" ]; then
     make prebuilt PREBUILT_URL="$VLC_PREBUILT_CONTRIBS_URL"
-    make -j$JOBS --output-sync=recurse .luac
+    make -j$JOBS --output-sync=recurse tools
 else
     make prebuilt
-    make -j$JOBS --output-sync=recurse .luac
+    make -j$JOBS --output-sync=recurse tools
 fi
 cd ../..
 

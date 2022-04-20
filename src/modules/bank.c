@@ -73,7 +73,7 @@ static void vlc_modcap_free(void *data)
 
 static int vlc_module_cmp (const void *a, const void *b)
 {
-    const module_t *const *ma = a, *const *mb = b;
+    module_t *const *ma = a, *const *mb = b;
     /* Note that qsort() uses _ascending_ order,
      * so the smallest module is the one with the biggest score. */
     return (*mb)->i_score - (*ma)->i_score;
@@ -181,7 +181,7 @@ static vlc_plugin_t *module_InitStatic(vlc_plugin_cb entry)
  * at build time. To workaround this, we add -Wl,-U,vlc_static_modules. */
 #if defined(__ELF__) \
     || (defined(__MACH__) && defined(HAVE_DYLIB_DYNAMIC_LOOKUP)) \
-    || !HAVE_DYNAMIC_PLUGINS
+    || !defined(HAVE_DYNAMIC_PLUGINS)
 VLC_WEAK
 extern vlc_plugin_cb vlc_static_modules[];
 
@@ -574,7 +574,7 @@ static void AllocateAllPlugins (vlc_object_t *p_this)
     /* Windows Store Apps can not load external plugins with absolute paths. */
     AllocatePluginPath (p_this, "plugins", mode);
 #else
-    /* Contruct the special search path for system that have a relocatable
+    /* Construct the special search path for system that have a relocatable
      * executable. Set it to <vlc path>/plugins. */
     char *vlcpath = config_GetSysPath(VLC_PKG_LIB_DIR, "plugins");
     if (likely(vlcpath != NULL))
@@ -844,7 +844,12 @@ module_t **module_list_get (size_t *n)
 
 size_t module_list_cap(module_t *const **restrict list, const char *name)
 {
-    const void **cp = tfind(&name, &modules.caps_tree, vlc_modcap_cmp);
+    vlc_modcap_t key;
+
+    assert(name != NULL);
+    key.name = (char *)name;
+
+    const void **cp = tfind(&key, &modules.caps_tree, vlc_modcap_cmp);
     if (cp == NULL)
     {
         *list = NULL;

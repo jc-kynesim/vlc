@@ -20,7 +20,7 @@
 #include "medialib.hpp"
 #include <vlc_cxx_helpers.hpp>
 
-#include "util/listcache.hpp"
+#include "mllistcache.hpp"
 #include "util/qmlinputitem.hpp"
 
 // MediaLibrary includes
@@ -29,70 +29,13 @@
 
 #include "util/asynctask.hpp"
 
-class BulkTaskLoader : public AsyncTask<std::vector<std::unique_ptr<MLItem>>>
-{
-public:
-    BulkTaskLoader(QSharedPointer<ListCacheLoader<std::unique_ptr<MLItem>>> loader, QVector<int> indexes)
-        : m_loader(loader)
-        , m_indexes {indexes}
-    {
-    }
-
-    std::vector<std::unique_ptr<MLItem>> execute() override
-    {
-        if (m_indexes.isEmpty())
-            return {};
-
-        auto sortedIndexes = m_indexes;
-        std::sort(sortedIndexes.begin(), sortedIndexes.end());
-
-        struct Range
-        {
-            int low, high; // [low, high] (all inclusive)
-        };
-
-        QVector<Range> ranges;
-        ranges.push_back(Range {sortedIndexes[0], sortedIndexes[0]});
-        const int MAX_DIFFERENCE = 4;
-        for (const auto index : sortedIndexes)
-        {
-            if ((index - ranges.back().high) < MAX_DIFFERENCE)
-                ranges.back().high = index;
-            else
-                ranges.push_back(Range {index, index});
-        }
-
-
-        std::vector<std::unique_ptr<MLItem>> r(m_indexes.size());
-        for (const auto range : ranges)
-        {
-            auto data = m_loader->load(range.low, range.high - range.low + 1);
-            for (int i = 0; i < m_indexes.size(); ++i)
-            {
-                const auto targetIndex = m_indexes[i];
-                if (targetIndex >= range.low && targetIndex <= range.high)
-                {
-                    r.at(i) = std::move(data.at(targetIndex - range.low));
-                }
-            }
-        }
-
-        return r;
-    }
-
-private:
-    QSharedPointer<ListCacheLoader<std::unique_ptr<MLItem>>> m_loader;
-    QVector<int> m_indexes;
-};
-
-static constexpr ssize_t COUNT_UNINITIALIZED =
-    ListCache<std::unique_ptr<MLItem>>::COUNT_UNINITIALIZED;
+static constexpr ssize_t COUNT_UNINITIALIZED = MLListCache::COUNT_UNINITIALIZED;
 
 MLBaseModel::MLBaseModel(QObject *parent)
     : QAbstractListModel(parent)
     , m_ml_event_handle( nullptr, [this](vlc_ml_event_callback_t* cb ) {
-            assert( m_ml != nullptr );
-            vlc_ml_event_unregister_callback( m_ml, cb );
+            assert( m_mediaLib != nullptr );
+            m_mediaLib->unregisterEventListener( cb );
         })
 {
     connect( this, &MLBaseModel::resetRequested, this, &MLBaseModel::onResetRequested );
@@ -103,11 +46,14 @@ MLBaseModel::~MLBaseModel() = default;
 
 void MLBaseModel::sortByColumn(QByteArray name, Qt::SortOrder order)
 {
-    beginResetModel();
+    vlc_ml_sorting_criteria_t sort = nameToCriteria(name);
+    bool desc = (order == Qt::SortOrder::DescendingOrder);
+    if (m_sort_desc == desc && m_sort == sort)
+        return;
+
     m_sort_desc = (order == Qt::SortOrder::DescendingOrder);
     m_sort = nameToCriteria(name);
-    clear();
-    endResetModel();
+    resetCache();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -137,64 +83,82 @@ void MLBaseModel::getData(const QModelIndexList &indexes, QJSValue callback)
         return;
 
     QVector<int> indx;
-    std::transform(indexes.begin(), indexes.end(), std::back_inserter(indx), [](const auto &index)
-    {
+    std::transform(indexes.begin(), indexes.end(), std::back_inserter(indx),
+    [](const auto &index) {
         return index.row();
     });
 
-    TaskHandle<BulkTaskLoader> loader(new BulkTaskLoader(QSharedPointer<ListCacheLoader<std::unique_ptr<MLItem>>>(createLoader()), indx));
-    connect(loader.get(), &BaseAsyncTask::result, this, [this, callback, indx]() mutable
-    {
-        auto loader = (BulkTaskLoader *)sender();
-        auto freeSender = [this, &loader]()
+    QSharedPointer<BaseLoader> loader{ createLoader().release() };
+    struct Ctx {
+        std::vector<std::unique_ptr<MLItem>> items;
+    };
+    m_mediaLib->runOnMLThread<Ctx>(this,
+    //ML thread
+    [loader, indx](vlc_medialibrary_t* ml, Ctx& ctx){
+        if (indx.isEmpty())
+            return;
+
+        auto sortedIndexes = indx;
+        std::sort(sortedIndexes.begin(), sortedIndexes.end());
+
+        struct Range
         {
-            m_externalLoaders.erase(std::find_if(std::begin(m_externalLoaders), std::end(m_externalLoaders), [&](auto &v)
-            {
-                if (v.get() != loader)
-                    return false;
-
-                v.release();
-                loader->deleteLater();
-                loader = nullptr;
-                return true;
-            }));
-
-            assert(!loader);
+            int low, high; // [low, high] (all inclusive)
         };
 
-        auto jsEngine = qjsEngine(this);
-        if (!jsEngine)
+        QVector<Range> ranges;
+        ranges.push_back(Range {sortedIndexes[0], sortedIndexes[0]});
+        const int MAX_DIFFERENCE = 4;
+        for (const auto index : sortedIndexes)
         {
-            freeSender();
-            return;
+            if ((index - ranges.back().high) < MAX_DIFFERENCE)
+                ranges.back().high = index;
+            else
+                ranges.push_back(Range {index, index});
         }
 
-        const auto loadedItems = loader->takeResult();
-        assert((int)loadedItems.size() == indx.size());
+        ctx.items.resize(indx.size());
+        for (const auto range : ranges)
+        {
+            auto data = loader->load(ml, range.low, range.high - range.low + 1);
+            for (int i = 0; i < indx.size(); ++i)
+            {
+                const auto targetIndex = indx[i];
+                if (targetIndex >= range.low && targetIndex <= range.high)
+                {
+                    ctx.items.at(i) = std::move(data.at(targetIndex - range.low));
+                }
+            }
+        }
+
+    },
+    //UI thread
+    [this, indxSize = indx.size(), callback]
+    (quint64, Ctx& ctx) mutable
+    {
+        auto jsEngine = qjsEngine(this);
+        if (!jsEngine)
+            return;
+
+        assert((int)ctx.items.size() == indxSize);
 
         const QHash<int, QByteArray> roles = roleNames();
-        auto jsArray = jsEngine->newArray(loadedItems.size());
+        auto jsArray = jsEngine->newArray(indxSize);
 
-        for (size_t i = 0; i < loadedItems.size(); ++i)
+        for (int i = 0; i < indxSize; ++i)
         {
-            const auto &item = loadedItems[i];
+            const auto &item = ctx.items[i];
             QMap<QString, QVariant> dataDict;
 
-            for (int role: roles.keys())
-            {
-                if (item) // item may fail to load
+            if (item) // item may fail to load
+                for (int role: roles.keys())
                     dataDict[roles[role]] = itemRoleData(item.get(), role);
-            }
 
-            jsArray.setProperty(i, qjsEngine(this)->toScriptValue(dataDict));
+            jsArray.setProperty(i, jsEngine->toScriptValue(dataDict));
         }
 
         callback.call({jsArray});
-        freeSender();
     });
-
-    loader->start(*QThreadPool::globalInstance());
-    m_externalLoaders.push_back(std::move(loader));
 }
 
 QVariant MLBaseModel::data(const QModelIndex &index, int role) const
@@ -210,30 +174,12 @@ QVariant MLBaseModel::data(const QModelIndex &index, int role) const
 
 void MLBaseModel::onResetRequested()
 {
-    beginResetModel();
-    clear();
-    endResetModel();
-}
-
-void MLBaseModel::onLocalSizeAboutToBeChanged(size_t size)
-{
-    (void) size;
-    beginResetModel();
+    invalidateCache();
 }
 
 void MLBaseModel::onLocalSizeChanged(size_t size)
 {
-    (void) size;
-    endResetModel();
     emit countChanged(size);
-}
-
-void MLBaseModel::onLocalDataChanged(size_t offset, size_t count)
-{
-    assert(count);
-    auto first = index(offset);
-    auto last = index(offset + count - 1);
-    emit dataChanged(first, last);
 }
 
 void MLBaseModel::onVlcMlEvent(const MLEvent &event)
@@ -257,12 +203,22 @@ void MLBaseModel::onVlcMlEvent(const MLEvent &event)
                 if (stotal == COUNT_UNINITIALIZED)
                     break;
 
-                int index = 0;
+                int row = 0;
 
                 /* Only consider items available locally in cache */
-                const auto item = findInCache(event.media_thumbnail_generated.i_media_id, &index);
+                MLItemId itemId{event.media_thumbnail_generated.i_media_id, VLC_ML_PARENT_UNKNOWN};
+                MLItem* item = findInCache(itemId, &row);
                 if (item)
-                    thumbnailUpdated(index);
+                {
+                    vlc_ml_thumbnail_status_t status = VLC_ML_THUMBNAIL_STATUS_FAILURE;
+                    QString mrl;
+                    if (event.media_thumbnail_generated.b_success)
+                    {
+                        mrl = qfu(event.media_thumbnail_generated.psz_mrl);
+                        status = event.media_thumbnail_generated.i_status;
+                    }
+                    thumbnailUpdated(index(row), item, mrl, status);
+                }
             }
             break;
         }
@@ -286,8 +242,10 @@ QString MLBaseModel::getFirstSymbol(QString str)
 void MLBaseModel::onVlcMlEvent(void* data, const vlc_ml_event_t* event)
 {
     auto self = static_cast<MLBaseModel*>(data);
-    QMetaObject::invokeMethod(self, [self, event = MLEvent(event)] {
-        self->onVlcMlEvent(event);
+    //MLEvent is not copiable, but lambda needs to be copiable
+    auto  mlEvent = std::make_shared<MLEvent>(event);
+    QMetaObject::invokeMethod(self, [self, mlEvent] () mutable {
+        self->onVlcMlEvent(*mlEvent);
     });
 }
 
@@ -298,19 +256,15 @@ MLItemId MLBaseModel::parentId() const
 
 void MLBaseModel::setParentId(MLItemId parentId)
 {
-    beginResetModel();
     m_parent = parentId;
-    clear();
-    endResetModel();
+    resetCache();
     emit parentIdChanged();
 }
 
 void MLBaseModel::unsetParentId()
 {
-    beginResetModel();
     m_parent = MLItemId();
-    clear();
-    endResetModel();
+    resetCache();
     emit parentIdChanged();
 }
 
@@ -322,10 +276,9 @@ MediaLib* MLBaseModel::ml() const
 void MLBaseModel::setMl(MediaLib* medialib)
 {
     assert(medialib);
-    m_ml = medialib->vlcMl();
     m_mediaLib = medialib;
     if ( m_ml_event_handle == nullptr )
-        m_ml_event_handle.reset( vlc_ml_event_register_callback( m_ml, onVlcMlEvent, this ) );
+        m_ml_event_handle.reset( m_mediaLib->registerEventListener(onVlcMlEvent, this ) );
 }
 
 const QString& MLBaseModel::searchPattern() const
@@ -340,10 +293,8 @@ void MLBaseModel::setSearchPattern( const QString& pattern )
         /* No changes */
         return;
 
-    beginResetModel();
     m_search_pattern = patternToApply;
-    clear();
-    endResetModel();
+    resetCache();
 }
 
 Qt::SortOrder MLBaseModel::getSortOrder() const
@@ -353,10 +304,11 @@ Qt::SortOrder MLBaseModel::getSortOrder() const
 
 void MLBaseModel::setSortOder(Qt::SortOrder order)
 {
-    beginResetModel();
-    m_sort_desc = (order == Qt::SortOrder::DescendingOrder);
-    clear();
-    endResetModel();
+    bool desc = (order == Qt::SortOrder::DescendingOrder);
+    if (m_sort_desc == desc)
+        return;
+    m_sort_desc = desc;
+    resetCache();
     emit sortOrderChanged();
 }
 
@@ -367,19 +319,21 @@ const QString MLBaseModel::getSortCriteria() const
 
 void MLBaseModel::setSortCriteria(const QString& criteria)
 {
-    beginResetModel();
-    m_sort = nameToCriteria(criteria.toUtf8());
-    clear();
-    endResetModel();
+    vlc_ml_sorting_criteria_t sort = nameToCriteria(qtu(criteria));
+    if (m_sort == sort)
+        return;
+    m_sort = sort;
+    resetCache();
     emit sortCriteriaChanged();
 }
 
 void MLBaseModel::unsetSortCriteria()
 {
-    beginResetModel();
+    if (m_sort == VLC_ML_SORTING_DEFAULT)
+        return;
+
     m_sort = VLC_ML_SORTING_DEFAULT;
-    clear();
-    endResetModel();
+    resetCache();
     emit sortCriteriaChanged();
 }
 
@@ -391,12 +345,6 @@ int MLBaseModel::rowCount(const QModelIndex &parent) const
     validateCache();
 
     return m_cache->count();
-}
-
-void MLBaseModel::clear()
-{
-    invalidateCache();
-    emit countChanged( static_cast<unsigned int>(0) );
 }
 
 QVariant MLBaseModel::getIdForIndex(QVariant index) const
@@ -449,56 +397,6 @@ QVariantList MLBaseModel::getIdsForIndexes(const QVariantList & indexes) const
 
 //-------------------------------------------------------------------------------------------------
 
-/* Q_INVOKABLE virtual */
-QVariantList MLBaseModel::getItemsForIndexes(const QModelIndexList & indexes) const
-{
-    assert(m_ml);
-
-    QVariantList items;
-
-    vlc_ml_query_params_t query;
-
-    memset(&query, 0, sizeof(vlc_ml_query_params_t));
-
-    for (const QModelIndex & index : indexes)
-    {
-        MLItem * item = this->item(index.row());
-
-        if (item == nullptr)
-            continue;
-
-        MLItemId itemId = item->getId();
-
-        // NOTE: When we have a parent it's a collection of media(s).
-        if (itemId.type == VLC_ML_PARENT_UNKNOWN)
-        {
-            QmlInputItem input(vlc_ml_get_input_item(m_ml, itemId.id), false);
-
-            items.append(QVariant::fromValue(input));
-        }
-        else
-        {
-            ml_unique_ptr<vlc_ml_media_list_t> list;
-
-            list.reset(vlc_ml_list_media_of(m_ml, &query, itemId.type, itemId.id));
-
-            if (list == nullptr)
-                continue;
-
-            for (const vlc_ml_media_t & media : ml_range_iterate<vlc_ml_media_t>(list))
-            {
-                QmlInputItem input(vlc_ml_get_input_item(m_ml, media.i_id), false);
-
-                items.append(QVariant::fromValue(input));
-            }
-        }
-    }
-
-    return items;
-}
-
-//-------------------------------------------------------------------------------------------------
-
 unsigned MLBaseModel::getCount() const
 {
     if (!m_mediaLib)
@@ -509,27 +407,76 @@ unsigned MLBaseModel::getCount() const
     return static_cast<unsigned>(m_cache->count());
 }
 
+
+void MLBaseModel::onCacheDataChanged(int first, int last)
+{
+    emit dataChanged(index(first), index(last));
+}
+
+void MLBaseModel::onCacheBeginInsertRows(int first, int last)
+{
+    emit beginInsertRows({}, first, last);
+}
+
+void MLBaseModel::onCacheBeginRemoveRows(int first, int last)
+{
+    emit beginRemoveRows({}, first, last);
+}
+
+void MLBaseModel::onCacheBeginMoveRows(int first, int last, int destination)
+{
+    emit beginMoveRows({}, first, last, {}, destination);
+}
+
 void MLBaseModel::validateCache() const
 {
     if (m_cache)
         return;
 
-    auto &threadPool = m_mediaLib->threadPool();
+    if (!m_mediaLib)
+        return;
+
     auto loader = createLoader();
-    m_cache.reset(new ListCache<std::unique_ptr<MLItem>>(threadPool, loader));
-    connect(&*m_cache, &BaseListCache::localSizeAboutToBeChanged,
-            this, &MLBaseModel::onLocalSizeAboutToBeChanged);
-    connect(&*m_cache, &BaseListCache::localSizeChanged,
+    m_cache = std::make_unique<MLListCache>(m_mediaLib, std::move(loader), false);
+    connect(m_cache.get(), &MLListCache::localSizeChanged,
             this, &MLBaseModel::onLocalSizeChanged);
-    connect(&*m_cache, &BaseListCache::localDataChanged,
-            this, &MLBaseModel::onLocalDataChanged);
+
+    connect(m_cache.get(), &MLListCache::localDataChanged,
+            this, &MLBaseModel::onCacheDataChanged);
+
+    connect(m_cache.get(), &MLListCache::beginInsertRows,
+            this, &MLBaseModel::onCacheBeginInsertRows);
+    connect(m_cache.get(), &MLListCache::endInsertRows,
+            this, &MLBaseModel::endInsertRows);
+
+    connect(m_cache.get(), &MLListCache::beginRemoveRows,
+            this, &MLBaseModel::onCacheBeginRemoveRows);
+    connect(m_cache.get(), &MLListCache::endRemoveRows,
+            this, &MLBaseModel::endRemoveRows);
+
+    connect(m_cache.get(), &MLListCache::endMoveRows,
+            this, &MLBaseModel::endMoveRows);
+    connect(m_cache.get(), &MLListCache::beginMoveRows,
+            this, &MLBaseModel::onCacheBeginMoveRows);
 
     m_cache->initCount();
 }
 
+
+void MLBaseModel::resetCache()
+{
+    beginResetModel();
+    m_cache.reset();
+    endResetModel();
+    validateCache();
+}
+
 void MLBaseModel::invalidateCache()
 {
-    m_cache.reset();
+    if (m_cache)
+        m_cache->invalidate();
+    else
+        validateCache();
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -538,9 +485,12 @@ MLItem *MLBaseModel::item(int signedidx) const
 {
     validateCache();
 
+    if (!m_cache)
+        return nullptr;
+
     ssize_t count = m_cache->count();
 
-    if (count == COUNT_UNINITIALIZED || signedidx < 0 || signedidx >= count)
+    if (count == 0 || signedidx < 0 || signedidx >= count)
         return nullptr;
 
     unsigned int idx = static_cast<unsigned int>(signedidx);
@@ -561,6 +511,9 @@ MLItem *MLBaseModel::itemCache(int signedidx) const
 {
     unsigned int idx = static_cast<unsigned int>(signedidx);
 
+    if (!m_cache)
+        return nullptr;
+
     const std::unique_ptr<MLItem> *item = m_cache->get(idx);
 
     if (!item)
@@ -571,22 +524,82 @@ MLItem *MLBaseModel::itemCache(int signedidx) const
     return item->get();
 }
 
-MLItem *MLBaseModel::findInCache(const int id, int *index) const
+MLItem *MLBaseModel::findInCache(const MLItemId& id, int *index) const
 {
     const auto item = m_cache->find([id](const auto &item)
     {
-        return item->getId().id == id;
+        return item->getId() == id;
     }, index);
 
     return item ? item->get() : nullptr;
 }
 
+void MLBaseModel::updateItemInCache(const MLItemId& mlid)
+{
+    if (!m_cache)
+    {
+        emit resetRequested();
+        return;
+    }
+    MLItem* item = findInCache(mlid, nullptr);
+    if (!item) // items isn't loaded
+        return;
+
+    if (!m_itemLoader)
+        m_itemLoader = createLoader();
+    struct Ctx {
+        std::unique_ptr<MLItem> item;
+    };
+    m_mediaLib->runOnMLThread<Ctx>(this,
+    //ML thread
+    [mlid, itemLoader = m_itemLoader](vlc_medialibrary_t* ml, Ctx& ctx){
+        ctx.item = itemLoader->loadItemById(ml, mlid);
+    },
+    //UI thread
+    [this](qint64, Ctx& ctx) {
+        if (!ctx.item)
+            return;
+
+        m_cache->updateItem(std::move(ctx.item));
+    });
+}
+
+void MLBaseModel::deleteItemInCache(const MLItemId& mlid)
+{
+    if (!m_cache)
+    {
+        emit resetRequested();
+        return;
+    }
+    m_cache->deleteItem(mlid);
+}
+
+
+void MLBaseModel::moveRangeInCache(int first, int last, int to)
+{
+    if (!m_cache)
+    {
+        emit resetRequested();
+        return;
+    }
+    m_cache->moveRange(first, last, to);
+}
+
+void MLBaseModel::deleteRangeInCache(int first, int last)
+{
+    if (!m_cache)
+    {
+        emit resetRequested();
+        return;
+    }
+    m_cache->deleteRange(first, last);
+}
+
 //-------------------------------------------------------------------------------------------------
 
-MLBaseModel::BaseLoader::BaseLoader(vlc_medialibrary_t *ml, MLItemId parent, QString searchPattern,
+MLBaseModel::BaseLoader::BaseLoader(MLItemId parent, QString searchPattern,
                                     vlc_ml_sorting_criteria_t sort, bool sort_desc)
-    : m_ml(ml)
-    , m_parent(parent)
+    : m_parent(parent)
     , m_searchPattern(searchPattern)
     , m_sort(sort)
     , m_sort_desc(sort_desc)
@@ -594,7 +607,7 @@ MLBaseModel::BaseLoader::BaseLoader(vlc_medialibrary_t *ml, MLItemId parent, QSt
 }
 
 MLBaseModel::BaseLoader::BaseLoader(const MLBaseModel &model)
-    : BaseLoader(model.m_ml, model.m_parent, model.m_search_pattern, model.m_sort, model.m_sort_desc)
+    : BaseLoader(model.m_parent, model.m_search_pattern, model.m_sort, model.m_sort_desc)
 {
 }
 

@@ -37,8 +37,6 @@
 #endif
 
 #include <QTextBrowser>
-#include <QTabWidget>
-#include <QLabel>
 #include <QString>
 #include <QDialogButtonBox>
 #include <QEvent>
@@ -68,7 +66,7 @@ HelpDialog::HelpDialog( qt_intf_t *_p_intf ) : QVLCFrame( _p_intf )
     layout->addWidget( helpBrowser );
     layout->addWidget( closeButtonBox );
 
-    CONNECT( closeButtonBox, rejected(), this, close() );
+    connect( closeButtonBox, &QDialogButtonBox::rejected, this, &HelpDialog::close );
     restoreWidgetPosition( "Help", QSize( 500, 450 ) );
 }
 
@@ -90,7 +88,7 @@ AboutDialog::AboutDialog( qt_intf_t *_p_intf)
     ui.title->setText("<html><head/><body><p><span style=\" font-size:26pt; color:#353535;\"> " + qtr( "VLC media player" ) + " </span></p></body></html>");
 
     ui.MainBlabla->setText("<html><head/><body>" +
-    qtr( "<p>VLC media player is a free and open source media player, encoder, and streamer made by the volunteers of the <a href=\"http://www.videolan.org/\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</span></a> community.</p><p>VLC uses its internal codecs, works on essentially every popular platform, and can read almost all files, CDs, DVDs, network streams, capture cards and other media formats!</p><p><a href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: underline; color:#0057ae;\">Help and join us!</span></a>" ) +
+    qtr( "<p>VLC media player is a free and open source media player, encoder, and streamer made by the volunteers of the <a href=\"https://www.videolan.org/\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</span></a> community.</p><p>VLC uses its internal codecs, works on essentially every popular platform, and can read almost all files, CDs, DVDs, network streams, capture cards and other media formats!</p><p><a href=\"https://www.videolan.org/contribute/\"><span style=\" text-decoration: underline; color:#0057ae;\">Help and join us!</span></a>" ) +
     "</p></body> </html>");
 
 #if 0
@@ -221,11 +219,11 @@ UpdateDialog::UpdateDialog( qt_intf_t *_p_intf ) : QVLCFrame( _p_intf )
     setWindowTitle( qtr( "VLC media player updates" ) );
     setWindowRole( "vlc-update" );
 
-    BUTTONACT( recheckButton, UpdateOrDownload() );
-    CONNECT( ui.updateDialogButtonBox, rejected(), this, close() );
+    BUTTONACT( recheckButton, &UpdateDialog::UpdateOrDownload );
+    connect( ui.updateDialogButtonBox, &QDialogButtonBox::rejected, this, &UpdateDialog::close );
 
-    CONNECT( ui.updateNotifyButtonBox, accepted(), this, UpdateOrDownload() );
-    CONNECT( ui.updateNotifyButtonBox, rejected(), this, close() );
+    connect( ui.updateNotifyButtonBox, &QDialogButtonBox::accepted, this, &UpdateDialog::UpdateOrDownload );
+    connect( ui.updateNotifyButtonBox, &QDialogButtonBox::rejected, this, &UpdateDialog::close );
 
     /* Create the update structure */
     p_update = update_New( p_intf );

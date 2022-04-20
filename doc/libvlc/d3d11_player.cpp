@@ -1,4 +1,4 @@
-/* compile: g++ d3d11_player.cpp -o d3d11_player.exe -L<path/libvlc> -lvlc -ld3d11 -ld3dcompiler_47 -luuid */
+/* compile: g++ d3d11_player.cpp -o d3d11_player.exe -L<path/libvlc> -lvlc -ld3d11 -ld3dcompiler -luuid */
 
 /* This is the most extreme use case where libvlc is given its own ID3D11DeviceContext
    and draws in a texture shared with the ID3D11DeviceContext of the app.
@@ -74,13 +74,13 @@ struct render_context
 
     ID3D11SamplerState *samplerState;
 
-    SRWLOCK sizeLock; // the ReportSize callback cannot be called during/after the Cleanup_cb is called
+    SRWLOCK sizeLock; // the ReportSize callback cannot be called during/after the CleanupDevice_cb is called
     SRWLOCK swapchainLock; // protect the swapchain access when the UI needs to resize it
     unsigned width, height;
     struct {
         unsigned width, height;
     } client_area;
-    void (*ReportSize)(void *ReportOpaque, unsigned width, unsigned height);
+    libvlc_video_output_resize_cb ReportSize;
     void *ReportOpaque;
 };
 
@@ -153,7 +153,7 @@ static void init_direct3d(struct render_context *ctx)
                                   NULL,
                                   creationFlags,
                                   NULL,
-                                  NULL,
+                                  0,
                                   D3D11_SDK_VERSION,
                                   &scd,
                                   &ctx->swapchain,
@@ -228,9 +228,9 @@ static void init_direct3d(struct render_context *ctx)
     ctx->vertexBufferStride = sizeof(OurVertices[0]);
 
     D3D11_MAPPED_SUBRESOURCE ms;
-    ctx->d3dctx->Map(ctx->pVertexBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &ms);
+    ctx->d3dctx->Map(ctx->pVertexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);
     memcpy(ms.pData, OurVertices, sizeof(OurVertices));
-    ctx->d3dctx->Unmap(ctx->pVertexBuffer, NULL);
+    ctx->d3dctx->Unmap(ctx->pVertexBuffer, 0);
 
     ctx->quadIndexCount = 6;
     D3D11_BUFFER_DESC quadDesc = { };
@@ -240,7 +240,7 @@ static void init_direct3d(struct render_context *ctx)
     quadDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     ctx->d3device->CreateBuffer(&quadDesc, NULL, &ctx->pIndexBuffer);
 
-    ctx->d3dctx->Map(ctx->pIndexBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &ms);
+    ctx->d3dctx->Map(ctx->pIndexBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &ms);
     WORD *triangle_pos = static_cast<WORD*>(ms.pData);
     triangle_pos[0] = 3;
     triangle_pos[1] = 1;
@@ -249,7 +249,7 @@ static void init_direct3d(struct render_context *ctx)
     triangle_pos[3] = 2;
     triangle_pos[4] = 1;
     triangle_pos[5] = 3;
-    ctx->d3dctx->Unmap(ctx->pIndexBuffer, NULL);
+    ctx->d3dctx->Unmap(ctx->pIndexBuffer, 0);
 
     ctx->d3dctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -413,10 +413,9 @@ static bool UpdateOutput_cb( void *opaque, const libvlc_video_render_cfg_t *cfg,
 
     ctx->d3dctx->PSSetShaderResources(0, 1, &ctx->resized.textureShaderInput);
 
-    D3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc = {
-        .Format = texDesc.Format,
-        .ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D,
-    };
+    D3D11_RENDER_TARGET_VIEW_DESC renderTargetViewDesc = { };
+    renderTargetViewDesc.Format = texDesc.Format;
+    renderTargetViewDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
     hr = ctx->d3deviceVLC->CreateRenderTargetView(ctx->resized.textureVLC, &renderTargetViewDesc, &ctx->resized.textureRenderTarget);
     if (FAILED(hr)) return false;
 
@@ -427,6 +426,7 @@ static bool UpdateOutput_cb( void *opaque, const libvlc_video_render_cfg_t *cfg,
     out->colorspace     = libvlc_video_colorspace_BT709;
     out->primaries      = libvlc_video_primaries_BT709;
     out->transfer       = libvlc_video_transfer_func_SRGB;
+    out->orientation    = libvlc_video_orient_top_left;
 
     return true;
 }
@@ -474,7 +474,7 @@ static bool SelectPlane_cb( void *opaque, size_t plane, void *out )
     return true;
 }
 
-static bool Setup_cb( void **opaque, const libvlc_video_setup_device_cfg_t *cfg, libvlc_video_setup_device_info_t *out )
+static bool SetupDevice_cb( void **opaque, const libvlc_video_setup_device_cfg_t *cfg, libvlc_video_setup_device_info_t *out )
 {
     struct render_context *ctx = static_cast<struct render_context *>(*opaque);
 
@@ -483,7 +483,7 @@ static bool Setup_cb( void **opaque, const libvlc_video_setup_device_cfg_t *cfg,
     return true;
 }
 
-static void Cleanup_cb( void *opaque )
+static void CleanupDevice_cb( void *opaque )
 {
     // here we can release all things Direct3D11 for good (if playing only one file)
     struct render_context *ctx = static_cast<struct render_context *>( opaque );
@@ -491,9 +491,9 @@ static void Cleanup_cb( void *opaque )
 }
 
 // receive the libvlc callback to call when we want to change the libvlc output size
-static void Resize_cb( void *opaque,
-                       void (*report_size_change)(void *report_opaque, unsigned width, unsigned height),
-                       void *report_opaque )
+static void SetResize_cb( void *opaque,
+                          libvlc_video_output_resize_cb report_size_change,
+                          void *report_opaque )
 {
     struct render_context *ctx = static_cast<struct render_context *>( opaque );
     AcquireSRWLockExclusive(&ctx->sizeLock);
@@ -553,8 +553,8 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARA
             }
             ReleaseSRWLockExclusive(&ctx->swapchainLock);
 
-            ctx->width  = LOWORD(lParam) * (BORDER_RIGHT - BORDER_LEFT) / 2.0f; /* remove the orange part ! */
-            ctx->height = HIWORD(lParam) * (BORDER_TOP - BORDER_BOTTOM) / 2.0f;
+            ctx->width  = unsigned(LOWORD(lParam) * (BORDER_RIGHT - BORDER_LEFT) / 2.0f); // remove the orange part !
+            ctx->height = unsigned(HIWORD(lParam) * (BORDER_TOP - BORDER_BOTTOM) / 2.0f);
 
             // tell libvlc we want a new rendering size
             // we could also match the source video size and scale in swapchain render
@@ -572,7 +572,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARA
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN:
             {
-                int key = tolower( (unsigned char)MapVirtualKey( wParam, 2 ) );
+                int key = tolower( MapVirtualKey( (UINT)wParam, 2 ) );
                 if (key == 'a')
                 {
                     if (AspectRatio == NULL)
@@ -622,12 +622,12 @@ int WINAPI WinMain(HINSTANCE hInstance,
     /* remove "" around the given path */
     if (lpCmdLine[0] == '"')
     {
-        file_path = strdup( lpCmdLine+1 );
+        file_path = _strdup( lpCmdLine+1 );
         if (file_path[strlen(file_path)-1] == '"')
             file_path[strlen(file_path)-1] = '\0';
     }
     else
-        file_path = strdup( lpCmdLine );
+        file_path = _strdup( lpCmdLine );
 
     p_libvlc = libvlc_new( 0, NULL );
     p_media = libvlc_media_new_path( p_libvlc, file_path );
@@ -674,7 +674,8 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
     /* Tell VLC to render into our D3D11 environment */
     libvlc_video_set_output_callbacks( Context.p_mp, libvlc_video_engine_d3d11,
-                                       Setup_cb, Cleanup_cb, Resize_cb, UpdateOutput_cb, Swap_cb, StartRendering_cb,
+                                       SetupDevice_cb, CleanupDevice_cb, SetResize_cb,
+                                       UpdateOutput_cb, Swap_cb, StartRendering_cb,
                                        nullptr, nullptr, SelectPlane_cb,
                                        &Context );
 
@@ -703,5 +704,5 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
     libvlc_release( p_libvlc );
 
-    return msg.wParam;
+    return (int)msg.wParam;
 }

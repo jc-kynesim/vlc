@@ -94,7 +94,6 @@ static const char *const passthrough_modes_text[] = {
 vlc_module_begin ()
     set_shortname( "ALSA" )
     set_description( N_("ALSA audio output") )
-    set_category( CAT_AUDIO )
     set_subcategory( SUBCAT_AUDIO_AOUT )
     add_string ("alsa-audio-device", "default",
                 AUDIO_DEV_TEXT, AUDIO_DEV_LONGTEXT)
@@ -383,6 +382,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     char *devbuf = NULL;
     if (sep != '\0')
     {
+#ifdef IEC958_AES3_CON_FS_22050
         unsigned aes3;
 
         switch (fmt->i_rate)
@@ -406,6 +406,11 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                       0, aes3) == -1)
             return VLC_ENOMEM;
         device = devbuf;
+#else
+       /* SALSA-lib lacks many AES definitions, but it does not matter much,
+        * as it does note support parametric device names either. */
+       return VLC_ENOTSUP;
+#endif
     }
 
     /* Open the device */
@@ -731,8 +736,12 @@ static void Drain (audio_output_t *aout)
 {
     aout_sys_t *p_sys = aout->sys;
     snd_pcm_t *pcm = p_sys->pcm;
+
+    /* XXX: Synchronous drain, not interruptible. */
     snd_pcm_drain (pcm);
     snd_pcm_prepare (pcm);
+
+    aout_DrainedReport(aout);
 }
 
 /**

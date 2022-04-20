@@ -25,7 +25,7 @@
  *****************************************************************************
  *
  * You should use this module in combination with the transcode module, to get
- * raw datas from it. This module does not make any conversion at all, so you
+ * raw data from it. This module does not make any conversion at all, so you
  * need to use the transcode module for this purpose.
  *
  * For example, you can use smem as it :
@@ -96,7 +96,6 @@ vlc_module_begin ()
     set_description( N_("Stream output to memory buffer") )
     set_capability( "sout output", 0 )
     add_shortcut( "smem" )
-    set_category( CAT_SOUT )
     set_subcategory( SUBCAT_SOUT_STREAM )
     add_string( SOUT_PREFIX_VIDEO "prerender-callback", "0", T_VIDEO_PRERENDER_CALLBACK, LT_VIDEO_PRERENDER_CALLBACK )
         change_volatile()

@@ -26,16 +26,16 @@
 #include "player/player_controller.hpp"
 
 #include <QStackedWidget>
-#include <QVBoxLayout>
+#include <QGridLayout>
 #include <QScrollBar>
 #include <QLabel>
-#include <QStringList>
 #include <QDateTime>
 
 #include "EPGWidget.hpp"
 #include "EPGRuler.hpp"
 #include "EPGView.hpp"
 #include "EPGChannels.hpp"
+#include "EPGItem.hpp"
 
 EPGWidget::EPGWidget( QWidget *parent ) : QWidget( parent )
 {
@@ -70,17 +70,15 @@ EPGWidget::EPGWidget( QWidget *parent ) : QWidget( parent )
     layout->addWidget( rootWidget );
     setLayout( layout );
 
-    CONNECT( m_epgView, rangeChanged(const QDateTime &, const QDateTime &),
-             m_rulerWidget, setRange(const QDateTime &, const QDateTime &) );
+    connect( m_epgView, &EPGView::rangeChanged, m_rulerWidget, &EPGRuler::setRange );
 
-    CONNECT( m_epgView->horizontalScrollBar(), valueChanged(int),
-             m_rulerWidget, setOffset(int) );
-    CONNECT( m_epgView->verticalScrollBar(), valueChanged(int),
-             m_channelsWidget, setOffset(int) );
-    connect( m_epgView, SIGNAL( itemFocused(EPGItem*)),
-             this, SIGNAL(itemSelectionChanged(EPGItem*)) );
-    CONNECT( m_epgView, programAdded(const EPGProgram *), m_channelsWidget, addProgram(const EPGProgram *) );
-    CONNECT( m_epgView, programActivated(int), this, activateProgram(int) );
+    connect( m_epgView->horizontalScrollBar(), &QScrollBar::valueChanged,
+             m_rulerWidget, &EPGRuler::setOffset );
+    connect( m_epgView->verticalScrollBar(), &QScrollBar::valueChanged,
+             m_channelsWidget, &EPGChannels::setOffset );
+    connect( m_epgView, &EPGView::itemFocused, this, &EPGWidget::itemSelectionChanged );
+    connect( m_epgView, &EPGView::programAdded, m_channelsWidget, &EPGChannels::addProgram );
+    connect( m_epgView, &EPGView::programActivated, this, &EPGWidget::activateProgram );
 }
 
 void EPGWidget::reset()
@@ -106,7 +104,7 @@ void EPGWidget::updateEPG( input_item_t *p_input_item )
     i_event_source_type = p_input_item->i_type;
     b_input_type_known = true;
 
-    /* Fixme: input could have dissapeared */
+    /* Fixme: input could have disappeared */
     vlc_mutex_lock(  & p_input_item->lock );
     m_epgView->updateEPG( p_input_item->pp_epg, p_input_item->i_epg );
     m_epgView->setEpgTime( ( p_input_item->i_epg_time ) ?

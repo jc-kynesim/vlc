@@ -39,11 +39,14 @@ FocusScope {
 
     implicitHeight: contentRect.implicitHeight
 
+    // otherwise produces artefacts on retract animation
+    clip: true
+
     Rectangle{
         id: contentRect
 
+        anchors.fill: parent
         implicitHeight: contentLayout.implicitHeight + ( VLCStyle.margin_normal * 2 )
-        width: parent.width
         color: VLCStyle.colors.expandDelegate
 
         Rectangle {
@@ -100,7 +103,7 @@ FocusScope {
                             id: expand_cover_id
 
                             anchors.fill: parent
-                            source: model.thumbnail || VLCStyle.noArtCover
+                            source: model.thumbnail || VLCStyle.noArtVideoCover
                             radius: VLCStyle.gridCover_radius
                         }
 
@@ -121,16 +124,16 @@ FocusScope {
                                 id: playActionBtn
 
                                 iconTxt: VLCIcons.play_outline
-                                text: i18n.qtr("Play")
-                                onClicked: medialib.addAndPlay( model.id )
+                                text: I18n.qtr("Play")
+                                onClicked: MediaLib.addAndPlay( model.id )
                             }
 
                             Widgets.TabButtonExt {
                                 id: enqueueActionBtn
 
                                 iconTxt: VLCIcons.enqueue
-                                text: i18n.qtr("Enqueue")
-                                onClicked: medialib.addToPlaylist( model.id )
+                                text: I18n.qtr("Enqueue")
+                                onClicked: MediaLib.addToPlaylist( model.id )
                             }
                         }
 
@@ -151,7 +154,7 @@ FocusScope {
                     width: parent.width
 
                     Widgets.SubtitleLabel {
-                        text: model.title || i18n.qtr("Unknown title")
+                        text: model.title || I18n.qtr("Unknown title")
 
                         Layout.fillWidth: true
                     }
@@ -178,12 +181,12 @@ FocusScope {
                     topPadding: VLCStyle.margin_normal
 
                     Widgets.MenuCaption {
-                        text: "<b>" + i18n.qtr("File Name:") + "</b> " + expandRect.model.fileName
+                        text: "<b>" + I18n.qtr("File Name:") + "</b> " + expandRect.model.fileName
                         width: parent.width
                     }
 
                     Widgets.MenuCaption {
-                        text: "<b>" + i18n.qtr("Path:") + "</b> " + expandRect.model.display_mrl
+                        text: "<b>" + I18n.qtr("Path:") + "</b> " + expandRect.model.display_mrl
                         topPadding: VLCStyle.margin_xsmall
                         width: parent.width
                     }
@@ -210,7 +213,7 @@ FocusScope {
                             }
 
                             Widgets.CaptionLabel {
-                                text: _showMoreInfo ? i18n.qtr("View Less") : i18n.qtr("View More")
+                                text: _showMoreInfo ? I18n.qtr("View Less") : I18n.qtr("View More")
                                 color: VLCStyle.colors.text
                             }
                         }
@@ -238,7 +241,7 @@ FocusScope {
                         }
 
                         Widgets.MenuCaption {
-                            text: i18n.qtr("Video track")
+                            text: I18n.qtr("Video track")
                             font.bold: true
                             bottomPadding: VLCStyle.margin_small
                         }
@@ -248,9 +251,9 @@ FocusScope {
 
                             delegate: Repeater {
                                 model: [
-                                    {text: i18n.qtr("Codec:"), data: modelData.codec },
-                                    {text: i18n.qtr("Language:"), data: modelData.language },
-                                    {text: i18n.qtr("FPS:"), data: modelData.fps }
+                                    {text: I18n.qtr("Codec:"), data: modelData.codec },
+                                    {text: I18n.qtr("Language:"), data: modelData.language },
+                                    {text: I18n.qtr("FPS:"), data: modelData.fps }
                                 ]
 
                                 delegate: Widgets.MenuCaption {
@@ -276,7 +279,7 @@ FocusScope {
                         }
 
                         Widgets.MenuCaption {
-                            text: i18n.qtr("Audio track")
+                            text: I18n.qtr("Audio track")
                             font.bold: true
                             bottomPadding: VLCStyle.margin_small
                         }
@@ -286,9 +289,9 @@ FocusScope {
 
                             delegate: Repeater {
                                 model: [
-                                    {text: i18n.qtr("Codec:"), data: modelData.codec },
-                                    {text: i18n.qtr("Language:"), data: modelData.language },
-                                    {text: i18n.qtr("Channel:"), data: modelData.nbchannels }
+                                    {text: I18n.qtr("Codec:"), data: modelData.codec },
+                                    {text: I18n.qtr("Language:"), data: modelData.language },
+                                    {text: I18n.qtr("Channel:"), data: modelData.nbchannels }
                                 ]
 
                                 delegate: Widgets.MenuCaption {

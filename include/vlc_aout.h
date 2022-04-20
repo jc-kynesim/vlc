@@ -125,7 +125,7 @@
  */
 
 struct vlc_audio_output_events {
-    void (*timing_report)(audio_output_t *, vlc_tick_t system_now, vlc_tick_t pts);
+    void (*drained_report)(audio_output_t *);
     void (*volume_report)(audio_output_t *, float);
     void (*mute_report)(audio_output_t *, bool);
     void (*policy_report)(audio_output_t *, bool);
@@ -158,7 +158,7 @@ struct audio_output
     /**< Starts a new stream (mandatory, cannot be NULL).
       *
       * This callback changes the audio output from stopped to playing state
-      * (if succesful). After the callback returns, time_get(), play(),
+      * (if successful). After the callback returns, time_get(), play(),
       * pause(), flush() and eventually stop() callbacks may be called.
       *
       * \param fmt input stream sample format upon entry,
@@ -241,13 +241,18 @@ struct audio_output
     void (*flush)( audio_output_t *);
     /**< Flushes the playback buffers (mandatory, cannot be NULL).
       *
-      * \param wait true to wait for playback of pending buffers (drain),
-      *             false to discard pending buffers (flush)
-      *
       * \note This callback cannot be called in stopped state.
       */
+
     void (*drain)(audio_output_t *);
-    /**< Drain the playback buffers (can be NULL).
+    /**< Drain the playback buffers asynchronously (can be NULL).
+      *
+      * A drain operation can be cancelled by aout->flush() or aout->stop().
+      *
+      * It is legal to continue playback after a drain_async, if flush() is
+      * called before the next play().
+      *
+      * Call aout_DrainedReport() to notify that the stream is drained.
       *
       * If NULL, the caller will wait for the delay returned by time_get before
       * calling stop().
@@ -268,7 +273,7 @@ struct audio_output
       */
 
     int (*mute_set)(audio_output_t *, bool mute);
-    /**< Changes muting (optinal, may be NULL).
+    /**< Changes muting (optional, may be NULL).
       *
       * \param mute true to mute, false to unmute
       * \warning The same constraints apply as with volume_set().
@@ -287,7 +292,7 @@ struct audio_output
         bool headphones; /**< Default to false, set it to true if the current
                               sink is using headphones */
     } current_sink_info;
-    /**< Current sink informations set by the module from the start() function */
+    /**< Current sink information set by the module from the start() function */
 
     const struct vlc_audio_output_events *events;
 };
@@ -295,6 +300,14 @@ struct audio_output
 static inline int aout_TimeGet(audio_output_t *aout, vlc_tick_t *delay)
 {
     return aout->time_get(aout, delay);
+}
+
+/**
+ * Report than the stream is drained (after a call to aout->drain_async)
+ */
+static inline void aout_DrainedReport(audio_output_t *aout)
+{
+    aout->events->drained_report(aout);
 }
 
 /**
@@ -572,6 +585,14 @@ VLC_API block_t *aout_FiltersDrain(aout_filters_t *);
 VLC_API void     aout_FiltersFlush(aout_filters_t *);
 VLC_API void     aout_FiltersChangeViewpoint(aout_filters_t *, const vlc_viewpoint_t *vp);
 
+/**
+ * Create a vout from an "visualization" audio filter.
+ *
+ * @warning Can only be called once, from the probe function (Open).
+ *
+ * @return a valid vout or NULL in case of error, the returned vout should not
+ * be freed via vout_Close().
+ */
 VLC_API vout_thread_t *aout_filter_GetVout(filter_t *, const video_format_t *);
 
 /** @} */

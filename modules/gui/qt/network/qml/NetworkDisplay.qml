@@ -38,8 +38,6 @@ Widgets.PageLoader {
 
     // Settings
 
-    defaultPage: "home"
-
     pageModel: [{
         name: "home",
         url: "qrc:///network/NetworkHomeDisplay.qml"
@@ -48,6 +46,11 @@ Widgets.PageLoader {
         component: browseComponent,
         guard: function (prop) { return !!prop.tree }
     }]
+
+    loadDefaultView: function() {
+        History.update(["mc", "network", "home"])
+        loadPage("home")
+    }
 
     // Events
     onCurrentItemChanged: {
@@ -70,7 +73,7 @@ Widgets.PageLoader {
         target: stackView.currentItem
 
         onBrowse: {
-            history.push(["mc", "network", "browse", { tree: tree }]);
+            History.push(["mc", "network", "browse", { tree: tree }]);
             stackView.currentItem.setCurrentItemFocus(reason);
         }
     }
@@ -98,13 +101,13 @@ Widgets.PageLoader {
             path: view.name === "browse" ? root.stackView.currentItem.providerModel.path : []
 
             onHomeButtonClicked: {
-                history.push(["mc", "network", "home"])
+                History.push(["mc", "network", "home"])
 
                 stackView.currentItem.setCurrentItemFocus(reason)
             }
 
             onBrowse: {
-                history.push(["mc", "network", "browse", { "tree": tree }])
+                History.push(["mc", "network", "browse", { "tree": tree }])
 
                 stackView.currentItem.setCurrentItemFocus(reason)
             }

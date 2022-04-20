@@ -93,7 +93,6 @@ static void Flush( decoder_t * );
 vlc_module_begin( )
     set_shortname( "GstDecode" )
     add_shortcut( "gstdecode" )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_VCODEC )
     /* decoder main module */
     set_description( N_( "GStreamer Based Decoder" ) )
@@ -380,6 +379,9 @@ static GstStructure* vlc_to_gst_fmt( const es_format_t *p_fmt )
         break;
     case VLC_CODEC_VP9:
         p_str = gst_structure_new_empty( "video/x-vp9" );
+        break;
+    case VLC_CODEC_AV1:
+        p_str = gst_structure_new_empty( "video/x-av1" );
         break;
     case VLC_CODEC_MPGV:
         p_str = gst_structure_new_empty( "video/mpeg" );

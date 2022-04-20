@@ -51,12 +51,13 @@ static void get_custom_from_packedyuv422( picture_t *, picture_t *, int * );
 
 
 #define COMPONENT_TEXT N_("RGB component to extract")
-#define COMPONENT_LONGTEXT N_("RGB component to extract. 0 for Red, 1 for Green and 2 for Blue.")
+#define COMPONENT_LONGTEXT N_("RGB component to extract, as an RGB hexadecimal mask. "\
+    "E.g. 0xFF0000 for red; 0x00FF00 for green and 0x0000FF for blue.")
 #define FILTER_PREFIX "extract-"
 
 static const int pi_component_values[] = { 0xFF0000, 0x00FF00, 0x0000FF };
 static const char *const ppsz_component_descriptions[] = {
-    "Red", "Green", "Blue" };
+    N_("Red"), N_("Green"), N_("Blue") };
 
 /*****************************************************************************
  * Module descriptor
@@ -64,7 +65,6 @@ static const char *const ppsz_component_descriptions[] = {
 vlc_module_begin ()
     set_description( N_("Extract RGB component video filter") )
     set_shortname( N_("Extract" ))
-    set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
     add_shortcut( "extract" )
 

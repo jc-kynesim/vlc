@@ -23,8 +23,6 @@
 #ifndef VLC_D3D_SHADERS_H
 #define VLC_D3D_SHADERS_H
 
-#include <d3dcompiler.h> // for pD3DCompile
-
 #include "../../video_chroma/dxgi_fmt.h"
 
 #include <vlc_es.h>
@@ -45,6 +43,7 @@ typedef struct {
     bool                     b_full_range;
     unsigned                 luminance_peak;
     const d3d_format_t       *pixelFormat;
+    video_orientation_t      orientation;
 } display_info_t;
 
 /* structures passed to the pixel shader */
@@ -118,7 +117,7 @@ void D3D_SetupQuad(vlc_object_t *, const video_format_t *, d3d_quad_t *,
                    const display_info_t *);
 
 bool D3D_QuadSetupBuffers(vlc_object_t *, d3d_quad_t *, video_projection_mode_t);
-bool D3D_SetupQuadData(vlc_object_t *, d3d_quad_t *, const RECT *, d3d_vertex_t*, void *, video_orientation_t);
+bool D3D_SetupQuadData(vlc_object_t *, d3d_quad_t *, const RECT *, d3d_vertex_t*, void *, video_transform_t);
 
 void D3D_UpdateViewpoint(d3d_quad_t *, const vlc_viewpoint_t *, float f_sar);
 

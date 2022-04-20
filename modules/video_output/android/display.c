@@ -56,7 +56,6 @@ static void Close(vout_display_t *vd);
 static void SubpicturePrepare(vout_display_t *vd, subpicture_t *subpicture);
 
 vlc_module_begin()
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     set_description("Android video output")
     add_shortcut("android-display")
@@ -625,7 +624,7 @@ static void ClearSurface(vout_display_t *vd)
         vlc_gl_ReleaseCurrent(gl);
 
 end:
-        vlc_gl_Release(gl);
+        vlc_gl_Delete(gl);
     }
     else
     {

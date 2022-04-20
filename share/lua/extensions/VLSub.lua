@@ -93,7 +93,7 @@ local options = {
     int_os_password = 'Password',
     int_help_mess =[[
       Download subtitles from
-      <a href='http://www.opensubtitles.org/'>
+      <a href='https://www.opensubtitles.org/'>
       opensubtitles.org
       </a> and display them while watching a video.<br>
       <br>
@@ -130,7 +130,7 @@ local options = {
       they're important.<br>
       <br>
       Find more VLC extensions at
-      <a href='http://addons.videolan.org'>addons.videolan.org</a>.
+      <a href='https://addons.videolan.org'>addons.videolan.org</a>.
       ]],
     int_no_support_mess = [[
       <strong>VLSub is not working with VLC 2.1.x on
@@ -332,7 +332,7 @@ function descriptor()
     title = "VLsub 0.11.1",
     version = "0.11.1",
     author = "exebetche",
-    url = 'http://www.opensubtitles.org/',
+    url = 'https://www.opensubtitles.org/',
     shortdesc = "VLsub";
     description = options.translation.int_descr,
     capabilities = {"menu", "input-listener" }
@@ -664,9 +664,14 @@ function check_config()
   local filePath	= slash.."vlsub_conf.xml"
 
   openSub.conf.dirPath = vlc.config.userdatadir()
+  local res,err = vlc.io.mkdir( openSub.conf.dirPath, "0700" )
+  if res ~= 0 and err ~= vlc.errno.EEXIST then
+    vlc.msg.warn("Failed to create " .. openSub.conf.dirPath)
+    return false
+  end
   local subdirs = { "lua", "extensions", "userdata", "vlsub" }
   for _, dir in ipairs(subdirs) do
-    local res, err = vlc.io.mkdir( openSub.conf.dirPath .. slash .. dir, "0700" )
+    res, err = vlc.io.mkdir( openSub.conf.dirPath .. slash .. dir, "0700" )
     if res ~= 0 and err ~= vlc.errno.EEXIST then
       vlc.msg.warn("Failed to create " .. openSub.conf.dirPath .. slash .. dir )
       return false
@@ -923,7 +928,7 @@ function get_available_translations()
 -- causing error  with github https CA certficate on OS X an XP)
 -- https://github.com/exebetche/vlsub/tree/master/locale
 
-  local translations_url = "http://addons.videolan.org/CONTENT/"..
+  local translations_url = "https://addons.videolan.org/CONTENT/"..
     "content-files/148752-vlsub_translations.xml"
 
   if input_table['intLangBut']:get_text() == lang["int_search_transl"]
@@ -1007,7 +1012,7 @@ openSub = {
   itemStore = nil,
   actionLabel = "",
   conf = {
-    url = "http://api.opensubtitles.org/xml-rpc",
+    url = "https://api.opensubtitles.org/xml-rpc",
     path = nil,
     userAgentHTTP = "VLSub",
     useragent = "VLSub 0.11.1",

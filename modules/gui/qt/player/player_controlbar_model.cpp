@@ -26,8 +26,9 @@
 
 decltype (PlayerControlbarModel::playerIdentifierDictionary)
     PlayerControlbarModel::playerIdentifierDictionary {
-        {Mainplayer, N_("Mainplayer")},
-        {Miniplayer, N_("Miniplayer")}
+        {Videoplayer, N_("Video player")},
+        {Audioplayer, N_("Audio player")},
+        {Miniplayer,  N_("Mini player")}
     };
 
 QJSValue PlayerControlbarModel::getPlaylistIdentifierListModel(QQmlEngine *engine, QJSEngine *scriptEngine)

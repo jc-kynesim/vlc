@@ -21,11 +21,12 @@ pragma Singleton
 import QtQuick 2.11
 
 import org.videolan.vlc 0.1
+import org.videolan.compat 0.1
 
 Item {
     id: root
 
-    property real uiTransluency: (enabled && topWindow.active) ? 1 : 0
+    property real uiTransluency: (enabled && MainCtx.intfMainWindow.active) ? 1 : 0
 
     enabled: MainCtx.hasAcrylicSurface
 
@@ -36,16 +37,10 @@ Item {
         }
     }
 
-    Binding {
+    BindingCompat {
         when: root.enabled
         target: MainCtx
         property: "acrylicActive"
         value: root.uiTransluency != 0
-
-        Component.onCompleted: {
-            // restoreMode is only available in Qt >= 5.14
-            if ("restoreMode" in this)
-                this.restoreMode = Binding.RestoreBindingOrValue
-        }
     }
 }

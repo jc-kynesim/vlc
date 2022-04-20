@@ -83,13 +83,18 @@ void CompositorDummy::unloadGUI()
 
 bool CompositorDummy::setupVoutWindow(vout_window_t*, VoutDestroyCb)
 {
-    //dummy compositor doesn't handle window intergration
+    //dummy compositor doesn't handle window integration
     return false;
 }
 
 Compositor::Type CompositorDummy::type() const
 {
     return Compositor::DummyCompositor;
+}
+
+QQuickItem * CompositorDummy::activeFocusItem() const /* override */
+{
+    return m_qmlWidget->activeFocusItem();
 }
 
 }

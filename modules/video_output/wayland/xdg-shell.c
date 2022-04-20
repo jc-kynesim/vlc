@@ -272,7 +272,7 @@ static int Enable(vout_window_t *wnd, const vout_window_cfg_t *restrict cfg)
     if (cfg->is_decorated)
         return VLC_EGENERIC;
 #endif
-    vout_window_SetSize(wnd, cfg->width, cfg->height);
+    Resize(wnd, cfg->width, cfg->height);
     wl_surface_commit(wnd->handle.wl);
     wl_display_flush(display);
 #ifdef XDG_SHELL
@@ -806,7 +806,6 @@ vlc_module_begin()
     set_shortname(N_("WL shell"))
     set_description(N_("Wayland shell surface"))
 #endif
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
 #ifdef XDG_SHELL
     set_capability("vout window", 20)

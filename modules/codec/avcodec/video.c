@@ -47,6 +47,10 @@
 
 #include <libavutil/stereo3d.h>
 
+#if LIBAVUTIL_VERSION_CHECK( 57, 16, 100 )
+# include <libavutil/dovi_meta.h>
+#endif
+
 #include "../cc.h"
 #define FRAME_INFO_DEPTH 64
 
@@ -533,7 +537,9 @@ int InitVideoDec( vlc_object_t *obj )
     i_thread_count = __MIN( i_thread_count, p_codec->id == AV_CODEC_ID_HEVC ? 32 : 16 );
     msg_Dbg( p_dec, "allowing %d thread(s) for decoding", i_thread_count );
     p_context->thread_count = i_thread_count;
+#if LIBAVCODEC_VERSION_MAJOR < 60
     p_context->thread_safe_callbacks = true;
+#endif
 
     switch( p_codec->id )
     {
@@ -733,6 +739,34 @@ static void update_late_frame_count( decoder_t *p_dec, block_t *p_block,
    }
 }
 
+#if LIBAVUTIL_VERSION_CHECK( 57, 16, 100 )
+static void map_dovi_metadata( vlc_video_dovi_metadata_t *out,
+                               const AVDOVIMetadata *data )
+{
+    const AVDOVIRpuDataHeader *hdr = av_dovi_get_header( data );
+    const AVDOVIDataMapping *vdm = av_dovi_get_mapping( data );
+    const AVDOVIColorMetadata *color = av_dovi_get_color( data );
+    out->bl_bit_depth = hdr->bl_bit_depth;
+    out->el_bit_depth = hdr->el_bit_depth;
+    out->coef_log2_denom = hdr->coef_log2_denom;
+    out->nlq_method_idc = (enum vlc_dovi_nlq_method_t) vdm->nlq_method_idc;
+    for( size_t i = 0; i < ARRAY_SIZE( out->nonlinear_offset ); i++ )
+        out->nonlinear_offset[i] = av_q2d( color->ycc_to_rgb_offset[i] );
+    for( size_t i = 0; i < ARRAY_SIZE( out->nonlinear_matrix ); i++ )
+        out->nonlinear_matrix[i] = av_q2d( color->ycc_to_rgb_matrix[i] );
+    for( size_t i = 0; i < ARRAY_SIZE( out->linear_matrix); i++ )
+        out->linear_matrix[i] = av_q2d( color->rgb_to_lms_matrix[i] );
+    out->source_min_pq = color->source_min_pq;
+    out->source_max_pq = color->source_max_pq;
+
+    static_assert(sizeof(out->curves) == sizeof(vdm->curves), "struct mismatch");
+    static_assert(sizeof(out->nlq)    == sizeof(vdm->nlq),    "struct mismatch");
+    memcpy(out->curves, vdm->curves, sizeof(out->curves));
+    memcpy(out->nlq,    vdm->nlq,    sizeof(out->nlq));
+    for( int i = 0; i < ARRAY_SIZE( out->curves ); i++)
+        assert( out->curves[i].num_pivots <= ARRAY_SIZE( out->curves[i].pivots ));
+}
+#endif
 
 static int DecodeSidedata( decoder_t *p_dec, const AVFrame *frame, picture_t *p_pic )
 {
@@ -886,6 +920,19 @@ static int DecodeSidedata( decoder_t *p_dec, const AVFrame *frame, picture_t *p_
             cc_Flush( &p_sys->cc );
         }
     }
+
+#if LIBAVUTIL_VERSION_CHECK( 57, 16, 100 )
+    const AVFrameSideData *p_dovi = av_frame_get_side_data( frame, AV_FRAME_DATA_DOVI_METADATA );
+    if( p_dovi )
+    {
+        vlc_video_dovi_metadata_t *dst;
+        dst = picture_AttachNewAncillary( p_pic, VLC_ANCILLARY_ID_DOVI, sizeof(*dst) );
+        if( !dst )
+            return VLC_ENOMEM;
+        map_dovi_metadata( dst, (AVDOVIMetadata *) p_dovi->data );
+    }
+#endif
+
     return 0;
 }
 
@@ -1648,7 +1695,7 @@ no_reuse:
         return swfmt;
     }
 
-#if LIBAVCODEC_VERSION_CHECK(57, 83, 101) && 0
+#if !LIBAVCODEC_VERSION_CHECK(57, 83, 101)
     if (p_context->active_thread_type)
     {
         msg_Warn(p_dec, "thread type %d: disabling hardware acceleration",

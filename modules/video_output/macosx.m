@@ -74,7 +74,6 @@ vlc_module_begin ()
     /* Will be loaded even without interface module. see voutgl.m */
     set_shortname ("Mac OS X")
     set_description (N_("Mac OS X OpenGL video output"))
-    set_category (CAT_VIDEO)
     set_subcategory (SUBCAT_VIDEO_VOUT)
     set_callback_display(Open, 300)
     add_shortcut ("macosx", "vout_macosx")
@@ -533,7 +532,7 @@ static void OpenglSwap (vlc_gl_t *gl)
 }
 
 /**
- * Gets called when the vout will aquire the lock and flush.
+ * Gets called when the vout will acquire the lock and flush.
  * (Non main thread).
  */
 - (void)setVoutFlushing:(BOOL)flushing

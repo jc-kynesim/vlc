@@ -17,27 +17,32 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Layouts 1.11
-import QtQuick.Controls 2.4
+import QtQuick.Templates 2.4 as T
 import QtGraphicalEffects 1.0
+
 import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-FocusScope{
-    id: widgetfscope
+T.Pane {
+    id: root
 
-    implicitWidth: volumeWidget.implicitWidth
-    implicitHeight: volumeWidget.implicitHeight
-
-    property bool paintOnly: false
-
-    property color color: colors.buttonText
     property VLCColors colors: VLCStyle.colors
+    property color color: colors.accent
+    property bool paintOnly: false
+    readonly property var _player: paintOnly ? ({ muted: false, volume: .5 }) : Player
 
-    readonly property var _player: paintOnly ? ({ muted: false, volume: .5 }) : player
+    implicitWidth: Math.max(background ? background.implicitWidth : 0, contentWidth + leftPadding + rightPadding)
+    implicitHeight: Math.max(background ? background.implicitHeight : 0, contentHeight + topPadding + bottomPadding)
 
-    RowLayout{
+    contentWidth: volumeWidget.implicitWidth
+    contentHeight: volumeWidget.implicitHeight
+
+    Keys.priority: Keys.AfterItem
+    Keys.onPressed: Navigation.defaultKeyAction(event)
+
+    RowLayout {
         id: volumeWidget
 
         anchors.fill: parent
@@ -47,7 +52,7 @@ FocusScope{
             id: volumeBtn
 
             focus: true
-            paintOnly: widgetfscope.paintOnly
+            paintOnly: root.paintOnly
             size: VLCStyle.icon_normal
             iconText:
                 if( _player.muted )
@@ -60,20 +65,23 @@ FocusScope{
                     VLCIcons.volume_medium
                 else
                     VLCIcons.volume_high
-            text: i18n.qtr("Mute")
-            color: widgetfscope.color
+            text: I18n.qtr("Mute")
+            color: colors.buttonText
             colorHover: colors.buttonTextHover
             colorFocus: colors.bgFocus
-            onClicked: player.muted = !player.muted
+            onClicked: Player.muted = !Player.muted
 
-            Navigation.parentItem: widgetfscope
+            Navigation.parentItem: root
             Navigation.rightItem: volControl
         }
 
-        Slider {
+        T.Slider {
             id: volControl
 
             implicitWidth: VLCStyle.dp(100, VLCStyle.scale)
+            implicitHeight: Math.max(background ? background.implicitHeight : 0,
+                                    (handle ? handle.implicitHeight : 0) + topPadding + bottomPadding)
+
             Layout.fillHeight: true
             Layout.margins: VLCStyle.dp(5, VLCStyle.scale)
 
@@ -84,7 +92,7 @@ FocusScope{
             stepSize: 0.05
             opacity: _player.muted ? 0.5 : 1
 
-            Accessible.name: i18n.qtr("Volume")
+            Accessible.name: I18n.qtr("Volume")
 
             Keys.onPressed: {
                 if (KeyHelper.matchOk(event)) {
@@ -96,7 +104,7 @@ FocusScope{
 
             Keys.onReleased: {
                 if (KeyHelper.matchOk(event)) {
-                    player.muted = !player.muted
+                    Player.muted = !Player.muted
                 }
             }
 
@@ -107,12 +115,12 @@ FocusScope{
             }
 
             Component.onCompleted: {
-                widgetfscope.paintOnlyChanged.connect(_syncVolumeWithPlayer)
+                root.paintOnlyChanged.connect(_syncVolumeWithPlayer)
                 volControl._syncVolumeWithPlayer()
             }
 
             Connections {
-                target: player
+                target: Player
                 enabled: !paintOnly
 
                 onVolumeChanged: volControl._syncVolumeWithPlayer()
@@ -127,7 +135,7 @@ FocusScope{
             }
 
             Navigation.leftItem: volumeBtn
-            Navigation.parentItem: widgetfscope
+            Navigation.parentItem: root
 
             Keys.onUpPressed: {
                 volControl.increase()
@@ -141,7 +149,7 @@ FocusScope{
 
             Keys.priority: Keys.BeforeItem
 
-            readonly property color sliderColor: (volControl.position > fullvolpos) ? colors.volmax : widgetfscope.color
+            readonly property color sliderColor: (volControl.position > fullvolpos) ? colors.volmax : root.color
             readonly property int maxvol: 125
             readonly property real fullvolpos: 100 / maxvol
             readonly property real maxvolpos: maxvol / 100
@@ -151,10 +159,10 @@ FocusScope{
                     return
 
                 if (!volControl._inhibitPlayerVolumeUpdate) {
-                    if (player.muted)
-                        player.muted = false
+                    if (Player.muted)
+                        Player.muted = false
 
-                    player.volume = volControl.value
+                    Player.volume = volControl.value
                 }
             }
 
@@ -169,7 +177,7 @@ FocusScope{
 
                     pos: Qt.point(handle.x + handle.width / 2, handle.y)
 
-                    colors: widgetfscope.colors
+                    colors: root.colors
                 }
             }
 
@@ -189,18 +197,7 @@ FocusScope{
                     width: volControl.visualPosition * sliderBg.width
                     height: parent.height
                     radius: VLCStyle.dp(4, VLCStyle.scale)
-                    color: widgetfscope.color
-                    layer.enabled: (paintOnly || volControl.hovered || volControl.activeFocus)
-                    layer.effect: LinearGradient {
-                        start: Qt.point(0, 0)
-                        end: Qt.point(sliderBg.width, 0)
-                        gradient: Gradient {
-                            GradientStop { position: 0.30; color: colors.volbelowmid }
-                            GradientStop { position: 0.80; color: colors.volabovemid }
-                            GradientStop { position: 0.85; color: colors.volhigh }
-                            GradientStop { position: 1.00; color: colors.volmax }
-                        }
-                    }
+                    color: root.color
                 }
                 Rectangle{
                     id: tickmark
@@ -208,7 +205,7 @@ FocusScope{
                     width: VLCStyle.dp(1, VLCStyle.scale)
                     height: parent.height
                     radius: VLCStyle.dp(2, VLCStyle.scale)
-                    color: widgetfscope.color
+                    color: root.color
                 }
             }
 

@@ -34,11 +34,10 @@ FocusScope {
 
     // Properties
 
-    readonly property int contentMargin: (MainCtx.gridView
-                                          &&
-                                          _currentView) ? _currentView.contentMargin : 0
+    readonly property int contentMargin: (_currentView.contentMargin) ? _currentView.contentMargin
+                                                                      : 0
 
-    // NOTE: Specify an optionnal header for the view.
+    // NOTE: Specify an optional header for the view.
     property Component header: undefined
 
     property Item headerItem: (_currentView) ? _currentView.headerItem : undefined
@@ -47,11 +46,14 @@ FocusScope {
 
     property int initialIndex: 0
 
-    property var model: MLVideoModel { ml: medialib }
+    /* required */ property var model
+
+    // NOTE: The ContextMenu depends on the model so we have to provide it too.
+    /* required */ property var contextMenu
 
     property var sortModel: [
-        { text: i18n.qtr("Alphabetic"), criteria: "title"    },
-        { text: i18n.qtr("Duration"),   criteria: "duration" }
+        { text: I18n.qtr("Alphabetic"), criteria: "title"    },
+        { text: I18n.qtr("Duration"),   criteria: "duration" }
     ]
 
     // Aliases
@@ -74,8 +76,8 @@ FocusScope {
         target: MainCtx
 
         onGridViewChanged: {
-            if (MainCtx.gridView) view.replace(grid);
-            else                        view.replace(list);
+            if (MainCtx.gridView) view.replace(grid)
+            else                  view.replace(list)
         }
     }
 
@@ -110,34 +112,51 @@ FocusScope {
             _currentView.positionViewAtIndex(initialIndex, ItemView.Contain)
     }
 
-    // Private
+    function getLabel(model) {
+        if (!model) return ""
 
-    function _actionAtIndex() {
-        g_mainDisplay.showPlayer();
-
-        medialib.addAndPlay(model.getIdsForIndexes(modelSelect.selectedIndexes));
+        return [
+            model.resolution_name || "",
+            model.channel || ""
+        ].filter(function(a) { return a !== "" })
     }
 
     // Events
 
+    function onAction(indexes) {
+        g_mainDisplay.showPlayer()
+
+        MediaLib.addAndPlay(model.getIdsForIndexes(indexes))
+    }
+
+    function onDoubleClick(object) {
+        g_mainDisplay.play(MediaLib, object.id)
+    }
+
+    function onLabelGrid(object) { return getLabel(object) }
+    function onLabelList(object) { return getLabel(object) }
+
+    // Private events
+
     function _onNavigationUp() {
+        // NOTE: We are calling the header focus function when we have one.
         if (headerItem && headerItem.focus)
-            headerItem.setCurrentItemFocus(Qt.TabFocusReason);
+            headerItem.forceActiveFocus(Qt.TabFocusReason)
         else
-            Navigation.defaultNavigationUp();
+            Navigation.defaultNavigationUp()
     }
 
     function _onNavigationCancel() {
         if (_currentView.currentIndex <= 0) {
-            Navigation.defaultNavigationCancel();
+            Navigation.defaultNavigationCancel()
         } else {
-            _currentView.currentIndex = 0;
+            _currentView.currentIndex = 0
 
-            _currentView.positionViewAtIndex(0, ItemView.Contain);
+            _currentView.positionViewAtIndex(0, ItemView.Contain)
         }
     }
 
-    // Childs
+    // Children
 
     Widgets.StackViewExt {
         id: view
@@ -157,16 +176,12 @@ FocusScope {
         indexes: modelSelect.selectedIndexes
 
         coverRole: "thumbnail"
+
+        defaultCover: VLCStyle.noArtVideoCover
     }
 
     Util.SelectableDelegateModel {
         id: modelSelect
-
-        model: root.model
-    }
-
-    VideoContextMenu {
-        id: contextMenu
 
         model: root.model
     }
@@ -188,34 +203,20 @@ FocusScope {
 
             model: root.model
 
-            delegateModel: modelSelect
+            selectionDelegateModel: modelSelect
 
             headerDelegate: root.header
 
             activeFocusOnTab: true
 
+            // Navigation
+
             Navigation.parentItem: root
 
             Navigation.upAction: _onNavigationUp
 
-            //cancelAction takes a *function* pass it directly
+            // NOTE: cancelAction takes a function, we pass it directly.
             Navigation.cancelAction: root._onNavigationCancel
-
-            expandDelegate: VideoInfoExpandPanel {
-                width: gridView.width
-
-                x: 0
-
-                model: root.model
-
-                Navigation.parentItem: gridView
-
-                Navigation.cancelAction: function() { gridView.retract() }
-                Navigation.upAction    : function() { gridView.retract() }
-                Navigation.downAction  : function() { gridView.retract() }
-
-                onRetract: gridView.retract()
-            }
 
             // Events
 
@@ -229,21 +230,17 @@ FocusScope {
                 modelSelect.select(model.index(0,0), ItemSelectionModel.ClearAndSelect);
             }
 
-            onSelectAll: modelSelect.selectAll()
-
-            onSelectionUpdated: modelSelect.updateSelection(keyModifiers, oldIndex, newIndex)
-
-            onActionAtIndex: _actionAtIndex()
+            onActionAtIndex: root.onAction(modelSelect.selectedIndexes)
 
             // Connections
 
             Connections {
-                target: contextMenu
+                target: root.contextMenu
 
                 onShowMediaInformation: gridView.switchExpandItem(index)
             }
 
-            // Childs
+            // Children
 
             Widgets.GridShadows {
                 id: shadows
@@ -266,6 +263,8 @@ FocusScope {
                           &&
                           gridView.expandIndex !== gridItem.index) ? 0.7 : 1
 
+                labels: root.onLabelGrid(model)
+
                 // FIXME: Sometimes MLBaseModel::getDataAt returns {} so we use 'isNew === true'.
                 showNewIndicator: (model.isNew === true)
 
@@ -278,18 +277,34 @@ FocusScope {
 
                 onItemClicked: gridView.leftClickOnItem(modifier, index)
 
-                onItemDoubleClicked: g_mainDisplay.play(medialib, model.id)
+                onItemDoubleClicked: root.onDoubleClick(model)
 
                 onContextMenuButtonClicked: {
                     gridView.rightClickOnItem(index);
 
-                    contextMenu.popup(modelSelect.selectedIndexes, globalMousePos,
-                                      { "information" : index });
+                    root.contextMenu.popup(modelSelect.selectedIndexes, globalMousePos,
+                                           { "information" : index });
                 }
 
                 // Animations
 
                 Behavior on opacity { NumberAnimation { duration: VLCStyle.duration_faster } }
+            }
+
+            expandDelegate: VideoInfoExpandPanel {
+                width: gridView.width
+
+                x: 0
+
+                model: root.model
+
+                Navigation.parentItem: gridView
+
+                Navigation.cancelAction: function() { gridView.retract() }
+                Navigation.upAction    : function() { gridView.retract() }
+                Navigation.downAction  : function() { gridView.retract() }
+
+                onRetract: gridView.retract()
             }
         }
     }
@@ -297,9 +312,10 @@ FocusScope {
     Component {
         id: list
 
-        VideoListDisplay
-        {
+        VideoListDisplay {
             id: listView
+
+            readonly property real contentMargin: VLCStyle.margin_normal
 
             // Settings
 
@@ -317,6 +333,8 @@ FocusScope {
 
             activeFocusOnTab: true
 
+            // Navigation
+
             Navigation.parentItem: root
 
             Navigation.upAction: _onNavigationUp
@@ -326,14 +344,17 @@ FocusScope {
 
             // Events
 
-            onActionForSelection: _actionAtIndex()
+            onActionForSelection: root.onAction(modelSelect.selectedIndexes)
 
-            onItemDoubleClicked: g_mainDisplay.play(medialib, model.id)
+            onItemDoubleClicked: root.onDoubleClick(model)
 
-            onContextMenuButtonClicked: contextMenu.popup(modelSelect.selectedIndexes,
-                                                          menuParent.mapToGlobal(0,0))
+            onContextMenuButtonClicked: root.contextMenu.popup(modelSelect.selectedIndexes, globalMousePos)
 
-            onRightClick: contextMenu.popup(modelSelect.selectedIndexes, globalMousePos)
+            onRightClick: root.contextMenu.popup(modelSelect.selectedIndexes, globalMousePos)
+
+            // Functions
+
+            function onLabels(model) { return root.onLabelList(model); }
         }
     }
 
@@ -345,12 +366,12 @@ FocusScope {
 
         visible: (model.count === 0)
 
-        text: i18n.qtr("No video found\nPlease try adding sources, by going to the Network tab")
+        focus: visible
+
+        text: I18n.qtr("No video found\nPlease try adding sources, by going to the Network tab")
 
         cover: VLCStyle.noArtVideoCover
 
         Navigation.parentItem: root
-
-        focus: visible
     }
 }

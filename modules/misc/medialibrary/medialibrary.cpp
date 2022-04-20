@@ -32,7 +32,6 @@
 #include "fs/devicelister.h"
 
 #include <medialibrary/IMedia.h>
-#include <medialibrary/IAlbumTrack.h>
 #include <medialibrary/IAlbum.h>
 #include <medialibrary/IArtist.h>
 #include <medialibrary/IGenre.h>
@@ -87,6 +86,7 @@ void assignToEvent( vlc_ml_event_t* ev, vlc_ml_genre_t* g )    { ev->creation.p_
 void assignToEvent( vlc_ml_event_t* ev, vlc_ml_group_t* g )    { ev->creation.p_group    = g; }
 void assignToEvent( vlc_ml_event_t* ev, vlc_ml_playlist_t* p ) { ev->creation.p_playlist = p; }
 void assignToEvent( vlc_ml_event_t* ev, vlc_ml_bookmark_t* b ) { ev->creation.p_bookmark = b; }
+void assignToEvent( vlc_ml_event_t* ev, vlc_ml_folder_t* f )   { ev->creation.p_folder = f; }
 
 template <typename To, typename From>
 void wrapEntityCreatedEventCallback( vlc_medialibrary_module_t* ml,
@@ -252,6 +252,24 @@ void MediaLibrary::onBookmarksDeleted( std::set<int64_t> bookmarkIds )
                                     VLC_ML_EVENT_BOOKMARKS_DELETED );
 }
 
+void MediaLibrary::onFoldersAdded( std::vector<medialibrary::FolderPtr> folders )
+{
+    wrapEntityCreatedEventCallback<vlc_ml_folder_t>( m_vlc_ml, folders,
+                                                     VLC_ML_EVENT_FOLDER_ADDED );
+}
+
+void MediaLibrary::onFoldersModified( std::set<int64_t> folderIds )
+{
+    wrapEntityModifiedEventCallback( m_vlc_ml, folderIds,
+                                     VLC_ML_EVENT_FOLDER_UPDATED );
+}
+
+void MediaLibrary::onFoldersDeleted( std::set<int64_t> folderIds )
+{
+    wrapEntityDeletedEventCallback( m_vlc_ml, folderIds,
+                                    VLC_ML_EVENT_FOLDER_DELETED );
+}
+
 void MediaLibrary::onDiscoveryStarted()
 {
     vlc_ml_event_t ev;
@@ -385,7 +403,21 @@ MediaLibrary* MediaLibrary::create( vlc_medialibrary_module_t* vlc_ml )
     auto mlDir = std::string{ userDir.get() } + "/ml/";
     auto dbPath = mlDir + "ml.db";
     auto mlFolderPath = mlDir + "mlstorage/";
-    auto ml = NewMediaLibrary( dbPath.c_str(), mlFolderPath.c_str(), true );
+    medialibrary::SetupConfig cfg;
+    cfg.deviceListers = { { "smb://", std::make_shared<vlc::medialibrary::DeviceLister>(
+                                           VLC_OBJECT(vlc_ml) ) } };
+    cfg.fsFactories = {
+        std::make_shared<vlc::medialibrary::SDFileSystemFactory>(
+                                    VLC_OBJECT( vlc_ml ), "file://"),
+        std::make_shared<vlc::medialibrary::SDFileSystemFactory>(
+                                    VLC_OBJECT( vlc_ml ), "smb://")
+    };
+
+    cfg.parserServices = {
+        std::make_shared<MetadataExtractor>( VLC_OBJECT( vlc_ml ) )
+    };
+
+    auto ml = NewMediaLibrary( dbPath.c_str(), mlFolderPath.c_str(), true, &cfg );
     if ( !ml )
         return nullptr;
 
@@ -409,12 +441,6 @@ bool MediaLibrary::Init()
     if( m_initialized )
         return true;
 
-    m_ml->registerDeviceLister( std::make_shared<vlc::medialibrary::DeviceLister>(
-                                    VLC_OBJECT(m_vlc_ml) ), "smb://" );
-    m_ml->addFileSystemFactory( std::make_shared<vlc::medialibrary::SDFileSystemFactory>(
-                                    VLC_OBJECT( m_vlc_ml ), m_ml.get(), "file://") );
-    m_ml->addFileSystemFactory( std::make_shared<vlc::medialibrary::SDFileSystemFactory>(
-                                    VLC_OBJECT( m_vlc_ml ), m_ml.get(), "smb://") );
     auto initStatus = m_ml->initialize( this );
     switch ( initStatus )
     {
@@ -453,7 +479,6 @@ bool MediaLibrary::Init()
         }
     }
 
-    m_ml->addParserService( std::make_shared<MetadataExtractor>( VLC_OBJECT( m_vlc_ml ) ) );
     try
     {
         m_ml->addThumbnailer( std::make_shared<Thumbnailer>( m_vlc_ml ) );
@@ -719,10 +744,39 @@ int MediaLibrary::List( int listQuery, const vlc_ml_query_params_t* params, va_l
         psz_pattern = params->psz_pattern;
         paramsPtr = &p;
     }
+
+    medialibrary::IMedia::Type type = medialibrary::IMedia::Type::Unknown;
+
     switch ( listQuery )
     {
         case VLC_ML_LIST_MEDIA_OF:
         case VLC_ML_COUNT_MEDIA_OF:
+            // N/A default value
+            break;
+        case VLC_ML_LIST_VIDEO_OF:
+        case VLC_ML_COUNT_VIDEO_OF:
+            type = medialibrary::IMedia::Type::Video;
+            break;
+        case VLC_ML_LIST_AUDIO_OF:
+        case VLC_ML_COUNT_AUDIO_OF:
+            type = medialibrary::IMedia::Type::Audio;
+            break;
+        case VLC_ML_LIST_FOLDERS_BY_TYPE:
+        case VLC_ML_COUNT_FOLDERS_BY_TYPE:
+            type = static_cast<medialibrary::IMedia::Type>(va_arg(args, int));
+            break;
+        default:
+            break;
+    }
+
+    switch ( listQuery )
+    {
+        case VLC_ML_LIST_MEDIA_OF:
+        case VLC_ML_COUNT_MEDIA_OF:
+        case VLC_ML_LIST_VIDEO_OF:
+        case VLC_ML_COUNT_VIDEO_OF:
+        case VLC_ML_LIST_AUDIO_OF:
+        case VLC_ML_COUNT_AUDIO_OF:
         case VLC_ML_LIST_ARTISTS_OF:
         case VLC_ML_COUNT_ARTISTS_OF:
         case VLC_ML_LIST_ALBUMS_OF:
@@ -734,6 +788,7 @@ int MediaLibrary::List( int listQuery, const vlc_ml_query_params_t* params, va_l
         default:
             break;
     }
+
     switch( listQuery )
     {
         case VLC_ML_LIST_ALBUM_TRACKS:
@@ -950,7 +1005,14 @@ int MediaLibrary::List( int listQuery, const vlc_ml_query_params_t* params, va_l
         case VLC_ML_COUNT_GROUPS:
         case VLC_ML_LIST_GROUP_MEDIA:
         case VLC_ML_COUNT_GROUP_MEDIA:
-            return listGroup( listQuery, paramsPtr, psz_pattern, nbItems, offset, args );
+            return listGroup( listQuery, paramsPtr, type, psz_pattern, nbItems, offset, args );
+        case VLC_ML_LIST_FOLDERS:
+        case VLC_ML_COUNT_FOLDERS:
+        case VLC_ML_LIST_FOLDERS_BY_TYPE:
+        case VLC_ML_COUNT_FOLDERS_BY_TYPE:
+        case VLC_ML_LIST_FOLDER_MEDIA:
+        case VLC_ML_COUNT_FOLDER_MEDIA:
+            return listFolder( listQuery, paramsPtr, type, psz_pattern, nbItems, offset, args );
         case VLC_ML_LIST_PLAYLIST_MEDIA:
         case VLC_ML_COUNT_PLAYLIST_MEDIA:
         case VLC_ML_LIST_PLAYLISTS:
@@ -1043,42 +1105,6 @@ int MediaLibrary::List( int listQuery, const vlc_ml_query_params_t* params, va_l
             if ( parent == nullptr )
                 return VLC_EGENERIC;
             const auto query = parent->subfolders();
-            *( va_arg( args, size_t* ) ) = query == nullptr ? 0 : query->count();
-            break;
-        }
-        case VLC_ML_LIST_FOLDERS:
-        {
-            const auto query = m_ml->folders( medialibrary::IMedia::Type::Unknown, paramsPtr );
-            if ( query == nullptr )
-                return VLC_EGENERIC;
-            auto* res = ml_convert_list<vlc_ml_folder_list_t, vlc_ml_folder_t>( query->all() );
-            *( va_arg( args, vlc_ml_folder_list_t** ) ) = res;
-            break;
-        }
-        case VLC_ML_COUNT_FOLDERS:
-        {
-            const auto query = m_ml->folders( medialibrary::IMedia::Type::Unknown, paramsPtr );
-            *( va_arg( args, size_t* ) ) = query == nullptr ? 0 : query->count();
-            break;
-        }
-        case VLC_ML_LIST_FOLDER_MEDIAS:
-        {
-            const auto folder = m_ml->folder( va_arg( args, int64_t ) );
-            if ( folder == nullptr )
-                return VLC_EGENERIC;
-            const auto query = folder->media( medialibrary::IMedia::Type::Unknown, paramsPtr );
-            if ( query == nullptr )
-                return VLC_EGENERIC;
-            auto* res = ml_convert_list<vlc_ml_media_list_t, vlc_ml_media_t>( query->all() );
-            *( va_arg( args, vlc_ml_media_list_t** ) ) = res;
-            break;
-        }
-        case VLC_ML_COUNT_FOLDER_MEDIAS:
-        {
-            const auto folder = m_ml->folder( va_arg( args, int64_t ) );
-            if ( folder == nullptr )
-                return VLC_EGENERIC;
-            const auto query = folder->media( medialibrary::IMedia::Type::Unknown, paramsPtr );
             *( va_arg( args, size_t* ) ) = query == nullptr ? 0 : query->count();
             break;
         }
@@ -1369,7 +1395,8 @@ int MediaLibrary::controlMedia( int query, va_list args )
     switch( query )
     {
         case VLC_ML_MEDIA_UPDATE_PROGRESS:
-            if ( m->setLastPosition( va_arg( args, double ) ) == false )
+            if ( m->setLastPosition( va_arg( args, double ) ) ==
+                    medialibrary::IMedia::ProgressResult::Error )
                 return VLC_EGENERIC;
             return VLC_SUCCESS;
         case VLC_ML_MEDIA_GET_MEDIA_PLAYBACK_STATE:
@@ -1484,6 +1511,8 @@ int MediaLibrary::filterListChildrenQuery( int query, int parentType )
     switch( query )
     {
         case VLC_ML_LIST_MEDIA_OF:
+        case VLC_ML_LIST_VIDEO_OF:
+        case VLC_ML_LIST_AUDIO_OF:
             switch ( parentType )
             {
                 case VLC_ML_PARENT_ALBUM:
@@ -1496,12 +1525,16 @@ int MediaLibrary::filterListChildrenQuery( int query, int parentType )
                     return VLC_ML_LIST_GENRE_TRACKS;
                 case VLC_ML_PARENT_GROUP:
                     return VLC_ML_LIST_GROUP_MEDIA;
+                case VLC_ML_PARENT_FOLDER:
+                    return VLC_ML_LIST_FOLDER_MEDIA;
                 case VLC_ML_PARENT_PLAYLIST:
                     return VLC_ML_LIST_PLAYLIST_MEDIA;
                 default:
                     vlc_assert_unreachable();
             }
         case VLC_ML_COUNT_MEDIA_OF:
+        case VLC_ML_COUNT_VIDEO_OF:
+        case VLC_ML_COUNT_AUDIO_OF:
             switch ( parentType )
             {
                 case VLC_ML_PARENT_ALBUM:
@@ -1514,6 +1547,8 @@ int MediaLibrary::filterListChildrenQuery( int query, int parentType )
                     return VLC_ML_COUNT_GENRE_TRACKS;
                 case VLC_ML_PARENT_GROUP:
                     return VLC_ML_COUNT_GROUP_MEDIA;
+                case VLC_ML_PARENT_FOLDER:
+                    return VLC_ML_COUNT_FOLDER_MEDIA;
                 case VLC_ML_PARENT_PLAYLIST:
                     return VLC_ML_COUNT_PLAYLIST_MEDIA;
                 default:
@@ -1770,7 +1805,8 @@ int MediaLibrary::listGenre( int listQuery, const medialibrary::QueryParameters*
 }
 
 int MediaLibrary::listGroup( int listQuery, const medialibrary::QueryParameters* paramsPtr,
-                             const char* pattern, uint32_t nbItems, uint32_t offset, va_list args )
+                             medialibrary::IMedia::Type type, const char* pattern,
+                             uint32_t nbItems, uint32_t offset, va_list args )
 {
     switch( listQuery )
     {
@@ -1782,7 +1818,7 @@ int MediaLibrary::listGroup( int listQuery, const medialibrary::QueryParameters*
             if ( pattern )
                 query = m_ml->searchMediaGroups( pattern, paramsPtr );
             else
-                query = m_ml->mediaGroups( medialibrary::IMedia::Type::Unknown, paramsPtr );
+                query = m_ml->mediaGroups( type, paramsPtr );
 
             if ( query == nullptr )
                 return VLC_EGENERIC;
@@ -1815,10 +1851,9 @@ int MediaLibrary::listGroup( int listQuery, const medialibrary::QueryParameters*
             medialibrary::Query<medialibrary::IMedia> query;
 
             if ( pattern )
-                query = group->searchMedia( pattern, medialibrary::IMedia::Type::Unknown,
-                                            paramsPtr );
+                query = group->searchMedia( pattern, type, paramsPtr );
             else
-                query = group->media( medialibrary::IMedia::Type::Unknown, paramsPtr );
+                query = group->media( type, paramsPtr );
 
             if ( query == nullptr )
                 return VLC_EGENERIC;
@@ -1845,6 +1880,86 @@ int MediaLibrary::listGroup( int listQuery, const medialibrary::QueryParameters*
     }
 }
 
+int MediaLibrary::listFolder(int listQuery, const medialibrary::QueryParameters * paramsPtr,
+                             medialibrary::IMedia::Type type, const char * pattern,
+                             uint32_t nbItems, uint32_t offset, va_list args)
+{
+    switch (listQuery)
+    {
+        case VLC_ML_LIST_FOLDERS:
+        case VLC_ML_COUNT_FOLDERS:
+        case VLC_ML_LIST_FOLDERS_BY_TYPE:
+        case VLC_ML_COUNT_FOLDERS_BY_TYPE:
+        {
+            medialibrary::Query<medialibrary::IFolder> query;
+
+            if (pattern)
+                query = m_ml->searchFolders(pattern, type, paramsPtr);
+            else
+                query = m_ml->folders(type, paramsPtr);
+
+            if (query == nullptr)
+                return VLC_EGENERIC;
+
+            switch (listQuery)
+            {
+                case VLC_ML_LIST_FOLDERS:
+                case VLC_ML_LIST_FOLDERS_BY_TYPE:
+                    *va_arg(args, vlc_ml_folder_list_t **) =
+                        ml_convert_list<vlc_ml_folder_list_t, vlc_ml_folder_t>
+                        (query->items(nbItems, offset));
+                    return VLC_SUCCESS;
+
+                case VLC_ML_COUNT_FOLDERS:
+                case VLC_ML_COUNT_FOLDERS_BY_TYPE:
+                    *va_arg(args, size_t *) = query->count();
+                    return VLC_SUCCESS;
+
+                default:
+                    vlc_assert_unreachable();
+            }
+        }
+
+        case VLC_ML_LIST_FOLDER_MEDIA:
+        case VLC_ML_COUNT_FOLDER_MEDIA:
+        {
+            medialibrary::FolderPtr folder = m_ml->folder(va_arg(args, int64_t));
+
+            if (folder == nullptr)
+                return VLC_EGENERIC;
+
+            medialibrary::Query<medialibrary::IMedia> query;
+
+            if (pattern)
+                query = folder->searchMedia(pattern, type, paramsPtr);
+            else
+                query = folder->media(type, paramsPtr);
+
+            if (query == nullptr)
+                return VLC_EGENERIC;
+
+            switch (listQuery)
+            {
+                case VLC_ML_LIST_FOLDER_MEDIA:
+                    *va_arg(args, vlc_ml_media_list_t **) =
+                        ml_convert_list<vlc_ml_media_list_t, vlc_ml_media_t>
+                        (query->items(nbItems, offset));
+                    return VLC_SUCCESS;
+
+                case VLC_ML_COUNT_FOLDER_MEDIA:
+                    *va_arg(args, size_t *) = query->count();
+                    return VLC_SUCCESS;
+
+                default:
+                    vlc_assert_unreachable();
+            }
+        }
+
+        default:
+            vlc_assert_unreachable();
+    }
+}
+
 int MediaLibrary::listPlaylist( int listQuery, const medialibrary::QueryParameters* paramsPtr,
                                 const char* pattern, uint32_t nbItems, uint32_t offset, va_list args )
 {
@@ -1857,7 +1972,7 @@ int MediaLibrary::listPlaylist( int listQuery, const medialibrary::QueryParamete
             if ( pattern != nullptr )
                 query = m_ml->searchPlaylists( pattern, paramsPtr );
             else
-                query = m_ml->playlists( paramsPtr );
+                query = m_ml->playlists( medialibrary::PlaylistType::All, paramsPtr );
             if ( query == nullptr )
                 return VLC_EGENERIC;
             switch ( listQuery )
@@ -2008,7 +2123,6 @@ static void Close( vlc_object_t* obj )
 vlc_module_begin()
     set_shortname(N_("media library"))
     set_description(N_( "Organize your media" ))
-    set_category(CAT_ADVANCED)
     set_subcategory(SUBCAT_ADVANCED_MISC)
     set_capability("medialibrary", 100)
     set_callbacks(Open, Close)

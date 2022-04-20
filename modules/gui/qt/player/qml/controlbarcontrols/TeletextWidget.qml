@@ -17,75 +17,93 @@
  *****************************************************************************/
 
 import QtQuick 2.11
-import QtQuick.Layouts 1.11
-import QtQuick.Controls 2.4
+import QtQuick.Templates 2.4 as T
 
 import org.videolan.vlc 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
 
-FocusScope{
-    id: widgetfscope
-    x: teleWidget.x
-    y: teleWidget.y
-    width: teleWidget.width
-    height: teleWidget.height
 
-    property bool autohide: !paintOnly && !player.isTeletextAvailable
+T.Pane {
+    id: root
+
+    property VLCColors colors: VLCStyle.colors
     property bool paintOnly: false
-    visible: !autohide
 
-    property color color: VLCStyle.colors.text
-    property color bgColor: VLCStyle.colors.bg
+    enabled: Player.isTeletextAvailable
 
-    RowLayout{
+    implicitWidth: Math.max(background ? background.implicitWidth : 0, contentWidth + leftPadding + rightPadding)
+    implicitHeight: Math.max(background ? background.implicitHeight : 0, contentHeight + topPadding + bottomPadding)
+
+    contentWidth: teleWidget.implicitWidth
+    contentHeight: teleWidget.implicitHeight
+
+    Keys.priority: Keys.AfterItem
+    Keys.onPressed: Navigation.defaultKeyAction(event)
+
+    Row {
         id: teleWidget
-        width: autohide ? 0 : VLCStyle.widthTeletext
+        anchors.fill: parent
 
-        spacing: 0
-
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: teleActivateBtn
-            paintOnly: widgetfscope.paintOnly
-            iconText: VLCIcons.tv
-            text: i18n.qtr("Teletext activate")
+
             size: VLCStyle.icon_normal
-            onClicked: player.teletextEnabled = !player.teletextEnabled
-            color: widgetfscope.color
-            checked: player.teletextEnabled
+
+            paintOnly: root.paintOnly
+
+            checked: Player.teletextEnabled
+
             focus: true
 
-            Navigation.parentItem: widgetfscope
-            Navigation.rightItem: player.teletextEnabled ? teleTransparencyBtn : null
+            iconText: VLCIcons.tv
+            text: I18n.qtr("Teletext activate")
+
+            colors: root.colors
+            color: colors.text
+
+            toolTip.visible: hovered || visualFocus
+
+            Navigation.parentItem: root
+            Navigation.rightItem: teleTransparencyBtn
+
+            onClicked: Player.teletextEnabled = !Player.teletextEnabled
         }
 
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: teleTransparencyBtn
-            paintOnly: widgetfscope.paintOnly
-            iconText: VLCIcons.tvtelx
-            text: i18n.qtr("Teletext transparency")
-            size: VLCStyle.icon_normal
-            opacity: 0.5
-            enabled: player.teletextEnabled
-            onClicked: player.teletextTransparency = !player.teletextTransparency
-            color: widgetfscope.color
 
-            Navigation.parentItem: widgetfscope
+            size: VLCStyle.icon_normal
+
+            paintOnly: root.paintOnly
+
+            opacity: 0.5
+
+            iconText: VLCIcons.tvtelx
+            text: I18n.qtr("Teletext transparency")
+
+            colors: root.colors
+            color: colors.text
+
+            toolTip.visible: hovered || visualFocus
+
+            Navigation.parentItem: root
             Navigation.leftItem: teleActivateBtn
             Navigation.rightItem: telePageNumber
+
+            onClicked: Player.teletextTransparency = !Player.teletextTransparency
         }
 
         Widgets.SpinBoxExt{
             id: telePageNumber
-            enabled: player.teletextEnabled
             from: 100
             to: 899
             editable: true
-            textColor: widgetfscope.color
-            bgColor: widgetfscope.bgColor
+            textColor: colors.text
+            bgColor: colors.bg
 
-            Navigation.parentItem: widgetfscope
+            Navigation.parentItem: root
             Navigation.leftItem: teleTransparencyBtn
             Navigation.rightItem: indexKeyBtn
 
@@ -95,97 +113,136 @@ FocusScope{
             onValueChanged: {
                 if (inhibitPageUpdate)
                     return
-                player.teletextPage = value
+                Player.teletextPage = value
             }
 
             Component.onCompleted: {
-                value = player.teletextPage
+                value = Player.teletextPage
                 inhibitPageUpdate = false
             }
 
             Connections {
-                target: player
+                target: Player
                 onTeletextPageChanged: {
                     telePageNumber.inhibitPageUpdate = true
-                    telePageNumber.value = player.teletextPage
+                    telePageNumber.value = Player.teletextPage
                     telePageNumber.inhibitPageUpdate = false
                 }
             }
         }
 
-        Widgets.IconToolButton{
+        Widgets.IconControlButton{
             id: indexKeyBtn
-            paintOnly: widgetfscope.paintOnly
-            enabled: player.teletextEnabled
+
             size: VLCStyle.icon_normal
+
+            paintOnly: root.paintOnly
+
             iconText: VLCIcons.record
-            text: i18n.qtr("Index key")
-            onClicked: player.teletextPage = PlayerController.TELE_INDEX
+            text: I18n.qtr("Index key")
+
+            colors: root.colors
             color: "grey"
             colorDisabled: "grey"
 
-            Navigation.parentItem: widgetfscope
+            toolTip.visible: hovered || visualFocus
+
+            Navigation.parentItem: root
             Navigation.leftItem: telePageNumber
             Navigation.rightItem: redKeyBtn
+
+            onClicked: Player.teletextPage = Player.TELE_INDEX
         }
-        Widgets.IconToolButton{
+
+        Widgets.IconControlButton{
             id: redKeyBtn
-            paintOnly: widgetfscope.paintOnly
-            enabled: player.teletextEnabled
+
             size: VLCStyle.icon_normal
+
+            paintOnly: root.paintOnly
+
             iconText: VLCIcons.record
-            text: i18n.qtr("Red key")
-            onClicked: player.teletextPage = PlayerController.TELE_RED
+            text: I18n.qtr("Red key")
+
+            colors: root.colors
             color: "red"
             colorDisabled: "grey"
 
-            Navigation.parentItem: widgetfscope
+            toolTip.visible: hovered || visualFocus
+
+            Navigation.parentItem: root
             Navigation.leftItem: indexKeyBtn
             Navigation.rightItem: greenKeyBtn
+
+            onClicked: Player.teletextPage = Player.TELE_RED
         }
-        Widgets.IconToolButton{
+
+        Widgets.IconControlButton{
             id: greenKeyBtn
-            paintOnly: widgetfscope.paintOnly
-            enabled: player.teletextEnabled
+
             size: VLCStyle.icon_normal
+
+            paintOnly: root.paintOnly
+
             iconText: VLCIcons.record
-            text: i18n.qtr("Green key")
-            onClicked: player.teletextPage = PlayerController.TELE_GREEN
+            text: I18n.qtr("Green key")
+
+            colors: root.colors
             color: "green"
             colorDisabled: "grey"
 
-            Navigation.parentItem: widgetfscope
+            toolTip.visible: hovered || visualFocus
+
+            Navigation.parentItem: root
             Navigation.leftItem: redKeyBtn
             Navigation.rightItem: yellowKeyBtn
+
+            onClicked: Player.teletextPage = Player.TELE_GREEN
         }
-        Widgets.IconToolButton{
+
+        Widgets.IconControlButton{
             id: yellowKeyBtn
-            paintOnly: widgetfscope.paintOnly
-            enabled: player.teletextEnabled
+
             size: VLCStyle.icon_normal
+
+            paintOnly: root.paintOnly
+
             iconText: VLCIcons.record
-            text: i18n.qtr("Yellow key")
-            onClicked: player.teletextPage = PlayerController.TELE_YELLOW
+            text: I18n.qtr("Yellow key")
+
+            colors: root.colors
             color: "yellow"
             colorDisabled: "grey"
 
-            Navigation.parentItem: widgetfscope
+            toolTip.visible: hovered || visualFocus
+
+            Navigation.parentItem: root
             Navigation.leftItem: greenKeyBtn
             Navigation.rightItem: blueKeyBtn
+
+            onClicked: Player.teletextPage = Player.TELE_YELLOW
         }
-        Widgets.IconToolButton{
+
+        Widgets.IconControlButton{
             id: blueKeyBtn
-            paintOnly: widgetfscope.paintOnly
-            enabled: player.teletextEnabled
+
             size: VLCStyle.icon_normal
+
+            paintOnly: root.paintOnly
+
             iconText: VLCIcons.record
-            text: i18n.qtr("Blue key")
-            onClicked: player.teletextPage = PlayerController.TELE_BLUE
+            text: I18n.qtr("Blue key")
+
+            colors: root.colors
             color: "blue"
             colorDisabled: "grey"
 
-            Navigation.parentItem: widgetfscope
+            toolTip.visible: hovered || visualFocus
+
+            Navigation.parentItem: root
             Navigation.leftItem: yellowKeyBtn
+
+            onClicked: Player.teletextPage = Player.TELE_BLUE
         }
     }
 }

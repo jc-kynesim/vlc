@@ -30,49 +30,28 @@ import "qrc:///style/"
 FocusScope {
     id: root
 
-    // Properties
-
-    property Item focusItem: recentVideosListView
-
-    property int currentIndex: -1
-
-    property var model: undefined;
-
-    // Properties
-
-    property int displayMargins: 0
+    property alias leftPadding: recentVideosColumn.leftPadding
+    property alias rightPadding: recentVideosColumn.rightPadding
 
     // Settings
 
     implicitHeight: recentVideosColumn.height
 
-    // Events
-
-    onCurrentIndexChanged: {
-        recentVideoListView.currentIndex = _currentIndex
-    }
-
-    onFocusChanged: {
-        if (activeFocus && root.currentIndex === -1 && root.model.count > 0)
-            root.currentIndex = 0
-    }
+    focus: listView.count > 0
 
     // Functions
 
-    function setCurrentItemFocus(reason) {
-        recentVideosListView.setCurrentItemFocus(reason);
-    }
-
-    function _actionAtIndex(index, model, selectionModel) {
+    function _actionAtIndex(index) {
         g_mainDisplay.showPlayer()
-        medialib.addAndPlay( model.getIdsForIndexes( selectionModel.selectedIndexes ), [":restore-playback-pos=2"] )
+        MediaLib.addAndPlay( model.getIdForIndexes(index), [":restore-playback-pos=2"] )
     }
 
     // Childs
 
-    Util.SelectableDelegateModel {
-        id: recentVideoSelection
-        model: root.model
+    VideoContextMenu {
+        id: contextMenu
+
+        model: listView.model
     }
 
     Column {
@@ -82,22 +61,20 @@ FocusScope {
 
         spacing: VLCStyle.margin_xsmall
 
+        topPadding: VLCStyle.margin_normal
+
+        bottomPadding: VLCStyle.margin_normal
+
         Widgets.SubtitleLabel {
-            id: continueWatchingLabel
+            text: I18n.qtr("Continue Watching")
 
-            anchors.left: parent.left
-            anchors.right: parent.right
-
-            // NOTE: We want this to be properly aligned with the grid items.
-            anchors.leftMargin: VLCStyle.margin_normal
-
-            text: i18n.qtr("Continue Watching")
+            visible: listView.visible
         }
 
         Widgets.KeyNavigableListView {
-            id: recentVideosListView
+            id: listView
 
-            width: parent.width
+            width: root.width - root.leftPadding - root.rightPadding
 
             implicitHeight: VLCStyle.gridItem_video_height + VLCStyle.gridItemSelectedBorder
                             +
@@ -106,8 +83,8 @@ FocusScope {
             spacing: VLCStyle.column_margin_width
 
             // NOTE: Sometimes, we want items to be visible on the sides.
-            displayMarginBeginning: root.displayMargins
-            displayMarginEnd: root.displayMargins
+            displayMarginBeginning: root.leftPadding
+            displayMarginEnd: root.leftPadding
 
             // NOTE: We want navigation buttons to be centered on the item cover.
             buttonMargin: VLCStyle.margin_xsmall + VLCStyle.gridCover_video_height / 2 - buttonLeft.height / 2
@@ -116,39 +93,62 @@ FocusScope {
 
             focus: true
 
-            model: root.model
+            fadeColor: VLCStyle.colors.bg
 
             Navigation.parentItem: root
+
+            visible: listView.count > 0
+
+            model: MLRecentsVideoModel {
+                ml: MediaLib
+            }
 
             header: Item {
                 width: VLCStyle.margin_normal
             }
 
             delegate: VideoGridItem {
-                id: recentVideoGridItem
+                id: gridItem
 
                 x: selectedBorderWidth
                 y: selectedBorderWidth
+
                 pictureWidth: VLCStyle.gridCover_video_width
                 pictureHeight: VLCStyle.gridCover_video_height
+
+                selected: activeFocus
 
                 focus: true
 
                 unselectedUnderlay: shadows.unselected
                 selectedUnderlay: shadows.selected
 
-                onItemDoubleClicked: recentVideoGridItem.play()
+                onItemDoubleClicked: gridItem.play()
 
                 onItemClicked: {
-                    recentVideoSelection.updateSelection( modifier , root.model.currentIndex, index )
-                    recentVideosListView.currentIndex = index
-                    recentVideosListView.forceActiveFocus()
+                    listView.currentIndex = index
+                    this.forceActiveFocus(Qt.MouseFocusReason)
                 }
 
-                Connections {
-                    target: recentVideoSelection
+                // NOTE: contextMenu.popup wants a list of indexes.
+                onContextMenuButtonClicked: {
+                    contextMenu.popup([root.model.index(index, 0)],
+                                      globalMousePos,
+                                      { "player-options": [":restore-playback-pos=2"] })
+                }
 
-                    onSelectionChanged: selected = recentVideoSelection.isSelected(root.model.index(index, 0))
+                dragItem: Widgets.DragItem {
+                    coverRole: "thumbnail"
+
+                    indexes: [index]
+
+                    onRequestData: {
+                        setData(identifier, [model])
+                    }
+
+                    function getSelectedInputItem(cb) {
+                        return MediaLib.mlInputItem([model.id], cb)
+                    }
                 }
 
                 Behavior on opacity {
@@ -160,7 +160,7 @@ FocusScope {
                 function play() {
                     if (model.id !== undefined) {
                         g_mainDisplay.showPlayer()
-                        medialib.addAndPlay( model.id, [":restore-playback-pos=2"] )
+                        MediaLib.addAndPlay( model.id, [":restore-playback-pos=2"] )
                     }
                 }
             }
@@ -169,11 +169,7 @@ FocusScope {
                 width: VLCStyle.margin_normal
             }
 
-            onSelectionUpdated: recentVideoSelection.updateSelection( keyModifiers, oldIndex, newIndex )
-            onActionAtIndex: {
-                g_mainDisplay.showPlayer()
-                medialib.addAndPlay( model.getIdsForIndexes( recentVideoSelection.selectedIndexes ), [":restore-playback-pos=2"] )
-            }
+            onActionAtIndex: root._actionAtIndex(index)
 
             Widgets.GridShadows {
                 id: shadows
@@ -181,6 +177,10 @@ FocusScope {
                 coverWidth: VLCStyle.gridCover_video_width
                 coverHeight: VLCStyle.gridCover_video_height
             }
+        }
+
+        Widgets.SubtitleLabel {
+            text: I18n.qtr("Videos")
         }
     }
 }

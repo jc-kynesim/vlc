@@ -52,10 +52,6 @@ static picture_t *FilterPacked( filter_t *, picture_t * );
  * Module descriptor
  *****************************************************************************/
 
-#define THRES_TEXT N_("Brightness threshold")
-#define THRES_LONGTEXT N_("When this mode is enabled, pixels will be " \
-        "shown as black or white. The threshold value will be the brightness " \
-        "defined below." )
 #define CONT_TEXT N_("Image contrast (0-2)")
 #define CONT_LONGTEXT N_("Set the image contrast, between 0 and 2. Defaults to 1.")
 #define HUE_TEXT N_("Image hue (-180..180)")
@@ -70,7 +66,6 @@ static picture_t *FilterPacked( filter_t *, picture_t * );
 vlc_module_begin ()
     set_description( N_("Image properties filter") )
     set_shortname( N_("Image adjust" ))
-    set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
 
     add_float_with_range( "contrast", 1.0, 0.0, 2.0,
@@ -88,17 +83,14 @@ vlc_module_begin ()
     add_float_with_range( "gamma", 1.0, 0.01, 10.0,
                           GAMMA_TEXT, GAMMA_LONGTEXT )
         change_safe()
-    add_bool( "brightness-threshold", false,
-              THRES_TEXT, THRES_LONGTEXT )
-        change_safe()
+    add_obsolete_bool("brightness-threshold") /* since 4.0.0 */
 
     add_shortcut( "adjust" )
     set_callback_video_filter( Create )
 vlc_module_end ()
 
 static const char *const ppsz_filter_options[] = {
-    "contrast", "brightness", "hue", "saturation", "gamma",
-    "brightness-threshold", NULL
+    "contrast", "brightness", "hue", "saturation", "gamma", NULL
 };
 
 /*****************************************************************************
@@ -111,7 +103,6 @@ typedef struct
     _Atomic float f_hue;
     _Atomic float f_saturation;
     _Atomic float f_gamma;
-    atomic_bool  b_brightness_threshold;
     int (*pf_process_sat_hue)( picture_t *, picture_t *, int, int, int,
                                int, int );
     int (*pf_process_sat_hue_clip)( picture_t *, picture_t *, int, int,
@@ -124,16 +115,6 @@ static int FloatCallback( vlc_object_t *obj, char const *varname,
     _Atomic float *atom = data;
 
     atomic_store_explicit( atom, newval.f_float, memory_order_relaxed );
-    (void) obj; (void) varname; (void) oldval;
-    return VLC_SUCCESS;
-}
-
-static int BoolCallback( vlc_object_t *obj, char const *varname,
-                         vlc_value_t oldval, vlc_value_t newval, void *data )
-{
-    atomic_bool *atom = data;
-
-    atomic_store_explicit( atom, newval.b_bool, memory_order_relaxed );
     (void) obj; (void) varname; (void) oldval;
     return VLC_SUCCESS;
 }
@@ -207,8 +188,6 @@ static int Create( filter_t *p_filter )
                  var_CreateGetFloatCommand( p_filter, "saturation" ) );
     atomic_init( &p_sys->f_gamma,
                  var_CreateGetFloatCommand( p_filter, "gamma" ) );
-    atomic_init( &p_sys->b_brightness_threshold,
-                 var_CreateGetBoolCommand( p_filter, "brightness-threshold" ) );
 
     var_AddCallback( p_filter, "contrast", FloatCallback, &p_sys->f_contrast );
     var_AddCallback( p_filter, "brightness", FloatCallback,
@@ -217,8 +196,6 @@ static int Create( filter_t *p_filter )
     var_AddCallback( p_filter, "saturation", FloatCallback,
                      &p_sys->f_saturation );
     var_AddCallback( p_filter, "gamma", FloatCallback, &p_sys->f_gamma );
-    var_AddCallback( p_filter, "brightness-threshold", BoolCallback,
-                     &p_sys->b_brightness_threshold );
 
     return VLC_SUCCESS;
 }
@@ -237,8 +214,6 @@ static void Destroy( filter_t *p_filter )
     var_DelCallback( p_filter, "saturation", FloatCallback,
                      &p_sys->f_saturation );
     var_DelCallback( p_filter, "gamma", FloatCallback, &p_sys->f_gamma );
-    var_DelCallback( p_filter, "brightness-threshold", BoolCallback,
-                     &p_sys->b_brightness_threshold );
 }
 
 /*****************************************************************************
@@ -282,44 +257,20 @@ static void FilterPlanar( filter_t *p_filter, picture_t *p_pic, picture_t *p_out
     int i_sat = (int)( atomic_load_explicit( &p_sys->f_saturation, memory_order_relaxed ) * f_range );
     float f_gamma = 1.f / atomic_load_explicit( &p_sys->f_gamma, memory_order_relaxed );
 
-    /*
-     * Threshold mode drops out everything about luma, contrast and gamma.
-     */
-    if( !atomic_load_explicit( &p_sys->b_brightness_threshold,
-                               memory_order_relaxed ) )
+    /* Contrast is a fast but kludged function, so I put this gap to be
+     * cleaner :) */
+    i_lum += i_mid - i_cont / 2;
+
+    /* Fill the gamma lookup table */
+    for( unsigned i = 0 ; i < i_size; i++ )
     {
-
-        /* Contrast is a fast but kludged function, so I put this gap to be
-         * cleaner :) */
-        i_lum += i_mid - i_cont / 2;
-
-        /* Fill the gamma lookup table */
-        for( unsigned i = 0 ; i < i_size; i++ )
-        {
-            pi_gamma[ i ] = VLC_CLIP( powf(i / f_max, f_gamma) * f_max, 0, i_max );
-        }
-
-        /* Fill the luma lookup table */
-        for( unsigned i = 0 ; i < i_size; i++ )
-        {
-            pi_luma[ i ] = pi_gamma[VLC_CLIP( (int)(i_lum + i_cont * i / i_range), 0, (int) i_max )];
-        }
+        pi_gamma[ i ] = VLC_CLIP( powf(i / f_max, f_gamma) * f_max, 0, i_max );
     }
-    else
-    {
-        /*
-         * We get luma as threshold value: the higher it is, the darker is
-         * the image. Should I reverse this?
-         */
-        for( int i = 0 ; i < i_range; i++ )
-        {
-            pi_luma[ i ] = (i < i_lum) ? 0 : i_max;
-        }
 
-        /*
-         * Desaturates image to avoid that strange yellow halo...
-         */
-        i_sat = 0;
+    /* Fill the luma lookup table */
+    for( unsigned i = 0 ; i < i_size; i++ )
+    {
+        pi_luma[ i ] = pi_gamma[VLC_CLIP( (int)(i_lum + i_cont * i / i_range), 0, (int) i_max )];
     }
 
     /*
@@ -478,43 +429,20 @@ static picture_t *FilterPacked( filter_t *p_filter, picture_t *p_pic )
     i_sat = (int)( atomic_load_explicit( &p_sys->f_saturation, memory_order_relaxed ) * 256 );
     f_gamma = 1.0 / atomic_load_explicit( &p_sys->f_gamma, memory_order_relaxed );
 
-    /*
-     * Threshold mode drops out everything about luma, contrast and gamma.
-     */
-    if( !atomic_load_explicit( &p_sys->b_brightness_threshold, memory_order_relaxed ) )
+    /* Contrast is a fast but kludged function, so I put this gap to be
+     * cleaner :) */
+    i_lum += 128 - i_cont / 2;
+
+    /* Fill the gamma lookup table */
+    for( int i = 0 ; i < 256 ; i++ )
     {
-
-        /* Contrast is a fast but kludged function, so I put this gap to be
-         * cleaner :) */
-        i_lum += 128 - i_cont / 2;
-
-        /* Fill the gamma lookup table */
-        for( int i = 0 ; i < 256 ; i++ )
-        {
-          pi_gamma[ i ] = clip_uint8_vlc( pow(i / 255.0, f_gamma) * 255.0);
-        }
-
-        /* Fill the luma lookup table */
-        for( int i = 0 ; i < 256 ; i++ )
-        {
-            pi_luma[ i ] = pi_gamma[clip_uint8_vlc( i_lum + i_cont * i / 256)];
-        }
+        pi_gamma[ i ] = clip_uint8_vlc( pow(i / 255.0, f_gamma) * 255.0);
     }
-    else
-    {
-        /*
-         * We get luma as threshold value: the higher it is, the darker is
-         * the image. Should I reverse this?
-         */
-        for( int i = 0 ; i < 256 ; i++ )
-        {
-            pi_luma[ i ] = (i < i_lum) ? 0 : 255;
-        }
 
-        /*
-         * Desaturates image to avoid that strange yellow halo...
-         */
-        i_sat = 0;
+    /* Fill the luma lookup table */
+    for( int i = 0 ; i < 256 ; i++ )
+    {
+        pi_luma[ i ] = pi_gamma[clip_uint8_vlc( i_lum + i_cont * i / 256)];
     }
 
     /*

@@ -1,5 +1,5 @@
 # aom
-AOM_VERSION := 3.2.0
+AOM_VERSION := 3.3.0
 AOM_URL := https://storage.googleapis.com/aom-releases/libaom-$(AOM_VERSION).tar.gz
 
 PKGS += aom
@@ -13,9 +13,7 @@ $(TARBALLS)/libaom-$(AOM_VERSION).tar.gz:
 .sum-aom: libaom-$(AOM_VERSION).tar.gz
 
 aom: libaom-$(AOM_VERSION).tar.gz .sum-aom
-	rm -Rf $(UNPACK_DIR) $@
-	mkdir -p $(UNPACK_DIR)
-	tar xvzfo "$<" -C $(UNPACK_DIR)
+	$(UNPACK)
 ifdef HAVE_ANDROID
 	$(APPLY) $(SRC)/aom/aom-android-pthreads.patch
 	$(APPLY) $(SRC)/aom/aom-android-cpufeatures.patch
@@ -83,7 +81,7 @@ endif
 	rm -rf $(PREFIX)/include/aom
 	cd $< && rm -rf aom_build && mkdir -p aom_build
 	cd $</aom_build && LDFLAGS="$(AOM_LDFLAGS)" $(HOSTVARS) $(CMAKE) ../ $(AOM_CONF)
-	cd $< && $(CMAKEBUILD) aom_build
+	+$(CMAKEBUILD) $</aom_build
 	$(call pkg_static,"aom_build/aom.pc")
-	cd $</aom_build && $(CMAKEBUILD) . --target install
+	+$(CMAKEBUILD) $</aom_build --target install
 	touch $@

@@ -57,8 +57,8 @@ public:
         LOOP_BUTTON,
         INFO_BUTTON,
         LANG_BUTTON,
-        MENU_BUTTON,
-        BACK_BUTTON,
+        MENU_BUTTON, // deprecated
+        BACK_BUTTON, // deprecated
         CHAPTER_PREVIOUS_BUTTON,
         CHAPTER_NEXT_BUTTON,
         BUTTON_MAX,
@@ -71,6 +71,11 @@ public:
         VOLUME,
         TELETEXT_BUTTONS,
         ASPECT_RATIO_COMBOBOX,
+        DVD_MENUS_BUTTON,
+        REVERSE_BUTTON,
+        BOOKMARK_BUTTON,
+        RENDERER_BUTTON,
+        NAVIGATION_BUTTONS,
         SPECIAL_MAX,
 
         WIDGET_SPACER = 0x40,

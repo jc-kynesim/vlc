@@ -21,6 +21,7 @@ import QtQuick.Controls 2.4
 import QtQuick.Layouts  1.11
 import QtQml.Models     2.2
 
+import org.videolan.vlc 0.1
 import org.videolan.medialib 0.1
 
 import "qrc:///widgets/" as Widgets
@@ -36,9 +37,11 @@ Widgets.PageLoader {
     property bool isViewMultiView: true
 
     property var contentModel
+
+    property var sortMenu
     property var sortModel
 
-    property var tabModel: ListModel {
+    property ListModel tabModel: ListModel {
         Component.onCompleted: {
             pageModel.forEach(function(e) {
                 append({
@@ -61,30 +64,31 @@ Widgets.PageLoader {
     // Settings
     //---------------------------------------------------------------------------------------------
 
-    defaultPage: "all"
-
     pageModel: [{
             name: "all",
-            displayText: i18n.qtr("All"),
+            displayText: I18n.qtr("All"),
             url: "qrc:///medialibrary/VideoAllDisplay.qml"
         },{
-            name: "groups",
-            displayText: i18n.qtr("Groups"),
-            url: "qrc:///medialibrary/VideoGroupsDisplay.qml"
-        },{
             name: "playlists",
-            displayText: i18n.qtr("Playlists"),
+            displayText: I18n.qtr("Playlists"),
             url: "qrc:///medialibrary/VideoPlaylistsDisplay.qml"
         }
     ]
+
+    loadDefaultView: function () {
+        History.update(["mc", "video", "all"])
+        loadPage("all")
+    }
 
     onCurrentItemChanged: {
         isViewMultiView = (currentItem.isViewMultiView === undefined
                            ||
                            currentItem.isViewMultiView);
 
-        contentModel = currentItem.model;
-        sortModel    = currentItem.sortModel;
+        // NOTE: We need bindings because the VideoAll model can change over time.
+        contentModel = Qt.binding(function () { return currentItem.model; })
+        sortMenu     = Qt.binding(function () { return currentItem.sortMenu; })
+        sortModel    = Qt.binding(function () { return currentItem.sortModel; })
     }
 
     //---------------------------------------------------------------------------------------------
@@ -92,6 +96,6 @@ Widgets.PageLoader {
     //---------------------------------------------------------------------------------------------
 
     function loadIndex(index) {
-        history.push(["mc", "video", root.pageModel[index].name]);
+        History.push(["mc", "video", root.pageModel[index].name]);
     }
 }

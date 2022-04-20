@@ -42,7 +42,6 @@ vlc_module_begin ()
     set_shortname( "PulseAudio" )
     set_description( N_("Pulseaudio audio output") )
     set_capability( "audio output", 160 )
-    set_category( CAT_AUDIO )
     set_subcategory( SUBCAT_AUDIO_AOUT )
     add_shortcut( "pulseaudio", "pa" )
     set_callbacks( Open, Close )
@@ -67,6 +66,8 @@ typedef struct
     pa_context *context; /**< PulseAudio connection context */
     pa_threaded_mainloop *mainloop; /**< PulseAudio thread */
     pa_time_event *trigger; /**< Deferred stream trigger */
+    pa_time_event *drain_trigger; /**< Drain stream trigger */
+    bool draining;
     pa_cvolume cvolume; /**< actual sink input volume */
     vlc_tick_t last_date; /**< Play system timestamp of last buffer */
 
@@ -83,6 +84,37 @@ static void VolumeReport(audio_output_t *aout)
     pa_volume_t volume = pa_cvolume_max(&sys->cvolume);
 
     aout_VolumeReport(aout, (float)volume / PA_VOLUME_NORM);
+}
+
+static void drain_trigger_cb(pa_mainloop_api *api, pa_time_event *e,
+                              const struct timeval *tv, void *userdata)
+{
+    audio_output_t *aout = userdata;
+    aout_sys_t *sys = aout->sys;
+
+    assert(sys->drain_trigger == e);
+
+    vlc_pa_rttime_free(sys->mainloop, sys->drain_trigger);
+    sys->drain_trigger = NULL;
+    sys->draining = false;
+
+    aout_DrainedReport(aout);
+    (void) api; (void) e; (void) tv;
+}
+
+static int TriggerDrain(audio_output_t *aout)
+{
+    aout_sys_t *sys = aout->sys;
+    assert(sys->drain_trigger == NULL);
+
+    vlc_tick_t delay = vlc_pa_get_latency(aout, sys->context, sys->stream);
+    if (delay == VLC_TICK_INVALID)
+        return VLC_EGENERIC;
+
+    delay += pa_rtclock_now();
+    sys->drain_trigger = pa_context_rttime_new(sys->context, delay,
+                                               drain_trigger_cb, aout);
+    return sys->drain_trigger ? VLC_SUCCESS : VLC_ENOMEM;
 }
 
 /*** Sink ***/
@@ -258,7 +290,11 @@ static void stream_latency_cb(pa_stream *s, void *userdata)
 
     /* This callback is _never_ called while paused. */
     if (sys->last_date == VLC_TICK_INVALID)
+    {
+        if (sys->draining && sys->drain_trigger == NULL)
+            TriggerDrain(aout);
         return; /* nothing to do if buffers are (still) empty */
+    }
     if (pa_stream_is_corked(s) > 0)
         stream_start(s, aout, sys->last_date);
 }
@@ -557,6 +593,13 @@ static void Flush(audio_output_t *aout)
 
     pa_threaded_mainloop_lock(sys->mainloop);
 
+    if (sys->drain_trigger != NULL)
+    {
+        vlc_pa_rttime_free(sys->mainloop, sys->drain_trigger);
+        sys->drain_trigger = NULL;
+        sys->draining = false;
+    }
+
     pa_operation *op = pa_stream_flush(s, NULL, NULL);
     if (op != NULL)
         pa_operation_unref(op);
@@ -590,19 +633,19 @@ static void Drain(audio_output_t *aout)
     pa_operation *op = pa_stream_drain(s, NULL, NULL);
     if (op != NULL)
         pa_operation_unref(op);
-    sys->last_date = VLC_TICK_INVALID;
 
-    /* XXX: Loosy drain emulation.
-     * See #18141: drain callback is never received */
-    vlc_tick_t delay;
-    if (TimeGet(aout, &delay) == 0 && delay <= VLC_TICK_FROM_SEC(5))
+    if (sys->last_date == VLC_TICK_INVALID)
+        aout_DrainedReport(aout);
+    else
     {
-        pa_threaded_mainloop_unlock(sys->mainloop);
-        vlc_tick_sleep(delay);
-        pa_threaded_mainloop_lock(sys->mainloop);
+        sys->last_date = VLC_TICK_INVALID;
+
+        /* XXX: Loosy drain emulation.
+         * See #18141: drain callback is never received */
+        sys->draining = true;
+        TriggerDrain(aout);
     }
 
-    stream_stop(s, aout);
     pa_threaded_mainloop_unlock(sys->mainloop);
 }
 
@@ -829,7 +872,8 @@ static int Start(audio_output_t *aout, audio_sample_format_t *restrict fmt)
         pa_cvolume_set(cvolume, ss.channels, sys->volume_force);
     }
 
-    sys->trigger = NULL;
+    sys->trigger = sys->drain_trigger = NULL;
+    sys->draining = false;
     pa_cvolume_init(&sys->cvolume);
     sys->last_date = VLC_TICK_INVALID;
 
@@ -963,8 +1007,7 @@ static int Start(audio_output_t *aout, audio_sample_format_t *restrict fmt)
                                    cvolume, NULL) < 0
      || stream_wait(s, sys->mainloop)) {
         if (encoding != PA_ENCODING_PCM)
-            vlc_pa_error(aout, "digital pass-through stream connection failure",
-                         sys->context);
+            msg_Dbg(aout, "digital pass-through not available");
         else
             vlc_pa_error(aout, "stream connection failure", sys->context);
         goto fail;
@@ -1003,6 +1046,8 @@ static void Stop(audio_output_t *aout)
     pa_threaded_mainloop_lock(sys->mainloop);
     if (unlikely(sys->trigger != NULL))
         vlc_pa_rttime_free(sys->mainloop, sys->trigger);
+    if (sys->drain_trigger != NULL)
+        vlc_pa_rttime_free(sys->mainloop, sys->drain_trigger);
     pa_stream_disconnect(s);
 
     /* Clear all callbacks */

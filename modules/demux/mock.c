@@ -279,6 +279,7 @@ CreateTitle(demux_t *demux, size_t idx)
          && asprintf(&t->seekpoint[i]->psz_name, "Mock Chapter %zu-%zu", idx, i)
             == -1)
         {
+            t->seekpoint[i]->psz_name = NULL;
             vlc_input_title_Delete(t);
             return NULL;
         }
@@ -1136,7 +1137,6 @@ error:
 vlc_module_begin()
     set_description("mock access demux")
     set_capability("access", 0)
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_ACCESS)
     set_callbacks(Open, Close)
     OPTIONS_GLOBAL(DECLARE_MODULE_OPTIONS)

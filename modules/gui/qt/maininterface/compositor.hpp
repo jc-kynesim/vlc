@@ -27,9 +27,7 @@
 #include <QObject>
 
 #include <vlc_common.h>
-#include <vlc_interface.h>
 #include <vlc_vout_window.h>
-
 
 #include "qt.hpp"
 
@@ -76,6 +74,7 @@ public:
 
     virtual QWindow* interfaceMainWindow() const = 0;
 
+    virtual QQuickItem * activeFocusItem() const = 0;
 };
 
 /**
@@ -95,8 +94,11 @@ public:
     class QmlUISurface
     {
     public:
+        virtual ~QmlUISurface() = default;
         virtual QQmlEngine* engine() const = 0;
         virtual void setContent(QQmlComponent *component, QQuickItem *item) = 0;
+
+        virtual QQuickItem * activeFocusItem() const = 0;
     };
 public:
     explicit CompositorVideo(qt_intf_t* p_intf, QObject* parent = nullptr);
@@ -125,7 +127,6 @@ protected:
 private:
     bool commonGUICreateImpl(QWindow* window, CompositorVideo::Flags flags);
 
-
 protected slots:
     virtual void onSurfacePositionChanged(const QPointF&) {}
     virtual void onSurfaceSizeChanged(const QSizeF&) {}
@@ -151,7 +152,7 @@ Q_DECLARE_OPERATORS_FOR_FLAGS(CompositorVideo::Flags)
 
 
 /**
- * @brief The CompositorFactory class will instanciate a compositor
+ * @brief The CompositorFactory class will instantiate a compositor
  * in auto mode, compositor will be instantiated from the list by order declaration,
  * compositor can be explicitly defined by passing its name.
  *
@@ -172,7 +173,7 @@ public:
 
     /**
      * @brief preInit will check whether a compositor can be used, before starting Qt,
-     * each candidate will may perform some basic checks and can setup Qt enviroment variable if required
+     * each candidate may perform some basic checks and can setup Qt environment variable if required
      *
      * @note if a compositor return true on preinit but fails to initialize afterwards, next
      * compositor in chain will be initialized without the preinit phaze (as Qt will be already started)
@@ -185,7 +186,7 @@ public:
     /**
      * @brief createCompositor will instantiate a compositor
      *
-     * @return the instantaied compositor, null if no compsitor can be instanciated
+     * @return the compositor instance, null if no compositor can be instantiated
      */
     Compositor* createCompositor();
 

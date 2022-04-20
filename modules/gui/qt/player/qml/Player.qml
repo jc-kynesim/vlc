@@ -35,19 +35,30 @@ FocusScope {
     property int _lockAutoHide: 0
     readonly property bool _autoHide: _lockAutoHide == 0
                                       && rootPlayer.hasEmbededVideo
-                                      && player.hasVideoOutput
+                                      && Player.hasVideoOutput
                                       && playlistpopup.state !== "visible"
 
     property bool pinVideoControls: rootPlayer.hasEmbededVideo && MainCtx.pinVideoControls
     property bool hasEmbededVideo: MainCtx.hasEmbededVideo
     readonly property int positionSliderY: controlBarView.y + controlBarView.sliderY
-    readonly property string coverSource: (mainPlaylistController.currentItem.artwork && mainPlaylistController.currentItem.artwork.toString())
-                                          ? mainPlaylistController.currentItem.artwork
-                                          : VLCStyle.noArtCover
+    readonly property string coverSource: {
+        if (mainPlaylistController.currentItem.artwork && mainPlaylistController.currentItem.artwork.toString())
+            mainPlaylistController.currentItem.artwork
+        else if (Player.hasVideoOutput)
+            VLCStyle.noArtVideoCover
+        else
+            VLCStyle.noArtAlbumCover
+
+    }
 
     // NOTE: We force the night theme when playing a video.
     readonly property VLCColors colors: (MainCtx.hasEmbededVideo) ? VLCStyle.nightColors
-                                                                        : VLCStyle.colors
+                                                                  : VLCStyle.colors
+
+    // Events
+
+    Component.onCompleted: MainCtx.preferHotkeys = true
+    Component.onDestruction: MainCtx.preferHotkeys = false
 
     Keys.priority: Keys.AfterItem
     Keys.onPressed: {
@@ -103,7 +114,7 @@ FocusScope {
             if (MainCtx.hasEmbededVideo && !MainCtx.canShowVideoPIP) {
                mainPlaylistController.stop()
             }
-            history.previous()
+            History.previous()
         }
     }
 
@@ -423,7 +434,7 @@ FocusScope {
                 font.pixelSize: VLCStyle.fontSize_xxlarge
                 horizontalAlignment: Text.AlignHCenter
                 color: rootPlayer.colors.playerFg
-                Accessible.description: i18n.qtr("album")
+                Accessible.description: I18n.qtr("album")
             }
 
             Widgets.MenuLabel {
@@ -437,7 +448,7 @@ FocusScope {
                 font.weight: Font.Light
                 horizontalAlignment: Text.AlignHCenter
                 color: rootPlayer.colors.playerFg
-                Accessible.description: i18n.qtr("artist")
+                Accessible.description: I18n.qtr("artist")
             }
 
             Widgets.NavigableRow {
@@ -446,7 +457,7 @@ FocusScope {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.topMargin: VLCStyle.margin_large
 
-                visible: player.videoTracks.count === 0 && centerContent.height > (audioControls.y + audioControls.height)
+                visible: Player.videoTracks.count === 0 && centerContent.height > (audioControls.y + audioControls.height)
                 focus: visible
                 spacing: VLCStyle.margin_xxsmall
                 Navigation.parentItem: rootPlayer
@@ -457,8 +468,8 @@ FocusScope {
                     Widgets.IconToolButton {
                         size: VLCIcons.pixelSize(VLCStyle.icon_large)
                         iconText: VLCIcons.skip_back
-                        onClicked: player.jumpBwd()
-                        text: i18n.qtr("Step back")
+                        onClicked: Player.jumpBwd()
+                        text: I18n.qtr("Step back")
                         color: rootPlayer.colors.playerFg
                         colorHover: rootPlayer.colors.buttonTextHover
                         colorFocus: rootPlayer.colors.bgFocus
@@ -467,8 +478,8 @@ FocusScope {
                     Widgets.IconToolButton {
                         size: VLCIcons.pixelSize(VLCStyle.icon_large)
                         iconText: VLCIcons.visualization
-                        onClicked: player.toggleVisualization()
-                        text: i18n.qtr("Visualization")
+                        onClicked: Player.toggleVisualization()
+                        text: I18n.qtr("Visualization")
                         color: rootPlayer.colors.playerFg
                         colorHover: rootPlayer.colors.buttonTextHover
                         colorFocus: rootPlayer.colors.bgFocus
@@ -477,8 +488,8 @@ FocusScope {
                     Widgets.IconToolButton{
                         size: VLCIcons.pixelSize(VLCStyle.icon_large)
                         iconText: VLCIcons.skip_for
-                        onClicked: player.jumpFwd()
-                        text: i18n.qtr("Step forward")
+                        onClicked: Player.jumpFwd()
+                        text: I18n.qtr("Step forward")
                         color: rootPlayer.colors.playerFg
                         colorHover: rootPlayer.colors.buttonTextHover
                         colorFocus: rootPlayer.colors.bgFocus
@@ -536,7 +547,8 @@ FocusScope {
 
                 onRequestLockUnlockAutoHide: rootPlayer.lockUnlockAutoHide(lock, source)
 
-                identifier: PlayerControlbarModel.Mainplayer
+                identifier: (Player.hasVideoOutput) ? PlayerControlbarModel.Videoplayer
+                                                    : PlayerControlbarModel.Audioplayer
             }
         }
     }
@@ -639,7 +651,7 @@ FocusScope {
     //visible when user navigates within the control bar
     KeyEventFilter {
         id: filter
-        target: topWindow
+        target: MainCtx.intfMainWindow
         enabled: controlBarView.state === "visible"
                  && (controlBarView.focus || topcontrolView.focus)
         Keys.onPressed: toolbarAutoHide.setVisible(5000)

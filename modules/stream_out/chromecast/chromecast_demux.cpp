@@ -248,7 +248,7 @@ struct demux_cc
                 break;
             }
             case CC_PACE_OK_WAIT:
-                /* Yeld: return to let the input thread doing controls  */
+                /* Yield: return to let the input thread doing controls  */
                 return VLC_DEMUXER_SUCCESS;
             case CC_PACE_OK:
             case CC_PACE_OK_ENDED:
@@ -289,7 +289,7 @@ struct demux_cc
         return ret;
     }
 
-    int Control( demux_t *p_demux_filter, int i_query, va_list args )
+    int Control( demux_t *, int i_query, va_list args )
     {
         if( !m_enabled && i_query != DEMUX_FILTER_ENABLE )
             return demux_vaControl( p_demux->s, i_query, args );
@@ -345,7 +345,7 @@ struct demux_cc
         case DEMUX_SET_POSITION:
         {
             double pos = va_arg( args, double );
-            /* Force unprecise seek */
+            /* Force imprecise seek */
             int ret = demux_Control( p_demux->s, DEMUX_SET_POSITION, pos, false );
             if( ret != VLC_SUCCESS )
                 return ret;
@@ -357,7 +357,7 @@ struct demux_cc
         case DEMUX_SET_TIME:
         {
             vlc_tick_t time = va_arg( args, vlc_tick_t );
-            /* Force unprecise seek */
+            /* Force imprecise seek */
             int ret = demux_Control( p_demux->s, DEMUX_SET_TIME, time, false );
             if( ret != VLC_SUCCESS )
                 return ret;
@@ -491,7 +491,6 @@ void Close(vlc_object_t *p_this)
 
 vlc_module_begin ()
     set_shortname( "cc_demux" )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_DEMUX )
     set_description( N_( "Chromecast demux wrapper" ) )
     set_capability( "demux_filter", 0 )

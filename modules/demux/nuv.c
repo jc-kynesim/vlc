@@ -46,7 +46,6 @@ static int  Open  ( vlc_object_t * );
 static void Close ( vlc_object_t * );
 
 vlc_module_begin ()
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_DEMUX )
     set_description( N_("Nuv demuxer") )
     set_capability( "demux", 145 )
@@ -266,7 +265,7 @@ static int Open( vlc_object_t * p_this )
         }
     }
 
-    /* Check and load extented */
+    /* Check and load extended */
     if( vlc_stream_Peek( p_demux->s, &p_peek, 1 ) != 1 )
         goto error;
     if( p_peek[0] == 'X' )

@@ -217,7 +217,7 @@ static bool BDJO_IsBlacklisted(demux_t *p_demux, const char *psz_bd_path)
 static const char *const ppsz_region_code[] = {
     "A", "B", "C" };
 static const char *const ppsz_region_code_text[] = {
-    "Region A", "Region B", "Region C" };
+    N_("Region A"), N_("Region B"), N_("Region C") };
 
 #define REGION_DEFAULT   1   /* Index to region list. Actual region code is (1<<REGION_DEFAULT) */
 #define LANGUAGE_DEFAULT ("eng")
@@ -241,7 +241,6 @@ vlc_module_begin ()
     set_shortname(N_("Blu-ray"))
     set_description(N_("Blu-ray Disc support (libbluray)"))
 
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_ACCESS)
     set_capability("access", 500)
     add_bool("bluray-menu", true, BD_MENU_TEXT, BD_MENU_LONGTEXT)
@@ -256,7 +255,6 @@ vlc_module_begin ()
     /* demux module */
     add_submodule()
         set_description( "BluRay demuxer" )
-        set_category( CAT_INPUT )
         set_subcategory( SUBCAT_INPUT_DEMUX )
         set_capability( "demux", 5 )
         set_callbacks( blurayOpen, blurayClose )
@@ -1671,7 +1669,7 @@ static void subpictureUpdaterUpdate(subpicture_t *p_subpic,
 
     /*
      * When this function is called, all p_subpic regions are gone.
-     * We need to duplicate our regions (stored internaly) to this subpic.
+     * We need to duplicate our regions (stored internally) to this subpic.
      */
     subpicture_region_t *p_src = p_overlay->p_regions;
     if (!p_src) {
@@ -2039,7 +2037,7 @@ static void blurayDrawArgbOverlay(demux_t *p_demux, const BD_ARGB_OVERLAY* const
     vlc_mutex_lock(&ov->lock);
 
     /* ARGB in word order -> byte order */
-#ifdef WORDS_BIG_ENDIAN
+#ifdef WORDS_BIGENDIAN
     const vlc_fourcc_t rgbchroma = VLC_CODEC_ARGB;
 #else
     const vlc_fourcc_t rgbchroma = VLC_CODEC_BGRA;

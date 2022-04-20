@@ -50,7 +50,6 @@ static int OpenDecoder(vlc_object_t *);
 static void CloseDecoder(vlc_object_t *);
 
 vlc_module_begin()
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_VCODEC )
     set_shortname(N_("MMAL decoder"))
     set_description(N_("MMAL-based decoder plugin for Raspberry Pi"))
@@ -471,7 +470,7 @@ static int decode(decoder_t *dec, block_t *block)
         return VLCDEC_SUCCESS;
     }
 
-    // Reenable stuff if the last thing we did was flush
+    // Re-enable stuff if the last thing we did was flush
     if (!sys->output->is_enabled &&
         (status = mmal_port_enable(sys->output, decoder_output_cb)) != MMAL_SUCCESS)
     {

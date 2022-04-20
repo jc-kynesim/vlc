@@ -29,11 +29,8 @@
 #include <QFileDialog>
 #include <QTextStream>
 #include <QMessageBox>
-#include <QTabWidget>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
-#include <QMutex>
-#include <QLineEdit>
 #include <QScrollBar>
 #include <QMutex>
 #include <QMutexLocker>
@@ -41,7 +38,6 @@
 #include <assert.h>
 
 #include <vlc_common.h>
-#include <vlc_input_item.h>
 #include <vlc_playlist.h>
 #include <vlc_interface.h>
 
@@ -100,8 +96,9 @@ MessagesDialog::MessagesDialog( qt_intf_t *_p_intf)
     ui.filterEdit->setText( getSettings()->value( "messages-filter" ).toString() );
     getSettings()->endGroup();
 
-    updateButton = new QPushButton( QIcon(":/update.svg"), "" );
-    updateButton->setFlat( true );
+    updateButton = new QToolButton;
+    updateButton->setIcon( QIcon(":/update.svg") );
+    updateButton->setAutoRaise( true );
     ui.mainTab->setCornerWidget( updateButton );
 
 #ifndef NDEBUG
@@ -121,15 +118,15 @@ MessagesDialog::MessagesDialog( qt_intf_t *_p_intf)
 
     tabChanged(0);
 
-    BUTTONACT( updateButton, updateOrClear() );
-    BUTTONACT( ui.saveLogButton, save() );
-    CONNECT( ui.filterEdit, editingFinished(), this, updateConfig() );
-    CONNECT( ui.filterEdit, textChanged(QString), this, filterMessages() );
-    CONNECT( ui.bottomButtonsBox, rejected(), this, hide() );
-    CONNECT( ui.verbosityBox, valueChanged( int ),
-             this, changeVerbosity( int ) );
+    BUTTONACT( updateButton, &MessagesDialog::updateOrClear );
+    BUTTONACT( ui.saveLogButton, &MessagesDialog::save );
+    connect( ui.filterEdit, &QLineEdit::editingFinished, this, &MessagesDialog::updateConfig );
+    connect( ui.filterEdit, &QLineEdit::textChanged, this, &MessagesDialog::filterMessages );
+    connect( ui.bottomButtonsBox, &QDialogButtonBox::rejected, this, &MessagesDialog::hide );
+    connect( ui.verbosityBox, QOverload<int>::of(&QVLCDebugLevelSpinBox::valueChanged),
+             this, &MessagesDialog::changeVerbosity );
 
-    CONNECT( ui.mainTab, currentChanged( int ), this, tabChanged( int ) );
+    connect( ui.mainTab, &QTabWidget::currentChanged, this, &MessagesDialog::tabChanged );
 
     /* General action */
     restoreWidgetPosition( "Messages", QSize( 600, 450 ) );

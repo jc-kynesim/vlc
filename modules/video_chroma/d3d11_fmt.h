@@ -25,6 +25,10 @@
 
 #include <vlc_codec.h>
 
+#ifdef __cplusplus
+// avoid some warnings in mingw
+#define D3D11_NO_HELPERS
+#endif
 #include <d3d11.h>
 
 #include "dxgi_fmt.h"
@@ -71,6 +75,7 @@ typedef struct
     ID3D11VideoProcessorInputView  *processorInput;  /* when used as processor input */
     ID3D11VideoProcessorOutputView *processorOutput; /* when used as processor output */
     ID3D11ShaderResourceView      *renderSrc[DXGI_MAX_SHADER_VIEW];
+    HANDLE                        sharedHandle;
 } picture_sys_d3d11_t;
 
 struct d3d11_pic_context
@@ -78,6 +83,15 @@ struct d3d11_pic_context
     picture_context_t         s;
     picture_sys_d3d11_t       picsys;
 };
+
+struct block_sys_d3d11_t
+{
+    block_t       self;
+    picture_t     *d3d11_pic;
+};
+
+#define D3D11BLOCK_FROM_BLOCK(block)  \
+    container_of((block), struct block_sys_d3d11_t, self)
 
 typedef struct
 {
@@ -173,9 +187,9 @@ const d3d_format_t *FindD3D11Format(vlc_object_t *,
     FindD3D11Format(VLC_OBJECT(a),b,c,d,e,f,g,h,i)
 
 int AllocateTextures(vlc_object_t *, d3d11_device_t *, const d3d_format_t *,
-                     const video_format_t *, ID3D11Texture2D *textures[],
-                     plane_t planes[]);
-#define AllocateTextures(a,b,c,d,e,f)  AllocateTextures(VLC_OBJECT(a),b,c,d,e,f)
+                     const video_format_t *, bool, ID3D11Texture2D *textures[],
+                     plane_t planes[]) VLC_USED;
+#define AllocateTextures(a,b,c,d,e,f,g)  AllocateTextures(VLC_OBJECT(a),b,c,d,e,f,g)
 
 static inline void d3d11_device_lock(d3d11_device_t *d3d_dev)
 {
@@ -193,7 +207,8 @@ void d3d11_pic_context_destroy(picture_context_t *);
 picture_context_t *d3d11_pic_context_copy(picture_context_t *);
 
 picture_t *D3D11_AllocPicture(vlc_object_t *,
-                              const video_format_t *, vlc_video_context *, const d3d_format_t *);
+                              const video_format_t *, vlc_video_context *,
+                              bool, const d3d_format_t *);
 
 #ifdef __cplusplus
 }

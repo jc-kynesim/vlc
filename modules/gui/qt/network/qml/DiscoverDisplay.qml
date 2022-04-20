@@ -33,19 +33,21 @@ Widgets.PageLoader {
     property var contentModel
     property bool isViewMultiView: false
 
-    //name and properties of the tab to be initially loaded
-    defaultPage: "services"
-
     pageModel: [{
-            displayText: i18n.qtr("Services"),
+            displayText: I18n.qtr("Services"),
             name: "services",
             url: "qrc:///network/ServicesHomeDisplay.qml"
         }, {
-            displayText: i18n.qtr("URL"),
+            displayText: I18n.qtr("URL"),
             name: "url",
             url: "qrc:///network/DiscoverUrlDisplay.qml"
         }
     ]
+
+    loadDefaultView: function () {
+        History.update(["mc", "discover", "services"])
+        loadPage("services")
+    }
 
     onCurrentItemChanged: {
         sortModel = currentItem.sortModel
@@ -56,11 +58,11 @@ Widgets.PageLoader {
 
 
     function loadIndex(index) {
-        history.push(["mc", "discover", root.pageModel[index].name])
+        History.push(["mc", "discover", root.pageModel[index].name])
     }
 
 
-    property var tabModel: ListModel {
+    property ListModel tabModel: ListModel {
         Component.onCompleted: {
             pageModel.forEach(function(e) {
                 append({

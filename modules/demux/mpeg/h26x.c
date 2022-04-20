@@ -48,7 +48,6 @@ static void Close( vlc_object_t * );
 
 vlc_module_begin ()
     set_shortname( "H264")
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_DEMUX )
     set_description( N_("H264 video demuxer" ) )
     set_capability( "demux", 6 )
@@ -60,7 +59,6 @@ vlc_module_begin ()
 
     add_submodule()
         set_shortname( "HEVC")
-        set_category( CAT_INPUT )
         set_subcategory( SUBCAT_INPUT_DEMUX )
         set_description( N_("HEVC/H.265 video demuxer" ) )
         set_capability( "demux", 6 )
@@ -207,7 +205,7 @@ static int ProbeH264( const uint8_t *p_peek, size_t i_peek, void *p_priv )
     }
     else if( i_nal_type == H264_NAL_AU_DELIMITER )
     {
-        if( i_ref_idc || p_ctx->b_pps || p_ctx->b_sps )
+        if( i_ref_idc )
             return -1;
     }
     else if ( i_nal_type == H264_NAL_SEI )
@@ -337,7 +335,7 @@ static int GenericOpen( demux_t *p_demux, const char *psz_module,
 
     float f_fps = 0;
     char *psz_fpsvar;
-    if( asprintf( &psz_fpsvar, "%s-fps", psz_module ) )
+    if( asprintf( &psz_fpsvar, "%s-fps", psz_module ) != -1 )
     {
         f_fps = var_CreateGetFloat( p_demux, psz_fpsvar );
         free( psz_fpsvar );

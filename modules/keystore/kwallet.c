@@ -47,7 +47,6 @@ static void Close( vlc_object_t * );
 vlc_module_begin()
     set_shortname( N_("KWallet keystore") )
     set_description( N_("Secrets are stored via KWallet") )
-    set_category( CAT_ADVANCED )
     set_subcategory( SUBCAT_ADVANCED_MISC )
     set_capability( "keystore", 100 )
     set_callbacks( Open, Close )
@@ -58,7 +57,7 @@ vlc_module_end()
  * but we only use the "Password" category. *
  * It is juste a simple Entry name ( or key ) *
  * associated with a secret. *
- * Keys are urls formated with : *
+ * Keys are urls formatted with : *
  *     _ Protocol *
  *     _ User ( optional ) *
  *     _ Server *
@@ -237,7 +236,10 @@ key2values( char* psz_key, vlc_keystore_entry* p_entry )
         goto end;
     if ( url.i_port && asprintf( &p_entry->ppsz_values[KEY_PORT],
                                  "%d", url.i_port) == -1 )
+    {
+        p_entry->ppsz_values[KEY_PORT] = NULL;
         goto end;
+    }
     if ( url.psz_path && !( p_entry->ppsz_values[KEY_PATH] =
                             strdup( url.psz_path ) ) )
         goto end;

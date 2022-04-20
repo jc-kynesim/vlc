@@ -43,7 +43,6 @@ static int  Open ( vlc_object_t * );
 static void Close( vlc_object_t * );
 
 vlc_module_begin()
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_STREAM_FILTER )
     set_description( N_("Internal stream record") )
     set_capability( "stream_filter", 0 )
@@ -166,7 +165,7 @@ static int Start( stream_t *s, const char *psz_extension )
     if( !psz_extension )
         psz_extension = "dat";
 
-    /* Retreive path */
+    /* Retrieve path */
     char *psz_path = var_CreateGetNonEmptyString( s, "input-record-path" );
     if( !psz_path )
         psz_path = config_GetUserDir( VLC_DOWNLOAD_DIR );

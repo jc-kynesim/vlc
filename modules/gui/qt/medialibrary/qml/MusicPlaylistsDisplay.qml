@@ -21,6 +21,7 @@ import QtQuick.Controls 2.4
 import QtQuick.Layouts  1.11
 import QtQml.Models     2.2
 
+import org.videolan.vlc 0.1
 import org.videolan.medialib 0.1
 
 import "qrc:///widgets/" as Widgets
@@ -42,8 +43,6 @@ Widgets.PageLoader {
     // Settings
     //---------------------------------------------------------------------------------------------
 
-    defaultPage: "all"
-
     pageModel: [{
         name: "all",
         component: componentAll
@@ -51,6 +50,11 @@ Widgets.PageLoader {
         name: "list",
         component: componentList
     }]
+
+    loadDefaultView: function () {
+        History.update(["mc", "music", "playlists", "all"])
+        loadPage("all")
+    }
 
     //---------------------------------------------------------------------------------------------
     // Events
@@ -71,11 +75,11 @@ Widgets.PageLoader {
     // Private
 
     function _updateHistoryList(index) {
-        history.update(["mc", "music", "playlists", "all", { "initialIndex": index }]);
+        History.update(["mc", "music", "playlists", "all", { "initialIndex": index }]);
     }
 
     function _updateHistoryPlaylist(playlist) {
-        history.update(["mc", "music", "playlists", "list", {
+        History.update(["mc", "music", "playlists", "list", {
                             "initialIndex": playlist.currentIndex,
                             "initialId"   : playlist.parentId,
                             "initialName" : playlist.name
@@ -97,7 +101,7 @@ Widgets.PageLoader {
             onCurrentIndexChanged: _updateHistoryList(currentIndex)
 
             onShowList: {
-                history.push(["mc", "music", "playlists", "list",
+                History.push(["mc", "music", "playlists", "list",
                              { parentId: model.id, name: model.name }]);
 
                 stackView.currentItem.setCurrentItemFocus(reason);
@@ -112,6 +116,8 @@ Widgets.PageLoader {
             id: playlist
 
             anchors.fill: parent
+
+            isMusic: true
 
             onCurrentIndexChanged: _updateHistoryPlaylist(playlist)
             onParentIdChanged    : _updateHistoryPlaylist(playlist)

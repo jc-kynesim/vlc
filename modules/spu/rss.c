@@ -175,7 +175,6 @@ vlc_module_begin ()
     set_shortname( N_("RSS / Atom") )
     set_help(RSS_HELP)
     set_callback_sub_source( CreateFilter, 1 )
-    set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_SUBPIC )
     add_string( CFG_PREFIX "urls", NULL, MSG_TEXT, MSG_LONGTEXT )
 
@@ -593,7 +592,7 @@ static picture_t *LoadImage( filter_t *p_filter, const char *psz_url )
 }
 
 /****************************************************************************
- * remove all ' ' '\t' '\n' '\r' characters from the begining and end of the
+ * remove all ' ' '\t' '\n' '\r' characters from the beginning and end of the
  * string.
  ***************************************************************************/
 static char *removeWhiteChars( const char *psz_src )
@@ -935,7 +934,7 @@ static rss_feed_t* FetchRSS( filter_t *p_filter )
         if( !ParseFeed( p_filter, p_xml_reader, p_feed ) )
             goto error;
 
-        /* If we have a image: load it if requiere */
+        /* If we have a image: load it if required */
         if( b_images && p_feed->psz_image && !p_feed->p_pic )
         {
             p_feed->p_pic = LoadImage( p_filter, p_feed->psz_image );

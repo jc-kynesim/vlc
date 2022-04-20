@@ -48,7 +48,7 @@ FocusScope {
     function hideResumePanel() {
         resumeTimeout.stop()
         resumePanel.visible = false
-        player.acknowledgeRestoreCallback()
+        Player.acknowledgeRestoreCallback()
         hidden()
     }
 
@@ -62,9 +62,9 @@ FocusScope {
     }
 
     Connections {
-        target: player
+        target: Player
         onCanRestorePlaybackChanged: {
-            if (player.canRestorePlayback) {
+            if (Player.canRestorePlayback) {
                 showResumePanel()
             } else {
                 hideResumePanel()
@@ -73,7 +73,7 @@ FocusScope {
     }
 
     Component.onCompleted: {
-        if (player.canRestorePlayback) {
+        if (Player.canRestorePlayback) {
             showResumePanel()
         }
     }
@@ -105,19 +105,19 @@ FocusScope {
             font.pixelSize: VLCStyle.fontSize_normal
             font.bold: true
 
-            text: i18n.qtr("Do you want to restart the playback where you left off?")
+            text: I18n.qtr("Do you want to restart the playback where you left off?")
         }
 
         Widgets.TabButtonExt {
             id: continueBtn
             Layout.preferredHeight: implicitHeight
             Layout.preferredWidth: implicitWidth
-            text: i18n.qtr("Continue")
+            text: I18n.qtr("Continue")
             font.bold: true
             color: resumePanel.colors.playerFg
             focus: true
             onClicked: {
-                player.restorePlaybackPos()
+                Player.restorePlaybackPos()
                 hideResumePanel()
             }
 
@@ -131,7 +131,7 @@ FocusScope {
             id: closeBtn
             Layout.preferredHeight: implicitHeight
             Layout.preferredWidth: implicitWidth
-            text: i18n.qtr("Dismiss")
+            text: I18n.qtr("Dismiss")
             font.bold: true
             color: resumePanel.colors.playerFg
             onClicked: hideResumePanel()

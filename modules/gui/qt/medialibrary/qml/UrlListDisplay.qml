@@ -47,7 +47,7 @@ Widgets.KeyNavigableTableView {
             "criteria": "url",
             "width": VLCStyle.colWidth(Math.max(listView_id._nbCols - 1,
                                                 1)),
-            "text": i18n.qtr("Url"),
+            "text": I18n.qtr("Url"),
             "showSection": "url",
             headerDelegate: urlHeaderDelegate
         }, {
@@ -61,16 +61,16 @@ Widgets.KeyNavigableTableView {
     rowHeight: VLCStyle.listAlbumCover_height + VLCStyle.margin_xxsmall * 2
     headerColor: VLCStyle.colors.bg
 
-    onActionForSelection: medialib.addAndPlay(model.getIdsForIndexes(
+    onActionForSelection: MediaLib.addAndPlay(model.getIdsForIndexes(
                                                   selection))
-    onItemDoubleClicked: medialib.addAndPlay(model.id)
-    onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes, menuParent.mapToGlobal(0,0))
+    onItemDoubleClicked: MediaLib.addAndPlay(model.id)
+    onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
     onRightClick: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
 
     MLUrlModel {
         id: urlModel
 
-        ml: medialib
+        ml: MediaLib
     }
 
     Util.SelectableDelegateModel {

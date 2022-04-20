@@ -156,7 +156,7 @@ static void Close( filter_t *filter )
         vlc_gl_interop_Delete(sys->interop);
         vlc_gl_ReleaseCurrent(sys->gl);
 
-        vlc_gl_Release(sys->gl);
+        vlc_gl_Delete(sys->gl);
         free(sys);
     }
 }
@@ -209,7 +209,7 @@ static int Open( vlc_object_t *obj )
         goto gl_api_failure;
     }
 
-    sys->interop = vlc_gl_interop_New(sys->gl, api, filter->vctx_in,
+    sys->interop = vlc_gl_interop_New(sys->gl, filter->vctx_in,
                                       &filter->fmt_in.video);
     if (!sys->interop)
     {
@@ -295,7 +295,7 @@ gl_api_failure:
     vlc_gl_ReleaseCurrent(sys->gl);
 
 make_current_failure:
-    vlc_gl_Release(sys->gl);
+    vlc_gl_Delete(sys->gl);
 
 gl_create_failure:
     free(sys);
@@ -303,14 +303,16 @@ gl_create_failure:
     return VLC_EGENERIC;
 }
 
+#define FILTER_LIST_TEXT N_( "OpenGL filter" )
+#define FILTER_LIST_LONGTEXT N_( "List of OpenGL filters to execute" )
+
 vlc_module_begin()
     set_shortname( N_("opengl") )
     set_description( N_("Opengl filter executor") )
-    set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
     set_capability( "video filter", 0 )
     add_shortcut( "opengl" )
     set_callback( Open )
     add_module_list( "opengl-filter", "opengl filter", NULL,
-                     "opengl filter", "List of OpenGL filters to execute" )
+                     FILTER_LIST_TEXT, FILTER_LIST_LONGTEXT )
 vlc_module_end()

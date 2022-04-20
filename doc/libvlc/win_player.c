@@ -58,7 +58,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARA
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN:
             {
-                int key = tolower( (unsigned char)MapVirtualKey( wParam, 2 ) );
+                int key = tolower( MapVirtualKey( (UINT)wParam, 2 ) );
                 if (key == 'a')
                 {
                     if (AspectRatio == NULL)
@@ -108,12 +108,12 @@ int WINAPI WinMain(HINSTANCE hInstance,
     /* remove "" around the given path */
     if (lpCmdLine[0] == '"')
     {
-        file_path = strdup( lpCmdLine+1 );
+        file_path = _strdup( lpCmdLine+1 );
         if (file_path[strlen(file_path)-1] == '"')
             file_path[strlen(file_path)-1] = '\0';
     }
     else
-        file_path = strdup( lpCmdLine );
+        file_path = _strdup( lpCmdLine );
 
     Context.p_libvlc = libvlc_new( 0, NULL );
     p_media = libvlc_media_new_path( Context.p_libvlc, file_path );
@@ -169,5 +169,5 @@ int WINAPI WinMain(HINSTANCE hInstance,
     libvlc_media_player_release( Context.p_mediaplayer );
     libvlc_release( Context.p_libvlc );
 
-    return msg.wParam;
+    return (int)msg.wParam;
 }

@@ -47,8 +47,6 @@
 #include "avcodec.h"
 #include "avcommon.h"
 
-#include <libavutil/channel_layout.h>
-
 #define HURRY_UP_GUARD1 VLC_TICK_FROM_MS(450)
 #define HURRY_UP_GUARD2 VLC_TICK_FROM_MS(300)
 #define HURRY_UP_GUARD3 VLC_TICK_FROM_MS(100)
@@ -56,6 +54,12 @@
 #define MAX_FRAME_DELAY (FF_MAX_B_FRAMES + 2)
 
 #define RAW_AUDIO_FRAME_SIZE (2048)
+
+#if LIBAVCODEC_VERSION_CHECK(59, 0, 100)
+# define AVC_MAYBE_CONST const
+#else
+# define AVC_MAYBE_CONST
+#endif
 
 /*****************************************************************************
  * Local prototypes
@@ -90,7 +94,7 @@ typedef struct
     /*
      * libavcodec properties
      */
-    AVCodec         *p_codec;
+    AVC_MAYBE_CONST AVCodec *p_codec;
     AVCodecContext  *p_context;
 
     /*
@@ -227,10 +231,10 @@ static const uint16_t mpeg4_default_non_intra_matrix[64] = {
 
 static const int DEFAULT_ALIGN = 0;
 
-static void probe_video_frame_rate( encoder_t *p_enc, AVCodecContext *p_context, AVCodec *p_codec )
+static void probe_video_frame_rate( encoder_t *p_enc, AVCodecContext *p_context, AVC_MAYBE_CONST AVCodec *p_codec )
 {
     /* if we don't have i_frame_rate_base, we are probing and just checking if we can find codec
-     * so set fps to requested fps if asked by user or input fps is availabled */
+     * so set fps to requested fps if asked by user or input fps is available */
     p_context->time_base.num = p_enc->fmt_in.video.i_frame_rate_base ? p_enc->fmt_in.video.i_frame_rate_base : 1;
 
     // MP4V doesn't like CLOCK_FREQ denominator in time_base, so use 1/25 as default for that
@@ -296,11 +300,25 @@ int InitVideoEnc( vlc_object_t *p_this )
     encoder_t *p_enc = (encoder_t *)p_this;
     encoder_sys_t *p_sys;
     AVCodecContext *p_context;
-    AVCodec *p_codec = NULL;
+    AVC_MAYBE_CONST AVCodec *p_codec = NULL;
     enum AVCodecID i_codec_id;
     const char *psz_namecodec;
     float f_val;
     char *psz_val;
+
+    static const struct vlc_encoder_operations audio_ops =
+    {
+        .close = EndVideoEnc,
+        .encode_audio = EncodeAudio,
+    };
+
+    static const struct vlc_encoder_operations video_ops =
+    {
+        .close = EndVideoEnc,
+        .encode_video = EncodeVideo,
+    };
+
+    const struct vlc_encoder_operations *encoder_ops;
 
     msg_Dbg( p_this, "using %s %s", AVPROVIDER(LIBAVCODEC), LIBAVCODEC_IDENT );
 
@@ -312,6 +330,7 @@ int InitVideoEnc( vlc_object_t *p_this )
     switch( p_enc->fmt_out.i_cat )
     {
         case VIDEO_ES:
+            encoder_ops = &video_ops;
             if( p_enc->fmt_out.i_codec == VLC_CODEC_MP1V )
             {
                 i_codec_id = AV_CODEC_ID_MPEG1VIDEO;
@@ -330,6 +349,7 @@ int InitVideoEnc( vlc_object_t *p_this )
             return VLC_EGENERIC;
 
         case AUDIO_ES:
+            encoder_ops = &audio_ops;
             if( GetFfmpegCodec( AUDIO_ES, p_enc->fmt_out.i_codec, &i_codec_id,
                                 &psz_namecodec ) )
                 break;
@@ -1050,8 +1070,8 @@ errmsg:
     }
     msg_Dbg( p_enc, "found encoder %s", psz_namecodec );
 
-    p_enc->pf_encode_video = EncodeVideo;
-    p_enc->pf_encode_audio = EncodeAudio;
+    assert(encoder_ops != NULL);
+    p_enc->ops = encoder_ops;
 
 
     return VLC_SUCCESS;
@@ -1469,9 +1489,8 @@ static block_t *EncodeAudio( encoder_t *p_enc, block_t *p_aout_buf )
 /*****************************************************************************
  * EndVideoEnc: libavcodec encoder destruction
  *****************************************************************************/
-void EndVideoEnc( vlc_object_t *p_this )
+void EndVideoEnc( encoder_t *p_enc )
 {
-    encoder_t *p_enc = (encoder_t *)p_this;
     encoder_sys_t *p_sys = p_enc->p_sys;
 
     av_frame_free( &p_sys->frame );

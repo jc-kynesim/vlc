@@ -36,7 +36,7 @@
 // #define STREAM_DEBUG 1
 
 /*
- * Complex scheme using mutliple track to avoid seeking
+ * Complex scheme using multiple track to avoid seeking
  */
 
 /* How many tracks we have, currently only used for stream mode */
@@ -564,7 +564,6 @@ static void Close(vlc_object_t *obj)
 }
 
 vlc_module_begin()
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_STREAM_FILTER)
     set_capability("stream_filter", 0)
     add_shortcut("cache")

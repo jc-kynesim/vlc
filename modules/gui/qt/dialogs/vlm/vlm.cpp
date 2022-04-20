@@ -33,22 +33,16 @@
 #include "util/qt_dirs.hpp"
 
 #include <QString>
-#include <QComboBox>
 #include <QVBoxLayout>
-#include <QStackedWidget>
 #include <QLabel>
 #include <QWidget>
 #include <QGridLayout>
-#include <QLineEdit>
-#include <QCheckBox>
 #include <QToolButton>
 #include <QGroupBox>
 #include <QPushButton>
-#include <QHBoxLayout>
 #include <QDateTimeEdit>
 #include <QDateTime>
 #include <QSpinBox>
-#include <QScrollArea>
 #include <QFileDialog>
 
 
@@ -138,21 +132,21 @@ VLMDialog::VLMDialog( qt_intf_t *_p_intf ) : QVLCFrame( _p_intf )
     showScheduleWidget( QVLM_Broadcast );
 
     /* Connect the comboBox to show the right Widgets */
-    CONNECT( ui.mediaType, currentIndexChanged( int ),
-             this, showScheduleWidget( int ) );
+    connect( ui.mediaType, QOverload<int>::of(&QComboBox::currentIndexChanged),
+             this, &VLMDialog::showScheduleWidget );
 
     /* Connect the leftList to show the good VLMItem */
-    CONNECT( ui.vlmListItem, currentRowChanged( int ),
-             this, selectVLMItem( int ) );
+    connect( ui.vlmListItem, &QListWidget::currentRowChanged,
+             this, &VLMDialog::selectVLMItem );
 
-    BUTTONACT( closeButton, close() );
-    BUTTONACT( exportButton, exportVLMConf() );
-    BUTTONACT( importButton, importVLMConf() );
-    BUTTONACT( ui.addButton, addVLMItem() );
-    BUTTONACT( ui.clearButton, clearWidgets() );
-    BUTTONACT( ui.saveButton, saveModifications() );
-    BUTTONACT( ui.inputButton, selectInput() );
-    BUTTONACT( ui.outputButton, selectOutput() );
+    BUTTONACT( closeButton, &VLMDialog::close );
+    BUTTONACT( exportButton, &VLMDialog::exportVLMConf );
+    BUTTONACT( importButton, &VLMDialog::importVLMConf );
+    BUTTONACT( ui.addButton, &VLMDialog::addVLMItem );
+    BUTTONACT( ui.clearButton, &VLMDialog::clearWidgets );
+    BUTTONACT( ui.saveButton, &VLMDialog::saveModifications );
+    BUTTONACT( ui.inputButton, &VLMDialog::selectInput );
+    BUTTONACT( ui.outputButton, &VLMDialog::selectOutput );
 
     if( !restoreGeometry( getSettings()->value("VLM/geometry").toByteArray() ) )
     {
@@ -356,7 +350,9 @@ void VLMDialog::selectInput()
 
 void VLMDialog::selectOutput()
 {
-    SoutDialog *s = new SoutDialog( windowHandle(), p_intf );
+    QWidget* windowWidget = window();
+    QWindow* parentWindow = windowWidget ? windowWidget->windowHandle() : nullptr;
+    SoutDialog *s = new SoutDialog( parentWindow, p_intf );
     if( s->exec() == QDialog::Accepted )
     {
         int i = s->getChain().indexOf( " " );
@@ -471,9 +467,9 @@ VLMAWidget::VLMAWidget( VLMWrapper *_vlm, const QString& _name,
     deleteButton->setToolTip( qtr("Delete") );
     objLayout->addWidget( deleteButton, 0, 6 );
 
-    BUTTONACT( modifyButton, modify() );
-    BUTTONACT( deleteButton, del() );
-    CONNECT( this, clicked( bool ), this, toggleEnabled( bool ) );
+    BUTTONACT( modifyButton, &VLMAWidget::modify );
+    BUTTONACT( deleteButton, &VLMAWidget::del );
+    connect( this, &VLMAWidget::clicked, this, &VLMAWidget::toggleEnabled );
 }
 
 void VLMAWidget::modify()
@@ -522,9 +518,9 @@ VLMBroadcast::VLMBroadcast( VLMWrapper *vlm, const QString& _name,
     loopButton->setToolTip( qtr("Repeat") );
     objLayout->addWidget( loopButton, 1, 2 );
 
-    BUTTONACT( playButton, togglePlayPause() );
-    BUTTONACT( stopButton, stop() );
-    BUTTONACT( loopButton, toggleLoop() );
+    BUTTONACT( playButton, &VLMBroadcast::togglePlayPause );
+    BUTTONACT( stopButton, &VLMBroadcast::stop );
+    BUTTONACT( loopButton, &VLMBroadcast::toggleLoop );
 
     update();
 }

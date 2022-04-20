@@ -40,12 +40,7 @@
 #include "misc/rcu.h"
 
 vlc_mutex_t config_lock = VLC_STATIC_MUTEX;
-atomic_bool config_dirty = ATOMIC_VAR_INIT(false);
-
-static inline char *strdupnull (const char *src)
-{
-    return src ? strdup (src) : NULL;
-}
+static atomic_bool config_dirty = ATOMIC_VAR_INIT(false);
 
 int config_GetType(const char *name)
 {
@@ -518,6 +513,27 @@ void config_ResetAll(void)
                 vlc_param_SetString(param, p_config->orig.psz);
         }
     }
-    vlc_mutex_lock(&config_lock);
+    vlc_mutex_unlock(&config_lock);
     atomic_store_explicit(&config_dirty, true, memory_order_release);
+}
+
+
+int config_AutoSaveConfigFile( vlc_object_t *p_this )
+{
+    assert( p_this );
+
+    if (!atomic_exchange_explicit(&config_dirty, false, memory_order_acquire))
+        return 0;
+
+    int ret = config_SaveConfigFile (p_this);
+
+    if (unlikely(ret != 0))
+        /*
+         * On write failure, set the dirty flag back again. While it looks
+         * racy, it really means to retry later in hope that it does not
+         * fail again. Concurrent write attempts would not succeed anyway.
+         */
+        atomic_store_explicit(&config_dirty, true, memory_order_relaxed);
+
+    return ret;
 }

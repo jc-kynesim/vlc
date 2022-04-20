@@ -30,53 +30,34 @@
 
 #include "maininterface/mainctx.hpp"
 #include "compositor.hpp"
-#include "player/player_controller.hpp"                    // Creation
 #include "util/renderer_manager.hpp"
 
 #include "widgets/native/customwidgets.hpp"               // qtEventToVLCKey, QVLCStackedWidget
 #include "util/qt_dirs.hpp"                     // toNativeSeparators
-#include "util/imagehelper.hpp"
-#include "util/color_scheme_model.hpp"
 
 #include "widgets/native/interface_widgets.hpp"     // bgWidget, videoWidget
 
-#include "playlist/playlist_model.hpp"
 #include "playlist/playlist_controller.hpp"
-#include <vlc_playlist.h>
+
+#include "dialogs/dialogs_provider.hpp"
 
 #include "videosurface.hpp"
 
 #include "menus/menus.hpp"                            // Menu creation
 
-#include "vlc_media_library.h"
-
 #include "dialogs/toolbar/controlbar_profile_model.hpp"
 
-#include <QCloseEvent>
 #include <QKeyEvent>
 
 #include <QUrl>
-#include <QSize>
 #include <QDate>
 #include <QMimeData>
 
 #include <QWindow>
-#include <QMenuBar>
-#include <QStatusBar>
-#include <QLabel>
-#include <QStackedWidget>
 #include <QScreen>
-#include <QStackedLayout>
 #ifdef _WIN32
 #include <QFileInfo>
 #endif
-
-
-#include <QtGlobal>
-#include <QTimer>
-
-#include <vlc_actions.h>                    /* Wheel event */
-#include <vlc_vout_window.h>                /* VOUT_ events */
 
 #define VLC_REFERENCE_SCALE_FACTOR 96.
 
@@ -138,7 +119,7 @@ MainCtx::MainCtx(qt_intf_t *_p_intf)
     vlc_medialibrary_t* ml = vlc_ml_instance_get( p_intf );
     b_hasMedialibrary = (ml != NULL);
     if (b_hasMedialibrary) {
-        m_medialib = new MediaLib(p_intf, this);
+        m_medialib = new MediaLib(p_intf);
     }
 
     /* Controlbar Profile Model Creation */
@@ -175,7 +156,13 @@ MainCtx::MainCtx(qt_intf_t *_p_intf)
     /* VideoWidget connects for asynchronous calls */
     connect( this, &MainCtx::askToQuit, THEDP, &DialogsProvider::quit, Qt::QueuedConnection  );
 
-    connect(this, &MainCtx::interfaceFullScreenChanged, this, &MainCtx::useClientSideDecorationChanged);
+    QMetaObject::invokeMethod(this, [this]()
+    {
+        // *** HACKY ***
+        assert(p_intf->p_compositor->interfaceMainWindow());
+        connect(p_intf->p_compositor->interfaceMainWindow(), &QWindow::screenChanged,
+                this, &MainCtx::screenChanged);
+    }, Qt::QueuedConnection);
 
     /** END of CONNECTS**/
 
@@ -217,11 +204,13 @@ MainCtx::~MainCtx()
     settings->setValue( "playlist-width-factor", playlistWidthFactor);
 
     settings->setValue( "grid-view", m_gridView );
+    settings->setValue( "grouping", m_grouping );
+
     settings->setValue( "color-scheme", m_colorScheme->currentScheme() );
     /* Save the stackCentralW sizes */
     settings->endGroup();
 
-    if( var_InheritBool( p_intf, "qt-recentplay" ) )
+    if( var_InheritBool( p_intf, "save-recentplay" ) )
         getSettings()->setValue( "filedialog-path", m_dialogFilepath );
     else
         getSettings()->remove( "filedialog-path" );
@@ -232,6 +221,9 @@ MainCtx::~MainCtx()
     var_DelCallback( libvlc, "intf-show", IntfRaiseMainCB, p_intf );
     var_DelCallback( libvlc, "intf-toggle-fscontrol", IntfShowCB, p_intf );
     var_DelCallback( libvlc, "intf-popupmenu", PopupMenuCB, p_intf );
+
+    if (m_medialib)
+        m_medialib->destroy();
 
     p_intf->p_mi = NULL;
 }
@@ -247,7 +239,7 @@ bool MainCtx::hasVLM() const {
 bool MainCtx::useClientSideDecoration() const
 {
     //don't show CSD when interface is fullscreen
-    return !m_windowTitlebar && m_windowVisibility != QWindow::FullScreen;
+    return !m_windowTitlebar;
 }
 
 bool MainCtx::hasFirstrun() const {
@@ -277,7 +269,7 @@ void MainCtx::loadPrefs(const bool callSignals)
     /* Are we in the enhanced always-video mode or not ? */
     loadFromVLCOption(b_minimalView, "qt-minimal-view", nullptr);
 
-    /* Do we want anoying popups or not */
+    /* Do we want annoying popups or not */
     loadFromVLCOption(i_notificationSetting, "qt-notification", nullptr);
 
     /* Should the UI stays on top of other windows */
@@ -291,6 +283,8 @@ void MainCtx::loadPrefs(const bool callSignals)
 #if QT_CLIENT_SIDE_DECORATION_AVAILABLE
     loadFromVLCOption(m_windowTitlebar, "qt-titlebar" , &MainCtx::useClientSideDecorationChanged);
 #endif
+
+    loadFromVLCOption(m_smoothScroll, "qt-smooth-scrolling", &MainCtx::smoothScrollChanged);
 }
 
 void MainCtx::loadFromSettingsImpl(const bool callSignals)
@@ -316,6 +310,8 @@ void MainCtx::loadFromSettingsImpl(const bool callSignals)
     loadFromSettings(playlistWidthFactor, "MainWindow/playlist-width-factor", 4.0 , &MainCtx::playlistWidthFactorChanged);
 
     loadFromSettings(m_gridView, "MainWindow/grid-view", true, &MainCtx::gridViewChanged);
+
+    loadFromSettings(m_grouping, "MainWindow/grouping", GROUPING_NONE, &MainCtx::groupingChanged);
 
     loadFromSettings(m_showRemainingTime, "MainWindow/ShowRemainingTime", false, &MainCtx::showRemainingTimeChanged);
 
@@ -474,6 +470,13 @@ void MainCtx::setGridView(bool asGrid)
 {
     m_gridView = asGrid;
     emit gridViewChanged( asGrid );
+}
+
+void MainCtx::setGrouping(Grouping grouping)
+{
+    m_grouping = grouping;
+
+    emit groupingChanged(grouping);
 }
 
 void MainCtx::setInterfaceAlwaysOnTop( bool on_top )
@@ -816,4 +819,37 @@ void MainCtx::setAcrylicActive(bool newAcrylicActive)
 
     m_acrylicActive = newAcrylicActive;
     emit acrylicActiveChanged();
+}
+
+bool MainCtx::preferHotkeys() const
+{
+    return m_preferHotkeys;
+}
+
+void MainCtx::setPreferHotkeys(bool enable)
+{
+    if (m_preferHotkeys == enable)
+        return;
+
+    m_preferHotkeys = enable;
+
+    emit preferHotkeysChanged();
+}
+
+QWindow *MainCtx::intfMainWindow() const
+{
+    if (p_intf->p_compositor)
+        return p_intf->p_compositor->interfaceMainWindow();
+    else
+        return nullptr;
+}
+
+QVariant MainCtx::settingValue(const QString &key, const QVariant &defaultValue) const
+{
+    return settings->value(key, defaultValue);
+}
+
+void MainCtx::setSettingValue(const QString &key, const QVariant &value)
+{
+    settings->setValue(key, value);
 }

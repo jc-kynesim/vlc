@@ -20,6 +20,7 @@ libfreetype_plugin_la_LDFLAGS = $(FREETYPE_LDFLAGS) -rpath '$(textdir)'
 
 if HAVE_WIN32
 libfreetype_plugin_la_SOURCES += text_renderer/freetype/fonts/dwrite.cpp
+libfreetype_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) $(LIBCOMCXXFLAGS)
 libfreetype_plugin_la_LINK = $(CXXLINK)
 if HAVE_WIN32_DESKTOP
 libfreetype_plugin_la_SOURCES += text_renderer/freetype/fonts/win32.c
@@ -74,6 +75,7 @@ endif
 # SAPI TTS (win32)
 libsapi_plugin_la_SOURCES = text_renderer/sapi.cpp
 libsapi_plugin_la_LIBADD = $(LIBCOM)
+libsapi_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) $(LIBCOMCXXFLAGS)
 if HAVE_SAPI
 text_LTLIBRARIES += libsapi_plugin.la
 endif

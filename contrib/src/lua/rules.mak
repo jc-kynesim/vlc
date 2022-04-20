@@ -27,17 +27,34 @@ endif
 
 # Feel free to add autodetection if you need to...
 PKGS += lua luac
+PKGS_TOOLS += luac
 PKGS_ALL += luac
 ifeq ($(call need_pkg,"lua >= 5.1"),)
-PKGS_FOUND += lua luac
+PKGS_FOUND += lua
+ifndef HAVE_CROSS_COMPILE
+PKGS_FOUND += luac
+endif
 else
 ifeq ($(call need_pkg,"lua5.2"),)
-PKGS_FOUND += lua luac
+PKGS_FOUND += lua
+ifndef HAVE_CROSS_COMPILE
+PKGS_FOUND += luac
+endif
 else
 ifeq ($(call need_pkg,"lua5.1"),)
-PKGS_FOUND += lua luac
+PKGS_FOUND += lua
+ifndef HAVE_CROSS_COMPILE
+PKGS_FOUND += luac
 endif
 endif
+endif
+endif
+
+ifeq ($(shell $(HOST)-luac -v 2>/dev/null | head -1 | sed  -E 's/Lua ([0-9]+).([0-9]+).*/\1.\2/'),$(LUA_SHORTVERSION))
+PKGS_FOUND += luac
+endif
+ifeq ($(shell $(HOST)-luac -v 2>/dev/null | head -1 | sed  -E 's/Lua ([0-9]+).([0-9]+).*/\1.\2/'),5.2)
+PKGS_FOUND += luac
 endif
 
 $(TARBALLS)/lua-$(LUA_VERSION).tar.gz:
@@ -111,15 +128,11 @@ endif
 .sum-luac: .sum-lua
 	touch $@
 
+LUACVARS=AR="$(BUILDAR) cru"
 ifdef HAVE_WIN32
 ifndef HAVE_CROSS_COMPILE
-LUACVARS=CPPFLAGS="-DLUA_DL_DLL"
+LUACVARS+=CPPFLAGS="$(BUILDCPPFLAGS) -DLUA_DL_DLL"
 endif
-endif
-
-ifdef HAVE_CROSS_COMPILE
-# Remove the cross-compiler environment for the native compiler
-LUACVARS+=CFLAGS="" CPPFLAGS="" LDFLAGS=""
 endif
 
 # DO NOT use the same intermediate directory as the lua target
@@ -131,7 +144,7 @@ luac: lua-$(LUA_VERSION).tar.gz .sum-luac
 	$(MOVE)
 
 .luac: luac
-	cd $< && $(LUACVARS) $(MAKE) generic
+	cd $< && $(MAKE) $(BUILDVARS) $(LUACVARS) generic
 	mkdir -p -- $(BUILDBINDIR)
 	install -m 0755 -s -- $</src/luac $(BUILDBINDIR)/$(HOST)-luac
 	touch $@

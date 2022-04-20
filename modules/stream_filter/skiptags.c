@@ -97,15 +97,20 @@ static uint_fast32_t SkipAPETag(stream_t *s)
         return 0;
 
     uint_fast32_t size = GetDWLE(peek + 12);
-    if (size > SSIZE_MAX - 32u)
-        return 0; /* impossibly long tag */
 
-    uint_fast32_t flags = GetDWLE(peek + 16);
-    if ((flags & (1u << 29)) == 0)
-        return 0;
+    if (version >= 2000)
+    {
+        uint_fast32_t flags = GetDWLE(peek + 16);
+        if ((flags & (1u << 29)) == 0)
+            return 0;
 
-    if (flags & (1u << 30))
-        size += 32;
+        if (flags & (1u << 30))
+        {
+            if (size > UINT32_MAX - 32u)
+                return 0; /* impossibly long tag */
+            size += 32;
+        }
+    }
 
     msg_Dbg(s, "AP2 v%"PRIuFAST32" tag found, "
             "skipping %"PRIuFAST32" bytes", version / 1000, size);
@@ -117,34 +122,53 @@ static bool SkipTag(stream_t *s, uint_fast32_t (*skipper)(stream_t *),
 {
     uint_fast64_t offset = vlc_stream_Tell(s);
     uint_fast32_t size = skipper(s);
-    if(size> 0)
+    if (size == 0)
+        return false;
+    if (*pi_tags_count < MAX_TAGS && size <= MAX_TAG_SIZE)
     {
-        /* Skip the entire tag */
-        ssize_t read;
-        if(*pi_tags_count < MAX_TAGS && size <= MAX_TAG_SIZE)
-        {
-            *pp_block = vlc_stream_Block(s, size);
-            read = *pp_block ? (ssize_t)(*pp_block)->i_buffer : -1;
+        *pp_block = vlc_stream_Block(s, size);
+        if (unlikely(!*pp_block))
+        {   /* I/O error, try to restore offset. If it fails, screwed. */
+            if (vlc_stream_Seek(s, offset))
+                msg_Err(s, "seek failure");
+            return false;
         }
-        else
+        if((*pp_block)->i_buffer < size)
         {
-            read = vlc_stream_Read(s, NULL, size);
-        }
-
-        if(read < (ssize_t)size)
-        {
+            // unexpected EOF, tag not fully read
             block_ChainRelease(*pp_block);
             *pp_block = NULL;
-            if (unlikely(read < 0))
-            {   /* I/O error, try to restore offset. If it fails, screwed. */
-                if (vlc_stream_Seek(s, offset))
-                    msg_Err(s, "seek failure");
-                return false;
-            }
+            return false;
         }
-        else (*pi_tags_count)++;
+        (*pi_tags_count)++;
+        return true;
     }
-    return size != 0;
+
+    // Tag too big, skip the entire tag
+    while(size)
+    {
+        /* Skip the entire tag */
+#if SSIZE_MAX < UINT_FAST32_MAX
+        ssize_t skip = __MIN(size, SSIZE_MAX);
+#else
+        ssize_t skip = size;
+#endif
+        ssize_t read = vlc_stream_Read(s, NULL, skip);
+
+        if (unlikely(read < 0))
+        {   /* I/O error, try to restore offset. If it fails, screwed. */
+            if (vlc_stream_Seek(s, offset))
+                msg_Err(s, "seek failure");
+            return false;
+        }
+        if(read < skip)
+        {
+            // unexpected EOF
+            return false;
+        }
+        size -= read;
+    }
+    return true;
 }
 
 static ssize_t Read(stream_t *stream, void *buf, size_t buflen)
@@ -234,7 +258,6 @@ static void Close(vlc_object_t *obj)
 }
 
 vlc_module_begin()
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_STREAM_FILTER)
     set_capability("stream_filter", 330)
 

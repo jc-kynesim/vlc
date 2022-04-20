@@ -2,11 +2,8 @@
  * customwidgets.hpp: Custom widgets
  ****************************************************************************
  * Copyright (C) 2006 the VideoLAN team
- * Copyright (C) 2004 Daniel Molkentin <molkentin@kde.org>
  *
  * Authors: Clément Stenac <zorglub@videolan.org>
- * The "ClickLineEdit" control is based on code by  Daniel Molkentin
- * <molkentin@kde.org> for libkdepim
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,13 +23,10 @@
 #ifndef VLC_QT_CUSTOMWIDGETS_HPP_
 #define VLC_QT_CUSTOMWIDGETS_HPP_
 
-#include <QLineEdit>
 #include <QPushButton>
 #include <QLabel>
-#include <QStackedWidget>
 #include <QSpinBox>
 #include <QCheckBox>
-#include <QList>
 #include <QToolButton>
 #include <QDial>
 

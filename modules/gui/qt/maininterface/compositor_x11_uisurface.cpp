@@ -35,7 +35,7 @@ CompositorX11UISurface::CompositorX11UISurface(QWindow* window, QScreen* screen)
     format.setDepthBufferSize(8);
     format.setStencilBufferSize(8);
     format.setAlphaBufferSize(8);
-
+    format.setSwapInterval(0);
     setFormat(format);
 
     m_context = new QOpenGLContext();
@@ -90,6 +90,11 @@ void CompositorX11UISurface::setContent(QQmlComponent*,  QQuickItem* rootItem)
     updateSizes();
 }
 
+QQuickItem * CompositorX11UISurface::activeFocusItem() const /* override */
+{
+    return m_uiWindow->activeFocusItem();
+}
+
 void CompositorX11UISurface::createFbo()
 {
     //write to the immediate context
@@ -111,6 +116,8 @@ void CompositorX11UISurface::render()
 
     m_uiRenderControl->polishItems();
     m_uiRenderControl->sync();
+
+    // FIXME: Render function should be executed in rendering thread
     m_uiRenderControl->render();
 
     m_uiWindow->resetOpenGLState();
@@ -282,10 +289,12 @@ void CompositorX11UISurface::exposeEvent(QExposeEvent *)
 {
     if (isExposed())
     {
-        m_context->makeCurrent(this);
-        m_uiRenderControl->initialize(m_context);
-        m_context->doneCurrent();
-
+        if (!m_uiWindow->openglContext())
+        {
+            m_context->makeCurrent(this);
+            m_uiRenderControl->initialize(m_context);
+            m_context->doneCurrent();
+        }
         requestUpdate();
     }
 }

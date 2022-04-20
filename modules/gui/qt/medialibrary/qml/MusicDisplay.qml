@@ -33,29 +33,33 @@ Widgets.PageLoader {
     property var contentModel
     property bool isViewMultiView: true
 
-    defaultPage: "artists"
     pageModel: [{
-            displayText: i18n.qtr("Artists"),
+            displayText: I18n.qtr("Artists"),
             name: "artists",
             url: "qrc:///medialibrary/MusicArtistsDisplay.qml"
         }, {
-            displayText: i18n.qtr("Albums"),
+            displayText: I18n.qtr("Albums"),
             name: "albums",
             url: "qrc:///medialibrary/MusicAlbumsDisplay.qml"
         }, {
-            displayText: i18n.qtr("Tracks"),
+            displayText: I18n.qtr("Tracks"),
             name: "tracks" ,
             url: "qrc:///medialibrary/MusicTracksDisplay.qml"
         }, {
-            displayText: i18n.qtr("Genres"),
+            displayText: I18n.qtr("Genres"),
             name: "genres" ,
             url: "qrc:///medialibrary/MusicGenresDisplay.qml"
         }, {
-            displayText: i18n.qtr("Playlists"),
+            displayText: I18n.qtr("Playlists"),
             name: "playlists" ,
             url: "qrc:///medialibrary/MusicPlaylistsDisplay.qml"
         }
     ]
+
+    loadDefaultView: function () {
+        History.update(["mc", "music", "artists"])
+        loadPage("artists")
+    }
 
     onCurrentItemChanged: {
         sortModel = currentItem.sortModel
@@ -64,10 +68,10 @@ Widgets.PageLoader {
     }
 
     function loadIndex(index) {
-        history.push(["mc", "music", root.pageModel[index].name])
+        History.push(["mc", "music", root.pageModel[index].name])
     }
 
-    property var tabModel: ListModel {
+    property ListModel tabModel: ListModel {
         Component.onCompleted: {
             pageModel.forEach(function(e) {
                 append({

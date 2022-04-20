@@ -55,6 +55,9 @@ function get(dict, key, defaultValue) {
 
 // NOTE: This allows us to force another 'reason' even when the item has activeFocus.
 function enforceFocus(item, reason) {
+    if (item.activeFocus && item.focusReason === reason)
+        return
+
     item.focus = false;
 
     item.forceActiveFocus(reason);
@@ -62,4 +65,10 @@ function enforceFocus(item, reason) {
 
 function pointInRadius(x, y, radius) {
      return (x * x + y * y < radius * radius)
+}
+
+// checks if point `pos` lies in rect `rect`
+function contains(rect, pos) {
+    return (clamp(pos.x, rect.x, rect.x + rect.width) === pos.x)
+            && (clamp(pos.y, rect.y, rect.y + rect.height) === pos.y)
 }

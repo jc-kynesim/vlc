@@ -111,7 +111,7 @@ static void Flush( decoder_t * );
 
 #ifdef ENABLE_SOUT
 static int OpenEncoder  ( vlc_object_t * );
-static void CloseEncoder( vlc_object_t * );
+static void CloseEncoder( encoder_t * );
 static block_t *Encode  ( encoder_t *, subpicture_t * );
 #endif
 
@@ -120,7 +120,6 @@ vlc_module_begin ()
     set_description( N_("DVB subtitles decoder") )
     set_shortname( N_("DVB subtitles") )
     set_capability( "spu decoder", 80 )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_SCODEC )
     set_callbacks( Open, Close )
 
@@ -133,8 +132,8 @@ vlc_module_begin ()
 #   define ENC_CFG_PREFIX "sout-dvbsub-"
     add_submodule ()
     set_description( N_("DVB subtitles encoder") )
-    set_capability( "encoder", 100 )
-    set_callbacks( OpenEncoder, CloseEncoder )
+    set_capability( "spu encoder", 100 )
+    set_callback( OpenEncoder )
 
     add_integer( ENC_CFG_PREFIX "x", -1, ENC_POSX_TEXT, ENC_POSX_LONGTEXT )
     add_integer( ENC_CFG_PREFIX "y", -1, ENC_POSY_TEXT, ENC_POSY_LONGTEXT )
@@ -203,7 +202,7 @@ typedef struct dvbsub_clut_s
 
 } dvbsub_clut_t;
 
-/* The Region is an aera on the image [7.2.3]
+/* The Region is an area on the image [7.2.3]
  * with a list of the object definitions associated and a CLUT */
 typedef struct dvbsub_region_s
 {
@@ -1674,7 +1673,7 @@ typedef struct
     unsigned int i_region_ver;
     unsigned int i_clut_ver;
 
-    int i_regions;
+    unsigned int i_regions;
     encoder_region_t *p_regions;
 
     vlc_tick_t i_pts;
@@ -1709,7 +1708,6 @@ static int OpenEncoder( vlc_object_t *p_this )
         return VLC_ENOMEM;
     p_enc->p_sys = p_sys;
 
-    p_enc->pf_encode_sub = Encode;
     p_enc->fmt_out.i_codec = VLC_CODEC_DVBS;
     p_enc->fmt_out.subs.dvb.i_id  = 1 << 16 | 1;
 
@@ -1723,6 +1721,13 @@ static int OpenEncoder( vlc_object_t *p_this )
 
     p_sys->i_offset_x = var_CreateGetInteger( p_this, ENC_CFG_PREFIX "x" );
     p_sys->i_offset_y = var_CreateGetInteger( p_this, ENC_CFG_PREFIX "y" );
+
+    static const struct vlc_encoder_operations ops =
+    {
+        .close = CloseEncoder,
+        .encode_sub = Encode,
+    };
+    p_enc->ops = &ops;
 
     return VLC_SUCCESS;
 }
@@ -2043,13 +2048,12 @@ static block_t *Encode( encoder_t *p_enc, subpicture_t *p_subpic )
 /*****************************************************************************
  * CloseEncoder: encoder destruction
  *****************************************************************************/
-static void CloseEncoder( vlc_object_t *p_this )
+static void CloseEncoder( encoder_t *p_enc )
 {
-    encoder_t *p_enc = (encoder_t *)p_this;
     encoder_sys_t *p_sys = p_enc->p_sys;
 
-    var_Destroy( p_this , ENC_CFG_PREFIX "x" );
-    var_Destroy( p_this , ENC_CFG_PREFIX "y" );
+    var_Destroy( p_enc , ENC_CFG_PREFIX "x" );
+    var_Destroy( p_enc , ENC_CFG_PREFIX "y" );
 
     if( p_sys->i_regions ) free( p_sys->p_regions );
     free( p_sys );
@@ -2061,7 +2065,8 @@ static void encode_page_composition( encoder_t *p_enc, bs_t *s,
     encoder_sys_t *p_sys = p_enc->p_sys;
     subpicture_region_t *p_region;
     bool b_mode_change = false;
-    int i_regions, i_timeout;
+    unsigned int i_regions;
+    int i_timeout;
 
     bs_write( s, 8, 0x0f ); /* Sync byte */
     bs_write( s, 8, DVBSUB_ST_PAGE_COMPOSITION ); /* Segment type */
@@ -2085,7 +2090,7 @@ static void encode_page_composition( encoder_t *p_enc, bs_t *s,
               (int)p_region->fmt.i_visible_width ) )
         {
             b_mode_change = true;
-            msg_Dbg( p_enc, "region %i width change: %i -> %i",
+            msg_Dbg( p_enc, "region %u width change: %i -> %i",
                      i_regions, p_sys->p_regions[i_regions].i_width,
                      p_region->fmt.i_visible_width );
             p_sys->p_regions[i_regions].i_width =
@@ -2095,7 +2100,7 @@ static void encode_page_composition( encoder_t *p_enc, bs_t *s,
              (int)p_region->fmt.i_visible_height )
         {
             b_mode_change = true;
-            msg_Dbg( p_enc, "region %i height change: %i -> %i",
+            msg_Dbg( p_enc, "region %u height change: %i -> %i",
                      i_regions, p_sys->p_regions[i_regions].i_height,
                      p_region->fmt.i_visible_height );
             p_sys->p_regions[i_regions].i_height =

@@ -60,10 +60,10 @@ RowLayout {
 
             anchors.centerIn: parent
 
-            enabled: mainPlaylistController.count > 1
+            checked: mainPlaylistController.random
             size: VLCStyle.icon_normal
             iconText: VLCIcons.shuffle_on
-            onClicked: mainPlaylistController.shuffle()
+            onClicked: mainPlaylistController.toggleRandom()
             focusPolicy: Qt.NoFocus
         }
     }
@@ -79,6 +79,8 @@ RowLayout {
 
             enabled: mainPlaylistController.count > 1
 
+            checked: mainPlaylistController.sortKey !== PlaylistControllerModel.SORT_KEY_NONE
+
             popupAbove: true
 
             focusPolicy: Qt.NoFocus
@@ -88,7 +90,7 @@ RowLayout {
             criteriaRole: "key"
 
             onSortSelected: {
-                mainPlaylistController.sortKey = type
+                mainPlaylistController.sortKey = key
             }
 
             onSortOrderSelected: {

@@ -121,7 +121,7 @@ static bool srt_schedule_reconnect(sout_access_out_t *p_access)
         srt_close( p_sys->sock );
     }
 
-    p_sys->sock = srt_socket( res->ai_family, SOCK_DGRAM, 0 );
+    p_sys->sock = srt_create_socket( );
     if ( p_sys->sock == SRT_INVALID_SOCK )
     {
         msg_Err( p_access, "Failed to open socket." );
@@ -207,7 +207,7 @@ static bool srt_schedule_reconnect(sout_access_out_t *p_access)
         &(int) { SRT_EPOLL_ERR | SRT_EPOLL_OUT });
 
     /* Schedule a connect */
-    msg_Dbg( p_access, "Schedule SRT connect (dest addresss: %s, port: %d).",
+    msg_Dbg( p_access, "Schedule SRT connect (dest address: %s, port: %d).",
         psz_dst_addr, i_dst_port );
 
     stat = srt_connect( p_sys->sock, res->ai_addr, res->ai_addrlen );
@@ -452,7 +452,6 @@ static void Close( vlc_object_t * p_this )
 vlc_module_begin()
     set_shortname( N_( "SRT" ) )
     set_description( N_( "SRT stream output" ) )
-    set_category( CAT_SOUT )
     set_subcategory( SUBCAT_SOUT_ACO )
 
     add_obsolete_integer( SRT_PARAM_CHUNK_SIZE )

@@ -57,7 +57,6 @@ static void Close        ( filter_t * );
 vlc_module_begin ()
     set_shortname( N_("Goom"))
     set_description( N_("Goom effect") )
-    set_category( CAT_AUDIO )
     set_subcategory( SUBCAT_AUDIO_VISUAL )
     set_capability( "visualization", 0 )
     add_integer( "goom-width", 800,
@@ -354,8 +353,6 @@ static void Close( filter_t *p_filter )
     vlc_join( p_thread->thread, NULL );
 
     /* Free data */
-    vout_Close( p_thread->p_vout );
-
     while( p_thread->i_blocks-- )
     {
         block_Release( p_thread->pp_blocks[p_thread->i_blocks] );

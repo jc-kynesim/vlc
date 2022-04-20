@@ -385,7 +385,7 @@ static void* update_CheckReal( void * );
  *
  * \param p_update pointer to update struct
  * \param pf_callback pointer to a function to call when the update_check is finished
- * \param p_data pointer to some datas to give to the callback
+ * \param p_data pointer to some data to give to the callback
  * \returns nothing
  */
 void update_Check( update_t *p_update, void (*pf_callback)( void*, bool ), void *p_data )
@@ -568,7 +568,10 @@ static void* update_DownloadReal( void *obj )
     }
     psz_tmpdestfile++;
     if( asprintf( &psz_destfile, "%s%s", psz_destdir, psz_tmpdestfile ) == -1 )
+    {
+        psz_destfile = NULL;
         goto end;
+    }
 
     p_file = vlc_fopen( psz_destfile, "w" );
     if( !p_file )

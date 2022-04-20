@@ -50,7 +50,7 @@ static void CloseDecoder  ( vlc_object_t * );
 
 #ifdef ENABLE_SOUT
 static int OpenEncoder   ( vlc_object_t * );
-static void CloseEncoder ( vlc_object_t * );
+static void CloseEncoder ( encoder_t * );
 #endif
 
 #define ENC_CFG_PREFIX "sout-speex-"
@@ -91,7 +91,6 @@ static const char * const ppsz_enc_mode_descriptions[] = {
 };
 
 vlc_module_begin ()
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACODEC )
 
     set_description( N_("Speex audio decoder") )
@@ -107,8 +106,8 @@ vlc_module_begin ()
 #ifdef ENABLE_SOUT
     add_submodule ()
     set_description( N_("Speex audio encoder") )
-    set_capability( "encoder", 100 )
-    set_callbacks( OpenEncoder, CloseEncoder )
+    set_capability( "audio encoder", 100 )
+    set_callback( OpenEncoder )
 
     add_integer( ENC_CFG_PREFIX "mode", 0, ENC_MODE_TEXT,
                  ENC_MODE_LONGTEXT )
@@ -456,7 +455,7 @@ static int ProcessHeaders( decoder_t *p_dec )
 }
 
 /*****************************************************************************
- * ProcessInitialHeader: processes the inital Speex header packet.
+ * ProcessInitialHeader: processes the initial Speex header packet.
  *****************************************************************************/
 static int ProcessInitialHeader( decoder_t *p_dec, ogg_packet *p_oggpacket )
 {
@@ -993,7 +992,6 @@ static int OpenEncoder( vlc_object_t *p_this )
     if( ( p_sys = (encoder_sys_t *)malloc(sizeof(encoder_sys_t)) ) == NULL )
         return VLC_ENOMEM;
     p_enc->p_sys = p_sys;
-    p_enc->pf_encode_audio = Encode;
     p_enc->fmt_in.i_codec = VLC_CODEC_S16N;
     p_enc->fmt_out.i_codec = VLC_CODEC_SPEEX;
 
@@ -1069,6 +1067,13 @@ static int OpenEncoder( vlc_object_t *p_this )
         memcpy( p_extra, pp_header[i], pi_header[i] );
         p_extra += pi_header[i];
     }
+
+    static const struct vlc_encoder_operations ops =
+    {
+        .close = CloseEncoder,
+        .encode_audio = Encode,
+    };
+    p_enc->ops = &ops;
 
     msg_Dbg( p_enc, "encoding: frame size:%d, channels:%d, samplerate:%d",
              p_sys->i_frame_size, p_enc->fmt_in.audio.i_channels,
@@ -1180,9 +1185,8 @@ static block_t *Encode( encoder_t *p_enc, block_t *p_aout_buf )
 /*****************************************************************************
  * CloseEncoder: encoder destruction
  *****************************************************************************/
-static void CloseEncoder( vlc_object_t *p_this )
+static void CloseEncoder( encoder_t *p_enc )
 {
-    encoder_t *p_enc = (encoder_t *)p_this;
     encoder_sys_t *p_sys = p_enc->p_sys;
 
     speex_encoder_destroy( p_sys->p_state );

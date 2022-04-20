@@ -28,6 +28,9 @@
 #include <assert.h>
 #include <vlc_atomic.h>
 
+struct vlc_ancillary;
+typedef uint32_t vlc_ancillary_id;
+
 /**
  * \defgroup picture Generic picture API
  * \ingroup output
@@ -87,16 +90,15 @@ struct vlc_video_context_operations
 /** Decoder device type */
 enum vlc_video_context_type
 {
-    VLC_VIDEO_CONTEXT_NONE,
-    VLC_VIDEO_CONTEXT_VAAPI,
-    VLC_VIDEO_CONTEXT_VDPAU,
-    VLC_VIDEO_CONTEXT_DXVA2, /**< private: d3d9_video_context_t* */
-    VLC_VIDEO_CONTEXT_D3D11VA,  /**< private: d3d11_video_context_t* */
-    VLC_VIDEO_CONTEXT_AWINDOW, /**< private: android_video_context_t* */
-    VLC_VIDEO_CONTEXT_NVDEC,
-    VLC_VIDEO_CONTEXT_CVPX,
-    VLC_VIDEO_CONTEXT_MMAL,
-    VLC_VIDEO_CONTEXT_DRM_PRIME,
+    VLC_VIDEO_CONTEXT_VAAPI = 1, //!< private: vaapi_vctx* or empty
+    VLC_VIDEO_CONTEXT_VDPAU,     //!< empty
+    VLC_VIDEO_CONTEXT_DXVA2,     //!< private: d3d9_video_context_t*
+    VLC_VIDEO_CONTEXT_D3D11VA,   //!< private: d3d11_video_context_t*
+    VLC_VIDEO_CONTEXT_AWINDOW,   //!< private: android_video_context_t*
+    VLC_VIDEO_CONTEXT_NVDEC,     //!< empty
+    VLC_VIDEO_CONTEXT_CVPX,      //!< private: cvpx_video_context*
+    VLC_VIDEO_CONTEXT_MMAL,      //!< empty
+    VLC_VIDEO_CONTEXT_DRM_PRIME, //!< empty
 };
 
 VLC_API vlc_video_context * vlc_video_context_Create(vlc_decoder_device *,
@@ -411,6 +413,46 @@ VLC_API void picture_Copy( picture_t *p_dst, const picture_t *p_src );
  * \return A clone picture on success, NULL on error.
  */
 VLC_API picture_t *picture_Clone(picture_t *pic);
+
+/**
+ * Attach an ancillary to the picture
+ *
+ * @warning the ancillary will be released only if the picture is created from
+ * picture_New(), and picture_Clone().
+ *
+ * @note Several ancillaries can be attached to a picture, but if two
+ * ancillaries are identified by the same ID, only the last one take
+ * precedence.
+ *
+ * @param pic the picture to attach an ancillary
+ * @param ancillary ancillary that will be held by the frame, can't be NULL
+ * @return VLC_SUCCESS in case of success, VLC_ENOMEM in case of alloc error
+ */
+VLC_API int
+picture_AttachAncillary(picture_t *pic, struct vlc_ancillary *ancillary);
+
+/**
+ * Allocate a new ancillary and attach it to a picture. Helper equivalent to
+ * malloc + vlc_ancillary_Create + picture_AttachAncillary. The returned memory
+ * is not initialized.
+ *
+ * @param pic picture to attach created ancillary to
+ * @param id id of the ancillary to create
+ * @param size allocation size in bytes
+ * @return The allocated pointer on success, NULL on out-of-memory
+ */
+VLC_API void *
+picture_AttachNewAncillary(picture_t *pic, vlc_ancillary_id id, size_t size);
+
+/**
+ * Return the ancillary identified by an ID
+ *
+ * @param id id of ancillary to request
+ * @return the ancillary or NULL if the ancillary for that particular id is
+ * not present
+ */
+VLC_API struct vlc_ancillary *
+picture_GetAncillary(const picture_t *pic, vlc_ancillary_id id);
 
 /**
  * This function will export a picture to an encoded bitstream.

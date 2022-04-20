@@ -58,7 +58,6 @@ vlc_module_begin ()
     set_shortname( N_("vsxu"))
     set_description( N_("vsxu") )
     set_capability( "visualization", 0 )
-    set_category( CAT_AUDIO )
     set_subcategory( SUBCAT_AUDIO_VISUAL )
     add_integer( "vsxu-width", 1280, WIDTH_TEXT, WIDTH_LONGTEXT )
     add_integer( "vsxu-height", 800, HEIGHT_TEXT, HEIGHT_LONGTEXT )
@@ -131,6 +130,7 @@ static int Open( vlc_object_t * p_this )
     vout_window_cfg_t cfg;
 
     memset( &cfg, 0, sizeof(cfg) );
+    cfg.is_decorated = true;
     cfg.width = var_InheritInteger( p_filter, "vsxu-width" );
     cfg.height = var_InheritInteger( p_filter, "vsxu-height" );
 
@@ -171,7 +171,7 @@ static void Close( filter_t *p_filter )
 
     vlc_join( p_sys->thread, NULL );
 
-    /* Free the ressources */
+    /* Free the resources */
     vlc_gl_surface_Destroy( p_sys->gl );
     delete p_sys->vsxu_cyclic_buffer;
     free( p_sys );

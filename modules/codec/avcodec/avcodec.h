@@ -31,7 +31,7 @@ vlc_fourcc_t GetVlcAudioFormat( int i_sample_fmt );
 
 /* Video encoder module */
 int  InitVideoEnc ( vlc_object_t * );
-void EndVideoEnc( vlc_object_t * );
+void EndVideoEnc( encoder_t * );
 
 /* Video Decoder */
 int InitVideoDec( vlc_object_t * );
@@ -91,8 +91,7 @@ int ffmpeg_OpenCodec( decoder_t *p_dec, AVCodecContext *, const AVCodec * );
 
 #define SKIP_IDCT_TEXT N_("Skip idct (default=0)")
 #define SKIP_IDCT_LONGTEXT N_( \
-    "Force skipping of idct to speed up decoding for frame types " \
-    "(-1=None, 0=Default, 1=B-frames, 2=P-frames, 3=B+P frames, 4=all frames)." )
+    "Force skipping of idct to speed up decoding for frame types." )
 
 #define DEBUG_TEXT N_( "Debug mask" )
 #define DEBUG_LONGTEXT NULL

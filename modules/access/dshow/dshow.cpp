@@ -65,19 +65,19 @@ static int DemuxControl( demux_t *, int, va_list );
 static int OpenDevice( vlc_object_t *, access_sys_t *, std::string, bool );
 static ComPtr<IBaseFilter> FindCaptureDevice( vlc_object_t *, std::string *,
                                        std::list<std::string> *, bool );
-static size_t EnumDeviceCaps( vlc_object_t *, IBaseFilter *,
+static size_t EnumDeviceCaps( vlc_object_t *, ComPtr<IBaseFilter> &,
                               int, int, int, int, int, int,
                               AM_MEDIA_TYPE *mt, size_t, bool );
 static bool ConnectFilters( vlc_object_t *, access_sys_t *,
-                            IBaseFilter *, CaptureFilter * );
+                            ComPtr<IBaseFilter> &, ComPtr<CaptureFilter> & );
 
-static void ShowPropertyPage( IUnknown * );
-static void ShowDeviceProperties( vlc_object_t *, ICaptureGraphBuilder2 *,
-                                  IBaseFilter *, bool );
-static void ShowTunerProperties( vlc_object_t *, ICaptureGraphBuilder2 *,
-                                 IBaseFilter *, bool );
-static void ConfigTuner( vlc_object_t *, ICaptureGraphBuilder2 *,
-                         IBaseFilter * );
+static void ShowPropertyPageO( ComPtr<IUnknown> & );
+static void ShowDeviceProperties( vlc_object_t *, ComPtr<ICaptureGraphBuilder2> &,
+                                  ComPtr<IBaseFilter> &, bool );
+static void ShowTunerProperties( vlc_object_t *, ComPtr<ICaptureGraphBuilder2> &,
+                                 ComPtr<IBaseFilter> &, bool );
+static void ConfigTuner( vlc_object_t *, ComPtr<ICaptureGraphBuilder2> &,
+                         ComPtr<IBaseFilter> & );
 
 /*****************************************************************************
  * Module descriptor
@@ -189,7 +189,6 @@ using namespace dshow;
 vlc_module_begin ()
     set_shortname( N_("DirectShow") )
     set_description( N_("DirectShow input") )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACCESS )
     add_string( "dshow-vdev", NULL, VDEV_TEXT, VDEV_LONGTEXT)
 
@@ -274,6 +273,13 @@ struct ComContext
     }
 };
 
+template<typename T>
+static void ShowPropertyPage( ComPtr<T> & t )
+{
+    ComPtr<IUnknown> obj(t);
+    ShowPropertyPageO(obj);
+}
+
 /*****************************************************************************
  * DirectShow elementary stream descriptor
  *****************************************************************************/
@@ -308,19 +314,17 @@ static void CreateDirectShowGraph( access_sys_t *p_sys )
 
     /* Create directshow filter graph */
     if( SUCCEEDED( CoCreateInstance( CLSID_FilterGraph, 0, CLSCTX_INPROC,
-                       (REFIID)IID_IFilterGraph, (void**)p_sys->p_graph.GetAddressOf() ) ) )
+                       __uuidof(p_sys->p_graph.Get()), &p_sys->p_graph ) ) )
     {
         /* Create directshow capture graph builder if available */
         if( SUCCEEDED( CoCreateInstance( CLSID_CaptureGraphBuilder2, 0,
-                         CLSCTX_INPROC, (REFIID)IID_ICaptureGraphBuilder2,
-                         (void**)p_sys->p_capture_graph_builder2.GetAddressOf() ) ) )
+                         CLSCTX_INPROC, __uuidof(p_sys->p_capture_graph_builder2.Get()), &p_sys->p_capture_graph_builder2 ) ) )
         {
             p_sys->p_capture_graph_builder2->
-                SetFiltergraph((IGraphBuilder *)p_sys->p_graph.Get() );
+                SetFiltergraph(static_cast<IGraphBuilder *>(p_sys->p_graph.Get()) );
         }
 
-        p_sys->p_graph->QueryInterface( IID_IMediaControl,
-                                        (void**)p_sys->p_control.GetAddressOf() );
+        p_sys->p_graph.As( &p_sys->p_control );
     }
 }
 
@@ -520,8 +524,8 @@ static int CommonOpen( vlc_object_t *p_this, access_sys_t *p_sys,
             {
                 /* FIXME: we do MEDIATYPE_Stream here so we don't do
                  * it twice. */
-                ShowTunerProperties( p_this, p_sys->p_capture_graph_builder2.Get(),
-                                     p_stream->p_device_filter.Get(), 0 );
+                ShowTunerProperties( p_this, p_sys->p_capture_graph_builder2,
+                                     p_stream->p_device_filter, 0 );
             }
         }
     }
@@ -563,7 +567,7 @@ static int CommonOpen( vlc_object_t *p_this, access_sys_t *p_sys,
         if( i_val >= 0 )
             p_sys->crossbar_routes[i].AudioOutputIndex = i_val;
 
-        IAMCrossbar *pXbar = p_sys->crossbar_routes[i].pXbar.Get();
+        ComPtr<IAMCrossbar> pXbar = p_sys->crossbar_routes[i].pXbar;
         LONG VideoInputIndex = p_sys->crossbar_routes[i].VideoInputIndex;
         LONG VideoOutputIndex = p_sys->crossbar_routes[i].VideoOutputIndex;
         LONG AudioInputIndex = p_sys->crossbar_routes[i].AudioInputIndex;
@@ -598,13 +602,12 @@ static int CommonOpen( vlc_object_t *p_this, access_sys_t *p_sys,
     {
         for( int i = p_sys->i_crossbar_route_depth-1; i >= 0 ; --i )
         {
-            IAMCrossbar *pXbar = p_sys->crossbar_routes[i].pXbar.Get();
+            ComPtr<IAMCrossbar> & pXbar = p_sys->crossbar_routes[i].pXbar;
             ComPtr<IBaseFilter> p_XF;
 
-            if( SUCCEEDED( pXbar->QueryInterface( IID_IBaseFilter,
-                                                  (void**)p_XF.ReleaseAndGetAddressOf() ) ) )
+            if( SUCCEEDED( pXbar.As( &p_XF ) ) )
             {
-                ShowPropertyPage( p_XF.Get() );
+                ShowPropertyPage( p_XF );
             }
         }
     }
@@ -855,8 +858,8 @@ static void DemuxClose( vlc_object_t *p_this )
  * ConnectFilters
  ****************************************************************************/
 static bool ConnectFilters( vlc_object_t *p_this, access_sys_t *p_sys,
-                            IBaseFilter *p_filter,
-                            CaptureFilter *p_capture_filter )
+                            ComPtr<IBaseFilter> & p_filter,
+                            ComPtr<CaptureFilter> & p_capture_filter )
 {
     ComPtr<CapturePin> p_input_pin = p_capture_filter->CustomGetPin();
 
@@ -866,7 +869,7 @@ static bool ConnectFilters( vlc_object_t *p_this, access_sys_t *p_sys,
     {
         if( FAILED(p_sys->p_capture_graph_builder2->
                 RenderStream( &PIN_CATEGORY_CAPTURE, &mediaType.majortype,
-                              p_filter, 0, (IBaseFilter *)p_capture_filter )) )
+                              p_filter.Get(), 0, p_capture_filter.Get() )) )
         {
             return false;
         }
@@ -876,7 +879,7 @@ static bool ConnectFilters( vlc_object_t *p_this, access_sys_t *p_sys,
         ComPtr<IEnumPins> pins;
         if( ( mediaType.majortype == MEDIATYPE_Video ||
               mediaType.majortype == MEDIATYPE_Stream ) &&
-            SUCCEEDED(p_filter->EnumPins(pins.GetAddressOf())) )
+            SUCCEEDED(p_filter->EnumPins(&pins)) )
         {
             ComPtr<IPin> pP;
             ULONG        n;
@@ -885,15 +888,14 @@ static bool ConnectFilters( vlc_object_t *p_this, access_sys_t *p_sys,
             GUID guid;
             DWORD dw;
 
-            while( !Found && ( S_OK == pins->Next(1, pP.ReleaseAndGetAddressOf(), &n) ) )
+            while( !Found && ( S_OK == pins->Next(1, &pP, &n) ) )
             {
                 if( S_OK == pP->QueryPinInfo(&pinInfo) )
                 {
                     ComPtr<IKsPropertySet> pKs;
                     // is this pin an ANALOGVIDEOIN input pin?
                     if( pinInfo.dir == PINDIR_INPUT &&
-                        pP->QueryInterface( IID_IKsPropertySet,
-                                            (void**)pKs.GetAddressOf() ) == S_OK )
+                        pP.As( &pKs ) == S_OK )
                     {
                         if( pKs->Get( AMPROPSETID_Pin,
                                       AMPROPERTY_PIN_CATEGORY, NULL, 0,
@@ -902,7 +904,7 @@ static bool ConnectFilters( vlc_object_t *p_this, access_sys_t *p_sys,
                             if( guid == PIN_CATEGORY_ANALOGVIDEOIN )
                             {
                                 // recursively search crossbar routes
-                                FindCrossbarRoutes( p_this, p_sys, pP.Get(), 0 );
+                                FindCrossbarRoutes( p_this, p_sys, pP, 0 );
                                 // found it
                                 Found = TRUE;
                             }
@@ -922,9 +924,9 @@ static bool ConnectFilters( vlc_object_t *p_this, access_sys_t *p_sys,
         ComPtr<IEnumPins> p_enumpins;
         ComPtr<IPin> p_pin;
 
-        if( S_OK != p_filter->EnumPins( p_enumpins.GetAddressOf() ) ) return false;
+        if( S_OK != p_filter->EnumPins( &p_enumpins ) ) return false;
 
-        while( S_OK == p_enumpins->Next( 1, p_pin.ReleaseAndGetAddressOf(), NULL ) )
+        while( S_OK == p_enumpins->Next( 1, &p_pin, NULL ) )
         {
             PIN_DIRECTION pin_dir;
             p_pin->QueryDirection( &pin_dir );
@@ -941,7 +943,7 @@ static bool ConnectFilters( vlc_object_t *p_this, access_sys_t *p_sys,
 }
 
 /*
- * get fourcc priority from arbritary preference, the higher the better
+ * get fourcc priority from arbitrary preference, the higher the better
  */
 static int GetFourCCPriority( int i_fourcc )
 {
@@ -983,7 +985,7 @@ static int OpenDevice( vlc_object_t *p_this, access_sys_t *p_sys,
             wchar_t *pwsz_devicename = ToWide( devicename.c_str() );
 
             if( likely( pwsz_devicename ) )
-                p_sys->p_graph->FindFilterByName( pwsz_devicename, p_device_filter.GetAddressOf() );
+                p_sys->p_graph->FindFilterByName( pwsz_devicename, &p_device_filter );
 
             free( pwsz_devicename );
 
@@ -1043,9 +1045,10 @@ static int OpenDevice( vlc_object_t *p_this, access_sys_t *p_sys,
         wchar_t *pwsz_devicename = ToWide( devicename.c_str() );
 
         if( likely( pwsz_devicename ) )
+        {
             hr = p_sys->p_graph->AddFilter( p_device_filter.Get(), pwsz_devicename );
-
-        free( pwsz_devicename );
+            free( pwsz_devicename );
+        }
 
         if( FAILED( hr ) )
         {
@@ -1054,10 +1057,10 @@ static int OpenDevice( vlc_object_t *p_this, access_sys_t *p_sys,
         }
     }
 
-    // Retreive acceptable media types supported by device
+    // Retrieve acceptable media types supported by device
     AM_MEDIA_TYPE media_types[MAX_MEDIA_TYPES];
     size_t media_count =
-        EnumDeviceCaps( p_this, p_device_filter.Get(), b_audio ? 0 : p_sys->i_chroma,
+        EnumDeviceCaps( p_this, p_device_filter, b_audio ? 0 : p_sys->i_chroma,
                         p_sys->i_width, p_sys->i_height,
       b_audio ? var_CreateGetInteger( p_this, "dshow-audio-channels" ) : 0,
       b_audio ? var_CreateGetInteger( p_this, "dshow-audio-samplerate" ) : 0,
@@ -1114,7 +1117,7 @@ static int OpenDevice( vlc_object_t *p_this, access_sys_t *p_sys,
 
     /* Attempt to connect one of this device's capture output pins */
     msg_Dbg( p_this, "connecting filters" );
-    if( ConnectFilters( p_this, p_sys, p_device_filter.Get(), p_capture_filter.Get() ) )
+    if( ConnectFilters( p_this, p_sys, p_device_filter, p_capture_filter ) )
     {
         /* Success */
         msg_Dbg( p_this, "filters connected successfully !" );
@@ -1130,19 +1133,19 @@ static int OpenDevice( vlc_object_t *p_this, access_sys_t *p_sys,
          * the proper parameters. */
         if( var_GetBool( p_this, "dshow-config" ) )
         {
-            ShowDeviceProperties( p_this, p_sys->p_capture_graph_builder2.Get(),
-                                  p_device_filter.Get(), b_audio );
+            ShowDeviceProperties( p_this, p_sys->p_capture_graph_builder2,
+                                  p_device_filter, b_audio );
         }
 
-        ConfigTuner( p_this, p_sys->p_capture_graph_builder2.Get(),
-                     p_device_filter.Get() );
+        ConfigTuner( p_this, p_sys->p_capture_graph_builder2,
+                     p_device_filter );
 
         if( var_GetBool( p_this, "dshow-tuner" ) &&
             dshow_stream.mt.majortype != MEDIATYPE_Stream )
         {
             /* FIXME: we do MEDIATYPE_Stream later so we don't do it twice. */
-            ShowTunerProperties( p_this, p_sys->p_capture_graph_builder2.Get(),
-                                 p_device_filter.Get(), b_audio );
+            ShowTunerProperties( p_this, p_sys->p_capture_graph_builder2,
+                                 p_device_filter, b_audio );
         }
 
         dshow_stream.mt =
@@ -1201,7 +1204,7 @@ static int OpenDevice( vlc_object_t *p_this, access_sys_t *p_sys,
 /* FindCaptureDevices:: This Function had two purposes :
     Returns the list of capture devices when p_listdevices != NULL
     Creates an IBaseFilter when p_devicename corresponds to an existing devname
-   These actions *may* be requested whith a single call.
+   These actions *may* be requested with a single call.
 */
 static ComPtr<IBaseFilter>
 FindCaptureDevice( vlc_object_t *p_this, std::string *p_devicename,
@@ -1217,7 +1220,7 @@ FindCaptureDevice( vlc_object_t *p_this, std::string *p_devicename,
     ComPtr<ICreateDevEnum> p_dev_enum;
 
     hr = CoCreateInstance( CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC,
-                           IID_ICreateDevEnum, (void**)p_dev_enum.GetAddressOf() );
+                           __uuidof(p_dev_enum.Get()), &p_dev_enum );
     if( FAILED(hr) )
     {
         msg_Err( p_this, "failed to create the device enumerator (0x%lX)", hr);
@@ -1228,10 +1231,10 @@ FindCaptureDevice( vlc_object_t *p_this, std::string *p_devicename,
     ComPtr<IEnumMoniker> p_class_enum;
     if( !b_audio )
         hr = p_dev_enum->CreateClassEnumerator( CLSID_VideoInputDeviceCategory,
-                                                p_class_enum.GetAddressOf(), 0 );
+                                                &p_class_enum, 0 );
     else
         hr = p_dev_enum->CreateClassEnumerator( CLSID_AudioInputDeviceCategory,
-                                                p_class_enum.GetAddressOf(), 0 );
+                                                &p_class_enum, 0 );
     if( FAILED(hr) )
     {
         msg_Err( p_this, "failed to create the class enumerator (0x%lX)", hr );
@@ -1240,7 +1243,7 @@ FindCaptureDevice( vlc_object_t *p_this, std::string *p_devicename,
 
     /* If there are no enumerators for the requested type, then
      * CreateClassEnumerator will succeed, but p_class_enum will be NULL */
-    if( p_class_enum == NULL )
+    if( !p_class_enum )
     {
         msg_Err( p_this, "no %s capture device was detected", ( b_audio ? "audio" : "video" ) );
         return p_base_filter;
@@ -1252,12 +1255,11 @@ FindCaptureDevice( vlc_object_t *p_this, std::string *p_devicename,
      * it will return S_FALSE (which is not a failure). Therefore, we check
      * that the return code is S_OK instead of using SUCCEEDED() macro. */
 
-    while( p_class_enum->Next( 1, p_moniker.ReleaseAndGetAddressOf(), &i_fetched ) == S_OK )
+    while( p_class_enum->Next( 1, &p_moniker, &i_fetched ) == S_OK )
     {
         /* Getting the property page to get the device name */
         ComPtr<IPropertyBag> p_bag;
-        hr = p_moniker->BindToStorage( 0, 0, IID_IPropertyBag,
-                                       (void**)p_bag.GetAddressOf() );
+        hr = p_moniker->BindToStorage( 0, 0, __uuidof(p_bag.Get()), &p_bag );
         if( SUCCEEDED(hr) )
         {
             VARIANT var;
@@ -1278,7 +1280,7 @@ FindCaptureDevice( vlc_object_t *p_this, std::string *p_devicename,
                 {
                     if( 0 == (*iter).compare( devname ) )
                     { /* devname is on the list. Try another name with sequence
-                         number apended and then rescan until a unique entry is found*/
+                         number appended and then rescan until a unique entry is found*/
                          char seq[16];
                          snprintf(seq, 16, " #%d", ++dup);
                          devname = ordevname + seq;
@@ -1293,13 +1295,12 @@ FindCaptureDevice( vlc_object_t *p_this, std::string *p_devicename,
                 {
                     msg_Dbg( p_this, "asked for %s, binding to %s", p_devicename->c_str() , devname.c_str() ) ;
                     /* NULL possibly means we don't need BindMoniker BindCtx ?? */
-                    hr = p_moniker->BindToObject( NULL, 0, IID_IBaseFilter,
-                                                  (void**)p_base_filter.GetAddressOf() );
+                    hr = p_moniker->BindToObject( NULL, 0, __uuidof(p_base_filter.Get()), &p_base_filter );
                     if( FAILED(hr) )
                     {
                         msg_Err( p_this, "couldn't bind moniker to filter "
                                  "object (0x%lX)", hr );
-                        return NULL;
+                        p_base_filter.Reset();
                     }
                     return p_base_filter;
                 }
@@ -1314,7 +1315,7 @@ FindCaptureDevice( vlc_object_t *p_this, std::string *p_devicename,
     return p_base_filter;
 }
 
-static size_t EnumDeviceCaps( vlc_object_t *p_this, IBaseFilter *p_filter,
+static size_t EnumDeviceCaps( vlc_object_t *p_this, ComPtr<IBaseFilter> &p_filter,
                               int i_fourcc, int i_width, int i_height,
                               int i_channels, int i_samplespersec,
                               int i_bitspersample, AM_MEDIA_TYPE *mt,
@@ -1330,13 +1331,13 @@ static size_t EnumDeviceCaps( vlc_object_t *p_this, IBaseFilter *p_filter,
     if( r_fps )
         i_AvgTimePerFrame = 10000000000LL/(LONGLONG)(r_fps*1000.0f);
 
-    if( FAILED(p_filter->EnumPins( p_enumpins.GetAddressOf() )) )
+    if( FAILED(p_filter->EnumPins( &p_enumpins )) )
     {
         msg_Dbg( p_this, "EnumDeviceCaps failed: no pin enumeration !");
         return 0;
     }
 
-    while( S_OK == p_enumpins->Next( 1, p_output_pin.ReleaseAndGetAddressOf(), NULL ) )
+    while( S_OK == p_enumpins->Next( 1, &p_output_pin, NULL ) )
     {
         PIN_INFO info;
 
@@ -1351,7 +1352,7 @@ static size_t EnumDeviceCaps( vlc_object_t *p_this, IBaseFilter *p_filter,
 
     p_enumpins->Reset();
 
-    while( !mt_count && p_enumpins->Next( 1, p_output_pin.ReleaseAndGetAddressOf(), NULL ) == S_OK )
+    while( !mt_count && p_enumpins->Next( 1, &p_output_pin, NULL ) == S_OK )
     {
         PIN_INFO info;
 
@@ -1370,19 +1371,18 @@ static size_t EnumDeviceCaps( vlc_object_t *p_this, IBaseFilter *p_filter,
         */
 
         ComPtr<IAMStreamConfig> pSC;
-        if( SUCCEEDED(p_output_pin->QueryInterface( IID_IAMStreamConfig,
-                                            (void**)pSC.GetAddressOf() )) )
+        if( SUCCEEDED(p_output_pin.As(&pSC)) )
         {
             int piCount, piSize;
             if( SUCCEEDED(pSC->GetNumberOfCapabilities(&piCount, &piSize)) )
             {
-                BYTE *pSCC= (BYTE *)CoTaskMemAlloc(piSize);
+                void *pSCC= CoTaskMemAlloc(piSize);
                 if( NULL != pSCC )
                 {
                     int i_priority = ES_PRIORITY_NOT_DEFAULTABLE;
                     for( int i=0; i<piCount; ++i )
                     {
-                        if( SUCCEEDED(pSC->GetStreamCaps(i, &p_mt, pSCC)) )
+                        if( SUCCEEDED(pSC->GetStreamCaps(i, &p_mt, static_cast<BYTE*>(pSCC))) )
                         {
                             int i_current_fourcc = GetFourCCFromMediaType( *p_mt );
                             int i_current_priority = GetFourCCPriority(i_current_fourcc);
@@ -1399,7 +1399,7 @@ static size_t EnumDeviceCaps( vlc_object_t *p_this, IBaseFilter *p_filter,
                             if( !b_audio && MEDIATYPE_Video == p_mt->majortype
                                     && FORMAT_VideoInfo == p_mt->formattype )
                             {
-                                VIDEO_STREAM_CONFIG_CAPS *pVSCC = reinterpret_cast<VIDEO_STREAM_CONFIG_CAPS*>(pSCC);
+                                VIDEO_STREAM_CONFIG_CAPS *pVSCC = static_cast<VIDEO_STREAM_CONFIG_CAPS*>(pSCC);
                                 VIDEOINFOHEADER *pVih = reinterpret_cast<VIDEOINFOHEADER*>(p_mt->pbFormat);
 
                                 if( i_AvgTimePerFrame )
@@ -1475,7 +1475,7 @@ static size_t EnumDeviceCaps( vlc_object_t *p_this, IBaseFilter *p_filter,
                             else if( b_audio && p_mt->majortype == MEDIATYPE_Audio
                                     && p_mt->formattype == FORMAT_WaveFormatEx )
                             {
-                                AUDIO_STREAM_CONFIG_CAPS *pASCC = reinterpret_cast<AUDIO_STREAM_CONFIG_CAPS*>(pSCC);
+                                AUDIO_STREAM_CONFIG_CAPS *pASCC = static_cast<AUDIO_STREAM_CONFIG_CAPS*>(pSCC);
                                 WAVEFORMATEX *pWfx = reinterpret_cast<WAVEFORMATEX*>(p_mt->pbFormat);
 
                                 if( i_current_fourcc && (WAVE_FORMAT_PCM == pWfx->wFormatTag) )
@@ -1559,7 +1559,7 @@ static size_t EnumDeviceCaps( vlc_object_t *p_this, IBaseFilter *p_filter,
                             CoTaskMemFree( (PVOID)p_mt );
                         }
                     }
-                    CoTaskMemFree( (LPVOID)pSCC );
+                    CoTaskMemFree( pSCC );
                     if( i_priority >= ES_PRIORITY_SELECTABLE_MIN )
                         msg_Dbg( p_this, "EnumDeviceCaps: input pin default format configured");
                 }
@@ -1570,7 +1570,7 @@ static size_t EnumDeviceCaps( vlc_object_t *p_this, IBaseFilter *p_filter,
         ** Probe pin for available medias (may be a previously configured one)
         */
 
-        if( FAILED( p_output_pin->EnumMediaTypes( p_enummt.ReleaseAndGetAddressOf() ) ) )
+        if( FAILED( p_output_pin->EnumMediaTypes( &p_enummt ) ) )
         {
             continue;
         }
@@ -1632,8 +1632,7 @@ static size_t EnumDeviceCaps( vlc_object_t *p_this, IBaseFilter *p_filter,
 
                     /* Setup a few properties like the audio latency */
                     ComPtr<IAMBufferNegotiation> p_ambuf;
-                    if( SUCCEEDED( p_output_pin->QueryInterface(
-                          IID_IAMBufferNegotiation, (void **)p_ambuf.GetAddressOf() ) ) )
+                    if( SUCCEEDED( p_output_pin->QueryInterface( IID_IAMBufferNegotiation, &p_ambuf ) ) )
                     {
                         ALLOCATOR_PROPERTIES AllocProp;
                         AllocProp.cbAlign = -1;
@@ -1978,15 +1977,14 @@ static int AppendAudioEnabledVDevs( vlc_object_t *p_this, std::list<std::string>
     ComPtr<IGraphBuilder> p_gbuilder;
     ComPtr<ICaptureGraphBuilder2> p_cgbuilder;
 
-    if( FAILED( CoCreateInstance( CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, IID_IFilterGraph,
-                                  ( void ** ) p_graph.GetAddressOf() ) ) )
+    if( FAILED( CoCreateInstance( CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER, __uuidof(p_graph.Get()), &p_graph ) ) )
         return VLC_EGENERIC;
 
-    if( FAILED( p_graph->QueryInterface( IID_IGraphBuilder, ( void ** ) p_gbuilder.GetAddressOf() ) ) )
+    if( FAILED( p_graph.As( &p_gbuilder ) ) )
         return VLC_EGENERIC;
 
     if( FAILED( CoCreateInstance( CLSID_CaptureGraphBuilder2, NULL, CLSCTX_INPROC_SERVER,
-                                  IID_ICaptureGraphBuilder2, ( void ** ) p_cgbuilder.GetAddressOf() ) ) )
+                                  __uuidof(p_cgbuilder.Get()), &p_cgbuilder ) ) )
         return VLC_EGENERIC;
 
     if( FAILED( p_cgbuilder->SetFiltergraph( p_gbuilder.Get() ) ) )
@@ -2006,7 +2004,7 @@ static int AppendAudioEnabledVDevs( vlc_object_t *p_this, std::list<std::string>
             continue;
 
         if( SUCCEEDED( p_cgbuilder->FindPin( p_device.Get(), PINDIR_OUTPUT, NULL, &MEDIATYPE_Audio,
-                                            true, 0, p_pin.GetAddressOf() ) ) )
+                                            true, 0, &p_pin ) ) )
             audio_list.push_back( *iter );
 
         p_gbuilder->RemoveFilter( p_device.Get() );
@@ -2075,13 +2073,12 @@ VLC_CONFIG_STRING_ENUM(FindDevices)
  * Properties
  *****************************************************************************/
 
-static void ShowPropertyPage( IUnknown *obj )
+static void ShowPropertyPageO( ComPtr<IUnknown> & obj )
 {
     ComPtr<ISpecifyPropertyPages> p_spec;
     CAUUID cauuid;
 
-    HRESULT hr = obj->QueryInterface( IID_ISpecifyPropertyPages,
-                                      (void **)p_spec.GetAddressOf() );
+    HRESULT hr = obj.As( &p_spec );
     if( FAILED(hr) ) return;
 
     if( SUCCEEDED(p_spec->GetPages( &cauuid )) )
@@ -2099,8 +2096,8 @@ static void ShowPropertyPage( IUnknown *obj )
 }
 
 static void ShowDeviceProperties( vlc_object_t *p_this,
-                                  ICaptureGraphBuilder2 *p_graph,
-                                  IBaseFilter *p_device_filter,
+                                  ComPtr<ICaptureGraphBuilder2> & p_graph,
+                                  ComPtr<IBaseFilter> & p_device_filter,
                                   bool b_audio )
 {
     HRESULT hr;
@@ -2121,11 +2118,11 @@ static void ShowDeviceProperties( vlc_object_t *p_this,
         msg_Dbg( p_this, "showing WDM Audio Configuration Pages" );
 
         hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE,
-                                     &MEDIATYPE_Audio, p_device_filter,
-                                     IID_IAMStreamConfig, (void **)p_SC.GetAddressOf() );
+                                     &MEDIATYPE_Audio, p_device_filter.Get(),
+                                     __uuidof(p_SC.Get()), &p_SC );
         if( SUCCEEDED(hr) )
         {
-            ShowPropertyPage(p_SC.Get());
+            ShowPropertyPage(p_SC);
         }
 
         /*
@@ -2133,11 +2130,11 @@ static void ShowDeviceProperties( vlc_object_t *p_this,
          */
         ComPtr<IAMTVAudio> p_TVA;
         hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE,
-                                             &MEDIATYPE_Audio, p_device_filter,
-                                             IID_IAMTVAudio, (void **)p_TVA.GetAddressOf() );
+                                     &MEDIATYPE_Audio, p_device_filter.Get(),
+                                     IID_IAMTVAudio, &p_TVA );
         if( SUCCEEDED(hr) )
         {
-            ShowPropertyPage(p_TVA.Get());
+            ShowPropertyPage(p_TVA);
         }
     }
 
@@ -2151,65 +2148,74 @@ static void ShowDeviceProperties( vlc_object_t *p_this,
         msg_Dbg( p_this, "showing WDM Video Configuration Pages" );
 
         hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE,
-                                     &MEDIATYPE_Interleaved, p_device_filter,
-                                     IID_IAMStreamConfig, (void **)p_SC.GetAddressOf() );
+                                     &MEDIATYPE_Interleaved, p_device_filter.Get(),
+                                     __uuidof(p_SC.Get()), &p_SC );
         if( FAILED(hr) )
         {
             hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE,
-                                         &MEDIATYPE_Video, p_device_filter,
-                                         IID_IAMStreamConfig, (void **)p_SC.GetAddressOf() );
+                                         &MEDIATYPE_Video, p_device_filter.Get(),
+                                         __uuidof(p_SC.Get()), &p_SC );
         }
 
         if( FAILED(hr) )
         {
             hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE,
-                                         &MEDIATYPE_Stream, p_device_filter,
-                                         IID_IAMStreamConfig, (void **)p_SC.GetAddressOf() );
+                                         &MEDIATYPE_Stream, p_device_filter.Get(),
+                                         __uuidof(p_SC.Get()), &p_SC );
         }
 
         if( SUCCEEDED(hr) )
         {
-            ShowPropertyPage(p_SC.Get());
+            ShowPropertyPage(p_SC);
         }
     }
 }
 
-static void ShowTunerProperties( vlc_object_t *p_this,
-                                 ICaptureGraphBuilder2 *p_graph,
-                                 IBaseFilter *p_device_filter,
-                                 bool b_audio )
+static HRESULT GetCaptureTVTuner(ComPtr<ICaptureGraphBuilder2> & p_graph,
+                                 ComPtr<IBaseFilter> & p_device_filter,
+                                 ComPtr<IAMTVTuner> & p_TV)
 {
     HRESULT hr;
+    hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE,
+                                 &MEDIATYPE_Interleaved, p_device_filter.Get(),
+                                 IID_IAMTVTuner, &p_TV );
+    if( SUCCEEDED(hr) )
+        goto done;
+
+    hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE,
+                                 &MEDIATYPE_Video, p_device_filter.Get(),
+                                 IID_IAMTVTuner, &p_TV );
+    if( SUCCEEDED(hr) )
+        goto done;
+
+    hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE,
+                                 &MEDIATYPE_Stream, p_device_filter.Get(),
+                                 IID_IAMTVTuner, &p_TV );
+    if( SUCCEEDED(hr) )
+        goto done;
+
+done:
+    return hr;
+}
+
+static void ShowTunerProperties( vlc_object_t *p_this,
+                                 ComPtr<ICaptureGraphBuilder2> & p_graph,
+                                 ComPtr<IBaseFilter> & p_device_filter,
+                                 bool b_audio )
+{
     msg_Dbg( p_this, "configuring Tuner Properties" );
 
     if( !p_graph || b_audio ) return;
 
     ComPtr<IAMTVTuner> p_TV;
-    hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE,
-                                 &MEDIATYPE_Interleaved, p_device_filter,
-                                 IID_IAMTVTuner, (void **)p_TV.GetAddressOf() );
-    if( FAILED(hr) )
+    if (SUCCEEDED(GetCaptureTVTuner(p_graph, p_device_filter, p_TV)))
     {
-        hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE,
-                                     &MEDIATYPE_Video, p_device_filter,
-                                     IID_IAMTVTuner, (void **)p_TV.GetAddressOf() );
-    }
-
-    if( FAILED(hr) )
-    {
-        hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE,
-                                     &MEDIATYPE_Stream, p_device_filter,
-                                     IID_IAMTVTuner, (void **)p_TV.GetAddressOf() );
-    }
-
-    if( SUCCEEDED(hr) )
-    {
-        ShowPropertyPage(p_TV.Get());
+        ShowPropertyPage(p_TV);
     }
 }
 
-static void ConfigTuner( vlc_object_t *p_this, ICaptureGraphBuilder2 *p_graph,
-                         IBaseFilter *p_device_filter )
+static void ConfigTuner( vlc_object_t *p_this, ComPtr<ICaptureGraphBuilder2> & p_graph,
+                         ComPtr<IBaseFilter>  & p_device_filter )
 {
     int i_channel, i_country, i_input, i_amtuner_mode;
     long l_modes = 0;
@@ -2228,24 +2234,7 @@ static void ConfigTuner( vlc_object_t *p_this, ICaptureGraphBuilder2 *p_graph,
     msg_Dbg( p_this, "tuner config: channel %i, country %i, input type %i",
              i_channel, i_country, i_input );
 
-    hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE, &MEDIATYPE_Interleaved,
-                                 p_device_filter, IID_IAMTVTuner,
-                                 (void **)p_TV.GetAddressOf() );
-    if( FAILED(hr) )
-    {
-        hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE, &MEDIATYPE_Video,
-                                     p_device_filter, IID_IAMTVTuner,
-                                     (void **)p_TV.GetAddressOf() );
-    }
-
-    if( FAILED(hr) )
-    {
-        hr = p_graph->FindInterface( &PIN_CATEGORY_CAPTURE, &MEDIATYPE_Stream,
-                                     p_device_filter, IID_IAMTVTuner,
-                                     (void **)p_TV.GetAddressOf() );
-    }
-
-    if( FAILED(hr) )
+    if (FAILED(GetCaptureTVTuner(p_graph, p_device_filter, p_TV)))
     {
         msg_Dbg( p_this, "couldn't find tuner interface" );
         return;

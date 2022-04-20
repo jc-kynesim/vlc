@@ -31,8 +31,6 @@
 #include <vlc_codec.h>
 #include <vlc_plugin.h>
 
-#include <ffnvcodec/dynlink_loader.h>
-
 #include "nvdec_fmt.h"
 
 #include "../../video_output/opengl/interop.h"
@@ -49,7 +47,6 @@ vlc_module_begin ()
     set_description("NVDEC OpenGL surface converter")
     set_capability("glinterop", 2)
     set_callbacks(Open, Close)
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     add_shortcut("nvdec")
 vlc_module_end ()
@@ -59,12 +56,18 @@ typedef struct {
     CUcontext cuConverterCtx;
     CUgraphicsResource cu_res[PICTURE_PLANE_MAX]; // Y, UV for NV12/P010
     CUarray mappedArray[PICTURE_PLANE_MAX];
+
+    struct {
+        PFNGLBINDTEXTUREPROC BindTexture;
+        PFNGLGETERRORPROC GetError;
+        PFNGLTEXIMAGE2DPROC TexImage2D;
+    } gl;
 } converter_sys_t;
 
 #define CALL_CUDA(func, ...) CudaCheckErr(VLC_OBJECT(interop->gl), devsys->cudaFunctions, devsys->cudaFunctions->func(__VA_ARGS__), #func)
 
-static int tc_nvdec_gl_allocate_texture(const struct vlc_gl_interop *interop, GLuint *textures,
-                                const GLsizei *tex_width, const GLsizei *tex_height)
+static int tc_nvdec_gl_allocate_texture(const struct vlc_gl_interop *interop, uint32_t textures[],
+                                const int32_t tex_width[], const int32_t tex_height[])
 {
     converter_sys_t *p_sys = interop->priv;
     vlc_decoder_device *device = p_sys->device;
@@ -77,11 +80,11 @@ static int tc_nvdec_gl_allocate_texture(const struct vlc_gl_interop *interop, GL
 
     for (unsigned i = 0; i < interop->tex_count; i++)
     {
-        interop->vt->BindTexture(interop->tex_target, textures[i]);
-        interop->vt->TexImage2D(interop->tex_target, 0, interop->texs[i].internal,
+        p_sys->gl.BindTexture(interop->tex_target, textures[i]);
+        p_sys->gl.TexImage2D(interop->tex_target, 0, interop->texs[i].internal,
                            tex_width[i], tex_height[i], 0, interop->texs[i].format,
                            interop->texs[i].type, NULL);
-        if (interop->vt->GetError() != GL_NO_ERROR)
+        if (p_sys->gl.GetError() != GL_NO_ERROR)
         {
             msg_Err(interop->gl, "could not alloc PBO buffers");
             return VLC_EGENERIC;
@@ -93,7 +96,7 @@ static int tc_nvdec_gl_allocate_texture(const struct vlc_gl_interop *interop, GL
         result = CALL_CUDA(cuGraphicsSubResourceGetMappedArray, &p_sys->mappedArray[i], p_sys->cu_res[i], 0, 0);
         result = CALL_CUDA(cuGraphicsUnmapResources, 1, &p_sys->cu_res[i], 0);
 
-        interop->vt->BindTexture(interop->tex_target, 0);
+        p_sys->gl.BindTexture(interop->tex_target, 0);
     }
 
     CALL_CUDA(cuCtxPopCurrent, NULL);
@@ -101,8 +104,8 @@ static int tc_nvdec_gl_allocate_texture(const struct vlc_gl_interop *interop, GL
 }
 
 static int
-tc_nvdec_gl_update(const struct vlc_gl_interop *interop, GLuint textures[],
-                   GLsizei const tex_widths[], GLsizei const tex_heights[],
+tc_nvdec_gl_update(const struct vlc_gl_interop *interop, uint32_t textures[],
+                   int32_t const tex_widths[], int32_t const tex_heights[],
                    picture_t *pic, size_t const plane_offsets[])
 {
     VLC_UNUSED(plane_offsets);
@@ -168,6 +171,19 @@ static int Open(vlc_object_t *obj)
         vlc_decoder_device_Release(device);
         return VLC_ENOMEM;
     }
+
+    p_sys->gl.BindTexture =
+        vlc_gl_GetProcAddress(interop->gl, "glBindTexture");
+    assert(p_sys->gl.BindTexture);
+
+    p_sys->gl.GetError =
+        vlc_gl_GetProcAddress(interop->gl, "glGetError");
+    assert(p_sys->gl.GetError);
+
+    p_sys->gl.TexImage2D =
+        vlc_gl_GetProcAddress(interop->gl, "glTexImage2D");
+    assert(p_sys->gl.TexImage2D);
+
     for (size_t i=0; i < ARRAY_SIZE(p_sys->cu_res); i++)
         p_sys->cu_res[i] = NULL;
     p_sys->cuConverterCtx = NULL;
@@ -208,12 +224,73 @@ static int Open(vlc_object_t *obj)
         default:                         render_chroma = VLC_CODEC_NV12; break;
     }
 
-    int ret = opengl_interop_init(interop, GL_TEXTURE_2D, render_chroma, interop->fmt_in.space);
-    if (ret != VLC_SUCCESS)
+    switch (render_chroma)
     {
-        vlc_decoder_device_Release(device);
-        return ret;
+        case VLC_CODEC_P010:
+        case VLC_CODEC_P016:
+            interop->tex_count = 2;
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 1},
+                .h = {1, 1},
+                .internal = GL_R16,
+                .format = GL_RED,
+                .type = GL_UNSIGNED_BYTE,
+            };
+            interop->texs[1] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 1},
+                .h = {1, 2},
+                .internal = GL_RG16,
+                .format = GL_RG,
+                .type = GL_UNSIGNED_BYTE,
+            };
+
+            break;
+        case VLC_CODEC_I444:
+            interop->tex_count = 3;
+            interop->texs[0] = interop->texs[1] = interop->texs[2] =
+                (struct vlc_gl_tex_cfg) {
+                    .w = {1, 1},
+                    .h = {1, 1},
+                    .internal = GL_RED,
+                    .format = GL_RED,
+                    .type = GL_UNSIGNED_BYTE,
+                };
+
+            break;
+        case VLC_CODEC_I444_16L:
+            interop->tex_count = 3;
+            interop->texs[0] = interop->texs[1] = interop->texs[2] =
+                (struct vlc_gl_tex_cfg) {
+                    .w = {1, 1},
+                    .h = {1, 1},
+                    .internal = GL_R16,
+                    .format = GL_RED,
+                    .type = GL_UNSIGNED_BYTE,
+                };
+
+            break;
+        case VLC_CODEC_NV12:
+            interop->tex_count = 2;
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 1},
+                .h = {1, 1},
+                .internal = GL_RED,
+                .format = GL_RED,
+                .type = GL_UNSIGNED_BYTE,
+            };
+            interop->texs[1] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 2},
+                .h = {1, 2},
+                .internal = GL_RG,
+                .format = GL_RG,
+                .type = GL_UNSIGNED_BYTE,
+            };
+
+            break;
     }
+
+    interop->fmt_out.i_chroma = render_chroma;
+    interop->fmt_out.space = interop->fmt_in.space;
 
     static const struct vlc_gl_interop_ops ops = {
         .allocate_textures = tc_nvdec_gl_allocate_texture,

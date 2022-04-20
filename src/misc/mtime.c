@@ -144,10 +144,12 @@ uint64_t NTPtime64(void)
     return t;
 }
 
-struct timespec timespec_from_vlc_tick (vlc_tick_t date)
+struct timespec *vlc_tick_to_timespec(struct timespec *restrict ts,
+                                      vlc_tick_t tick)
 {
-    lldiv_t d = lldiv (date, CLOCK_FREQ);
-    struct timespec ts = { d.quot, NS_FROM_VLC_TICK( d.rem ) };
+    lldiv_t d = lldiv(tick, CLOCK_FREQ);
 
+    ts->tv_sec = d.quot;
+    ts->tv_nsec = NS_FROM_VLC_TICK(d.rem);;
     return ts;
 }

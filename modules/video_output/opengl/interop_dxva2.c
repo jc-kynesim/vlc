@@ -61,7 +61,6 @@ static void GLConvClose(vlc_object_t *);
 
 vlc_module_begin ()
     set_shortname("dxva2")
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     set_description("DXVA2 surface converter")
     set_capability("glinterop", 1)
@@ -98,8 +97,8 @@ struct glpriv
 };
 
 static int
-GLConvUpdate(const struct vlc_gl_interop *interop, GLuint *textures,
-             const GLsizei *tex_width, const GLsizei *tex_height,
+GLConvUpdate(const struct vlc_gl_interop *interop, uint32_t textures[],
+             const int32_t tex_width[], const int32_t tex_height[],
              picture_t *pic, const size_t *plane_offset)
 {
     VLC_UNUSED(textures); VLC_UNUSED(tex_width); VLC_UNUSED(tex_height); VLC_UNUSED(plane_offset);
@@ -164,8 +163,8 @@ GLConvUpdate(const struct vlc_gl_interop *interop, GLuint *textures,
 }
 
 static int
-GLConvAllocateTextures(const struct vlc_gl_interop *interop, GLuint *textures,
-                       const GLsizei *tex_width, const GLsizei *tex_height)
+GLConvAllocateTextures(const struct vlc_gl_interop *interop, uint32_t textures[],
+                       const int32_t tex_width[], const int32_t tex_height[])
 {
     VLC_UNUSED(tex_width); VLC_UNUSED(tex_height);
     struct glpriv *priv = interop->priv;
@@ -531,10 +530,18 @@ GLConvOpen(vlc_object_t *obj)
     /* The pictures are uploaded upside-down */
     video_format_TransformBy(&interop->fmt_out, TRANSFORM_VFLIP);
 
-    int ret = opengl_interop_init(interop, GL_TEXTURE_2D, VLC_CODEC_RGB32,
-                                  COLOR_SPACE_UNDEF);
-    if (ret != VLC_SUCCESS)
-        goto error;
+    interop->tex_target = GL_TEXTURE_2D;
+    interop->fmt_out.i_chroma = VLC_CODEC_RGB32;
+    interop->fmt_out.space = COLOR_SPACE_UNDEF;
+
+    interop->tex_count = 1;
+    interop->texs[0] = (struct vlc_gl_tex_cfg) {
+        .w = {1, 1},
+        .h = {1, 1},
+        .internal = GL_RGBA,
+        .format = GL_RGBA,
+        .type = GL_UNSIGNED_BYTE,
+    };
 
     return VLC_SUCCESS;
 

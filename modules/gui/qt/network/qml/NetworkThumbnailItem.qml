@@ -35,7 +35,14 @@ Item {
     readonly property bool containsMouse: parent.containsMouse
     readonly property int index: parent.index
 
-    signal playClicked(var index)
+    readonly property string artworkSource: !!rowModel ? rowModel.artwork : ""
+
+    readonly property bool _showPlayCover: (currentlyFocused || containsMouse)
+                                           && !!rowModel
+                                           && (rowModel.type !== NetworkMediaModel.TYPE_NODE)
+                                           && (rowModel.type !== NetworkMediaModel.TYPE_DIRECTORY)
+
+    signal playClicked(int index)
 
     Widgets.ListCoverShadow {
         anchors.fill: artwork.visible ? artwork : background
@@ -63,41 +70,32 @@ Item {
 
             width: VLCStyle.play_cover_small
 
-            visible: ((currentlyFocused || containsMouse)
-                      &&
-                      (rowModel.type !== NetworkMediaModel.TYPE_NODE
-                       &&
-                       rowModel.type !== NetworkMediaModel.TYPE_DIRECTORY))
+            visible: item._showPlayCover
 
             onClicked: playClicked(item.index)
         }
     }
 
-    Image {
+    Widgets.ScaledImage {
         id: artwork
 
-        x: (width - paintedWidth) / 2
-        y: (parent.height - paintedHeight) / 2
+        x: Math.round((width - paintedWidth) / 2)
+        y: Math.round((parent.height - paintedHeight) / 2)
         width: VLCStyle.listAlbumCover_width
         height: VLCStyle.listAlbumCover_height
         fillMode: Image.PreserveAspectFit
         horizontalAlignment: Image.AlignLeft
         verticalAlignment: Image.AlignTop
-        source: item.rowModel.artwork
-        visible: item.rowModel.artwork
-                 && item.rowModel.artwork.toString() !== ""
-        mipmap: true
+        source: item.artworkSource
+        visible: item.artworkSource !== ""
 
         Widgets.PlayCover {
-            anchors.centerIn: parent
+            x: Math.round((artwork.paintedWidth - width) / 2)
+            y: Math.round((artwork.paintedHeight - height) / 2)
 
             width: VLCStyle.play_cover_small
 
-            visible: ((currentlyFocused || containsMouse)
-                      &&
-                      (rowModel.type !== NetworkMediaModel.TYPE_NODE
-                       &&
-                       rowModel.type !== NetworkMediaModel.TYPE_DIRECTORY))
+            visible: item._showPlayCover
 
             onClicked: playClicked(item.index)
         }

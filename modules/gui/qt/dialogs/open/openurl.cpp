@@ -25,17 +25,16 @@
 #endif
 
 #include "dialogs/open/openurl.hpp"
-#include "widgets/native/searchlineedit.hpp"
 #include "util/validators.hpp"
 
 #include <QPushButton>
 #include <QDialogButtonBox>
 #include <QApplication>
 #include <QClipboard>
-#include <QMimeData>
-#include <QList>
 #include <QFile>
 #include <QLabel>
+#include <QVBoxLayout>
+#include <QLineEdit>
 
 #include <assert.h>
 
@@ -51,16 +50,17 @@ OpenUrlDialog::OpenUrlDialog( qt_intf_t *_p_intf,
 
     QDialogButtonBox *box = new QDialogButtonBox( this );
     but = box->addButton( qtr( "&Play" ), QDialogButtonBox::AcceptRole );
-    CONNECT( but, clicked(), this, play() );
+    connect( but, &QPushButton::clicked, this, &OpenUrlDialog::play );
 
     but = box->addButton( qtr( "&Enqueue" ), QDialogButtonBox::AcceptRole );
-    CONNECT( but, clicked(), this, enqueue() );
+    connect( but, &QPushButton::clicked, this, &OpenUrlDialog::enqueue );
 
     but = box->addButton( qtr( "&Cancel" ) , QDialogButtonBox::RejectRole );
-    CONNECT( box, rejected(), this, reject() );
+    connect( box, &QDialogButtonBox::rejected, this, &OpenUrlDialog::reject );
 
     /* Info label and line edit */
-    edit = new ClickLineEdit( qtr( "Enter URL here..." ), this );
+    edit = new QLineEdit( this );
+    edit->setPlaceholderText( qtr( "Enter URL here..." ) );
     edit->setValidator( new UrlValidator( edit ) );
 
     QLabel *info = new QLabel( qtr( "Please enter the URL or path "

@@ -27,10 +27,33 @@
 #include <vlc_mouse.h>
 #include "../video_output/vout_internal.h"
 
+enum input_resource_vout_state
+{
+    INPUT_RESOURCE_VOUT_NOTCHANGED,
+    INPUT_RESOURCE_VOUT_STARTED,
+    INPUT_RESOURCE_VOUT_STOPPED,
+};
+
 /**
  * This function set the associated input.
  */
 void input_resource_SetInput( input_resource_t *, input_thread_t * );
+
+/**
+ * \return the current audio output if any.
+ * Use aout_Release() to drop the reference.
+ */
+audio_output_t *input_resource_HoldAout( input_resource_t * );
+
+/**
+ * This function creates or recycles an audio output.
+ */
+audio_output_t *input_resource_GetAout( input_resource_t * );
+
+/**
+ * This function retains or destroys an audio output.
+ */
+void input_resource_PutAout( input_resource_t *, audio_output_t * );
 
 /**
  * This function handles sout request.
@@ -41,8 +64,9 @@ void input_resource_PutSout(input_resource_t *, sout_stream_t *);
 vout_thread_t *input_resource_RequestVout(input_resource_t *, vlc_video_context *,
                                          const vout_configuration_t *,
                                          enum vlc_vout_order *order,
-                                         bool *has_started);
-void input_resource_PutVout(input_resource_t *, vout_thread_t *, bool *has_stopped);
+                                         enum input_resource_vout_state *vout_state);
+void input_resource_PutVout(input_resource_t *, vout_thread_t *,
+                            enum input_resource_vout_state *vout_state);
 
 /**
  * This function returns one of the current vout if any.

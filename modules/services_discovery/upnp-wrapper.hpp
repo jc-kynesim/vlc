@@ -39,11 +39,7 @@
 #include <upnp.h>
 #include <upnptools.h>
 
-#if UPNP_VERSION < 10800
-typedef void* UpnpEventPtr;
-#else
 typedef const void* UpnpEventPtr;
-#endif
 
 /**
  * libUpnp allows only one instance per process, so we create a wrapper
@@ -93,30 +89,6 @@ private:
 // Helper functions
 // **************************
 
-#if UPNP_VERSION < 10623
-/*
- * Compat functions and typedefs for libupnp prior to 1.8
- */
-
-typedef Upnp_Discovery UpnpDiscovery;
-typedef Upnp_Action_Complete UpnpActionComplete;
-
-inline const char* UpnpDiscovery_get_Location_cstr( const UpnpDiscovery* p_discovery )
-{
-  return p_discovery->Location;
-}
-
-inline const char* UpnpDiscovery_get_DeviceID_cstr( const UpnpDiscovery* p_discovery )
-{
-  return p_discovery->DeviceId;
-}
-
-inline static IXML_Document* UpnpActionComplete_get_ActionResult( const UpnpActionComplete* p_result )
-{
-  return p_result->ActionResult;
-}
-#endif
-
 /*
  * Returns the value of a child element, or NULL on error
  */
@@ -156,24 +128,29 @@ inline IP_ADAPTER_MULTICAST_ADDRESS* getMulticastAddress(IP_ADAPTER_ADDRESSES* p
     return NULL;
 }
 
-inline bool isAdapterSuitable(IP_ADAPTER_ADDRESSES* p_adapter, bool ipv6)
+inline bool isAdapterSuitable(IP_ADAPTER_ADDRESSES* p_adapter)
 {
     if ( p_adapter->OperStatus != IfOperStatusUp )
         return false;
     if (p_adapter->Length == sizeof(IP_ADAPTER_ADDRESSES_XP))
     {
         IP_ADAPTER_ADDRESSES_XP* p_adapter_xp = reinterpret_cast<IP_ADAPTER_ADDRESSES_XP*>( p_adapter );
-        // On Windows Server 2003 and Windows XP, this member is zero if IPv4 is not available on the interface.
-        if (ipv6)
-            return p_adapter_xp->Ipv6IfIndex != 0;
+        // On Windows Server 2003 and Windows XP, those members are zero if the IPv* implementation
+        // is not available on the interface.
+#if defined( UPNP_ENABLE_IPV6 )
+        return p_adapter_xp->Ipv6IfIndex != 0 || p_adapter_xp->IfIndex != 0;
+#else
         return p_adapter_xp->IfIndex != 0;
+#endif
     }
     IP_ADAPTER_ADDRESSES_LH* p_adapter_lh = reinterpret_cast<IP_ADAPTER_ADDRESSES_LH*>( p_adapter );
     if (p_adapter_lh->FirstGatewayAddress == NULL)
         return false;
-    if (ipv6)
-        return p_adapter_lh->Ipv6Enabled;
+#if defined( UPNP_ENABLE_IPV6 )
+    return p_adapter_lh->Ipv6Enabled || p_adapter_lh->Ipv4Enabled;
+#else
     return p_adapter_lh->Ipv4Enabled;
+#endif
 }
 
 inline IP_ADAPTER_ADDRESSES* ListAdapters()
@@ -208,8 +185,6 @@ inline IP_ADAPTER_ADDRESSES* ListAdapters()
     return addresses;
 }
 
-#ifdef UPNP_ENABLE_IPV6
-
 inline char* getPreferedAdapter()
 {
     IP_ADAPTER_ADDRESSES *p_adapter, *addresses;
@@ -222,7 +197,7 @@ inline char* getPreferedAdapter()
     p_adapter = addresses;
     while (p_adapter != NULL)
     {
-        if (isAdapterSuitable( p_adapter, true ))
+        if (isAdapterSuitable( p_adapter ))
         {
             /* make sure it supports 239.255.255.250 */
             IP_ADAPTER_MULTICAST_ADDRESS *p_multicast = getMulticastAddress( p_adapter );
@@ -238,99 +213,7 @@ inline char* getPreferedAdapter()
     free(addresses);
     return NULL;
 }
-
-#else
-
-inline char *getIpv4ForMulticast()
-{
-    IP_ADAPTER_UNICAST_ADDRESS *p_best_ip = NULL;
-    wchar_t psz_uri[32];
-    DWORD strSize;
-    IP_ADAPTER_ADDRESSES *p_adapter, *addresses;
-
-    addresses = ListAdapters();
-    if (addresses == NULL)
-        return NULL;
-
-    /* find one with multicast capabilities */
-    p_adapter = addresses;
-    while (p_adapter != NULL)
-    {
-        if (isAdapterSuitable( p_adapter, false ))
-        {
-            /* make sure it supports 239.255.255.250 */
-            IP_ADAPTER_MULTICAST_ADDRESS *p_multicast = getMulticastAddress( p_adapter );
-            if (p_multicast != NULL)
-            {
-                /* get an IPv4 address */
-                IP_ADAPTER_UNICAST_ADDRESS *p_unicast = p_adapter->FirstUnicastAddress;
-                while (p_unicast != NULL)
-                {
-                    strSize = sizeof( psz_uri ) / sizeof( wchar_t );
-                    if( WSAAddressToString( p_unicast->Address.lpSockaddr,
-                                            p_unicast->Address.iSockaddrLength,
-                                            NULL, psz_uri, &strSize ) == 0 )
-                    {
-                        if ( p_best_ip == NULL ||
-                             p_best_ip->ValidLifetime > p_unicast->ValidLifetime )
-                        {
-                            p_best_ip = p_unicast;
-                        }
-                    }
-                    p_unicast = p_unicast->Next;
-                }
-            }
-        }
-        p_adapter = p_adapter->Next;
-    }
-
-    if ( p_best_ip != NULL )
-        goto done;
-
-    /* find any with IPv4 */
-    p_adapter = addresses;
-    while (p_adapter != NULL)
-    {
-        if (isAdapterSuitable(p_adapter, false))
-        {
-            /* get an IPv4 address */
-            IP_ADAPTER_UNICAST_ADDRESS *p_unicast = p_adapter->FirstUnicastAddress;
-            while (p_unicast != NULL)
-            {
-                strSize = sizeof( psz_uri ) / sizeof( wchar_t );
-                if( WSAAddressToString( p_unicast->Address.lpSockaddr,
-                                        p_unicast->Address.iSockaddrLength,
-                                        NULL, psz_uri, &strSize ) == 0 )
-                {
-                    if ( p_best_ip == NULL ||
-                         p_best_ip->ValidLifetime > p_unicast->ValidLifetime )
-                    {
-                        p_best_ip = p_unicast;
-                    }
-                }
-                p_unicast = p_unicast->Next;
-            }
-        }
-        p_adapter = p_adapter->Next;
-    }
-
-done:
-    if (p_best_ip != NULL)
-    {
-        strSize = sizeof( psz_uri ) / sizeof( wchar_t );
-        WSAAddressToString( p_best_ip->Address.lpSockaddr,
-                            p_best_ip->Address.iSockaddrLength,
-                            NULL, psz_uri, &strSize );
-        free(addresses);
-        return FromWide( psz_uri );
-    }
-    free(addresses);
-    return NULL;
-}
-#endif /* UPNP_ENABLE_IPV6 */
 #else /* _WIN32 */
-
-#ifdef UPNP_ENABLE_IPV6
 
 #ifdef __APPLE__
 #include <TargetConditionals.h>
@@ -406,14 +289,7 @@ inline char *getPreferedAdapter()
 }
 
 #endif
-#else
-
-inline char *getIpv4ForMulticast()
-{
-    return NULL;
-}
-
-#endif
 
 #endif /* _WIN32 */
-#endif /* UPNP_WRAPPER_H */
+
+#endif

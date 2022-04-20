@@ -8,7 +8,7 @@
     <x>0</x>
     <y>0</y>
     <width>700</width>
-    <height>1069</height>
+    <height>507</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -48,6 +48,9 @@
           <height>16</height>
          </size>
         </property>
+        <property name="toolTip">
+         <string>Add scanned folder</string>
+        </property>
         <property name="text">
          <string>+</string>
         </property>
@@ -60,6 +63,9 @@
           <width>16</width>
           <height>16</height>
          </size>
+        </property>
+        <property name="toolTip">
+         <string>Add banned folder</string>
         </property>
         <property name="text">
          <string>+</string>
@@ -89,7 +95,7 @@
       <item row="2" column="0" rowspan="2">
        <widget class="QLabel" name="label">
         <property name="text">
-         <string>Banned Folders:</string>
+         <string>Banned folders:</string>
         </property>
        </widget>
       </item>
@@ -158,6 +164,12 @@
    <header>widgets/native/mlfolderseditor.hpp</header>
   </customwidget>
  </customwidgets>
+ <tabstops>
+  <tabstop>entryPoints</tabstop>
+  <tabstop>addButton</tabstop>
+  <tabstop>bannedEntryPoints</tabstop>
+  <tabstop>banButton</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

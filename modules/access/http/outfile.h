@@ -29,11 +29,11 @@
 
 struct vlc_http_mgr;
 struct vlc_http_outfile;
-struct block_t;
 
 /**
  * Creates an HTTP output file.
  *
+ * @param mgr HTTP connection manager
  * @param url URL of the file to write
  * @param ua user-agent string (NULL to ignore)
  * @param user username for authentication (NULL to skip)

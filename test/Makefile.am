@@ -23,6 +23,7 @@ check_PROGRAMS = \
 	test_libvlc_renderer_discoverer \
 	test_libvlc_slaves \
 	test_src_config_chain \
+	test_src_misc_ancillary \
 	test_src_misc_variables \
 	test_src_input_stream \
 	test_src_input_stream_fifo \
@@ -33,11 +34,13 @@ check_PROGRAMS = \
 	test_src_misc_bits \
 	test_src_misc_epg \
 	test_src_misc_keystore \
+	test_src_video_output \
 	test_modules_packetizer_helpers \
 	test_modules_packetizer_hxxx \
 	test_modules_packetizer_h264 \
 	test_modules_packetizer_hevc \
 	test_modules_packetizer_mpegvideo \
+	test_modules_codec_hxxx_helper \
 	test_modules_keystore \
 	test_modules_demux_timestamps_filter \
 	test_modules_demux_ts_pes \
@@ -78,7 +81,7 @@ check_HEADERS = libvlc/test.h libvlc/libvlc_additions.h libvlc/media_utils.h
 TESTS = $(check_PROGRAMS) check_POTFILES.sh
 
 AM_CFLAGS = -DSRCDIR=\"$(srcdir)\"
-AM_LDFLAGS = -no-install
+AM_LDFLAGS = -no-install $(LDFLAGS_vlc)
 LIBVLCCORE = -L../src/ -lvlccore
 LIBVLC = -L../lib -lvlc
 
@@ -102,6 +105,8 @@ test_libvlc_slaves_SOURCES = libvlc/slaves.c
 test_libvlc_slaves_LDADD = $(LIBVLCCORE) $(LIBVLC)
 test_libvlc_meta_SOURCES = libvlc/meta.c
 test_libvlc_meta_LDADD = $(LIBVLCCORE) $(LIBVLC)
+test_src_misc_ancillary_SOURCES = src/misc/ancillary.c
+test_src_misc_ancillary_LDADD = $(LIBVLCCORE) $(LIBVLC)
 test_src_misc_variables_SOURCES = src/misc/variables.c
 test_src_misc_variables_LDADD = $(LIBVLCCORE) $(LIBVLC)
 test_src_config_chain_SOURCES = src/config/chain.c
@@ -155,6 +160,19 @@ test_modules_demux_ts_pes_SOURCES = modules/demux/ts_pes.c \
 test_modules_playlist_m3u_SOURCES = modules/demux/playlist/m3u.c
 test_modules_playlist_m3u_LDADD = $(LIBVLCCORE) $(LIBVLC)
 
+test_modules_codec_hxxx_helper_SOURCES = modules/codec/hxxx_helper.c \
+                                      ../modules/codec/hxxx_helper.c \
+                                      ../modules/packetizer/hxxx_nal.c \
+                                      ../modules/packetizer/h264_slice.c \
+                                      ../modules/packetizer/h264_nal.c \
+                                      ../modules/packetizer/hevc_nal.c
+test_modules_codec_hxxx_helper_LDADD = $(LIBVLCCORE) $(LIBVLC)
+
+test_src_video_output_SOURCES = \
+	src/video_output/video_output.c \
+	src/video_output/video_output.h \
+	src/video_output/video_output_scenarios.c
+test_src_video_output_LDADD = $(LIBVLCCORE) $(LIBVLC)
 
 checkall:
 	$(MAKE) check_PROGRAMS="$(check_PROGRAMS) $(EXTRA_PROGRAMS)" check
@@ -294,4 +312,15 @@ endif
 
 if HAVE_TVOS
 noinst_PROGRAMS += vlccoreios
+endif
+
+vlc_window_SOURCES = vlc-window.c
+vlc_window_CPPFLAGS = $(AM_CPPFLAGS) -I../include/ \
+	-DTOP_BUILDDIR=\"$$(cd "$(top_builddir)"; pwd)\" \
+	-DTOP_SRCDIR=\"$$(cd "$(top_srcdir)"; pwd)\"
+vlc_window_LDADD = ../lib/libvlc.la ../src/libvlccore.la ../compat/libcompat.la
+# Opt-out for building the test driver if there is no dynamic plugins, since we
+# cannot link static plugins currently anyway.
+if HAVE_DYNAMIC_PLUGINS
+noinst_PROGRAMS += vlc-window
 endif

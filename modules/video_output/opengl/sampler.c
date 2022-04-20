@@ -66,6 +66,8 @@ struct vlc_gl_sampler_priv {
      * conversion), selected by vlc_gl_sampler_SetCurrentPlane(). */
     bool expose_planes;
     unsigned plane;
+
+    struct vlc_gl_extension_vt extension_vt;
 };
 
 static inline struct vlc_gl_sampler_priv *
@@ -421,32 +423,21 @@ opengl_init_swizzle(struct vlc_gl_sampler *sampler,
                     vlc_fourcc_t chroma,
                     const vlc_chroma_description_t *desc)
 {
-    struct vlc_gl_sampler_priv *priv = PRIV(sampler);
-
-    GLint oneplane_texfmt;
-    if (vlc_gl_StrHasToken(priv->api->extensions, "GL_ARB_texture_rg"))
-        oneplane_texfmt = GL_RED;
-    else
-        oneplane_texfmt = GL_LUMINANCE;
-
     if (desc->plane_count == 3)
         swizzle_per_tex[0] = swizzle_per_tex[1] = swizzle_per_tex[2] = "r";
     else if (desc->plane_count == 2)
     {
-        if (oneplane_texfmt == GL_RED)
-        {
-            swizzle_per_tex[0] = "r";
+        swizzle_per_tex[0] = "r";
+        if (sampler->glfmt.formats[1] == GL_RG)
             swizzle_per_tex[1] = "rg";
-        }
         else
-        {
-            swizzle_per_tex[0] = "x";
-            swizzle_per_tex[1] = "xa";
-        }
+            swizzle_per_tex[1] = "ra";
     }
     else if (desc->plane_count == 1)
     {
         /*
+         * One plane, but uploaded into two separate textures for Y and UV.
+         *
          * Set swizzling in Y1 U V order
          * R  G  B  A
          * U  Y1 V  Y2 => GRB
@@ -457,16 +448,20 @@ opengl_init_swizzle(struct vlc_gl_sampler *sampler,
         switch (chroma)
         {
             case VLC_CODEC_UYVY:
-                swizzle_per_tex[0] = "grb";
+                swizzle_per_tex[0] = "g";
+                swizzle_per_tex[1] = "rb";
                 break;
             case VLC_CODEC_YUYV:
-                swizzle_per_tex[0] = "rga";
+                swizzle_per_tex[0] = "r";
+                swizzle_per_tex[1] = "ga";
                 break;
             case VLC_CODEC_VYUY:
-                swizzle_per_tex[0] = "gbr";
+                swizzle_per_tex[0] = "g";
+                swizzle_per_tex[1] = "br";
                 break;
             case VLC_CODEC_YVYU:
-                swizzle_per_tex[0] = "rag";
+                swizzle_per_tex[0] = "r";
+                swizzle_per_tex[1] = "ag";
                 break;
             default:
                 assert(!"missing chroma");
@@ -634,8 +629,7 @@ opengl_fragment_shader_init(struct vlc_gl_sampler *sampler, bool expose_planes)
     if (desc == NULL)
         return VLC_EGENERIC;
 
-    unsigned tex_count = desc->plane_count;
-    assert(tex_count == glfmt->tex_count);
+    unsigned tex_count = glfmt->tex_count;
 
     if (expose_planes)
         return sampler_planes_init(sampler);
@@ -668,22 +662,17 @@ opengl_fragment_shader_init(struct vlc_gl_sampler *sampler, bool expose_planes)
 #ifdef HAVE_LIBPLACEBO
     if (priv->pl_sh) {
         struct pl_shader *sh = priv->pl_sh;
-        struct pl_color_map_params color_params = pl_color_map_default_params;
-        color_params.intent = var_InheritInteger(priv->gl, "rendering-intent");
-        color_params.tone_mapping_algo = var_InheritInteger(priv->gl, "tone-mapping");
-        color_params.tone_mapping_param = var_InheritFloat(priv->gl, "tone-mapping-param");
-        color_params.desaturation_strength = var_InheritFloat(priv->gl, "desat-strength");
-        color_params.desaturation_exponent = var_InheritFloat(priv->gl, "desat-exponent");
-        color_params.desaturation_base = var_InheritFloat(priv->gl, "desat-base");
-        color_params.gamut_warning = var_InheritBool(priv->gl, "tone-mapping-warn");
+        struct pl_color_map_params color_params;
+        vlc_placebo_ColorMapParams(VLC_OBJECT(priv->gl), "gl", &color_params);
 
         struct pl_color_space dst_space = pl_color_space_unknown;
         dst_space.primaries = var_InheritInteger(priv->gl, "target-prim");
         dst_space.transfer = var_InheritInteger(priv->gl, "target-trc");
 
+        struct pl_shader_obj *tone_map_state = NULL;
         pl_shader_color_map(sh, &color_params,
                 vlc_placebo_ColorSpace(fmt),
-                dst_space, NULL, false);
+                dst_space, &tone_map_state, false);
 
         struct pl_shader_obj *dither_state = NULL;
         int method = var_InheritInteger(priv->gl, "dither-algo");
@@ -716,6 +705,7 @@ opengl_fragment_shader_init(struct vlc_gl_sampler *sampler, bool expose_planes)
         }
 
         const struct pl_shader_res *res = priv->pl_sh_res = pl_shader_finalize(sh);
+        pl_shader_obj_destroy(&tone_map_state);
         pl_shader_obj_destroy(&dither_state);
 
         FREENULL(priv->uloc.pl_vars);
@@ -829,6 +819,7 @@ vlc_gl_sampler_New(struct vlc_gl_t *gl, const struct vlc_gl_api *api,
         return NULL;
 
     struct vlc_gl_sampler *sampler = &priv->sampler;
+    vlc_gl_LoadExtensionFunctions(gl, &priv->extension_vt);
 
     priv->uloc.pl_vars = NULL;
     priv->pl_ctx = NULL;
@@ -888,6 +879,8 @@ vlc_gl_sampler_Delete(struct vlc_gl_sampler *sampler)
 
 #ifdef HAVE_LIBPLACEBO
     FREENULL(priv->uloc.pl_vars);
+    if (priv->pl_sh)
+        pl_shader_free(&priv->pl_sh);
     if (priv->pl_ctx)
         pl_context_destroy(&priv->pl_ctx);
 #endif

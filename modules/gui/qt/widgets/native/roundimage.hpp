@@ -28,10 +28,10 @@
 #include "util/asynctask.hpp"
 
 #include <QImage>
-#include <QQuickPaintedItem>
+#include <QQuickItem>
 #include <QUrl>
 
-class RoundImage : public QQuickPaintedItem
+class RoundImage : public QQuickItem
 {
     Q_OBJECT
 
@@ -43,25 +43,22 @@ class RoundImage : public QQuickPaintedItem
 public:
     RoundImage(QQuickItem *parent = nullptr);
 
-    void paint(QPainter *painter) override;
-
-    void classBegin() override;
     void componentComplete() override;
 
     QUrl source() const;
     qreal radius() const;
 
 public slots:
-    void setSource(QUrl source);
+    void setSource(const QUrl& source);
     void setRadius(qreal radius);
 
 signals:
-    void sourceChanged(QUrl source);
-    void radiusChanged(int radius);
-    void sourceSizeChanged(QSizeF sourceSize);
+    void sourceChanged(const QUrl&);
+    void radiusChanged(qreal);
 
 protected:
     void itemChange(QQuickItem::ItemChange change, const QQuickItem::ItemChangeData &value) override;
+    QSGNode* updatePaintNode(QSGNode *oldNode, QQuickItem::UpdatePaintNodeData *) override;
 
 private:
     class RoundImageGenerator : public AsyncTask<QImage>
@@ -84,11 +81,13 @@ private:
     QUrl m_source;
     qreal m_radius = 0.0;
     qreal m_dpr = 1.0; // device pixel ratio
+
     QImage m_roundImage;
+    bool m_dirty = false;
+
     TaskHandle<RoundImageGenerator> m_roundImageGenerator {};
 
     bool m_enqueuedGeneration = false;
-    bool m_isComponentComplete = true;
 };
 
 #endif

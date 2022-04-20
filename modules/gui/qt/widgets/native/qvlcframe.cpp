@@ -22,6 +22,10 @@
 
 #include <QWindow>
 #include <QScreen>
+#include <QApplication>
+#include <QDesktopWidget>
+#include <QKeyEvent>
+#include <QStyle>
 
 #include "qvlcframe.hpp"
 #include "maininterface/compositor.hpp"
@@ -221,7 +225,7 @@ void QVLCDialog::keyPressEvent(QKeyEvent *keyEvent)
 
 void QVLCDialog::setWindowTransientParent(QWidget* widget, QWindow* parent, qt_intf_t* p_intf)
 {
-    if (!parent)
+    if (!parent && p_intf)
         parent = p_intf->p_compositor->interfaceMainWindow();
     if (!parent)
         return;

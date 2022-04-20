@@ -119,7 +119,7 @@ enum
 /*
  * TTML Parsing and inheritance order:
  * Each time a text node is found and belongs to out time interval,
- * we backward merge attributes dictionnary up to root.
+ * we backward merge attributes dictionary up to root.
  * Then we convert attributes, merging with style by id or region
  * style, and sets from parent node.
  */
@@ -775,7 +775,7 @@ static void BIDIConvert( text_segment_t *p_segment, int i_direction )
 
     char *psz_text = NULL;
     if( asprintf( &psz_text, "%s%s%s", p_bidi[i_direction].psz_uni_start,
-                  p_segment->psz_text, p_bidi[i_direction].psz_uni_end ) < 0 )
+                  p_segment->psz_text, p_bidi[i_direction].psz_uni_end ) != -1 )
     {
         free( p_segment->psz_text );
         p_segment->psz_text = psz_text;

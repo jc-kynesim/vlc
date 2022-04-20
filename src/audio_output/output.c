@@ -63,10 +63,11 @@ static int var_CopyDevice (vlc_object_t *src, const char *name,
     return var_Set (dst, "audio-device", value);
 }
 
-static void aout_TimingNotify(audio_output_t *aout, vlc_tick_t system_ts,
-                              vlc_tick_t audio_ts)
+static void aout_DrainedNotify(audio_output_t *aout)
 {
-    aout_RequestRetiming(aout, system_ts, audio_ts);
+    aout_owner_t *owner = aout_owner (aout);
+    assert(owner->main_stream);
+    vlc_aout_stream_NotifyDrained(owner->main_stream);
 }
 
 /**
@@ -145,7 +146,14 @@ out:
 
 static void aout_RestartNotify (audio_output_t *aout, unsigned mode)
 {
-    aout_RequestRestart (aout, mode);
+    aout_owner_t *owner = aout_owner (aout);
+    if (owner->main_stream)
+        vlc_aout_stream_RequestRestart(owner->main_stream, mode);
+}
+
+void aout_InputRequestRestart(audio_output_t *aout)
+{
+    aout_RestartNotify(aout, AOUT_RESTART_FILTERS);
 }
 
 static int aout_GainNotify (audio_output_t *aout, float gain)
@@ -153,13 +161,14 @@ static int aout_GainNotify (audio_output_t *aout, float gain)
     aout_owner_t *owner = aout_owner (aout);
 
     vlc_mutex_assert(&owner->lock);
-    aout_volume_SetVolume (owner->volume, gain);
     /* XXX: ideally, return -1 if format cannot be amplified */
+    if (owner->main_stream != NULL)
+        vlc_aout_stream_NotifyGain(owner->main_stream, gain);
     return 0;
 }
 
 static const struct vlc_audio_output_events aout_events = {
-    aout_TimingNotify,
+    aout_DrainedNotify,
     aout_VolumeNotify,
     aout_MuteNotify,
     aout_PolicyNotify,
@@ -242,6 +251,8 @@ audio_output_t *aout_New (vlc_object_t *parent)
     atomic_init (&owner->vp.update, false);
     vlc_atomic_rc_init(&owner->rc);
     vlc_audio_meter_Init(&owner->meter, aout);
+
+    owner->main_stream = NULL;
 
     /* Audio output module callbacks */
     var_Create (aout, "volume", VLC_VAR_FLOAT);
@@ -377,7 +388,7 @@ audio_output_t *aout_Hold(audio_output_t *aout)
 /**
  * Deinitializes an audio output module and destroys an audio output object.
  */
-void aout_Destroy (audio_output_t *aout)
+static void aout_Destroy (audio_output_t *aout)
 {
     aout_owner_t *owner = aout_owner (aout);
 
@@ -398,15 +409,6 @@ void aout_Destroy (audio_output_t *aout)
     var_DelCallback(aout, "volume", var_Copy, vlc_object_parent(aout));
     var_DelCallback (aout, "stereo-mode", StereoModeCallback, NULL);
     var_DelCallback (aout, "mix-mode", MixModeCallback, NULL);
-    aout_Release(aout);
-}
-
-void aout_Release(audio_output_t *aout)
-{
-    aout_owner_t *owner = aout_owner(aout);
-
-    if (!vlc_atomic_rc_dec(&owner->rc))
-        return;
 
     aout_dev_t *dev;
     vlc_list_foreach(dev, &owner->dev.list, node)
@@ -417,6 +419,16 @@ void aout_Release(audio_output_t *aout)
     }
 
     vlc_object_delete(VLC_OBJECT(aout));
+}
+
+void aout_Release(audio_output_t *aout)
+{
+    aout_owner_t *owner = aout_owner(aout);
+
+    if (!vlc_atomic_rc_dec(&owner->rc))
+        return;
+
+    aout_Destroy(aout);
 }
 
 static int aout_PrepareStereoMode(audio_output_t *aout,
@@ -655,12 +667,12 @@ static void aout_UpdateMixMode(audio_output_t *aout, int mode,
  * the codec from the mixer_format in case of DTSHD/DTS or EAC3/AC3 fallback
  * \warning The caller must NOT hold the audio output lock.
  */
-int aout_OutputNew (audio_output_t *aout)
+int aout_OutputNew(audio_output_t *aout, vlc_aout_stream *stream,
+                   audio_sample_format_t *fmt, int input_profile,
+                   audio_sample_format_t *filter_fmt,
+                   aout_filters_cfg_t *filters_cfg)
 {
     aout_owner_t *owner = aout_owner (aout);
-    audio_sample_format_t *fmt = &owner->mixer_format;
-    audio_sample_format_t *filter_fmt = &owner->filter_format;
-    aout_filters_cfg_t *filters_cfg = &owner->filters_cfg;
 
     vlc_fourcc_t formats[] = {
         fmt->i_format, 0, 0
@@ -709,7 +721,7 @@ int aout_OutputNew (audio_output_t *aout)
         switch (fmt->i_format)
         {
             case VLC_CODEC_DTS:
-                if (owner->input_profile > 0)
+                if (input_profile > 0)
                 {
                     assert(ARRAY_SIZE(formats) >= 3);
                     /* DTSHD can be played as DTSHD or as DTS */
@@ -718,7 +730,7 @@ int aout_OutputNew (audio_output_t *aout)
                 }
                 break;
             case VLC_CODEC_A52:
-                if (owner->input_profile > 0)
+                if (input_profile > 0)
                 {
                     assert(ARRAY_SIZE(formats) >= 3);
                     formats[0] = VLC_CODEC_EAC3;
@@ -739,11 +751,16 @@ int aout_OutputNew (audio_output_t *aout)
     aout->current_sink_info.headphones = false;
 
     vlc_mutex_lock(&owner->lock);
+    /* XXX: Remove when aout/stream support is complete (in all modules) */
+    assert(owner->main_stream == NULL);
+
     int ret = VLC_EGENERIC;
     for (size_t i = 0; formats[i] != 0 && ret != VLC_SUCCESS; ++i)
     {
         filter_fmt->i_format = fmt->i_format = formats[i];
         ret = aout->start(aout, fmt);
+        if (ret == 0)
+            owner->main_stream = stream;
     }
     vlc_mutex_unlock(&owner->lock);
     if (ret)
@@ -771,6 +788,7 @@ int aout_OutputNew (audio_output_t *aout)
     aout_FormatPrepare (fmt);
     assert (fmt->i_bytes_per_frame > 0 && fmt->i_frame_length > 0);
     aout_FormatPrint (aout, "output", fmt);
+
     return 0;
 }
 
@@ -784,6 +802,7 @@ void aout_OutputDelete (audio_output_t *aout)
     aout_owner_t *owner = aout_owner(aout);
     vlc_mutex_lock(&owner->lock);
     aout->stop (aout);
+    owner->main_stream = NULL;
     vlc_mutex_unlock(&owner->lock);
 }
 

@@ -49,11 +49,6 @@
 #include "modules/modules.h"
 #include "misc/rcu.h"
 
-static inline char *strdupnull (const char *src)
-{
-    return src ? strdup (src) : NULL;
-}
-
 /**
  * Get the user's configuration file
  */
@@ -535,24 +530,4 @@ error:
     free (temporary);
     free (permanent);
     return -1;
-}
-
-int config_AutoSaveConfigFile( vlc_object_t *p_this )
-{
-    assert( p_this );
-
-    if (!atomic_exchange_explicit(&config_dirty, false, memory_order_acquire))
-        return 0;
-
-    int ret = config_SaveConfigFile (p_this);
-
-    if (unlikely(ret != 0))
-        /*
-         * On write failure, set the dirty flag back again. While it looks
-         * racy, it really means to retry later in hope that it does not
-         * fail again. Concurrent write attempts would not succeed anyway.
-         */
-        atomic_store_explicit(&config_dirty, true, memory_order_relaxed);
-
-    return ret;
 }

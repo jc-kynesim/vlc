@@ -21,6 +21,7 @@ import QtQuick.Controls 2.4
 import QtQml.Models 2.11
 
 import org.videolan.vlc 0.1
+import org.videolan.compat 0.1
 
 import "qrc:///player/"
 import "qrc:///widgets/" as Widgets
@@ -32,7 +33,7 @@ Control {
     padding: background.border.width
 
     readonly property int controlId: model.id
-    property var dndView: null
+    property ListView dndView: null
 
     readonly property bool dragActive: loader.Drag.active
     property alias dropArea: dropArea
@@ -56,11 +57,13 @@ Control {
 
         drag.onActiveChanged: {
             if (drag.active) {
+                dragAutoScrollHandler.dragItem = loader
                 root.dragStarted(controlId)
                 removeInfoRectVisible = true
                 drag.target.Drag.start()
 
             } else {
+                dragAutoScrollHandler.dragItem = null
                 drag.target.Drag.drop()
                 removeInfoRectVisible = false
                 root.dragStopped(controlId)
@@ -102,7 +105,7 @@ Control {
         }
     }
 
-    Binding {
+    BindingCompat {
         when: dragActive
         value: true
 
@@ -153,11 +156,6 @@ Control {
             source: PlayerControlbarControls.control(model.id).source
 
             Drag.source: control
-
-            onXChanged: {
-                if (Drag.active)
-                    root.handleScroll(this)
-            }
 
             onLoaded: {
                 item.paintOnly = true

@@ -47,13 +47,12 @@ static int  OpenPacketizer( vlc_object_t * );
 
 #ifdef ENABLE_SOUT
 static int  OpenEncoder   ( vlc_object_t * );
-static void CloseEncoder  ( vlc_object_t * );
+static void CloseEncoder  ( encoder_t * );
 static block_t *EncodeFrames( encoder_t *, block_t * );
 #endif
 
 vlc_module_begin ()
 
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACODEC )
     set_description( N_("Linear PCM audio decoder") )
     set_capability( "audio decoder", 100 )
@@ -67,8 +66,8 @@ vlc_module_begin ()
 #ifdef ENABLE_SOUT
     add_submodule ()
     set_description( N_("Linear PCM audio encoder") )
-    set_capability( "encoder", 100 )
-    set_callbacks( OpenEncoder, CloseEncoder )
+    set_capability( "audio encoder", 100 )
+    set_callback( OpenEncoder )
     add_shortcut( "lpcm" )
 #endif
 
@@ -552,7 +551,6 @@ static int OpenEncoder( vlc_object_t *p_this )
     p_sys->i_channels = p_enc->fmt_in.audio.i_channels;
     p_sys->i_rate = p_enc->fmt_in.audio.i_rate;
 
-    p_enc->pf_encode_audio = EncodeFrames;
     p_enc->fmt_in.i_codec = p_enc->fmt_out.i_codec;
 
     p_enc->fmt_in.audio.i_bitspersample = 16;
@@ -565,15 +563,22 @@ static int OpenEncoder( vlc_object_t *p_this )
         (p_sys->i_frame_samples + LPCM_VOB_HEADER_LEN) /
         p_sys->i_frame_samples;
 
+    static const struct vlc_encoder_operations ops =
+    {
+        .close = CloseEncoder,
+        .encode_audio = EncodeFrames,
+    };
+
+    p_enc->ops = &ops;
+
     return VLC_SUCCESS;
 }
 
 /*****************************************************************************
  * CloseEncoder: lpcm encoder destruction
  *****************************************************************************/
-static void CloseEncoder ( vlc_object_t *p_this )
+static void CloseEncoder ( encoder_t *p_enc )
 {
-    encoder_t     *p_enc = (encoder_t *)p_this;
     encoder_sys_t *p_sys = p_enc->p_sys;
 
     free( p_sys->p_buffer );

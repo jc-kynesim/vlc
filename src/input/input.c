@@ -59,18 +59,9 @@
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
-enum input_create_option {
-    INPUT_CREATE_OPTION_NONE,
-    INPUT_CREATE_OPTION_PREPARSING,
-    INPUT_CREATE_OPTION_THUMBNAILING,
-};
-
 static  void *Run( void * );
 static  void *Preparse( void * );
 
-static input_thread_t * Create  ( vlc_object_t *, input_thread_events_cb, void *,
-                                  input_item_t *, enum input_create_option option,
-                                  input_resource_t *, vlc_renderer_item_t * );
 static void             Destroy ( input_thread_t *p_input );
 static  int             Init    ( input_thread_t *p_input );
 static void             End     ( input_thread_t *p_input );
@@ -119,44 +110,6 @@ static int input_SlaveSourceAdd( input_thread_t *, enum slave_type,
 static char *input_SubtitleFile2Uri( input_thread_t *, const char * );
 static void input_ChangeState( input_thread_t *p_input, int i_state, vlc_tick_t ); /* TODO fix name */
 
-#undef input_Create
-/**
- * Create a new input_thread_t.
- *
- * You need to call input_Start on it when you are done
- * adding callback on the variables/events you want to monitor.
- *
- * \param p_parent a vlc_object
- * \param p_item an input item
- * \param p_resource an optional input ressource
- * \return a pointer to the spawned input thread
- */
-input_thread_t *input_Create( vlc_object_t *p_parent,
-                              input_thread_events_cb events_cb, void *events_data,
-                              input_item_t *p_item,
-                              input_resource_t *p_resource,
-                              vlc_renderer_item_t *p_renderer )
-{
-    return Create( p_parent, events_cb, events_data, p_item,
-                   INPUT_CREATE_OPTION_NONE, p_resource, p_renderer );
-}
-
-input_thread_t *input_CreatePreparser( vlc_object_t *parent,
-                                       input_thread_events_cb events_cb,
-                                       void *events_data, input_item_t *item )
-{
-    return Create( parent, events_cb, events_data, item,
-                   INPUT_CREATE_OPTION_PREPARSING, NULL, NULL );
-}
-
-input_thread_t *input_CreateThumbnailer(vlc_object_t *obj,
-                                        input_thread_events_cb events_cb,
-                                        void *events_data, input_item_t *item)
-{
-    return Create( obj, events_cb, events_data, item,
-                   INPUT_CREATE_OPTION_THUMBNAILING, NULL, NULL );
-}
-
 /**
  * Start a input_thread_t created by input_Create.
  *
@@ -169,7 +122,7 @@ int input_Start( input_thread_t *p_input )
     input_thread_private_t *priv = input_priv(p_input);
     void *(*func)(void *) = Run;
 
-    if( priv->b_preparsing )
+    if( priv->type == INPUT_TYPE_PREPARSING )
         func = Preparse;
 
     assert( !priv->is_running );
@@ -250,18 +203,23 @@ input_item_t *input_GetItem( input_thread_t *p_input )
     return input_priv(p_input)->p_item;
 }
 
-/*****************************************************************************
- * This function creates a new input, and returns a pointer
- * to its description. On error, it returns NULL.
+#undef input_Create
+/**
+ * Create a new input_thread_t.
  *
- * XXX Do not forget to update vlc_input.h if you add new variables.
- *****************************************************************************/
-static input_thread_t *Create( vlc_object_t *p_parent,
-                               input_thread_events_cb events_cb, void *events_data,
-                               input_item_t *p_item,
-                               enum input_create_option option,
-                               input_resource_t *p_resource,
-                               vlc_renderer_item_t *p_renderer )
+ * You need to call input_Start on it when you are done
+ * adding callback on the variables/events you want to monitor.
+ *
+ * \param p_parent a vlc_object
+ * \param p_item an input item
+ * \param p_resource an optional input ressource
+ * \return a pointer to the spawned input thread
+ */
+input_thread_t *input_Create( vlc_object_t *p_parent,
+                              input_thread_events_cb events_cb, void *events_data,
+                              input_item_t *p_item, enum input_type type,
+                              input_resource_t *p_resource,
+                              vlc_renderer_item_t *p_renderer )
 {
     /* Allocate descriptor */
     input_thread_private_t *priv;
@@ -280,20 +238,20 @@ static input_thread_t *Create( vlc_object_t *p_parent,
     input_thread_t *p_input = &priv->input;
 
     char * psz_name = input_item_GetName( p_item );
-    const char *option_str;
-    switch (option)
+    const char *type_str;
+    switch (type)
     {
-        case INPUT_CREATE_OPTION_PREPARSING:
-            option_str = "preparsing ";
+        case INPUT_TYPE_PREPARSING:
+            type_str = "preparsing ";
             break;
-        case INPUT_CREATE_OPTION_THUMBNAILING:
-            option_str = "thumbnailing ";
+        case INPUT_TYPE_THUMBNAILING:
+            type_str = "thumbnailing ";
             break;
         default:
-            option_str = "";
+            type_str = "";
             break;
     }
-    msg_Dbg( p_input, "Creating an input for %s'%s'", option_str, psz_name);
+    msg_Dbg( p_input, "Creating an input for %s'%s'", type_str, psz_name);
     free( psz_name );
 
     /* Parse input options */
@@ -302,8 +260,7 @@ static input_thread_t *Create( vlc_object_t *p_parent,
     /* Init Common fields */
     priv->events_cb = events_cb;
     priv->events_data = events_data;
-    priv->b_preparsing = option == INPUT_CREATE_OPTION_PREPARSING;
-    priv->b_thumbnailing = option == INPUT_CREATE_OPTION_THUMBNAILING;
+    priv->type = type;
     priv->i_start = 0;
     priv->i_stop  = 0;
     priv->i_title_offset = input_priv(p_input)->i_seekpoint_offset = 0;
@@ -315,8 +272,8 @@ static input_thread_t *Create( vlc_object_t *p_parent,
     priv->normal_time = VLC_TICK_0;
     TAB_INIT( priv->i_attachment, priv->attachment );
     priv->p_sout   = NULL;
-    priv->b_out_pace_control = priv->b_thumbnailing;
-    priv->p_renderer = p_renderer && priv->b_preparsing == false ?
+    priv->b_out_pace_control = priv->type == INPUT_TYPE_THUMBNAILING;
+    priv->p_renderer = p_renderer && priv->type != INPUT_TYPE_PREPARSING ?
                 vlc_renderer_item_hold( p_renderer ) : NULL;
 
     priv->viewpoint_changed = false;
@@ -338,7 +295,8 @@ static input_thread_t *Create( vlc_object_t *p_parent,
 
     /* setup the preparse depth of the item
      * if we are preparsing, use the i_preparse_depth of the parent item */
-    if( priv->b_preparsing || priv->b_thumbnailing )
+    if( priv->type == INPUT_TYPE_PREPARSING
+     || priv->type == INPUT_TYPE_THUMBNAILING )
     {
         p_input->obj.logger = NULL;
         p_input->obj.no_interact = true;
@@ -401,12 +359,13 @@ static input_thread_t *Create( vlc_object_t *p_parent,
     input_item_SetESNowPlaying( p_item, NULL );
 
     /* */
-    if( !priv->b_preparsing && var_InheritBool( p_input, "stats" ) )
+    if( priv->type != INPUT_TYPE_PREPARSING && var_InheritBool( p_input, "stats" ) )
         priv->stats = input_stats_Create();
     else
         priv->stats = NULL;
 
-    priv->p_es_out_display = input_EsOutNew( p_input, priv->master, priv->rate );
+    priv->p_es_out_display = input_EsOutNew( p_input, priv->master, priv->rate,
+                                             priv->type );
     if( !priv->p_es_out_display )
     {
         Destroy( p_input );
@@ -785,7 +744,7 @@ static int InitSout( input_thread_t * p_input )
 {
     input_thread_private_t *priv = input_priv(p_input);
 
-    if( priv->b_preparsing )
+    if( priv->type == INPUT_TYPE_PREPARSING )
         return VLC_SUCCESS;
 
     /* Find a usable sout and attach it to p_input */
@@ -831,29 +790,29 @@ static void InitProperties( input_thread_t *input )
     input_source_t *master = priv->master;
     assert(master);
 
-    int capabilites = 0;
+    int capabilities = 0;
     bool b_can_seek;
 
     if( demux_Control( master->p_demux, DEMUX_CAN_SEEK, &b_can_seek ) )
         b_can_seek = false;
     if( b_can_seek )
-        capabilites |= VLC_INPUT_CAPABILITIES_SEEKABLE;
+        capabilities |= VLC_INPUT_CAPABILITIES_SEEKABLE;
 
     if( master->b_can_pause || !master->b_can_pace_control )
-        capabilites |= VLC_INPUT_CAPABILITIES_PAUSEABLE;
+        capabilities |= VLC_INPUT_CAPABILITIES_PAUSEABLE;
     if( !master->b_can_pace_control || master->b_can_rate_control )
-        capabilites |= VLC_INPUT_CAPABILITIES_CHANGE_RATE;
+        capabilities |= VLC_INPUT_CAPABILITIES_CHANGE_RATE;
     if( !master->b_rescale_ts && !master->b_can_pace_control && master->b_can_rate_control )
-        capabilites |= VLC_INPUT_CAPABILITIES_REWINDABLE;
+        capabilities |= VLC_INPUT_CAPABILITIES_REWINDABLE;
 
 #ifdef ENABLE_SOUT
-    capabilites |= VLC_INPUT_CAPABILITIES_RECORDABLE;
+    capabilities |= VLC_INPUT_CAPABILITIES_RECORDABLE;
 #else
     if( master->b_can_stream_record )
-        capabilites |= VLC_INPUT_CAPABILITIES_RECORDABLE;
+        capabilities |= VLC_INPUT_CAPABILITIES_RECORDABLE;
 #endif
 
-    input_SendEventCapabilities( input, capabilites );
+    input_SendEventCapabilities( input, capabilities );
 
     int i_attachment;
     input_attachment_t **attachment;
@@ -879,7 +838,7 @@ static void InitTitle( input_thread_t * p_input, bool had_titles )
     input_thread_private_t *priv = input_priv(p_input);
     input_source_t *p_master = priv->master;
 
-    if( priv->b_preparsing )
+    if( priv->type == INPUT_TYPE_PREPARSING )
         return;
 
     vlc_mutex_lock( &priv->p_item->lock );
@@ -1203,7 +1162,7 @@ static void LoadSlaves( input_thread_t *p_input )
                                   SLAVE_ADD_FORCED );
 
             free( psz_mrl );
-            /* Don't update item slaves for attachements */
+            /* Don't update item slaves for attachments */
         }
         vlc_input_attachment_Release( a );
     }
@@ -1353,7 +1312,7 @@ static int Init( input_thread_t * p_input )
     input_SendEventTimes( p_input, 0.0, VLC_TICK_INVALID, priv->normal_time,
                           i_length );
 
-    if( !priv->b_preparsing )
+    if( priv->type != INPUT_TYPE_PREPARSING )
     {
         StartTitle( p_input );
         SetSubtitlesOptions( p_input );
@@ -1369,7 +1328,7 @@ static int Init( input_thread_t * p_input )
     }
 
 #ifdef ENABLE_SOUT
-    if( !priv->b_preparsing && priv->p_sout )
+    if( priv->type != INPUT_TYPE_PREPARSING && priv->p_sout )
     {
         priv->b_out_pace_control = sout_StreamIsSynchronous(priv->p_sout);
         msg_Dbg( p_input, "starting in %ssync mode",
@@ -2555,7 +2514,8 @@ static demux_t *InputDemuxNew( input_thread_t *p_input, es_out_t *p_es_out,
 
     /* create the underlying access stream */
     stream_t *p_stream = stream_AccessNew( obj, p_input, p_es_out,
-                                           priv->b_preparsing, url );
+                                           priv->type == INPUT_TYPE_PREPARSING,
+                                           url );
     if( p_stream == NULL )
         return NULL;
 
@@ -2588,7 +2548,7 @@ static demux_t *InputDemuxNew( input_thread_t *p_input, es_out_t *p_es_out,
 
     /* create a regular demux with the access stream created */
     demux_t *demux = demux_NewAdvanced( obj, p_input, psz_demux, url, p_stream,
-                                        p_es_out, priv->b_preparsing );
+                                        p_es_out, priv->type == INPUT_TYPE_PREPARSING );
     if( demux != NULL )
         return demux;
 
@@ -2808,8 +2768,8 @@ static int InputSourceInit( input_source_t *in, input_thread_t *p_input,
     demux_Control( in->p_demux, DEMUX_CAN_PAUSE, &in->b_can_pause );
 
     /* get attachment
-     * FIXME improve for b_preparsing: move it after GET_META and check psz_arturl */
-    if( !input_priv(p_input)->b_preparsing )
+     * FIXME improve for preparsing: move it after GET_META and check psz_arturl */
+    if( input_priv(p_input)->type != INPUT_TYPE_PREPARSING )
     {
         if( demux_Control( in->p_demux, DEMUX_GET_TITLE_INFO,
                            &in->title, &in->i_title,
@@ -3422,7 +3382,7 @@ static int input_SlaveSourceAdd( input_thread_t *p_input,
     if( ret != VLC_SUCCESS )
     {
         msg_Warn( p_input, "failed to add %s as slave", psz_uri );
-        return VLC_EGENERIC;
+        goto error;
     }
 
     if( i_type == SLAVE_TYPE_GENERIC )
@@ -3435,18 +3395,14 @@ static int input_SlaveSourceAdd( input_thread_t *p_input,
             if( demux_Control( priv->master->p_demux, DEMUX_GET_TIME, &i_time ) )
             {
                 msg_Err( p_input, "demux doesn't like DEMUX_GET_TIME" );
-                InputSourceDestroy( p_source );
-                input_source_Release( p_source );
-                return VLC_EGENERIC;
+                goto error;
             }
 
             if( demux_Control( p_source->p_demux,
                                DEMUX_SET_TIME, i_time, true ) )
             {
                 msg_Err( p_input, "seek failed for new slave" );
-                InputSourceDestroy( p_source );
-                input_source_Release( p_source );
-                return VLC_EGENERIC;
+                goto error;
             }
         }
 
@@ -3459,6 +3415,11 @@ static int input_SlaveSourceAdd( input_thread_t *p_input,
     TAB_APPEND( priv->i_slave, priv->slave, p_source );
 
     return VLC_SUCCESS;
+
+error:
+    InputSourceDestroy( p_source );
+    input_source_Release( p_source );
+    return VLC_EGENERIC;
 }
 
 static char *input_SubtitleFile2Uri( input_thread_t *p_input,

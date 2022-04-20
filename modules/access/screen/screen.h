@@ -25,18 +25,22 @@
 #include <vlc_access.h>
 #include <vlc_demux.h>
 
-#ifdef __APPLE__
-#   define SCREEN_DISPLAY_ID
+#define SCREEN_SUBSCREEN
+#ifdef _WIN32
+#define SCREEN_MOUSE
 #endif
 
-#define SCREEN_SUBSCREEN
-#define SCREEN_MOUSE
-
-#ifdef SCREEN_MOUSE
-#   include <vlc_image.h>
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 typedef struct screen_data_t screen_data_t;
+
+struct screen_capture_operations
+{
+    block_t* (*capture)( demux_t * );
+    void (*close)( screen_data_t * );
+};
 
 typedef struct
 {
@@ -62,25 +66,22 @@ typedef struct
 
 #ifdef SCREEN_MOUSE
     picture_t *p_mouse;
-    filter_t *p_blend;
     picture_t dst;
 #endif
 
-#ifdef SCREEN_DISPLAY_ID
-  unsigned int i_display_id;
-  unsigned int i_screen_index;
-#endif
-
     screen_data_t *p_data;
+    const struct screen_capture_operations *ops;
 } demux_sys_t;
 
 int      screen_InitCapture ( demux_t * );
-int      screen_CloseCapture( demux_t * );
-block_t *screen_Capture( demux_t * );
+#if defined(_WIN32) && !defined(VLC_WINSTORE_APP)
+int      screen_InitCaptureGDI ( demux_t * );
+#endif
 
 #ifdef SCREEN_SUBSCREEN
 void FollowMouse( demux_sys_t *, int, int );
 #endif
-#ifdef SCREEN_MOUSE
-void RenderCursor( demux_t *, int, int, uint8_t * );
+
+#ifdef __cplusplus
+}
 #endif

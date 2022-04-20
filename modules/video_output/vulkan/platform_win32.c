@@ -28,8 +28,31 @@
 #include <vlc_plugin.h>
 #include "platform.h"
 
-static void ClosePlatform(vlc_vk_platform_t *vk);
-static int CreateSurface(vlc_vk_platform_t *vk);
+static void ClosePlatform(vlc_vk_platform_t *vk)
+{
+    VLC_UNUSED(vk);
+}
+
+static int CreateSurface(vlc_vk_platform_t *vk, VkInstance vkinst, VkSurfaceKHR *surface_out)
+{
+    // Get current win32 HINSTANCE
+    HINSTANCE hInst = GetModuleHandle(NULL);
+
+    VkWin32SurfaceCreateInfoKHR winfo = {
+         .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+         .hinstance = hInst,
+         .hwnd = (HWND) vk->window->handle.hwnd,
+    };
+
+    VkResult res = vkCreateWin32SurfaceKHR(vkinst, &winfo, NULL, surface_out);
+    if (res != VK_SUCCESS) {
+        msg_Err(vk, "Failed creating Win32 surface");
+        return VLC_EGENERIC;
+    }
+
+    return VLC_SUCCESS;
+}
+
 static const struct vlc_vk_platform_operations platform_ops =
 {
     .close = ClosePlatform,
@@ -42,39 +65,13 @@ static int InitPlatform(vlc_vk_platform_t *vk)
         return VLC_EGENERIC;
 
     vk->platform_ext = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
-    vk->platform_ops = &platform_ops;
-    return VLC_SUCCESS;
-}
-
-static void ClosePlatform(vlc_vk_platform_t *vk)
-{
-    VLC_UNUSED(vk);
-}
-
-static int CreateSurface(vlc_vk_platform_t *vk, VkInstance vkinst)
-{
-    // Get current win32 HINSTANCE
-    HINSTANCE hInst = GetModuleHandle(NULL);
-
-    VkWin32SurfaceCreateInfoKHR winfo = {
-         .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-         .hinstance = hInst,
-         .hwnd = (HWND) vk->window->handle.hwnd,
-    };
-
-    VkResult res = vkCreateWin32SurfaceKHR(vkinst, &winfo, NULL, &vk->surface);
-    if (res != VK_SUCCESS) {
-        msg_Err(vk, "Failed creating Win32 surface");
-        return VLC_EGENERIC;
-    }
-
+    vk->ops = &platform_ops;
     return VLC_SUCCESS;
 }
 
 vlc_module_begin()
     set_shortname("Vulkan Win32")
     set_description(N_("Win32 platform support for Vulkan"))
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     set_capability("vulkan platform", 50)
     set_callback(InitPlatform)

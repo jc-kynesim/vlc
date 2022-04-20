@@ -61,7 +61,6 @@ vlc_module_begin ()
     set_shortname( N_("Subtitles (advanced)"))
     set_description( N_("Subtitle renderers using libass") )
     set_capability( "spu decoder", 100 )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_SCODEC )
     set_callbacks( Create, Destroy )
     add_string("ssa-fontsdir", NULL, TEXT_SSA_FONTSDIR, NULL)
@@ -437,6 +436,9 @@ static int SubpictureValidate( subpicture_t *p_subpic,
     if( b_fmt_src || b_fmt_dst )
     {
         ass_set_frame_size( p_sys->p_renderer, fmt.i_visible_width, fmt.i_visible_height );
+#if LIBASS_VERSION > 0x01010000
+        ass_set_storage_size( p_sys->p_renderer, p_fmt_src->i_visible_width, p_fmt_src->i_visible_height );
+#endif
         const double src_ratio = (double)p_fmt_src->i_visible_width / p_fmt_src->i_visible_height;
         const double dst_ratio = (double)p_fmt_dst->i_visible_width / p_fmt_dst->i_visible_height;
         ass_set_aspect_ratio( p_sys->p_renderer, dst_ratio / src_ratio, 1 );

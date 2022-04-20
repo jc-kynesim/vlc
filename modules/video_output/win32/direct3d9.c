@@ -77,9 +77,9 @@ static void Close(vout_display_t *);
 #define HW_BLENDING_TEXT N_("Use hardware blending support")
 #define HW_BLENDING_LONGTEXT N_(\
     "Try to use hardware acceleration for subtitle/OSD blending.")
-#define HW_YUV_TEXT N_("Use hardware YUV->RGB conversions")
+#define HW_YUV_TEXT N_("Use hardware YUV to RGB conversions")
 #define HW_YUV_LONGTEXT N_(\
-    "Try to use hardware acceleration for YUV->RGB conversions. " \
+    "Try to use hardware acceleration for YUV to RGB conversions. " \
     "This option doesn't have any effect when using overlays.")
 
 #define PIXEL_SHADER_TEXT N_("Pixel Shader")
@@ -96,7 +96,6 @@ vlc_module_begin ()
     set_shortname("Direct3D9")
     set_description(N_("Direct3D9 video output"))
     set_help(D3D9_HELP)
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
 
     add_bool("direct3d9-hw-blending", true, HW_BLENDING_TEXT, HW_BLENDING_LONGTEXT)
@@ -1754,6 +1753,7 @@ static bool LocalSwapchainUpdateOutput( void *opaque, const libvlc_video_render_
     out->colorspace  = libvlc_video_colorspace_BT709;
     out->primaries   = libvlc_video_primaries_BT709;
     out->transfer    = libvlc_video_transfer_func_SRGB;
+    out->orientation = libvlc_video_orient_top_left;
 
     return true;
 }
@@ -1896,7 +1896,7 @@ error:
 }
 
 /**
- * It destroyes a Direct3D vout display.
+ * It destroys a Direct3D vout display.
  */
 static void Close(vout_display_t *vd)
 {

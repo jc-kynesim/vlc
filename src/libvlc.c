@@ -139,29 +139,38 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
     /* System specific initialization code */
     system_Init();
 
-    /* Initialize the module bank and load the configuration of the
-     * core module. We need to do this at this stage to be able to display
-     * a short help if required by the user. (short help == core module
-     * options) */
+    /*
+     * Initialize the module bank and load the core config only.
+     */
     module_InitBank ();
 
-    /* Get command line options that affect module loading. */
-    if( config_LoadCmdLine( p_libvlc, i_argc, ppsz_argv, NULL ) )
-    {
-        module_EndBank (false);
-        return VLC_EGENERIC;
-    }
+    /*
+     * Perform early check for commandline arguments that affect module loading.
+     */
+#ifdef HAVE_DYNAMIC_PLUGINS
+    config_CmdLineEarlyScan( p_libvlc, i_argc, ppsz_argv );
+#endif
 
     vlc_threads_setup (p_libvlc);
 
-    /* Load the builtins and plugins into the module_bank.
-     * We have to do it before config_Load*() because this also gets the
-     * list of configuration options exported by each module and loads their
-     * default values. */
+    /*
+     * Load plugin data into the module bank.
+     * We need to do this here such that option sets from plugins are added to
+     * the config system in order that full commandline argument parsing and
+     * saved settings handling can function properly.
+     */
     module_LoadPlugins (p_libvlc);
 
     /*
-     * Override default configuration with config file settings
+     * Fully process command line settings.
+     * Results are stored as runtime state within `p_libvlc` object variables.
+     */
+    int vlc_optind;
+    if( config_LoadCmdLine( p_libvlc, i_argc, ppsz_argv, &vlc_optind ) )
+        goto error;
+
+    /*
+     * Load saved settings into the config system, as applicable.
      */
     if( !var_InheritBool( p_libvlc, "ignore-config" ) )
     {
@@ -170,13 +179,6 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
         else
             config_LoadConfigFile( p_libvlc );
     }
-
-    /*
-     * Override configuration with command line settings
-     */
-    int vlc_optind;
-    if( config_LoadCmdLine( p_libvlc, i_argc, ppsz_argv, &vlc_optind ) )
-        goto error;
 
     vlc_LogInit(p_libvlc);
     vlc_tracer_Init(p_libvlc);
@@ -191,6 +193,9 @@ int libvlc_InternalInit( libvlc_int_t *p_libvlc, int i_argc,
     /*xgettext: Translate "C" to the language code: "fr", "en_GB", "nl", "ru"... */
     msg_Dbg( p_libvlc, "translation test: code is \"%s\"", _("C") );
 
+    /*
+     * Handle info requests such as for help or version text.
+     */
     if (config_PrintHelp (VLC_OBJECT(p_libvlc)))
     {
         libvlc_InternalCleanup (p_libvlc);

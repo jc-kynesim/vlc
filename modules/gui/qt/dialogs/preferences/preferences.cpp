@@ -29,6 +29,7 @@
 #include "widgets/native/qvlcframe.hpp"
 #include "dialogs/errors/errors.hpp"
 
+#include "expert_view.hpp"
 #include "dialogs/preferences/complete_preferences.hpp"
 #include "dialogs/preferences/simple_preferences.hpp"
 #include "widgets/native/searchlineedit.hpp"
@@ -44,7 +45,6 @@
 #include <QStackedWidget>
 #include <QSplitter>
 #include <QShortcut>
-#include <QScrollArea>
 
 #include <vlc_modules.h>
 
@@ -74,8 +74,11 @@ PrefsDialog::PrefsDialog( QWindow *parent, qt_intf_t *_p_intf )
     simple->setToolTip( qtr( "Switch to simple preferences view" ) );
     all = new QRadioButton( qtr("All"), types );
     all->setToolTip( qtr( "Switch to full preferences view" ) );
+    expert = new QRadioButton( qtr("Expert"), types );
+    expert->setToolTip( qtr( "Switch to expert preferences view" ) );
     types_l->addWidget( simple );
     types_l->addWidget( all );
+    types_l->addWidget( expert );
     types->setLayout( types_l );
     simple->setChecked( true );
 
@@ -108,7 +111,7 @@ PrefsDialog::PrefsDialog( QWindow *parent, qt_intf_t *_p_intf )
     simple_split_widget->layout()->addWidget( simple_panels_stack );
 
     simple_tree_panel->layout()->setMargin( 1 );
-    simple_panels_stack->layout()->setContentsMargins( 6, 0, 0, 3 );
+    simple_panels_stack->setContentsMargins( 6, 0, 0, 3 );
     simple_split_widget->layout()->setMargin( 0 );
 
     stack->insertWidget( SIMPLE, simple_split_widget );
@@ -132,6 +135,30 @@ PrefsDialog::PrefsDialog( QWindow *parent, qt_intf_t *_p_intf )
 
     stack->insertWidget( ADVANCED, advanced_split_widget );
 
+    /* Expert view (panel) */
+    expert_widget = new QWidget;
+    expert_widget_layout = new QGridLayout;
+    expert_widget->setLayout( expert_widget_layout );
+
+    expert_table_filter = nullptr;
+    expert_table = nullptr;
+
+    expert_text = new QLabel;
+    expert_longtext = new QLabel;
+
+    expert_text->setWordWrap(true);
+    expert_longtext->setWordWrap(true);
+
+    QFont textFont = QApplication::font();
+    textFont.setPointSize( textFont.pointSize() + 2 );
+    textFont.setUnderline( true );
+    expert_text->setFont( textFont );
+
+    expert_widget_layout->addWidget( expert_text, 2, 0, 1, 2 );
+    expert_widget_layout->addWidget( expert_longtext, 3, 0, 1, 2 );
+
+    stack->insertWidget( EXPERT, expert_widget );
+
     /* Layout  */
     main_layout->addWidget( stack, 0, 0, 3, 3 );
     main_layout->addWidget( types, 3, 0, 2, 1 );
@@ -139,17 +166,20 @@ PrefsDialog::PrefsDialog( QWindow *parent, qt_intf_t *_p_intf )
     main_layout->setRowStretch( 2, 4 );
     main_layout->setMargin( 9 );
 
-    if( var_InheritBool( p_intf, "qt-advanced-pref" ) )
-        setAdvanced();
-    else
-        setSimple();
+    switch( var_InheritInteger( p_intf, "qt-initial-prefs-view" ) )
+    {
+        case 2:  setExpert();   break;
+        case 1:  setAdvanced(); break;
+        default: setSimple();   break;
+    }
 
-    BUTTONACT( save, save() );
-    BUTTONACT( cancel, cancel() );
-    BUTTONACT( reset, reset() );
+    BUTTONACT( save, &PrefsDialog::save );
+    BUTTONACT( cancel, &PrefsDialog::cancel );
+    BUTTONACT( reset, &PrefsDialog::reset );
 
-    BUTTONACT( simple, setSimple() );
-    BUTTONACT( all, setAdvanced() );
+    BUTTONACT( simple, &PrefsDialog::setSimple );
+    BUTTONACT( all, &PrefsDialog::setAdvanced );
+    BUTTONACT( expert, &PrefsDialog::setExpert );
 
     QVLCTools::restoreWidgetPosition( p_intf, "Preferences", this, QSize( 850, 700 ) );
 }
@@ -159,12 +189,55 @@ PrefsDialog::~PrefsDialog()
     module_list_free( p_list );
 }
 
+void PrefsDialog::setExpert()
+{
+    /* Lazy creation */
+    if( !expert_table )
+    {
+        if ( !p_list )
+            p_list = module_list_get( &count );
+
+        expert_table_filter = new SearchLineEdit( expert_widget );
+        expert_table_filter->setMinimumHeight( 26 );
+        expert_table_filter_modified = new QCheckBox( qtr( "Modified only" ), expert_widget );
+
+        QShortcut *search = new QShortcut( QKeySequence( QKeySequence::Find ), expert_table_filter );
+
+        ExpertPrefsTableModel *table_model = new ExpertPrefsTableModel( p_list, count, this );
+        expert_table = new ExpertPrefsTable( expert_widget );
+        expert_table->setModel( table_model );
+        expert_table->resizeColumnToContents( ExpertPrefsTableModel::NameField );
+
+        expert_widget_layout->addWidget( expert_table_filter, 0, 0 );
+        expert_widget_layout->addWidget( expert_table_filter_modified, 0, 1 );
+        expert_widget_layout->addWidget( expert_table, 1, 0, 1, 2 );
+
+        connect( expert_table->selectionModel(), &QItemSelectionModel::currentChanged,
+                 this, &PrefsDialog::changeExpertDesc );
+        connect( expert_table_filter, &SearchLineEdit::textChanged,
+                 this, &PrefsDialog::expertTableFilterChanged );
+        connect( expert_table_filter_modified, &QCheckBox::toggled,
+                 this, &PrefsDialog::expertTableFilterModifiedToggled );
+        connect( search, &QShortcut::activated,
+                 expert_table_filter, QOverload<>::of(&SearchLineEdit::setFocus) );
+
+        /* Set initial selection */
+        expert_table->setCurrentIndex(
+                expert_table->model()->index( 0, 0, QModelIndex() ) );
+    }
+
+    expert->setChecked( true );
+    stack->setCurrentIndex( EXPERT );
+    setWindowTitle( qtr( "Expert Preferences" ) );
+}
+
 void PrefsDialog::setAdvanced()
 {
     /* Lazy creation */
     if( !advanced_tree )
     {
-        p_list = module_list_get( &count );
+        if ( !p_list )
+            p_list = module_list_get( &count );
 
         advanced_tree = new PrefsTree( p_intf, advanced_tree_panel, p_list, count );
 
@@ -182,20 +255,15 @@ void PrefsDialog::setAdvanced()
         advanced_tree_panel->layout()->addWidget( advanced_tree );
         advanced_tree_panel->setSizePolicy( QSizePolicy::Maximum, QSizePolicy::Preferred );
 
-        CONNECT( advanced_tree,
-                 currentItemChanged( QTreeWidgetItem *, QTreeWidgetItem * ),
-                 this, changeAdvPanel( QTreeWidgetItem * ) );
-        CONNECT( tree_filter, textChanged( const QString &  ),
-                 this, advancedTreeFilterChanged( const QString & ) );
-        CONNECT( current_filter, stateChanged(int),
-                 this, onlyLoadedToggled() );
-        CONNECT( search, activated(), tree_filter, setFocus() );
-    }
+        connect( advanced_tree, &PrefsTree::currentItemChanged, this, &PrefsDialog::changeAdvPanel );
+        connect( tree_filter, &SearchLineEdit::textChanged, this, &PrefsDialog::advancedTreeFilterChanged );
+        connect( current_filter, &QCheckBox::stateChanged, this, &PrefsDialog::onlyLoadedToggled );
+        connect( search, &QShortcut::activated, tree_filter, QOverload<>::of(&SearchLineEdit::setFocus) );
 
-    /* Select the first Item of the preferences. Maybe you want to select a specified
-       category... */
-    advanced_tree->setCurrentIndex(
-            advanced_tree->model()->index( 0, 0, QModelIndex() ) );
+        /* Set initial selection */
+        advanced_tree->setCurrentIndex(
+                advanced_tree->model()->index( 0, 0, QModelIndex() ) );
+    }
 
     all->setChecked( true );
     stack->setCurrentIndex( ADVANCED );
@@ -207,10 +275,9 @@ void PrefsDialog::setSimple()
     /* If no simple_tree, create one, connect it */
     if( !simple_tree )
     {
-         simple_tree = new SPrefsCatList( p_intf, simple_tree_panel );
-         CONNECT( simple_tree,
-                  currentItemChanged( int ),
-                  this, changeSimplePanel( int ) );
+        simple_tree = new SPrefsCatList( p_intf, simple_tree_panel );
+        connect( simple_tree, &SPrefsCatList::currentItemChanged,
+                 this, &PrefsDialog::changeSimplePanel );
         simple_tree_panel->layout()->addWidget( simple_tree );
         simple_tree_panel->setSizePolicy( QSizePolicy::Fixed, QSizePolicy::Preferred );
     }
@@ -239,15 +306,26 @@ void PrefsDialog::changeSimplePanel( int number )
 void PrefsDialog::changeAdvPanel( QTreeWidgetItem *item )
 {
     if( item == NULL ) return;
-    PrefsItemData *data = item->data( 0, Qt::UserRole ).value<PrefsItemData*>();
+    PrefsTreeItem *node = static_cast<PrefsTreeItem *>( item );
 
-    if( !data->panel )
+    if( !node->panel )
     {
-        data->panel = new AdvPrefsPanel( p_intf, advanced_panels_stack, data );
-        advanced_panels_stack->insertWidget( advanced_panels_stack->count(),
-                                             data->panel );
+        node->panel = new AdvPrefsPanel( p_intf, advanced_panels_stack, node );
+        advanced_panels_stack->addWidget( node->panel );
     }
-    advanced_panels_stack->setCurrentWidget( data->panel );
+    advanced_panels_stack->setCurrentWidget( node->panel );
+}
+
+/* Changing from one Expert item description to another */
+void PrefsDialog::changeExpertDesc( const QModelIndex &current, const QModelIndex &previous )
+{
+    Q_UNUSED( previous );
+    if( !current.isValid() )
+       return;
+    ExpertPrefsTableItem *item = expert_table->myModel()->itemAt( current );
+
+    expert_text->setText( item->getTitle() );
+    expert_longtext->setText( item->getDescription() );
 }
 
 /* Actual apply and save for the preferences */
@@ -265,6 +343,11 @@ void PrefsDialog::save()
     {
         msg_Dbg( p_intf, "Saving the advanced preferences" );
         advanced_tree->applyAll();
+    }
+    else if( expert->isChecked() && expert_table->isVisible() )
+    {
+        msg_Dbg( p_intf, "Saving the expert preferences" );
+        expert_table->applyAll();
     }
 
     /* Save to file */
@@ -314,6 +397,16 @@ void PrefsDialog::reset()
 
         accept();
     }
+}
+
+void PrefsDialog::expertTableFilterModifiedToggled( bool checked )
+{
+    expert_table->filter( expert_table_filter->text(), checked );
+}
+
+void PrefsDialog::expertTableFilterChanged( const QString & text )
+{
+    expert_table->filter( text, expert_table_filter_modified->isChecked() );
 }
 
 void PrefsDialog::advancedTreeFilterChanged( const QString & text )

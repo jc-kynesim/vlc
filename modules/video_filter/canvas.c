@@ -47,7 +47,7 @@ static void Flush( filter_t * );
  *  - The outer picture is called the canvas.
  *  - The innter picture is callsed the subpicture.
  *
- * NB, all of the following operatons take into account aspect ratio
+ * NB, all of the following operations take into account aspect ratio
  *
  * A canvas is of canvas_{width,height}.
  * In Pad mode:
@@ -107,7 +107,6 @@ vlc_module_begin ()
     set_help( CANVAS_HELP )
     set_callback_video_filter( Activate )
 
-    set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
 
     add_integer_with_range( CFG_PREFIX "width", 0, 0, INT_MAX,

@@ -41,7 +41,6 @@ vlc_module_begin ()
     set_shortname (N_("Audio memory"))
     set_description (N_("Audio memory output"))
     set_capability ("audio output", 0)
-    set_category (CAT_AUDIO)
     set_subcategory (SUBCAT_AUDIO_AOUT)
     set_callbacks (Open, Close)
 
@@ -143,6 +142,8 @@ static void Drain (audio_output_t *aout)
     vlc_mutex_lock(&sys->lock);
     sys->drain (sys->opaque);
     vlc_mutex_unlock(&sys->lock);
+
+    aout_DrainedReport (aout);
 }
 
 static int VolumeSet (audio_output_t *aout, float vol)
@@ -205,6 +206,8 @@ static void Stop (audio_output_t *aout)
     aout_sys_t *sys = aout->sys;
 
     vlc_mutex_lock(&sys->lock);
+    if (sys->flush != NULL)
+        sys->flush (sys->opaque);
     if (sys->cleanup != NULL)
         sys->cleanup (sys->opaque);
 

@@ -312,6 +312,8 @@ static void WindowCloseLocal( intf_thread_t* pIntf, vlc_object_t *pObj )
     VoutManager::instance( pIntf )->releaseWnd( pWnd );
 }
 
+static void WindowSetFullscreen( vout_window_t *pWnd, const char * );
+
 static int WindowEnable( vout_window_t *pWnd, const vout_window_cfg_t *cfg )
 {
     vout_window_skins_t* sys = (vout_window_skins_t *)pWnd->sys;
@@ -331,7 +333,7 @@ static int WindowEnable( vout_window_t *pWnd, const vout_window_cfg_t *cfg )
     }
 
     if (cfg->is_fullscreen)
-        vout_window_SetFullScreen( pWnd, NULL );
+        WindowSetFullscreen( pWnd, NULL );
     return VLC_SUCCESS;
 }
 
@@ -343,7 +345,7 @@ static void WindowDisable( vout_window_t *pWnd )
     // In the process of quitting vlc, the interfaces are destroyed first,
     // then comes the playlist along with the player and possible vouts.
     // problem: the interface is no longer active to properly deallocate
-    // ressources allocated as a vout window submodule.
+    // resources allocated as a vout window submodule.
     intf_thread_t *pIntf = skin_load_intf;
     if( pIntf == NULL )
     {
@@ -475,7 +477,6 @@ static void WindowClose( vout_window_t *pWnd )
     " to play back video even though no video tag is implemented")
 
 vlc_module_begin ()
-    set_category( CAT_INTERFACE )
     set_subcategory( SUBCAT_INTERFACE_MAIN )
     add_loadfile("skins2-last", "", SKINS2_LAST, SKINS2_LAST_LONG)
     add_string( "skins2-config", "", SKINS2_CONFIG, SKINS2_CONFIG_LONG )

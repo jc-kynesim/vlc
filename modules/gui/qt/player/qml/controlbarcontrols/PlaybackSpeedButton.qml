@@ -18,21 +18,25 @@
 import QtQuick 2.11
 import QtQuick.Templates 2.4 as T
 
+import org.videolan.vlc 0.1
+
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
-import "qrc:///player/" as Player
-
+import "qrc:///player/" as P
+import "qrc:///util/Helpers.js" as Helpers
 
 Widgets.IconControlButton {
     id: playbackSpeedButton
 
+    readonly property bool _isCurrentViewPlayer: !paintOnly && (History.current.name === "player")
+
     size: VLCStyle.icon_medium
-    text: i18n.qtr("Playback Speed")
+    text: I18n.qtr("Playback Speed")
     color: playbackSpeedPopup.visible ? colors.accent : colors.playerControlBarFg
 
     onClicked: playbackSpeedPopup.open()
 
-    Player.PlaybackSpeed {
+    P.PlaybackSpeed {
         id: playbackSpeedPopup
 
         z: 1
@@ -40,14 +44,16 @@ Widgets.IconControlButton {
         focus: true
         parent: playbackSpeedButton.paintOnly
                 ? playbackSpeedButton // button is not part of main display (ToolbarEditorDialog)
-                : (history.current.view === "player") ? rootPlayer : g_mainDisplay
+                : playbackSpeedButton._isCurrentViewPlayer ? rootPlayer : g_root
+
+        Navigation.parentItem: playbackSpeedButton
 
         onOpened: {
             // update popup coordinates
             //
             // mapFromItem is affected by various properties of source and target objects
             // which can't be represented in a binding expression so a initial setting in
-            // object defination (x: clamp(...)) doesn't work, so we set x and y on initial open
+            // object definition (x: clamp(...)) doesn't work, so we set x and y on initial open
             x = Qt.binding(function () {
                 // coords are mapped through playbackSpeedButton.parent so that binding is generated based on playbackSpeedButton.x
                 var mappedParentCoordinates = parent.mapFromItem(playbackSpeedButton.parent, playbackSpeedButton.x, 0)
@@ -64,14 +70,14 @@ Widgets.IconControlButton {
 
             // player related --
             playerControlLayout.requestLockUnlockAutoHide(true, playerControlLayout)
-            if (!!rootPlayer)
+            if (playbackSpeedButton._isCurrentViewPlayer)
                 rootPlayer.menu = playbackSpeedPopup
         }
 
         onClosed: {
             playerControlLayout.requestLockUnlockAutoHide(false, playerControlLayout)
             playbackSpeedButton.forceActiveFocus()
-            if (!!rootPlayer)
+            if (playbackSpeedButton._isCurrentViewPlayer)
                 rootPlayer.menu = undefined
         }
     }
@@ -79,7 +85,7 @@ Widgets.IconControlButton {
     T.Label {
         anchors.centerIn: parent
         font.pixelSize: VLCStyle.fontSize_normal
-        text: !playbackSpeedButton.paintOnly ? i18n.qtr("%1x").arg(+player.rate.toFixed(2)) : i18n.qtr("1x")
+        text: !playbackSpeedButton.paintOnly ? I18n.qtr("%1x").arg(+Player.rate.toFixed(2)) : I18n.qtr("1x")
         color: playbackSpeedButton.background.foregroundColor // IconToolButton.background is a AnimatedBackground
     }
 }

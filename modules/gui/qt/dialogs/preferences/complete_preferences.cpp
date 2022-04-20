@@ -26,8 +26,6 @@
 #include <QApplication>
 #include <QLabel>
 #include <QTreeWidget>
-#include <QTreeWidgetItem>
-#include <QVariant>
 #include <QString>
 #include <QFont>
 #include <QGroupBox>
@@ -38,10 +36,7 @@
 #include "dialogs/preferences/complete_preferences.hpp"
 #include "dialogs/preferences/preferences_widgets.hpp"
 
-#include <vlc_config_cat.h>
-#include <vlc_intf_strings.h>
 #include <vlc_modules.h>
-#include <vlc_plugin.h>
 #include <assert.h>
 
 #define ITEM_HEIGHT 25
@@ -62,279 +57,262 @@ PrefsTree::PrefsTree( qt_intf_t *_p_intf, QWidget *_parent,
     setTextElideMode( Qt::ElideNone );
 
     setUniformRowHeights( true );
-    CONNECT( this, itemExpanded(QTreeWidgetItem*), this, resizeColumns() );
+    connect( this, &PrefsTree::itemExpanded, this, &PrefsTree::resizeColumns );
 
-    /* Nice icons */
-#define BI( a,b) QIcon a##_icon = QIcon( b )
-    BI( audio, ":/prefsmenu/advanced/audio.svg" );
-    BI( video, ":/prefsmenu/advanced/video.svg" );
-    BI( input, ":/prefsmenu/advanced/codec.svg" );
-    BI( sout, ":/prefsmenu/advanced/sout.svg" );
-    BI( advanced, ":/prefsmenu/advanced/extended.svg" );
-    BI( playlist, ":/prefsmenu/advanced/playlist.svg" );
-    BI( interface, ":/prefsmenu/advanced/intf.svg" );
-#undef BI
+    main_module = module_get_main();
+    assert( main_module );
 
-    /* Build the tree for the main module */
-    module_t *p_module = module_get_main();
+    enum vlc_config_cat cat = CAT_UNKNOWN;
+    enum vlc_config_subcat subcat = SUBCAT_UNKNOWN;
+    QTreeWidgetItem *cat_item = nullptr;
 
-    /* Initialisation and get the confsize */
-    PrefsItemData *data = NULL;
-    PrefsItemData *data_sub = NULL;
-    QTreeWidgetItem *current_item = NULL;
+    /* Create base cat/subcat tree from core config set */
     unsigned confsize;
+    module_t *p_module = main_module;
     module_config_t *const p_config = module_config_get (p_module, &confsize);
-
-    /* Go through the list of conf */
     for( size_t i = 0; i < confsize; i++ )
     {
-        QIcon icon;
-
-        /* Work on a new item */
         module_config_t *p_item = p_config + i;
 
-        switch( p_item->i_type )
-        {
-        /* This is a category */
-        case CONFIG_CATEGORY:
-            if( p_item->value.i == CAT_HIDDEN ) break;
+        if( p_item->i_type != CONFIG_SUBCATEGORY )
+            continue;
 
-            /* PrefsItemData Init */
-            data = new PrefsItemData( this );
-            data->name = qfu( config_CategoryNameGet( p_item->value.i ) );
-            data->help = qfu( config_CategoryHelpGet( p_item->value.i ) );
-            data->i_type = PrefsItemData::TYPE_CATEGORY;
-            data->i_object_id = p_item->value.i;
+        subcat = (enum vlc_config_subcat) p_item->value.i;
+        cat = vlc_config_cat_FromSubcat(subcat);
 
-            /* This is a category, put a nice icon */
-            switch( p_item->value.i )
-            {
-#define CI(a,b) case a: icon = b##_icon;break
-            CI( CAT_AUDIO, audio );
-            CI( CAT_VIDEO, video );
-            CI( CAT_INPUT, input );
-            CI( CAT_SOUT, sout );
-            CI( CAT_ADVANCED, advanced );
-            CI( CAT_PLAYLIST, playlist );
-            CI( CAT_INTERFACE, interface );
-            }
-#undef CI
+        if( cat == CAT_UNKNOWN || cat == CAT_HIDDEN )
+            continue;
 
-            /* Create a new QTreeItem to display it in the tree at top level */
-            current_item = new QTreeWidgetItem();
-            current_item->setText( 0, data->name );
-            current_item->setIcon( 0 , icon );
-            //current_item->setSizeHint( 0, QSize( -1, ITEM_HEIGHT ) );
-            current_item->setData( 0, Qt::UserRole,
-                                   QVariant::fromValue( data ) );
-            addTopLevelItem( current_item );
-            expandItem( current_item );
-            break;
+        /* Create parent cat node? */
+        if( findCatItem(cat) == nullptr )
+            cat_item = createCatNode( cat );
 
-        /* This is a subcategory */
-        case CONFIG_SUBCATEGORY:
-            if( p_item->value.i == SUBCAT_HIDDEN ) break;
-
-            /* Special cases: move the main subcategories to the parent cat*/
-            if( data && vlc_config_subcat_IsGeneral(p_item->value.i) )
-            {
-                /* Data still contains the correct thing */
-                data->i_type = PrefsItemData::TYPE_CATSUBCAT;
-                data->i_subcat_id = p_item->value.i;
-                data->name = qfu( config_CategoryNameGet( p_item->value.i ) );
-                data->help = qfu( config_CategoryHelpGet( p_item->value.i ) );
-                current_item->setData( 0, Qt::UserRole,
-                                       QVariant::fromValue( data ) );
-                continue;
-            }
-
-            /* Normal Subcategories */
-
-            /* Process the Data */
-            data_sub = new PrefsItemData( this );
-            data_sub->name = qfu( config_CategoryNameGet( p_item->value.i) );
-            data_sub->help = qfu( config_CategoryHelpGet( p_item->value.i ) );
-            data_sub->i_type = PrefsItemData::TYPE_SUBCATEGORY;
-            data_sub->i_object_id = p_item->value.i;
-
-            /* Create a new TreeWidget */
-            QTreeWidgetItem *subcat_item = new QTreeWidgetItem();
-            subcat_item->setText( 0, data_sub->name );
-            subcat_item->setData( 0, Qt::UserRole,
-                                  QVariant::fromValue( data_sub ) );
-            //subcat_item->setSizeHint( 0, QSize( -1, ITEM_HEIGHT ) );
-
-            /* Add it to the parent */
-            assert( current_item );
-            current_item->addChild( subcat_item );
-            break;
-
-        /* Other items don't need yet a place on the tree */
-        }
+        // Create subcat node
+        // Note that this is done conditionally, primarily because we must take
+        // no action here for 'general' subcats (which are merged into the
+        // parent category node), but also just out of caution should a mistake
+        // result in more than one instance of a subcat to be present within the
+        // core option set.
+        if( findSubcatItem( subcat ) == nullptr )
+            createSubcatNode( cat_item, subcat );
     }
     module_config_free( p_config );
 
-    /* Build the tree of plugins */
+    /* Add nodes for plugins */
+    /* A plugin gets one node for its entire set, located based on the first used subcat */
     for( size_t i = 0; i < count; i++ )
     {
         p_module = p_list[i];
-        // Main module excluded
-        if( module_is_main( p_module) ) continue;
 
-        unsigned  confsize;
-        int i_subcategory = SUBCAT_UNKNOWN, i_category = CAT_UNKNOWN;
+        /* Main module is already covered above */
+        if( module_is_main( p_module) )
+            continue;
 
-        bool b_options = false;
+        unsigned confsize;
         module_config_t *const p_config = module_config_get (p_module, &confsize);
 
-        /* Loop through the configurations items */
+        /* Get the first (used) subcat */
+        cat = CAT_UNKNOWN;
+        subcat = SUBCAT_UNKNOWN;
+        bool has_options = false;
         for (size_t i = 0; i < confsize; i++)
         {
             const module_config_t *p_item = p_config + i;
 
-            if( p_item->i_type == CONFIG_CATEGORY )
-                i_category = p_item->value.i;
-            else if( p_item->i_type == CONFIG_SUBCATEGORY )
-                i_subcategory = p_item->value.i;
+            if( p_item->i_type == CONFIG_SUBCATEGORY )
+            {
+                subcat = (enum vlc_config_subcat) p_item->value.i;
+                cat = vlc_config_cat_FromSubcat( subcat );
+                continue;
+            }
 
             if( CONFIG_ITEM(p_item->i_type) )
-                b_options = true;
-
-            if( b_options && i_category != CAT_UNKNOWN && i_subcategory != SUBCAT_UNKNOWN )
-                break;
+            {
+                has_options = true;
+                /* If cat lookup worked, we can stop now, else keep looking */
+                if( cat != CAT_UNKNOWN )
+                    break;
+            }
         }
         module_config_free (p_config);
 
-        /* Dummy item, please proceed */
-        if( !b_options || i_category == CAT_UNKNOWN || i_subcategory == SUBCAT_UNKNOWN )
+        /* No options, or definitely no place to place it in the tree - ignore */
+        if( !has_options || cat == CAT_UNKNOWN || cat == CAT_HIDDEN )
             continue;
 
-        // Locate the category item;
-        QTreeWidgetItem *subcat_item = NULL;
-        bool b_found = false;
+        /* Locate the category item */
+        /* If not found (very unlikely), we will create it */
+        cat_item = findCatItem( cat );
+        if ( !cat_item )
+            cat_item = createCatNode( cat );
 
-        for( int i_cat_index = 0 ; i_cat_index < topLevelItemCount();
-                                   i_cat_index++ )
-        {
-            /* Get the treeWidgetItem that correspond to the category */
-            QTreeWidgetItem *cat_item = topLevelItem( i_cat_index );
-            PrefsItemData *data = cat_item->data( 0, Qt::UserRole ).
-                                             value<PrefsItemData *>();
+        /* Locate the subcategory item */
+        /* If not found (was not used in the core option set - quite possible), we will create it */
+        QTreeWidgetItem *subcat_item = findSubcatItem( subcat );
+        if( !subcat_item )
+            subcat_item = createSubcatNode( cat_item, subcat );
 
-            /* If we match the good category */
-            if( data->i_object_id == i_category )
-            {
-                for( int i_sc_index = 0; i_sc_index < cat_item->childCount();
-                         i_sc_index++ )
-                {
-                    subcat_item = cat_item->child( i_sc_index );
-                    PrefsItemData *sc_data = subcat_item->data(0, Qt::UserRole).
-                                                value<PrefsItemData *>();
-                    if( sc_data && sc_data->i_object_id == i_subcategory )
-                    {
-                        b_found = true;
-                        break;
-                    }
-                }
-                if( !b_found )
-                {
-                    subcat_item = cat_item;
-                    b_found = true;
-                }
-                break;
-            }
-        }
-        if( !b_found ) continue;
-
-        PrefsItemData *module_data = new PrefsItemData( this );
-        module_data->i_type = PrefsItemData::TYPE_MODULE;
-        module_data->psz_shortcut = strdup( module_get_object( p_module ) );
-        module_data->name = qfut( module_GetShortName( p_module ) );
-        module_data->help.clear();
-        module_data->p_module = p_module;
-        const char *psz_help = module_get_help( p_module );
-        if ( psz_help )
-            module_data->help = qfut( psz_help );
-
-        QTreeWidgetItem *module_item = new QTreeWidgetItem();
-        module_item->setText( 0, module_data->name );
-        module_item->setData( 0, Qt::UserRole,
-                              QVariant::fromValue( module_data) );
-        //module_item->setSizeHint( 0, QSize( -1, ITEM_HEIGHT ) );
-        subcat_item->addChild( module_item );
+        createPluginNode( subcat_item, p_module );
     }
 
-    /* We got everything, just sort a bit */
+    // We got everything, just sort a bit.
+    // We allow the subcat and plugin nodes to be alphabetical, but we force
+    // the top-level cat nodes into a preferred order.
     sortItems( 0, Qt::AscendingOrder );
+    unsigned index = 0;
+    for (unsigned i = 0; i < ARRAY_SIZE(categories_array); i++)
+    {
+        cat_item = findCatItem( categories_array[i].id );
+        if ( cat_item == NULL )
+            continue;
+        unsigned cur_index = (unsigned)indexOfTopLevelItem( cat_item );
+        if (cur_index != index)
+        {
+            insertTopLevelItem( index, takeTopLevelItem( cur_index ) );
+            expandItem( cat_item );
+        }
+        ++index;
+    }
 
     resizeColumnToContents( 0 );
 }
 
+QTreeWidgetItem *PrefsTree::createCatNode( enum vlc_config_cat cat )
+{
+    enum vlc_config_subcat general_subcat = vlc_config_cat_GetGeneralSubcat( cat );
+    assert(general_subcat != SUBCAT_UNKNOWN && general_subcat != SUBCAT_HIDDEN);
+
+    PrefsTreeItem *item = new PrefsTreeItem( PrefsTreeItem::CATEGORY_NODE );
+
+    item->cat_id = cat;
+    item->subcat_id = general_subcat;
+    item->p_module = this->main_module;
+    item->name = qfu( vlc_config_subcat_GetName( general_subcat ) );
+    item->help = qfu( vlc_config_subcat_GetHelp( general_subcat ) );
+
+    QIcon icon;
+    switch( cat )
+    {
+#define CI(a,b) case a: icon = QIcon( b );break
+        CI( CAT_AUDIO,     ":/prefsmenu/advanced/audio.svg"    );
+        CI( CAT_VIDEO,     ":/prefsmenu/advanced/video.svg"    );
+        CI( CAT_INPUT,     ":/prefsmenu/advanced/codec.svg"    );
+        CI( CAT_SOUT,      ":/prefsmenu/advanced/sout.svg"     );
+        CI( CAT_ADVANCED,  ":/prefsmenu/advanced/extended.svg" );
+        CI( CAT_PLAYLIST,  ":/prefsmenu/advanced/playlist.svg" );
+        CI( CAT_INTERFACE, ":/prefsmenu/advanced/intf.svg"     );
+#undef CI
+        default: break;
+    }
+
+    item->setText( 0, qfu( vlc_config_cat_GetName( cat ) ) );
+    item->setIcon( 0, icon );
+    //current_item->setSizeHint( 0, QSize( -1, ITEM_HEIGHT ) );
+
+    int cat_index = (int) vlc_config_cat_IndexOf( cat );
+    int general_subcat_index = (int) vlc_config_subcat_IndexOf( general_subcat );
+    this->catMap[cat_index] = item;
+    this->subcatMap[general_subcat_index] = item;
+
+    addTopLevelItem( item );
+    expandItem( item );
+
+    return item;
+}
+
+QTreeWidgetItem *PrefsTree::createSubcatNode( QTreeWidgetItem * cat, enum vlc_config_subcat subcat )
+{
+    assert( cat );
+
+    PrefsTreeItem *item = new PrefsTreeItem( PrefsTreeItem::SUBCATEGORY_NODE );
+
+    item->cat_id = CAT_UNKNOWN;
+    item->subcat_id = subcat;
+    item->p_module = this->main_module;
+    item->name = qfu( vlc_config_subcat_GetName( subcat ) );
+    item->help = qfu( vlc_config_subcat_GetHelp( subcat ) );
+
+    item->setText( 0, item->name );
+    //item->setSizeHint( 0, QSize( -1, ITEM_HEIGHT ) );
+
+    int subcat_index = (int) vlc_config_subcat_IndexOf( subcat );
+    this->subcatMap[subcat_index] = item;
+
+    cat->addChild( item );
+
+    return item;
+}
+
+void PrefsTree::createPluginNode( QTreeWidgetItem * parent, module_t *mod )
+{
+    assert( parent );
+
+    PrefsTreeItem *item = new PrefsTreeItem( PrefsTreeItem::PLUGIN_NODE );
+
+    item->cat_id = CAT_UNKNOWN;
+    item->subcat_id = SUBCAT_UNKNOWN;
+    item->p_module = mod;
+    item->module_name = strdup( module_get_object( mod ) );
+    item->name = qfut( module_get_name( mod, false ) );
+    const char *help = module_get_help( mod );
+    if( help )
+        item->help = qfut( help );
+    else
+        item->help.clear();
+
+    item->setText( 0, item->name );
+    //item->setSizeHint( 0, QSize( -1, ITEM_HEIGHT ) );
+
+    parent->addChild( item );
+}
+
+QTreeWidgetItem *PrefsTree::findCatItem( enum vlc_config_cat cat )
+{
+    int cat_index = vlc_config_cat_IndexOf( cat );
+    return this->catMap[cat_index];
+}
+
+QTreeWidgetItem *PrefsTree::findSubcatItem( enum vlc_config_subcat subcat )
+{
+    int subcat_index = vlc_config_subcat_IndexOf( subcat );
+    return this->subcatMap[subcat_index];
+}
+
 void PrefsTree::applyAll()
-{
-    doAll( false );
-}
-
-void PrefsTree::cleanAll()
-{
-    doAll( true );
-}
-
-void PrefsTree::doAll( bool doclean )
 {
     for( int i_cat_index = 0 ; i_cat_index < topLevelItemCount();
              i_cat_index++ )
     {
-        QTreeWidgetItem *cat_item = topLevelItem( i_cat_index );
+        PrefsTreeItem *cat_item = topLevelItem( i_cat_index );
         for( int i_sc_index = 0; i_sc_index < cat_item->childCount();
                  i_sc_index++ )
         {
-            QTreeWidgetItem *sc_item = cat_item->child( i_sc_index );
-            for( int i_module = 0 ; i_module < sc_item->childCount();
+            PrefsTreeItem *subcat_item = cat_item->child( i_sc_index );
+            for( int i_module = 0 ; i_module < subcat_item->childCount();
                      i_module++ )
             {
-                PrefsItemData *data = sc_item->child( i_module )->
-                               data( 0, Qt::UserRole).value<PrefsItemData *>();
-                if( data->panel && doclean )
-                {
-                    delete data->panel;
-                    data->panel = NULL;
-                }
-                else if( data->panel )
-                    data->panel->apply();
+                PrefsTreeItem *mod_item = subcat_item->child( i_module );
+                if( mod_item->panel )
+                    mod_item->panel->apply();
             }
-            PrefsItemData *data = sc_item->data( 0, Qt::UserRole).
-                                            value<PrefsItemData *>();
-            if( data->panel && doclean )
-            {
-                delete data->panel;
-                data->panel = NULL;
-            }
-            else if( data->panel )
-                data->panel->apply();
+            if( subcat_item->panel )
+                subcat_item->panel->apply();
         }
-        PrefsItemData *data = cat_item->data( 0, Qt::UserRole).
-                                            value<PrefsItemData *>();
-        if( data->panel && doclean )
-        {
-            delete data->panel;
-            data->panel = NULL;
-        }
-        else if( data->panel )
-            data->panel->apply();
+        if( cat_item->panel )
+            cat_item->panel->apply();
     }
 }
 
 /* apply filter on tree item and recursively on its sub items
  * returns whether the item was filtered */
-bool PrefsTree::filterItems( QTreeWidgetItem *item, const QString &text,
+bool PrefsTree::filterItems( PrefsTreeItem *item, const QString &text,
                            Qt::CaseSensitivity cs )
 {
     bool sub_filtered = true;
 
     for( int i = 0; i < item->childCount(); i++ )
     {
-        QTreeWidgetItem *sub_item = item->child( i );
+        PrefsTreeItem *sub_item = item->child( i );
         if ( !filterItems( sub_item, text, cs ) )
         {
             /* not all the sub items were filtered */
@@ -342,39 +320,19 @@ bool PrefsTree::filterItems( QTreeWidgetItem *item, const QString &text,
         }
     }
 
-    PrefsItemData *data = item->data( 0, Qt::UserRole ).value<PrefsItemData *>();
-
-    bool filtered = sub_filtered && !data->contains( text, cs );
-    if ( b_show_only_loaded && sub_filtered && !data->b_loaded )
+    bool filtered = sub_filtered && !item->contains( text, cs );
+    if ( b_show_only_loaded && sub_filtered && !item->module_is_loaded )
         filtered = true;
-    item->setExpanded( !sub_filtered );
     item->setHidden( filtered );
 
     return filtered;
 }
 
-
-/* collapse item if it's not selected or one of its sub items
- * returns whether the item was collapsed */
-bool PrefsTree::collapseUnselectedItems( QTreeWidgetItem *item )
+void PrefsTree::unfilterItems( PrefsTreeItem *item )
 {
-    bool sub_collapsed = true;
-
-    for( int i = 0; i < item->childCount(); i++ )
-    {
-        QTreeWidgetItem *sub_item = item->child( i );
-        if ( !collapseUnselectedItems( sub_item ) )
-        {
-            /* not all the sub items were collapsed */
-            sub_collapsed = false;
-        }
-    }
-
-    bool collapsed = sub_collapsed && !item->isSelected();
-    item->setExpanded( !sub_collapsed );
     item->setHidden( false );
-
-    return collapsed;
+    for( int i = 0; i < item->childCount(); i++ )
+        unfilterItems( item->child( i ) );
 }
 
 static void populateLoadedSet( QSet<QString> *loaded, vlc_object_t *p_node )
@@ -405,9 +363,9 @@ static void populateLoadedSet( QSet<QString> *loaded, vlc_object_t *p_node )
     delete[] tab;
 }
 
-/* Updates the PrefsItemData loaded status to reflect currently
+/* Updates the plugin node 'loaded' status to reflect currently
  * running modules */
-void PrefsTree::updateLoadedStatus( QTreeWidgetItem *item = NULL,
+void PrefsTree::updateLoadedStatus( PrefsTreeItem *item = NULL,
                                     QSet<QString> *loaded = NULL )
 {
     bool b_release = false;
@@ -427,9 +385,8 @@ void PrefsTree::updateLoadedStatus( QTreeWidgetItem *item = NULL,
     }
     else
     {
-        PrefsItemData *data = item->data( 0, Qt::UserRole )
-                .value<PrefsItemData *>();
-        data->b_loaded = loaded->contains( QString( data->psz_shortcut ) );
+        if( item->node_type == PrefsTreeItem::PLUGIN_NODE )
+            item->module_is_loaded = loaded->contains( QString( item->module_name ) );
 
         for( int i = 0; i < item->childCount(); i++ )
             updateLoadedStatus( item->child( i ), loaded );
@@ -448,15 +405,11 @@ void PrefsTree::filter( const QString &text )
 
     for( int i = 0 ; i < topLevelItemCount(); i++ )
     {
-        QTreeWidgetItem *cat_item = topLevelItem( i );
+        PrefsTreeItem *cat_item = topLevelItem( i );
         if ( clear_filter )
-        {
-            collapseUnselectedItems( cat_item );
-        }
+            unfilterItems( cat_item );
         else
-        {
             filterItems( cat_item, text, Qt::CaseInsensitive );
-        }
     }
 }
 
@@ -471,39 +424,24 @@ void PrefsTree::resizeColumns()
     resizeColumnToContents( 0 );
 }
 
-PrefsItemData::PrefsItemData( QObject *_parent ) : QObject( _parent )
+PrefsTreeItem::PrefsTreeItem( PrefsTreeItemType ty ) : QTreeWidgetItem(ty)
 {
-    panel = NULL;
-    i_object_id = 0;
-    i_subcat_id = SUBCAT_UNKNOWN;
-    psz_shortcut = NULL;
-    b_loaded = false;
+    node_type = ty;
+    panel = nullptr;
+    cat_id = CAT_UNKNOWN;
+    subcat_id = SUBCAT_UNKNOWN;
+    p_module = nullptr;
+    module_name = nullptr;
+    module_is_loaded = false;
 }
 
-/* go over the module config items and search text in psz_text
- * also search the module name and head */
-bool PrefsItemData::contains( const QString &text, Qt::CaseSensitivity cs )
+/* go over the config items and search text in psz_text
+ * also search the node name and head */
+bool PrefsTreeItem::contains( const QString &text, Qt::CaseSensitivity cs )
 {
-    if( this->i_type == TYPE_CATEGORY )
-        return false;
-
-    bool is_core = this->i_type != TYPE_MODULE;
-    int id = SUBCAT_UNKNOWN;
-
-    /* find our module */
-    module_t *p_module;
-    if( !is_core )
-        p_module = this->p_module;
-    else
-    {
-        p_module = module_get_main();
-        assert( p_module );
-
-        if( this->i_type == TYPE_SUBCATEGORY )
-            id = this->i_object_id;
-        else // TYPE_CATSUBCAT
-            id = this->i_subcat_id;
-    }
+    bool is_core = this->node_type != PrefsTreeItem::PLUGIN_NODE;
+    enum vlc_config_subcat id = this->subcat_id;
+    module_t *p_module = this->p_module;
 
     /* check the node itself (its name/longname/helptext) */
 
@@ -521,7 +459,7 @@ bool PrefsItemData::contains( const QString &text, Qt::CaseSensitivity cs )
         return true;
     }
 
-    /* check options belonging to this subcat or module */
+    /* check options belonging to this core subcat or plugin */
 
     unsigned confsize;
     module_config_t *const p_config = module_config_get (p_module, &confsize),
@@ -553,13 +491,13 @@ bool PrefsItemData::contains( const QString &text, Qt::CaseSensitivity cs )
 
     do
     {
-        if ( p_item->i_type == CONFIG_CATEGORY || p_item->i_type == CONFIG_SUBCATEGORY )
+        if ( p_item->i_type == CONFIG_SUBCATEGORY )
         {
-            /* for core, if we hit a cat or subcat, stop */
+            /* for core, if we hit a subcat, stop */
             if ( is_core )
                 break;
-            /* a module's options are grouped under one node; we can/should
-               ignore all cat/subcat entries. */
+            /* a plugin's options are grouped under one node; we can/should
+               ignore all other subcat entries. */
             continue;
         }
 
@@ -584,62 +522,41 @@ end:
  *********************************************************************/
 
 AdvPrefsPanel::AdvPrefsPanel( qt_intf_t *_p_intf, QWidget *_parent,
-                        PrefsItemData * data ) :
+                        PrefsTreeItem * node ) :
                         QWidget( _parent ), p_intf( _p_intf )
 {
-    /* Find our module */
-    module_t *p_module = NULL;
-    p_config = NULL;
-    if( data->i_type == PrefsItemData::TYPE_CATEGORY )
-        return;
-    else if( data->i_type == PrefsItemData::TYPE_MODULE )
-        p_module = data->p_module;
-    else
-    {
-        p_module = module_get_main();
-        assert( p_module );
-    }
+    module_t *p_module = node->p_module;
 
     unsigned confsize;
     p_config = module_config_get( p_module, &confsize );
     module_config_t *p_item = p_config,
                     *p_end = p_config + confsize;
 
-    if( data->i_type == PrefsItemData::TYPE_SUBCATEGORY ||
-        data->i_type == PrefsItemData::TYPE_CATSUBCAT )
+    QString heading;
+
+    if( node->node_type != PrefsTreeItem::PLUGIN_NODE  )
     {
+        heading = QString( node->name );
+        /* Skip to the relevant part of the core config */
         while (p_item < p_end)
         {
             if(  p_item->i_type == CONFIG_SUBCATEGORY &&
-                 ( ( data->i_type == PrefsItemData::TYPE_SUBCATEGORY &&
-                     p_item->value.i == data->i_object_id ) ||
-                   ( data->i_type == PrefsItemData::TYPE_CATSUBCAT &&
-                     p_item->value.i == data->i_subcat_id ) ) )
+                 p_item->value.i == node->subcat_id )
                 break;
             p_item++;
         }
+        p_item++; // Skip past the subcat entry itself
+    }
+    else
+    {
+        heading = QString( qfut( module_GetLongName( p_module ) ) );
     }
 
     /* Widgets now */
     global_layout = new QVBoxLayout();
     global_layout->setMargin( 2 );
-    QString head;
-    QString help;
 
-    help = QString( data->help );
-
-    if( data->i_type == PrefsItemData::TYPE_SUBCATEGORY ||
-        data->i_type == PrefsItemData::TYPE_CATSUBCAT )
-    {
-        head = QString( data->name );
-        p_item++; // Why that ?
-    }
-    else
-    {
-        head = QString( qfut( module_GetLongName( p_module ) ) );
-    }
-
-    QLabel *titleLabel = new QLabel( head );
+    QLabel *titleLabel = new QLabel( heading );
     QFont titleFont = QApplication::font();
     titleFont.setPointSize( titleFont.pointSize() + 6 );
     titleLabel->setFont( titleFont );
@@ -649,7 +566,7 @@ AdvPrefsPanel::AdvPrefsPanel( qt_intf_t *_p_intf, QWidget *_parent,
     title_line->setFrameShape(QFrame::HLine);
     title_line->setFrameShadow(QFrame::Sunken);
 
-    QLabel *helpLabel = new QLabel( help, this );
+    QLabel *helpLabel = new QLabel( node->help, this );
     helpLabel->setWordWrap( true );
 
     global_layout->addWidget( titleLabel );
@@ -667,15 +584,15 @@ AdvPrefsPanel::AdvPrefsPanel( qt_intf_t *_p_intf, QWidget *_parent,
     int i_line = 0, i_boxline = 0;
     bool has_hotkey = false;
 
-    if( p_item ) do
+    if( p_item ) for ( ; p_item < p_end; ++p_item)
     {
-        if( ( ( data->i_type == PrefsItemData::TYPE_SUBCATEGORY &&
-                p_item->value.i != data->i_object_id ) ||
-              ( data->i_type == PrefsItemData::TYPE_CATSUBCAT  &&
-                p_item->value.i != data->i_subcat_id ) ) &&
-            ( p_item->i_type == CONFIG_CATEGORY ||
-              p_item->i_type == CONFIG_SUBCATEGORY ) )
-            break;
+        if( p_item->i_type == CONFIG_SUBCATEGORY )
+        {
+            if( node->node_type == PrefsTreeItem::PLUGIN_NODE )
+                continue;
+            else
+                break;
+        }
 
         if( p_item->i_type == CONFIG_SECTION )
         {
@@ -691,6 +608,7 @@ AdvPrefsPanel::AdvPrefsPanel( qt_intf_t *_p_intf, QWidget *_parent,
             box->hide();
             boxlayout = new QGridLayout();
         }
+
         /* Only one hotkey control */
         if( p_item->i_type == CONFIG_ITEM_KEY )
         {
@@ -713,11 +631,6 @@ AdvPrefsPanel::AdvPrefsPanel( qt_intf_t *_p_intf, QWidget *_parent,
         else i_line++;
         controls.append( control );
     }
-    while( !( ( data->i_type == PrefsItemData::TYPE_SUBCATEGORY ||
-               data->i_type == PrefsItemData::TYPE_CATSUBCAT ) &&
-             ( p_item->i_type == CONFIG_CATEGORY ||
-               p_item->i_type == CONFIG_SUBCATEGORY ) )
-        && ( ++p_item < p_end ) );
 
     if( box && i_boxline > 0 )
     {

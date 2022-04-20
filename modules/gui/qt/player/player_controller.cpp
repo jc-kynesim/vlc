@@ -32,11 +32,9 @@
 #include <vlc_cxx_helpers.hpp>
 #include <vlc_vout.h>
 
-#include <QApplication>
 #include <QFile>
 #include <QDir>
 #include <QSignalMapper>
-#include <QMessageBox>
 
 #include <assert.h>
 
@@ -1096,9 +1094,10 @@ PlayerController::PlayerController( qt_intf_t *_p_intf )
 {
     /* Audio Menu */
     menusAudioMapper = new QSignalMapper(this);
-    CONNECT( menusAudioMapper, mapped(const QString&), this, menusUpdateAudio(const QString&) );
-    CONNECT( &d_ptr->m_position_timer, timeout(), this, updatePositionFromTimer() );
-    CONNECT( &d_ptr->m_time_timer, timeout(), this, updateTimeFromTimer() );
+    connect( menusAudioMapper, QSIGNALMAPPER_MAPPEDSTR_SIGNAL,
+             this, &PlayerController::menusUpdateAudio );
+    connect( &d_ptr->m_position_timer, &QTimer::timeout, this, &PlayerController::updatePositionFromTimer );
+    connect( &d_ptr->m_time_timer, &QTimer::timeout, this, &PlayerController::updateTimeFromTimer );
 
     input_fetcher_cbs.on_art_fetch_ended = onArtFetchEnded_callback;
 }
@@ -1108,6 +1107,13 @@ PlayerController::~PlayerController()
 }
 
 // PLAYBACK
+
+vlc_player_t * PlayerController::getPlayer() const
+{
+    Q_D(const PlayerController);
+
+    return d->m_player;
+}
 
 input_item_t *PlayerController::getInput()
 {

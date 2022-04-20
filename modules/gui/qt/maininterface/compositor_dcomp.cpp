@@ -149,7 +149,7 @@ bool CompositorDirectComposition::preInit(qt_intf_t * p_intf)
         requestedFeatureLevels,
         ARRAY_SIZE(requestedFeatureLevels),
         D3D11_SDK_VERSION,
-        d3dDevice.GetAddressOf(),
+        &d3dDevice,
         nullptr,    // Actual feature level
         nullptr);
 
@@ -227,7 +227,7 @@ bool CompositorDirectComposition::init()
         requestedFeatureLevels,
         ARRAY_SIZE(requestedFeatureLevels),
         D3D11_SDK_VERSION,
-        m_d3d11Device.GetAddressOf(),
+        &m_d3d11Device,
         nullptr,    // Actual feature level
         nullptr);
 
@@ -371,7 +371,7 @@ void CompositorDirectComposition::addVisual(Microsoft::WRL::ComPtr<IDComposition
 {
     vlc_assert(m_rootVisual);
 
-    HRESULT hr = m_rootVisual->AddVisual(visual.Get(), FALSE, m_videoVisual ? m_videoVisual.Get() : m_uiVisual.Get());
+    HRESULT hr = m_rootVisual->AddVisual(visual.Get(), TRUE, NULL);
     if (FAILED(hr))
         msg_Err(m_intf, "failed to add visual, code: 0x%lX", hr);
 
@@ -385,6 +385,11 @@ void CompositorDirectComposition::removeVisual(Microsoft::WRL::ComPtr<IDComposit
         msg_Err(m_intf, "failed to remove visual, code: 0x%lX", hr);
 
     m_dcompDevice->Commit();
+}
+
+QQuickItem * CompositorDirectComposition::activeFocusItem() const /* override */
+{
+    return m_uiSurface->activeFocusItem();
 }
 
 }

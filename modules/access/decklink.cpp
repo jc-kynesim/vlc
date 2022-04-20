@@ -111,7 +111,6 @@ static const char *const ppsz_audioconns_text[] = {
 vlc_module_begin ()
     set_shortname(N_("DeckLink"))
     set_description(N_("Blackmagic DeckLink SDI input"))
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_ACCESS)
 
     add_integer("decklink-card-index", 0,
@@ -254,15 +253,16 @@ public:
     {
         m_ref_.store(1);
     }
+    virtual ~DeckLinkCaptureDelegate() = default;
 
-    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID, LPVOID *) { return E_NOINTERFACE; }
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID, LPVOID *) override { return E_NOINTERFACE; }
 
-    virtual ULONG STDMETHODCALLTYPE AddRef(void)
+    ULONG STDMETHODCALLTYPE AddRef(void) override
     {
         return m_ref_.fetch_add(1);
     }
 
-    virtual ULONG STDMETHODCALLTYPE Release(void)
+    ULONG STDMETHODCALLTYPE Release(void) override
     {
         uintptr_t new_ref = m_ref_.fetch_sub(1);
         if (new_ref == 0)
@@ -270,7 +270,10 @@ public:
         return new_ref;
     }
 
-    virtual HRESULT STDMETHODCALLTYPE VideoInputFormatChanged(BMDVideoInputFormatChangedEvents events, IDeckLinkDisplayMode *mode, BMDDetectedVideoInputFormatFlags flags)
+    HRESULT STDMETHODCALLTYPE
+    VideoInputFormatChanged(BMDVideoInputFormatChangedEvents events,
+                            IDeckLinkDisplayMode *mode,
+                             BMDDetectedVideoInputFormatFlags flags) override
     {
         demux_sys_t *sys = static_cast<demux_sys_t *>(demux_->p_sys);
 
@@ -317,7 +320,9 @@ public:
         return S_OK;
     }
 
-    virtual HRESULT STDMETHODCALLTYPE VideoInputFrameArrived(IDeckLinkVideoInputFrame*, IDeckLinkAudioInputPacket*);
+    HRESULT STDMETHODCALLTYPE
+    VideoInputFrameArrived(IDeckLinkVideoInputFrame*,
+                           IDeckLinkAudioInputPacket*) override;
 
 private:
     std::atomic_uint m_ref_;
@@ -540,6 +545,7 @@ static int Open(vlc_object_t *p_this)
     int         physical_channels = 0;
     int         rate;
     BMDVideoInputFlags flags = bmdVideoInputFlagDefault;
+    void *pv;
 
     if (demux->out == NULL)
         return VLC_EGENERIC;
@@ -588,21 +594,24 @@ static int Open(vlc_object_t *p_this)
     msg_Dbg(demux, "Opened DeckLink PCI card %d (%s)", card_index, model_name);
     free(model_name);
 
-    if (sys->card->QueryInterface(IID_IDeckLinkInput, (void**)&sys->input) != S_OK) {
+    if (sys->card->QueryInterface(IID_IDeckLinkInput, &pv) != S_OK) {
         msg_Err(demux, "Card has no inputs");
         goto finish;
     }
+    sys->input = static_cast<IDeckLinkInput*>(pv);
 
     /* Set up the video and audio sources. */
-    if (sys->card->QueryInterface(IID_IDeckLinkConfiguration, (void**)&sys->config) != S_OK) {
+    if (sys->card->QueryInterface(IID_IDeckLinkConfiguration, &pv) != S_OK) {
         msg_Err(demux, "Failed to get configuration interface");
         goto finish;
     }
+    sys->config = static_cast<IDeckLinkConfiguration*>(pv);
 
-    if (sys->card->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&sys->attributes) != S_OK) {
+    if (sys->card->QueryInterface(IID_IDeckLinkProfileAttributes, &pv) != S_OK) {
         msg_Err(demux, "Failed to get attributes interface");
         goto finish;
     }
+    sys->attributes = static_cast<IDeckLinkProfileAttributes*>(pv);
 
     if (GetVideoConn(demux) || GetAudioConn(demux))
         goto finish;

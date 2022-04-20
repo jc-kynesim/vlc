@@ -92,7 +92,6 @@ static void DemuxClose( vlc_object_t * );
 vlc_module_begin()
     set_description( N_("SDI Input") )
     set_shortname( N_("SDI") )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACCESS )
 
     add_integer( "linsys-sdi-link", 0,
@@ -1284,7 +1283,7 @@ static void HandleAudioConfig( demux_t *p_demux, const uint16_t *p_anc,
                         p_audio->i_delay = i_tmp;
                 }
                 if ( p_anc[13] & 0x1 )
-                    msg_Warn( p_demux, "asymetric audio is not supported" );
+                    msg_Warn( p_demux, "asymmetric audio is not supported" );
             }
             else
             {
@@ -1300,7 +1299,7 @@ static void HandleAudioConfig( demux_t *p_demux, const uint16_t *p_anc,
                         p_audio->i_delay = i_tmp;
                 }
                 if ( p_anc[10] & 0x1 )
-                    msg_Warn( p_demux, "asymetric audio is not supported" );
+                    msg_Warn( p_demux, "asymmetric audio is not supported" );
             }
 
             switch ( i_rate )

@@ -46,8 +46,6 @@ ifeq ($(ARCH)-$(HAVE_WIN32),aarch64-1)
 HAVE_WIN64 := 1
 endif
 
-need_pkg = $(shell $(PKG_CONFIG) $(1) || echo 1)
-
 ifeq ($(findstring mingw32,$(BUILD)),mingw32)
 MSYS_BUILD := 1
 endif
@@ -58,61 +56,40 @@ endif
 #
 # Default values for tools
 #
-ifndef HAVE_CROSS_COMPILE
+ifdef HAVE_CROSS_COMPILE
+MAYBEHOST := $(HOST)-
+else
+MAYBEHOST :=
+endif
 ifneq ($(findstring $(origin CC),undefined default),)
-CC := gcc
+CC := $(MAYBEHOST)gcc
 endif
 ifneq ($(findstring $(origin CXX),undefined default),)
-CXX := g++
+CXX := $(MAYBEHOST)g++
 endif
 ifneq ($(findstring $(origin LD),undefined default),)
-LD := ld
+LD := $(MAYBEHOST)ld
 endif
 ifneq ($(findstring $(origin AR),undefined default),)
-AR := ar
-endif
-NM ?= nm
-RANLIB ?= ranlib
-STRIP ?= strip
-WIDL ?= widl
-WINDRES ?= windres
-PKG_CONFIG ?= pkg-config
+ifeq ($(shell $(MAYBEHOST)gcc-ar --version >/dev/null 2>&1 || echo Prehistory),)
+AR := $(MAYBEHOST)gcc-ar
 else
-ifneq ($(findstring $(origin CC),undefined default),)
-CC := $(HOST)-gcc
+AR := $(MAYBEHOST)ar
 endif
-ifneq ($(findstring $(origin CXX),undefined default),)
-CXX := $(HOST)-g++
 endif
-ifneq ($(findstring $(origin LD),undefined default),)
-LD := $(HOST)-ld
-endif
-ifneq ($(findstring $(origin AR),undefined default),)
-AR := $(HOST)-ar
-endif
-NM ?= $(HOST)-nm
-RANLIB ?= $(HOST)-ranlib
-STRIP ?= $(HOST)-strip
-WIDL ?= $(HOST)-widl
-WINDRES ?= $(HOST)-windres
-
-# On Debian x86_64-w64-mingw32-pkg-config exists, runs but returns an error when checking packages
-ifeq ($(shell unset PKG_CONFIG_LIBDIR; $(HOST)-pkg-config --version 1>/dev/null 2>/dev/null || echo FAIL),)
-PKG_CONFIG ?= $(HOST)-pkg-config
+ifeq ($(shell $(MAYBEHOST)gcc-nm --version >/dev/null 2>&1 || echo Prehistory),)
+NM ?= $(MAYBEHOST)gcc-nm
 else
-# Use the regular pkg-config and set some PKG_CONFIG_LIBDIR ourselves
-PKG_CONFIG = pkg-config
-ifeq ($(findstring $(origin PKG_CONFIG_LIBDIR),undefined),)
-# an extra PKG_CONFIG_LIBDIR was provided, use it prioritarily
-PKG_CONFIG_LIBDIR := $(PKG_CONFIG_LIBDIR):/usr/$(HOST)/lib/pkgconfig:/usr/lib/$(HOST)/pkgconfig
+NM ?= $(MAYBEHOST)nm
+endif
+ifeq ($(shell $(MAYBEHOST)gcc-ranlib --version >/dev/null 2>&1 || echo Prehistory),)
+RANLIB ?= $(MAYBEHOST)gcc-ranlib
 else
-PKG_CONFIG_LIBDIR := /usr/$(HOST)/lib/pkgconfig:/usr/lib/$(HOST)/pkgconfig
+RANLIB ?= $(MAYBEHOST)ranlib
 endif
-export PKG_CONFIG_LIBDIR
-need_pkg = $(shell PKG_CONFIG_LIBDIR=$(PKG_CONFIG_LIBDIR) $(PKG_CONFIG) $(1) || echo 1)
-endif
-
-endif
+STRIP ?= $(MAYBEHOST)strip
+WIDL ?= $(MAYBEHOST)widl
+WINDRES ?= $(MAYBEHOST)windres
 
 ifdef HAVE_ANDROID
 ifneq ($(findstring $(origin CC),undefined default),)
@@ -150,11 +127,12 @@ endif
 
 LN_S = ln -s
 ifdef HAVE_WIN32
-ifneq ($(shell $(CC) $(CFLAGS) -E -dM -include _mingw.h - < /dev/null | grep -E __MINGW64_VERSION_MAJOR),)
+MINGW_W64_VERSION := $(shell echo "__MINGW64_VERSION_MAJOR" | $(CC) $(CFLAGS) -E -include _mingw.h - | tail -n 1)
+ifneq ($(MINGW_W64_VERSION),)
 HAVE_MINGW_W64 := 1
-MINGW_W64_VERSION := $(shell $(CC) $(CFLAGS) -E -dM -include _mingw.h - < /dev/null | grep -E 'define\s__MINGW64_VERSION_MAJOR' | sed -e 's/\#define\s__MINGW64_VERSION_MAJOR\s//')
-HAVE_MINGW64_V8 := $(shell [ $(MINGW_W64_VERSION) -gt 7 ] && echo true)
+mingw_at_least = $(shell [ $(MINGW_W64_VERSION) -gt $(1) ] && echo true)
 endif
+HAVE_WINPTHREAD := $(shell $(CC) $(CFLAGS) -E -dM -include pthread.h - < /dev/null >/dev/null 2>&1 || echo FAIL)
 ifndef HAVE_CROSS_COMPILE
 LN_S = cp -R
 endif
@@ -196,7 +174,39 @@ endif
 endif
 endif
 
-# Do not export those! Use HOSTVARS.
+ifeq ($(shell gcc --version >/dev/null 2>&1 || echo No GCC),)
+BUILDCC ?= gcc
+BUILDCXX ?= g++
+ifeq ($(shell gcc-ar --version >/dev/null 2>&1 || echo Prehistoric GCC),)
+BUILDAR ?= gcc-ar
+BUILDNM ?= gcc-nm
+BUILDRANLIB ?= gcc-ranlib
+endif
+else ifeq ($(shell clang --version >/dev/null 2>&1 || No LLVM/Clang),)
+BUILDCC ?= clang
+BUILDCXX ?= clang++
+ifeq ($(shell llvm-ar --version >/dev/null 2>&1 || echo Prehistoric LLVM),)
+BUILDAR ?= llvm-ar
+BUILDNM ?= llvm-nm
+BUILDRANLIB ?= llvm-ranlib
+BUILDSTRIP ?= llvm-strip
+endif
+endif
+
+BUILDCC ?= cc
+BUILDCXX ?= c++
+BUILDLD ?= $(BUILDCC)
+BUILDAR ?= ar
+BUILDNM ?= nm
+BUILDRANLIB ?= ranlib
+BUILDSTRIP ?= strip
+
+BUILDCPPFLAGS ?=
+BUILDCFLAGS ?= -O2
+BUILDCXXFLAGS ?= $(BUILDCFLAGS)
+BUILDLDFLAGS ?= $(BUILDCFLAGS)
+
+# Do not export variables above! Use HOSTVARS or BUILDVARS.
 
 # Do the FPU detection, after we have figured out our compilers and flags.
 ifneq ($(findstring $(ARCH),aarch64 i386 ppc ppc64 sparc sparc64 x86_64),)
@@ -207,6 +217,10 @@ ifneq ($(call cppcheck, __VFP_FP__)),)
 ifeq ($(call cppcheck, __SOFTFP__),)
 HAVE_FPU = 1
 endif
+endif
+else ifneq ($(filter riscv%, $(ARCH)),)
+ifneq ($(call cppcheck, __riscv_flen),)
+HAVE_FPU = 1
 endif
 else ifneq ($(call cppcheck, __mips_hard_float),)
 HAVE_FPU = 1
@@ -222,11 +236,22 @@ export ACLOCAL_AMFLAGS
 # Tools #
 #########
 
+need_pkg = $(shell $(PKG_CONFIG) $(1) || echo 1)
+
 ifdef HAVE_CROSS_COMPILE
-# This inhibits .pc file from within the cross-compilation toolchain sysroot.
-# Hopefully, nobody ever needs that.
-PKG_CONFIG_PATH := /usr/share/pkgconfig
+# Use pkg-config cross-tool if it actually works
+ifeq ($(shell unset PKG_CONFIG_LIBDIR; $(HOST)-pkg-config --version 1>/dev/null 2>/dev/null || echo FAIL),)
+PKG_CONFIG ?= $(HOST)-pkg-config
+else
+# Use the regular pkg-config and set some PKG_CONFIG_LIBDIR ourselves
+PKG_CONFIG_LIBDIR ?= /usr/$(HOST)/lib/pkgconfig:/usr/lib/$(HOST)/pkgconfig:/usr/share/pkgconfig
+export PKG_CONFIG_LIBDIR
+need_pkg = $(shell PKG_CONFIG_LIBDIR=$(PKG_CONFIG_LIBDIR) $(PKG_CONFIG) $(1) || echo 1)
 endif
+endif # HAVE_CROSS_COMPILE
+
+PKG_CONFIG ?= pkg-config
+
 PKG_CONFIG_PATH := $(PREFIX)/lib/pkgconfig:$(PKG_CONFIG_PATH)
 ifeq ($(findstring mingw32,$(BUILD)),mingw32)
 PKG_CONFIG_PATH := $(shell cygpath -pm ${PKG_CONFIG_PATH})
@@ -254,7 +279,7 @@ download = (rm -f $@.tmp && \
 	wget --passive -c -p -O $@.tmp "$(1)" && \
 	touch $@.tmp && \
 	mv $@.tmp $@ )
-else ifeq ($(which fetch >/dev/null 2>&1 || echo FAIL),)
+else ifeq ($(command -v fetch >/dev/null 2>&1 || echo FAIL),)
 download = (rm -f $@.tmp && \
 	fetch -p -o $@.tmp "$(1)" && \
 	touch $@.tmp && \
@@ -266,7 +291,7 @@ endif
 download_pkg = $(call download,$(CONTRIB_VIDEOLAN)/$(2)/$(lastword $(subst /, ,$(@)))) || \
 	( $(call download,$(1)) && echo "Please upload this package $(lastword $(subst /, ,$(@))) to our FTP" )
 
-ifeq ($(shell which xz >/dev/null 2>&1 || echo FAIL),)
+ifeq ($(shell command -v xz >/dev/null 2>&1 || echo FAIL),)
 XZ = xz
 else
 XZ ?= $(error XZ (LZMA) compressor not found)
@@ -280,12 +305,6 @@ else ifeq ($(shell openssl version >/dev/null 2>&1 || echo FAIL),)
 SHA512SUM = openssl dgst -sha512
 else
 SHA512SUM = $(error SHA-512 checksumming not found)
-endif
-
-ifeq ($(shell protoc --version >/dev/null 2>&1 || echo FAIL),)
-PROTOC = protoc
-else
-PROTOC ?= $(error Protobuf compiler (protoc) not found)
 endif
 
 #
@@ -331,6 +350,11 @@ CFLAGS := $(CFLAGS) -g -O2
 CXXFLAGS := $(CXXFLAGS) -g -O2
 endif
 
+ifdef HAVE_BITCODE_ENABLED
+CFLAGS := $(CFLAGS) -fembed-bitcode
+CXXFLAGS := $(CXXFLAGS) -fembed-bitcode
+endif
+
 HOSTVARS := $(HOSTTOOLS) \
 	CPPFLAGS="$(CPPFLAGS)" \
 	CFLAGS="$(CFLAGS)" \
@@ -341,6 +365,30 @@ HOSTVARS_PIC := $(HOSTTOOLS) \
 	CFLAGS="$(CFLAGS) $(PIC)" \
 	CXXFLAGS="$(CXXFLAGS) $(PIC)" \
 	LDFLAGS="$(LDFLAGS)"
+
+BUILDCOMMONCONF := --disable-dependency-tracking
+BUILDCOMMONCONF += --prefix="$(BUILDPREFIX)"
+BUILDCOMMONCONF += --datarootdir="$(BUILDPREFIX)/share"
+BUILDCOMMONCONF += --includedir="$(BUILDPREFIX)/include"
+BUILDCOMMONCONF += --libdir="$(BUILDPREFIX)"
+BUILDCOMMONCONF += --build="$(BUILD)" --host="$(BUILD)"
+# For platform-independent tools (--target should be meaningless):
+BUILDPROGCONF := $(BUILDCOMMONCONF) \
+	--target="$(BUILD)" --program-prefix=""
+# For platform-dependent tools:
+BUILDTOOLCONF := $(BUILDCOMMONCONF) \
+	--target="$(HOST)" --program-prefix="$(HOST)-"
+
+BUILDTOOLS := \
+	CC="$(BUILDCC)" CXX="$(BUILDCXX)" LD="$(BUILDLD)" \
+	AR="$(BUILDAR)" NM="$(BUILDNM)" RANLIB="$(BUILDRANLIB)" \
+	STRIP="$(BUILDSTRIP)" PATH="$(BUILDPREFIX)/bin:$(PATH)"
+
+BUILDVARS := $(BUILDTOOLS) \
+	CPPFLAGS="$(BUILDCPPFLAGS)" \
+	CFLAGS="$(BUILDCFLAGS)" \
+	CXXFLAGS="$(BUILDCXXFLAGS)" \
+	LDFLAGS="$(BUILDLDFLAGS)"
 
 download_git = \
 	rm -Rf -- "$(@:.tar.xz=)" && \
@@ -389,11 +437,15 @@ UPDATE_AUTOCONFIG = for dir in $(AUTOMAKE_DATA_DIRS); do \
 ifdef HAVE_DARWIN_OS
 AUTORECONF = AUTOPOINT=true autoreconf
 else
-AUTORECONF = autoreconf
+AUTORECONF = GTKDOCIZE=true autoreconf
 endif
 RECONF = mkdir -p -- $(PREFIX)/share/aclocal && \
 	cd $< && $(AUTORECONF) -fiv $(ACLOCAL_AMFLAGS)
-CMAKEBUILD := cmake --build
+# Work around for https://lists.nongnu.org/archive/html/bug-gnulib/2020-05/msg00237.html
+# When using a single command, make might take a shortcut and fork/exec
+# itself instead of relying on a shell, but a bug in gnulib ends up
+# trying to execute a cmake folder when one is found in the PATH
+CMAKEBUILD := env cmake --build
 CMAKE = cmake . -DCMAKE_TOOLCHAIN_FILE=$(abspath toolchain.cmake) \
 		-DCMAKE_INSTALL_PREFIX:STRING=$(PREFIX) \
 		-DBUILD_SHARED_LIBS:BOOL=OFF
@@ -416,6 +468,9 @@ MESONFLAGS += --buildtype debug
 else
 MESONFLAGS += --buildtype debugoptimized
 endif
+ifdef HAVE_BITCODE_ENABLED
+MESONFLAGS += -Db_bitcode=true
+endif
 
 ifdef HAVE_CROSS_COMPILE
 # When cross-compiling meson uses the env vars like
@@ -429,7 +484,7 @@ ifdef HAVE_CROSS_COMPILE
 # generated crossfile, so everything should work as
 # expected.
 MESONFLAGS += --cross-file $(abspath crossfile.meson)
-MESON = env -i PATH="$(PREFIX)/bin:$(PATH)" PKG_CONFIG_LIBDIR="$(PKG_CONFIG_LIBDIR)" \
+MESON = env -i PATH="$(PREFIX)/bin:$(PATH)" \
 	PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" \
 	meson -Dpkg_config_path="$(PKG_CONFIG_PATH)" \
 	$(MESONFLAGS)
@@ -482,13 +537,14 @@ PKGS := $(sort $(PKGS_MANUAL) $(PKGS_DEPS))
 fetch: $(PKGS:%=.sum-%)
 fetch-all: $(PKGS_ALL:%=.sum-%)
 install: $(PKGS:%=.%)
+tools: $(PKGS_TOOLS:%=.dep-%)
 
 mostlyclean:
 	-$(RM) $(foreach p,$(PKGS_ALL),.$(p) .sum-$(p) .dep-$(p))
 	-$(RM) toolchain.cmake
 	-$(RM) crossfile.meson
 	-$(RM) -R "$(PREFIX)"
-	-$(RM) -R "$(BUILDBINDIR)"
+	-$(RM) "$(BUILDBINDIR)/$(HOST)-*"
 	-$(RM) -R */
 
 clean: mostlyclean
@@ -531,6 +587,8 @@ endif
 list:
 	@echo All packages:
 	@echo '  $(PKGS_ALL)' | tr " " "\n" | sort | tr "\n" " " |fmt
+	@echo All native tools:
+	@echo '  $(PKGS_TOOLS)' | tr " " "\n" | sort | tr "\n" " " |fmt
 	@echo Distribution-provided packages:
 	@echo '  $(PKGS_FOUND)' | tr " " "\n" | sort | tr "\n" " " |fmt
 	@echo Automatically selected packages:
@@ -547,9 +605,15 @@ list:
 help:
 	@cat $(SRC)/help.txt
 
-.PHONY: all fetch fetch-all install mostlyclean clean distclean package list help prebuilt
+.PHONY: all fetch fetch-all install mostlyclean clean distclean package list help prebuilt tools
 
 CMAKE_SYSTEM_NAME =
+ifdef HAVE_CROSS_COMPILE
+CMAKE_SYSTEM_NAME = $(error CMAKE_SYSTEM_NAME required for cross-compilation)
+endif
+ifdef HAVE_LINUX
+CMAKE_SYSTEM_NAME = Linux
+endif
 ifdef HAVE_WIN32
 CMAKE_SYSTEM_NAME = Windows
 ifdef HAVE_VISUALSTUDIO

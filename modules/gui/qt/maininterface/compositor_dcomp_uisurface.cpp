@@ -182,17 +182,17 @@ bool CompositorDCompositionUISurface::init()
     eglRet = eglQueryDisplayAttribEXT(m_eglDisplay, EGL_DEVICE_EXT, reinterpret_cast<EGLAttrib*>(&m_eglDevice));
     if (!eglRet || m_eglDevice == 0)
     {
-        msg_Err(m_intf, "failed to retreive egl device");
+        msg_Err(m_intf, "failed to retrieve egl device");
         return false;
     }
-    ID3D11Device* d3dDevice = nullptr;
-    eglRet = eglQueryDeviceAttribEXT(m_eglDevice, EGL_D3D11_DEVICE_ANGLE, reinterpret_cast<EGLAttrib*>(&d3dDevice));
+    ComPtr<ID3D11Device> d3dDevice;
+    eglRet = eglQueryDeviceAttribEXT(m_eglDevice, EGL_D3D11_DEVICE_ANGLE, reinterpret_cast<EGLAttrib*>(static_cast<void**>(&d3dDevice)));
     if (!eglRet || !d3dDevice)
     {
-        msg_Err(m_intf, "failed to retreive egl device");
+        msg_Err(m_intf, "failed to retrieve egl device");
         return false;
     }
-    HR(d3dDevice->QueryInterface(__uuidof(ID3D11Device1), (void **)(m_qtd3dDevice1.GetAddressOf())));
+    HR(d3dDevice.As(&m_qtd3dDevice1));
 
     m_uiOffscreenSurface = new QOffscreenSurface();
     m_uiOffscreenSurface->setFormat(format);;
@@ -516,6 +516,11 @@ void CompositorDCompositionUISurface::setContent(QQmlComponent*,  QQuickItem* ro
     requestUpdate();
 }
 
+QQuickItem * CompositorDCompositionUISurface::activeFocusItem() const /* override */
+{
+    return m_uiWindow->activeFocusItem();
+}
+
 void CompositorDCompositionUISurface::render()
 {
     EGLBoolean eglRet;
@@ -559,6 +564,13 @@ void CompositorDCompositionUISurface::render()
     {
         msg_Err( m_intf, "SwapChain Present failed. code 0x%lX)", hr );
     }
+}
+
+void CompositorDCompositionUISurface::forceRender()
+{
+    m_renderPending = false;
+    m_renderTimer.stop();
+    render();
 }
 
 void CompositorDCompositionUISurface::timerEvent(QTimerEvent *event)
@@ -610,6 +622,7 @@ bool CompositorDCompositionUISurface::eventFilter(QObject* object, QEvent* event
 
     case QEvent::Resize:
         updateSizes();
+        forceRender();
         break;
 
     case QEvent::WindowActivate:

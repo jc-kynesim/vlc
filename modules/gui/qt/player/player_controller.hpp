@@ -26,7 +26,6 @@
 #include "qt.hpp"
 #include <QObject>
 #include <QEvent>
-#include <QAbstractListModel>
 #include <QScopedPointer>
 #include <vlc_cxx_helpers.hpp>
 #include "player/input_models.hpp"
@@ -251,6 +250,8 @@ public:
 
 
 public:
+    vlc_player_t * getPlayer() const;
+
     input_item_t *getInput();
 
     VoutPtr getVout();

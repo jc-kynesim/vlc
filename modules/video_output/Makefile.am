@@ -25,9 +25,10 @@ libdecklinkoutput_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) $(CPPFLAGS_decklinkoutput)
 libdecklinkoutput_plugin_la_LIBADD = $(LIBS_decklinkoutput)
 if HAVE_WIN32
 libdecklinkoutput_plugin_la_LIBADD += $(LIBCOM)
+libdecklinkoutput_plugin_la_CXXFLAGS += $(LIBCOMCXXFLAGS)
 endif
 if HAVE_LINUX
-libdecklinkoutput_plugin_la_LIBADD += $(LIBDL) -lpthread
+libdecklinkoutput_plugin_la_LIBADD += $(LIBDL)
 endif
 vout_LTLIBRARIES += libdecklinkoutput_plugin.la
 endif
@@ -50,6 +51,12 @@ endif
 
 
 if HAVE_OSX
+libwindow_macosx_plugin_la_SOURCES = video_output/window_macosx.m
+libwindow_macosx_plugin_la_LDFLAGS = $(AM_LDFLAGS) \
+	-Wl,-framework,Cocoa
+libwindow_macosx_plugin_la_OBJCFLAGS = $(AM_OBJCFLAGS) \
+	-fobjc-arc -fobjc-exceptions
+
 libvout_macosx_plugin_la_SOURCES = video_output/macosx.m \
 	$(OPENGL_VOUT_COMMONSOURCES)
 libvout_macosx_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -DHAVE_GL_CORE_SYMBOLS
@@ -64,7 +71,7 @@ libcaopengllayer_plugin_la_LIBADD = libvlc_opengl.la
 libcaopengllayer_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)' \
 	-Wl,-framework,OpenGL,-framework,Cocoa,-framework,QuartzCore
 
-vout_LTLIBRARIES += libvout_macosx_plugin.la libcaopengllayer_plugin.la
+vout_LTLIBRARIES += libvout_macosx_plugin.la libcaopengllayer_plugin.la libwindow_macosx_plugin.la
 endif
 
 libvout_ios_plugin_la_SOURCES = video_output/opengl/display.c $(OPENGL_VOUT_COMMONSOURCES)
@@ -186,6 +193,7 @@ libdirect3d11_plugin_la_SOURCES = video_output/win32/direct3d11.cpp \
  video_output/win32/d3d11_swapchain.cpp video_output/win32/d3d11_swapchain.h \
  video_output/win32/dxgi_swapchain.cpp video_output/win32/dxgi_swapchain.h \
  video_output/win32/common.c video_output/win32/common.h
+libdirect3d11_plugin_la_CXXFLAGS = $(AM_CXXFLAGS) $(LIBCOMCXXFLAGS)
 libdirect3d11_plugin_la_LIBADD = libchroma_copy.la libd3d11_common.la $(LIBCOM) -luuid
 if !HAVE_WINSTORE
 libdirect3d11_plugin_la_SOURCES += video_output/win32/events.c \
@@ -322,9 +330,17 @@ vout_LTLIBRARIES += $(LTLIBfb)
 libkms_plugin_la_SOURCES = video_output/kms.c
 libkms_plugin_la_CFLAGS = $(AM_CFLAGS) $(KMS_CFLAGS)
 libkms_plugin_la_LIBADD = $(KMS_LIBS)
-libkms_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(voutdir)'
-EXTRA_LTLIBRARIES += libkms_plugin.la
-vout_LTLIBRARIES += $(LTLIBkms)
+
+libdrm_display_plugin_la_SOURCES = \
+	video_output/drm/vlc_drm.h \
+	video_output/drm/fourcc.c \
+	video_output/drm/buffers.c \
+	video_output/drm/planes.c \
+	video_output/drm/display.c
+libdrm_display_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(KMS_CFLAGS)
+if HAVE_KMS
+vout_LTLIBRARIES += libkms_plugin.la libdrm_display_plugin.la
+endif
 
 
 ### Coloured ASCII art ###

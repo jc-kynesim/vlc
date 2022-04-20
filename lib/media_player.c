@@ -38,7 +38,6 @@
 #include <vlc_actions.h>
 
 #include "libvlc_internal.h"
-#include "media_internal.h" // libvlc_media_set_state()
 #include "media_player_internal.h"
 #include "renderer_discoverer_internal.h"
 
@@ -92,7 +91,7 @@ on_state_changed(vlc_player_t *player, enum vlc_player_state new_state,
             event.type = libvlc_MediaPlayerStopped;
             break;
         case VLC_PLAYER_STATE_STOPPING:
-            event.type = libvlc_MediaPlayerEndReached;
+            event.type = libvlc_MediaPlayerStopping;
             break;
         case VLC_PLAYER_STATE_STARTED:
             event.type = libvlc_MediaPlayerOpening;
@@ -653,6 +652,8 @@ libvlc_media_player_new( libvlc_instance_t *instance )
     var_Create (mp, "sub-source", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
     var_Create (mp, "sub-filter", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
 
+    var_Create (mp, "osd", VLC_VAR_BOOL); // off
+
     var_Create (mp, "marq-marquee", VLC_VAR_STRING);
     var_Create (mp, "marq-color", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
     var_Create (mp, "marq-opacity", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
@@ -1061,9 +1062,9 @@ bool libvlc_video_set_output_callbacks(libvlc_media_player_t *mp,
     else if ( engine == libvlc_video_engine_disable )
     {
         // use the default display module
-        var_SetString ( mp, "vout", "" );
+        var_SetString ( mp, "vout", "any" );
         // use the default window
-        var_SetString( mp, "window", "");
+        var_SetString( mp, "window", "any" );
     }
     else
         return false;
@@ -1090,15 +1091,14 @@ void libvlc_media_player_set_nsobject( libvlc_media_player_t *p_mi,
 {
     assert (p_mi != NULL);
 #ifdef __APPLE__
-    var_SetString (p_mi, "dec-dev", "");
-    var_SetString (p_mi, "vout", "");
-    var_SetString (p_mi, "window", "");
+    var_SetString (p_mi, "dec-dev", "any");
+    var_SetString (p_mi, "vout", "any");
+    var_SetString (p_mi, "window", "any");
     var_SetAddress (p_mi, "drawable-nsobject", drawable);
 #else
     (void)drawable;
     libvlc_printerr ("can't set nsobject: APPLE build required");
     assert(false);
-    var_SetString (p_mi, "vout", "none");
     var_SetString (p_mi, "window", "none");
 #endif
 }
@@ -1125,9 +1125,9 @@ void libvlc_media_player_set_xwindow( libvlc_media_player_t *p_mi,
 {
     assert (p_mi != NULL);
 
-    var_SetString (p_mi, "dec-dev", "");
-    var_SetString (p_mi, "vout", "");
-    var_SetString (p_mi, "window", drawable ? "embed-xid,any" : "");
+    var_SetString (p_mi, "dec-dev", "any");
+    var_SetString (p_mi, "vout", "any");
+    var_SetString (p_mi, "window", drawable ? "embed-xid,any" : "any");
     var_SetInteger (p_mi, "drawable-xid", drawable);
 }
 
@@ -1147,16 +1147,15 @@ void libvlc_media_player_set_hwnd( libvlc_media_player_t *p_mi,
 {
     assert (p_mi != NULL);
 #if defined (_WIN32) || defined (__OS2__)
-    var_SetString (p_mi, "dec-dev", "");
-    var_SetString (p_mi, "vout", "");
+    var_SetString (p_mi, "dec-dev", "any");
+    var_SetString (p_mi, "vout", "any");
     var_SetString (p_mi, "window",
-                   (drawable != NULL) ? "embed-hwnd,any" : "");
+                   (drawable != NULL) ? "embed-hwnd,any" : "any");
     var_SetInteger (p_mi, "drawable-hwnd", (uintptr_t)drawable);
 #else
     (void) drawable;
     libvlc_printerr ("can't set hwnd: WIN32 build required");
     assert(false);
-    var_SetString (p_mi, "vout", "none");
     var_SetString (p_mi, "window", "none");
 #endif
 }
@@ -1188,7 +1187,6 @@ void libvlc_media_player_set_android_context( libvlc_media_player_t *p_mi,
     (void) p_awindow_handler;
     libvlc_printerr ("can't set android context: ANDROID build required");
     assert(false);
-    var_SetString (p_mi, "vout", "none");
     var_SetString (p_mi, "window", "none");
 #endif
 }
@@ -1603,7 +1601,7 @@ libvlc_state_t libvlc_media_player_get_state( libvlc_media_player_t *p_mi )
         case VLC_PLAYER_STATE_STOPPED:
             return libvlc_Stopped;
         case VLC_PLAYER_STATE_STOPPING:
-            return libvlc_Ended;
+            return libvlc_Stopping;
         case VLC_PLAYER_STATE_STARTED:
             return libvlc_Opening;
         case VLC_PLAYER_STATE_PLAYING:
@@ -1713,20 +1711,15 @@ bool libvlc_media_player_can_pause(libvlc_media_player_t *p_mi)
 
 bool libvlc_media_player_program_scrambled(libvlc_media_player_t *p_mi)
 {
+    const struct vlc_player_program *program;
     bool b_program_scrambled = false;
 
     vlc_player_t *player = p_mi->player;
     vlc_player_Lock(player);
-
-    const struct vlc_player_program *program =
-        vlc_player_GetSelectedProgram(player);
-    if (!program)
-        goto end;
-
-    b_program_scrambled = program->scrambled;
-
+    program = vlc_player_GetSelectedProgram(player);
+    if (program != NULL)
+        b_program_scrambled = program->scrambled;
     vlc_player_Unlock(player);
-end:
     return b_program_scrambled;
 }
 

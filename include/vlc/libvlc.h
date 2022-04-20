@@ -102,19 +102,10 @@ LIBVLC_API void libvlc_clearerr (void);
  * Sets the LibVLC error status and message for the current thread.
  * Any previous error is overridden.
  * \param fmt the format string
- * \param ap the arguments
- * \return a nul terminated string in any case
- */
-LIBVLC_API const char *libvlc_vprinterr (const char *fmt, va_list ap);
-
-/**
- * Sets the LibVLC error status and message for the current thread.
- * Any previous error is overridden.
- * \param fmt the format string
  * \param ...  the arguments for the format string
  * \return a nul terminated string in any case
  */
-LIBVLC_API const char *libvlc_printerr (const char *fmt, ...);
+const char *libvlc_printerr (const char *fmt, ...);
 
 /**@} */
 
@@ -538,9 +529,9 @@ libvlc_module_description_t *libvlc_video_filter_list_get( libvlc_instance_t *p_
 /**
  * Return the current time as defined by LibVLC. The unit is the microsecond.
  * Time increases monotonically (regardless of time zone changes and RTC
- * adjustements).
+ * adjustments).
  * The origin is arbitrary but consistent across the whole system
- * (e.g. the system uptim, the time since the system was booted).
+ * (e.g. the system uptime, the time since the system was booted).
  * \note On systems that support it, the POSIX monotonic clock is used.
  */
 LIBVLC_API

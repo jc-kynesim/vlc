@@ -24,22 +24,79 @@
 
 #include <stdio.h>
 #include <string.h>
+#ifdef HAVE_SYS_AUXV_H
+# include <sys/auxv.h>
+#endif
+#ifndef AT_HWCAP /* ancient libc, fallback to kernel header */
+# include <linux/auxvec.h>
+#endif
 #include <vlc_common.h>
 #include <vlc_cpu.h>
 
-#undef CPU_FLAGS
-#if defined (__arm__) || defined (__aarch64__)
-# define CPU_FLAGS "Features\t:"
+#if defined (__aarch64__)
+unsigned vlc_CPU_raw(void)
+{
+    unsigned int flags = 0;
+    const unsigned long hwcap = getauxval(AT_HWCAP);
+    //const unsigned long hwcap2 = getauxval(AT_HWCAP2); // TODO: SVE2
+
+    /* HWCAP_FP (HAVE_FPU) is statically assumed. */
+# ifdef HWCAP_ASIMD
+    if (hwcap & HWCAP_ASIMD)
+        flags |= VLC_CPU_ARM_NEON;
+# endif
+# ifdef HWCAP_SVE
+    if (hwcap & HWCAP_SVE)
+        flags |= VLC_CPU_ARM_SVE;
+# endif
+    return flags;
+}
+
+#elif defined (__arm__)
+/* On AArch32, glibc's <bits/hwcap.h> uses different HWCAP names than the
+ * kernel and other libc's. Include the kernel header manually. */
+# include <asm/hwcap.h>
+
+unsigned vlc_CPU_raw(void)
+{
+    unsigned int flags = 0;
+    const unsigned long hwcap = getauxval(AT_HWCAP);
+
+    /* TLS implies ARMv6, Thumb-EE and VFP imply ARMv7 */
+    if (hwcap & (HWCAP_TLS|HWCAP_THUMBEE|HWCAP_VFP))
+        flags |= VLC_CPU_ARMv6; /* SIMD */
+    if (hwcap & HWCAP_NEON)
+        flags |= VLC_CPU_ARM_NEON; /* Advanced SIMD */
+    return flags;
+}
+
+#elif defined (__powerpc__) /* both 32- and 64-bit */
+unsigned vlc_CPU_raw(void)
+{
+    const unsigned long hwcap = getauxval(AT_HWCAP);
+    unsigned int flags = 0;
+
+    if (hwcap & PPC_FEATURE_HAS_ALTIVEC)
+        flags |= VLC_CPU_ALTIVEC;
+
+    return flags;
+}
+
+#elif defined (__riscv)
+# define HWCAP_RV(letter) (1LU << ((letter) - 'A'))
+
+unsigned vlc_CPU_raw(void)
+{
+    const unsigned long hwcap = getauxval(AT_HWCAP);
+    unsigned int flags = 0;
+
+    if (hwcap & HWCAP_RV('V'))
+        flags |= VLC_CPU_RV_V;
+
+    return flags;
+}
 
 #elif defined (__i386__) || defined (__x86_64__)
-# define CPU_FLAGS "flags\t\t:"
-
-#elif defined (__powerpc__) || defined (__powerpc64__)
-# define CPU_FLAGS "cpu\t\t:"
-
-#endif
-
-#ifdef CPU_FLAGS
 unsigned vlc_CPU_raw(void)
 {
     FILE *info = fopen ("/proc/cpuinfo", "rte");
@@ -52,34 +109,19 @@ unsigned vlc_CPU_raw(void)
 
     while (getline (&line, &linelen, info) != -1)
     {
-        char *p = line, *cap;
+        char *p, *cap;
         uint_fast32_t core_caps = 0;
 
-#if defined (__arm__)
-        unsigned ver;
-        if (sscanf (line, "Processor\t: ARMv%u", &ver) >= 1 && ver >= 6)
-            core_caps |= VLC_CPU_ARMv6;
-#endif
-        if (strncmp (line, CPU_FLAGS, strlen (CPU_FLAGS)))
+        if (strncmp(line, "flags", 5))
+            continue;
+
+        p = line + 5;
+        p += strspn(p, "\t");
+        if (*p != ':')
             continue;
 
         while ((cap = strsep (&p, " ")) != NULL)
         {
-#if defined (__arm__) || defined (__aarch64__)
-            if (!strcmp (cap, "neon"))
-                core_caps |= VLC_CPU_ARM_NEON;
-# if defined (__aarch64__)
-            if (!strcmp (cap, "sve"))
-                core_caps |= VLC_CPU_ARM_SVE;
-# endif
-
-#elif defined (__i386__) || defined (__x86_64__)
-            if (!strcmp (cap, "mmx"))
-                core_caps |= VLC_CPU_MMX;
-            if (!strcmp (cap, "sse"))
-                core_caps |= VLC_CPU_SSE | VLC_CPU_MMXEXT;
-            if (!strcmp (cap, "mmxext"))
-                core_caps |= VLC_CPU_MMXEXT;
             if (!strcmp (cap, "sse2"))
                 core_caps |= VLC_CPU_SSE2;
             if (!strcmp (cap, "pni"))
@@ -88,23 +130,10 @@ unsigned vlc_CPU_raw(void)
                 core_caps |= VLC_CPU_SSSE3;
             if (!strcmp (cap, "sse4_1"))
                 core_caps |= VLC_CPU_SSE4_1;
-            if (!strcmp (cap, "sse4_2"))
-                core_caps |= VLC_CPU_SSE4_2;
-            if (!strcmp (cap, "sse4a"))
-                core_caps |= VLC_CPU_SSE4A;
             if (!strcmp (cap, "avx"))
                 core_caps |= VLC_CPU_AVX;
             if (!strcmp (cap, "avx2"))
                 core_caps |= VLC_CPU_AVX2;
-            if (!strcmp (cap, "xop"))
-                core_caps |= VLC_CPU_XOP;
-            if (!strcmp (cap, "fma4"))
-                core_caps |= VLC_CPU_FMA4;
-
-#elif defined (__powerpc__) || defined (__powerpc64__)
-            if (!strcmp (cap, "altivec supported"))
-                core_caps |= VLC_CPU_ALTIVEC;
-#endif
         }
 
         /* Take the intersection of capabilities of each processor */

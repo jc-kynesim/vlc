@@ -135,7 +135,6 @@ static int DpbDisplayPicture( decoder_t *, picture_t * );
 vlc_module_begin ()
     set_description( N_("MPEG I/II video decoder (using libmpeg2)") )
     set_capability( "video decoder", 50 )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_VCODEC )
     set_callbacks( OpenDecoder, CloseDecoder )
     add_shortcut( "libmpeg2" )
@@ -152,7 +151,7 @@ static int OpenDecoder( vlc_object_t *p_this )
     if( p_dec->fmt_in.i_codec != VLC_CODEC_MPGV )
         return VLC_EGENERIC;
 
-    /* Select onl recognized original format (standard mpeg video) */
+    /* Select only recognized original format (standard mpeg video) */
     switch( p_dec->fmt_in.i_original_fourcc )
     {
     case VLC_FOURCC('m','p','g','1'):
@@ -767,7 +766,7 @@ static void PutPicture( decoder_t *p_dec, picture_t *p_picture )
         pp_buf[j] = p_picture ? p_picture->p[j].p_pixels : NULL;
     mpeg2_set_buf( p_sys->p_mpeg2dec, pp_buf, p_picture );
 
-    /* Completly broken API, why the hell does it suppose
+    /* Completely broken API, why the hell does it suppose
      * the stride of the chroma planes ! */
     if( p_picture )
         mpeg2_stride( p_sys->p_mpeg2dec, p_picture->p[Y_PLANE].i_pitch );
@@ -806,7 +805,7 @@ static void DpbClean( decoder_t *p_dec )
     }
 }
 /**
- * Retreive a picture and reserve a place in the DPB
+ * Retrieve a picture and reserve a place in the DPB
  */
 static picture_t *DpbNewPicture( decoder_t *p_dec )
 {

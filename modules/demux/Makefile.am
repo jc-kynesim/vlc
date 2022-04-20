@@ -45,6 +45,9 @@ demux_LTLIBRARIES += libwav_plugin.la
 libnsv_plugin_la_SOURCES = demux/nsv.c
 demux_LTLIBRARIES += libnsv_plugin.la
 
+libhx_plugin_la_SOURCES = demux/hx.c
+demux_LTLIBRARIES += libhx_plugin.la
+
 libps_plugin_la_SOURCES = demux/mpeg/ps.c demux/mpeg/ps.h demux/mpeg/pes.h
 demux_LTLIBRARIES += libps_plugin.la
 
@@ -149,11 +152,8 @@ if ENABLE_SOUT
 libavformat_plugin_la_SOURCES += demux/avformat/mux.c
 endif
 libavformat_plugin_la_CFLAGS = $(AM_CFLAGS) $(AVFORMAT_CFLAGS) $(AVUTIL_CFLAGS)
-libavformat_plugin_la_LIBADD = $(AVFORMAT_LIBS) $(AVUTIL_LIBS) $(LIBM) libavcodec_common.la
+libavformat_plugin_la_LIBADD = $(AVFORMAT_LIBS) $(AVUTIL_LIBS) $(LIBM) $(LIBZ) libavcodec_common.la
 libavformat_plugin_la_LDFLAGS = $(AM_LDFLAGS) $(SYMBOLIC_LDFLAGS)
-if HAVE_ZLIB
-libavformat_plugin_la_LIBADD += -lz
-endif
 if HAVE_AVFORMAT
 if !MERGE_FFMPEG
 demux_LTLIBRARIES += libavformat_plugin.la
@@ -191,23 +191,25 @@ libmkv_plugin_la_SOURCES = \
 	demux/mkv/chapters.hpp demux/mkv/chapters.cpp \
 	demux/mkv/chapter_command.hpp demux/mkv/chapter_command.cpp \
 	demux/mkv/stream_io_callback.hpp demux/mkv/stream_io_callback.cpp \
-	demux/mp4/libmp4.c demux/vobsub.h \
+	demux/vobsub.h \
 	demux/mkv/mkv.hpp demux/mkv/mkv.cpp \
         demux/av1_unpack.h codec/webvtt/helpers.h \
 	demux/windows_audio_commons.h
 libmkv_plugin_la_SOURCES += packetizer/dts_header.h packetizer/dts_header.c
 libmkv_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(CFLAGS_mkv)
 libmkv_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(demuxdir)'
-libmkv_plugin_la_LIBADD = $(LIBS_mkv)
-if HAVE_ZLIB
-libmkv_plugin_la_LIBADD += -lz
-endif
+libmkv_plugin_la_LIBADD = $(LIBS_mkv) $(LIBZ) libvlc_mp4.la
 demux_LTLIBRARIES += $(LTLIBmkv)
 EXTRA_LTLIBRARIES += libmkv_plugin.la
 
+libvlc_mp4_la_SOURCES = demux/mp4/libmp4.c demux/mp4/libmp4.h
+libvlc_mp4_la_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/demux/mp4
+libvlc_mp4_la_LIBADD = $(LIBM) $(LIBZ)
+libvlc_mp4_la_LDFLAGS = -static
+noinst_LTLIBRARIES += libvlc_mp4.la
+
 libmp4_plugin_la_SOURCES = demux/mp4/mp4.c demux/mp4/mp4.h \
                            demux/mp4/fragments.c demux/mp4/fragments.h \
-                           demux/mp4/libmp4.c demux/mp4/libmp4.h \
                            demux/mp4/attachments.c demux/mp4/attachments.h \
                            demux/mp4/languages.h \
                            demux/mp4/heif.c demux/mp4/heif.h \
@@ -220,11 +222,8 @@ libmp4_plugin_la_SOURCES = demux/mp4/mp4.c demux/mp4/mp4.h \
                            demux/asf/asfpacket.c demux/asf/asfpacket.h \
                            packetizer/iso_color_tables.h \
                            meta_engine/ID3Genres.h
-libmp4_plugin_la_LIBADD = $(LIBM)
+libmp4_plugin_la_LIBADD = libvlc_mp4.la
 libmp4_plugin_la_LDFLAGS = $(AM_LDFLAGS)
-if HAVE_ZLIB
-libmp4_plugin_la_LIBADD += -lz
-endif
 demux_LTLIBRARIES += libmp4_plugin.la
 
 libmpgv_plugin_la_SOURCES = demux/mpeg/mpgv.c
@@ -410,8 +409,6 @@ libvlc_adaptive_la_SOURCES = \
     demux/adaptive/xml/Node.cpp \
     demux/adaptive/xml/Node.h
 libvlc_adaptive_la_SOURCES += \
-     demux/mp4/libmp4.c \
-     demux/mp4/libmp4.h \
      meta_engine/ID3Tag.h
 # DASH specific
 libvlc_adaptive_la_SOURCES += \
@@ -487,15 +484,9 @@ libvlc_adaptive_la_SOURCES += \
     packetizer/h264_nal.c \
     packetizer/hevc_nal.c
 libvlc_adaptive_la_CXXFLAGS = $(AM_CXXFLAGS) -I$(srcdir)/demux/adaptive
-libvlc_adaptive_la_LIBADD = $(SOCKET_LIBS) $(LIBM)
+libvlc_adaptive_la_LIBADD = $(SOCKET_LIBS) $(LIBM) libvlc_mp4.la
 libvlc_adaptive_la_LDFLAGS = -static
-if !HAVE_WIN32
-libvlc_adaptive_la_LDFLAGS += -lpthread
-endif
 libvlc_adaptive_la_LIBADD += libvlc_http.la
-if HAVE_ZLIB
-libvlc_adaptive_la_LIBADD += -lz
-endif
 if HAVE_GCRYPT
 libvlc_adaptive_la_CXXFLAGS += $(GCRYPT_CFLAGS)
 libvlc_adaptive_la_LIBADD += $(GCRYPT_LIBS)
@@ -518,6 +509,8 @@ adaptive_test_SOURCES = \
     demux/adaptive/test/playlist/SegmentTimeline.cpp \
     demux/adaptive/test/playlist/TemplatedUri.cpp \
     demux/adaptive/test/plumbing/CommandsQueue.cpp \
+    demux/adaptive/test/plumbing/FakeEsOut.cpp \
+    demux/adaptive/test/SegmentTracker.cpp \
     demux/adaptive/test/test.cpp \
     demux/adaptive/test/test.hpp
 adaptive_test_LDADD = libvlc_adaptive.la
@@ -528,7 +521,9 @@ libytdl_plugin_la_SOURCES = demux/ytdl.c
 libytdl_plugin_la_LIBADD = libvlc_json.la
 if !HAVE_WIN32
 if !HAVE_ANDROID
+if !HAVE_EMSCRIPTEN
 demux_LTLIBRARIES += libytdl_plugin.la
+endif
 endif
 endif
 

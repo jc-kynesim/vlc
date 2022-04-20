@@ -138,7 +138,6 @@ static const char *const ts_standards_list_text[] =
 vlc_module_begin ()
     set_description( N_("MPEG Transport Stream demuxer") )
     set_shortname ( "MPEG-TS" )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_DEMUX )
 
     add_string( "ts-standard", "auto", STANDARD_TEXT, STANDARD_LONGTEXT )
@@ -522,8 +521,7 @@ static int Open( vlc_object_t *p_this )
     }
 
     if( p_sys->standard == TS_STANDARD_AUTO &&
-       ( !strncasecmp( p_demux->psz_url, "atsc", 4 ) ||
-         !strncasecmp( p_demux->psz_url, "usdigital", 9 ) ) )
+       !strncasecmp( p_demux->psz_url, "atsc", 4 ) )
     {
         TsChangeStandard( p_sys, TS_STANDARD_ATSC );
     }
@@ -2472,7 +2470,7 @@ static void PCRFixHandle( demux_t *p_demux, ts_pmt_t *p_pmt, block_t *p_block )
     {
         return;
     }
-    /* Record the first data packet timestamp in case there wont be any PCR */
+    /* Record the first data packet timestamp in case there won't be any PCR */
     else if( p_pmt->pcr.i_first_dts == TS_TICK_UNKNOWN )
     {
         p_pmt->pcr.i_first_dts = TO_SCALE(p_block->i_dts);

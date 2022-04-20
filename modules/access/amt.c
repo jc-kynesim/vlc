@@ -70,7 +70,7 @@
 #define TIMEOUT_TEXT N_("Native multicast timeout (sec)")
 #define AMT_RELAY_ADDRESS N_("AMT relay (IP address or FQDN)")
 #define AMT_RELAY_ADDR_LONG N_("AMT relay anycast address, or specify the relay you want by address or fully qualified domain name")
-#define AMT_DEFAULT_RELAY N_("amt-relay.m2icast.net")
+#define AMT_DEFAULT_RELAY "amt-relay.m2icast.net"
 
 /*****************************************************************************
  * Various Lengths of Msgs or Hdrs
@@ -253,7 +253,6 @@ static void make_ip_header( amt_ip_alert_t *p_ipHead );
 vlc_module_begin ()
     set_shortname( N_("AMT" ) )
     set_description( N_("AMT input") )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACCESS )
 
     add_integer( "amt-native-timeout", 5, TIMEOUT_TEXT, NULL )

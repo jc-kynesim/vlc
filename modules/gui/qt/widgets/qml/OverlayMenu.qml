@@ -17,12 +17,13 @@
  *****************************************************************************/
 import QtQuick 2.11
 import QtQuick.Controls 2.4
+import QtQuick.Templates 2.4 as T
 import QtQuick.Layouts 1.11
 import org.videolan.vlc 0.1
 
 import "qrc:///style/"
 
-Item {
+FocusScope {
     id: root
 
     property real widthRatio: (3 / 4)
@@ -56,23 +57,28 @@ Item {
         listView.resetStack()
     }
 
-    /* required */ property var itemParent
-    /* required */ property var backgroundItem
+    property alias effectSource: effect.source
+
+    property alias scrollBarActive: scrollBar.active
 
     visible: false
 
     function open() {
-        listView.currentModel = root.model;
-
-        visible = true;
-
-        listView.forceActiveFocus(Qt.TabFocusReason);
+        listView.currentModel = root.model
+        visible = true
+        focus = true
     }
 
     function close() {
-        visible = false;
+        visible = false
+        focus = false
+    }
 
-        itemParent.forceActiveFocus(Qt.BacktabFocusReason);
+    Keys.onPressed: {
+        if (KeyHelper.matchCancel(event)) {
+            close()
+            event.accepted = true
+        }
     }
 
     Rectangle {
@@ -116,28 +122,33 @@ Item {
         }
 
         FrostedGlassEffect {
-            source: backgroundItem
-
+            id: effect
             anchors.fill: parent
 
-            readonly property point overlayPos: backgroundItem.mapFromItem(root, parentItem.x, parentItem.y)
-            sourceRect: Qt.rect(overlayPos.x, overlayPos.y, width, height)
+            source: backgroundItem
+
+            color: VLCStyle.colors.topBanner
 
             tintStrength: 0.0
             exclusionStrength: 0.1
         }
 
-        KeyNavigableListView {
+        ListView {
             id: listView
 
             anchors.fill: parent
             anchors.topMargin: root.topPadding
             anchors.bottomMargin: root.bottomPadding
 
+            ScrollBar.vertical: ScrollBar { id: scrollBar; active: true }
+
+            focus: true
+
             keyNavigationWraps: true
 
             property var stack: []
             property var currentModel: root.model
+            property int oldCurrentIndex
 
             model: currentModel.entries
 
@@ -158,15 +169,24 @@ Item {
                 if (stack.length > 1) {
                     stack.pop()
                     currentModel = stack[stack.length - 1]
-                }
-                else {
+                    listView.currentIndex = listView.oldCurrentIndex
+                } else {
                     root.close()
                 }
             }
 
             function loadModel(_model) {
+                listView.oldCurrentIndex = listView.currentIndex
                 listView.stack.push(_model)
                 listView.currentModel = _model
+            }
+
+            Keys.onPressed: {
+                if (root.isRight ? KeyHelper.matchLeft(event)
+                                 : KeyHelper.matchRight(event)) {
+                    goBack()
+                    event.accepted = true
+                }
             }
 
             header: MenuLabel {
@@ -180,21 +200,32 @@ Item {
                 bottomPadding: VLCStyle.margin_normal
             }
 
-            delegate: Button {
+            delegate: T.AbstractButton {
                 id: button
+
+                implicitWidth: Math.max(background ? background.implicitWidth : 0,
+                                        (contentItem ? contentItem.implicitWidth : 0) + leftPadding + rightPadding)
+                implicitHeight: Math.max(background ? background.implicitHeight : 0,
+                                         (contentItem ? contentItem.implicitHeight : 0) + topPadding + bottomPadding)
+                baselineOffset: contentItem ? contentItem.y + contentItem.baselineOffset : 0
 
                 readonly property bool yieldsAnotherModel: (!!modelData.model)
 
+                enabled: modelData.enabled
+
                 width: listView.width
 
+                topPadding: VLCStyle.margin_xsmall
+                bottomPadding: VLCStyle.margin_xsmall
                 leftPadding: root.leftPadding
                 rightPadding: root.rightPadding
+
+                spacing: VLCStyle.margin_xsmall
 
                 function trigger(triggerEnabled) {
                     if (yieldsAnotherModel) {
                         listView.loadModel(modelData.model)
-                    }
-                    else if (triggerEnabled) {
+                    } else if (triggerEnabled) {
                         modelData.trigger()
                         root.close()
                     }
@@ -203,16 +234,9 @@ Item {
                 onClicked: trigger(true)
 
                 Keys.onPressed: {
-                    if (KeyHelper.matchRight(event)) {
+                    if (root.isRight ? KeyHelper.matchRight(event)
+                                     : KeyHelper.matchLeft(event)) {
                         trigger(false)
-                        event.accepted = true
-                    }
-                    else if (KeyHelper.matchLeft(event)) {
-                        listView.goBack()
-                        event.accepted = true
-                    }
-                    else if (KeyHelper.matchCancel(event)) {
-                        root.close()
                         event.accepted = true
                     }
                 }
@@ -220,51 +244,54 @@ Item {
                 contentItem: RowLayout {
                     id: rowLayout
 
-                    Item {
+                    opacity: enabled ? 1.0 : 0.5
+                    spacing: button.spacing
+
+                    width: scrollBar.active ? (parent.width - scrollBar.width)
+                                            : parent.width
+
+                    Loader {
                         id: icon
 
                         Layout.preferredWidth: VLCStyle.icon_small
                         Layout.preferredHeight: VLCStyle.icon_small
                         Layout.alignment: Qt.AlignHCenter
 
-                        Loader {
-                            active: (!!modelData.icon.source || !!modelData.fontIcon || modelData.tickMark === true)
-                            anchors.fill: parent
+                        active: (!!modelData.icon.source || !!modelData.fontIcon || modelData.tickMark === true)
 
-                            Component {
-                                id: imageIcon
-                                Image {
-                                    sourceSize: Qt.size(icon.width, icon.height)
-                                    source: modelData.icon.source
-                                }
+                        Component {
+                            id: imageIcon
+                            Image {
+                                sourceSize: Qt.size(icon.width, icon.height)
+                                source: modelData.icon.source
                             }
+                        }
 
-                            Component {
-                                id: fontIcon
-                                IconLabel {
-                                    horizontalAlignment: Text.AlignHCenter
-                                    text: modelData.fontIcon
-                                    color: colors.text
-                                }
+                        Component {
+                            id: fontIcon
+                            IconLabel {
+                                horizontalAlignment: Text.AlignHCenter
+                                text: modelData.fontIcon
+                                color: colors.text
                             }
+                        }
 
-                            Component {
-                                id: tickMark
-                                ListLabel {
-                                    horizontalAlignment: Text.AlignHCenter
-                                    text: "✓"
-                                    color: colors.text
-                                }
+                        Component {
+                            id: tickMark
+                            ListLabel {
+                                horizontalAlignment: Text.AlignHCenter
+                                text: "✓"
+                                color: colors.text
                             }
+                        }
 
-                            sourceComponent: {
-                                if (modelData.tickMark === true)
-                                    tickMark
-                                else if (!!modelData.fontIcon)
-                                    fontIcon
-                                else
-                                    imageIcon
-                            }
+                        sourceComponent: {
+                            if (modelData.tickMark === true)
+                                tickMark
+                            else if (!!modelData.fontIcon)
+                                fontIcon
+                            else
+                                imageIcon
                         }
                     }
 
@@ -279,31 +306,29 @@ Item {
                         color: colors.text
                     }
 
-                    Loader {
-                        active: (button.yieldsAnotherModel ||
-                                 ( (!!modelData.marking) && (modelData.marking.length >= 1) ))
+                    ListLabel {
+                        Layout.alignment: Qt.AlignHCenter
 
-                        sourceComponent: ListLabel {
-                            Layout.alignment: Qt.AlignHCenter
+                        horizontalAlignment: Text.AlignHCenter
 
-                            text: {
-                                if (button.yieldsAnotherModel)
-                                    "⮕"
-                                else if (!!modelData.marking)
-                                    modelData.marking
-                            }
+                        visible: text.length > 0
 
-                            color: colors.text
-                        }
+                        text: (typeof modelData.marking === 'string') ? modelData.marking
+                                                                      : button.yieldsAnotherModel ? "➜"
+                                                                                                  : ""
+
+                        color: colors.text
                     }
                 }
-
-                background: Rectangle {
-                    visible: button.activeFocus
-                    color: colors.accent
-                    opacity: 0.8
-                }
             }
+
+            highlight: Rectangle {
+                color: colors.accent
+                opacity: 0.8
+            }
+
+            highlightResizeDuration: 0
+            highlightMoveDuration: 0
         }
     }
 

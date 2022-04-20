@@ -94,15 +94,27 @@ using namespace TagLib;
 #include <algorithm>
 #include <limits>
 
+#if defined(VLC_PATCHED_TAGLIB_IOSTREAM_RESOLVERS) || \
+    TAGLIB_VERSION >= VERSION_INT(1, 13, 0)
+#define USE_IOSTREAM_RESOLVER 1
+#endif
+
 namespace VLCTagLib
 {
     template <class T>
+#ifdef USE_IOSTREAM_RESOLVER
+    class ExtResolver : public FileRef::StreamTypeResolver
+#else
     class ExtResolver : public FileRef::FileTypeResolver
+#endif
     {
         public:
             ExtResolver(const std::string &);
             ~ExtResolver() {}
             virtual File *createFile(FileName, bool, AudioProperties::ReadStyle) const;
+#ifdef USE_IOSTREAM_RESOLVER
+            virtual File *createFileFromStream(IOStream*, bool, AudioProperties::ReadStyle) const;
+#endif
 
         protected:
             std::string ext;
@@ -110,7 +122,7 @@ namespace VLCTagLib
 }
 
 template <class T>
-VLCTagLib::ExtResolver<T>::ExtResolver(const std::string & ext) : FileTypeResolver()
+VLCTagLib::ExtResolver<T>::ExtResolver(const std::string & ext)
 {
     this->ext = ext;
     std::transform(this->ext.begin(), this->ext.end(), this->ext.begin(), ::toupper);
@@ -130,8 +142,27 @@ File *VLCTagLib::ExtResolver<T>::createFile(FileName fileName, bool, AudioProper
             return new T(fileName, false, AudioProperties::Fast);
     }
 
-    return 0;
+    return nullptr;
 }
+
+#ifdef USE_IOSTREAM_RESOLVER
+template<class T>
+File* VLCTagLib::ExtResolver<T>::createFileFromStream(IOStream* s, bool, AudioProperties::ReadStyle) const
+{
+    std::string filename = std::string(s->name());
+    std::size_t namesize = filename.size();
+
+    if (namesize > ext.length())
+    {
+        std::string fext = filename.substr(namesize - ext.length(), ext.length());
+        std::transform(fext.begin(), fext.end(), fext.begin(), ::toupper);
+        if(fext == ext)
+            return new T(s, ID3v2::FrameFactory::instance(), false, AudioProperties::Fast);
+    }
+
+    return nullptr;
+}
+#endif
 
 static VLCTagLib::ExtResolver<MPEG::File> aacresolver(".aac");
 static bool b_extensions_registered = false;
@@ -754,7 +785,7 @@ static void ReadMetaFromXiph( Ogg::XiphComment* tag, demux_meta_t* p_demux_meta,
 
     if( mime_list.size() != 0 && art_list.size() != 0 )
     {
-        // We get only the first covert art
+        // We get only the first cover art
         if( mime_list.size() > 1 || art_list.size() > 1 )
             msg_Warn( p_demux_meta, "Found %i embedded arts, so using only the first one",
                     art_list.size() );
@@ -879,7 +910,6 @@ static int ReadMeta( vlc_object_t* p_this)
     vlc::threads::mutex_locker locker(taglib_lock);
     demux_meta_t*   p_demux_meta = (demux_meta_t *)p_this;
     vlc_meta_t*     p_meta;
-    FileRef f;
 
     p_demux_meta->p_meta = NULL;
 
@@ -915,7 +945,7 @@ static int ReadMeta( vlc_object_t* p_this)
     else
         s.setMaxSequentialRead( 1024 * 2048 );
 #endif
-    f = FileRef( &s, false, AudioProperties::ReadStyle::Fast );
+    FileRef f( &s, false, AudioProperties::ReadStyle::Fast );
 
     if( f.isNull() )
         return VLC_EGENERIC;

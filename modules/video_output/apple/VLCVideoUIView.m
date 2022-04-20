@@ -260,7 +260,7 @@
 }
 
 /**
- * Vout window operations implemention, which are expected to be run on
+ * Vout window operations implementation, which are expected to be run on
  * the main thread only. Core C wrappers below must typically use
  * dispatch_async with dispatch_get_main_queue() to call them.
  *
@@ -434,7 +434,6 @@ static int Open(vout_window_t *wnd)
 vlc_module_begin ()
     set_shortname("UIView")
     set_description("iOS UIView vout window provider")
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     set_capability("vout window", 300)
     set_callback(Open)

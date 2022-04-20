@@ -58,7 +58,6 @@ VLC_RD_PROBE_HELPER( "avahi_renderer", "Avahi Zeroconf renderer Discovery" )
 vlc_module_begin ()
     set_shortname( "Avahi" )
     set_description( N_("Zeroconf services") )
-    set_category( CAT_PLAYLIST )
     set_subcategory( SUBCAT_PLAYLIST_SD )
     set_capability( "services_discovery", 0 )
     set_callbacks( OpenSD, CloseSD )
@@ -67,7 +66,6 @@ vlc_module_begin ()
     VLC_SD_PROBE_SUBMODULE
     add_submodule() \
         set_description( N_( "Avahi Renderer Discovery" ) )
-        set_category( CAT_SOUT )
         set_subcategory( SUBCAT_SOUT_RENDERER )
         set_capability( "renderer_discovery", 0 )
         set_callbacks( OpenRD, CloseRD )
@@ -178,7 +176,10 @@ static void add_renderer( const char *psz_protocol, const char *psz_name,
         model = get_string_list_value( txt, "md" );
 
         if( asprintf( &uri, "%s://%s:%u", psz_protocol, psz_addr, i_port ) < 0 )
+        {
+            uri = NULL;
             goto error;
+        }
 
         extra_uri = renderer_flags & VLC_RENDERER_CAN_VIDEO ? NULL : "no-video";
         demux = "cc_demux";

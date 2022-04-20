@@ -89,15 +89,19 @@ const char *libvlc_errmsg (void)
 void libvlc_clearerr (void)
 {
     free_error ();
-    vlc_threadvar_set (context, NULL);
+    int ret = vlc_threadvar_set (context, NULL);
+    if(unlikely(ret != 0))
+        abort();
 }
 
 /**
  * Sets the LibVLC error status and message for the current thread.
  * Any previous error is overridden.
- * @return a nul terminated string (always)
+ * \param fmt the format string
+ * \param ap the arguments
+ * \return a nul terminated string in any case
  */
-const char *libvlc_vprinterr (const char *fmt, va_list ap)
+static const char *libvlc_vprinterr (const char *fmt, va_list ap)
 {
     char *msg;
 
@@ -106,7 +110,9 @@ const char *libvlc_vprinterr (const char *fmt, va_list ap)
         msg = (char *)oom;
 
     free_error ();
-    vlc_threadvar_set (context, msg);
+    int ret = vlc_threadvar_set (context, msg);
+    if(unlikely(ret != 0))
+        abort();
     return msg;
 }
 

@@ -224,7 +224,6 @@ static int Mpeg4ReadAudioSpecificConfig(bs_t *s, mpeg4_asc_t *p_cfg, bool);
  * Module descriptor
  *****************************************************************************/
 vlc_module_begin ()
-    set_category(CAT_SOUT)
     set_subcategory(SUBCAT_SOUT_PACKETIZER)
     set_description(N_("MPEG4 audio packetizer"))
     set_capability("packetizer", 50)
@@ -1102,7 +1101,7 @@ static int LOASParse(decoder_t *p_dec, uint8_t *p_buffer, int i_buffer)
     return i_accumulated;
 
 truncated:
-    msg_Warn(p_dec,"Truncated LAOS packet. Wrong format ?");
+    msg_Warn(p_dec,"Truncated LOAS packet. Wrong format ?");
     return 0;
 }
 

@@ -63,7 +63,6 @@ struct filter_level
 typedef struct
 {
     float f_gamma;
-    bool  b_brightness_threshold;
 
     struct filter_level Brightness;
     struct filter_level Contrast;
@@ -81,10 +80,6 @@ typedef struct
     ID3D11VideoProcessorOutputView *procOutput[PROCESSOR_SLICES];
 } filter_sys_t;
 
-#define THRES_TEXT N_("Brightness threshold")
-#define THRES_LONGTEXT N_("When this mode is enabled, pixels will be " \
-        "shown as black or white. The threshold value will be the brightness " \
-        "defined below." )
 #define CONT_TEXT N_("Image contrast (0-2)")
 #define CONT_LONGTEXT N_("Set the image contrast, between 0 and 2. Defaults to 1.")
 #define HUE_TEXT N_("Image hue (0-360)")
@@ -97,8 +92,7 @@ typedef struct
 #define GAMMA_LONGTEXT N_("Set the image gamma, between 0.01 and 10. Defaults to 1.")
 
 static const char *const ppsz_filter_options[] = {
-    "contrast", "brightness", "hue", "saturation", "gamma",
-    "brightness-threshold", NULL
+    "contrast", "brightness", "hue", "saturation", "gamma", NULL
 };
 
 static bool ApplyFilter( filter_sys_t *p_sys,
@@ -208,7 +202,9 @@ static picture_t *AllocPicture( filter_t *p_filter )
     if (unlikely(cfg == NULL))
         return NULL;
 
-    return D3D11_AllocPicture(VLC_OBJECT(p_filter), &p_filter->fmt_out.video, p_filter->vctx_out, cfg);
+    return D3D11_AllocPicture(VLC_OBJECT(p_filter),
+                              &p_filter->fmt_out.video, p_filter->vctx_out,
+                              false, cfg);
 }
 
 static picture_t *Filter(filter_t *p_filter, picture_t *p_pic)
@@ -344,8 +340,6 @@ static void D3D11CloseAdjust(filter_t *filter)
     var_DelCallback( filter, "hue",        AdjustCallback, sys );
     var_DelCallback( filter, "saturation", AdjustCallback, sys );
     var_DelCallback( filter, "gamma",      AdjustCallback, sys );
-    var_DelCallback( filter, "brightness-threshold",
-                                             AdjustCallback, sys );
 
     for (int i=0; i<PROCESSOR_SLICES; i++)
     {
@@ -455,16 +449,12 @@ static int D3D11OpenAdjust(filter_t *filter)
     InitLevel(filter, &sys->Hue,        "hue",        0.0 );
     InitLevel(filter, &sys->Saturation, "saturation", 1.0 );
     sys->f_gamma = var_CreateGetFloatCommand( filter, "gamma" );
-    sys->b_brightness_threshold =
-        var_CreateGetBoolCommand( filter, "brightness-threshold" );
 
     var_AddCallback( filter, "contrast",   AdjustCallback, sys );
     var_AddCallback( filter, "brightness", AdjustCallback, sys );
     var_AddCallback( filter, "hue",        AdjustCallback, sys );
     var_AddCallback( filter, "saturation", AdjustCallback, sys );
     var_AddCallback( filter, "gamma",      AdjustCallback, sys );
-    var_AddCallback( filter, "brightness-threshold",
-                                             AdjustCallback, sys );
 
     hr = ID3D11VideoDevice_CreateVideoProcessor(sys->d3d_proc.d3dviddev,
                                                 sys->d3d_proc.procEnumerator, 0,
@@ -565,7 +555,6 @@ error:
 
 vlc_module_begin()
     set_description(N_("Direct3D11 adjust filter"))
-    set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
     set_callback_video_filter(D3D11OpenAdjust)
     add_shortcut( "adjust" )
@@ -584,9 +573,6 @@ vlc_module_begin()
         change_safe()
     add_float_with_range( "gamma", 1.0, 0.01, 10.0,
                           GAMMA_TEXT, GAMMA_LONGTEXT )
-        change_safe()
-    add_bool( "brightness-threshold", false,
-              THRES_TEXT, THRES_LONGTEXT )
         change_safe()
 
     add_submodule()
@@ -611,5 +597,10 @@ vlc_module_begin()
     add_integer("winrt-d3dcontext", 0x0, N_("Context"), NULL) /* ID3D11DeviceContext* */
 #endif /* VLC_WINSTORE_APP */
     add_shortcut ("d3d11")
+
+    add_submodule()
+    set_subcategory( SUBCAT_INPUT_VCODEC )
+    set_callbacks( D3D11OpenBlockDecoder, D3D11CloseBlockDecoder )
+    set_capability( "video decoder", 90 )
 
 vlc_module_end()

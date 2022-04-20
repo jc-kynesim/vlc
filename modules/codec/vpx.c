@@ -48,14 +48,18 @@ static void CloseDecoder(vlc_object_t *);
 #ifdef ENABLE_SOUT
 static const char *const ppsz_sout_options[] = { "quality-mode", NULL };
 static int OpenEncoder(vlc_object_t *);
-static void CloseEncoder(vlc_object_t *);
+static void CloseEncoder(encoder_t *);
 static block_t *Encode(encoder_t *p_enc, picture_t *p_pict);
 
 #define QUALITY_MODE_TEXT N_("Quality mode")
-#define QUALITY_MODE_LONGTEXT N_("Quality setting which will determine max encoding time\n" \
-        " - 0: Good quality\n"\
-        " - 1: Realtime\n"\
-        " - 2: Best quality")
+#define QUALITY_MODE_LONGTEXT N_("Quality setting which will determine max encoding time.")
+
+static const int quality_values[] = {
+    VPX_DL_GOOD_QUALITY, VPX_DL_REALTIME, VPX_DL_BEST_QUALITY
+};
+static const char* const quality_desc[] = {
+    N_("Good"), N_("Realtime"), N_("Best"),
+};
 #endif
 
 /*****************************************************************************
@@ -67,18 +71,17 @@ vlc_module_begin ()
     set_description(N_("WebM video decoder"))
     set_capability("video decoder", 60)
     set_callbacks(OpenDecoder, CloseDecoder)
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_VCODEC)
 #ifdef ENABLE_SOUT
     add_submodule()
     set_shortname("vpx")
-    set_capability("encoder", 60)
+    set_capability("video encoder", 60)
     set_description(N_("WebM video encoder"))
-    set_callbacks(OpenEncoder, CloseEncoder)
+    set_callback(OpenEncoder)
 #   define ENC_CFG_PREFIX "sout-vpx-"
     add_integer( ENC_CFG_PREFIX "quality-mode", VPX_DL_GOOD_QUALITY, QUALITY_MODE_TEXT,
                  QUALITY_MODE_LONGTEXT )
-        change_integer_range( 0, 2 )
+        change_integer_list( quality_values, quality_desc );
 #endif
 vlc_module_end ()
 
@@ -435,22 +438,28 @@ static int OpenEncoder(vlc_object_t *p_this)
         return VLC_EGENERIC;
     }
 
-    p_enc->pf_encode_video = Encode;
     p_enc->fmt_in.i_codec = VLC_CODEC_I420;
     config_ChainParse(p_enc, ENC_CFG_PREFIX, ppsz_sout_options, p_enc->p_cfg);
 
     /* Deadline (in ms) to spend in encoder */
     switch (var_GetInteger(p_enc, ENC_CFG_PREFIX "quality-mode")) {
-        case 1:
+        case VPX_DL_REALTIME:
             p_sys->quality = VPX_DL_REALTIME;
             break;
-        case 2:
+        case VPX_DL_BEST_QUALITY:
             p_sys->quality = VPX_DL_BEST_QUALITY;
             break;
         default:
             p_sys->quality = VPX_DL_GOOD_QUALITY;
             break;
     }
+
+    static const struct vlc_encoder_operations ops =
+    {
+        .close = CloseEncoder,
+        .encode_video = Encode,
+    };
+    p_enc->ops = &ops;
 
     return VLC_SUCCESS;
 }
@@ -521,12 +530,11 @@ static block_t *Encode(encoder_t *p_enc, picture_t *p_pict)
 /*****************************************************************************
  * CloseEncoder: encoder destruction
  *****************************************************************************/
-static void CloseEncoder(vlc_object_t *p_this)
+static void CloseEncoder(encoder_t *p_enc)
 {
-    encoder_t *p_enc = (encoder_t *)p_this;
     encoder_sys_t *p_sys = p_enc->p_sys;
     if (vpx_codec_destroy(&p_sys->ctx))
-        VPX_ERR(p_this, &p_sys->ctx, "Failed to destroy codec");
+        VPX_ERR(&p_enc->obj, &p_sys->ctx, "Failed to destroy codec");
     free(p_sys);
 }
 

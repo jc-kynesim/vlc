@@ -616,7 +616,7 @@ static bool ReadWin32( intf_thread_t *p_intf, unsigned char *p_buffer, int *pi_s
                                 MS_FROM_VLC_TICK(INTF_IDLE_SLEEP), TRUE ) == WAIT_OBJECT_0 )
     {
         // Prefer to fail early when there's not enough space to store a 4 bytes
-        // UTF8 character. The function will be immediatly called again and we won't
+        // UTF8 character. The function will be immediately called again and we won't
         // lose an input
         while( *pi_size < MAX_LINE_LENGTH - 4 &&
                ReadConsoleInput( p_intf->p_sys->hConsoleIn, &input_record, 1, &i_dw ) )
@@ -655,7 +655,7 @@ static bool ReadWin32( intf_thread_t *p_intf, unsigned char *p_buffer, int *pi_s
                         nbBytes++;
                     }
                     assert( clz( (unsigned char)~(p_buffer[*pi_size]) ) == nbBytes + 1 );
-                    // The first utf8 byte will be overriden by a \0
+                    // The first utf8 byte will be overridden by a \0
                 }
                 else
                     (*pi_size)--;
@@ -1039,7 +1039,6 @@ static void Deactivate( vlc_object_t *p_this )
 
 vlc_module_begin()
     set_shortname(N_("RC"))
-    set_category(CAT_INTERFACE)
     set_subcategory(SUBCAT_INTERFACE_MAIN)
     set_description(N_("Remote control interface"))
     add_bool("rc-show-pos", false, POS_TEXT, POS_LONGTEXT)

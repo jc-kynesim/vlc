@@ -36,22 +36,15 @@
 #define MENU_GET_ACTION(a) ( (uint16_t)( ((uint32_t)a) >> 16 ) )
 #define MENU_GET_EXTENSION(a) ( (uint16_t)( ((uint32_t)a) & 0xFFFF ) )
 
-ExtensionsManager* ExtensionsManager::instance = NULL;
-
 ExtensionsManager::ExtensionsManager( qt_intf_t *_p_intf, QObject *parent )
         : QObject( parent ), p_intf( _p_intf ), p_extensions_manager( NULL )
         , p_edp( NULL )
 {
-    assert( ExtensionsManager::instance == NULL );
-    instance = this;
-
     menuMapper = new QSignalMapper( this );
-    CONNECT( menuMapper, mapped( int ), this, triggerMenu( int ) );
+    connect( menuMapper, QSIGNALMAPPER_MAPPEDINT_SIGNAL, this, &ExtensionsManager::triggerMenu );
     connect( THEMIM, &PlayerController::playingStateChanged, this, &ExtensionsManager::playingChanged );
-    DCONNECT( THEMIM, inputChanged( bool ),
-              this, inputChanged( ) );
-    CONNECT( THEMIM, metaChanged( input_item_t* ),
-             this, metaChanged( input_item_t* ) );
+    connect( THEMIM, &PlayerController::inputChanged, this, &ExtensionsManager::inputChanged, Qt::DirectConnection );
+    connect( THEMIM, &PlayerController::metaChanged, this, &ExtensionsManager::metaChanged );
     b_unloading = false;
     b_failed = false;
 }
@@ -71,8 +64,7 @@ bool ExtensionsManager::loadExtensions()
 {
     if( !p_extensions_manager )
     {
-        p_extensions_manager = ( extensions_manager_t* )
-                    vlc_object_create( p_intf, sizeof( extensions_manager_t ) );
+        p_extensions_manager = vlc_object_create<extensions_manager_t>( p_intf );
         if( !p_extensions_manager )
         {
             b_failed = true;
@@ -172,7 +164,7 @@ void ExtensionsManager::menu( QMenu *current )
                     action = submenu->addAction( qfu( ppsz_titles[i] ) );
                     menuMapper->setMapping( action,
                                             MENU_MAP( pi_ids[i], i_ext ) );
-                    CONNECT( action, triggered(), menuMapper, map() );
+                    connect( action, &QAction::triggered, menuMapper, QOverload<>::of(&QSignalMapper::map) );
                     free( ppsz_titles[i] );
                 }
                 if( !i_num )
@@ -195,14 +187,14 @@ void ExtensionsManager::menu( QMenu *current )
             action = submenu->addAction( QIcon( ":/toolbar/clear.svg" ),
                                          qtr( "Deactivate" ) );
             menuMapper->setMapping( action, MENU_MAP( 0, i_ext ) );
-            CONNECT( action, triggered(), menuMapper, map() );
+            connect( action, &QAction::triggered, menuMapper, QOverload<>::of(&QSignalMapper::map) );
         }
         else
         {
             action = current->addAction(
                     qfu( p_ext->psz_shortdescription ? p_ext->psz_shortdescription: p_ext->psz_title ) );
             menuMapper->setMapping( action, MENU_MAP( 0, i_ext ) );
-            CONNECT( action, triggered(), menuMapper, map() );
+            connect( action, &QAction::triggered, menuMapper, QOverload<>::of(&QSignalMapper::map) );
 
             if( !extension_TriggerOnly( p_extensions_manager, p_ext ) )
             {

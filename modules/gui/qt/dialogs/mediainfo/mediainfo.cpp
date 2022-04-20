@@ -89,17 +89,17 @@ MediaInfoDialog::MediaInfoDialog( qt_intf_t *_p_intf,
     layout->addWidget( saveMetaButton, 2, 6 );
     layout->addWidget( closeButton, 2, 7 );
 
-    BUTTONACT( closeButton, close() );
+    BUTTONACT( closeButton, &MediaInfoDialog::close );
 
     /* The tabs buttons are shown in the main dialog for space and cosmetics */
-    BUTTONACT( saveMetaButton, saveMeta() );
+    BUTTONACT( saveMetaButton, &MediaInfoDialog::saveMeta );
 
     /* Let the MetaData Panel update the URI */
-    CONNECT( MP, uriSet( const QString& ), this, updateURI( const QString& ) );
-    CONNECT( MP, editing(), saveMetaButton, show() );
+    connect( MP, &MetaPanel::uriSet, this, &MediaInfoDialog::updateURI );
+    connect( MP, &MetaPanel::editing, saveMetaButton, &QPushButton::show );
 
     /* Display the buttonBar according to the Tab selected */
-    CONNECT( infoTabW, currentChanged( int ), this, updateButtons( int ) );
+    connect( infoTabW, &QTabWidget::currentChanged, this, &MediaInfoDialog::updateButtons );
 
     /* If using the General Mode */
     if( isMainInputInfo )
@@ -123,7 +123,7 @@ MediaInfoDialog::MediaInfoDialog( qt_intf_t *_p_intf,
     else
         msg_Dbg( p_intf, "Using an item specific info windows" );
 
-    /* Call update at start, so info is filled up at begginning */
+    /* Call update at start, so info is filled up at beginning */
     if( p_item )
         updateAllTabs( p_item );
 

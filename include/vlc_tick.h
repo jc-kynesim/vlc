@@ -31,6 +31,8 @@
 #ifndef __VLC_MTIME_H
 # define __VLC_MTIME_H 1
 
+struct timespec;
+
 /**
  * High precision date or time interval
  *
@@ -186,8 +188,15 @@ typedef int64_t msftime_t;
 #define vlc_tick_from_timespec(tv) \
     (vlc_tick_from_sec( (tv)->tv_sec ) + VLC_TICK_FROM_NS( (tv)->tv_nsec ))
 
-struct timespec timespec_from_vlc_tick(vlc_tick_t date);
-
+/**
+ * Converts a VLC tick to a POSIX time specification.
+ *
+ * \param ts [out] storage space for the time specification
+ * \param tick VLC tick
+ * \return @c ts
+ */
+VLC_API struct timespec *vlc_tick_to_timespec(struct timespec *restrict ts,
+                                              vlc_tick_t tick);
 
 /*****************************************************************************
  * MSTRTIME_MAX_SIZE: maximum possible size of vlc_tick_to_str

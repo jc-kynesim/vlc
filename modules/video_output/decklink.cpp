@@ -30,7 +30,6 @@
 # include "config.h"
 #endif
 
-#include <vlc_fixups.h>
 #include <cinttypes>
 
 #include <vlc_common.h>
@@ -59,6 +58,7 @@
 #if BLACKMAGIC_DECKLINK_API_VERSION < 0x0b010000
  #define IID_IDeckLinkProfileAttributes IID_IDeckLinkAttributes
  #define IDeckLinkProfileAttributes IDeckLinkAttributes
+ #define bmdVideoConnectionUnspecified 0
 #endif
 
 #define FRAME_SIZE 1920
@@ -136,12 +136,12 @@ static const char *const ppsz_videoconns[] = {
     "svideo"
 };
 static const char *const ppsz_videoconns_text[] = {
-    "SDI",
-    "HDMI",
-    "Optical SDI",
-    "Component",
-    "Composite",
-    "S-video",
+    N_("SDI"),
+    N_("HDMI"),
+    N_("Optical SDI"),
+    N_("Component"),
+    N_("Composite"),
+    N_("S-video"),
 };
 static const BMDVideoConnection rgbmd_videoconns[] =
 {
@@ -159,17 +159,18 @@ static const int rgi_afd_values[] = {
     0, 2, 3, 4, 8, 9, 10, 11, 13, 14, 15,
 };
 static const char * const rgsz_afd_text[] = {
-    "0:  Undefined",
-    "2:  Box 16:9 (top aligned)",
-    "3:  Box 14:9 (top aligned)",
-    "4:  Box > 16:9 (centre aligned)",
-    "8:  Same as coded frame (full frame)",
-    "9:   4:3 (centre aligned)",
-    "10: 16:9 (centre aligned)",
-    "11: 14:9 (centre aligned)",
-    "13:  4:3 (with shoot and protect 14:9 centre)",
-    "14: 16:9 (with shoot and protect 14:9 centre)",
-    "15: 16:9 (with shoot and protect  4:3 centre)",
+    /* Note: Skip further translation - too technical */
+    N_("Undefined"),
+    "Box 16:9 (top aligned)",
+    "Box 14:9 (top aligned)",
+    "Box > 16:9 (centre aligned)",
+    "Same as coded frame (full frame)",
+    "4:3  (centre aligned)",
+    "16:9 (centre aligned)",
+    "14:9 (centre aligned)",
+    "4:3  (with shoot and protect 14:9 centre)",
+    "16:9 (with shoot and protect 14:9 centre)",
+    "16:9 (with shoot and protect  4:3 centre)",
 };
 static_assert(ARRAY_SIZE(rgi_afd_values) == ARRAY_SIZE(rgsz_afd_text), "afd arrays messed up");
 
@@ -177,8 +178,7 @@ static const int rgi_ar_values[] = {
     0, 1,
 };
 static const char * const rgsz_ar_text[] = {
-    "0:   4:3",
-    "1:  16:9",
+    "4:3", "16:9",
 };
 static_assert(ARRAY_SIZE(rgi_ar_values) == ARRAY_SIZE(rgsz_ar_text), "afd arrays messed up");
 
@@ -213,6 +213,8 @@ struct decklink_sys_t
     vlc_tick_t offset;
 
     /* !With LOCK */
+
+    vlc_timer_t drain_timer;
 
     /* single video module exclusive */
     struct
@@ -249,7 +251,6 @@ vlc_module_begin()
 
     add_submodule ()
     set_description (N_("DeckLink Video Output module"))
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     set_callback_display(OpenVideo, 0)
     set_section(N_("DeckLink Video Options"), NULL)
@@ -276,7 +277,6 @@ vlc_module_begin()
 
     add_submodule ()
     set_description (N_("DeckLink Audio Output module"))
-    set_category(CAT_AUDIO)
     set_subcategory(SUBCAT_AUDIO_AOUT)
     set_capability("audio output", 0)
     set_callbacks (OpenAudio, CloseAudio)
@@ -417,6 +417,7 @@ static int OpenDecklink(vout_display_t *vd, decklink_sys_t *sys, video_format_t 
     IDeckLinkConfiguration *p_config = NULL;
     IDeckLinkProfileAttributes *p_attributes = NULL;
     IDeckLink *p_card = NULL;
+    void *pv;
     union {
         BMDDisplayMode id;
         char str[4];
@@ -479,8 +480,9 @@ static int OpenDecklink(vout_display_t *vd, decklink_sys_t *sys, video_format_t 
 
     /* Read attributes */
 
-    result = p_card->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&p_attributes);
+    result = p_card->QueryInterface(IID_IDeckLinkProfileAttributes, &pv);
     CHECK("Could not get IDeckLinkAttributes");
+    p_attributes = static_cast<IDeckLinkProfileAttributes*>(pv);
 
 #ifdef _WIN32
     LONGLONG iconn;
@@ -491,13 +493,13 @@ static int OpenDecklink(vout_display_t *vd, decklink_sys_t *sys, video_format_t 
     result = p_attributes->GetInt(BMDDeckLinkVideoOutputConnections, &iconn); /* reads mask */
     CHECK("Could not get BMDDeckLinkVideoOutputConnections");
 
-    result = p_card->QueryInterface(IID_IDeckLinkOutput,
-        (void**)&sys->p_output);
+    result = p_card->QueryInterface(IID_IDeckLinkOutput, &pv);
     CHECK("No outputs");
+    sys->p_output = static_cast<IDeckLinkOutput*>(pv);
 
-    result = p_card->QueryInterface(IID_IDeckLinkConfiguration,
-        (void**)&p_config);
+    result = p_card->QueryInterface(IID_IDeckLinkConfiguration, &pv);
     CHECK("Could not get config interface");
+    p_config = static_cast<IDeckLinkConfiguration*>(pv);
 
     /* Now configure card */
 
@@ -515,7 +517,7 @@ static int OpenDecklink(vout_display_t *vd, decklink_sys_t *sys, video_format_t 
                                           vd->source, wanted_mode.id);
     if(p_display_mode == NULL)
     {
-        msg_Err(vd, "Could not negociate a compatible display mode");
+        msg_Err(vd, "Could not negotiate a compatible display mode");
         goto error;
     }
     else
@@ -834,6 +836,17 @@ static void CloseVideo(vout_display_t *vd)
  * Audio
  *****************************************************************************/
 
+static void DrainReset(audio_output_t *aout)
+{
+    decklink_sys_t *sys = (decklink_sys_t *) aout->sys;
+
+    if (sys->drain_timer != NULL)
+    {
+        vlc_timer_destroy(sys->drain_timer);
+        sys->drain_timer = NULL;
+    }
+}
+
 static void Flush(audio_output_t *aout)
 {
     decklink_sys_t *sys = (decklink_sys_t *) aout->sys;
@@ -843,8 +856,17 @@ static void Flush(audio_output_t *aout)
     if (!p_output)
         return;
 
+    DrainReset(aout);
+
     if (sys->p_output->FlushBufferedAudioSamples() == E_FAIL)
         msg_Err(aout, "Flush failed");
+}
+
+static void DrainTimerCb(void *data)
+{
+    audio_output_t *aout = (audio_output_t *) data;
+
+    aout_DrainedReport(aout);
 }
 
 static void Drain(audio_output_t *aout)
@@ -856,9 +878,28 @@ static void Drain(audio_output_t *aout)
     if (!p_output)
         return;
 
+    assert(sys->drain_timer == NULL);
+
     uint32_t samples;
     sys->p_output->GetBufferedAudioSampleFrameCount(&samples);
-    vlc_tick_sleep(vlc_tick_from_samples(samples, sys->i_rate));
+
+    if (samples == 0)
+    {
+        aout_DrainedReport(aout);
+        return;
+    }
+
+    /* Create and arm a timer to notify when drained */
+    int ret = vlc_timer_create(&sys->drain_timer, DrainTimerCb, aout);
+    if (ret != 0)
+    {
+        aout_DrainedReport(aout);
+        return;
+    }
+
+    vlc_timer_schedule(sys->drain_timer, false,
+                       vlc_tick_from_samples(samples, sys->i_rate),
+                       VLC_TIMER_FIRE_ONCE);
 }
 
 
@@ -926,6 +967,7 @@ static int OpenAudio(vlc_object_t *p_this)
     sys->i_rate = var_InheritInteger(aout, AUDIO_CFG_PREFIX "audio-rate");
     vlc_cond_signal(&sys->cond);
     vlc_mutex_unlock(&sys->lock);
+    sys->drain_timer = NULL;
 
     aout->play      = PlayAudio;
     aout->start     = Start;
@@ -934,7 +976,7 @@ static int OpenAudio(vlc_object_t *p_this)
     aout->time_get  = TimeGet;
 
     aout->pause     = aout_PauseDefault;
-    aout->stop      = NULL;
+    aout->stop      = Flush;
     aout->mute_set  = NULL;
     aout->volume_set= NULL;
 

@@ -40,7 +40,7 @@ void input_ConfigVarInit ( input_thread_t *p_input )
 {
     /* Create Object Variables for private use only */
 
-    if( !input_priv(p_input)->b_preparsing )
+    if( input_priv(p_input)->type != INPUT_TYPE_PREPARSING )
     {
         var_Create( p_input, "video", VLC_VAR_BOOL | VLC_VAR_DOINHERIT );
         var_Create( p_input, "audio", VLC_VAR_BOOL | VLC_VAR_DOINHERIT );
@@ -106,7 +106,6 @@ void input_ConfigVarInit ( input_thread_t *p_input )
     var_Create( p_input, "input-record-native", VLC_VAR_BOOL | VLC_VAR_DOINHERIT );
 
     /* */
-    var_Create( p_input, "access", VLC_VAR_STRING | VLC_VAR_DOINHERIT );
     var_Create( p_input, "demux", VLC_VAR_STRING | VLC_VAR_DOINHERIT );
     var_Create( p_input, "demux-filter", VLC_VAR_STRING | VLC_VAR_DOINHERIT );
     var_Create( p_input, "stream-filter", VLC_VAR_STRING | VLC_VAR_DOINHERIT );
@@ -123,4 +122,7 @@ void input_ConfigVarInit ( input_thread_t *p_input )
 
     /* Inherited by demux/subtitle.c */
     var_Create( p_input, "sub-original-fps", VLC_VAR_FLOAT );
+
+    /* used by Medialibrary */
+    var_Create( p_input, "save-recentplay", VLC_VAR_BOOL | VLC_VAR_DOINHERIT );
 }

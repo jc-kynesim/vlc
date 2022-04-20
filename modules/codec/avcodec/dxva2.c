@@ -54,7 +54,6 @@ static int Open(vlc_va_t *, AVCodecContext *, enum AVPixelFormat hwfmt, const AV
 
 vlc_module_begin()
     set_description(N_("DirectX Video Acceleration (DXVA) 2.0"))
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_VCODEC)
     set_va_callback(Open, 110)
 vlc_module_end()
@@ -69,7 +68,7 @@ typedef struct {
     D3DFORMAT    format;
     vlc_fourcc_t codec;
 } d3d9_format_t;
-/* XXX Prefered format must come first */
+/* XXX Preferred format must come first */
 static const d3d9_format_t d3d_formats[] = {
     { "YV12",   MAKEFOURCC('Y','V','1','2'),    VLC_CODEC_YV12 },
     { "NV12",   MAKEFOURCC('N','V','1','2'),    VLC_CODEC_NV12 },

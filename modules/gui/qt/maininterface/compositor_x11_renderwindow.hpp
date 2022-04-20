@@ -26,6 +26,7 @@
 
 #include <QObject>
 #include <QMutex>
+#include <QMainWindow>
 
 #include <xcb/xcb.h>
 #include <xcb/render.h>
@@ -39,7 +40,6 @@
 #include "compositor_x11_utils.hpp"
 
 class QWidget;
-class QMainWindow;
 class QSocketNotifier;
 
 namespace vlc {
@@ -110,8 +110,8 @@ private:
 };
 
 /**
- * @brief The X11DamageObserver class  allows to register and listen
- * damages on a X11 surface. This is performed on a separate X11 conection
+ * @brief The X11DamageObserver class  allows to register and listen to
+ * damages on a X11 surface. This is performed on a separate X11 connection
  * from Qt, as we want to be able to be able to continue refreshing the composition
  * when Qt main thread is stalled.
  */
@@ -144,11 +144,11 @@ public:
     QSocketNotifier* m_socketNotifier = nullptr;
 };
 
-class CompositorX11RenderWindow : public QObject
+class CompositorX11RenderWindow : public QMainWindow
 {
     Q_OBJECT
 public:
-    explicit CompositorX11RenderWindow(qt_intf_t* p_intf, xcb_connection_t* conn, bool useCDS, QObject* parent = nullptr);
+    explicit CompositorX11RenderWindow(qt_intf_t* p_intf, xcb_connection_t* conn, bool useCDS, QWidget* parent = nullptr);
     ~CompositorX11RenderWindow();
 
     bool init();
@@ -185,7 +185,6 @@ private:
     qt_intf_t* m_intf = nullptr;
     xcb_connection_t* m_conn = nullptr;
 
-    QMainWindow* m_rootWidget = nullptr;
     QWidget* m_stable = nullptr;
 
     QThread* m_renderThread = nullptr;

@@ -18,18 +18,14 @@
 #ifndef COMPOSITORX11_HPP
 #define COMPOSITORX11_HPP
 
-#include <QObject>
 #include "compositor.hpp"
 #include "videosurface.hpp"
 #include <memory>
 
 #include <xcb/xcb.h>
 
-class QMainWindow;
+class QObject;
 class QWidget;
-class MainUI;
-class InterfaceWindowHandler;
-class VideoWindowHandler;
 
 namespace vlc {
 
@@ -54,6 +50,8 @@ public:
     inline Type type() const override { return X11Compositor; };
 
     inline QWindow* interfaceMainWindow() const override { return m_interfaceWindow; };
+
+    QQuickItem * activeFocusItem() const override;
 
 private:
     int windowEnable(const vout_window_cfg_t *)  override;

@@ -212,7 +212,7 @@ static int DirRead(stream_t *p_access, input_item_node_t *p_node)
                 free( psz_path );
 
                 i_ret = vlc_readdir_helper_additem( &rdh, psz_uri, NULL,
-                                    psz_name, ITEM_TYPE_DIRECTORY, ITEM_NET );
+                                    psz_name, ITEM_TYPE_DIRECTORY, ITEM_NET, NULL );
                 free( psz_name );
                 free( psz_uri );
             }
@@ -385,7 +385,6 @@ vlc_module_begin()
     set_description(N_("UNC input"))
     set_help(N_("Microsoft Windows networking (UNC) input"))
     set_capability("access", 0)
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_ACCESS)
     add_string("smb-user", NULL, SMB_USER_TEXT, SMB_USER_LONGTEXT)
     add_password("smb-pwd", NULL, SMB_PASS_TEXT, SMB_PASS_LONGTEXT)

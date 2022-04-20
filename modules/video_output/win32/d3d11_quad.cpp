@@ -27,8 +27,6 @@
 #include <cassert>
 #include <vlc_common.h>
 
-#include <d3d11.h>
-
 #include "d3d11_quad.h"
 #include "common.h"
 
@@ -103,7 +101,7 @@ static bool AllocQuadVertices(vlc_object_t *o, d3d11_device_t *d3d_dev, d3d11_qu
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    hr = d3d_dev->d3ddevice->CreateBuffer(&bd, NULL, quad->vertexBuffer.GetAddressOf());
+    hr = d3d_dev->d3ddevice->CreateBuffer(&bd, NULL, &quad->vertexBuffer);
     if(FAILED(hr)) {
         msg_Err(o, "Failed to create vertex buffer. (hr=%lX)", hr);
         goto fail;
@@ -113,7 +111,7 @@ static bool AllocQuadVertices(vlc_object_t *o, d3d11_device_t *d3d_dev, d3d11_qu
     bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
     bd.ByteWidth = sizeof(WORD) * quad->generic.indexCount;
 
-    hr = d3d_dev->d3ddevice->CreateBuffer(&bd, NULL, quad->indexBuffer.GetAddressOf());
+    hr = d3d_dev->d3ddevice->CreateBuffer(&bd, NULL, &quad->indexBuffer);
     if(FAILED(hr)) {
         msg_Err(o, "Could not create the quad indices. (hr=0x%lX)", hr);
         goto fail;
@@ -126,19 +124,23 @@ fail:
     return false;
 }
 
-void D3D11_ReleaseQuad(d3d11_quad_t *quad)
+void d3d11_quad_t::Reset()
 {
-    quad->pPixelShaderConstants.Reset();
-    quad->vertexBuffer.Reset();
-    quad->indexBuffer.Reset();
-    quad->viewpointShaderConstant.Reset();
-    D3D11_ReleaseQuadPixelShader(quad);
-    ReleaseD3D11PictureSys(&quad->picSys);
+    pPixelShaderConstants.Reset();
+    vertexBuffer.Reset();
+    indexBuffer.Reset();
+    viewpointShaderConstant.Reset();
+    for (size_t i=0; i<ARRAY_SIZE(d3dpixelShader); i++)
+    {
+        d3dpixelShader[i].Reset();
+        SamplerStates[i].Reset();
+    }
+    ReleaseD3D11PictureSys(&picSys);
 }
 
 #undef D3D11_UpdateQuadPosition
 bool D3D11_UpdateQuadPosition( vlc_object_t *o, d3d11_device_t *d3d_dev, d3d11_quad_t *quad,
-                                const RECT *output, video_orientation_t orientation )
+                                const RECT *output, video_transform_t orientation )
 {
     bool result = true;
     HRESULT hr;
@@ -251,7 +253,7 @@ int D3D11_AllocateQuad(vlc_object_t *o, d3d11_device_t *d3d_dev,
     constantDesc.ByteWidth = sizeof(PS_CONSTANT_BUFFER);
     constantDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     constantDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    hr = d3d_dev->d3ddevice->CreateBuffer(&constantDesc, NULL, quad->pPixelShaderConstants.GetAddressOf());
+    hr = d3d_dev->d3ddevice->CreateBuffer(&constantDesc, NULL, &quad->pPixelShaderConstants);
     if(FAILED(hr)) {
         msg_Err(o, "Could not create the pixel shader constant buffer. (hr=0x%lX)", hr);
         goto error;
@@ -261,7 +263,7 @@ int D3D11_AllocateQuad(vlc_object_t *o, d3d11_device_t *d3d_dev,
     {
         static_assert((sizeof(VS_PROJECTION_CONST)%16)==0,"Constant buffers require 16-byte alignment");
         constantDesc.ByteWidth = sizeof(VS_PROJECTION_CONST);
-        hr = d3d_dev->d3ddevice->CreateBuffer(&constantDesc, NULL, quad->viewpointShaderConstant.GetAddressOf());
+        hr = d3d_dev->d3ddevice->CreateBuffer(&constantDesc, NULL, &quad->viewpointShaderConstant);
         if(FAILED(hr)) {
             msg_Err(o, "Could not create the vertex shader constant buffer. (hr=0x%lX)", hr);
             goto error;
@@ -274,7 +276,7 @@ int D3D11_AllocateQuad(vlc_object_t *o, d3d11_device_t *d3d_dev,
     return VLC_SUCCESS;
 
 error:
-    D3D11_ReleaseQuad(quad);
+    quad->Reset();
     return VLC_EGENERIC;
 }
 
@@ -296,26 +298,26 @@ int D3D11_SetupQuad(vlc_object_t *o, d3d11_device_t *d3d_dev, const video_format
     return VLC_SUCCESS;
 }
 
-void D3D11_UpdateViewport(d3d11_quad_t *quad, const RECT *rect, const d3d_format_t *display)
+void d3d11_quad_t::UpdateViewport(const RECT *rect, const d3d_format_t *display)
 {
     LONG srcAreaWidth, srcAreaHeight;
 
     srcAreaWidth  = RECTWidth(*rect);
     srcAreaHeight = RECTHeight(*rect);
 
-    quad->cropViewport[0].TopLeftX = rect->left;
-    quad->cropViewport[0].TopLeftY = rect->top;
-    quad->cropViewport[0].Width    = srcAreaWidth;
-    quad->cropViewport[0].Height   = srcAreaHeight;
+    cropViewport[0].TopLeftX = rect->left;
+    cropViewport[0].TopLeftY = rect->top;
+    cropViewport[0].Width    = srcAreaWidth;
+    cropViewport[0].Height   = srcAreaHeight;
 
-    switch ( quad->generic.textureFormat->formatTexture )
+    switch ( generic.textureFormat->formatTexture )
     {
     case DXGI_FORMAT_NV12:
     case DXGI_FORMAT_P010:
-        quad->cropViewport[1].TopLeftX = rect->left / 2;
-        quad->cropViewport[1].TopLeftY = rect->top / 2;
-        quad->cropViewport[1].Width    = srcAreaWidth / 2;
-        quad->cropViewport[1].Height   = srcAreaHeight / 2;
+        cropViewport[1].TopLeftX = rect->left / 2;
+        cropViewport[1].TopLeftY = rect->top / 2;
+        cropViewport[1].Width    = srcAreaWidth / 2;
+        cropViewport[1].Height   = srcAreaHeight / 2;
         break;
     case DXGI_FORMAT_R8G8B8A8_UNORM:
     case DXGI_FORMAT_B8G8R8A8_UNORM:
@@ -330,29 +332,29 @@ void D3D11_UpdateViewport(d3d11_quad_t *quad, const RECT *rect, const d3d_format
         if ( display->formatTexture == DXGI_FORMAT_NV12 ||
              display->formatTexture == DXGI_FORMAT_P010 )
         {
-            quad->cropViewport[1].TopLeftX = rect->left / 2;
-            quad->cropViewport[1].TopLeftY = rect->top / 2;
-            quad->cropViewport[1].Width    = srcAreaWidth / 2;
-            quad->cropViewport[1].Height   = srcAreaHeight / 2;
+            cropViewport[1].TopLeftX = rect->left / 2;
+            cropViewport[1].TopLeftY = rect->top / 2;
+            cropViewport[1].Width    = srcAreaWidth / 2;
+            cropViewport[1].Height   = srcAreaHeight / 2;
         }
         break;
     case DXGI_FORMAT_UNKNOWN:
-        switch ( quad->generic.textureFormat->fourcc )
+        switch ( generic.textureFormat->fourcc )
         {
         case VLC_CODEC_YUVA:
             if ( display->formatTexture != DXGI_FORMAT_NV12 &&
                  display->formatTexture != DXGI_FORMAT_P010 )
             {
-                quad->cropViewport[1] = quad->cropViewport[0];
+                cropViewport[1] = cropViewport[0];
                 break;
             }
             /* fallthrough */
         case VLC_CODEC_I420_10L:
         case VLC_CODEC_I420:
-            quad->cropViewport[1].TopLeftX = quad->cropViewport[0].TopLeftX / 2;
-            quad->cropViewport[1].TopLeftY = quad->cropViewport[0].TopLeftY / 2;
-            quad->cropViewport[1].Width    = quad->cropViewport[0].Width / 2;
-            quad->cropViewport[1].Height   = quad->cropViewport[0].Height / 2;
+            cropViewport[1].TopLeftX = cropViewport[0].TopLeftX / 2;
+            cropViewport[1].TopLeftY = cropViewport[0].TopLeftY / 2;
+            cropViewport[1].Width    = cropViewport[0].Width / 2;
+            cropViewport[1].Height   = cropViewport[0].Height / 2;
             break;
         }
         break;

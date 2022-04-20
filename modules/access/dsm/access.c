@@ -51,6 +51,7 @@
 
 #include <bdsm/bdsm.h>
 #include "../smb_common.h"
+#include "../cache.h"
 
 /*****************************************************************************
  * Module descriptor
@@ -78,7 +79,6 @@ vlc_module_begin ()
     set_shortname( "dsm" )
     set_description( N_("libdsm SMB input") )
     set_help(BDSM_HELP)
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_ACCESS )
     add_string( "smb-user", NULL, SMB_USER_TEXT, SMB_USER_LONGTEXT )
     add_password("smb-pwd", NULL, SMB_PASS_TEXT, SMB_PASS_LONGTEXT)
@@ -97,7 +97,6 @@ vlc_module_begin ()
     add_submodule()
         add_shortcut( "dsm-sd" )
         set_description( N_("libdsm NETBIOS discovery module") )
-        set_category( CAT_PLAYLIST )
         set_subcategory( SUBCAT_PLAYLIST_SD )
         set_capability( "services_discovery", 0 )
         set_callbacks( bdsm_SdOpen, bdsm_SdClose )
@@ -109,6 +108,15 @@ vlc_module_end ()
 /*****************************************************************************
  * Local prototypes
  *****************************************************************************/
+
+struct dsm_cache_context
+{
+    smb_session *session;
+    smb_tid tid;
+};
+
+VLC_ACCESS_CACHE_REGISTER(dsm_cache);
+
 static ssize_t Read( stream_t *, void *, size_t );
 static int Seek( stream_t *, uint64_t );
 static int Control( stream_t *, int, va_list );
@@ -118,11 +126,10 @@ static int get_address( stream_t *p_access );
 static int login( stream_t *p_access );
 static bool get_path( stream_t *p_access );
 static int add_item( stream_t *p_access,  struct vlc_readdir_helper *p_rdh,
-                     const char *psz_name, int i_type );
+                     const char *psz_name, int i_type, smb_stat *p_st );
 
 typedef struct
 {
-    netbios_ns         *p_ns;               /**< Netbios name service */
     smb_session        *p_session;          /**< bdsm SMB Session object */
 
     vlc_url_t           url;
@@ -135,7 +142,56 @@ typedef struct
 
     smb_fd              i_fd;               /**< SMB fd for the file we're reading */
     smb_tid             i_tid;              /**< SMB Tree ID we're connected to */
+
+    struct vlc_access_cache_entry *cache_entry;
 } access_sys_t;
+
+#if BDSM_VERSION_CURRENT >= 5
+
+static void
+smb_session_interrupt_callback( void *data )
+{
+    smb_session_abort( data );
+}
+
+static inline void
+smb_session_interrupt_register( access_sys_t *sys )
+{
+    vlc_interrupt_register( smb_session_interrupt_callback, sys->p_session );
+}
+
+static inline void
+smb_session_interrupt_unregister( void )
+{
+    vlc_interrupt_unregister();
+}
+
+static void
+netbios_ns_interrupt_callback( void *data )
+{
+    netbios_ns_abort( data );
+}
+
+static inline void
+netbios_ns_interrupt_register( netbios_ns *ns )
+{
+    vlc_interrupt_register( netbios_ns_interrupt_callback, ns );
+}
+
+static inline void
+netbios_ns_interrupt_unregister( void )
+{
+    vlc_interrupt_unregister();
+}
+
+#else
+
+#define smb_session_interrupt_register( sys ) do {} while (0)
+#define smb_session_interrupt_unregister() do {} while(0)
+#define netbios_ns_interrupt_register( ns ) do {} while (0)
+#define netbios_ns_interrupt_unregister() do {} while (0)
+
+#endif
 
 /*****************************************************************************
  * Open: Initialize module's data structures and libdsm
@@ -151,10 +207,6 @@ static int Open( vlc_object_t *p_this )
     p_sys = p_access->p_sys = (access_sys_t*)calloc( 1, sizeof( access_sys_t ) );
     if( p_access->p_sys == NULL )
         return VLC_ENOMEM;
-
-    p_sys->p_ns = netbios_ns_new();
-    if( p_sys->p_ns == NULL )
-        goto error;
 
     p_sys->p_session = smb_session_new();
     if( p_sys->p_session == NULL )
@@ -172,18 +224,6 @@ static int Open( vlc_object_t *p_this )
     msg_Dbg( p_access, "Session: Host name = %s, ip = %s", p_sys->netbios_name,
              inet_ntoa( p_sys->addr ) );
 
-    /* Now that we have the required data, let's establish a session */
-    status = smb_session_connect( p_sys->p_session, p_sys->netbios_name,
-                                  p_sys->addr.s_addr, SMB_TRANSPORT_TCP );
-    if( status != DSM_SUCCESS )
-    {
-        msg_Err( p_access, "Unable to connect/negotiate SMB session");
-        /* FIXME: libdsm wrongly return network error when the server can't
-         * handle the SMBv1 protocol */
-        status = DSM_ERROR_GENERIC;
-        goto error;
-    }
-
     get_path( p_access );
 
     if( login( p_access ) != VLC_SUCCESS )
@@ -195,19 +235,26 @@ static int Open( vlc_object_t *p_this )
 
     /* If there is no shares, browse them */
     if( !p_sys->psz_share )
+    {
         return BrowserInit( p_access );
+    }
 
     assert(p_sys->i_fd > 0);
 
     msg_Dbg( p_access, "Path: Share name = %s, path = %s", p_sys->psz_share,
              p_sys->psz_path );
 
+    smb_session_interrupt_register( p_sys );
+
     st = smb_stat_fd( p_sys->p_session, p_sys->i_fd );
     if( smb_stat_get( st, SMB_STAT_ISDIR ) )
     {
         smb_fclose( p_sys->p_session, p_sys->i_fd );
+        smb_session_interrupt_unregister();
         return BrowserInit( p_access );
     }
+
+    smb_session_interrupt_unregister();
 
     msg_Dbg( p_access, "Successfully opened smb://%s", p_access->psz_location );
 
@@ -246,19 +293,21 @@ static int OpenNotForced( vlc_object_t *p_this )
 /*****************************************************************************
  * Close: free unused data structures
  *****************************************************************************/
+
 static void Close( vlc_object_t *p_this )
 {
     stream_t     *p_access = (stream_t*)p_this;
     access_sys_t *p_sys = p_access->p_sys;
 
-    if( p_sys->p_ns )
-        netbios_ns_destroy( p_sys->p_ns );
     if( p_sys->i_fd )
         smb_fclose( p_sys->p_session, p_sys->i_fd );
-    if( p_sys->p_session )
-        smb_session_destroy( p_sys->p_session );
     vlc_UrlClean( &p_sys->url );
     free( p_sys->psz_fullpath );
+
+    if( p_sys->cache_entry )
+        vlc_access_cache_AddEntry( &dsm_cache, p_sys->cache_entry );
+    else if( p_sys->p_session != NULL )
+        smb_session_destroy( p_sys->p_session );
 
     free( p_sys );
 }
@@ -278,11 +327,20 @@ static int get_address( stream_t *p_access )
         /* This is not an ip address, let's try netbios/dns resolve */
         struct addrinfo *p_info = NULL;
 
+        netbios_ns *p_ns = netbios_ns_new();
+        if( p_ns == NULL )
+            return VLC_EGENERIC;
+        netbios_ns_interrupt_register( p_ns );
+
         /* Is this a netbios name on this LAN ? */
         uint32_t ip4_addr;
-        if( netbios_ns_resolve( p_sys->p_ns, p_sys->url.psz_host,
-                                NETBIOS_FILESERVER,
-                                &ip4_addr) == 0 )
+
+        int ret = netbios_ns_resolve( p_ns, p_sys->url.psz_host,
+                                      NETBIOS_FILESERVER, &ip4_addr);
+        netbios_ns_interrupt_unregister();
+        netbios_ns_destroy( p_ns );
+
+        if( ret == 0 )
         {
             p_sys->addr.s_addr = ip4_addr;
             strlcpy( p_sys->netbios_name, p_sys->url.psz_host, 16);
@@ -307,8 +365,17 @@ static int get_address( stream_t *p_access )
             return VLC_EGENERIC;
     }
 
+    netbios_ns *p_ns = netbios_ns_new();
+    if( p_ns == NULL )
+        return VLC_EGENERIC;
+    netbios_ns_interrupt_register( p_ns );
+
     /* We have an IP address, let's find the NETBIOS name */
-    const char *psz_nbt = netbios_ns_inverse( p_sys->p_ns, p_sys->addr.s_addr );
+    const char *psz_nbt = netbios_ns_inverse( p_ns, p_sys->addr.s_addr );
+
+    netbios_ns_interrupt_unregister();
+    netbios_ns_destroy( p_ns );
+
     if( psz_nbt != NULL )
         strlcpy( p_sys->netbios_name, psz_nbt, 16 );
     else
@@ -354,6 +421,14 @@ error:
         == NT_STATUS_ACCESS_DENIED ? EACCES : ENOENT;
 }
 
+static void
+dsm_FreeContext(void *context_)
+{
+    struct dsm_cache_context *context = context_;
+    smb_session_destroy( context->session );
+    free( context );
+}
+
 /* Performs login with existing credentials and ask the user for new ones on
    failure */
 static int login( stream_t *p_access )
@@ -385,10 +460,56 @@ static int login( stream_t *p_access )
     }
     psz_domain = credential.psz_realm ? credential.psz_realm : p_sys->netbios_name;
 
+    struct vlc_access_cache_entry *cache_entry =
+        vlc_access_cache_GetSmbEntry( &dsm_cache, p_sys->netbios_name, p_sys->psz_share,
+                                      credential.psz_username);
+
+    if( cache_entry != NULL )
+    {
+        struct dsm_cache_context *context = cache_entry->context;
+
+        smb_session_interrupt_register( p_sys );
+        int ret = smb_fopen( context->session, context->tid,
+                             p_sys->psz_path, SMB_MOD_RO, &p_sys->i_fd );
+        smb_session_interrupt_unregister();
+
+        if( ret == DSM_SUCCESS )
+        {
+            p_sys->cache_entry = cache_entry;
+
+            smb_session_destroy( p_sys->p_session );
+
+            p_sys->p_session = context->session;
+            p_sys->i_tid = context->tid;
+            i_ret = VLC_SUCCESS;
+            msg_Dbg( p_access, "re-using old dsm session" );
+            goto error;
+        }
+    }
+
+    smb_session_interrupt_register( p_sys );
+
+    /* Now that we have the required data, let's establish a session */
+    int status = smb_session_connect( p_sys->p_session, p_sys->netbios_name,
+                                      p_sys->addr.s_addr, SMB_TRANSPORT_TCP );
+    if( status != DSM_SUCCESS )
+    {
+        msg_Err( p_access, "Unable to connect/negotiate SMB session");
+        /* FIXME: libdsm wrongly return network error when the server can't
+         * handle the SMBv1 protocol */
+        smb_session_interrupt_unregister();
+        goto error;
+    }
+
     /* Try to authenticate on the remote machine */
     int connect_err = smb_connect( p_access, psz_login, psz_password, psz_domain );
     if( connect_err == ENOENT )
+    {
+        smb_session_interrupt_unregister();
         goto error;
+    }
+
+    smb_session_interrupt_unregister();
 
     if( connect_err == EACCES )
     {
@@ -408,7 +529,10 @@ static int login( stream_t *p_access )
             psz_password = credential.psz_password;
             psz_domain = credential.psz_realm ? credential.psz_realm
                                               : p_sys->netbios_name;
+
+            smb_session_interrupt_register( p_sys );
             connect_err = smb_connect( p_access, psz_login, psz_password, psz_domain );
+            smb_session_interrupt_unregister();
         }
 
         if( connect_err != 0 )
@@ -430,6 +554,28 @@ static int login( stream_t *p_access )
     if( !b_guest )
         vlc_credential_store( &credential, p_access );
 
+    if( p_sys->psz_share )
+    {
+        struct dsm_cache_context *context = malloc(sizeof(*context));
+        if( context )
+        {
+            context->session = p_sys->p_session;
+            context->tid = p_sys->i_tid;
+            p_sys->cache_entry =
+                vlc_access_cache_entry_NewSmb( context, p_sys->netbios_name,
+                                               p_sys->psz_share,
+                                               credential.psz_username,
+                                               dsm_FreeContext);
+        }
+        else
+            p_sys->cache_entry = NULL;
+
+        if( p_sys->cache_entry == NULL )
+        {
+            smb_session_destroy( p_sys->p_session );
+            goto error;
+        }
+    }
     i_ret = VLC_SUCCESS;
 error:
     vlc_credential_clean( &credential );
@@ -508,7 +654,11 @@ static int Seek( stream_t *p_access, uint64_t i_pos )
 
     msg_Dbg( p_access, "seeking to %"PRId64, i_pos );
 
-    if (smb_fseek(p_sys->p_session, p_sys->i_fd, i_pos, SMB_SEEK_SET) == -1)
+    smb_session_interrupt_register( p_sys );
+    int ret = smb_fseek(p_sys->p_session, p_sys->i_fd, i_pos, SMB_SEEK_SET);
+    smb_session_interrupt_unregister();
+
+    if (ret == -1)
         return VLC_EGENERIC;
 
     return VLC_SUCCESS;
@@ -522,7 +672,10 @@ static ssize_t Read( stream_t *p_access, void *p_buffer, size_t i_len )
     access_sys_t *p_sys = p_access->p_sys;
     int i_read;
 
+    smb_session_interrupt_register( p_sys );
     i_read = smb_fread( p_sys->p_session, p_sys->i_fd, p_buffer, i_len );
+    smb_session_interrupt_unregister();
+
     if( i_read < 0 )
     {
         msg_Err( p_access, "read failed" );
@@ -576,7 +729,7 @@ static int Control( stream_t *p_access, int i_query, va_list args )
 }
 
 static int add_item( stream_t *p_access, struct vlc_readdir_helper *p_rdh,
-                     const char *psz_name, int i_type )
+                     const char *psz_name, int i_type, smb_stat *p_st )
 {
     char         *psz_uri;
     int           i_ret;
@@ -593,8 +746,14 @@ static int add_item( stream_t *p_access, struct vlc_readdir_helper *p_rdh,
     if( i_ret == -1 )
         return VLC_ENOMEM;
 
+    input_item_t *p_item;
     i_ret = vlc_readdir_helper_additem( p_rdh, psz_uri, NULL, psz_name, i_type,
-                                        ITEM_NET );
+                                        ITEM_NET, &p_item );
+    if ( i_ret == VLC_SUCCESS && p_item && p_st )
+    {
+        input_item_AddStat( p_item, "mtime", smb_stat_get( *p_st, SMB_STAT_MTIME ));
+        input_item_AddStat( p_item, "size", smb_stat_get( *p_st, SMB_STAT_SIZE ));
+    }
     free( psz_uri );
     return i_ret;
 }
@@ -607,9 +766,16 @@ static int BrowseShare( stream_t *p_access, input_item_node_t *p_node )
     size_t          share_count;
     int             i_ret = VLC_SUCCESS;
 
+    smb_session_interrupt_register( p_sys );
+
     if( smb_share_get_list( p_sys->p_session, &shares, &share_count )
         != DSM_SUCCESS )
+    {
+        smb_session_interrupt_unregister();
         return VLC_EGENERIC;
+    }
+
+    smb_session_interrupt_unregister();
 
     struct vlc_readdir_helper rdh;
     vlc_readdir_helper_init( &rdh, p_access, p_node );
@@ -621,7 +787,7 @@ static int BrowseShare( stream_t *p_access, input_item_node_t *p_node )
         if( psz_name[strlen( psz_name ) - 1] == '$')
             continue;
 
-        i_ret = add_item( p_access, &rdh, psz_name, ITEM_TYPE_DIRECTORY );
+        i_ret = add_item( p_access, &rdh, psz_name, ITEM_TYPE_DIRECTORY, NULL );
     }
 
     vlc_readdir_helper_finish( &rdh, i_ret == VLC_SUCCESS );
@@ -644,11 +810,18 @@ static int BrowseDirectory( stream_t *p_access, input_item_node_t *p_node )
     {
         if( asprintf( &psz_query, "%s\\*", p_sys->psz_path ) == -1 )
             return VLC_ENOMEM;
+
+        smb_session_interrupt_register( p_sys );
         files = smb_find( p_sys->p_session, p_sys->i_tid, psz_query );
+        smb_session_interrupt_unregister();
         free( psz_query );
     }
     else
+    {
+        smb_session_interrupt_register( p_sys );
         files = smb_find( p_sys->p_session, p_sys->i_tid, "\\*" );
+        smb_session_interrupt_unregister();
+    }
 
     if( files == NULL )
         return VLC_EGENERIC;
@@ -672,7 +845,7 @@ static int BrowseDirectory( stream_t *p_access, input_item_node_t *p_node )
 
         i_type = smb_stat_get( st, SMB_STAT_ISDIR ) ?
                  ITEM_TYPE_DIRECTORY : ITEM_TYPE_FILE;
-        i_ret = add_item( p_access, &rdh, psz_name, i_type );
+        i_ret = add_item( p_access, &rdh, psz_name, i_type, &st );
     }
 
     vlc_readdir_helper_finish( &rdh, i_ret == VLC_SUCCESS );

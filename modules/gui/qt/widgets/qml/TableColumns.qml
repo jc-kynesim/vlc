@@ -19,6 +19,9 @@ import QtQuick 2.11
 import QtQuick.Controls 2.4
 import QtQuick.Layouts 1.11
 
+import org.videolan.vlc 0.1
+import org.videolan.medialib 0.1
+
 import "qrc:///widgets/" as Widgets
 import "qrc:///util/Helpers.js" as Helpers
 import "qrc:///style/"
@@ -59,10 +62,19 @@ Item {
 
                 anchors.fill: parent
 
-                source: (rowModel ? (root.showTitleText ? rowModel.cover : rowModel[model.criteria]) : VLCStyle.noArtCover) || VLCStyle.noArtCover
+                source: {
+                    var cover = null
+                    if (!!rowModel) {
+                        if (root.showTitleText)
+                            cover = rowModel.cover
+                        else
+                            cover = rowModel[model.criteria]
+                    }
+                    return cover || model.placeHolder || VLCStyle.noArtAlbumCover
+                }
                 playCoverVisible: (currentlyFocused || containsMouse)
                 playIconSize: VLCStyle.play_cover_small
-                onPlayIconClicked: g_mainDisplay.play(medialib, rowModel.id)
+                onPlayIconClicked: g_mainDisplay.play(MediaLib, rowModel.id)
                 radius: root.titleCover_radius
 
                 imageOverlay: Item {
@@ -84,13 +96,24 @@ Item {
             }
         }
 
-        Widgets.ListLabel {
-            text: (!rowModel || !root.showTitleText) ? "" : (rowModel[model.criteria] || i18n.qtr("Unknown Title"))
+        Widgets.ScrollingText {
+            id: textRect
+
+            label: text
+            forceScroll: parent.currentlyFocused
+            clip: scrolling
             visible: root.showTitleText
-            color: foregroundColor
 
             Layout.fillHeight: true
             Layout.fillWidth: true
+
+            Widgets.ListLabel {
+                id: text
+
+                anchors.verticalCenter: parent.verticalCenter
+                text: (!rowModel || !root.showTitleText) ? "" : (rowModel[model.criteria] || I18n.qtr("Unknown Title"))
+                color: foregroundColor
+            }
         }
     }
 

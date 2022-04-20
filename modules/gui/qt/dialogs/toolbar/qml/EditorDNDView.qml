@@ -20,8 +20,10 @@ import QtQuick.Controls 2.4
 import QtQml.Models 2.11
 
 import org.videolan.vlc 0.1
+import org.videolan.compat 0.1
 
 import "qrc:///style/"
+import "qrc:///util/" as Util
 
 ListView {
     id: playerBtnDND
@@ -32,9 +34,6 @@ ListView {
 
     currentIndex: -1
     highlightFollowsCurrentItem: false
-
-    boundsBehavior: Flickable.StopAtBounds
-    boundsMovement: Flickable.StopAtBounds
 
     property bool containsDrag: footerItem.dropVisible
 
@@ -94,6 +93,15 @@ ListView {
         }
     }
     
+    MouseEventFilter {
+        target: playerBtnDND
+    }
+
+    Util.FlickableScrollHandler {
+        fallbackScroll: true
+        enabled: true
+    }
+
     MouseArea {
         anchors.fill: parent
 
@@ -101,21 +109,6 @@ ListView {
         z: -1
 
         cursorShape: root.dragActive ? Qt.DragMoveCursor : Qt.ArrowCursor
-
-        onWheel: {
-            // scrolling based on angleDelta.x is handled by the listview itself
-            var y = wheel.angleDelta.y
-
-            if (y > 0) {
-                scrollBar.decrease()
-                wheel.accepted = true
-            } else if (y < 0) {
-                scrollBar.increase()
-                wheel.accepted = true
-            } else {
-                wheel.accepted = false
-            }
-        }
     }
 
     footer: Item {
@@ -167,7 +160,7 @@ ListView {
 
         dndView: playerBtnDND
 
-        Binding {
+        BindingCompat {
             when: dropArea.containsDrag
             value: true
 

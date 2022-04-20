@@ -44,6 +44,7 @@ typedef struct vlc_gl_sys_t
     Display *display;
     GLXWindow win;
     GLXContext ctx;
+    bool restore_forget_gravity;
 } vlc_gl_sys_t;
 
 static int MakeCurrent (vlc_gl_t *gl)
@@ -120,6 +121,12 @@ static void Close(vlc_gl_t *gl)
 
     glXDestroyContext(dpy, sys->ctx);
     glXDestroyWindow(dpy, sys->win);
+    if (sys->restore_forget_gravity) {
+        XSetWindowAttributes swa;
+        swa.bit_gravity = ForgetGravity;
+        XChangeWindowAttributes (dpy, gl->surface->handle.xid, CWBitGravity,
+                                 &swa);
+    }
     XCloseDisplay(dpy);
     free(sys);
 }
@@ -212,6 +219,16 @@ static int Open(vlc_gl_t *gl, unsigned width, unsigned height)
         goto error;
     }
 
+    /* Set bit gravity if necessary */
+    if (wa.bit_gravity == ForgetGravity) {
+        XSetWindowAttributes swa;
+        swa.bit_gravity = NorthWestGravity;
+        XChangeWindowAttributes (dpy, gl->surface->handle.xid, CWBitGravity,
+                                 &swa);
+        sys->restore_forget_gravity = true;
+    } else
+        sys->restore_forget_gravity = false;
+
     /* Initialize OpenGL callbacks */
     gl->sys = sys;
     gl->make_current = MakeCurrent;
@@ -269,7 +286,6 @@ error:
 vlc_module_begin ()
     set_shortname (N_("GLX"))
     set_description (N_("GLX extension for OpenGL"))
-    set_category (CAT_VIDEO)
     set_subcategory (SUBCAT_VIDEO_VOUT)
     set_capability ("opengl", 20)
     set_callback(Open)

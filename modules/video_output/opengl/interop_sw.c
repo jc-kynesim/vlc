@@ -29,7 +29,7 @@
 #include "interop_sw.h"
 
 #include <vlc_common.h>
-#include "gl_api.h"
+#include "gl_util.h"
 
 #define PBO_DISPLAY_COUNT 2 /* Double buffering */
 typedef struct
@@ -41,6 +41,7 @@ typedef struct
 
 struct priv
 {
+    bool   has_texture_rg;
     bool   has_unpack_subimage;
     void * texture_temp_buf;
     size_t texture_temp_buf_size;
@@ -48,6 +49,27 @@ struct priv
         picture_t *display_pics[PBO_DISPLAY_COUNT];
         size_t display_idx;
     } pbo;
+
+#define OPENGL_VTABLE_F(X) \
+        X(PFNGLGETERRORPROC,        GetError) \
+        X(PFNGLGETINTEGERVPROC,     GetIntegerv) \
+        X(PFNGLGETSTRINGPROC,       GetString) \
+        \
+        X(PFNGLACTIVETEXTUREPROC,   ActiveTexture) \
+        X(PFNGLBINDTEXTUREPROC,     BindTexture) \
+        X(PFNGLTEXIMAGE2DPROC,      TexImage2D) \
+        X(PFNGLTEXSUBIMAGE2DPROC,   TexSubImage2D) \
+        \
+        X(PFNGLBINDBUFFERPROC,      BindBuffer) \
+        X(PFNGLBUFFERDATAPROC,      BufferData) \
+        X(PFNGLBUFFERSUBDATAPROC,   BufferSubData) \
+        X(PFNGLDELETEBUFFERSPROC,   DeleteBuffers) \
+        X(PFNGLGENBUFFERSPROC,      GenBuffers) \
+        X(PFNGLPIXELSTOREIPROC,     PixelStorei)
+    struct {
+#define DECLARE_SYMBOL(type, name) type name;
+        OPENGL_VTABLE_F(DECLARE_SYMBOL)
+    } gl;
 };
 
 static void
@@ -63,6 +85,7 @@ pbo_picture_destroy(picture_t *pic)
 static picture_t *
 pbo_picture_create(const struct vlc_gl_interop *interop)
 {
+    const struct priv *priv = interop->priv;
     picture_sys_t *picsys = calloc(1, sizeof(*picsys));
     if (unlikely(picsys == NULL))
         return NULL;
@@ -78,8 +101,8 @@ pbo_picture_create(const struct vlc_gl_interop *interop)
         return NULL;
     }
 
-    interop->vt->GenBuffers(pic->i_planes, picsys->buffers);
-    picsys->DeleteBuffers = interop->vt->DeleteBuffers;
+    priv->gl.GenBuffers(pic->i_planes, picsys->buffers);
+    picsys->DeleteBuffers = priv->gl.DeleteBuffers;
 
     /* XXX: needed since picture_NewFromResource override pic planes */
     if (picture_Setup(pic, &interop->fmt_out))
@@ -89,7 +112,7 @@ pbo_picture_create(const struct vlc_gl_interop *interop)
     }
 
     assert(pic->i_planes > 0
-        && (unsigned) pic->i_planes == interop->tex_count);
+        && (unsigned) pic->i_planes <= interop->tex_count);
 
     for (int i = 0; i < pic->i_planes; ++i)
     {
@@ -109,20 +132,21 @@ pbo_picture_create(const struct vlc_gl_interop *interop)
 static int
 pbo_data_alloc(const struct vlc_gl_interop *interop, picture_t *pic)
 {
+    const struct priv *priv = interop->priv;
     picture_sys_t *picsys = pic->p_sys;
 
-    interop->vt->GetError();
+    priv->gl.GetError();
 
     for (int i = 0; i < pic->i_planes; ++i)
     {
-        interop->vt->BindBuffer(GL_PIXEL_UNPACK_BUFFER, picsys->buffers[i]);
-        interop->vt->BufferData(GL_PIXEL_UNPACK_BUFFER, picsys->bytes[i], NULL,
+        priv->gl.BindBuffer(GL_PIXEL_UNPACK_BUFFER, picsys->buffers[i]);
+        priv->gl.BufferData(GL_PIXEL_UNPACK_BUFFER, picsys->bytes[i], NULL,
                                 GL_DYNAMIC_DRAW);
 
-        if (interop->vt->GetError() != GL_NO_ERROR)
+        if (priv->gl.GetError() != GL_NO_ERROR)
         {
             msg_Err(interop->gl, "could not alloc PBO buffers");
-            interop->vt->DeleteBuffers(i, picsys->buffers);
+            priv->gl.DeleteBuffers(i, picsys->buffers);
             return VLC_EGENERIC;
         }
     }
@@ -145,7 +169,7 @@ pbo_pics_alloc(const struct vlc_gl_interop *interop)
     }
 
     /* turn off pbo */
-    interop->vt->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    priv->gl.BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
     return VLC_SUCCESS;
 error:
@@ -155,8 +179,8 @@ error:
 }
 
 static int
-tc_pbo_update(const struct vlc_gl_interop *interop, GLuint *textures,
-              const GLsizei *tex_width, const GLsizei *tex_height,
+tc_pbo_update(const struct vlc_gl_interop *interop, uint32_t textures[],
+              const int32_t tex_width[], const int32_t tex_height[],
               picture_t *pic, const size_t *plane_offset)
 {
     (void) plane_offset; assert(plane_offset == NULL);
@@ -170,35 +194,48 @@ tc_pbo_update(const struct vlc_gl_interop *interop, GLuint *textures,
     {
         GLsizeiptr size = pic->p[i].i_lines * pic->p[i].i_pitch;
         const GLvoid *data = pic->p[i].p_pixels;
-        interop->vt->BindBuffer(GL_PIXEL_UNPACK_BUFFER,
+        priv->gl.BindBuffer(GL_PIXEL_UNPACK_BUFFER,
                            p_sys->buffers[i]);
-        interop->vt->BufferSubData(GL_PIXEL_UNPACK_BUFFER, 0, size, data);
+        priv->gl.BufferSubData(GL_PIXEL_UNPACK_BUFFER, 0, size, data);
 
-        interop->vt->ActiveTexture(GL_TEXTURE0 + i);
-        interop->vt->BindTexture(interop->tex_target, textures[i]);
+        priv->gl.ActiveTexture(GL_TEXTURE0 + i);
+        priv->gl.BindTexture(interop->tex_target, textures[i]);
 
-        interop->vt->PixelStorei(GL_UNPACK_ROW_LENGTH, pic->p[i].i_pitch
+        priv->gl.PixelStorei(GL_UNPACK_ROW_LENGTH, pic->p[i].i_pitch
             * tex_width[i] / (pic->p[i].i_visible_pitch ? pic->p[i].i_visible_pitch : 1));
 
-        interop->vt->TexSubImage2D(interop->tex_target, 0, 0, 0, tex_width[i], tex_height[i],
+        priv->gl.TexSubImage2D(interop->tex_target, 0, 0, 0, tex_width[i], tex_height[i],
                                    interop->texs[i].format, interop->texs[i].type, NULL);
-        interop->vt->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        priv->gl.PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    }
+
+    if (pic->i_planes == 1 && interop->tex_count == 2)
+    {
+        /* For YUV 4:2:2 formats, a single plane is uploaded into 2 textures */
+        priv->gl.ActiveTexture(GL_TEXTURE1);
+        priv->gl.BindTexture(interop->tex_target, textures[1]);
+        priv->gl.PixelStorei(GL_UNPACK_ROW_LENGTH, pic->p[0].i_pitch
+            * tex_width[1] / (pic->p[0].i_visible_pitch ? pic->p[0].i_visible_pitch : 1));
+        priv->gl.TexSubImage2D(interop->tex_target, 0, 0, 0, tex_width[1], tex_height[1],
+                               interop->texs[1].format, interop->texs[1].type, NULL);
+        priv->gl.PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
     }
 
     /* turn off pbo */
-    interop->vt->BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    priv->gl.BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
     return VLC_SUCCESS;
 }
 
 static int
-tc_common_allocate_textures(const struct vlc_gl_interop *interop, GLuint *textures,
-                            const GLsizei *tex_width, const GLsizei *tex_height)
+tc_common_allocate_textures(const struct vlc_gl_interop *interop, uint32_t textures[],
+                            const int32_t tex_width[], const int32_t tex_height[])
 {
+    const struct priv *priv = interop->priv;
     for (unsigned i = 0; i < interop->tex_count; i++)
     {
-        interop->vt->BindTexture(interop->tex_target, textures[i]);
-        interop->vt->TexImage2D(interop->tex_target, 0, interop->texs[i].internal,
+        priv->gl.BindTexture(interop->tex_target, textures[i]);
+        priv->gl.TexImage2D(interop->tex_target, 0, interop->texs[i].internal,
                                 tex_width[i], tex_height[i], 0, interop->texs[i].format,
                                 interop->texs[i].type, NULL);
     }
@@ -207,7 +244,7 @@ tc_common_allocate_textures(const struct vlc_gl_interop *interop, GLuint *textur
 
 static int
 upload_plane(const struct vlc_gl_interop *interop, unsigned tex_idx,
-             GLsizei width, GLsizei height,
+             int32_t width, int32_t height,
              unsigned pitch, unsigned visible_pitch, const void *pixels)
 {
     struct priv *priv = interop->priv;
@@ -215,7 +252,7 @@ upload_plane(const struct vlc_gl_interop *interop, unsigned tex_idx,
     GLenum tex_type = interop->texs[tex_idx].type;
 
     /* This unpack alignment is the default, but setting it just in case. */
-    interop->vt->PixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    priv->gl.PixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
     if (!priv->has_unpack_subimage)
     {
@@ -244,36 +281,37 @@ upload_plane(const struct vlc_gl_interop *interop, unsigned tex_idx,
                 source += pitch;
                 destination += visible_pitch;
             }
-            interop->vt->TexSubImage2D(interop->tex_target, 0, 0, 0, width, height,
+            priv->gl.TexSubImage2D(interop->tex_target, 0, 0, 0, width, height,
                                        tex_format, tex_type, priv->texture_temp_buf);
         }
         else
         {
-            interop->vt->TexSubImage2D(interop->tex_target, 0, 0, 0, width, height,
+            priv->gl.TexSubImage2D(interop->tex_target, 0, 0, 0, width, height,
                                        tex_format, tex_type, pixels);
         }
     }
     else
     {
-        interop->vt->PixelStorei(GL_UNPACK_ROW_LENGTH, pitch * width / (visible_pitch ? visible_pitch : 1));
-        interop->vt->TexSubImage2D(interop->tex_target, 0, 0, 0, width, height,
+        priv->gl.PixelStorei(GL_UNPACK_ROW_LENGTH, pitch * width / (visible_pitch ? visible_pitch : 1));
+        priv->gl.TexSubImage2D(interop->tex_target, 0, 0, 0, width, height,
                                    tex_format, tex_type, pixels);
-        interop->vt->PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        priv->gl.PixelStorei(GL_UNPACK_ROW_LENGTH, 0);
     }
     return VLC_SUCCESS;
 }
 
 static int
-tc_common_update(const struct vlc_gl_interop *interop, GLuint *textures,
-                 const GLsizei *tex_width, const GLsizei *tex_height,
+tc_common_update(const struct vlc_gl_interop *interop, uint32_t textures[],
+                 const int32_t tex_width[], const int32_t tex_height[],
                  picture_t *pic, const size_t *plane_offset)
 {
+    const struct priv *priv = interop->priv;
     int ret = VLC_SUCCESS;
-    for (unsigned i = 0; i < interop->tex_count && ret == VLC_SUCCESS; i++)
+    for (int i = 0; i < pic->i_planes && ret == VLC_SUCCESS; i++)
     {
         assert(textures[i] != 0);
-        interop->vt->ActiveTexture(GL_TEXTURE0 + i);
-        interop->vt->BindTexture(interop->tex_target, textures[i]);
+        priv->gl.ActiveTexture(GL_TEXTURE0 + i);
+        priv->gl.BindTexture(interop->tex_target, textures[i]);
         const void *pixels = plane_offset != NULL ?
                              &pic->p[i].p_pixels[plane_offset[i]] :
                              pic->p[i].p_pixels;
@@ -281,7 +319,238 @@ tc_common_update(const struct vlc_gl_interop *interop, GLuint *textures,
         ret = upload_plane(interop, i, tex_width[i], tex_height[i],
                            pic->p[i].i_pitch, pic->p[i].i_visible_pitch, pixels);
     }
+
+    if (pic->i_planes == 1 && interop->tex_count == 2)
+    {
+        /* For YUV 4:2:2 formats, a single plane is uploaded into 2 textures */
+        assert(textures[1] != 0);
+        priv->gl.ActiveTexture(GL_TEXTURE1);
+        priv->gl.BindTexture(interop->tex_target, textures[1]);
+        const void *pixels = plane_offset != NULL ?
+                             &pic->p[0].p_pixels[plane_offset[0]] :
+                             pic->p[0].p_pixels;
+
+        ret = upload_plane(interop, 1, tex_width[1], tex_height[1],
+                           pic->p[0].i_pitch, pic->p[0].i_visible_pitch, pixels);
+    }
+
     return ret;
+}
+
+static inline void
+DivideRationalByTwo(vlc_rational_t *r) {
+    if (r->num % 2 == 0)
+        r->num /= 2;
+    else
+        r->den *= 2;
+}
+
+static int
+interop_yuv_base_init(struct vlc_gl_interop *interop, GLenum tex_target,
+                      vlc_fourcc_t chroma, const vlc_chroma_description_t *desc)
+{
+    struct priv *priv = interop->priv;
+
+    (void) chroma;
+
+    GLint oneplane_texfmt, oneplane16_texfmt,
+          twoplanes_texfmt, twoplanes16_texfmt;
+
+    if (priv->has_texture_rg)
+    {
+        oneplane_texfmt = GL_RED;
+        oneplane16_texfmt = GL_R16;
+        twoplanes_texfmt = GL_RG;
+        twoplanes16_texfmt = GL_RG16;
+    }
+    else
+    {
+        oneplane_texfmt = GL_LUMINANCE;
+        oneplane16_texfmt = GL_LUMINANCE16;
+        twoplanes_texfmt = GL_LUMINANCE_ALPHA;
+        twoplanes16_texfmt = 0;
+    }
+
+    if (desc->pixel_size == 2)
+    {
+        if (vlc_gl_interop_GetTexFormatSize(interop, tex_target, oneplane_texfmt,
+                                            oneplane16_texfmt, GL_UNSIGNED_SHORT) != 16)
+            return VLC_EGENERIC;
+    }
+
+    if (desc->plane_count == 3)
+    {
+        GLint internal = 0;
+        GLenum type = 0;
+
+        if (desc->pixel_size == 1)
+        {
+            internal = oneplane_texfmt;
+            type = GL_UNSIGNED_BYTE;
+        }
+        else if (desc->pixel_size == 2)
+        {
+            internal = oneplane16_texfmt;
+            type = GL_UNSIGNED_SHORT;
+        }
+        else
+            return VLC_EGENERIC;
+
+        assert(internal != 0 && type != 0);
+
+        interop->tex_count = 3;
+        for (unsigned i = 0; i < interop->tex_count; ++i )
+        {
+            interop->texs[i] = (struct vlc_gl_tex_cfg) {
+                { desc->p[i].w.num, desc->p[i].w.den },
+                { desc->p[i].h.num, desc->p[i].h.den },
+                internal, oneplane_texfmt, type
+            };
+        }
+    }
+    else if (desc->plane_count == 2)
+    {
+        interop->tex_count = 2;
+
+        if (desc->pixel_size == 1)
+        {
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                { desc->p[0].w.num, desc->p[0].w.den },
+                { desc->p[0].h.num, desc->p[0].h.den },
+                oneplane_texfmt, oneplane_texfmt, GL_UNSIGNED_BYTE
+            };
+            interop->texs[1] = (struct vlc_gl_tex_cfg) {
+                { desc->p[1].w.num, desc->p[1].w.den },
+                { desc->p[1].h.num, desc->p[1].h.den },
+                twoplanes_texfmt, twoplanes_texfmt, GL_UNSIGNED_BYTE
+            };
+        }
+        else if (desc->pixel_size == 2)
+        {
+            if (twoplanes16_texfmt == 0
+             || vlc_gl_interop_GetTexFormatSize(interop, tex_target, twoplanes_texfmt,
+                                                twoplanes16_texfmt, GL_UNSIGNED_SHORT) != 16)
+                return VLC_EGENERIC;
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                { desc->p[0].w.num, desc->p[0].w.den },
+                { desc->p[0].h.num, desc->p[0].h.den },
+                oneplane16_texfmt, oneplane_texfmt, GL_UNSIGNED_SHORT
+            };
+            interop->texs[1] = (struct vlc_gl_tex_cfg) {
+                { desc->p[1].w.num, desc->p[1].w.den },
+                { desc->p[1].h.num, desc->p[1].h.den },
+                twoplanes16_texfmt, twoplanes_texfmt, GL_UNSIGNED_SHORT
+            };
+        }
+        else
+            return VLC_EGENERIC;
+
+        /*
+         * If plane_count == 2, then the chroma is semiplanar: the U and V
+         * planes are packed in the second plane. As a consequence, the
+         * horizontal scaling, as reported in the vlc_chroma_description_t, is
+         * doubled.
+         *
+         * But once imported as an OpenGL texture, both components are stored
+         * in a single texel (the two first components of the vec4).
+         * Therefore, from OpenGL, the width is not doubled, so the horizontal
+         * scaling must be divided by 2 to compensate.
+         */
+         DivideRationalByTwo(&interop->texs[1].w);
+    }
+    else if (desc->plane_count == 1)
+    {
+        /* Only YUV 4:2:2 formats */
+        /* The pictures have only 1 plane, but it is uploaded twice, once to
+         * access the Y components, once to access the UV components. See
+         * #26712. */
+        interop->tex_count = 2;
+        interop->texs[0] = (struct vlc_gl_tex_cfg) {
+            { 1, 1 }, { 1, 1 },
+            twoplanes_texfmt, twoplanes_texfmt, GL_UNSIGNED_BYTE
+        };
+        interop->texs[1] = (struct vlc_gl_tex_cfg) {
+            { 1, 2 }, { 1, 1 },
+            GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE
+        };
+    }
+    else
+        return VLC_EGENERIC;
+
+    return VLC_SUCCESS;
+}
+
+static int
+interop_rgb_base_init(struct vlc_gl_interop *interop, GLenum tex_target,
+                      vlc_fourcc_t chroma)
+{
+    (void) tex_target;
+
+    switch (chroma)
+    {
+        case VLC_CODEC_RGB24:
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                { 1, 1 }, { 1, 1 }, GL_RGB, GL_RGB, GL_UNSIGNED_BYTE
+            };
+            break;
+
+        case VLC_CODEC_RGB32:
+        case VLC_CODEC_RGBA:
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                { 1, 1 }, { 1, 1 }, GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE
+            };
+            break;
+        case VLC_CODEC_BGRA: {
+            if (vlc_gl_interop_GetTexFormatSize(interop, tex_target, GL_BGRA, GL_RGBA,
+                                                GL_UNSIGNED_BYTE) != 32)
+                return VLC_EGENERIC;
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                { 1, 1 }, { 1, 1 }, GL_RGBA, GL_BGRA, GL_UNSIGNED_BYTE
+            };
+            break;
+        }
+        default:
+            return VLC_EGENERIC;
+    }
+    interop->tex_count = 1;
+    return VLC_SUCCESS;
+}
+
+static void
+interop_xyz12_init(struct vlc_gl_interop *interop)
+{
+    interop->tex_count = 1;
+    interop->tex_target = GL_TEXTURE_2D;
+    interop->texs[0] = (struct vlc_gl_tex_cfg) {
+        { 1, 1 }, { 1, 1 }, GL_RGB, GL_RGB, GL_UNSIGNED_SHORT
+    };
+}
+
+static int
+opengl_interop_init(struct vlc_gl_interop *interop, GLenum tex_target,
+                    vlc_fourcc_t chroma, video_color_space_t yuv_space)
+{
+    bool is_yuv = vlc_fourcc_IsYUV(chroma);
+    const vlc_chroma_description_t *desc =
+        vlc_fourcc_GetChromaDescription(chroma);
+    if (!desc)
+        return VLC_EGENERIC;
+
+    assert(!interop->fmt_out.p_palette);
+    interop->fmt_out.i_chroma = chroma;
+    interop->fmt_out.space = yuv_space;
+    interop->tex_target = tex_target;
+
+    if (chroma == VLC_CODEC_XYZ12)
+    {
+        interop_xyz12_init(interop);
+        return VLC_SUCCESS;
+    }
+
+    if (is_yuv)
+        return interop_yuv_base_init(interop, tex_target, chroma, desc);
+
+    return interop_rgb_base_init(interop, tex_target, chroma);
 }
 
 void
@@ -297,15 +566,42 @@ opengl_interop_generic_deinit(struct vlc_gl_interop *interop)
 int
 opengl_interop_generic_init(struct vlc_gl_interop *interop, bool allow_dr)
 {
+
+    struct priv *priv = calloc(1, sizeof(struct priv));
+    if (unlikely(priv == NULL))
+        return VLC_ENOMEM;
+
+    interop->priv = priv;
+
+#define LOAD_SYMBOL(type, name) \
+    priv->gl.name = vlc_gl_GetProcAddress(interop->gl, "gl" # name); \
+    assert(priv->gl.name != NULL);
+
+    OPENGL_VTABLE_F(LOAD_SYMBOL);
+
+    struct vlc_gl_extension_vt extension_vt;
+    vlc_gl_LoadExtensionFunctions(interop->gl, &extension_vt);
+
+    /* OpenGL or OpenGL ES2 with GL_EXT_unpack_subimage ext */
+    priv->has_unpack_subimage = interop->gl->api_type == VLC_OPENGL
+        || vlc_gl_HasExtension(&extension_vt, "GL_EXT_unpack_subimage");
+
+    /* RG textures are available natively since OpenGL 3.0 and OpenGL ES 3.0 */
+    priv->has_texture_rg = vlc_gl_GetVersionMajor(&extension_vt) >= 3
+        || (interop->gl->api_type == VLC_OPENGL
+            && vlc_gl_HasExtension(&extension_vt, "GL_ARB_texture_rg"))
+        || (interop->gl->api_type == VLC_OPENGL_ES2
+            && vlc_gl_HasExtension(&extension_vt, "GL_EXT_texture_rg"));
+
     video_color_space_t space;
     const vlc_fourcc_t *list;
 
     if (vlc_fourcc_IsYUV(interop->fmt_in.i_chroma))
     {
         GLint max_texture_units = 0;
-        interop->vt->GetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &max_texture_units);
+        priv->gl.GetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &max_texture_units);
         if (max_texture_units < 3)
-            return VLC_EGENERIC;
+            goto error;
 
         list = vlc_fourcc_GetYUVFallback(interop->fmt_in.i_chroma);
         space = interop->fmt_in.space;
@@ -343,7 +639,7 @@ opengl_interop_generic_init(struct vlc_gl_interop *interop, bool allow_dr)
         list++;
     }
 
-    return VLC_EGENERIC;
+    goto error;
 
 interop_init:
     /* We found a chroma with matching parameters for OpenGL. The interop can
@@ -364,10 +660,6 @@ interop_init:
         video_format_FixRgb(&interop->fmt_out);
     }
 
-    struct priv *priv = interop->priv = calloc(1, sizeof(struct priv));
-    if (unlikely(priv == NULL))
-        return VLC_ENOMEM;
-
     static const struct vlc_gl_interop_ops ops = {
         .allocate_textures = tc_common_allocate_textures,
         .update_textures = tc_common_update,
@@ -376,22 +668,18 @@ interop_init:
     interop->ops = &ops;
     interop->fmt_in.i_chroma = i_chroma;
 
-    /* OpenGL or OpenGL ES2 with GL_EXT_unpack_subimage ext */
-    priv->has_unpack_subimage =
-        !interop->api->is_gles || vlc_gl_StrHasToken(interop->api->extensions, "GL_EXT_unpack_subimage");
-
     if (allow_dr && priv->has_unpack_subimage)
     {
         /* Ensure we do direct rendering / PBO with OpenGL 3.0 or higher. */
-        const unsigned char *ogl_version = interop->vt->GetString(GL_VERSION);
+        const unsigned char *ogl_version = priv->gl.GetString(GL_VERSION);
         const bool glver_ok = strverscmp((const char *)ogl_version, "3.0") >= 0;
 
         const bool has_pbo = glver_ok &&
-            (vlc_gl_StrHasToken(interop->api->extensions, "GL_ARB_pixel_buffer_object") ||
-             vlc_gl_StrHasToken(interop->api->extensions, "GL_EXT_pixel_buffer_object"));
+            (vlc_gl_HasExtension(&extension_vt, "GL_ARB_pixel_buffer_object") ||
+             vlc_gl_HasExtension(&extension_vt, "GL_EXT_pixel_buffer_object"));
 
-        const bool supports_pbo = has_pbo && interop->vt->BufferData
-            && interop->vt->BufferSubData;
+        const bool supports_pbo = has_pbo && priv->gl.BufferData
+            && priv->gl.BufferSubData;
         if (supports_pbo && pbo_pics_alloc(interop) == VLC_SUCCESS)
         {
             static const struct vlc_gl_interop_ops pbo_ops = {
@@ -405,4 +693,9 @@ interop_init:
     }
 
     return VLC_SUCCESS;
+
+error:
+    free(priv);
+    interop->priv = NULL;
+    return VLC_EGENERIC;
 }

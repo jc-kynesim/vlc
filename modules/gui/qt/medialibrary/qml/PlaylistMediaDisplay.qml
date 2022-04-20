@@ -38,14 +38,19 @@ FocusScope {
 
     readonly property int currentIndex: view.currentIndex
 
-    property int     initialIndex: 0
-    property var initialId
-    property string  initialName
+    // NOTE: We need 'var' for properties altered by StackView.replace().
+    property int    initialIndex: 0
+    property var    initialId
+    property string initialName
 
-    // NOTE: Specify an optionnal header for the view.
+    // NOTE: Specify an optional header for the view.
     property Component header: undefined
 
     property Item headerItem: view.headerItem
+
+    property bool isMusic: true
+    property string _placeHolder: isMusic ? VLCStyle.noArtAlbumCover : VLCStyle.noArtVideoCover
+
 
     // Aliases
 
@@ -99,7 +104,7 @@ FocusScope {
     MLPlaylistModel {
         id: model
 
-        ml: medialib
+        ml: MediaLib
 
         parentId: initialId
 
@@ -138,6 +143,8 @@ FocusScope {
         indexes: modelSelect.selectedIndexes
 
         coverRole: "thumbnail"
+
+        defaultCover: root._placeHolder
     }
 
     Util.SelectableDelegateModel {
@@ -194,7 +201,7 @@ FocusScope {
         // Events
 
         onContextMenuButtonClicked: contextMenu.popup(modelSelect.selectedIndexes,
-                                                      menuParent.mapToGlobal(0,0))
+                                                      globalMousePos)
 
         onRightClick: contextMenu.popup(modelSelect.selectedIndexes, globalMousePos)
 
@@ -210,9 +217,9 @@ FocusScope {
 
         focus: visible
 
-        text: i18n.qtr("No media found")
+        text: I18n.qtr("No media found")
 
-        cover: VLCStyle.noArtAlbumCover
+        cover: root._placeHolder
 
         Navigation.parentItem: root
     }

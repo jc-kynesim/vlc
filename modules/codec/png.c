@@ -30,6 +30,7 @@
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_codec.h>
+#include <vlc_rand.h>
 #include <png.h>
 
 /* PNG_SYS_COMMON_MEMBERS:
@@ -83,7 +84,6 @@ static block_t *EncodeBlock(encoder_t *, picture_t *);
  * Module descriptor
  *****************************************************************************/
 vlc_module_begin ()
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_VCODEC )
     set_description( N_("PNG video decoder") )
     set_capability( "video decoder", 1000 )
@@ -95,7 +95,7 @@ vlc_module_begin ()
     add_shortcut("png")
     set_section(N_("Encoding"), NULL)
     set_description(N_("PNG video encoder"))
-    set_capability("encoder", 1000)
+    set_capability("video encoder", 1000)
     set_callback(OpenEncoder)
 vlc_module_end ()
 
@@ -182,6 +182,53 @@ static void user_warning( png_structp p_png, png_const_charp warning_msg )
     msg_Warn( p_sys->p_obj, "%s", warning_msg );
 }
 
+#ifdef PNG_TEXT_SUPPORTED
+static void process_text_chunk( decoder_t *p_dec, const png_textp chunk )
+{
+    if( chunk->compression != PNG_ITXT_COMPRESSION_NONE ||
+        memcmp( chunk->key, "XML:com.adobe.xmp", 17 ) ||
+        chunk->itxt_length < 20 )
+        return;
+
+    const char *exifxmp = (const char *) chunk->text;
+    const char *orient = strnstr( exifxmp, ":Orientation>", chunk->itxt_length );
+    if(orient && orient - exifxmp > 14)
+        p_dec->fmt_out.video.orientation = ORIENT_FROM_EXIF( orient[13] - '0' );
+}
+
+static int make_xmp_packet( const video_format_t *fmt, png_textp chunk )
+{
+    unsigned char id[9];
+    vlc_rand_bytes(id, 8);
+    for(int i=0; i<8; i++)
+        id[i] = (id[i] % 26) + 'A';
+    id[8] = '\0';
+    int len = asprintf( &chunk->text,
+            "<?xpacket begin='﻿' id='%s'?>"
+             "<x:xmpmeta xmlns:x='adobe:ns:meta/' x:xmptk='VLC " VERSION "'>"
+              "<rdf:RDF xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'>"
+               "<rdf:Description rdf:about='' xmlns:tiff='http://ns.adobe.com/tiff/1.0/'>"
+                "<tiff:Orientation>%" PRIu8 "</tiff:Orientation>"
+               "</rdf:Description>"
+              "</rdf:RDF>"
+             "</x:xmpmeta>"
+            "<?xpacket end='r'?>", id, ORIENT_TO_EXIF(fmt->orientation) );
+    if(len == 0)
+    {
+        free(chunk->text);
+        chunk->text = NULL;
+    }
+    chunk->itxt_length = (len <= 0) ? 0 : len;
+    chunk->compression = PNG_ITXT_COMPRESSION_NONE;
+    chunk->key = len > 0 ? strdup( "XML:com.adobe.xmp" ) : NULL;
+    chunk->lang_key = NULL;
+    chunk->lang = NULL;
+    chunk->text_length = 0;
+    return len > 0 ? VLC_SUCCESS : VLC_EGENERIC;
+}
+
+#endif
+
 /****************************************************************************
  * DecodeBlock: the whole thing
  ****************************************************************************
@@ -255,6 +302,14 @@ static int DecodeBlock( decoder_t *p_dec, block_t *p_block )
     p_dec->fmt_out.video.i_visible_height = p_dec->fmt_out.video.i_height = i_height;
     p_dec->fmt_out.video.i_sar_num = 1;
     p_dec->fmt_out.video.i_sar_den = 1;
+
+#ifdef PNG_TEXT_SUPPORTED
+    png_textp textp;
+    int numtextp;
+    if( png_get_text( p_png, p_info, &textp, &numtextp ) > 0 )
+        for( int ii=0; ii<numtextp; ii++ )
+            process_text_chunk( p_dec, &textp[ii] );
+#endif
 
     if( i_color_type == PNG_COLOR_TYPE_PALETTE )
         png_set_palette_to_rgb( p_png );
@@ -341,7 +396,10 @@ static int OpenEncoder(vlc_object_t *p_this)
     p_enc->fmt_in.video.i_bmask = 0;
     video_format_FixRgb( &p_enc->fmt_in.video );
 
-    p_enc->pf_encode_video = EncodeBlock;
+    static const struct vlc_encoder_operations ops =
+        { .encode_video = EncodeBlock };
+
+    p_enc->ops = &ops;
 
     return VLC_SUCCESS;
 }
@@ -401,7 +459,19 @@ static block_t *EncodeBlock(encoder_t *p_enc, picture_t *p_pic)
             PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT );
     if( p_sys->b_error ) goto error;
 
-    png_write_info( p_png, p_info );
+#ifdef PNG_TEXT_SUPPORTED
+    png_text text;
+    if( make_xmp_packet( &p_pic->format, &text ) == VLC_SUCCESS )
+    {
+        png_set_text( p_png, p_info, &text, 1 );
+        png_write_info( p_png, p_info );
+        free( text.key );
+        free( text.text );
+    }
+    else
+#endif
+        png_write_info( p_png, p_info );
+
     if( p_sys->b_error ) goto error;
 
     /* Encode picture */

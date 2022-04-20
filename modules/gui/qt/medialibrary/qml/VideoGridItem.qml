@@ -17,6 +17,7 @@
  *****************************************************************************/
 import QtQuick 2.11
 
+import org.videolan.vlc 0.1
 import org.videolan.medialib 0.1
 
 import "qrc:///widgets/" as Widgets
@@ -36,12 +37,12 @@ Widgets.GridItem {
     function play() {
         if ( model.id !== undefined ) {
             g_mainDisplay.showPlayer()
-            medialib.addAndPlay( model.id )
+            MediaLib.addAndPlay( model.id )
         }
     }
 
-    image: model.thumbnail || VLCStyle.noArtCover
-    title: model.title || i18n.qtr("Unknown title")
+    image: model.thumbnail || VLCStyle.noArtVideoCover
+    title: model.title || I18n.qtr("Unknown title")
     subtitle: Helpers.msToString(model.duration) || ""
     pictureWidth: VLCStyle.gridCover_video_width
     pictureHeight: VLCStyle.gridCover_video_height

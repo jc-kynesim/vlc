@@ -6,10 +6,6 @@ libchroma_copy_la_SOURCES = video_chroma/copy.c video_chroma/copy.h
 libchroma_copy_la_LDFLAGS = -static
 noinst_LTLIBRARIES += libchroma_copy.la
 
-libchroma_omx_plugin_la_SOURCES = video_chroma/omxdl.c
-libchroma_omx_plugin_la_CFLAGS = $(AM_CFLAGS) $(OMXIP_CFLAGS)
-libchroma_omx_plugin_la_LIBADD = $(OMXIP_LIBS)
-
 libswscale_plugin_la_SOURCES = video_chroma/swscale.c codec/avcodec/chroma.c
 libswscale_plugin_la_CFLAGS = $(AM_CFLAGS) $(SWSCALE_CFLAGS)
 libswscale_plugin_la_LIBADD = $(SWSCALE_LIBS) $(LIBM)
@@ -40,6 +36,8 @@ libyuy2_i422_plugin_la_SOURCES = video_chroma/yuy2_i422.c
 
 libyuvp_plugin_la_SOURCES = video_chroma/yuvp.c
 
+liborient_plugin_la_SOURCES = video_chroma/orient.c video_chroma/orient.h
+
 chroma_LTLIBRARIES = \
 	libi420_rgb_plugin.la \
 	libi420_yuy2_plugin.la \
@@ -52,9 +50,10 @@ chroma_LTLIBRARIES = \
 	librv32_plugin.la \
 	libchain_plugin.la \
 	libyuvp_plugin.la \
+	liborient_plugin.la \
 	$(LTLIBswscale)
 
-EXTRA_LTLIBRARIES += libswscale_plugin.la libchroma_omx_plugin.la
+EXTRA_LTLIBRARIES += libswscale_plugin.la
 
 # AltiVec
 libi420_yuy2_altivec_plugin_la_SOURCES = video_chroma/i420_yuy2.c video_chroma/i420_yuy2.h

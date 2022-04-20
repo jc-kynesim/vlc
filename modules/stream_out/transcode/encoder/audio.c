@@ -61,12 +61,14 @@ int transcode_encoder_audio_open( transcode_encoder_t *p_enc,
 {
     p_enc->p_encoder->p_cfg = p_cfg->p_config_chain;
     p_enc->p_encoder->fmt_out.i_codec = p_cfg->i_codec;
+    p_enc->p_encoder->ops = NULL;
 
-    p_enc->p_encoder->p_module = module_need( p_enc->p_encoder, "encoder",
+    p_enc->p_encoder->p_module = module_need( p_enc->p_encoder, "audio encoder",
                                               p_cfg->psz_name, true );
 
     if( p_enc->p_encoder->p_module )
     {
+        assert( p_enc->p_encoder->ops != NULL );
         p_enc->p_encoder->fmt_out.i_codec =
                 vlc_fourcc_GetCodec( AUDIO_ES, p_enc->p_encoder->fmt_out.i_codec );
     }
@@ -146,6 +148,7 @@ int transcode_encoder_audio_test( encoder_t *p_encoder,
                                   es_format_t *p_enc_wanted_in )
 {
     p_encoder->p_cfg = p_cfg->p_config_chain;
+    p_encoder->ops = NULL;
 
     es_format_Init( &p_encoder->fmt_in, AUDIO_ES, i_codec_in );
     p_encoder->fmt_in.audio = p_dec_out->audio;
@@ -169,7 +172,7 @@ int transcode_encoder_audio_test( encoder_t *p_encoder,
         p_afmt_out->i_physical_channels = AOUT_CHANS_STEREO;
     }
 
-    module_t *p_module = module_need( p_encoder, "encoder", p_cfg->psz_name, true );
+    module_t *p_module = module_need( p_encoder, "audio encoder", p_cfg->psz_name, true );
     if( !p_module )
     {
         msg_Err( p_encoder, "cannot find audio encoder (module:%s fourcc:%4.4s). "
@@ -201,7 +204,7 @@ int transcode_encoder_audio_test( encoder_t *p_encoder,
 
 block_t * transcode_encoder_audio_encode( transcode_encoder_t *p_enc, block_t *p_block )
 {
-    return p_enc->p_encoder->pf_encode_audio( p_enc->p_encoder, p_block );
+    return vlc_encoder_EncodeAudio( p_enc->p_encoder, p_block );
 }
 
 int transcode_encoder_audio_drain( transcode_encoder_t *p_enc, block_t **out )

@@ -94,18 +94,19 @@ static const char *const ppsz_videoconns[] = {
     "svideo"
 };
 static const char *const ppsz_videoconns_text[] = {
-    "SDI",
-    "HDMI",
-    "Optical SDI",
-    "Component",
-    "Composite",
-    "S-video",
+    N_("SDI"),
+    N_("HDMI"),
+    N_("Optical SDI"),
+    N_("Component"),
+    N_("Composite"),
+    N_("S-video"),
 };
 static const int rgi_afd_values[] = {
     0, 2, 3, 4, 8, 9, 10, 11, 13, 14, 15,
 };
 static const char * const rgsz_afd_text[] = {
-    "Undefined",
+    /* Note: Skip further translation - too technical */
+    N_("Undefined"),
     "Box 16:9 (top aligned)",
     "Box 14:9 (top aligned)",
     "Box > 16:9 (centre aligned)",
@@ -166,7 +167,6 @@ vlc_module_begin ()
     set_description(N_("SDI stream output"))
     set_capability("sout output", 0)
     add_shortcut("sdiout")
-    set_category(CAT_SOUT)
     set_subcategory(SUBCAT_SOUT_STREAM)
     set_callbacks(OpenSDIOutput, CloseSDIOutput)
 

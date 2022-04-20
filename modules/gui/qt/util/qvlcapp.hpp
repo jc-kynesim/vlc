@@ -25,7 +25,6 @@
 #define VLC_QT_QVLCAPP_HPP_
 
 #include <QApplication>
-#include <QEvent>
 #include <QStyle>
 
 #if defined(Q_OS_WIN)
@@ -48,7 +47,7 @@ private slots:
 public:
     QVLCApp( int & argc, char ** argv ) : QApplication( argc, argv, true ), m_defaultStyle( style()->objectName() )
     {
-        connect( this, SIGNAL(quitSignal()), this, SLOT(doQuit()) );
+        connect( this, &QVLCApp::quitSignal, this, &QVLCApp::doQuit );
     }
 
     static void triggerQuit()

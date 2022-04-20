@@ -46,6 +46,7 @@
 #include "util/varchoicemodel.hpp"
 #include "medialibrary/medialib.hpp"
 #include "medialibrary/mlrecentsmodel.hpp"
+#include "medialibrary/mlbookmarkmodel.hpp"
 
 
 #include <QMenu>
@@ -53,7 +54,6 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QSignalMapper>
-#include <QStatusBar>
 
 using namespace vlc::playlist;
 
@@ -61,7 +61,7 @@ using namespace vlc::playlist;
   This file defines the main menus and the pop-up menu (right-click menu)
   and the systray menu (in that order in the file)
 
-  There are 4 menus that have to be rebuilt everytime there are called:
+  There are 4 menus that have to be rebuilt every time there are called:
   Audio, Video, Navigation, view
   4 functions are building those menus: AudioMenu, VideoMenu, NavigMenu, View
 
@@ -193,7 +193,7 @@ void VLCMenuBar::FileMenu(qt_intf_t *p_intf, QMenu *menu)
     addDPStaticEntry( menu, qtr( "Open &Location from clipboard" ),
                       NULL, &DialogsProvider::openUrlDialog, "Ctrl+V" );
 
-    if( mi && var_InheritBool( p_intf, "qt-recentplay" ) && mi->hasMediaLibrary() )
+    if( mi && var_InheritBool( p_intf, "save-recentplay" ) && mi->hasMediaLibrary() )
     {
         MLRecentsModel* recentModel = new MLRecentsModel(nullptr);
         recentModel->setMl(mi->getMediaLibrary());
@@ -481,15 +481,19 @@ void VLCMenuBar::NavigMenu( qt_intf_t *p_intf, QMenu *menu )
     menu->addMenu( submenu );
     menu->addMenu( new CheckableListMenu( qtr("&Program") , THEMIM->getPrograms(), CheckableListMenu::GROUPED , menu) );
 
-    if (p_intf->p_mi && p_intf->p_mi->hasMediaLibrary() )
+    MainCtx * mi = p_intf->p_mi;
+
+    if (mi && p_intf->p_mi->hasMediaLibrary() )
     {
-        submenu = new QMenu( qfut( I_MENU_BOOKMARK ), menu );
-        submenu->setTearOffEnabled( true );
-        addDPStaticEntry( submenu, qtr( "&Manage" ), "",
-                          &DialogsProvider::bookmarksDialog, "Ctrl+B" );
-        submenu->addSeparator();
-        action = menu->addMenu( submenu );
-        action->setData( "bookmark" );
+        MediaLib * mediaLib = mi->getMediaLibrary();
+
+        BookmarkMenu * bookmarks = new BookmarkMenu(mediaLib, p_intf->p_player, menu);
+
+        bookmarks->setTitle(qfut(I_MENU_BOOKMARK));
+
+        action = menu->addMenu(bookmarks);
+
+        action->setData("bookmark");
     }
 
     menu->addSeparator();

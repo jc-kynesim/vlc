@@ -42,7 +42,7 @@ decltype (ControlbarProfileModel::m_defaults)
                 N_("Minimalist Style"),
                 {
                     {
-                        PlayerControlbarModel::Mainplayer,
+                        PlayerControlbarModel::Videoplayer,
                         {
                             {
                                 {
@@ -54,17 +54,35 @@ decltype (ControlbarProfileModel::m_defaults)
                                     ControlListModel::WIDGET_SPACER,
                                     ControlListModel::RECORD_BUTTON,
                                     ControlListModel::WIDGET_SPACER,
-                                    ControlListModel::TELETEXT_BUTTONS,
+                                    ControlListModel::NAVIGATION_BUTTONS,
                                     ControlListModel::WIDGET_SPACER,
-                                    ControlListModel::PLAYLIST_BUTTON,
-                                    ControlListModel::WIDGET_SPACER,
+                                    ControlListModel::PLAYLIST_BUTTON
+                                }, {},
+                                {
                                     ControlListModel::VOLUME
-                                },
+                                }
+                            }
+                        }
+                    },
+                    {
+                        PlayerControlbarModel::Audioplayer,
+                        {
+                            {
                                 {
-
-                                },
+                                    ControlListModel::PLAY_BUTTON,
+                                    ControlListModel::WIDGET_SPACER,
+                                    ControlListModel::PREVIOUS_BUTTON,
+                                    ControlListModel::STOP_BUTTON,
+                                    ControlListModel::NEXT_BUTTON,
+                                    ControlListModel::WIDGET_SPACER,
+                                    ControlListModel::RECORD_BUTTON,
+                                    ControlListModel::WIDGET_SPACER,
+                                    ControlListModel::NAVIGATION_BUTTONS,
+                                    ControlListModel::WIDGET_SPACER,
+                                    ControlListModel::PLAYLIST_BUTTON
+                                }, {},
                                 {
-
+                                    ControlListModel::VOLUME
                                 }
                             }
                         }
@@ -74,17 +92,14 @@ decltype (ControlbarProfileModel::m_defaults)
                         {
                             {
                                 {
+                                    ControlListModel::ARTWORK_INFO
+                                },
+                                {
                                     ControlListModel::PREVIOUS_BUTTON,
                                     ControlListModel::PLAY_BUTTON,
                                     ControlListModel::STOP_BUTTON,
                                     ControlListModel::NEXT_BUTTON
-                                },
-                                {
-
-                                },
-                                {
-
-                                }
+                                }, {}
                             }
                         }
                     }
@@ -95,7 +110,7 @@ decltype (ControlbarProfileModel::m_defaults)
                 N_("One-liner Style"),
                 {
                     {
-                        PlayerControlbarModel::Mainplayer,
+                        PlayerControlbarModel::Videoplayer,
                         {
                             {
                                 {
@@ -109,17 +124,41 @@ decltype (ControlbarProfileModel::m_defaults)
                                     ControlListModel::PLAYLIST_BUTTON,
                                     ControlListModel::EXTENDED_BUTTON,
                                     ControlListModel::WIDGET_SPACER,
+                                    ControlListModel::RECORD_BUTTON,
+                                    ControlListModel::SNAPSHOT_BUTTON,
+                                    ControlListModel::ATOB_BUTTON,
+                                    ControlListModel::FRAME_BUTTON
+                                },
+                                {},
+                                {
+                                    ControlListModel::VOLUME
+                                }
+                            }
+                        }
+                    },
+                    {
+                        PlayerControlbarModel::Audioplayer,
+                        {
+                            {
+                                {
+                                    ControlListModel::PLAY_BUTTON,
+                                    ControlListModel::WIDGET_SPACER,
+                                    ControlListModel::PREVIOUS_BUTTON,
+                                    ControlListModel::STOP_BUTTON,
+                                    ControlListModel::NEXT_BUTTON,
+                                    ControlListModel::WIDGET_SPACER,
+                                    ControlListModel::FULLSCREEN_BUTTON,
+                                    ControlListModel::PLAYLIST_BUTTON,
+                                    ControlListModel::EXTENDED_BUTTON,
                                     ControlListModel::WIDGET_SPACER,
                                     ControlListModel::RECORD_BUTTON,
                                     ControlListModel::SNAPSHOT_BUTTON,
                                     ControlListModel::ATOB_BUTTON,
                                     ControlListModel::FRAME_BUTTON
                                 },
+                                {},
                                 {
                                     ControlListModel::VOLUME
-                                },
-                                {
-
                                 }
                             }
                         }
@@ -129,19 +168,16 @@ decltype (ControlbarProfileModel::m_defaults)
                         {
                             {
                                 {
+                                    ControlListModel::ARTWORK_INFO
+                                },
+                                {
                                     ControlListModel::RANDOM_BUTTON,
                                     ControlListModel::PREVIOUS_BUTTON,
                                     ControlListModel::PLAY_BUTTON,
                                     ControlListModel::STOP_BUTTON,
                                     ControlListModel::NEXT_BUTTON,
                                     ControlListModel::LOOP_BUTTON
-                                },
-                                {
-
-                                },
-                                {
-
-                                }
+                                }, {}
                             }
                         }
                     }
@@ -152,7 +188,25 @@ decltype (ControlbarProfileModel::m_defaults)
                 N_("Simplest Style"),
                 {
                     {
-                        PlayerControlbarModel::Mainplayer,
+                        PlayerControlbarModel::Videoplayer,
+                        {
+                            {
+                                {
+                                    ControlListModel::VOLUME
+                                },
+                                {
+                                    ControlListModel::PLAY_BUTTON,
+                                    ControlListModel::NEXT_BUTTON,
+                                    ControlListModel::STOP_BUTTON
+                                },
+                                {
+                                    ControlListModel::FULLSCREEN_BUTTON
+                                }
+                            }
+                        }
+                    },
+                    {
+                        PlayerControlbarModel::Audioplayer,
                         {
                             {
                                 {
@@ -174,16 +228,13 @@ decltype (ControlbarProfileModel::m_defaults)
                         {
                             {
                                 {
+                                    ControlListModel::ARTWORK_INFO
+                                },
+                                {
                                     ControlListModel::PREVIOUS_BUTTON,
                                     ControlListModel::PLAY_BUTTON,
                                     ControlListModel::NEXT_BUTTON
-                                },
-                                {
-
-                                },
-                                {
-
-                                }
+                                }, {}
                             }
                         }
                     }
@@ -194,7 +245,7 @@ decltype (ControlbarProfileModel::m_defaults)
                 N_("Classic Style"),
                 {
                     {
-                        PlayerControlbarModel::Mainplayer,
+                        PlayerControlbarModel::Videoplayer,
                         {
                             {
                                 {
@@ -211,9 +262,32 @@ decltype (ControlbarProfileModel::m_defaults)
                                     ControlListModel::LOOP_BUTTON,
                                     ControlListModel::RANDOM_BUTTON
                                 },
+                                {},
                                 {
-
+                                    ControlListModel::VOLUME
+                                }
+                            }
+                        }
+                    },
+                    {
+                        PlayerControlbarModel::Audioplayer,
+                        {
+                            {
+                                {
+                                    ControlListModel::PLAY_BUTTON,
+                                    ControlListModel::WIDGET_SPACER,
+                                    ControlListModel::PREVIOUS_BUTTON,
+                                    ControlListModel::STOP_BUTTON,
+                                    ControlListModel::NEXT_BUTTON,
+                                    ControlListModel::WIDGET_SPACER,
+                                    ControlListModel::FULLSCREEN_BUTTON,
+                                    ControlListModel::EXTENDED_BUTTON,
+                                    ControlListModel::WIDGET_SPACER,
+                                    ControlListModel::PLAYLIST_BUTTON,
+                                    ControlListModel::LOOP_BUTTON,
+                                    ControlListModel::RANDOM_BUTTON
                                 },
+                                {},
                                 {
                                     ControlListModel::VOLUME
                                 }
@@ -225,6 +299,9 @@ decltype (ControlbarProfileModel::m_defaults)
                         {
                             {
                                 {
+                                    ControlListModel::ARTWORK_INFO
+                                },
+                                {
                                     ControlListModel::PLAY_BUTTON,
                                     ControlListModel::WIDGET_SPACER,
                                     ControlListModel::PREVIOUS_BUTTON,
@@ -237,9 +314,6 @@ decltype (ControlbarProfileModel::m_defaults)
                                     ControlListModel::PLAYLIST_BUTTON,
                                     ControlListModel::LOOP_BUTTON,
                                     ControlListModel::RANDOM_BUTTON
-                                },
-                                {
-
                                 },
                                 {
                                     ControlListModel::VOLUME
@@ -310,7 +384,7 @@ QString ControlbarProfileModel::generateUniqueName(const QString &name)
     };
 
     // Actually, the profile model inherently does not allow two
-    // profiles to have the same name so it could be sufficent
+    // profiles to have the same name so it could be sufficient
     // to check only for name existence but for cases when the
     // config file is edited explicitly, using count_if might
     // be helpful.

@@ -44,6 +44,8 @@ namespace adaptive
     using namespace playlist;
     using namespace logic;
 
+    using StreamPosition = AbstractStream::StreamPosition;
+
     class PlaylistManager
     {
         public:
@@ -59,9 +61,9 @@ namespace adaptive
             bool    started() const;
             void    stop();
 
-            AbstractStream::BufferingStatus bufferize(vlc_tick_t, vlc_tick_t,
+            AbstractStream::BufferingStatus bufferize(Times, vlc_tick_t,
                                                       vlc_tick_t, vlc_tick_t);
-            AbstractStream::Status dequeue(vlc_tick_t, vlc_tick_t *);
+            AbstractStream::Status dequeue(Times, Times *);
 
             virtual bool needsUpdate() const;
             virtual bool updatePlaylist();
@@ -77,12 +79,12 @@ namespace adaptive
             virtual int doDemux(vlc_tick_t);
 
             void    setLivePause(bool);
-            virtual bool    setPosition(vlc_tick_t);
-            vlc_tick_t getResumeTime() const;
-            vlc_tick_t getFirstDTS() const;
+            virtual bool setPosition(vlc_tick_t, double pos = -1, bool accurate = false);
+            StreamPosition getResumePosition() const;
+            Times getFirstTimes() const;
             unsigned getActiveStreamsCount() const;
 
-            vlc_tick_t getCurrentDemuxTime() const;
+            Times getTimes(bool = false) const;
             vlc_tick_t getMinAheadTime() const;
 
             virtual bool reactivateStream(AbstractStream *);
@@ -116,8 +118,7 @@ namespace adaptive
             struct
             {
                 TimestampSynchronizationPoint pcr_syncpoint;
-                vlc_tick_t  i_nzpcr;
-                vlc_tick_t  i_firstpcr;
+                Times times, firsttimes;
                 mutable vlc_mutex_t lock;
                 vlc_cond_t  cond;
             } demux;
@@ -131,6 +132,7 @@ namespace adaptive
             {
                 bool        b_live;
                 vlc_tick_t  i_time;
+                vlc_tick_t  i_normaltime;
                 double      f_position;
                 mutable vlc_mutex_t lock;
                 vlc_tick_t  playlistStart;
@@ -138,6 +140,8 @@ namespace adaptive
                 vlc_tick_t  playlistLength;
                 time_t      lastupdate;
             } cached;
+
+            SynchronizationReferences synchronizationReferences;
 
         private:
             void setBufferingRunState(bool);

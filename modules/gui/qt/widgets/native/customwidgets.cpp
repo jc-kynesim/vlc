@@ -2,11 +2,8 @@
  * customwidgets.cpp: Custom widgets
  ****************************************************************************
  * Copyright (C) 2006-2011 the VideoLAN team
- * Copyright (C) 2004 Daniel Molkentin <molkentin@kde.org>
  *
  * Authors: Clément Stenac <zorglub@videolan.org>
- * The "ClickLineEdit" control is based on code by  Daniel Molkentin
- * <molkentin@kde.org> for libkdepim
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,14 +25,12 @@
 #endif
 
 #include "customwidgets.hpp"
-#include "qt.hpp"               /* needed for qtr,  but not necessary */
 
 #include <QtMath>  // for wheel deadzone calculation
 #include <QPainter>
 #include <QRect>
 #include <QKeyEvent>
 #include <QWheelEvent>
-#include <QPixmap>
 #include <QApplication>
 #include <vlc_actions.h>
 
@@ -349,8 +344,10 @@ SpinningIcon::SpinningIcon( QWidget *parent ) : QLabel( parent )
     frames << ":/util/wait3.svg";
     frames << ":/util/wait4.svg";
     animator = new PixmapAnimator( this, frames, SPINNER_SIZE, SPINNER_SIZE );
-    CONNECT( animator, pixmapReady( const QPixmap & ), this, setPixmap( const QPixmap & ) );
-    CONNECT( animator, pixmapReady( const QPixmap & ), this, repaint() );
+    connect( animator, &PixmapAnimator::pixmapReady, this, [=]( const QPixmap &pixmap ) {
+        this->setPixmap( pixmap );
+        this->repaint();
+    } );
     setScaledContents( true );
     setFixedSize( 16, 16 );
     animator->setCurrentTime( 0 );
@@ -365,8 +362,8 @@ QToolButtonExt::QToolButtonExt(QWidget *parent, int ms )
     /* default to twice the doubleclick delay */
     setAutoRepeatDelay( ( ms > 0 )? ms : 2 * QApplication::doubleClickInterval() );
     setAutoRepeatInterval( 100 );
-    connect( this, SIGNAL(released()), this, SLOT(releasedSlot()) );
-    connect( this, SIGNAL(clicked()), this, SLOT(clickedSlot()) );
+    connect( this, &QToolButtonExt::released, this, &QToolButtonExt::releasedSlot );
+    connect( this, &QToolButtonExt::clicked, this, &QToolButtonExt::clickedSlot );
 }
 
 /* table illustrating the different scenarios and the events generated

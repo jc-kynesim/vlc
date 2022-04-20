@@ -216,9 +216,9 @@ static vout_window_t *video_splitter_CreateWindow(vlc_object_t *obj,
     vout_display_GetDefaultDisplaySize(&cfg.width, &cfg.height, source,
                                        vdcfg);
 
-    vout_window_t *window = vout_window_New(obj, NULL, &owner);
+    vout_window_t *window = vout_window_New(obj, NULL, &owner, &cfg);
     if (window != NULL) {
-        if (vout_window_Enable(window, &cfg)) {
+        if (vout_window_Enable(window)) {
             vout_window_Delete(window);
             window = NULL;
         }
@@ -300,9 +300,14 @@ static int vlc_vidsplit_Open(vout_display_t *vd,
         }
 
         vdcfg.window = part->window;
+        vlc_sem_wait(&part->lock);
+        vdcfg.display.width = part->width;
+        vdcfg.display.height = part->height;
+
         vout_display_t *display = vout_display_New(obj, &output->fmt, ctx, &vdcfg,
                                                    modname, NULL);
         if (display == NULL) {
+            vlc_sem_post(&part->lock);
             vout_window_Disable(part->window);
             vout_window_Delete(part->window);
             splitter->i_output = i;
@@ -310,9 +315,7 @@ static int vlc_vidsplit_Open(vout_display_t *vd,
             return VLC_EGENERIC;
         }
 
-        vlc_sem_wait(&part->lock);
         part->display = display;
-        vout_display_SetSize(display, part->width, part->height);
         vlc_sem_post(&part->lock);
     }
 
@@ -324,9 +327,8 @@ static int vlc_vidsplit_Open(vout_display_t *vd,
 vlc_module_begin()
     set_shortname(N_("Splitter"))
     set_description(N_("Video splitter display plugin"))
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     set_callback_display(vlc_vidsplit_Open, 0)
-    add_module("video-splitter", "video splitter", NULL,
+    add_module("video-splitter", "video splitter", "none",
                N_("Video splitter module"), NULL)
 vlc_module_end()

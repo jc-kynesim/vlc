@@ -28,7 +28,12 @@
 #import <Cocoa/Cocoa.h>
 #import <vlc_input.h>
 
-#define _NS(s) ((s) ? toNSStr(vlc_gettext(s)) : @"")
+#define NSTR(s) ((s) ? toNSStr(vlc_gettext(s)) : @"")
+
+/**
+ * For marking translatable static strings (like `_()`)
+ */
+#define _NS(s) NSTR(s)
 
 /**
  * Get a contextualized translation string
@@ -165,7 +170,7 @@ static inline NSString *B64DecNSStr(NSString *s) {
 
  Base64 encodes the given C string and frees it, returns and empty
  NSString in case of failure.
- The given string is freed regardless if an error occured or not.
+ The given string is freed regardless if an error occurred or not.
 
  \warning Compatibility function, do not use in new code!
  */

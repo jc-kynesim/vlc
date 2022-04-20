@@ -55,7 +55,7 @@
 #include "vout_internal.h"
 #include "display.h"
 #include "snapshot.h"
-#include "window.h"
+#include "video_window.h"
 #include "../misc/variables.h"
 #include "../clock/clock.h"
 #include "statistic.h"
@@ -214,118 +214,19 @@ static bool VideoFormatIsCropArEqual(video_format_t *dst,
            dst->i_visible_height == src->i_visible_height;
 }
 
-static void vout_display_SizeWindow(unsigned *restrict width,
-                                    unsigned *restrict height,
-                                    unsigned w, unsigned h,
-                                    unsigned sar_num, unsigned sar_den,
-                                    video_orientation_t orientation,
-                                    const vout_display_cfg_t *restrict cfg)
-{
-    *width = cfg->display.width;
-    *height = cfg->display.height;
-
-    /* If both width and height are forced, keep them as is. */
-    if (*width != 0 && *height != 0)
-        return;
-
-    /* Compute intended video resolution from source. */
-    assert(sar_num > 0 && sar_den > 0);
-    w = (w * sar_num) / sar_den;
-
-    /* Adjust video size for orientation and pixel A/R. */
-    if (ORIENT_IS_SWAP(orientation)) {
-        unsigned x = w;
-
-        w = h;
-        h = x;
-    }
-
-    if (cfg->display.sar.num > 0 && cfg->display.sar.den > 0)
-        w = (w * cfg->display.sar.den) / cfg->display.sar.num;
-
-    /* If width is forced, adjust height according to the aspect ratio */
-    if (*width != 0) {
-        *height = (*width * h) / w;
-        return;
-    }
-
-    /* If height is forced, adjust width according to the aspect ratio */
-    if (*height != 0) {
-        *width = (*height * w) / h;
-        return;
-    }
-
-    /* If neither width nor height are forced, use the requested zoom. */
-    *width = (w * cfg->zoom.num) / cfg->zoom.den;
-    *height = (h * cfg->zoom.num) / cfg->zoom.den;
-}
-
-static void vout_SizeWindow(vout_thread_sys_t *vout,
-                            const video_format_t *original,
-                            unsigned *restrict width,
-                            unsigned *restrict height)
-{
-    vout_thread_sys_t *sys = vout;
-    unsigned w = original->i_visible_width;
-    unsigned h = original->i_visible_height;
-    unsigned sar_num = original->i_sar_num;
-    unsigned sar_den = original->i_sar_den;
-
-    if (sys->source.dar.num > 0 && sys->source.dar.den > 0) {
-        unsigned num = sys->source.dar.num * h;
-        unsigned den = sys->source.dar.den * w;
-
-        vlc_ureduce(&sar_num, &sar_den, num, den, 0);
-    }
-
-    switch (sys->source.crop.mode) {
-        case VOUT_CROP_NONE:
-            break;
-
-        case VOUT_CROP_RATIO: {
-            unsigned num = sys->source.crop.ratio.num;
-            unsigned den = sys->source.crop.ratio.den;
-
-            if (w * den > h * num)
-                w = h * num / den;
-            else
-                h = w * den / num;
-            break;
-        }
-
-        case VOUT_CROP_WINDOW:
-            w = sys->source.crop.window.width;
-            h = sys->source.crop.window.height;
-            break;
-
-        case VOUT_CROP_BORDER:
-            w = sys->source.crop.border.right - sys->source.crop.border.left;
-            h = sys->source.crop.border.bottom - sys->source.crop.border.top;
-            break;
-    }
-
-    /* If the vout thread is running, the window lock must be held here. */
-    vout_display_SizeWindow(width, height, w, h, sar_num, sar_den,
-                            original->orientation,
-                            &sys->display_cfg);
-}
-
 static void vout_UpdateWindowSizeLocked(vout_thread_sys_t *vout)
 {
     vout_thread_sys_t *sys = vout;
     unsigned width, height;
 
+    if (unlikely(sys->original.i_chroma == 0))
+        return; /* not started yet, postpone size computaton */
+
     vlc_mutex_assert(&sys->window_lock);
-
-    vlc_mutex_lock(&sys->display_lock);
-    if (sys->display != NULL) {
-        vout_SizeWindow(vout, &sys->original, &width, &height);
-        vlc_mutex_unlock(&sys->display_lock);
-
-        msg_Dbg(&vout->obj, "requested window size: %ux%u", width, height);
-        vout_window_SetSize(sys->display_cfg.window, width, height);
-    } else
-        vlc_mutex_unlock(&sys->display_lock);
+    vout_display_SizeWindow(&width, &height, &sys->original, &sys->source.dar,
+                            &sys->source.crop, &sys->display_cfg);
+    msg_Dbg(&vout->obj, "requested window size: %ux%u", width, height);
+    vout_window_SetSize(sys->display_cfg.window, width, height);
 }
 
 /* */
@@ -1357,7 +1258,8 @@ static int RenderPicture(vout_thread_sys_t *sys, bool render_now)
             vlc_clock_Lock(sys->clock);
 
             bool timed_out = false;
-            while (!timed_out) {
+            while (!timed_out)
+            {
                 vlc_tick_t deadline;
                 if (vlc_clock_IsPaused(sys->clock))
                     deadline = max_deadline;
@@ -1371,7 +1273,7 @@ static int RenderPicture(vout_thread_sys_t *sys, bool render_now)
 
                 system_pts = deadline;
                 timed_out = vlc_clock_Wait(sys->clock, deadline);
-            };
+            }
 
             vlc_clock_Unlock(sys->clock);
         }
@@ -1431,10 +1333,8 @@ static int DisplayNextFrame(vout_thread_sys_t *sys)
     return RenderPicture(sys, true);
 }
 
-static int DisplayPicture(vout_thread_sys_t *vout, vlc_tick_t *deadline)
+static vlc_tick_t DisplayPicture(vout_thread_sys_t *vout)
 {
-    assert(deadline);
-
     vout_thread_sys_t *sys = vout;
     bool paused = sys->pause.is_on;
 
@@ -1460,17 +1360,12 @@ static int DisplayPicture(vout_thread_sys_t *vout, vlc_tick_t *deadline)
     */
     bool refresh = false;
 
-    vlc_tick_t date_refresh = VLC_TICK_INVALID;
-
     picture_t *next = NULL;
     if (first)
     {
         next = PreparePicture(vout, true, false);
         if (!next)
-        {
-            *deadline = VLC_TICK_INVALID;
-            return VLC_EGENERIC; // wait with no known deadline
-        }
+            return vlc_tick_now() + VOUT_REDISPLAY_DELAY; /* Unknown deadline */
     }
     else if (!paused)
     {
@@ -1487,6 +1382,8 @@ static int DisplayPicture(vout_thread_sys_t *vout, vlc_tick_t *deadline)
             }
         }
     }
+
+    vlc_tick_t date_refresh = VLC_TICK_MAX;
 
     if (next != NULL)
     {
@@ -1512,19 +1409,21 @@ static int DisplayPicture(vout_thread_sys_t *vout, vlc_tick_t *deadline)
         render_now = refresh;
     }
 
-    if (date_refresh != VLC_TICK_INVALID)
-        *deadline = date_refresh;
-
     if (!first && !refresh && !dropped_current_frame) {
         // nothing changed, wait until the next deadline or a control
-        return VLC_EGENERIC;
+        vlc_tick_t max_deadline = vlc_tick_now() + VOUT_REDISPLAY_DELAY;
+        return __MIN(date_refresh, max_deadline);
     }
 
     /* display the picture immediately */
     render_now |= sys->displayed.current->b_force;
 
-    int ret = RenderPicture(vout, render_now);
-    return render_now ? VLC_EGENERIC : ret;
+    RenderPicture(vout, render_now);
+    if (render_now)
+        return vlc_tick_now() + VOUT_REDISPLAY_DELAY;
+
+    /* Prepare the next picture immediately without waiting */
+    return VLC_TICK_INVALID;
 }
 
 void vout_ChangePause(vout_thread_t *vout, bool is_paused, vlc_tick_t date)
@@ -1749,8 +1648,8 @@ static int vout_Start(vout_thread_sys_t *vout, vlc_video_context *vctx, const vo
     vlc_mutex_unlock(&sys->window_lock);
 
     /* Setup the window size, protected by the display_lock */
-    dcfg.window_props.width = sys->window_width;
-    dcfg.window_props.height = sys->window_height;
+    dcfg.display.width = sys->window_width;
+    dcfg.display.height = sys->window_height;
 
     sys->display = vout_OpenWrapper(&vout->obj, &sys->private, sys->splitter_name, &dcfg,
                                     &sys->original, vctx);
@@ -1819,17 +1718,8 @@ static void *Thread(void *object)
     vout_thread_sys_t *sys = vout;
 
     vlc_tick_t deadline = VLC_TICK_INVALID;
-    bool wait = false;
 
     for (;;) {
-        if (wait)
-        {
-            const vlc_tick_t max_deadline = vlc_tick_now() + VLC_TICK_FROM_MS(100);
-            deadline = deadline == VLC_TICK_INVALID ? max_deadline : __MIN(deadline, max_deadline);
-        } else {
-            deadline = VLC_TICK_INVALID;
-        }
-
         vlc_mouse_t video_mouse;
         while (vout_control_Pop(&sys->control, &video_mouse, deadline) == VLC_SUCCESS) {
             if (atomic_load(&sys->control_is_terminated))
@@ -1840,7 +1730,11 @@ static void *Thread(void *object)
         if (atomic_load(&sys->control_is_terminated))
             break;
 
-        wait = DisplayPicture(vout, &deadline) != VLC_SUCCESS;
+        /* A deadline of VLC_TICK_INVALID means "immediately" */
+        deadline = DisplayPicture(vout);
+
+        assert(deadline == VLC_TICK_INVALID ||
+               deadline <= vlc_tick_now() + VOUT_REDISPLAY_DELAY);
 
         if (atomic_load(&sys->control_is_terminated))
             break;
@@ -1898,7 +1792,6 @@ static void vout_ReleaseDisplay(vout_thread_sys_t *vout)
     if (sys->spu)
         spu_Detach(sys->spu);
     sys->clock = NULL;
-    video_format_Clean(&sys->original);
 }
 
 void vout_StopDisplay(vout_thread_t *vout)
@@ -2032,14 +1925,24 @@ vout_thread_t *vout_Create(vlc_object_t *object)
     vout_IntfInit(vout);
 
     /* Get splitter name if present */
-    sys->splitter_name = config_GetType("video-splitter") ?
-        var_InheritString(vout, "video-splitter") : NULL;
-    if (sys->splitter_name != NULL) {
-        var_Create(vout, "window", VLC_VAR_STRING);
-        var_SetString(vout, "window", "wdummy");
+    sys->splitter_name = NULL;
+
+    if (config_GetType("video-splitter")) {
+        char *splitter_name = var_InheritString(vout, "video-splitter");
+        if (unlikely(splitter_name == NULL)) {
+            vlc_object_delete(vout);
+            return NULL;
+        }
+
+        if (strcmp(splitter_name, "none") != 0) {
+            var_Create(vout, "window", VLC_VAR_STRING);
+            var_SetString(vout, "window", "wdummy");
+            sys->splitter_name = splitter_name;
+        } else
+            free(splitter_name);
     }
 
-    sys->original.i_chroma = 0;
+    video_format_Init(&sys->original, 0);
     sys->source.dar.num = 0;
     sys->source.dar.den = 0;
     sys->source.crop.mode = VOUT_CROP_NONE;
@@ -2106,6 +2009,9 @@ int vout_ChangeSource( vout_thread_t *vout, const video_format_t *original )
 {
     vout_thread_sys_t *sys = VOUT_THREAD_TO_SYS(vout);
 
+    if (sys->display == NULL)
+        return -1;
+
      /* TODO: If dimensions are equal or slightly smaller, update the aspect
      * ratio and crop settings, instead of recreating a display.
      */
@@ -2124,28 +2030,16 @@ static int EnableWindowLocked(vout_thread_sys_t *vout, const video_format_t *ori
 
     assert(!sys->dummy);
     vlc_mutex_assert(&sys->window_lock);
+    VoutGetDisplayCfg(vout, original, &sys->display_cfg);
+    vout_UpdateWindowSizeLocked(vout);
 
     if (!sys->window_enabled) {
-        vout_window_cfg_t wcfg = {
-            .is_fullscreen = var_GetBool(&vout->obj, "fullscreen"),
-            .is_decorated = var_InheritBool(&vout->obj, "video-deco"),
-        // TODO: take pixel A/R, crop and zoom into account
-#if defined(__APPLE__) || defined(_WIN32)
-            .x = var_InheritInteger(&vout->obj, "video-x"),
-            .y = var_InheritInteger(&vout->obj, "video-y"),
-#endif
-        };
-
-        VoutGetDisplayCfg(vout, original, &sys->display_cfg);
-        vout_SizeWindow(vout, original, &wcfg.width, &wcfg.height);
-
-        if (vout_window_Enable(sys->display_cfg.window, &wcfg)) {
+        if (vout_window_Enable(sys->display_cfg.window)) {
             msg_Err(&vout->obj, "failed to enable window");
             return -1;
         }
         sys->window_enabled = true;
-    } else
-        vout_UpdateWindowSizeLocked(vout);
+    }
     return 0;
 }
 
@@ -2175,9 +2069,11 @@ int vout_Request(const vout_configuration_t *cfg, vlc_video_context *vctx, input
     assert(cfg->fmt != NULL);
     assert(cfg->clock != NULL);
 
-    if (!VoutCheckFormat(cfg->fmt))
-        /* don't stop the display and keep sys->original */
+    if (!VoutCheckFormat(cfg->fmt)) {
+        if (sys->display != NULL)
+            vout_StopDisplay(cfg->vout);
         return -1;
+    }
 
     video_format_t original;
     VoutFixFormat(&original, cfg->fmt);
@@ -2189,14 +2085,16 @@ int vout_Request(const vout_configuration_t *cfg, vlc_video_context *vctx, input
     }
 
     vlc_mutex_lock(&sys->window_lock);
+    video_format_Clean(&sys->original);
+    sys->original = original;
     vout_InitSource(vout);
 
     if (EnableWindowLocked(vout, &original) != 0)
     {
         /* the window was not enabled, nor the display started */
         msg_Err(cfg->vout, "failed to enable window");
-        video_format_Clean(&original);
         vlc_mutex_unlock(&sys->window_lock);
+        assert(sys->display == NULL);
         return -1;
     }
     vlc_mutex_unlock(&sys->window_lock);
@@ -2206,8 +2104,6 @@ int vout_Request(const vout_configuration_t *cfg, vlc_video_context *vctx, input
 
     vout_ReinitInterlacingSupport(cfg->vout, &sys->private);
 
-    sys->original = original;
-
     sys->delay = 0;
     sys->rate = 1.f;
     sys->clock = cfg->clock;
@@ -2216,7 +2112,6 @@ int vout_Request(const vout_configuration_t *cfg, vlc_video_context *vctx, input
     if (vout_Start(vout, vctx, cfg))
     {
         msg_Err(cfg->vout, "video output display creation failed");
-        video_format_Clean(&sys->original);
         vout_DisableWindow(vout);
         return -1;
     }

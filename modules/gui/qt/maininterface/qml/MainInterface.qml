@@ -22,6 +22,7 @@ import QtQuick.Controls 2.4
 import QtQuick.Window 2.11
 
 import org.videolan.vlc 0.1
+import org.videolan.compat 0.1
 
 import "qrc:///widgets/" as Widgets
 import "qrc:///style/"
@@ -29,22 +30,22 @@ import "qrc:///style/"
 import "qrc:///dialogs/" as DG
 import "qrc:///playlist/" as PL
 
-Rectangle {
+Item {
     id: root
-    color: "transparent"
+
     property bool _interfaceReady: false
     property bool _playlistReady: false
 
     property alias g_root: root
-    property var g_dialogs: dialogsLoader.item
+    property QtObject g_dialogs: dialogsLoader.item
 
-    Binding {
+    BindingCompat {
         target: VLCStyle.self
         property: "appWidth"
         value: root.width
     }
 
-    Binding {
+    BindingCompat {
         target: VLCStyle.self
         property: "appHeight"
         value: root.height
@@ -80,7 +81,7 @@ Rectangle {
     ]
 
     function loadCurrentHistoryView() {
-        var current = history.current
+        var current = History.current
         if ( !current || !current.name  || !current.properties ) {
             console.warn("unable to load requested view, undefined")
             return
@@ -89,20 +90,21 @@ Rectangle {
     }
 
     Connections {
-        target: history
+        target: History
         onCurrentChanged: loadCurrentHistoryView()
     }
 
     function setInitialView() {
         //set the initial view
         var loadPlayer = !mainPlaylistController.empty;
-        if (medialib)
-            history.push(["mc", "video"], loadPlayer ? History.Stay : History.Go)
+
+        if (MainCtx.mediaLibraryAvailable)
+            History.push(["mc", "video"], loadPlayer ? History.Stay : History.Go)
         else
-            history.push(["mc", "home"], loadPlayer ? History.Stay : History.Go)
+            History.push(["mc", "home"], loadPlayer ? History.Stay : History.Go)
 
         if (loadPlayer)
-            history.push(["player"])
+            History.push(["player"])
     }
 
 
@@ -115,8 +117,6 @@ Rectangle {
 
     DropArea {
         anchors.fill: parent
-        onEntered: console.log("drop Enter")
-        onExited: console.log("drop exit")
         onDropped: {
             if (drop.hasUrls) {
                 var list = []
@@ -134,19 +134,19 @@ Rectangle {
             focus: true
 
             Connections {
-                target: player
+                target: Player
                 onPlayingStateChanged: {
-                    if (player.playingState === PlayerController.PLAYING_STATE_STOPPED
-                            && history.current.name === "player") {
-                        if (history.previousEmpty)
+                    if (Player.playingState === Player.PLAYING_STATE_STOPPED
+                            && History.current.name === "player") {
+                        if (History.previousEmpty)
                         {
-                            if (medialib)
-                                history.push(["mc", "video"])
+                            if (MainCtx.mediaLibraryAvailable)
+                                History.push(["mc", "video"])
                             else
-                                history.push(["mc", "home"])
+                                History.push(["mc", "home"])
                         }
                         else
-                            history.previous()
+                            History.previous()
                     }
                 }
             }
@@ -169,6 +169,7 @@ Rectangle {
             item.bgContent = root
         }
     }
+
     Connections {
         target: dialogsLoader.item
         onRestoreFocus: {
@@ -176,12 +177,24 @@ Rectangle {
         }
     }
 
+    MouseArea {
+        /// handles mouse navigation buttons
+        anchors.fill: parent
+        acceptedButtons: Qt.BackButton
+        cursorShape: undefined
+        onClicked: History.previous()
+    }
+
     Loader {
-        active: (MainCtx.clientSideDecoration
-                 &&
-                 // NOTE: We don't want to steal the mouse when we are maximized or in fullscreen
-                 !((topWindow.visibility & Window.Maximized) || MainCtx.interfaceFullScreen))
+        active: {
+            var windowVisibility = MainCtx.intfMainWindow.visibility
+            return MainCtx.clientSideDecoration
+                    && (windowVisibility !== Window.Maximized)
+                    && (windowVisibility !== Window.FullScreen)
+
+        }
 
         source: "qrc:///widgets/CSDMouseStealer.qml"
     }
+
 }

@@ -47,7 +47,7 @@ static int  Open ( vlc_object_t *p_this );
 static void Close( vlc_object_t *p_this );
 
 #define SUB_TYPE_LONGTEXT \
-    N_("Force the subtiles format. Selecting \"auto\" means autodetection and should always work.")
+    N_("Force the subtitles format. Selecting \"auto\" means autodetection and should always work.")
 #define SUB_DESCRIPTION_LONGTEXT \
     N_("Override the default track description.")
 
@@ -63,7 +63,6 @@ vlc_module_begin ()
     set_shortname( N_("Subtitles"))
     set_description( N_("Text subtitle parser") )
     set_capability( "demux", 0 )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_DEMUX )
     add_string( "sub-type", "auto", N_("Subtitle format"),
                 SUB_TYPE_LONGTEXT )
@@ -1231,7 +1230,7 @@ static int  ParseSSA( vlc_object_t *p_obj, subs_properties_t *p_props,
          * Format: Marked, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
          * Dialogue: Marked=0,0:02:40.65,0:02:41.79,Wolf main,Cher,0000,0000,0000,,Et les enregistrements de ses ondes delta ?
          *
-         * SSA-1 is similar but only has 8 commas up untill the subtitle text. Probably the Effect field is no present, but not 100 % sure.
+         * SSA-1 is similar but only has 8 commas up until the subtitle text. Probably the Effect field is no present, but not 100 % sure.
          */
 
         /* For ASS:
@@ -1908,7 +1907,7 @@ static int ParseJSS( vlc_object_t *p_obj, subs_properties_t *p_props,
             continue;
         }
         else
-            /* Unkown type line, probably a comment */
+            /* Unknown type line, probably a comment */
         {
             free( psz_orig );
             continue;
@@ -2119,7 +2118,7 @@ static int ParseRealText( vlc_object_t *p_obj, subs_properties_t *p_props,
         if( !psz_text )
             return VLC_ENOMEM;
 
-        /* Find the good begining. This removes extra spaces at the beginning
+        /* Find the good beginning. This removes extra spaces at the beginning
            of the line.*/
         char *psz_temp = strcasestr( s, "<time");
         if( psz_temp != NULL )

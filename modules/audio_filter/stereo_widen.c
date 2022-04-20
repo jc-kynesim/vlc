@@ -77,7 +77,6 @@ vlc_module_begin ()
     set_shortname( N_("Stereo Enhancer") )
     set_description( N_("Simple stereo widening effect") )
     set_help( HELP_TEXT )
-    set_category( CAT_AUDIO )
     set_subcategory( SUBCAT_AUDIO_AFILTER )
     set_capability( "audio filter", 0 )
     set_callback( Open )
@@ -235,7 +234,7 @@ static int paramCallback( vlc_object_t *p_this, char const *psz_var,
         if( MakeRingBuffer( &p_sys->pf_ringbuf, &p_sys->i_len, &p_sys->pf_write,
                             newval.f_float, p_filter->fmt_in.audio.i_rate ) != VLC_SUCCESS )
         {
-            msg_Dbg( p_filter, "Couldnt allocate buffer for delay" );
+            msg_Dbg( p_filter, "Couldn't allocate buffer for delay" );
         }
         else
         {

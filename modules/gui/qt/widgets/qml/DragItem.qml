@@ -46,9 +46,9 @@ Item {
     // data from last setData
     readonly property alias indexesData: dragItem._data
 
-    property string defaultCover: VLCStyle.noArtCover
+    property string defaultCover: VLCStyle.noArtAlbumCover
 
-    property string defaultText: i18n.qtr("Unknown")
+    property string defaultText: I18n.qtr("Unknown")
 
     // function(index, data) - returns cover for the index in the model in the form {artwork: <string> (file-name), cover: <component>}
     property var coverProvider: null
@@ -68,7 +68,7 @@ Item {
 
     signal requestData(var identifier)
 
-    function getSelectedInputItem() {
+    function getSelectedInputItem(cb) {
         console.assert(false, "getSelectedInputItem is not implemented.")
 
         return undefined
@@ -162,9 +162,6 @@ Item {
 
     on_ActiveChanged: {
         if (_active) {
-            if (_indexesSize < 1)
-                return
-
             dragItem._currentRequest += 1
             dragItem.requestData(dragItem._currentRequest)
 
@@ -321,9 +318,10 @@ Item {
 
         ScrollingText {
             label: titleLabel
-            scroll: true
+            forceScroll: true
             height: titleLabel.height
             width: parent.width
+            clip: scrolling
 
             T.Label {
                 id: titleLabel
@@ -342,7 +340,7 @@ Item {
 
             visible: text && text !== ""
             width: parent.width
-            text: i18n.qtr("%1 selected").arg(dragItem._indexesSize)
+            text: I18n.qtr("%1 selected").arg(dragItem._indexesSize)
             color: colors.menuCaption
         }
     }
@@ -350,8 +348,7 @@ Item {
     Component {
         id: artworkLoader
 
-        Image {
-            mipmap: true
+        ScaledImage {
             fillMode: Image.PreserveAspectCrop
             width: coverSize
             height: coverSize

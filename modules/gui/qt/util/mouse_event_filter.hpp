@@ -20,6 +20,7 @@
 
 #include <QObject>
 #include <QPointF>
+#include <QPointer>
 
 class MouseEventFilter : public QObject
 {
@@ -51,8 +52,8 @@ private:
     void detach();
 
 private:
-    QObject *m_target = nullptr;
-    Qt::MouseButtons m_targetItemInitialAcceptedMouseButtons = 0;
+    QPointer<QObject> m_target;
+    Qt::MouseButtons m_targetItemInitialAcceptedMouseButtons = Qt::NoButton;
     bool m_filterEventsSynthesizedByQt = false;
 };
 

@@ -111,7 +111,7 @@ Item {
             cursorShape: modelData.cursor
             acceptedButtons: Qt.LeftButton
 
-            onPressed: topWindow.startSystemResize(modelData.edge)
+            onPressed: MainCtx.intfMainWindow.startSystemResize(modelData.edge)
         }
     }
 }

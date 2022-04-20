@@ -55,7 +55,6 @@ vlc_module_begin ()
     set_description( N_("Matroska stream demuxer" ) )
     set_capability( "demux", 50 )
     set_callbacks( Open, Close )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_DEMUX )
 
     add_bool( "mkv-use-ordered-chapters", true,
@@ -113,7 +112,7 @@ static int OpenInternal( demux_t *p_demux, bool trust_cues )
     std::string         s_path, s_filename;
     bool                b_need_preload = false;
 
-    /* peek the begining */
+    /* peek the beginning */
     if( vlc_stream_Peek( p_demux->s, &p_peek, 4 ) < 4 ) return VLC_EGENERIC;
 
     /* is a valid file */
@@ -215,7 +214,7 @@ static int OpenInternal( demux_t *p_demux, bool trust_cues )
                             stream_t      *p_file_stream = vlc_stream_NewURL(
                                                             p_demux,
                                                             psz_url );
-                            /* peek the begining */
+                            /* peek the beginning */
                             if( p_file_stream &&
                                 vlc_stream_Peek( p_file_stream, &p_peek, 4 ) >= 4
                                 && p_peek[0] == 0x1a && p_peek[1] == 0x45 &&
@@ -604,7 +603,7 @@ void BlockDecode( demux_t *p_demux, KaxBlock *block, KaxSimpleBlock *simpleblock
             break;
         }
 
-#if defined(HAVE_ZLIB_H)
+#ifdef HAVE_ZLIB
         if( track.i_compression_type == MATROSKA_COMPRESSION_ZLIB &&
             track.i_encoding_scope & MATROSKA_ENCODING_SCOPE_ALL_FRAMES )
         {

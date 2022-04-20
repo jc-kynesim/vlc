@@ -53,7 +53,7 @@
  * Modules descriptor
  *****************************************************************************/
 static int      Open(vlc_object_t *);
-static void     Close(vlc_object_t *);
+static void     Close(encoder_t *);
 
 #define SW_IMPL_TEXT N_("Enable software mode")
 #define SW_IMPL_LONGTEXT N_("Allow the use of the Intel Media SDK software " \
@@ -107,7 +107,7 @@ static void     Close(vlc_object_t *);
 #define QP_TEXT N_("Quantization parameter")
 #define QP_LONGTEXT N_("Quantization parameter for all types of frames. " \
     "This parameters sets qpi, qpp and qpb. It has less precedence than " \
-    "the forementionned parameters. Used only if rc_method is 'qp'.")
+    "the forementioned parameters. Used only if rc_method is 'qp'.")
 
 #define QPI_TEXT N_("Quantization parameter for I-frames")
 #define QPI_LONGTEXT N_("Quantization parameter for I-frames. This parameter " \
@@ -130,7 +130,7 @@ static void     Close(vlc_object_t *);
 #define ACCURACY_LONGTEXT N_("Tolerance in percentage of the 'avbr' " \
     " (Average Variable BitRate) method. (e.g. 10 with a bitrate of 800 " \
     " kbps means the encoder tries not to  go above 880 kbps and under " \
-    " 730 kbps. The targeted accuracy is only reached after a certained " \
+    " 730 kbps. The targeted accuracy is only reached after a certain " \
     " convergence period. See the convergence parameter")
 
 #define CONVERGENCE_TEXT N_("Convergence time of 'avbr' RateControl")
@@ -156,13 +156,13 @@ static const int profile_h264_list[] =
       { MFX_PROFILE_UNKNOWN, MFX_PROFILE_AVC_CONSTRAINED_BASELINE, MFX_PROFILE_AVC_MAIN,
       MFX_PROFILE_AVC_EXTENDED, MFX_PROFILE_AVC_HIGH };
 static const char *const profile_h264_text[] =
-    { "decide", "baseline", "main", "extended", "high" };
+    { N_("Undefined"), N_("baseline"), N_("main"), N_("extended"), N_("high") };
 
 static const int profile_mpeg2_list[] =
     { MFX_PROFILE_UNKNOWN, MFX_PROFILE_MPEG2_SIMPLE, MFX_PROFILE_MPEG2_MAIN,
       MFX_PROFILE_MPEG2_HIGH };
 static const char *const profile_mpeg2_text[] =
-    { "decide", "simple", "main", "high" };
+    { N_("Undefined"), N_("simple"), N_("main"), N_("high") };
 
 static const int level_h264_list[] =
     { MFX_LEVEL_UNKNOWN, MFX_LEVEL_AVC_1, MFX_LEVEL_AVC_1b, MFX_LEVEL_AVC_12,
@@ -171,20 +171,20 @@ static const int level_h264_list[] =
       MFX_LEVEL_AVC_41, MFX_LEVEL_AVC_42, MFX_LEVEL_AVC_5, MFX_LEVEL_AVC_51,
       MFX_LEVEL_AVC_52};
 static const char *const level_h264_text[] =
-    { "decide", "1", "1.1b", "1.2", "1.3", "2", "2.1", "2.2", "3", "3.1",
+    { N_("Undefined"), "1", "1.1b", "1.2", "1.3", "2", "2.1", "2.2", "3", "3.1",
       "3.2", "4", "4.1",   "4.2",   "5", "5.1", "5.2" };
 
 static const int level_mpeg2_list[] =
     { MFX_LEVEL_UNKNOWN, MFX_LEVEL_MPEG2_LOW, MFX_LEVEL_MPEG2_MAIN,
       MFX_LEVEL_MPEG2_HIGH, MFX_LEVEL_MPEG2_HIGH1440 };
 static const char *const level_mpeg2_text[] =
-    { "decide", "low", "main", "high", "high1440" };
+    { N_("Undefined"), N_("low"), N_("main"), N_("high"), N_("high1440") };
 
 static const int target_usage_list[] =
     { MFX_TARGETUSAGE_UNKNOWN, MFX_TARGETUSAGE_BEST_QUALITY, MFX_TARGETUSAGE_BALANCED,
       MFX_TARGETUSAGE_BEST_SPEED };
 static const char *const target_usage_text[] =
-    { "decide", "quality", "balanced", "speed" };
+    { N_("Undefined"), N_("quality"), N_("balanced"), N_("speed") };
 
 static const int rc_method_list[] =
     { MFX_RATECONTROL_CBR, MFX_RATECONTROL_VBR,
@@ -193,12 +193,11 @@ static const char *const rc_method_text[] =
     { "cbr", "vbr", "qp", "avbr" };
 
 vlc_module_begin ()
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_VCODEC)
     set_description(N_("Intel QuickSync Video encoder for MPEG4-Part10/MPEG2 (aka H.264/H.262)"))
     set_shortname("qsv")
-    set_capability("encoder", 0)
-    set_callbacks(Open, Close)
+    set_capability("video encoder", 0)
+    set_callback(Open)
 
     add_bool(SOUT_CFG_PREFIX "software", false, SW_IMPL_TEXT, SW_IMPL_LONGTEXT)
 
@@ -620,23 +619,27 @@ static int Open(vlc_object_t *this)
         goto nomem;
     }
 
-    enc->pf_encode_video = Encode;
+    static const struct vlc_encoder_operations ops =
+    {
+        .close = Close,
+        .encode_video = Encode,
+    };
+    enc->ops = &ops;
 
     return VLC_SUCCESS;
 
  error:
-    Close(this);
+    Close(enc);
     enc->p_sys = NULL;
     return VLC_EGENERIC;
  nomem:
-    Close(this);
+    Close(enc);
     enc->p_sys = NULL;
     return VLC_ENOMEM;
 }
 
-static void Close(vlc_object_t *this)
+static void Close(encoder_t *enc)
 {
-    encoder_t *enc = (encoder_t *)this;
     encoder_sys_t *sys = enc->p_sys;
 
     MFXVideoENCODE_Close(sys->session);

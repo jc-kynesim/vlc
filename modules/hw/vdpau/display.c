@@ -43,7 +43,6 @@ static void Close(vout_display_t *vd);
 vlc_module_begin()
     set_shortname(N_("VDPAU"))
     set_description(N_("VDPAU output"))
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
     set_callback_display(Open, 0)
 
@@ -148,6 +147,8 @@ static void Queue(vout_display_t *vd, picture_t *pic, subpicture_t *subpic,
     vlc_vdp_output_surface_t *p_sys = pic->p_sys;
     VdpOutputSurface surface = p_sys->surface;
     VdpStatus err;
+
+    vlc_xcb_Manage(vd->obj.logger, sys->conn);
 
     VdpPresentationQueueStatus status;
     VdpTime ts;
@@ -299,11 +300,13 @@ static int Open(vout_display_t *vd,
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
 
+    struct vlc_logger *log = vd->obj.logger;
     const xcb_screen_t *screen;
-    if (vlc_xcb_parent_Create(vd, vd->cfg->window, &sys->conn, &screen) != VLC_SUCCESS)
+    int ret = vlc_xcb_parent_Create(log, vd->cfg->window, &sys->conn, &screen);
+    if (ret != VLC_SUCCESS)
     {
         free(sys);
-        return VLC_EGENERIC;
+        return ret;
     }
 
     vlc_decoder_device *dec_device = context ? vlc_video_context_HoldDevice(context) : NULL;
@@ -324,10 +327,6 @@ static int Open(vout_display_t *vd,
     sys->device = vdpau_decoder->device;
 
     vlc_decoder_device_Release(dec_device);
-
-    const char *info;
-    if (vdp_get_information_string(sys->vdp, &info) == VDP_STATUS_OK)
-        msg_Dbg(vd, "using back-end %s", info);
 
     /* Check source format */
     video_format_t fmt;
@@ -442,7 +441,7 @@ static int Open(vout_display_t *vd,
                 sys->window, vd->cfg->window->handle.xid, place.x, place.y,
                 place.width, place.height, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT,
                 screen->root_visual, mask, values);
-        if (vlc_xcb_error_Check(vd, sys->conn, "window creation failure", c))
+        if (vlc_xcb_error_Check(log, sys->conn, "window creation failure", c))
             goto error;
         msg_Dbg(vd, "using X11 window 0x%08"PRIx32, sys->window);
         xcb_map_window(sys->conn, sys->window);

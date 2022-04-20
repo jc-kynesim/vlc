@@ -24,6 +24,7 @@
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
+#include "gl_util.h"
 #include "interop.h"
 #include "../../codec/vt_utils.h"
 
@@ -45,13 +46,20 @@ struct priv
     CGLContextObj gl_ctx;
 #endif
     picture_t *last_pic;
+
+    struct {
+        PFNGLACTIVETEXTUREPROC ActiveTexture;
+        PFNGLBINDTEXTUREPROC BindTexture;
+        PFNGLTEXPARAMETERIPROC TexParameteri;
+        PFNGLTEXPARAMETERFPROC TexParameterf;
+    } gl;
 };
 
 #if TARGET_OS_IPHONE
 /* CVOpenGLESTextureCache version (ios) */
 static int
-tc_cvpx_update(const struct vlc_gl_interop *interop, GLuint *textures,
-               const GLsizei *tex_width, const GLsizei *tex_height,
+tc_cvpx_update(const struct vlc_gl_interop *interop, uint32_t textures[],
+               const int32_t tex_width[], const int32_t tex_height[],
                picture_t *pic, const size_t *plane_offset)
 {
     (void) plane_offset;
@@ -93,12 +101,12 @@ tc_cvpx_update(const struct vlc_gl_interop *interop, GLuint *textures,
         }
 
         textures[i] = CVOpenGLESTextureGetName(cvtex);
-        interop->vt->BindTexture(interop->tex_target, textures[i]);
-        interop->vt->TexParameteri(interop->tex_target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        interop->vt->TexParameteri(interop->tex_target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        interop->vt->TexParameterf(interop->tex_target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        interop->vt->TexParameterf(interop->tex_target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        interop->vt->BindTexture(interop->tex_target, 0);
+        priv->gl.BindTexture(interop->tex_target, textures[i]);
+        priv->gl.TexParameteri(interop->tex_target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        priv->gl.TexParameteri(interop->tex_target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        priv->gl.TexParameterf(interop->tex_target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        priv->gl.TexParameterf(interop->tex_target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        priv->gl.BindTexture(interop->tex_target, 0);
         priv->last_cvtexs[i] = cvtex;
     }
 
@@ -108,8 +116,8 @@ tc_cvpx_update(const struct vlc_gl_interop *interop, GLuint *textures,
 #else
 /* IOSurface version (macos) */
 static int
-tc_cvpx_update(const struct vlc_gl_interop *interop, GLuint *textures,
-               const GLsizei *tex_width, const GLsizei *tex_height,
+tc_cvpx_update(const struct vlc_gl_interop *interop, uint32_t textures[],
+               const int32_t tex_width[], const int32_t tex_height[],
                picture_t *pic, const size_t *plane_offset)
 {
     (void) plane_offset;
@@ -121,8 +129,8 @@ tc_cvpx_update(const struct vlc_gl_interop *interop, GLuint *textures,
 
     for (unsigned i = 0; i < interop->tex_count; ++i)
     {
-        interop->vt->ActiveTexture(GL_TEXTURE0 + i);
-        interop->vt->BindTexture(interop->tex_target, textures[i]);
+        priv->gl.ActiveTexture(GL_TEXTURE0 + i);
+        priv->gl.BindTexture(interop->tex_target, textures[i]);
 
         CGLError err =
             CGLTexImageIOSurface2D(priv->gl_ctx, interop->tex_target,
@@ -184,6 +192,15 @@ Open(vlc_object_t *obj)
     if (unlikely(priv == NULL))
         return VLC_ENOMEM;
 
+#define LOAD_FUNCTION(name) \
+    priv->gl.name = vlc_gl_GetProcAddress(interop->gl, "gl" # name); \
+    assert(priv->gl.name != NULL)
+
+    LOAD_FUNCTION(ActiveTexture);
+    LOAD_FUNCTION(BindTexture);
+    LOAD_FUNCTION(TexParameteri);
+    LOAD_FUNCTION(TexParameterf);
+
 #if TARGET_OS_IPHONE
     const GLenum tex_target = GL_TEXTURE_2D;
 
@@ -218,7 +235,18 @@ Open(vlc_object_t *obj)
     }
 #endif
 
-    int ret;
+    struct vlc_gl_extension_vt extension_vt;
+    vlc_gl_LoadExtensionFunctions(interop->gl, &extension_vt);
+
+    /* RG textures are available natively since OpenGL 3.0 and OpenGL ES 3.0 */
+    bool has_texture_rg = vlc_gl_GetVersionMajor(&extension_vt) >= 3
+        || (interop->gl->api_type == VLC_OPENGL
+            && vlc_gl_HasExtension(&extension_vt, "GL_ARB_texture_rg"))
+        || (interop->gl->api_type == VLC_OPENGL_ES2
+            && vlc_gl_HasExtension(&extension_vt, "GL_EXT_texture_rg"));
+
+    interop->tex_target = tex_target;
+
     switch (interop->fmt_in.i_chroma)
     {
         case VLC_CODEC_CVPX_UYVY:
@@ -226,55 +254,110 @@ Open(vlc_object_t *obj)
              * swizzling. Indeed, the Y, Cb and Cr color channels within the
              * GL_RGB_422_APPLE format are mapped into the existing green, blue
              * and red color channels, respectively. cf. APPLE_rgb_422 khronos
-             * extenstion. */
+             * extension. */
 
-            ret = opengl_interop_init(interop, tex_target, VLC_CODEC_VYUY,
-                                      interop->fmt_in.space);
-            if (ret != VLC_SUCCESS)
-                goto error;
+            interop->fmt_out.i_chroma = VLC_CODEC_VYUY;
+            interop->fmt_out.space = interop->fmt_in.space;
 
-            interop->texs[0].internal = GL_RGB;
-            interop->texs[0].format = GL_RGB_422_APPLE;
-            interop->texs[0].type = GL_UNSIGNED_SHORT_8_8_APPLE;
-            interop->texs[0].w = interop->texs[0].h = (vlc_rational_t) { 1, 1 };
+            interop->tex_count = 1;
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 1},
+                .h = {1, 1},
+                .internal = GL_RGB,
+                .format = GL_RGB_422_APPLE,
+                .type = GL_UNSIGNED_SHORT_8_8_APPLE,
+            };
+
             break;
         case VLC_CODEC_CVPX_NV12:
         {
-            ret = opengl_interop_init(interop, tex_target, VLC_CODEC_NV12,
-                                      interop->fmt_in.space);
-            if (ret != VLC_SUCCESS)
-                goto error;
+            interop->fmt_out.i_chroma = VLC_CODEC_NV12;
+            interop->fmt_out.space = interop->fmt_in.space;
+
+            interop->tex_count = 2;
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 1},
+                .h = {1, 1},
+                .internal = has_texture_rg ? GL_RED : GL_LUMINANCE,
+                .format = has_texture_rg ? GL_RED : GL_LUMINANCE,
+                .type = GL_UNSIGNED_BYTE,
+            };
+            interop->texs[1] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 2},
+                .h = {1, 2},
+                .internal = has_texture_rg ? GL_RG : GL_LUMINANCE_ALPHA,
+                .format = has_texture_rg ? GL_RG : GL_LUMINANCE_ALPHA,
+                .type = GL_UNSIGNED_BYTE,
+            };
+
             break;
         }
         case VLC_CODEC_CVPX_P010:
         {
-            ret = opengl_interop_init(interop, tex_target, VLC_CODEC_P010,
-                                      interop->fmt_in.space);
-            if (ret != VLC_SUCCESS)
+            if (!has_texture_rg
+             || vlc_gl_interop_GetTexFormatSize(interop, tex_target, GL_RG,
+                                                GL_RG16, GL_UNSIGNED_SHORT) != 16)
                 goto error;
+
+            interop->fmt_out.i_chroma = VLC_CODEC_P010;
+            interop->fmt_out.space = interop->fmt_in.space;
+
+            interop->tex_count = 2;
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 1},
+                .h = {1, 1},
+                .internal = GL_R16,
+                .format = GL_RED,
+                .type = GL_UNSIGNED_BYTE,
+            };
+            interop->texs[1] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 1},
+                .h = {1, 2},
+                .internal = GL_RG16,
+                .format = GL_RG,
+                .type = GL_UNSIGNED_BYTE,
+            };
 
             break;
         }
         case VLC_CODEC_CVPX_I420:
-            ret = opengl_interop_init(interop, tex_target, VLC_CODEC_I420,
-                                      interop->fmt_in.space);
-            if (ret != VLC_SUCCESS)
-                goto error;
+            interop->fmt_out.i_chroma = VLC_CODEC_I420;
+            interop->fmt_out.space = interop->fmt_in.space;
+
+            interop->tex_count = 3;
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 1},
+                .h = {1, 1},
+                .internal = has_texture_rg ? GL_RED : GL_LUMINANCE,
+                .format = has_texture_rg ? GL_RED : GL_LUMINANCE,
+                .type = GL_UNSIGNED_BYTE,
+            };
+            interop->texs[1] = interop->texs[2] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 2},
+                .h = {1, 2},
+                .internal = has_texture_rg ? GL_RED : GL_LUMINANCE,
+                .format = has_texture_rg ? GL_RED : GL_LUMINANCE,
+                .type = GL_UNSIGNED_BYTE,
+            };
 
             break;
         case VLC_CODEC_CVPX_BGRA:
-            ret = opengl_interop_init(interop, tex_target, VLC_CODEC_RGB32,
-                                      COLOR_SPACE_UNDEF);
-            if (ret != VLC_SUCCESS)
-                goto error;
+            interop->fmt_out.i_chroma = VLC_CODEC_RGB32;
+            interop->fmt_out.space = COLOR_SPACE_UNDEF;
 
-            interop->texs[0].internal = GL_RGBA;
-            interop->texs[0].format = GL_BGRA;
+            interop->tex_count = 1;
+            interop->texs[0] = (struct vlc_gl_tex_cfg) {
+                .w = {1, 1},
+                .h = {1, 1},
+                .internal = GL_RGBA,
+                .format = GL_BGRA,
 #if TARGET_OS_IPHONE
-            interop->texs[0].type = GL_UNSIGNED_BYTE;
+                .type = GL_UNSIGNED_BYTE,
 #else
-            interop->texs[0].type = GL_UNSIGNED_INT_8_8_8_8_REV;
+                .type = GL_UNSIGNED_INT_8_8_8_8_REV,
 #endif
+            };
+
             break;
         default:
             vlc_assert_unreachable();
@@ -306,6 +389,5 @@ vlc_module_begin ()
     set_description("Apple OpenGL CVPX converter")
     set_capability("glinterop", 1)
     set_callback(Open)
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
 vlc_module_end ()

@@ -31,12 +31,12 @@ FocusScope {
     id: root
     property alias model: genreModel
     property var sortModel: [
-        { text: i18n.qtr("Alphabetic"), criteria: "title" }
+        { text: I18n.qtr("Alphabetic"), criteria: "title" }
     ]
 
     readonly property var currentIndex: _currentView.currentIndex
     //the index to "go to" when the view is loaded
-    property var initialIndex: 0
+    property int initialIndex: 0
 
     property alias _currentView: view.currentItem
 
@@ -72,7 +72,9 @@ FocusScope {
 
     MLGenreModel {
         id: genreModel
-        ml: medialib
+        ml: MediaLib
+
+        coverDefault: VLCStyle.noArtAlbumCover
 
         onCountChanged: {
             if (genreModel.count > 0 && !selectionModel.hasSelection) {
@@ -83,7 +85,7 @@ FocusScope {
 
     function _actionAtIndex(index) {
         if (selectionModel.selectedIndexes.length > 1) {
-            medialib.addAndPlay(model.getIdsForIndexes(selectionModel.selectedIndexes))
+            MediaLib.addAndPlay(model.getIdsForIndexes(selectionModel.selectedIndexes))
         } else if (selectionModel.selectedIndexes.length === 1) {
             var sel = selectionModel.selectedIndexes[0]
             var model = genreModel.getDataAt(sel)
@@ -108,7 +110,7 @@ FocusScope {
     }
 
     /*
-     *define the intial position/selection
+     *define the initial position/selection
      * This is done on activeFocus rather than Component.onCompleted because selectionModel.
      * selectedGroup update itself after this event
      */
@@ -133,7 +135,7 @@ FocusScope {
         MainInterface.MainGridView {
             id: gridView_id
 
-            delegateModel: selectionModel
+            selectionDelegateModel: selectionModel
             model: genreModel
             topMargin: VLCStyle.margin_large
 
@@ -155,7 +157,7 @@ FocusScope {
                 height: width / 2
                 pictureWidth: width
                 pictureHeight: height
-                image: model.cover || VLCStyle.noArtAlbum
+                image: model.cover || VLCStyle.noArtAlbumCover
                 playCoverBorderWidth: VLCStyle.dp(3, VLCStyle.scale)
                 dragItem: genreDragItem
                 unselectedUnderlay: shadows.unselected
@@ -166,7 +168,7 @@ FocusScope {
 
                 onPlayClicked: {
                     if (model.id)
-                        medialib.addAndPlay(model.id)
+                        MediaLib.addAndPlay(model.id)
                 }
 
                 onContextMenuButtonClicked: {
@@ -196,14 +198,14 @@ FocusScope {
                              elide: Text.ElideRight
                              font.pixelSize: VLCStyle.fontSize_large
                              font.weight: Font.DemiBold
-                             text: model.name || i18n.qtr("Unknown genre")
+                             text: model.name || I18n.qtr("Unknown genre")
                              color: "white"
                              horizontalAlignment: Text.AlignHCenter
                         }
 
                         Widgets.CaptionLabel {
                             width: item.width
-                            text: model.nb_tracks > 1 ? i18n.qtr("%1 Tracks").arg(model.nb_tracks) : i18n.qtr("%1 Track").arg(model.nb_tracks)
+                            text: model.nb_tracks > 1 ? I18n.qtr("%1 Tracks").arg(model.nb_tracks) : I18n.qtr("%1 Track").arg(model.nb_tracks)
                             opacity: .7
                             color: "white"
                             horizontalAlignment: Text.AlignHCenter
@@ -217,8 +219,6 @@ FocusScope {
             cellWidth: VLCStyle.colWidth(2)
             cellHeight: cellWidth / 2
 
-            onSelectAll: selectionModel.selectAll()
-            onSelectionUpdated:  selectionModel.updateSelection( keyModifiers, oldIndex, newIndex )
             onActionAtIndex: _actionAtIndex(index)
 
             Navigation.parentItem: root
@@ -259,15 +259,15 @@ FocusScope {
 
             sortModel:  [
                 { isPrimary: true, criteria: "cover", width: VLCStyle.listAlbumCover_width, headerDelegate: tableColumns.titleHeaderDelegate, colDelegate: tableColumns.titleDelegate },
-                { criteria: "name", width: VLCStyle.colWidth(tableView_id._nameColSpan), text: i18n.qtr("Name") },
-                { criteria: "nb_tracks", width: VLCStyle.colWidth(1), text: i18n.qtr("Tracks") }
+                { criteria: "name", width: VLCStyle.colWidth(tableView_id._nameColSpan), text: I18n.qtr("Name") },
+                { criteria: "nb_tracks", width: VLCStyle.colWidth(1), text: I18n.qtr("Tracks") }
             ]
 
             onItemDoubleClicked: {
                 root.showAlbumView(model.id, model.name, Qt.MouseFocusReason)
             }
 
-            onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes, menuParent.mapToGlobal(0,0))
+            onContextMenuButtonClicked: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
             onRightClick: contextMenu.popup(selectionModel.selectedIndexes, globalMousePos)
 
             Widgets.TableColumns {
@@ -305,7 +305,7 @@ FocusScope {
         anchors.fill: parent
         visible: genreModel.count === 0
         focus: genreModel.count === 0
-        text: i18n.qtr("No genres found\nPlease try adding sources, by going to the Network tab")
+        text: I18n.qtr("No genres found\nPlease try adding sources, by going to the Network tab")
         Navigation.parentItem: root
         cover: VLCStyle.noArtAlbumCover
     }

@@ -32,6 +32,13 @@
 #include <QGraphicsScene>
 #include <QGraphicsPixmapItem>
 #include <QGraphicsBlurEffect>
+#include <QUrl>
+#include <QQmlFile>
+
+// Qt private exported function
+QT_BEGIN_NAMESPACE
+extern void VLC_WEAK qt_blurImage(QImage &blurImage, qreal radius, bool quality, int transposed = 0);
+QT_END_NAMESPACE
 
 //-------------------------------------------------------------------------------------------------
 // Static variables
@@ -40,7 +47,7 @@ static const QString COVERGENERATOR_STORAGE = "/art/qt-covers";
 
 static const int COVERGENERATOR_COUNT = 2;
 
-static const QString COVERGENERATOR_DEFAULT = ":/noart.png";
+static const QString COVERGENERATOR_DEFAULT = ":/noart_albumCover.svg";
 
 //-------------------------------------------------------------------------------------------------
 // Ctor / dtor
@@ -60,49 +67,49 @@ CoverGenerator::CoverGenerator(vlc_medialibrary_t * ml, const MLItemId & itemId)
 // Interface
 //-------------------------------------------------------------------------------------------------
 
-/* Q_INVOKABLE */ MLItemId CoverGenerator::getId()
+MLItemId CoverGenerator::getId()
 {
     return m_id;
 }
 
 //-------------------------------------------------------------------------------------------------
 
-/* Q_INVOKABLE */ void CoverGenerator::setSize(const QSize & size)
+void CoverGenerator::setSize(const QSize & size)
 {
     m_size = size;
 }
 
-/* Q_INVOKABLE */ void CoverGenerator::setCountX(int x)
+void CoverGenerator::setCountX(int x)
 {
     m_countX = x;
 }
 
-/* Q_INVOKABLE */ void CoverGenerator::setCountY(int y)
+void CoverGenerator::setCountY(int y)
 {
     m_countY = y;
 }
 
-/* Q_INVOKABLE */ void CoverGenerator::setSplit(Split split)
+void CoverGenerator::setSplit(Split split)
 {
     m_split = split;
 }
 
-/* Q_INVOKABLE */ void CoverGenerator::setSmooth(bool enabled)
+void CoverGenerator::setSmooth(bool enabled)
 {
     m_smooth = enabled;
 }
 
-/* Q_INVOKABLE */ void CoverGenerator::setBlur(int radius)
+void CoverGenerator::setBlur(int radius)
 {
     m_blur = radius;
 }
 
-/* Q_INVOKABLE */ void CoverGenerator::setDefaultThumbnail(const QString & fileName)
+void CoverGenerator::setDefaultThumbnail(const QString & fileName)
 {
     m_default = fileName;
 }
 
-/* Q_INVOKABLE */ void CoverGenerator::setPrefix(const QString & prefix)
+void CoverGenerator::setPrefix(const QString & prefix)
 {
     m_prefix = prefix;
 }
@@ -214,7 +221,7 @@ QString CoverGenerator::execute() /* override */
     painter.end();
 
     if (m_blur > 0)
-        blur(&image);
+        blur(image);
 
     image.save(fileName, "jpg");
 
@@ -263,7 +270,10 @@ void CoverGenerator::draw(QPainter & painter,
 
 void CoverGenerator::drawImage(QPainter & painter, const QString & fileName, const QRect & target)
 {
-    QFile file(fileName);
+    //QFile expect the :/ instead of qrc:// for resources files
+    QString adaptedFilename = QQmlFile::urlToLocalFileOrQrc(fileName);
+
+    QFile file(adaptedFilename);
 
     if (file.open(QIODevice::ReadOnly) == false)
     {
@@ -319,32 +329,47 @@ void CoverGenerator::drawImage(QPainter & painter, const QString & fileName, con
 
 //-------------------------------------------------------------------------------------------------
 
-// FIXME: This implementation is not ideal and uses a dedicated QGraphicsScene.
-void CoverGenerator::blur(QImage * image)
+void CoverGenerator::blur(QImage& image)
 {
-    assert(image);
+    if (Q_LIKELY(&qt_blurImage))
+    {
+        // A symbol is available for qt_blurImage()
+        // Exported function can be used directly within a separate thread:
+        qt_blurImage(image, 2.5 * (m_blur + 1), true);
+    }
+    else
+    {
+        const auto blurImage = [&]() {
+            QGraphicsScene scene;
 
-    QGraphicsScene scene;
+            QGraphicsPixmapItem item(QPixmap::fromImage(image));
 
-    QGraphicsPixmapItem item(QPixmap::fromImage(*image));
+            QGraphicsBlurEffect effect;
 
-    QGraphicsBlurEffect effect;
+            effect.setBlurRadius(m_blur);
 
-    effect.setBlurRadius(m_blur);
+            effect.setBlurHints(QGraphicsBlurEffect::QualityHint);
 
-    effect.setBlurHints(QGraphicsBlurEffect::QualityHint);
+            item.setGraphicsEffect(&effect);
 
-    item.setGraphicsEffect(&effect);
+            scene.addItem(&item);
 
-    scene.addItem(&item);
+            QPainter painter(&image);
 
-    QImage result(image->size(), QImage::Format_ARGB32);
+            scene.render(&painter);
+        };
 
-    QPainter painter(&result);
-
-    scene.render(&painter);
-
-    *image = result;
+        if (qApp->thread() == QThread::currentThread())
+        {
+            blurImage();
+        }
+        else
+        {
+            // Not executing in Qt GUI thread, this is not supported.
+            // Block this thread, and blur the image in the GUI thread instead:
+            QMetaObject::invokeMethod(qApp, blurImage, Qt::BlockingQueuedConnection);
+        }
+    }
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -357,6 +382,8 @@ QString CoverGenerator::getPrefix(vlc_ml_parent_type type) const
             return "genre";
         case VLC_ML_PARENT_GROUP:
             return "group";
+        case VLC_ML_PARENT_FOLDER:
+            return "folder";
         case VLC_ML_PARENT_PLAYLIST:
             return "playlist";
         default:

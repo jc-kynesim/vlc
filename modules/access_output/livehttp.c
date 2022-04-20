@@ -110,7 +110,6 @@ vlc_module_begin ()
     set_shortname( N_("LiveHTTP" ))
     add_shortcut( "livehttp" )
     set_capability( "sout access", 0 )
-    set_category( CAT_SOUT )
     set_subcategory( SUBCAT_SOUT_ACO )
     add_integer( SOUT_CFG_PREFIX "seglen", 10, SEGLEN_TEXT, SEGLEN_LONGTEXT )
     add_integer( SOUT_CFG_PREFIX "numsegs", 0, NUMSEGS_TEXT, NUMSEGS_LONGTEXT )
@@ -335,7 +334,7 @@ static int CryptSetup( sout_access_out_t *p_access, char *key_file )
                                          GCRY_CIPHER_MODE_CBC, 0 );
     if( err )
     {
-        msg_Err( p_access, "Openin AES Cipher failed: %s", gpg_strerror(err));
+        msg_Err( p_access, "Opening AES Cipher failed: %s", gpg_strerror(err));
         free( keyfile );
         return VLC_EGENERIC;
     }
@@ -509,7 +508,7 @@ static void destroySegment( output_segment_t *segment )
 }
 
 /************************************************************************
- * segmentAmountNeeded: check that playlist has atleast 3*p_sys->segment_max_length of segments
+ * segmentAmountNeeded: check that playlist has at least 3*p_sys->segment_max_length of segments
  * return how many segments are needed for that (max of p_sys->i_segment )
  ************************************************************************/
 static uint32_t segmentAmountNeeded( sout_access_out_sys_t *p_sys )
@@ -730,7 +729,7 @@ static void closeCurrentSegment( sout_access_out_t *p_access, sout_access_out_sy
         vlc_close( p_sys->i_handle );
         p_sys->i_handle = -1;
 
-        if( ! ( us_asprintf( &segment->psz_duration, "%.2f", secf_from_vlc_tick( p_sys->current_segment_length )) ) )
+        if( us_asprintf( &segment->psz_duration, "%.2f", secf_from_vlc_tick( p_sys->current_segment_length ) ) == -1 )
         {
             msg_Err( p_access, "Couldn't set duration on closed segment");
             return;
@@ -945,11 +944,11 @@ static ssize_t writeSegment( sout_access_out_t *p_access )
     block_ChainProperties( output, NULL, NULL, &current_length );
 
     ssize_t i_write=0;
-    bool crypted = false;
+    bool encrypted = false;
     p_sys->current_segment_length = current_length;
     while( output )
     {
-        if( p_sys->key_uri && !crypted )
+        if( p_sys->key_uri && !encrypted )
         {
             if( p_sys->stuffing_size )
             {
@@ -976,7 +975,7 @@ static ssize_t writeSegment( sout_access_out_t *p_access )
                 msg_Err( p_access, "Encryption failure: %s ", gpg_strerror(err) );
                 return -1;
             }
-            crypted=true;
+            encrypted=true;
 
         }
 
@@ -994,7 +993,7 @@ static ssize_t writeSegment( sout_access_out_t *p_access )
            block_t *p_next = output->p_next;
            block_Release (output);
            output = p_next;
-           crypted=false;
+           encrypted=false;
         }
         else
         {

@@ -308,24 +308,6 @@ DISTCLEAN_PKG += apache-ant-$(ANT_VERSION).tar.bz2
 CLEAN_FILE += .buildant
 
 
-# Protobuf Protoc
-
-protobuf-$(PROTOBUF_VERSION).tar.gz:
-	$(call download_pkg,$(PROTOBUF_URL),protobuf)
-
-protobuf: protobuf-$(PROTOBUF_VERSION).tar.gz
-	$(UNPACK)
-	$(MOVE)
-
-.buildprotoc: protobuf
-	(cd $< && ./configure --prefix="$(PREFIX)" --disable-shared --enable-static --disable-dependency-tracking && $(MAKE) && $(MAKE) install)
-	(find $(PREFIX) -name 'protobuf*.pc' -exec rm -f {} \;)
-	touch $@
-
-CLEAN_PKG += protobuf
-DISTCLEAN_PKG += protobuf-$(PROTOBUF_VERSION).tar.gz
-CLEAN_FILE += .buildprotoc
-
 #
 # GNU bison
 #
@@ -399,6 +381,7 @@ meson: meson-$(MESON_VERSION).tar.gz
 	$(MOVE)
 
 .buildmeson: meson
+	mkdir -p $(PREFIX)/bin
 	printf "#!/bin/sh\n\npython3 $(abspath .)/meson/meson.py \"\$$@\"\n" > $(PREFIX)/bin/meson
 	chmod +x $(PREFIX)/bin/meson
 	touch $@
@@ -419,7 +402,7 @@ ninja: ninja-$(NINJA_VERSION).tar.gz
 	$(MOVE)
 
 .buildninja: ninja
-	(cd $<; ./configure.py --bootstrap && mv ninja $(PREFIX)/bin/)
+	(cd $<; python3 ./configure.py --bootstrap && mv ninja $(PREFIX)/bin/)
 	touch $@
 
 CLEAN_PKG += ninja

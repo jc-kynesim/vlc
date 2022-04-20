@@ -160,6 +160,9 @@ static const staticentry_t p_list_video[] = {
         E("QMP4", "QNAP Systems MPEG-4"),
         E("qMP4", "QNAP Systems MPEG-4"),
         E("wMP4", "QNAP Systems MPEG-4"),
+        E("G264", "GeoVision MPEG-4"),
+        E("GM40", "GeoVision MPEG-4"),
+        E("GMP4", "GeoVision MPEG-4"),
         /* 3ivx delta 3.5 Unsupported
          * putting it here gives extreme distorted images */
         //E("3IV1", "3ivx delta 3.5 MPEG-4 Video"),
@@ -234,6 +237,7 @@ static const staticentry_t p_list_video[] = {
         A("hvc1"),
         A("HM10"),
         E("dvhe", "Dolby Vision HEVC (H.265)"),
+        E("GHEC", "GeoVision HEVC"),
         /* E("dvh1", "Dolby Vision HEVC (H.265)"), Collides with DV */
 
     /* h264 */
@@ -671,6 +675,11 @@ static const staticentry_t p_list_video[] = {
         A("CAVS"),
         A("AVs2"),
         A("avs2"),
+
+    B(VLC_CODEC_CAVS2, "AVS2-P2 video (IEEE 1857.4)"),
+        A("AVS2"),
+
+    B(VLC_CODEC_CAVS3, "AVS3-P2 video (IEEE 1857.10)"),
 
     B(VLC_CODEC_AMV, "AMV"),
 
@@ -1262,6 +1271,8 @@ static const staticentry_t p_list_video[] = {
         A("AGM7"),
 
     B(VLC_CODEC_NOTCHLC, "NotchLC"),
+
+    B(VLC_CODEC_RTP_VIDEO_RAW, "RTP raw video"),
 };
 
 static const staticentry_t p_list_audio[] = {

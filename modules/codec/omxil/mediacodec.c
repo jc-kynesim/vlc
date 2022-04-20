@@ -197,7 +197,6 @@ static void ReleaseAllPictureContexts(decoder_sys_t *);
 
 vlc_module_begin ()
     set_description("Video decoder using Android MediaCodec via NDK")
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_VCODEC)
     set_section(N_("Decoding"), NULL)
     set_capability("video decoder", 800)
@@ -285,11 +284,11 @@ static int H264SetCSD(decoder_t *p_dec, bool *p_size_changed)
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
     struct hxxx_helper *hh = &p_sys->video.hh;
-    assert(hh->h264.i_sps_count > 0 || hh->h264.i_pps_count > 0);
+    assert(hxxx_helper_has_config(hh));
 
-    block_t *p_spspps_blocks = h264_helper_get_annexb_config(hh);
+    block_t *p_spspps_blocks = hxxx_helper_get_extradata_chain(hh);
 
-    if (p_spspps_blocks != NULL)
+    if (p_spspps_blocks != NULL && p_spspps_blocks->p_next)
         CSDInit(p_sys, p_spspps_blocks, 2);
 
     HXXXInitSize(p_dec, p_size_changed);
@@ -303,20 +302,11 @@ static int HEVCSetCSD(decoder_t *p_dec, bool *p_size_changed)
     decoder_sys_t *p_sys = p_dec->p_sys;
     struct hxxx_helper *hh = &p_sys->video.hh;
 
-    assert(hh->hevc.i_vps_count > 0 || hh->hevc.i_sps_count > 0 ||
-           hh->hevc.i_pps_count > 0 );
+    assert(hxxx_helper_has_config(hh));
 
-    block_t *p_xps_blocks = hevc_helper_get_annexb_config(hh);
-    if (p_xps_blocks != NULL)
-    {
-        block_t *p_monolith = block_ChainGather(p_xps_blocks);
-        if (p_monolith == NULL)
-        {
-            block_ChainRelease(p_xps_blocks);
-            return VLC_ENOMEM;
-        }
-        CSDInit(p_sys, p_monolith, 1);
-    }
+    block_t *p_xps = hxxx_helper_get_extradata_block(hh);
+    if (p_xps != NULL)
+        CSDInit(p_sys, p_xps, 1);
 
     HXXXInitSize(p_dec, p_size_changed);
     return VLC_SUCCESS;
@@ -330,14 +320,13 @@ static int ParseVideoExtraH264(decoder_t *p_dec, uint8_t *p_extra, int i_extra)
     int i_ret = hxxx_helper_set_extra(hh, p_extra, i_extra);
     if (i_ret != VLC_SUCCESS)
         return i_ret;
-    assert(hh->pf_process_block != NULL);
 
     if (p_sys->api.i_quirks & MC_API_VIDEO_QUIRKS_ADAPTIVE)
         p_sys->b_adaptive = true;
 
     p_sys->pf_on_new_block = VideoHXXX_OnNewBlock;
 
-    if (hh->h264.i_sps_count > 0 || hh->h264.i_pps_count > 0)
+    if (hxxx_helper_has_config(hh))
         return H264SetCSD(p_dec, NULL);
     return VLC_SUCCESS;
 }
@@ -350,15 +339,13 @@ static int ParseVideoExtraHEVC(decoder_t *p_dec, uint8_t *p_extra, int i_extra)
     int i_ret = hxxx_helper_set_extra(hh, p_extra, i_extra);
     if (i_ret != VLC_SUCCESS)
         return i_ret;
-    assert(hh->pf_process_block != NULL);
 
     if (p_sys->api.i_quirks & MC_API_VIDEO_QUIRKS_ADAPTIVE)
         p_sys->b_adaptive = true;
 
     p_sys->pf_on_new_block = VideoHXXX_OnNewBlock;
 
-    if (hh->hevc.i_vps_count > 0 || hh->hevc.i_sps_count > 0 ||
-        hh->hevc.i_pps_count > 0 )
+    if (hxxx_helper_has_config(hh))
         return HEVCSetCSD(p_dec, NULL);
     return VLC_SUCCESS;
 }
@@ -372,7 +359,7 @@ static int ParseVideoExtraVc1(decoder_t *p_dec, uint8_t *p_extra, int i_extra)
         return VLC_EGENERIC;
 
     /* Initialisation data starts with : 0x00 0x00 0x01 0x0f */
-    /* Skipping unecessary data */
+    /* Skipping unnecessary data */
     static const uint8_t vc1_start_code[4] = {0x00, 0x00, 0x01, 0x0f};
     for (; offset < i_extra - 4 ; ++offset)
     {
@@ -721,6 +708,7 @@ CreateVideoContext(decoder_t *p_dec)
     avctx->render = PictureContextRenderPic;
     avctx->render_ts = p_sys->api.release_out_ts ? PictureContextRenderPicTs : NULL;
     avctx->get_texture = p_sys->video.surfacetexture ? PictureContextGetTexture : NULL;
+    avctx->texture = NULL;
 
     for (size_t i = 0; i < ARRAY_SIZE(p_sys->video.apic_ctxs); ++i)
     {
@@ -903,7 +891,7 @@ static int OpenDecoder(vlc_object_t *p_this, pf_MediaCodecApi_init pf_init)
         case VLC_CODEC_H264:
         case VLC_CODEC_HEVC:
             hxxx_helper_init(&p_sys->video.hh, VLC_OBJECT(p_dec),
-                             p_dec->fmt_in.i_codec, false);
+                             p_dec->fmt_in.i_codec, 0, 0);
             break;
         }
         p_sys->pf_on_new_block = Video_OnNewBlock;
@@ -1746,27 +1734,24 @@ static int VideoHXXX_OnNewBlock(decoder_t *p_dec, block_t **pp_block)
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
     struct hxxx_helper *hh = &p_sys->video.hh;
-    bool b_config_changed = false;
-    bool *p_config_changed = p_sys->b_adaptive ? NULL : &b_config_changed;
 
-    *pp_block = hh->pf_process_block(hh, *pp_block, p_config_changed);
+    *pp_block = hxxx_helper_process_block(hh, *pp_block);
     if (!*pp_block)
         return 0;
-    if (b_config_changed)
+    if (!p_sys->b_adaptive && hxxx_helper_has_new_config(hh))
     {
         bool b_size_changed;
         int i_ret;
         switch (p_dec->fmt_in.i_codec)
         {
         case VLC_CODEC_H264:
-            if (hh->h264.i_sps_count > 0 || hh->h264.i_pps_count > 0)
+            if (hxxx_helper_has_config(hh))
                 i_ret = H264SetCSD(p_dec, &b_size_changed);
             else
                 i_ret = VLC_EGENERIC;
             break;
         case VLC_CODEC_HEVC:
-            if (hh->hevc.i_vps_count > 0 || hh->hevc.i_sps_count > 0 ||
-                hh->hevc.i_pps_count > 0 )
+            if (hxxx_helper_has_config(hh))
                 i_ret = HEVCSetCSD(p_dec, &b_size_changed);
             else
                 i_ret = VLC_EGENERIC;

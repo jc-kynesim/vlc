@@ -182,7 +182,6 @@ vlc_module_begin ()
     set_description( N_("Text subtitle decoder") )
     set_capability( "spu decoder", 50 )
     set_callbacks( OpenDecoder, CloseDecoder )
-    set_category( CAT_INPUT )
     set_subcategory( SUBCAT_INPUT_SCODEC )
 
     add_integer( "subsdec-align", -1, ALIGN_TEXT, ALIGN_LONGTEXT )
@@ -619,7 +618,7 @@ static bool IsClosed( const char* psz_subtitle, const char* psz_tagname )
     const char* psz_tagpos = strcasestr( psz_subtitle, psz_tagname );
     if ( !psz_tagpos )
         return false;
-    // Search for '</' and '>' immediatly before & after (minding the potential spaces)
+    // Search for '</' and '>' immediately before & after (minding the potential spaces)
     const char* psz_endtag = psz_tagpos + strlen( psz_tagname );
     while ( *psz_endtag == ' ' )
         psz_endtag++;

@@ -16,9 +16,10 @@ $(TARBALLS)/taglib-$(TAGLIB_VERSION).tar.gz:
 taglib: taglib-$(TAGLIB_VERSION).tar.gz .sum-taglib
 	$(UNPACK)
 	$(APPLY) $(SRC)/taglib/0001-Implement-ID3v2-readStyle-avoid-worst-case.patch
+	$(APPLY) $(SRC)/taglib/0001-FileTypeResolver-Fix-IOStream-usage-with-custom-reso.patch
 	$(MOVE)
 
 .taglib: taglib toolchain.cmake
 	cd $< && $(HOSTVARS_PIC) $(CMAKE) .
-	cd $< && $(CMAKEBUILD) . --target install
+	+$(CMAKEBUILD) $< --target install
 	touch $@

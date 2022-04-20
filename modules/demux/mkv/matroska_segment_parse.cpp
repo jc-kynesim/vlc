@@ -487,7 +487,7 @@ void matroska_segment_c::ParseTrackEntry( const KaxTrackEntry *m )
             unsigned int i_crop_bottom = vars.track_video_info.i_crop_bottom;
             unsigned int i_crop_left   = vars.track_video_info.i_crop_left;
 
-            unsigned int i_display_unit   = vars.track_video_info.i_display_unit; VLC_UNUSED(i_display_unit);
+            unsigned int i_display_unit   = vars.track_video_info.i_display_unit;
             unsigned int i_display_width  = vars.track_video_info.i_display_width;
             unsigned int i_display_height = vars.track_video_info.i_display_height;
 
@@ -519,24 +519,66 @@ void matroska_segment_c::ParseTrackEntry( const KaxTrackEntry *m )
                 }
             }
 
-            if( i_display_height && i_display_width )
+            unsigned int h_crop;
+            if (!add_overflow(i_crop_left, i_crop_right, &h_crop))
             {
-                tk->fmt.video.i_sar_num = i_display_width  * tk->fmt.video.i_height;
-                tk->fmt.video.i_sar_den = i_display_height * tk->fmt.video.i_width;
+                debug( vars, "invalid horizontal crop %u+%u",
+                              i_crop_left, i_crop_right );
+                i_crop_left = i_crop_right = 0;
+            }
+            else if (unlikely(h_crop >= tk->fmt.video.i_width))
+            {
+                debug( vars, "Horizontal crop (left=%u, right=%u) "
+                             "greater than the picture width (%u)",
+                              i_crop_left, i_crop_right, tk->fmt.video.i_width );
+                i_crop_left = i_crop_right = 0;
             }
 
-            tk->fmt.video.i_visible_width   = tk->fmt.video.i_width;
-            tk->fmt.video.i_visible_height  = tk->fmt.video.i_height;
-
-            if( i_crop_left || i_crop_right || i_crop_top || i_crop_bottom )
+            unsigned int v_crop;
+            if (!add_overflow(i_crop_top, i_crop_bottom, &v_crop))
             {
-                tk->fmt.video.i_x_offset        = i_crop_left;
-                tk->fmt.video.i_y_offset        = i_crop_top;
-                tk->fmt.video.i_visible_width  -= i_crop_left + i_crop_right;
-                tk->fmt.video.i_visible_height -= i_crop_top + i_crop_bottom;
+                debug( vars, "invalid vertical crop %u+%u",
+                              i_crop_top, i_crop_bottom);
+                i_crop_top = i_crop_bottom = 0;
             }
-            /* FIXME: i_display_* allows you to not only set DAR, but also a zoom factor.
-               we do not support this atm */
+            if (unlikely(v_crop >= tk->fmt.video.i_height))
+            {
+                debug( vars, "Vertical crop (top=%u, bottom=%u) "
+                             "greater than the picture height (%u)",
+                              i_crop_top, i_crop_bottom, tk->fmt.video.i_height );
+                i_crop_top = i_crop_bottom = 0;
+            }
+
+            tk->fmt.video.i_x_offset      = i_crop_left;
+            tk->fmt.video.i_y_offset      = i_crop_top;
+            tk->fmt.video.i_visible_width = tk->fmt.video.i_width -
+                                            (i_crop_left + i_crop_right);
+            tk->fmt.video.i_visible_height = tk->fmt.video.i_height -
+                                            (i_crop_top + i_crop_bottom);
+
+            if (i_display_unit == 0 && i_display_width == 0)
+                i_display_width = tk->fmt.video.i_width;
+            if (i_display_unit == 0 && i_display_height == 0)
+                i_display_height = tk->fmt.video.i_height;
+
+            if (i_display_height && i_display_width)
+            {
+                switch (i_display_unit)
+                {
+                    case 0: // pixels
+                    case 1: // centimeters
+                    case 2: // inches
+                        vlc_ureduce( &tk->fmt.video.i_sar_num, &tk->fmt.video.i_sar_den,
+                                     i_display_width * tk->fmt.video.i_visible_height,
+                                     i_display_height * tk->fmt.video.i_visible_width, 0);
+                        break;
+                    case 3: // display aspect ratio
+                        vlc_ureduce( &tk->fmt.video.i_sar_num, &tk->fmt.video.i_sar_den,
+                                     i_display_height * tk->fmt.video.i_visible_width,
+                                     i_display_width * tk->fmt.video.i_visible_height, 0);
+                        break;
+                }
+            }
         }
 #if LIBMATROSKA_VERSION >= 0x010406
         E_CASE( KaxVideoProjection, proj )
@@ -740,12 +782,12 @@ void matroska_segment_c::ParseTrackEntry( const KaxTrackEntry *m )
             }
             if (name != nullptr) debug( vars, "Range=%s", name );
         }
-        E_CASE( KaxVideoColourTransferCharacter, tranfer )
+        E_CASE( KaxVideoColourTransferCharacter, transfer )
         {
             ONLY_FMT(VIDEO);
-            vars.tk->fmt.video.transfer = iso_23001_8_tc_to_vlc_xfer( static_cast<uint8>(tranfer) );
+            vars.tk->fmt.video.transfer = iso_23001_8_tc_to_vlc_xfer( static_cast<uint8>(transfer) );
             const char *name = nullptr;
-            switch( static_cast<uint8>(tranfer) )
+            switch( static_cast<uint8>(transfer) )
             {
             case 1: name = "BT-709";
                 break;
@@ -776,9 +818,9 @@ void matroska_segment_c::ParseTrackEntry( const KaxTrackEntry *m )
                 break;
             }
             if (vars.tk->fmt.video.transfer == TRANSFER_FUNC_UNDEF)
-                debug( vars, "Unsupported Colour Transfer=%d", static_cast<uint8>(tranfer) );
+                debug( vars, "Unsupported Colour Transfer=%d", static_cast<uint8>(transfer) );
             else if (name == nullptr)
-                debug( vars, "Colour Transfer=%d", static_cast<uint8>(tranfer) );
+                debug( vars, "Colour Transfer=%d", static_cast<uint8>(transfer) );
             else
                 debug( vars, "Colour Transfer=%s", name );
         }
@@ -1020,7 +1062,7 @@ void matroska_segment_c::ParseTrackEntry( const KaxTrackEntry *m )
 
     if ( bSupported )
     {
-#ifdef HAVE_ZLIB_H
+#ifdef HAVE_ZLIB
         if( p_track->i_compression_type == MATROSKA_COMPRESSION_ZLIB &&
             p_track->i_encoding_scope & MATROSKA_ENCODING_SCOPE_PRIVATE &&
             p_track->i_extra_data && p_track->p_extra_data &&
@@ -1098,10 +1140,9 @@ void matroska_segment_c::ParseTracks( KaxTracks *tracks )
 
     TrackHandlers::Dispatcher().iterate( tracks->begin(), tracks->end(), &payload );
 
-    auto t = matroska_segment_c::tracks.begin();
-    for (t; t != matroska_segment_c::tracks.end(); ++t)
+    for (auto &track : matroska_segment_c::tracks)
     {
-        pcr_shift = std::max(pcr_shift, t->second->i_codec_delay);
+        pcr_shift = std::max(pcr_shift, track.second->i_codec_delay);
     }
 }
 
@@ -1743,6 +1784,15 @@ bool matroska_segment_c::TrackInit( mkv_track_t * p_tk )
             vars.p_tk->b_pts_only = true;
 
             fill_extra_data( vars.p_tk, 0 );
+        }
+        S_CASE("V_CAVS") {
+            vars.p_fmt->i_codec = VLC_CODEC_CAVS;
+        }
+        S_CASE("V_AVS2") {
+            vars.p_fmt->i_codec = VLC_CODEC_CAVS2;
+        }
+        S_CASE("V_AVS3") {
+            vars.p_fmt->i_codec = VLC_CODEC_CAVS3;
         }
         S_CASE("V_MPEG4/MS/V3") {
             vars.p_fmt->i_codec = VLC_CODEC_DIV3;

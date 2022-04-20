@@ -337,9 +337,9 @@ typedef enum libvlc_video_transfer_func_t {
  * adequate dimensions must be returned via the second parameter. Those
  * planes must be aligned on 32-bytes boundaries.
  *
- * \param opaque private pointer as passed to libvlc_video_set_callbacks() [IN]
- * \param planes start address of the pixel planes (LibVLC allocates the array
- *             of void pointers, this callback must initialize the array) [OUT]
+ * \param[in] opaque private pointer as passed to libvlc_video_set_callbacks()
+ * \param[out] planes start address of the pixel planes (LibVLC allocates the array
+ *             of void pointers, this callback must initialize the array)
  * \return a private pointer for the display and unlock callbacks to identify
  *         the picture buffers
  */
@@ -355,11 +355,11 @@ typedef void *(*libvlc_video_lock_cb)(void *opaque, void **planes);
  * \note A picture buffer is unlocked after the picture is decoded,
  * but before the picture is displayed.
  *
- * \param opaque private pointer as passed to libvlc_video_set_callbacks() [IN]
- * \param picture private pointer returned from the @ref libvlc_video_lock_cb
- *                callback [IN]
- * \param planes pixel planes as defined by the @ref libvlc_video_lock_cb
- *               callback (this parameter is only for convenience) [IN]
+ * \param[in] opaque private pointer as passed to libvlc_video_set_callbacks()
+ * \param[in] picture private pointer returned from the @ref libvlc_video_lock_cb
+ *                callback
+ * \param[in] planes pixel planes as defined by the @ref libvlc_video_lock_cb
+ *               callback (this parameter is only for convenience)
  */
 typedef void (*libvlc_video_unlock_cb)(void *opaque, void *picture,
                                        void *const *planes);
@@ -370,9 +370,9 @@ typedef void (*libvlc_video_unlock_cb)(void *opaque, void *picture,
  * When the video frame needs to be shown, as determined by the media playback
  * clock, the display callback is invoked.
  *
- * \param opaque private pointer as passed to libvlc_video_set_callbacks() [IN]
- * \param picture private pointer returned from the @ref libvlc_video_lock_cb
- *                callback [IN]
+ * \param[in] opaque private pointer as passed to libvlc_video_set_callbacks()
+ * \param[in] picture private pointer returned from the @ref libvlc_video_lock_cb
+ *                callback
  */
 typedef void (*libvlc_video_display_cb)(void *opaque, void *picture);
 
@@ -383,19 +383,19 @@ typedef void (*libvlc_video_display_cb)(void *opaque, void *picture);
  * as it needs. In that case, LibVLC will attempt to convert the video format
  * (rescaling and chroma conversion) but these operations can be CPU intensive.
  *
- * \param opaque pointer to the private pointer passed to
- *               libvlc_video_set_callbacks() [IN/OUT]
- * \param chroma pointer to the 4 bytes video format identifier [IN/OUT]
- * \param width pointer to the buffer width in pixels[IN/OUT]
- * \param height pointer to the buffer height in pixels[IN/OUT]
- * \param pitches table of scanline pitches in bytes for each pixel plane
- *                (the table is allocated by LibVLC) [OUT]
- * \param lines table of scanlines count for each plane [OUT]
+ * \param[in,out] opaque pointer to the private pointer passed to
+ *                libvlc_video_set_callbacks()
+ * \param[in,out] chroma pointer to the 4 bytes video format identifier
+ * \param[in,out] width pointer to the buffer width in pixels
+ * \param[in,out] height pointer to the buffer height in pixels
+ * \param[out] pitches table of scanline pitches in bytes for each pixel plane
+ *                (the table is allocated by LibVLC)
+ * \param[out] lines table of scanlines count for each plane
  * \return the number of picture buffers allocated, 0 indicates failure
  *
  * \version LibVLC 4.0.0 and later.
- * \param (width+1) - pointer to display width in pixels[IN]
- * \param (height+1) - pointer to display height in pixels[IN]
+ * \param[in] (width+1) - pointer to display width in pixels
+ * \param[in] (height+1) - pointer to display height in pixels
  *
  * \note
  * For each pixels plane, the scanline pitch must be bigger than or equal to
@@ -414,8 +414,8 @@ typedef unsigned (*libvlc_video_format_cb)(void **opaque, char *chroma,
 /**
  * Callback prototype to configure picture buffers format.
  *
- * \param opaque private pointer as passed to libvlc_video_set_format_callbacks()
- *               (and possibly modified by @ref libvlc_video_format_cb) [IN]
+ * \param[in] opaque private pointer as passed to libvlc_video_set_format_callbacks()
+ *               (and possibly modified by @ref libvlc_video_format_cb)
  */
 typedef void (*libvlc_video_cleanup_cb)(void *opaque);
 
@@ -523,12 +523,11 @@ typedef struct libvlc_video_setup_device_info_t
  * Callback prototype called to initialize user data.
  * Setup the rendering environment.
  *
- * \param opaque private pointer passed to the @a libvlc_video_set_output_callbacks()
+ * \param[in,out] opaque private pointer passed to the @a libvlc_video_set_output_callbacks()
  *               on input. The callback can change this value on output to be
  *               passed to all the other callbacks set on @a libvlc_video_set_output_callbacks().
- *               [IN/OUT]
- * \param cfg requested configuration of the video device [IN]
- * \param out libvlc_video_setup_device_info_t* to fill [OUT]
+ * \param[in] cfg requested configuration of the video device
+ * \param[out] out libvlc_video_setup_device_info_t* to fill
  * \return true on success
  * \version LibVLC 4.0.0 or later
  *
@@ -553,45 +552,64 @@ typedef bool (*libvlc_video_output_setup_cb)(void **opaque,
 /**
  * Callback prototype called to release user data
  *
- * \param opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb() [IN]
+ * \param[in] opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb()
  * \version LibVLC 4.0.0 or later
  */
 typedef void (*libvlc_video_output_cleanup_cb)(void* opaque);
 
 typedef struct libvlc_video_render_cfg_t
 {
-    unsigned width;                        /** rendering video width in pixel */
-    unsigned height;                      /** rendering video height in pixel */
-    unsigned bitdepth;      /** rendering video bit depth in bits per channel */
-    bool full_range;          /** video is full range or studio/limited range */
-    libvlc_video_color_space_t colorspace;              /** video color space */
-    libvlc_video_color_primaries_t primaries;       /** video color primaries */
-    libvlc_video_transfer_func_t transfer;        /** video transfer function */
-    void *device;   /** device used for rendering, IDirect3DDevice9* for D3D9 */
+    /** rendering video width in pixel */
+    unsigned width;
+    /** rendering video height in pixel */
+    unsigned height;
+    /** rendering video bit depth in bits per channel */
+    unsigned bitdepth;
+    /** video is full range or studio/limited range */
+    bool full_range;
+    /** video color space */
+    libvlc_video_color_space_t colorspace;
+    /** video color primaries */
+    libvlc_video_color_primaries_t primaries;
+    /** video transfer function */
+    libvlc_video_transfer_func_t transfer;
+    /** device used for rendering, IDirect3DDevice9* for D3D9 */
+    void *device;
 } libvlc_video_render_cfg_t;
 
 typedef struct libvlc_video_output_cfg_t
 {
     union {
-        int dxgi_format;  /** the rendering DXGI_FORMAT for \ref libvlc_video_engine_d3d11*/
-        uint32_t d3d9_format;  /** the rendering D3DFORMAT for \ref libvlc_video_engine_d3d9 */
-        int opengl_format;  /** the rendering GLint GL_RGBA or GL_RGB for \ref libvlc_video_engine_opengl and
-                            for \ref libvlc_video_engine_gles2 */
-        void *p_surface; /** currently unused */
+        /** The rendering DXGI_FORMAT for \ref libvlc_video_engine_d3d11. */
+        int dxgi_format;
+        /** The rendering D3DFORMAT for \ref libvlc_video_engine_d3d9. */
+        uint32_t d3d9_format;
+        /** The rendering GLint GL_RGBA or GL_RGB for
+         * \ref libvlc_video_engine_opengl and for
+         * \ref libvlc_video_engine_gles2. */
+        int opengl_format;
+        /** currently unused */
+        void *p_surface;
     };
-    bool full_range;          /** video is full range or studio/limited range */
-    libvlc_video_color_space_t colorspace;              /** video color space */
-    libvlc_video_color_primaries_t primaries;       /** video color primaries */
-    libvlc_video_transfer_func_t transfer;        /** video transfer function */
+    /** Video is full range or studio/limited range. */
+    bool full_range;
+    /** video color space */
+    libvlc_video_color_space_t colorspace;
+    /** video color primaries */
+    libvlc_video_color_primaries_t primaries;
+    /** video transfer function */
+    libvlc_video_transfer_func_t transfer;
+    /** video surface orientation */
+    libvlc_video_orient_t orientation;
 } libvlc_video_output_cfg_t;
 
 /**
  * Callback prototype called on video size changes.
  * Update the rendering output setup.
  *
- * \param opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb() [IN]
- * \param cfg configuration of the video that will be rendered [IN]
- * \param output configuration describing with how the rendering is setup [OUT]
+ * \param[in] opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb()
+ * \param[in] cfg configuration of the video that will be rendered
+ * \param[out] output configuration describing with how the rendering is setup
  * \version LibVLC 4.0.0 or later
  *
  * \note the configuration device for Direct3D9 is the IDirect3DDevice9 that VLC
@@ -612,7 +630,7 @@ typedef bool (*libvlc_video_update_output_cb)(void* opaque, const libvlc_video_r
  * This callback is called outside of libvlc_video_makeCurrent_cb current/not-current
  * calls.
  *
- * \param opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb() [IN]
+ * \param[in] opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb()
  * \version LibVLC 4.0.0 or later
  */
 typedef void (*libvlc_video_swap_cb)(void* opaque);
@@ -621,13 +639,13 @@ typedef void (*libvlc_video_swap_cb)(void* opaque);
  * Callback prototype to set up the OpenGL context for rendering.
  * Tell the host the rendering is about to start/has finished.
  *
- * \param opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb() [IN]
- * \param enter true to set the context as current, false to unset it [IN]
+ * \param[in] opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb()
+ * \param[in] enter true to set the context as current, false to unset it
  * \return true on success
  * \version LibVLC 4.0.0 or later
  *
  * On Direct3D11 the following may change on the provided ID3D11DeviceContext*
- * between \ref enter being true and \ref enter being false:
+ * between \p enter being true and \p enter being false:
  * - IASetPrimitiveTopology()
  * - IASetInputLayout()
  * - IASetVertexBuffers()
@@ -646,7 +664,7 @@ typedef bool (*libvlc_video_makeCurrent_cb)(void* opaque, bool enter);
 /**
  * Callback prototype to load opengl functions
  *
- * \param opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb() [IN]
+ * \param[in] opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb()
  * \param fct_name name of the opengl function to load
  * \return a pointer to the named OpenGL function the NULL otherwise
  * \version LibVLC 4.0.0 or later
@@ -673,9 +691,9 @@ typedef enum libvlc_video_metadata_type_t {
 /**
  * Callback prototype to receive metadata before rendering.
  *
- * \param opaque private pointer passed to the @a libvlc_video_set_output_callbacks() [IN]
- * \param type type of data passed in metadata [IN]
- * \param metadata the type of metadata [IN]
+ * \param[in] opaque private pointer passed to the @a libvlc_video_set_output_callbacks()
+ * \param[in] type type of data passed in metadata
+ * \param[in] metadata the type of metadata
  * \version LibVLC 4.0.0 or later
  */
 typedef void (*libvlc_video_frameMetadata_cb)(void* opaque, libvlc_video_metadata_type_t type, const void *metadata);
@@ -695,6 +713,18 @@ typedef enum libvlc_video_engine_t {
     libvlc_video_engine_d3d9,
 } libvlc_video_engine_t;
 
+
+/** Callback type that can be called to request a render size changes.
+ * 
+ * libvlc will provide a callback of this type when calling \ref libvlc_video_output_set_resize_cb.
+ * 
+ * \param report_opaque parameter passed to \ref libvlc_video_output_set_resize_cb. [IN]
+ * \param width new rendering width requested. [IN]
+ * \param height new rendering height requested. [IN]
+ */
+typedef void( *libvlc_video_output_resize_cb )( void *report_opaque, unsigned width, unsigned height );
+
+
 /** Set the callback to call when the host app resizes the rendering area.
  *
  * This allows text rendering and aspect ratio to be handled properly when the host
@@ -702,19 +732,19 @@ typedef enum libvlc_video_engine_t {
  *
  * It may be called before the \ref libvlc_video_output_setup_cb callback.
  *
- * \param opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb() [IN]
- * \param report_size_change callback which must be called when the host size changes. [IN]
- *        The callback is valid until another call to \ref libvlc_video_output_set_resize_cb
- *        is done. This may be called from any thread.
- * \param report_opaque private pointer to pass to the \ref report_size_change callback. [IN]
+ * \param[in] opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb()
+ * \param[in] report_size_change callback which must be called when the host size changes.
+ *            The callback is valid until another call to \ref libvlc_video_output_set_resize_cb
+ *            is done. This may be called from any thread.
+ * \param[in] report_opaque private pointer to pass to the \ref report_size_change callback.
  */
 typedef void( *libvlc_video_output_set_resize_cb )( void *opaque,
-                                                    void (*report_size_change)(void *report_opaque, unsigned width, unsigned height),
+                                                    libvlc_video_output_resize_cb report_size_change,
                                                     void *report_opaque );
 
 /** Tell the host the rendering for the given plane is about to start
  *
- * \param opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb() [IN]
+ * \param[in] opaque private pointer set on the opaque parameter of @a libvlc_video_output_setup_cb()
  * \param plane number of the rendering plane to select
  * \param output handle of the rendering output for the given plane
  * \return true on success
@@ -926,8 +956,8 @@ LIBVLC_API void libvlc_media_player_set_android_context( libvlc_media_player_t *
  * track sampling rate is 48000 Hz, then 1200 samples represent 25 milliseconds
  * of audio signal - regardless of the number of audio channels.
  *
- * \param data data pointer as passed to libvlc_audio_set_callbacks() [IN]
- * \param samples pointer to a table of audio samples to play back [IN]
+ * \param[in] data data pointer as passed to libvlc_audio_set_callbacks()
+ * \param[in] samples pointer to a table of audio samples to play back
  * \param count number of audio samples to play back
  * \param pts expected play time stamp (see libvlc_delay())
  */
@@ -940,7 +970,7 @@ typedef void (*libvlc_audio_play_cb)(void *data, const void *samples,
  * LibVLC invokes this callback to pause audio playback.
  *
  * \note The pause callback is never called if the audio is already paused.
- * \param data data pointer as passed to libvlc_audio_set_callbacks() [IN]
+ * \param[in] data data pointer as passed to libvlc_audio_set_callbacks()
  * \param pts time stamp of the pause request (should be elapsed already)
  */
 typedef void (*libvlc_audio_pause_cb)(void *data, int64_t pts);
@@ -952,7 +982,7 @@ typedef void (*libvlc_audio_pause_cb)(void *data, int64_t pts);
  * previously paused.
  *
  * \note The resume callback is never called if the audio is not paused.
- * \param data data pointer as passed to libvlc_audio_set_callbacks() [IN]
+ * \param[in] data data pointer as passed to libvlc_audio_set_callbacks()
  * \param pts time stamp of the resumption request (should be elapsed already)
  */
 typedef void (*libvlc_audio_resume_cb)(void *data, int64_t pts);
@@ -964,7 +994,7 @@ typedef void (*libvlc_audio_resume_cb)(void *data, int64_t pts);
  * stop playback as soon as possible. This typically occurs when the media is
  * stopped.
  *
- * \param data data pointer as passed to libvlc_audio_set_callbacks() [IN]
+ * \param[in] data data pointer as passed to libvlc_audio_set_callbacks()
  */
 typedef void (*libvlc_audio_flush_cb)(void *data, int64_t pts);
 
@@ -975,13 +1005,13 @@ typedef void (*libvlc_audio_flush_cb)(void *data, int64_t pts);
  * There will be no further decoded samples for the track, but playback should
  * nevertheless continue until all already pending buffers are rendered.
  *
- * \param data data pointer as passed to libvlc_audio_set_callbacks() [IN]
+ * \param[in] data data pointer as passed to libvlc_audio_set_callbacks()
  */
 typedef void (*libvlc_audio_drain_cb)(void *data);
 
 /**
  * Callback prototype for audio volume change.
- * \param data data pointer as passed to libvlc_audio_set_callbacks() [IN]
+ * \param[in] data data pointer as passed to libvlc_audio_set_callbacks()
  * \param volume software volume (1. = nominal, 0. = mute)
  * \param mute muted flag
  */
@@ -1034,11 +1064,11 @@ void libvlc_audio_set_volume_callback( libvlc_media_player_t *mp,
  * Callback prototype to setup the audio playback.
  *
  * This is called when the media player needs to create a new audio output.
- * \param opaque pointer to the data pointer passed to
- *               libvlc_audio_set_callbacks() [IN/OUT]
- * \param format 4 bytes sample format [IN/OUT]
- * \param rate sample rate [IN/OUT]
- * \param channels channels count [IN/OUT]
+ * \param[in,out] opaque pointer to the data pointer passed to
+ *               libvlc_audio_set_callbacks()
+ * \param[in,out] format 4 bytes sample format
+ * \param[in,out] rate sample rate
+ * \param[in,out] channels channels count
  * \return 0 on success, anything else to skip audio playback
  */
 typedef int (*libvlc_audio_setup_cb)(void **opaque, char *format, unsigned *rate,
@@ -1048,7 +1078,7 @@ typedef int (*libvlc_audio_setup_cb)(void **opaque, char *format, unsigned *rate
  * Callback prototype for audio playback cleanup.
  *
  * This is called when the media player no longer needs an audio output.
- * \param opaque data pointer as passed to libvlc_audio_set_callbacks() [IN]
+ * \param[in] opaque data pointer as passed to libvlc_audio_set_callbacks()
  */
 typedef void (*libvlc_audio_cleanup_cb)(void *opaque);
 
@@ -1073,9 +1103,16 @@ void libvlc_audio_set_format_callbacks( libvlc_media_player_t *mp,
  * This only works in combination with libvlc_audio_set_callbacks(),
  * and is mutually exclusive with libvlc_audio_set_format_callbacks().
  *
+ * The supported formats are:
+ * - "S16N" for signed 16-bit PCM
+ * - "S32N" for signed 32-bit PCM
+ * - "FL32" for single precision IEEE 754
+ *
+ * All supported formats use the native endianess.
+ * If there are more than one channel, samples are interleaved.
+ *
  * \param mp the media player
  * \param format a four-characters string identifying the sample format
- *               (e.g. "S16N" or "f32l")
  * \param rate sample rate (expressed in Hz)
  * \param channels channels count
  * \version LibVLC 2.0.0 or later
@@ -1313,7 +1350,7 @@ LIBVLC_API void libvlc_media_player_set_video_title_display( libvlc_media_player
  * this function again to get the updated track.
  *
  *
- * The track list can be used to get track informations and to select specific
+ * The track list can be used to get track information and to select specific
  * tracks.
  *
  * \param p_mi the media player
@@ -1351,7 +1388,7 @@ libvlc_media_player_get_selected_track( libvlc_media_player_t *p_mi,
  *
  * \version LibVLC 4.0.0 and later.
  *
- * This function can be used to get the last updated informations of a track.
+ * This function can be used to get the last updated information of a track.
  *
  * \param p_mi the media player
  * \param psz_id valid string representing a track id (cf. psz_id from \ref
@@ -1598,7 +1635,7 @@ libvlc_media_player_get_program_from_id( libvlc_media_player_t *p_mi, int i_grou
  * function is called. If a program is updated after this call, the user will
  * need to call this function again to get the updated program.
  *
- * The program list can be used to get program informations and to select
+ * The program list can be used to get program information and to select
  * specific programs.
  *
  * \param p_mi the media player
@@ -1692,8 +1729,8 @@ void libvlc_video_set_mouse_input( libvlc_media_player_t *p_mi, unsigned on );
  *
  * \param p_mi media player
  * \param num number of the video (starting from, and most commonly 0)
- * \param px pointer to get the pixel width [OUT]
- * \param py pointer to get the pixel height [OUT]
+ * \param[out] px pointer to get the pixel width
+ * \param[out] py pointer to get the pixel height
  * \return 0 on success, -1 if the specified video does not exist
  */
 LIBVLC_API
@@ -1718,8 +1755,8 @@ int libvlc_video_get_size( libvlc_media_player_t *p_mi, unsigned num,
  *
  * \param p_mi media player
  * \param num number of the video (starting from, and most commonly 0)
- * \param px pointer to get the abscissa [OUT]
- * \param py pointer to get the ordinate [OUT]
+ * \param[out] px pointer to get the abscissa
+ * \param[out] py pointer to get the ordinate
  * \return 0 on success, -1 if the specified video does not exist
  */
 LIBVLC_API
@@ -1856,9 +1893,9 @@ LIBVLC_API int libvlc_video_set_spu_delay( libvlc_media_player_t *p_mi, int64_t 
  * \version LibVLC 3.0.0 and later.
  *
  * \param p_mi the media player
- * \param titles address to store an allocated array of title descriptions
- *        descriptions (must be freed with libvlc_title_descriptions_release()
- *        by the caller) [OUT]
+ * \param[out] titles address to store an allocated array of title descriptions
+ *             descriptions (must be freed with libvlc_title_descriptions_release()
+ *             by the caller)
  *
  * \return the number of titles (-1 on error)
  */
@@ -1884,9 +1921,9 @@ LIBVLC_API
  *
  * \param p_mi the media player
  * \param i_chapters_of_title index of the title to query for chapters (uses current title if set to -1)
- * \param pp_chapters address to store an allocated array of chapter descriptions
- *        descriptions (must be freed with libvlc_chapter_descriptions_release()
- *        by the caller) [OUT]
+ * \param[out] pp_chapters address to store an allocated array of chapter descriptions
+ *             descriptions (must be freed with libvlc_chapter_descriptions_release()
+ *             by the caller)
  *
  * \return the number of chapters (-1 on error)
  */
@@ -2223,8 +2260,9 @@ LIBVLC_API int libvlc_audio_output_set( libvlc_media_player_t *p_mi,
                                         const char *psz_name );
 
 /**
- * Gets a list of potential audio output devices,
- * \see libvlc_audio_output_device_set().
+ * Gets a list of potential audio output devices.
+ *
+ * See also libvlc_audio_output_device_set().
  *
  * \note Not all audio outputs support enumerating devices.
  * The audio output may be functional even if the list is empty (NULL).
@@ -2243,30 +2281,18 @@ LIBVLC_API int libvlc_audio_output_set( libvlc_media_player_t *p_mi,
 LIBVLC_API libvlc_audio_output_device_t *
 libvlc_audio_output_device_enum( libvlc_media_player_t *mp );
 
-/**
- * Gets a list of audio output devices for a given audio output module,
- * \see libvlc_audio_output_device_set().
- *
- * \note Not all audio outputs support this. In particular, an empty (NULL)
- * list of devices does <b>not</b> imply that the specified audio output does
- * not work.
- *
- * \note The list might not be exhaustive.
- *
- * \warning Some audio output devices in the list might not actually work in
- * some circumstances. By default, it is recommended to not specify any
- * explicit audio device.
- *
- * \param p_instance libvlc instance
- * \param aout audio output name
- *                 (as returned by libvlc_audio_output_list_get())
- * \return A NULL-terminated linked list of potential audio output devices.
- * It must be freed with libvlc_audio_output_device_list_release()
- * \version LibVLC 2.1.0 or later.
- */
-LIBVLC_API libvlc_audio_output_device_t *
+#if defined (__GNUC__) && !defined (__clang__)
+__attribute__((unused))
+__attribute__((noinline))
+__attribute__((error("Use libvlc_audio_output_device_enum() instead")))
+static libvlc_audio_output_device_t *
 libvlc_audio_output_device_list_get( libvlc_instance_t *p_instance,
-                                     const char *aout );
+                                     const char *aout )
+{
+    (void) p_instance; (void) aout;
+    return NULL;
+}
+#endif
 
 /**
  * Frees a list of available audio output devices.
@@ -2280,24 +2306,8 @@ LIBVLC_API void libvlc_audio_output_device_list_release(
 /**
  * Configures an explicit audio output device.
  *
- * If the module paramater is NULL, audio output will be moved to the device
- * specified by the device identifier string immediately. This is the
- * recommended usage.
- *
  * A list of adequate potential device strings can be obtained with
  * libvlc_audio_output_device_enum().
- *
- * However passing NULL is supported in LibVLC version 2.2.0 and later only;
- * in earlier versions, this function would have no effects when the module
- * parameter was NULL.
- *
- * If the module parameter is not NULL, the device parameter of the
- * corresponding audio output, if it exists, will be set to the specified
- * string. Note that some audio output modules do not have such a parameter
- * (notably MMDevice and PulseAudio).
- *
- * A list of adequate potential device strings can be obtained with
- * libvlc_audio_output_device_list_get().
  *
  * \note This function does not select the specified audio output plugin.
  * libvlc_audio_output_set() is used for that purpose.
@@ -2307,18 +2317,18 @@ LIBVLC_API void libvlc_audio_output_device_list_release(
  * Some audio output modules require further parameters (e.g. a channels map
  * in the case of ALSA).
  *
+ * \version This function originally expected three parameters.
+ * The middle parameter was removed from LibVLC 4.0 onward.
+  *
  * \param mp media player
- * \param module If NULL, current audio output module.
- *               if non-NULL, name of audio output module
-                 (see \ref libvlc_audio_output_t::psz_name)
  * \param device_id device identifier string
  *               (see \ref libvlc_audio_output_device_t::psz_device)
  *
- * \bug This function returns nothing. Errors are ignored (this is a
- * design bug).
+ * \return If the change of device was requested succesfully, zero is returned
+ * (the actual change is asynchronous and not guaranteed to succeed).
+ * On error, a non-zero value is returned.
  */
-LIBVLC_API void libvlc_audio_output_device_set( libvlc_media_player_t *mp,
-                                                const char *module,
+LIBVLC_API int libvlc_audio_output_device_set( libvlc_media_player_t *mp,
                                                 const char *device_id );
 
 /**
@@ -2329,8 +2339,8 @@ LIBVLC_API void libvlc_audio_output_device_set( libvlc_media_player_t *mp,
  * \warning The initial value for the current audio output device identifier
  * may not be set or may be some unknown value. A LibVLC application should
  * compare this value against the known device identifiers (e.g. those that
- * were previously retrieved by a call to libvlc_audio_output_device_enum or
- * libvlc_audio_output_device_list_get) to find the current audio output device.
+ * were previously retrieved by a call to libvlc_audio_output_device_enum) to
+ * find the current audio output device.
  *
  * It is possible that the selected audio output device changes (an external
  * change) without a call to libvlc_audio_output_device_set. That may make this
@@ -2612,7 +2622,7 @@ typedef enum libvlc_media_player_role {
     libvlc_role_Game, /**< Video game */
     libvlc_role_Notification, /**< User interaction feedback */
     libvlc_role_Animation, /**< Embedded animation (e.g. in web page) */
-    libvlc_role_Production, /**< Audio editting/production */
+    libvlc_role_Production, /**< Audio editing/production */
     libvlc_role_Accessibility, /**< Accessibility */
     libvlc_role_Test /** Testing */
 #define libvlc_role_Last libvlc_role_Test

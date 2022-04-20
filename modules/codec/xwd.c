@@ -86,7 +86,7 @@ static int Decode (decoder_t *dec, block_t *block)
                 chroma = VLC_CODEC_ARGB;
             break;
     }
-    /* TODO: check image endianess, set RGB mask */
+    /* TODO: check image endianness, set RGB mask */
     if (!chroma)
         goto drop;
 
@@ -144,7 +144,6 @@ static int Open(vlc_object_t *obj)
 vlc_module_begin()
     set_description(N_("XWD image decoder"))
     set_capability("video decoder", 50)
-    set_category(CAT_INPUT)
     set_subcategory(SUBCAT_INPUT_VCODEC)
     set_callback(Open)
 vlc_module_end()

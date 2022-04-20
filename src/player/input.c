@@ -105,19 +105,21 @@ vlc_player_WaitRetryDelay(vlc_player_t *player)
 {
 #define RETRY_TIMEOUT_BASE VLC_TICK_FROM_MS(100)
 #define RETRY_TIMEOUT_MAX VLC_TICK_FROM_MS(3200)
-    if (player->error_count)
+#define MAX_EOS_BURST 4
+    /* Temporize only after a few successive EOS */
+    if (player->eos_burst_count > MAX_EOS_BURST)
     {
-        /* Delay the next opening in case of error to avoid busy loops */
+        unsigned pow = player->eos_burst_count - MAX_EOS_BURST;
+        /* Delay the next opening to avoid busy loops */
         vlc_tick_t delay = RETRY_TIMEOUT_BASE;
-        for (unsigned i = 1; i < player->error_count
-          && delay < RETRY_TIMEOUT_MAX; ++i)
+        for (unsigned i = 1; i < pow && delay < RETRY_TIMEOUT_MAX; ++i)
             delay *= 2; /* Wait 100, 200, 400, 800, 1600 and finally 3200ms */
         delay += vlc_tick_now();
 
-        while (player->error_count > 0
+        while (player->eos_burst_count != 0
             && vlc_cond_timedwait(&player->start_delay_cond, &player->lock,
                                   delay) == 0);
-        if (player->error_count == 0)
+        if (player->eos_burst_count == 0)
             return false; /* canceled */
     }
     return true;
@@ -135,6 +137,7 @@ vlc_player_input_HandleState(struct vlc_player_input *input,
      && state != VLC_PLAYER_STATE_STOPPED)
         return;
 
+    enum vlc_player_state last_state = input->state;
     input->state = state;
 
     /* Override the global state if the player is still playing and has a next
@@ -155,19 +158,34 @@ vlc_player_input_HandleState(struct vlc_player_input *input,
 
             vlc_player_ResetTimer(player);
 
-            if (input->error != VLC_PLAYER_ERROR_NONE)
-                player->error_count++;
-            else
-                player->error_count = 0;
+            if (player->last_eos != VLC_TICK_INVALID)
+            {
+                vlc_tick_t diff = vlc_tick_now() - player->last_eos;
+                if (diff < VLC_PLAYER_EOS_BURST_THRESHOLD)
+                    ++player->eos_burst_count;
+                else
+                    player->eos_burst_count = 0;
+            }
 
             vlc_player_WaitRetryDelay(player);
+
+            /* Assign the current date after the wait */
+            player->last_eos = vlc_tick_now();
 
             if (!player->deleting)
                 vlc_player_OpenNextMedia(player);
             if (!player->input)
                 player->started = false;
 
-            switch (player->media_stopped_action)
+            /* If the last input was not even started, always play the next
+             * media */
+            enum vlc_player_media_stopped_action stopped_action;
+            if (last_state == VLC_PLAYER_STATE_STOPPED)
+                stopped_action = VLC_PLAYER_MEDIA_STOPPED_CONTINUE;
+            else
+                stopped_action = player->media_stopped_action;
+
+            switch (stopped_action)
             {
                 case VLC_PLAYER_MEDIA_STOPPED_EXIT:
                     if (player->input && player->started)
@@ -971,7 +989,8 @@ vlc_player_input_New(vlc_player_t *player, input_item_t *item)
     input->ml.has_audio_tracks = input->ml.has_video_tracks = false;
 
     input->thread = input_Create(player, input_thread_Events, input, item,
-                                 player->resource, player->renderer);
+                                 INPUT_TYPE_NONE, player->resource,
+                                 player->renderer);
     if (!input->thread)
     {
         free(input);

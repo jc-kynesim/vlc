@@ -20,6 +20,7 @@ import QtQuick          2.11
 import QtQuick.Controls 2.4
 import QtQml.Models     2.2
 
+import org.videolan.vlc 0.1
 import org.videolan.medialib 0.1
 
 import "qrc:///widgets/" as Widgets
@@ -39,7 +40,7 @@ MainInterface.MainTableView {
     //---------------------------------------------------------------------------------------------
     // Private
 
-    property var _item: null
+    property Item _item: null
 
     property bool _before: true
 
@@ -61,7 +62,9 @@ MainInterface.MainTableView {
         type: "image",
 
         headerDelegate: table.titleHeaderDelegate,
-        colDelegate   : table.titleDelegate
+        colDelegate   : table.titleDelegate,
+
+        placeHolder: VLCStyle.noArtAlbumCover,
     }, {
         isPrimary: true,
 
@@ -69,7 +72,7 @@ MainInterface.MainTableView {
 
         width: VLCStyle.colWidth(Math.max(columns - 2, 1)),
 
-        text: i18n.qtr("Title")
+        text: I18n.qtr("Title")
     }, {
         criteria: "duration",
 
@@ -83,8 +86,8 @@ MainInterface.MainTableView {
     // Events
     //---------------------------------------------------------------------------------------------
 
-    onActionForSelection: medialib.addAndPlay(model.getIdsForIndexes(selection))
-    onItemDoubleClicked: medialib.addAndPlay(model.id)
+    onActionForSelection: MediaLib.addAndPlay(model.getIdsForIndexes(selection))
+    onItemDoubleClicked: MediaLib.addAndPlay(model.id)
 
     //---------------------------------------------------------------------------------------------
     // Connections
@@ -116,7 +119,9 @@ MainInterface.MainTableView {
 
         // NOTE: Dropping medialibrary content into the playlist.
         } else if (Helpers.isValidInstanceOf(item, Widgets.DragItem)) {
-            model.insert(item.getSelectedInputItem(), index);
+            item.getSelectedInputItem(function(inputItems) {
+                model.insert(inputItems, index);
+            })
         }
 
         forceActiveFocus();

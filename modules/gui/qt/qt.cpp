@@ -116,10 +116,9 @@ static void ShowDialog   ( intf_thread_t *, int, int, intf_dialog_args_t * );
 /*****************************************************************************
  * Module descriptor
  *****************************************************************************/
-#define ADVANCED_PREFS_TEXT N_( "Show advanced preferences over simple ones" )
-#define ADVANCED_PREFS_LONGTEXT N_( "Show advanced preferences and not simple "\
-                                    "preferences when opening the preferences "\
-                                    "dialog." )
+#define INITIAL_PREFS_VIEW_TEXT N_( "Select the initial preferences view" )
+#define INITIAL_PREFS_VIEW_LONGTEXT N_( "Select which preferences view to show upon "\
+                                        "opening the preferences dialog." )
 
 #define SYSTRAY_TEXT N_( "Systray icon" )
 #define SYSTRAY_LONGTEXT N_( "Show an icon in the systray " \
@@ -179,12 +178,6 @@ static void ShowDialog   ( intf_thread_t *, int, int, intf_dialog_args_t * );
 #define RECENTPLAY_FILTER_LONGTEXT N_( "Regular expression used to filter " \
         "the recent items played in the player." )
 
-#define SLIDERCOL_TEXT N_( "Define the colors of the volume slider" )
-#define SLIDERCOL_LONGTEXT N_( "Define the colors of the volume slider\n" \
-                       "By specifying the 12 numbers separated by a ';'\n" \
-            "Default is '255;255;255;20;226;20;255;176;15;235;30;20'\n" \
-            "An alternative can be '30;30;50;40;40;100;50;50;160;150;150;255'")
-
 #define QT_MODE_TEXT N_( "Selection of the starting mode and look" )
 #define QT_MODE_LONGTEXT N_( "Start VLC with:\n" \
                              " - normal mode\n"  \
@@ -243,8 +236,15 @@ static void ShowDialog   ( intf_thread_t *, int, int, intf_dialog_args_t * );
 
 #define FULLSCREEN_CONTROL_PIXELS N_( "Fullscreen controller mouse sensitivity" )
 
-#define QT_COMPOSITOR_TEXT N_("Select Qt video intergration backend")
-#define QT_COMPOSITOR_LONGTEXT N_("Select Qt video intergration backend. Use with care, the interface may not start if an incompatible compositor is selected")
+#define QT_COMPOSITOR_TEXT N_("Select Qt video integration backend")
+#define QT_COMPOSITOR_LONGTEXT N_("Select Qt video integration backend. Use with care, the interface may not start if an incompatible compositor is selected")
+
+#define SMOOTH_SCROLLING_TEXT N_( "Use smooth scrolling in Flickable based views" )
+#define SMOOTH_SCROLLING_LONGTEXT N_( "Deactivating this option will disable smooth scrolling in Flickable based views (such as the Playqueue)" )
+
+static const int initial_prefs_view_list[] = { 0, 1, 2 };
+static const char *const initial_prefs_view_list_texts[] =
+    { N_("Simple"), N_("Advanced"), N_("Expert") };
 
 static const int i_notification_list[] =
     { NOTIFICATION_NEVER, NOTIFICATION_MINIMIZED, NOTIFICATION_ALWAYS };
@@ -290,7 +290,6 @@ static const char *const compositor_user[] = {
 vlc_module_begin ()
     set_shortname( "Qt" )
     set_description( N_("Qt interface") )
-    set_category( CAT_INTERFACE )
     set_subcategory( SUBCAT_INTERFACE_MAIN )
     set_capability( "interface", 151 )
     set_callbacks( OpenIntf, Close )
@@ -333,10 +332,8 @@ vlc_module_begin ()
     add_string("qt-compositor", "auto", QT_COMPOSITOR_TEXT, QT_COMPOSITOR_LONGTEXT)
             change_string_list(compositor_vlc, compositor_user)
 
-    add_bool( "qt-recentplay", true, RECENTPLAY_TEXT,
-              nullptr )
-    add_string( "qt-recentplay-filter", "",
-                RECENTPLAY_FILTER_TEXT, RECENTPLAY_FILTER_LONGTEXT )
+    add_obsolete_bool( "qt-recentplay" )
+    add_obsolete_string( "qt-recentplay-filter" )
     add_obsolete_integer( "qt-continue" )
 
 #ifdef UPDATE_CHECK
@@ -374,13 +371,14 @@ vlc_module_begin ()
                nullptr )
 
 
-    add_bool( "qt-advanced-pref", false, ADVANCED_PREFS_TEXT,
-              ADVANCED_PREFS_LONGTEXT )
+    add_obsolete_bool( "qt-advanced-pref" ) /* since 4.0.0 */
+    add_integer( "qt-initial-prefs-view", 0, INITIAL_PREFS_VIEW_TEXT, INITIAL_PREFS_VIEW_LONGTEXT )
+        change_integer_range( 0, 2 )
+        change_integer_list( initial_prefs_view_list, initial_prefs_view_list_texts )
     add_bool( "qt-error-dialogs", true, ERROR_TEXT,
               nullptr )
 
-    add_string( "qt-slider-colours", "153;210;153;20;210;20;255;199;15;245;39;29",
-                SLIDERCOL_TEXT, SLIDERCOL_LONGTEXT )
+    add_obsolete_string( "qt-slider-colours")
 
     add_bool( "qt-privacy-ask", true, PRIVACY_TEXT, nullptr )
         change_private ()
@@ -405,6 +403,8 @@ vlc_module_begin ()
     add_integer( "qt-auto-raise", MainCtx::RAISE_VIDEO, AUTORAISE_ON_PLAYBACK_TEXT,
                  AUTORAISE_ON_PLAYBACK_LONGTEXT )
             change_integer_list( i_raise_list, psz_raise_list_text )
+
+    add_bool( "qt-smooth-scrolling", true, SMOOTH_SCROLLING_TEXT, SMOOTH_SCROLLING_LONGTEXT )
 
     cannot_unload_broken_library()
 
@@ -566,7 +566,7 @@ static int OpenIntfCommon( vlc_object_t *p_this, bool dialogProvider )
 {
     auto intfThread = reinterpret_cast<intf_thread_t*>(p_this);
     libvlc_int_t *libvlc = vlc_object_instance( p_this );
-    qt_intf_t* p_intf = (qt_intf_t*)vlc_object_create( libvlc, sizeof( *p_intf ) );
+    auto p_intf = vlc_object_create<qt_intf_t>( libvlc );
     if (!p_intf)
         return VLC_ENOMEM;
     p_intf->obj.logger = vlc_LogHeaderCreate(libvlc->obj.logger, "qt");
@@ -790,6 +790,8 @@ static void *Thread( void *obj )
             msg_Err(p_intf, "unable to create main interface");
             delete p_intf->p_mi;
             p_intf->p_mi = nullptr;
+            //process deleteLater events as the main loop will never run
+            QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
             return ThreadCleanup( p_intf, CLEANUP_ERROR );
         }
 

@@ -66,7 +66,7 @@ void vlc_global_mutex (unsigned n, bool acquire)
 static void vlc_mutex_init_common(vlc_mutex_t *mtx, bool recursive)
 {
     atomic_init(&mtx->value, 0);
-    atomic_init(&mtx->recursion, recursive);
+    atomic_init(&mtx->recursion, recursive ? 1 : 0);
     atomic_init(&mtx->owner, 0);
 }
 
@@ -131,13 +131,15 @@ int vlc_mutex_trylock(vlc_mutex_t *mtx)
      */
     unsigned recursion = atomic_load_explicit(&mtx->recursion,
                                               memory_order_relaxed);
-    if (unlikely(recursion) && vlc_mutex_held(mtx)) {
-        /* This thread already owns the mutex, locks recursively.
-         * Other threads shall not have modified the recursion or owner fields.
-         */
-        atomic_store_explicit(&mtx->recursion, recursion + 1,
-                              memory_order_relaxed);
-        return 0;
+    if (unlikely(recursion)) {
+        if (vlc_mutex_held(mtx)) {
+            /* This thread already owns the mutex, locks recursively.
+             * Other threads shall not have modified the recursion or owner fields.
+             */
+            atomic_store_explicit(&mtx->recursion, recursion + 1,
+                                  memory_order_relaxed);
+            return 0;
+        }
     } else
         assert(!vlc_mutex_held(mtx));
 
@@ -289,6 +291,9 @@ void vlc_cond_wait(vlc_cond_t *cond, vlc_mutex_t *mutex)
 {
     struct vlc_cond_waiter waiter;
 
+    // wait on a multiply locked mutex not supported
+    assert(atomic_load_explicit(&mutex->recursion, memory_order_relaxed) <= 1);
+
     vlc_cond_wait_prepare(&waiter, cond, mutex);
     vlc_atomic_wait(&waiter.value, 0);
     vlc_cond_wait_finish(&waiter, cond, mutex);
@@ -299,6 +304,9 @@ int vlc_cond_timedwait(vlc_cond_t *cond, vlc_mutex_t *mutex,
 {
     struct vlc_cond_waiter waiter;
     int ret;
+
+    // wait on a multiply locked mutex not supported
+    assert(atomic_load_explicit(&mutex->recursion, memory_order_relaxed) <= 1);
 
     vlc_cond_wait_prepare(&waiter, cond, mutex);
     ret = vlc_atomic_timedwait(&waiter.value, 0, deadline);
@@ -398,24 +406,15 @@ enum { VLC_ONCE_UNDONE, VLC_ONCE_DOING, VLC_ONCE_CONTEND, VLC_ONCE_DONE };
 
 static_assert (VLC_ONCE_DONE == 3, "Check vlc_once in header file");
 
-void (vlc_once)(vlc_once_t *restrict once, void (*cb)(void *), void *opaque)
+bool (vlc_once_begin)(vlc_once_t *restrict once)
 {
     unsigned int value = VLC_ONCE_UNDONE;
 
     if (atomic_compare_exchange_strong_explicit(&once->value, &value,
                                                 VLC_ONCE_DOING,
                                                 memory_order_acquire,
-                                                memory_order_acquire)) {
-        /* First time: run the callback */
-        cb(opaque);
-
-        if (atomic_exchange_explicit(&once->value, VLC_ONCE_DONE,
-                                     memory_order_release) == VLC_ONCE_CONTEND)
-            /* Notify waiters if any */
-            vlc_atomic_notify_all(&once->value);
-
-        return;
-    }
+                                                memory_order_acquire))
+        return false;
 
     assert(value >= VLC_ONCE_DOING);
 
@@ -431,5 +430,21 @@ void (vlc_once)(vlc_once_t *restrict once, void (*cb)(void *), void *opaque)
     while (unlikely(value != VLC_ONCE_DONE)) {
         vlc_atomic_wait(&once->value, VLC_ONCE_CONTEND);
         value = atomic_load_explicit(&once->value, memory_order_acquire);
+    }
+
+    return true;
+}
+
+void vlc_once_complete(vlc_once_t *restrict once)
+{
+    switch (atomic_exchange_explicit(&once->value, VLC_ONCE_DONE,
+                                     memory_order_release)) {
+        case VLC_ONCE_DOING: /* No waiters, nothing (else) to do */
+            break;
+        case VLC_ONCE_CONTEND: /* Notify waiters */
+            vlc_atomic_notify_all(&once->value);
+            break;
+        default:
+            vlc_assert_unreachable();
     }
 }

@@ -98,6 +98,7 @@ static void Resize(vlc_gl_t * gl, unsigned w, unsigned h)
     assert(render_cfg.colorspace == libvlc_video_colorspace_BT709);
     assert(render_cfg.primaries  == libvlc_video_primaries_BT709);
     assert(render_cfg.transfer   == libvlc_video_transfer_func_SRGB);
+    assert(render_cfg.orientation == libvlc_video_orient_top_left);
     sys->width = w;
     sys->height = h;
 }
@@ -172,7 +173,6 @@ static int Open(vlc_gl_t *gl, unsigned width, unsigned height)
 vlc_module_begin()
     set_shortname("GL texture")
     set_description("GL texture output")
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
 
     set_capability("opengl", 0)

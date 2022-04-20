@@ -132,10 +132,13 @@ if HAVE_LINUX
 if HAVE_ANDROID
 libopengl_filter_plugin_la_LIBADD = libvlc_opengles.la
 libopengl_filter_plugin_la_CFLAGS = -DUSE_OPENGL_ES2=1
+video_filter_LTLIBRARIES += libopengl_filter_plugin.la
 else
 libopengl_filter_plugin_la_LIBADD = libvlc_opengl.la
-endif
+if HAVE_GL
 video_filter_LTLIBRARIES += libopengl_filter_plugin.la
+endif
+endif
 endif
 
 if HAVE_IOS
@@ -169,22 +172,12 @@ libdeinterlace_plugin_la_SOURCES = \
 	video_filter/deinterlace/yadif.h \
 	video_filter/deinterlace/algo_phosphor.c video_filter/deinterlace/algo_phosphor.h \
 	video_filter/deinterlace/algo_ivtc.c video_filter/deinterlace/algo_ivtc.h
-# inline ASM doesn't build with -O0
-libdeinterlace_plugin_la_CFLAGS = $(AM_CFLAGS) -O2
+libdeinterlace_plugin_la_CPPFLAGS = $(AM_CPPFLAGS)
+libdeinterlace_plugin_la_CFLAGS = $(AM_CFLAGS)
 if HAVE_X86ASM
 libdeinterlace_plugin_la_SOURCES += video_filter/deinterlace/yadif_x86.asm
-endif
-if HAVE_NEON
-libdeinterlace_plugin_la_SOURCES += video_filter/deinterlace/merge_arm.S
-libdeinterlace_plugin_la_CFLAGS += -DCAN_COMPILE_ARM
-endif
-if HAVE_ARM64
-libdeinterlace_plugin_la_SOURCES += video_filter/deinterlace/merge_arm64.S
-libdeinterlace_plugin_la_CFLAGS += -DCAN_COMPILE_ARM64
-endif
-if HAVE_SVE
-libdeinterlace_plugin_la_SOURCES += video_filter/deinterlace/merge_sve.S
-libdeinterlace_plugin_la_CFLAGS += -DCAN_COMPILE_SVE
+# inline ASM doesn't build with -O0
+libdeinterlace_plugin_la_CFLAGS += -O2
 endif
 libdeinterlace_plugin_la_LIBADD = libdeinterlace_common.la
 video_filter_LTLIBRARIES += libdeinterlace_plugin.la

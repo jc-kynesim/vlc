@@ -29,19 +29,19 @@ FocusScope {
     implicitWidth: layoutLoader_left.implicitWidth + layoutLoader_center.implicitWidth + layoutLoader_right.implicitWidth + 2 * layoutSpacing
     implicitHeight: VLCStyle.maxControlbarControlHeight
 
-    property var colors: undefined
+    property VLCColors colors: null
 
-    property var defaultSize: VLCStyle.icon_normal // default size for IconToolButton based controls
+    property real defaultSize: VLCStyle.icon_normal // default size for IconToolButton based controls
 
     property real spacing: VLCStyle.margin_normal // spacing between controls
     property real layoutSpacing: VLCStyle.margin_xxlarge // spacing between layouts (left, center, and right)
 
     property int identifier: -1
-    readonly property var model: {
+    readonly property PlayerControlbarModel model: {
         if (!!MainCtx.controlbarProfileModel.currentModel)
             MainCtx.controlbarProfileModel.currentModel.getModel(identifier)
         else
-            undefined
+            null
     }
 
     signal requestLockUnlockAutoHide(bool lock, var source)
@@ -68,7 +68,11 @@ FocusScope {
         focus: true
 
         sourceComponent: ControlLayout {
-            model: playerControlLayout.model.left
+            model: ControlListFilter {
+                sourceModel: playerControlLayout.model.left
+
+                player: Player
+            }
 
             Navigation.parentItem: playerControlLayout
             Navigation.rightItem: layoutLoader_center.item
@@ -95,7 +99,11 @@ FocusScope {
                                               : implicitWidth
 
         sourceComponent: ControlLayout {
-            model: playerControlLayout.model.center
+            model: ControlListFilter {
+                sourceModel: playerControlLayout.model.center
+
+                player: Player
+            }
 
             Navigation.parentItem: playerControlLayout
             Navigation.leftItem: layoutLoader_left.item
@@ -123,7 +131,11 @@ FocusScope {
                 && !!playerControlLayout.model.right
 
         sourceComponent: ControlLayout {
-            model: playerControlLayout.model.right
+            model: ControlListFilter {
+                sourceModel: playerControlLayout.model.right
+
+                player: Player
+            }
 
             rightAligned: true
 

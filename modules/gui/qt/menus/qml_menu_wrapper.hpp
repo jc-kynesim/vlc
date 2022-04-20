@@ -24,6 +24,7 @@
 #include <QPoint>
 #include <QQuickItem>
 #include "menus.hpp"
+#include "maininterface/mainctx.hpp"
 
 class MediaLib;
 class MLAlbumModel;
@@ -32,8 +33,8 @@ class MLArtistModel;
 class MLAlbumTrackModel;
 class MLUrlModel;
 class MLVideoModel;
-class MLGroupListModel;
-class MLGroupModel;
+class MLVideoGroupsModel;
+class MLVideoFoldersModel;
 class MLPlaylistListModel;
 class MLPlaylistModel;
 class NetworkDeviceModel;
@@ -82,6 +83,9 @@ public:
 
     Q_INVOKABLE void close();
 
+protected:
+    virtual void onPopup(QMenu * menu);
+
 signals:
     void selected(int index);
 
@@ -89,6 +93,18 @@ private:
     QMenu *m_menu = nullptr;
 };
 
+class SortMenuVideo : public SortMenu
+{
+    Q_OBJECT
+
+    SIMPLE_MENU_PROPERTY(MainCtx *, ctx, nullptr)
+
+protected: // SortMenu reimplementation
+    void onPopup(QMenu * menu) override;
+
+signals:
+    void grouping(MainCtx::Grouping grouping);
+};
 
 //inherit VLCMenuBar so we can access menu creation functions
 class QmlGlobalMenu : public VLCMenuBar
@@ -162,6 +178,52 @@ protected:
     void keyReleaseEvent(QKeyEvent *) override;
 private:
     QmlMenuBar* m_menubar = nullptr;
+};
+
+class QmlBookmarkMenu : public QObject
+{
+    Q_OBJECT
+
+    SIMPLE_MENU_PROPERTY(MainCtx *, ctx, nullptr)
+
+    SIMPLE_MENU_PROPERTY(PlayerController *, player, nullptr)
+
+public:
+    explicit QmlBookmarkMenu(QObject * parent = nullptr);
+
+    ~QmlBookmarkMenu();
+
+public: // Interface
+    Q_INVOKABLE void popup(QPoint pos);
+
+signals:
+    void aboutToHide();
+    void aboutToShow();
+
+private:
+    QMenu * m_menu = nullptr;
+};
+
+class QmlRendererMenu : public QObject
+{
+    Q_OBJECT
+
+    SIMPLE_MENU_PROPERTY(MainCtx *, ctx, nullptr)
+
+public:
+    explicit QmlRendererMenu(QObject * parent = nullptr);
+
+    ~QmlRendererMenu();
+
+public: // Interface
+    Q_INVOKABLE void popup(QPoint pos);
+
+signals:
+    void aboutToHide();
+    void aboutToShow();
+
+private:
+    RendererMenu * m_menu = nullptr;
 };
 
 class BaseMedialibMenu : public QObject
@@ -262,17 +324,47 @@ private:
 // Groups
 //-------------------------------------------------------------------------------------------------
 
-class GroupListContextMenu : public QObject {
+class VideoGroupsContextMenu : public QObject {
     Q_OBJECT
-    SIMPLE_MENU_PROPERTY(MLGroupListModel *, model, nullptr)
+
+    SIMPLE_MENU_PROPERTY(MLVideoGroupsModel *, model, nullptr)
+
 public:
-    GroupListContextMenu(QObject * parent = nullptr);
-    ~GroupListContextMenu() /* override */;
+    VideoGroupsContextMenu(QObject * parent = nullptr);
+
+    ~VideoGroupsContextMenu(); /* override */
 
 public slots:
     void popup(const QModelIndexList & selected, QPoint pos, QVariantMap options = {});
+
+signals:
+    void showMediaInformation(int index);
+
 private:
-    QMenu* m_menu = nullptr;
+    QMenu * m_menu = nullptr;
+};
+
+// Folders
+
+class VideoFoldersContextMenu : public QObject {
+    Q_OBJECT
+
+    SIMPLE_MENU_PROPERTY(MLVideoFoldersModel *, model, nullptr)
+
+public:
+    VideoFoldersContextMenu(QObject * parent = nullptr);
+
+    ~VideoFoldersContextMenu(); /* override */
+
+public slots:
+    void popup(const QModelIndexList & selected, QPoint pos, QVariantMap options = {});
+
+signals:
+    // FIXME: This signal is required for VideoAll Connections.
+    void showMediaInformation(int index);
+
+private:
+    QMenu * m_menu = nullptr;
 };
 
 //-------------------------------------------------------------------------------------------------

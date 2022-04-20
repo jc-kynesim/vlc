@@ -45,7 +45,6 @@ static void Close(vout_window_t *);
 vlc_module_begin ()
     set_shortname (N_("Drawable"))
     set_description (N_("Embedded window video"))
-    set_category (CAT_VIDEO)
     set_subcategory (SUBCAT_VIDEO_VOUT)
     set_capability ("vout window", 70)
     set_callback(Open)
@@ -67,7 +66,7 @@ static const struct vout_window_operations ops = {
 #define RECTWidth(r)   (LONG)((r).right - (r).left)
 #define RECTHeight(r)  (LONG)((r).bottom - (r).top)
 
-static const TCHAR *EMBED_HWND_CLASS = TEXT("VLC embeded HWND");
+static const TCHAR *EMBED_HWND_CLASS = TEXT("VLC embedded HWND");
 
 struct drawable_sys
 {
