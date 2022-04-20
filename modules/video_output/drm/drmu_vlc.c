@@ -407,7 +407,7 @@ drmu_fb_vlc_new_pic_cma_attach(drmu_env_t * const du, picture_t * const pic)
                           fb_vlc_color_range(&pic->format),
                           fb_vlc_colorspace(&pic->format));
 
-    drmu_fb_int_chroma_siting_set(dfb fb_vlc_chroma_siting(&pic->format));
+    drmu_fb_int_chroma_siting_set(dfb, fb_vlc_chroma_siting(&pic->format));
 
     // Set delete callback & hold this pic
     // Aux attached to dfb immediately so no fail cleanup required
