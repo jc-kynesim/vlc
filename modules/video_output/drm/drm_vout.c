@@ -345,9 +345,7 @@ static void CloseDrmVout(vout_display_t *vd)
     vout_display_sys_t *const sys = vd->sys;
     unsigned int i;
 
-#if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
-#endif
 
     drmu_pool_delete(&sys->sub_fb_pool);
 
@@ -448,7 +446,7 @@ static int OpenDrmVout(vout_display_t *vd,
     vout_display_sys_t *sys;
     int ret = VLC_EGENERIC;
     int rv;
-    msg_Info(vd, "<<< %s: Fmt=%4.4s, fmtp_chroma=%4.4s", __func__,
+    msg_Dbg(vd, "<<< %s: Fmt=%4.4s, fmtp_chroma=%4.4s", __func__,
              (const char *)&vd->fmt->i_chroma, (const char *)&fmtp->i_chroma);
 
     if (!var_InheritBool(vd, "fullscreen")) {
