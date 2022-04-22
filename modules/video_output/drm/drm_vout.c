@@ -349,9 +349,7 @@ static void CloseDrmVout(vout_display_t *vd)
     vout_display_sys_t *const sys = vd->sys;
     unsigned int i;
 
-#if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
-#endif
 
     drmu_pool_delete(&sys->sub_fb_pool);
 
