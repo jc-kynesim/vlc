@@ -257,6 +257,7 @@ subpics_done:
         msg_Err(vd, "Failed to create frme buffer from pic");
         return;
     }
+    drmu_output_fb_info_set(sys->dout, dfb);
 
     ret = drmu_atomic_plane_fb_set(da, sys->dp, dfb, r);
     drmu_atomic_add_output_props(da, sys->dout);
