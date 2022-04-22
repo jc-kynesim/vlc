@@ -33,6 +33,7 @@ struct drmu_atomic_q_s;
 static struct drmu_bo_env_s * env_boe(drmu_env_t * const du);
 static struct pollqueue * env_pollqueue(const drmu_env_t * const du);
 static struct drmu_atomic_q_s * env_atomic_q(drmu_env_t * const du);
+static int env_object_state_save(drmu_env_t * const du, const uint32_t obj_id, const uint32_t obj_type);
 
 // Update return value with a new one for cases where we don't stop on error
 static inline int rvup(int rv1, int rv2)
@@ -1942,6 +1943,9 @@ typedef struct drmu_crtc_s {
     struct drmu_env_s * du;
     int crtc_idx;
 
+    atomic_int ref_count;
+    bool saved;
+
     struct drm_mode_crtc crtc;
 
     struct {
@@ -2179,6 +2183,56 @@ drmu_atomic_crtc_add_active(struct drmu_atomic_s * const da, drmu_crtc_t * const
     return drmu_atomic_add_prop_range(da, dc->crtc.crtc_id, dc->pid.active, val);
 }
 
+// Use the same claim logic as we do for planes
+// As it stands we don't do anything much on final unref so the logic
+// isn't really needed but it doesn't cost us much so do this way against
+// future need
+
+bool
+drmu_crtc_is_claimed(const drmu_crtc_t * const dc)
+{
+    return atomic_load(&dc->ref_count) != 0;
+}
+
+void
+drmu_crtc_unref(drmu_crtc_t ** const ppdc)
+{
+    drmu_crtc_t * const dc = *ppdc;
+
+    if (dc == NULL)
+        return;
+    *ppdc = NULL;
+
+    if (atomic_fetch_sub(&dc->ref_count, 1) != 2)
+        return;
+    atomic_store(&dc->ref_count, 0);
+}
+
+drmu_crtc_t *
+drmu_crtc_ref(drmu_crtc_t * const dc)
+{
+    if (!dc)
+        return NULL;
+    atomic_fetch_add(&dc->ref_count, 1);
+    return dc;
+}
+
+// A Conn should be claimed before any op that might change its state
+int
+drmu_crtc_claim_ref(drmu_crtc_t * const dc)
+{
+    drmu_env_t * const du = dc->du;
+    static const int ref0 = 0;
+    if (!atomic_compare_exchange_strong(&dc->ref_count, &ref0, 2))
+        return -EBUSY;
+
+    // 1st time through save state
+    if (!dc->saved && env_object_state_save(du, dc->crtc.crtc_id, DRM_MODE_OBJECT_CRTC) == 0)
+        dc->saved = true;
+
+    return 0;
+}
+
 //----------------------------------------------------------------------------
 //
 // CONN functions
@@ -2211,9 +2265,13 @@ static const char * conn_type_names[32] = {
 
 struct drmu_conn_s {
     drmu_env_t * du;
-    bool probed;
     unsigned int conn_idx;
+
+    atomic_int ref_count;
+    bool saved;
+
     struct drm_mode_get_connector conn;
+    bool probed;
     unsigned int modes_size;
     unsigned int enc_ids_size;
     struct drm_mode_modeinfo * modes;
@@ -2476,6 +2534,56 @@ conn_init(drmu_env_t * const du, drmu_conn_t * const dn, unsigned int conn_idx, 
 fail:
     conn_uninit(dn);
     return rv;
+}
+
+// Use the same claim logic as we do for planes
+// As it stands we don't do anything much on final unref so the logic
+// isn't really needed but it doesn't cost us much so do this way against
+// future need
+
+bool
+drmu_conn_is_claimed(const drmu_conn_t * const dn)
+{
+    return atomic_load(&dn->ref_count) != 0;
+}
+
+void
+drmu_conn_unref(drmu_conn_t ** const ppdn)
+{
+    drmu_conn_t * const dn = *ppdn;
+
+    if (dn == NULL)
+        return;
+    *ppdn = NULL;
+
+    if (atomic_fetch_sub(&dn->ref_count, 1) != 2)
+        return;
+    atomic_store(&dn->ref_count, 0);
+}
+
+drmu_conn_t *
+drmu_conn_ref(drmu_conn_t * const dn)
+{
+    if (!dn)
+        return NULL;
+    atomic_fetch_add(&dn->ref_count, 1);
+    return dn;
+}
+
+// A Conn should be claimed before any op that might change its state
+int
+drmu_conn_claim_ref(drmu_conn_t * const dn)
+{
+    drmu_env_t * const du = dn->du;
+    static const int ref0 = 0;
+    if (!atomic_compare_exchange_strong(&dn->ref_count, &ref0, 2))
+        return -EBUSY;
+
+    // 1st time through save state
+    if (!dn->saved && env_object_state_save(du, dn->conn.connector_id, DRM_MODE_OBJECT_CONNECTOR) == 0)
+        dn->saved = true;
+
+    return 0;
 }
 
 //----------------------------------------------------------------------------
@@ -3093,14 +3201,8 @@ drmu_plane_ref_crtc(drmu_plane_t * const dp, drmu_crtc_t * const dc)
     dp->dc = dc;
 
     // 1st time through save state
-    if (!dp->saved && drmu_env_restore_is_enabled(du)) {
-        drmu_props_t *props = props_new(du, drmu_plane_id(dp), DRM_MODE_OBJECT_PLANE);
-        drmu_atomic_t * da = drmu_atomic_new(du);
-        drmu_atomic_props_add_save(da, drmu_plane_id(dp), props);
-        props_free(props);
-        drmu_atomic_env_restore_add_snapshot(&da);
+    if (!dp->saved && env_object_state_save(du, drmu_plane_id(dp), DRM_MODE_OBJECT_PLANE) == 0)
         dp->saved = true;
-    }
 
     return 0;
 }
@@ -3483,6 +3585,36 @@ drmu_env_delete(drmu_env_t ** const ppdu)
     free(du);
 }
 
+static int
+env_object_state_save(drmu_env_t * const du, const uint32_t obj_id, const uint32_t obj_type)
+{
+    drmu_props_t * props;
+    drmu_atomic_t * da;
+    int rv;
+
+    if (!du->da_restore)
+        return -EINVAL;
+
+    if ((props = props_new(du, obj_id, obj_type)) == NULL)
+        return -ENOENT;
+
+    if ((da = drmu_atomic_new(du)) == NULL) {
+        rv = -ENOMEM;
+        goto fail;
+    }
+
+    if ((rv = drmu_atomic_props_add_save(da, obj_id, props)) != 0)
+        goto fail;
+
+    props_free(props);
+    return drmu_atomic_env_restore_add_snapshot(&da);
+
+fail:
+    if (props)
+        props_free(props);
+    return rv;
+}
+
 int
 drmu_env_restore_enable(drmu_env_t * const du)
 {
@@ -3541,8 +3673,8 @@ drmu_env_polltask_cb(void * v, short revents)
     pollqueue_add_task(du->pt, 1000);
 }
 
-int
-drmu_env_set_client_cap(drmu_env_t * const du, uint64_t cap_id, uint64_t cap_val)
+static int
+env_set_client_cap(drmu_env_t * const du, uint64_t cap_id, uint64_t cap_val)
 {
     struct drm_set_client_cap cap = {
         .capability = cap_id,
@@ -3583,18 +3715,18 @@ drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log)
     }
 
     // We want the primary plane for video
-    if ((rv = drmu_env_set_client_cap(du, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1)) != 0)
+    if ((rv = env_set_client_cap(du, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1)) != 0)
         drmu_debug(du, "Failed to set universal planes cap");
     // We need atomic for almost everything we do
-    if ((rv = drmu_env_set_client_cap(du, DRM_CLIENT_CAP_ATOMIC, 1)) != 0) {
+    if ((rv = env_set_client_cap(du, DRM_CLIENT_CAP_ATOMIC, 1)) != 0) {
         drmu_err(du, "Failed to set atomic cap");
         goto fail1;
     }
     // We can understand AR info
-    if ((rv = drmu_env_set_client_cap(du, DRM_CLIENT_CAP_ASPECT_RATIO, 1)) != 0)
+    if ((rv = env_set_client_cap(du, DRM_CLIENT_CAP_ASPECT_RATIO, 1)) != 0)
         drmu_debug(du, "Failed to set AR cap");
     // We would like to see writeback connectors
-    if ((rv = drmu_env_set_client_cap(du, DRM_CLIENT_CAP_WRITEBACK_CONNECTORS, 1)) != 0)
+    if ((rv = env_set_client_cap(du, DRM_CLIENT_CAP_WRITEBACK_CONNECTORS, 1)) != 0)
         drmu_debug(du, "Failed to set writeback cap");
 
     {
