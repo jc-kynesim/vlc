@@ -157,7 +157,7 @@ include video_output/xcb/Makefile.am
 include video_output/vulkan/Makefile.am
 
 ### DRM ###
-include video_output/drm/Makefile.am
+include video_output/drmu/Makefile.am
 
 ### Wayland ###
 include video_output/wayland/Makefile.am
