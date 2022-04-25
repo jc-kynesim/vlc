@@ -32,6 +32,7 @@
 #include "drmu.h"
 #include "drmu_log.h"
 #include "drmu_output.h"
+#include "drmu_util.h"
 #include "drmu_vlc.h"
 
 #include <vlc_common.h>
@@ -50,6 +51,11 @@
 #define DRM_VOUT_SOURCE_MODESET_LONGTEXT N_("Attempt to match display resolution and refresh rate to source.\
  Defaults to the 'preferred' mode if no good enough match found. \
  If unset then resolution & refresh will not be set.")
+
+#define DRM_VOUT_MODE_NAME "drm-vout-mode"
+#define DRM_VOUT_MODE_TEXT N_("Set this mode for display")
+
+#define DRM_VOUT_MODE_LONGTEXT N_("arg: <w>x<h>@<hz> Force mode to arg")
 
 #define DRM_VOUT_NO_MODESET_NAME "drm-vout-no-modeset"
 #define DRM_VOUT_NO_MODESET_TEXT N_("Do not modeset")
@@ -250,6 +256,7 @@ subpics_done:
         msg_Err(vd, "Failed to create frme buffer from pic");
         return;
     }
+    drmu_output_fb_info_set(sys->dout, dfb);
 
     ret = drmu_atomic_plane_fb_set(da, sys->dp, dfb, r);
     drmu_atomic_add_output_props(da, sys->dout);
@@ -513,16 +520,35 @@ static int OpenDrmVout(vlc_object_t *object)
     vd->display = vd_drm_display;
     vd->control = vd_drm_control;
 
-    if (!var_InheritBool(vd, DRM_VOUT_SOURCE_MODESET_NAME)) {
-        sys->mode_id = -1;
-    }
-    else {
+    const char *modestr = var_InheritString(vd, DRM_VOUT_MODE_NAME);
+    sys->mode_id = -1;
+
+    if (var_InheritBool(vd, DRM_VOUT_SOURCE_MODESET_NAME))
+        modestr = "source";
+
+    if (modestr != NULL && strcmp(modestr, "none") != 0) {
         drmu_mode_simple_params_t pick = {
             .width = fmtp->i_visible_width,
             .height = fmtp->i_visible_height,
             .hz_x_1000 = fmtp->i_frame_rate_base == 0 ? 0 :
                 (unsigned int)(((uint64_t)fmtp->i_frame_rate * 1000) / fmtp->i_frame_rate_base),
         };
+
+        if (strcmp(modestr, "source") != 0) {
+            unsigned int w, h, hz;
+            if (*drmu_util_parse_mode(modestr, &w, &h, &hz) != 0) {
+                msg_Err(vd, "Bad mode string: '%s'", modestr);
+                ret = VLC_EGENERIC;
+                goto fail;
+            }
+            if (w && h) {
+                pick.width = w;
+                pick.height = h;
+            }
+            if (hz)
+                pick.hz_x_1000 = hz;
+        }
+
         sys->mode_id = drmu_output_mode_pick_simple(sys->dout, drmu_mode_pick_simple_cb, &pick);
 
         msg_Dbg(vd, "Mode id=%d", sys->mode_id);
@@ -533,7 +559,9 @@ static int OpenDrmVout(vlc_object_t *object)
 
             drmu_output_mode_id_set(sys->dout, sys->mode_id);
             mode = drmu_output_mode_simple_params(sys->dout);
-            msg_Dbg(vd, "Mode: %dx%d %d/%d - req %dx%d", mode->width, mode->height, mode->sar.num, mode->sar.den, pick.width, pick.height);
+                msg_Info(vd, "Mode %d: %dx%d@%d.%03d %d/%d - req %dx%d@%d.%d", sys->mode_id,
+                        mode->width, mode->height, mode->hz_x_1000 / 1000, mode->hz_x_1000 % 1000,
+                        mode->sar.num, mode->sar.den, pick.width, pick.height, pick.hz_x_1000 / 1000, pick.hz_x_1000 % 1000);
         }
     }
 
@@ -575,6 +603,7 @@ vlc_module_begin()
     add_bool(DRM_VOUT_SOURCE_MODESET_NAME, false, DRM_VOUT_SOURCE_MODESET_TEXT, DRM_VOUT_SOURCE_MODESET_LONGTEXT, false)
     add_bool(DRM_VOUT_NO_MODESET_NAME,     false, DRM_VOUT_NO_MODESET_TEXT, DRM_VOUT_NO_MODESET_LONGTEXT, false)
     add_bool(DRM_VOUT_NO_MAX_BPC,          false, DRM_VOUT_NO_MAX_BPC_TEXT, DRM_VOUT_NO_MAX_BPC_LONGTEXT, false)
+    add_string(DRM_VOUT_MODE_NAME,         "none", DRM_VOUT_MODE_TEXT, DRM_VOUT_MODE_LONGTEXT, false)
 
     set_callbacks(OpenDrmVout, CloseDrmVout)
 vlc_module_end()
