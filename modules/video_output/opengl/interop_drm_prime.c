@@ -35,7 +35,7 @@
 #include <vlc_codec.h>
 #include <vlc_plugin.h>
 
-#include "gl_api.h"
+#include "gl_util.h"
 #include "interop.h"
 #include "../codec/avcodec/drm_pic.h"
 
@@ -75,7 +75,12 @@ struct priv
     struct
     {
         PFNGLBINDTEXTUREPROC BindTexture;
+        PFNGLDELETETEXTURESPROC DeleteTextures;
+        PFNGLGENTEXTURESPROC GenTextures;
     } gl;
+
+    unsigned int tex_n;
+    GLuint texs[16];
 };
 
 static inline bool
@@ -193,8 +198,8 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
                 goto fail;
             }
 
-            priv->gl.BindTexture(interop->tex_target, textures[n]);
             priv->glEGLImageTargetTexture2DOES(interop->tex_target, images[n]);
+            priv->gl.BindTexture(interop->tex_target, textures[n]);
 
             ++n;
         }
@@ -247,9 +252,10 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
         goto fail;
     }
 
-    priv->gl.BindTexture(interop->tex_target, textures[0]);
     priv->glEGLImageTargetTexture2DOES(interop->tex_target, images[0]);
+    priv->gl.BindTexture(interop->tex_target, priv->texs[priv->tex_n++ & 15]);
 #endif
+    destroy_images(interop, images);
 
     if (pic != priv->last.pic)
     {
@@ -273,6 +279,8 @@ Close(struct vlc_gl_interop *interop)
     msg_Info(interop, "Close DRM_PRIME");
 
     release_last(interop, priv);
+    priv->gl.DeleteTextures(16, priv->texs);
+
     free(priv);
 }
 
@@ -367,8 +375,10 @@ Open(vlc_object_t *obj)
         priv->egl.debugMessageControlKHR((void *)egl_err_cb, atts);
     }
 
-    const char *eglexts = priv->egl.queryString(priv->egl.display, EGL_EXTENSIONS);
-    if (!eglexts || !vlc_gl_StrHasToken(eglexts, "GL_OES_EGL_image"))
+    struct vlc_gl_extension_vt extension_vt;
+    vlc_gl_LoadExtensionFunctions(interop->gl, &extension_vt);
+
+    if (!vlc_gl_HasExtension(&extension_vt, "GL_OES_EGL_image"))
     {
         msg_Err(obj, "GL missing GL_OES_EGL_image");
         goto error;
@@ -382,10 +392,16 @@ Open(vlc_object_t *obj)
         msg_Err(obj, "glEGLImageTargetTexture2DOES missing");
         goto error;
     }
-    priv->gl.BindTexture =
-        vlc_gl_GetProcAddress(interop->gl, "glBindTexture");
-    if (priv->gl.BindTexture == NULL)
+    priv->gl.BindTexture = vlc_gl_GetProcAddress(interop->gl, "glBindTexture");
+    priv->gl.DeleteTextures = vlc_gl_GetProcAddress(interop->gl, "glDeleteTextures");
+    priv->gl.GenTextures = vlc_gl_GetProcAddress(interop->gl, "glGenTextures");
+    if (priv->gl.BindTexture == NULL ||
+        priv->gl.DeleteTextures == NULL ||
+        priv->gl.GenTextures == NULL)
         goto error;
+
+
+    priv->gl.GenTextures(16, priv->texs);
 
     /* The pictures are uploaded upside-down */
     video_format_TransformBy(&interop->fmt_out, TRANSFORM_VFLIP);
@@ -402,6 +418,15 @@ Open(vlc_object_t *obj)
     interop->tex_target = GL_TEXTURE_EXTERNAL_OES;
     interop->fmt_out.i_chroma = VLC_CODEC_RGB24,
     interop->fmt_out.space = COLOR_SPACE_UNDEF;
+
+    interop->tex_count = 1;
+    interop->texs[0] = (struct vlc_gl_tex_cfg) {
+        .w = {1, 1},
+        .h = {1, 1},
+        .internal = GL_RGBA,
+        .format = GL_RGBA,
+        .type = GL_UNSIGNED_BYTE,
+    };
 #endif
 
     static const struct vlc_gl_interop_ops ops = {
