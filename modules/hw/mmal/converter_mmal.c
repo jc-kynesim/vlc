@@ -49,7 +49,7 @@ static EGLint vlc_to_gl_fourcc(const video_format_t * const fmt)
           return MMAL_FOURCC('Y','V','1','2');
        case MMAL_ENCODING_I422:
           return MMAL_FOURCC('Y','U','1','6');
-//       case MMAL_ENCODING_YUVUV128:  // Doesn't actually work yet
+       case MMAL_ENCODING_YUVUV128:  // Doesn't actually work yet
        case MMAL_ENCODING_NV12:
           return MMAL_FOURCC('N','V','1','2');
        case MMAL_ENCODING_NV21:
@@ -348,12 +348,13 @@ static vlc_fourcc_t chroma_in_out(const vlc_fourcc_t chroma_in)
     {
         case VLC_CODEC_MMAL_OPAQUE:
         case VLC_CODEC_MMAL_ZC_I420:
-        case VLC_CODEC_MMAL_ZC_SAND8:
         case VLC_CODEC_MMAL_ZC_SAND10:          // ISP only
             return VLC_CODEC_MMAL_ZC_I420;
         case VLC_CODEC_MMAL_ZC_SAND30:          // HVS only
         case VLC_CODEC_MMAL_ZC_RGB32:
             return VLC_CODEC_MMAL_ZC_RGB32;     // HVS can't generate YUV of any sort
+        case VLC_CODEC_MMAL_ZC_SAND8:
+            return VLC_CODEC_MMAL_ZC_SAND8;
         default:
             break;
     }
