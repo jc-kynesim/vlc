@@ -264,7 +264,7 @@ tc_mmal_update(const opengl_tex_converter_t *tc, GLuint *textures,
     if (tex == NULL)
         return VLC_EGENERIC;
 
-//    tc->vt->BindTexture(GL_TEXTURE_EXTERNAL_OES, tex->texture);
+    tc->vt->BindTexture(GL_TEXTURE_EXTERNAL_OES, tex->texture);
 
     cma_buf_unref(sys->last_cb);
     sys->last_cb = cma_buf_ref(cb);
