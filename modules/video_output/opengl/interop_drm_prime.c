@@ -49,16 +49,16 @@ typedef void *GLeglImageOES;
 typedef void (*PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)(GLenum target, GLeglImageOES image);
 #endif
 
+// Number of pics to hold
+// Vaapi interop only uses 1 but that produces flickering
+// 2 seems solid (I guess 1 queued to render, 1 rendering)
+#define HOLD_PICS_COUNT 2
+
 #define IMAGES_MAX 4
 struct priv
 {
     PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
     unsigned fourcc;
-
-    struct {
-        picture_t *                 pic;
-        EGLImageKHR images[IMAGES_MAX];
-    } last;
 
     struct {
         EGLDisplay display;
@@ -75,12 +75,10 @@ struct priv
     struct
     {
         PFNGLBINDTEXTUREPROC BindTexture;
-        PFNGLDELETETEXTURESPROC DeleteTextures;
-        PFNGLGENTEXTURESPROC GenTextures;
     } gl;
 
-    unsigned int tex_n;
-    GLuint texs[16];
+    unsigned int hold_pic_n;
+    picture_t * hold_pics[HOLD_PICS_COUNT];
 };
 
 static inline bool
@@ -101,14 +99,6 @@ static void destroy_images(const struct vlc_gl_interop *interop, EGLImageKHR img
         if (img)
             priv->egl.destroyImageKHR(priv->egl.display, img);
     }
-}
-
-static void release_last(const struct vlc_gl_interop *interop, struct priv *priv)
-{
-    if (priv->last.pic != NULL)
-        picture_Release(priv->last.pic);
-    priv->last.pic = NULL;
-    destroy_images(interop, priv->last.images);
 }
 
 static int
@@ -198,8 +188,8 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
                 goto fail;
             }
 
-            priv->glEGLImageTargetTexture2DOES(interop->tex_target, images[n]);
             priv->gl.BindTexture(interop->tex_target, textures[n]);
+            priv->glEGLImageTargetTexture2DOES(interop->tex_target, images[n]);
 
             ++n;
         }
@@ -252,16 +242,21 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
         goto fail;
     }
 
+    priv->gl.BindTexture(interop->tex_target, textures[0]);
     priv->glEGLImageTargetTexture2DOES(interop->tex_target, images[0]);
-    priv->gl.BindTexture(interop->tex_target, priv->texs[priv->tex_n++ & 15]);
 #endif
     destroy_images(interop, images);
 
-    if (pic != priv->last.pic)
     {
-        release_last(interop, priv);
-        priv->last.pic = picture_Hold(pic);
-        memcpy(priv->last.images, images, sizeof(images));
+        const unsigned int now = priv->hold_pic_n;
+        const unsigned int prev = now == 0 ? HOLD_PICS_COUNT - 1 : now - 1;
+        const unsigned int next = now + 1 == HOLD_PICS_COUNT ? 0 : now + 1;
+        if (pic != priv->hold_pics[prev]) {
+            if (priv->hold_pics[now])
+                picture_Release(priv->hold_pics[now]);
+            priv->hold_pics[now] = picture_Hold(pic);
+            priv->hold_pic_n = next;
+        }
     }
 
     return VLC_SUCCESS;
@@ -278,8 +273,12 @@ Close(struct vlc_gl_interop *interop)
 
     msg_Info(interop, "Close DRM_PRIME");
 
-    release_last(interop, priv);
-    priv->gl.DeleteTextures(16, priv->texs);
+    for (unsigned int i = 0; i != HOLD_PICS_COUNT; ++i)
+    {
+        if (priv->hold_pics[i])
+            picture_Release(priv->hold_pics[i]);
+        priv->hold_pics[i] = NULL;
+    }
 
     free(priv);
 }
@@ -393,15 +392,8 @@ Open(vlc_object_t *obj)
         goto error;
     }
     priv->gl.BindTexture = vlc_gl_GetProcAddress(interop->gl, "glBindTexture");
-    priv->gl.DeleteTextures = vlc_gl_GetProcAddress(interop->gl, "glDeleteTextures");
-    priv->gl.GenTextures = vlc_gl_GetProcAddress(interop->gl, "glGenTextures");
-    if (priv->gl.BindTexture == NULL ||
-        priv->gl.DeleteTextures == NULL ||
-        priv->gl.GenTextures == NULL)
+    if (priv->gl.BindTexture == NULL)
         goto error;
-
-
-    priv->gl.GenTextures(16, priv->texs);
 
     /* The pictures are uploaded upside-down */
     video_format_TransformBy(&interop->fmt_out, TRANSFORM_VFLIP);
