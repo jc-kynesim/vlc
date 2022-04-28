@@ -101,6 +101,81 @@ static void destroy_images(const struct vlc_gl_interop *interop, EGLImageKHR img
     }
 }
 
+static inline EGLint *
+a_set(EGLint * a, const EGLint v1, const EGLint v2)
+{
+    *a++ = v1;
+    *a++ = v2;
+    return a;
+}
+
+static EGLint *
+a_set_pic_color_space(EGLint * const a, const picture_t * const pic)
+{
+    switch (pic->format.space)
+    {
+        case COLOR_SPACE_BT2020:
+            return a_set(a, EGL_YUV_COLOR_SPACE_HINT_EXT, EGL_ITU_REC2020_EXT);
+        case COLOR_SPACE_BT601:
+            return a_set(a, EGL_YUV_COLOR_SPACE_HINT_EXT, EGL_ITU_REC601_EXT);
+        case COLOR_SPACE_BT709:
+            return a_set(a, EGL_YUV_COLOR_SPACE_HINT_EXT, EGL_ITU_REC709_EXT);
+        case COLOR_SPACE_UNDEF:
+        default:
+            break;
+    }
+
+    if (pic->format.i_visible_width > 1024 || pic->format.i_visible_height > 600)
+        return a_set(a, EGL_YUV_COLOR_SPACE_HINT_EXT, EGL_ITU_REC709_EXT);
+    return a_set(a, EGL_YUV_COLOR_SPACE_HINT_EXT, EGL_ITU_REC601_EXT);
+}
+
+static EGLint *
+a_set_pic_range(EGLint * const a, const picture_t * const pic)
+{
+    switch (pic->format.color_range)
+    {
+        case COLOR_RANGE_FULL:
+            return a_set(a, EGL_SAMPLE_RANGE_HINT_EXT, EGL_YUV_FULL_RANGE_EXT);
+        case COLOR_RANGE_LIMITED:
+            return a_set(a, EGL_SAMPLE_RANGE_HINT_EXT, EGL_YUV_NARROW_RANGE_EXT);
+        case COLOR_RANGE_UNDEF:
+        default:
+            break;
+    }
+    return a;
+}
+
+static EGLint *
+a_set_pic_chroma_siting(EGLint * const a, const picture_t * const pic)
+{
+    switch (pic->format.chroma_location) {
+        case CHROMA_LOCATION_LEFT:
+            return a_set(a_set(a,
+                         EGL_YUV_CHROMA_HORIZONTAL_SITING_HINT_EXT, EGL_YUV_CHROMA_SITING_0_EXT),
+                         EGL_YUV_CHROMA_VERTICAL_SITING_HINT_EXT, EGL_YUV_CHROMA_SITING_0_5_EXT);
+        case CHROMA_LOCATION_CENTER:
+            return a_set(a_set(a,
+                         EGL_YUV_CHROMA_HORIZONTAL_SITING_HINT_EXT, EGL_YUV_CHROMA_SITING_0_5_EXT),
+                         EGL_YUV_CHROMA_VERTICAL_SITING_HINT_EXT, EGL_YUV_CHROMA_SITING_0_5_EXT);
+        case CHROMA_LOCATION_TOP_LEFT:
+            return a_set(a_set(a,
+                         EGL_YUV_CHROMA_HORIZONTAL_SITING_HINT_EXT, EGL_YUV_CHROMA_SITING_0_EXT),
+                         EGL_YUV_CHROMA_VERTICAL_SITING_HINT_EXT, EGL_YUV_CHROMA_SITING_0_EXT);
+        case CHROMA_LOCATION_TOP_CENTER:
+            return a_set(a_set(a,
+                         EGL_YUV_CHROMA_HORIZONTAL_SITING_HINT_EXT, EGL_YUV_CHROMA_SITING_0_5_EXT),
+                         EGL_YUV_CHROMA_VERTICAL_SITING_HINT_EXT, EGL_YUV_CHROMA_SITING_0_EXT);
+        case CHROMA_LOCATION_BOTTOM_LEFT:
+        case CHROMA_LOCATION_BOTTOM_CENTER:
+        case CHROMA_LOCATION_UNDEF:
+        default:
+            break;
+    }
+    return a;
+}
+
+
 static int
 tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
                 const GLsizei *tex_width, const GLsizei *tex_height,
@@ -202,6 +277,9 @@ tc_vaegl_update(const struct vlc_gl_interop *interop, GLuint *textures,
     *a++ = tex_height[0];
     *a++ = EGL_LINUX_DRM_FOURCC_EXT;
     *a++ = desc->layers[0].format;
+    a = a_set_pic_color_space(a, pic);
+    a = a_set_pic_range(a, pic);
+    a = a_set_pic_chroma_siting(a, pic);
 
     const EGLint * ext = plane_exts;
 
