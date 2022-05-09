@@ -243,7 +243,7 @@ subpics_done:
     else
 #endif
 #if HAS_DRMPRIME
-    if (pic->format.i_chroma == VLC_CODEC_DRM_PRIME_OPAQUE) {
+    if (drmu_format_vlc_to_drm_prime(pic->format.i_chroma, NULL) != 0) {
         dfb = drmu_fb_vlc_new_pic_attach(sys->du, pic);
     }
     else
@@ -565,22 +565,28 @@ static int OpenDrmVout(vlc_object_t *object)
         }
     }
 
+    {
 #if HAS_DRMPRIME
-    if (vd->fmt.i_chroma == VLC_CODEC_DRM_PRIME_OPAQUE) {
-        // Hurrah!
-    }
-    else
+        uint32_t drm_fmt;
+        uint64_t drm_mod;
+
+        if ((drm_fmt = drmu_format_vlc_to_drm_prime(vd->fmt.i_chroma, &drm_mod)) != 0 &&
+            drmu_plane_format_check(sys->dp, drm_fmt, drm_mod)) {
+            // Hurrah!
+        }
+        else
 #endif
 #if HAS_ZC_CMA
-    if (vd->fmt.i_chroma == VLC_CODEC_MMAL_OPAQUE) {
-        // Can't deal directly with opaque - but we can always convert it to ZC I420
-        vd->fmt.i_chroma = VLC_CODEC_MMAL_ZC_I420;
-    }
-    else
+        if (vd->fmt.i_chroma == VLC_CODEC_MMAL_OPAQUE) {
+            // Can't deal directly with opaque - but we can always convert it to ZC I420
+            vd->fmt.i_chroma = VLC_CODEC_MMAL_ZC_I420;
+        }
+        else
 #endif
-    if (drmu_format_vlc_to_drm(&vd->fmt) == 0) {
-        // no conversion - ask for something we know we can deal with
-        vd->fmt.i_chroma = VLC_CODEC_I420;
+        if (drmu_format_vlc_to_drm(&vd->fmt) == 0) {
+            // no conversion - ask for something we know we can deal with
+            vd->fmt.i_chroma = VLC_CODEC_I420;
+        }
     }
 //    vout_display_SetSizeAndSar(vd, drmu_crtc_width(sys->dc), drmu_crtc_height(sys->dc),
 //                               drmu_ufrac_vlc_to_rational(drmu_crtc_sar(sys->dc)));

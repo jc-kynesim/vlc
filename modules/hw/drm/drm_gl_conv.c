@@ -236,7 +236,10 @@ OpenGLConverter(vlc_object_t *obj)
     int rv = VLC_EGENERIC;
 
     // Do we know what to do with this?
-    if (tc->fmt.i_chroma != VLC_CODEC_DRM_PRIME_OPAQUE)
+    // There must be a way of probing for supported formats...
+    if (!(tc->fmt.i_chroma == VLC_CODEC_DRM_PRIME_I420 ||
+          tc->fmt.i_chroma == VLC_CODEC_DRM_PRIME_NV12 ||
+          tc->fmt.i_chroma == VLC_CODEC_DRM_PRIME_SAND8))
         return VLC_EGENERIC;
 
     {
