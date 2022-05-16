@@ -67,6 +67,7 @@ vlc_fourcc_t vlc_va_GetChroma(enum PixelFormat hwfmt, enum PixelFormat swfmt)
                 case AV_PIX_FMT_RPI4_8:
                     return VLC_CODEC_DRM_PRIME_SAND8;
                 case AV_PIX_FMT_RPI4_10:
+                case AV_PIX_FMT_YUV420P10LE:  // When probing this is the swfmt given
                     return VLC_CODEC_DRM_PRIME_SAND30;
                 default:
                     return 0;
