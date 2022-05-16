@@ -60,7 +60,7 @@ drmu_format_vlc_to_drm_prime(const vlc_fourcc_t chroma_in, uint64_t * const pmod
             fmt = DRM_FORMAT_NV12;
             mod = DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(0);
             break;
-        case VLC_CODEC_MMAL_ZC_SAND30:
+        case VLC_CODEC_DRM_PRIME_SAND30:
             fmt = DRM_FORMAT_P030;
             mod = DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(0);
             break;
