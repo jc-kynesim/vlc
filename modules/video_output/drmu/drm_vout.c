@@ -448,10 +448,10 @@ static int OpenDrmVout(vlc_object_t *object)
     int rv;
     msg_Info(vd, "<<< %s: Fmt=%4.4s", __func__, (const char *)&fmtp->i_chroma);
 
-    if (!var_InheritBool(vd, "fullscreen")) {
-        msg_Dbg(vd, ">>> %s: Not fullscreen", __func__);
-        return ret;
-    }
+//    if (!var_InheritBool(vd, "fullscreen")) {
+//        msg_Dbg(vd, ">>> %s: Not fullscreen", __func__);
+//        return ret;
+//    }
 
     sys = calloc(1, sizeof(*sys));
     if (!sys)
