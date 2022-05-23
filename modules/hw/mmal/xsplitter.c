@@ -52,6 +52,7 @@ static inline const char * str_fourcc(char buf[5], uint32_t fcc)
     buf[1] = drmu_log_safechar((fcc >> 8) & 0xff);
     buf[2] = drmu_log_safechar((fcc >> 16) & 0xff);
     buf[3] = drmu_log_safechar((fcc >> 24) & 0xff);
+    buf[4] = 0;
     return buf;
 }
 
@@ -261,10 +262,11 @@ static picture_pool_t * mmal_x11_pool(vout_display_t * vd, unsigned count)
     vout_display_t * const x_vd = sys->cur_desc->vout;
 #if TRACE_ALL
     char buf0[5];
+    char buf1[5];
     msg_Dbg(vd, "<<< %s (count=%d) %s:%dx%d->%s:%dx%d", __func__, count,
             str_fourcc(buf0, vd->fmt.i_chroma),
             vd->fmt.i_width, vd->fmt.i_height,
-            str_fourcc(buf0, x_vd->fmt.i_chroma),
+            str_fourcc(buf1, x_vd->fmt.i_chroma),
             x_vd->fmt.i_width, x_vd->fmt.i_height);
 #endif
     picture_pool_t * pool = x_vd->pool(x_vd, count);
@@ -289,7 +291,8 @@ static void mmal_x11_prepare(vout_display_t * vd, picture_t * pic, subpicture_t 
     mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
     vout_display_t * const x_vd = sys->cur_desc->vout;
 #if TRACE_ALL
-    msg_Dbg(vd, "<<< %s", __func__);
+    char buf0[5];
+    msg_Dbg(vd, "<<< %s: fmt=%s, %dx%d", __func__, str_fourcc(buf0, pic->format.i_chroma), pic->format.i_width, pic->format.i_height);
 #endif
     if (x_vd->prepare)
         x_vd->prepare(x_vd, pic, sub);
