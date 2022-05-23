@@ -442,7 +442,8 @@ subpic_make_chromas_from_drm(const uint32_t * const drm_chromas, const unsigned 
 static int OpenDrmVout(vlc_object_t *object)
 {
     vout_display_t * const vd = (vout_display_t *)object;
-    video_format_t * const fmtp = &vd->fmt;
+//    video_format_t * const fmtp = &vd->fmt;
+    const video_format_t *const fmtp = &vd->source;
     vout_display_sys_t *sys;
     int ret = VLC_EGENERIC;
     int rv;
@@ -570,20 +571,24 @@ static int OpenDrmVout(vlc_object_t *object)
         uint32_t drm_fmt;
         uint64_t drm_mod;
 
-        if ((drm_fmt = drmu_format_vlc_to_drm_prime(vd->fmt.i_chroma, &drm_mod)) != 0 &&
+        // We think we can deal with the source format so set requested
+        // input format to source
+        vd->fmt = *fmtp;
+
+        if ((drm_fmt = drmu_format_vlc_to_drm_prime(fmtp->i_chroma, &drm_mod)) != 0 &&
             drmu_plane_format_check(sys->dp, drm_fmt, drm_mod)) {
             // Hurrah!
         }
         else
 #endif
 #if HAS_ZC_CMA
-        if (vd->fmt.i_chroma == VLC_CODEC_MMAL_OPAQUE) {
+        if (fmtp->i_chroma == VLC_CODEC_MMAL_OPAQUE) {
             // Can't deal directly with opaque - but we can always convert it to ZC I420
             vd->fmt.i_chroma = VLC_CODEC_MMAL_ZC_I420;
         }
         else
 #endif
-        if (drmu_format_vlc_to_drm(&vd->fmt) == 0) {
+        if (drmu_format_vlc_to_drm(fmtp) == 0) {
             // no conversion - ask for something we know we can deal with
             vd->fmt.i_chroma = VLC_CODEC_I420;
         }
