@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os, sys
 from stat import *
@@ -20,7 +20,7 @@ def walktree(top, callback, n, prefix):
 def visitfile(file, linkname, n, prefix):
     if (linkname.startswith(prefix + 'lib/')):
         newlink = "../" * n + linkname[len(prefix):]
-        print 'relinking', file, "->", newlink
+        print('relinking', file, "->", newlink)
         os.remove(file)
         os.symlink(newlink, file)
 
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     elif argc == 3:
         walktree(sys.argv[1], visitfile, 0, sys.argv[2])
     else:
-        print "rebase_liblinks.py <local root> [<old sysroot>]"
+        print("rebase_liblinks.py <local root> [<old sysroot>]")
 
 
 
