@@ -1,29 +1,29 @@
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
+
+#include <vlc_common.h>
+#include <vlc_filter.h>
+#include <vlc_picture.h>
+#include <vlc_plugin.h>
+
+#include <libavutil/buffer.h>
+#include <libavutil/frame.h>
+#include <libavutil/hwcontext.h>
+
+#include "../../codec/avcodec/drm_pic.h"
+
+#include <assert.h>
+
+#define TRACE_ALL 1
+
 //----------------------------------------------------------------------------
 //
 // Simple copy in to ZC
 
 typedef struct to_nv12_sys_s {
-    vcsm_init_type_t vcsm_init_type;
-    cma_buf_pool_t * cma_out_pool;
+    int dummy;
 } to_nv12_sys_t;
-
-
-static size_t buf_alloc_size(const vlc_fourcc_t i_chroma, const unsigned int width, const unsigned int height)
-{
-    const unsigned int pels = width * height;
-
-    switch (i_chroma)
-    {
-        case VLC_CODEC_MMAL_ZC_RGB32:
-            return pels * 4;
-        case VLC_CODEC_MMAL_ZC_I420:
-            return pels * 3 / 2;
-        default:
-            break;
-    }
-    return 0;
-}
-
 
 static picture_t *
 to_nv12_filter(filter_t *p_filter, picture_t *in_pic)
@@ -32,51 +32,56 @@ to_nv12_filter(filter_t *p_filter, picture_t *in_pic)
 #if TRACE_ALL
     msg_Dbg(p_filter, "<<< %s", __func__);
 #endif
+    AVFrame * frame_in = av_frame_alloc();
+    AVFrame * frame_out = av_frame_alloc();
+    drm_prime_video_sys_t * const pctx = (drm_prime_video_sys_t *)in_pic->context;
+    int rv;
 
-    assert(p_filter->fmt_out.video.i_chroma == VLC_CODEC_MMAL_ZC_I420);
+    VLC_UNUSED(sys);
+    VLC_UNUSED(in_pic);
+
+    assert(p_filter->fmt_out.video.i_chroma == VLC_CODEC_NV12);
+
+    if (!frame_in || !frame_out || !pctx)
+        goto fail0;
 
     picture_t * const out_pic = filter_NewPicture(p_filter);
     if (out_pic == NULL)
         goto fail0;
 
-    MMAL_ES_SPECIFIC_FORMAT_T mm_vfmt = {.video={0}};
-    MMAL_ES_FORMAT_T mm_esfmt = {
-        .encoding = vlc_to_mmal_video_fourcc(&p_filter->fmt_out.video),
-        .es = &mm_vfmt};
+    frame_in->format      = AV_PIX_FMT_DRM_PRIME;
+    frame_in->buf[0]      = av_buffer_ref(pctx->buf);
+    frame_in->data[0]     = (uint8_t *)pctx->desc;
+    frame_in->hw_frames_ctx = av_buffer_ref(pctx->hw_frames_ctx);
+    frame_in->width       = in_pic->format.i_width;
+    frame_in->height      = in_pic->format.i_height;
+    frame_in->crop_left   = in_pic->format.i_x_offset;
+    frame_in->crop_top    = in_pic->format.i_y_offset;
+    frame_in->crop_right  = frame_in->width - in_pic->format.i_visible_width - frame_in->crop_left;
+    frame_in->crop_bottom = frame_in->height - in_pic->format.i_visible_height - frame_in->crop_top;
 
-    hw_mmal_vlc_fmt_to_mmal_fmt(&mm_esfmt, &p_filter->fmt_out.video);
+    frame_out->format     = AV_PIX_FMT_NV12;
+    frame_out->width      = out_pic->format.i_width;
+    frame_out->height     = out_pic->format.i_height;
+    for (int i = 0; i != in_pic->i_planes; ++i) {
+        frame_out->data[i] = out_pic->p[i].p_pixels;
+        frame_out->linesize[i] = out_pic->p[i].i_pitch;
+    }
 
-    const size_t buf_alloc = buf_alloc_size(p_filter->fmt_out.video.i_chroma,
-                                            mm_vfmt.video.width, mm_vfmt.video.height);
-    if (buf_alloc == 0)
+    if ((rv = av_hwframe_transfer_data(frame_out, frame_in, 0)) != 0) {
+        msg_Err(p_filter, "Failed to transfer data: %s", av_err2str(rv));
         goto fail1;
-    cma_buf_t *const cb = cma_buf_pool_alloc_buf(sys->cma_out_pool, buf_alloc);
-    if (cb == NULL)
-        goto fail1;
+    }
 
-    if (cma_buf_pic_attach(cb, out_pic) != VLC_SUCCESS)
-        goto fail2;
-    cma_pic_set_data(out_pic, &mm_esfmt, NULL);
-
-    hw_mmal_copy_pic_to_buf(cma_buf_addr(cb), NULL, &mm_esfmt, in_pic);
-
-    // Copy pic properties
-    out_pic->date              = in_pic->date;
-    out_pic->b_force           = in_pic->b_force;
-    out_pic->b_progressive     = in_pic->b_progressive;
-    out_pic->b_top_field_first = in_pic->b_top_field_first;
-    out_pic->i_nb_fields       = in_pic->i_nb_fields;
-
-    picture_Release(in_pic);
-
+    av_frame_free(&frame_in);
+    av_frame_free(&frame_out);
     return out_pic;
 
-fail2:
-    cma_buf_unref(cb);
 fail1:
     picture_Release(out_pic);
 fail0:
-    picture_Release(in_pic);
+    av_frame_free(&frame_in);
+    av_frame_free(&frame_out);
     return NULL;
 }
 
@@ -94,9 +99,6 @@ static void CloseConverterToNv12(vlc_object_t * obj)
         return;
 
     p_filter->p_sys = NULL;
-
-    cma_buf_pool_deletez(&sys->cma_out_pool);
-    cma_vcsm_exit(sys->vcsm_init_type);
 
     free(sys);
 }
@@ -126,14 +128,13 @@ static int OpenConverterToNv12(vlc_object_t * obj)
         goto fail;
 
     {
-        char dbuf0[5], dbuf1[5];
         msg_Dbg(p_filter, "%s: %s,%dx%d [(%d,%d) %d/%d] sar:%d/%d->%s,%dx%d [(%d,%d) %dx%d] rgb:%#x:%#x:%#x sar:%d/%d", __func__,
-                str_fourcc(dbuf0, p_filter->fmt_in.video.i_chroma),
+                fourcc2str(p_filter->fmt_in.video.i_chroma),
                 p_filter->fmt_in.video.i_width, p_filter->fmt_in.video.i_height,
                 p_filter->fmt_in.video.i_x_offset, p_filter->fmt_in.video.i_y_offset,
                 p_filter->fmt_in.video.i_visible_width, p_filter->fmt_in.video.i_visible_height,
                 p_filter->fmt_in.video.i_sar_num, p_filter->fmt_in.video.i_sar_den,
-                str_fourcc(dbuf1, p_filter->fmt_out.video.i_chroma),
+                fourcc2str(p_filter->fmt_out.video.i_chroma),
                 p_filter->fmt_out.video.i_width, p_filter->fmt_out.video.i_height,
                 p_filter->fmt_out.video.i_x_offset, p_filter->fmt_out.video.i_y_offset,
                 p_filter->fmt_out.video.i_visible_width, p_filter->fmt_out.video.i_visible_height,
@@ -148,17 +149,6 @@ static int OpenConverterToNv12(vlc_object_t * obj)
     }
     p_filter->p_sys = (filter_sys_t *)sys;
 
-    if ((sys->vcsm_init_type = cma_vcsm_init()) == VCSM_INIT_NONE) {
-        msg_Err(p_filter, "VCSM init failed");
-        goto fail;
-    }
-
-    if ((sys->cma_out_pool = cma_buf_pool_new(5, 5, true, "conv-to-zc")) == NULL)
-    {
-        msg_Err(p_filter, "Failed to allocate input CMA pool");
-        goto fail;
-    }
-
     p_filter->pf_video_filter = to_nv12_filter;
     p_filter->pf_flush = to_nv12_flush;
     return VLC_SUCCESS;
@@ -169,7 +159,6 @@ fail:
 }
 
 vlc_module_begin()
-    add_submodule()
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
     set_shortname(N_("DRMPRIME-SAND30 to NV12"))

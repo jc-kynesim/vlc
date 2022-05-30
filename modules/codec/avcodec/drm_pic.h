@@ -12,6 +12,7 @@ typedef struct drm_prime_video_sys_s {
 
     struct AVBufferRef * buf;
     const struct AVDRMFrameDescriptor * desc;
+    struct AVBufferRef * hw_frames_ctx;
 } drm_prime_video_sys_t;
 
 static inline const struct AVDRMFrameDescriptor *
