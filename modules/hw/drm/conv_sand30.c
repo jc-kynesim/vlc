@@ -25,6 +25,31 @@ typedef struct to_nv12_sys_s {
     int dummy;
 } to_nv12_sys_t;
 
+static vlc_fourcc_t
+dst_fourcc_vlc_to_av(const vlc_fourcc_t av)
+{
+    switch (av) {
+    case VLC_CODEC_NV12:
+        return AV_PIX_FMT_NV12;
+    case VLC_CODEC_I420_10L:
+        return AV_PIX_FMT_YUV420P10LE;
+    }
+    return 0;
+}
+
+static void
+pic_buf_free(void *opaque, uint8_t *data)
+{
+    VLC_UNUSED(data);
+    picture_Release(opaque);
+}
+
+static AVBufferRef *
+mk_buf_from_pic(picture_t * const pic, uint8_t * const data, const size_t size)
+{
+    return av_buffer_create(data, size, pic_buf_free, picture_Hold(pic), 0);
+}
+
 static picture_t *
 to_nv12_filter(filter_t *p_filter, picture_t *in_pic)
 {
@@ -38,9 +63,6 @@ to_nv12_filter(filter_t *p_filter, picture_t *in_pic)
     int rv;
 
     VLC_UNUSED(sys);
-    VLC_UNUSED(in_pic);
-
-    assert(p_filter->fmt_out.video.i_chroma == VLC_CODEC_NV12);
 
     if (!frame_in || !frame_out || !pctx)
         goto fail0;
@@ -60,10 +82,15 @@ to_nv12_filter(filter_t *p_filter, picture_t *in_pic)
     frame_in->crop_right  = frame_in->width - in_pic->format.i_visible_width - frame_in->crop_left;
     frame_in->crop_bottom = frame_in->height - in_pic->format.i_visible_height - frame_in->crop_top;
 
-    frame_out->format     = AV_PIX_FMT_NV12;
+    frame_out->format     = dst_fourcc_vlc_to_av(p_filter->fmt_out.video.i_chroma);
     frame_out->width      = out_pic->format.i_width;
     frame_out->height     = out_pic->format.i_height;
-    for (int i = 0; i != in_pic->i_planes; ++i) {
+    for (int i = 0; i != out_pic->i_planes; ++i) {
+        frame_out->buf[i] = mk_buf_from_pic(out_pic, out_pic->p[i].p_pixels, out_pic->p[i].i_lines * out_pic->p[i].i_pitch);
+        if (!frame_out->buf[i]) {
+            msg_Err(p_filter, "Failed to make buf from pic");
+            goto fail1;
+        }
         frame_out->data[i] = out_pic->p[i].p_pixels;
         frame_out->linesize[i] = out_pic->p[i].i_pitch;
     }
@@ -75,6 +102,7 @@ to_nv12_filter(filter_t *p_filter, picture_t *in_pic)
 
     av_frame_free(&frame_in);
     av_frame_free(&frame_out);
+    picture_Release(in_pic);
     return out_pic;
 
 fail1:
@@ -82,6 +110,7 @@ fail1:
 fail0:
     av_frame_free(&frame_in);
     av_frame_free(&frame_out);
+    picture_Release(in_pic);
     return NULL;
 }
 
@@ -106,7 +135,7 @@ static void CloseConverterToNv12(vlc_object_t * obj)
 static bool to_nv12_validate_fmt(const video_format_t * const f_in, const video_format_t * const f_out)
 {
     if (!(f_in->i_chroma == VLC_CODEC_DRM_PRIME_SAND30 &&
-          f_out->i_chroma == VLC_CODEC_NV12))
+          dst_fourcc_vlc_to_av(f_out->i_chroma) != 0))
     {
         return false;
     }
