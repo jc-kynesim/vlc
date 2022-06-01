@@ -5,7 +5,8 @@ CONF_MMAL=--disable-mmal
 
 MC=`uname -m`
 if [ "$MC" == "armv7l" ]; then
-  CONF_MMAL=--enable-mmal-avcodec
+#  CONF_MMAL=--enable-mmal-avcodec
+  CONF_MMAL=
   ARM=armv7
 elif [ "$MC" == "aarch64" ]; then
   ARM=arm64
