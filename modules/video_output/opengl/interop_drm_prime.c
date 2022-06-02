@@ -84,7 +84,9 @@ struct priv
 static inline bool
 vlc_drm_prime_IsChromaOpaque(const int i_vlc_chroma)
 {
-    return i_vlc_chroma == VLC_CODEC_DRM_PRIME_OPAQUE;
+    return i_vlc_chroma == VLC_CODEC_DRM_PRIME_I420 ||
+           i_vlc_chroma == VLC_CODEC_DRM_PRIME_NV12 ||
+           i_vlc_chroma == VLC_CODEC_DRM_PRIME_SAND8;
 }
 
 static void destroy_images(const struct vlc_gl_interop *interop, EGLImageKHR imgs[IMAGES_MAX])

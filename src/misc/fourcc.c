@@ -823,6 +823,9 @@ static const struct
     { { VLC_CODEC_D3D11_OPAQUE_10B, VLC_CODEC_D3D9_OPAQUE_10B,
         VLC_CODEC_D3D11_OPAQUE_RGBA, VLC_CODEC_D3D11_OPAQUE_BGRA },
                                                FAKE_FMT() },
+    { { VLC_CODEC_DRM_PRIME_I420,  VLC_CODEC_DRM_PRIME_NV12,
+        VLC_CODEC_DRM_PRIME_SAND8, VLC_CODEC_DRM_PRIME_SAND30 },
+                                               FAKE_FMT() },
 
     { { VLC_CODEC_NVDEC_OPAQUE_16B,
         VLC_CODEC_NVDEC_OPAQUE_10B, VLC_CODEC_NVDEC_OPAQUE },
@@ -839,8 +842,6 @@ static const struct
 
     { { VLC_CODEC_VAAPI_420, VLC_CODEC_VAAPI_420_10BPP },
                                                FAKE_FMT() },
-
-    { { VLC_CODEC_DRM_PRIME_OPAQUE, 0 },       FAKE_FMT() },
 
     { { 0 },                                   FAKE_FMT() }
 };

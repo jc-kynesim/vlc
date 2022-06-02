@@ -76,10 +76,9 @@ drmu_atomic_add_output_props(drmu_atomic_t * const da, drmu_output_t * const dou
             rv = rvup(rv, drmu_atomic_conn_colorspace_set(da, dn, dout->colorspace));
         if (dout->broadcast_rgb)
             rv = rvup(rv, drmu_atomic_conn_broadcast_rgb_set(da, dn, dout->broadcast_rgb));
-        if (dout->hdr_metadata_isset != DRMU_ISSET_UNSET) {
+        if (dout->hdr_metadata_isset != DRMU_ISSET_UNSET)
             rv = rvup(rv, drmu_atomic_conn_hdr_metadata_set(da, dn,
                 dout->hdr_metadata_isset == DRMU_ISSET_NULL ? NULL : &dout->hdr_metadata));
-        }
     }
 
     return rv;

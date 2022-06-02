@@ -244,7 +244,7 @@ subpics_done:
     else
 #endif
 #if HAS_DRMPRIME
-    if (pic->format.i_chroma == VLC_CODEC_DRM_PRIME_OPAQUE) {
+    if (drmu_format_vlc_to_drm_prime(pic->format.i_chroma, NULL) != 0) {
         dfb = drmu_fb_vlc_new_pic_attach(sys->du, pic);
     }
     else

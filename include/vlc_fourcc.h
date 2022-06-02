@@ -418,7 +418,6 @@
 
 /* DRM Prime opaque buffer with modifers */
 /* ?? Do I need to separate underlying fmts ?? */
-#define VLC_CODEC_DRM_PRIME_OPAQUE VLC_FOURCC('D','R','M','P')
 
 /* DXVA2 opaque video surface for use with D3D9 */
 #define VLC_CODEC_D3D9_OPAQUE     VLC_FOURCC('D','X','A','9') /* 4:2:0  8 bpc */
@@ -429,6 +428,12 @@
 #define VLC_CODEC_D3D11_OPAQUE_10B      VLC_FOURCC('D','X','1','0') /* 4:2:0 10 bpc */
 #define VLC_CODEC_D3D11_OPAQUE_RGBA     VLC_FOURCC('D','X','R','G')
 #define VLC_CODEC_D3D11_OPAQUE_BGRA     VLC_FOURCC('D','A','G','R')
+
+/* DRM Prime */
+#define VLC_CODEC_DRM_PRIME_I420        VLC_FOURCC('D','P','V','0')
+#define VLC_CODEC_DRM_PRIME_NV12        VLC_FOURCC('D','P','N','1')
+#define VLC_CODEC_DRM_PRIME_SAND8       VLC_FOURCC('D','P','S','8')
+#define VLC_CODEC_DRM_PRIME_SAND30      VLC_FOURCC('D','P','S','3')
 
 /* NVDEC opaque video format for use the NVDec API */
 #define VLC_CODEC_NVDEC_OPAQUE          VLC_FOURCC('N','V','D','8') /* 4:2:0  8 bpc */

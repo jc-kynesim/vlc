@@ -101,7 +101,8 @@ static int DrmPrimeCreate(vlc_va_t *va, AVCodecContext *ctx, enum AVPixelFormat 
     VLC_UNUSED(desc);
     VLC_UNUSED(fmt_in);
 
-    msg_Err(va, "<<< %s: hwfmt=%d, dec_device=%p, type=%d", __func__, hwfmt, dec_device, dec_device ? (int)dec_device->type : -1);
+    msg_Err(va, "<<< %s: hwfmt=%d, dec_device=%p, type=%d, ctx fmt=%d/%d", __func__, hwfmt, dec_device, dec_device ? (int)dec_device->type : -1,
+            ctx->pix_fmt, ctx->sw_pix_fmt);
 
     if ( hwfmt != AV_PIX_FMT_DRM_PRIME || dec_device == NULL ||
         dec_device->type != VLC_DECODER_DEVICE_DRM_PRIME)
@@ -157,7 +158,28 @@ static int DrmPrimeCreate(vlc_va_t *va, AVCodecContext *ctx, enum AVPixelFormat 
         va->ops = &ops;
     }
 
-    fmt_out->i_chroma = VLC_CODEC_DRM_PRIME_OPAQUE;
+    // Ctx pix fmt is our best guess
+    // In general it won't matter if we get it wrong as we pull actual info for
+    // the format in the drm prime descriptor
+    switch (ctx->sw_pix_fmt)
+    {
+        case AV_PIX_FMT_YUV420P:
+            fmt_out->i_chroma = VLC_CODEC_DRM_PRIME_I420;
+            break;
+        case AV_PIX_FMT_RPI4_8:
+            fmt_out->i_chroma = VLC_CODEC_DRM_PRIME_SAND8;
+            break;
+        case AV_PIX_FMT_RPI4_10:
+        case AV_PIX_FMT_YUV420P10LE:  // When probing this is the swfmt given
+            fmt_out->i_chroma = VLC_CODEC_DRM_PRIME_SAND30;
+            break;
+        default:
+            msg_Warn(va, "Unexpected sw_pix_fmt: %d", ctx->sw_pix_fmt);
+            /* FALLTHRU */
+        case AV_PIX_FMT_NV12:
+            fmt_out->i_chroma = VLC_CODEC_DRM_PRIME_NV12;
+            break;
+    }
 
     *vtcx_out = sys->vctx;
 

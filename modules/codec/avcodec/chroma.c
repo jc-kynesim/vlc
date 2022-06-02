@@ -212,7 +212,10 @@ static const struct
     {VLC_CODEC_XYZ12, AV_PIX_FMT_XYZ12, 0xfff0, 0xfff0, 0xfff0},
 
     /* Cheating h/w formats */
-    {VLC_CODEC_DRM_PRIME_OPAQUE, AV_PIX_FMT_DRM_PRIME, 0, 0, 0},
+    {VLC_CODEC_DRM_PRIME_I420, AV_PIX_FMT_DRM_PRIME, 0, 0, 0},
+    {VLC_CODEC_DRM_PRIME_NV12, AV_PIX_FMT_DRM_PRIME, 0, 0, 0},
+    {VLC_CODEC_DRM_PRIME_SAND8, AV_PIX_FMT_DRM_PRIME, 0, 0, 0},
+    {VLC_CODEC_DRM_PRIME_SAND30, AV_PIX_FMT_DRM_PRIME, 0, 0, 0},
 
     { 0, 0, 0, 0, 0 }
 };
