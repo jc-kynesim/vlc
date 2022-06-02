@@ -400,7 +400,7 @@ static int OpenVideoCodec( decoder_t *p_dec )
     if( ret < 0 )
         return ret;
 
-    msg_Info(p_dec, "%s: Pix format=%d/%d", __func__, ctx->pix_fmt, ctx->sw_pix_fmt);
+    msg_Dbg(p_dec, "%s: Pix format=%d/%d", __func__, ctx->pix_fmt, ctx->sw_pix_fmt);
 
     switch( ctx->active_thread_type )
     {
@@ -1345,7 +1345,7 @@ void EndVideoDec( vlc_object_t *obj )
     decoder_sys_t *p_sys = p_dec->p_sys;
     AVCodecContext *ctx = p_sys->p_context;
 
-    msg_Info(obj, "<<< %s", __func__);
+    msg_Dbg(obj, "<<< %s", __func__);
 
     /* do not flush buffers if codec hasn't been opened (theora/vorbis/VC1) */
     if( avcodec_is_open( ctx ) )

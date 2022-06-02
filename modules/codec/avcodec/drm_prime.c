@@ -101,7 +101,7 @@ static int DrmPrimeCreate(vlc_va_t *va, AVCodecContext *ctx, enum AVPixelFormat 
     VLC_UNUSED(desc);
     VLC_UNUSED(fmt_in);
 
-    msg_Err(va, "<<< %s: hwfmt=%d, dec_device=%p, type=%d, ctx fmt=%d/%d", __func__, hwfmt, dec_device, dec_device ? (int)dec_device->type : -1,
+    msg_Dbg(va, "<<< %s: hwfmt=%d, dec_device=%p, type=%d, ctx fmt=%d/%d", __func__, hwfmt, dec_device, dec_device ? (int)dec_device->type : -1,
             ctx->pix_fmt, ctx->sw_pix_fmt);
 
     if ( hwfmt != AV_PIX_FMT_DRM_PRIME || dec_device == NULL ||
@@ -194,7 +194,7 @@ error:
 static void
 DrmPrimeDecoderDeviceClose(vlc_decoder_device *device)
 {
-    msg_Err(device, "<<< %s", __func__);
+    msg_Dbg(device, "<<< %s", __func__);
 }
 
 static const struct vlc_decoder_device_operations dev_ops = {
@@ -207,7 +207,7 @@ DrmPrimeDecoderDeviceOpen(vlc_decoder_device *device, vout_window_t *window)
     if (!window)
         return VLC_EGENERIC;
 
-    msg_Err(device, "<<< %s", __func__);
+    msg_Dbg(device, "<<< %s", __func__);
 
     device->ops = &dev_ops;
     device->type = VLC_DECODER_DEVICE_DRM_PRIME;
