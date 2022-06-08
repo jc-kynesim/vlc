@@ -910,7 +910,7 @@ static int TsStart( es_out_t *p_out )
     p_ts->p_storage_w = NULL;
 
     p_sys->b_delayed = true;
-    if( vlc_clone( &p_ts->thread, TsRun, p_ts, VLC_THREAD_PRIORITY_INPUT ) )
+    if( vlc_clone( &p_ts->thread, TsRun, p_ts ) )
     {
         msg_Err( p_sys->p_input, "cannot create timeshift thread" );
 
@@ -1089,6 +1089,8 @@ static int TsChangeRate( ts_thread_t *p_ts, float src_rate, float rate )
 
 static void *TsRun( void *p_data )
 {
+    vlc_thread_set_name("vlc-timeshift");
+
     ts_thread_t *p_ts = p_data;
     vlc_tick_t i_buffering_date = -1;
 

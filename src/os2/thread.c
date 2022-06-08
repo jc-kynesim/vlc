@@ -445,7 +445,7 @@ static void vlc_entry( void *p )
 }
 
 int vlc_clone (vlc_thread_t *p_handle, void *(*entry) (void *),
-               void *data, int priority)
+               void *data)
 {
     struct vlc_thread *th = malloc (sizeof (*th));
     if (unlikely(th == NULL))
@@ -471,16 +471,6 @@ int vlc_clone (vlc_thread_t *p_handle, void *(*entry) (void *),
 
     if (p_handle != NULL)
         *p_handle = th;
-
-    if (priority)
-    {
-        LONG delta = PRTYD_MAXIMUM;
-
-        if (priority != VLC_THREAD_PRIORITY_HIGHEST)
-            delta >>= 1;
-
-        DosSetPriority(PRTYS_THREAD, PRTYC_REGULAR, delta, th->tid );
-    }
 
     return 0;
 
@@ -514,19 +504,14 @@ void vlc_join (vlc_thread_t th, void **result)
     free( th );
 }
 
-int vlc_set_priority (vlc_thread_t th, int priority)
-{
-    if (DosSetPriority(PRTYS_THREAD,
-                       HIBYTE(priority),
-                       LOBYTE(priority),
-                       th->tid))
-        return VLC_EGENERIC;
-    return VLC_SUCCESS;
-}
-
 unsigned long vlc_thread_id (void)
 {
     return _gettid();
+}
+
+void (vlc_thread_set_name)(const char *name)
+{
+    VLC_UNUSED(name);
 }
 
 /*** Thread cancellation ***/

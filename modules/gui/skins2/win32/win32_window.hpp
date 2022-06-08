@@ -27,7 +27,7 @@
 #include "../src/generic_window.hpp"
 #include "../src/os_window.hpp"
 
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 
 #include <windows.h>
 #include <ole2.h>   // LPDROPTARGET
@@ -62,8 +62,8 @@ public:
     virtual void toggleOnTop( bool onTop ) const;
 
     /// Set the window handler
-    void setOSHandle( vout_window_t *pWnd ) const {
-        pWnd->type = VOUT_WINDOW_TYPE_HWND;
+    void setOSHandle( vlc_window_t *pWnd ) const {
+        pWnd->type = VLC_WINDOW_TYPE_HWND;
         pWnd->info.has_double_click = true;
         pWnd->handle.hwnd = m_hWnd;
     }

@@ -65,16 +65,26 @@ netbios_ns_interrupt_register(netbios_ns *ns)
     vlc_interrupt_register(netbios_ns_interrupt_callback, ns);
 }
 
-static inline void
+static inline int
 netbios_ns_interrupt_unregister(void)
 {
-    vlc_interrupt_unregister();
+    return vlc_interrupt_unregister();
 }
 
 #else
 
-#define netbios_ns_interrupt_register( ns ) do {} while (0)
-#define netbios_ns_interrupt_unregister() do {} while (0)
+static inline void
+netbios_ns_interrupt_register(netbios_ns *ns)
+{
+    (void) ns;
+}
+
+static inline int
+netbios_ns_interrupt_unregister(void)
+{
+    return 0;
+}
+
 #endif
 
 #endif
@@ -313,12 +323,19 @@ FileSeek(stream_t *access, uint64_t i_pos)
     if (sys->smb2 == NULL)
         return VLC_EGENERIC;
 
+    if (i_pos > INT64_MAX)
+    {
+        msg_Err(access, "can't seek past INT64_MAX (requested: %"PRIu64")\n",
+                i_pos);
+        return VLC_EGENERIC;
+    }
+
     struct vlc_smb2_op op = VLC_SMB2_OP(access, &sys->smb2);
 
-    int err = smb2_lseek(op.smb2, sys->smb2fh, i_pos, SEEK_SET, NULL);
+    int64_t err = smb2_lseek(op.smb2, sys->smb2fh, i_pos, SEEK_SET, NULL);
     if (err < 0)
     {
-        VLC_SMB2_SET_ERROR(&op, "smb2_seek_async", err);
+        VLC_SMB2_SET_ERROR(&op, "smb2_lseek", err);
         return err;
     }
     sys->eof = false;
@@ -670,8 +687,8 @@ vlc_smb2_connect_open_share(stream_t *access, const char *url,
     if (!username)
     {
         username = "Guest";
-        /* A NULL password enable ntlmssp anonymous login */
-        password = NULL;
+        /* An empty password enable ntlmssp anonymous login */
+        password = "";
     }
 
     struct vlc_access_cache_entry *cache_entry =
@@ -756,18 +773,19 @@ error:
     return op.error_status;
 }
 
-static char *
-vlc_smb2_resolve(stream_t *access, const char *host, unsigned port)
+static int
+vlc_smb2_resolve(stream_t *access, const char *host, unsigned port,
+                 char **out_host)
 {
     (void) access;
     if (!host)
-        return NULL;
+        return -ENOENT;
 
 #ifdef HAVE_DSM
     /* Test if the host is an IP */
     struct in_addr addr;
     if (inet_pton(AF_INET, host, &addr) == 1)
-        return NULL;
+        return -ENOENT;
 
     /* Test if the host can be resolved */
     struct addrinfo *info = NULL;
@@ -775,28 +793,38 @@ vlc_smb2_resolve(stream_t *access, const char *host, unsigned port)
     {
         freeaddrinfo(info);
         /* Let smb2 resolve it */
-        return NULL;
+        return -ENOENT;
     }
 
     /* Test if the host is a netbios name */
-    char *out_host = NULL;
     netbios_ns *ns = netbios_ns_new();
     if (!ns)
-        return NULL;
+        return -ENOMEM;
+
+    int ret = -ENOENT;
     netbios_ns_interrupt_register(ns);
     uint32_t ip4_addr;
     if (netbios_ns_resolve(ns, host, NETBIOS_FILESERVER, &ip4_addr) == 0)
     {
         char ip[INET_ADDRSTRLEN];
         if (inet_ntop(AF_INET, &ip4_addr, ip, sizeof(ip)))
-            out_host = strdup(ip);
+        {
+            *out_host = strdup(ip);
+            ret = 0;
+        }
     }
-    netbios_ns_interrupt_unregister();
+    if (netbios_ns_interrupt_unregister() == EINTR)
+    {
+        if (unlikely(ret == 0))
+            free(*out_host);
+        netbios_ns_destroy(ns);
+        return -EINTR;
+    }
     netbios_ns_destroy(ns);
-    return out_host;
+    return ret;
 #else
     (void) port;
-    return NULL;
+    return -ENOENT;
 #endif
 }
 
@@ -819,13 +847,16 @@ Open(vlc_object_t *p_obj)
     if (sys->encoded_url.psz_path == NULL)
         sys->encoded_url.psz_path = (char *) "/";
 
-    char *resolved_host = vlc_smb2_resolve(access, sys->encoded_url.psz_host,
-                                           sys->encoded_url.i_port);
+    char *resolved_host = NULL;
+    ret = vlc_smb2_resolve(access, sys->encoded_url.psz_host,
+                           sys->encoded_url.i_port, &resolved_host);
 
     /* smb2_* functions need a decoded url. Re compose the url from the
      * modified sys->encoded_url (with the resolved host). */
     char *url;
-    if (resolved_host != NULL)
+    if (ret == -EINTR)
+        goto error;
+    else if (ret == 0)
     {
         vlc_url_t resolved_url = sys->encoded_url;
         resolved_url.psz_host = resolved_host;
@@ -850,14 +881,21 @@ Open(vlc_object_t *p_obj)
 
     /* First, try Guest login or using "smb-" options (without
      * keystore/user interaction) */
-    vlc_credential_get(&credential, access, "smb-user", "smb-pwd", NULL,
-                       NULL);
+    if (vlc_credential_get(&credential, access, "smb-user", "smb-pwd", NULL,
+                           NULL) == -EINTR)
+    {
+        vlc_credential_clean(&credential);
+        free(resolved_host);
+        ret = -EINTR;
+        goto error;
+    }
+
     ret = vlc_smb2_connect_open_share(access, url, &credential);
 
     while (VLC_SMB2_STATUS_DENIED(ret)
         && vlc_credential_get(&credential, access, "smb-user", "smb-pwd",
                               SMB_LOGIN_DIALOG_TITLE, SMB_LOGIN_DIALOG_TEXT,
-                              sys->encoded_url.psz_host))
+                              sys->encoded_url.psz_host) == 0)
         ret = vlc_smb2_connect_open_share(access, url, &credential);
     free(resolved_host);
     free(url);
@@ -914,7 +952,7 @@ error:
      * case of network error (EIO) or when the user asked to cancel it
      * (vlc_killed()). Indeed, in these cases, it is useless to try next smb
      * modules. */
-    return vlc_killed() || ret == -EIO ? VLC_ETIMEOUT : VLC_EGENERIC;
+    return ret == -EINTR || ret == -EIO || vlc_killed() ? VLC_ETIMEOUT : VLC_EGENERIC;
 }
 
 static void

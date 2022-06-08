@@ -137,10 +137,8 @@ static int vlc_clone_attr (vlc_thread_t *th, void *(*entry) (void *),
     return ret;
 }
 
-int vlc_clone (vlc_thread_t *th, void *(*entry) (void *), void *data,
-               int priority)
+int vlc_clone (vlc_thread_t *th, void *(*entry) (void *), void *data)
 {
-    (void) priority;
     return vlc_clone_attr (th, entry, data);
 }
 
@@ -152,12 +150,6 @@ void vlc_join (vlc_thread_t handle, void **result)
 
     /* release thread handle */
     free(th);
-}
-
-int vlc_set_priority (vlc_thread_t th, int priority)
-{
-    (void) th; (void) priority;
-    return VLC_SUCCESS;
 }
 
 void vlc_cancel (vlc_thread_t thread_id)

@@ -29,7 +29,7 @@
 #include <va/va_drmcommon.h>
 
 #include <vlc_common.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 #include <vlc_codec.h>
 #include <vlc_plugin.h>
 
@@ -499,7 +499,7 @@ Open(vlc_object_t *obj)
                 .type = GL_UNSIGNED_BYTE,
             };
             interop->texs[1] = (struct vlc_gl_tex_cfg) {
-                .w = {1, 1},
+                .w = {1, 2},
                 .h = {1, 2},
                 .internal = GL_RG16,
                 .format = GL_RG,

@@ -51,11 +51,12 @@ else
 	$(APPLY) $(SRC)/qt/qt-fix-msys-long-pathes.patch
 	$(APPLY) $(SRC)/qt/0003-fix-angle-compilation.patch
 	cd $(UNPACK_DIR); for i in QtFontDatabaseSupport QtWindowsUIAutomationSupport QtEventDispatcherSupport QtCore; do \
-		sed -i -e 's,"../../../../../src,"../src,g' include/$$i/$(QT_VERSION)/$$i/private/*.h; done
+		sed -i.orig -e 's,"../../../../../src,"../src,g' include/$$i/$(QT_VERSION)/$$i/private/*.h; done
 endif
 	$(APPLY) $(SRC)/qt/qt-fix-gcc11-build.patch
 
 endif
+	$(APPLY) $(SRC)/qt/qt-add-missing-header-darwin.patch
 	$(MOVE)
 
 
@@ -106,14 +107,14 @@ ifdef HAVE_MINGW_W64
 QT_CONFIG += -no-direct2d
 endif
 
-ENV_VARS := $(HOSTVARS) DXSDK_DIR=$(PREFIX)/bin
+QT_ENV_VARS := $(HOSTVARS) DXSDK_DIR=$(PREFIX)/bin
 
 .qt: qt
 	# Prevent all Qt contribs from generating and installing libtool .la files
-	cd $< && sed -i "/CONFIG/ s/ create_libtool/ -create_libtool/g" mkspecs/features/qt_module.prf
-	+cd $< && $(ENV_VARS) ./configure $(QT_PLATFORM) $(QT_CONFIG) -prefix $(PREFIX) -hostprefix $(PREFIX)/lib/qt5
+	cd $< && sed -i.orig "/CONFIG/ s/ create_libtool/ -create_libtool/g" mkspecs/features/qt_module.prf
+	+cd $< && $(QT_ENV_VARS) ./configure $(QT_PLATFORM) $(QT_CONFIG) -prefix $(PREFIX) -hostprefix $(PREFIX)/lib/qt5
 	# Make && Install libraries
-	cd $< && $(ENV_VARS) $(MAKE)
+	cd $< && $(QT_ENV_VARS) $(MAKE)
 	cd $< && $(MAKE) -C src sub-corelib-install_subtargets sub-gui-install_subtargets sub-widgets-install_subtargets sub-platformsupport-install_subtargets sub-zlib-install_subtargets sub-bootstrap-install_subtargets sub-network-install_subtargets
 	# Install tools
 	cd $< && $(MAKE) -C src sub-moc-install_subtargets sub-rcc-install_subtargets sub-uic-install_subtargets sub-qlalr-install_subtargets
@@ -127,10 +128,17 @@ ifdef HAVE_WIN32
 	# Vista styling
 	$(SRC)/qt/AddStaticLink.sh "$(PREFIX)" Qt5Widgets plugins/styles qwindowsvistastyle
 endif
+
+ifdef HAVE_MACOSX
+	$(SRC)/qt/AddStaticLink.sh "$(PREFIX)" Qt5Gui plugins/platforms qcocoa
+	# Qt Cocoa plugins depend on printer support...
+	cd $< && cp ./lib/libQt5PrintSupport.a "$(PREFIX)/lib/"
+endif
+
 	#fix host tools headers to avoid collusion with target headers
 	mkdir -p $(PREFIX)/lib/qt5/include
 	cp -R $(PREFIX)/include/QtCore $(PREFIX)/lib/qt5/include
-	sed -i -e "s#\$\$QT_MODULE_INCLUDE_BASE#$(PREFIX)/lib/qt5/include#g" $(PREFIX)/lib/qt5/mkspecs/modules/qt_lib_bootstrap_private.pri
+	sed -i.orig -e "s#\$\$QT_MODULE_INCLUDE_BASE#$(PREFIX)/lib/qt5/include#g" $(PREFIX)/lib/qt5/mkspecs/modules/qt_lib_bootstrap_private.pri
 	# Install a qmake with correct paths set
 	cd $< && $(MAKE) sub-qmake-qmake-aux-pro-install_subtargets install_mkspecs
 ifdef HAVE_WIN32

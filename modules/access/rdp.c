@@ -336,6 +336,8 @@ static void *DemuxThread( void *p_data )
     vlc_tick_t i_next_frame_date = vlc_tick_now() + p_sys->i_frame_interval;
     int i_ret;
 
+    vlc_thread_set_name("vlc-rdp");
+
     for(;;)
     {
         i_ret = 0;
@@ -471,7 +473,7 @@ static int Open( vlc_object_t *p_this )
         goto error;
     }
 
-    if ( vlc_clone( &p_sys->thread, DemuxThread, p_demux, VLC_THREAD_PRIORITY_INPUT ) != VLC_SUCCESS )
+    if ( vlc_clone( &p_sys->thread, DemuxThread, p_demux ) != VLC_SUCCESS )
     {
         msg_Err( p_demux, "can't spawn thread" );
         freerdp_disconnect( p_sys->p_instance );

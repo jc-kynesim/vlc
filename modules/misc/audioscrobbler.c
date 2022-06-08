@@ -409,7 +409,7 @@ static int Open(vlc_object_t *p_this)
     vlc_cond_init(&p_sys->wait);
     vlc_sem_init(&p_sys->dead, 0);
 
-    if (vlc_clone(&p_sys->thread, Run, p_intf, VLC_THREAD_PRIORITY_LOW))
+    if (vlc_clone(&p_sys->thread, Run, p_intf))
     {
         retval = VLC_ENOMEM;
         goto fail;
@@ -669,6 +669,8 @@ static void HandleInterval(vlc_tick_t *next, unsigned int *i_interval)
  *****************************************************************************/
 static void *Run(void *data)
 {
+    vlc_thread_set_name("vlc-scrobbler");
+
     intf_thread_t          *p_intf = data;
     uint8_t                 p_buffer[1024];
     bool                    b_handshaked = false;

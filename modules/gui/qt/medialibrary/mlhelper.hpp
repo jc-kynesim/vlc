@@ -31,6 +31,8 @@
 // Forward declarations
 class MLBaseModel;
 class MLItemCover;
+class MLItemId;
+class CoverGenerator;
 
 template<typename T>
 class MLDeleter
@@ -75,9 +77,33 @@ MLListRange<T> ml_range_iterate(L& list)
     return MLListRange<T>{ list->p_items, list->p_items + list->i_nb_items };
 }
 
+QString toValidLocalFile(const char *mrl);
+
+template <typename T, typename O>
+void thumbnailCopy(const MLListRange<T> &list, O dst, const int max)
+{
+    int count = 0;
+    for (const auto &item : list)
+    {
+        if (item.thumbnails[VLC_ML_THUMBNAIL_SMALL].i_status != VLC_ML_THUMBNAIL_STATUS_AVAILABLE)
+            continue;
+
+        const auto path = toValidLocalFile(item.thumbnails[VLC_ML_THUMBNAIL_SMALL].psz_mrl);
+        if (path.isEmpty())
+            continue;
+
+        *dst++ = path;
+        ++count;
+        if (count == max)
+            return;
+    }
+}
+
 QString MsToString( int64_t time, bool doShort = false );
 
-QString getVideoListCover( const MLBaseModel* model, MLItemCover* item, int width, int height,
-                           int role );
+QStringList extractMediaThumbnails(vlc_medialibrary_t *p_ml, const int count, const MLItemId &itemID);
+
+QString createGroupMediaCover(const MLBaseModel* model, MLItemCover* parent
+                              , int role, const std::shared_ptr<CoverGenerator> generator);
 
 #endif // MLHELPER_HPP

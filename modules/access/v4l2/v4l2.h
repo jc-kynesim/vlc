@@ -37,19 +37,23 @@ extern int (*v4l2_munmap) (void *, size_t);
 
 typedef struct vlc_v4l2_ctrl vlc_v4l2_ctrl_t;
 
+#include <vlc_atomic.h>
 #include <vlc_block.h>
 
 struct vlc_v4l2_buffer {
     block_t block;
     struct vlc_v4l2_buffers *pool;
+    uint32_t index;
 };
 
 struct vlc_v4l2_buffers {
-    int fd;
-    _Atomic uint32_t inflight;
-    vlc_mutex_t lock;
     size_t count;
-    struct vlc_v4l2_buffer bufs[];
+    struct vlc_v4l2_buffer **bufs;
+
+    int fd;
+    vlc_atomic_rc_t refs;
+    _Atomic size_t unused;
+    vlc_mutex_t lock;
 };
 
 /* v4l2.c */
@@ -62,8 +66,7 @@ int SetupTuner (vlc_object_t *, int fd, uint32_t);
 int SetupVideo(vlc_object_t *, int fd, uint32_t,
                es_format_t *, uint32_t *, uint32_t *);
 
-int StartUserPtr (vlc_object_t *, int);
-struct vlc_v4l2_buffers *StartMmap(vlc_object_t *, int, unsigned int);
+struct vlc_v4l2_buffers *StartMmap(vlc_object_t *, int);
 void StopMmap(struct vlc_v4l2_buffers *);
 
 vlc_tick_t GetBufferPTS (const struct v4l2_buffer *);

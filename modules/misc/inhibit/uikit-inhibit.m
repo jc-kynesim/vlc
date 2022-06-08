@@ -28,7 +28,7 @@
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_inhibit.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 
 #include <UIKit/UIKit.h>
 
@@ -43,8 +43,8 @@ static void UpdateInhibit(vlc_inhibit_t *ih, unsigned mask)
 static int OpenInhibit(vlc_object_t *obj)
 {
     vlc_inhibit_t *ih = (vlc_inhibit_t *)obj;
-    vout_window_t *wnd = vlc_inhibit_GetWindow(ih);
-    if (wnd->type != VOUT_WINDOW_TYPE_NSOBJECT)
+    vlc_window_t *wnd = vlc_inhibit_GetWindow(ih);
+    if (wnd->type != VLC_WINDOW_TYPE_NSOBJECT)
         return VLC_EGENERIC;
 
     UIView * view = (__bridge UIView*)wnd->handle.nsobject;

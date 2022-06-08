@@ -257,7 +257,7 @@ static int OpenCommon( demux_t *p_demux,
     /* Load the audio packetizer */
     es_format_Init( &fmt, i_cat, p_sys->codec.i_codec );
     fmt.i_original_fourcc = p_sys->i_original;
-    p_sys->p_packetizer = demux_PacketizerNew( p_demux, &fmt, p_sys->codec.psz_name );
+    p_sys->p_packetizer = demux_PacketizerNew( VLC_OBJECT(p_demux), &fmt, p_sys->codec.psz_name );
     if( !p_sys->p_packetizer )
     {
         free( p_sys );
@@ -1095,7 +1095,7 @@ static int ID3TAG_Parse_Handler( uint32_t i_tag, const uint8_t *p_payload, size_
                         {
                             const char *psz_val = vlc_meta_GetExtra( p_meta, ppsz_keys[i] );
                             if( psz_val )
-                                *pf = us_atof( psz_val );
+                                *pf = vlc_atof_c( psz_val );
                         }
                         free( ppsz_keys[i] );
                     }

@@ -160,10 +160,10 @@ smb_session_interrupt_register( access_sys_t *sys )
     vlc_interrupt_register( smb_session_interrupt_callback, sys->p_session );
 }
 
-static inline void
+static inline int
 smb_session_interrupt_unregister( void )
 {
-    vlc_interrupt_unregister();
+    return vlc_interrupt_unregister();
 }
 
 static void
@@ -178,18 +178,37 @@ netbios_ns_interrupt_register( netbios_ns *ns )
     vlc_interrupt_register( netbios_ns_interrupt_callback, ns );
 }
 
-static inline void
+static inline int
 netbios_ns_interrupt_unregister( void )
 {
-    vlc_interrupt_unregister();
+    return vlc_interrupt_unregister();
 }
 
 #else
 
-#define smb_session_interrupt_register( sys ) do {} while (0)
-#define smb_session_interrupt_unregister() do {} while(0)
-#define netbios_ns_interrupt_register( ns ) do {} while (0)
-#define netbios_ns_interrupt_unregister() do {} while (0)
+static inline void
+smb_session_interrupt_register( access_sys_t *sys )
+{
+    (void) sys;
+}
+
+static inline int
+smb_session_interrupt_unregister( void )
+{
+    return 0;
+}
+
+static inline void
+netbios_ns_interrupt_register( netbios_ns *ns )
+{
+    (void) ns;
+}
+
+static inline int
+netbios_ns_interrupt_unregister( void )
+{
+    return 0;
+}
 
 #endif
 
@@ -250,11 +269,13 @@ static int Open( vlc_object_t *p_this )
     if( smb_stat_get( st, SMB_STAT_ISDIR ) )
     {
         smb_fclose( p_sys->p_session, p_sys->i_fd );
-        smb_session_interrupt_unregister();
+        if (smb_session_interrupt_unregister() == EINTR)
+            goto error;
         return BrowserInit( p_access );
     }
 
-    smb_session_interrupt_unregister();
+    if (smb_session_interrupt_unregister() == EINTR)
+        goto error;
 
     msg_Dbg( p_access, "Successfully opened smb://%s", p_access->psz_location );
 
@@ -337,7 +358,11 @@ static int get_address( stream_t *p_access )
 
         int ret = netbios_ns_resolve( p_ns, p_sys->url.psz_host,
                                       NETBIOS_FILESERVER, &ip4_addr);
-        netbios_ns_interrupt_unregister();
+        if (netbios_ns_interrupt_unregister() == EINTR)
+        {
+            netbios_ns_destroy( p_ns );
+            return -EINTR;
+        }
         netbios_ns_destroy( p_ns );
 
         if( ret == 0 )
@@ -374,6 +399,11 @@ static int get_address( stream_t *p_access )
     const char *psz_nbt = netbios_ns_inverse( p_ns, p_sys->addr.s_addr );
 
     netbios_ns_interrupt_unregister();
+    if (netbios_ns_interrupt_unregister() == EINTR)
+    {
+        netbios_ns_destroy( p_ns );
+        return -EINTR;
+    }
     netbios_ns_destroy( p_ns );
 
     if( psz_nbt != NULL )
@@ -444,8 +474,10 @@ static int login( stream_t *p_access )
     psz_var_domain = var_InheritString( p_access, "smb-domain" );
     credential.psz_realm = psz_var_domain ? psz_var_domain : NULL;
 
-    vlc_credential_get( &credential, p_access, "smb-user", "smb-pwd",
-                        NULL, NULL );
+    if (vlc_credential_get( &credential, p_access, "smb-user", "smb-pwd",
+                            NULL, NULL ) == -EINTR )
+        goto error;
+
 
     if( !credential.psz_username )
     {
@@ -509,7 +541,8 @@ static int login( stream_t *p_access )
         goto error;
     }
 
-    smb_session_interrupt_unregister();
+    if (smb_session_interrupt_unregister() == EINTR)
+        goto error;
 
     if( connect_err == EACCES )
     {
@@ -522,7 +555,7 @@ static int login( stream_t *p_access )
         while( connect_err == EACCES
             && vlc_credential_get( &credential, p_access, "smb-user", "smb-pwd",
                                    SMB1_LOGIN_DIALOG_TITLE,
-                                   SMB_LOGIN_DIALOG_TEXT, p_sys->netbios_name ) )
+                                   SMB_LOGIN_DIALOG_TEXT, p_sys->netbios_name ) == 0 )
         {
             b_guest = false;
             psz_login = credential.psz_username;
@@ -674,7 +707,8 @@ static ssize_t Read( stream_t *p_access, void *p_buffer, size_t i_len )
 
     smb_session_interrupt_register( p_sys );
     i_read = smb_fread( p_sys->p_session, p_sys->i_fd, p_buffer, i_len );
-    smb_session_interrupt_unregister();
+    if (smb_session_interrupt_unregister() == EINTR)
+        errno = EINTR;
 
     if( i_read < 0 )
     {

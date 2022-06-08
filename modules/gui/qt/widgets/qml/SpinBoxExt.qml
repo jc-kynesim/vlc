@@ -34,6 +34,15 @@ SpinBox{
     Keys.priority: Keys.AfterItem
     Keys.onPressed: Navigation.defaultKeyAction(event)
 
+    //ideally we should use Keys.onShortcutOverride but it doesn't
+    //work with TextField before 5.13 see QTBUG-68711
+    onActiveFocusChanged: {
+        if (activeFocus)
+            MainCtx.useGlobalShortcuts = false
+        else
+            MainCtx.useGlobalShortcuts = true
+    }
+
     background: Rectangle {
         implicitWidth: VLCStyle.dp(4, VLCStyle.scale)
         implicitHeight: VLCStyle.dp(32, VLCStyle.scale)
@@ -42,6 +51,9 @@ SpinBox{
     }
 
     contentItem: TextInput {
+        // NOTE: This is required for InterfaceWindowHandler::applyKeyEvent.
+        property bool visualFocus: control.activeFocus
+
         text: control.textFromValue(control.value, control.locale)
 
         font: control.font
@@ -53,6 +65,13 @@ SpinBox{
         autoScroll: false
         readOnly: !control.editable
         validator: control.validator
+
+        Keys.priority: Keys.AfterItem
+
+        Keys.onPressed: Navigation.defaultKeyAction(event)
+        Keys.onReleased: Navigation.defaultKeyReleaseAction(event)
+
+        Navigation.parentItem: control
     }
     up.indicator: Rectangle {
         x: parent.width - width

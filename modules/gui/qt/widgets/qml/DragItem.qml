@@ -174,7 +174,7 @@ Item {
     Behavior on opacity {
         NumberAnimation {
             easing.type: Easing.InOutSine
-            duration: VLCStyle.ms128
+            duration: VLCStyle.duration_short
         }
     }
 
@@ -352,6 +352,8 @@ Item {
             fillMode: Image.PreserveAspectCrop
             width: coverSize
             height: coverSize
+            asynchronous: true
+            cache: false
         }
     }
 }

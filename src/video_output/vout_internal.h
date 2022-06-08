@@ -43,6 +43,7 @@ typedef struct vlc_clock_t vlc_clock_t;
 typedef struct {
     vout_thread_t        *vout;
     vlc_clock_t          *clock;
+    const char           *str_id;
     const video_format_t *fmt;
     vlc_mouse_event      mouse_event;
     void                 *mouse_opaque;
@@ -98,7 +99,8 @@ void vout_StopDisplay(vout_thread_t *);
  * \retval 0 on success
  * \retval -1 on error, the vout needs to be restarted to handle the format
  */
-int vout_ChangeSource( vout_thread_t *p_vout, const video_format_t *fmt );
+int vout_ChangeSource( vout_thread_t *p_vout, const video_format_t *fmt,
+                       const vlc_video_context * );
 
 enum vout_crop_mode {
     VOUT_CROP_NONE, VOUT_CROP_RATIO, VOUT_CROP_WINDOW, VOUT_CROP_BORDER,
@@ -152,7 +154,7 @@ void vout_ChangeWindowed(vout_thread_t *);
 void vout_ChangeWindowState(vout_thread_t *, unsigned state);
 void vout_ChangeDisplaySize(vout_thread_t *, unsigned width, unsigned height,
                             void (*ack_cb)(void *), void *opaque);
-void vout_ChangeDisplayFilled(vout_thread_t *, bool is_filled);
+void vout_ChangeDisplayFitting(vout_thread_t *, enum vlc_video_fitting);
 void vout_ChangeZoom(vout_thread_t *, unsigned num, unsigned den);
 void vout_ChangeDisplayAspectRatio(vout_thread_t *, unsigned num, unsigned den);
 void vout_ChangeCrop(vout_thread_t *, const struct vout_crop *);
@@ -163,11 +165,14 @@ void vout_ControlChangeSubFilters(vout_thread_t *, const char *);
 void vout_ChangeSpuChannelMargin(vout_thread_t *, enum vlc_vout_order order, int);
 void vout_ChangeViewpoint( vout_thread_t *, const vlc_viewpoint_t *);
 
+void vout_FilterMouse(vout_thread_t *vout, vlc_mouse_t *mouse);
+
 /* */
 void vout_CreateVars( vout_thread_t * );
 void vout_IntfInit( vout_thread_t * );
 void vout_IntfReinit( vout_thread_t * );
 void vout_IntfDeinit(vlc_object_t *);
+enum vlc_video_fitting var_InheritFit(vlc_object_t *);
 
 /* */
 ssize_t vout_RegisterSubpictureChannelInternal( vout_thread_t *,
@@ -210,11 +215,6 @@ void vout_ChangeSpuRate( vout_thread_t *, size_t channel_id, float rate );
  */
 void vout_ChangeSpuDelay( vout_thread_t *, size_t channel_id, vlc_tick_t delay );
 
-
-/**
- * Updates the pointing device state.
- */
-void vout_MouseState(vout_thread_t *, const vlc_mouse_t *);
 
 /**
  * This function will return and reset internal statistics.

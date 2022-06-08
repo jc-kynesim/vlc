@@ -28,7 +28,7 @@
 #include <vlc_common.h>
 #include <vlc_codec.h>
 #include <vlc_plugin.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 #include <vlc_xlib.h>
 #include "vlc_vdpau.h"
 
@@ -65,11 +65,11 @@ static int ScreenNumberOfWindow(Display *dpy, Window w)
     return -1;
 }
 
-static int Open(vlc_decoder_device *device, vout_window_t *window)
+static int Open(vlc_decoder_device *device, vlc_window_t *window)
 {
     int errCode = VLC_EGENERIC;
 
-    if (window == NULL || window->type != VOUT_WINDOW_TYPE_XID)
+    if (window == NULL || window->type != VLC_WINDOW_TYPE_XID)
         return VLC_ENOTSUP;
     if (!vlc_xlib_init(VLC_OBJECT(device)))
         return VLC_ENOTSUP;

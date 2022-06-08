@@ -35,7 +35,7 @@
 #include <vlc_actions.h>
 
 
-VoutWindow::VoutWindow( intf_thread_t *pIntf, vout_window_t* pWnd,
+VoutWindow::VoutWindow( intf_thread_t *pIntf, vlc_window_t* pWnd,
                         int width, int height, GenericWindow* pParent ) :
       GenericWindow( pIntf, 0, 0, false, false, pParent,
                      GenericWindow::VoutWindow ),
@@ -50,19 +50,11 @@ VoutWindow::VoutWindow( intf_thread_t *pIntf, vout_window_t* pWnd,
     {
         updateWindowConfiguration( m_pWnd );
 
-        m_pTimer = pOsFactory->createOSTimer( m_cmdHideMouse );
+        m_pTimer.reset(pOsFactory->createOSTimer( m_cmdHideMouse ));
     }
 }
 
-
-VoutWindow::~VoutWindow()
-{
-    if( m_pWnd )
-    {
-        delete m_pTimer;
-    }
-}
-
+VoutWindow::~VoutWindow() = default;
 
 void VoutWindow::setCtrlVideo( CtrlVideo* pCtrlVideo )
 {
@@ -99,7 +91,7 @@ void VoutWindow::resize( int width, int height )
     GenericWindow::resize( width, height );
 
     if( m_pWnd )
-        vout_window_ReportSize( m_pWnd, width, height );
+        vlc_window_ReportSize( m_pWnd, width, height );
 }
 
 
@@ -125,7 +117,7 @@ void VoutWindow::processEvent( EvtMotion &rEvtMotion )
     int x = rEvtMotion.getXPos() - m_pParentWindow->getLeft() - getLeft();
     int y = rEvtMotion.getYPos() - m_pParentWindow->getTop() - getTop();
 
-    vout_window_ReportMouseMoved( m_pWnd, x, y );
+    vlc_window_ReportMouseMoved( m_pWnd, x, y );
     showMouse();
 }
 
@@ -141,11 +133,11 @@ void VoutWindow::processEvent( EvtMouse &rEvtMouse )
         button = 2;
 
     if( rEvtMouse.getAction() == EvtMouse::kDown )
-        vout_window_ReportMousePressed( m_pWnd, button );
+        vlc_window_ReportMousePressed( m_pWnd, button );
     else if( rEvtMouse.getAction() == EvtMouse::kUp )
-        vout_window_ReportMouseReleased( m_pWnd, button );
+        vlc_window_ReportMouseReleased( m_pWnd, button );
     else if( rEvtMouse.getAction() == EvtMouse::kDblClick )
-        vout_window_ReportMouseDoubleClick( m_pWnd, button );
+        vlc_window_ReportMouseDoubleClick( m_pWnd, button );
     showMouse();
 }
 

@@ -933,6 +933,17 @@ static int DecodeSidedata( decoder_t *p_dec, const AVFrame *frame, picture_t *p_
     }
 #endif
 
+    const AVFrameSideData *p_icc = av_frame_get_side_data( frame, AV_FRAME_DATA_ICC_PROFILE );
+    if( p_icc )
+    {
+        vlc_icc_profile_t *icc;
+        icc = picture_AttachNewAncillary( p_pic, VLC_ANCILLARY_ID_ICC, sizeof(*icc) + p_icc->size );
+        if( !icc )
+            return VLC_ENOMEM;
+        memcpy( icc->data, p_icc->data, p_icc->size );
+        icc->size = p_icc->size;
+    }
+
     return 0;
 }
 
@@ -1357,7 +1368,7 @@ void EndVideoDec( vlc_object_t *obj )
 
     if( p_sys->p_va )
     {
-        vlc_va_Delete( p_sys->p_va );
+        vlc_va_Delete( p_sys->p_va, NULL );
         vlc_video_context_Release( p_sys->vctx_out );
         p_sys->vctx_out = NULL;
     }
@@ -1679,7 +1690,7 @@ no_reuse:
     if (p_sys->p_va != NULL)
     {
         msg_Err(p_dec, "existing hardware acceleration cannot be reused");
-        vlc_va_Delete(p_sys->p_va);
+        vlc_va_Delete(p_sys->p_va, NULL);
         p_sys->p_va = NULL;
         vlc_video_context_Release( p_sys->vctx_out );
         p_sys->vctx_out = NULL;
@@ -1762,8 +1773,7 @@ no_reuse:
 
         if (decoder_UpdateVideoOutput(p_dec, vctx_out))
         {
-            vlc_va_Delete(va);
-            p_context->hwaccel_context = NULL;
+            vlc_va_Delete(va, p_context);
             continue; /* Unsupported codec profile or such */
         }
 

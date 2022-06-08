@@ -43,24 +43,6 @@
 #include "display.h"
 #include "vout_internal.h"
 
-/*****************************************************************************
- * FIXME/TODO see how to have direct rendering here (interact with vout.c)
- *****************************************************************************/
-static picture_t *VideoBufferNew(filter_t *filter)
-{
-    vout_display_t *vd = filter->owner.sys;
-    const video_format_t *fmt = &filter->fmt_out.video;
-
-    assert(vd->fmt->i_chroma == fmt->i_chroma &&
-           vd->fmt->i_width  == fmt->i_width  &&
-           vd->fmt->i_height == fmt->i_height);
-
-    picture_pool_t *pool = vout_GetPool(vd, 3);
-    if (!pool)
-        return NULL;
-    return picture_pool_Get(pool);
-}
-
 static int vout_display_Control(vout_display_t *vd, int query)
 {
     return vd->ops->control(vd, query);
@@ -73,19 +55,19 @@ static int vout_display_Control(vout_display_t *vd, int query)
 /* */
 void vout_display_GetDefaultDisplaySize(unsigned *width, unsigned *height,
                                         const video_format_t *source,
-                                        const vout_display_cfg_t *cfg)
+                                        const struct vout_display_placement *dp)
 {
     /* Use the original video size */
     if (source->i_sar_num >= source->i_sar_den) {
-        *width  = (int64_t)source->i_visible_width * source->i_sar_num * cfg->display.sar.den / source->i_sar_den / cfg->display.sar.num;
+        *width  = (int64_t)source->i_visible_width * source->i_sar_num * dp->sar.den / source->i_sar_den / dp->sar.num;
         *height = source->i_visible_height;
     } else {
         *width  = source->i_visible_width;
-        *height = (int64_t)source->i_visible_height * source->i_sar_den * cfg->display.sar.num / source->i_sar_num / cfg->display.sar.den;
+        *height = (int64_t)source->i_visible_height * source->i_sar_den * dp->sar.num / source->i_sar_num / dp->sar.den;
     }
 
-    *width  = *width  * cfg->zoom.num / cfg->zoom.den;
-    *height = *height * cfg->zoom.num / cfg->zoom.den;
+    *width  = *width  * dp->zoom.num / dp->zoom.den;
+    *height = *height * dp->zoom.num / dp->zoom.den;
 
     if (ORIENT_IS_SWAP(source->orientation)) {
         /* Apply the source orientation only if the dimensions are initialized
@@ -97,12 +79,12 @@ void vout_display_GetDefaultDisplaySize(unsigned *width, unsigned *height,
 }
 
 /* */
-void vout_display_PlacePicture(vout_display_place_t *place,
-                               const video_format_t *source,
-                               const vout_display_cfg_t *cfg)
+void vout_display_PlacePicture(vout_display_place_t *restrict place,
+                               const video_format_t *restrict source,
+                               const struct vout_display_placement *restrict dp)
 {
     memset(place, 0, sizeof(*place));
-    if (cfg->display.width == 0 || cfg->display.height == 0)
+    if (dp->width == 0 || dp->height == 0)
         return;
 
     /* */
@@ -113,23 +95,41 @@ void vout_display_PlacePicture(vout_display_place_t *place,
     video_format_ApplyRotation(&source_rot, source);
     source = &source_rot;
 
-    if (cfg->is_display_filled) {
-        display_width  = cfg->display.width;
-        display_height = cfg->display.height;
+    if (dp->fitting != VLC_VIDEO_FIT_NONE) {
+        display_width  = dp->width;
+        display_height = dp->height;
     } else
         vout_display_GetDefaultDisplaySize(&display_width, &display_height,
-                                           source, cfg);
+                                           source, dp);
 
     const unsigned width  = source->i_visible_width;
     const unsigned height = source->i_visible_height;
     /* Compute the height if we use the width to fill up display_width */
-    const int64_t scaled_height = (int64_t)height * display_width  * cfg->display.sar.num * source->i_sar_den / (width  * source->i_sar_num * cfg->display.sar.den);
+    const int64_t scaled_height = (int64_t)height * display_width  * dp->sar.num * source->i_sar_den / (width  * source->i_sar_num * dp->sar.den);
     /* And the same but switching width/height */
-    const int64_t scaled_width  = (int64_t)width  * display_height * cfg->display.sar.den * source->i_sar_num / (height * source->i_sar_den * cfg->display.sar.num);
+    const int64_t scaled_width  = (int64_t)width  * display_height * dp->sar.den * source->i_sar_num / (height * source->i_sar_den * dp->sar.num);
 
     if (source->projection_mode == PROJECTION_MODE_RECTANGULAR) {
-        /* We keep the solution that avoid filling outside the display */
-        if (scaled_width <= cfg->display.width) {
+        bool fit_height;
+
+        switch (dp->fitting) {
+            case VLC_VIDEO_FIT_NONE:
+            case VLC_VIDEO_FIT_SMALLER:
+                /* We keep the solution fitting within the display */
+                fit_height = scaled_width <= dp->width;
+                break;
+            case VLC_VIDEO_FIT_LARGER:
+                fit_height = scaled_width >= dp->width;
+                break;
+            case VLC_VIDEO_FIT_WIDTH:
+                fit_height = false;
+                break;
+            case VLC_VIDEO_FIT_HEIGHT:
+                fit_height = true;
+                break;
+        }
+
+        if (fit_height) {
             place->width  = scaled_width;
             place->height = display_height;
         } else {
@@ -144,27 +144,27 @@ void vout_display_PlacePicture(vout_display_place_t *place,
     }
 
     /*  Compute position */
-    switch (cfg->align.horizontal) {
+    switch (dp->align.horizontal) {
     case VLC_VIDEO_ALIGN_LEFT:
         place->x = 0;
         break;
     case VLC_VIDEO_ALIGN_RIGHT:
-        place->x = cfg->display.width - place->width;
+        place->x = dp->width - place->width;
         break;
     default:
-        place->x = ((int)cfg->display.width - (int)place->width) / 2;
+        place->x = ((int)dp->width - (int)place->width) / 2;
         break;
     }
 
-    switch (cfg->align.vertical) {
+    switch (dp->align.vertical) {
     case VLC_VIDEO_ALIGN_TOP:
         place->y = 0;
         break;
     case VLC_VIDEO_ALIGN_BOTTOM:
-        place->y = cfg->display.height - place->height;
+        place->y = dp->height - place->height;
         break;
     default:
-        place->y = ((int)cfg->display.height - (int)place->height) / 2;
+        place->y = ((int)dp->height - (int)place->height) / 2;
         break;
     }
 }
@@ -172,11 +172,11 @@ void vout_display_PlacePicture(vout_display_place_t *place,
 /** Translates window coordinates to video coordinates */
 void vout_display_TranslateCoordinates(int *restrict xp, int *restrict yp,
                                        const video_format_t *restrict source,
-                                       const vout_display_cfg_t *restrict cfg)
+                                       const struct vout_display_placement *restrict dp)
 {
     vout_display_place_t place;
 
-    vout_display_PlacePicture(&place, source, cfg);
+    vout_display_PlacePicture(&place, source, dp);
 
     if (place.width <= 0 || place.height <= 0)
         return;
@@ -229,14 +229,6 @@ void vout_display_TranslateCoordinates(int *restrict xp, int *restrict yp,
     *yp = y;
 }
 
-void vout_display_TranslateMouseState(vout_display_t *vd, vlc_mouse_t *video,
-                                      const vlc_mouse_t *window)
-{
-    *video = *window;
-    vout_display_TranslateCoordinates(&video->i_x, &video->i_y, vd->source,
-                                      vd->cfg);
-}
-
 typedef struct {
     vout_display_t  display;
 
@@ -253,6 +245,25 @@ typedef struct {
     filter_chain_t *converters;
     picture_pool_t *pool;
 } vout_display_priv_t;
+
+/*****************************************************************************
+ * FIXME/TODO see how to have direct rendering here (interact with vout.c)
+ *****************************************************************************/
+static picture_t *VideoBufferNew(filter_t *filter)
+{
+    vout_display_t *vd = filter->owner.sys;
+    vout_display_priv_t *osys = container_of(vd, vout_display_priv_t, display);
+    const video_format_t *fmt = &filter->fmt_out.video;
+
+    assert(osys->display_fmt.i_chroma == fmt->i_chroma &&
+           osys->display_fmt.i_width  == fmt->i_width  &&
+           osys->display_fmt.i_height == fmt->i_height);
+
+    picture_pool_t *pool = vout_GetPool(vd, 3);
+    if (!pool)
+        return NULL;
+    return picture_pool_Get(pool);
+}
 
 static vlc_decoder_device * DisplayHoldDecoderDevice(vlc_object_t *o, void *sys)
 {
@@ -282,7 +293,7 @@ static int VoutDisplayCreateRender(vout_display_t *vd)
     v_src.i_sar_num = 0;
     v_src.i_sar_den = 0;
 
-    video_format_t v_dst = *vd->fmt;
+    video_format_t v_dst = osys->display_fmt;
     v_dst.i_sar_num = 0;
     v_dst.i_sar_den = 0;
 
@@ -342,7 +353,7 @@ picture_pool_t *vout_GetPool(vout_display_t *vd, unsigned count)
     vout_display_priv_t *osys = container_of(vd, vout_display_priv_t, display);
 
     if (osys->pool == NULL)
-        osys->pool = picture_pool_NewFromFormat(vd->fmt, count);
+        osys->pool = picture_pool_NewFromFormat(&osys->display_fmt, count);
     return osys->pool;
 }
 
@@ -548,14 +559,14 @@ void vout_display_SetSizeAndSar(vout_display_t *vd, unsigned width, unsigned hei
         vout_display_Reset(vd);
 }
 
-void vout_SetDisplayFilled(vout_display_t *vd, bool is_filled)
+void vout_SetDisplayFitting(vout_display_t *vd, enum vlc_video_fitting fit)
 {
     vout_display_priv_t *osys = container_of(vd, vout_display_priv_t, display);
 
-    if (is_filled == osys->cfg.is_display_filled)
+    if (fit == osys->cfg.display.fitting)
         return; /* nothing to do */
 
-    osys->cfg.is_display_filled = is_filled;
+    osys->cfg.display.fitting = fit;
     if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_DISPLAY_FILLED))
         vout_display_Reset(vd);
 }
@@ -563,13 +574,16 @@ void vout_SetDisplayFilled(vout_display_t *vd, bool is_filled)
 void vout_SetDisplayZoom(vout_display_t *vd, unsigned num, unsigned den)
 {
     vout_display_priv_t *osys = container_of(vd, vout_display_priv_t, display);
+    unsigned onum = osys->cfg.display.zoom.num;
+    unsigned oden = osys->cfg.display.zoom.den;
 
-    if (!osys->cfg.is_display_filled
-     && osys->cfg.zoom.num == num && osys->cfg.zoom.den == den)
-        return; /* nothing to do */
+    osys->cfg.display.zoom.num = num;
+    osys->cfg.display.zoom.den = den;
 
-    osys->cfg.zoom.num = num;
-    osys->cfg.zoom.den = den;
+    if (osys->cfg.display.fitting != VLC_VIDEO_FIT_NONE)
+        return; /* zoom has no effects */
+    if (onum * den == num * oden)
+        return; /* zoom has not changed */
     if (vout_display_Control(vd, VOUT_DISPLAY_CHANGE_ZOOM))
         vout_display_Reset(vd);
 }
@@ -647,7 +661,7 @@ vout_display_t *vout_display_New(vlc_object_t *parent,
         msg_Warn(parent, "window size missing");
         vout_display_GetDefaultDisplaySize(&osys->cfg.display.width,
                                            &osys->cfg.display.height,
-                                           source, cfg);
+                                           source, &cfg->display);
     }
 
     osys->pool = NULL;
@@ -690,6 +704,7 @@ vout_display_t *vout_display_New(vlc_object_t *parent,
 
         int ret = cb(vd, &osys->display_fmt, vctx);
         if (ret == VLC_SUCCESS) {
+            assert(vd->ops->prepare != NULL || vd->ops->display != NULL);
             if (VoutDisplayCreateRender(vd) == 0) {
                 msg_Dbg(vd, "using %s module \"%s\"", "vout display",
                         module_get_object(mods[i]));

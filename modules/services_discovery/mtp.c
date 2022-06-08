@@ -290,6 +290,8 @@ UpdateDevices( services_discovery_t *p_sd,
  *****************************************************************************/
 static void *Run( void *data )
 {
+    vlc_thread_set_name("vlc-mtp");
+
     LIBMTP_raw_device_t *p_rawdevices;
     int i_numrawdevices;
     services_discovery_t *p_sd = data;
@@ -328,7 +330,7 @@ static int Open( vlc_object_t *p_this )
 
     vlc_once(&mtp_init_once, vlc_libmtp_init, NULL);
 
-    if (vlc_clone (&p_sys->thread, Run, p_sd, VLC_THREAD_PRIORITY_LOW))
+    if (vlc_clone (&p_sys->thread, Run, p_sd))
     {
         free (p_sys);
         return VLC_EGENERIC;

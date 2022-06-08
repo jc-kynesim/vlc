@@ -341,6 +341,8 @@ static void *DemuxThread( void *p_data )
     vlc_tick_t i_next_frame_date = vlc_tick_now() + p_sys->i_frame_interval;
     int i_status;
 
+    vlc_thread_set_name("vlc-vnc");
+
     for(;;)
     {
         i_status = WaitForMessage( p_sys->p_client, p_sys->i_frame_interval );
@@ -474,7 +476,7 @@ static int Open( vlc_object_t *p_this )
     p_sys->i_starttime = vlc_tick_now();
     vlc_sem_init( &p_sys->closing, 0 );
 
-    if ( vlc_clone( &p_sys->thread, DemuxThread, p_demux, VLC_THREAD_PRIORITY_INPUT ) != VLC_SUCCESS )
+    if ( vlc_clone( &p_sys->thread, DemuxThread, p_demux ) != VLC_SUCCESS )
     {
         msg_Err( p_demux, "can't spawn thread" );
         return VLC_EGENERIC;

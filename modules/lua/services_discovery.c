@@ -239,7 +239,7 @@ int Open_LuaSD( vlc_object_t *p_this )
     p_sys->dead = false;
     vlc_queue_Init( &p_sys->queue, offsetof (struct sd_query, next) );
 
-    if( vlc_clone( &p_sys->thread, Run, p_sd, VLC_THREAD_PRIORITY_LOW ) )
+    if( vlc_clone( &p_sys->thread, Run, p_sd ) )
     {
         goto error;
     }
@@ -273,6 +273,8 @@ void Close_LuaSD( vlc_object_t *p_this )
  ****************************************************************************/
 static void* Run( void *data )
 {
+    vlc_thread_set_name("vlc-lua-service");
+
     services_discovery_t *p_sd = ( services_discovery_t * )data;
     services_discovery_sys_t *p_sys = p_sd->p_sys;
     lua_State *L = p_sys->L;

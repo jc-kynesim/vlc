@@ -32,6 +32,9 @@
         <file alias="ViewDragAutoScrollHandler.qml">util/qml/ViewDragAutoScrollHandler.qml</file>
         <file alias="BindingRev8.qml">util/qml/BindingRev8.qml</file>
         <file alias="BindingRev14.qml">util/qml/BindingRev14.qml</file>
+        <file alias="VanillaObject.qml">util/qml/VanillaObject.qml</file>
+        <file alias="NativeMenu.qml">util/qml/NativeMenu.qml</file>
+        <file alias="MLContextMenu.qml">util/qml/MLContextMenu.qml</file>
     </qresource>
     <qresource prefix="/toolbar">
         <file alias="faster.svg">pixmaps/faster.svg</file>
@@ -104,6 +107,7 @@
         <file alias="file_black.svg">pixmaps/types/file_black.svg</file>
     </qresource>
     <qresource prefix="/">
+        <file alias="download.svg">pixmaps/download.svg</file>
         <file alias="update.svg">pixmaps/update.svg</file>
         <file alias="noart.png">pixmaps/noart.png</file>
         <file alias="noart64.png">pixmaps/noart-64.png</file>
@@ -123,6 +127,7 @@
         <file alias="noart_videoCover.svg">pixmaps/noart_videoCover.svg</file>
         <file alias="play_button.svg">pixmaps/play_button.svg</file>
         <file alias="back.svg">pixmaps/back.svg</file>
+        <file alias="sync.svg">pixmaps/sync.svg</file>
         <file alias="theme_dark.svg">pixmaps/theme_dark.svg</file>
         <file alias="theme_daynight.svg">pixmaps/theme_daynight.svg</file>
         <file alias="theme_light.svg">pixmaps/theme_light.svg</file>
@@ -335,6 +340,7 @@
         <file alias="Menubar.qml">menus/qml/Menubar.qml</file>
         <file alias="GlobalShortcuts.qml">menus/qml/GlobalShortcuts.qml</file>
         <file alias="GlobalShortcutsMedialib.qml">menus/qml/GlobalShortcutsMedialib.qml</file>
+        <file alias="ShortcutExt.qml">menus/qml/ShortcutExt.qml</file>
     </qresource>
     <qresource prefix="/player">
         <file alias="qmldir">player/qml/qmldir</file>
@@ -342,7 +348,12 @@
         <file alias="ControlBar.qml">player/qml/ControlBar.qml</file>
         <file alias="ResumeDialog.qml">player/qml/ResumeDialog.qml</file>
         <file alias="SliderBar.qml">player/qml/SliderBar.qml</file>
+        <file alias="TracksMenu.qml">player/qml/TracksMenu.qml</file>
         <file alias="TrackInfo.qml">player/qml/TrackInfo.qml</file>
+        <file alias="TracksPage.qml">player/qml/TracksPage.qml</file>
+        <file alias="TracksPageSpeed.qml">player/qml/TracksPageSpeed.qml</file>
+        <file alias="TracksPageAudio.qml">player/qml/TracksPageAudio.qml</file>
+        <file alias="TracksPageSubtitle.qml">player/qml/TracksPageSubtitle.qml</file>
         <file alias="ControlbarControls.qml">player/qml/ControlbarControls.qml</file>
         <file alias="MiniPlayer.qml">player/qml/MiniPlayer.qml</file>
         <file alias="TopBar.qml">player/qml/TopBar.qml</file>
@@ -350,9 +361,9 @@
         <file alias="PlayerControlLayout.qml">player/qml/PlayerControlLayout.qml</file>
         <file alias="PlayerMenu.qml">player/qml/PlayerMenu.qml</file>
         <file alias="PlayerMenuItem.qml">player/qml/PlayerMenuItem.qml</file>
-        <file alias="LanguageMenu.qml">player/qml/LanguageMenu.qml</file>
         <file alias="ControlLayout.qml">player/qml/ControlLayout.qml</file>
         <file alias="PlaybackSpeed.qml">player/qml/PlaybackSpeed.qml</file>
+        <file alias="PlayerPlaylistVisibilityFSM.qml">player/qml/PlayerPlaylistVisibilityFSM.qml</file>
     </qresource>
     <qresource prefix="/player/controlbarcontrols">
         <file alias="HighResolutionTimeWidget.qml">player/qml/controlbarcontrols/HighResolutionTimeWidget.qml</file>

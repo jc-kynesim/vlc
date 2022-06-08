@@ -56,44 +56,93 @@ vlc_tick_t GetBufferPTS(const struct v4l2_buffer *buf)
     return pts;
 }
 
+static void DestroyBuffer(struct vlc_v4l2_buffers *pool,
+                          struct vlc_v4l2_buffer *buf)
+{
+    block_t *block = &buf->block;
+
+    v4l2_munmap(block->p_start, block->i_size);
+    free(buf);
+
+    if (vlc_atomic_rc_dec(&pool->refs)) {
+        free(pool->bufs);
+        free(pool);
+    }
+}
+
 static void ReleaseBuffer(block_t *block)
 {
     struct vlc_v4l2_buffer *buf = container_of(block, struct vlc_v4l2_buffer,
                                                block);
     struct vlc_v4l2_buffers *pool = buf->pool;
-    uint32_t index = buf - pool->bufs;
     struct v4l2_buffer buf_req = {
         .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
         .memory = V4L2_MEMORY_MMAP,
-        .index = index,
+        .index = buf->index,
     };
-    uint32_t mask;
     int fd;
 
-    vlc_mutex_lock(&pool->lock);
-    mask = atomic_fetch_and_explicit(&pool->inflight, ~(1U << index),
-                                     memory_order_relaxed);
-    fd = pool->fd;
-    vlc_mutex_unlock(&pool->lock);
-    assert(mask & (1U << index));
+    assert(buf->index < pool->count);
+    assert(pool->bufs[buf->index] == NULL);
 
-    assert(mask & (1U << index));
+    vlc_mutex_lock(&pool->lock);
+    fd = pool->fd;
 
     if (likely(fd >= 0)) {
-        /* Requeue the freed buffer */
+        pool->bufs[buf->index] = buf;
         v4l2_ioctl(pool->fd, VIDIOC_QBUF, &buf_req);
-        return;
+        atomic_fetch_add(&pool->unused, 1);
     }
+    vlc_mutex_unlock(&pool->lock);
 
-    v4l2_munmap(block->p_start, block->i_size);
-
-    if (vlc_popcount(mask) == 1) /* last active buffer? */
-        free(pool);
+    if (unlikely(fd < 0))
+        DestroyBuffer(pool, buf);
 }
 
 static const struct vlc_block_callbacks vlc_v4l2_buffer_cbs = {
     ReleaseBuffer,
 };
+
+static struct vlc_v4l2_buffer *AllocateBuffer(struct vlc_v4l2_buffers *pool,
+                                              uint32_t index)
+{
+    struct v4l2_buffer buf_req = {
+        .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+        .memory = V4L2_MEMORY_MMAP,
+        .index = index,
+    };
+    int fd = pool->fd;
+
+    if (v4l2_ioctl(fd, VIDIOC_QUERYBUF, &buf_req) < 0)
+        return NULL;
+
+    struct vlc_v4l2_buffer *buf = malloc(sizeof (*buf));
+    if (unlikely(buf == NULL))
+        return NULL;
+
+    void *base = v4l2_mmap(NULL, buf_req.length, PROT_READ | PROT_WRITE,
+                           MAP_SHARED, fd, buf_req.m.offset);
+    if (base == MAP_FAILED) {
+        free(buf);
+        return NULL;
+    }
+
+    block_Init(&buf->block, &vlc_v4l2_buffer_cbs, base, buf_req.length);
+    buf->pool = pool;
+    buf->index = index;
+    vlc_atomic_rc_inc(&pool->refs);
+
+    assert(buf->index < pool->count);
+    assert(pool->bufs[index] == NULL);
+    pool->bufs[index] = buf;
+
+    if (v4l2_ioctl(fd, VIDIOC_QBUF, &buf_req) < 0) {
+        DestroyBuffer(pool, buf);
+        buf = NULL;
+    }
+
+    return buf;
+}
 
 block_t *GrabVideo(vlc_object_t *demux, struct vlc_v4l2_buffers *restrict pool)
 {
@@ -102,7 +151,6 @@ block_t *GrabVideo(vlc_object_t *demux, struct vlc_v4l2_buffers *restrict pool)
         .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
         .memory = V4L2_MEMORY_MMAP,
     };
-    uint32_t mask;
 
     /* Wait for next frame */
     if (v4l2_ioctl(fd, VIDIOC_DQBUF, &buf_req) < 0)
@@ -121,10 +169,13 @@ block_t *GrabVideo(vlc_object_t *demux, struct vlc_v4l2_buffers *restrict pool)
     }
 
     assert(buf_req.index < pool->count);
-    mask = atomic_fetch_or_explicit(&pool->inflight, 1U << buf_req.index,
-                                    memory_order_relaxed);
 
-    struct vlc_v4l2_buffer *buf = pool->bufs + buf_req.index;
+    struct vlc_v4l2_buffer *const buf = pool->bufs[buf_req.index];
+
+    assert(buf != NULL);
+    assert(buf->index == buf_req.index);
+    pool->bufs[buf_req.index] = NULL;
+
     block_t *block = &buf->block;
     /* Reinitialise the buffer */
     block->p_buffer = block->p_start;
@@ -132,7 +183,7 @@ block_t *GrabVideo(vlc_object_t *demux, struct vlc_v4l2_buffers *restrict pool)
     block->i_buffer = buf_req.bytesused;
     block->p_next = NULL;
 
-    if ((size_t)vlc_popcount(mask) == pool->count - 1) {
+    if (atomic_fetch_sub(&pool->unused, 1) <= 2) {
         /* Running out of buffers! Memory copy forced. */
         block = block_Duplicate(block);
         block_Release(&buf->block);
@@ -144,14 +195,13 @@ block_t *GrabVideo(vlc_object_t *demux, struct vlc_v4l2_buffers *restrict pool)
 
 /**
  * Allocates memory-mapped buffers, queues them and start streaming.
- * @param n requested buffers count
  * @return array of allocated buffers (use free()), or NULL on error.
  */
-struct vlc_v4l2_buffers *StartMmap(vlc_object_t *obj, int fd, unsigned int n)
+struct vlc_v4l2_buffers *StartMmap(vlc_object_t *obj, int fd)
 {
     struct vlc_v4l2_buffers *pool;
     struct v4l2_requestbuffers req = {
-        .count = n,
+        .count = 16,
         .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
         .memory = V4L2_MEMORY_MMAP,
     };
@@ -168,52 +218,36 @@ struct vlc_v4l2_buffers *StartMmap(vlc_object_t *obj, int fd, unsigned int n)
         return NULL;
     }
 
-    pool = malloc(sizeof (*pool) + req.count * sizeof (pool->bufs[0]));
+    pool = malloc(sizeof (*pool));
     if (unlikely(pool == NULL))
         return NULL;
 
+    pool->bufs = calloc(req.count, sizeof (pool->bufs[0]));
+    if (unlikely(pool->bufs == NULL)) {
+        free(pool);
+        return NULL;
+    }
+
+    pool->count = req.count;
+    for (size_t i = 0; i < req.count; i++)
+        pool->bufs[i] = NULL;
+
     pool->fd = fd;
-    pool->inflight = 0;
-    pool->count = 0;
+    vlc_atomic_rc_init(&pool->refs);
     vlc_mutex_init(&pool->lock);
 
-    while (pool->count < req.count)
+    for (uint32_t index = 0; index < req.count; index++)
     {
-        struct vlc_v4l2_buffer *const buf = pool->bufs + pool->count;
-        struct v4l2_buffer buf_req = {
-            .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
-            .memory = V4L2_MEMORY_MMAP,
-            .index = pool->count,
-        };
+        struct vlc_v4l2_buffer *buf = AllocateBuffer(pool, index);
 
-        if (v4l2_ioctl(fd, VIDIOC_QUERYBUF, &buf_req) < 0)
-        {
-            msg_Err(obj, "cannot query buffer %zu: %s", pool->count,
+        if (unlikely(buf == NULL)) {
+            msg_Err(obj, "cannot allocate buffer %"PRIu32": %s", index,
                     vlc_strerror_c(errno));
-            goto error;
-        }
-
-        void *base = v4l2_mmap(NULL, buf_req.length, PROT_READ | PROT_WRITE,
-                               MAP_SHARED, fd, buf_req.m.offset);
-        if (base == MAP_FAILED)
-        {
-            msg_Err(obj, "cannot map buffer %"PRIu32": %s", buf_req.index,
-                    vlc_strerror_c(errno));
-            goto error;
-        }
-
-        block_Init(&buf->block, &vlc_v4l2_buffer_cbs, base, buf_req.length);
-        buf->pool = pool;
-        pool->count++;
-
-        /* Some drivers refuse to queue buffers before they are mapped. Bug? */
-        if (v4l2_ioctl(fd, VIDIOC_QBUF, &buf_req) < 0)
-        {
-            msg_Err(obj, "cannot queue buffer %"PRIu32": %s", buf_req.index,
-                     vlc_strerror_c(errno));
             goto error;
         }
     }
+
+    atomic_init(&pool->unused, pool->count);
 
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (v4l2_ioctl(fd, VIDIOC_STREAMON, &type) < 0)
@@ -231,48 +265,24 @@ void StopMmap(struct vlc_v4l2_buffers *pool)
 {
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     const size_t count = pool->count;
-    uint32_t unused;
-
-    /* STREAMOFF implicitly dequeues all buffers */
-    v4l2_ioctl(pool->fd, VIDIOC_STREAMOFF, &type);
+    int fd = pool->fd;
 
     vlc_mutex_lock(&pool->lock);
     pool->fd = -1;
-    unused = (~atomic_load_explicit(&pool->inflight, memory_order_relaxed))
-             & ((UINT64_C(1) << count) - 1);
-    atomic_fetch_or_explicit(&pool->inflight, unused, memory_order_relaxed);
     vlc_mutex_unlock(&pool->lock);
 
-    for (size_t i = 0; i < count; i++)
-        if (unused & (1u << i))
-            block_Release(&pool->bufs[i].block);
-    /* Pool is freed whence all buffers are released (possibly here) */
-}
+    /* STREAMOFF implicitly dequeues all buffers */
+    v4l2_ioctl(fd, VIDIOC_STREAMOFF, &type);
 
-/**
- * Allocates user pointer buffers, and start streaming.
- */
-int StartUserPtr(vlc_object_t *obj, int fd)
-{
-    struct v4l2_requestbuffers reqbuf = {
-        .type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
-        .memory = V4L2_MEMORY_USERPTR,
-        .count = 2,
-    };
+    for (size_t i = 0; i < count; i++) {
+        struct vlc_v4l2_buffer *const buf = pool->bufs[i];
 
-    if (v4l2_ioctl(fd, VIDIOC_REQBUFS, &reqbuf) < 0)
-    {
-        if (errno != EINVAL)
-            msg_Err(obj, "cannot reserve user buffers: %s",
-                    vlc_strerror_c(errno));
-        else
-            msg_Dbg(obj, "user buffers not supported");
-        return -1;
+        if (buf != NULL)
+            DestroyBuffer(pool, buf);
     }
-    if (v4l2_ioctl(fd, VIDIOC_STREAMON, &reqbuf.type) < 0)
-    {
-        msg_Err(obj, "cannot start streaming: %s", vlc_strerror_c(errno));
-        return -1;
+
+    if (vlc_atomic_rc_dec(&pool->refs)) {
+        free(pool->bufs);
+        free(pool);
     }
-    return 0;
 }

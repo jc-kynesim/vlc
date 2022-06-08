@@ -314,10 +314,6 @@ int vout_display_opengl_Display(vout_display_opengl_t *vgl)
 {
     GL_ASSERT_NOERROR(&vgl->api.vt);
 
-    /* Why drawing here and not in Render()? Because this way, the
-       OpenGL providers can call vout_display_opengl_Display to force redraw.
-       Currently, the OS X provider uses it to get a smooth window resizing */
-
     int ret = vlc_gl_filters_Draw(vgl->filters);
     if (ret != VLC_SUCCESS)
         return ret;
@@ -325,9 +321,6 @@ int vout_display_opengl_Display(vout_display_opengl_t *vgl)
     ret = vlc_gl_sub_renderer_Draw(vgl->sub_renderer);
     if (ret != VLC_SUCCESS)
         return ret;
-
-    /* Display */
-    vlc_gl_Swap(vgl->gl);
 
     GL_ASSERT_NOERROR(&vgl->api.vt);
 

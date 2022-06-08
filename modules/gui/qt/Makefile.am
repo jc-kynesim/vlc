@@ -210,6 +210,8 @@ libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlplaylistmedia.hpp \
 	gui/qt/medialibrary/mlplaylistmodel.cpp \
 	gui/qt/medialibrary/mlplaylistmodel.hpp \
+	gui/qt/medialibrary/thumbnailcollector.hpp \
+	gui/qt/medialibrary/thumbnailcollector.cpp \
 	gui/qt/menus/custom_menus.cpp \
 	gui/qt/menus/custom_menus.hpp \
 	gui/qt/menus/qml_menu_wrapper.cpp \
@@ -416,6 +418,7 @@ nodist_libqt_plugin_la_SOURCES = \
 	gui/qt/medialibrary/mlplaylistmodel.moc.cpp \
 	gui/qt/medialibrary/mlvideofoldersmodel.moc.cpp \
 	gui/qt/medialibrary/mlvideogroupsmodel.moc.cpp \
+	gui/qt/medialibrary/thumbnailcollector.moc.cpp \
 	gui/qt/menus/custom_menus.moc.cpp \
 	gui/qt/menus/qml_menu_wrapper.moc.cpp \
 	gui/qt/menus/menus.moc.cpp \
@@ -719,12 +722,14 @@ libqt_plugin_la_RES = \
 	gui/qt/pixmaps/close.svg \
 	gui/qt/pixmaps/rename.svg \
 	gui/qt/pixmaps/del.svg \
+	gui/qt/pixmaps/download.svg \
 	gui/qt/pixmaps/ellipsis.svg \
 	gui/qt/pixmaps/topbar/grid.svg \
 	gui/qt/pixmaps/topbar/list.svg \
 	gui/qt/pixmaps/cone.svg \
 	gui/qt/pixmaps/album_cover.svg \
 	gui/qt/pixmaps/back.svg \
+	gui/qt/pixmaps/sync.svg \
 	gui/qt/pixmaps/time.svg \
 	gui/qt/pixmaps/theme_dark.svg \
 	gui/qt/pixmaps/theme_daynight.svg \
@@ -789,6 +794,7 @@ libqt_plugin_la_QML = \
 	gui/qt/menus/qml/GlobalShortcuts.qml \
 	gui/qt/menus/qml/GlobalShortcutsMedialib.qml \
 	gui/qt/menus/qml/Menubar.qml \
+	gui/qt/menus/qml/ShortcutExt.qml \
 	gui/qt/network/qml/AddressbarButton.qml \
 	gui/qt/network/qml/DiscoverDisplay.qml \
 	gui/qt/network/qml/DiscoverUrlDisplay.qml \
@@ -805,7 +811,6 @@ libqt_plugin_la_QML = \
 	gui/qt/player/qml/qmldir \
 	gui/qt/player/qml/ControlBar.qml \
 	gui/qt/player/qml/ControlbarControls.qml \
-	gui/qt/player/qml/LanguageMenu.qml \
 	gui/qt/player/qml/PlaybackSpeed.qml \
 	gui/qt/player/qml/MiniPlayer.qml \
 	gui/qt/player/qml/PIPPlayer.qml \
@@ -813,10 +818,16 @@ libqt_plugin_la_QML = \
 	gui/qt/player/qml/PlayerControlLayout.qml \
 	gui/qt/player/qml/PlayerMenu.qml \
 	gui/qt/player/qml/PlayerMenuItem.qml \
+	gui/qt/player/qml/PlayerPlaylistVisibilityFSM.qml \
 	gui/qt/player/qml/ResumeDialog.qml \
 	gui/qt/player/qml/SliderBar.qml \
 	gui/qt/player/qml/TopBar.qml \
 	gui/qt/player/qml/TrackInfo.qml \
+	gui/qt/player/qml/TracksMenu.qml \
+	gui/qt/player/qml/TracksPage.qml \
+	gui/qt/player/qml/TracksPageAudio.qml \
+	gui/qt/player/qml/TracksPageSpeed.qml \
+	gui/qt/player/qml/TracksPageSubtitle.qml \
 	gui/qt/player/qml/ControlLayout.qml \
 	gui/qt/player/qml/controlbarcontrols/HighResolutionTimeWidget.qml \
 	gui/qt/player/qml/controlbarcontrols/ArtworkInfoWidget.qml \
@@ -876,6 +887,9 @@ libqt_plugin_la_QML = \
 	gui/qt/util/qml/ViewDragAutoScrollHandler.qml \
 	gui/qt/util/qml/BindingRev8.qml \
 	gui/qt/util/qml/BindingRev14.qml \
+	gui/qt/util/qml/VanillaObject.qml \
+	gui/qt/util/qml/NativeMenu.qml \
+	gui/qt/util/qml/MLContextMenu.qml \
 	gui/qt/widgets/qml/ActionButtonOverlay.qml \
 	gui/qt/widgets/qml/ActionButtonPrimary.qml \
 	gui/qt/widgets/qml/BannerTabButton.qml \

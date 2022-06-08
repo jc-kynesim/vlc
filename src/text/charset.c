@@ -43,11 +43,7 @@
 #include "libvlc.h"
 #include <vlc_charset.h>
 
-/**
- * us_strtod() has the same prototype as ANSI C strtod() but it uses the
- * POSIX/C decimal format, regardless of the current numeric locale.
- */
-double us_strtod( const char *str, char **end )
+double vlc_strtod_c(const char *restrict str, char **restrict end)
 {
     locale_t loc = newlocale (LC_NUMERIC_MASK, "C", NULL);
     locale_t oldloc = uselocale (loc);
@@ -61,12 +57,7 @@ double us_strtod( const char *str, char **end )
     return res;
 }
 
-
-/**
- * us_strtof() has the same prototype as ANSI C strtof() but it uses the
- * POSIX/C decimal format, regardless of the current numeric locale.
- */
-float us_strtof( const char *str, char **end )
+float vlc_strtof_c(const char *restrict str, char **restrict end)
 {
     locale_t loc = newlocale (LC_NUMERIC_MASK, "C", NULL);
     locale_t oldloc = uselocale (loc);
@@ -80,22 +71,8 @@ float us_strtof( const char *str, char **end )
     return res;
 }
 
-
-/**
- * us_atof() has the same prototype as ANSI C atof() but it expects a dot
- * as decimal separator, regardless of the system locale.
- */
-double us_atof( const char *str )
-{
-    return us_strtod( str, NULL );
-}
-
-
-/**
- * us_vasprintf() has the same prototype as vasprintf(), but doesn't use
- * the system locale.
- */
-int us_vasprintf( char **ret, const char *format, va_list ap )
+int vlc_vasprintf_c(char **restrict ret, const char *restrict format,
+                    va_list ap)
 {
     locale_t loc = newlocale( LC_NUMERIC_MASK, "C", NULL );
     locale_t oldloc = uselocale( loc );
@@ -111,19 +88,42 @@ int us_vasprintf( char **ret, const char *format, va_list ap )
     return i_rc;
 }
 
-
-/**
- * us_asprintf() has the same prototype as asprintf(), but doesn't use
- * the system locale.
- */
-int us_asprintf( char **ret, const char *format, ... )
+int vlc_asprintf_c(char **restrict ret, const char *restrict format, ...)
 {
     va_list ap;
     int i_rc;
 
     va_start( ap, format );
-    i_rc = us_vasprintf( ret, format, ap );
+    i_rc = vlc_vasprintf_c(ret, format, ap);
     va_end( ap );
 
     return i_rc;
+}
+
+int vlc_vsscanf_c(const char *restrict buf, const char *restrict format,
+                  va_list ap)
+{
+    locale_t loc = newlocale(LC_NUMERIC_MASK, "C", NULL);
+    locale_t oldloc = uselocale(loc);
+    int ret = vsscanf(buf, format, ap);
+
+    if (loc != (locale_t)0)
+    {
+        uselocale(oldloc);
+        freelocale(loc);
+    }
+
+    return ret;
+}
+
+int vlc_sscanf_c(const char *restrict buf, const char *restrict format, ...)
+{
+    va_list ap;
+    int ret;
+
+    va_start(ap, format);
+    ret = vlc_vsscanf_c(buf, format, ap);
+    va_end( ap );
+
+    return ret;
 }

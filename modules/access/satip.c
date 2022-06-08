@@ -441,6 +441,9 @@ static void *satip_thread(void *data) {
     vlc_tick_t last_recv = vlc_tick_now();
     ssize_t len;
     vlc_tick_t next_keepalive = vlc_tick_now() + vlc_tick_from_sec(sys->keepalive_interval);
+
+    vlc_thread_set_name("vlc-satip");
+
 #ifdef HAVE_RECVMMSG
     struct mmsghdr msgs[VLEN];
     struct iovec iovecs[VLEN];
@@ -770,7 +773,7 @@ static int satip_open(vlc_object_t *obj)
 
     vlc_queue_Init(&sys->queue, offsetof (block_t, p_next));
 
-    if (vlc_clone(&sys->thread, satip_thread, access, VLC_THREAD_PRIORITY_INPUT)) {
+    if (vlc_clone(&sys->thread, satip_thread, access)) {
         msg_Err(access, "Failed to create worker thread.");
         goto error;
     }

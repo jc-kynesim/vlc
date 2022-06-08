@@ -27,6 +27,7 @@
 #include <vlc_keystore.h>
 #include <vlc_modules.h>
 #include <vlc_url.h>
+#include <vlc_interrupt.h>
 #include <libvlc.h>
 
 #include <assert.h>
@@ -372,7 +373,7 @@ vlc_credential_clean(vlc_credential *p_credential)
 }
 
 #undef vlc_credential_get
-bool
+int
 vlc_credential_get(vlc_credential *p_credential, vlc_object_t *p_parent,
                    const char *psz_option_username,
                    const char *psz_option_password,
@@ -385,7 +386,7 @@ vlc_credential_get(vlc_credential *p_credential, vlc_object_t *p_parent,
     if (!is_url_valid(p_url))
     {
         msg_Err(p_parent, "vlc_credential_get: invalid url");
-        return false;
+        return -EINVAL;
     }
 
     p_credential->b_from_keystore = false;
@@ -451,13 +452,16 @@ vlc_credential_get(vlc_credential *p_credential, vlc_object_t *p_parent,
             if (p_credential->p_keystore != NULL)
                 credential_find_keystore(p_credential, p_credential->p_keystore);
 
+            if (vlc_killed())
+                return -EINTR;
+
             p_credential->i_get_order++;
             break;
 
         default:
         case GET_FROM_DIALOG:
             if (!psz_dialog_title || !psz_dialog_fmt)
-                return false;
+                return -ENOENT;
             char *psz_dialog_username = NULL;
             char *psz_dialog_password = NULL;
             va_list ap;
@@ -483,7 +487,7 @@ vlc_credential_get(vlc_credential *p_credential, vlc_object_t *p_parent,
             if (i_ret != 1)
             {
                 p_credential->psz_username = p_credential->psz_password = NULL;
-                return false;
+                return vlc_killed() ? -EINTR : -ENOENT;
             }
 
             p_credential->psz_username = p_credential->psz_dialog_username;
@@ -495,7 +499,7 @@ vlc_credential_get(vlc_credential *p_credential, vlc_object_t *p_parent,
             break;
         }
     }
-    return is_credential_valid(p_credential);
+    return is_credential_valid(p_credential) ? 0 : -ENOENT;
 }
 
 #undef vlc_credential_store

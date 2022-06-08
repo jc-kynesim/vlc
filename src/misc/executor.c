@@ -119,6 +119,8 @@ ThreadRun(void *userdata)
     struct vlc_executor_thread *thread = userdata;
     vlc_executor_t *executor = thread->owner;
 
+    vlc_thread_set_name("vlc-exec-runner");
+
     vlc_mutex_lock(&executor->lock);
 
     struct vlc_runnable *runnable;
@@ -157,7 +159,7 @@ SpawnThread(vlc_executor_t *executor)
     thread->owner = executor;
     thread->current_task = NULL;
 
-    if (vlc_clone(&thread->thread, ThreadRun, thread, VLC_THREAD_PRIORITY_LOW))
+    if (vlc_clone(&thread->thread, ThreadRun, thread))
     {
         free(thread);
         return VLC_EGENERIC;

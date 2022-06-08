@@ -82,7 +82,7 @@ InterfaceWindowHandler::InterfaceWindowHandler(qt_intf_t *_p_intf, MainCtx* main
              this, &InterfaceWindowHandler::setInterfaceFullScreen);
 
     connect( m_mainCtx, &MainCtx::toggleWindowVisibility,
-             this, &InterfaceWindowHandler::toggleWindowVisiblity);
+             this, &InterfaceWindowHandler::toggleWindowVisibility);
 
     connect( m_mainCtx, &MainCtx::setInterfaceVisibible,
              this, &InterfaceWindowHandler::setInterfaceVisible);
@@ -271,7 +271,7 @@ void InterfaceWindowHandler::onVideoEmbedChanged(bool embed)
 }
 
 
-void InterfaceWindowHandler::toggleWindowVisiblity()
+void InterfaceWindowHandler::toggleWindowVisibility()
 {
     switch ( m_window->visibility() )
     {
@@ -365,10 +365,9 @@ bool InterfaceWindowHandler::applyKeyEvent(QKeyEvent * event) const
 
     QQuickItem * item = p_intf->p_compositor->activeFocusItem();
 
-    // NOTE: When this item is a control and has visual focus we let it handle the key.
-    if (item && item->inherits("QQuickControl")
-        &&
-        QQmlProperty(item, "visualFocus", qmlContext(item)).read().toBool())
+    // NOTE: When the item has visual focus we let it handle the key. When the item does not
+    //       inherit from QQuickControl we have to declare the 'visualFocus' property ourselves.
+    if (item && QQmlProperty(item, "visualFocus", qmlContext(item)).read().toBool())
     {
         return false;
     }

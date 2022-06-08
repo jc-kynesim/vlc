@@ -50,7 +50,7 @@ function isValidInstanceOf(object, type) {
 // or the value is invalid, returns defaultValue
 function get(dict, key, defaultValue) {
     var v = typeof dict !== "undefined" ? dict[key] : undefined
-    return !v ? defaultValue : v
+    return typeof v === "undefined" ? defaultValue : v
 }
 
 // NOTE: This allows us to force another 'reason' even when the item has activeFocus.
@@ -71,4 +71,12 @@ function pointInRadius(x, y, radius) {
 function contains(rect, pos) {
     return (clamp(pos.x, rect.x, rect.x + rect.width) === pos.x)
             && (clamp(pos.y, rect.y, rect.y + rect.height) === pos.y)
+}
+
+function isInteger(data) {
+    return (typeof data === 'number' && (data % 1) === 0)
+}
+
+function compareFloat(a, b) {
+    return (Math.abs(a - b) < Number.EPSILON)
 }

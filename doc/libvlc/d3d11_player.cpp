@@ -390,6 +390,13 @@ static bool UpdateOutput_cb( void *opaque, const libvlc_video_render_cfg_t *cfg,
     texDesc.Width  = cfg->width;
     texDesc.MiscFlags = D3D11_RESOURCE_MISC_SHARED | D3D11_RESOURCE_MISC_SHARED_NTHANDLE;
 
+    // we reported a size of 0, we have to handle it
+    // 0 dimensions are not allowed, a value of 8 is used otherwise
+    if (cfg->width == 0)
+        texDesc.Width = 8;
+    if (cfg->height == 0)
+        texDesc.Height = 8;
+
     hr = ctx->d3device->CreateTexture2D( &texDesc, NULL, &ctx->resized.texture );
     if (FAILED(hr)) return false;
 
@@ -553,8 +560,8 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARA
             }
             ReleaseSRWLockExclusive(&ctx->swapchainLock);
 
-            ctx->width  = unsigned(LOWORD(lParam) * (BORDER_RIGHT - BORDER_LEFT) / 2.0f); // remove the orange part !
-            ctx->height = unsigned(HIWORD(lParam) * (BORDER_TOP - BORDER_BOTTOM) / 2.0f);
+            ctx->width  = unsigned(ctx->client_area.width * (BORDER_RIGHT - BORDER_LEFT) / 2.0f); // remove the orange part !
+            ctx->height = unsigned(ctx->client_area.height * (BORDER_TOP - BORDER_BOTTOM) / 2.0f);
 
             // tell libvlc we want a new rendering size
             // we could also match the source video size and scale in swapchain render

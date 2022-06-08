@@ -46,6 +46,7 @@
 #include <vlc_charset.h>
 #include <vlc_interrupt.h>
 #include <vlc_keystore.h>
+#include <vlc_strings.h>
 
 #ifndef IPPORT_FTP
 # define IPPORT_FTP 21u
@@ -454,8 +455,13 @@ static int Login( vlc_object_t *p_access, access_sys_t *p_sys, const char *path 
     bool b_logged = false;
 
     /* First: try credentials from url / option */
-    vlc_credential_get( &credential, p_access, "ftp-user", "ftp-pwd",
-                        NULL, NULL );
+    if (vlc_credential_get( &credential, p_access, "ftp-user", "ftp-pwd",
+                            NULL, NULL ) == -EINTR )
+    {
+        vlc_credential_clean( &credential );
+        goto error;
+    }
+
     do
     {
         const char *psz_username = credential.psz_username;
@@ -470,7 +476,7 @@ static int Login( vlc_object_t *p_access, access_sys_t *p_sys, const char *path 
     }
     while( vlc_credential_get( &credential, p_access, "ftp-user", "ftp-pwd",
                                LOGIN_DIALOG_TITLE, LOGIN_DIALOG_TEXT,
-                               url.psz_host ) );
+                               url.psz_host ) == 0 );
 
     if( b_logged )
     {
@@ -909,6 +915,43 @@ static ssize_t Read( stream_t *p_access, void *p_buffer, size_t i_len )
     return i_read;
 }
 
+/**
+ * Parse MLST facts list
+ *
+ * Parses a MLST facts list (without the trailing space/filename)
+ * pointed to by linep and fills the key/value variables.
+ * If a not properly formatted fact is encountered, the
+ * whole fact value will be in key and val will be NULL.
+ *
+ * \note This function modifies the linep pointer, so
+ *       the original value for it must be saved to free
+ *       it once done.
+ * \retval false if at the end of the list
+ * \retval true  if there are more list items to process
+ */
+static bool mlst_facts_iter(char **linep, const char **key, const char **val)
+{
+    // MLST format parsed here is 'key=val;key=val...;'
+    // Lack of trailing ; at the end is accepted too, even though
+    // not permitted by the standard.
+    char *fact = strsep(linep, ";");
+    *key = NULL;
+    *val = NULL;
+
+    if (fact == NULL || fact[0] == '\0')
+        return false;
+
+    // Separate key and value
+    char *sep = strchr(fact, '=');
+    if (sep) {
+        *sep++ = '\0';
+    }
+    *key = fact;
+    *val = sep;
+
+    return true;
+}
+
 /*****************************************************************************
  * DirRead:
  *****************************************************************************/
@@ -927,6 +970,7 @@ static int DirRead (stream_t *p_access, input_item_node_t *p_current_node)
     {
         char *psz_file;
         int type = ITEM_TYPE_UNKNOWN;
+        long long size = 0;
 
         char *psz_line = vlc_tls_GetLine( p_sys->data );
         if( psz_line == NULL )
@@ -934,21 +978,32 @@ static int DirRead (stream_t *p_access, input_item_node_t *p_current_node)
 
         if( p_sys->features.b_mlst )
         {
-            /* MLST Format is key=val;key=val...; FILENAME */
-            if( strstr( psz_line, "type=dir" ) )
-                type = ITEM_TYPE_DIRECTORY;
-            if( strstr( psz_line, "type=file" ) )
-                type = ITEM_TYPE_FILE;
+            const char *key, *val;
+            char *facts = psz_line;
 
-            /* Get the filename or fail */
-            psz_file = strchr( psz_line, ' ' );
-            if( psz_file )
-                psz_file++;
-            else
-            {
-                msg_Warn( p_access, "Empty filename in MLST list" );
+            // Separate MLST and filename
+            psz_file = strchr(psz_line, ' ');
+            if (likely(psz_file)) {
+                *psz_file++ = '\0';
+            } else {
+                msg_Warn( p_access, "No filename in MLST list found" );
                 free( psz_line );
                 continue;
+            }
+
+            while (mlst_facts_iter( &facts, &key, &val )) {
+                if (val == NULL) {
+                    msg_Warn( p_access, "Skipping invalid MLST fact '%s'", key);
+                    continue;
+                }
+                if (!vlc_ascii_strcasecmp( key, "type" )) {
+                    if (!vlc_ascii_strcasecmp( val, "dir" ))
+                        type = ITEM_TYPE_DIRECTORY;
+                    else if (!vlc_ascii_strcasecmp( val, "file" ))
+                        type = ITEM_TYPE_FILE;
+                } else if (!vlc_ascii_strcasecmp( key, "size" )) {
+                    size = atoll(val);
+                }
             }
         }
         else
@@ -968,6 +1023,7 @@ static int DirRead (stream_t *p_access, input_item_node_t *p_current_node)
 
         struct vlc_memstream ms;
 
+        // Scheme
         vlc_memstream_open(&ms);
         vlc_memstream_puts(&ms, "ftp");
         if (p_sys->tlsmode != NONE)
@@ -978,26 +1034,39 @@ static int DirRead (stream_t *p_access, input_item_node_t *p_current_node)
         }
         vlc_memstream_puts(&ms, "://");
 
+        // Host
+        // In case of IPv6, enclose in []
         if (strchr(p_sys->url.psz_host, ':') != NULL)
             vlc_memstream_printf(&ms, "[%s]", p_sys->url.psz_host);
         else
             vlc_memstream_puts(&ms, p_sys->url.psz_host);
 
+        // Port
+        // Only print if not the default for the scheme
         if (p_sys->url.i_port != ((p_sys->tlsmode != IMPLICIT) ? IPPORT_FTP
                                                                : IPPORT_FTPS))
             vlc_memstream_printf(&ms, ":%d", p_sys->url.i_port);
 
+        // Separating / after host[:port]
+        vlc_memstream_putc(&ms, '/');
+
+        // Path to the current location, if any
         if (p_sys->url.psz_path != NULL)
-            vlc_memstream_printf(&ms, "/%s", p_sys->url.psz_path);
+            vlc_memstream_puts(&ms, p_sys->url.psz_path);
+
+        // Filename
         vlc_memstream_puts(&ms, psz_filename);
         free(psz_filename);
 
         if (likely(vlc_memstream_close(&ms) == 0))
         {
-            msg_Err(p_access, "%s -> %s", p_sys->url.psz_path, ms.ptr);
-
+            input_item_t *p_item;
             i_ret = vlc_readdir_helper_additem( &rdh, ms.ptr, NULL, psz_file,
-                                                type, ITEM_NET, NULL );
+                                                type, ITEM_NET, &p_item );
+
+            if (i_ret == VLC_SUCCESS && p_item && size > 0) {
+                input_item_AddStat(p_item, "size", size);
+            }
             free(ms.ptr);
         }
         free( psz_line );

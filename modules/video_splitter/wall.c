@@ -32,7 +32,7 @@
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_video_splitter.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 
 #define ROW_MAX (15)
 #define COL_MAX (15)
@@ -101,7 +101,7 @@ typedef struct
 } video_splitter_sys_t;
 
 static int Filter( video_splitter_t *, picture_t *pp_dst[], picture_t * );
-static int Mouse( video_splitter_t *, int, vout_window_mouse_event_t * );
+static int Mouse( video_splitter_t *, int, vlc_window_mouse_event_t * );
 
 /**
  * This function allocates and initializes a Wall splitter module.
@@ -267,17 +267,19 @@ static int Filter( video_splitter_t *p_splitter, picture_t *pp_dst[], picture_t 
             picture_t *p_dst = pp_dst[p_output->i_output];
 
             /* */
-            picture_t tmp = *p_src;
-            for( int i = 0; i < tmp.i_planes; i++ )
+            for( int i = 0; i < p_src->i_planes; i++ )
             {
-                plane_t *p0 = &tmp.p[0];
-                plane_t *p = &tmp.p[i];
-                const int i_y = p_output->i_top  * p->i_visible_pitch / p0->i_visible_pitch;
-                const int i_x = p_output->i_left * p->i_visible_lines / p0->i_visible_lines;
+                const plane_t *p0 = p_src->p;
+                plane_t p = p_src->p[i];
+                const int i_y = p_output->i_top  * p.i_visible_pitch
+                                                   / p0->i_visible_pitch;
+                const int i_x = p_output->i_left * p.i_visible_lines
+                                                   / p0->i_visible_lines;
 
-                p->p_pixels += i_y * p->i_pitch + ( i_x - (i_x % p->i_pixel_pitch));
+                p.p_pixels += i_y * p.i_pitch + i_x * p.i_pixel_pitch;
+                plane_CopyPixels(p_dst->p + i, &p);
             }
-            picture_Copy( p_dst, &tmp );
+            picture_CopyProperties(p_dst, p_src);
         }
     }
 
@@ -285,7 +287,7 @@ static int Filter( video_splitter_t *p_splitter, picture_t *pp_dst[], picture_t 
     return VLC_SUCCESS;
 }
 static int Mouse( video_splitter_t *p_splitter, int i_index,
-                  vout_window_mouse_event_t *restrict ev )
+                  vlc_window_mouse_event_t *restrict ev )
 {
     video_splitter_sys_t *p_sys = p_splitter->p_sys;
 

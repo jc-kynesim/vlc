@@ -1518,6 +1518,8 @@ static void * spu_PrerenderThread(void *priv)
     spu_private_t *sys = spu->p;
     vlc_fourcc_t chroma_list[SPU_CHROMALIST_COUNT+1];
 
+    vlc_thread_set_name("vlc-spu-prerend");
+
     chroma_list[SPU_CHROMALIST_COUNT] = 0;
 
     vlc_mutex_lock(&sys->prerender.lock);
@@ -1708,7 +1710,7 @@ spu_t *spu_Create(vlc_object_t *object, vout_thread_t *vout)
     sys->last_sort_date = -1;
     sys->vout = vout;
 
-    if(vlc_clone(&sys->prerender.thread, spu_PrerenderThread, spu, VLC_THREAD_PRIORITY_VIDEO))
+    if(vlc_clone(&sys->prerender.thread, spu_PrerenderThread, spu))
     {
         spu_Cleanup(spu);
         vlc_object_delete(spu);
@@ -1928,6 +1930,7 @@ subpicture_t *spu_Render(spu_t *spu,
         VLC_CODEC_RGBA,
         VLC_CODEC_ARGB,
         VLC_CODEC_BGRA,
+        VLC_CODEC_ABGR,
         VLC_CODEC_YUVP,
         0,
     };
@@ -1935,6 +1938,7 @@ subpicture_t *spu_Render(spu_t *spu,
         VLC_CODEC_RGBA,
         VLC_CODEC_ARGB,
         VLC_CODEC_BGRA,
+        VLC_CODEC_ABGR,
         VLC_CODEC_YUVA,
         VLC_CODEC_YUVP,
         0,

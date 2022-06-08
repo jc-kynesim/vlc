@@ -162,8 +162,8 @@ static int Open(vlc_gl_t *gl, unsigned width, unsigned height)
     int nVidiaAffinity = var_InheritInteger(gl, "gpu-affinity");
     if (nVidiaAffinity >= 0) CreateGPUAffinityDC(gl, nVidiaAffinity);
 
-    vout_window_t *wnd = gl->surface;
-    if (wnd->type != VOUT_WINDOW_TYPE_HWND || wnd->handle.hwnd == 0)
+    vlc_window_t *wnd = gl->surface;
+    if (wnd->type != VLC_WINDOW_TYPE_HWND || wnd->handle.hwnd == 0)
         goto error;
 
     sys->hvideownd = wnd->handle.hwnd;
@@ -218,12 +218,16 @@ static int Open(vlc_gl_t *gl, unsigned width, unsigned height)
 
     wglMakeCurrent(sys->hGLDC, NULL);
 
-    gl->make_current = MakeCurrent;
-    gl->release_current = ReleaseCurrent;
-    gl->resize = NULL;
-    gl->swap = Swap;
-    gl->get_proc_address = OurGetProcAddress;
-    gl->destroy = Close;
+    static const struct vlc_gl_operations gl_ops =
+    {
+        .make_current = MakeCurrent,
+        .release_current = ReleaseCurrent,
+        .resize = NULL,
+        .swap = Swap,
+        .get_proc_address = OurGetProcAddress,
+        .close = Close,
+    };
+    gl->ops = &gl_ops;
 
     (void) width; (void) height;
     return VLC_SUCCESS;

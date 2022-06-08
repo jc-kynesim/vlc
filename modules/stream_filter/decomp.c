@@ -96,6 +96,8 @@ static void cleanup_mmap (void *addr)
 
 static void *Thread (void *data)
 {
+    vlc_thread_set_name("vlc-decomp");
+
     stream_t *stream = data;
     stream_sys_t *p_sys = stream->p_sys;
 #ifdef HAVE_VMSPLICE
@@ -273,8 +275,7 @@ static int Open (stream_t *stream, const char *path)
 
             if (vlc_spawnp(&p_sys->pid, path, fdv, argv) == 0)
             {
-                if (vlc_clone(&p_sys->thread, Thread, stream,
-                              VLC_THREAD_PRIORITY_INPUT) == 0)
+                if (vlc_clone(&p_sys->thread, Thread, stream) == 0)
                     ret = VLC_SUCCESS;
             }
             else

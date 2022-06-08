@@ -28,7 +28,7 @@
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_aout.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 #include <vlc_opengl.h>
 #include <vlc_filter.h>
 #include <vlc_rand.h>
@@ -183,7 +183,7 @@ static int Open( vlc_object_t * p_this )
     p_sys->i_nb_samples  = 0;
 
     /* Create the OpenGL context */
-    vout_window_cfg_t cfg;
+    vlc_window_cfg_t cfg;
 
     memset(&cfg, 0, sizeof (cfg));
     cfg.is_decorated = true;
@@ -195,8 +195,7 @@ static int Open( vlc_object_t * p_this )
         goto error;
 
     /* Create the thread */
-    if( vlc_clone( &p_sys->thread, Thread, p_filter,
-                   VLC_THREAD_PRIORITY_LOW ) )
+    if( vlc_clone( &p_sys->thread, Thread, p_filter ) )
     {
         vlc_gl_surface_Destroy( p_sys->gl );
         goto error;
@@ -274,6 +273,8 @@ static block_t *DoWork( filter_t *p_filter, block_t *p_in_buf )
  */
 static void *Thread( void *p_data )
 {
+    vlc_thread_set_name("vlc-projectm");
+
     filter_t  *p_filter = (filter_t*)p_data;
     filter_sys_t *p_sys = reinterpret_cast<filter_sys_t *>( p_filter->p_sys );
     vlc_gl_t *gl = p_sys->gl;

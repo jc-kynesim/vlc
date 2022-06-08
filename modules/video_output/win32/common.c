@@ -97,7 +97,7 @@ void CommonPlacePicture(vout_display_t *vd, display_win32_area_t *area)
 {
     /* Update the window position and size */
     vout_display_place_t before_place = area->place;
-    vout_display_PlacePicture(&area->place, vd->source, vd->cfg);
+    vout_display_PlacePicture(&area->place, vd->source, &vd->cfg->display);
 
     /* Signal the change in size/position */
     if (!vout_display_PlaceEquals(&before_place, &area->place))
@@ -126,19 +126,12 @@ void CommonWindowClean(vout_display_sys_win32_t *sys)
 }
 #endif /* !VLC_WINSTORE_APP */
 
-int CommonControl(vout_display_t *vd, display_win32_area_t *area, vout_display_sys_win32_t *sys, int query)
+void CommonControl(vout_display_t *vd, display_win32_area_t *area, vout_display_sys_win32_t *sys, int query)
 {
     switch (query) {
-    case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
-    case VOUT_DISPLAY_CHANGE_ZOOM:
-    case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
-    case VOUT_DISPLAY_CHANGE_SOURCE_CROP: {
-        CommonPlacePicture(vd, area);
-        return VLC_SUCCESS;
-    }
     case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
-    {   /* Update dimensions */
 #ifndef VLC_WINSTORE_APP
+        // Update dimensions
         if (sys->event != NULL)
         {
             RECT clientRect;
@@ -149,11 +142,15 @@ int CommonControl(vout_display_t *vd, display_win32_area_t *area, vout_display_s
                          RECTHeight(clientRect), SWP_NOZORDER|SWP_NOMOVE|SWP_NOACTIVATE);
         }
 #endif /* !VLC_WINSTORE_APP */
+        // fallthrough
+    case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
+    case VOUT_DISPLAY_CHANGE_ZOOM:
+    case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
+    case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
         CommonPlacePicture(vd, area);
-        return VLC_SUCCESS;
-    }
+        break;
 
     default:
-        return VLC_EGENERIC;
+        vlc_assert_unreachable();
     }
 }

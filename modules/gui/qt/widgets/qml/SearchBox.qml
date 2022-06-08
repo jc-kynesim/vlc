@@ -65,7 +65,7 @@ FocusScope {
         reversible: true
 
         SequentialAnimation {
-            NumberAnimation { property: "width"; easing.type: Easing.InOutSine; duration: VLCStyle.duration_normal; }
+            NumberAnimation { property: "width"; easing.type: Easing.InOutSine; duration: VLCStyle.duration_long; }
             PropertyAction { property: "highlighted" }
             PropertyAction { property: "focus" }
         }
@@ -129,6 +129,15 @@ FocusScope {
             Navigation.parentItem: root
             Navigation.rightItem: clearButton.visible ? clearButton : iconButton
             Navigation.cancelAction: function() { root.state = "" }
+
+            //ideally we should use Keys.onShortcutOverride but it doesn't
+            //work with TextField before 5.13 see QTBUG-68711
+            onActiveFocusChanged: {
+                if (activeFocus)
+                    MainCtx.useGlobalShortcuts = false
+                else
+                    MainCtx.useGlobalShortcuts = true
+            }
 
             Keys.priority: Keys.AfterItem
             Keys.onPressed: {

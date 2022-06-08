@@ -79,7 +79,7 @@ int Activate( extensions_manager_t *p_mgr, extension_t *p_ext )
     p_sys->b_exiting = false;
     p_sys->b_thread_running = true;
 
-    if( vlc_clone( &p_sys->thread, Run, p_ext, VLC_THREAD_PRIORITY_LOW )
+    if( vlc_clone( &p_sys->thread, Run, p_ext )
         != VLC_SUCCESS )
     {
         p_sys->b_exiting = true;
@@ -265,6 +265,8 @@ static void* Run( void *data )
 {
     extension_t *p_ext = data;
     extensions_manager_t *p_mgr = p_ext->p_sys->p_mgr;
+
+    vlc_thread_set_name("vlc-lua-ext");
 
     vlc_mutex_lock( &p_ext->p_sys->command_lock );
 

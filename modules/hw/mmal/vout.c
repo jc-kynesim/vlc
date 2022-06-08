@@ -515,17 +515,16 @@ place_dest(vout_display_t *vd, const video_format_t * fmt)
 {
     vout_display_sys_t * const sys = vd->sys;
     // Ignore what VLC thinks might be going on with display size
-    vout_display_cfg_t tcfg = *vd->cfg;
+    struct vout_display_placement dp = vd->cfg->display;
     vout_display_place_t place;
-    tcfg.display.width = sys->display_width;
-    tcfg.display.height = sys->display_height;
-    tcfg.is_display_filled = true;
-    vout_display_PlacePicture(&place, fmt, &tcfg);
+
+    dp.width = sys->display_width;
+    dp.height = sys->display_height;
+    dp.fitting = VLC_VIDEO_FIT_SMALLER;
+    vout_display_PlacePicture(&place, fmt, &dp);
 
     sys->dest_rect = place_to_mmal_rect(place);
 }
-
-
 
 static int configure_display(vout_display_t *vd, const video_format_t *fmt)
 {
@@ -724,7 +723,7 @@ static void vd_manage(vout_display_t *vd)
         if (query_resolution(vd, sys->display_id, &width, &height) >= 0) {
             sys->display_width = width;
             sys->display_height = height;
-//            vout_window_ReportSize(vd->cfg->window, width, height);
+//            vlc_window_ReportSize(vd->cfg->window, width, height);
         }
 
         sys->need_configure_display = false;
@@ -1087,9 +1086,9 @@ static int OpenMmalVout(vout_display_t *vd,
     MMAL_STATUS_T status;
     int ret = VLC_EGENERIC;
     // At the moment all copy is via I420
-    const bool needs_copy = !hw_mmal_chroma_is_mmal(vd->fmt->i_chroma);
+    const bool needs_copy = !hw_mmal_chroma_is_mmal(vd->source->i_chroma);
     const MMAL_FOURCC_T enc_in = needs_copy ? MMAL_ENCODING_I420 :
-        vout_vlc_to_mmal_pic_fourcc(vd->fmt->i_chroma);
+        vout_vlc_to_mmal_pic_fourcc(vd->source->i_chroma);
 
     msg_Info(vd, "<<< %s: Fmt=%4.4s, Cpy=%d", __func__, (const char *)&vd->fmt->i_chroma, needs_copy);
 

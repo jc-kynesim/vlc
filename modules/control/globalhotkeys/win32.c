@@ -75,7 +75,7 @@ static int Open( vlc_object_t *p_this )
     vlc_mutex_init( &p_sys->lock );
     vlc_sem_init( &p_sys->wait, 0 );
 
-    if( vlc_clone( &p_sys->thread, Thread, p_intf, VLC_THREAD_PRIORITY_LOW ) )
+    if( vlc_clone( &p_sys->thread, Thread, p_intf ) )
         return VLC_ENOMEM;
 
     vlc_sem_wait( &p_sys->wait );
@@ -112,6 +112,8 @@ static void Close( vlc_object_t *p_this )
 static void *Thread( void *p_data )
 {
     MSG message;
+
+    vlc_thread_set_name("vlc-hotkeys-win");
 
     intf_thread_t *p_intf = p_data;
     intf_sys_t *p_sys = p_intf->p_sys;

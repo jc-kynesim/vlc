@@ -233,6 +233,7 @@ static const staticentry_t p_list_video[] = {
         A("h265"),
         A("H265"),
         A("x265"),
+        A("X265"),
         A("hev1"),
         A("hvc1"),
         A("HM10"),
@@ -819,6 +820,7 @@ static const staticentry_t p_list_video[] = {
         A("AV32"),
     B(VLC_CODEC_BGRA, "32 bits BGRA"),
         A("BGRA"),
+    B(VLC_CODEC_ABGR, "32 bits ABGR"),
     B(VLC_CODEC_RGBA10, "32 bits RGB 10bits A 2bits"),
         A("RGA0"),
     B(VLC_CODEC_RGBA64, "64 bits RGBA"),
@@ -1203,17 +1205,9 @@ static const staticentry_t p_list_video[] = {
     B(VLC_CODEC_IMM5, "Infinity IMM5"),
         A("IMM5"),
 
-    B(VLC_CODEC_VDPAU_VIDEO_420, "4:2:0 VDPAU opaque"),
-        A("VDV0"),
+    B(VLC_CODEC_VDPAU_VIDEO, "VDPAU video"),
 
-    B(VLC_CODEC_VDPAU_VIDEO_422, "4:2:2 VDPAU opaque"),
-        A("VDV2"),
-
-    B(VLC_CODEC_VDPAU_VIDEO_444, "4:4:4 VDPAU opaque"),
-        A("VDV4"),
-
-    B(VLC_CODEC_VDPAU_OUTPUT, "VDPAU opaque"),
-        A("VDVR"),
+    B(VLC_CODEC_VDPAU_OUTPUT, "VDPAU output"),
 
     B(VLC_CODEC_VAAPI_420, "4:2:0 VAAPI opaque"),
         A("VAOP"),

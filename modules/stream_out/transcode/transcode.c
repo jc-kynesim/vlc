@@ -211,7 +211,7 @@ vlc_module_begin ()
         change_integer_range( 0, 32 )
     add_integer( SOUT_CFG_PREFIX "pool-size", 10, POOL_TEXT, POOL_LONGTEXT )
         change_integer_range( 1, 1000 )
-    add_bool( SOUT_CFG_PREFIX "high-priority", false, HP_TEXT, HP_LONGTEXT )
+    add_obsolete_bool( SOUT_CFG_PREFIX "high-priority" ) // Since 4.0.0
 
 vlc_module_end ()
 
@@ -322,13 +322,6 @@ static void SetVideoEncoderConfig( sout_stream_t *p_stream, transcode_encoder_co
 
     p_cfg->video.threads.i_count = var_GetInteger( p_stream, SOUT_CFG_PREFIX "threads" );
     p_cfg->video.threads.pool_size = var_GetInteger( p_stream, SOUT_CFG_PREFIX "pool-size" );
-
-#if VLC_THREAD_PRIORITY_OUTPUT != VLC_THREAD_PRIORITY_VIDEO
-    if( var_GetBool( p_stream, SOUT_CFG_PREFIX "high-priority" ) )
-        p_cfg->video.threads.i_priority = VLC_THREAD_PRIORITY_OUTPUT;
-    else
-#endif
-        p_cfg->video.threads.i_priority = VLC_THREAD_PRIORITY_VIDEO;
 }
 
 static void SetSPUEncoderConfig( sout_stream_t *p_stream, transcode_encoder_config_t *p_cfg )
@@ -586,7 +579,7 @@ static void *Add( sout_stream_t *p_stream, const es_format_t *p_fmt )
     struct decoder_owner * p_owner = vlc_object_create( p_stream, sizeof( *p_owner ) );
     if( !p_owner )
         goto error;
-    p_owner->p_obj = VLC_OBJECT(p_stream);
+    p_owner->p_stream = p_stream;
 
     id->p_decoder = &p_owner->dec;
     decoder_Init( id->p_decoder, p_fmt );
@@ -683,7 +676,10 @@ static void Del( sout_stream_t *p_stream, void *_id )
             transcode_audio_clean( p_stream, id );
             break;
         case VIDEO_ES:
-            Send( p_stream, id, NULL );
+            /* Drain if we didn't receive an error, otherwise the
+             * decoder/encoder might not even exist. */
+            if(!id->b_error)
+                Send( p_stream, id, NULL );
             decoder_Destroy( id->p_decoder );
             vlc_mutex_lock( &p_sys->lock );
             if( id == p_sys->id_video )
@@ -744,6 +740,9 @@ static int Send( sout_stream_t *p_stream, void *_id, block_t *p_buffer )
     if( p_out &&
         sout_StreamIdSend( p_stream->p_next, id->downstream_id, p_out ) )
         i_ret = VLC_EGENERIC;
+
+    if (i_ret != VLC_SUCCESS)
+        id->b_error = true;
 
     return i_ret;
 error:

@@ -1587,6 +1587,8 @@ static void *KeepAliveThread( void *p_data )
     stream_t *p_access = p_data;
     access_sys_t *p_sys = p_access->p_sys;
 
+    vlc_thread_set_name("vlc-mms-keep");
+
     do  /* Send keep-alive every ten seconds */
         mms_CommandSend( p_access, 0x1b, 0, 0, NULL, 0 );
     while (vlc_sem_timedwait( &p_sys->keep_alive.sem,
@@ -1603,8 +1605,7 @@ static void KeepAliveStart( stream_t *p_access )
 
     vlc_sem_init( &p_sys->keep_alive.sem, 0 );
     p_sys->b_keep_alive = !vlc_clone( &p_sys->keep_alive.thread,
-                                      KeepAliveThread, p_access,
-                                      VLC_THREAD_PRIORITY_LOW );
+                                      KeepAliveThread, p_access );
 }
 
 static void KeepAliveStop( stream_t *p_access )

@@ -53,6 +53,8 @@ struct vlc_demux_chained_t
 
 static void *vlc_demux_chained_Thread(void *data)
 {
+    vlc_thread_set_name("vlc-demux-chain");
+
     vlc_demux_chained_t *dc = data;
     demux_t *demux = demux_New(VLC_OBJECT(dc->reader), dc->name, "vlc://nop",
                                dc->reader, dc->out);
@@ -119,8 +121,7 @@ vlc_demux_chained_t *vlc_demux_chained_New(vlc_object_t *parent,
 
     vlc_mutex_init(&dc->lock);
 
-    if (vlc_clone(&dc->thread, vlc_demux_chained_Thread, dc,
-                  VLC_THREAD_PRIORITY_INPUT))
+    if (vlc_clone(&dc->thread, vlc_demux_chained_Thread, dc))
     {
         vlc_stream_Delete(dc->reader);
         vlc_stream_fifo_Close(dc->writer);

@@ -616,18 +616,23 @@ static int Connect( demux_t *p_demux )
     const char *psz_user = NULL;
     const char *psz_pwd  = NULL;
     int  i_http_port  = 0;
-    int  i_ret        = VLC_SUCCESS;
+    int  i_ret;
     const int i_timeout = var_InheritInteger( p_demux, "ipv4-timeout" );
 
     vlc_credential_init( &credential, &p_sys->url );
 
+    i_ret = vlc_credential_get( &credential, p_demux, "rtsp-user", "rtsp-pwd",
+                                NULL, NULL );
     /* Credentials can be NULL since they may not be needed */
-    if( vlc_credential_get( &credential, p_demux, "rtsp-user", "rtsp-pwd",
-                            NULL, NULL) )
+    if( i_ret == 0 )
     {
         psz_user = credential.psz_username;
         psz_pwd = credential.psz_password;
     }
+    else if( i_ret == -EINTR )
+        goto bailout;
+
+    i_ret = VLC_SUCCESS;
 
 createnew:
     /* FIXME: This is naive and incorrect; it does not prevent the thread
@@ -678,7 +683,7 @@ describe:
 
             if( vlc_credential_get( &credential, p_demux, "rtsp-user", "rtsp-pwd",
                                     _("RTSP authentication"),
-                                    _("Please enter a valid login name and a password.") ) )
+                                    _("Please enter a valid login name and a password.") ) == 0 )
             {
                 psz_user = credential.psz_username;
                 psz_pwd = credential.psz_password;

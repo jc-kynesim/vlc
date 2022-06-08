@@ -171,9 +171,6 @@ static void DecSysRelease( decoder_sys_t *p_sys );
 static void DecSysHold( decoder_sys_t *p_sys );
 #ifdef HAVE_TIGER
 static uint32_t GetTigerColor( decoder_t *p_dec, const char *psz_prefix );
-static char *GetTigerString( decoder_t *p_dec, const char *psz_name );
-static int GetTigerInteger( decoder_t *p_dec, const char *psz_name );
-static double GetTigerFloat( decoder_t *p_dec, const char *psz_name );
 static void UpdateTigerFontColor( decoder_t *p_dec );
 static void UpdateTigerBackgroundColor( decoder_t *p_dec );
 static void UpdateTigerFontEffect( decoder_t *p_dec );
@@ -195,7 +192,8 @@ static void UpdateTigerFontDesc( decoder_t *p_dec );
 
 #ifdef HAVE_TIGER
 
-static const tiger_font_effect pi_font_effects[] = { tiger_font_plain, tiger_font_shadow, tiger_font_outline };
+static const tiger_font_effect pp_font_effects[] = { tiger_font_plain, tiger_font_shadow, tiger_font_outline };
+static const int pi_font_effects[] = { 0, 1, 2 };
 static const char * const ppsz_font_effect_names[] = { N_("None"), N_("Shadow"), N_("Outline") };
 
 /* nicked off freetype.c */
@@ -286,7 +284,7 @@ vlc_module_begin ()
                 TIGER_DEFAULT_FONT_DESC_TEXT, TIGER_DEFAULT_FONT_DESC_LONGTEXT);
     add_integer_with_range( "kate-tiger-default-font-effect",
                             TIGER_DEFAULT_FONT_EFFECT_DEFAULT,
-                            0, sizeof(pi_font_effects)/sizeof(pi_font_effects[0])-1,
+                            0, ARRAY_SIZE(pi_font_effects),
                             TIGER_DEFAULT_FONT_EFFECT_TEXT, TIGER_DEFAULT_FONT_EFFECT_LONGTEXT )
     change_integer_list( pi_font_effects, ppsz_font_effect_names );
     add_float_with_range( "kate-tiger-default-font-effect-strength",
@@ -371,10 +369,15 @@ static int OpenCommon( vlc_object_t *p_this, bool b_packetizer )
     /* get initial value of configuration */
     p_sys->i_tiger_default_font_color = GetTigerColor( p_dec, "kate-tiger-default-font" );
     p_sys->i_tiger_default_background_color = GetTigerColor( p_dec, "kate-tiger-default-background" );
-    p_sys->e_tiger_default_font_effect = GetTigerInteger( p_dec, "kate-tiger-default-font-effect" );
-    p_sys->f_tiger_default_font_effect_strength = GetTigerFloat( p_dec, "kate-tiger-default-font-effect-strength" );
-    p_sys->psz_tiger_default_font_desc = GetTigerString( p_dec, "kate-tiger-default-font-desc" );
-    p_sys->f_tiger_quality = GetTigerFloat( p_dec, "kate-tiger-quality" );
+
+    int font_effect_idx = var_InheritInteger( p_dec, "kate-tiger-default-font-effect" );
+    if (font_effect_idx < 0 || (size_t)font_effect_idx >= ARRAY_SIZE(pp_font_effects))
+        font_effect_idx = TIGER_DEFAULT_FONT_EFFECT_DEFAULT;
+
+    p_sys->e_tiger_default_font_effect = pp_font_effects[font_effect_idx];
+    p_sys->f_tiger_default_font_effect_strength = var_InheritFloat( p_dec, "kate-tiger-default-font-effect-strength" );
+    p_sys->psz_tiger_default_font_desc = var_InheritString( p_dec, "kate-tiger-default-font-desc" );
+    p_sys->f_tiger_quality = var_InheritFloat( p_dec, "kate-tiger-quality" );
 
     if( p_sys->b_use_tiger )
     {
@@ -918,46 +921,19 @@ static uint32_t GetTigerColor( decoder_t *p_dec, const char *psz_prefix )
 
     if( asprintf( &psz_tmp, "%s-color", psz_prefix ) >= 0 )
     {
-        uint32_t i_rgb = var_CreateGetInteger( p_dec, psz_tmp );
-        var_Destroy( p_dec, psz_tmp );
+        uint32_t i_rgb = var_InheritInteger( p_dec, psz_tmp );
         free( psz_tmp );
         i_color |= i_rgb;
     }
 
     if( asprintf( &psz_tmp, "%s-alpha", psz_prefix ) >= 0 )
     {
-        uint32_t i_alpha = var_CreateGetInteger( p_dec, psz_tmp );
-        var_Destroy( p_dec, psz_tmp );
+        uint32_t i_alpha = var_InheritInteger( p_dec, psz_tmp );
         free( psz_tmp );
         i_color |= (i_alpha << 24);
     }
 
     return i_color;
-}
-
-static char *GetTigerString( decoder_t *p_dec, const char *psz_name )
-{
-    char *psz_value = var_CreateGetString( p_dec, psz_name );
-    if( psz_value)
-    {
-        psz_value = strdup( psz_value );
-    }
-    var_Destroy( p_dec, psz_name );
-    return psz_value;
-}
-
-static int GetTigerInteger( decoder_t *p_dec, const char *psz_name )
-{
-    int i_value = var_CreateGetInteger( p_dec, psz_name );
-    var_Destroy( p_dec, psz_name );
-    return i_value;
-}
-
-static double GetTigerFloat( decoder_t *p_dec, const char *psz_name )
-{
-    double f_value = var_CreateGetFloat( p_dec, psz_name );
-    var_Destroy( p_dec, psz_name );
-    return f_value;
 }
 
 static void UpdateTigerQuality( decoder_t *p_dec )

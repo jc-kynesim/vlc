@@ -116,7 +116,7 @@ static int Open( vlc_object_t *p_this )
         goto error;
     }
 
-    if( vlc_clone( &p_sys->thread, Run, p_intf, VLC_THREAD_PRIORITY_LOW ) )
+    if( vlc_clone( &p_sys->thread, Run, p_intf ) )
     {
         lirc_freeconfig( p_sys->config );
         lirc_deinit();
@@ -154,6 +154,8 @@ static void *Run( void *data )
 {
     intf_thread_t *p_intf = data;
     intf_sys_t *p_sys = p_intf->p_sys;
+
+    vlc_thread_set_name("vlc-lirc");
 
     struct pollfd ufd;
     ufd.fd = p_sys->i_fd;

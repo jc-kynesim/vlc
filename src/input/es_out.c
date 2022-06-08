@@ -851,12 +851,18 @@ static int EsOutSetRecord(  es_out_t *out, bool b_record )
             if( !p_es->p_dec )
                 continue;
 
-            p_es->p_dec_record =
-                vlc_input_decoder_New( VLC_OBJECT(p_input), &p_es->fmt,
-                                       p_es->id.str_id, NULL,
-                                       input_priv(p_input)->p_resource,
-                                       p_sys->p_sout_record, INPUT_TYPE_NONE,
-                                       &decoder_cbs, p_es );
+            const struct vlc_input_decoder_cfg cfg = {
+                .fmt = &p_es->fmt,
+                .str_id = p_es->id.str_id,
+                .clock = NULL,
+                .resource = input_priv(p_input)->p_resource,
+                .sout = p_sys->p_sout_record,
+                .input_type = INPUT_TYPE_NONE,
+                .cbs = &decoder_cbs,
+                .cbs_data = p_es,
+            };
+
+            p_es->p_dec_record = vlc_input_decoder_New( VLC_OBJECT(p_input), &cfg );
 
             if( p_es->p_dec_record && p_sys->b_buffering )
                 vlc_input_decoder_StartWait( p_es->p_dec_record );
@@ -2065,8 +2071,7 @@ static char *EsOutCreateStrId( es_out_id_t *es, bool stable, const char *id,
                                es_out_id_t *p_master )
 {
     struct vlc_memstream ms;
-    int ret = vlc_memstream_open( &ms );
-    if( ret != 0 )
+    if( vlc_memstream_open( &ms ) != 0 )
         return NULL;
 
     if( p_master )
@@ -2096,9 +2101,10 @@ static char *EsOutCreateStrId( es_out_id_t *es, bool stable, const char *id,
         vlc_memstream_puts( &ms, "/auto" );
 
     vlc_memstream_printf( &ms, "/%d", es->fmt.i_id );
-    ret = vlc_memstream_close( &ms );
+    if( vlc_memstream_close( &ms ) != 0 )
+        return NULL;
 
-    return ret == 0 ? ms.ptr : NULL;
+    return ms.ptr;
 }
 
 static es_out_id_t *EsOutAddLocked( es_out_t *out, input_source_t *source,
@@ -2165,8 +2171,7 @@ static es_out_id_t *EsOutAddLocked( es_out_t *out, input_source_t *source,
             return NULL;
         }
         /* Increase ref count for program */
-        if( p_pgrm )
-            p_pgrm->i_es++;
+        p_pgrm->i_es++;
 
         /* The group 0 is the default one and can be used by different contexts */
         assert( fmt->i_group == 0 || p_pgrm->source == es->id.source );
@@ -2340,10 +2345,17 @@ static void EsOutCreateDecoder( es_out_t *out, es_out_id_t *p_es )
     }
 
     input_thread_private_t *priv = input_priv(p_input);
-    dec = vlc_input_decoder_New( VLC_OBJECT(p_input), &p_es->fmt,
-                                 p_es->id.str_id, p_es->p_clock,
-                                 priv->p_resource, priv->p_sout,
-                                 p_sys->input_type, &decoder_cbs, p_es );
+    const struct vlc_input_decoder_cfg cfg = {
+        .fmt = &p_es->fmt,
+        .str_id = p_es->id.str_id,
+        .clock = p_es->p_clock,
+        .resource = priv->p_resource,
+        .sout = priv->p_sout,
+        .input_type = p_sys->input_type,
+        .cbs = &decoder_cbs,
+        .cbs_data = p_es,
+    };
+    dec = vlc_input_decoder_New( VLC_OBJECT(p_input), &cfg );
     if( dec != NULL )
     {
         vlc_input_decoder_ChangeRate( dec, p_sys->rate );
@@ -2353,11 +2365,18 @@ static void EsOutCreateDecoder( es_out_t *out, es_out_id_t *p_es )
 
         if( !p_es->p_master && p_sys->p_sout_record )
         {
-            p_es->p_dec_record =
-                vlc_input_decoder_New( VLC_OBJECT(p_input), &p_es->fmt,
-                                       p_es->id.str_id, NULL,
-                                       priv->p_resource, p_sys->p_sout_record,
-                                       INPUT_TYPE_NONE, &decoder_cbs, p_es );
+            const struct vlc_input_decoder_cfg rec_cfg = {
+                .fmt = &p_es->fmt,
+                .str_id = p_es->id.str_id,
+                .clock = NULL,
+                .resource = priv->p_resource,
+                .sout = p_sys->p_sout_record,
+                .input_type = INPUT_TYPE_NONE,
+                .cbs = &decoder_cbs,
+                .cbs_data = p_es,
+            };
+            p_es->p_dec_record = vlc_input_decoder_New( VLC_OBJECT(p_input), &rec_cfg );
+
             if( p_es->p_dec_record && p_sys->b_buffering )
                 vlc_input_decoder_StartWait( p_es->p_dec_record );
         }
@@ -2784,7 +2803,7 @@ static void EsOutSelectListFromProps( es_out_t *out, enum es_format_category_e c
 
         /* EsOutIdMatchStrIds will modify str_ids */
         strcpy( buffer, esprops->str_ids );
-        if( !EsOutIdMatchStrIds( other, buffer ) && EsIsSelected( other ) ) 
+        if( !EsOutIdMatchStrIds( other, buffer ) && EsIsSelected( other ) )
             EsOutUnselectEs( out, other, other->p_pgrm == p_sys->p_pgrm );
     }
 

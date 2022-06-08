@@ -136,6 +136,8 @@ static void *HelperThread(void *data)
     intf_thread_t *intf = data;
     intf_sys_t *sys = intf->p_sys;
 
+    vlc_thread_set_name("vlc-ctrl-win");
+
     HWND ipcwindow =
         CreateWindow(L"STATIC",                      /* name of window class */
                   L"VLC ipc " TEXT(VERSION),        /* window title bar text */
@@ -178,7 +180,7 @@ static int Open(vlc_object_t *obj)
     /* Run the helper thread */
     sys->ready = CreateEvent(NULL, FALSE, FALSE, NULL);
 
-    if (vlc_clone(&sys->thread, HelperThread, intf, VLC_THREAD_PRIORITY_LOW))
+    if (vlc_clone(&sys->thread, HelperThread, intf))
     {
         free(sys);
         msg_Err(intf, "one instance mode DISABLED "

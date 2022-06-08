@@ -76,6 +76,11 @@ typedef struct vout_display_sys_t
     vlc_gl_t *gl;
     vout_display_place_t place;
     bool place_changed;
+    bool is_dirty;
+
+    struct {
+        PFNGLFLUSHPROC Flush;
+    } vt;
 } vout_display_sys_t;
 
 /* Display callbacks */
@@ -98,13 +103,13 @@ static const struct vlc_display_operations ops = {
 };
 
 static void
-FlipVerticalAlign(vout_display_cfg_t *cfg)
+FlipVerticalAlign(struct vout_display_placement *dp)
 {
     /* Reverse vertical alignment as the GL tex are Y inverted */
-    if (cfg->align.vertical == VLC_VIDEO_ALIGN_TOP)
-        cfg->align.vertical = VLC_VIDEO_ALIGN_BOTTOM;
-    else if (cfg->align.vertical == VLC_VIDEO_ALIGN_BOTTOM)
-        cfg->align.vertical = VLC_VIDEO_ALIGN_TOP;
+    if (dp->align.vertical == VLC_VIDEO_ALIGN_TOP)
+        dp->align.vertical = VLC_VIDEO_ALIGN_BOTTOM;
+    else if (dp->align.vertical == VLC_VIDEO_ALIGN_BOTTOM)
+        dp->align.vertical = VLC_VIDEO_ALIGN_TOP;
 }
 
 /**
@@ -118,20 +123,19 @@ static int Open(vout_display_t *vd,
         return VLC_ENOMEM;
 
     sys->gl = NULL;
+    sys->is_dirty = false;
 
-    vout_window_t *surface = vd->cfg->window;
+    vlc_window_t *surface = vd->cfg->window;
     char *gl_name = var_InheritString(surface, MODULE_VARNAME);
 
     /* VDPAU GL interop works only with GLX. Override the "gl" option to force
      * it. */
 #ifndef USE_OPENGL_ES2
-    if (surface->type == VOUT_WINDOW_TYPE_XID)
+    if (surface->type == VLC_WINDOW_TYPE_XID)
     {
         switch (vd->source->i_chroma)
         {
-            case VLC_CODEC_VDPAU_VIDEO_444:
-            case VLC_CODEC_VDPAU_VIDEO_422:
-            case VLC_CODEC_VDPAU_VIDEO_420:
+            case VLC_CODEC_VDPAU_VIDEO:
             {
                 /* Force the option only if it was not previously set */
                 if (gl_name == NULL || gl_name[0] == 0
@@ -153,10 +157,9 @@ static int Open(vout_display_t *vd,
     if (sys->gl == NULL)
         goto error;
 
-
-    vout_display_cfg_t flipped_cfg = *vd->cfg;
-    FlipVerticalAlign(&flipped_cfg);
-    vout_display_PlacePicture(&sys->place, vd->source, &flipped_cfg);
+    struct vout_display_placement flipped_dp = vd->cfg->display;
+    FlipVerticalAlign(&flipped_dp);
+    vout_display_PlacePicture(&sys->place, vd->source, &flipped_dp);
     sys->place_changed = true;
     vlc_gl_Resize (sys->gl, vd->cfg->display.width, vd->cfg->display.height);
 
@@ -165,6 +168,13 @@ static int Open(vout_display_t *vd,
 
     if (vlc_gl_MakeCurrent (sys->gl))
         goto error;
+
+    sys->vt.Flush = vlc_gl_GetProcAddress(sys->gl, "glFlush");
+    if (sys->vt.Flush == NULL)
+    {
+        vlc_gl_ReleaseCurrent (sys->gl);
+        goto error;
+    }
 
     sys->vgl = vout_display_opengl_New (fmt, &spu_chromas, sys->gl,
                                         &vd->cfg->viewpoint, context);
@@ -210,17 +220,7 @@ static void PictureRender (vout_display_t *vd, picture_t *pic, subpicture_t *sub
     if (vlc_gl_MakeCurrent (sys->gl) == VLC_SUCCESS)
     {
         vout_display_opengl_Prepare (sys->vgl, pic, subpicture);
-        vlc_gl_ReleaseCurrent (sys->gl);
-    }
-}
-
-static void PictureDisplay (vout_display_t *vd, picture_t *pic)
-{
-    vout_display_sys_t *sys = vd->sys;
-    VLC_UNUSED(pic);
-
-    if (vlc_gl_MakeCurrent (sys->gl) == VLC_SUCCESS)
-    {
+        sys->vt.Flush();
         if (sys->place_changed)
         {
             vout_display_opengl_SetOutputSize(sys->vgl, sys->place.width,
@@ -229,10 +229,21 @@ static void PictureDisplay (vout_display_t *vd, picture_t *pic)
                                          sys->place.width, sys->place.height);
             sys->place_changed = false;
         }
-
         vout_display_opengl_Display(sys->vgl);
+        sys->vt.Flush();
         vlc_gl_ReleaseCurrent (sys->gl);
+        sys->is_dirty = true;
     }
+}
+
+static void PictureDisplay (vout_display_t *vd, picture_t *pic)
+{
+    vout_display_sys_t *sys = vd->sys;
+    VLC_UNUSED(pic);
+
+    /* Present on screen */
+    if (sys->is_dirty)
+        vlc_gl_Swap(sys->gl);
 }
 
 static int Control (vout_display_t *vd, int query)
@@ -246,24 +257,24 @@ static int Control (vout_display_t *vd, int query)
       case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
       case VOUT_DISPLAY_CHANGE_ZOOM:
       {
-        vout_display_cfg_t cfg = *vd->cfg;
+        struct vout_display_placement dp = vd->cfg->display;
 
-        FlipVerticalAlign(&cfg);
+        FlipVerticalAlign(&dp);
 
-        vout_display_PlacePicture(&sys->place, vd->source, &cfg);
+        vout_display_PlacePicture(&sys->place, vd->source, &dp);
         sys->place_changed = true;
-        vlc_gl_Resize (sys->gl, cfg.display.width, cfg.display.height);
+        vlc_gl_Resize (sys->gl, dp.width, dp.height);
         return VLC_SUCCESS;
       }
 
       case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
       case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
       {
-        vout_display_cfg_t cfg = *vd->cfg;
+        struct vout_display_placement dp = vd->cfg->display;
 
-        FlipVerticalAlign(&cfg);
+        FlipVerticalAlign(&dp);
 
-        vout_display_PlacePicture(&sys->place, vd->source, &cfg);
+        vout_display_PlacePicture(&sys->place, vd->source, &dp);
         sys->place_changed = true;
         return VLC_SUCCESS;
       }

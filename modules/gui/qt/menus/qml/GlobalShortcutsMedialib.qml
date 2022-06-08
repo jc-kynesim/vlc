@@ -21,7 +21,7 @@ import org.videolan.vlc 0.1
 import org.videolan.medialib 0.1
 
 Item {
-    Shortcut{ context: Qt.ApplicationShortcut; sequence:"Ctrl+B"; onActivated: DialogsProvider.bookmarksDialog(); }
+    ShortcutExt{ sequence:"Ctrl+B"; onActivated: DialogsProvider.bookmarksDialog() }
 
     MLRecentModel {
         id: recentModel
@@ -34,7 +34,7 @@ Item {
         model: 10
 
         Item {
-            Shortcut {
+            ShortcutExt {
                 sequence: "Ctrl+" + ((index + 1) % 10)
                 onActivated:  {
                     if (index < recentModel.count)
@@ -45,7 +45,6 @@ Item {
                             MediaLib.addAndPlay([trackId])
                     }
                 }
-                context: Qt.ApplicationShortcut
             }
         }
     }

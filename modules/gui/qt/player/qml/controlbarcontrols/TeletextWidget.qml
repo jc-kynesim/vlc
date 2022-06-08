@@ -63,7 +63,7 @@ T.Pane {
             colors: root.colors
             color: colors.text
 
-            toolTip.visible: hovered || visualFocus
+            T.ToolTip.visible: hovered || visualFocus
 
             Navigation.parentItem: root
             Navigation.rightItem: teleTransparencyBtn
@@ -78,6 +78,8 @@ T.Pane {
 
             paintOnly: root.paintOnly
 
+            enabled: teleActivateBtn.checked
+
             opacity: 0.5
 
             iconText: VLCIcons.tvtelx
@@ -86,7 +88,7 @@ T.Pane {
             colors: root.colors
             color: colors.text
 
-            toolTip.visible: hovered || visualFocus
+            T.ToolTip.visible: hovered || visualFocus
 
             Navigation.parentItem: root
             Navigation.leftItem: teleActivateBtn
@@ -97,8 +99,20 @@ T.Pane {
 
         Widgets.SpinBoxExt{
             id: telePageNumber
+
+            // NOTE: We want a fixed size for the TextInput.
+            width: VLCStyle.dp(64, VLCStyle.scale)
+
+            enabled: teleActivateBtn.checked
+
             from: 100
             to: 899
+
+            validator: IntValidator {
+                bottom: telePageNumber.from
+                top: telePageNumber.to
+            }
+
             editable: true
             textColor: colors.text
             bgColor: colors.bg
@@ -138,6 +152,8 @@ T.Pane {
 
             paintOnly: root.paintOnly
 
+            enabled: teleActivateBtn.checked
+
             iconText: VLCIcons.record
             text: I18n.qtr("Index key")
 
@@ -145,7 +161,7 @@ T.Pane {
             color: "grey"
             colorDisabled: "grey"
 
-            toolTip.visible: hovered || visualFocus
+            T.ToolTip.visible: hovered || visualFocus
 
             Navigation.parentItem: root
             Navigation.leftItem: telePageNumber
@@ -161,6 +177,8 @@ T.Pane {
 
             paintOnly: root.paintOnly
 
+            enabled: teleActivateBtn.checked
+
             iconText: VLCIcons.record
             text: I18n.qtr("Red key")
 
@@ -168,7 +186,7 @@ T.Pane {
             color: "red"
             colorDisabled: "grey"
 
-            toolTip.visible: hovered || visualFocus
+            T.ToolTip.visible: hovered || visualFocus
 
             Navigation.parentItem: root
             Navigation.leftItem: indexKeyBtn
@@ -184,6 +202,8 @@ T.Pane {
 
             paintOnly: root.paintOnly
 
+            enabled: teleActivateBtn.checked
+
             iconText: VLCIcons.record
             text: I18n.qtr("Green key")
 
@@ -191,7 +211,7 @@ T.Pane {
             color: "green"
             colorDisabled: "grey"
 
-            toolTip.visible: hovered || visualFocus
+            T.ToolTip.visible: hovered || visualFocus
 
             Navigation.parentItem: root
             Navigation.leftItem: redKeyBtn
@@ -207,6 +227,8 @@ T.Pane {
 
             paintOnly: root.paintOnly
 
+            enabled: teleActivateBtn.checked
+
             iconText: VLCIcons.record
             text: I18n.qtr("Yellow key")
 
@@ -214,7 +236,7 @@ T.Pane {
             color: "yellow"
             colorDisabled: "grey"
 
-            toolTip.visible: hovered || visualFocus
+            T.ToolTip.visible: hovered || visualFocus
 
             Navigation.parentItem: root
             Navigation.leftItem: greenKeyBtn
@@ -230,6 +252,8 @@ T.Pane {
 
             paintOnly: root.paintOnly
 
+            enabled: teleActivateBtn.checked
+
             iconText: VLCIcons.record
             text: I18n.qtr("Blue key")
 
@@ -237,7 +261,7 @@ T.Pane {
             color: "blue"
             colorDisabled: "grey"
 
-            toolTip.visible: hovered || visualFocus
+            T.ToolTip.visible: hovered || visualFocus
 
             Navigation.parentItem: root
             Navigation.leftItem: yellowKeyBtn

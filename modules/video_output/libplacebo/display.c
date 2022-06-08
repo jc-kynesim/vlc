@@ -28,6 +28,7 @@
 #endif
 
 #include <vlc_common.h>
+#include <vlc_ancillary.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
 #include <vlc_fs.h>
@@ -113,17 +114,11 @@ static int Open(vout_display_t *vd,
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
 
-    if (vd->cfg->window == NULL)
-    {
-        msg_Err(vd, "parent window not available");
-        goto error;
-    }
-
     char *name = var_InheritString(vd, "pl-gpu");
     sys->pl = vlc_placebo_Create(vd->cfg, name);
     free(name);
     if (sys->pl == NULL)
-        goto error;
+        return VLC_EGENERIC;
 
     if (vlc_placebo_MakeCurrent(sys->pl) != VLC_SUCCESS)
         goto error;
@@ -145,18 +140,19 @@ static int Open(vout_display_t *vd,
     vlc_placebo_ReleaseCurrent(sys->pl);
 
     // Attempt using the input format as the display format
-    if (vlc_placebo_FormatSupported(gpu, vd->fmt->i_chroma)) {
-        fmt->i_chroma = vd->fmt->i_chroma;
+    if (vlc_placebo_FormatSupported(gpu, vd->source->i_chroma)) {
+        fmt->i_chroma = vd->source->i_chroma;
     } else {
+        fmt->i_chroma = 0;
         const vlc_fourcc_t *fcc;
-        for (fcc = vlc_fourcc_GetFallback(vd->fmt->i_chroma); *fcc; fcc++) {
+        for (fcc = vlc_fourcc_GetFallback(vd->source->i_chroma); *fcc; fcc++) {
             if (vlc_placebo_FormatSupported(gpu, *fcc)) {
                 fmt->i_chroma = *fcc;
                 break;
             }
         }
 
-        if (!fmt->i_chroma) {
+        if (fmt->i_chroma == 0) {
             fmt->i_chroma = VLC_CODEC_RGBA;
             msg_Warn(vd, "Failed picking any suitable input format, falling "
                      "back to RGBA for sanity!");
@@ -189,8 +185,7 @@ static int Open(vout_display_t *vd,
 
 error:
     pl_renderer_destroy(&sys->renderer);
-    if (sys->pl != NULL)
-        vlc_placebo_Release(sys->pl);
+    vlc_placebo_Release(sys->pl);
     return VLC_EGENERIC;
 }
 
@@ -263,6 +258,16 @@ static void PictureRender(vout_display_t *vd, picture_t *pic,
     vlc_placebo_DoviMetadata(&img, pic, &sys->dovi_metadata);
 #endif
 
+#if PL_API_VER >= 96
+    struct vlc_ancillary *iccp = picture_GetAncillary(pic, VLC_ANCILLARY_ID_ICC);
+    if (iccp) {
+        vlc_icc_profile_t *icc = vlc_ancillary_GetData(iccp);
+        img.profile.data = icc->data;
+        img.profile.len = icc->size;
+        pl_icc_profile_compute_signature(&img.profile);
+    }
+#endif
+
     // Upload the image data for each plane
     struct pl_plane_data data[4];
     if (!vlc_placebo_PlaneData(pic, data, NULL)) {
@@ -289,17 +294,22 @@ static void PictureRender(vout_display_t *vd, picture_t *pic,
 
     // Set the target crop dynamically based on the swapchain flip state
     vout_display_place_t place;
-    vout_display_cfg_t cfg = *vd->cfg;
-    cfg.display.width = frame.fbo->params.w;
-    cfg.display.height = frame.fbo->params.h;
+    struct vout_display_placement dp = vd->cfg->display;
+    dp.width = frame.fbo->params.w;
+    dp.height = frame.fbo->params.h;
     if (need_vflip) {
-        switch (cfg.align.vertical) {
-        case VLC_VIDEO_ALIGN_TOP: cfg.align.vertical = VLC_VIDEO_ALIGN_BOTTOM; break;
-        case VLC_VIDEO_ALIGN_BOTTOM: cfg.align.vertical = VLC_VIDEO_ALIGN_TOP; break;
-        default: break;
+        switch (dp.align.vertical) {
+        case VLC_VIDEO_ALIGN_TOP:
+            dp.align.vertical = VLC_VIDEO_ALIGN_BOTTOM;
+            break;
+        case VLC_VIDEO_ALIGN_BOTTOM:
+            dp.align.vertical = VLC_VIDEO_ALIGN_TOP;
+            break;
+        default:
+            break;
         }
     }
-    vout_display_PlacePicture(&place, vd->fmt, &cfg);
+    vout_display_PlacePicture(&place, vd->fmt, &dp);
     if (need_vflip) {
         place.y = frame.fbo->params.h - place.y;
         place.height = -place.height;

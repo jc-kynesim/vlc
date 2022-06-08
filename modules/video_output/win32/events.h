@@ -21,7 +21,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 #include <vlc_vout_display.h>
 
 /**
@@ -36,12 +36,12 @@ typedef struct {
 } event_cfg_t;
 
 typedef struct {
-    vout_window_t *parent_window;
+    vlc_window_t *parent_window;
     HWND hparent;
     HWND hvideownd;
 } event_hwnd_t;
 
-event_thread_t *EventThreadCreate( vlc_object_t *, vout_window_t *);
+event_thread_t *EventThreadCreate( vlc_object_t *, vlc_window_t *);
 void            EventThreadDestroy( event_thread_t * );
 int             EventThreadStart( event_thread_t *, event_hwnd_t *, const event_cfg_t * );
 void            EventThreadStop( event_thread_t * );

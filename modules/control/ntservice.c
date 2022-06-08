@@ -114,7 +114,7 @@ static int Activate( vlc_object_t *p_this )
 
     p_intf->p_sys = p_sys;
 
-    if( vlc_clone( &p_sys->thread, Run, p_intf, VLC_THREAD_PRIORITY_LOW ) )
+    if( vlc_clone( &p_sys->thread, Run, p_intf ) )
         return VLC_ENOMEM;
 
     return VLC_SUCCESS;
@@ -143,6 +143,8 @@ static void *Run( void *data )
         { (WCHAR*) TEXT(VLCSERVICENAME), (LPSERVICE_MAIN_FUNCTION) &ServiceDispatch },
         { NULL, NULL }
     };
+
+    vlc_thread_set_name("vlc-ntservice");
 
     p_global_intf = p_intf;
     p_intf->p_sys->psz_service = var_InheritString( p_intf, "ntservice-name" );

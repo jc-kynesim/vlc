@@ -28,6 +28,7 @@
 #include "../src/os_loop.hpp"
 
 #include <map>
+#include <memory>
 
 class X11Display;
 class GenericWindow;
@@ -36,6 +37,8 @@ class GenericWindow;
 class X11Loop: public OSLoop
 {
 public:
+    X11Loop( intf_thread_t *pIntf, X11Display &rDisplay );
+
     /// Get the instance of X11Loop
     static OSLoop *instance( intf_thread_t *pIntf, X11Display &rDisplay );
 
@@ -69,10 +72,6 @@ private:
         return i!=m_keymap.end() ? (i->second) : keysym;
     }
     static int X11ModToMod( unsigned state );
-
-    // Private because it's a singleton
-    X11Loop( intf_thread_t *pIntf, X11Display &rDisplay );
-    virtual ~X11Loop();
 
     /// Handle the next X11 event
     void handleX11Event();

@@ -33,6 +33,8 @@ FocusScope {
     property alias leftPadding: recentVideosColumn.leftPadding
     property alias rightPadding: recentVideosColumn.rightPadding
 
+    property alias subtitleText : subtitleLabel.text
+
     // Settings
 
     implicitHeight: recentVideosColumn.height
@@ -48,10 +50,12 @@ FocusScope {
 
     // Childs
 
-    VideoContextMenu {
+    Util.MLContextMenu {
         id: contextMenu
 
         model: listView.model
+
+        showPlayAsAudioAction: true
     }
 
     Column {
@@ -84,7 +88,7 @@ FocusScope {
 
             // NOTE: Sometimes, we want items to be visible on the sides.
             displayMarginBeginning: root.leftPadding
-            displayMarginEnd: root.leftPadding
+            displayMarginEnd: root.rightPadding
 
             // NOTE: We want navigation buttons to be centered on the item cover.
             buttonMargin: VLCStyle.margin_xsmall + VLCStyle.gridCover_video_height / 2 - buttonLeft.height / 2
@@ -132,7 +136,7 @@ FocusScope {
 
                 // NOTE: contextMenu.popup wants a list of indexes.
                 onContextMenuButtonClicked: {
-                    contextMenu.popup([root.model.index(index, 0)],
+                    contextMenu.popup([listView.model.index(index, 0)],
                                       globalMousePos,
                                       { "player-options": [":restore-playback-pos=2"] })
                 }
@@ -153,7 +157,7 @@ FocusScope {
 
                 Behavior on opacity {
                     NumberAnimation {
-                        duration: VLCStyle.duration_faster
+                        duration: VLCStyle.duration_short
                     }
                 }
 
@@ -180,7 +184,9 @@ FocusScope {
         }
 
         Widgets.SubtitleLabel {
-            text: I18n.qtr("Videos")
+            id: subtitleLabel
+
+            visible: text !== ""
         }
     }
 }

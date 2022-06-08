@@ -145,7 +145,7 @@ vlm_t *vlm_New( libvlc_int_t *libvlc, const char *psz_vlmconf )
     TAB_INIT( p_vlm->i_schedule, p_vlm->schedule );
     var_Create( p_vlm, "intf-event", VLC_VAR_ADDRESS );
 
-    if( vlc_clone( &p_vlm->thread, Manage, p_vlm, VLC_THREAD_PRIORITY_LOW ) )
+    if( vlc_clone( &p_vlm->thread, Manage, p_vlm ) )
     {
         vlc_object_delete(p_vlm);
         vlc_mutex_unlock( &vlm_mutex );
@@ -238,6 +238,8 @@ int vlm_ExecuteCommand( vlm_t *p_vlm, const char *psz_command,
  *****************************************************************************/
 static void* Manage( void* p_object )
 {
+    vlc_thread_set_name("vlc-vlm");
+
     vlm_t *vlm = (vlm_t*)p_object;
     time_t lastcheck;
     bool exiting;
@@ -773,7 +775,7 @@ static int vlm_ControlMediaInstanceGetTimePosition( vlm_t *p_vlm, int64_t id, co
 
     vlc_player_Lock(p_instance->player);
     if( pi_time )
-        *pi_time = US_FROM_VLC_TICK(vlc_player_GetTime(p_instance->player)); 
+        *pi_time = US_FROM_VLC_TICK(vlc_player_GetTime(p_instance->player));
     if( pd_position )
         *pd_position = vlc_player_GetPosition(p_instance->player);
     vlc_player_Unlock(p_instance->player);

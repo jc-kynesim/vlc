@@ -33,6 +33,8 @@
 #include <vlc_url.h>
 #include <vlc_http.h>
 
+#include <cassert>
+
 using namespace adaptive::http;
 
 AbstractConnectionManager::AbstractConnectionManager(vlc_object_t *p_object_)
@@ -85,6 +87,16 @@ HTTPConnectionManager::HTTPConnectionManager    (vlc_object_t *p_object_)
 
 HTTPConnectionManager::~HTTPConnectionManager   ()
 {
+    while(!cache.empty())
+    {
+        HTTPChunkBufferedSource *purged = cache.back();
+        cache.pop_back();
+        assert(cache_total >= purged->contentLength);
+        cache_total -= purged->contentLength;
+        CacheDebug(msg_Dbg(p_object, "Cache DEL '%s' usage %u bytes",
+                            purged->getStorageID().c_str(), cache_total));
+        deleteSource(purged);
+    }
     delete downloader;
     delete downloaderhp;
     this->closeAllConnections();
@@ -174,6 +186,7 @@ AbstractChunkSource *HTTPConnectionManager::makeSource(const std::string &url,
                 if(s->getStorageID() == storageid)
                 {
                     cache.remove(s);
+                    assert(cache_total >= s->contentLength);
                     cache_total -= s->contentLength;
                     CacheDebug(msg_Dbg(p_object, "Cache GET '%s' usage %u bytes",
                                        storageid.c_str(), cache_total));
@@ -214,6 +227,7 @@ void HTTPConnectionManager::recycleSource(AbstractChunkSource *source)
         {
             HTTPChunkBufferedSource *purged = cache.back();
             cache.pop_back();
+            assert(cache_total >= purged->contentLength);
             cache_total -= purged->contentLength;
             CacheDebug(msg_Dbg(p_object, "Cache DEL '%s' usage %u bytes",
                                purged->getStorageID().c_str(), cache_total));

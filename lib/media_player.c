@@ -36,6 +36,7 @@
 #include <vlc_vout.h>
 #include <vlc_aout.h>
 #include <vlc_actions.h>
+#include <vlc_modules.h>
 
 #include "libvlc_internal.h"
 #include "media_player_internal.h"
@@ -577,6 +578,7 @@ libvlc_media_player_t *
 libvlc_media_player_new( libvlc_instance_t *instance )
 {
     libvlc_media_player_t * mp;
+    int doinherit;
 
     assert(instance);
 
@@ -603,10 +605,10 @@ libvlc_media_player_new( libvlc_instance_t *instance )
     var_Create (mp, "vmem-data", VLC_VAR_ADDRESS);
     var_Create (mp, "vmem-setup", VLC_VAR_ADDRESS);
     var_Create (mp, "vmem-cleanup", VLC_VAR_ADDRESS);
-    var_Create (mp, "vmem-chroma", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
-    var_Create (mp, "vmem-width", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "vmem-height", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "vmem-pitch", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
+    var_Create (mp, "vmem-chroma", VLC_VAR_STRING);
+    var_Create (mp, "vmem-width", VLC_VAR_INTEGER);
+    var_Create (mp, "vmem-height", VLC_VAR_INTEGER);
+    var_Create (mp, "vmem-pitch", VLC_VAR_INTEGER);
 
     var_Create (mp, "vout-cb-type", VLC_VAR_INTEGER );
     var_Create( mp, "vout-cb-opaque", VLC_VAR_ADDRESS );
@@ -654,29 +656,35 @@ libvlc_media_player_new( libvlc_instance_t *instance )
 
     var_Create (mp, "osd", VLC_VAR_BOOL); // off
 
-    var_Create (mp, "marq-marquee", VLC_VAR_STRING);
-    var_Create (mp, "marq-color", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "marq-opacity", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "marq-position", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "marq-refresh", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "marq-size", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "marq-timeout", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "marq-x", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "marq-y", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
+    doinherit = module_exists("marq") ? VLC_VAR_DOINHERIT : 0;
+    var_Create(mp, "marq-marquee", VLC_VAR_STRING);
+    var_Create(mp, "marq-color", VLC_VAR_INTEGER | doinherit);
+    var_Create(mp, "marq-opacity", VLC_VAR_INTEGER | doinherit);
+    var_Create(mp, "marq-position", VLC_VAR_INTEGER | doinherit);
+    var_Create(mp, "marq-refresh", VLC_VAR_INTEGER | doinherit);
+    var_Create(mp, "marq-size", VLC_VAR_INTEGER | doinherit);
+    var_Create(mp, "marq-timeout", VLC_VAR_INTEGER | doinherit);
+    var_Create(mp, "marq-x", VLC_VAR_INTEGER | doinherit);
+    var_Create(mp, "marq-y", VLC_VAR_INTEGER | doinherit);
 
-    var_Create (mp, "logo-file", VLC_VAR_STRING);
-    var_Create (mp, "logo-x", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "logo-y", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "logo-delay", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "logo-repeat", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "logo-opacity", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "logo-position", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
+    doinherit = module_exists("logo") ? VLC_VAR_DOINHERIT : 0;
+    var_Create(mp, "logo-file", VLC_VAR_STRING);
+    var_Create(mp, "logo-x", VLC_VAR_INTEGER | doinherit);
+    var_Create(mp, "logo-y", VLC_VAR_INTEGER | doinherit);
+    var_Create(mp, "logo-delay", VLC_VAR_INTEGER | doinherit);
+    var_Create(mp, "logo-repeat", VLC_VAR_INTEGER | doinherit);
+    var_Create(mp, "logo-opacity", VLC_VAR_INTEGER | doinherit);
+    var_Create(mp, "logo-position", VLC_VAR_INTEGER | doinherit);
 
-    var_Create (mp, "contrast", VLC_VAR_FLOAT | VLC_VAR_DOINHERIT);
-    var_Create (mp, "brightness", VLC_VAR_FLOAT | VLC_VAR_DOINHERIT);
-    var_Create (mp, "hue", VLC_VAR_FLOAT | VLC_VAR_DOINHERIT);
-    var_Create (mp, "saturation", VLC_VAR_FLOAT | VLC_VAR_DOINHERIT);
-    var_Create (mp, "gamma", VLC_VAR_FLOAT | VLC_VAR_DOINHERIT);
+    var_Create(mp, "contrast", VLC_VAR_FLOAT);
+    var_SetFloat(mp, "contrast", 1.f);
+    var_Create(mp, "brightness", VLC_VAR_FLOAT);
+    var_SetFloat(mp, "brightness", 1.f);
+    var_Create(mp, "hue", VLC_VAR_FLOAT);
+    var_Create(mp, "saturation", VLC_VAR_FLOAT);
+    var_SetFloat(mp, "saturation", 1.f);
+    var_Create(mp, "gamma", VLC_VAR_FLOAT);
+    var_SetFloat(mp, "gamma", 1.f);
 
      /* Audio */
     var_Create (mp, "aout", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
@@ -695,9 +703,9 @@ libvlc_media_player_new( libvlc_instance_t *instance )
     var_Create (mp, "amem-flush", VLC_VAR_ADDRESS);
     var_Create (mp, "amem-drain", VLC_VAR_ADDRESS);
     var_Create (mp, "amem-set-volume", VLC_VAR_ADDRESS);
-    var_Create (mp, "amem-format", VLC_VAR_STRING | VLC_VAR_DOINHERIT);
-    var_Create (mp, "amem-rate", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
-    var_Create (mp, "amem-channels", VLC_VAR_INTEGER | VLC_VAR_DOINHERIT);
+    var_Create (mp, "amem-format", VLC_VAR_STRING);
+    var_Create (mp, "amem-rate", VLC_VAR_INTEGER);
+    var_Create (mp, "amem-channels", VLC_VAR_INTEGER);
 
     /* Video Title */
     var_Create (mp, "video-title-show", VLC_VAR_BOOL);

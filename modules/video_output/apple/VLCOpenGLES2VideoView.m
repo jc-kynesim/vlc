@@ -229,17 +229,21 @@ static void Close(vlc_gl_t *gl)
 
     /* Setup the usual vlc_gl_t callbacks before loading the API since we need
      * the get_proc_address symbol and a current context. */
-    gl->make_current = MakeCurrent;
-    gl->release_current = ReleaseCurrent;
-    gl->resize = Resize;
-    gl->swap = Swap;
-    gl->get_proc_address = GetSymbol;
-    gl->destroy = Close;
+    static const struct vlc_gl_operations gl_ops =
+    {
+        .make_current = MakeCurrent,
+        .release_current = ReleaseCurrent,
+        .resize = Resize,
+        .swap = Swap,
+        .get_proc_address = GetSymbol,
+        .close = Close,
+    };
+    gl->ops = &gl_ops;
 
     return self;
 }
 
-- (BOOL)attachToWindow:(vout_window_t*)wnd
+- (BOOL)attachToWindow:(vlc_window_t*)wnd
 {
     @try {
         UIView *viewContainer = (__bridge UIView*)wnd->handle.nsobject;
@@ -489,10 +493,10 @@ static void Close(vlc_gl_t *gl)
 
 static int Open(vlc_gl_t *gl, unsigned width, unsigned height)
 {
-    vout_window_t *wnd = gl->surface;
+    vlc_window_t *wnd = gl->surface;
 
     /* We only support UIView container window. */
-    if (wnd->type != VOUT_WINDOW_TYPE_NSOBJECT)
+    if (wnd->type != VLC_WINDOW_TYPE_NSOBJECT)
         return VLC_EGENERIC;
 
     @autoreleasepool {

@@ -36,20 +36,17 @@ typedef struct {
     bool yielding;
     bool is_held;
     unsigned pending_count;
-    DECL_ARRAY(vlc_mouse_t) cmd;
 } vout_control_t;
 
 /* */
 void vout_control_Init(vout_control_t *);
-void vout_control_Clean(vout_control_t *);
 
 /* controls outside of the vout thread */
-void vout_control_PushMouse(vout_control_t *, const vlc_mouse_t *);
 void vout_control_Wake(vout_control_t *);
 void vout_control_Hold(vout_control_t *);
 void vout_control_Release(vout_control_t *);
 
 /* control inside of the vout thread */
-int vout_control_Pop(vout_control_t *, vlc_mouse_t *, vlc_tick_t deadline);
+void vout_control_Wait(vout_control_t *, vlc_tick_t deadline);
 
 #endif

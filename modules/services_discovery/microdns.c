@@ -460,6 +460,8 @@ stop_sd_cb( void *p_this )
 static void *
 RunSD( void *p_this )
 {
+    vlc_thread_set_name("vlc-mdns-servis");
+
     services_discovery_t *p_sd = ( services_discovery_t* )p_this;
     struct discovery_sys *p_sys = p_sd->p_sys;
 
@@ -560,6 +562,8 @@ stop_rd_cb( void *p_this )
 static void *
 RunRD( void *p_this )
 {
+    vlc_thread_set_name("vlc-mdns-render");
+
     vlc_renderer_discovery_t *p_rd = p_this;
     struct discovery_sys *p_sys = p_rd->p_sys;
 
@@ -607,8 +611,7 @@ OpenCommon( vlc_object_t *p_obj, struct discovery_sys *p_sys, bool b_renderer )
         goto error;
     }
 
-    if( vlc_clone( &p_sys->thread, b_renderer ? RunRD : RunSD, p_obj,
-                   VLC_THREAD_PRIORITY_LOW) )
+    if( vlc_clone( &p_sys->thread, b_renderer ? RunRD : RunSD, p_obj) )
     {
         msg_Err( p_obj, "Can't run the lookup thread" );
         goto error;

@@ -37,7 +37,7 @@ const char vlc_module_name[] = MODULE_STRING;
 #include <vlc_access.h>
 #include <vlc_demux.h>
 #include <vlc_codec.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 #include <vlc_interface.h>
 #include <vlc_player.h>
 #include <vlc_filter.h>
@@ -58,7 +58,7 @@ static const struct vlc_decoder_device_operations decoder_device_ops =
 
 static int OpenDecoderDevice(
         struct vlc_decoder_device *device,
-        vout_window_t *window
+        vlc_window_t *window
 ) {
     VLC_UNUSED(window);
     device->ops = &decoder_device_ops;
@@ -156,18 +156,19 @@ static int OpenConverter(vlc_object_t *obj)
     return VLC_SUCCESS;
 }
 
-static int OpenWindow(vout_window_t *wnd)
+static int OpenWindow(vlc_window_t *wnd)
 {
-    static const struct vout_window_operations ops = {
+    static const struct vlc_window_operations ops = {
 
     };
     wnd->ops = &ops;
     return VLC_SUCCESS;
 }
 
-static void CloseDisplay(vout_display_t *vd)
+static void Display(vout_display_t *vd, picture_t *picture)
 {
-
+    (void) vd;
+    (void) picture;
 }
 
 static int OpenDisplay(vout_display_t *vd, video_format_t *fmtp,
@@ -175,7 +176,7 @@ static int OpenDisplay(vout_display_t *vd, video_format_t *fmtp,
 {
     static const struct vlc_display_operations ops =
     {
-        .close = CloseDisplay,
+        .display = Display,
     };
     vd->ops = &ops;
 

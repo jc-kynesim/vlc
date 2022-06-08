@@ -118,7 +118,7 @@ pluginsinclude_HEADERS = \
 	../include/vlc_vout.h \
 	../include/vlc_vout_display.h \
 	../include/vlc_vout_osd.h \
-	../include/vlc_vout_window.h \
+	../include/vlc_window.h \
 	../include/vlc_xlib.h \
 	../include/vlc_xml.h \
 	$(NULL)
@@ -264,6 +264,7 @@ libvlccore_la_SOURCES = \
 	clock/input_clock.c \
 	clock/clock.c \
 	input/decoder.c \
+	input/decoder_device.c \
 	input/decoder_helpers.c \
 	input/demux.c \
 	input/demux_chained.c \
@@ -465,7 +466,8 @@ endif
 if HAVE_DARWIN
 libvlccore_la_SOURCES += \
 	darwin/error.c \
-	darwin/specific.c
+	darwin/specific.c \
+	darwin/thread.c
 libvlccore_objc_la_SOURCES = \
 	darwin/dirs.m \
 	darwin/netconf.m

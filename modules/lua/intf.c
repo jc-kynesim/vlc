@@ -367,7 +367,7 @@ static int Start_LuaIntf( vlc_object_t *p_this, const char *name )
 
     p_sys->L = L;
 
-    if( vlc_clone( &p_sys->thread, Run, p_intf, VLC_THREAD_PRIORITY_LOW ) )
+    if( vlc_clone( &p_sys->thread, Run, p_intf ) )
     {
         vlclua_fd_cleanup( &p_sys->dtable );
         lua_close( p_sys->L );
@@ -401,6 +401,8 @@ void Close_LuaIntf( vlc_object_t *p_this )
 
 static void *Run( void *data )
 {
+    vlc_thread_set_name("vlc-lua-intf");
+
     intf_thread_t *p_intf = data;
     intf_sys_t *p_sys = p_intf->p_sys;
     lua_State *L = p_sys->L;
@@ -422,11 +424,6 @@ int Open_LuaIntf( vlc_object_t *p_this )
 int Open_LuaHTTP( vlc_object_t *p_this )
 {
     return Start_LuaIntf( p_this, "http" );
-}
-
-int Open_LuaCLI( vlc_object_t *p_this )
-{
-    return Start_LuaIntf( p_this, "cli" );
 }
 
 int Open_LuaTelnet( vlc_object_t *p_this )

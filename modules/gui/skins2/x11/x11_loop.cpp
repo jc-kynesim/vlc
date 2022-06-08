@@ -105,27 +105,17 @@ X11Loop::X11Loop( intf_thread_t *pIntf, X11Display &rDisplay ):
     }
 }
 
-
-X11Loop::~X11Loop()
-{
-}
-
-
 OSLoop *X11Loop::instance( intf_thread_t *pIntf, X11Display &rDisplay )
 {
-    if( pIntf->p_sys->p_osLoop == NULL )
-    {
-        OSLoop *pOsLoop = new X11Loop( pIntf, rDisplay );
-        pIntf->p_sys->p_osLoop = pOsLoop;
-    }
-    return pIntf->p_sys->p_osLoop;
+    if (pIntf->p_sys->p_osLoop == NULL)
+        pIntf->p_sys->p_osLoop = std::make_unique<X11Loop>(pIntf, rDisplay);
+    return pIntf->p_sys->p_osLoop.get();
 }
 
 
 void X11Loop::destroy( intf_thread_t *pIntf )
 {
-    delete pIntf->p_sys->p_osLoop;
-    pIntf->p_sys->p_osLoop = NULL;
+    pIntf->p_sys->p_osLoop.reset();
 }
 
 

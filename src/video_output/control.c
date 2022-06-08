@@ -40,21 +40,6 @@ void vout_control_Init(vout_control_t *ctrl)
     ctrl->yielding = false;
     ctrl->forced_awake = false;
     ctrl->pending_count = 0;
-    ARRAY_INIT(ctrl->cmd);
-}
-
-void vout_control_Clean(vout_control_t *ctrl)
-{
-    /* */
-    ARRAY_RESET(ctrl->cmd);
-}
-
-void vout_control_PushMouse(vout_control_t *ctrl, const vlc_mouse_t *video_mouse)
-{
-    vlc_mutex_lock(&ctrl->lock);
-    ARRAY_APPEND(ctrl->cmd, *video_mouse);
-    vlc_cond_signal(&ctrl->wait_request);
-    vlc_mutex_unlock(&ctrl->lock);
 }
 
 void vout_control_Wake(vout_control_t *ctrl)
@@ -88,54 +73,38 @@ void vout_control_Release(vout_control_t *ctrl)
     vlc_mutex_unlock(&ctrl->lock);
 }
 
-int vout_control_Pop(vout_control_t *ctrl, vlc_mouse_t *mouse, vlc_tick_t deadline)
+void vout_control_Wait(vout_control_t *ctrl, vlc_tick_t deadline)
 {
-    bool has_cmd = false;
     vlc_mutex_lock(&ctrl->lock);
 
-    bool timed_out = false;
-    for (;;)
-    {
-        if (ctrl->forced_awake)
-            break;
+    ctrl->yielding = true;
 
-        if (ctrl->pending_count != 0)
-        {
-            /* Let vout_control_Hold() callers pass */
-            ctrl->yielding = true;
-            vlc_cond_signal(&ctrl->wait_available);
-            vlc_cond_wait(&ctrl->wait_request, &ctrl->lock);
-            ctrl->yielding = false;
-        }
-        else if (timed_out)
-            break;
-        else if (ctrl->cmd.i_size <= 0 && deadline != VLC_TICK_INVALID)
-        {
-            ctrl->yielding = true;
-            vlc_cond_signal(&ctrl->wait_available);
-            timed_out =
-                vlc_cond_timedwait(&ctrl->wait_request, &ctrl->lock, deadline);
-            ctrl->yielding = false;
-        }
-        else
-            break;
+    while (ctrl->pending_count != 0)
+    {
+        /* Let vout_control_Hold() callers pass */
+        vlc_cond_signal(&ctrl->wait_available);
+        vlc_cond_wait(&ctrl->wait_request, &ctrl->lock);
     }
+
+    if (deadline != VLC_TICK_INVALID)
+    {
+        do
+        {
+            if (ctrl->forced_awake)
+                break;
+
+            vlc_cond_signal(&ctrl->wait_available);
+        }
+        while (vlc_cond_timedwait(&ctrl->wait_request, &ctrl->lock,
+                                  deadline) == 0);
+    }
+
+    ctrl->yielding = false;
 
     while (ctrl->is_held)
         vlc_cond_wait(&ctrl->wait_available, &ctrl->lock);
 
-    if (ctrl->cmd.i_size > 0) {
-        has_cmd = true;
-        *mouse = ARRAY_VAL(ctrl->cmd, 0);
-        ARRAY_REMOVE(ctrl->cmd, 0);
-        // keep forced_awake set, if it is, so we report all mouse states we have
-        // after we were awaken when a new picture has been pushed by the decoder
-        // see vout_control_Wake
-    } else {
-        ctrl->forced_awake = false;
-    }
+    ctrl->forced_awake = false;
     vlc_mutex_unlock(&ctrl->lock);
-
-    return has_cmd ? VLC_SUCCESS : VLC_EGENERIC;
 }
 

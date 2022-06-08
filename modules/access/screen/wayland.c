@@ -238,6 +238,8 @@ static void *Thread(void *data)
     struct pollfd ufd[1];
     unsigned interval = lroundf(CLOCK_FREQ / (sys->rate * 1000.f));
 
+    vlc_thread_set_name("vlc-scr-wayland");
+
     int canc = vlc_savecancel();
     vlc_cleanup_push(cleanup_wl_display_read, display);
 
@@ -418,7 +420,7 @@ static int Open(vlc_object_t *obj)
     /* Initializes demux */
     sys->start = vlc_tick_now();
 
-    if (vlc_clone(&sys->thread, Thread, demux, VLC_THREAD_PRIORITY_INPUT))
+    if (vlc_clone(&sys->thread, Thread, demux))
         goto error;
 
     demux->pf_demux = NULL;

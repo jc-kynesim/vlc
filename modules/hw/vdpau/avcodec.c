@@ -116,7 +116,7 @@ static int Lock(vlc_va_t *va, picture_t *pic, AVCodecContext *ctx, AVFrame *fram
     return VLC_SUCCESS;
 }
 
-static void Close(vlc_va_t *va)
+static void Close(vlc_va_t *va, AVCodecContext* ctx)
 {
     vlc_va_sys_t *sys = va->sys;
 
@@ -126,6 +126,8 @@ static void Close(vlc_va_t *va)
     vlc_video_context_Release(sys->vctx);
     if (sys->hwaccel_context)
         av_free(sys->hwaccel_context);
+    if (ctx)
+        ctx->hwaccel_context = NULL;
     free(sys);
 }
 
@@ -146,27 +148,13 @@ static int Open(vlc_va_t *va, AVCodecContext *avctx, enum AVPixelFormat hwfmt, c
     (void) desc;
     void *func;
     VdpStatus err;
-    VdpChromaType type;
+    VdpChromaType type, *chroma;
     uint32_t width, height;
 
     if (av_vdpau_get_surface_parameters(avctx, &type, &width, &height))
         return VLC_EGENERIC;
 
-    switch (type)
-    {
-        case VDP_CHROMA_TYPE_420:
-            fmt_out->i_chroma = VLC_CODEC_VDPAU_VIDEO_420;
-            break;
-        case VDP_CHROMA_TYPE_422:
-            fmt_out->i_chroma = VLC_CODEC_VDPAU_VIDEO_422;
-            break;
-        case VDP_CHROMA_TYPE_444:
-            fmt_out->i_chroma = VLC_CODEC_VDPAU_VIDEO_444;
-            break;
-        default:
-            msg_Err(va, "unsupported chroma type %"PRIu32, type);
-            return VLC_EGENERIC;
-    }
+    fmt_out->i_chroma = VLC_CODEC_VDPAU_VIDEO;
 
     unsigned codec_refs;
     switch (avctx->codec_id)
@@ -193,13 +181,16 @@ static int Open(vlc_va_t *va, AVCodecContext *avctx, enum AVPixelFormat hwfmt, c
        return VLC_ENOMEM;
 
     sys->vctx = vlc_video_context_Create(dec_device, VLC_VIDEO_CONTEXT_VDPAU,
-                                         0, &vdpau_vctx_ops);
+                                         sizeof (VdpChromaType),
+                                         &vdpau_vctx_ops);
     if (sys->vctx == NULL)
     {
         free(sys);
         return VLC_ENOMEM;
     }
 
+    chroma = vlc_video_context_GetPrivate(sys->vctx, VLC_VIDEO_CONTEXT_VDPAU);
+    *chroma = type;
     sys->type = type;
     sys->width = width;
     sys->height = height;
@@ -231,7 +222,7 @@ static int Open(vlc_va_t *va, AVCodecContext *avctx, enum AVPixelFormat hwfmt, c
     if (i < refs)
     {
         msg_Err(va, "not enough video RAM");
-        Close(va);
+        Close(va, avctx);
         return VLC_ENOMEM;
     }
 

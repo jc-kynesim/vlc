@@ -127,8 +127,7 @@ int input_Start( input_thread_t *p_input )
 
     assert( !priv->is_running );
     /* Create thread and wait for its readiness. */
-    priv->is_running = !vlc_clone( &priv->thread, func, priv,
-                                   VLC_THREAD_PRIORITY_INPUT );
+    priv->is_running = !vlc_clone( &priv->thread, func, priv );
     if( !priv->is_running )
     {
         msg_Err( p_input, "cannot create input thread" );
@@ -420,17 +419,12 @@ static void *Run( void *data )
     input_thread_private_t *priv = data;
     input_thread_t *p_input = &priv->input;
 
+    vlc_thread_set_name("vlc-input");
+
     vlc_interrupt_set(&priv->interrupt);
 
     if( !Init( p_input ) )
     {
-        if( priv->master->b_can_pace_control && priv->b_out_pace_control )
-        {
-            /* We don't want a high input priority here or we'll
-             * end-up sucking up all the CPU time */
-            vlc_set_priority( priv->thread, VLC_THREAD_PRIORITY_LOW );
-        }
-
         MainLoop( p_input, true ); /* FIXME it can be wrong (like with VLM) */
 
         /* Clean up */
@@ -445,6 +439,8 @@ static void *Preparse( void *data )
 {
     input_thread_private_t *priv = data;
     input_thread_t *p_input = &priv->input;
+
+    vlc_thread_set_name("vlc-preparse");
 
     vlc_interrupt_set(&priv->interrupt);
 

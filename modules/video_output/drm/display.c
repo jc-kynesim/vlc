@@ -33,13 +33,17 @@
 # include "config.h"
 #endif
 
-#include <drm_mode.h>
+#ifndef HAVE_LIBDRM
+# include <drm/drm_mode.h>
+#else
+# include <drm_mode.h>
+#endif
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
 #include <vlc_picture.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 #include "vlc_drm.h"
 
 #include <assert.h>
@@ -95,12 +99,12 @@ static void Display(vout_display_t *vd, picture_t *picture)
 {
     VLC_UNUSED(picture);
     vout_display_sys_t *sys = vd->sys;
-    vout_window_t *wnd = vd->cfg->window;
+    vlc_window_t *wnd = vd->cfg->window;
     const video_format_t *fmt = vd->fmt;
     picture_t *pic = sys->buffers[sys->front_buf];
     vout_display_place_t place;
 
-    vout_display_PlacePicture(&place, vd->fmt, vd->cfg);
+    vout_display_PlacePicture(&place, vd->fmt, &vd->cfg->display);
 
     struct drm_mode_set_plane sp = {
         .plane_id = sys->plane_id,
@@ -151,11 +155,11 @@ static const struct vlc_display_operations ops = {
 static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
 {
-    vout_window_t *wnd = vd->cfg->window;
+    vlc_window_t *wnd = vd->cfg->window;
     uint_fast32_t drm_fourcc = 0;
     video_format_t fmt;
 
-    if (wnd->type != VOUT_WINDOW_TYPE_KMS)
+    if (wnd->type != VLC_WINDOW_TYPE_KMS)
         return VLC_EGENERIC;
 
     /*
@@ -207,7 +211,7 @@ static int Open(vout_display_t *vd,
     msg_Dbg(vd, "using DRM pixel format %4.4s (0x%08"PRIXFAST32")",
             (char *)&drm_fourcc, drm_fourcc);
 
-    video_format_ApplyRotation(&fmt, vd->fmt);
+    video_format_ApplyRotation(&fmt, vd->source);
     if (!vlc_video_format_drm(&fmt, drm_fourcc)) {
         /* This can only occur if $vlc-drm-chroma is unknown. */
         assert(chroma != NULL);

@@ -44,7 +44,8 @@ static_assert(VLC_PLAYER_CAP_SEEK == VLC_INPUT_CAPABILITIES_SEEKABLE &&
               "player/input capabilities mismatch");
 
 static_assert(VLC_PLAYER_TITLE_MENU == INPUT_TITLE_MENU &&
-              VLC_PLAYER_TITLE_INTERACTIVE == INPUT_TITLE_INTERACTIVE,
+              VLC_PLAYER_TITLE_INTERACTIVE == INPUT_TITLE_INTERACTIVE &&
+              VLC_PLAYER_TITLE_MAIN == INPUT_TITLE_MAIN,
               "player/input title flag mismatch");
 
 #define vlc_player_foreach_inputs(it) \
@@ -199,6 +200,8 @@ static void *
 vlc_player_destructor_Thread(void *data)
 {
     vlc_player_t *player = data;
+
+    vlc_thread_set_name("vlc-player-end");
 
     vlc_mutex_lock(&player->lock);
 
@@ -2018,7 +2021,7 @@ vlc_player_New(vlc_object_t *parent, enum vlc_player_lock_type lock_type,
     vlc_player_InitTimer(player);
 
     if (vlc_clone(&player->destructor.thread, vlc_player_destructor_Thread,
-                  player, VLC_THREAD_PRIORITY_LOW) != 0)
+                  player) != 0)
     {
         vlc_player_DestroyTimer(player);
         goto error;

@@ -280,7 +280,7 @@ bool AbstractDecodedStream::init(const es_format_t *p_fmt)
         return false;
     }
 
-    if(vlc_clone(&thread, decoderThreadCallback, this, VLC_THREAD_PRIORITY_VIDEO))
+    if(vlc_clone(&thread, decoderThreadCallback, this))
     {
         es_format_Clean(&p_owner->decoder_out);
         es_format_Clean(&p_owner->last_fmt_update);
@@ -294,6 +294,8 @@ bool AbstractDecodedStream::init(const es_format_t *p_fmt)
 
 void * AbstractDecodedStream::decoderThreadCallback(void *me)
 {
+    vlc_thread_set_name("vlc-SDI");
+
     reinterpret_cast<AbstractDecodedStream *>(me)->decoderThread();
     return NULL;
 }

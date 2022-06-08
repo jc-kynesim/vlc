@@ -181,12 +181,12 @@ void ConvertDialog::close()
 
         if( dumpRadio->isChecked() )
         {
-            mrl.header("demux=dump :demuxdump-file=" + fileLine->text());
+            mrl.header(" :demux=dump :demuxdump-file=" + fileLine->text());
         }
         else
         {
             mrl = profile->getTranscode();
-            mrl.header( "sout=#" + mrl.getHeader() );
+            mrl.header( " :sout=#" + mrl.getHeader() );
             if( deinterBox->isChecked() )
             {
                 mrl.option("deinterlace");
@@ -227,16 +227,13 @@ void ConvertDialog::close()
                 newFileName = newFileName.append(fileExtension);
             }
 
-            newFileName.replace( QChar('\''), "\\\'" );
-
-
             mrl.end();
             SoutModule dstModule("std");
             SoutModule file("file");
             file.option("no-overwrite");
             dstModule.option("access", file);
             dstModule.option("mux", profile->getMux());
-            dstModule.option("dst", "'" + newFileName + "'");
+            dstModule.option("dst", newFileName);
 
             if( displayBox->isChecked() )
             {

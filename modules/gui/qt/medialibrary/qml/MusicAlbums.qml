@@ -112,8 +112,9 @@ FocusScope {
         defaultCover: VLCStyle.noArtAlbumCover
     }
 
-    AlbumContextMenu {
+    Util.MLContextMenu {
         id: contextMenu
+
         model: albumModelId
     }
 
@@ -163,7 +164,7 @@ FocusScope {
 
                 Behavior on opacity {
                     NumberAnimation {
-                        duration: VLCStyle.duration_faster
+                        duration: VLCStyle.duration_short
                     }
                 }
             }

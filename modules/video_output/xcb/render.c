@@ -172,7 +172,10 @@ static void RenderRegion(vout_display_t *vd, const subpicture_t *subpic,
 
     xcb_render_composite(conn, XCB_RENDER_PICT_OP_OVER,
                          sys->picture.subpic, sys->picture.alpha,
-                         sys->picture.scale, 0, 0, 0, 0, dx, dy, dw, dh);
+                         sys->picture.scale,
+                         reg->fmt.i_x_offset, reg->fmt.i_y_offset,
+                         reg->fmt.i_x_offset, reg->fmt.i_y_offset,
+                         dx, dy, dw, dh);
 
     xcb_render_free_picture(conn, sys->picture.alpha);
     xcb_render_free_picture(conn, sys->picture.subpic);
@@ -281,7 +284,7 @@ static void CreateBuffers(vout_display_t *vd)
                               sys->format.argb, 0, NULL);
 
     vout_display_place_t *place = &sys->place;
-    vout_display_PlacePicture(place, fmt, vd->cfg);
+    vout_display_PlacePicture(place, fmt, &vd->cfg->display);
 
     /* Homogeneous coordinates transform from destination(place)
      * to source(fmt) */
@@ -445,6 +448,9 @@ static vlc_fourcc_t ParseFormat(const xcb_setup_t *setup,
                 if (d->red_shift == 16 && d->green_shift == 8
                  && d->blue_shift == 0)
                     return VLC_CODEC_ARGB;
+                if (d->red_shift == 0 && d->green_shift == 8
+                 && d->blue_shift == 16)
+                    return VLC_CODEC_ABGR;
 #else
                 if (d->red_shift == 0 && d->green_shift == 8
                  && d->blue_shift == 16)
@@ -455,6 +461,9 @@ static vlc_fourcc_t ParseFormat(const xcb_setup_t *setup,
                 if (d->red_shift == 8 && d->green_shift == 16
                  && d->blue_shift == 24)
                     return VLC_CODEC_ARGB;
+                if (d->red_shift == 24 && d->green_shift == 16
+                 && d->blue_shift == 8)
+                    return VLC_CODEC_ABGR;
 #endif
             }
             break;

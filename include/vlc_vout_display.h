@@ -29,7 +29,7 @@
 #include <vlc_actions.h>
 #include <vlc_mouse.h>
 #include <vlc_vout.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 #include <vlc_viewpoint.h>
 
 /**
@@ -78,11 +78,35 @@ typedef struct vlc_video_align {
 /** @} */
 
 /**
+ * Video automatic scale fitting.
+ */
+enum vlc_video_fitting {
+    VLC_VIDEO_FIT_NONE /**< No automatic scaling (use explicit zoom ratio) */,
+    VLC_VIDEO_FIT_SMALLER /**< Fit inside / to smallest dimension */,
+    VLC_VIDEO_FIT_LARGER /**< Fit outside / to largest dimension */,
+    VLC_VIDEO_FIT_WIDTH /**< Fit to width */,
+    VLC_VIDEO_FIT_HEIGHT /**< Fit to height */,
+};
+
+/**
+ * Display placement and zoom configuration.
+ */
+struct vout_display_placement {
+    unsigned width; /**< Requested display pixel width (0 by default). */
+    unsigned height; /**< Requested display pixel height (0 by default). */
+    vlc_rational_t sar; /**< Requested sample aspect ratio */
+
+    vlc_video_align_t align; /**< Alignment within the window */
+    enum vlc_video_fitting fitting; /**< Scaling/fitting mode */
+    vlc_rational_t zoom; /**< Zoom ratio (if fitting is disabled) */
+};
+
+/**
  * User configuration for a video output display (\ref vout_display_t)
  *
  * This primarily controls the size of the display area within the video
  * window, as follows:
- * - If \ref vout_display_cfg::is_display_filled "is_display_filled" is set,
+ * - If \ref vout_display_cfg::display::fitting is not disabled,
  *   the video size is fitted to the display size.
  * - If \ref vout_display_cfg::window "window" size is valid, the video size
  *   is set to the window size,
@@ -90,24 +114,8 @@ typedef struct vlc_video_align {
  *   multiplied by the zoom factor.
  */
 typedef struct vout_display_cfg {
-    struct vout_window_t *window; /**< Window */
-
-    /** Display properties */
-    struct {
-        unsigned width; /**< Requested display pixel width (0 by default). */
-        unsigned height; /**< Requested display pixel height (0 by default). */
-        vlc_rational_t sar; /**< Requested sample aspect ratio */
-    } display;
-
-    /** Alignment of the video within the window */
-    vlc_video_align_t align;
-
-    /** Automatic scaling/fitting flag */
-    bool is_display_filled;
-
-    /** Zoom ratio */
-    vlc_rational_t zoom;
-
+    struct vlc_window *window; /**< Window */
+    struct vout_display_placement display; /**< Display placement properties */
     vlc_viewpoint_t viewpoint;
 } vout_display_cfg_t;
 
@@ -137,7 +145,7 @@ enum vout_display_query {
     VOUT_DISPLAY_CHANGE_DISPLAY_SIZE,
 
     /**
-     * Notifies a change of the display fill display flag by the user.
+     * Notifies a change of the display fitting mode by the user.
      *
      * \retval VLC_SUCCESS if the display handled the change
      * \retval VLC_EGENERIC if a \ref vlc_display_operations::reset_pictures
@@ -423,11 +431,11 @@ void vout_display_SetSizeAndSar(vout_display_t *vd, unsigned width, unsigned hei
 
 static inline void vout_display_SendEventMousePressed(vout_display_t *vd, int button)
 {
-    vout_window_ReportMousePressed(vd->cfg->window, button);
+    vlc_window_ReportMousePressed(vd->cfg->window, button);
 }
 static inline void vout_display_SendEventMouseReleased(vout_display_t *vd, int button)
 {
-    vout_window_ReportMouseReleased(vd->cfg->window, button);
+    vlc_window_ReportMouseReleased(vd->cfg->window, button);
 }
 static inline void vout_display_SendEventViewpointMoved(vout_display_t *vd,
                                                         const vlc_viewpoint_t *vp)
@@ -446,12 +454,12 @@ static inline void vout_display_SendEventViewpointMoved(vout_display_t *vd,
  */
 static inline void vout_display_SendMouseMovedDisplayCoordinates(vout_display_t *vd, int m_x, int m_y)
 {
-    vout_window_ReportMouseMoved(vd->cfg->window, m_x, m_y);
+    vlc_window_ReportMouseMoved(vd->cfg->window, m_x, m_y);
 }
 
 static inline bool vout_display_cfg_IsWindowed(const vout_display_cfg_t *cfg)
 {
-    return cfg->window->type != VOUT_WINDOW_TYPE_DUMMY;
+    return cfg->window->type != VLC_WINDOW_TYPE_DUMMY;
 }
 
 /**
@@ -460,8 +468,10 @@ static inline bool vout_display_cfg_IsWindowed(const vout_display_cfg_t *cfg)
  *
  * This assumes that the picture is already cropped.
  */
-VLC_API void vout_display_GetDefaultDisplaySize(unsigned *width, unsigned *height, const video_format_t *source, const vout_display_cfg_t *);
-
+VLC_API
+void vout_display_GetDefaultDisplaySize(unsigned *width, unsigned *height,
+                                        const video_format_t *source,
+                                        const struct vout_display_placement *);
 
 /**
  * Video placement.
@@ -498,7 +508,10 @@ static inline bool vout_display_PlaceEquals(const vout_display_place_t *p1,
  * \param source Video source format
  * \param cfg Display configuration
  */
-VLC_API void vout_display_PlacePicture(vout_display_place_t *place, const video_format_t *source, const vout_display_cfg_t *cfg);
+VLC_API
+void vout_display_PlacePicture(vout_display_place_t *restrict place,
+                               const video_format_t *restrict source,
+                               const struct vout_display_placement *cfg);
 
 /**
  * Translates coordinates.
@@ -509,21 +522,11 @@ VLC_API void vout_display_PlacePicture(vout_display_place_t *place, const video_
  * \param x pointer to abscissa to be translated
  * \param y pointer to ordinate to be translated
  * \param fmt video format
- * \param cfg display configuration
+ * \param dp display configuration
  */
 void vout_display_TranslateCoordinates(int *x, int *y,
                                        const video_format_t *fmt,
-                                       const vout_display_cfg_t *cfg);
-
-/**
- * Translates mouse state.
- *
- * This translates the mouse (pointer) state from window coordinates to
- * video coordinates.
- * @note @c video and @c window pointers may alias.
- */
-void vout_display_TranslateMouseState(vout_display_t *vd, vlc_mouse_t *video,
-                                      const vlc_mouse_t *window);
+                                       const struct vout_display_placement *dp);
 
 /** @} */
 #endif /* VLC_VOUT_DISPLAY_H */

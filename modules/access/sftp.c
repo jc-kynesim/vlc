@@ -403,8 +403,10 @@ static int Open( vlc_object_t* p_this )
         goto error;
     }
 
-    vlc_credential_get( &credential, p_access, "sftp-user", "sftp-pwd",
-                        NULL, NULL );
+    if (vlc_credential_get( &credential, p_access, "sftp-user", "sftp-pwd",
+                            NULL, NULL) == -EINTR)
+        goto error;
+
     char* psz_userauthlist = NULL;
     bool b_publickey_tried = false;
     do
@@ -463,7 +465,7 @@ static int Open( vlc_object_t* p_this )
     } while( vlc_credential_get( &credential, p_access, "sftp-user", "sftp-pwd",
                                 _("SFTP authentication"),
                                 _("Please enter a valid login and password for "
-                                "the SFTP connection to %s"), url.psz_host ) );
+                                "the SFTP connection to %s"), url.psz_host ) == 0 );
 
     /* Create the sftp session */
     p_sys->sftp_session = libssh2_sftp_init( p_sys->ssh_session );

@@ -778,8 +778,7 @@ static HRESULT Start( vlc_object_t *obj, aout_stream_sys_t *sys,
         }
     }
 
-    int ret = vlc_clone(&sys->eraser_thread, PlayedDataEraser, (void*) obj,
-                        VLC_THREAD_PRIORITY_LOW);
+    int ret = vlc_clone(&sys->eraser_thread, PlayedDataEraser, (void*) obj);
     if( unlikely( ret ) )
     {
         if( ret != ENOMEM )
@@ -1109,6 +1108,8 @@ static void * PlayedDataEraser( void * data )
     int64_t toerase, tosleep;
     vlc_tick_t ticksleep;
     HRESULT dsresult;
+
+    vlc_thread_set_name("vlc-directsound");
 
     for(;;)
     {

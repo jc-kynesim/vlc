@@ -27,6 +27,7 @@ import org.videolan.vlc 0.1
 import "qrc:///widgets/" as Widgets
 import "qrc:///main/"    as MainInterface
 import "qrc:///util/"    as Util
+import "qrc:///util/Helpers.js" as Helpers
 import "qrc:///style/"
 
 FocusScope {
@@ -99,7 +100,7 @@ FocusScope {
     }
 
     function resetFocus() {
-        if (model.count === 0) return
+        if (!model || model.count === 0) return
 
         var initialIndex = root.initialIndex
 
@@ -282,13 +283,16 @@ FocusScope {
                 onContextMenuButtonClicked: {
                     gridView.rightClickOnItem(index);
 
-                    root.contextMenu.popup(modelSelect.selectedIndexes, globalMousePos,
-                                           { "information" : index });
+                    var options = {}
+                    if (Helpers.get(model, "isVideo", true))
+                        options["information"] = index
+
+                    root.contextMenu.popup(modelSelect.selectedIndexes, globalMousePos, options);
                 }
 
                 // Animations
 
-                Behavior on opacity { NumberAnimation { duration: VLCStyle.duration_faster } }
+                Behavior on opacity { NumberAnimation { duration: VLCStyle.duration_short } }
             }
 
             expandDelegate: VideoInfoExpandPanel {

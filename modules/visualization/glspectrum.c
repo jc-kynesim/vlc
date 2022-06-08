@@ -29,7 +29,7 @@
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_aout.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 #include <vlc_opengl.h>
 #include <vlc_filter.h>
 #include <vlc_queue.h>
@@ -193,7 +193,7 @@ static int Open(vlc_object_t * p_this)
     p_sys->dead = false;
 
     /* Create the openGL provider */
-    vout_window_cfg_t cfg = {
+    vlc_window_cfg_t cfg = {
         .is_decorated = true,
         .width = var_InheritInteger(p_filter, "glspectrum-width"),
         .height = var_InheritInteger(p_filter, "glspectrum-height"),
@@ -222,8 +222,7 @@ static int Open(vlc_object_t * p_this)
     vlc_gl_ReleaseCurrent(p_sys->gl);
 
     /* Create the thread */
-    if (vlc_clone(&p_sys->thread, Thread, p_filter,
-                  VLC_THREAD_PRIORITY_VIDEO)) {
+    if (vlc_clone(&p_sys->thread, Thread, p_filter)) {
         vlc_gl_surface_Destroy(p_sys->gl);
         return VLC_ENOMEM;
     }
@@ -425,6 +424,8 @@ static void drawBars(filter_t *p_filter, float heights[])
  */
 static void *Thread( void *p_data )
 {
+    vlc_thread_set_name("vlc-glspectrum");
+
     filter_t  *p_filter = (filter_t*)p_data;
     filter_sys_t *p_sys = p_filter->p_sys;
     vlc_gl_t *gl = p_sys->gl;

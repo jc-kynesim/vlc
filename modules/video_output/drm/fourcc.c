@@ -25,7 +25,11 @@
 #endif
 
 #include <stdint.h>
-#include <drm_fourcc.h>
+#ifndef HAVE_LIBDRM
+# include <drm/drm_fourcc.h>
+#else
+# include <drm_fourcc.h>
+#endif
 #include <vlc_common.h>
 #include <vlc_es.h>
 #include "vlc_drm.h"
@@ -173,6 +177,7 @@ static const struct {
     { DRM_FORMAT_ARGB8888, VLC_CODEC_BGRA },
     { DRM_FORMAT_ABGR8888, VLC_CODEC_RGBA },
     { DRM_FORMAT_BGRA8888, VLC_CODEC_ARGB },
+    { DRM_FORMAT_RGBA8888, VLC_CODEC_ABGR },
 #ifndef WORDS_BIGENDIAN
     { DRM_FORMAT_ABGR2101010, VLC_CODEC_RGBA10 },
 #endif

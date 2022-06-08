@@ -982,8 +982,7 @@ static httpd_host_t *httpd_HostCreate(vlc_object_t *p_this,
     host->p_tls    = p_tls;
 
     /* create the thread */
-    if (vlc_clone(&host->thread, httpd_HostThread, host,
-                   VLC_THREAD_PRIORITY_LOW)) {
+    if (vlc_clone(&host->thread, httpd_HostThread, host)) {
         msg_Err(p_this, "cannot spawn http host thread");
         goto error;
     }
@@ -1194,7 +1193,7 @@ void httpd_MsgAdd(httpd_message_t *msg, const char *name, const char *psz_value,
 
     va_list args;
     va_start(args, psz_value);
-    int ret = us_vasprintf(&h->value, psz_value, args);
+    int ret = vlc_vasprintf_c(&h->value, psz_value, args);
     va_end(args);
 
     if (ret == -1) {
@@ -2055,6 +2054,8 @@ static void httpdLoop(httpd_host_t *host)
 
 static void* httpd_HostThread(void *data)
 {
+    vlc_thread_set_name("vlc-httpd");
+
     httpd_host_t *host = data;
 
     while (atomic_load_explicit(&host->ref, memory_order_relaxed) > 0)

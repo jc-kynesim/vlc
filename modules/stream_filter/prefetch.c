@@ -125,6 +125,8 @@ static int ThreadControl(stream_t *stream, int query, ...)
 
 static void *Thread(void *data)
 {
+    vlc_thread_set_name("vlc-prefetch");
+
     stream_t *stream = data;
     stream_sys_t *sys = stream->p_sys;
     bool paused = false;
@@ -488,7 +490,7 @@ static int Open(vlc_object_t *obj)
 
     stream->p_sys = sys;
 
-    if (vlc_clone(&sys->thread, Thread, stream, VLC_THREAD_PRIORITY_LOW))
+    if (vlc_clone(&sys->thread, Thread, stream))
     {
         vlc_interrupt_destroy(sys->interrupt);
         goto error;

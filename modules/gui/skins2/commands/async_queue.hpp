@@ -28,6 +28,9 @@
 
 #include <list>
 #include <string>
+#include <memory>
+
+#include <vlc_cxx_helpers.hpp>
 
 class OSTimer;
 
@@ -55,16 +58,15 @@ public:
 
 private:
     /// Command queue
-    typedef std::list<CmdGenericPtr> cmdList_t;
+    using cmdList_t = std::list<CmdGenericPtr>;
     cmdList_t m_cmdList;
     /// Timer
-    OSTimer *m_pTimer;
+    std::unique_ptr<OSTimer> m_pTimer;
     /// Mutex
-    vlc_mutex_t m_lock;
+    vlc::threads::mutex m_lock;
 
     // Private because it is a singleton
     AsyncQueue( intf_thread_t *pIntf );
-    virtual ~AsyncQueue();
 
     // Callback to flush the queue
     DEFINE_CALLBACK( AsyncQueue, Flush );

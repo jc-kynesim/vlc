@@ -26,7 +26,7 @@
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 #include <vlc_codec.h>
 
 #include <bcm_host.h>
@@ -34,7 +34,7 @@
 
 #include "mmal_picture.h"
 
-static int OpenDecoderDevice(vlc_decoder_device *, vout_window_t *);
+static int OpenDecoderDevice(vlc_decoder_device *, vlc_window_t *);
 
 vlc_module_begin()
     set_description(N_("MMAL"))
@@ -117,7 +117,7 @@ static const struct vlc_decoder_device_operations mmal_device_ops = {
     .close = CloseDecoderDevice,
 };
 
-static int OpenDecoderDevice(vlc_decoder_device *device, vout_window_t *window)
+static int OpenDecoderDevice(vlc_decoder_device *device, vlc_window_t *window)
 {
     VLC_UNUSED(window);
 

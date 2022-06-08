@@ -281,13 +281,15 @@ FocusScope {
         parentId: albumModel.parentId
     }
 
-    AlbumContextMenu {
+    Util.MLContextMenu {
         id: contextMenu
+
         model: albumModel
     }
 
-    AlbumTrackContextMenu {
+    Util.MLContextMenu {
         id: trackContextMenu
+
         model: trackModel
     }
 
@@ -332,7 +334,7 @@ FocusScope {
 
                 Behavior on opacity {
                     NumberAnimation {
-                        duration: VLCStyle.duration_faster
+                        duration: VLCStyle.duration_short
                     }
                 }
             }

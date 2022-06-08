@@ -48,7 +48,7 @@ public: // Enums
     };
 
 public:
-    CoverGenerator(vlc_medialibrary_t * ml, const MLItemId & itemId);
+    CoverGenerator(const MLItemId & itemId);
 
 public: // Interface
     MLItemId getId();
@@ -72,30 +72,26 @@ public: // Interface
     // NOTE: This lets us enforce a specific prefix for the cover fileName.
     void setPrefix(const QString & prefix);
 
+    int requiredNoOfThumbnails() const;
+
     bool cachedFileAvailable() const;
 
     QString cachedFileURL() const;
 
-public:
-    QString execute();
+    QString execute(QStringList thumbnails) const;
 
 private: // Functions
     QString fileName() const;
 
-    void draw(QPainter & painter, const QStringList & fileNames, int countX, int countY);
+    void draw(QPainter & painter, const QStringList & fileNames, int countX, int countY) const;
 
-    void drawImage(QPainter & painter, const QString & fileName, const QRect & rect);
+    void drawImage(QPainter & painter, const QString & fileName, const QRect & rect) const;
 
-    void blur(QImage &image);
+    void blur(QImage &image) const;
 
     QString getPrefix(vlc_ml_parent_type type) const;
 
-    QStringList getMedias(int count, int64_t id, vlc_ml_parent_type type) const;
-    QStringList getGenre (int count, int64_t id) const;
-
 private:
-    vlc_medialibrary_t * m_ml;
-
     MLItemId m_id;
 
     QSize m_size;

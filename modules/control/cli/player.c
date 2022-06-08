@@ -434,7 +434,14 @@ static int PlayerSetTrack(struct cli_client *cl, const char *const *args,
     {
         int idx = atoi(args[1]);
         if (idx < 0)
+        {
+            if (idx == -1)
+            {
+                vlc_player_UnselectTrackCategory(player, cat);
+                ret = 0;
+            }
             goto out;
+        }
 
         size_t track_count = vlc_player_GetTrackCount(player, cat);
         if ((unsigned)idx >= track_count)
@@ -494,43 +501,6 @@ static int PlayerRecord(struct cli_client *cl, const char *const *args,
     vlc_player_Unlock(player);
     (void) cl;
     return 0;
-}
-
-static int PlayerItemInfo(struct cli_client *cl, const char *const *args,
-                          size_t count, void *data)
-{
-    vlc_player_t *player = data;
-    input_item_t *item;
-
-    vlc_player_Lock(player);
-    item = vlc_player_GetCurrentMedia(player);
-
-    if (item != NULL)
-    {
-        vlc_mutex_lock(&item->lock);
-        for (int i = 0; i < item->i_categories; i++)
-        {
-            info_category_t *category = item->pp_categories[i];
-            info_t *info;
-
-            if (info_category_IsHidden(category))
-                continue;
-
-            cli_printf(cl, "+----[ %s ]", category->psz_name);
-            cli_printf(cl, "| ");
-            info_foreach(info, &category->infos)
-                cli_printf(cl, "| %s: %s", info->psz_name,
-                           info->psz_value);
-            cli_printf(cl, "| ");
-        }
-        cli_printf(cl, "+----[ end of stream info ]");
-        vlc_mutex_unlock(&item->lock);
-    }
-    else
-        cli_printf(cl, "no input");
-    vlc_player_Unlock(player);
-    (void) args; (void) count;
-    return (item != NULL) ? 0 : VLC_ENOENT;
 }
 
 static int PlayerGetTime(struct cli_client *cl, const char *const *args,
@@ -1022,7 +992,6 @@ static const struct cli_handler cmds[] =
     { "normal", PlayerNormal },
     { "rate", PlayerRate },
     { "frame", PlayerFrame },
-    { "info", PlayerItemInfo },
     { "get_time", PlayerGetTime },
     { "get_length", PlayerGetLength },
     { "get_title", PlayerGetTitle },

@@ -137,7 +137,7 @@ static int DecodeFrame( decoder_t *p_dec, block_t *p_block )
             return VLC_EGENERIC;
         }
 
-        if( decoder_UpdateVideoOutput( p_dec, p_sys->vctx ) != VLC_SUCCESS )
+        if( decoder_UpdateVideoOutput( p_dec, p_sys->vctx ) )
         {
             block_Release( p_block );
             return VLCDEC_SUCCESS;
@@ -191,7 +191,7 @@ static int DecodeFrame( decoder_t *p_dec, block_t *p_block )
         if (src_sys->renderSrc[j])
             src_sys->renderSrc[j]->Release();
     }
-    D3D11_AllocateResourceView(p_dec, dev_sys->d3d_dev.d3ddevice, p_sys->output_format,
+    D3D11_AllocateResourceView(vlc_object_logger(p_dec), dev_sys->d3d_dev.d3ddevice, p_sys->output_format,
                                src_sys->texture, src_sys->slice_index, src_sys->renderSrc);
 
     picture_Hold( p_pic ); // hold the picture we got from the block
@@ -284,7 +284,7 @@ int D3D11OpenBlockDecoder( vlc_object_t *obj )
             return VLC_EGENERIC;
         }
 
-        if( decoder_UpdateVideoOutput( p_dec, p_sys->vctx ) != VLC_SUCCESS )
+        if( decoder_UpdateVideoOutput( p_dec, p_sys->vctx ) )
         {
             vlc_video_context_Release(p_sys->vctx);
             vlc_decoder_device_Release(dec_dev);

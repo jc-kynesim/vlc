@@ -62,13 +62,6 @@ typedef struct vlc_thread *vlc_thread_t;
 typedef struct vlc_threadvar *vlc_threadvar_t;
 typedef struct vlc_timer *vlc_timer_t;
 
-# define VLC_THREAD_PRIORITY_LOW      0
-# define VLC_THREAD_PRIORITY_INPUT    THREAD_PRIORITY_ABOVE_NORMAL
-# define VLC_THREAD_PRIORITY_AUDIO    THREAD_PRIORITY_HIGHEST
-# define VLC_THREAD_PRIORITY_VIDEO    0
-# define VLC_THREAD_PRIORITY_OUTPUT   THREAD_PRIORITY_ABOVE_NORMAL
-# define VLC_THREAD_PRIORITY_HIGHEST  THREAD_PRIORITY_TIME_CRITICAL
-
 static inline int vlc_poll(struct pollfd *fds, unsigned nfds, int timeout)
 {
     int val;
@@ -89,13 +82,6 @@ typedef struct vlc_thread *vlc_thread_t;
 
 typedef struct vlc_threadvar *vlc_threadvar_t;
 typedef struct vlc_timer *vlc_timer_t;
-
-# define VLC_THREAD_PRIORITY_LOW      0
-# define VLC_THREAD_PRIORITY_INPUT    1
-# define VLC_THREAD_PRIORITY_AUDIO    VLC_THREAD_PRIORITY_HIGHEST
-# define VLC_THREAD_PRIORITY_VIDEO    0
-# define VLC_THREAD_PRIORITY_OUTPUT   1
-# define VLC_THREAD_PRIORITY_HIGHEST  2
 
 # define pthread_sigmask  sigprocmask
 
@@ -129,13 +115,6 @@ typedef struct vlc_thread *vlc_thread_t;
 #define VLC_THREAD_CANCELED ((void*) UINTPTR_MAX)
 typedef pthread_key_t   vlc_threadvar_t;
 typedef struct vlc_timer *vlc_timer_t;
-
-# define VLC_THREAD_PRIORITY_LOW      0
-# define VLC_THREAD_PRIORITY_INPUT    0
-# define VLC_THREAD_PRIORITY_AUDIO    0
-# define VLC_THREAD_PRIORITY_VIDEO    0
-# define VLC_THREAD_PRIORITY_OUTPUT   0
-# define VLC_THREAD_PRIORITY_HIGHEST  0
 
 static inline int vlc_poll (struct pollfd *fds, unsigned nfds, int timeout)
 {
@@ -197,16 +176,6 @@ typedef pthread_key_t   vlc_threadvar_t;
  * \ingroup timer
  */
 typedef struct vlc_timer *vlc_timer_t;
-
-/* Thread priorities.
- * No effect for POSIX threads
- */
-# define VLC_THREAD_PRIORITY_LOW      0
-# define VLC_THREAD_PRIORITY_INPUT    0
-# define VLC_THREAD_PRIORITY_AUDIO    0
-# define VLC_THREAD_PRIORITY_VIDEO    0
-# define VLC_THREAD_PRIORITY_OUTPUT   0
-# define VLC_THREAD_PRIORITY_HIGHEST  0
 
 #endif
 
@@ -513,6 +482,86 @@ VLC_API int vlc_sem_timedwait(vlc_sem_t *sem, vlc_tick_t deadline) VLC_USED;
 
 #ifndef __cplusplus
 /**
+ * \defgroup latch Latches
+ *
+ * The latch is a downward counter used to synchronise threads.
+ *
+ * @{
+ */
+/**
+ * Latch.
+ *
+ * Storage space for a thread-safe latch.
+ */
+typedef struct
+{
+    atomic_size_t value;
+    atomic_uint ready;
+} vlc_latch_t;
+
+/**
+ * Initializes a latch.
+ *
+ * @param value initial latch value (typically 1)
+ */
+VLC_API void vlc_latch_init(vlc_latch_t *, size_t value);
+
+/**
+ * Decrements the value of a latch.
+ *
+ * This function atomically decrements the value of a latch by the given
+ * quantity. If the result is zero, then any thread waiting on the latch is
+ * woken up.
+ *
+ * \warning If the result is (arithmetically) strictly negative, the behaviour
+ * is undefined.
+ *
+ * \param n quantity to subtract from the latch value (typically 1)
+ *
+ * \note This function is not a cancellation point.
+ */
+VLC_API void vlc_latch_count_down(vlc_latch_t *, size_t n);
+
+/**
+ * Decrements the value of a latch and waits on it.
+ *
+ * This function atomically decrements the value of a latch by the given
+ * quantity. Then, if the result of the subtraction is strictly positive,
+ * it waits until the value reaches zero.
+ *
+ * This function is equivalent to the succession of vlc_latch_count_down()
+ * then vlc_latch_wait(), and is only an optimisation to combine the two.
+ *
+ * \warning If the result is strictly negative, the behaviour is undefined.
+ *
+ * @param n number of times to decrement the value (typically 1)
+ *
+ * \note This function may be a cancellation point.
+ */
+VLC_API void vlc_latch_count_down_and_wait(vlc_latch_t *, size_t n);
+
+/**
+ * Checks if a latch is ready.
+ *
+ * This function compares the value of a latch with zero.
+ *
+ * \retval false if the latch value is non-zero
+ * \retval true if the latch value equals zero
+ */
+VLC_API bool vlc_latch_is_ready(const vlc_latch_t *latch) VLC_USED;
+
+/**
+ * Waits on a latch.
+ *
+ * This function waits until the value of the latch reaches zero.
+ *
+ * \note This function may be a point of cancellation.
+ */
+VLC_API void vlc_latch_wait(vlc_latch_t *);
+
+/** @} */
+
+/**
  * One-time initialization.
  *
  * A one-time initialization object must always be initialized assigned to
@@ -656,12 +705,39 @@ VLC_API void *vlc_threadvar_get(vlc_threadvar_t);
  *           [OUT]
  * @param entry entry point for the thread
  * @param data data parameter given to the entry point
- * @param priority thread priority value
  * @return 0 on success, a standard error code on error.
  * @note In case of error, the value of *th is undefined.
  */
-VLC_API int vlc_clone(vlc_thread_t *th, void *(*entry)(void *), void *data,
-                      int priority) VLC_USED;
+VLC_API int vlc_clone(vlc_thread_t *th, void *(*entry)(void *),
+                      void *data) VLC_USED;
+
+#if defined(__GNUC__)
+static
+VLC_UNUSED_FUNC
+VLC_WARN_CALL("thread name too big")
+const char * vlc_thread_name_too_big( const char * thread_name )
+{
+    return thread_name;
+}
+
+# define check_name_length( thread_name ) \
+    ((__builtin_constant_p(__builtin_strlen(thread_name) > 15) && \
+      __builtin_strlen(thread_name) > 15) \
+      ? vlc_thread_name_too_big(thread_name): thread_name)
+#endif
+
+/**
+ * Set the thread name of the current thread.
+ *
+ * \param name the string to use as the thread name
+ *
+ * \note On Linux the name can be up to 16-byte long, including the terminating
+ *       nul character. If larger, the name will be truncated.
+ */
+VLC_API void vlc_thread_set_name(const char *name);
+#if defined(check_name_length)
+# define vlc_thread_set_name(name)  vlc_thread_set_name(check_name_length(name))
+#endif
 
 /**
  * Marks a thread as cancelled.
@@ -787,16 +863,16 @@ VLC_API void vlc_tick_sleep(vlc_tick_t delay);
 #define VLC_HARD_MIN_SLEEP  VLC_TICK_FROM_MS(10)   /* 10 milliseconds = 1 tick at 100Hz */
 #define VLC_SOFT_MIN_SLEEP  VLC_TICK_FROM_SEC(9)   /* 9 seconds */
 
-#if defined (__GNUC__) && !defined (__clang__)
+#if defined(__GNUC__)
+
 /* Linux has 100, 250, 300 or 1000Hz
  *
  * HZ=100 by default on FreeBSD, but some architectures use a 1000Hz timer
  */
 
 static
-__attribute__((unused))
-__attribute__((noinline))
-__attribute__((error("sorry, cannot sleep for such short a time")))
+VLC_UNUSED_FUNC
+VLC_ERROR_CALL("sorry, cannot sleep for such short a time")
 vlc_tick_t impossible_delay( vlc_tick_t delay )
 {
     (void) delay;
@@ -804,9 +880,8 @@ vlc_tick_t impossible_delay( vlc_tick_t delay )
 }
 
 static
-__attribute__((unused))
-__attribute__((noinline))
-__attribute__((warning("use proper event handling instead of short delay")))
+VLC_UNUSED_FUNC
+VLC_WARN_CALL("use proper event handling instead of short delay")
 vlc_tick_t harmful_delay( vlc_tick_t delay )
 {
     return delay;
@@ -822,9 +897,8 @@ vlc_tick_t harmful_delay( vlc_tick_t delay )
            : d))
 
 static
-__attribute__((unused))
-__attribute__((noinline))
-__attribute__((error("deadlines can not be constant")))
+VLC_UNUSED_FUNC
+VLC_ERROR_CALL("deadlines can not be constant")
 vlc_tick_t impossible_deadline( vlc_tick_t deadline )
 {
     return deadline;
@@ -832,13 +906,14 @@ vlc_tick_t impossible_deadline( vlc_tick_t deadline )
 
 # define check_deadline( d ) \
     (__builtin_constant_p(d) ? impossible_deadline(d) : d)
-#else
-# define check_delay(d) (d)
-# define check_deadline(d) (d)
 #endif
 
+#if defined(check_delay)
 #define vlc_tick_sleep(d) vlc_tick_sleep(check_delay(d))
+#endif
+#if defined(check_deadline)
 #define vlc_tick_wait(d) vlc_tick_wait(check_deadline(d))
+#endif
 
 /**
  * \defgroup timer Asynchronous/threaded timers

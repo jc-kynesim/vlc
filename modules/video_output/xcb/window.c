@@ -47,12 +47,13 @@ typedef xcb_atom_t Atom;
 #include <vlc_common.h>
 #include <vlc_plugin.h>
 #include <vlc_actions.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 
 typedef struct
 {
     xcb_connection_t *conn;
     vlc_thread_t thread;
+    vlc_latch_t ready;
 
     xcb_window_t root;
     xcb_atom_t wm_state;
@@ -73,7 +74,7 @@ typedef struct
 } vout_window_sys_t;
 
 #ifdef HAVE_XKBCOMMON
-static int InitKeyboard(vout_window_t *wnd)
+static int InitKeyboard(vlc_window_t *wnd)
 {
     vout_window_sys_t *sys = wnd->sys;
     xcb_connection_t *conn = sys->conn;
@@ -97,7 +98,7 @@ static int InitKeyboard(vout_window_t *wnd)
     return 0;
 }
 
-static void DeinitKeyboard(vout_window_t *wnd)
+static void DeinitKeyboard(vlc_window_t *wnd)
 {
     vout_window_sys_t *sys = wnd->sys;
 
@@ -109,7 +110,7 @@ static void DeinitKeyboard(vout_window_t *wnd)
     sys->xkb.map = NULL;
 }
 
-static void ProcessKeyboardEvent(vout_window_t *wnd,
+static void ProcessKeyboardEvent(vlc_window_t *wnd,
                                  const xcb_generic_event_t *ev)
 {
     vout_window_sys_t *sys = wnd->sys;
@@ -137,7 +138,7 @@ static void ProcessKeyboardEvent(vout_window_t *wnd,
     }
 }
 
-static int InitKeyboardExtension(vout_window_t *wnd)
+static int InitKeyboardExtension(vlc_window_t *wnd)
 {
     vout_window_sys_t *sys = wnd->sys;
     xcb_connection_t *conn = sys->conn;
@@ -200,7 +201,7 @@ static int InitKeyboardExtension(vout_window_t *wnd)
     return 0;
 }
 
-static void DeinitKeyboardExtension(vout_window_t *wnd)
+static void DeinitKeyboardExtension(vlc_window_t *wnd)
 {
     vout_window_sys_t *sys = wnd->sys;
 
@@ -224,7 +225,7 @@ static xcb_cursor_t CursorCreate(xcb_connection_t *conn, xcb_window_t root)
     return cur;
 }
 
-static int ProcessEvent(vout_window_t *wnd, xcb_generic_event_t *ev)
+static int ProcessEvent(vlc_window_t *wnd, xcb_generic_event_t *ev)
 {
 #ifdef HAVE_XKBCOMMON
     vout_window_sys_t *sys = wnd->sys;
@@ -244,7 +245,7 @@ static int ProcessEvent(vout_window_t *wnd, xcb_generic_event_t *ev)
             if (vk == KEY_UNSET)
                 break;
 
-            vout_window_ReportKeyPress(wnd, vk);
+            vlc_window_ReportKeyPress(wnd, vk);
 #endif
             break;
         }
@@ -257,7 +258,7 @@ static int ProcessEvent(vout_window_t *wnd, xcb_generic_event_t *ev)
         {
             xcb_button_release_event_t *bpe = (void *)ev;
 
-            vout_window_ReportMousePressed(wnd, bpe->detail - 1);
+            vlc_window_ReportMousePressed(wnd, bpe->detail - 1);
             ret = 1;
             break;
         }
@@ -266,7 +267,7 @@ static int ProcessEvent(vout_window_t *wnd, xcb_generic_event_t *ev)
         {
             xcb_button_release_event_t *bre = (void *)ev;
 
-            vout_window_ReportMouseReleased(wnd, bre->detail - 1);
+            vlc_window_ReportMouseReleased(wnd, bre->detail - 1);
             ret = 1;
             break;
         }
@@ -275,7 +276,7 @@ static int ProcessEvent(vout_window_t *wnd, xcb_generic_event_t *ev)
         {
             xcb_motion_notify_event_t *mne = (void *)ev;
 
-            vout_window_ReportMouseMoved(wnd, mne->event_x, mne->event_y);
+            vlc_window_ReportMouseMoved(wnd, mne->event_x, mne->event_y);
             ret = 1;
             break;
         }
@@ -283,11 +284,11 @@ static int ProcessEvent(vout_window_t *wnd, xcb_generic_event_t *ev)
         case XCB_CONFIGURE_NOTIFY:
         {
             xcb_configure_notify_event_t *cne = (void *)ev;
-            vout_window_ReportSize (wnd, cne->width, cne->height);
+            vlc_window_ReportSize (wnd, cne->width, cne->height);
             break;
         }
         case XCB_DESTROY_NOTIFY:
-            vout_window_ReportClose (wnd);
+            vlc_window_ReportClose (wnd);
             break;
 
         case XCB_UNMAP_NOTIFY:
@@ -321,19 +322,45 @@ static int ProcessEvent(vout_window_t *wnd, xcb_generic_event_t *ev)
 /** Background thread for X11 events handling */
 static void *Thread (void *data)
 {
-    vout_window_t *wnd = data;
+    vlc_thread_set_name("vlc-window-x11");
+
+    vlc_window_t *wnd = data;
     vout_window_sys_t *p_sys = wnd->sys;
     xcb_connection_t *conn = p_sys->conn;
     struct pollfd ufd = {
         .fd = xcb_get_file_descriptor(conn),
         .events = POLLIN,
     };
+    xcb_window_t window = wnd->handle.xid;
     xcb_cursor_t cursor = CursorCreate(conn, p_sys->root); /* blank cursor */
     vlc_tick_t lifetime = VLC_TICK_FROM_MS( var_InheritInteger(wnd, "mouse-hide-timeout") );
     vlc_tick_t deadline = VLC_TICK_MAX;
+    xcb_generic_event_t *ev;
 
     if (ufd.fd == -1)
         return NULL;
+
+    /* Report initial pointer position. */
+    xcb_query_pointer_cookie_t qpc = xcb_query_pointer(conn, window);
+    /* Report initial window size (for the embedded case). */
+    xcb_get_geometry_cookie_t ggc = xcb_get_geometry(conn, window);
+
+    xcb_query_pointer_reply_t *qpr = xcb_query_pointer_reply(conn, qpc, NULL);
+    if (qpr != NULL) {
+        while ((ev = xcb_poll_for_queued_event(conn)) != NULL)
+            ProcessEvent(wnd, ev);
+        vlc_window_ReportMouseMoved(wnd, qpr->win_x, qpr->win_y);
+        free(qpr);
+    }
+
+    xcb_get_geometry_reply_t *geo = xcb_get_geometry_reply(conn, ggc, NULL);
+    if (geo != NULL) {
+        while ((ev = xcb_poll_for_queued_event(conn)) != NULL)
+            ProcessEvent(wnd, ev);
+        vlc_window_ReportSize(wnd, geo->width, geo->height);
+        free(geo);
+    }
+    vlc_latch_count_down(&p_sys->ready, 1);
 
     for (;;)
     {
@@ -351,14 +378,12 @@ static void *Thread (void *data)
 
         if (val == 0)
         {   /* timeout: hide cursor */
-            xcb_change_window_attributes(conn, wnd->handle.xid,
-                                         XCB_CW_CURSOR, &cursor);
+            xcb_change_window_attributes(conn, window, XCB_CW_CURSOR, &cursor);
             xcb_flush(conn);
             deadline = VLC_TICK_MAX;
         }
         else
         {
-            xcb_generic_event_t *ev;
             bool show_cursor = false;
 
             while ((ev = xcb_poll_for_event (conn)) != NULL)
@@ -366,8 +391,7 @@ static void *Thread (void *data)
 
             if (show_cursor)
             {
-                xcb_change_window_attributes(conn, wnd->handle.xid,
-                                             XCB_CW_CURSOR,
+                xcb_change_window_attributes(conn, window, XCB_CW_CURSOR,
                                              &(uint32_t){ XCB_CURSOR_NONE });
                 xcb_flush(conn);
                 deadline = vlc_tick_now() + lifetime;
@@ -390,7 +414,7 @@ static void *Thread (void *data)
 #define NET_WM_STATE_TOGGLE 2
 
 /** Changes the EWMH state of the (mapped) window */
-static void change_wm_state (vout_window_t *wnd, bool on, xcb_atom_t state)
+static void change_wm_state (vlc_window_t *wnd, bool on, xcb_atom_t state)
 {
     vout_window_sys_t *sys = wnd->sys;
     /* From EWMH "_WM_STATE" */
@@ -413,7 +437,7 @@ static void change_wm_state (vout_window_t *wnd, bool on, xcb_atom_t state)
                     (const char *)&ev);
 }
 
-static void Resize(vout_window_t *wnd, unsigned width, unsigned height)
+static void Resize(vlc_window_t *wnd, unsigned width, unsigned height)
 {
     vout_window_sys_t *sys = wnd->sys;
     xcb_connection_t *conn = sys->conn;
@@ -425,18 +449,18 @@ static void Resize(vout_window_t *wnd, unsigned width, unsigned height)
     xcb_flush(conn);
 }
 
-static void SetState(vout_window_t *wnd, unsigned state)
+static void SetState(vlc_window_t *wnd, unsigned state)
 {
     vout_window_sys_t *sys = wnd->sys;
-    bool above = (state & VOUT_WINDOW_STATE_ABOVE) != 0;
-    bool below = (state & VOUT_WINDOW_STATE_BELOW) != 0;
+    bool above = (state & VLC_WINDOW_STATE_ABOVE) != 0;
+    bool below = (state & VLC_WINDOW_STATE_BELOW) != 0;
 
     change_wm_state(wnd, above, sys->wm_state_above);
     change_wm_state(wnd, below, sys->wm_state_below);
     xcb_flush(sys->conn);
 }
 
-static void UnsetFullscreen(vout_window_t *wnd)
+static void UnsetFullscreen(vlc_window_t *wnd)
 {
     vout_window_sys_t *sys = wnd->sys;
 
@@ -444,7 +468,7 @@ static void UnsetFullscreen(vout_window_t *wnd)
     xcb_flush(sys->conn);
 }
 
-static void SetFullscreen(vout_window_t *wnd, const char *idstr)
+static void SetFullscreen(vlc_window_t *wnd, const char *idstr)
 {
     vout_window_sys_t *sys = wnd->sys;
 
@@ -531,11 +555,12 @@ xcb_atom_t get_atom (xcb_connection_t *conn, xcb_intern_atom_cookie_t ck)
     return atom;
 }
 
-static int Enable(vout_window_t *wnd, const vout_window_cfg_t *restrict cfg)
+static int Enable(vlc_window_t *wnd, const vlc_window_cfg_t *restrict cfg)
 {
     vout_window_sys_t *sys = wnd->sys;
     xcb_connection_t *conn = sys->conn;
     xcb_window_t window = wnd->handle.xid;
+    xcb_void_cookie_t ck;
 
     /* Set initial window state */
     if (cfg->is_decorated)
@@ -550,25 +575,13 @@ static int Enable(vout_window_t *wnd, const vout_window_cfg_t *restrict cfg)
     }
 
     /* Make the window visible */
-    xcb_map_window(conn, window);
-
-    /* Report initial pointer position.
-     * This will implicitly flush the XCB connection so that the window gets
-     * mapped by the display server shortly.
-     */
-    xcb_query_pointer_cookie_t qpc = xcb_query_pointer(conn, window);
-    xcb_query_pointer_reply_t *pr = xcb_query_pointer_reply(conn, qpc, NULL);
-
-    if (pr != NULL)
-    {
-        vout_window_ReportMouseMoved(wnd, pr->win_x, pr->win_y);
-        free(pr);
-    }
-
+    ck = xcb_map_window_checked(conn, window);
+    free(xcb_request_check(conn, ck));
+    vlc_latch_wait(&sys->ready);
     return VLC_SUCCESS;
 }
 
-static void Disable(vout_window_t *wnd)
+static void Disable(vlc_window_t *wnd)
 {
     vout_window_sys_t *sys = wnd->sys;
     xcb_connection_t *conn = sys->conn;
@@ -577,9 +590,9 @@ static void Disable(vout_window_t *wnd)
     xcb_flush(conn);
 }
 
-static void Close(vout_window_t *);
+static void Close(vlc_window_t *);
 
-static const struct vout_window_operations ops = {
+static const struct vlc_window_operations ops = {
     .enable = Enable,
     .disable = Disable,
     .resize = Resize,
@@ -589,15 +602,14 @@ static const struct vout_window_operations ops = {
     .set_state = SetState,
 };
 
-static int OpenCommon(vout_window_t *wnd, char *display,
-                      xcb_connection_t *conn,
-                      xcb_window_t root, xcb_window_t window)
+static int OpenCommon(vlc_window_t *wnd, char *display, xcb_connection_t *conn,
+                      xcb_window_t root, xcb_window_t window, uint32_t events)
 {
     vout_window_sys_t *sys = vlc_obj_malloc(VLC_OBJECT(wnd), sizeof (*sys));
     if (sys == NULL)
         return VLC_ENOMEM;
 
-    wnd->type = VOUT_WINDOW_TYPE_XID;
+    wnd->type = VLC_WINDOW_TYPE_XID;
     wnd->handle.xid = window;
     wnd->display.x11 = display;
     wnd->ops = &ops;
@@ -607,7 +619,7 @@ static int OpenCommon(vout_window_t *wnd, char *display,
     sys->root = root;
 
 #ifdef HAVE_XKBCOMMON
-    if (var_InheritBool(wnd, "keyboard-events"))
+    if (events & XCB_EVENT_MASK_KEY_PRESS)
         InitKeyboardExtension(wnd);
     else
         sys->xkb.ctx = NULL;
@@ -678,9 +690,10 @@ static int OpenCommon(vout_window_t *wnd, char *display,
     sys->wm_state_fullscreen = get_atom(conn, wm_state_fs_ck);
     sys->motif_wm_hints = get_atom(conn, motif_wm_hints_ck);
 
+    vlc_latch_init(&sys->ready, 1);
     /* Create the event thread. It will dequeue all events, so any checked
      * request from this thread must be completed at this point. */
-    if (vlc_clone(&sys->thread, Thread, wnd, VLC_THREAD_PRIORITY_LOW))
+    if (vlc_clone(&sys->thread, Thread, wnd))
     {
         DeinitKeyboardExtension(wnd);
         return VLC_ENOMEM;
@@ -692,7 +705,7 @@ static int OpenCommon(vout_window_t *wnd, char *display,
 /**
  * Create an X11 window.
  */
-static int Open(vout_window_t *wnd)
+static int Open(vlc_window_t *wnd)
 {
     xcb_generic_error_t *err;
     xcb_void_cookie_t ck;
@@ -731,10 +744,11 @@ static int Open(vout_window_t *wnd)
         /* XCB_CW_BACK_PIXEL */
         scr->black_pixel,
         /* XCB_CW_EVENT_MASK */
-        XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_POINTER_MOTION |
-        XCB_EVENT_MASK_STRUCTURE_NOTIFY,
+        XCB_EVENT_MASK_POINTER_MOTION | XCB_EVENT_MASK_STRUCTURE_NOTIFY,
     };
 
+    if (var_InheritBool(wnd, "keyboard-events"))
+        values[1] |= XCB_EVENT_MASK_KEY_PRESS;
     if (var_InheritBool(wnd, "mouse-events"))
         values[1] |= XCB_EVENT_MASK_BUTTON_PRESS
                    | XCB_EVENT_MASK_BUTTON_RELEASE;
@@ -752,7 +766,7 @@ static int Open(vout_window_t *wnd)
         goto error;
     }
 
-    ret = OpenCommon(wnd, display, conn, scr->root, window);
+    ret = OpenCommon(wnd, display, conn, scr->root, window, values[1]);
     if (ret != VLC_SUCCESS)
         goto error;
 
@@ -768,7 +782,7 @@ error:
 /**
  * Destroys the X11 window.
  */
-static void Close (vout_window_t *wnd)
+static void Close (vlc_window_t *wnd)
 {
     vout_window_sys_t *p_sys = wnd->sys;
     xcb_connection_t *conn = p_sys->conn;
@@ -783,7 +797,7 @@ static void Close (vout_window_t *wnd)
 
 /*** Embedded drawable support ***/
 
-static int EmEnable(vout_window_t *wnd, const vout_window_cfg_t *restrict cfg)
+static int EmEnable(vlc_window_t *wnd, const vlc_window_cfg_t *restrict cfg)
 {
     vout_window_sys_t *sys = wnd->sys;
 
@@ -867,9 +881,9 @@ static void ReleaseDrawable (vlc_object_t *obj, xcb_window_t window)
     var_Destroy(vlc, "xid-in-use");
 }
 
-static void EmClose(vout_window_t *);
+static void EmClose(vlc_window_t *);
 
-static const struct vout_window_operations em_ops = {
+static const struct vlc_window_operations em_ops = {
     .enable = EmEnable,
     .set_fullscreen = SetFullscreen,
     .unset_fullscreen = UnsetFullscreen,
@@ -880,7 +894,7 @@ static const struct vout_window_operations em_ops = {
 /**
  * Wrap an existing X11 window to embed the video.
  */
-static int EmOpen (vout_window_t *wnd)
+static int EmOpen (vlc_window_t *wnd)
 {
     int ret = VLC_EGENERIC;
     xcb_window_t window = var_InheritInteger (wnd, "drawable-xid");
@@ -910,20 +924,18 @@ static int EmOpen (vout_window_t *wnd)
         goto error;
     }
     root = geo->root;
-    /* FIXME: racy - compare seq.no.with configure event */
-    vout_window_ReportSize(wnd, geo->width, geo->height);
     free (geo);
 
     /* Try to subscribe to keyboard and mouse events (only one X11 client can
      * subscribe to input events, so this can fail). */
-    value |= XCB_EVENT_MASK_KEY_PRESS;
-
+    if (var_InheritBool(wnd, "keyboard-events"))
+        value |= XCB_EVENT_MASK_KEY_PRESS;
     if (var_InheritBool(wnd, "mouse-events"))
         value |= XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE;
 
     xcb_change_window_attributes(conn, window, XCB_CW_EVENT_MASK, &value);
 
-    ret = OpenCommon(wnd, NULL, conn, root, window);
+    ret = OpenCommon(wnd, NULL, conn, root, window, value);
     if (ret != VLC_SUCCESS)
         goto error;
 
@@ -936,7 +948,7 @@ error:
     return VLC_EGENERIC;
 }
 
-static void EmClose (vout_window_t *wnd)
+static void EmClose (vlc_window_t *wnd)
 {
     xcb_window_t window = wnd->handle.xid;
 

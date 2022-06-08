@@ -66,7 +66,7 @@ struct event_thread_t
     RECT window_area;
 
     /* */
-    vout_window_t *parent_window;
+    vlc_window_t *parent_window;
     WCHAR class_video[256];
     HWND hparent;
     HWND hvideownd;
@@ -89,6 +89,8 @@ static void Win32VoutCloseWindow ( event_thread_t * );
  *****************************************************************************/
 static void *EventThread( void *p_this )
 {
+    vlc_thread_set_name("vlc-vout-hwnd");
+
     event_thread_t *p_event = (event_thread_t *)p_this;
     MSG msg;
     int canc = vlc_savecancel ();
@@ -136,9 +138,9 @@ static void *EventThread( void *p_this )
     return NULL;
 }
 
-event_thread_t *EventThreadCreate( vlc_object_t *obj, vout_window_t *parent_window)
+event_thread_t *EventThreadCreate( vlc_object_t *obj, vlc_window_t *parent_window)
 {
-    if (parent_window->type != VOUT_WINDOW_TYPE_HWND)
+    if (parent_window->type != VLC_WINDOW_TYPE_HWND)
         return NULL;
      /* Create the Vout EventThread, this thread is created by us to isolate
      * the Win32 PeekMessage function calls. We want to do this because
@@ -181,8 +183,7 @@ int EventThreadStart( event_thread_t *p_event, event_hwnd_t *p_hwnd, const event
     atomic_store( &p_event->b_done, false);
     p_event->b_error = false;
 
-    if( vlc_clone( &p_event->thread, EventThread, p_event,
-                   VLC_THREAD_PRIORITY_LOW ) )
+    if( vlc_clone( &p_event->thread, EventThread, p_event ) )
     {
         msg_Err( p_event->obj, "cannot create Vout EventThread" );
         return VLC_EGENERIC;
@@ -249,7 +250,7 @@ static long FAR PASCAL VideoEventProc( HWND hwnd, UINT message,
     {
     /* the user wants to close the window */
     case WM_CLOSE:
-        vout_window_ReportClose(p_event->parent_window);
+        vlc_window_ReportClose(p_event->parent_window);
         return 0;
 
     /* the window has been closed so shut down everything now */
@@ -299,7 +300,7 @@ static int Win32VoutCreateWindow( event_thread_t *p_event )
     hInstance = GetModuleHandle(NULL);
 
     /* If an external window was specified, we'll draw in it. */
-    assert( p_event->parent_window->type == VOUT_WINDOW_TYPE_HWND );
+    assert( p_event->parent_window->type == VLC_WINDOW_TYPE_HWND );
     p_event->hparent = p_event->parent_window->handle.hwnd;
 
     /* Fill in the window class structure */

@@ -87,9 +87,14 @@ T.Pane {
 
             property bool _inhibitPlayerVolumeUpdate: false
 
+            // FIXME: Currently we are not updating the ShiftModifier status while dragging. This
+            //        could be fixed with a custom Slider based on a MouseArea.
+            property bool _shiftPressed: false
+
+            property real _clamp: 0.01
+
             from: 0
             to: maxvolpos
-            stepSize: 0.05
             opacity: _player.muted ? 0.5 : 1
 
             Accessible.name: I18n.qtr("Volume")
@@ -114,6 +119,24 @@ T.Pane {
                 volControl._inhibitPlayerVolumeUpdate = false
             }
 
+            function _adjustPlayerVolume() {
+                Player.muted = false
+
+                var value = volControl.value
+
+                // NOTE: We are clamping the value to make it easier to restore the default volume.
+                if (_shiftPressed === false) {
+                    if (Math.abs(value - 1.0) < _clamp)
+                        value = 1.0
+                    else
+                        _clamp = 0.01
+                }
+
+                Player.volume = value
+
+                volControl.value = value
+            }
+
             Component.onCompleted: {
                 root.paintOnlyChanged.connect(_syncVolumeWithPlayer)
                 volControl._syncVolumeWithPlayer()
@@ -126,31 +149,23 @@ T.Pane {
                 onVolumeChanged: volControl._syncVolumeWithPlayer()
             }
 
-            Timer {
-                // useful for keyboard volume alteration
-                id: tooltipShower
-                running: false
-                repeat: false
-                interval: 1000
-            }
-
             Navigation.leftItem: volumeBtn
             Navigation.parentItem: root
 
             Keys.onUpPressed: {
-                volControl.increase()
-                tooltipShower.restart()
+                Player.muted = false
+                Player.setVolumeUp()
             }
 
             Keys.onDownPressed: {
-                volControl.decrease()
-                tooltipShower.restart()
+                Player.muted = false
+                Player.setVolumeDown()
             }
 
             Keys.priority: Keys.BeforeItem
 
             readonly property color sliderColor: (volControl.position > fullvolpos) ? colors.volmax : root.color
-            readonly property int maxvol: 125
+            readonly property int maxvol: MainCtx.maxVolume
             readonly property real fullvolpos: 100 / maxvol
             readonly property real maxvolpos: maxvol / 100
 
@@ -159,10 +174,7 @@ T.Pane {
                     return
 
                 if (!volControl._inhibitPlayerVolumeUpdate) {
-                    if (Player.muted)
-                        Player.muted = false
-
-                    Player.volume = volControl.value
+                    Qt.callLater(volControl._adjustPlayerVolume)
                 }
             }
 
@@ -171,9 +183,9 @@ T.Pane {
                 active: !paintOnly
 
                 sourceComponent: Widgets.PointingTooltip {
-                    visible: tooltipShower.running || sliderMouseArea.pressed || sliderMouseArea.containsMouse
+                    visible: sliderMouseArea.pressed || volControl.pressed || volControl.hovered || volControl.visualFocus
 
-                    text: Math.round(volControl.value * 100) + "%"
+                    text: Math.round(Player.volume * 100) + "%"
 
                     pos: Qt.point(handle.x + handle.width / 2, handle.y)
 
@@ -205,7 +217,29 @@ T.Pane {
                     width: VLCStyle.dp(1, VLCStyle.scale)
                     height: parent.height
                     radius: VLCStyle.dp(2, VLCStyle.scale)
+
+                    // NOTE: This shouldn't be visible when the volume stops before a 100.
+                    visible: (volControl.maxvol > 100)
+
                     color: root.color
+
+                    // NOTE: This is a helper to select the default volume when clicking on the
+                    //       tickmark. We apply a higher clamp value to achieve that behavior on
+                    //       the Slider.
+                    MouseArea {
+                        anchors.fill: parent
+
+                        anchors.margins: -(VLCStyle.dp(4, VLCStyle.scale))
+
+                        onPressed: {
+                            mouse.accepted = false
+
+                            if (mouse.modifiers === Qt.ShiftModifier)
+                                return
+
+                            volControl._clamp = 0.1
+                        }
+                    }
                 }
             }
 
@@ -225,57 +259,75 @@ T.Pane {
                 id: sliderMouseArea
                 anchors.fill: parent
 
-                hoverEnabled: true
-                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                acceptedButtons: (Qt.LeftButton | Qt.RightButton)
 
-                Component.onCompleted: {
-                    positionChanged.connect(adjustVolume)
-                    onPressed.connect(adjustVolume)
+                onPressed: {
+                    volControl._shiftPressed = (mouse.modifiers === Qt.ShiftModifier)
+
+                    if (mouse.button === Qt.LeftButton) {
+                        mouse.accepted = false
+
+                        return
+                    }
+
+                    adjustVolume(mouse)
+                }
+
+                onPositionChanged: if (mouse.buttons & Qt.RightButton) adjustVolume(mouse)
+
+                onWheel: {
+                    var delta = 0, fineControl = false
+
+                    if ((Math.abs(wheel.pixelDelta.x) % 120 > 0) || (Math.abs(wheel.pixelDelta.y) % 120 > 0)) {
+                        if (Math.abs(wheel.pixelDelta.x) > Math.abs(wheel.pixelDelta.y))
+                            delta = wheel.pixelDelta.x
+                        else
+                            delta = wheel.pixelDelta.y
+                        fineControl = true
+                    }
+                    else if (wheel.angleDelta.x)
+                        delta = wheel.angleDelta.x
+                    else if (wheel.angleDelta.y)
+                        delta = wheel.angleDelta.y
+
+                    if (delta === 0)
+                        return
+
+                    if (wheel.inverted)
+                        delta = -delta
+
+                    if (fineControl)
+                        volControl.value += 0.001 * delta
+                    else {
+                        // Degrees to steps for standard mouse
+                        delta = delta / 8 / 15
+
+                        var steps = Math.ceil(Math.abs(delta))
+
+                        Player.muted = false
+
+                        if (delta > 0)
+                            Player.setVolumeUp(steps)
+                        else
+                            Player.setVolumeDown(steps)
+                    }
+
+                    wheel.accepted = true
                 }
 
                 function adjustVolume(mouse) {
-                    if (pressedButtons === Qt.LeftButton) {
-                        // The slider itself can handle this,
-                        // but then the top&bottom margins need to be
-                        // set there instead of here. Also, if handled
-                        // there stepSize will be respected.
-                        volControl.value = volControl.maxvolpos * (mouse.x - handle.width)
-                                                                / (sliderBg.width - handle.width)
+                    mouse.accepted = true
 
-                        mouse.accepted = true
-                    } else if (pressedButtons === Qt.RightButton) {
-                        var pos = mouse.x * volControl.maxvolpos / width
-                        if (pos < 0.25)
-                            volControl.value = 0
-                        else if (pos < 0.75)
-                            volControl.value = 0.5
-                        else if (pos < 1.125)
-                            volControl.value = 1
-                        else
-                            volControl.value = 1.25
+                    var pos = mouse.x * volControl.maxvolpos / width
 
-                        mouse.accepted = true
-                    }
-                }
-
-                onPressed: {
-                    if (!volControl.activeFocus)
-                        volControl.forceActiveFocus(Qt.MouseFocusReason)
-                }
-
-                onWheel: {
-                    var x = wheel.angleDelta.x
-                    var y = wheel.angleDelta.y
-
-                    if (x > 0 || y > 0) {
-                        volControl.increase()
-                        wheel.accepted = true
-                    } else if (x < 0 || y < 0) {
-                        volControl.decrease()
-                        wheel.accepted = true
-                    } else {
-                        wheel.accepted = false
-                    }
+                    if (pos < 0.25)
+                        volControl.value = 0
+                    else if (pos < 0.75)
+                        volControl.value = 0.5
+                    else if (pos < 1.125)
+                        volControl.value = 1
+                    else
+                        volControl.value = 1.25
                 }
             }
         }

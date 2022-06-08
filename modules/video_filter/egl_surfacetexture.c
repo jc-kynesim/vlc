@@ -249,10 +249,9 @@ static picture_t *SwapOffscreen(vlc_gl_t *gl)
     return current_picture;
 }
 
-static void Close( vlc_gl_t *gl )
+static void Close(vlc_gl_t *gl)
 {
     struct surfacetexture_sys *sys = gl->sys;
-    struct video_ctx *vctx = GetVCtx(gl);
 
     picture_Release(sys->current_picture);
     vlc_video_context_Release(gl->offscreen_vctx_out);
@@ -368,12 +367,15 @@ static int Open(vlc_gl_t *gl, unsigned width, unsigned height)
         goto error2;
     }
 
-    gl->make_current = MakeCurrent;
-    gl->release_current = ReleaseCurrent;
-    gl->resize = NULL;
-    gl->swap_offscreen = SwapOffscreen;
-    gl->get_proc_address = GetSymbol;
-    gl->destroy = Close;
+    static const struct vlc_gl_operations gl_ops =
+    {
+        .make_current = MakeCurrent,
+        .release_current = ReleaseCurrent,
+        .swap_offscreen = SwapOffscreen,
+        .get_proc_address = GetSymbol,
+        .close = Close,
+    };
+    gl->ops = &gl_ops;
 
     struct video_ctx *vctx = GetVCtx(gl);
 

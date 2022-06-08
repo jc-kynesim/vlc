@@ -26,21 +26,22 @@
 #include "generic_window.hpp"
 #include "dialogs.hpp"
 #include "../commands/cmd_generic.hpp"
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
+#include <memory>
 
 class OSGraphics;
 class OSTimer;
 class CtrlVideo;
-struct vout_window_t;
+struct vlc_window;
 
 /// Class to handle a video output window
 class VoutWindow: private GenericWindow
 {
 public:
 
-    VoutWindow( intf_thread_t *pIntf, struct vout_window_t* pWnd,
+    VoutWindow( intf_thread_t *pIntf, struct vlc_window *pWnd,
                 int width, int height, GenericWindow* pParent = NULL );
-    virtual ~VoutWindow();
+    ~VoutWindow();
 
     /// Make some functions public
     //@{
@@ -85,7 +86,7 @@ public:
 private:
 
     /// vout thread
-    struct vout_window_t* m_pWnd;
+    struct vlc_window *m_pWnd;
 
     /// original width and height
     int original_width;
@@ -98,7 +99,7 @@ private:
     GenericWindow* m_pParentWindow;
 
     // Cursor timer
-    OSTimer *m_pTimer;
+    std::unique_ptr<OSTimer> m_pTimer;
     int mouse_hide_timeout;
     DEFINE_CALLBACK( VoutWindow, HideMouse );
 };

@@ -266,8 +266,7 @@ static int Open(vlc_object_t *p_this)
     p_fingerprinter->pf_apply = ApplyResult;
 
     var_Create( p_fingerprinter, "results-available", VLC_VAR_BOOL );
-    if( vlc_clone( &p_sys->thread, Run, p_fingerprinter,
-                   VLC_THREAD_PRIORITY_LOW ) )
+    if( vlc_clone( &p_sys->thread, Run, p_fingerprinter ) )
     {
         msg_Err( p_fingerprinter, "cannot spawn fingerprinter thread" );
         goto error;
@@ -345,6 +344,8 @@ static void fill_metas_with_results( fingerprint_request_t *p_r, acoustid_finger
  *****************************************************************************/
 static void *Run( void *opaque )
 {
+    vlc_thread_set_name("vlc-fingerprint");
+
     fingerprinter_thread_t *p_fingerprinter = opaque;
     fingerprinter_sys_t *p_sys = p_fingerprinter->p_sys;
 

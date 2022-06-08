@@ -62,6 +62,8 @@ typedef struct vout_display_sys_t
 
     unsigned width;
     unsigned height;
+
+    vlc_fourcc_t spu_formats[3];
 } vout_display_sys_t;
 
 static void RenderRegion(vout_display_t *vd, VdpOutputSurface target,
@@ -70,17 +72,30 @@ static void RenderRegion(vout_display_t *vd, VdpOutputSurface target,
 {
     vout_display_sys_t *sys = vd->sys;
     VdpBitmapSurface surface;
-#ifdef WORDS_BIGENDIAN
-    VdpRGBAFormat fmt = VDP_RGBA_FORMAT_B8G8R8A8;
-#else
-    VdpRGBAFormat fmt = VDP_RGBA_FORMAT_R8G8B8A8;
-#endif
+    VdpRGBAFormat fmt;
     VdpStatus err;
+
+    switch (reg->fmt.i_chroma) {
+#ifdef WORDS_BIGENDIAN
+        case VLC_CODEC_ARGB:
+            fmt = VDP_RGBA_FORMAT_B8G8R8A8;
+            break;
+#else
+        case VLC_CODEC_RGBA:
+            fmt = VDP_RGBA_FORMAT_R8G8B8A8;
+            break;
+        case VLC_CODEC_BGRA:
+            fmt = VDP_RGBA_FORMAT_B8G8R8A8;
+            break;
+#endif
+        default:
+            vlc_assert_unreachable();
+    }
 
     /* Create GPU surface for sub-picture */
     err = vdp_bitmap_surface_create(sys->vdp, sys->device, fmt,
-        reg->fmt.i_visible_width, reg->fmt.i_visible_height, VDP_FALSE,
-                                    &surface);
+                                    reg->fmt.i_width, reg->fmt.i_height,
+                                    VDP_FALSE, &surface);
     if (err != VDP_STATUS_OK)
     {
         msg_Err(vd, "%s creation failure: %s", "bitmap surface",
@@ -103,7 +118,7 @@ static void RenderRegion(vout_display_t *vd, VdpOutputSurface target,
     }
 
     /* Render onto main surface */
-    VdpRect area = {
+    VdpRect dst_area = {
         reg->i_x * sys->width
             / subpic->i_original_picture_width,
         reg->i_y * sys->height
@@ -112,6 +127,12 @@ static void RenderRegion(vout_display_t *vd, VdpOutputSurface target,
             / subpic->i_original_picture_width,
         (reg->i_y + reg->fmt.i_visible_height) * sys->height
             / subpic->i_original_picture_height,
+    };
+    VdpRect src_area = {
+        reg->fmt.i_x_offset,
+        reg->fmt.i_y_offset,
+        reg->fmt.i_x_offset + reg->fmt.i_visible_width,
+        reg->fmt.i_y_offset + reg->fmt.i_visible_height,
     };
     VdpColor color = { 1.f, 1.f, 1.f,
         reg->i_alpha * subpic->i_alpha / 65025.f };
@@ -130,8 +151,9 @@ static void RenderRegion(vout_display_t *vd, VdpOutputSurface target,
         .blend_constant = { 0.f, 0.f, 0.f, 0.f },
     };
 
-    err = vdp_output_surface_render_bitmap_surface(sys->vdp, target, &area,
-                                             surface, NULL, &color, &state, 0);
+    err = vdp_output_surface_render_bitmap_surface(sys->vdp, target, &dst_area,
+                                                   surface, &src_area, &color,
+                                                   &state, 0);
     if (err != VDP_STATUS_OK)
         msg_Err(vd, "blending failure: %s",
                 vdp_get_error_string(sys->vdp, err));
@@ -230,7 +252,7 @@ static int ResetPictures(vout_display_t *vd, video_format_t *fmt)
     vout_display_place_t place;
 
     msg_Dbg(vd, "resetting pictures");
-    vout_display_PlacePicture(&place, src, vd->cfg);
+    vout_display_PlacePicture(&place, src, &vd->cfg->display);
 
     fmt->i_width = src->i_width * place.width / src->i_visible_width;
     fmt->i_height = src->i_height * place.height / src->i_visible_height;
@@ -259,7 +281,7 @@ static int Control(vout_display_t *vd, int query)
     {
         vout_display_place_t place;
 
-        vout_display_PlacePicture(&place, vd->source, vd->cfg);
+        vout_display_PlacePicture(&place, vd->source, &vd->cfg->display);
         if (place.width  != vd->fmt->i_visible_width
          || place.height != vd->fmt->i_visible_height)
             return VLC_EGENERIC;
@@ -296,6 +318,9 @@ static const struct vlc_display_operations ops = {
 static int Open(vout_display_t *vd,
                 video_format_t *fmtp, vlc_video_context *context)
 {
+    if (fmtp->i_chroma != VLC_CODEC_VDPAU_VIDEO)
+        return VLC_ENOTSUP;
+
     vout_display_sys_t *sys = malloc(sizeof (*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
@@ -330,52 +355,9 @@ static int Open(vout_display_t *vd,
 
     /* Check source format */
     video_format_t fmt;
-    VdpChromaType chroma;
-    VdpYCbCrFormat format;
     VdpStatus err;
 
     video_format_ApplyRotation(&fmt, fmtp);
-
-    if (fmt.i_chroma == VLC_CODEC_VDPAU_VIDEO_420
-     || fmt.i_chroma == VLC_CODEC_VDPAU_VIDEO_422
-     || fmt.i_chroma == VLC_CODEC_VDPAU_VIDEO_444)
-        ;
-    else
-    if (vlc_fourcc_to_vdp_ycc(fmt.i_chroma, &chroma, &format))
-    {
-        uint32_t w, h;
-        VdpBool ok;
-
-        err = vdp_video_surface_query_capabilities(sys->vdp, sys->device,
-                                                   chroma, &ok, &w, &h);
-        if (err != VDP_STATUS_OK)
-        {
-            msg_Err(vd, "%s capabilities query failure: %s", "video surface",
-                    vdp_get_error_string(sys->vdp, err));
-            goto error;
-        }
-        if (!ok || w < fmt.i_width || h < fmt.i_height)
-        {
-            msg_Err(vd, "source video %s not supported", "chroma type");
-            goto error;
-        }
-
-        err = vdp_video_surface_query_get_put_bits_y_cb_cr_capabilities(
-                                   sys->vdp, sys->device, chroma, format, &ok);
-        if (err != VDP_STATUS_OK)
-        {
-            msg_Err(vd, "%s capabilities query failure: %s", "video surface",
-                    vdp_get_error_string(sys->vdp, err));
-            goto error;
-        }
-        if (!ok)
-        {
-            msg_Err(vd, "source video %s not supported", "YCbCr format");
-            goto error;
-        }
-    }
-    else
-        goto error;
 
     /* Check video mixer capabilities */
     {
@@ -433,7 +415,7 @@ static int Open(vout_display_t *vd,
         };
         vout_display_place_t place;
 
-        vout_display_PlacePicture(&place, vd->source, vd->cfg);
+        vout_display_PlacePicture(&place, vd->source, &vd->cfg->display);
         sys->window = xcb_generate_id(sys->conn);
 
         xcb_void_cookie_t c =
@@ -445,29 +427,6 @@ static int Open(vout_display_t *vd,
             goto error;
         msg_Dbg(vd, "using X11 window 0x%08"PRIx32, sys->window);
         xcb_map_window(sys->conn, sys->window);
-    }
-
-    /* Check bitmap capabilities (for SPU) */
-    const vlc_fourcc_t *spu_chromas = NULL;
-    {
-#ifdef WORDS_BIGENDIAN
-        static const vlc_fourcc_t subpicture_chromas[] = { VLC_CODEC_ARGB, 0 };
-#else
-        static const vlc_fourcc_t subpicture_chromas[] = { VLC_CODEC_RGBA, 0 };
-#endif
-        uint32_t w, h;
-        VdpBool ok;
-
-        err = vdp_bitmap_surface_query_capabilities(sys->vdp, sys->device,
-                                        VDP_RGBA_FORMAT_R8G8B8A8, &ok, &w, &h);
-        if (err != VDP_STATUS_OK)
-        {
-            msg_Err(vd, "%s capabilities query failure: %s", "output surface",
-                    vdp_get_error_string(sys->vdp, err));
-            ok = VDP_FALSE;
-        }
-        if (ok)
-            spu_chromas = subpicture_chromas;
     }
 
     /* Initialize VDPAU queue */
@@ -490,10 +449,44 @@ static int Open(vout_display_t *vd,
         goto error;
     }
 
+    /* Check bitmap capabilities (for SPU) */
+    {
+        uint32_t w, h;
+        VdpBool ok;
+        unsigned int n = 0;
+
+        err = vdp_bitmap_surface_query_capabilities(sys->vdp, sys->device,
+                                                    VDP_RGBA_FORMAT_R8G8B8A8,
+                                                    &ok, &w, &h);
+        if (err == VDP_STATUS_OK && ok == VDP_TRUE)
+#ifdef WORDS_BIGENDIAN
+            sys->spu_formats[n++] = VLC_CODEC_ABGR;
+#else
+            sys->spu_formats[n++] = VLC_CODEC_RGBA;
+#endif
+        if (n > 0) {
+            sys->spu_formats[n] = 0;
+            vd->info.subpicture_chromas = sys->spu_formats;
+        }
+
+        err = vdp_bitmap_surface_query_capabilities(sys->vdp, sys->device,
+                                                    VDP_RGBA_FORMAT_B8G8R8A8,
+                                                    &ok, &w, &h);
+        if (err == VDP_STATUS_OK && ok == VDP_TRUE)
+#ifdef WORDS_BIGENDIAN
+            sys->spu_formats[n++] = VLC_CODEC_ARGB;
+#else
+            sys->spu_formats[n++] = VLC_CODEC_BGRA;
+#endif
+        if (n > 0) {
+            sys->spu_formats[n] = 0;
+            vd->info.subpicture_chromas = sys->spu_formats;
+        }
+    }
+
     /* */
     sys->current = NULL;
     vd->sys = sys;
-    vd->info.subpicture_chromas = spu_chromas;
     *fmtp = fmt;
 
     vd->ops = &ops;

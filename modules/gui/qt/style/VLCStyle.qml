@@ -217,37 +217,38 @@ QtObject {
 
     readonly property int dragDelta: dp(12, scale)
 
-    // Speed
+    // durations. Values are aligned on Kirigami
 
-    property bool animate: true
+    //should be used for animation that benefits from a longer animation than duration_long
+    readonly property int duration_veryLong: 400
 
-    property real speed: 1.0
+    //should be used for longer animation (opening/closing panes & dialogs)
+    readonly property int duration_long: 200
 
-    // NOTE: This ratio is useful because we want a 1.2 speed to be *faster* than 1.0.
-    readonly property real ratioSpeed: (animate && speed) ? 1 / speed : 0.0
+    //should be used for short animations (hovering, accuenting UI event)
+    readonly property int duration_short: 100
 
-    // duration
+    //should be used for near instant animations
+    readonly property int duration_veryShort: 50
 
-    readonly property int duration_slower: 300 * ratioSpeed
-    readonly property int duration_slow  : 250 * ratioSpeed
-    readonly property int duration_normal: 200 * ratioSpeed
-    readonly property int duration_fast  : 150 * ratioSpeed
-    readonly property int duration_faster: 100 * ratioSpeed
+    /* human time reaction, how much time before the user should be informed that something
+     * is going on, or before something should be automatically automated,
+     * this should not be used for animations
+     *
+     * Some examples:
+     *
+     * - When the user types text in a search field, wait no longer than this duration after
+     *   the user completes typing before starting the search
+     * - When loading data which would commonly arrive rapidly enough to not require interaction,
+     *   wait this long before showing a spinner
+     */
+    readonly property int duration_humanMoment: 2000
 
-    readonly property int ms2000: 2000 * ratioSpeed
-    readonly property int ms1000: 1000 * ratioSpeed
+    //timing before showing up a tooltip
+    readonly property int delayToolTipAppear: 700
 
-    readonly property int ms500: 500 * ratioSpeed
-    readonly property int ms140: 140 * ratioSpeed
-    readonly property int ms128: 128 * ratioSpeed
-    readonly property int ms125: 125 * ratioSpeed
-
-    readonly property int ms75: 75 * ratioSpeed
-    readonly property int ms64: 64 * ratioSpeed
-    readonly property int ms10: 10 * ratioSpeed
-
-    //timings
-    readonly property int delayToolTipAppear: 500
+    //timing for the progressbar/scanbar bouncing animation, explicitly very long
+    readonly property int durationSliderBouncing: 2000
 
     //default arts
     readonly property url noArtAlbum: "qrc:///noart_album.svg";

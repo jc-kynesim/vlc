@@ -448,6 +448,8 @@ static void *cli_client_thread(void *data)
     intf_thread_t *intf = cl->intf;
     char cmd[MAX_LINE_LENGTH + 1];
 
+    vlc_thread_set_name("vlc-cli-client");
+
     while (fgets(cmd, sizeof (cmd), cl->stream) != NULL)
     {
         int canc = vlc_savecancel();
@@ -481,7 +483,7 @@ static struct cli_client *cli_client_new(intf_thread_t *intf, int fd,
     cl->intf = intf;
     vlc_mutex_init(&cl->output_lock);
 
-    if (vlc_clone(&cl->thread, cli_client_thread, cl, VLC_THREAD_PRIORITY_LOW))
+    if (vlc_clone(&cl->thread, cli_client_thread, cl))
     {
         free(cl);
         cl = NULL;
@@ -533,6 +535,8 @@ static void *Run(void *data)
 {
     intf_thread_t *intf = data;
     intf_sys_t *sys = intf->p_sys;
+
+    vlc_thread_set_name("vlc-cli-server");
 
     assert(sys->pi_socket_listen != NULL);
 
@@ -753,6 +757,8 @@ static void *Run( void *data )
     intf_thread_t *p_intf = data;
     intf_sys_t *p_sys = p_intf->p_sys;
 
+    vlc_thread_set_name("vlc-cli-server");
+
     char p_buffer[ MAX_LINE_LENGTH + 1 ];
 
     int  i_size = 0;
@@ -954,7 +960,7 @@ static int Activate( vlc_object_t *p_this )
         intf_consoleIntroMsg( p_intf );
 #endif
 #endif
-    if( vlc_clone( &p_sys->thread, Run, p_intf, VLC_THREAD_PRIORITY_LOW ) )
+    if( vlc_clone( &p_sys->thread, Run, p_intf ) )
         goto error;
 
     msg_print(p_intf, "%s",

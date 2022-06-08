@@ -53,9 +53,8 @@ static const QString COVERGENERATOR_DEFAULT = ":/noart_albumCover.svg";
 // Ctor / dtor
 //-------------------------------------------------------------------------------------------------
 
-CoverGenerator::CoverGenerator(vlc_medialibrary_t * ml, const MLItemId & itemId)
-    : m_ml(ml)
-    , m_id(itemId)
+CoverGenerator::CoverGenerator(const MLItemId & itemId)
+    : m_id(itemId)
     , m_countX(COVERGENERATOR_COUNT)
     , m_countY(COVERGENERATOR_COUNT)
     , m_split(Divide)
@@ -114,6 +113,11 @@ void CoverGenerator::setPrefix(const QString & prefix)
     m_prefix = prefix;
 }
 
+int CoverGenerator::requiredNoOfThumbnails() const
+{
+    return m_countX * m_countY;
+}
+
 bool CoverGenerator::cachedFileAvailable() const
 {
     return QFile::exists(fileName());
@@ -138,15 +142,11 @@ QString CoverGenerator::fileName() const
 // QRunnable implementation
 //-------------------------------------------------------------------------------------------------
 
-QString CoverGenerator::execute() /* override */
+QString CoverGenerator::execute(QStringList thumbnails) const
 {
     QDir dir(config_GetUserDir(VLC_CACHE_DIR) + COVERGENERATOR_STORAGE);
 
     dir.mkpath(dir.absolutePath());
-
-    vlc_ml_parent_type type = m_id.type;
-
-    int64_t id = m_id.id;
 
     QString fileName = this->fileName();
     if (dir.exists(fileName))
@@ -154,14 +154,7 @@ QString CoverGenerator::execute() /* override */
         return QUrl::fromLocalFile(fileName).toString();
     }
 
-    QStringList thumbnails;
-
     int count = m_countX * m_countY;
-
-    if (type == VLC_ML_PARENT_GENRE)
-        thumbnails = getGenre(count, id);
-    else
-        thumbnails = getMedias(count, id, type);
 
     int countX;
     int countY;
@@ -233,7 +226,7 @@ QString CoverGenerator::execute() /* override */
 //-------------------------------------------------------------------------------------------------
 
 void CoverGenerator::draw(QPainter & painter,
-                          const QStringList & fileNames, int countX, int countY)
+                          const QStringList & fileNames, int countX, int countY) const
 {
     int count = fileNames.count();
 
@@ -268,12 +261,12 @@ void CoverGenerator::draw(QPainter & painter,
     }
 }
 
-void CoverGenerator::drawImage(QPainter & painter, const QString & fileName, const QRect & target)
+void CoverGenerator::drawImage(QPainter & painter, const QString & fileName, const QRect & target) const
 {
     //QFile expect the :/ instead of qrc:// for resources files
-    QString adaptedFilename = QQmlFile::urlToLocalFileOrQrc(fileName);
-
-    QFile file(adaptedFilename);
+    const QUrl fileURL {fileName};
+    const QString adaptedFilename = QQmlFile::urlToLocalFileOrQrc(fileURL);
+    QFile file(adaptedFilename.isEmpty() ? fileName : adaptedFilename);
 
     if (file.open(QIODevice::ReadOnly) == false)
     {
@@ -329,7 +322,7 @@ void CoverGenerator::drawImage(QPainter & painter, const QString & fileName, con
 
 //-------------------------------------------------------------------------------------------------
 
-void CoverGenerator::blur(QImage& image)
+void CoverGenerator::blur(QImage& image) const
 {
     if (Q_LIKELY(&qt_blurImage))
     {
@@ -389,72 +382,4 @@ QString CoverGenerator::getPrefix(vlc_ml_parent_type type) const
         default:
             return "unknown";
     }
-}
-
-//-------------------------------------------------------------------------------------------------
-
-QStringList CoverGenerator::getGenre(int count, int64_t id) const
-{
-    QStringList thumbnails;
-
-    vlc_ml_query_params_t params;
-
-    memset(&params, 0, sizeof(vlc_ml_query_params_t));
-
-    // NOTE: We retrieve twice the count to maximize our chances to get a valid thumbnail.
-    params.i_nbResults = count * 2;
-
-    ml_unique_ptr<vlc_ml_album_list_t> list(vlc_ml_list_genre_albums(m_ml, &params, id));
-
-    for (const vlc_ml_album_t & album : ml_range_iterate<vlc_ml_album_t>(list))
-    {
-        if (album.thumbnails[VLC_ML_THUMBNAIL_SMALL].i_status != VLC_ML_THUMBNAIL_STATUS_AVAILABLE)
-            continue;
-
-        QUrl url(album.thumbnails[VLC_ML_THUMBNAIL_SMALL].psz_mrl);
-
-        // NOTE: We only want local files to compose the cover.
-        if (url.isLocalFile() == false)
-            continue;
-
-        thumbnails.append(url.toLocalFile());
-
-        if (thumbnails.count() == count)
-            return thumbnails;
-    }
-
-    return thumbnails;
-}
-
-QStringList CoverGenerator::getMedias(int count, int64_t id, vlc_ml_parent_type type) const
-{
-    QStringList thumbnails;
-
-    vlc_ml_query_params_t params;
-
-    memset(&params, 0, sizeof(vlc_ml_query_params_t));
-
-    // NOTE: We retrieve twice the count to maximize our chances to get a valid thumbnail.
-    params.i_nbResults = count * 2;
-
-    ml_unique_ptr<vlc_ml_media_list_t> list(vlc_ml_list_media_of(m_ml, &params, type, id));
-
-    for (const vlc_ml_media_t & media : ml_range_iterate<vlc_ml_media_t>(list))
-    {
-        if (media.thumbnails[VLC_ML_THUMBNAIL_SMALL].i_status != VLC_ML_THUMBNAIL_STATUS_AVAILABLE)
-            continue;
-
-        QUrl url(media.thumbnails[VLC_ML_THUMBNAIL_SMALL].psz_mrl);
-
-        // NOTE: We only want local files to compose the cover.
-        if (url.isLocalFile() == false)
-            continue;
-
-        thumbnails.append(url.toLocalFile());
-
-        if (thumbnails.count() == count)
-            return thumbnails;
-    }
-
-    return thumbnails;
 }

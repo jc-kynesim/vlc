@@ -65,7 +65,7 @@ extern "C" char **environ;
 #include "playlist/playlist_item.hpp"
 
 #include <vlc_plugin.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 #include <vlc_cxx_helpers.hpp>
 
 #ifdef QT_STATIC /* For static builds */
@@ -93,6 +93,8 @@ extern "C" char **environ;
   #ifdef _WIN32
    Q_IMPORT_PLUGIN(QWindowsVistaStylePlugin)
    Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
+  #elif defined(Q_OS_MACOS)
+   Q_IMPORT_PLUGIN(QCocoaIntegrationPlugin)
   #endif
  #endif
 #endif
@@ -109,7 +111,7 @@ static void CloseInternal( qt_intf_t * );
 static int  OpenIntf     ( vlc_object_t * );
 static int  OpenDialogs  ( vlc_object_t * );
 static void Close        ( vlc_object_t * );
-static int  WindowOpen   ( vout_window_t * );
+static int  WindowOpen   ( vlc_window_t * );
 static void ShowDialog   ( intf_thread_t *, int, int, intf_dialog_args_t * );
 
 
@@ -511,7 +513,7 @@ static int OpenInternal( qt_intf_t *p_intf )
     libvlc_SetExitHandler( vlc_object_instance(p_intf), Abort, p_intf );
     Thread( (void *)p_intf );
 #else
-    if( vlc_clone( &p_intf->thread, Thread, p_intf, VLC_THREAD_PRIORITY_LOW ) )
+    if( vlc_clone( &p_intf->thread, Thread, p_intf ) )
     {
         return VLC_ENOMEM;
     }
@@ -654,6 +656,8 @@ static void *Thread( void *obj )
     char vlc_name[] = "vlc"; /* for WM_CLASS */
     char *argv[3] = { nullptr };
     int argc = 0;
+
+    vlc_thread_set_name("vlc-qt");
 
     auto argvReleaser = vlc::wrap_carray<char*>(argv, [](char* ptr[]) {
         for ( int i = 0; ptr[i] != nullptr; ++i )
@@ -800,13 +804,13 @@ static void *Thread( void *obj )
 
         QString platform = app.platformName();
         if( platform == qfu("xcb") )
-            p_intf->voutWindowType = VOUT_WINDOW_TYPE_XID;
+            p_intf->voutWindowType = VLC_WINDOW_TYPE_XID;
         else if( platform == qfu("wayland") || platform == qfu("wayland-egl") )
-            p_intf->voutWindowType = VOUT_WINDOW_TYPE_WAYLAND;
+            p_intf->voutWindowType = VLC_WINDOW_TYPE_WAYLAND;
         else if( platform == qfu("windows") )
-            p_intf->voutWindowType = VOUT_WINDOW_TYPE_HWND;
+            p_intf->voutWindowType = VLC_WINDOW_TYPE_HWND;
         else if( platform == qfu("cocoa" ) )
-            p_intf->voutWindowType = VOUT_WINDOW_TYPE_NSOBJECT;
+            p_intf->voutWindowType = VLC_WINDOW_TYPE_NSOBJECT;
         else
         {
             msg_Err( p_intf, "unknown Qt platform: %s", qtu(platform) );
@@ -939,7 +943,7 @@ static void ShowDialog( intf_thread_t *p_intf, int i_dialog_event, int i_arg,
     QApplication::postEvent( THEDP, event );
 }
 
-static void WindowCloseCb( vout_window_t * )
+static void WindowCloseCb( vlc_window_t * )
 {
     qt_intf_t *p_intf = nullptr;
     bool shutdown = false;
@@ -960,7 +964,7 @@ static void WindowCloseCb( vout_window_t * )
 /**
  * Video output window provider
  */
-static int WindowOpen( vout_window_t *p_wnd )
+static int WindowOpen( vlc_window_t *p_wnd )
 {
     if( !var_InheritBool( p_wnd, "embedded-video" ) )
         return VLC_EGENERIC;
@@ -985,8 +989,8 @@ static int WindowOpen( vout_window_t *p_wnd )
 
         switch( p_intf->voutWindowType )
         {
-            case VOUT_WINDOW_TYPE_XID:
-            case VOUT_WINDOW_TYPE_HWND:
+            case VLC_WINDOW_TYPE_XID:
+            case VLC_WINDOW_TYPE_HWND:
                 if( var_InheritBool( p_wnd, "video-wallpaper" ) )
                     return VLC_EGENERIC;
                 break;

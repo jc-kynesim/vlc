@@ -399,7 +399,7 @@ FocusScope {
 
     function animateFlickableContentY( newContentY ) {
         animateContentY.stop()
-        animateContentY.duration = VLCStyle.duration_slow
+        animateContentY.duration = VLCStyle.duration_long
         animateContentY.to = newContentY
         animateContentY.start()
     }
@@ -458,7 +458,8 @@ FocusScope {
 
     function _containsItem(id) {
         var i = id - _currentRange[0]
-        return i >= 0 && i < _idChildrenList.length && typeof _idChildrenList[i] !== "undefined"
+        var childrenList = _idChildrenList
+        return i >= 0 && i < childrenList.length && typeof childrenList[i] !== "undefined"
     }
 
     function _repositionItem(id, x, y) {
@@ -593,9 +594,13 @@ FocusScope {
         Loader {
             id: headerItemLoader
 
+            x: 0
+            y: root.topMargin
+
             //load the header early (when the first row is visible)
             visible: flickable.contentY < (root.headerHeight + root._effectiveCellHeight + root.topMargin)
-            focus: item.focus
+
+            focus: (status === Loader.Ready) ? item.focus : false
             onFocusChanged: {
                 if (!focus)
                     return;
@@ -603,14 +608,11 @@ FocusScope {
                 // when we gain the focus ensure the widget is fully visible
                 animateFlickableContentY(0);
             }
-            onLoaded: {
-                item.x = 0
-                item.y = root.topMargin
-            }
         }
 
         Loader {
             id: footerItemLoader
+
             focus: (status === Loader.Ready) ? item.focus : false
 
             y: root.topMargin + root.headerHeight + (root._effectiveCellHeight * (Math.ceil(model.count / root._nbItemPerRow))) +
@@ -804,7 +806,7 @@ FocusScope {
             target: root;
             properties: "_expandItemVerticalSpace"
             easing.type: Easing.OutQuad
-            duration: VLCStyle.duration_slow
+            duration: VLCStyle.duration_long
             to: 0
             onStopped: {
                 root.expandIndex = -1
@@ -818,7 +820,7 @@ FocusScope {
             target: root;
             properties: "_expandItemVerticalSpace"
             easing.type: Easing.InQuad
-            duration: VLCStyle.duration_slow
+            duration: VLCStyle.duration_long
             from: 0
         }
     }

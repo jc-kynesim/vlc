@@ -91,9 +91,9 @@ static vlc_tick_t main_stream_to_system(vlc_clock_main_t *main_clock,
 
 static void vlc_clock_main_reset(vlc_clock_main_t *main_clock)
 {
-    AvgReset(&main_clock->coeff_avg);
     main_clock->coeff = 1.0f;
     main_clock->rate = 1.0f;
+    AvgResetAndFill(&main_clock->coeff_avg, main_clock->coeff);
     main_clock->offset = VLC_TICK_INVALID;
 
     main_clock->wait_sync_ref_priority = UINT_MAX;
@@ -114,9 +114,8 @@ static inline void vlc_clock_on_update(vlc_clock_t *clock,
                               clock->cbs_data);
 
     if (main_clock->tracer != NULL && clock->track_str_id)
-    {
-        vlc_tracer_TraceRender(main_clock->tracer, "RENDER", clock->track_str_id, ts, system_now);
-    }
+        vlc_tracer_TraceRender(main_clock->tracer, "RENDER", clock->track_str_id,
+                               system_now, ts);
 }
 
 static vlc_tick_t vlc_clock_master_update(vlc_clock_t *clock,
@@ -430,6 +429,7 @@ vlc_clock_main_t *vlc_clock_main_New(struct vlc_logger *parent_logger, struct vl
     main_clock->output_dejitter = AOUT_MAX_PTS_ADVANCE * 2;
 
     AvgInit(&main_clock->coeff_avg, 10);
+    AvgResetAndFill(&main_clock->coeff_avg, main_clock->coeff);
 
     return main_clock;
 }

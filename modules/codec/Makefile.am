@@ -51,6 +51,7 @@ libg711_plugin_la_SOURCES = codec/g711.c
 codec_LTLIBRARIES += libg711_plugin.la
 
 libfluidsynth_plugin_la_SOURCES = codec/fluidsynth.c
+libfluidsynth_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) -DDATADIR=\"$(datadir)\"
 libfluidsynth_plugin_la_CFLAGS = $(AM_CFLAGS) $(FLUIDSYNTH_CFLAGS)
 libfluidsynth_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(codecdir)'
 libfluidsynth_plugin_la_LIBADD = $(FLUIDSYNTH_LIBS)
@@ -585,7 +586,6 @@ codec_LTLIBRARIES += $(LTLIBtwolame)
 libdav1d_plugin_la_SOURCES = codec/dav1d.c \
 	packetizer/av1_obu.c packetizer/av1_obu.h
 libdav1d_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) $(DAV1D_CFLAGS)
-libdav1d_plugin_la_CFLAGS = $(AM_CFLAGS)
 libdav1d_plugin_la_LDFLAGS = $(AM_LDFLAGS) -rpath '$(codecdir)'
 libdav1d_plugin_la_LIBADD = $(DAV1D_LIBS)
 EXTRA_LTLIBRARIES += libdav1d_plugin.la

@@ -122,7 +122,7 @@ T.Control {
 
                 NumberAnimation {
                     properties: "opacity, playCoverOpacity"
-                    duration: VLCStyle.duration_slow
+                    duration: VLCStyle.duration_long
                     easing.type: Easing.InSine
                 }
 
@@ -145,7 +145,7 @@ T.Control {
 
                 NumberAnimation {
                     properties: "opacity, playCoverOpacity"
-                    duration: VLCStyle.duration_normal
+                    duration: VLCStyle.duration_long
                     easing.type: Easing.OutSine
                 }
 
@@ -254,11 +254,12 @@ T.Control {
             Widgets.MediaCover {
                 id: picture
 
-                width: pictureWidth
-                height: pictureHeight
                 playCoverVisible: false
                 playCoverOpacity: 0
                 radius: VLCStyle.gridCover_radius
+
+                Layout.preferredWidth: pictureWidth
+                Layout.preferredHeight: pictureHeight
 
                 onPlayIconClicked: root.playClicked()
             }
@@ -281,6 +282,7 @@ T.Control {
 
                     height: implicitHeight
                     color: background.foregroundColor
+                    textFormat: Text.PlainText
                 }
             }
 
@@ -291,6 +293,7 @@ T.Control {
                 text: root.subtitle
                 elide: Text.ElideRight
                 color: background.foregroundColor
+                textFormat: Text.PlainText
 
                 Layout.preferredWidth: Math.min(pictureWidth, implicitWidth)
                 Layout.alignment: root.textAlignHCenter ? Qt.AlignCenter : Qt.AlignLeft
@@ -302,12 +305,13 @@ T.Control {
 
                 ToolTip.delay: VLCStyle.delayToolTipAppear
                 ToolTip.text: subtitleTxt.text
-                ToolTip.visible: {
-                    if (!mouseArea.containsMouse)
-                        return false
+                ToolTip.visible: subtitleTxtMouseArea.containsMouse
 
-                    var pos = mouseArea.mapToItem(subtitleTxt, mouseArea.mouseX, mouseArea.mouseY)
-                    return Helpers.contains(Qt.rect(0, 0, width, height), pos)
+                MouseArea {
+                    id: subtitleTxtMouseArea
+
+                    anchors.fill: parent
+                    hoverEnabled: true
                 }
             }
         }

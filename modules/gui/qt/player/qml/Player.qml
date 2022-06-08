@@ -118,6 +118,29 @@ FocusScope {
         }
     }
 
+    PlayerPlaylistVisibilityFSM {
+        id: playlistVisibility
+
+        onShowPlaylist: {
+            rootPlayer.lockUnlockAutoHide(true, playlistVisibility)
+            MainCtx.playlistVisible = true
+        }
+
+        onHidePlaylist: {
+            rootPlayer.lockUnlockAutoHide(false, playlistVisibility)
+            MainCtx.playlistVisible = false
+        }
+    }
+
+    Connections {
+        target: MainCtx
+
+        //playlist
+        onPlaylistDockedChanged: playlistVisibility.updatePlaylistDocked()
+        onPlaylistVisibleChanged: playlistVisibility.updatePlaylistVisible()
+        onHasEmbededVideoChanged: playlistVisibility.updateVideoEmbed()
+    }
+
     VideoSurface {
         id: videoSurface
 
@@ -205,6 +228,15 @@ FocusScope {
         }
     }
 
+    Component {
+        id: acrylicBackground
+
+        Widgets.AcrylicBackground {
+            width: rootPlayer.width
+            alternativeColor: rootPlayer.colors.playerBg
+        }
+    }
+
     /* top control bar background */
     Widgets.DrawerExt {
         edge: Widgets.DrawerExt.Edges.Top
@@ -215,7 +247,7 @@ FocusScope {
 
         component: {
             if (rootPlayer.pinVideoControls)
-                return backgroundForPinnedControls
+                return acrylicBackground
             else if (topcontrolView.contentItem.isResumeDialogVisible)
                 return topcontrolViewResumeBg
             else
@@ -345,12 +377,7 @@ FocusScope {
                 Navigation.parentItem: rootPlayer
                 Navigation.downItem: playlistpopup.showPlaylist ? playlistpopup : (audioControls.visible ? audioControls : controlBarView)
 
-                onTooglePlaylistVisibility: {
-                    if (MainCtx.playlistDocked)
-                        playlistpopup.showPlaylist = !playlistpopup.showPlaylist
-                    else
-                        MainCtx.playlistVisible = !MainCtx.playlistVisible
-                }
+                onTogglePlaylistVisibility: playlistVisibility.togglePlaylistVisibility()
 
                 onRequestLockUnlockAutoHide: {
                     rootPlayer.lockUnlockAutoHide(lock, source)
@@ -396,25 +423,37 @@ FocusScope {
             visible: !rootPlayer.hasEmbededVideo
 
             Item {
-                Layout.preferredHeight: rootPlayer.height / 2.7182
-                Layout.preferredWidth: height * cover.sar
+                Layout.preferredHeight: rootPlayer.height / heightConstant
+                Layout.preferredWidth: cover.paintedWidth
                 Layout.maximumHeight: centerContent.height
                 Layout.alignment: Qt.AlignHCenter
+
+                readonly property real heightConstant: 2.7182
 
                 Image {
                     id: cover
 
                     //source aspect ratio
-                    readonly property real sar: cover.sourceSize.width / cover.sourceSize.height
+                    readonly property real sar: paintedWidth / paintedHeight
 
-                    anchors.fill: parent
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.horizontalCenter: parent.horizontalCenter
                     source: rootPlayer.coverSource
                     fillMode: Image.PreserveAspectFit
-                    mipmap: height < sourceSize.height * .3
+                    mipmap: true
+                    cache: false
+                    asynchronous: true
+                    sourceSize: Qt.size(maximumWidth, maximumHeight)
+
+                    readonly property real maximumWidth: MainCtx.screen ? (MainCtx.screen.availableVirtualSize.width * MainCtx.screen.devicePixelRatio)
+                                                                        : 1024
+                    readonly property real maximumHeight: MainCtx.screen ? (MainCtx.screen.availableVirtualSize.height * MainCtx.screen.devicePixelRatio / parent.heightConstant)
+                                                                         : 1024
                 }
 
                 Widgets.CoverShadow {
-                    anchors.fill: cover
+                    anchors.fill: parent
                     source: cover
                     primaryVerticalOffset: VLCStyle.dp(24)
                     primaryRadius: VLCStyle.dp(54)
@@ -567,7 +606,7 @@ FocusScope {
         }
         focus: false
         edge: Widgets.DrawerExt.Edges.Right
-        state: showPlaylist && MainCtx.playlistDocked ? "visible" : "hidden"
+        state: playlistVisibility.isPlaylistVisible ? "visible" : "hidden"
         component: Rectangle {
             color: rootPlayer.colors.setColorAlpha(rootPlayer.colors.topBanner, 0.8)
             width: (rootPlayer.width + playlistView.rightPadding) / 4
@@ -590,7 +629,7 @@ FocusScope {
                 Navigation.cancelAction: closePlaylist
 
                 function closePlaylist() {
-                    playlistpopup.showPlaylist = false
+                    playlistVisibility.togglePlaylistVisibility()
                     if (audioControls.visible)
                         audioControls.forceActiveFocus()
                     else

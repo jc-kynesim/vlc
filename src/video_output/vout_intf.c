@@ -151,6 +151,21 @@ static void AddCustomRatios( vout_thread_t *p_vout, const char *psz_var,
     }
 }
 
+enum vlc_video_fitting var_InheritFit(vlc_object_t *obj)
+{
+    int64_t v = var_InheritInteger(obj, "fit");
+    /* Safe variable => paranoid checks */
+    switch (v) {
+        case VLC_VIDEO_FIT_SMALLER:
+        case VLC_VIDEO_FIT_LARGER:
+        case VLC_VIDEO_FIT_WIDTH:
+        case VLC_VIDEO_FIT_HEIGHT:
+            return v;
+        default:
+            return VLC_VIDEO_FIT_SMALLER;
+    }
+}
+
 void vout_CreateVars( vout_thread_t *p_vout )
 {
     vlc_value_t val;
@@ -453,6 +468,8 @@ exit:
 
 bool vout_ParseCrop(struct vout_crop *restrict cfg, const char *crop_str)
 {
+    float fnum, fden;
+
     if (sscanf(crop_str, "%u:%u", &cfg->ratio.num, &cfg->ratio.den) == 2) {
         if (cfg->ratio.num != 0 && cfg->ratio.den != 0)
             cfg->mode = VOUT_CROP_RATIO;
@@ -466,6 +483,14 @@ bool vout_ParseCrop(struct vout_crop *restrict cfg, const char *crop_str)
                       &cfg->border.left, &cfg->border.top,
                       &cfg->border.right, &cfg->border.bottom) == 4) {
         cfg->mode = VOUT_CROP_BORDER;
+    } else if (vlc_sscanf_c(crop_str, "%f:%f", &fnum, &fden) == 2) {
+        long num = lroundf(ldexp(fnum, 24/*-bit mantissa */));
+        long den = lroundf(ldexp(fden, 24));
+        long gcd = GCD(num, den);
+
+        cfg->mode = VOUT_CROP_RATIO;
+        cfg->ratio.num = num / gcd;
+        cfg->ratio.den = den / gcd;
     } else if (*crop_str == '\0') {
         cfg->mode = VOUT_CROP_NONE;
     } else {
@@ -536,9 +561,11 @@ static int AutoScaleCallback( vlc_object_t *obj, char const *name,
                               vlc_value_t prev, vlc_value_t cur, void *data )
 {
     vout_thread_t *p_vout = (vout_thread_t *)obj;
+    enum vlc_video_fitting fit = cur.b_bool ? var_InheritFit(obj)
+                                            : VLC_VIDEO_FIT_NONE;
 
     (void) name; (void) prev; (void) data;
-    vout_ChangeDisplayFilled(p_vout, cur.b_bool);
+    vout_ChangeDisplayFitting(p_vout, fit);
     return VLC_SUCCESS;
 }
 
@@ -556,7 +583,7 @@ static int AboveCallback( vlc_object_t *obj, char const *name,
                           vlc_value_t prev, vlc_value_t cur, void *data )
 {
     vout_ChangeWindowState((vout_thread_t *)obj,
-        cur.b_bool ? VOUT_WINDOW_STATE_ABOVE : VOUT_WINDOW_STATE_NORMAL);
+        cur.b_bool ? VLC_WINDOW_STATE_ABOVE : VLC_WINDOW_STATE_NORMAL);
     (void) name; (void) prev; (void) data;
     return VLC_SUCCESS;
 }
@@ -568,7 +595,7 @@ static int WallPaperCallback( vlc_object_t *obj, char const *name,
 
     if( cur.b_bool )
     {
-        vout_ChangeWindowState(vout, VOUT_WINDOW_STATE_BELOW);
+        vout_ChangeWindowState(vout, VLC_WINDOW_STATE_BELOW);
         vout_ChangeFullscreen(vout, NULL);
     }
     else

@@ -21,7 +21,7 @@
 #include <QtQuick/QQuickItem>
 #include <QMutex>
 #include "qt.hpp"
-#include "vlc_vout_window.h"
+#include "vlc_window.h"
 
 class MainCtx;
 class VideoSurfaceProvider : public QObject
@@ -31,7 +31,7 @@ public:
     VideoSurfaceProvider(QObject* parent = nullptr);
     virtual ~VideoSurfaceProvider() {}
 
-    void enable(vout_window_t* voutWindow);
+    void enable(vlc_window_t* voutWindow);
     void disable();
     bool isEnabled();
 
@@ -57,7 +57,7 @@ public slots:
 
 protected:
     QMutex m_voutlock;
-    vout_window_t* m_voutWindow = nullptr;
+    vlc_window_t* m_voutWindow = nullptr;
     bool m_videoEmbed = false;
 };
 

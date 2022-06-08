@@ -791,6 +791,8 @@ static void *vlc_h2_recv_thread(void *data)
     struct vlc_h2_parser *parser;
     int canc, val;
 
+    vlc_thread_set_name("vlc-h2-recv");
+
     canc = vlc_savecancel();
     parser = vlc_h2_parse_init(conn, &vlc_h2_parser_callbacks);
     if (unlikely(parser == NULL))
@@ -889,8 +891,7 @@ struct vlc_http_conn *vlc_h2_conn_create(void *ctx, struct vlc_tls *tls)
     vlc_cond_init(&conn->send_wait);
 
     if (vlc_h2_conn_queue(conn, vlc_h2_frame_settings())
-     || vlc_clone(&conn->thread, vlc_h2_recv_thread, conn,
-                  VLC_THREAD_PRIORITY_INPUT))
+     || vlc_clone(&conn->thread, vlc_h2_recv_thread, conn))
     {
         vlc_h2_output_destroy(conn->out);
         goto error;

@@ -123,6 +123,8 @@ static void AddressDestroy (sap_address_t *addr)
  */
 static void *RunThread (void *self)
 {
+    vlc_thread_set_name("vlc-sap");
+
     sap_address_t *addr = self;
 
     vlc_mutex_lock(&sap_mutex);
@@ -334,8 +336,7 @@ matched:
 
     if (sap_addr->session_count++ == 0)
     {
-        if (vlc_clone(&sap_addr->thread, RunThread, sap_addr,
-                      VLC_THREAD_PRIORITY_LOW))
+        if (vlc_clone(&sap_addr->thread, RunThread, sap_addr))
         {
             msg_Err(obj, "unable to spawn SAP announce thread");
             AddressDestroy(sap_addr);

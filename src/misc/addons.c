@@ -223,8 +223,8 @@ void addons_manager_Gather( addons_manager_t *p_manager, const char *psz_uri )
 
     if( !p_manager->p_priv->finder.b_live )
     {
-        if( vlc_clone( &p_manager->p_priv->finder.thread, FinderThread, p_manager,
-                       VLC_THREAD_PRIORITY_LOW ) )
+        if( vlc_clone( &p_manager->p_priv->finder.thread, FinderThread, p_manager
+                       ) )
         {
             msg_Err( p_manager->p_priv->p_parent,
                      "cannot spawn entries provider thread" );
@@ -330,6 +330,8 @@ static void finder_thread_interrupted( void* p_data )
 
 static void *FinderThread( void *p_data )
 {
+    vlc_thread_set_name("vlc-addon-find");
+
     addons_manager_t *p_manager = p_data;
     int i_cancel = vlc_savecancel();
     vlc_interrupt_set( p_manager->p_priv->finder.p_interrupt );
@@ -456,6 +458,8 @@ static void installer_thread_interrupted( void* p_data )
 
 static void *InstallerThread( void *p_data )
 {
+    vlc_thread_set_name("vlc-addon-instl");
+
     addons_manager_t *p_manager = p_data;
     int i_cancel = vlc_savecancel();
     vlc_interrupt_set( p_manager->p_priv->installer.p_interrupt );
@@ -537,8 +541,8 @@ static int InstallEntry( addons_manager_t *p_manager, addon_entry_t *p_entry )
     ARRAY_APPEND( p_manager->p_priv->installer.entries, p_entry );
     if( !p_manager->p_priv->installer.b_live )
     {
-        if( vlc_clone( &p_manager->p_priv->installer.thread, InstallerThread, p_manager,
-                       VLC_THREAD_PRIORITY_LOW ) )
+        if( vlc_clone( &p_manager->p_priv->installer.thread, InstallerThread, p_manager
+                       ) )
         {
             msg_Err( p_manager->p_priv->p_parent,
                      "cannot spawn addons installer thread" );

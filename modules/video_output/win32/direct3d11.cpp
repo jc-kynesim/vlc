@@ -325,7 +325,7 @@ static int UpdateStaging(vout_display_t *vd, const video_format_t *fmt)
             return VLC_EGENERIC;
         }
 
-        if (D3D11_AllocateResourceView(vd, sys->d3d_dev->d3ddevice, sys->picQuad.generic.textureFormat,
+        if (D3D11_AllocateResourceView(vlc_object_logger(vd), sys->d3d_dev->d3ddevice, sys->picQuad.generic.textureFormat,
                                     textures, 0, sys->stagingSys.renderSrc))
         {
             msg_Err(vd, "Failed to allocate the staging shader view");
@@ -388,7 +388,7 @@ static int Open(vout_display_t *vd,
     if ( sys->swapCb == NULL || sys->startEndRenderingCb == NULL || sys->updateOutputCb == NULL )
     {
 #ifndef VLC_WINSTORE_APP
-        if (vd->cfg->window->type == VOUT_WINDOW_TYPE_HWND)
+        if (vd->cfg->window->type == VLC_WINDOW_TYPE_HWND)
         {
             if (CommonWindowInit(vd, &sys->area, &sys->sys,
                        vd->source->projection_mode != PROJECTION_MODE_RECTANGULAR))
@@ -399,7 +399,7 @@ static int Open(vout_display_t *vd,
 
         /* use our internal swapchain callbacks */
 #if defined(HAVE_DCOMP_H) && !defined(VLC_WINSTORE_APP)
-        if (vd->cfg->window->type == VOUT_WINDOW_TYPE_DCOMP)
+        if (vd->cfg->window->type == VLC_WINDOW_TYPE_DCOMP)
             sys->outside_opaque =
                 D3D11_CreateLocalSwapchainHandleDComp(VLC_OBJECT(vd),
                                                       vd->cfg->window->display.dcomp_device,
@@ -426,7 +426,7 @@ static int Open(vout_display_t *vd,
         goto error;
     }
 
-    vout_window_SetTitle(vd->cfg->window, VOUT_TITLE " (Direct3D11 output)");
+    vlc_window_SetTitle(vd->cfg->window, VOUT_TITLE " (Direct3D11 output)");
     msg_Dbg(vd, "Direct3D11 display adapter successfully initialized");
 
     vd->info.can_scale_spu        = true;
@@ -466,7 +466,7 @@ static void Close(vout_display_t *vd)
 static int Control(vout_display_t *vd, int query)
 {
     vout_display_sys_t *sys = static_cast<vout_display_sys_t *>(vd->sys);
-    int res = CommonControl( vd, &sys->area, &sys->sys, query );
+    CommonControl( vd, &sys->area, &sys->sys, query );
 
     if ( sys->area.place_changed )
     {
@@ -474,7 +474,7 @@ static int Control(vout_display_t *vd, int query)
         sys->area.place_changed =false;
     }
 
-    return res;
+    return VLC_SUCCESS;
 }
 
 static bool SelectRenderPlane(void *opaque, size_t plane, ID3D11RenderTargetView **targetView)
@@ -1333,7 +1333,7 @@ static int Direct3D11MapSubpicture(vout_display_t *vd, int *subpicture_region_co
                 continue;
             }
 
-            if (D3D11_AllocateResourceView(vd, sys->d3d_dev->d3ddevice, sys->regionQuad.generic.textureFormat,
+            if (D3D11_AllocateResourceView(vlc_object_logger(vd), sys->d3d_dev->d3ddevice, sys->regionQuad.generic.textureFormat,
                                            d3dquad->picSys.texture, 0,
                                            d3dquad->picSys.renderSrc)) {
                 msg_Err(vd, "Failed to create %dx%d shader view for OSD",
