@@ -76,9 +76,10 @@ static int DrmPrimeGet(vlc_va_t *va, picture_t *pic, AVCodecContext * avctx, AVF
 #endif
 }
 
-static void DrmPrimeDelete(vlc_va_t *va)
+static void DrmPrimeDelete(vlc_va_t *va, AVCodecContext* ctx)
 {
     vlc_drm_prime_sys_t * const sys = (vlc_drm_prime_sys_t *)va->sys;
+    VLC_UNUSED(ctx);
 
     if (!sys)
         return;
@@ -186,7 +187,7 @@ static int DrmPrimeCreate(vlc_va_t *va, AVCodecContext *ctx, enum AVPixelFormat 
     return VLC_SUCCESS;
 
 error:
-    DrmPrimeDelete(va);
+    DrmPrimeDelete(va, NULL);
     return VLC_EGENERIC;
 }
 
@@ -202,7 +203,7 @@ static const struct vlc_decoder_device_operations dev_ops = {
 };
 
 static int
-DrmPrimeDecoderDeviceOpen(vlc_decoder_device *device, vout_window_t *window)
+DrmPrimeDecoderDeviceOpen(vlc_decoder_device *device, vlc_window_t *window)
 {
     if (!window)
         return VLC_EGENERIC;

@@ -139,6 +139,10 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *pic,
 
     VLC_UNUSED(date);
 
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s", __func__);
+#endif
+
     if (da == NULL)
         goto fail;
 
@@ -208,12 +212,12 @@ subpics_done:
 
     {
         vout_display_place_t place;
-        vout_display_cfg_t cfg = *vd->cfg;
+        struct vout_display_placement cfg = vd->cfg->display;
         const drmu_mode_simple_params_t * const mode = drmu_output_mode_simple_params(sys->dout);
 
-        cfg.display.width  = mode->width;
-        cfg.display.height = mode->height;
-        cfg.display.sar    = drmu_ufrac_vlc_to_rational(mode->sar);
+        cfg.width  = mode->width;
+        cfg.height = mode->height;
+        cfg.sar    = drmu_ufrac_vlc_to_rational(mode->sar);
 
         vout_display_PlacePicture(&place, &pic->format, &cfg);
         r = drmu_rect_vlc_place(&place);
@@ -316,6 +320,10 @@ static int vd_drm_control(vout_display_t *vd, int query)
 {
     int ret = VLC_EGENERIC;
 
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s: query=%d", __func__, query);
+#endif
+
     switch (query) {
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
         case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
@@ -338,6 +346,11 @@ static int vd_drm_reset_pictures(vout_display_t *vd, video_format_t *fmt)
 {
     VLC_UNUSED(vd);
     VLC_UNUSED(fmt);
+
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s", __func__);
+#endif
+
     return VLC_SUCCESS;
 }
 

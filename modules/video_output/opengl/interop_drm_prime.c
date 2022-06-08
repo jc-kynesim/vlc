@@ -31,7 +31,7 @@
 #include <libdrm/drm_fourcc.h>
 
 #include <vlc_common.h>
-#include <vlc_vout_window.h>
+#include <vlc_window.h>
 #include <vlc_codec.h>
 #include <vlc_plugin.h>
 
