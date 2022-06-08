@@ -458,6 +458,7 @@ static int OpenDrmVout(vout_display_t *vd,
                         video_format_t *fmtp, vlc_video_context *vctx)
 {
     vout_display_sys_t *sys;
+    vlc_window_t * const wnd = vd->cfg->window;
     int ret = VLC_EGENERIC;
     int rv;
     msg_Dbg(vd, "<<< %s: Fmt=%4.4s, fmtp_chroma=%4.4s", __func__,
@@ -490,14 +491,18 @@ static int OpenDrmVout(vout_display_t *vd,
         goto fail;
     }
 
-
     {
         const drmu_log_env_t log = {
             .fn = drmu_log_vlc_cb,
             .v = vd,
             .max_level = DRMU_LOG_LEVEL_ALL
         };
-        if ((sys->du = drmu_env_new_xlease(&log)) == NULL &&
+        if (wnd->type == VLC_WINDOW_TYPE_KMS) {
+            msg_Dbg(vd, "Using fd %d from KMS window", wnd->display.drm_fd);
+            if ((sys->du = drmu_env_new_fd(dup(wnd->display.drm_fd), &log)) == NULL)
+                goto fail;
+        }
+        else if ((sys->du = drmu_env_new_xlease(&log)) == NULL &&
             (sys->du = drmu_env_new_open(DRM_MODULE, &log)) == NULL)
             goto fail;
     }
