@@ -1600,8 +1600,14 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
             goto fail;
         }
 
-        out_pic->format.i_sar_den = p_filter->fmt_out.video.i_sar_den;
-        out_pic->format.i_sar_num = p_filter->fmt_out.video.i_sar_num;
+        if (p_filter->fmt_out.video.i_sar_den == 0 || p_filter->fmt_out.video.i_sar_num == 0) {
+            out_pic->format.i_sar_den = 1;
+            out_pic->format.i_sar_num = 1;
+        }
+        else {
+            out_pic->format.i_sar_den = p_filter->fmt_out.video.i_sar_den;
+            out_pic->format.i_sar_num = p_filter->fmt_out.video.i_sar_num;
+        }
 
         if (sys->is_sliced) {
             vlc_mutex_lock(&sys->lock);
