@@ -1,8 +1,12 @@
 set -e
 BASE=`pwd`
 
+CONF_MMAL=--disable-mmal
+
 MC=`uname -m`
 if [ "$MC" == "armv7l" ]; then
+#  CONF_MMAL=--enable-mmal-avcodec
+  CONF_MMAL=
   ARM=armv7
 elif [ "$MC" == "aarch64" ]; then
   ARM=arm64
@@ -18,6 +22,6 @@ mkdir -p $OUT
 echo "**" > $BASE/out/.gitignore
 
 cd $OUT
-$BASE/configure  --disable-vdpau --enable-gles2 --enable-mmal-avcodec
+$BASE/configure  --disable-vdpau --enable-gles2 $CONF_MMAL
 echo "Configured in $OUT"
 
