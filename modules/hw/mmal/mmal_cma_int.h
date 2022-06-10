@@ -41,7 +41,7 @@ struct cma_buf_pool_s {
 typedef struct cma_buf_s {
     atomic_int ref_count;
     cma_buf_type_t type;
-    cma_buf_pool_t * cbp;
+    struct cma_buf_pool_s * cbp;
     bool in_flight;
     size_t size;
     unsigned int vcsm_h;   // VCSM handle from initial alloc

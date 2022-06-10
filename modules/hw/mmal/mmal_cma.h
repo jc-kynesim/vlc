@@ -12,8 +12,6 @@ unsigned int cma_buf_vcsm_handle(cma_buf_t * const cb);
 size_t cma_buf_size(const cma_buf_t * const cb);
 int cma_buf_add_context2(cma_buf_t *const cb, picture_context_t * const ctx2);
 unsigned int cma_buf_vc_handle(cma_buf_t *const cb);
-int cma_buf_fd(const cma_buf_t *const cb);
-void * cma_buf_addr(const cma_buf_t *const cb);
 unsigned int cma_buf_vc_addr(cma_buf_t *const cb);
 picture_context_t * cma_buf_context2(const cma_buf_t *const cb);
 

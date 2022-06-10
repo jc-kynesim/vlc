@@ -67,6 +67,10 @@ static void drmprime_buf_pool_on_put_cb(void * v)
     cdb->cb.vc_h = 0;
     cdb->cb.vc_addr = 0;
     av_buffer_unref(&cdb->avbuf);
+    if (cdb->cb.ctx2) {
+        cdb->cb.ctx2->destroy(cdb->cb.ctx2);
+        cdb->cb.ctx2 = NULL;
+    }
 }
 
 // Pool has died - safe now to exit vcsm
