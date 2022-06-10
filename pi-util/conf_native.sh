@@ -14,6 +14,9 @@ OUT=$BASE/out/$ARM-`lsb_release -sc`-rel
 
 echo "Configuring in $OUT"
 mkdir -p $OUT
+# Nothing under here need worry git - including this .gitignore!
+echo "**" > $BASE/out/.gitignore
+
 cd $OUT
 $BASE/configure  --disable-vdpau --enable-gles2 --enable-mmal-avcodec
 echo "Configured in $OUT"
