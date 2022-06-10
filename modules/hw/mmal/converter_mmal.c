@@ -49,7 +49,7 @@ static EGLint vlc_to_gl_fourcc(const video_format_t * const fmt)
           return MMAL_FOURCC('Y','V','1','2');
        case MMAL_ENCODING_I422:
           return MMAL_FOURCC('Y','U','1','6');
-//       case MMAL_ENCODING_YUVUV128:  // Doesn't actually work yet
+       case MMAL_ENCODING_YUVUV128:  // Doesn't actually work yet
        case MMAL_ENCODING_NV12:
           return MMAL_FOURCC('N','V','1','2');
        case MMAL_ENCODING_NV21:
@@ -153,7 +153,7 @@ static tex_context_t * get_tex_context(const opengl_tex_converter_t * const tc, 
 
             for (int i = 0; i < pic->i_planes; ++i)
             {
-                const uint64_t mod = DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(pic->p[i].i_pitch >> 7);
+                const uint64_t mod = DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(pic->p[i].i_pitch);
 
                 *a++ = *n++;
                 *a++ = fd;
@@ -264,7 +264,7 @@ tc_mmal_update(const opengl_tex_converter_t *tc, GLuint *textures,
     if (tex == NULL)
         return VLC_EGENERIC;
 
-//    tc->vt->BindTexture(GL_TEXTURE_EXTERNAL_OES, tex->texture);
+    tc->vt->BindTexture(GL_TEXTURE_EXTERNAL_OES, tex->texture);
 
     cma_buf_unref(sys->last_cb);
     sys->last_cb = cma_buf_ref(cb);
@@ -348,12 +348,13 @@ static vlc_fourcc_t chroma_in_out(const vlc_fourcc_t chroma_in)
     {
         case VLC_CODEC_MMAL_OPAQUE:
         case VLC_CODEC_MMAL_ZC_I420:
-        case VLC_CODEC_MMAL_ZC_SAND8:
         case VLC_CODEC_MMAL_ZC_SAND10:          // ISP only
             return VLC_CODEC_MMAL_ZC_I420;
         case VLC_CODEC_MMAL_ZC_SAND30:          // HVS only
         case VLC_CODEC_MMAL_ZC_RGB32:
             return VLC_CODEC_MMAL_ZC_RGB32;     // HVS can't generate YUV of any sort
+        case VLC_CODEC_MMAL_ZC_SAND8:
+            return VLC_CODEC_MMAL_ZC_SAND8;
         default:
             break;
     }
