@@ -34,13 +34,14 @@ fi
 
 # We seem to sometimes gain add
 echo Generating patch: $PATCHFILE
-git diff $VERSION -- modules/hw/mmal modules/video_output/opengl\
+REFNAME=refs/heads/$VERSION
+git diff $REFNAME -- modules/hw/mmal modules/video_output/opengl\
  modules/gui/qt/qt.cpp\
  src/misc include src/video_output src/input\
  configure.ac > $PATCHFILE
-git diff $VERSION -- modules/video_chroma/chain.c > ../vlc-$VERSION-$1-002-chain.patch
-git diff $VERSION -- bin/vlc.c > ../vlc-$VERSION-$1-003-vlc.patch
-git diff $VERSION -- modules/access/srt.c modules/access_output/srt.c > ../vlc-$VERSION-$1-004-srt.patch
+git diff $REFNAME -- modules/video_chroma/chain.c > ../vlc-$VERSION-$1-002-chain.patch
+git diff $REFNAME -- bin/vlc.c > ../vlc-$VERSION-$1-003-vlc.patch
+git diff $REFNAME -- modules/access/srt.c modules/access_output/srt.c > ../vlc-$VERSION-$1-004-srt.patch
 
 #echo Copying patch to arm-build
 #scp $PATCHFILE john@arm-build:patches/0002-vlc-3.0.6-mmal_test_4.patch
