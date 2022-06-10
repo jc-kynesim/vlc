@@ -134,15 +134,11 @@ vlc_va_t *vlc_va_New(vlc_object_t *obj, AVCodecContext *avctx,
                      enum PixelFormat pix_fmt, const es_format_t *fmt,
                      picture_sys_t *p_sys)
 {
-    msg_Info(obj, "%s", __func__);
-
     vlc_va_t *va = vlc_object_create(obj, sizeof (*va));
     if (unlikely(va == NULL))
         return NULL;
 
     char *modlist = var_InheritString(obj, "avcodec-hw");
-
-    msg_Info(obj, "VA modules: '%s'", modlist);
 
     va->module = vlc_module_load(va, "hw decoder", modlist, true,
                                  vlc_va_Start, va, avctx, pix_fmt, fmt, p_sys);
