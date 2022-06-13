@@ -2076,6 +2076,8 @@ int vout_Request(const vout_configuration_t *cfg, vlc_video_context *vctx, input
     assert(cfg->fmt != NULL);
     assert(cfg->clock != NULL);
 
+    msg_Info(cfg->vout, "%s", __func__);
+
     if (!VoutCheckFormat(cfg->fmt)) {
         if (sys->display != NULL)
             vout_StopDisplay(cfg->vout);

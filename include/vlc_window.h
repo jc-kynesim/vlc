@@ -43,6 +43,7 @@
 struct vlc_window;
 struct wl_display;
 struct wl_surface;
+struct drmu_env_s;
 
 /**
  * Window handle type.
@@ -65,6 +66,7 @@ enum vlc_window_type {
     VLC_WINDOW_TYPE_WAYLAND /**< Wayland surface */,
     VLC_WINDOW_TYPE_DCOMP /**< Win32 DirectComposition */,
     VLC_WINDOW_TYPE_KMS /**< DRM KMS CRTC */,
+    VLC_WINDOW_TYPE_DRMU /**< DRMU (like KMS) */,
 };
 
 /**
@@ -400,6 +402,7 @@ typedef struct vlc_window {
         struct wl_display *wl; /**< Wayland display (client pointer) */
         void* dcomp_device; /**< DirectComposition device */
         int      drm_fd; /**< KMS DRM device */
+        struct drmu_env_s * drmu_env;  /**< drmu environment */
     } display;
 
     const struct vlc_window_operations *ops; /**< operations handled by the

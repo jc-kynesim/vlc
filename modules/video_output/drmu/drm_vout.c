@@ -373,7 +373,7 @@ static void CloseDrmVout(vout_display_t *vd)
 
     drmu_plane_unref(&sys->dp);
     drmu_output_unref(&sys->dout);
-    drmu_env_delete(&sys->du);
+    drmu_env_unref(&sys->du);
 
     if (sys->dec_dev)
         vlc_decoder_device_Release(sys->dec_dev);
@@ -497,7 +497,10 @@ static int OpenDrmVout(vout_display_t *vd,
             .v = vd,
             .max_level = DRMU_LOG_LEVEL_ALL
         };
-        if (wnd->type == VLC_WINDOW_TYPE_KMS) {
+        if (wnd->type == VLC_WINDOW_TYPE_DRMU) {
+            sys->du = drmu_env_ref(wnd->display.drmu_env);
+        }
+        else if (wnd->type == VLC_WINDOW_TYPE_KMS) {
             msg_Dbg(vd, "Using fd %d from KMS window", wnd->display.drm_fd);
             if ((sys->du = drmu_env_new_fd(dup(wnd->display.drm_fd), &log)) == NULL)
                 goto fail;
@@ -630,6 +633,61 @@ fail:
     return ret;
 }
 
+//----------------------------------------------------------------------------
+
+static int WindowEnable(vlc_window_t *wnd, const vlc_window_cfg_t *cfg)
+{
+    const drmu_log_env_t log = {
+        .fn = drmu_log_vlc_cb,
+        .v = wnd,
+        .max_level = DRMU_LOG_LEVEL_ALL
+    };
+
+    VLC_UNUSED(cfg);
+    msg_Info(wnd, "<<< %s: %dx%d", __func__, cfg->width, cfg->height);
+
+    if ((wnd->display.drmu_env = drmu_env_new_xlease(&log)) == NULL &&
+        (wnd->display.drmu_env = drmu_env_new_open(DRM_MODULE, &log)) == NULL)
+        goto fail;
+
+    vlc_window_ReportSize(wnd, cfg->width, cfg->height);
+
+    return VLC_SUCCESS;
+
+fail:
+    return VLC_EGENERIC;
+}
+
+static void WindowDisable(vlc_window_t *wnd)
+{
+    msg_Info(wnd, "<<< %s", __func__);
+    drmu_env_unref(&wnd->display.drmu_env);
+}
+
+static void WindowClose(vlc_window_t *wnd)
+{
+    msg_Info(wnd, "<<< %s", __func__);
+    drmu_env_unref(&wnd->display.drmu_env);
+}
+
+static const struct vlc_window_operations window_ops =
+{
+    .destroy = WindowClose,
+    .enable = WindowEnable,
+    .disable = WindowDisable,
+};
+
+static int OpenDrmWindow(vlc_window_t *wnd)
+{
+    msg_Info(wnd, "<<< %s", __func__);
+
+    wnd->ops = &window_ops;
+    wnd->type = VLC_WINDOW_TYPE_DRMU;
+
+    return VLC_SUCCESS;
+}
+
+
 vlc_module_begin()
     set_shortname(N_("DRM vout"))
     set_description(N_("DRM vout plugin"))
@@ -642,5 +700,14 @@ vlc_module_begin()
     add_string(DRM_VOUT_MODE_NAME,         "none", DRM_VOUT_MODE_TEXT, DRM_VOUT_MODE_LONGTEXT)
 
     set_callback_display(OpenDrmVout, 16)  // 1 point better than ASCII art
+
+    add_submodule()
+    set_shortname("drm_win")
+    set_subcategory(SUBCAT_VIDEO_VOUT)
+
+    set_description("DRMU window provider")
+    set_callback(OpenDrmWindow)
+    set_capability("vout window", 10)
+
 vlc_module_end()
 
