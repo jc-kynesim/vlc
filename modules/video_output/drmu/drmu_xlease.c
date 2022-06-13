@@ -134,7 +134,7 @@ drmu_env_new_xlease(const drmu_log_env_t * const log2)
     const int fd = get_lease_fd(log);
 
     if (fd == -1) {
-        drmu_debug_log(log, "Failed to get xlease");
+        drmu_err_log(log, "Failed to get xlease");
         return NULL;
     }
     return drmu_env_new_fd(fd, log);
