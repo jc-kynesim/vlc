@@ -48,7 +48,7 @@ public: // Enums
     };
 
 public:
-    CoverGenerator(const MLItemId & itemId);
+    CoverGenerator();
 
 public: // Interface
     MLItemId getId();
@@ -69,16 +69,9 @@ public: // Interface
 
     void setDefaultThumbnail(const QString & fileName);
 
-    // NOTE: This lets us enforce a specific prefix for the cover fileName.
-    void setPrefix(const QString & prefix);
-
     int requiredNoOfThumbnails() const;
 
-    bool cachedFileAvailable() const;
-
-    QString cachedFileURL() const;
-
-    QString execute(QStringList thumbnails) const;
+    QImage execute(QStringList thumbnails) const;
 
 private: // Functions
     QString fileName() const;
@@ -92,8 +85,6 @@ private: // Functions
     QString getPrefix(vlc_ml_parent_type type) const;
 
 private:
-    MLItemId m_id;
-
     QSize m_size;
 
     int m_countX;
@@ -101,13 +92,9 @@ private:
 
     Split m_split;
 
-    bool m_smooth;
-
     int m_blur;
 
     QString m_default;
-
-    QString m_prefix;
 };
 
 #endif // COVERGENERATOR_HPP

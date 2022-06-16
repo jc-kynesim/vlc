@@ -1362,46 +1362,57 @@ static int DisplayNextFrame(vout_thread_sys_t *sys)
     return RenderPicture(sys, true);
 }
 
+static bool UpdateCurrentPicture(vout_thread_sys_t *sys)
+{
+    assert(sys->clock);
+
+    if (sys->displayed.current == NULL)
+    {
+        sys->displayed.current = PreparePicture(sys, true, false);
+        return sys->displayed.current != NULL;
+    }
+
+    if (sys->pause.is_on)
+        return false;
+
+    const vlc_tick_t system_now = vlc_tick_now();
+    const vlc_tick_t system_swap_current =
+        vlc_clock_ConvertToSystem(sys->clock, system_now,
+                                  sys->displayed.current->date, sys->rate);
+    if (unlikely(system_swap_current == VLC_TICK_MAX))
+        // the clock is paused but the vout thread is not ?
+        return false;
+
+    const vlc_tick_t render_delay = vout_chrono_GetHigh(&sys->chrono.render) + VOUT_MWAIT_TOLERANCE;
+    vlc_tick_t system_prepare_current = system_swap_current - render_delay;
+    if (unlikely(system_prepare_current > system_now))
+        // the current frame is not late, we still have time to display it
+        // no need to get a new picture
+        return true;
+
+    // the current frame will be late, look for the next not late one
+    picture_t *next = PreparePicture(sys, false, false);
+    if (next == NULL)
+        return false;
+
+    picture_Release(sys->displayed.current);
+    sys->displayed.current = next;
+
+    return true;
+}
+
 static vlc_tick_t DisplayPicture(vout_thread_sys_t *vout)
 {
     vout_thread_sys_t *sys = vout;
-    bool paused = sys->pause.is_on;
 
     assert(sys->clock);
 
     UpdateDeinterlaceFilter(sys);
 
-    const vlc_tick_t system_now = vlc_tick_now();
-    const vlc_tick_t render_delay = vout_chrono_GetHigh(&sys->chrono.render) + VOUT_MWAIT_TOLERANCE;
-    const bool first = !sys->displayed.current;
 
-    picture_t *next = NULL;
-    if (first)
+    bool current_changed = UpdateCurrentPicture(sys);
+    if (current_changed)
     {
-        next = PreparePicture(vout, true, false);
-    }
-    else if (!paused)
-    {
-        const vlc_tick_t system_swap_current =
-            vlc_clock_ConvertToSystem(sys->clock, system_now,
-                                      sys->displayed.current->date, sys->rate);
-        if (likely(system_swap_current != VLC_TICK_MAX))
-        {
-            vlc_tick_t system_prepare_current = system_swap_current - render_delay;
-            if (system_prepare_current <= system_now)
-            {
-                // the current frame will be late, look for the next not late one
-                next = PreparePicture(vout, false, false);
-            }
-        }
-    }
-
-    if (next != NULL)
-    {
-        if (likely(sys->displayed.current != NULL))
-            picture_Release(sys->displayed.current);
-        sys->displayed.current = next;
-
         // next frame will still need some waiting before display, we don't need
         // to render now
         // display forced picture immediately
@@ -1414,8 +1425,10 @@ static vlc_tick_t DisplayPicture(vout_thread_sys_t *vout)
     }
     else if (likely(sys->displayed.date != VLC_TICK_INVALID))
     {
+        const vlc_tick_t render_delay = vout_chrono_GetHigh(&sys->chrono.render) + VOUT_MWAIT_TOLERANCE;
         // next date we need to display again the current picture
         vlc_tick_t date_refresh = sys->displayed.date + VOUT_REDISPLAY_DELAY - render_delay;
+        const vlc_tick_t system_now = vlc_tick_now();
         /* FIXME/XXX we must redisplay the last decoded picture (because
         * of potential vout updated, or filters update or SPU update)
         * For now a high update period is needed but it could be removed
@@ -1427,7 +1440,7 @@ static vlc_tick_t DisplayPicture(vout_thread_sys_t *vout)
         */
         if (date_refresh > system_now) {
             // nothing changed, wait until the next deadline or a control
-            vlc_tick_t max_deadline = vlc_tick_now() + VOUT_REDISPLAY_DELAY;
+            vlc_tick_t max_deadline = system_now + VOUT_REDISPLAY_DELAY;
             return __MIN(date_refresh, max_deadline);
         }
         RenderPicture(vout, true);

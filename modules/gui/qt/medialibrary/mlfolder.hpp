@@ -22,9 +22,9 @@
 #define MLFOLDER_HPP
 
 // MediaLibrary includes
-#include "mlitemcover.hpp"
+#include "mlqmltypes.hpp"
 
-class MLFolder : public MLItemCover
+class MLFolder : public MLItem
 {
 public:
     MLFolder(const vlc_ml_folder_t * data);
@@ -41,6 +41,10 @@ public: // Interface
 
     unsigned int getCount() const;
 
+    unsigned int getAudioCount() const;
+
+    unsigned int getVideoCount() const;
+
 private:
     bool m_present;
     bool m_banned;
@@ -52,6 +56,8 @@ private:
     int64_t m_duration;
 
     unsigned int m_count;
+    unsigned int m_audioCount;
+    unsigned int m_videoCount;
 };
 
 #endif

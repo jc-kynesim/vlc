@@ -19,21 +19,12 @@
 #include "mlgenre.hpp"
 
 MLGenre::MLGenre(const vlc_ml_genre_t *_data )
-    : MLItemCover( MLItemId( _data->i_id, VLC_ML_PARENT_GENRE ) )
+    : MLItem( MLItemId( _data->i_id, VLC_ML_PARENT_GENRE ) )
     , m_name     ( QString::fromUtf8( _data->psz_name ) )
     , m_nbTracks ( (unsigned int)_data->i_nb_tracks )
 
 {
     assert(_data);
-
-    for (int i = VLC_ML_THUMBNAIL_SMALL; i < VLC_ML_THUMBNAIL_SIZE_COUNT; ++i)
-    {
-        if (_data->thumbnails[i].psz_mrl)
-        {
-            setCover(_data->thumbnails[i].psz_mrl);
-            break;
-        }
-    }
 }
 
 QString MLGenre::getName() const

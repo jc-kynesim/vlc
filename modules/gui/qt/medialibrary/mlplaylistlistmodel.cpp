@@ -28,6 +28,7 @@
 
 // MediaLibrary includes
 #include "mlhelper.hpp"
+#include "mlcustomcover.hpp"
 #include "mlplaylist.hpp"
 
 //-------------------------------------------------------------------------------------------------
@@ -36,9 +37,9 @@
 
 namespace  {
 
-// NOTE: We multiply by 2 to cover most dpi settings.
-const int MLPLAYLISTMODEL_COVER_WIDTH  = 512 * 2; // 16 / 10 ratio
-const int MLPLAYLISTMODEL_COVER_HEIGHT = 320 * 2;
+// NOTE: We multiply by 3 to cover most dpi settings.
+const int MLPLAYLISTMODEL_COVER_WIDTH  = 260 * 3; // 16 / 10 ratio
+const int MLPLAYLISTMODEL_COVER_HEIGHT = 162 * 3;
 
 const int PLAYLIST_COVERX = 2;
 const int PLAYLIST_COVERY = 2;
@@ -300,21 +301,10 @@ void MLPlaylistListModel::endTransaction()
 
 QString MLPlaylistListModel::getCover(MLPlaylist * playlist) const
 {
-    auto generator = std::make_shared<CoverGenerator>(playlist->getId());
-
-    generator->setCountX(PLAYLIST_COVERX);
-    generator->setCountY(PLAYLIST_COVERY);
-
-    generator->setSize(m_coverSize);
-
-    if (!m_coverDefault.isEmpty())
-        generator->setDefaultThumbnail(m_coverDefault);
-
-    generator->setPrefix(m_coverPrefix);
-
-    return createGroupMediaCover(this, playlist
-                                 , PLAYLIST_THUMBNAIL
-                                 , generator);
+    return ml()->customCover()->get(playlist->getId()
+                                    , m_coverSize
+                                    , m_coverDefault
+                                    , PLAYLIST_COVERX, PLAYLIST_COVERY);
 }
 
 //-------------------------------------------------------------------------------------------------

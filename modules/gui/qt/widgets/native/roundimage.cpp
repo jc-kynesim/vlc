@@ -31,10 +31,12 @@
 
 #include <QBuffer>
 #include <QCache>
+#include <QFile>
 #include <QImage>
 #include <QImageReader>
 #include <QPainter>
 #include <QPainterPath>
+#include <QQuickImageProvider>
 #include <QQuickWindow>
 #include <QGuiApplication>
 #include <QSGImageNode>
@@ -72,49 +74,228 @@ namespace
     }
 
     // images are cached (result of RoundImageGenerator) with the cost calculated from QImage::sizeInBytes
-    QCache<ImageCacheKey, QImage> imageCache(2 * 1024 * 1024); // 2 MiB
+    QCache<ImageCacheKey, QImage> imageCache(32 * 1024 * 1024); // 32 MiB
 
-    std::unique_ptr<QIODevice> getReadable(const QUrl &url)
-    try
+    QRectF doPreserveAspectCrop(const QSizeF &sourceSize, const QSizeF &size)
     {
-        if (!QQmlFile::isLocalFile(url))
+        const qreal ratio = std::max(size.width() / sourceSize.width(), size.height() / sourceSize.height());
+        const QSizeF imageSize = sourceSize * ratio;
+        const QPointF alignedCenteredTopLeft {(size.width() - imageSize.width()) / 2., (size.height() - imageSize.height()) / 2.};
+        return {alignedCenteredTopLeft, imageSize};
+    }
+
+    class ImageReader : public AsyncTask<QImage>
+    {
+    public:
+        // requestedSize is only taken as hint, the Image is resized with PreserveAspectCrop
+        ImageReader(QIODevice *device, QSize requestedSize)
+            : device {device}
+            , requestedSize {requestedSize}
         {
-#ifdef QT_NETWORK_LIB
-            QNetworkAccessManager networkMgr;
-            networkMgr.setRedirectPolicy(QNetworkRequest::NoLessSafeRedirectPolicy);
-            auto reply = networkMgr.get(QNetworkRequest(url));
-            QEventLoop loop;
-            QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-            loop.exec();
-
-            if (reply->error() != QNetworkReply::NoError)
-                throw std::runtime_error(reply->errorString().toStdString());
-
-            class DataOwningBuffer : private QByteArray, public QBuffer
-            {
-            public:
-                explicit DataOwningBuffer(const QByteArray &data)
-                    : QByteArray(data), QBuffer(this, nullptr) { }
-            };
-
-            auto file = std::make_unique<DataOwningBuffer>(reply->readAll());
-            file->open(QIODevice::ReadOnly);
-            return file;
-#else
-            throw std::runtime_error("Qt Network Library is not available!");
-#endif
         }
+
+        QString errorString() const { return errorStr; }
+
+        QImage execute()
+        {
+            QImageReader reader;
+            reader.setDevice(device);
+            const QSize sourceSize = reader.size();
+
+            if (requestedSize.isValid())
+                reader.setScaledSize(doPreserveAspectCrop(sourceSize, requestedSize).size().toSize());
+
+            auto img = reader.read();
+            errorStr = reader.errorString();
+            return img;
+        }
+
+    private:
+        QIODevice *device;
+        QSize requestedSize;
+        QString errorStr;
+    };
+
+    class LocalImageResponse : public QQuickImageResponse
+    {
+    public:
+        LocalImageResponse(const QString &fileName, const QSize &requestedSize)
+        {
+            auto file = new QFile(fileName);
+            reader.reset(new ImageReader(file, requestedSize));
+            file->setParent(reader.get());
+
+            connect(reader.get(), &ImageReader::result, this, &LocalImageResponse::handleImageRead);
+
+            reader->start(*QThreadPool::globalInstance());
+        }
+
+        QQuickTextureFactory *textureFactory() const override
+        {
+            return result.isNull() ? nullptr : QQuickTextureFactory::textureFactoryForImage(result);
+        }
+
+        QString errorString() const override
+        {
+            return errorStr;
+        }
+
+    private:
+        void handleImageRead()
+        {
+            result = reader->takeResult();
+            errorStr = reader->errorString();
+            reader.reset();
+
+            emit finished();
+        }
+
+        QImage result;
+        TaskHandle<ImageReader> reader;
+        QString errorStr;
+    };
+
+#ifdef QT_NETWORK_LIB
+    class NetworkImageResponse : public QQuickImageResponse
+    {
+    public:
+        NetworkImageResponse(QNetworkReply *reply, QSize requestedSize) : reply {reply}, requestedSize {requestedSize}
+        {
+            QObject::connect(reply, &QNetworkReply::finished
+                             , this, &NetworkImageResponse::handleNetworkReplyFinished);
+        }
+
+        QQuickTextureFactory *textureFactory() const override
+        {
+            return result.isNull() ? nullptr : QQuickTextureFactory::textureFactoryForImage(result);
+        }
+
+        QString errorString() const override
+        {
+            return error;
+        }
+
+        void cancel() override
+        {
+            if (reply->isRunning())
+                reply->abort();
+
+            reader.reset();
+        }
+
+    private:
+        void handleNetworkReplyFinished()
+        {
+            if (reply->error() != QNetworkReply::NoError)
+            {
+                error = reply->errorString();
+                emit finished();
+                return;
+            }
+
+            reader.reset(new ImageReader(reply, requestedSize));
+            QObject::connect(reader.get(), &ImageReader::result, this, [this]()
+            {
+                result = reader->takeResult();
+                error = reader->errorString();
+                reader.reset();
+
+                emit finished();
+            });
+
+            reader->start(*QThreadPool::globalInstance());
+        }
+
+        QNetworkReply *reply;
+        QSize requestedSize;
+        TaskHandle<ImageReader> reader;
+        QImage result;
+        QString error;
+    };
+#endif
+
+    class ImageProviderAsyncAdaptor : public QQuickImageResponse
+    {
+    public:
+        ImageProviderAsyncAdaptor(QQuickImageProvider *provider, const QString &id, const QSize &requestedSize)
+        {
+            task.reset(new ProviderImageGetter(provider, id, requestedSize));
+            connect(task.get(), &ProviderImageGetter::result, this, [this]()
+            {
+                result = task->takeResult();
+                task.reset();
+
+                emit finished();
+            });
+
+            task->start(*QThreadPool::globalInstance());
+        }
+
+        QQuickTextureFactory *textureFactory() const override
+        {
+            return result.isNull() ? nullptr : QQuickTextureFactory::textureFactoryForImage(result);
+        }
+
+    private:
+        class ProviderImageGetter : public AsyncTask<QImage>
+        {
+        public:
+            ProviderImageGetter(QQuickImageProvider *provider, const QString &id, const QSize &requestedSize)
+                : provider {provider}
+                , id{id}
+                , requestedSize{requestedSize}
+            {
+            }
+
+            QImage execute() override
+            {
+                return provider->requestImage(id, &sourceSize, requestedSize);
+            }
+
+        private:
+            QQuickImageProvider *provider;
+            QString id;
+            QSize requestedSize;
+            QSize sourceSize;
+        };
+
+        TaskHandle<ProviderImageGetter> task;
+        QImage result;
+    };
+
+    QQuickImageResponse *getAsyncImageResponse(const QUrl &url, const QSize &requestedSize, QQmlEngine *engine)
+    {
+        if (url.scheme() == QStringLiteral("image"))
+        {
+            auto provider = engine->imageProvider(url.host());
+            if (!provider)
+                return nullptr;
+
+            assert(provider->imageType() == QQmlImageProviderBase::Image
+                   || provider->imageType() == QQmlImageProviderBase::ImageResponse);
+
+            const auto imageId = url.toString(QUrl::RemoveScheme | QUrl::RemoveAuthority).mid(1);;
+
+            if (provider->imageType() == QQmlImageProviderBase::Image)
+                return new ImageProviderAsyncAdaptor(static_cast<QQuickImageProvider *>(provider), imageId, requestedSize);
+            if (provider->imageType() == QQmlImageProviderBase::ImageResponse)
+                return static_cast<QQuickAsyncImageProvider *>(provider)->requestImageResponse(imageId, requestedSize);
+
+            return nullptr;
+        }
+        else if (QQmlFile::isLocalFile(url))
+        {
+            return new LocalImageResponse(QQmlFile::urlToLocalFileOrQrc(url), requestedSize);
+        }
+#ifdef QT_NETWORK_LIB
         else
         {
-            auto file = std::make_unique<QFile>(QQmlFile::urlToLocalFileOrQrc(url));
-            file->open(QIODevice::ReadOnly);
-            return file;
+            QNetworkRequest request(url);
+            request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+            auto reply = engine->networkAccessManager()->get(request);
+            return new NetworkImageResponse(reply, requestedSize);
         }
-    }
-    catch (const std::exception& error)
-    {
-        qWarning() << "Could not load source image:" << url << error.what();
-        return {};
+#endif
     }
 }
 
@@ -125,6 +306,11 @@ RoundImage::RoundImage(QQuickItem *parent) : QQuickItem {parent}
 
     connect(this, &QQuickItem::heightChanged, this, &RoundImage::regenerateRoundImage);
     connect(this, &QQuickItem::widthChanged, this, &RoundImage::regenerateRoundImage);
+}
+
+RoundImage::~RoundImage()
+{
+    resetImageRequest();
 }
 
 QSGNode *RoundImage::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
@@ -229,16 +415,112 @@ void RoundImage::setDPR(const qreal value)
     regenerateRoundImage();
 }
 
+void RoundImage::handleImageRequestFinished()
+{
+    const QString error = m_activeImageRequest->errorString();
+    QImage image;
+    if (auto textureFactory = m_activeImageRequest->textureFactory())
+    {
+        image = textureFactory->image();
+        delete textureFactory;
+    }
+
+    resetImageRequest();
+
+    if (image.isNull())
+    {
+        qDebug() << "failed to get image, error" << error << source();
+        return;
+    }
+
+    const qreal scaledWidth = this->width() * m_dpr;
+    const qreal scaledHeight = this->height() * m_dpr;
+    const qreal scaledRadius = this->radius() * m_dpr;
+
+    const ImageCacheKey key {source(), QSizeF {scaledWidth, scaledHeight}.toSize(), scaledRadius};
+
+    // Image is generated in size factor of `m_dpr` to avoid scaling artefacts when
+    // generated image is set with device pixel ratio
+    m_roundImageGenerator.reset(new RoundImageGenerator(image, scaledWidth, scaledHeight, scaledRadius));
+    connect(m_roundImageGenerator.get(), &BaseAsyncTask::result, this, [this, key]()
+    {
+        const auto image = new QImage(m_roundImageGenerator->takeResult());
+
+        m_roundImageGenerator.reset();
+
+        if (image->isNull())
+        {
+            delete image;
+            setRoundImage({});
+            return;
+        }
+
+        image->setDevicePixelRatio(m_dpr);
+        setRoundImage(*image);
+
+        imageCache.insert(key, image, image->sizeInBytes());
+    });
+
+    m_roundImageGenerator->start(*QThreadPool::globalInstance());
+}
+
+void RoundImage::resetImageRequest()
+{
+    if (!m_activeImageRequest)
+        return;
+
+    m_activeImageRequest->disconnect(this);
+    m_activeImageRequest->deleteLater();
+    m_activeImageRequest = nullptr;
+}
+
+void RoundImage::load()
+{
+    m_enqueuedGeneration = false;
+    assert(!m_roundImageGenerator);
+
+    auto engine = qmlEngine(this);
+    if (!engine || m_source.isEmpty() || !size().isValid() || size().isEmpty())
+        return;
+
+    const qreal scaledWidth = this->width() * m_dpr;
+    const qreal scaledHeight = this->height() * m_dpr;
+    const qreal scaledRadius = this->radius() * m_dpr;
+
+    const ImageCacheKey key {source(), QSizeF {scaledWidth, scaledHeight}.toSize(), scaledRadius};
+    if (auto image = imageCache.object(key)) // should only by called in mainthread
+    {
+        setRoundImage(*image);
+        return;
+    }
+
+    m_activeImageRequest = getAsyncImageResponse(source(), QSizeF {scaledWidth, scaledHeight}.toSize(), engine);
+    connect(m_activeImageRequest, &QQuickImageResponse::finished, this, &RoundImage::handleImageRequestFinished);
+}
+
+void RoundImage::setRoundImage(QImage image)
+{
+    m_dirty = true;
+    m_roundImage = image;
+
+    // remove old contents, setting ItemHasContent to false will
+    // inhibit updatePaintNode() call and old content will remain
+    if (image.isNull())
+        update();
+
+    setFlag(ItemHasContents, not image.isNull());
+    update();
+}
+
 void RoundImage::regenerateRoundImage()
 {
     if (!isComponentComplete() || m_enqueuedGeneration)
         return;
 
     // remove old contents
-    m_dirty = true;
-    m_roundImage = {};
-    update();
-    setFlag(ItemHasContents, false); // update() is still required
+    setRoundImage({});
+
+    resetImageRequest();
 
     m_roundImageGenerator.reset();
 
@@ -246,62 +528,11 @@ void RoundImage::regenerateRoundImage()
     // subsequent updates can be merged, f.e when VLCStyle.scale changes
     m_enqueuedGeneration = true;
 
-    QMetaObject::invokeMethod(this, [this] ()
-    {
-        m_enqueuedGeneration = false;
-        assert(!m_roundImageGenerator);
-
-        const qreal scaledWidth = this->width() * m_dpr;
-        const qreal scaledHeight = this->height() * m_dpr;
-        const qreal scaledRadius = this->radius() * m_dpr;
-
-        const ImageCacheKey key {source(), QSizeF {scaledWidth, scaledHeight}.toSize(), scaledRadius};
-        if (auto image = imageCache.object(key)) // should only by called in mainthread
-        {
-            m_roundImage = *image;
-            m_dirty = true;
-            setFlag(ItemHasContents, true);
-            update();
-            return;
-        }
-
-        // Image is generated in size factor of `m_dpr` to avoid scaling artefacts when
-        // generated image is set with device pixel ratio
-        m_roundImageGenerator.reset(new RoundImageGenerator(m_source, scaledWidth, scaledHeight, scaledRadius));
-        connect(m_roundImageGenerator.get(), &BaseAsyncTask::result, this, [this, key]()
-        {
-            const auto image = new QImage(m_roundImageGenerator->takeResult());
-
-            m_roundImageGenerator.reset();
-
-            if (!image->isNull())
-            {
-                image->setDevicePixelRatio(m_dpr);
-
-                imageCache.insert(key, image, image->sizeInBytes());
-
-                setFlag(ItemHasContents, true);
-
-                m_roundImage = *image;
-
-                m_dirty = true;
-            }
-            else
-            {
-                delete image;
-                m_dirty = false;
-                setFlag(ItemHasContents, false);
-            }
-
-            update();
-        });
-
-        m_roundImageGenerator->start(*QThreadPool::globalInstance());
-    }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(this, &RoundImage::load, Qt::QueuedConnection);
 }
 
-RoundImage::RoundImageGenerator::RoundImageGenerator(const QUrl &source, qreal width, qreal height, qreal radius)
-    : source(source)
+RoundImage::RoundImageGenerator::RoundImageGenerator(const QImage &sourceImage, qreal width, qreal height, qreal radius)
+    : sourceImage(sourceImage)
     , width(width)
     , height(height)
     , radius(radius)
@@ -310,33 +541,8 @@ RoundImage::RoundImageGenerator::RoundImageGenerator(const QUrl &source, qreal w
 
 QImage RoundImage::RoundImageGenerator::execute()
 {
-    if (width <= 0 || height <= 0)
+    if (width <= 0 || height <= 0 || sourceImage.isNull())
         return {};
-
-    if (source.isEmpty())
-        return {};
-
-    auto file = getReadable(source);
-    if (!file || !file->isOpen())
-        return {};
-
-    QImageReader sourceReader(file.get());
-
-    // do PreserveAspectCrop
-    const QSizeF size {width, height};
-    QSizeF defaultSize = sourceReader.size();
-    if (!defaultSize.isValid())
-        defaultSize = size;
-
-    const qreal ratio = std::max(size.width() / defaultSize.width(), size.height() / defaultSize.height());
-    const QSizeF targetSize = defaultSize * ratio;
-    const QPointF alignedCenteredTopLeft {(size.width() - targetSize.width()) / 2., (size.height() - targetSize.height()) / 2.};
-    sourceReader.setScaledSize(targetSize.toSize());
-
-    if (Q_UNLIKELY(radius <= 0))
-    {
-        return sourceReader.read();
-    }
 
     QImage target(width, height, QImage::Format_ARGB32_Premultiplied);
     if (target.isNull())
@@ -353,7 +559,10 @@ QImage RoundImage::RoundImageGenerator::execute()
         path.addRoundedRect(0, 0, width, height, radius, radius);
         painter.setClipPath(path);
 
-        painter.drawImage({alignedCenteredTopLeft, targetSize}, sourceReader.read());
+        // do PreserveAspectCrop
+        const auto imageSize = sourceImage.size();
+        const QPointF alignedCenteredTopLeft {(width - imageSize.width()) / 2., (height - imageSize.height()) / 2.};
+        painter.drawImage(QRectF {alignedCenteredTopLeft, imageSize}, sourceImage);
     }
 
     return target;

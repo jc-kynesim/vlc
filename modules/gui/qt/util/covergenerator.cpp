@@ -53,24 +53,15 @@ static const QString COVERGENERATOR_DEFAULT = ":/noart_albumCover.svg";
 // Ctor / dtor
 //-------------------------------------------------------------------------------------------------
 
-CoverGenerator::CoverGenerator(const MLItemId & itemId)
-    : m_id(itemId)
-    , m_countX(COVERGENERATOR_COUNT)
+CoverGenerator::CoverGenerator()
+    : m_countX(COVERGENERATOR_COUNT)
     , m_countY(COVERGENERATOR_COUNT)
     , m_split(Divide)
-    , m_smooth(true)
     , m_blur(0)
     , m_default(COVERGENERATOR_DEFAULT) {}
 
 //-------------------------------------------------------------------------------------------------
 // Interface
-//-------------------------------------------------------------------------------------------------
-
-MLItemId CoverGenerator::getId()
-{
-    return m_id;
-}
-
 //-------------------------------------------------------------------------------------------------
 
 void CoverGenerator::setSize(const QSize & size)
@@ -93,11 +84,6 @@ void CoverGenerator::setSplit(Split split)
     m_split = split;
 }
 
-void CoverGenerator::setSmooth(bool enabled)
-{
-    m_smooth = enabled;
-}
-
 void CoverGenerator::setBlur(int radius)
 {
     m_blur = radius;
@@ -108,52 +94,17 @@ void CoverGenerator::setDefaultThumbnail(const QString & fileName)
     m_default = fileName;
 }
 
-void CoverGenerator::setPrefix(const QString & prefix)
-{
-    m_prefix = prefix;
-}
-
 int CoverGenerator::requiredNoOfThumbnails() const
 {
     return m_countX * m_countY;
-}
-
-bool CoverGenerator::cachedFileAvailable() const
-{
-    return QFile::exists(fileName());
-}
-
-QString CoverGenerator::cachedFileURL() const
-{
-    return QUrl::fromLocalFile(fileName()).toString();
-}
-
-QString CoverGenerator::fileName() const
-{
-    QDir dir(config_GetUserDir(VLC_CACHE_DIR) + COVERGENERATOR_STORAGE);
-    return dir.absoluteFilePath(QString("%1_thumbnail_%2_%3x%4.jpg")
-                                .arg((m_prefix.isEmpty() ? getPrefix(m_id.type) : m_prefix)
-                                     , QString::number(m_id.id)
-                                     , QString::number(m_size.width())
-                                     , QString::number(m_size.height())));
 }
 
 //-------------------------------------------------------------------------------------------------
 // QRunnable implementation
 //-------------------------------------------------------------------------------------------------
 
-QString CoverGenerator::execute(QStringList thumbnails) const
+QImage CoverGenerator::execute(QStringList thumbnails) const
 {
-    QDir dir(config_GetUserDir(VLC_CACHE_DIR) + COVERGENERATOR_STORAGE);
-
-    dir.mkpath(dir.absolutePath());
-
-    QString fileName = this->fileName();
-    if (dir.exists(fileName))
-    {
-        return QUrl::fromLocalFile(fileName).toString();
-    }
-
     int count = m_countX * m_countY;
 
     int countX;
@@ -216,9 +167,7 @@ QString CoverGenerator::execute(QStringList thumbnails) const
     if (m_blur > 0)
         blur(image);
 
-    image.save(fileName, "jpg");
-
-    return QUrl::fromLocalFile(fileName).toString();
+    return image;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -230,8 +179,8 @@ void CoverGenerator::draw(QPainter & painter,
 {
     int count = fileNames.count();
 
-    int width  = m_size.width()  / countX;
-    int height = m_size.height() / countY;
+    const int width  = std::ceil(m_size.width()  / static_cast<double>(countX));
+    const int height = std::ceil(m_size.height() / static_cast<double>(countY));
 
     for (int y = 0; y < countY; y++)
     {
@@ -285,35 +234,11 @@ void CoverGenerator::drawImage(QPainter & painter, const QString & fileName, con
     QSize size = reader.size().scaled(target.width(),
                                       target.height(), Qt::KeepAspectRatioByExpanding);
 
-    QImage image;
+    reader.setScaledSize(size);
+    QImage image = reader.read();
 
-    if (fileName.endsWith(".svg", Qt::CaseInsensitive))
-    {
-        if (size.isEmpty() == false)
-        {
-            reader.setScaledSize(size);
-        }
-
-        if (reader.read(&image) == false)
-            return;
-    }
-    else
-    {
-        if (reader.read(&image) == false)
-            return;
-
-        if (size.isEmpty() == false)
-        {
-            // NOTE: Should we use Qt::SmoothTransformation or favor efficiency ?
-            if (m_smooth)
-                image = image.scaled(size, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-            else
-                image = image.scaled(size, Qt::IgnoreAspectRatio);
-        }
-    }
-
-    int x = (image.width () - target.width ()) / 2;
-    int y = (image.height() - target.height()) / 2;
+    int x = std::ceil((image.width() - target.width()) / 2.);
+    int y = std::ceil((image.height() - target.height()) / 2.);
 
     QRect source(x, y, target.width(), target.height());
 

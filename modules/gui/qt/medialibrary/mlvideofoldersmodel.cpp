@@ -31,14 +31,14 @@
 #include "util/covergenerator.hpp"
 
 // MediaLibrary includes
-#include "mlhelper.hpp"
+#include "mlcustomcover.hpp"
 #include "mlfolder.hpp"
 
 // Static variables
 
-// NOTE: We multiply by 2 to cover most dpi settings.
-static const int MLVIDEOFOLDERSMODEL_COVER_WIDTH  = 512 * 2; // 16 / 10 ratio
-static const int MLVIDEOFOLDERSMODEL_COVER_HEIGHT = 320 * 2;
+// NOTE: We multiply by 3 to cover most dpi settings.
+static const int MLVIDEOFOLDERSMODEL_COVER_WIDTH  = 260 * 3; // 16 / 10 ratio
+static const int MLVIDEOFOLDERSMODEL_COVER_HEIGHT = 162 * 3;
 
 static const QHash<QByteArray, vlc_ml_sorting_criteria_t> criterias =
 {
@@ -56,11 +56,9 @@ QHash<int, QByteArray> MLVideoFoldersModel::roleNames() const /* override */
 {
     return {
         { FOLDER_ID, "id" },
-        { FOLDER_IS_NEW, "isNew" },
         { FOLDER_TITLE, "title" },
         { FOLDER_THUMBNAIL, "thumbnail" },
         { FOLDER_DURATION, "duration" },
-        { FOLDER_PROGRESS, "progress" },
         { FOLDER_COUNT, "count"},
     };
 }
@@ -86,16 +84,14 @@ QVariant MLVideoFoldersModel::itemRoleData(MLItem * item, const int role) const 
             return QVariant::fromValue(folder->getTitle());
         case FOLDER_THUMBNAIL:
         {
-            auto generator = std::make_shared<CoverGenerator>(folder->getId());
-            generator->setSize(QSize(MLVIDEOFOLDERSMODEL_COVER_WIDTH, MLVIDEOFOLDERSMODEL_COVER_HEIGHT));
-            generator->setDefaultThumbnail(":/noart_videoCover.svg");
-
-            return createGroupMediaCover(this, folder, FOLDER_THUMBNAIL, generator);
+            return ml()->customCover()->get(folder->getId()
+                                            , QSize(MLVIDEOFOLDERSMODEL_COVER_WIDTH, MLVIDEOFOLDERSMODEL_COVER_HEIGHT)
+                                            , QStringLiteral(":/noart_videoCover.svg"));
         }
         case FOLDER_DURATION:
             return QVariant::fromValue(folder->getDuration());
         case FOLDER_COUNT:
-            return QVariant::fromValue(folder->getCount());
+            return QVariant::fromValue(folder->getVideoCount());
         default:
             return QVariant();
     }

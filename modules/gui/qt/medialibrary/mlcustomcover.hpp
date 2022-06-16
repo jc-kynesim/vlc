@@ -1,7 +1,7 @@
 /*****************************************************************************
- * Copyright (C) 2021 VLC authors and VideoLAN
+ * Copyright (C) 2022 VLC authors and VideoLAN
  *
- * Authors: Benjamin Arnaud <bunjee@omega.gg>
+ * Authors: Prince Gupta <guptaprince8832@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,35 +18,34 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
  *****************************************************************************/
 
-#ifndef MLITEMCOVER_HPP
-#define MLITEMCOVER_HPP
+#ifndef MLCUSTOMCOVER_HPP
+#define MLCUSTOMCOVER_HPP
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+#include <QQuickAsyncImageProvider>
 
-// Util includes
-#include "util/covergenerator.hpp"
+#include <memory>
 
-// MediaLibrary includes
-#include "mlqmltypes.hpp"
+class MLItemId;
+class MediaLib;
 
-class MLItemCover : public MLItem
+class MLCustomCover : public QQuickAsyncImageProvider
 {
 public:
-    /* explicit */ MLItemCover(const MLItemId & id);
+    MLCustomCover(const QString &providerId, MediaLib *ml);
 
-public: // Interface
-    bool hasGenerator() const;
-    void setGenerator(bool generating);
+    QString get(const MLItemId &parentId
+                , const QSize &size
+                , const QString &defaultCover
+                , const int countX = 2
+                , const int countY = 2
+                , const int blur = 0
+                , const bool split_duplicate = false);
 
-    QString getCover() const;
-    void    setCover(const QString & fileName);
+    QQuickImageResponse *requestImageResponse(const QString &id, const QSize &requestedSize);
 
 private:
-    bool m_isGenerating = false;
-
-    QString m_cover;
+    const QString m_providerId;
+    MediaLib *m_ml = nullptr;
 };
 
-#endif
+#endif // MLCUSTOMCOVER_HPP

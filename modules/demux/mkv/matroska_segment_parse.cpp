@@ -732,7 +732,7 @@ void matroska_segment_c::ParseTrackEntry( const KaxTrackEntry *m )
         E_CASE( KaxVideoFrameRate, vfps )
         {
             ONLY_FMT(VIDEO);
-            vars.tk->f_fps = __MAX( static_cast<float>( vfps ), 1 );
+            vars.tk->f_fps = std::max( static_cast<float>(vfps) , 1.0f );
             debug( vars, "fps=%f", vars.tk->f_fps );
         }
         E_CASE( KaxVideoColourSpace, colourspace )
@@ -1913,7 +1913,7 @@ bool matroska_segment_c::TrackInit( mkv_track_t * p_tk )
                 if( p_wf->wFormatTag == WAVE_FORMAT_EXTENSIBLE &&
                     p_tk->i_extra_data >= sizeof(WAVEFORMATEXTENSIBLE) )
                 {
-                    WAVEFORMATEXTENSIBLE *p_wext = (WAVEFORMATEXTENSIBLE*)p_wf;
+                    WAVEFORMATEXTENSIBLE *p_wext = container_of(p_wf, WAVEFORMATEXTENSIBLE, Format);
                     GUID subFormat = p_wext->SubFormat;
 
                     sf_tag_to_fourcc( &subFormat,  &p_tk->fmt.i_codec, NULL);
