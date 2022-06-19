@@ -734,7 +734,8 @@ void BlockDecode( demux_t *p_demux, KaxBlock *block, KaxSimpleBlock *simpleblock
         /* use time stamp only for first block */
         i_pts = ( track.i_default_duration )?
                  i_pts + track.i_default_duration:
-                 ( track.fmt.b_packetized ) ? VLC_TICK_INVALID : i_pts + 1;
+                 VLC_TICK_INVALID;  // Adding 1 causes avsync disaster
+//                 ( track.fmt.b_packetized ) ? VLC_TICK_INVALID : i_pts + 1;
     }
 }
 
