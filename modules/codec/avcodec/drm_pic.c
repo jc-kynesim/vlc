@@ -49,10 +49,8 @@ drm_prime_picture_context_new(AVBufferRef * const buf, const void * data, AVBuff
     return &pctx->cmn;
 }
 
-int drm_prime_attach_buf_to_pic(struct decoder_t *dec, picture_t *pic, AVFrame *frame)
+int drm_prime_attach_buf_to_pic(picture_t *pic, AVFrame *frame)
 {
-
-    VLC_UNUSED(dec);
     if (pic->context)
         return VLC_EGENERIC;
 
