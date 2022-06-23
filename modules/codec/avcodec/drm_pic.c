@@ -45,7 +45,7 @@ drm_prime_picture_context_new(AVBufferRef * const buf, const void * data, AVBuff
 
     pctx->buf = av_buffer_ref(buf);
     pctx->desc = data;
-    pctx->hw_frames_ctx = av_buffer_ref(hw_frames_ctx);
+    pctx->hw_frames_ctx = !hw_frames_ctx ? NULL : av_buffer_ref(hw_frames_ctx);
     return &pctx->cmn;
 }
 
