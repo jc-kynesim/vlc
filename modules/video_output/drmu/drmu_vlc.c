@@ -337,11 +337,7 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
                              desc->layers[0].format,
                              pic->format.i_width,
                              pic->format.i_height,
-                             (drmu_rect_t){
-                                 .x = pic->format.i_x_offset,
-                                 .y = pic->format.i_y_offset,
-                                 .w = pic->format.i_visible_width,
-                                 .h = pic->format.i_visible_height});
+                             drmu_rect_vlc_pic_crop(pic));
 
     drmu_fb_int_color_set(dfb,
                           fb_vlc_color_encoding(&pic->format),
