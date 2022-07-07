@@ -1629,6 +1629,7 @@ no_reuse:
     static const enum PixelFormat hwfmts[] =
     {
         AV_PIX_FMT_DRM_PRIME,
+#if 0  // RPI - ignore stuff we know isn't going to work
 #ifdef _WIN32
 #if LIBAVUTIL_VERSION_CHECK(54, 13, 1, 24, 100)
         AV_PIX_FMT_D3D11VA_VLD,
@@ -1638,6 +1639,7 @@ no_reuse:
         AV_PIX_FMT_VAAPI,
 #if (LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(52, 4, 0))
         AV_PIX_FMT_VDPAU,
+#endif
 #endif
         AV_PIX_FMT_NONE,
     };
