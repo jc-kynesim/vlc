@@ -608,6 +608,7 @@ static void CloseDrmVout(vout_display_t *vd)
     msg_Dbg(vd, "<<< %s", __func__);
 
     drmu_pool_delete(&sys->sub_fb_pool);
+    drmu_pool_delete(&sys->pic_pool);
 
     for (i = 0; i != SUBPICS_MAX; ++i)
         drmu_plane_unref(sys->subplanes + i);
