@@ -85,20 +85,30 @@ typedef enum drmu_isset_e {
 
 drmu_ufrac_t drmu_ufrac_reduce(drmu_ufrac_t x);
 
-static inline int
-drmu_rect_rescale_1(int x, int mul, int div)
+static inline int_fast32_t
+drmu_rect_rescale_1s(int_fast32_t x, uint_fast32_t mul, uint_fast32_t div)
 {
-    return div == 0 ? x * mul : (x * mul + div/2) / div;
+    const int_fast64_t m = x * (int_fast64_t)mul;
+    const int d2 = div/2;
+    return (int)(div == 0 ? m :
+                 m >= 0 ? (m + d2) / (int_fast64_t)div : (m - d2) / (int_fast64_t)div);
+}
+
+static inline uint_fast32_t
+drmu_rect_rescale_1u(uint_fast32_t x, uint_fast32_t mul, uint_fast32_t div)
+{
+    const uint_fast64_t m = x * (uint_fast64_t)mul;
+    return (uint_fast32_t)(div == 0 ? m : (m + div/2) / div);
 }
 
 static inline drmu_rect_t
 drmu_rect_rescale(const drmu_rect_t s, const drmu_rect_t mul, const drmu_rect_t div)
 {
     return (drmu_rect_t){
-        .x = drmu_rect_rescale_1(s.x - div.x, mul.w, div.w) + mul.x,
-        .y = drmu_rect_rescale_1(s.y - div.y, mul.h, div.h) + mul.y,
-        .w = drmu_rect_rescale_1(s.w,         mul.w, div.w),
-        .h = drmu_rect_rescale_1(s.h,         mul.h, div.h)
+        .x = drmu_rect_rescale_1s(s.x - div.x, mul.w, div.w) + mul.x,
+        .y = drmu_rect_rescale_1s(s.y - div.y, mul.h, div.h) + mul.y,
+        .w = drmu_rect_rescale_1u(s.w,         mul.w, div.w),
+        .h = drmu_rect_rescale_1u(s.h,         mul.h, div.h)
     };
 }
 
