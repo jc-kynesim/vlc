@@ -60,7 +60,7 @@ tc_drm_update(const opengl_tex_converter_t *tc, GLuint *textures,
                 picture_t *pic, const size_t *plane_offset)
 {
     drm_gl_converter_t * const sys = tc->priv;
-#if TRACE_ALL || 1
+#if TRACE_ALL
     {
         char cbuf[5];
         msg_Dbg(tc, "%s: %s %d*%dx%d : %d*%dx%d", __func__,
