@@ -620,7 +620,7 @@ static void CloseDrmVout(vout_display_t *vd)
 
     drmu_plane_unref(&sys->dp);
     drmu_output_unref(&sys->dout);
-    drmu_env_delete(&sys->du);
+    drmu_env_unref(&sys->du);
 
     free(sys->subpic_chromas);
     vd->info.subpicture_chromas = NULL;

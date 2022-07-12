@@ -321,10 +321,10 @@ int drmu_crtc_idx(const drmu_crtc_t * const dc);
 drmu_crtc_t * drmu_env_crtc_find_id(drmu_env_t * const du, const uint32_t crtc_id);
 drmu_crtc_t * drmu_env_crtc_find_n(drmu_env_t * const du, const unsigned int n);
 
-typedef struct drmu_mode_pick_simple_params_s {
+typedef struct drmu_mode_simple_params_s {
     unsigned int width;
     unsigned int height;
-    unsigned int hz_x_1000;  // Refresh rate * 1000 i.e. 50Hz = 50000
+    unsigned int hz_x_1000;  // Frame rate * 1000 i.e. 50Hz = 50000 (N.B. frame not field rate if interlaced)
     drmu_ufrac_t par;  // Picture Aspect Ratio (0:0 if unknown)
     drmu_ufrac_t sar;  // Sample Aspect Ratio
     uint32_t type;
@@ -483,7 +483,8 @@ int drmu_env_queue_wait(drmu_env_t * const du);
 int drmu_ioctl(const drmu_env_t * const du, unsigned long req, void * arg);
 int drmu_fd(const drmu_env_t * const du);
 const struct drmu_log_env_s * drmu_env_log(const drmu_env_t * const du);
-void drmu_env_delete(drmu_env_t ** const ppdu);
+void drmu_env_unref(drmu_env_t ** const ppdu);
+drmu_env_t * drmu_env_ref(drmu_env_t * const du);
 // Restore state on env close
 int drmu_env_restore_enable(drmu_env_t * const du);
 bool drmu_env_restore_is_enabled(const drmu_env_t * const du);
