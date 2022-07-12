@@ -89,9 +89,10 @@ static inline int_fast32_t
 drmu_rect_rescale_1s(int_fast32_t x, uint_fast32_t mul, uint_fast32_t div)
 {
     const int_fast64_t m = x * (int_fast64_t)mul;
-    const int d2 = div/2;
-    return (int)(div == 0 ? m :
-                 m >= 0 ? (m + d2) / (int_fast64_t)div : (m - d2) / (int_fast64_t)div);
+    const uint_fast32_t d2 = div/2;
+    return div == 0 ? (int_fast32_t)m :
+        m >= 0 ? (int_fast32_t)(((uint_fast64_t)m + d2) / div) :
+            -(int_fast32_t)(((uint_fast64_t)(-m) + d2) / div);
 }
 
 static inline uint_fast32_t
