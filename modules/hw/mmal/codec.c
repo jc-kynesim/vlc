@@ -2370,39 +2370,39 @@ static void FilterBlendNeon(filter_t *p_filter,
 {
     const uint8_t * s_data;
     uint8_t * d_data;
-    int width = src_pic->format.i_visible_width;
-    int height = src_pic->format.i_visible_height;
+    const video_format_t *const src_fmt = &p_filter->fmt_in.video;  // Format here has different visible params to pic
+    const video_format_t *const dst_fmt = &p_filter->fmt_out.video;
+    int width = src_fmt->i_visible_width;
+    int height = src_fmt->i_visible_height;
     blend_neon_fn *const blend_fn = (blend_neon_fn * )p_filter->p_sys;
 
 #if TRACE_ALL
-    msg_Dbg(p_filter, "%s (%d,%d:%d) pic=%p, pts=%lld, force=%d", __func__, x_offset, y_offset, alpha, src_pic, src_pic->date, src_pic->b_force);
+    msg_Dbg(p_filter, "%s (%d,%d:%d) pic=%p (%dx%d/%dx%d), pts=%lld, force=%d, filter in %dx%d/%dx%d", __func__, x_offset, y_offset, alpha,
+            src_pic, src_pic->format.i_width, src_pic->format.i_height, src_pic->format.i_visible_width, src_pic->format.i_visible_height,
+            src_pic->date, src_pic->b_force,
+            src_fmt->i_width, src_fmt->i_height, src_fmt->i_visible_width, src_fmt->i_visible_height);
 #endif
 
-    if (alpha == 0 ||
-        src_pic->format.i_visible_height == 0 ||
-        src_pic->format.i_visible_width == 0)
-    {
+    if (alpha == 0)
         return;
-    }
 
-    x_offset += dst_pic->format.i_x_offset;
-    y_offset += dst_pic->format.i_y_offset;
+    x_offset += dst_fmt->i_x_offset;
+    y_offset += dst_fmt->i_y_offset;
 
     // Deal with R/B overrun
-    if (x_offset + width >= (int)(dst_pic->format.i_x_offset + dst_pic->format.i_visible_width))
-        width = dst_pic->format.i_x_offset + dst_pic->format.i_visible_width - x_offset;
-    if (y_offset + height >= (int)(dst_pic->format.i_y_offset + dst_pic->format.i_visible_height))
-        height = dst_pic->format.i_y_offset + dst_pic->format.i_visible_height - y_offset;
+    if (x_offset + width >= (int)(dst_fmt->i_x_offset + dst_fmt->i_visible_width))
+        width = dst_fmt->i_x_offset + dst_fmt->i_visible_width - x_offset;
+    if (y_offset + height >= (int)(dst_fmt->i_y_offset + dst_fmt->i_visible_height))
+        height = dst_fmt->i_y_offset + dst_fmt->i_visible_height - y_offset;
 
-    if (width <= 0 || height <= 0) {
+    if (width <= 0 || height <= 0)
         return;
-    }
 
     // *** L/U overrun
 
     s_data = src_pic->p[0].p_pixels +
-        src_pic->p[0].i_pixel_pitch * src_pic->format.i_x_offset +
-        src_pic->p[0].i_pitch * src_pic->format.i_y_offset;
+        src_pic->p[0].i_pixel_pitch * src_fmt->i_x_offset +
+        src_pic->p[0].i_pitch * src_fmt->i_y_offset;
     d_data = dst_pic->p[0].p_pixels +
         dst_pic->p[0].i_pixel_pitch * x_offset +
         dst_pic->p[0].i_pitch * y_offset;
