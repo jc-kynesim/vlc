@@ -242,6 +242,7 @@ void hw_mmal_vzc_buf_scale_dest_rect(MMAL_BUFFER_HEADER_T * const buf, const MMA
 void hw_mmal_vzc_buf_get_wh(MMAL_BUFFER_HEADER_T * const buf, int * const pW, int * const pH);
 unsigned int hw_mmal_vzc_buf_seq(MMAL_BUFFER_HEADER_T * const buf);
 MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc, picture_t * const pic,
+                                                const video_format_t * src_fmt,
                                                 const MMAL_RECT_T dst_pic_rect,
                                                 const int x_offset, const int y_offset,
                                                 const unsigned int alpha, const bool is_first);

@@ -1139,6 +1139,7 @@ unsigned int hw_mmal_vzc_buf_seq(MMAL_BUFFER_HEADER_T * const buf)
 
 MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc,
                                                 picture_t * const pic,
+                                                const video_format_t * src_fmt,
                                                 const MMAL_RECT_T dst_pic_rect,
                                                 const int x_offset, const int y_offset,
                                                 const unsigned int alpha,
@@ -1235,10 +1236,10 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc,
 //        printf("+++ bpp:%d, vis:%dx%d wxh:%dx%d, d:%dx%d\n", bpp, fmt->i_visible_width, fmt->i_visible_height, fmt->i_width, fmt->i_height, dst_stride, dst_lines);
 
         sb->dreg.src_rect = (MMAL_RECT_T){
-            .x      = (fmt->i_x_offset - xl),
-            .y      = 0,
-            .width  = fmt->i_visible_width,
-            .height = fmt->i_visible_height
+            .x      = (fmt->i_x_offset - xl) + src_fmt->i_x_offset,
+            .y      = src_fmt->i_y_offset,
+            .width  = src_fmt->i_visible_width,
+            .height = src_fmt->i_visible_height
         };
 
         sb->pic_rect = dst_pic_rect;
@@ -1246,8 +1247,8 @@ MMAL_BUFFER_HEADER_T * hw_mmal_vzc_buf_from_pic(vzc_pool_ctl_t * const pc,
         sb->orig_dest_rect = (MMAL_RECT_T){
             .x      = x_offset,
             .y      = y_offset,
-            .width  = fmt->i_visible_width,
-            .height = fmt->i_visible_height
+            .width  = src_fmt->i_visible_width,
+            .height = src_fmt->i_visible_height
         };
 
         if (needs_copy)

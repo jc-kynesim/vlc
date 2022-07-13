@@ -1043,6 +1043,7 @@ static int attach_subpics(vout_display_t * const vd, vout_display_sys_t * const 
             // coord space of the placed rectangle in the cfg display space
             if ((sys->subpic_bufs[n] = hw_mmal_vzc_buf_from_pic(sys->vzc,
                 src,
+                &sreg->fmt,
                 (MMAL_RECT_T){.width = sys->spu_rect.width, .height=sys->spu_rect.height},
                 sreg->i_x, sreg->i_y,
                 sreg->i_alpha,

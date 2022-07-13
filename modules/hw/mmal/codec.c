@@ -2277,7 +2277,8 @@ static void FilterBlendMmal(filter_t *p_filter,
     {
         // cast away src const so we can ref it
         MMAL_BUFFER_HEADER_T *buf = hw_mmal_vzc_buf_from_pic(sys->vzc, (picture_t *)src,
-                                                             vis_mmal_rect(&dst->format),
+                                                             &p_filter->fmt_in.video,
+                                                             vis_mmal_rect(&p_filter->fmt_out.video),
                                                              x_offset, y_offset,
                                                              alpha,
                                                              dst != sys->last_dst || !hw_mmal_pic_has_sub_bufs(dst));
