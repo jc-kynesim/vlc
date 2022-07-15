@@ -23,6 +23,8 @@ typedef struct filter_sys_t {
     AVFilterGraph *filter_graph;
     AVFilterContext *buffersink_ctx;  // Allocated within graph - no explicit free
     AVFilterContext *buffersrc_ctx;   // Allocated within graph - no explicit free
+    bool has_out;
+    AVFrame *out_frame;
 } filter_sys_t;
 
 static void drmp_av_flush(filter_t * filter)
@@ -63,6 +65,9 @@ static picture_t * drmp_av_deinterlace(filter_t * filter, picture_t * in_pic)
     frame->crop_top    = in_pic->format.i_y_offset;
     frame->crop_right  = frame->width -  in_pic->format.i_visible_width -  frame->crop_left;
     frame->crop_bottom = frame->height - in_pic->format.i_visible_height - frame->crop_top;
+    frame->interlaced_frame = !in_pic->b_progressive;
+    frame->top_field_first  = in_pic->b_top_field_first;
+    frame->pts         = (in_pic->date == VLC_TS_INVALID) ? AV_NOPTS_VALUE : in_pic->date;
 
     picture_Release(in_pic);
     in_pic = NULL;
@@ -73,18 +78,22 @@ static picture_t * drmp_av_deinterlace(filter_t * filter, picture_t * in_pic)
     }
     av_frame_unref(frame);
 
-    while ((ret = av_buffersink_get_frame(sys->buffersink_ctx, frame)) == 0) {
-        picture_t * const pic = filter_NewPicture(filter);
-        if (!pic) {
-            msg_Err(filter, "Failed to alloc out pic");
-            goto fail;
-        }
-        if (drm_prime_attach_buf_to_pic(pic, frame) != VLC_SUCCESS) {
+    while (sys->has_out || (ret = av_buffersink_get_frame(sys->buffersink_ctx, sys->out_frame)) == 0) {
+        picture_t *const pic = filter_NewPicture(filter);
+        sys->has_out = true;
+        // Failure to get an output pic happens quite often, just keep the
+        // frame for next time
+        if (!pic)
+            break;
+
+        if (drm_prime_attach_buf_to_pic(pic, sys->out_frame) != VLC_SUCCESS) {
             msg_Err(filter, "Failed to attach frame to out pic");
             picture_Release(pic);
             goto fail;
         }
-        av_frame_unref(frame);
+        pic->date =  sys->out_frame->pts == AV_NOPTS_VALUE ? VLC_TS_INVALID : sys->out_frame->pts;
+        av_frame_unref(sys->out_frame);
+        sys->has_out = false;
 
         *pp_pic = pic;
         pp_pic = &pic->p_next;
@@ -119,6 +128,7 @@ static void CloseDrmpAvDeinterlace(filter_t *filter)
     if (sys == NULL)
         return;
 
+    av_frame_free(&sys->out_frame);
     avfilter_graph_free(&sys->filter_graph);
     free(sys);
 }
@@ -138,8 +148,9 @@ static int init_filters(filter_t * const filter,
     AVFilterInOut *inputs  = avfilter_inout_alloc();
     enum AVPixelFormat pix_fmts[] = { AV_PIX_FMT_DRM_PRIME, AV_PIX_FMT_NONE };
 
+    sys->out_frame = av_frame_alloc();
     sys->filter_graph = avfilter_graph_alloc();
-    if (!outputs || !inputs || !sys->filter_graph) {
+    if (!outputs || !inputs || !sys->filter_graph || !sys->out_frame) {
         ret = AVERROR(ENOMEM);
         goto end;
     }
