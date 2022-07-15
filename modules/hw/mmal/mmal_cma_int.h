@@ -27,6 +27,7 @@ typedef enum cma_buf_type_e {
     CMA_BUF_TYPE_CMA,
     CMA_BUF_TYPE_VCSM,
     CMA_BUF_TYPE_DRMPRIME,
+    CMA_BUF_TYPE_IMPORT,   // dmabuf with external pooling
 } cma_buf_type_t;
 
 struct cma_buf_pool_s {

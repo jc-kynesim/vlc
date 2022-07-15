@@ -35,6 +35,8 @@
 #include <vlc_filter.h>
 #include <vlc_threads.h>
 
+#include "../../codec/avcodec/drm_pic.h"
+
 #include <interface/mmal/mmal.h>
 #include <interface/mmal/util/mmal_util.h>
 #include <interface/mmal/util/mmal_default_components.h>
@@ -1041,6 +1043,7 @@ typedef struct filter_sys_t {
 
     MMAL_STATUS_T err_stream;
 
+    bool is_mmal;
     bool needs_copy_in;
     bool is_cma;
     bool is_sliced;
@@ -1523,9 +1526,9 @@ static picture_t *conv_filter(filter_t *p_filter, picture_t *p_pic)
         // (Re)enable if required will be done later
     }
 
-    if (p_pic->context == NULL) {
+    if (!sys->is_mmal || p_pic->context == NULL) {
         // Can't have stashed subpics if not one of our pics
-        if (!sys->needs_copy_in)
+        if (sys->is_mmal)
             msg_Dbg(p_filter, "%s: No context", __func__);
     }
     else if (sys->resizer_type == FILTER_RESIZER_HVS)
@@ -1824,7 +1827,8 @@ static void CloseConverter(vlc_object_t * obj)
 
 static inline MMAL_FOURCC_T filter_enc_in(const video_format_t * const fmt)
 {
-    if (hw_mmal_chroma_is_mmal(fmt->i_chroma))
+    if (hw_mmal_chroma_is_mmal(fmt->i_chroma) ||
+        drm_prime_is_chroma(fmt->i_chroma))
         return vlc_to_mmal_video_fourcc(fmt);
 
     if (fmt->i_chroma == VLC_CODEC_I420 ||
@@ -1932,7 +1936,8 @@ retry:
     pic_fifo_init(&sys->ret_pics);
     pic_fifo_init(&sys->slice.pics);
 
-    sys->needs_copy_in = !hw_mmal_chroma_is_mmal(p_filter->fmt_in.video.i_chroma);
+    sys->is_mmal = hw_mmal_chroma_is_mmal(p_filter->fmt_in.video.i_chroma);
+    sys->needs_copy_in = !sys->is_mmal && !drm_prime_is_chroma(p_filter->fmt_in.video.i_chroma);
     sys->in_port_cb_fn = conv_input_port_cb;
 
     if ((sys->vcsm_init_type = cma_vcsm_init()) == VCSM_INIT_NONE) {
@@ -2490,7 +2495,8 @@ vlc_module_begin()
     set_subcategory( SUBCAT_INPUT_VCODEC )
     set_shortname(N_("MMAL decoder"))
     set_description(N_("MMAL-based decoder plugin for Raspberry Pi"))
-    set_capability("video decoder", 90)
+    set_capability("video decoder", 1)
+//    set_capability("video decoder", 90)
     add_shortcut("mmal_decoder")
     add_bool(MMAL_OPAQUE_NAME, true, MMAL_OPAQUE_TEXT, MMAL_OPAQUE_LONGTEXT, false)
     set_callbacks(OpenDecoder, CloseDecoder)

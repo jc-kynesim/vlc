@@ -56,7 +56,29 @@ typedef struct pic_ctx_subpic_s {
 } pic_ctx_subpic_t;
 
 
-const char * str_fourcc(char * const buf, const unsigned int fcc);
+#ifndef fourcc2str
+static inline char safechar(unsigned int x)
+{
+    const unsigned int c = x & 0xff;
+    return c > ' ' && c < 0x7f ? (char)c : '.';
+}
+
+static inline const char *
+str_fourcc(char buf[5], const uint32_t fcc)
+{
+    if (fcc == 0)
+        return "----";
+    buf[0] = safechar(fcc);
+    buf[1] = safechar(fcc >> 8);
+    buf[2] = safechar(fcc >> 16);
+    buf[3] = safechar(fcc >> 24);
+    buf[4] = 0;
+    return buf;
+}
+
+#define fourcc2str(fcc) \
+    str_fourcc((char[5]){0}, fcc)
+#endif
 
 MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc);
 MMAL_FOURCC_T vlc_to_mmal_color_space(const video_color_space_t vlc_cs);

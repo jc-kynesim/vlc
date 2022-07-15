@@ -33,6 +33,9 @@
 #include <vlc_cpu.h>
 #include <vlc_picture.h>
 
+#include <libavutil/hwcontext_drm.h>
+#include "../../codec/avcodec/drm_pic.h"
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wbad-function-cast"
 #include <bcm_host.h>
@@ -50,24 +53,6 @@
 #define TRACE_TRANSFORMS 0
 
 #define UINT64_SIZE(s) (((s) + sizeof(uint64_t) - 1)/sizeof(uint64_t))
-
-static inline char safe_char(const unsigned int c0)
-{
-    const unsigned int c = c0 & 0xff;
-    return c > ' ' && c < 0x7f ? c : '.';
-}
-
-const char * str_fourcc(char * const buf, const unsigned int fcc)
-{
-    if (fcc == 0)
-        return "----";
-    buf[0] = safe_char(fcc >> 0);
-    buf[1] = safe_char(fcc >> 8);
-    buf[2] = safe_char(fcc >> 16);
-    buf[3] = safe_char(fcc >> 24);
-    buf[4] = 0;
-    return buf;
-}
 
 // WB + Inv
 static inline void flush_range(void * const start, const size_t len)
@@ -136,7 +121,10 @@ MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc
         }
         case VLC_CODEC_I420:
         case VLC_CODEC_MMAL_ZC_I420:
+        case VLC_CODEC_DRM_PRIME_I420:
             return MMAL_ENCODING_I420;
+        case VLC_CODEC_DRM_PRIME_NV12:
+            return MMAL_ENCODING_NV12;
         case VLC_CODEC_RGBA:
             return MMAL_ENCODING_RGBA;
         case VLC_CODEC_BGRA:
@@ -146,10 +134,12 @@ MMAL_FOURCC_T vlc_to_mmal_video_fourcc(const video_frame_format_t * const vf_vlc
         // VLC_CODEC_ABGR does not exist in VLC
         case VLC_CODEC_MMAL_OPAQUE:
             return MMAL_ENCODING_OPAQUE;
+        case VLC_CODEC_DRM_PRIME_SAND8:
         case VLC_CODEC_MMAL_ZC_SAND8:
             return MMAL_ENCODING_YUVUV128;
         case VLC_CODEC_MMAL_ZC_SAND10:
             return MMAL_ENCODING_YUVUV64_10;
+        case VLC_CODEC_DRM_PRIME_SAND30:
         case VLC_CODEC_MMAL_ZC_SAND30:
             return MMAL_ENCODING_YUV10_COL;
         default:
@@ -205,6 +195,11 @@ bool hw_mmal_vlc_pic_to_mmal_fmt_update(MMAL_ES_FORMAT_T *const es_fmt, const pi
         // Now overwrite width/height with a better guess as to actual layout info
         vf_new->height = pic->p[0].i_lines;
         vf_new->width = pic->p[0].i_pitch / pic->p[0].i_pixel_pitch;
+    }
+    else if (drm_prime_is_chroma(pic->format.i_chroma)) {
+        const AVDRMFrameDescriptor * const desc = drm_prime_get_desc(pic);
+        vf_new->width = desc->layers[0].planes[0].pitch;
+        vf_new->height = desc->layers[0].planes[1].offset / vf_new->width;
     }
 
     if (
@@ -662,7 +657,15 @@ MMAL_BUFFER_HEADER_T * hw_mmal_pic_buf_replicated(const picture_t *const pic, MM
     if (rep_buf == NULL)
         return NULL;
 
-    if (ctx->bufs[0] != NULL)
+    if (drm_prime_is_chroma(pic->format.i_chroma)) {
+        const struct AVDRMFrameDescriptor * const desc = drm_prime_get_desc(pic);
+        cma_buf_t *cb = cma_buf_import_dmabuf(desc->objects[0].fd, desc->objects[0].size, pic->context);
+        int rv = cma_buf_buf_attach(rep_buf, cb);
+        cma_buf_unref(cb);
+        if (rv != 0)
+            goto fail;
+    }
+    else if (ctx->bufs[0] != NULL)
     {
         // Existing buffer - replicate it
         if (mmal_buffer_header_replicate(rep_buf, ctx->bufs[0]) != MMAL_SUCCESS)

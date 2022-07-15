@@ -366,9 +366,12 @@ void cma_pool_delete(cma_buf_t * const cb)
 {
     assert(atomic_load(&cb->ref_count) == 0);
 #if TRACE_ALL
-    cb->cbp->alloc_size -= cb->size;
-    --cb->cbp->alloc_n;
-    fprintf(stderr, "%s[%d:%s]: N=%d, Total=%d\n", __func__, cb->cbp->pool->seq, cb->cbp->pool->name, cb->cbp->alloc_n, cb->cbp->alloc_size);
+    if (cb->cbp)
+    {
+        cb->cbp->alloc_size -= cb->size;
+        --cb->cbp->alloc_n;
+        fprintf(stderr, "%s[%d:%s]: N=%d, Total=%d\n", __func__, cb->cbp->pool->seq, cb->cbp->pool->name, cb->cbp->alloc_n, cb->cbp->alloc_size);
+    }
 #endif
 
     if (cb->ctx2 != NULL)
@@ -376,12 +379,12 @@ void cma_pool_delete(cma_buf_t * const cb)
 
     if (cb->mmap != MAP_FAILED)
     {
-        if (cb->cbp->buf_type != CMA_BUF_TYPE_VCSM)
+        if (cb->type != CMA_BUF_TYPE_VCSM)
             munmap(cb->mmap, cb->size);
         else
             vcsm_unlock_hdl(cb->vcsm_h);
     }
-    if (cb->fd != -1)
+    if (cb->fd != -1 && cb->type != CMA_BUF_TYPE_IMPORT)
         close(cb->fd);
     if (cb->vcsm_h != 0)
         vcsm_free(cb->vcsm_h);
@@ -406,6 +409,7 @@ static void * cma_pool_alloc_cb(void * v, size_t size)
 
     *cb = (cma_buf_t){
         .ref_count = ATOMIC_VAR_INIT(0),
+        .type = cbp->buf_type,
         .cbp = cbp,
         .in_flight = 0,
         .size = size,
@@ -644,7 +648,10 @@ void cma_buf_unref(cma_buf_t * const cb)
     {
         const bool was_in_flight = cb->in_flight;
         cb->in_flight = false;
-        cma_pool_fixed_put(cb->cbp->pool, cb, cb->size, was_in_flight);
+        if (cb->cbp)
+            cma_pool_fixed_put(cb->cbp->pool, cb, cb->size, was_in_flight);
+        else
+            cma_pool_delete(cb);
     }
 }
 
@@ -668,5 +675,25 @@ cma_buf_t * cma_buf_pool_alloc_buf(cma_buf_pool_t * const cbp, const size_t size
     // When 1st allocated or retrieved from the pool the block will have a
     // ref count of 0 so ref here
     return cma_buf_ref(cb);
+}
+
+
+cma_buf_t * cma_buf_import_dmabuf(const int fd, const size_t size, picture_context_t * const ctx2)
+{
+    cma_buf_t * cb = calloc(1, sizeof(*cb));
+    if (cb == NULL)
+        return NULL;
+    cb->fd = -1;
+    cb->size = size;
+    cb->mmap = MAP_FAILED;
+    cb->type = CMA_BUF_TYPE_IMPORT;
+    cb->fd = fd;
+
+    if (ctx2 != NULL && (cb->ctx2 = ctx2->copy(ctx2)) == NULL)
+        goto fail;
+    return cma_buf_ref(cb);
+fail:
+    cma_pool_delete(cb);
+    return NULL;
 }
 

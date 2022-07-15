@@ -104,7 +104,7 @@ typedef struct filter_sys_t
 static picture_t * di_alloc_opaque(filter_t * const p_filter, MMAL_BUFFER_HEADER_T * const buf)
 {
     filter_sys_t *const filter_sys = p_filter->p_sys;
-    picture_t * const pic = filter_NewPicture(p_filter);
+    picture_t *const pic = picture_NewFromFormat(&p_filter->fmt_out.video);
 
     if (pic == NULL)
         goto fail1;
@@ -359,7 +359,7 @@ static picture_t *deinterlace(filter_t * p_filter, picture_t * p_pic)
             if (sys->is_cma)
             {
                 // Alloc pic
-                if ((out_pic = filter_NewPicture(p_filter)) == NULL)
+                if ((out_pic = picture_NewFromFormat(&p_filter->fmt_out.video)) == NULL)
                 {
                     // Can't alloc pic - just stop extraction
                     mmal_queue_put_back(sys->out_q, out_buf);

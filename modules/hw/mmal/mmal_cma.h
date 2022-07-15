@@ -18,6 +18,8 @@ picture_context_t * cma_buf_context2(const cma_buf_t *const cb);
 void cma_buf_unref(cma_buf_t * const cb);
 cma_buf_t * cma_buf_ref(cma_buf_t * const cb);
 
+cma_buf_t * cma_buf_import_dmabuf(const int fd, const size_t size, picture_context_t * const ctx2);
+
 struct cma_buf_pool_s;
 typedef struct cma_buf_pool_s cma_buf_pool_t;
 

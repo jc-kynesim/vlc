@@ -35,6 +35,8 @@
 #include <vlc_vout_display.h>
 #include <vlc_modules.h>
 
+#include "../../codec/avcodec/drm_pic.h"
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wbad-function-cast"
 #include <bcm_host.h>
@@ -177,11 +179,12 @@ static inline bool want_copy(const vout_display_t * const vd)
 
 static inline vlc_fourcc_t req_chroma(const vout_display_t * const vd)
 {
-    return !hw_mmal_chroma_is_mmal(vd->fmt.i_chroma) && !want_copy(vd) ?
+    return !hw_mmal_chroma_is_mmal(vd->fmt.i_chroma) && !drm_prime_is_chroma(vd->fmt.i_chroma) && !want_copy(vd) ?
         VLC_CODEC_I420 :
         vd->fmt.i_chroma;
 }
 
+#if 0
 static MMAL_FOURCC_T vout_vlc_to_mmal_pic_fourcc(const unsigned int fcc)
 {
     switch (fcc){
@@ -201,6 +204,7 @@ static MMAL_FOURCC_T vout_vlc_to_mmal_pic_fourcc(const unsigned int fcc)
     }
     return MMAL_ENCODING_I420;
 }
+#endif
 
 static void display_set_format(const vout_display_t * const vd, MMAL_ES_FORMAT_T *const es_fmt, const bool is_intermediate)
 {
@@ -209,7 +213,7 @@ static void display_set_format(const vout_display_t * const vd, MMAL_ES_FORMAT_T
     MMAL_VIDEO_FORMAT_T * const v_fmt = &es_fmt->es->video;
 
     es_fmt->type = MMAL_ES_TYPE_VIDEO;
-    es_fmt->encoding = is_intermediate ? MMAL_ENCODING_I420 : vout_vlc_to_mmal_pic_fourcc(vd->fmt.i_chroma);
+    es_fmt->encoding = is_intermediate ? MMAL_ENCODING_I420 : vlc_to_mmal_video_fourcc(&vd->fmt);
     es_fmt->encoding_variant = 0;
 
     v_fmt->width  = (w + 31) & ~31;
@@ -768,7 +772,7 @@ static picture_pool_t *vd_pool(vout_display_t *vd, unsigned count)
             vd->fmt.i_width, vd->fmt.i_height, vd->fmt.i_sar_num, vd->fmt.i_sar_den, vd->source.i_width, vd->source.i_height);
 
     if (sys->pic_pool == NULL) {
-        sys->pic_pool = picture_pool_NewFromFormat(&vd->fmt, count);
+        sys->pic_pool = picture_pool_NewFromFormat(&vd->fmt, 30 /*count*/);
     }
     return sys->pic_pool;
 }
@@ -1529,9 +1533,9 @@ static int OpenMmalVout(vlc_object_t *object)
     MMAL_STATUS_T status;
     int ret = VLC_EGENERIC;
     // At the moment all copy is via I420
-    const bool needs_copy = !hw_mmal_chroma_is_mmal(vd->fmt.i_chroma);
+    const bool needs_copy = !hw_mmal_chroma_is_mmal(vd->fmt.i_chroma) && !drm_prime_is_chroma(vd->fmt.i_chroma);
     const MMAL_FOURCC_T enc_in = needs_copy ? MMAL_ENCODING_I420 :
-        vout_vlc_to_mmal_pic_fourcc(vd->fmt.i_chroma);
+        vlc_to_mmal_video_fourcc(&vd->fmt);
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s: o:%d", __func__, (int)vd->fmt.orientation);
