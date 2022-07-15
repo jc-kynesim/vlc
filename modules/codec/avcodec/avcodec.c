@@ -247,17 +247,41 @@ vlc_module_begin ()
 #endif
 vlc_module_end ()
 
-AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
-                                     const AVCodec **restrict codecp )
+static const char *
+hw_v4l2m2m_dec_str(const unsigned i_codec_id)
+{
+    switch( i_codec_id )
+    {
+        case AV_CODEC_ID_MPEG2VIDEO:
+            return "mpeg2_v4l2m2m";
+        case AV_CODEC_ID_H264:
+            return "h264_v4l2m2m";
+        default:
+            break;
+    }
+    return NULL;
+}
+
+AVCodecContext *ffmpeg_AllocContextHw( decoder_t *p_dec,
+                                     const AVCodec **restrict codecp, const int hw )
 {
     unsigned i_codec_id;
     const char *psz_namecodec;
     const AVCodec *p_codec = NULL;
+    const char * hw_dec_name = NULL;
+    const char * const psz_decoder = var_InheritString( p_dec, "avcodec-codec" );
+
+    // If named decoder do not attempt hw override - wait for non-hw pass
+    if( hw != 0 && psz_decoder != NULL )
+        return NULL;
 
     /* *** determine codec type *** */
     if( !GetFfmpegCodec( p_dec->fmt_in.i_cat, p_dec->fmt_in.i_codec,
                          &i_codec_id, &psz_namecodec ) )
          return NULL;
+
+    if( hw != 0 && (hw_dec_name = hw_v4l2m2m_dec_str(i_codec_id)) == NULL )
+        return NULL;
 
     msg_Dbg( p_dec, "using %s %s", AVPROVIDER(LIBAVCODEC), LIBAVCODEC_IDENT );
 
@@ -265,10 +289,9 @@ AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
     vlc_init_avcodec(VLC_OBJECT(p_dec));
 
     /* *** ask ffmpeg for a decoder *** */
-    char *psz_decoder = var_InheritString( p_dec, "avcodec-codec" );
     if( psz_decoder != NULL )
     {
-        p_codec = avcodec_find_decoder_by_name( psz_decoder );
+        p_codec = avcodec_find_decoder_by_name(psz_decoder);
         if( !p_codec )
             msg_Err( p_dec, "Decoder `%s' not found", psz_decoder );
         else if( p_codec->id != i_codec_id )
@@ -279,16 +302,9 @@ AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
         }
         free( psz_decoder );
     }
-    if( i_codec_id == AV_CODEC_ID_H264 )
-        p_codec = avcodec_find_decoder_by_name("h264_v4l2m2m");
-    if( !p_codec )
-        p_codec = avcodec_find_decoder( i_codec_id );
-    if( !p_codec )
-    {
-        msg_Dbg( p_dec, "codec not found (%s)", psz_namecodec );
-        return NULL;
-    }
-    if( !p_codec )
+    if( hw_dec_name != NULL )
+        p_codec = avcodec_find_decoder_by_name(hw_dec_name);
+    else if( !p_codec )
         p_codec = avcodec_find_decoder( i_codec_id );
     if( !p_codec )
     {
@@ -306,6 +322,12 @@ AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
     avctx->debug = var_InheritInteger( p_dec, "avcodec-debug" );
     avctx->opaque = p_dec;
     return avctx;
+}
+
+AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
+                                     const AVCodec **restrict codecp )
+{
+    return ffmpeg_AllocContextHw(p_dec, codecp, 0);
 }
 
 /*****************************************************************************
