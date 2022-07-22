@@ -78,6 +78,10 @@
 #define MMAL_ISP_TEXT N_("Use mmal isp rather than hvs.")
 #define MMAL_ISP_LONGTEXT N_("Use mmal isp rather than hvs. This may be faster but has no blend.")
 
+#define MMAL_DECODE_ENABLE_NAME "mmal-decode-enable"
+#define MMAL_DECODE_ENABLE_TEXT N_("Enable mmal decode even if normally disabled")
+#define MMAL_DECODE_ENABLE_LONGTEXT N_("Enable mmal decode even if normally disabled. MMAL decode is normally disabled on Pi4 or later.")
+
 typedef struct decoder_sys_t
 {
     MMAL_COMPONENT_T *component;
@@ -813,6 +817,21 @@ static int OpenDecoder(decoder_t *dec)
     decoder_sys_t *sys;
     MMAL_STATUS_T status;
     const MMAL_FOURCC_T in_fcc = vlc_to_mmal_es_fourcc(dec->fmt_in.i_codec);
+    static bool is_kms = false;
+    static bool kms_checked = false;
+
+    if (!kms_checked) {
+        // This is true for Pi3 and earlier
+        // On Pi4 and later it is almost certainly better to be using V4L2
+        is_kms = !rpi_use_qpu_deinterlace();
+        kms_checked = true;
+    }
+    if (is_kms && !var_InheritBool(dec, MMAL_DECODE_ENABLE_NAME)) {
+#if TRACE_ALL
+        msg_Dbg(dec, "%s: <<< Disabled: Is KMS", __func__);
+#endif
+        return VLC_EGENERIC;
+    }
 
 #if TRACE_ALL || 1
     {
@@ -2495,10 +2514,10 @@ vlc_module_begin()
     set_subcategory( SUBCAT_INPUT_VCODEC )
     set_shortname(N_("MMAL decoder"))
     set_description(N_("MMAL-based decoder plugin for Raspberry Pi"))
-    set_capability("video decoder", 1)
-//    set_capability("video decoder", 90)
+    set_capability("video decoder", 90)
     add_shortcut("mmal_decoder")
     add_bool(MMAL_OPAQUE_NAME, true, MMAL_OPAQUE_TEXT, MMAL_OPAQUE_LONGTEXT, false)
+    add_bool(MMAL_DECODE_ENABLE_NAME, false, MMAL_DECODE_ENABLE_TEXT, MMAL_DECODE_ENABLE_LONGTEXT, true)
     set_callbacks(OpenDecoder, CloseDecoder)
 
     add_submodule()
