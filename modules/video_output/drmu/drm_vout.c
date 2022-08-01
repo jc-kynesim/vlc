@@ -539,8 +539,22 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic,
     return;
 }
 
+static void subpic_cache_flush(vout_display_sys_t * const sys)
+{
+    for (unsigned int i = 0; i != SUBPICS_MAX; ++i) {
+        if (sys->subpics[i].pic != NULL) {
+            picture_Release(sys->subpics[i].pic);
+            sys->subpics[i].pic = NULL;
+        }
+        drmu_fb_unref(&sys->subpics[i].fb);
+    }
+}
+
 static void kill_pool(vout_display_sys_t * const sys)
 {
+    // Drop all cached subpics
+    subpic_cache_flush(sys);
+
     if (sys->vlc_pic_pool != NULL) {
         picture_pool_Release(sys->vlc_pic_pool);
         sys->vlc_pic_pool = NULL;
@@ -614,11 +628,7 @@ static void CloseDrmVout(vout_display_t *vd)
 
     for (i = 0; i != SUBPICS_MAX; ++i)
         drmu_plane_unref(sys->subplanes + i);
-    for (i = 0; i != SUBPICS_MAX; ++i) {
-        if (sys->subpics[i].pic != NULL)
-            picture_Release(sys->subpics[i].pic);
-        drmu_fb_unref(&sys->subpics[i].fb);
-    }
+    subpic_cache_flush(sys);
 
     drmu_plane_unref(&sys->dp);
     drmu_output_unref(&sys->dout);
