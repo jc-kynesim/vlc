@@ -456,14 +456,17 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
             }
 
             if (swap_vout) {
-                x_desc->on_swap_away(vd, sys, x_desc);
                 vout_display_SendEventPicturesInvalid(vd);
+                x_desc->on_swap_away(vd, sys, x_desc);
             }
 
             rv = vout_display_Control(new_desc, ctl, cfg);
             if (rv == VLC_SUCCESS) {
                 vd->fmt       = new_desc->vout->fmt;
                 sys->cur_desc = new_desc;
+                // Strictly this is illegal but subpic chromas are consulted
+                // on every render so it is in fact safe.
+                vd->info.subpicture_chromas = sys->cur_desc->vout->info.subpicture_chromas;
             }
 
             break;
@@ -480,6 +483,7 @@ static int mmal_x11_control(vout_display_t * vd, int ctl, va_list va)
             }
             rv = reset_pictures(vd, &sys->x_desc);
             rv = up_rv(rv, reset_pictures(vd, &sys->mmal_desc));
+            rv = up_rv(rv, reset_pictures(vd, &sys->drm_desc));
 
             vd->fmt = x_desc->vout->fmt;
             break;
