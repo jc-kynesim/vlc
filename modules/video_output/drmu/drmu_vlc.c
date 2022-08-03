@@ -308,6 +308,21 @@ fb_vlc_chroma_siting(const video_format_t * const fmt)
     return DRMU_CHROMA_SITING_UNSPECIFIED;
 }
 
+void
+drmu_fb_vlc_pic_set_metadata(drmu_fb_t * const dfb, const picture_t * const pic)
+{
+    struct hdr_output_metadata meta;
+
+    drmu_fb_int_color_set(dfb,
+                          fb_vlc_color_encoding(&pic->format),
+                          fb_vlc_color_range(&pic->format),
+                          fb_vlc_colorspace(&pic->format));
+
+    drmu_fb_int_chroma_siting_set(dfb, fb_vlc_chroma_siting(&pic->format));
+
+    drmu_fb_hdr_metadata_set(dfb, pic_hdr_metadata(&meta, &pic->format) == 0 ? &meta : NULL);
+}
+
 #if HAS_DRMPRIME
 // Create a new fb from a VLC DRM_PRIME picture.
 // Picture is held reffed by the fb until the fb is deleted
@@ -339,12 +354,6 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
                              pic->format.i_height,
                              drmu_rect_vlc_pic_crop(pic));
 
-    drmu_fb_int_color_set(dfb,
-                          fb_vlc_color_encoding(&pic->format),
-                          fb_vlc_color_range(&pic->format),
-                          fb_vlc_colorspace(&pic->format));
-
-    drmu_fb_int_chroma_siting_set(dfb, fb_vlc_chroma_siting(&pic->format));
 
     // Set delete callback & hold this pic
     // Aux attached to dfb immediately so no fail cleanup required
@@ -375,10 +384,7 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
         }
     }
 
-    {
-        struct hdr_output_metadata meta;
-        drmu_fb_hdr_metadata_set(dfb, pic_hdr_metadata(&meta, &pic->format) == 0 ? &meta : NULL);
-    }
+    drmu_fb_vlc_pic_set_metadata(dfb, pic);
 
     if (drmu_fb_int_make(dfb) != 0)
         goto fail;
@@ -421,18 +427,7 @@ drmu_fb_vlc_new_pic_cma_attach(drmu_env_t * const du, picture_t * const pic)
                              fmt,
                              pic->format.i_width,
                              pic->format.i_height,
-                             (drmu_rect_t){
-                                 .x = pic->format.i_x_offset,
-                                 .y = pic->format.i_y_offset,
-                                 .w = pic->format.i_visible_width,
-                                 .h = pic->format.i_visible_height});
-
-    drmu_fb_int_color_set(dfb,
-                          fb_vlc_color_encoding(&pic->format),
-                          fb_vlc_color_range(&pic->format),
-                          fb_vlc_colorspace(&pic->format));
-
-    drmu_fb_int_chroma_siting_set(dfb, fb_vlc_chroma_siting(&pic->format));
+                             drmu_rect_vlc_pic_crop(pic));
 
     // Set delete callback & hold this pic
     // Aux attached to dfb immediately so no fail cleanup required
@@ -461,10 +456,7 @@ drmu_fb_vlc_new_pic_cma_attach(drmu_env_t * const du, picture_t * const pic)
         }
     }
 
-    {
-        struct hdr_output_metadata meta;
-        drmu_fb_hdr_metadata_set(dfb, pic_hdr_metadata(&meta, &pic->format) == 0 ? NULL : &meta);
-    }
+    drmu_fb_vlc_pic_set_metadata(dfb, pic);
 
     if (drmu_fb_int_make(dfb) != 0)
         goto fail;
