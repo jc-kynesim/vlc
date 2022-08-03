@@ -231,35 +231,35 @@ pic_hdr_metadata(struct hdr_output_metadata * const m, const struct video_format
     return 0;
 }
 
-static const char *
+static drmu_color_encoding_t
 fb_vlc_color_encoding(const video_format_t * const fmt)
 {
     switch (fmt->space)
     {
         case COLOR_SPACE_BT2020:
-            return "ITU-R BT.2020 YCbCr";
+            return DRMU_COLOR_ENCODING_BT2020;
         case COLOR_SPACE_BT601:
-            return "ITU-R BT.601 YCbCr";
+            return DRMU_COLOR_ENCODING_BT601;
         case COLOR_SPACE_BT709:
-            return "ITU-R BT.709 YCbCr";
+            return DRMU_COLOR_ENCODING_BT709;
         case COLOR_SPACE_UNDEF:
         default:
             break;
     }
 
     return (fmt->i_visible_width > 1024 || fmt->i_visible_height > 600) ?
-        "ITU-R BT.709 YCbCr" :
-        "ITU-R BT.601 YCbCr";
+        DRMU_COLOR_ENCODING_BT709 :
+        DRMU_COLOR_ENCODING_BT601;
 }
 
-static const char *
+static drmu_color_range_t
 fb_vlc_color_range(const video_format_t * const fmt)
 {
 #if HAS_VLC4
     switch (fmt->color_range)
     {
         case COLOR_RANGE_FULL:
-            return "YCbCr full range";
+            return DRMU_COLOR_RANGE_YCBCR_FULL_RANGE;
         case COLOR_RANGE_UNDEF:
         case COLOR_RANGE_LIMITED:
         default:
@@ -267,9 +267,9 @@ fb_vlc_color_range(const video_format_t * const fmt)
     }
 #else
     if (fmt->b_color_range_full)
-        return "YCbCr full range";
+        return DRMU_COLOR_RANGE_YCBCR_FULL_RANGE;
 #endif
-    return "YCbCr limited range";
+    return DRMU_COLOR_RANGE_YCBCR_LIMITED_RANGE;
 }
 
 
@@ -278,11 +278,11 @@ fb_vlc_colorspace(const video_format_t * const fmt)
 {
     switch (fmt->space) {
         case COLOR_SPACE_BT2020:
-            return "BT2020_RGB";
+            return DRMU_COLORSPACE_BT2020_RGB;
         default:
             break;
     }
-    return "Default";
+    return DRMU_COLORSPACE_DEFAULT;
 }
 
 static drmu_chroma_siting_t
