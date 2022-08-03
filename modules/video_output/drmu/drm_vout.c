@@ -134,6 +134,8 @@ copy_pic_to_fb(vout_display_t *vd, drmu_pool_t * const pool, picture_t * const s
         plane_CopyPixels(&dst_plane, src->p + i);
     }
 
+    drmu_fb_vlc_pic_set_metadata(fb, src);
+
     return fb;
 }
 
