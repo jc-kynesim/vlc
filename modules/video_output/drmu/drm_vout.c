@@ -485,8 +485,8 @@ subpics_done:
     }
     drmu_output_fb_info_set(sys->dout, dfb);
 
-    ret = drmu_atomic_plane_fb_set(da, sys->dp, dfb, r);
-    drmu_atomic_add_output_props(da, sys->dout);
+    ret = drmu_atomic_plane_add_fb(da, sys->dp, dfb, r);
+    drmu_atomic_output_add_props(da, sys->dout);
     drmu_fb_unref(&dfb);
 
     if (ret != 0) {
@@ -505,11 +505,11 @@ subpics_done:
         // Rescale from sub-space
         if (sys->subplanes[i])
         {
-            if ((ret = drmu_atomic_plane_fb_set(da, sys->subplanes[i], spe->fb,
+            if ((ret = drmu_atomic_plane_add_fb(da, sys->subplanes[i], spe->fb,
                                   drmu_rect_rescale(spe->pos, r, spe->space))) != 0) {
                  msg_Err(vd, "drmModeSetPlane for subplane %d failed: %s", i, strerror(-ret));
             }
-            drmu_atomic_add_plane_alpha(da, sys->subplanes[i], (spe->alpha * DRMU_PLANE_ALPHA_OPAQUE) / (0xff * 0xff));
+            drmu_atomic_plane_add_alpha(da, sys->subplanes[i], (spe->alpha * DRMU_PLANE_ALPHA_OPAQUE) / (0xff * 0xff));
         }
     }
 
