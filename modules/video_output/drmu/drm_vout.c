@@ -703,6 +703,39 @@ subpic_make_chromas_from_drm(const uint32_t * const drm_chromas, const unsigned 
     return c;
 }
 
+static int
+test_simple_plane_set(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+    drmu_atomic_t *da = drmu_atomic_new(sys->du);
+    drmu_fb_t *fb;
+    int rv = -ENOMEM;
+
+    if (da == NULL) {
+        msg_Warn(vd, "Failed to alloc test atomic");
+        goto fail;
+    }
+
+    if ((fb = drmu_pool_fb_new_dumb(sys->sub_fb_pool, 128, 128, drmu_format_vlc_chroma_to_drm(sys->subpic_chromas[0]))) == NULL) {
+        msg_Warn(vd, "Failed to alloc test FB");
+        goto fail;
+    }
+
+    if ((rv = drmu_atomic_plane_add_fb(da, sys->subplanes[0], fb, drmu_rect_wh(128, 128))) != 0) {
+        msg_Warn(vd, "Failed to add test FB to atomic");
+        goto fail;
+    }
+
+    if ((rv = drmu_atomic_commit(da, DRM_MODE_ATOMIC_TEST_ONLY)) != 0) {
+        msg_Warn(vd, "Failed to commit test FB");
+        goto fail;
+    }
+
+fail:
+    drmu_atomic_unref(&da);
+    drmu_fb_unref(&fb);
+    return rv;
+}
+
 static int OpenDrmVout(vlc_object_t *object)
 {
     vout_display_t * const vd = (vout_display_t *)object;
@@ -770,6 +803,11 @@ static int OpenDrmVout(vlc_object_t *object)
             const uint32_t * const drm_chromas = drmu_plane_formats(sys->subplanes[i], &n);
             sys->subpic_chromas = subpic_make_chromas_from_drm(drm_chromas, n);
         }
+    }
+
+    if (test_simple_plane_set(vd, sys) != 0) {
+        msg_Warn(vd, "Failed simple pic test");
+        goto fail;
     }
 
     vd->info = (vout_display_info_t){
