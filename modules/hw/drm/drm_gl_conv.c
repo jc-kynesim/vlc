@@ -19,39 +19,51 @@
 
 #define TRACE_ALL 0
 
+#define ICACHE_SIZE 2
+
 typedef struct drm_gl_converter_s
 {
     EGLint drm_fourcc;
 
-    EGLImageKHR last_image;
-    picture_t * last_pic;
+    unsigned int icache_n;
+    struct icache_s {
+        EGLImageKHR last_image;
+        picture_context_t * last_ctx;
+    } icache[ICACHE_SIZE];
 
     PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
 } drm_gl_converter_t;
 
 
-static void unset_last(const opengl_tex_converter_t * const tc)
+static void
+unset_icache_ent(const opengl_tex_converter_t * const tc, struct icache_s * const s)
 {
-    drm_gl_converter_t * const sys = tc->priv;
-
-    if (sys->last_image)
+    if (s->last_image)
     {
-        tc->gl->egl.destroyImageKHR(tc->gl, sys->last_image);
-        sys->last_image = NULL;
+        tc->gl->egl.destroyImageKHR(tc->gl, s->last_image);
+        s->last_image = NULL;
     }
 
-    if (sys->last_pic)
+    if (s->last_ctx)
     {
-        picture_Release(sys->last_pic);
-        sys->last_pic = NULL;
+        s->last_ctx->destroy(s->last_ctx);
+        s->last_ctx = NULL;
     }
 }
 
-static void set_last(const opengl_tex_converter_t * const tc, EGLImageKHR image, picture_t * pic)
+static void
+update_icache(const opengl_tex_converter_t * const tc, EGLImageKHR image, picture_t * pic)
 {
     drm_gl_converter_t * const sys = tc->priv;
-    sys->last_image = image;
-    sys->last_pic = picture_Hold(pic);
+    struct icache_s * const s = sys->icache + sys->icache_n;
+
+    s->last_image = image;
+    // DRM buffer is held by the context, pictures can be in surprisingly
+    // small pools for filters so let go of the pic and keep a ref on the
+    // context
+    unset_icache_ent(tc, s);
+    s->last_ctx = pic->context->copy(pic->context);
+    sys->icache_n = sys->icache_n + 1 >= ICACHE_SIZE ? 0 : sys->icache_n + 1;
 }
 
 static int
@@ -156,8 +168,7 @@ tc_drm_update(const opengl_tex_converter_t *tc, GLuint *textures,
         tc->vt->TexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         sys->glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, image);
 
-        unset_last(tc);
-        set_last(tc, image, pic);
+        update_icache(tc, image, pic);
     }
 
     return VLC_SUCCESS;
@@ -220,11 +231,13 @@ CloseGLConverter(vlc_object_t *obj)
 {
     opengl_tex_converter_t * const tc = (opengl_tex_converter_t *)obj;
     drm_gl_converter_t * const sys = tc->priv;
+    unsigned int i;
 
     if (sys == NULL)
         return;
 
-    unset_last(tc);
+    for (i = 0; i != ICACHE_SIZE; ++i)
+        unset_icache_ent(tc, sys->icache + i);
     free(sys);
 }
 
