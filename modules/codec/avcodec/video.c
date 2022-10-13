@@ -29,6 +29,8 @@
 # include "config.h"
 #endif
 
+#define OPT_RPI 1
+
 #include <vlc_common.h>
 #include <vlc_codec.h>
 #include <vlc_avcodec.h>
@@ -97,6 +99,7 @@ struct decoder_sys_t
     /* VA API */
     vlc_va_t *p_va;
     enum PixelFormat pix_fmt;
+    enum PixelFormat sw_pix_fmt;
     int profile;
     int level;
 
@@ -433,6 +436,7 @@ static int OpenVideoCodec( decoder_t *p_dec )
 
     ctx->bits_per_coded_sample = p_dec->fmt_in.video.i_bits_per_pixel;
     p_sys->pix_fmt = AV_PIX_FMT_NONE;
+    p_sys->sw_pix_fmt = AV_PIX_FMT_NONE;
     p_sys->profile = -1;
     p_sys->level = -1;
     cc_Init( &p_sys->cc );
@@ -1240,10 +1244,10 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         {   /* When direct rendering is not used, get_format() and get_buffer()
              * might not be called. The output video format must be set here
              * then picture buffer can be allocated. */
-            if (frame->format == AV_PIX_FMT_DRM_PRIME ||
-                (p_sys->p_va == NULL
+            if ((frame->format == AV_PIX_FMT_DRM_PRIME ||
+                 p_sys->p_va == NULL)
              && lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
-                                       p_context->pix_fmt) == 0))
+                                       p_context->sw_pix_fmt) == 0)
                 p_pic = decoder_NewPicture(p_dec);
 
             if( !p_pic )
@@ -1596,7 +1600,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
     video_format_t fmt;
 
     /* Enumerate available formats */
-    enum PixelFormat swfmt = avcodec_default_get_format(p_context, pi_fmt);
+    enum PixelFormat def_swfmt = avcodec_default_get_format(p_context, pi_fmt);
     bool can_hwaccel = false;
 
     for (size_t i = 0; pi_fmt[i] != AV_PIX_FMT_NONE; i++)
@@ -1619,7 +1623,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
      * existing output format, and if present, hardware acceleration back-end.
      * This avoids resetting the pipeline downstream. This also avoids
      * needlessly probing for hardware acceleration support. */
-     if (lavc_GetVideoFormat(p_dec, &fmt, p_context, p_sys->pix_fmt, swfmt) != 0)
+     if (lavc_GetVideoFormat(p_dec, &fmt, p_context, p_sys->pix_fmt, p_sys->sw_pix_fmt) != 0)
      {
          msg_Dbg(p_dec, "get format failed");
          goto no_reuse;
@@ -1641,7 +1645,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
      for (size_t i = 0; pi_fmt[i] != AV_PIX_FMT_NONE; i++)
         if (pi_fmt[i] == p_sys->pix_fmt)
         {
-            if (lavc_UpdateVideoFormat(p_dec, p_context, p_sys->pix_fmt, swfmt) == 0)
+            if (lavc_UpdateVideoFormat(p_dec, p_context, p_sys->pix_fmt, p_sys->sw_pix_fmt) == 0)
             {
                 msg_Dbg(p_dec, "reusing decoder output format %d", pi_fmt[i]);
                 return p_sys->pix_fmt;
@@ -1660,7 +1664,7 @@ no_reuse:
     p_sys->level = p_context->level;
 
     if (!can_hwaccel)
-        return swfmt;
+        return def_swfmt;
 
 #if (LIBAVCODEC_VERSION_MICRO >= 100) \
   && (LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 83, 101))
@@ -1668,7 +1672,7 @@ no_reuse:
     {
         msg_Warn(p_dec, "thread type %d: disabling hardware acceleration",
                  p_context->active_thread_type);
-        return swfmt;
+        return def_swfmt;
     }
 #endif
 
@@ -1677,7 +1681,7 @@ no_reuse:
     static const enum PixelFormat hwfmts[] =
     {
         AV_PIX_FMT_DRM_PRIME,
-#if 0  // RPI - ignore stuff we know isn't going to work
+#if !OPT_RPI  // RPI - ignore stuff we know isn't going to work
 #ifdef _WIN32
 #if LIBAVUTIL_VERSION_CHECK(54, 13, 1, 24, 100)
         AV_PIX_FMT_D3D11VA_VLD,
@@ -1695,12 +1699,21 @@ no_reuse:
     for( size_t i = 0; hwfmts[i] != AV_PIX_FMT_NONE; i++ )
     {
         enum PixelFormat hwfmt = AV_PIX_FMT_NONE;
+        enum PixelFormat swfmt = def_swfmt;
         for( size_t j = 0; hwfmt == AV_PIX_FMT_NONE && pi_fmt[j] != AV_PIX_FMT_NONE; j++ )
             if( hwfmts[i] == pi_fmt[j] )
                 hwfmt = hwfmts[i];
 
         if( hwfmt == AV_PIX_FMT_NONE )
             continue;
+
+#if OPT_RPI
+        // Kludge to what we know the swfmt is going to be
+        if (hwfmt == AV_PIX_FMT_DRM_PRIME && p_context->codec_id == AV_CODEC_ID_HEVC && def_swfmt == AV_PIX_FMT_YUV420P)
+            swfmt = AV_PIX_FMT_RPI4_8;
+        if (hwfmt == AV_PIX_FMT_DRM_PRIME && p_context->codec_id == AV_CODEC_ID_HEVC && def_swfmt == AV_PIX_FMT_YUV420P10LE)
+            swfmt = AV_PIX_FMT_RPI4_10;
+#endif
 
         p_dec->fmt_out.video.i_chroma = vlc_va_GetChroma(hwfmt, swfmt);
         if (p_dec->fmt_out.video.i_chroma == 0)
@@ -1734,12 +1747,14 @@ no_reuse:
 
         p_sys->p_va = va;
         p_sys->pix_fmt = hwfmt;
+        p_sys->sw_pix_fmt = swfmt;
         p_context->draw_horiz_band = NULL;
         return hwfmt;
     }
 
     post_mt(p_sys);
     /* Fallback to default behaviour */
-    p_sys->pix_fmt = swfmt;
-    return swfmt;
+    p_sys->pix_fmt = def_swfmt;
+    p_sys->sw_pix_fmt = def_swfmt;
+    return p_sys->pix_fmt;
 }
