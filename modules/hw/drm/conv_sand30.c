@@ -15,7 +15,7 @@
 
 #include <assert.h>
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 //----------------------------------------------------------------------------
 //
@@ -29,6 +29,8 @@ static vlc_fourcc_t
 dst_fourcc_vlc_to_av(const vlc_fourcc_t av)
 {
     switch (av) {
+    case VLC_CODEC_I420:
+        return AV_PIX_FMT_YUV420P;
     case VLC_CODEC_NV12:
         return AV_PIX_FMT_NV12;
     case VLC_CODEC_I420_10L:
@@ -134,18 +136,29 @@ static void CloseConverterToNv12(vlc_object_t * obj)
 
 static bool to_nv12_validate_fmt(const video_format_t * const f_in, const video_format_t * const f_out)
 {
-    if (!(f_in->i_chroma == VLC_CODEC_DRM_PRIME_SAND30 &&
-          dst_fourcc_vlc_to_av(f_out->i_chroma) != 0))
-    {
-        return false;
-    }
     if (f_in->i_height != f_out->i_height ||
         f_in->i_width  != f_out->i_width)
     {
         return false;
     }
 
-    return true;
+    if (f_in->i_chroma == VLC_CODEC_DRM_PRIME_SAND8 &&
+        (f_out->i_chroma == VLC_CODEC_I420 || f_out->i_chroma == VLC_CODEC_NV12))
+        return true;
+
+    if (f_in->i_chroma == VLC_CODEC_DRM_PRIME_I420 &&
+        f_out->i_chroma == VLC_CODEC_I420)
+        return true;
+
+    if (f_in->i_chroma == VLC_CODEC_DRM_PRIME_NV12 &&
+        f_out->i_chroma == VLC_CODEC_NV12)
+        return true;
+
+    if (f_in->i_chroma == VLC_CODEC_DRM_PRIME_SAND30 &&
+        (f_out->i_chroma == VLC_CODEC_I420_10L || f_out->i_chroma == VLC_CODEC_NV12))
+        return true;
+
+    return false;
 }
 
 static int OpenConverterToNv12(vlc_object_t * obj)
@@ -190,10 +203,10 @@ fail:
 vlc_module_begin()
     set_category( CAT_VIDEO )
     set_subcategory( SUBCAT_VIDEO_VFILTER )
-    set_shortname(N_("DRMPRIME-SAND30 to NV12"))
-    set_description(N_("DRMPRIME-SAND30 to NV12 filter"))
-    add_shortcut("sand30_to_nv12")
-    set_capability( "video converter", 901 )
+    set_shortname(N_("DRMPRIME to s/w"))
+    set_description(N_("DRMPRIME-to software picture filter"))
+    add_shortcut("drmprime_to_sw")
+    set_capability( "video converter", 50 )
     set_callbacks(OpenConverterToNv12, CloseConverterToNv12)
 vlc_module_end()
 
