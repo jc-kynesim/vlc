@@ -241,6 +241,62 @@ CloseGLConverter(vlc_object_t *obj)
     free(sys);
 }
 
+#ifndef DRM_FORMAT_P030
+#define DRM_FORMAT_P030 fourcc_code('P', '0', '3', '0')
+#endif
+
+static struct vlc_to_drm_mod_s {
+    vlc_fourcc_t chroma;
+    uint32_t drm_fmt;
+    uint64_t drm_mod;
+} vlc_to_drm_mods[] = {
+    {VLC_CODEC_DRM_PRIME_I420,   DRM_FORMAT_YUV420, DRM_FORMAT_MOD_LINEAR},
+    {VLC_CODEC_DRM_PRIME_NV12,   DRM_FORMAT_NV12,   DRM_FORMAT_MOD_LINEAR},
+    {VLC_CODEC_DRM_PRIME_SAND8,  DRM_FORMAT_NV12,   DRM_FORMAT_MOD_BROADCOM_SAND128},
+    {VLC_CODEC_DRM_PRIME_SAND30, DRM_FORMAT_P030,   DRM_FORMAT_MOD_BROADCOM_SAND128},
+};
+
+static bool check_chroma(opengl_tex_converter_t * const tc)
+{
+    char fcc[5] = {0};
+    vlc_fourcc_to_char(tc->fmt.i_chroma, fcc);
+    uint32_t fmt = 0;
+    uint64_t mod = DRM_FORMAT_MOD_INVALID;
+    uint64_t mods[16];
+    int32_t mod_count = 0;
+
+    for (unsigned int i = 0; i != ARRAY_SIZE(vlc_to_drm_mods); ++i)
+    {
+        if (tc->fmt.i_chroma == vlc_to_drm_mods[i].chroma)
+        {
+            fmt = vlc_to_drm_mods[i].drm_fmt;
+            mod = vlc_to_drm_mods[i].drm_mod;
+            break;
+        }
+    }
+    if (!fmt)
+        return false;
+
+    if (!tc->gl->egl.queryDmaBufModifiersEXT)
+    {
+        msg_Dbg(tc, "No queryDmaBufModifiersEXT");
+        return false;
+    }
+
+    if (!tc->gl->egl.queryDmaBufModifiersEXT(tc->gl, fmt, 16, mods, NULL, &mod_count))
+    {
+        msg_Dbg(tc, "queryDmaBufModifiersEXT Failed for %s", fcc);
+        return false;
+    }
+
+    for (int32_t i = 0; i < mod_count; ++i)
+    {
+        if (mods[i] == mod)
+            return true;
+    }
+    msg_Dbg(tc, "Mod %" PRIx64 " not found for %s/%.4s in %d mods", mod, fcc, (char*)&fmt, mod_count);
+    return false;
+}
 
 static int
 OpenGLConverter(vlc_object_t *obj)
@@ -249,10 +305,7 @@ OpenGLConverter(vlc_object_t *obj)
     int rv = VLC_EGENERIC;
 
     // Do we know what to do with this?
-    // There must be a way of probing for supported formats...
-    if (!(tc->fmt.i_chroma == VLC_CODEC_DRM_PRIME_I420 ||
-          tc->fmt.i_chroma == VLC_CODEC_DRM_PRIME_NV12 ||
-          tc->fmt.i_chroma == VLC_CODEC_DRM_PRIME_SAND8))
+    if (!check_chroma(tc))
         return VLC_EGENERIC;
 
     {
