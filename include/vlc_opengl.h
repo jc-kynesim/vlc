@@ -68,6 +68,9 @@ struct vlc_gl_t
                                     const int32_t *attrib_list);
             /* call eglDestroyImageKHR() with current display, can be NULL */
             bool (*destroyImageKHR)(vlc_gl_t *, void *image);
+            bool (*queryDmaBufModifiersEXT)(vlc_gl_t *gl, uint32_t format,
+                                            unsigned int max_modifiers, uint64_t *modifiers,
+                                            unsigned int *external_only, int32_t *num_modifiers);
         } egl;
         /* if ext == VLC_GL_EXT_WGL */
         struct
