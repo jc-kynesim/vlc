@@ -58,6 +58,7 @@ typedef struct vlc_gl_sys_t
 #endif
     PFNEGLCREATEIMAGEKHRPROC    eglCreateImageKHR;
     PFNEGLDESTROYIMAGEKHRPROC   eglDestroyImageKHR;
+    PFNEGLQUERYDMABUFMODIFIERSEXTPROC eglQueryDmaBufModifiersEXT;
 } vlc_gl_sys_t;
 
 static int MakeCurrent (vlc_gl_t *gl)
@@ -127,6 +128,15 @@ static bool DestroyImageKHR(vlc_gl_t *gl, void *image)
     vlc_gl_sys_t *sys = gl->sys;
 
     return sys->eglDestroyImageKHR(sys->display, image);
+}
+
+static bool QueryDmaBufModifiersEXT(vlc_gl_t *gl, uint32_t format,
+                                    unsigned int max_modifiers, uint64_t *modifiers,
+                                    unsigned int *external_only, int32_t *num_modifiers)
+{
+    vlc_gl_sys_t *sys = gl->sys;
+
+    return sys->eglQueryDmaBufModifiersEXT(sys->display, format, max_modifiers, modifiers, external_only, num_modifiers);
 }
 
 static bool CheckToken(const char *haystack, const char *needle)
@@ -427,6 +437,9 @@ static int Open (vlc_object_t *obj, const struct gl_api *api)
         gl->egl.createImageKHR = CreateImageKHR;
         gl->egl.destroyImageKHR = DestroyImageKHR;
     }
+    sys->eglQueryDmaBufModifiersEXT = (void *)eglGetProcAddress("eglQueryDmaBufModifiersEXT");
+    if (sys->eglQueryDmaBufModifiersEXT)
+        gl->egl.queryDmaBufModifiersEXT = QueryDmaBufModifiersEXT;
 
     return VLC_SUCCESS;
 
