@@ -231,7 +231,7 @@ QSize VideoWidget::physicalSize() const
 }
 
 void WindowResized(vout_window_t *, const QSize&);
-void WindowReleased(vout_window_t *);
+void WindowOrphaned(vout_window_t *);
 
 void VideoWidget::reportSize()
 {
@@ -402,13 +402,14 @@ void VideoWidget::mouseDoubleClickEvent( QMouseEvent *event )
 }
 
 
-void VideoWidget::release( void )
+void VideoWidget::release( bool forced )
 {
-    msg_Dbg( p_intf, "Video is not needed anymore" );
+    msg_Dbg( p_intf, "video widget is %s", forced ? "orphaned" : "released" );
 
     if( stable )
     {
-        WindowReleased(p_window);
+        if( forced )
+            WindowOrphaned(p_window);
         layout->removeWidget( stable );
         stable->deleteLater();
         stable = NULL;
