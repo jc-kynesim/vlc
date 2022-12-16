@@ -225,6 +225,8 @@ typedef void (* drmu_fb_on_delete_fn)(struct drmu_fb_s * dfb, void * v);
 void drmu_fb_pre_delete_set(drmu_fb_t *const dfb, drmu_fb_pre_delete_fn fn, void * v);
 void drmu_fb_pre_delete_unset(drmu_fb_t *const dfb);
 unsigned int drmu_fb_pixel_bits(const drmu_fb_t * const dfb);
+uint32_t drmu_fb_pixel_format(const drmu_fb_t * const dfb);
+uint64_t drmu_fb_modifier(const drmu_fb_t * const dfb, const unsigned int plane);
 drmu_fb_t * drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format);
 drmu_fb_t * drmu_fb_new_dumb_mod(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format, const uint64_t mod);
 drmu_fb_t * drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format);
@@ -424,6 +426,13 @@ int drmu_conn_claim_ref(drmu_conn_t * const dn);
 // Plane
 
 uint32_t drmu_plane_id(const drmu_plane_t * const dp);
+
+#define DRMU_PLANE_TYPE_CURSOR  4
+#define DRMU_PLANE_TYPE_PRIMARY 2
+#define DRMU_PLANE_TYPE_OVERLAY 1
+#define DRMU_PLANE_TYPE_UNKNOWN 0
+unsigned int drmu_plane_type(const drmu_plane_t * const dp);
+
 const uint32_t * drmu_plane_formats(const drmu_plane_t * const dp, unsigned int * const pCount);
 bool drmu_plane_format_check(const drmu_plane_t * const dp, const uint32_t format, const uint64_t modifier);
 
@@ -432,6 +441,8 @@ bool drmu_plane_format_check(const drmu_plane_t * const dp, const uint32_t forma
 #define DRMU_PLANE_ALPHA_TRANSPARENT            0
 #define DRMU_PLANE_ALPHA_OPAQUE                 0xffff
 int drmu_atomic_plane_add_alpha(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int alpha);
+
+int drmu_atomic_plane_add_zpos(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int zpos);
 
 // X, Y & TRANSPOSE can be ORed to get all others
 #define DRMU_PLANE_ROTATION_0                   0
@@ -479,11 +490,11 @@ drmu_plane_t * drmu_plane_ref(drmu_plane_t * const dp);
 // Returns -EBUSY if plane already associated
 int drmu_plane_ref_crtc(drmu_plane_t * const dp, drmu_crtc_t * const dc);
 
-#define DRMU_PLANE_TYPE_CURSOR  4
-#define DRMU_PLANE_TYPE_PRIMARY 2
-#define DRMU_PLANE_TYPE_OVERLAY 1
-#define DRMU_PLANE_TYPE_UNKNOWN 0
+typedef bool (*drmu_plane_new_find_ok_fn)(const drmu_plane_t * dp, void * v);
 
+// Find a "free" plane that satisfies (returns true) the ok callback
+// Does not ref
+drmu_plane_t * drmu_plane_new_find(drmu_crtc_t * const dc, const drmu_plane_new_find_ok_fn cb, void * const v);
 // Find a "free" plane of the given type. Types can be ORed
 // Does not ref
 drmu_plane_t * drmu_plane_new_find_type(drmu_crtc_t * const dc, const unsigned int req_type);
