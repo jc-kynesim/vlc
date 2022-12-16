@@ -46,6 +46,13 @@
 #include <libdrm/drm_mode.h>
 #include <libdrm/drm_fourcc.h>
 
+#define TRACE_ALL 0
+
+#define SUBPICS_MAX 4
+
+#define DRM_MODULE "vc4"
+
+
 #define DRM_VOUT_SOURCE_MODESET_NAME "drm-vout-source-modeset"
 #define DRM_VOUT_SOURCE_MODESET_TEXT N_("Attempt to match display to source")
 #define DRM_VOUT_SOURCE_MODESET_LONGTEXT N_("Attempt to match display resolution and refresh rate to source.\
@@ -67,12 +74,22 @@
 #define DRM_VOUT_NO_MAX_BPC_LONGTEXT N_("Do not try to switch from 8-bit RGB to 12-bit YCC on UHD frames.\
  12 bit is dependant on kernel and display support so may not be availible")
 
+#define DRM_VOUT_WINDOW_NAME "drm-vout-window"
+#define DRM_VOUT_WINDOW_TEXT N_("Display window for Rpi fullscreen")
+#define DRM_VOUT_WINDOW_LONGTEXT N_("Display window for Rpi fullscreen."\
+"fullscreen|<width>x<height>+<x>+<y>")
 
-#define TRACE_ALL 0
+#define DRM_VOUT_DISPLAY_NAME "drm-vout-display"
+#define DRM_VOUT_DISPLAY_TEXT N_("Output device for Rpi fullscreen.")
+#define DRM_VOUT_DISPLAY_LONGTEXT N_("Output device for Rpi fullscreen. " \
+"Valid values are HDMI-1,HDMI-2.  By default if qt-fullscreen-screennumber " \
+"is specified (or set by Fullscreen Output Device in Preferences) " \
+"HDMI-<qt-fullscreen-screennumber+1> will be used, otherwise HDMI-1.")
 
-#define SUBPICS_MAX 4
+#define DRM_VOUT_MODULE_NAME "drm-vout-module"
+#define DRM_VOUT_MODULE_TEXT N_("DRM module to use")
+#define DRM_VOUT_MODULE_LONGTEXT N_("DRM module for Rpi fullscreen")
 
-#define DRM_MODULE "vc4"
 
 typedef struct subpic_ent_s {
     drmu_fb_t * fb;
@@ -139,6 +156,33 @@ copy_pic_to_fb(vout_display_t *vd, drmu_pool_t * const pool, picture_t * const s
     return fb;
 }
 
+
+static vout_display_place_t str_to_rect(const char * s)
+{
+    vout_display_place_t rect = {0};
+    rect.width = strtoul(s, (char**)&s, 0);
+    if (*s == '\0')
+        return rect;
+    if (*s++ != 'x')
+        goto fail;
+    rect.height = strtoul(s, (char**)&s, 0);
+    if (*s == '\0')
+        return rect;
+    if (*s++ != '+')
+        goto fail;
+    rect.x = strtoul(s, (char**)&s, 0);
+    if (*s == '\0')
+        return rect;
+    if (*s++ != '+')
+        goto fail;
+    rect.y = strtoul(s, (char**)&s, 0);
+    if (*s != '\0')
+        goto fail;
+    return rect;
+
+fail:
+    return (vout_display_place_t){0,0,0,0};
+}
 
 // MMAL headers comment these (getting 2 a bit wrong) but do not give
 // defines
@@ -765,7 +809,7 @@ static int OpenDrmVout(vlc_object_t *object)
             .max_level = DRMU_LOG_LEVEL_ALL
         };
         if ((sys->du = drmu_env_new_xlease(&log)) == NULL &&
-            (sys->du = drmu_env_new_open(DRM_MODULE, &log)) == NULL)
+            (sys->du = drmu_env_new_open(var_InheritString(vd, DRM_VOUT_MODULE_NAME), &log)) == NULL)
             goto fail;
     }
 
@@ -779,9 +823,27 @@ static int OpenDrmVout(vlc_object_t *object)
     drmu_output_modeset_allow(sys->dout, !var_InheritBool(vd, DRM_VOUT_NO_MODESET_NAME));
     drmu_output_max_bpc_allow(sys->dout, !var_InheritBool(vd, DRM_VOUT_NO_MAX_BPC));
 
-    if ((rv = drmu_output_add_output(sys->dout, NULL)) != 0) {  // **** HDMI name here
-        msg_Err(vd, "Failed to find output: %s", strerror(-rv));
-        goto fail;
+
+    {
+        const char *display_name = var_InheritString(vd, DRM_VOUT_DISPLAY_NAME);
+        int qt_num = var_InheritInteger(vd, "qt-fullscreen-screennumber");
+        const char * conn_name = qt_num == 0 ? "HDMI-A-1" :  qt_num == 1 ? "HDMI-A-2" : NULL;
+        const char * dname;
+
+        if (display_name && strcasecmp(display_name, "auto") != 0) {
+            if (strcasecmp(display_name, "hdmi-1") == 0)
+                conn_name = "HDMI-A-1";
+            else if (strcasecmp(display_name, "hdmi-2") == 0)
+                conn_name = "HDMI-A-2";
+        }
+
+        dname = conn_name != NULL ? conn_name : "<auto>";
+
+        if ((rv = drmu_output_add_output(sys->dout, conn_name)) != 0) {
+            msg_Err(vd, "Failed to find output %s: %s", dname, strerror(-rv));
+            goto fail;
+        }
+        msg_Dbg(vd, "Using conn %s\n", dname);
     }
 
     if ((sys->sub_fb_pool = drmu_pool_new(sys->du, 10)) == NULL)
@@ -898,6 +960,23 @@ static int OpenDrmVout(vlc_object_t *object)
 //    vout_display_SetSizeAndSar(vd, drmu_crtc_width(sys->dc), drmu_crtc_height(sys->dc),
 //                               drmu_ufrac_vlc_to_rational(drmu_crtc_sar(sys->dc)));
 
+    {
+        const char *window_str = var_InheritString(vd, DRM_VOUT_WINDOW_NAME);
+        if (strcmp(window_str, "fullscreen") == 0) {
+            /* Leave req_win null */
+            msg_Dbg(vd, "Window: fullscreen");
+        }
+        else {
+            sys->req_win = str_to_rect(window_str);
+            if (sys->req_win.width != 0)
+                msg_Dbg(vd, "Window: %dx%d @ %d,%d",
+                        sys->req_win.width, sys->req_win.height,
+                        sys->req_win.x, sys->req_win.y);
+            else
+                msg_Warn(vd, "Window: '%s': cannot parse (usage: <w>x<h>+<x>+<y>) - using fullscreen", window_str);
+        }
+    }
+
     set_display_windows(vd, sys);
 
     configure_display(vd, vd->cfg, &vd->source);
@@ -921,6 +1000,9 @@ vlc_module_begin()
     add_bool(DRM_VOUT_NO_MODESET_NAME,     false, DRM_VOUT_NO_MODESET_TEXT, DRM_VOUT_NO_MODESET_LONGTEXT, false)
     add_bool(DRM_VOUT_NO_MAX_BPC,          false, DRM_VOUT_NO_MAX_BPC_TEXT, DRM_VOUT_NO_MAX_BPC_LONGTEXT, false)
     add_string(DRM_VOUT_MODE_NAME,         "none", DRM_VOUT_MODE_TEXT, DRM_VOUT_MODE_LONGTEXT, false)
+    add_string(DRM_VOUT_WINDOW_NAME,       "fullscreen", DRM_VOUT_WINDOW_TEXT, DRM_VOUT_WINDOW_LONGTEXT, false)
+    add_string(DRM_VOUT_DISPLAY_NAME,      "auto", DRM_VOUT_DISPLAY_TEXT, DRM_VOUT_DISPLAY_LONGTEXT, false)
+    add_string(DRM_VOUT_MODULE_NAME,       DRM_MODULE, DRM_VOUT_MODULE_TEXT, DRM_VOUT_MODULE_LONGTEXT, false)
 
     set_callbacks(OpenDrmVout, CloseDrmVout)
 vlc_module_end()
