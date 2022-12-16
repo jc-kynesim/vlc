@@ -473,39 +473,33 @@ subpics_done:
         }
         drmu_fb_unref(&dst->fb);
     }
-#if 0
+
+    r = drmu_rect_vlc_place(&sys->dest_rect);
+
+#if 1
     {
-        vout_display_place_t place;
-        vout_display_cfg_t cfg = *vd->cfg;
-        const drmu_mode_simple_params_t * const mode = drmu_output_mode_simple_params(sys->dout);
-
-        cfg.display.width  = mode->width;
-        cfg.display.height = mode->height;
-        cfg.display.sar    = drmu_ufrac_vlc_to_rational(mode->sar);
-
-        vout_display_PlacePicture(&place, &pic->format, &cfg, false);
-        r = drmu_rect_vlc_place(&place);
-
-#if 0
-        {
-            static int z = 0;
-            if (--z < 0) {
-                z = 200;
-                msg_Info(vd, "Cropped: %d,%d %dx%d %d/%d Cfg: %dx%d %d/%d Display: %dx%d %d/%d Place: %d,%d %dx%d",
-                         pic->format.i_x_offset, pic->format.i_y_offset,
-                         pic->format.i_visible_width, pic->format.i_visible_height,
-                         pic->format.i_sar_num, pic->format.i_sar_den,
-                         vd->cfg->display.width,   vd->cfg->display.height,
-                         vd->cfg->display.sar.num, vd->cfg->display.sar.den,
-                         cfg.display.width,   cfg.display.height,
-                         cfg.display.sar.num, cfg.display.sar.den,
-                         r.x, r.y, r.w, r.h);
-            }
+        static int z = 0;
+        if (--z < 0) {
+            z = 200;
+            msg_Info(vd, "Pic: %d,%d %dx%d/%dx%d %d/%d Fmt: %d,%d %dx%d/%dx%d %d/%d Src: %d,%d %dx%d/%dx%d %d/%d Display: %dx%d %d/%d Place: %d,%d %dx%d",
+                     pic->format.i_x_offset, pic->format.i_y_offset,
+                     pic->format.i_width, pic->format.i_height,
+                     pic->format.i_visible_width, pic->format.i_visible_height,
+                     pic->format.i_sar_num, pic->format.i_sar_den,
+                     vd->fmt.i_x_offset, vd->fmt.i_y_offset,
+                     vd->fmt.i_width, vd->fmt.i_height,
+                     vd->fmt.i_visible_width, vd->fmt.i_visible_height,
+                     vd->fmt.i_sar_num, vd->fmt.i_sar_den,
+                     vd->source.i_x_offset, vd->source.i_y_offset,
+                     vd->source.i_width, vd->source.i_height,
+                     vd->source.i_visible_width, vd->source.i_visible_height,
+                     vd->source.i_sar_num, vd->source.i_sar_den,
+                     vd->cfg->display.width,   vd->cfg->display.height,
+                     vd->cfg->display.sar.num, vd->cfg->display.sar.den,
+                     r.x, r.y, r.w, r.h);
         }
-#endif
     }
 #endif
-    r = drmu_rect_vlc_place(&sys->dest_rect);
 
 #if HAS_ZC_CMA
     if (drmu_format_vlc_to_drm_cma(pic->format.i_chroma) != 0) {
@@ -527,7 +521,19 @@ subpics_done:
         msg_Err(vd, "Failed to create frme buffer from pic");
         return;
     }
+    // * Maybe scale cropping by vd->fmt.i_width/height / vd->source.i_width/height
+    //   to get pic coord cropping
+    //   Wait until we have a bad test case before doing this as I'm worried
+    //   that we may get unexpected w/h mismatches that do unwanted scaling
+#if 0
+    drmu_fb_crop_frac_set(dfb,
+        drmu_rect_rescale(
+            drmu_rect_vlc_format_crop(&vd->source),
+            drmu_rect_shl16(drmu_rect_wh(vd->fmt.i_width, vd->fmt.i_height)),
+            drmu_rect_wh(vd->source.i_width, vd->source.i_height)));
+#else
     drmu_fb_crop_frac_set(dfb, drmu_rect_shl16(drmu_rect_vlc_format_crop(&vd->source)));
+#endif
     drmu_output_fb_info_set(sys->dout, dfb);
 
     ret = drmu_atomic_plane_add_fb(da, sys->dp, dfb, r);
