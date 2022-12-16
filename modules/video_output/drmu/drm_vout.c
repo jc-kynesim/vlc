@@ -527,6 +527,7 @@ subpics_done:
         msg_Err(vd, "Failed to create frme buffer from pic");
         return;
     }
+    drmu_fb_crop_frac_set(dfb, drmu_rect_shl16(drmu_rect_vlc_format_crop(&vd->source)));
     drmu_output_fb_info_set(sys->dout, dfb);
 
     ret = drmu_atomic_plane_add_fb(da, sys->dp, dfb, r);
