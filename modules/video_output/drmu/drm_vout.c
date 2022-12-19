@@ -476,7 +476,7 @@ subpics_done:
 
     r = drmu_rect_vlc_place(&sys->dest_rect);
 
-#if 1
+#if 0
     {
         static int z = 0;
         if (--z < 0) {
