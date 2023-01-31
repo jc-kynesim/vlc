@@ -186,6 +186,8 @@ endif
 
 libdrm_vout_plugin_la_SOURCES = video_output/drmu/drm_vout.c \
 	video_output/drmu/drmu_vlc.c video_output/drmu/drmu_vlc.h \
+	video_output/drmu/drmu_fmts.c video_output/drmu/drmu_fmts.h \
+	video_output/drmu/drmu_chroma.h \
 	video_output/drmu/drmu_log.h video_output/drmu/drmu.c \
 	video_output/drmu/drmu_xlease.c video_output/drmu/drmu_atomic.c \
 	video_output/drmu/drmu_util.c video_output/drmu/drmu_util.h \
