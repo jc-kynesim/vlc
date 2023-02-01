@@ -792,6 +792,7 @@ static int OpenDrmVout(vlc_object_t *object)
     vout_display_t * const vd = (vout_display_t *)object;
 //    video_format_t * const fmtp = &vd->fmt;
     const video_format_t *const fmtp = &vd->source;
+    const uint32_t src_chroma = fmtp->i_chroma;
     vout_display_sys_t *sys;
     int ret = VLC_EGENERIC;
     int rv;
@@ -959,9 +960,22 @@ static int OpenDrmVout(vlc_object_t *object)
         }
         else
 #endif
-        if (drmu_format_vlc_to_drm(fmtp) == 0) {
+        if ((drm_fmt = drmu_format_vlc_to_drm(fmtp)) != 0 &&
+            drmu_plane_format_check(sys->dp, drm_fmt, 0)) {
+            // It is a format where simple byte copying works
+        }
+        else {
+            const vlc_fourcc_t *fallback = vlc_fourcc_IsYUV(fmtp->i_chroma) ?
+                vlc_fourcc_GetYUVFallback(fmtp->i_chroma) :
+                vlc_fourcc_GetRGBFallback(fmtp->i_chroma);
+
+            for (; *fallback; ++fallback) {
+                if (drmu_plane_format_check(sys->dp, drmu_format_vlc_chroma_to_drm(*fallback), 0))
+                    break;
+            }
+
             // no conversion - ask for something we know we can deal with
-            vd->fmt.i_chroma = VLC_CODEC_I420;
+            vd->fmt.i_chroma = *fallback ? *fallback : VLC_CODEC_I420;
         }
     }
 //    vout_display_SetSizeAndSar(vd, drmu_crtc_width(sys->dc), drmu_crtc_height(sys->dc),
@@ -983,6 +997,9 @@ static int OpenDrmVout(vlc_object_t *object)
                 msg_Warn(vd, "Window: '%s': cannot parse (usage: <w>x<h>+<x>+<y>) - using fullscreen", window_str);
         }
     }
+
+    if (src_chroma != vd->fmt.i_chroma)
+        msg_Warn(vd, "Cannot display %s directly trying %s", drmu_log_fourcc(src_chroma), drmu_log_fourcc(vd->fmt.i_chroma));
 
     set_display_windows(vd, sys);
 
