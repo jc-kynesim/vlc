@@ -581,6 +581,12 @@ drmu_prop_range_id(const drmu_prop_range_t * const pra)
     return pra == NULL ? 0 : pra->id;
 }
 
+const char *
+drmu_prop_range_name(const drmu_prop_range_t * const pra)
+{
+    return pra == NULL ? "{norange}" : pra->name;
+}
+
 drmu_prop_range_t *
 drmu_prop_range_new(drmu_env_t * const du, const uint32_t id)
 {
@@ -643,7 +649,7 @@ drmu_atomic_add_prop_range(drmu_atomic_t * const da, const uint32_t obj_id, cons
     if (rv != 0)
         drmu_warn(drmu_atomic_env(da),
                   "%s: Failed to add range %s obj_id=%#x, prop_id=%#x, val=%"PRId64", range=%"PRId64"->%"PRId64": %s",
-                  __func__, pra->name,
+                  __func__, drmu_prop_range_name(pra),
                   obj_id, drmu_prop_range_id(pra), x, drmu_prop_range_min(pra), drmu_prop_range_max(pra), strerror(-rv));
 
     return rv;
@@ -1050,10 +1056,15 @@ drmu_fb_int_free(drmu_fb_t * const dfb)
 
     // Call on_delete last so we have stopped using anything that might be
     // freed by it
-    if (dfb->on_delete_fn)
-        dfb->on_delete_fn(dfb, dfb->on_delete_v);
+    {
+        void * const v = dfb->on_delete_v;
+        const drmu_fb_on_delete_fn fn = dfb->on_delete_fn;
 
-    free(dfb);
+        free(dfb);
+
+        if (fn)
+            fn(v);
+    }
 }
 
 void

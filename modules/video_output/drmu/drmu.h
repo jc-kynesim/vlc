@@ -183,6 +183,7 @@ bool drmu_prop_range_immutable(const drmu_prop_range_t * const pra);
 uint64_t drmu_prop_range_max(const drmu_prop_range_t * const pra);
 uint64_t drmu_prop_range_min(const drmu_prop_range_t * const pra);
 uint32_t drmu_prop_range_id(const drmu_prop_range_t * const pra);
+const char * drmu_prop_range_name(const drmu_prop_range_t * const pra);
 drmu_prop_range_t * drmu_prop_range_new(drmu_env_t * const du, const uint32_t id);
 int drmu_atomic_add_prop_range(struct drmu_atomic_s * const da, const uint32_t obj_id, const drmu_prop_range_t * const pra, const uint64_t x);
 
@@ -206,7 +207,9 @@ struct drmu_fmt_info_s;
 // Non-zero means stop delete - fb will have zero refs so will probably want a new ref
 //   before next use
 typedef int (* drmu_fb_pre_delete_fn)(struct drmu_fb_s * dfb, void * v);
-typedef void (* drmu_fb_on_delete_fn)(struct drmu_fb_s * dfb, void * v);
+// Called after an fb has been deleted and therefore has ceased using any
+// user resources
+typedef void (* drmu_fb_on_delete_fn)(void * v);
 
 void drmu_fb_pre_delete_set(drmu_fb_t *const dfb, drmu_fb_pre_delete_fn fn, void * v);
 void drmu_fb_pre_delete_unset(drmu_fb_t *const dfb);
@@ -575,6 +578,10 @@ drmu_env_t * drmu_env_new_xlease(const struct drmu_log_env_s * const log);
 // drmu_xdri3
 
 drmu_env_t * drmu_env_new_xdri3(const drmu_log_env_t * const log);
+
+// drmu_waylease
+
+drmu_env_t * drmu_env_new_waylease(const struct drmu_log_env_s * const log);
 
 #ifdef __cplusplus
 }
