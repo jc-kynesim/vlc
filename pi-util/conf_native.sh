@@ -33,6 +33,7 @@ $BASE/configure \
  --libdir=$LIB_PREFIX\
  --includedir=$INC_PREFIX\
  --disable-vdpau\
+ --enable-wayland\
  --enable-gles2\
  $CONF_MMAL
 echo "Configured in $OUT"
