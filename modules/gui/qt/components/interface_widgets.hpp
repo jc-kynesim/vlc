@@ -88,6 +88,7 @@ private:
     bool enable_mouse_events;
 
     void reportSize();
+    void refreshHandles();
 
 signals:
     void sizeChanged( int, int );
