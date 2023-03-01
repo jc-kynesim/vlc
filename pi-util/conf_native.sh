@@ -13,7 +13,7 @@ elif [ "$MC" == "aarch64" ]; then
   A=aarch64-linux-gnu
   ARM=arm64
 else
-  echo "Unkown machine name: $MC"
+  echo "Unknown machine name: $MC"
   exit 1
 fi
 OUT=$BASE/out/$ARM-`lsb_release -sc`-rel
