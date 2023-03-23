@@ -36,6 +36,8 @@
 #include <vlc_aout.h>
 #include <vlc_cpu.h>
 
+#define ALSA_DEBUG	0
+
 #include <alsa/asoundlib.h>
 #include <alsa/version.h>
 
@@ -77,6 +79,14 @@ static const char *const channels_text[] = {
     N_("Surround 5.0"), N_("Surround 5.1"), N_("Surround 7.1"),
 };
 
+#define PASSTHROUGH_TEXT N_("Audio passthrough mode")
+static const int passthrough_modes[] = {
+    PASSTHROUGH_NONE, PASSTHROUGH_SPDIF, PASSTHROUGH_HDMI,
+};
+static const char *const passthrough_modes_text[] = {
+    N_("None"), N_("S/PDIF"), N_("HDMI"),
+};
+
 vlc_module_begin ()
     set_shortname( "ALSA" )
     set_description( N_("ALSA audio output") )
@@ -88,6 +98,9 @@ vlc_module_begin ()
     add_integer ("alsa-audio-channels", AOUT_CHANS_FRONT,
                  AUDIO_CHAN_TEXT, AUDIO_CHAN_LONGTEXT, false)
         change_integer_list (channels, channels_text)
+    add_integer("alsa-passthrough", PASSTHROUGH_NONE, PASSTHROUGH_TEXT,
+                NULL)
+        change_integer_list(passthrough_modes, passthrough_modes_text)
     add_sw_gain ()
     set_capability( "audio output", 150 )
     set_callbacks( Open, Close )
@@ -286,6 +299,11 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     aout_sys_t *sys = aout->sys;
     snd_pcm_format_t pcm_format; /* ALSA sample format */
     bool spdif = false;
+    unsigned channels;
+    int passthrough = PASSTHROUGH_NONE;
+    int audio_codec = 0;
+    snd_pcm_uframes_t periodSizeMax = 3200;
+    snd_pcm_uframes_t periodSize=2400, bufferSize = 9600;
 
     if (aout_FormatNbChannels(fmt) == 0)
         return VLC_EGENERIC;
@@ -308,12 +326,64 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
             pcm_format = SND_PCM_FORMAT_U8;
             break;
         default:
+
             if (AOUT_FMT_SPDIF(fmt))
-                spdif = var_InheritBool (aout, "spdif");
-            if (spdif)
+            {
+                passthrough = var_InheritInteger(aout, "alsa-passthrough");
+                vlc_object_t *p_libvlc = VLC_OBJECT( vlc_object_instance(aout) );
+                audio_codec = var_GetInteger(p_libvlc, "audio-codec");
+            }
+
+            if (AOUT_FMT_HDMI(fmt))
+            {
+                passthrough = var_InheritInteger(aout, "alsa-passthrough");
+                vlc_object_t *p_libvlc = VLC_OBJECT( vlc_object_instance(aout) );
+                audio_codec = var_GetInteger(p_libvlc, "audio-codec");
+                if (passthrough == PASSTHROUGH_SPDIF)
+                    passthrough = PASSTHROUGH_NONE; /* TODO? convert down */
+            }
+
+//            if (AOUT_FMT_SPDIF(fmt))
+//                spdif = var_InheritBool (aout, "spdif");
+//            if (spdif)
+            if (passthrough != PASSTHROUGH_NONE)
             {
                 fmt->i_format = VLC_CODEC_SPDIFL;
-                pcm_format = SND_PCM_FORMAT_S16;
+
+                switch (audio_codec) {
+                    case VLC_CODEC_TRUEHD:
+                        pcm_format = SND_PCM_FORMAT_S16_LE;
+                        fmt->i_rate = 192000;
+                        periodSizeMax = 5461; //bufferSize / 3;
+                        periodSize=4096;
+                        bufferSize = 16384;
+                        channels = 8;
+                        break;
+
+                    case VLC_CODEC_A52:
+                    case VLC_CODEC_AC3:
+                        pcm_format = SND_PCM_FORMAT_S16_LE;
+                        fmt->i_rate = 48000;
+                        periodSizeMax = 3200; //bufferSize / 3;
+                        periodSize=2400;
+                        bufferSize = 9600;
+                        channels = 2;
+
+                        break;
+
+                    case VLC_CODEC_EAC3:
+                        pcm_format = SND_PCM_FORMAT_S16_LE;
+                        fmt->i_rate = 192000;
+                        periodSizeMax = 12800;
+                        periodSize=9600;
+                        bufferSize = 38400;
+                        channels = 2;
+
+                        break;
+
+                    default:
+                        pcm_format = SND_PCM_FORMAT_S16;
+                }
             }
             else
             if (HAVE_FPU)
@@ -461,7 +531,6 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     }
 
     /* Set channels count */
-    unsigned channels;
     if (!spdif)
     {
         uint16_t map = var_InheritInteger (aout, "alsa-audio-channels");
@@ -497,6 +566,16 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
         goto error;
     }
     sys->rate = fmt->i_rate;
+
+    if (snd_pcm_hw_params_set_channels_min(pcm, hw, &channels) == 0)
+        snd_pcm_hw_params_set_channels_first(pcm, hw, &channels);
+    else
+        snd_pcm_hw_params_set_channels_last(pcm, hw, &channels);
+
+    snd_pcm_hw_params_set_period_size_max(pcm, hw, &periodSizeMax, NULL);
+
+    snd_pcm_hw_params_set_buffer_size_near(pcm, hw, &bufferSize);
+    snd_pcm_hw_params_set_period_size_near(pcm, hw, &periodSize, NULL);
 
 #if 1 /* work-around for period-long latency outputs (e.g. PulseAudio): */
     param = AOUT_MIN_PREPARE_TIME;
@@ -581,7 +660,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     /* Setup audio_output_t */
     if (spdif)
     {
-        fmt->i_bytes_per_frame = AOUT_SPDIF_SIZE;
+        fmt->i_bytes_per_frame = 61440;
         fmt->i_frame_length = A52_FRAME_NB;
     }
     fmt->channel_type = AUDIO_CHANNEL_TYPE_BITMAP;
@@ -589,6 +668,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
 
     aout->time_get = TimeGet;
     aout->play = Play;
+
     if (snd_pcm_hw_params_can_pause (hw))
         aout->pause = Pause;
     else
@@ -598,6 +678,34 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     }
     aout->flush = Flush;
     aout_SoftVolumeStart (aout);
+
+#if (ALSA_DEBUG == 1)  // for debugging
+    int xbits    = snd_pcm_hw_params_get_sbits(hw);
+    snd_pcm_format_t xfmt;
+    snd_pcm_hw_params_get_format(hw, &xfmt);
+    unsigned int xval=0;
+    int xdir=0;
+    snd_pcm_hw_params_get_rate(hw, &xval, &xdir);
+    snd_pcm_uframes_t xsize;
+    snd_pcm_hw_params_get_buffer_size(hw, &xsize);
+    fprintf(stderr, "%s:%d>>> xbits=%d, xfmt=%d, xval=%d, xdir=%d, xsize=%ld\n", 
+        __FILE__, __LINE__, xbits, xfmt, xval, xdir, xsize);
+
+    snd_pcm_uframes_t xframes;
+    snd_pcm_hw_params_get_period_size(hw, &xframes, &xdir);
+
+    unsigned int xbuftime;
+    int xdir2;
+    snd_pcm_hw_params_get_buffer_time(hw, &xbuftime, &xdir2);
+
+    snd_pcm_uframes_t xbufsize;
+    snd_pcm_hw_params_get_buffer_size(hw, &xbufsize);
+
+    fprintf(stderr, "%s:%d>>> xframes=%ld, xbuftime=%d, xdir2=%d, xbufsize=%ld\n", 
+        __FILE__, __LINE__, xframes, xbuftime, xdir2, xbufsize);
+#endif
+
+
     return 0;
 
 error:
@@ -626,6 +734,21 @@ static int TimeGet (audio_output_t *aout, mtime_t *restrict delay)
 static void Play (audio_output_t *aout, block_t *block)
 {
     aout_sys_t *sys = aout->sys;
+    int n;
+
+    // Check if this packet is a junk
+    unsigned char *pkt = (unsigned char *)block->p_buffer;
+    for (n=0; n<8; n++)
+    {
+        if (pkt[n] != 0) {
+            break;
+        }
+    }
+
+    // Header all 0's
+    if (n == 8) {
+        return;
+    }
 
     if (sys->chans_to_reorder != 0)
         aout_ChannelReorder(block->p_buffer, block->i_buffer,
@@ -635,6 +758,17 @@ static void Play (audio_output_t *aout, block_t *block)
 
     /* TODO: better overflow handling */
     /* TODO: no period wake ups */
+
+#if (ALSA_DEBUG == 1)   // for debugging
+    fprintf(stderr, "PCM Writei>>>i_nb_samples=%d, buffer=%p\n", block->i_nb_samples, block->p_buffer);
+    for (n=0; n<48; n++)
+    {
+        fprintf(stderr, "%02x ", ((unsigned char *)block->p_buffer)[n]);
+        if (n%8 == 7)
+            fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "\n");
+#endif
 
     while (block->i_nb_samples > 0)
     {

@@ -363,6 +363,8 @@ struct vlc_list_t
 #define VLC_EBADVAR        (-7) /**< Bad variable value */
 #define VLC_ENOITEM        (-8) /**< Item not found */
 
+#define VLC_CODEC_AC3                        VLC_FOURCC('a','c','-','3')
+
 /*****************************************************************************
  * Variable callbacks: called when the value is modified
  *****************************************************************************/

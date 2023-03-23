@@ -561,6 +561,42 @@ int aout_OutputNew (audio_output_t *aout, audio_sample_format_t *restrict fmt,
         aout_FormatPrepare (fmt);
         assert (aout_FormatNbChannels(fmt) > 0);
     }
+#if 0
+    // ***** VLC4 logic doesn't directly translate
+    else
+    {
+        switch (fmt->i_format)
+        {
+            case VLC_CODEC_DTS:
+                if (input_profile > 0)
+                {
+                    assert(ARRAY_SIZE(formats) >= 3);
+                    /* DTSHD can be played as DTSHD or as DTS */
+                    formats[0] = VLC_CODEC_DTSHD;
+                    formats[1] = VLC_CODEC_DTS;
+                }
+                break;
+            case VLC_CODEC_TRUEHD:
+                if (input_profile > 0)
+                {
+                    assert(ARRAY_SIZE(formats) >= 3);
+                    formats[0] = VLC_CODEC_TRUEHD;
+                    formats[1] = VLC_CODEC_MLP;
+                }
+                break;
+            case VLC_CODEC_A52:
+                if (input_profile > 0)
+                {
+                    assert(ARRAY_SIZE(formats) >= 3);
+                    formats[0] = VLC_CODEC_EAC3;
+                    formats[1] = VLC_CODEC_A52;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+#endif
 
     aout->current_sink_info.headphones = false;
 
