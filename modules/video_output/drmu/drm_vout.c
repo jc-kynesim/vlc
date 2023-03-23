@@ -851,7 +851,7 @@ static int OpenDrmVout(vlc_object_t *object)
             msg_Err(vd, "Failed to find output %s: %s", dname, strerror(-rv));
             goto fail;
         }
-        msg_Dbg(vd, "Using conn %s\n", dname);
+        msg_Dbg(vd, "Using conn %s", dname);
     }
 
     if ((sys->sub_fb_pool = drmu_pool_new(sys->du, 10)) == NULL)
