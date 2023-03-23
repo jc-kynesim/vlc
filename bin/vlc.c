@@ -109,6 +109,16 @@ static void exit_timeout (int signum)
     signal (SIGINT, SIG_DFL);
 }
 
+void sig_handler(int signo)
+{
+  if (signo == SIGINT) {
+    printf("received SIGINT\n");
+  } else if (signo == SIGSEGV) {
+    printf("received SIGINT, and wait for 10 sec for debugging\n");
+    sleep(10);
+  }
+}
+
 /*****************************************************************************
  * main: parse command line, start interface and spawn threads.
  *****************************************************************************/
@@ -121,6 +131,8 @@ int main(int argc, const char *argv[])
     signal (SIGPIPE, SIG_IGN);
     /* Restore SIGCHLD in case our parent process ignores it. */
     signal (SIGCHLD, SIG_DFL);
+
+    signal (SIGSEGV, sig_handler);
 
 #ifndef NDEBUG
     /* Activate malloc checking routines to detect heap corruptions. */

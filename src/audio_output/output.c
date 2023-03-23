@@ -729,6 +729,14 @@ int aout_OutputNew(audio_output_t *aout, vlc_aout_stream *stream,
                     formats[1] = VLC_CODEC_DTS;
                 }
                 break;
+            case VLC_CODEC_TRUEHD:
+                if (input_profile > 0)
+                {
+                    assert(ARRAY_SIZE(formats) >= 3);
+                    formats[0] = VLC_CODEC_TRUEHD;
+                    formats[1] = VLC_CODEC_MLP;
+                }
+                break;
             case VLC_CODEC_A52:
                 if (input_profile > 0)
                 {

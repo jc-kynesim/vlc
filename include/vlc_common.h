@@ -523,6 +523,8 @@ typedef union
 /** Operation not supported */
 #define VLC_ENOTSUP        (-ENOTSUP)
 
+#define VLC_CODEC_AC3                        VLC_FOURCC('a','c','-','3')
+
 /** @} */
 
 /*****************************************************************************

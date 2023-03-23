@@ -4249,6 +4249,39 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const vlc_meta_t *p
     case AUDIO_ES:
         info_category_AddInfo( p_cat, _("Type"), _("Audio") );
 
+        vlc_object_t *p_libvlc = VLC_OBJECT( vlc_object_instance(p_input) );
+        int passthrough = var_GetInteger( p_libvlc, "alsa-passthrough" );
+        enum {
+            PASSTHROUGH_NONE,
+            PASSTHROUGH_SPDIF,
+            PASSTHROUGH_HDMI,
+        };
+
+        int audio_codec = 0;
+
+        if (passthrough == PASSTHROUGH_HDMI &&
+              (VLC_CODEC_A52 == i_codec_fourcc ||
+               VLC_CODEC_EAC3 == i_codec_fourcc ||
+               VLC_CODEC_AC3 == i_codec_fourcc ||
+               VLC_CODEC_TRUEHD == i_codec_fourcc)) {
+            switch (i_codec_fourcc) {
+                case VLC_CODEC_TRUEHD:
+                    es->fmt.audio.i_physical_channels = AOUT_CHANS_7_1;
+                    break;
+                case VLC_CODEC_EAC3:
+                case VLC_CODEC_AC3:
+                case VLC_CODEC_A52:
+                    es->fmt.audio.i_physical_channels = AOUT_CHANS_5_1;
+                    break;
+                default:
+                    es->fmt.audio.i_physical_channels = AOUT_CHANS_2_0;
+            }
+            audio_codec = i_codec_fourcc;
+        }
+
+        var_Create( p_libvlc, "audio-codec", VLC_VAR_INTEGER );
+        var_SetInteger( p_libvlc, "audio-codec", audio_codec);
+
         if( p_fmt_es->audio.i_physical_channels )
             info_category_AddInfo( p_cat, _("Channels"), "%s",
                 vlc_gettext( aout_FormatPrintChannels( &p_fmt_es->audio ) ) );
@@ -4287,6 +4320,7 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const vlc_meta_t *p
         unsigned i_outbps = fmt->audio.i_bitspersample;
         if( i_outbps == 0 )
             i_outbps = aout_BitsPerSample( fmt->i_codec );
+
         if( i_outbps != 0 && i_outbps != i_orgbps )
             info_category_AddInfo( p_cat, _("Decoded bits per sample"), "%u",
                                    i_outbps );
