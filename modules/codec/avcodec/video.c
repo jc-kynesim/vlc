@@ -318,7 +318,7 @@ static int lavc_CopyPicture(decoder_t *dec, picture_t *pic, AVFrame *frame)
 
     if (frame->format == AV_PIX_FMT_DRM_PRIME)
     {
-        return drm_prime_attach_buf_to_pic(dec, pic, frame);
+        return drm_prime_attach_buf_to_pic(pic, frame);
     }
 
     vlc_fourcc_t fourcc = FindVlcChroma(frame->format);

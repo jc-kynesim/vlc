@@ -50,7 +50,7 @@ static int DrmPrimeGet(vlc_va_t *va, picture_t *pic, AVCodecContext * avctx, AVF
         return VLC_EGENERIC;
     }
 
-    return drm_prime_attach_buf_to_pic(NULL, pic, frame);
+    return drm_prime_attach_buf_to_pic(pic, frame);
 
 #if 0
     vlc_va_surface_t *va_surface = va_pool_Get(sys->va_pool);

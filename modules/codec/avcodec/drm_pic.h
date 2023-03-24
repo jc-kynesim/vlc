@@ -1,24 +1,25 @@
-#include "vlc_fourcc.h"
+#include <vlc_fourcc.h>
+#include <vlc_picture.h>
 
 struct picture_t;
 struct AVFrame;
 struct AVBufferRef;
 struct AVDRMFrameDescriptor;
-struct decoder_t;
 
 typedef struct drm_prime_video_sys_s {
+    picture_context_t cmn;  // PARENT: Common els at start
+
     struct AVBufferRef * buf;
     const struct AVDRMFrameDescriptor * desc;
+    struct AVBufferRef * hw_frames_ctx;
 } drm_prime_video_sys_t;
 
 static inline const struct AVDRMFrameDescriptor *
 drm_prime_get_desc(picture_t *pic)
 {
-    const drm_prime_video_sys_t * const vsys =
-        vlc_video_context_GetPrivate(pic->context->vctx, VLC_VIDEO_CONTEXT_DRM_PRIME);
-    if (!vsys)
-        return NULL;
-    return vsys->desc;
+    drm_prime_video_sys_t * const pctx = (drm_prime_video_sys_t *)pic->context;
+
+    return !pctx ? NULL : pctx->desc;
 }
 
 static inline char safechar(unsigned int x)
@@ -41,5 +42,5 @@ str_fourcc(char buf[5], const uint32_t fcc)
 #define fourcc2str(fcc) \
     str_fourcc((char[5]){0}, fcc)
 
-int drm_prime_attach_buf_to_pic(struct decoder_t *dec, struct picture_t *pic, struct AVFrame *frame);
+int drm_prime_attach_buf_to_pic(struct picture_t *pic, struct AVFrame *frame);
 
