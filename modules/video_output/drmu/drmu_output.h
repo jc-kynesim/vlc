@@ -12,12 +12,21 @@ typedef struct drmu_output_s drmu_output_t;
 
 drmu_plane_t * drmu_output_plane_ref_primary(drmu_output_t * const dout);
 drmu_plane_t * drmu_output_plane_ref_other(drmu_output_t * const dout);
+// Find and ref a plane that supports the given format & mod on the current crtc
+// Types is a bit field of acceptable plane types (DRMU_PLANE_TYPE_xxx), 0 => any
+//
+// add_output must be called before this (so we have a crtc to check against)
+drmu_plane_t * drmu_output_plane_ref_format(drmu_output_t * const dout, const unsigned int types, const uint32_t format, const uint64_t mod);
 
 // Add all props accumulated on the output to the atomic
-int drmu_atomic_add_output_props(drmu_atomic_t * const da, drmu_output_t * const dout);
+int drmu_atomic_output_add_props(drmu_atomic_t * const da, drmu_output_t * const dout);
 
 // Set FB info (bit-depth, HDR metadata etc.)
+// Only sets properties that are set in the fb - retains previous value otherwise
 int drmu_output_fb_info_set(drmu_output_t * const dout, const drmu_fb_t * const fb);
+// Unset all FB info
+// (set only sets stuff that is set in the fb, so will never clear anything)
+void drmu_output_fb_info_unset(drmu_output_t * const dout);
 
 // Set output mode
 int drmu_output_mode_id_set(drmu_output_t * const dout, const int mode_id);
@@ -32,6 +41,8 @@ int drmu_output_mode_pick_simple(drmu_output_t * const dout, drmu_mode_score_fn 
 // Simple mode picker cb - looks for width / height and then refresh
 // If nothing "plausible" defaults to EDID preferred mode
 drmu_mode_score_fn drmu_mode_pick_simple_cb;
+// As above but may choose an interlaced mode
+drmu_mode_score_fn drmu_mode_pick_simple_interlace_cb;
 
 // Allow fb max_bpc info to set the output mode (default false)
 int drmu_output_max_bpc_allow(drmu_output_t * const dout, const bool allow);

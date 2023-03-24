@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "drmu_chroma.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,9 +32,6 @@ typedef struct drmu_fb_s drmu_fb_t;
 struct drmu_prop_object_s;
 typedef struct drmu_prop_object_s drmu_prop_object_t;
 
-struct drmu_format_info_s;
-typedef struct drmu_format_info_s drmu_format_info_t;
-
 struct drmu_pool_s;
 typedef struct drmu_pool_s drmu_pool_t;
 
@@ -54,10 +53,6 @@ typedef struct drmu_rect_s {
     int32_t x, y;
     uint32_t w, h;
 } drmu_rect_t;
-
-typedef struct drmu_chroma_siting_s {
-    int32_t x, y;
-} drmu_chroma_siting_t;
 
 typedef struct drmu_ufrac_s {
     unsigned int num;
@@ -85,20 +80,31 @@ typedef enum drmu_isset_e {
 
 drmu_ufrac_t drmu_ufrac_reduce(drmu_ufrac_t x);
 
-static inline int
-drmu_rect_rescale_1(int x, int mul, int div)
+static inline int_fast32_t
+drmu_rect_rescale_1s(int_fast32_t x, uint_fast32_t mul, uint_fast32_t div)
 {
-    return div == 0 ? x * mul : (x * mul + div/2) / div;
+    const int_fast64_t m = x * (int_fast64_t)mul;
+    const uint_fast32_t d2 = div/2;
+    return div == 0 ? (int_fast32_t)m :
+        m >= 0 ? (int_fast32_t)(((uint_fast64_t)m + d2) / div) :
+            -(int_fast32_t)(((uint_fast64_t)(-m) + d2) / div);
+}
+
+static inline uint_fast32_t
+drmu_rect_rescale_1u(uint_fast32_t x, uint_fast32_t mul, uint_fast32_t div)
+{
+    const uint_fast64_t m = x * (uint_fast64_t)mul;
+    return (uint_fast32_t)(div == 0 ? m : (m + div/2) / div);
 }
 
 static inline drmu_rect_t
 drmu_rect_rescale(const drmu_rect_t s, const drmu_rect_t mul, const drmu_rect_t div)
 {
     return (drmu_rect_t){
-        .x = drmu_rect_rescale_1(s.x - div.x, mul.w, div.w) + mul.x,
-        .y = drmu_rect_rescale_1(s.y - div.y, mul.h, div.h) + mul.y,
-        .w = drmu_rect_rescale_1(s.w,         mul.w, div.w),
-        .h = drmu_rect_rescale_1(s.h,         mul.h, div.h)
+        .x = drmu_rect_rescale_1s(s.x - div.x, mul.w, div.w) + mul.x,
+        .y = drmu_rect_rescale_1s(s.y - div.y, mul.h, div.h) + mul.y,
+        .w = drmu_rect_rescale_1u(s.w,         mul.w, div.w),
+        .h = drmu_rect_rescale_1u(s.h,         mul.h, div.h)
     };
 }
 
@@ -122,10 +128,15 @@ drmu_rect_wh(const unsigned int w, const unsigned int h)
     };
 }
 
-static inline bool
-drmu_chroma_siting_eq(const drmu_chroma_siting_t a, const drmu_chroma_siting_t b)
+static inline drmu_rect_t
+drmu_rect_shl16(const drmu_rect_t a)
 {
-    return a.x == b.x && a.y == b.y;
+    return (drmu_rect_t){
+        .x = a.x << 16,
+        .y = a.y << 16,
+        .w = a.w << 16,
+        .h = a.h << 16
+    };
 }
 
 // Blob
@@ -168,9 +179,11 @@ int drmu_atomic_add_prop_bitmask(struct drmu_atomic_s * const da, const uint32_t
 
 void drmu_prop_range_delete(drmu_prop_range_t ** pppra);
 bool drmu_prop_range_validate(const drmu_prop_range_t * const pra, const uint64_t x);
+bool drmu_prop_range_immutable(const drmu_prop_range_t * const pra);
 uint64_t drmu_prop_range_max(const drmu_prop_range_t * const pra);
 uint64_t drmu_prop_range_min(const drmu_prop_range_t * const pra);
 uint32_t drmu_prop_range_id(const drmu_prop_range_t * const pra);
+const char * drmu_prop_range_name(const drmu_prop_range_t * const pra);
 drmu_prop_range_t * drmu_prop_range_new(drmu_env_t * const du, const uint32_t id);
 int drmu_atomic_add_prop_range(struct drmu_atomic_s * const da, const uint32_t obj_id, const drmu_prop_range_t * const pra, const uint64_t x);
 
@@ -185,24 +198,24 @@ drmu_bo_t * drmu_bo_new_dumb(drmu_env_t *const du, struct drm_mode_create_dumb *
 void drmu_bo_env_uninit(drmu_bo_env_t * const boe);
 void drmu_bo_env_init(drmu_bo_env_t * boe);
 
-// format_info
-
-unsigned int drmu_format_info_bit_depth(const drmu_format_info_t * const fmt_info);
-
 // fb
 struct hdr_output_metadata;
-struct drmu_format_info_s;
+struct drmu_fmt_info_s;
 
 // Called pre delete.
 // Zero returned means continue delete.
 // Non-zero means stop delete - fb will have zero refs so will probably want a new ref
 //   before next use
 typedef int (* drmu_fb_pre_delete_fn)(struct drmu_fb_s * dfb, void * v);
-typedef void (* drmu_fb_on_delete_fn)(struct drmu_fb_s * dfb, void * v);
+// Called after an fb has been deleted and therefore has ceased using any
+// user resources
+typedef void (* drmu_fb_on_delete_fn)(void * v);
 
 void drmu_fb_pre_delete_set(drmu_fb_t *const dfb, drmu_fb_pre_delete_fn fn, void * v);
 void drmu_fb_pre_delete_unset(drmu_fb_t *const dfb);
 unsigned int drmu_fb_pixel_bits(const drmu_fb_t * const dfb);
+uint32_t drmu_fb_pixel_format(const drmu_fb_t * const dfb);
+uint64_t drmu_fb_modifier(const drmu_fb_t * const dfb, const unsigned int plane);
 drmu_fb_t * drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format);
 drmu_fb_t * drmu_fb_new_dumb_mod(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format, const uint64_t mod);
 drmu_fb_t * drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format);
@@ -239,7 +252,39 @@ void drmu_fb_int_free(drmu_fb_t * const dfb);
 // crop will be set to the whole active area
 void drmu_fb_int_fmt_size_set(drmu_fb_t *const dfb, uint32_t fmt, uint32_t w, uint32_t h, const drmu_rect_t active);
 // All assumed to be const strings that do not need freed
-void drmu_fb_int_color_set(drmu_fb_t *const dfb, const char * const enc, const char * const range, const char * const space);
+typedef const char * drmu_color_encoding_t;
+#define DRMU_COLOR_ENCODING_UNSET               NULL
+#define DRMU_COLOR_ENCODING_BT2020              "ITU-R BT.2020 YCbCr"
+#define DRMU_COLOR_ENCODING_BT709               "ITU-R BT.709 YCbCr"
+#define DRMU_COLOR_ENCODING_BT601               "ITU-R BT.601 YCbCr"
+static inline bool drmu_color_encoding_is_set(const drmu_color_encoding_t x) {return x != NULL;}
+// Note: Color range only applies to YCbCr planes - ignored for RGB
+typedef const char * drmu_color_range_t;
+#define DRMU_COLOR_RANGE_UNSET                  NULL
+#define DRMU_COLOR_RANGE_YCBCR_FULL_RANGE       "YCbCr full range"
+#define DRMU_COLOR_RANGE_YCBCR_LIMITED_RANGE    "YCbCr limited range"
+static inline bool drmu_color_range_is_set(const drmu_color_range_t x) {return x != NULL;}
+typedef const char * drmu_colorspace_t;
+#define DRMU_COLORSPACE_UNSET                   NULL
+#define DRMU_COLORSPACE_DEFAULT                 "Default"
+#define DRMU_COLORSPACE_BT2020_CYCC             "BT2020_CYCC"
+#define DRMU_COLORSPACE_BT2020_RGB              "BT2020_RGB"
+#define DRMU_COLORSPACE_BT2020_YCC              "BT2020_YCC"
+#define DRMU_COLORSPACE_BT709_YCC               "BT709_YCC"
+#define DRMU_COLORSPACE_DCI_P3_RGB_D65          "DCI-P3_RGB_D65"
+#define DRMU_COLORSPACE_DCI_P3_RGB_THEATER      "DCI-P3_RGB_Theater"
+#define DRMU_COLORSPACE_SMPTE_170M_YCC          "SMPTE_170M_YCC"
+#define DRMU_COLORSPACE_SYCC_601                "SYCC_601"
+#define DRMU_COLORSPACE_XVYCC_601               "XVYCC_601"
+#define DRMU_COLORSPACE_XVYCC_709               "XVYCC_709"
+static inline bool drmu_colorspace_is_set(const drmu_colorspace_t x) {return x != NULL;}
+typedef const char * drmu_broadcast_rgb_t;
+#define DRMU_BROADCAST_RGB_UNSET                NULL
+#define DRMU_BROADCAST_RGB_AUTOMATIC            "Automatic"
+#define DRMU_BROADCAST_RGB_FULL                 "Full"
+#define DRMU_BROADCAST_RGB_LIMITED_16_235       "Limited 16:235"
+static inline bool drmu_broadcast_rgb_is_set(const drmu_broadcast_rgb_t x) {return x != NULL;}
+void drmu_fb_int_color_set(drmu_fb_t *const dfb, const drmu_color_encoding_t enc, const drmu_color_range_t range, const drmu_colorspace_t space);
 void drmu_fb_int_chroma_siting_set(drmu_fb_t *const dfb, const drmu_chroma_siting_t siting);
 void drmu_fb_int_on_delete_set(drmu_fb_t *const dfb, drmu_fb_on_delete_fn fn, void * v);
 void drmu_fb_int_bo_set(drmu_fb_t *const dfb, unsigned int i, drmu_bo_t * const bo);
@@ -247,10 +292,10 @@ void drmu_fb_int_layer_set(drmu_fb_t *const dfb, unsigned int i, unsigned int ob
 void drmu_fb_int_layer_mod_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset, uint64_t modifier);
 drmu_isset_t drmu_fb_hdr_metadata_isset(const drmu_fb_t *const dfb);
 const struct hdr_output_metadata * drmu_fb_hdr_metadata_get(const drmu_fb_t *const dfb);
-const char * drmu_color_range_to_broadcast_rgb(const char * const range);
-const char * drmu_fb_colorspace_get(const drmu_fb_t * const dfb);
-const char * drmu_fb_color_range_get(const drmu_fb_t * const dfb);
-const struct drmu_format_info_s * drmu_fb_format_info_get(const drmu_fb_t * const dfb);
+drmu_broadcast_rgb_t drmu_color_range_to_broadcast_rgb(const drmu_color_range_t range);
+drmu_colorspace_t drmu_fb_colorspace_get(const drmu_fb_t * const dfb);
+drmu_color_range_t drmu_fb_color_range_get(const drmu_fb_t * const dfb);
+const struct drmu_fmt_info_s * drmu_fb_format_info_get(const drmu_fb_t * const dfb);
 void drmu_fb_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta);
 int drmu_fb_int_make(drmu_fb_t *const dfb);
 
@@ -299,10 +344,10 @@ int drmu_crtc_idx(const drmu_crtc_t * const dc);
 drmu_crtc_t * drmu_env_crtc_find_id(drmu_env_t * const du, const uint32_t crtc_id);
 drmu_crtc_t * drmu_env_crtc_find_n(drmu_env_t * const du, const unsigned int n);
 
-typedef struct drmu_mode_pick_simple_params_s {
+typedef struct drmu_mode_simple_params_s {
     unsigned int width;
     unsigned int height;
-    unsigned int hz_x_1000;  // Refresh rate * 1000 i.e. 50Hz = 50000
+    unsigned int hz_x_1000;  // Frame rate * 1000 i.e. 50Hz = 50000 (N.B. frame not field rate if interlaced)
     drmu_ufrac_t par;  // Picture Aspect Ratio (0:0 if unknown)
     drmu_ufrac_t sar;  // Sample Aspect Ratio
     uint32_t type;
@@ -325,17 +370,13 @@ int drmu_crtc_claim_ref(drmu_crtc_t * const dc);
 // Connector
 
 // Set none if m=NULL
-int drmu_atomic_conn_hdr_metadata_set(struct drmu_atomic_s * const da, drmu_conn_t * const dn, const struct hdr_output_metadata * const m);
+int drmu_atomic_conn_add_hdr_metadata(struct drmu_atomic_s * const da, drmu_conn_t * const dn, const struct hdr_output_metadata * const m);
 
 // False set max_bpc to 8, true max value
-int drmu_atomic_conn_hi_bpc_set(struct drmu_atomic_s * const da, drmu_conn_t * const dn, bool hi_bpc);
+int drmu_atomic_conn_add_hi_bpc(struct drmu_atomic_s * const da, drmu_conn_t * const dn, bool hi_bpc);
 
-#define DRMU_COLORSPACE_DEFAULT            "Default"
-int drmu_atomic_conn_colorspace_set(struct drmu_atomic_s * const da, drmu_conn_t * const dn, const char * colorspace);
-#define DRMU_BROADCAST_RGB_AUTOMATIC       "Automatic"
-#define DRMU_BROADCAST_RGB_FULL            "Full"
-#define DRMU_BROADCAST_RGB_LIMITED_16_235  "Limited 16:235"
-int drmu_atomic_conn_broadcast_rgb_set(struct drmu_atomic_s * const da, drmu_conn_t * const dn, const char * bcrgb);
+int drmu_atomic_conn_add_colorspace(struct drmu_atomic_s * const da, drmu_conn_t * const dn, const drmu_colorspace_t colorspace);
+int drmu_atomic_conn_add_broadcast_rgb(struct drmu_atomic_s * const da, drmu_conn_t * const dn, const drmu_broadcast_rgb_t bcrgb);
 
 // Add crtc id
 int drmu_atomic_conn_add_crtc(struct drmu_atomic_s * const da, drmu_conn_t * const dn, drmu_crtc_t * const dc);
@@ -374,6 +415,13 @@ int drmu_conn_claim_ref(drmu_conn_t * const dn);
 // Plane
 
 uint32_t drmu_plane_id(const drmu_plane_t * const dp);
+
+#define DRMU_PLANE_TYPE_CURSOR  4
+#define DRMU_PLANE_TYPE_PRIMARY 2
+#define DRMU_PLANE_TYPE_OVERLAY 1
+#define DRMU_PLANE_TYPE_UNKNOWN 0
+unsigned int drmu_plane_type(const drmu_plane_t * const dp);
+
 const uint32_t * drmu_plane_formats(const drmu_plane_t * const dp, unsigned int * const pCount);
 bool drmu_plane_format_check(const drmu_plane_t * const dp, const uint32_t format, const uint64_t modifier);
 
@@ -381,7 +429,9 @@ bool drmu_plane_format_check(const drmu_plane_t * const dp, const uint32_t forma
 #define DRMU_PLANE_ALPHA_UNSET                  (-1)
 #define DRMU_PLANE_ALPHA_TRANSPARENT            0
 #define DRMU_PLANE_ALPHA_OPAQUE                 0xffff
-int drmu_atomic_add_plane_alpha(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int alpha);
+int drmu_atomic_plane_add_alpha(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int alpha);
+
+int drmu_atomic_plane_add_zpos(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int zpos);
 
 // X, Y & TRANSPOSE can be ORed to get all others
 #define DRMU_PLANE_ROTATION_0                   0
@@ -393,31 +443,13 @@ int drmu_atomic_add_plane_alpha(struct drmu_atomic_s * const da, const drmu_plan
 #define DRMU_PLANE_ROTATION_90                  5  // Rotate 90 clockwise
 #define DRMU_PLANE_ROTATION_270                 6  // Rotate 90 anti-cockwise
 #define DRMU_PLANE_ROTATION_180_TRANSPOSE       7  // Rotate 180 & transpose
-int drmu_atomic_add_plane_rotation(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int rot);
+int drmu_atomic_plane_add_rotation(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int rot);
 
-// Init constants - C winges if the struct is specified in a cfeonst init (which seems like a silly error)
-#define drmu_chroma_siting_float_i(_x, _y) {.x = (int32_t)((double)(_x) * 65536 + .5), .y = (int32_t)((double)(_y) * 65536 + .5)}
-#define DRMU_CHROMA_SITING_BOTTOM_I             drmu_chroma_siting_float_i(0.5, 1.0)
-#define DRMU_CHROMA_SITING_BOTTOM_LEFT_I        drmu_chroma_siting_float_i(0.0, 1.0)
-#define DRMU_CHROMA_SITING_CENTER_I             drmu_chroma_siting_float_i(0.5, 0.5)
-#define DRMU_CHROMA_SITING_LEFT_I               drmu_chroma_siting_float_i(0.0, 0.5)
-#define DRMU_CHROMA_SITING_TOP_I                drmu_chroma_siting_float_i(0.5, 0.0)
-#define DRMU_CHROMA_SITING_TOP_LEFT_I           drmu_chroma_siting_float_i(0.0, 0.0)
-#define DRMU_CHROMA_SITING_UNSPECIFIED_I        {INT32_MIN, INT32_MIN}
-// Inline constants
-#define drmu_chroma_siting_float(_x, _y) (drmu_chroma_siting_t)drmu_chroma_siting_float_i(_x, _y)
-#define DRMU_CHROMA_SITING_BOTTOM               drmu_chroma_siting_float(0.5, 1.0)
-#define DRMU_CHROMA_SITING_BOTTOM_LEFT          drmu_chroma_siting_float(0.0, 1.0)
-#define DRMU_CHROMA_SITING_CENTER               drmu_chroma_siting_float(0.5, 0.5)
-#define DRMU_CHROMA_SITING_LEFT                 drmu_chroma_siting_float(0.0, 0.5)
-#define DRMU_CHROMA_SITING_TOP                  drmu_chroma_siting_float(0.5, 0.0)
-#define DRMU_CHROMA_SITING_TOP_LEFT             drmu_chroma_siting_float(0.0, 0.0)
-#define DRMU_CHROMA_SITING_UNSPECIFIED          (drmu_chroma_siting_t){INT32_MIN, INT32_MIN}
 int drmu_atomic_plane_add_chroma_siting(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const drmu_chroma_siting_t siting);
 
-#define DRMU_PLANE_RANGE_FULL                   "YCbCr full range"
-#define DRMU_PLANE_RANGE_LIMITED                "YCbCr limited range"
-int drmu_atomic_plane_fb_set(struct drmu_atomic_s * const da, drmu_plane_t * const dp, drmu_fb_t * const dfb, const drmu_rect_t pos);
+// Adds the fb to the plane along with all fb properties that apply to a plane
+// pos is dest rect on the plane in full pixels (not frac)
+int drmu_atomic_plane_add_fb(struct drmu_atomic_s * const da, drmu_plane_t * const dp, drmu_fb_t * const dfb, const drmu_rect_t pos);
 
 // Unref a plane
 void drmu_plane_unref(drmu_plane_t ** const ppdp);
@@ -429,11 +461,11 @@ drmu_plane_t * drmu_plane_ref(drmu_plane_t * const dp);
 // Returns -EBUSY if plane already associated
 int drmu_plane_ref_crtc(drmu_plane_t * const dp, drmu_crtc_t * const dc);
 
-#define DRMU_PLANE_TYPE_CURSOR  4
-#define DRMU_PLANE_TYPE_PRIMARY 2
-#define DRMU_PLANE_TYPE_OVERLAY 1
-#define DRMU_PLANE_TYPE_UNKNOWN 0
+typedef bool (*drmu_plane_new_find_ok_fn)(const drmu_plane_t * dp, void * v);
 
+// Find a "free" plane that satisfies (returns true) the ok callback
+// Does not ref
+drmu_plane_t * drmu_plane_new_find(drmu_crtc_t * const dc, const drmu_plane_new_find_ok_fn cb, void * const v);
 // Find a "free" plane of the given type. Types can be ORed
 // Does not ref
 drmu_plane_t * drmu_plane_new_find_type(drmu_crtc_t * const dc, const unsigned int req_type);
@@ -461,7 +493,8 @@ int drmu_env_queue_wait(drmu_env_t * const du);
 int drmu_ioctl(const drmu_env_t * const du, unsigned long req, void * arg);
 int drmu_fd(const drmu_env_t * const du);
 const struct drmu_log_env_s * drmu_env_log(const drmu_env_t * const du);
-void drmu_env_delete(drmu_env_t ** const ppdu);
+void drmu_env_unref(drmu_env_t ** const ppdu);
+drmu_env_t * drmu_env_ref(drmu_env_t * const du);
 // Restore state on env close
 int drmu_env_restore_enable(drmu_env_t * const du);
 bool drmu_env_restore_is_enabled(const drmu_env_t * const du);
@@ -545,6 +578,10 @@ drmu_env_t * drmu_env_new_xlease(const struct drmu_log_env_s * const log);
 // drmu_xdri3
 
 drmu_env_t * drmu_env_new_xdri3(const drmu_log_env_t * const log);
+
+// drmu_waylease
+
+drmu_env_t * drmu_env_new_waylease(const struct drmu_log_env_s * const log);
 
 #ifdef __cplusplus
 }

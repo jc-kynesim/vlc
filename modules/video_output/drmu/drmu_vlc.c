@@ -1,4 +1,5 @@
 #include "drmu_vlc.h"
+#include "drmu_fmts.h"
 #include "drmu_log.h"
 
 #if HAS_ZC_CMA
@@ -71,38 +72,12 @@ drmu_format_vlc_to_drm_prime(const vlc_fourcc_t chroma_in, uint64_t * const pmod
 }
 #endif
 
+// Convert chroma to drm - can't cope with RGB32 or RGB16 as they require
+// more info
 uint32_t
-drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc)
+drmu_format_vlc_chroma_to_drm(const vlc_fourcc_t chroma)
 {
-    switch (vf_vlc->i_chroma) {
-        case VLC_CODEC_RGB32:
-        {
-            // VLC RGB32 aka RV32 means we have to look at the mask values
-            const uint32_t r = vf_vlc->i_rmask;
-            const uint32_t g = vf_vlc->i_gmask;
-            const uint32_t b = vf_vlc->i_bmask;
-            if (r == 0xff0000 && g == 0xff00 && b == 0xff)
-                return DRM_FORMAT_XRGB8888;
-            if (r == 0xff && g == 0xff00 && b == 0xff0000)
-                return DRM_FORMAT_XBGR8888;
-            if (r == 0xff000000 && g == 0xff0000 && b == 0xff00)
-                return DRM_FORMAT_RGBX8888;
-            if (r == 0xff00 && g == 0xff0000 && b == 0xff000000)
-                return DRM_FORMAT_BGRX8888;
-            break;
-        }
-        case VLC_CODEC_RGB16:
-        {
-            // VLC RGB16 aka RV16 means we have to look at the mask values
-            const uint32_t r = vf_vlc->i_rmask;
-            const uint32_t g = vf_vlc->i_gmask;
-            const uint32_t b = vf_vlc->i_bmask;
-            if (r == 0xf800 && g == 0x7e0 && b == 0x1f)
-                return DRM_FORMAT_RGB565;
-            if (r == 0x1f && g == 0x7e0 && b == 0xf800)
-                return DRM_FORMAT_BGR565;
-            break;
-        }
+    switch (chroma) {
         case VLC_CODEC_RGBA:
             return DRM_FORMAT_ABGR8888;
         case VLC_CODEC_BGRA:
@@ -125,16 +100,87 @@ drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc)
             return DRM_FORMAT_NV12;
         case VLC_CODEC_NV21:
             return DRM_FORMAT_NV21;
+        case VLC_CODEC_NV16:
+            return DRM_FORMAT_NV16;
+        case VLC_CODEC_NV61:
+            return DRM_FORMAT_NV61;
+        case VLC_CODEC_NV24:
+            return DRM_FORMAT_NV24;
+        case VLC_CODEC_NV42:
+            return DRM_FORMAT_NV42;
+        case VLC_CODEC_P010:
+            return DRM_FORMAT_P010;
+        case VLC_CODEC_J420:
         case VLC_CODEC_I420:
             return DRM_FORMAT_YUV420;
+        case VLC_CODEC_YV12:
+            return DRM_FORMAT_YVU420;
+        case VLC_CODEC_J422:
+        case VLC_CODEC_I422:
+            return DRM_FORMAT_YUV422;
+        case VLC_CODEC_J444:
+        case VLC_CODEC_I444:
+            return DRM_FORMAT_YUV444;
         default:
             break;
     }
+
 #if HAS_ZC_CMA
-    return drmu_format_vlc_to_drm_cma(vf_vlc->i_chroma);
+    return drmu_format_vlc_to_drm_cma(chroma);
 #else
     return 0;
 #endif
+}
+
+uint32_t
+drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc)
+{
+    switch (vf_vlc->i_chroma) {
+        case VLC_CODEC_RGB32:
+        {
+            // VLC RGB32 aka RV32 means we have to look at the mask values
+            const uint32_t r = vf_vlc->i_rmask;
+            const uint32_t g = vf_vlc->i_gmask;
+            const uint32_t b = vf_vlc->i_bmask;
+            if (r == 0xff0000 && g == 0xff00 && b == 0xff)
+                return DRM_FORMAT_XRGB8888;
+            if (r == 0xff && g == 0xff00 && b == 0xff0000)
+                return DRM_FORMAT_XBGR8888;
+            if (r == 0xff000000 && g == 0xff0000 && b == 0xff00)
+                return DRM_FORMAT_RGBX8888;
+            if (r == 0xff00 && g == 0xff0000 && b == 0xff000000)
+                return DRM_FORMAT_BGRX8888;
+            break;
+        }
+        case VLC_CODEC_RGB24:
+        {
+            // VLC RGB24 aka RV24 means we have to look at the mask values
+            const uint32_t r = vf_vlc->i_rmask;
+            const uint32_t g = vf_vlc->i_gmask;
+            const uint32_t b = vf_vlc->i_bmask;
+            if (r == 0xff0000 && g == 0xff00 && b == 0xff)
+                return DRM_FORMAT_RGB888;
+            if (r == 0xff && g == 0xff00 && b == 0xff0000)
+                return DRM_FORMAT_BGR888;
+            break;
+        }
+        case VLC_CODEC_RGB16:
+        {
+            // VLC RGB16 aka RV16 means we have to look at the mask values
+            const uint32_t r = vf_vlc->i_rmask;
+            const uint32_t g = vf_vlc->i_gmask;
+            const uint32_t b = vf_vlc->i_bmask;
+            if (r == 0xf800 && g == 0x7e0 && b == 0x1f)
+                return DRM_FORMAT_RGB565;
+            if (r == 0x1f && g == 0x7e0 && b == 0xf800)
+                return DRM_FORMAT_BGR565;
+            break;
+        }
+        default:
+            break;
+    }
+
+    return drmu_format_vlc_chroma_to_drm(vf_vlc->i_chroma);
 }
 
 vlc_fourcc_t
@@ -146,6 +192,9 @@ drmu_format_vlc_to_vlc(const uint32_t vf_drm)
         case DRM_FORMAT_RGBX8888:
         case DRM_FORMAT_BGRX8888:
             return VLC_CODEC_RGB32;
+        case DRM_FORMAT_RGB888:
+        case DRM_FORMAT_BGR888:
+            return VLC_CODEC_RGB24;
         case DRM_FORMAT_BGR565:
         case DRM_FORMAT_RGB565:
             return VLC_CODEC_RGB16;
@@ -170,8 +219,24 @@ drmu_format_vlc_to_vlc(const uint32_t vf_drm)
             return VLC_CODEC_NV12;
         case DRM_FORMAT_NV21:
             return VLC_CODEC_NV21;
+        case DRM_FORMAT_NV16:
+            return VLC_CODEC_NV16;
+        case DRM_FORMAT_NV61:
+            return VLC_CODEC_NV61;
+        case DRM_FORMAT_NV24:
+            return VLC_CODEC_NV24;
+        case DRM_FORMAT_NV42:
+            return VLC_CODEC_NV42;
+        case DRM_FORMAT_P010:
+            return VLC_CODEC_P010;
         case DRM_FORMAT_YUV420:
             return VLC_CODEC_I420;
+        case DRM_FORMAT_YVU420:
+            return VLC_CODEC_YV12;
+        case DRM_FORMAT_YUV422:
+            return VLC_CODEC_I422;
+        case DRM_FORMAT_YUV444:
+            return VLC_CODEC_I444;
         default:
             break;
     }
@@ -179,16 +244,15 @@ drmu_format_vlc_to_vlc(const uint32_t vf_drm)
 }
 
 typedef struct fb_aux_pic_s {
-    picture_t * pic;
+    picture_context_t * pic_ctx;
 } fb_aux_pic_t;
 
 static void
-pic_fb_delete_cb(drmu_fb_t * dfb, void * v)
+pic_fb_delete_cb(void * v)
 {
     fb_aux_pic_t * const aux = v;
-    VLC_UNUSED(dfb);
 
-    picture_Release(aux->pic);
+    aux->pic_ctx->destroy(aux->pic_ctx);
     free(aux);
 }
 
@@ -231,35 +295,35 @@ pic_hdr_metadata(struct hdr_output_metadata * const m, const struct video_format
     return 0;
 }
 
-static const char *
+static drmu_color_encoding_t
 fb_vlc_color_encoding(const video_format_t * const fmt)
 {
     switch (fmt->space)
     {
         case COLOR_SPACE_BT2020:
-            return "ITU-R BT.2020 YCbCr";
+            return DRMU_COLOR_ENCODING_BT2020;
         case COLOR_SPACE_BT601:
-            return "ITU-R BT.601 YCbCr";
+            return DRMU_COLOR_ENCODING_BT601;
         case COLOR_SPACE_BT709:
-            return "ITU-R BT.709 YCbCr";
+            return DRMU_COLOR_ENCODING_BT709;
         case COLOR_SPACE_UNDEF:
         default:
             break;
     }
 
     return (fmt->i_visible_width > 1024 || fmt->i_visible_height > 600) ?
-        "ITU-R BT.709 YCbCr" :
-        "ITU-R BT.601 YCbCr";
+        DRMU_COLOR_ENCODING_BT709 :
+        DRMU_COLOR_ENCODING_BT601;
 }
 
-static const char *
+static drmu_color_range_t
 fb_vlc_color_range(const video_format_t * const fmt)
 {
 #if HAS_VLC4
     switch (fmt->color_range)
     {
         case COLOR_RANGE_FULL:
-            return "YCbCr full range";
+            return DRMU_COLOR_RANGE_YCBCR_FULL_RANGE;
         case COLOR_RANGE_UNDEF:
         case COLOR_RANGE_LIMITED:
         default:
@@ -267,9 +331,9 @@ fb_vlc_color_range(const video_format_t * const fmt)
     }
 #else
     if (fmt->b_color_range_full)
-        return "YCbCr full range";
+        return DRMU_COLOR_RANGE_YCBCR_FULL_RANGE;
 #endif
-    return "YCbCr limited range";
+    return DRMU_COLOR_RANGE_YCBCR_LIMITED_RANGE;
 }
 
 
@@ -278,11 +342,11 @@ fb_vlc_colorspace(const video_format_t * const fmt)
 {
     switch (fmt->space) {
         case COLOR_SPACE_BT2020:
-            return "BT2020_RGB";
+            return DRMU_COLORSPACE_BT2020_RGB;
         default:
             break;
     }
-    return "Default";
+    return DRMU_COLORSPACE_DEFAULT;
 }
 
 static drmu_chroma_siting_t
@@ -306,6 +370,21 @@ fb_vlc_chroma_siting(const video_format_t * const fmt)
             break;
     }
     return DRMU_CHROMA_SITING_UNSPECIFIED;
+}
+
+void
+drmu_fb_vlc_pic_set_metadata(drmu_fb_t * const dfb, const picture_t * const pic)
+{
+    struct hdr_output_metadata meta;
+
+    drmu_fb_int_color_set(dfb,
+                          fb_vlc_color_encoding(&pic->format),
+                          fb_vlc_color_range(&pic->format),
+                          fb_vlc_colorspace(&pic->format));
+
+    drmu_fb_int_chroma_siting_set(dfb, fb_vlc_chroma_siting(&pic->format));
+
+    drmu_fb_hdr_metadata_set(dfb, pic_hdr_metadata(&meta, &pic->format) == 0 ? &meta : NULL);
 }
 
 #if HAS_DRMPRIME
@@ -337,18 +416,8 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
                              desc->layers[0].format,
                              pic->format.i_width,
                              pic->format.i_height,
-                             (drmu_rect_t){
-                                 .x = pic->format.i_x_offset,
-                                 .y = pic->format.i_y_offset,
-                                 .w = pic->format.i_visible_width,
-                                 .h = pic->format.i_visible_height});
+                             drmu_rect_vlc_pic_crop(pic));
 
-    drmu_fb_int_color_set(dfb,
-                          fb_vlc_color_encoding(&pic->format),
-                          fb_vlc_color_range(&pic->format),
-                          fb_vlc_colorspace(&pic->format));
-
-    drmu_fb_int_chroma_siting_set(dfb, fb_vlc_chroma_siting(&pic->format));
 
     // Set delete callback & hold this pic
     // Aux attached to dfb immediately so no fail cleanup required
@@ -356,7 +425,7 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
         drmu_err(du, "%s: Aux alloc failure", __func__);
         goto fail;
     }
-    aux->pic = picture_Hold(pic);
+    aux->pic_ctx = pic->context->copy(pic->context);
     drmu_fb_int_on_delete_set(dfb, pic_fb_delete_cb, aux);
 
     for (i = 0; i < desc->nb_objects; ++i)
@@ -379,10 +448,7 @@ drmu_fb_vlc_new_pic_attach(drmu_env_t * const du, picture_t * const pic)
         }
     }
 
-    {
-        struct hdr_output_metadata meta;
-        drmu_fb_hdr_metadata_set(dfb, pic_hdr_metadata(&meta, &pic->format) == 0 ? &meta : NULL);
-    }
+    drmu_fb_vlc_pic_set_metadata(dfb, pic);
 
     if (drmu_fb_int_make(dfb) != 0)
         goto fail;
@@ -425,18 +491,7 @@ drmu_fb_vlc_new_pic_cma_attach(drmu_env_t * const du, picture_t * const pic)
                              fmt,
                              pic->format.i_width,
                              pic->format.i_height,
-                             (drmu_rect_t){
-                                 .x = pic->format.i_x_offset,
-                                 .y = pic->format.i_y_offset,
-                                 .w = pic->format.i_visible_width,
-                                 .h = pic->format.i_visible_height});
-
-    drmu_fb_int_color_set(dfb,
-                          fb_vlc_color_encoding(&pic->format),
-                          fb_vlc_color_range(&pic->format),
-                          fb_vlc_colorspace(&pic->format));
-
-    drmu_fb_int_chroma_siting_set(dfb, fb_vlc_chroma_siting(&pic->format));
+                             drmu_rect_vlc_pic_crop(pic));
 
     // Set delete callback & hold this pic
     // Aux attached to dfb immediately so no fail cleanup required
@@ -444,7 +499,7 @@ drmu_fb_vlc_new_pic_cma_attach(drmu_env_t * const du, picture_t * const pic)
         drmu_err(du, "%s: Aux alloc failure", __func__);
         goto fail;
     }
-    aux->pic = picture_Hold(pic);
+    aux->pic_ctx = pic->context->copy(pic->context);
     drmu_fb_int_on_delete_set(dfb, pic_fb_delete_cb, aux);
 
     {
@@ -465,10 +520,7 @@ drmu_fb_vlc_new_pic_cma_attach(drmu_env_t * const du, picture_t * const pic)
         }
     }
 
-    {
-        struct hdr_output_metadata meta;
-        drmu_fb_hdr_metadata_set(dfb, pic_hdr_metadata(&meta, &pic->format) == 0 ? NULL : &meta);
-    }
+    drmu_fb_vlc_pic_set_metadata(dfb, pic);
 
     if (drmu_fb_int_make(dfb) != 0)
         goto fail;
@@ -483,20 +535,15 @@ fail:
 plane_t
 drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
 {
-    const unsigned int bpp = drmu_fb_pixel_bits(dfb);
-    unsigned int hdiv = 1;
-    unsigned int wdiv = 1;
+    const drmu_fmt_info_t *const f = drmu_fb_format_info_get(dfb);
+    unsigned int hdiv = drmu_fmt_info_hdiv(f, plane_n);
+    unsigned int wdiv = drmu_fmt_info_wdiv(f, plane_n);
+    const unsigned int bpp = drmu_fmt_info_pixel_bits(f);
     const uint32_t pitch_n = drmu_fb_pitch(dfb, plane_n);
     const drmu_rect_t crop = drmu_fb_crop_frac(dfb);
 
     if (pitch_n == 0) {
         return (plane_t) {.p_pixels = NULL };
-    }
-
-    // Slightly kludgy derivation of height & width divs
-    if (plane_n > 0) {
-        wdiv = drmu_fb_pitch(dfb, 0) / pitch_n;
-        hdiv = 2;
     }
 
     return (plane_t){
