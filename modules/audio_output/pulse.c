@@ -799,6 +799,16 @@ static int Start(audio_output_t *aout, audio_sample_format_t *restrict fmt)
             encoding = PA_ENCODING_DTS_IEC61937;
             ss.format = PA_SAMPLE_S16NE;
             break;
+        case VLC_CODEC_TRUEHD:
+            fmt->i_format = VLC_CODEC_SPDIFL;
+            fmt->i_bytes_per_frame = 4;
+            fmt->i_frame_length = 1;
+            fmt->i_physical_channels = AOUT_CHANS_7_1;
+            fmt->i_channels = 8;
+            fmt->i_rate = 192000;
+            encoding = PA_ENCODING_TRUEHD_IEC61937;
+            ss.format = PA_SAMPLE_S16NE;
+            break;
         default:
             if (!AOUT_FMT_LINEAR(fmt) || aout_FormatNbChannels(fmt) == 0)
                 return VLC_EGENERIC;
