@@ -57,6 +57,12 @@ struct aout_sys_t
 
 #include "audio_output/volume.h"
 
+enum {
+    PASSTHROUGH_NONE,
+    PASSTHROUGH_SPDIF,
+    PASSTHROUGH_HDMI,
+};
+
 #define A52_FRAME_NB 1536
 
 static int Open (vlc_object_t *);
@@ -99,7 +105,7 @@ vlc_module_begin ()
                  AUDIO_CHAN_TEXT, AUDIO_CHAN_LONGTEXT, false)
         change_integer_list (channels, channels_text)
     add_integer("alsa-passthrough", PASSTHROUGH_NONE, PASSTHROUGH_TEXT,
-                NULL)
+                NULL, false)
         change_integer_list(passthrough_modes, passthrough_modes_text)
     add_sw_gain ()
     set_capability( "audio output", 150 )
@@ -308,6 +314,8 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     if (aout_FormatNbChannels(fmt) == 0)
         return VLC_EGENERIC;
 
+    msg_Info(aout, "Format: %.4s", (char*)&fmt->i_format);
+
     switch (fmt->i_format)
     {
         case VLC_CODEC_FL64:
@@ -329,6 +337,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
 
             if (AOUT_FMT_SPDIF(fmt))
             {
+                msg_Info(aout, "is S/Pdif");
                 passthrough = var_InheritInteger(aout, "alsa-passthrough");
                 vlc_object_t *p_libvlc = VLC_OBJECT( vlc_object_instance(aout) );
                 audio_codec = var_GetInteger(p_libvlc, "audio-codec");
@@ -336,11 +345,13 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
 
             if (AOUT_FMT_HDMI(fmt))
             {
+                msg_Info(aout, "is HDMI");
                 passthrough = var_InheritInteger(aout, "alsa-passthrough");
                 vlc_object_t *p_libvlc = VLC_OBJECT( vlc_object_instance(aout) );
                 audio_codec = var_GetInteger(p_libvlc, "audio-codec");
                 if (passthrough == PASSTHROUGH_SPDIF)
                     passthrough = PASSTHROUGH_NONE; /* TODO? convert down */
+                msg_Info(aout, "audio codec: %08x", audio_codec);
             }
 
 //            if (AOUT_FMT_SPDIF(fmt))
@@ -352,6 +363,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
 
                 switch (audio_codec) {
                     case VLC_CODEC_TRUEHD:
+                        msg_Info(aout, "is TrueHD");
                         pcm_format = SND_PCM_FORMAT_S16_LE;
                         fmt->i_rate = 192000;
                         periodSizeMax = 5461; //bufferSize / 3;
@@ -402,12 +414,12 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
 
     /* Choose the IEC device for S/PDIF output */
     char sep = '\0';
-    if (spdif)
+    if (passthrough != PASSTHROUGH_NONE)
     {
         const char *opt = NULL;
 
         if (!strcmp (device, "default"))
-            device = "iec958"; /* TODO: hdmi */
+            device = (passthrough == PASSTHROUGH_HDMI) ? "hdmi" : "iec958";
 
         if (!strncmp (device, "iec958", 6))
             opt = device + 6;
@@ -531,7 +543,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     }
 
     /* Set channels count */
-    if (!spdif)
+    if (passthrough == PASSTHROUGH_NONE)
     {
         uint16_t map = var_InheritInteger (aout, "alsa-audio-channels");
 
@@ -541,10 +553,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
         channels = popcount (map);
     }
     else
-    {
         sys->chans_to_reorder = 0;
-        channels = 2;
-    }
 
     /* By default, ALSA plug will pad missing channels with zeroes, which is
      * usually fine. However, it will also discard extraneous channels, which
@@ -557,6 +566,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                  snd_strerror (val));
         goto error;
     }
+    msg_Info(aout, "Attempt channel set to %d", channels);
 
     /* Set sample rate */
     val = snd_pcm_hw_params_set_rate_near (pcm, hw, &fmt->i_rate, NULL);
