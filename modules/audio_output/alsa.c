@@ -739,7 +739,7 @@ static int TimeGet (audio_output_t *aout, mtime_t *restrict delay)
         msg_Err (aout, "cannot estimate delay: %s", snd_strerror (val));
         return -1;
     }
-    *delay = frames * CLOCK_FREQ / sys->rate;
+    *delay = (uint_fast64_t)frames * CLOCK_FREQ / sys->rate;
     return 0;
 }
 

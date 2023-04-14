@@ -219,8 +219,8 @@ static void aout_DecSilence (audio_output_t *aout, mtime_t length, mtime_t pts)
     const audio_sample_format_t *fmt = &owner->mixer_format;
     size_t frames = (fmt->i_rate * length) / CLOCK_FREQ;
 
-    block_t *block = block_Alloc (frames * fmt->i_bytes_per_frame
-                                  / fmt->i_frame_length);
+    block_t *block = block_Alloc ((size_t)((uint_fast64_t)frames * fmt->i_bytes_per_frame
+                                  / fmt->i_frame_length));
     if (unlikely(block == NULL))
         return; /* uho! */
 
