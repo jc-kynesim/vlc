@@ -311,10 +311,10 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     snd_pcm_uframes_t periodSizeMax = 3200;
     snd_pcm_uframes_t periodSize=2400, bufferSize = 9600;
 
-    if (aout_FormatNbChannels(fmt) == 0)
-        return VLC_EGENERIC;
+    msg_Info(aout, "Format: %.4s: Chans: %d", (char*)&fmt->i_format, aout_FormatNbChannels(fmt));
 
-    msg_Info(aout, "Format: %.4s", (char*)&fmt->i_format);
+    if (aout_FormatNbChannels(fmt) == 0 && AOUT_FMT_LINEAR(fmt))
+        return VLC_EGENERIC;
 
     switch (fmt->i_format)
     {
@@ -339,19 +339,20 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
             {
                 msg_Info(aout, "is S/Pdif");
                 passthrough = var_InheritInteger(aout, "alsa-passthrough");
-                vlc_object_t *p_libvlc = VLC_OBJECT( vlc_object_instance(aout) );
-                audio_codec = var_GetInteger(p_libvlc, "audio-codec");
+//                vlc_object_t *p_libvlc = VLC_OBJECT( vlc_object_instance(aout) );
+//                audio_codec = var_GetInteger(p_libvlc, "audio-codec");
+                audio_codec = fmt->i_format;
             }
 
             if (AOUT_FMT_HDMI(fmt))
             {
                 msg_Info(aout, "is HDMI");
                 passthrough = var_InheritInteger(aout, "alsa-passthrough");
-                vlc_object_t *p_libvlc = VLC_OBJECT( vlc_object_instance(aout) );
-                audio_codec = var_GetInteger(p_libvlc, "audio-codec");
+//                vlc_object_t *p_libvlc = VLC_OBJECT( vlc_object_instance(aout) );
+//                audio_codec = var_GetInteger(p_libvlc, "audio-codec");
                 if (passthrough == PASSTHROUGH_SPDIF)
                     passthrough = PASSTHROUGH_NONE; /* TODO? convert down */
-                msg_Info(aout, "audio codec: %08x", audio_codec);
+                audio_codec = fmt->i_format;
             }
 
 //            if (AOUT_FMT_SPDIF(fmt))

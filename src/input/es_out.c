@@ -3061,18 +3061,6 @@ static int LanguageArrayIndex( char **ppsz_langs, const char *psz_lang )
     return -1;
 }
 
-static void info_category_AddCodecInfo( info_category_t* p_cat,
-                                        const char *psz_info,
-                                        vlc_fourcc_t i_fourcc,
-                                        const char *psz_description )
-{
-    const char *ps_fcc = (const char*)&i_fourcc;
-    if( psz_description && *psz_description )
-        info_category_AddInfo( p_cat, psz_info, "%s (%.4s)",
-                               psz_description, ps_fcc );
-    else if ( i_fourcc != VLC_FOURCC(0,0,0,0) )
-        info_category_AddInfo( p_cat, psz_info, "%.4s", ps_fcc );
-}
 /****************************************************************************
  * EsOutUpdateInfo:
  * - add meta info to the playlist item
@@ -3159,39 +3147,6 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const es_format_t *
     case AUDIO_ES:
         info_category_AddInfo( p_cat, _("Type"), _("Audio") );
 
-        vlc_object_t *p_libvlc = VLC_OBJECT( vlc_object_instance(p_input) );
-        int passthrough = var_GetInteger( p_libvlc, "alsa-passthrough" );
-        enum {
-            PASSTHROUGH_NONE,
-            PASSTHROUGH_SPDIF,
-            PASSTHROUGH_HDMI,
-        };
-
-        int audio_codec = 0;
-
-        if (passthrough == PASSTHROUGH_HDMI &&
-              (VLC_CODEC_A52 == p_fmt_es->i_codec ||
-               VLC_CODEC_EAC3 == p_fmt_es->i_codec ||
-               VLC_CODEC_AC3 == p_fmt_es->i_codec ||
-               VLC_CODEC_TRUEHD == p_fmt_es->i_codec)) {
-            switch (i_codec_fourcc) {
-                case VLC_CODEC_TRUEHD:
-                    es->fmt.audio.i_physical_channels = AOUT_CHANS_7_1;
-                    break;
-                case VLC_CODEC_EAC3:
-                case VLC_CODEC_AC3:
-                case VLC_CODEC_A52:
-                    es->fmt.audio.i_physical_channels = AOUT_CHANS_5_1;
-                    break;
-                default:
-                    es->fmt.audio.i_physical_channels = AOUT_CHANS_2_0;
-            }
-            audio_codec = p_fmt_es->i_codec;
-        }
-
-        var_Create( p_libvlc, "audio-codec", VLC_VAR_INTEGER );
-        var_SetInteger( p_libvlc, "audio-codec", audio_codec);
-
         if( fmt->audio.i_physical_channels )
             info_category_AddInfo( p_cat, _("Channels"), "%s",
                                    _( aout_FormatPrintChannels( &fmt->audio ) ) );
@@ -3204,40 +3159,12 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const es_format_t *
             var_SetInteger( p_input, "sample-rate", fmt->audio.i_rate );
         }
 
-        unsigned int i_orgbps = p_fmt_es->audio.i_bitspersample;
-        if( i_orgbps == 0 )
-            i_orgbps = aout_BitsPerSample( p_fmt_es->i_codec );
-        if( i_orgbps != 0 )
+        unsigned int i_bitspersample = fmt->audio.i_bitspersample;
+        if( i_bitspersample == 0 )
+            i_bitspersample = aout_BitsPerSample( p_fmt_es->i_codec );
+        if( i_bitspersample != 0 )
             info_category_AddInfo( p_cat, _("Bits per sample"), "%u",
-                                   i_orgbps );
-
-        if( fmt->audio.i_format &&
-            fmt->audio.i_format != p_fmt_es->i_codec )
-        {
-            psz_codec_description = vlc_fourcc_GetDescription( AUDIO_ES,
-                                                               fmt->audio.i_format );
-            info_category_AddCodecInfo( p_cat, _("Decoded format"),
-                                        fmt->audio.i_format,
-                                        psz_codec_description );
-        }
-
-        if( fmt->audio.i_physical_channels &&
-            fmt->audio.i_physical_channels != p_fmt_es->audio.i_physical_channels )
-            info_category_AddInfo( p_cat, _("Decoded channels"), "%s",
-                vlc_gettext( aout_FormatPrintChannels( &fmt->audio ) ) );
-
-        if( fmt->audio.i_rate &&
-            fmt->audio.i_rate != p_fmt_es->audio.i_rate )
-            info_category_AddInfo( p_cat, _("Decoded sample rate"), _("%u Hz"),
-                                   fmt->audio.i_rate );
-
-        unsigned i_outbps = fmt->audio.i_bitspersample;
-        if( i_outbps == 0 )
-            i_outbps = aout_BitsPerSample( fmt->i_codec );
-
-        if( i_outbps != 0 && i_outbps != i_orgbps )
-            info_category_AddInfo( p_cat, _("Decoded bits per sample"), "%u",
-                                   i_outbps );
+                                   i_bitspersample );
 
         if( fmt->i_bitrate != 0 )
         {
