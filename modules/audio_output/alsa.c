@@ -746,20 +746,6 @@ static void Play (audio_output_t *aout, block_t *block)
     aout_sys_t *sys = aout->sys;
     int n;
 
-    // Check if this packet is a junk
-    unsigned char *pkt = (unsigned char *)block->p_buffer;
-    for (n=0; n<8; n++)
-    {
-        if (pkt[n] != 0) {
-            break;
-        }
-    }
-
-    // Header all 0's
-    if (n == 8) {
-        return;
-    }
-
     if (sys->chans_to_reorder != 0)
         aout_ChannelReorder(block->p_buffer, block->i_buffer,
                            sys->chans_to_reorder, sys->chans_table, sys->format);
