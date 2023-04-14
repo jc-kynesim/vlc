@@ -937,6 +937,7 @@ void matroska_segment_c::ComputeTrackPriority()
          ++it )
     {
         mkv_track_t &track = *it->second;
+
         bool flag = track.b_enabled && ( track.b_default || track.b_forced );
 
         switch( track.fmt.i_cat )

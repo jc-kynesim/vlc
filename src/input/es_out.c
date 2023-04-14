@@ -3170,10 +3170,10 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const es_format_t *
         int audio_codec = 0;
 
         if (passthrough == PASSTHROUGH_HDMI &&
-              (VLC_CODEC_A52 == i_codec_fourcc ||
-               VLC_CODEC_EAC3 == i_codec_fourcc ||
-               VLC_CODEC_AC3 == i_codec_fourcc ||
-               VLC_CODEC_TRUEHD == i_codec_fourcc)) {
+              (VLC_CODEC_A52 == p_fmt_es->i_codec ||
+               VLC_CODEC_EAC3 == p_fmt_es->i_codec ||
+               VLC_CODEC_AC3 == p_fmt_es->i_codec ||
+               VLC_CODEC_TRUEHD == p_fmt_es->i_codec)) {
             switch (i_codec_fourcc) {
                 case VLC_CODEC_TRUEHD:
                     es->fmt.audio.i_physical_channels = AOUT_CHANS_7_1;
@@ -3186,7 +3186,7 @@ static void EsOutUpdateInfo( es_out_t *out, es_out_id_t *es, const es_format_t *
                 default:
                     es->fmt.audio.i_physical_channels = AOUT_CHANS_2_0;
             }
-            audio_codec = i_codec_fourcc;
+            audio_codec = p_fmt_es->i_codec;
         }
 
         var_Create( p_libvlc, "audio-codec", VLC_VAR_INTEGER );
