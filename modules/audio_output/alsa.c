@@ -668,10 +668,15 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     }
 
     /* Setup audio_output_t */
-    if (spdif)
+    if (passthrough != PASSTHROUGH_NONE)
     {
         fmt->i_bytes_per_frame = 61440;
         fmt->i_frame_length = A52_FRAME_NB;
+        if (passthrough == PASSTHROUGH_HDMI)
+        {
+            fmt->i_channels = 8;
+            fmt->i_chan_mode = AOUT_CHANS_7_1;
+        }
     }
     fmt->channel_type = AUDIO_CHANNEL_TYPE_BITMAP;
     sys->format = fmt->i_format;
