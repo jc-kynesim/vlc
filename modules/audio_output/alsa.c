@@ -395,7 +395,13 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                         break;
 
                     default:
-                        pcm_format = SND_PCM_FORMAT_S16;
+                        pcm_format = SND_PCM_FORMAT_S16_LE;
+#warning Utter guesswork - CHECK for DTS etc
+                        periodSizeMax = 3200; //bufferSize / 3;
+                        periodSize=2400;
+                        bufferSize = 9600;
+                        channels = 2;
+                        break;
                 }
             }
             else
