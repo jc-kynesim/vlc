@@ -43,24 +43,6 @@
 #include <libavutil/intreadwrite.h>
 #include <libavutil/crc.h>
 
-#define min(a,b)             \
-({                           \
-    __typeof__ (a) _a = (a); \
-    __typeof__ (b) _b = (b); \
-    _a < _b ? _a : _b;       \
-})
-
-// for debugging audio data
-#define DEBUG 0
-
-#if (DEBUG == 1)
-FILE *flog = NULL;
-FILE *binLog=NULL;
-long savedCount = 0;
-uint8_t savedData[200*1024*1024];
-#endif
-
-
 static int  Open( vlc_object_t * );
 static void Close( vlc_object_t * );
 
@@ -77,11 +59,7 @@ struct filter_sys_t
     block_t *p_out_buf;
     size_t i_out_offset;
 
-    uint8_t *hd_buf[2];             ///< allocated buffers to concatenate hd audio frames
-    int hd_buf_size;                ///< size of the hd audio buffer (eac3, dts4)
-    int hd_buf_count;               ///< number of frames in the hd audio buffer (eac3)
-    int hd_buf_filled;              ///< amount of bytes in the hd audio buffer (eac3, truehd)
-    int hd_buf_idx;                 ///< active hd buffer index (truehd)
+    block_t *p_out_buf2;
 
     union
     {
@@ -91,12 +69,9 @@ struct filter_sys_t
         } eac3;
         struct truehd_ctx
         {
-            unsigned int i_frame_count;
-
-            uint16_t prev_time;      ///< input_timing from the last frame
-            int prev_size;           ///< previous frame size in bytes, including any MAT codes
-            int samples_per_frame;   ///< samples per frame for padding calculation
-
+            uint16_t prev_time;       ///< input_timing from the last frame
+            size_t prev_size;         ///< previous frame size in bytes, including any MAT codes
+            size_t samples_per_frame; ///< samples per frame for padding calculation
         } truehd;
         struct
         {
@@ -359,15 +334,15 @@ static const uint8_t mat_end_code[16] = {
 
 typedef struct MatCode
 {
-  int pos;
+  size_t pos;
   const uint8_t* code;
   unsigned int len;
 } MatCode_t;
 
 static const MatCode_t mat_codes[3] = {
-    {0, mat_start_code, 20},
-    {30708, mat_middle_code, 12},
-    {MAT_FRAME_SIZE - 16, mat_end_code, 16},
+    {0 + SPDIF_HEADER_SIZE,                   mat_start_code,  20},
+    {30708 + SPDIF_HEADER_SIZE,               mat_middle_code, 12},
+    {MAT_FRAME_SIZE - 16 + SPDIF_HEADER_SIZE, mat_end_code,    16},
 };
 
 
@@ -382,15 +357,13 @@ static const MatCode_t mat_codes[3] = {
  */
 static int write_buffer_truehd( filter_t *p_filter, block_t *p_in_buf )
 {
-#if 1
     filter_sys_t * const p_sys = p_filter->p_sys;
-    uint8_t *hd_buf = p_sys->hd_buf[p_sys->hd_buf_idx];
     int ratebits;
-    int padding_remaining = 0;
+    size_t padding_remaining = 0;
     uint16_t input_timing;
-    int total_frame_size = p_in_buf->i_buffer;
+    size_t total_frame_size = p_in_buf->i_buffer;
     const uint8_t *dataptr = p_in_buf->p_buffer;
-    int data_remaining = total_frame_size;
+    size_t data_remaining = total_frame_size;
     int have_pkt = 0;
     unsigned int next_code_idx;
     int rv;
@@ -403,6 +376,12 @@ static int write_buffer_truehd( filter_t *p_filter, block_t *p_in_buf )
     {
         return rv;
     }
+    // If buf exists from previous run reset timestamps
+    if (p_sys->p_out_buf->i_pts == VLC_TS_INVALID)
+    {
+        p_sys->p_out_buf->i_pts = p_in_buf->i_pts;
+        p_sys->p_out_buf->i_dts = p_in_buf->i_dts;
+    }
 
     if (AV_RB24(dataptr + 4) == 0xf8726f) {
         /* major sync unit, fetch sample rate */
@@ -414,7 +393,7 @@ static int write_buffer_truehd( filter_t *p_filter, block_t *p_in_buf )
             return SPDIF_MORE_DATA;
 
         p_sys->truehd.samples_per_frame = 40 << (ratebits & 3);
-        msg_Dbg(p_filter, "TrueHD samples per frame: %d",
+        msg_Dbg(p_filter, "TrueHD samples per frame: %zd",
                p_sys->truehd.samples_per_frame);
     }
 
@@ -436,24 +415,24 @@ static int write_buffer_truehd( filter_t *p_filter, block_t *p_in_buf )
          *
          * 2560 is divisible by truehd_samples_per_frame.
          */
-        int delta_bytes = delta_samples * 2560 / p_sys->truehd.samples_per_frame;
+        size_t delta_bytes = delta_samples * 2560 / p_sys->truehd.samples_per_frame;
 
         /* padding needed before this frame */
-        padding_remaining = delta_bytes - p_sys->truehd.prev_size;
+        padding_remaining = delta_bytes < p_sys->truehd.prev_size ? 0 : delta_bytes - p_sys->truehd.prev_size;
 
-        msg_Dbg(p_filter, "delta_samples: %"PRIu16", delta_bytes: %d",
+        msg_Dbg(p_filter, "delta_samples: %"PRIu16", delta_bytes: %zd",
                delta_samples, delta_bytes);
 
         /* sanity check */
-        if (padding_remaining < 0 || padding_remaining >= MAT_FRAME_SIZE / 2) {
-            msg_Warn(p_filter, "Unusual frame timing: %"PRIu16" => %"PRIu16", %d samples/frame",
+        if (delta_bytes < p_sys->truehd.prev_size || padding_remaining >= MAT_FRAME_SIZE / 2) {
+            msg_Warn(p_filter, "Unusual frame timing: %"PRIu16" => %"PRIu16", %zd samples/frame",
                                   p_sys->truehd.prev_time, input_timing, p_sys->truehd.samples_per_frame);
             padding_remaining = 0;
         }
     }
 
     for (next_code_idx = 0; next_code_idx < ARRAY_SIZE(mat_codes); next_code_idx++)
-        if (p_sys->hd_buf_filled <= mat_codes[next_code_idx].pos)
+        if (p_sys->i_out_offset <= mat_codes[next_code_idx].pos)
             break;
 
     if (next_code_idx >= ARRAY_SIZE(mat_codes)) {
@@ -462,30 +441,26 @@ static int write_buffer_truehd( filter_t *p_filter, block_t *p_in_buf )
     }
 
     while (padding_remaining || data_remaining ||
-           mat_codes[next_code_idx].pos == p_sys->hd_buf_filled) {
+            mat_codes[next_code_idx].pos == p_sys->i_out_offset) {
 
-        if (mat_codes[next_code_idx].pos == p_sys->hd_buf_filled) {
+        if (mat_codes[next_code_idx].pos == p_sys->i_out_offset)
+        {
             /* time to insert MAT code */
-            int code_len = mat_codes[next_code_idx].len;
-            int code_len_remaining = code_len;
-            memcpy(hd_buf + mat_codes[next_code_idx].pos,
-                   mat_codes[next_code_idx].code, code_len);
-            p_sys->hd_buf_filled += code_len;
+            size_t code_len = mat_codes[next_code_idx].len;
+            size_t code_len_remaining = code_len;
+            write_data(p_filter, mat_codes[next_code_idx].code, code_len, true);
 
             next_code_idx++;
             if (next_code_idx == ARRAY_SIZE(mat_codes)) {
                 next_code_idx = 0;
 
                 /* this was the last code, move to the next MAT frame */
+                write_finalize( p_filter, IEC61937_TRUEHD, 1 /* in bytes */ );
                 have_pkt = 1;
-//                ctx->out_buf = hd_buf;
-                p_sys->i_out_offset = SPDIF_HEADER_SIZE;  // ++
-                write_data( p_filter, hd_buf, MAT_FRAME_SIZE, true ); // ++
-                p_sys->truehd.i_frame_count = 0;
-
-                p_sys->hd_buf_idx ^= 1;
-                hd_buf = p_sys->hd_buf[p_sys->hd_buf_idx];
-                p_sys->hd_buf_filled = 0;
+                p_sys->p_out_buf2 = p_sys->p_out_buf;
+                write_init(p_filter, p_in_buf, MAT_PKT_OFFSET, MAT_PKT_OFFSET/16);
+                // We don't actually want timestamps from now
+                p_sys->p_out_buf->i_pts = VLC_TS_INVALID;
 
                 /* inter-frame gap has to be counted as well, add it */
                 code_len_remaining += MAT_PKT_OFFSET - MAT_FRAME_SIZE;
@@ -493,7 +468,7 @@ static int write_buffer_truehd( filter_t *p_filter, block_t *p_in_buf )
 
             if (padding_remaining) {
                 /* consider the MAT code as padding */
-                int counted_as_padding = __MIN(padding_remaining,
+                size_t counted_as_padding = __MIN(padding_remaining,
                                                code_len_remaining);
                 padding_remaining -= counted_as_padding;
                 code_len_remaining -= counted_as_padding;
@@ -504,11 +479,10 @@ static int write_buffer_truehd( filter_t *p_filter, block_t *p_in_buf )
         }
 
         if (padding_remaining) {
-            int padding_to_insert = __MIN(mat_codes[next_code_idx].pos - p_sys->hd_buf_filled,
+            size_t padding_to_insert = __MIN(mat_codes[next_code_idx].pos - p_sys->i_out_offset,
                                           padding_remaining);
 
-            memset(hd_buf + p_sys->hd_buf_filled, 0, padding_to_insert);
-            p_sys->hd_buf_filled += padding_to_insert;
+            write_padding(p_filter, padding_to_insert);
             padding_remaining -= padding_to_insert;
 
             if (padding_remaining)
@@ -516,11 +490,10 @@ static int write_buffer_truehd( filter_t *p_filter, block_t *p_in_buf )
         }
 
         if (data_remaining) {
-            int data_to_insert = __MIN(mat_codes[next_code_idx].pos - p_sys->hd_buf_filled,
+            size_t data_to_insert = __MIN(mat_codes[next_code_idx].pos - p_sys->i_out_offset,
                                        data_remaining);
 
-            memcpy(hd_buf + p_sys->hd_buf_filled, dataptr, data_to_insert);
-            p_sys->hd_buf_filled += data_to_insert;
+            write_data(p_filter, dataptr, data_to_insert, true);
             dataptr += data_to_insert;
             data_remaining -= data_to_insert;
         }
@@ -529,388 +502,12 @@ static int write_buffer_truehd( filter_t *p_filter, block_t *p_in_buf )
     p_sys->truehd.prev_size = total_frame_size;
     p_sys->truehd.prev_time = input_timing;
 
-    if (p_sys->truehd.i_frame_count < 23) {
-        p_sys->truehd.i_frame_count++;
-    }
-
-    msg_Dbg(p_filter, "TrueHD frame inserted, total size %d, buffer position %d",
-           total_frame_size, p_sys->hd_buf_filled);
+    msg_Dbg(p_filter, "TrueHD frame inserted, total size %zd, buffer position %zd",
+            total_frame_size, p_sys->i_out_offset);
 
     if (!have_pkt)
         return SPDIF_MORE_DATA;
 
-    write_finalize( p_filter, IEC61937_TRUEHD, 1 /* in bytes */ );
-
-    p_sys->truehd.i_frame_count = 0;
-#elif 1
-    #define MatCodes mat_codes
-    #define TRUEHD_FRAME_OFFSET     2560
-    static uint8_t trueHD[MAT_PKT_OFFSET];
-    uint8_t* data = p_in_buf->p_buffer;
-
-    filter_sys_t *p_sys = p_filter->p_sys;
-
-    if( !p_sys->p_out_buf
-     && write_init( p_filter, p_in_buf, MAT_PKT_OFFSET, MAT_PKT_OFFSET/16 ) )
-    {
-        return SPDIF_ERROR;
-    }
-
-    static bool sync_ready=false;
-    static int sync_count=0;
-
-    if (!sync_ready) {
-
-        if (AV_RB24(data + 4) != 0xf8726f) {
-            return SPDIF_MORE_DATA;
-        }
-
-        sync_count++;
-        if (sync_count == 4)
-            sync_ready = true;
-        else
-            return SPDIF_MORE_DATA;
-    }
-
-    uint8_t *pBuf = p_sys->hd_buf[0];
-    const uint8_t* pData = p_in_buf->p_buffer;
-
-    int totalFrameSize = p_in_buf->i_buffer;
-    int dataRem = p_in_buf->i_buffer;
-    int paddingRem = 0;
-    int ratebits = 0;
-    int nextCodeIdx = 0;
-    uint16_t inputTiming = 0;
-    bool havePacket = false;
-
-    static int samplesPerFrame = 0;
-    static int prevFrameSize = 0;
-    static int bufferFilled = 0;
-    static uint16_t prevFrameTime = 0;
-
-    static int frameNum = 0;
-
-
-    if (AV_RB24(data + 4) == 0xf8726f)
-    {
-        /* major sync unit, fetch sample rate */
-        if (data[7] == 0xba)
-            ratebits = data[8] >> 4;
-        else if (data[7] == 0xbb)
-            ratebits = data[9] >> 4;
-        else
-            return SPDIF_MORE_DATA;
-
-        samplesPerFrame = 40 << (ratebits & 3);
-
-        p_sys->truehd.i_frame_count = 0;
-    }
-
-    if (!samplesPerFrame)
-    {
-        return SPDIF_ERROR;
-    }
-
-    inputTiming = AV_RB16(data + 2);
-
-    if (prevFrameSize)
-    {
-        uint16_t deltaSamples = inputTiming - prevFrameTime;
-        /*
-         * One multiple-of-48kHz frame is 1/1200 sec and the IEC 61937 rate
-         * is 768kHz = 768000*4 bytes/sec.
-         * The nominal space per frame is therefore
-         * (768000*4 bytes/sec) * (1/1200 sec) = 2560 bytes.
-         * For multiple-of-44.1kHz frames: 1/1102.5 sec, 705.6kHz, 2560 bytes.
-         *
-         * 2560 is divisible by samplesPerFrame.
-         */
-        int deltaBytes = deltaSamples * TRUEHD_FRAME_OFFSET / samplesPerFrame;
-
-        /* padding needed before this frame */
-        paddingRem = deltaBytes - prevFrameSize;
-
-        // detects stream discontinuities
-        if (paddingRem < 0 || paddingRem >= MAT_FRAME_SIZE * 2)
-        {
-            return SPDIF_ERROR;
-        }
-    }
-
-    for (nextCodeIdx = 0; nextCodeIdx < 3; nextCodeIdx++)
-        if (bufferFilled <= MatCodes[nextCodeIdx].pos)
-            break;
-
-    if (nextCodeIdx >= 3)
-    {
-        return SPDIF_ERROR;
-    }
-
-    while (paddingRem || dataRem || MatCodes[nextCodeIdx].pos == bufferFilled)
-    {
-        if (MatCodes[nextCodeIdx].pos == bufferFilled)
-        {
-            /* time to insert MAT code */
-            int codeLen = MatCodes[nextCodeIdx].len;
-            int codeLenRemaining = codeLen;
-
-            memcpy(pBuf + MatCodes[nextCodeIdx].pos, MatCodes[nextCodeIdx].code, codeLen);
-            bufferFilled += codeLen;
-
-            nextCodeIdx++;
-            if (nextCodeIdx == 3)
-            {
-                nextCodeIdx = 0;
-
-                /* this was the last code, move to the next MAT frame */
-                havePacket = true;
-                p_sys->i_out_offset = SPDIF_HEADER_SIZE;
-                write_data( p_filter, pBuf, MAT_FRAME_SIZE, true );
-
-                bufferFilled = 0;
-                frameNum = 0;
-                p_sys->truehd.i_frame_count = 0;
-
-                /* inter-frame gap has to be counted as well, add it */
-                codeLenRemaining += MAT_PKT_OFFSET - MAT_FRAME_SIZE;
-            }
-
-            if (paddingRem)
-            {
-                /* consider the MAT code as padding */
-                const int countedAsPadding = min(paddingRem, codeLenRemaining);
-                paddingRem -= countedAsPadding;
-                codeLenRemaining -= countedAsPadding;
-            }
-            /* count the remainder of the code as part of frame size */
-            if (codeLenRemaining)
-               totalFrameSize += codeLenRemaining;
-        }
-
-        if (paddingRem)
-        {
-            const int paddingLen = min(MatCodes[nextCodeIdx].pos - bufferFilled, paddingRem);
-
-            memset(pBuf + bufferFilled, 0, paddingLen);
-            bufferFilled += paddingLen;
-            paddingRem -= paddingLen;
-
-            if (paddingRem)
-                continue; /* time to insert MAT code */
-        }
-
-        if (dataRem)
-        {
-            const int dataLen = min(MatCodes[nextCodeIdx].pos - bufferFilled, dataRem);
-
-            memcpy(pBuf + bufferFilled, pData, dataLen);
-            bufferFilled += dataLen;
-            pData += dataLen;
-            dataRem -= dataLen;
-        }
-    }
-
-
-    prevFrameSize = totalFrameSize;
-    prevFrameTime = inputTiming;
-    if (p_sys->truehd.i_frame_count < 23) {
-        frameNum++;
-        p_sys->truehd.i_frame_count++;
-    }
-
-    if (!havePacket)
-    {
-        return SPDIF_MORE_DATA;
-    }
-
-    write_finalize( p_filter, IEC61937_TRUEHD, 1 /* in bytes */ );
-
-    p_sys->truehd.i_frame_count = 0;
-#else
-#define MatCodes mat_codes
-#define TRUEHD_FRAME_OFFSET     2560
-    static uint8_t trueHD[MAT_PKT_OFFSET];
-    uint8_t* data = p_in_buf->p_buffer;
-
-    filter_sys_t *p_sys = p_filter->p_sys;
-
-    if( !p_sys->p_out_buf
-     && write_init( p_filter, p_in_buf, MAT_PKT_OFFSET, MAT_PKT_OFFSET/16 ) )
-    {
-        return SPDIF_ERROR;
-    }
-
-static bool sync_ready=false;
-static int sync_count=0;
-
-if (!sync_ready) {
-
-    if (AV_RB24(data + 4) != 0xf8726f) {
-        return SPDIF_MORE_DATA;
-    }
-
-    sync_count++;
-    if (sync_count == 4)
-        sync_ready = true;
-    else
-        return SPDIF_MORE_DATA;
-}
-
-    uint8_t* pBuf = &trueHD[0];
-    const uint8_t* pData = p_in_buf->p_buffer;
-
-    int totalFrameSize = p_in_buf->i_buffer;
-    int dataRem = p_in_buf->i_buffer;
-    int paddingRem = 0;
-    int ratebits = 0;
-    int nextCodeIdx = 0;
-    uint16_t inputTiming = 0;
-    bool havePacket = false;
-
-    static int samplesPerFrame = 0;
-    static int prevFrameSize = 0;
-    static int bufferFilled = 0;
-    static uint16_t prevFrameTime = 0;
-
-    static int frameNum = 0;
-
-
-    if (AV_RB24(data + 4) == 0xf8726f)
-    {
-        /* major sync unit, fetch sample rate */
-        if (data[7] == 0xba)
-            ratebits = data[8] >> 4;
-        else if (data[7] == 0xbb)
-            ratebits = data[9] >> 4;
-        else
-            return SPDIF_MORE_DATA;
-
-        samplesPerFrame = 40 << (ratebits & 3);
-
-        p_sys->truehd.i_frame_count = 0;
-    }
-
-    if (!samplesPerFrame)
-    {
-        return SPDIF_ERROR;
-    }
-
-    inputTiming = AV_RB16(data + 2);
-
-    if (prevFrameSize)
-    {
-        uint16_t deltaSamples = inputTiming - prevFrameTime;
-        /*
-         * One multiple-of-48kHz frame is 1/1200 sec and the IEC 61937 rate
-         * is 768kHz = 768000*4 bytes/sec.
-         * The nominal space per frame is therefore
-         * (768000*4 bytes/sec) * (1/1200 sec) = 2560 bytes.
-         * For multiple-of-44.1kHz frames: 1/1102.5 sec, 705.6kHz, 2560 bytes. 
-         *
-         * 2560 is divisible by samplesPerFrame.
-         */
-        int deltaBytes = deltaSamples * TRUEHD_FRAME_OFFSET / samplesPerFrame;
-
-        /* padding needed before this frame */
-        paddingRem = deltaBytes - prevFrameSize;
-
-        // detects stream discontinuities
-        if (paddingRem < 0 || paddingRem >= MAT_FRAME_SIZE * 2)
-        {
-            return SPDIF_ERROR;
-        }
-    }
-
-    for (nextCodeIdx = 0; nextCodeIdx < 3; nextCodeIdx++)
-        if (bufferFilled <= MatCodes[nextCodeIdx].pos)
-            break;
-
-    if (nextCodeIdx >= 3)
-    {
-        return SPDIF_ERROR;
-    }
-
-    while (paddingRem || dataRem || MatCodes[nextCodeIdx].pos == bufferFilled)
-    {
-        if (MatCodes[nextCodeIdx].pos == bufferFilled)
-        {
-            /* time to insert MAT code */
-            int codeLen = MatCodes[nextCodeIdx].len;
-            int codeLenRemaining = codeLen;
-
-            memcpy(pBuf + MatCodes[nextCodeIdx].pos, MatCodes[nextCodeIdx].code, codeLen);
-            bufferFilled += codeLen;
-
-            nextCodeIdx++;
-            if (nextCodeIdx == 3)
-            {
-                nextCodeIdx = 0;
-
-                /* this was the last code, move to the next MAT frame */
-                havePacket = true;
-                p_sys->i_out_offset = SPDIF_HEADER_SIZE;
-                write_data( p_filter, pBuf, MAT_FRAME_SIZE, true );
-
-                bufferFilled = 0;
-                frameNum = 0;
-                p_sys->truehd.i_frame_count = 0;
-
-                /* inter-frame gap has to be counted as well, add it */
-                codeLenRemaining += MAT_PKT_OFFSET - MAT_FRAME_SIZE;
-            }
-
-            if (paddingRem)
-            {
-                /* consider the MAT code as padding */
-                const int countedAsPadding = min(paddingRem, codeLenRemaining);
-                paddingRem -= countedAsPadding;
-                codeLenRemaining -= countedAsPadding;
-            }
-            /* count the remainder of the code as part of frame size */
-            if (codeLenRemaining)
-               totalFrameSize += codeLenRemaining;
-        }
-
-        if (paddingRem)
-        {
-            const int paddingLen = min(MatCodes[nextCodeIdx].pos - bufferFilled, paddingRem);
-
-            memset(pBuf + bufferFilled, 0, paddingLen);
-            bufferFilled += paddingLen;
-            paddingRem -= paddingLen;
-
-            if (paddingRem)
-                continue; /* time to insert MAT code */
-        }
-
-        if (dataRem)
-        {
-            const int dataLen = min(MatCodes[nextCodeIdx].pos - bufferFilled, dataRem);
-
-            memcpy(pBuf + bufferFilled, pData, dataLen);
-            bufferFilled += dataLen;
-            pData += dataLen;
-            dataRem -= dataLen;
-        }
-    }
-
-
-    prevFrameSize = totalFrameSize;
-    prevFrameTime = inputTiming;
-    if (p_sys->truehd.i_frame_count < 23) {
-        frameNum++;
-        p_sys->truehd.i_frame_count++;
-    }
-
-    if (!havePacket)
-    {
-        return SPDIF_MORE_DATA;
-    }
-
-    write_finalize( p_filter, IEC61937_TRUEHD, 1 /* in bytes */ );
-
-    p_sys->truehd.i_frame_count = 0;
-#endif
     return SPDIF_SUCCESS;
 }
 
@@ -1068,10 +665,17 @@ static void Flush( filter_t *p_filter )
         block_Release( p_sys->p_out_buf );
         p_sys->p_out_buf = NULL;
     }
+    if( p_sys->p_out_buf2 != NULL )
+    {
+        block_Release( p_sys->p_out_buf2 );
+        p_sys->p_out_buf2 = NULL;
+    }
+    p_sys->i_out_offset = 0;
+
     switch( p_filter->fmt_in.audio.i_format )
     {
         case VLC_CODEC_TRUEHD:
-            p_sys->truehd.i_frame_count = 0;
+            memset(&p_sys->truehd, 0, sizeof(p_sys->truehd));
             break;
         case VLC_CODEC_EAC3:
             p_sys->eac3.i_nb_blocks = 0;
@@ -1085,19 +689,6 @@ static block_t *DoWork( filter_t *p_filter, block_t *p_in_buf )
 {
     filter_sys_t *p_sys = p_filter->p_sys;
     block_t *p_out_buf = NULL;
-
-#if (DEBUG == 1) // print firt 16 bytes of audio packets for debugging
-    fprintf(flog, "\n%s:%d: >>>pos=%d, payload_len=%d, total_size=%d, sample=%d, bytes_per_fr=%d\n", __FUNCTION__, __LINE__, p_sys->i_out_offset, p_in_buf->i_buffer, p_in_buf->i_size, p_in_buf->i_nb_samples, p_filter->fmt_out.audio.i_bytes_per_frame);
-
-    fprintf(flog, "%s:%d AUDIO>>>data=\n", __FUNCTION__, __LINE__);
-    for (int m=0; m < 16; m+=2) {
-        fprintf(flog, "%02x %02x ", p_in_buf->p_buffer[m+1], p_in_buf->p_buffer[m]);
-        if ((m+2)%8 == 0) {
-            fprintf(flog, "\n");
-        }
-    }
-    fflush(flog);
-#endif
 
     int i_ret;
     switch( p_filter->fmt_in.audio.i_format )
@@ -1128,16 +719,16 @@ static block_t *DoWork( filter_t *p_filter, block_t *p_in_buf )
     switch( i_ret )
     {
         case SPDIF_SUCCESS:
-            assert( p_sys->p_out_buf->i_buffer == p_sys->i_out_offset );
-
-// capture audio to a file
-#if (DEBUG == 1)
-    memcpy(savedData+savedCount, p_sys->p_out_buf->p_buffer, p_sys->i_out_offset);
-    savedCount += MAT_PKT_OFFSET;
-#endif
-
-            p_out_buf = p_sys->p_out_buf;
-            p_sys->p_out_buf = NULL;
+            if (p_sys->p_out_buf2 != NULL)
+            {
+                p_out_buf = p_sys->p_out_buf2;
+                p_sys->p_out_buf2 = NULL;
+            }
+            else
+            {
+                p_out_buf = p_sys->p_out_buf;
+                p_sys->p_out_buf = NULL;
+            }
             break;
         case SPDIF_MORE_DATA:
             break;
@@ -1164,33 +755,12 @@ static int Open( vlc_object_t *p_this )
           p_filter->fmt_out.audio.i_format != VLC_CODEC_SPDIFB ) )
         return VLC_EGENERIC;
 
-// capture audio data
-#if (DEBUG == 1)
-    if (binLog == NULL) {
-        binLog = fopen("/home/pi/vlc.audio.pkt", "wb");
-        fprintf(stderr, "FOPEN pkt file\n");
-    }
-
-    if (flog == NULL) {
-        flog = fopen("/home/pi/vlc.audio.log", "w");
-    }
-#endif
-
-
     p_sys = p_filter->p_sys = calloc( 1, sizeof(filter_sys_t) );
     if( unlikely( p_sys == NULL ) )
         return VLC_ENOMEM;
 
     p_filter->pf_audio_filter = DoWork;
     p_filter->pf_flush = Flush;
-
-    if(p_filter->fmt_in.audio.i_format == VLC_CODEC_TRUEHD)
-    {
-        p_sys->hd_buf[0] = malloc(MAT_FRAME_SIZE);
-        p_sys->hd_buf[1] = malloc(MAT_FRAME_SIZE);
-        if( p_sys->hd_buf[0] == NULL || p_sys->hd_buf[1] == NULL )
-            return VLC_ENOMEM;
-    }
 
     return VLC_SUCCESS;
 }
@@ -1200,9 +770,6 @@ static void Close( vlc_object_t *p_this )
     filter_t *p_filter = (filter_t *)p_this;
     filter_sys_t * const p_sys = p_filter->p_sys;
 
-
     Flush( p_filter );
-    free(p_sys->hd_buf[0]);
-    free(p_sys->hd_buf[1]);
     free(p_sys);
 }
