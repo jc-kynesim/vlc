@@ -105,9 +105,9 @@ vlc_module_begin ()
     add_integer ("alsa-audio-channels", AOUT_CHANS_FRONT,
                  AUDIO_CHAN_TEXT, AUDIO_CHAN_LONGTEXT, false)
         change_integer_list (channels, channels_text)
-    add_integer(PASSTHROUGH_NAME, PASSTHROUGH_UNSET, PASSTHROUGH_TEXT,
-                PASSTHROUGH_LONGTEXT, false)
-        change_integer_list(passthrough_modes, passthrough_modes_text)
+    add_integer (PASSTHROUGH_NAME, PASSTHROUGH_UNSET, PASSTHROUGH_TEXT,
+                 PASSTHROUGH_LONGTEXT, false)
+        change_integer_list (passthrough_modes, passthrough_modes_text)
     add_sw_gain ()
     set_capability( "audio output", 150 )
     set_callbacks( Open, Close )
@@ -305,21 +305,20 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
 {
     aout_sys_t *sys = aout->sys;
     snd_pcm_format_t pcm_format; /* ALSA sample format */
-    bool spdif = false;
     unsigned channels;
-    int passthrough = var_InheritInteger(aout, PASSTHROUGH_NAME);
-    int audio_codec = 0;
-    snd_pcm_uframes_t periodSizeMax = 3200;
-    snd_pcm_uframes_t periodSize=2400, bufferSize = 9600;
+    int passthrough = PASSTHROUGH_NONE;
+    snd_pcm_uframes_t periodSizeMax;
+    snd_pcm_uframes_t periodSize = 2400;
+    snd_pcm_uframes_t bufferSize = 9600;
+    unsigned int req_rate = fmt->i_rate;
+    vlc_fourcc_t req_format = fmt->i_format;
+    unsigned int req_frame_length = fmt->i_frame_length;
+    unsigned int req_bytes_per_frame = fmt->i_bytes_per_frame;
 
-    msg_Info(aout, "Format: %.4s: Chans: %d, Pass: %d", (char*)&fmt->i_format, aout_FormatNbChannels(fmt), passthrough);
+    msg_Info(aout, "Format: %.4s: Chans: %d", (char*)&fmt->i_format, aout_FormatNbChannels(fmt));
 
     if (aout_FormatNbChannels(fmt) == 0 && AOUT_FMT_LINEAR(fmt))
         return VLC_EGENERIC;
-
-    // Explicit passthrough will override spdif
-    if (passthrough == PASSTHROUGH_UNSET)
-        passthrough = var_InheritBool(aout, "spdif") ? PASSTHROUGH_SPDIF : PASSTHROUGH_NONE;
 
     switch (fmt->i_format)
     {
@@ -339,76 +338,52 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
             pcm_format = SND_PCM_FORMAT_U8;
             break;
         default:
-
-            if (AOUT_FMT_SPDIF(fmt))
+            if (AOUT_FMT_SPDIF(fmt) || AOUT_FMT_HDMI(fmt))
             {
-                msg_Info(aout, "is S/Pdif");
-                audio_codec = fmt->i_format;
+                passthrough = var_InheritInteger(aout, PASSTHROUGH_NAME);
+                // Explicit passthrough will override spdif
+                if (passthrough == PASSTHROUGH_UNSET)
+                    passthrough = var_InheritBool(aout, "spdif") ? PASSTHROUGH_SPDIF : PASSTHROUGH_NONE;
+                msg_Dbg(aout, "Passthrough %d for format %4.4s", passthrough, (const char *)&fmt->i_format);
             }
 
-            if (AOUT_FMT_HDMI(fmt))
-            {
-                msg_Info(aout, "is HDMI");
-                audio_codec = fmt->i_format;
-            }
-
-//            if (AOUT_FMT_SPDIF(fmt))
-//                spdif = var_InheritBool (aout, "spdif");
-//            if (spdif)
             if (passthrough != PASSTHROUGH_NONE)
             {
-                fmt->i_format = VLC_CODEC_SPDIFL;
-
-                switch (audio_codec) {
+                switch (fmt->i_format) {
                     case VLC_CODEC_TRUEHD:
-                        msg_Info(aout, "is TrueHD");
-                        pcm_format = SND_PCM_FORMAT_S16_LE;
-                        fmt->i_rate = 192000;
-                        periodSizeMax = 5461; //bufferSize / 3;
-                        periodSize=4096;
+                        req_rate   = 192000;
+                        periodSize = 4096;
                         bufferSize = 16384;
-                        channels = 8;
-                        break;
-
-                    case VLC_CODEC_A52:
-                        pcm_format = SND_PCM_FORMAT_S16_LE;
-                        fmt->i_rate = 48000;
-                        periodSizeMax = 3200; //bufferSize / 3;
-                        periodSize=2400;
-                        bufferSize = 9600;
-                        channels = 2;
-
+                        channels   = 8;
+                        req_bytes_per_frame = 61440;
                         break;
 
                     case VLC_CODEC_EAC3:
-                        pcm_format = SND_PCM_FORMAT_S16_LE;
-                        fmt->i_rate = 192000;
-                        periodSizeMax = 12800;
-                        periodSize=9600;
+                        req_rate   = 192000;
+                        periodSize = 9600;
                         bufferSize = 38400;
-                        channels = 2;
-
+                        channels   = 2;
+                        req_bytes_per_frame = AOUT_SPDIF_SIZE * 4;
                         break;
 
                     default:
-                        pcm_format = SND_PCM_FORMAT_S16_LE;
-#warning Utter guesswork - CHECK for DTS etc
-                        periodSizeMax = 3200; //bufferSize / 3;
-                        periodSize=2400;
-                        bufferSize = 9600;
+                        req_bytes_per_frame = AOUT_SPDIF_SIZE;
                         channels = 2;
                         break;
                 }
+                req_frame_length = A52_FRAME_NB;
+                req_format = VLC_CODEC_SPDIFL;
+                pcm_format = SND_PCM_FORMAT_S16;
             }
             else
             if (HAVE_FPU)
             {
-                fmt->i_format = VLC_CODEC_FL32;
+                req_format = VLC_CODEC_FL32;
                 pcm_format = SND_PCM_FORMAT_FLOAT;
             }
             else
             {
-                fmt->i_format = VLC_CODEC_S16N;
+                req_format = VLC_CODEC_S16N;
                 pcm_format = SND_PCM_FORMAT_S16;
             }
     }
@@ -449,8 +424,12 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
             FS( 44100) /* def. */ FS( 48000) FS( 32000)
             FS( 22050)            FS( 24000)
             FS( 88200) FS(768000) FS( 96000)
-            FS(176400)            FS(192000)
+            FS(176400)
 #undef FS
+            case 192000:
+                aes3 = (passthrough == PASSTHROUGH_HDMI && channels == 8) ?
+                    IEC958_AES3_CON_FS_768000 : IEC958_AES3_CON_FS_192000;
+                break;
             default:
                 aes3 = IEC958_AES3_CON_FS_NOTID;
                 break;
@@ -515,21 +494,27 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     if (snd_pcm_hw_params_test_format (pcm, hw, pcm_format) == 0)
         ;
     else
-    if (snd_pcm_hw_params_test_format (pcm, hw, SND_PCM_FORMAT_FLOAT) == 0)
+    if (passthrough != PASSTHROUGH_NONE)
     {
-        fmt->i_format = VLC_CODEC_FL32;
+        msg_Warn(aout, "Failed to set required passthrough format");
+        goto error;
+    }
+    else
+    if (snd_pcm_hw_params_test_format(pcm, hw, SND_PCM_FORMAT_FLOAT) == 0)
+    {
+        req_format = VLC_CODEC_FL32;
         pcm_format = SND_PCM_FORMAT_FLOAT;
     }
     else
     if (snd_pcm_hw_params_test_format (pcm, hw, SND_PCM_FORMAT_S32) == 0)
     {
-        fmt->i_format = VLC_CODEC_S32N;
+        req_format = VLC_CODEC_S32N;
         pcm_format = SND_PCM_FORMAT_S32;
     }
     else
     if (snd_pcm_hw_params_test_format (pcm, hw, SND_PCM_FORMAT_S16) == 0)
     {
-        fmt->i_format = VLC_CODEC_S16N;
+        req_format = VLC_CODEC_S16N;
         pcm_format = SND_PCM_FORMAT_S16;
     }
     else
@@ -544,6 +529,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
         msg_Err (aout, "cannot set sample format: %s", snd_strerror (val));
         goto error;
     }
+    sys->format = req_format;
 
     /* Set channels count */
     if (passthrough == PASSTHROUGH_NONE)
@@ -556,7 +542,9 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
         channels = popcount (map);
     }
     else
+    {
         sys->chans_to_reorder = 0;
+    }
 
     /* By default, ALSA plug will pad missing channels with zeroes, which is
      * usually fine. However, it will also discard extraneous channels, which
@@ -569,27 +557,26 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                  snd_strerror (val));
         goto error;
     }
-    msg_Info(aout, "Attempt channel set to %d", channels);
 
     /* Set sample rate */
-    val = snd_pcm_hw_params_set_rate_near (pcm, hw, &fmt->i_rate, NULL);
+    sys->rate = req_rate;
+    val = snd_pcm_hw_params_set_rate_near (pcm, hw, &sys->rate, NULL);
     if (val)
     {
         msg_Err (aout, "cannot set sample rate: %s", snd_strerror (val));
         goto error;
     }
-    sys->rate = fmt->i_rate;
+    if (passthrough != PASSTHROUGH_NONE && sys->rate != req_rate)
+    {
+        msg_Warn(aout, "Passthrough requires rate %d, got %d", req_rate, sys->rate);
+        goto error;
+    }
 
-    if (snd_pcm_hw_params_set_channels_min(pcm, hw, &channels) == 0)
-        snd_pcm_hw_params_set_channels_first(pcm, hw, &channels);
-    else
-        snd_pcm_hw_params_set_channels_last(pcm, hw, &channels);
-
+    periodSizeMax = bufferSize / 3;
     snd_pcm_hw_params_set_period_size_max(pcm, hw, &periodSizeMax, NULL);
 
     snd_pcm_hw_params_set_buffer_size_near(pcm, hw, &bufferSize);
     snd_pcm_hw_params_set_period_size_near(pcm, hw, &periodSize, NULL);
-
 #if 1 /* work-around for period-long latency outputs (e.g. PulseAudio): */
     param = AOUT_MIN_PREPARE_TIME;
     val = snd_pcm_hw_params_set_period_time_near (pcm, hw, &param, NULL);
@@ -671,22 +658,15 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     }
 
     /* Setup audio_output_t */
-    if (passthrough != PASSTHROUGH_NONE)
-    {
-        fmt->i_bytes_per_frame = 61440;
-        fmt->i_frame_length = A52_FRAME_NB;
-        if (passthrough == PASSTHROUGH_HDMI)
-        {
-            fmt->i_channels = 8;
-            fmt->i_chan_mode = AOUT_CHANS_7_1;
-        }
-    }
+    fmt->i_bytes_per_frame = req_bytes_per_frame;
+    fmt->i_frame_length = req_frame_length;
+    fmt->i_channels = channels;
+    fmt->i_rate = sys->rate;
+    fmt->i_format = sys->format;
     fmt->channel_type = AUDIO_CHANNEL_TYPE_BITMAP;
-    sys->format = fmt->i_format;
 
     aout->time_get = TimeGet;
     aout->play = Play;
-
     if (snd_pcm_hw_params_can_pause (hw))
         aout->pause = Pause;
     else
@@ -696,34 +676,6 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     }
     aout->flush = Flush;
     aout_SoftVolumeStart (aout);
-
-#if (ALSA_DEBUG == 1)  // for debugging
-    int xbits    = snd_pcm_hw_params_get_sbits(hw);
-    snd_pcm_format_t xfmt;
-    snd_pcm_hw_params_get_format(hw, &xfmt);
-    unsigned int xval=0;
-    int xdir=0;
-    snd_pcm_hw_params_get_rate(hw, &xval, &xdir);
-    snd_pcm_uframes_t xsize;
-    snd_pcm_hw_params_get_buffer_size(hw, &xsize);
-    fprintf(stderr, "%s:%d>>> xbits=%d, xfmt=%d, xval=%d, xdir=%d, xsize=%ld\n", 
-        __FILE__, __LINE__, xbits, xfmt, xval, xdir, xsize);
-
-    snd_pcm_uframes_t xframes;
-    snd_pcm_hw_params_get_period_size(hw, &xframes, &xdir);
-
-    unsigned int xbuftime;
-    int xdir2;
-    snd_pcm_hw_params_get_buffer_time(hw, &xbuftime, &xdir2);
-
-    snd_pcm_uframes_t xbufsize;
-    snd_pcm_hw_params_get_buffer_size(hw, &xbufsize);
-
-    fprintf(stderr, "%s:%d>>> xframes=%ld, xbuftime=%d, xdir2=%d, xbufsize=%ld\n", 
-        __FILE__, __LINE__, xframes, xbuftime, xdir2, xbufsize);
-#endif
-
-
     return 0;
 
 error:
@@ -752,7 +704,6 @@ static int TimeGet (audio_output_t *aout, mtime_t *restrict delay)
 static void Play (audio_output_t *aout, block_t *block)
 {
     aout_sys_t *sys = aout->sys;
-    int n;
 
     if (sys->chans_to_reorder != 0)
         aout_ChannelReorder(block->p_buffer, block->i_buffer,
@@ -762,17 +713,6 @@ static void Play (audio_output_t *aout, block_t *block)
 
     /* TODO: better overflow handling */
     /* TODO: no period wake ups */
-
-#if (ALSA_DEBUG == 1)   // for debugging
-    fprintf(stderr, "PCM Writei>>>i_nb_samples=%d, buffer=%p\n", block->i_nb_samples, block->p_buffer);
-    for (n=0; n<48; n++)
-    {
-        fprintf(stderr, "%02x ", ((unsigned char *)block->p_buffer)[n]);
-        if (n%8 == 7)
-            fprintf(stderr, "\n");
-    }
-    fprintf(stderr, "\n");
-#endif
 
     while (block->i_nb_samples > 0)
     {
