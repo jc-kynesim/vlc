@@ -36,8 +36,6 @@
 #include <vlc_aout.h>
 #include <vlc_cpu.h>
 
-#define ALSA_DEBUG	0
-
 #include <alsa/asoundlib.h>
 #include <alsa/version.h>
 
@@ -58,7 +56,8 @@ struct aout_sys_t
 #include "audio_output/volume.h"
 
 enum {
-    PASSTHROUGH_NONE,
+    PASSTHROUGH_UNSET = -1,
+    PASSTHROUGH_NONE = 0,
     PASSTHROUGH_SPDIF,
     PASSTHROUGH_HDMI,
 };
@@ -85,12 +84,14 @@ static const char *const channels_text[] = {
     N_("Surround 5.0"), N_("Surround 5.1"), N_("Surround 7.1"),
 };
 
+#define PASSTHROUGH_NAME "alsa-passthrough"
 #define PASSTHROUGH_TEXT N_("Audio passthrough mode")
+#define PASSTHROUGH_LONGTEXT N_("Audio passthrough mode")
 static const int passthrough_modes[] = {
-    PASSTHROUGH_NONE, PASSTHROUGH_SPDIF, PASSTHROUGH_HDMI,
+    PASSTHROUGH_UNSET, PASSTHROUGH_NONE, PASSTHROUGH_SPDIF, PASSTHROUGH_HDMI,
 };
 static const char *const passthrough_modes_text[] = {
-    N_("None"), N_("S/PDIF"), N_("HDMI"),
+    N_("unset"), N_("none"), N_("S/PDIF"), N_("HDMI"),
 };
 
 vlc_module_begin ()
@@ -104,8 +105,8 @@ vlc_module_begin ()
     add_integer ("alsa-audio-channels", AOUT_CHANS_FRONT,
                  AUDIO_CHAN_TEXT, AUDIO_CHAN_LONGTEXT, false)
         change_integer_list (channels, channels_text)
-    add_integer("alsa-passthrough", PASSTHROUGH_NONE, PASSTHROUGH_TEXT,
-                NULL, false)
+    add_integer(PASSTHROUGH_NAME, PASSTHROUGH_UNSET, PASSTHROUGH_TEXT,
+                PASSTHROUGH_LONGTEXT, false)
         change_integer_list(passthrough_modes, passthrough_modes_text)
     add_sw_gain ()
     set_capability( "audio output", 150 )
@@ -306,15 +307,19 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     snd_pcm_format_t pcm_format; /* ALSA sample format */
     bool spdif = false;
     unsigned channels;
-    int passthrough = PASSTHROUGH_NONE;
+    int passthrough = var_InheritInteger(aout, PASSTHROUGH_NAME);
     int audio_codec = 0;
     snd_pcm_uframes_t periodSizeMax = 3200;
     snd_pcm_uframes_t periodSize=2400, bufferSize = 9600;
 
-    msg_Info(aout, "Format: %.4s: Chans: %d", (char*)&fmt->i_format, aout_FormatNbChannels(fmt));
+    msg_Info(aout, "Format: %.4s: Chans: %d, Pass: %d", (char*)&fmt->i_format, aout_FormatNbChannels(fmt), passthrough);
 
     if (aout_FormatNbChannels(fmt) == 0 && AOUT_FMT_LINEAR(fmt))
         return VLC_EGENERIC;
+
+    // Explicit passthrough will override spdif
+    if (passthrough == PASSTHROUGH_UNSET)
+        passthrough = var_InheritBool(aout, "spdif") ? PASSTHROUGH_SPDIF : PASSTHROUGH_NONE;
 
     switch (fmt->i_format)
     {
@@ -338,20 +343,12 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
             if (AOUT_FMT_SPDIF(fmt))
             {
                 msg_Info(aout, "is S/Pdif");
-                passthrough = var_InheritInteger(aout, "alsa-passthrough");
-//                vlc_object_t *p_libvlc = VLC_OBJECT( vlc_object_instance(aout) );
-//                audio_codec = var_GetInteger(p_libvlc, "audio-codec");
                 audio_codec = fmt->i_format;
             }
 
             if (AOUT_FMT_HDMI(fmt))
             {
                 msg_Info(aout, "is HDMI");
-                passthrough = var_InheritInteger(aout, "alsa-passthrough");
-//                vlc_object_t *p_libvlc = VLC_OBJECT( vlc_object_instance(aout) );
-//                audio_codec = var_GetInteger(p_libvlc, "audio-codec");
-                if (passthrough == PASSTHROUGH_SPDIF)
-                    passthrough = PASSTHROUGH_NONE; /* TODO? convert down */
                 audio_codec = fmt->i_format;
             }
 
@@ -374,7 +371,6 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                         break;
 
                     case VLC_CODEC_A52:
-                    case VLC_CODEC_AC3:
                         pcm_format = SND_PCM_FORMAT_S16_LE;
                         fmt->i_rate = 48000;
                         periodSizeMax = 3200; //bufferSize / 3;

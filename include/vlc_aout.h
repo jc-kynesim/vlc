@@ -79,8 +79,6 @@
 #define AOUT_FMT_SPDIF( p_format ) \
     ( ((p_format)->i_format == VLC_CODEC_SPDIFL)       \
        || ((p_format)->i_format == VLC_CODEC_SPDIFB)   \
-       || (p_format)->i_format == VLC_CODEC_TRUEHD     \
-       || (p_format)->i_format == VLC_CODEC_MLP        \
        || ((p_format)->i_format == VLC_CODEC_A52)      \
        || ((p_format)->i_format == VLC_CODEC_DTS) )
 
