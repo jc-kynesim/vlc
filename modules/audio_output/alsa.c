@@ -308,14 +308,14 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     unsigned channels;
     int passthrough = PASSTHROUGH_NONE;
     snd_pcm_uframes_t periodSizeMax;
-    snd_pcm_uframes_t periodSize = 2400;
+    snd_pcm_uframes_t periodSize;
     snd_pcm_uframes_t bufferSize = 9600;
     unsigned int req_rate = fmt->i_rate;
     vlc_fourcc_t req_format = fmt->i_format;
     unsigned int req_frame_length = fmt->i_frame_length;
     unsigned int req_bytes_per_frame = fmt->i_bytes_per_frame;
 
-    msg_Info(aout, "Format: %.4s: Chans: %d", (char*)&fmt->i_format, aout_FormatNbChannels(fmt));
+    msg_Info(aout, "Format: %.4s, Chans: %d, Rate:%d", (char*)&fmt->i_format, aout_FormatNbChannels(fmt), fmt->i_rate);
 
     if (aout_FormatNbChannels(fmt) == 0 && AOUT_FMT_LINEAR(fmt))
         return VLC_EGENERIC;
@@ -349,31 +349,41 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
 
             if (passthrough != PASSTHROUGH_NONE)
             {
+                req_frame_length = A52_FRAME_NB;
+                req_bytes_per_frame = AOUT_SPDIF_SIZE;
+                req_format = VLC_CODEC_SPDIFL;
+                pcm_format = SND_PCM_FORMAT_S16;
+                channels    = 2;
+
                 switch (fmt->i_format) {
+                    case VLC_CODEC_MLP:
                     case VLC_CODEC_TRUEHD:
-                        req_rate   = 192000;
-                        periodSize = 4096;
+                        req_rate   = fmt->i_rate * 4;
                         bufferSize = 16384;
                         channels   = 8;
-                        req_bytes_per_frame = 61440;
                         break;
 
-                    case VLC_CODEC_EAC3:
-                        req_rate   = 192000;
-                        periodSize = 9600;
+                    case VLC_CODEC_DTS:
+                    {
+                        if (passthrough == PASSTHROUGH_SPDIF)
+                            break;
                         bufferSize = 38400;
-                        channels   = 2;
-                        req_bytes_per_frame = AOUT_SPDIF_SIZE * 4;
+                        req_rate   = 192000;
+                        channels   = 8;
+                        break;
+                    }
+
+                    case VLC_CODEC_EAC3:
+                        req_rate   = fmt->i_rate * 4;
+                        bufferSize = 38400;
                         break;
 
                     default:
-                        req_bytes_per_frame = AOUT_SPDIF_SIZE;
-                        channels = 2;
                         break;
                 }
-                req_frame_length = A52_FRAME_NB;
-                req_format = VLC_CODEC_SPDIFL;
-                pcm_format = SND_PCM_FORMAT_S16;
+
+                req_bytes_per_frame = 2 * channels;
+                req_frame_length = 1;
             }
             else
             if (HAVE_FPU)
@@ -572,6 +582,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
         goto error;
     }
 
+    periodSize    = bufferSize / 4;
     periodSizeMax = bufferSize / 3;
     snd_pcm_hw_params_set_period_size_max(pcm, hw, &periodSizeMax, NULL);
 
@@ -704,6 +715,12 @@ static int TimeGet (audio_output_t *aout, mtime_t *restrict delay)
 static void Play (audio_output_t *aout, block_t *block)
 {
     aout_sys_t *sys = aout->sys;
+
+    static mtime_t last_pts = 0;
+    msg_Dbg(aout, "<<< %s: PTS: %"PRId64" samples: %u, bytes: %zu, delta: %"PRId64, __func__,
+            block->i_pts, block->i_nb_samples, block->i_buffer,
+            block->i_pts - last_pts);
+    last_pts = block->i_pts;
 
     if (sys->chans_to_reorder != 0)
         aout_ChannelReorder(block->p_buffer, block->i_buffer,
