@@ -39,6 +39,8 @@
 #include <alsa/asoundlib.h>
 #include <alsa/version.h>
 
+#define TRACE_ALL 0
+
 /** Private data for an ALSA PCM playback stream */
 struct aout_sys_t
 {
@@ -308,11 +310,9 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     int passthrough = PASSTHROUGH_NONE;
     snd_pcm_uframes_t periodSizeMax;
     snd_pcm_uframes_t periodSize;
-    snd_pcm_uframes_t bufferSize = 9600;
+    snd_pcm_uframes_t bufferSize;
     unsigned int req_rate = fmt->i_rate;
     vlc_fourcc_t req_format = fmt->i_format;
-    unsigned int req_frame_length = fmt->i_frame_length;
-    unsigned int req_bytes_per_frame = fmt->i_bytes_per_frame;
 
     msg_Info(aout, "Format: %.4s, Chans: %d, Rate:%d", (char*)&fmt->i_format, aout_FormatNbChannels(fmt), fmt->i_rate);
 
@@ -349,7 +349,6 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
 
             if (passthrough != PASSTHROUGH_NONE)
             {
-                req_bytes_per_frame = AOUT_SPDIF_SIZE;
                 req_format = VLC_CODEC_SPDIFL;
                 pcm_format = SND_PCM_FORMAT_S16;
                 sys->pause_bytes = 3 * 4;
@@ -360,7 +359,6 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                     case VLC_CODEC_TRUEHD:
                         sys->pause_bytes = 4 * 4;
                         req_rate   = fmt->i_rate * 4;
-                        bufferSize = 16384;
                         channels   = 8;
                         break;
 
@@ -368,7 +366,6 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                     {
                         if (passthrough == PASSTHROUGH_SPDIF)
                             break;
-                        bufferSize = 38400;
                         req_rate   = 192000;
                         channels   = 8;
                         break;
@@ -377,15 +374,11 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                     case VLC_CODEC_EAC3:
                         sys->pause_bytes = 4 * 4;
                         req_rate   = fmt->i_rate * 4;
-                        bufferSize = 38400;
                         break;
 
                     default:
                         break;
                 }
-
-                req_bytes_per_frame = 2 * channels;
-                req_frame_length = 1;
             }
             else
             if (HAVE_FPU)
@@ -398,6 +391,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                 req_format = VLC_CODEC_S16N;
                 pcm_format = SND_PCM_FORMAT_S16;
             }
+            break;
     }
 
     const char *device = sys->device;
@@ -584,6 +578,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
         goto error;
     }
 
+    bufferSize    = req_rate / 10;  // 100ms - bigger than this & truehd goes unhappy?
     periodSize    = bufferSize / 4;
     periodSizeMax = bufferSize / 3;
     snd_pcm_hw_params_set_period_size_max(pcm, hw, &periodSizeMax, NULL);
@@ -671,8 +666,8 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     }
 
     /* Setup audio_output_t */
-    fmt->i_bytes_per_frame = req_bytes_per_frame;
-    fmt->i_frame_length = req_frame_length;
+    fmt->i_frame_length = 1;
+    fmt->i_bytes_per_frame = snd_pcm_frames_to_bytes(pcm, fmt->i_frame_length);
     fmt->i_channels = channels;
     fmt->i_rate = sys->rate;
     fmt->i_format = sys->format;
@@ -718,11 +713,13 @@ static void Play (audio_output_t *aout, block_t *block)
 {
     aout_sys_t *sys = aout->sys;
 
+#if TRACE_ALL
     static mtime_t last_pts = 0;
     msg_Dbg(aout, "<<< %s: PTS: %"PRId64" samples: %u, bytes: %zu, delta: %"PRId64, __func__,
             block->i_pts, block->i_nb_samples, block->i_buffer,
             block->i_pts - last_pts);
     last_pts = block->i_pts;
+#endif
 
     // S/pdif packets always start with sync so if no sync then this must
     // be a padding buffer
