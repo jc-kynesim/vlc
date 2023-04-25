@@ -62,8 +62,6 @@ enum {
     PASSTHROUGH_HDMI,
 };
 
-#define A52_FRAME_NB 1536
-
 static int Open (vlc_object_t *);
 static void Close (vlc_object_t *);
 static int EnumDevices (vlc_object_t *, char const *, char ***, char ***);
@@ -349,7 +347,6 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
 
             if (passthrough != PASSTHROUGH_NONE)
             {
-                req_frame_length = A52_FRAME_NB;
                 req_bytes_per_frame = AOUT_SPDIF_SIZE;
                 req_format = VLC_CODEC_SPDIFL;
                 pcm_format = SND_PCM_FORMAT_S16;
