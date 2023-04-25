@@ -53,6 +53,7 @@ struct aout_sys_t
     bool soft_mute;
     float soft_gain;
     char *device;
+    unsigned int pause_bytes;
 };
 
 #include "audio_output/volume.h"
@@ -318,6 +319,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     if (aout_FormatNbChannels(fmt) == 0 && AOUT_FMT_LINEAR(fmt))
         return VLC_EGENERIC;
 
+    sys->pause_bytes = 0;
     switch (fmt->i_format)
     {
         case VLC_CODEC_FL64:
@@ -349,11 +351,13 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
             {
                 req_format = VLC_CODEC_SPDIFL;
                 pcm_format = SND_PCM_FORMAT_S16;
+                sys->pause_bytes = 3 * 4;
                 channels    = 2;
 
                 switch (fmt->i_format) {
                     case VLC_CODEC_MLP:
                     case VLC_CODEC_TRUEHD:
+                        sys->pause_bytes = 4 * 4;
                         req_rate   = fmt->i_rate * 4;
                         channels   = 8;
                         break;
@@ -368,6 +372,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                     }
 
                     case VLC_CODEC_EAC3:
+                        sys->pause_bytes = 4 * 4;
                         req_rate   = fmt->i_rate * 4;
                         break;
 
@@ -715,6 +720,21 @@ static void Play (audio_output_t *aout, block_t *block)
             block->i_pts - last_pts);
     last_pts = block->i_pts;
 #endif
+
+    // S/pdif packets always start with sync so if no sync then this must
+    // be a padding buffer
+    if (sys->pause_bytes != 0 && block->p_buffer[0] == 0)
+    {
+        static const uint8_t pause_le[16] = {0x72, 0xf8, 0x1f, 0x4e, 3, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        static const uint8_t pause_be[16] = {0xf8, 0x72, 0x4e, 0x1f, 0, 3, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0};
+        const uint8_t *const pause = sys->format == VLC_CODEC_SPDIFB ? pause_be : pause_le;
+        size_t n = block->i_buffer / sys->pause_bytes;
+        size_t i;
+
+        msg_Dbg(aout, "Silence detected");
+        for (i = 0; i != n; ++i)
+            memcpy(block->p_buffer + i * sys->pause_bytes, pause, sys->pause_bytes);
+    }
 
     if (sys->chans_to_reorder != 0)
         aout_ChannelReorder(block->p_buffer, block->i_buffer,
