@@ -12,6 +12,11 @@
 
 #define TRACE_ALL 0
 
+// If set will reduce requested size on X
+// A good idea if we have h/w scaler before X
+// as it limits the work needed by GL but a disaster if we don't
+#define LIMIT_X_PELS 0
+
 #define VOUT_DISPLAY_CHANGE_MMAL_BASE 1024
 #define VOUT_DISPLAY_CHANGE_MMAL_HIDE (VOUT_DISPLAY_CHANGE_MMAL_BASE + 0)
 
@@ -74,6 +79,7 @@ int main(int argc, char *argv[])
 }
 #endif
 
+#if LIMIT_X_PELS
 static const uint16_t sqrt_tab[64] = {
     [ 0]=58617, [ 1]=53510, [ 2]=49541, [ 3]=46341,
     [ 4]=43691, [ 5]=41449, [ 6]=39520, [ 7]=37837,
@@ -93,11 +99,17 @@ static const uint16_t sqrt_tab[64] = {
     [60]=16257, [61]=16134, [62]=16013, [63]=15895
 };
 #define SQRT_MAX (sizeof(sqrt_tab)/sizeof(sqrt_tab[0]) - 1)
+#endif
 
 static bool cpy_fmt_limit_size(const display_desc_t * const dd,
                            video_format_t * const dst,
                            const video_format_t * const src)
 {
+#if !LIMIT_X_PELS
+    VLC_UNUSED(dd);
+    *dst = *src;
+    return false;
+#else
     const unsigned int src_pel = src->i_visible_width * src->i_visible_height;
 
     *dst = *src;
@@ -126,6 +138,7 @@ static bool cpy_fmt_limit_size(const display_desc_t * const dd,
     dst->i_height         = height;
     dst->i_visible_height = height;
     return true;
+#endif
 }
 
 static void unload_display_module(vout_display_t * const x_vout)
