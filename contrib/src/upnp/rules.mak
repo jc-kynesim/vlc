@@ -32,7 +32,6 @@ endif
 
 upnp: pupnp-release-$(UPNP_VERSION).tar.gz .sum-upnp
 	$(UNPACK)
-	$(APPLY) $(SRC)/upnp/0001-Do-not-try-to-detach-detached-thread-the-result-is-u.patch
 ifdef HAVE_WIN32
 	$(APPLY) $(SRC)/upnp/libupnp-pthread-force.patch
 	$(APPLY) $(SRC)/upnp/libupnp-win32-exports.patch
