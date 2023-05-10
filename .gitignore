@@ -68,9 +68,6 @@ bin/vlc-cache-gen
 bin/vlc-static
 bin/vlc-wrapper
 include/vlc_about.h
-m4/fcntl-o.m4
-m4/libtool.m4
-m4/threadlib.m4
 modules/gui/qt/resources.cpp
 modules/gui/qt/ui/about.h
 modules/gui/qt/ui/equalizer.h
