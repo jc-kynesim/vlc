@@ -43,16 +43,18 @@ git diff $REFNAME -- \
  configure.ac \
  include \
  modules/Makefile.am \
+ modules/audio_filter \
+ modules/audio_output \
  modules/codec \
+ modules/gui/qt/qt.cpp \
  modules/hw/drm \
  modules/hw/mmal \
- modules/gui/qt/qt.cpp \
  modules/video_output/Makefile.am \
  modules/video_output/drmu \
  modules/video_output/opengl \
+ src/audio_output \
  src/input \
  src/misc \
- src/video_output \
  > $DIFFBASE-001-rpi.patch
 git diff $REFNAME -- modules/video_chroma/chain.c > $DIFFBASE-002-chain.patch
 git diff $REFNAME -- bin/vlc.c > $DIFFBASE-003-vlc.patch
