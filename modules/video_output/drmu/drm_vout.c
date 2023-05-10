@@ -630,6 +630,52 @@ static picture_pool_t *vd_drm_pool(vout_display_t *vd, unsigned count)
     return sys->vlc_pic_pool;
 }
 
+// Copy format from *fmtp into vd->fmt and make any necessary adjustments to
+// ensure display (tweak chroma)
+static void
+set_format(vout_display_t * const vd, vout_display_sys_t * const sys, const video_format_t *const fmtp)
+{
+#if HAS_DRMPRIME
+    uint32_t drm_fmt;
+    uint64_t drm_mod;
+
+    // We think we can deal with the source format so set requested
+    // input format to source
+    vd->fmt = *fmtp;
+
+    if ((drm_fmt = drmu_format_vlc_to_drm_prime(fmtp->i_chroma, &drm_mod)) != 0 &&
+        drmu_plane_format_check(sys->dp, drm_fmt, drm_mod)) {
+        // Hurrah!
+    }
+    else
+#endif
+#if HAS_ZC_CMA
+    if (fmtp->i_chroma == VLC_CODEC_MMAL_OPAQUE) {
+        // Can't deal directly with opaque - but we can always convert it to ZC I420
+        vd->fmt.i_chroma = VLC_CODEC_MMAL_ZC_I420;
+    }
+    else
+#endif
+    if ((drm_fmt = drmu_format_vlc_to_drm(fmtp)) != 0 &&
+        drmu_plane_format_check(sys->dp, drm_fmt, 0)) {
+        // It is a format where simple byte copying works
+    }
+    else {
+        const vlc_fourcc_t *fallback = vlc_fourcc_IsYUV(fmtp->i_chroma) ?
+            vlc_fourcc_GetYUVFallback(fmtp->i_chroma) :
+            vlc_fourcc_GetRGBFallback(fmtp->i_chroma);
+
+        for (; *fallback; ++fallback) {
+            if (drmu_plane_format_check(sys->dp, drmu_format_vlc_chroma_to_drm(*fallback), 0))
+                break;
+        }
+
+        // no conversion - ask for something we know we can deal with
+        vd->fmt.i_chroma = *fallback ? *fallback : VLC_CODEC_I420;
+    }
+}
+
+
 static int vd_drm_control(vout_display_t *vd, int query, va_list args)
 {
     vout_display_sys_t * const sys = vd->sys;
@@ -656,8 +702,7 @@ static int vd_drm_control(vout_display_t *vd, int query, va_list args)
         case VOUT_DISPLAY_RESET_PICTURES:
             msg_Warn(vd, "Reset Pictures");
             kill_pool(sys);
-            vd->fmt = vd->source; // Take (nearly) whatever source wants to give us
-//            vd->fmt.i_chroma = req_chroma(vd);  // Adjust chroma to something we can actaully deal with
+            set_format(vd, sys, &vd->source);
             ret = VLC_SUCCESS;
             break;
 
@@ -938,46 +983,8 @@ static int OpenDrmVout(vlc_object_t *object)
         }
     }
 
-    {
-#if HAS_DRMPRIME
-        uint32_t drm_fmt;
-        uint64_t drm_mod;
+    set_format(vd, sys, fmtp);
 
-        // We think we can deal with the source format so set requested
-        // input format to source
-        vd->fmt = *fmtp;
-
-        if ((drm_fmt = drmu_format_vlc_to_drm_prime(fmtp->i_chroma, &drm_mod)) != 0 &&
-            drmu_plane_format_check(sys->dp, drm_fmt, drm_mod)) {
-            // Hurrah!
-        }
-        else
-#endif
-#if HAS_ZC_CMA
-        if (fmtp->i_chroma == VLC_CODEC_MMAL_OPAQUE) {
-            // Can't deal directly with opaque - but we can always convert it to ZC I420
-            vd->fmt.i_chroma = VLC_CODEC_MMAL_ZC_I420;
-        }
-        else
-#endif
-        if ((drm_fmt = drmu_format_vlc_to_drm(fmtp)) != 0 &&
-            drmu_plane_format_check(sys->dp, drm_fmt, 0)) {
-            // It is a format where simple byte copying works
-        }
-        else {
-            const vlc_fourcc_t *fallback = vlc_fourcc_IsYUV(fmtp->i_chroma) ?
-                vlc_fourcc_GetYUVFallback(fmtp->i_chroma) :
-                vlc_fourcc_GetRGBFallback(fmtp->i_chroma);
-
-            for (; *fallback; ++fallback) {
-                if (drmu_plane_format_check(sys->dp, drmu_format_vlc_chroma_to_drm(*fallback), 0))
-                    break;
-            }
-
-            // no conversion - ask for something we know we can deal with
-            vd->fmt.i_chroma = *fallback ? *fallback : VLC_CODEC_I420;
-        }
-    }
 //    vout_display_SetSizeAndSar(vd, drmu_crtc_width(sys->dc), drmu_crtc_height(sys->dc),
 //                               drmu_ufrac_vlc_to_rational(drmu_crtc_sar(sys->dc)));
 
