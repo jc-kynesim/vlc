@@ -1,5 +1,5 @@
 /*****************************************************************************
- * mmal.c: MMAL-based vout plugin for Raspberry Pi
+ * drm_vout.c: DRM based output device
  *****************************************************************************
  * Copyright © 2014 jusst technologies GmbH
  *
