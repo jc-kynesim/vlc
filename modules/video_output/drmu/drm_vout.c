@@ -135,7 +135,7 @@ copy_pic_to_fb(vout_display_t *vd, drmu_pool_t * const pool, picture_t * const s
     int i;
 
     if (drm_fmt == 0) {
-        msg_Warn(vd, "Failed drm format copy_pic: %#x", src->format.i_chroma);
+        msg_Warn(vd, "Failed vlc->drm format for copy_pic: %s", drmu_log_fourcc(src->format.i_chroma));
         return NULL;
     }
 
