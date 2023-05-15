@@ -579,7 +579,6 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic,
                 subpicture_t *subpicture)
 {
     vout_display_sys_t *const sys = vd->sys;
-    VLC_UNUSED(subpicture);
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
@@ -587,6 +586,8 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic,
 
     drmu_atomic_queue(&sys->display_set);
 
+    if (subpicture)
+        subpicture_Delete(subpicture);
     picture_Release(p_pic);
     return;
 }
