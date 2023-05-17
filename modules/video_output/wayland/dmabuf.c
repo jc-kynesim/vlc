@@ -59,6 +59,12 @@ struct vout_display_sys_t
     struct wp_viewport *viewport;
     struct zwp_linux_dmabuf_v1 * linux_dmabuf_v1_bind;
 
+    struct wl_shm *shm;
+    int shm_fd;
+    struct wl_shm_pool *shm_pool;
+    void * shm_mmap;
+    unsigned int shm_size;
+
     picture_pool_t *vlc_pic_pool; /* picture pool */
 
     int x;
@@ -67,6 +73,79 @@ struct vout_display_sys_t
 
     video_format_t curr_aspect;
 };
+
+static void
+shm_pool_init(vout_display_sys_t * const sys)
+{
+    sys->shm_fd = -1;
+    sys->shm_mmap = MAP_FAILED;
+    sys->shm_size = 0;
+    sys->shm_pool = NULL;
+}
+
+static void
+shm_pool_close(vout_display_sys_t * const sys)
+{
+    if (sys->shm_pool != NULL)
+    {
+        wl_shm_pool_destroy(sys->shm_pool);
+        sys->shm_pool = NULL;
+    }
+    if (sys->shm_mmap != MAP_FAILED)
+    {
+        munmap(sys->shm_mmap, sys->shm_size);
+        sys->shm_mmap = MAP_FAILED;
+    }
+    sys->shm_size = 0;
+    if (sys->shm_fd != -1)
+    {
+        vlc_close(sys->shm_fd);
+        sys->shm_fd = -1;
+    }
+}
+
+static int
+shm_pool_create(vout_display_t * const vd, vout_display_sys_t * const sys, unsigned int shm_size)
+{
+    const long pagemask = sysconf(_SC_PAGE_SIZE) - 1;
+
+    sys->shm_fd = vlc_memfd();
+    if (sys->shm_fd == -1)
+    {
+        msg_Err(vd, "cannot create buffers: %s", vlc_strerror_c(errno));
+        goto error;
+    }
+
+    sys->shm_size = (shm_size + pagemask) & ~pagemask;
+
+    if (ftruncate(sys->shm_fd, sys->shm_size))
+    {
+        msg_Err(vd, "cannot allocate buffers: %s", vlc_strerror_c(errno));
+        goto error;
+    }
+
+    sys->shm_mmap = mmap(NULL, sys->shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, sys->shm_fd, 0);
+    if (sys->shm_mmap == MAP_FAILED)
+    {
+        msg_Err(vd, "cannot map buffers: %s", vlc_strerror_c(errno));
+        goto error;
+    }
+
+    memset(sys->shm_mmap, 0x80, sys->shm_size); /* gray fill */
+
+    sys->shm_pool = wl_shm_create_pool(sys->shm, sys->shm_fd, sys->shm_size);
+    if (sys->shm_pool == NULL)
+    {
+        msg_Err(vd, "failed wl_shm_create_pool");
+        goto error;
+    }
+
+    return VLC_SUCCESS;
+
+error:
+    shm_pool_close(sys);
+    return VLC_EGENERIC;
+}
 
 static void kill_pool(vout_display_sys_t * const sys)
 {
@@ -78,7 +157,7 @@ static void kill_pool(vout_display_sys_t * const sys)
 }
 
 // Actual picture pool for dmabufs is just a set of trivial containers
-static picture_pool_t *vd_dmabuf_pool(vout_display_t *vd, unsigned count)
+static picture_pool_t *vd_dmabuf_pool(vout_display_t * const vd, unsigned count)
 {
     vout_display_sys_t * const sys = vd->sys;
 
@@ -429,14 +508,38 @@ static const struct zwp_linux_dmabuf_v1_listener linux_dmabuf_v1_listener = {
 };
 
 
+static void shm_format_cb(void *data, struct wl_shm *shm, uint32_t format)
+{
+    vout_display_t *vd = data;
+    char str[4];
+
+    memcpy(str, &format, sizeof (str));
+
+    if (format >= 0x20202020)
+        msg_Dbg(vd, "format %.4s (0x%08"PRIx32")", str, format);
+    else
+        msg_Dbg(vd, "format %4"PRIu32" (0x%08"PRIx32")", format, format);
+    (void) shm;
+}
+
+static const struct wl_shm_listener shm_cbs =
+{
+    shm_format_cb,
+};
+
 static void registry_global_cb(void *data, struct wl_registry *registry,
                                uint32_t name, const char *iface, uint32_t vers)
 {
-    vout_display_t *vd = data;
-    vout_display_sys_t *sys = vd->sys;
+    vout_display_t * const vd = data;
+    vout_display_sys_t * const sys = vd->sys;
 
     msg_Dbg(vd, "global %3"PRIu32": %s version %"PRIu32, name, iface, vers);
 
+    if (!strcmp(iface, "wl_shm")) {
+        sys->shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
+        wl_shm_add_listener(sys->shm, &shm_cbs, vd);
+    }
+    else
     if (!strcmp(iface, "wp_viewporter"))
         sys->viewporter = wl_registry_bind(registry, name,
                                            &wp_viewporter_interface, 1);
@@ -481,6 +584,7 @@ static int Open(vlc_object_t *obj)
         return VLC_ENOMEM;
 
     vd->sys = sys;
+    shm_pool_init(sys);
 
     /* Get window */
     sys->embed = vout_display_NewWindow(vd, VOUT_WINDOW_TYPE_WAYLAND);
@@ -531,6 +635,12 @@ static int Open(vlc_object_t *obj)
         video_format_ApplyRotation(&vd->fmt, &fmt);
     }
 
+    if (shm_pool_create(vd, sys, 0x1000000) != 0)
+    {
+        msg_Err(vd, "shm pool create failed");
+        goto error;
+    }
+
     sys->curr_aspect = vd->source;
 
     vd->info.has_pictures_invalid = sys->viewport == NULL;
@@ -557,6 +667,7 @@ static void Close(vlc_object_t *obj)
     vout_display_sys_t *sys = vd->sys;
 
     ResetPictures(vd);
+    shm_pool_close(sys);
 
     if (sys->viewport != NULL)
         wp_viewport_destroy(sys->viewport);
