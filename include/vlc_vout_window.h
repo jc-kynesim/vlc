@@ -197,6 +197,10 @@ struct vout_window_t {
     vout_window_sys_t *sys;
 
     vout_window_owner_t owner;
+
+    union {
+        struct wl_compositor *wl; /**< Wayland compositor */
+    } compositor;
 };
 
 /**
