@@ -234,6 +234,8 @@ video_output/wayland/linux-dmabuf-unstable-v1-protocol.c: \
 	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
 
 libwl_dmabuf_plugin_la_SOURCES = video_output/wayland/dmabuf.c\
+	video_output/wayland/picpool.c video_output/wayland/picpool.h\
+	video_output/wayland/dmabuf_alloc.c video_output/wayland/dmabuf_alloc.h\
 	video_output/drmu/drmu_vlc_fmts.c
 nodist_libwl_dmabuf_plugin_la_SOURCES = \
 	video_output/wayland/viewporter-client-protocol.h \

@@ -43,6 +43,11 @@
 #include <vlc_picture_pool.h>
 #include <vlc_fs.h>
 
+// *** Avoid this include if possible
+#include <libdrm/drm_fourcc.h>
+
+#include "dmabuf_alloc.h"
+#include "picpool.h"
 #include "../drmu/drmu_vlc_fmts.h"
 #include "../../codec/avcodec/drm_pic.h"
 #include <libavutil/hwcontext_drm.h>
@@ -50,6 +55,13 @@
 #define TRACE_ALL 0
 
 #define MAX_PICTURES 4
+#define MAX_SUBPICS  6
+
+typedef struct subplane_s {
+    struct dmabuf_h * db;
+    struct wl_surface * surface;
+    struct wl_subsurface * subsurface;
+} subplane_t;
 
 struct vout_display_sys_t
 {
@@ -58,6 +70,7 @@ struct vout_display_sys_t
     struct wp_viewporter *viewporter;
     struct wp_viewport *viewport;
     struct zwp_linux_dmabuf_v1 * linux_dmabuf_v1_bind;
+    struct wl_subcompositor *subcompositor;
 
     struct wl_shm *shm;
     int shm_fd;
@@ -72,7 +85,11 @@ struct vout_display_sys_t
     bool use_buffer_transform;
 
     video_format_t curr_aspect;
+
+    picpool_ctl_t * subpic_pool;
+    subplane_t subplanes[MAX_SUBPICS];
 };
+
 
 static void
 shm_pool_init(vout_display_sys_t * const sys)
@@ -535,6 +552,9 @@ static void registry_global_cb(void *data, struct wl_registry *registry,
 
     msg_Dbg(vd, "global %3"PRIu32": %s version %"PRIu32, name, iface, vers);
 
+    if (strcmp(iface, wl_subcompositor_interface.name) == 0)
+        sys->subcompositor = wl_registry_bind(registry, name, &wl_subcompositor_interface, 1);
+    else
     if (!strcmp(iface, "wl_shm")) {
         sys->shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
         wl_shm_add_listener(sys->shm, &shm_cbs, vd);
@@ -548,7 +568,7 @@ static void registry_global_cb(void *data, struct wl_registry *registry,
         sys->use_buffer_transform = vers >= 2;
     else
     if (strcmp(iface, zwp_linux_dmabuf_v1_interface.name) == 0) {
-        sys->linux_dmabuf_v1_bind = wl_registry_bind(registry, name, &zwp_linux_dmabuf_v1_interface, 1);
+        sys->linux_dmabuf_v1_bind = wl_registry_bind(registry, name, &zwp_linux_dmabuf_v1_interface, 2);
         zwp_linux_dmabuf_v1_add_listener(sys->linux_dmabuf_v1_bind, &linux_dmabuf_v1_listener, vd);
     }
 }
@@ -567,6 +587,52 @@ static const struct wl_registry_listener registry_cbs =
     registry_global_cb,
     registry_global_remove_cb,
 };
+
+static void
+shm_buffer_release(void *data, struct wl_buffer *wl_buffer)
+{
+	(void)data;
+	/* Sent by the compositor when it's no longer using this buffer */
+	wl_buffer_destroy(wl_buffer);
+}
+
+static const struct wl_buffer_listener shm_buffer_listener = {
+	.release = shm_buffer_release,
+};
+
+static void
+chequerboard(uint32_t *const data, unsigned int stride, const unsigned int width, const unsigned int height)
+{
+    stride /= sizeof(uint32_t);
+
+	/* Draw checkerboxed background */
+	for (unsigned int y = 0; y < height; ++y) {
+		for (unsigned int x = 0; x < width; ++x) {
+			if ((x + y / 8 * 8) % 16 < 8)
+				data[y * stride + x] = 0xFF666666;
+			else
+				data[y * stride + x] = 0xFFEEEEEE;
+		}
+	}
+}
+
+static struct wl_buffer *
+draw_frame(vout_display_sys_t *sys)
+{
+	const int width = 640, height = 480;
+	int stride = width * 4;
+	int size = stride * height;
+    uint32_t *data = sys->shm_mmap;
+
+	struct wl_buffer *buffer = wl_shm_pool_create_buffer(sys->shm_pool, 0,
+			width, height, stride, WL_SHM_FORMAT_XRGB8888);
+
+    chequerboard(data, stride, width, height);
+
+	wl_buffer_add_listener(buffer, &shm_buffer_listener, NULL);
+	return buffer;
+}
+
 
 static int Open(vlc_object_t *obj)
 {
@@ -641,6 +707,77 @@ static int Open(vlc_object_t *obj)
         goto error;
     }
 
+    {
+        struct dmabufs_ctl * dbsc = dmabufs_ctl_new();
+        if (dbsc == NULL)
+        {
+            msg_Err(vd, "Failed to create dmabuf ctl");
+            goto error;
+        }
+        sys->subpic_pool = picpool_new(dbsc);
+        dmabufs_ctl_unref(&dbsc);
+        if (sys->subpic_pool == NULL)
+        {
+            msg_Err(vd, "Failed to create picpool");
+            goto error;
+        }
+    }
+
+    {
+        unsigned int i;
+        struct wl_compositor * const compositor = sys->embed->compositor.wl;
+
+        if (compositor == NULL)
+        {
+            msg_Err(vd, "Can't get compositor");
+            goto error;
+        }
+
+        for (i = 0; i != MAX_SUBPICS; ++i)
+        {
+            subplane_t *plane = sys->subplanes + i;
+            plane->surface = wl_compositor_create_surface(compositor);
+            plane->subsurface = wl_subcompositor_get_subsurface(sys->subcompositor, plane->surface, sys->embed->handle.wl);
+            wl_subsurface_set_sync(plane->subsurface);
+        }
+#if 0
+        // *****
+        wl_subsurface_set_position(sys->subplanes[0].subsurface, 20, 20);
+        wl_subsurface_place_above(sys->subplanes[0].subsurface, sys->embed->handle.wl);
+        wl_surface_attach(sys->subplanes[0].surface, draw_frame(sys), 0, 0);
+        wl_surface_commit(sys->subplanes[0].surface);
+#endif
+    }
+
+    {
+        unsigned int width = 640;
+        unsigned int height = 480;
+        unsigned int stride = 640 * 4;
+        struct zwp_linux_buffer_params_v1 *params;
+        struct wl_buffer * w_buffer;
+        struct dmabuf_h *dh = picpool_get(sys->subpic_pool, stride * height);
+        dmabuf_write_start(dh);
+        chequerboard(dmabuf_map(dh), stride, width, height);
+        dmabuf_write_end(dh);
+        sys->subplanes[0].db = dh;
+
+        params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1_bind);
+        if (!params)
+        {
+            msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
+            goto error;
+        }
+        zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), 0, 0, stride, 0, 0);
+        w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, DRM_FORMAT_ARGB8888, 0);
+        zwp_linux_buffer_params_v1_destroy(params);
+
+        wl_subsurface_set_position(sys->subplanes[0].subsurface, 20, 20);
+        wl_subsurface_place_above(sys->subplanes[0].subsurface, sys->embed->handle.wl);
+        wl_surface_attach(sys->subplanes[0].surface, w_buffer, 0, 0);
+        wl_surface_commit(sys->subplanes[0].surface);
+
+    }
+
     sys->curr_aspect = vd->source;
 
     vd->info.has_pictures_invalid = sys->viewport == NULL;
@@ -668,6 +805,7 @@ static void Close(vlc_object_t *obj)
 
     ResetPictures(vd);
     shm_pool_close(sys);
+    picpool_unref(&sys->subpic_pool);
 
     if (sys->viewport != NULL)
         wp_viewport_destroy(sys->viewport);
