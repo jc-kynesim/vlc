@@ -372,6 +372,7 @@ static picture_pool_t *vd_dmabuf_pool(vout_display_t * const vd, unsigned count)
 struct dmabuf_w_env_s {
     picture_context_t * pic_ctx;
     vout_display_t * vd;
+    int x, y;
     int w;
     int h;
 };
@@ -379,13 +380,19 @@ struct dmabuf_w_env_s {
 static struct dmabuf_w_env_s *
 dmabuf_w_env_new(vout_display_t * const vd, picture_context_t * pic_ctx)
 {
-    struct dmabuf_w_env_s * const dbe = malloc(sizeof(*dbe));
+    vout_display_sys_t * const sys = vd->sys;
+    struct dmabuf_w_env_s * const dbe = calloc(1, sizeof(*dbe));
     if (!dbe)
         return NULL;
     dbe->pic_ctx = pic_ctx->copy(pic_ctx);
     dbe->vd = vd;
-    dbe->w = vd->cfg->display.width;
-    dbe->h = vd->cfg->display.height;
+//    dbe->w = vd->cfg->display.width;
+//    dbe->h = vd->cfg->display.height;
+    msg_Dbg(vd, "%s: (%d,%d)", __func__, sys->x, sys->y);
+    dbe->x = sys->x;
+    dbe->y = sys->y;
+    dbe->w = vd->fmt.i_visible_width;
+    dbe->h = vd->fmt.i_visible_height;
 
     return dbe;
 }
@@ -451,8 +458,8 @@ create_wl_dmabuf_succeeded(void *data, struct zwp_linux_buffer_params_v1 *params
 //    wl_surface_commit(es->w_surface2);
 #endif
 
-    wl_surface_attach(surface, new_buffer, 0, 0);
-    wp_viewport_set_destination(sys->viewport, dbe->w, dbe->h);
+    wl_surface_attach(surface, new_buffer, dbe->x, dbe->y);
+//    wp_viewport_set_destination(sys->viewport, dbe->w, dbe->h);
     wl_surface_damage(surface, 0, 0, INT32_MAX, INT32_MAX);
     wl_surface_commit(surface);
 }
@@ -581,9 +588,6 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     vout_display_sys_t *sys = vd->sys;
     unsigned int n = 0;
 
-    sys->x = 0;
-    sys->y = 0;
-
     // Attempt to import the subpics
     for (subpicture_t * spic = subpic; spic != NULL; spic = spic->p_next)
     {
@@ -626,8 +630,6 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 {
     vout_display_sys_t *sys = vd->sys;
     struct wl_display *display = sys->embed->display.wl;
-
-    msg_Info(vd, "%s: surface=%p", __func__, sys->embed->handle.wl);
 
     for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
     {
@@ -712,7 +714,7 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             }
 
             vout_display_place_t place;
-
+#if 0
             vout_display_PlacePicture(&place, &sys->curr_aspect, vd->cfg, false);
             sys->x += place.width / 2;
             sys->y += place.height / 2;
@@ -720,7 +722,11 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             vout_display_PlacePicture(&place, &vd->source, cfg, false);
             sys->x -= place.width / 2;
             sys->y -= place.height / 2;
-
+#else
+            vout_display_PlacePicture(&place, &vd->source, cfg, true);
+            sys->x = place.x;
+            sys->y = place.y;
+#endif
             if (sys->viewport != NULL)
             {
                 video_format_t fmt;
@@ -1083,6 +1089,9 @@ static void Close(vlc_object_t *obj)
     wl_display_flush(sys->embed->display.wl);
     wl_event_queue_destroy(sys->eventq);
     vout_display_DeleteWindow(vd, sys->embed);
+
+    free(sys->subpic_chromas);
+
     free(sys);
 }
 
