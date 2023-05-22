@@ -58,10 +58,15 @@
 #define MAX_SUBPICS  6
 
 typedef struct subplane_s {
-    struct dmabuf_h * db;
     struct wl_surface * surface;
     struct wl_subsurface * subsurface;
 } subplane_t;
+
+typedef struct subpic_ent_s {
+    struct wl_buffer * wb;
+    picture_t * pic;
+} subpic_ent_t;
+
 
 struct vout_display_sys_t
 {
@@ -88,6 +93,7 @@ struct vout_display_sys_t
 
     picpool_ctl_t * subpic_pool;
     subplane_t subplanes[MAX_SUBPICS];
+    subpic_ent_t subpics[MAX_SUBPICS];
 };
 
 
@@ -163,6 +169,57 @@ error:
     shm_pool_close(sys);
     return VLC_EGENERIC;
 }
+
+static void
+subpic_buffer_release(void *data, struct wl_buffer *wl_buffer)
+{
+    struct dmabuf_h * dh = data;
+
+    /* Sent by the compositor when it's no longer using this buffer */
+    wl_buffer_destroy(wl_buffer);
+    dmabuf_unref(&dh);
+}
+
+static const struct wl_buffer_listener subpic_buffer_listener = {
+    .release = subpic_buffer_release,
+};
+
+static struct wl_buffer *
+copy_pic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, picture_t * const src)
+{
+    unsigned int w = src->format.i_visible_width;
+    unsigned int h = src->format.i_visible_height;
+    size_t stride = src->p[0].i_pitch;
+    size_t size = h * stride;
+    struct dmabuf_h * dh = picpool_get(sys->subpic_pool, size);
+    struct zwp_linux_buffer_params_v1 *params;
+    const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format);
+    struct wl_buffer * w_buffer = NULL;
+
+    dmabuf_write_start(dh);
+#warning Needs premul alpha
+    memcpy(dmabuf_map(dh), src->p[0].p_pixels, size);
+    dmabuf_write_end(dh);
+
+    params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1_bind);
+    if (!params)
+    {
+        msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
+        goto error;
+    }
+    zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), 0, 0, stride, 0, 0);
+    w_buffer = zwp_linux_buffer_params_v1_create_immed(params, w, h, drm_fmt, 0);
+    zwp_linux_buffer_params_v1_destroy(params);
+
+    wl_buffer_add_listener(w_buffer, &subpic_buffer_listener, dh);
+
+    return w_buffer;
+
+error:
+    dmabuf_unref(&dh);
+    return NULL;
+}
+
 
 static void kill_pool(vout_display_sys_t * const sys)
 {
@@ -383,8 +440,55 @@ out:
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 {
     vout_display_sys_t *sys = vd->sys;
+    unsigned int n = 0;
+
     sys->x = 0;
     sys->y = 0;
+
+    // Attempt to import the subpics
+    for (subpicture_t * spic = subpic; spic != NULL; spic = spic->p_next)
+    {
+        for (subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
+            picture_t * const src = sreg->p_picture;
+            subpic_ent_t * const dst = sys->subpics + n;
+
+            // If the same picture then assume the same contents
+            // We keep a ref to the previous pic to ensure that the same picture
+            // structure doesn't get reused and confuse us.
+            if (src != dst->pic) {
+                wl_buffer_destroy(dst->wb);
+                dst->wb = NULL;
+                if (dst->pic != NULL) {
+                    picture_Release(dst->pic);
+                    dst->pic = NULL;
+                }
+
+                dst->wb = copy_pic_to_w_buffer(vd, sys, src);
+                if (dst->wb == NULL)
+                    continue;
+
+                dst->pic = picture_Hold(src);
+            }
+
+            if (++n == MAX_SUBPICS)
+                goto subpics_done;
+        }
+    }
+subpics_done:
+
+    // Clear any other entries
+    for (; n != MAX_SUBPICS; ++n) {
+        subpic_ent_t * const dst = sys->subpics + n;
+        if (dst->pic != NULL) {
+            picture_Release(dst->pic);
+            dst->pic = NULL;
+        }
+        if (dst->wb != NULL)
+        {
+            wl_buffer_destroy(dst->wb);
+            dst->wb = NULL;
+        }
+    }
 
     (void)pic;
     (void) subpic;
@@ -621,7 +725,6 @@ draw_frame(vout_display_sys_t *sys)
 {
 	const int width = 640, height = 480;
 	int stride = width * 4;
-	int size = stride * height;
     uint32_t *data = sys->shm_mmap;
 
 	struct wl_buffer *buffer = wl_shm_pool_create_buffer(sys->shm_pool, 0,
@@ -726,6 +829,7 @@ static int Open(vlc_object_t *obj)
     {
         unsigned int i;
         struct wl_compositor * const compositor = sys->embed->compositor.wl;
+        struct wl_surface * below = sys->embed->handle.wl;
 
         if (compositor == NULL)
         {
@@ -738,6 +842,8 @@ static int Open(vlc_object_t *obj)
             subplane_t *plane = sys->subplanes + i;
             plane->surface = wl_compositor_create_surface(compositor);
             plane->subsurface = wl_subcompositor_get_subsurface(sys->subcompositor, plane->surface, sys->embed->handle.wl);
+            wl_subsurface_place_above(plane->subsurface, below);
+            below = plane->surface;
             wl_subsurface_set_sync(plane->subsurface);
         }
 #if 0
@@ -759,7 +865,6 @@ static int Open(vlc_object_t *obj)
         dmabuf_write_start(dh);
         chequerboard(dmabuf_map(dh), stride, width, height);
         dmabuf_write_end(dh);
-        sys->subplanes[0].db = dh;
 
         params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1_bind);
         if (!params)
@@ -770,9 +875,9 @@ static int Open(vlc_object_t *obj)
         zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), 0, 0, stride, 0, 0);
         w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, DRM_FORMAT_ARGB8888, 0);
         zwp_linux_buffer_params_v1_destroy(params);
+        wl_buffer_add_listener(w_buffer, &subpic_buffer_listener, dh);
 
         wl_subsurface_set_position(sys->subplanes[0].subsurface, 20, 20);
-        wl_subsurface_place_above(sys->subplanes[0].subsurface, sys->embed->handle.wl);
         wl_surface_attach(sys->subplanes[0].surface, w_buffer, 0, 0);
         wl_surface_commit(sys->subplanes[0].surface);
 
