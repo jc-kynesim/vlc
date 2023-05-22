@@ -57,6 +57,18 @@
 #define MAX_PICTURES 4
 #define MAX_SUBPICS  6
 
+typedef struct fmt_ent_s {
+    uint32_t fmt;
+    int32_t pri;
+    uint64_t mod;
+} fmt_ent_t;
+
+typedef struct fmt_list_s {
+    fmt_ent_t * fmts;
+    unsigned int size;
+    unsigned int len;
+} fmt_list_t;
+
 typedef struct subplane_s {
     struct wl_surface * surface;
     struct wl_subsurface * subsurface;
@@ -96,7 +108,68 @@ struct vout_display_sys_t
     picpool_ctl_t * subpic_pool;
     subplane_t subplanes[MAX_SUBPICS];
     subpic_ent_t subpics[MAX_SUBPICS];
+    vlc_fourcc_t * subpic_chromas;
+
+    fmt_list_t dmabuf_fmts;
 };
+
+
+static int
+fmt_list_add(fmt_list_t * const fl, uint32_t fmt, uint64_t mod, int32_t pri)
+{
+    if (fl->len >= fl->size)
+    {
+        unsigned int n = fl->len == 0 ? 64 : fl->len * 2;
+        fmt_ent_t * t = realloc(fl->fmts, n * sizeof(*t));
+        if (t == NULL)
+            return VLC_ENOMEM;
+        fl->fmts = t;
+        fl->size = n;
+    }
+    fl->fmts[fl->len++] = (fmt_ent_t){
+        .fmt = fmt,
+        .pri = pri,
+        .mod = mod
+    };
+    return 0;
+}
+
+static int
+fmt_sort_cb(const void * va, const void * vb)
+{
+    const fmt_ent_t * const a = va;
+    const fmt_ent_t * const b = vb;
+    return a->fmt < b->fmt ? -1 : a->fmt != b->fmt ? 1 :
+           a->mod < b->mod ? -1 : a->mod != b->mod ? 1 : 0;
+}
+
+static void
+fmt_list_sort(fmt_list_t * const fl)
+{
+    unsigned int n = 0;
+    if (fl->len <= 1)
+        return;
+    qsort(fl->fmts, fl->len, sizeof(*fl->fmts), fmt_sort_cb);
+    // Dedup - in case we have multiple working callbacks
+    for (unsigned int i = 1; i != fl->len; ++i)
+    {
+        if (fl->fmts[i].fmt != fl->fmts[n].fmt || fl->fmts[i].mod != fl->fmts[n].mod)
+            fl->fmts[n++] = fl->fmts[i];
+    }
+    fl->len = n + 1;
+}
+
+static int
+fmt_list_find(const fmt_list_t * const fl, uint32_t fmt, uint64_t mod)
+{
+    const fmt_ent_t x = {
+        .fmt = fmt,
+        .mod = mod
+    };
+    const fmt_ent_t * const fe = (fl->len == 0) ? NULL :
+        bsearch(&x, fl->fmts, fl->len, sizeof(x), fmt_sort_cb);
+    return fe == NULL ? -1 : fe->pri;
+}
 
 static void
 chequerboard(uint32_t *const data, unsigned int stride, const unsigned int width, const unsigned int height)
@@ -679,9 +752,12 @@ static void linux_dmabuf_v1_listener_format(void *data,
 {
     // Superceeded by _modifier
     vout_display_t * const vd = data;
+    vout_display_sys_t * const sys = vd->sys;
     (void)zwp_linux_dmabuf_v1;
-    (void)format;
+
     msg_Dbg(vd, "%s[%p], %.4s", __func__, (void*)vd, (const char *)&format);
+
+    fmt_list_add(&sys->dmabuf_fmts, format, DRM_FORMAT_MOD_LINEAR, 0);
 }
 
 static void
@@ -692,9 +768,12 @@ linux_dmabuf_v1_listener_modifier(void *data,
          uint32_t modifier_lo)
 {
     vout_display_t * const vd = data;
+    vout_display_sys_t * const sys = vd->sys;
     (void)zwp_linux_dmabuf_v1;
 
     msg_Dbg(vd, "%s[%p], %.4s %08x%08x", __func__, (void*)vd, (const char *)&format, modifier_hi, modifier_lo);
+
+    fmt_list_add(&sys->dmabuf_fmts, format, modifier_lo | ((uint64_t)modifier_hi << 32), 0);
 }
 
 static const struct zwp_linux_dmabuf_v1_listener linux_dmabuf_v1_listener = {
@@ -746,7 +825,7 @@ static void registry_global_cb(void *data, struct wl_registry *registry,
         sys->use_buffer_transform = vers >= 2;
     else
     if (strcmp(iface, zwp_linux_dmabuf_v1_interface.name) == 0) {
-        sys->linux_dmabuf_v1_bind = wl_registry_bind(registry, name, &zwp_linux_dmabuf_v1_interface, 2);
+        sys->linux_dmabuf_v1_bind = wl_registry_bind(registry, name, &zwp_linux_dmabuf_v1_interface, 3);
         zwp_linux_dmabuf_v1_add_listener(sys->linux_dmabuf_v1_bind, &linux_dmabuf_v1_listener, vd);
     }
 }
@@ -794,11 +873,6 @@ draw_frame(vout_display_sys_t *sys)
     return buffer;
 }
 
-static const vlc_fourcc_t subpic_chromas[] = {
-    VLC_CODEC_RGBA,
-    0
-};
-
 static int Open(vlc_object_t *obj)
 {
     vout_display_t * const vd = (vout_display_t *)obj;
@@ -836,6 +910,32 @@ static int Open(vlc_object_t *obj)
     wl_registry_add_listener(registry, &registry_cbs, vd);
     wl_display_roundtrip_queue(display, sys->eventq);
     wl_registry_destroy(registry);
+
+    // And again - we registered some listeners in the call registry callback
+    wl_display_roundtrip_queue(display, sys->eventq);
+
+    fmt_list_sort(&sys->dmabuf_fmts);
+
+    {
+        static vlc_fourcc_t const tryfmts[] = {
+            VLC_CODEC_RGBA,
+            VLC_CODEC_BGRA,
+        };
+        unsigned int n = 0;
+
+        if ((sys->subpic_chromas = calloc(ARRAY_SIZE(tryfmts) + 1, sizeof(vlc_fourcc_t))) == NULL)
+            goto error;
+        for (unsigned int i = 0; i != ARRAY_SIZE(tryfmts); ++i)
+        {
+            uint32_t drmfmt = drmu_format_vlc_chroma_to_drm(tryfmts[i]);
+            msg_Dbg(vd, "Look for %.4s", (char*)&drmfmt);
+            if (fmt_list_find(&sys->dmabuf_fmts, drmfmt, DRM_FORMAT_MOD_LINEAR) >= 0)
+                sys->subpic_chromas[n++] = tryfmts[i];
+        }
+
+        if (n == 0)
+            msg_Warn(vd, "No compatible subpic formats found");
+    }
 
     struct wl_surface *surface = sys->embed->handle.wl;
     if (sys->viewporter != NULL)
@@ -949,7 +1049,7 @@ static int Open(vlc_object_t *obj)
     sys->curr_aspect = vd->source;
 
     vd->info.has_pictures_invalid = sys->viewport == NULL;
-    vd->info.subpicture_chromas = subpic_chromas;
+    vd->info.subpicture_chromas = sys->subpic_chromas;
 
     vd->pool = vd_dmabuf_pool;
     vd->prepare = Prepare;
