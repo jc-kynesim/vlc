@@ -131,11 +131,15 @@ void dmabuf_free(struct dmabuf_h * dh)
 void dmabuf_unref(struct dmabuf_h ** const ppdh)
 {
     struct dmabuf_h * dh = *ppdh;
+    int n;
+
     if (dh == NULL)
         return;
     *ppdh = NULL;
 
-    if (atomic_fetch_sub(&dh->ref_count, 1) != 0)
+    n = atomic_fetch_sub(&dh->ref_count, 1);
+    fprintf(stderr, "%s[%p]: Ref: %d\n", __func__, dh, n);
+    if (n != 0)
         return;
 
     if (dh->predel_fn && dh->predel_fn(dh, dh->predel_v) != 0)
@@ -146,7 +150,11 @@ void dmabuf_unref(struct dmabuf_h ** const ppdh)
 
 struct dmabuf_h * dmabuf_ref(struct dmabuf_h * const dh)
 {
-    atomic_fetch_add(&dh->ref_count, 1);
+    if (dh != NULL)
+    {
+        int n = atomic_fetch_add(&dh->ref_count, 1);
+        fprintf(stderr, "%s[%p]: Ref: %d\n", __func__, dh, n);
+    }
     return dh;
 }
 

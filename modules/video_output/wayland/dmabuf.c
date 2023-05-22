@@ -64,7 +64,9 @@ typedef struct subplane_s {
 
 typedef struct subpic_ent_s {
     struct wl_buffer * wb;
+    struct dmabuf_h * dh;
     picture_t * pic;
+    bool update;
 } subpic_ent_t;
 
 
@@ -95,6 +97,22 @@ struct vout_display_sys_t
     subplane_t subplanes[MAX_SUBPICS];
     subpic_ent_t subpics[MAX_SUBPICS];
 };
+
+static void
+chequerboard(uint32_t *const data, unsigned int stride, const unsigned int width, const unsigned int height)
+{
+    stride /= sizeof(uint32_t);
+
+    /* Draw checkerboxed background */
+    for (unsigned int y = 0; y < height; ++y) {
+        for (unsigned int x = 0; x < width; ++x) {
+            if ((x + y / 8 * 8) % 16 < 8)
+                data[y * stride + x] = 0xFF666666;
+            else
+                data[y * stride + x] = 0xFFEEEEEE;
+        }
+    }
+}
 
 
 static void
@@ -184,11 +202,40 @@ static const struct wl_buffer_listener subpic_buffer_listener = {
     .release = subpic_buffer_release,
 };
 
-static struct wl_buffer *
-copy_pic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, picture_t * const src)
+static void
+copy_xxxa_with_premul(void * dst_data, int dst_stride,
+                      const void * src_data, int src_stride,
+                      const unsigned int x, const unsigned int y,
+                      const unsigned int w, const unsigned int h,
+                      const unsigned int global_alpha)
 {
-    unsigned int w = src->format.i_visible_width;
-    unsigned int h = src->format.i_visible_height;
+    uint8_t * dst = (uint8_t*)dst_data + dst_stride * y + x * 4;
+    const uint8_t * src = (uint8_t*)src_data + src_stride * y + x * 4;
+    const int src_inc = src_stride - (int)w * 4;
+    const int dst_inc = dst_stride - (int)w * 4;
+
+    for (unsigned int i = 0; i != h; ++i)
+    {
+        for (unsigned int j = 0; j != w; ++j, src+=4, dst += 4)
+        {
+            unsigned int a = src[3] * global_alpha * 258;
+            const unsigned int k = 0x800000;
+            dst[0] = (src[0] * a + k) >> 24;
+            dst[1] = (src[1] * a + k) >> 24;
+            dst[2] = (src[2] * a + k) >> 24;
+            dst[3] = (src[3] * global_alpha * 257 + 0x8000) >> 16;
+        }
+        src += src_inc;
+        dst += dst_inc;
+    }
+}
+
+static int
+copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, picture_t * const src,
+                        struct dmabuf_h ** pDmabuf_h, struct wl_buffer ** pW_buffer)
+{
+    unsigned int w = src->format.i_width;
+    unsigned int h = src->format.i_height;
     size_t stride = src->p[0].i_pitch;
     size_t size = h * stride;
     struct dmabuf_h * dh = picpool_get(sys->subpic_pool, size);
@@ -196,9 +243,12 @@ copy_pic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, picture
     const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format);
     struct wl_buffer * w_buffer = NULL;
 
+    fprintf(stderr, "%s: %.4s %dx%d, stride=%zd, surface=%p\n", __func__,
+            (char*)&drm_fmt, w, h, stride, sys->embed->handle.wl);
+
     dmabuf_write_start(dh);
-#warning Needs premul alpha
-    memcpy(dmabuf_map(dh), src->p[0].p_pixels, size);
+    copy_xxxa_with_premul(dmabuf_map(dh), stride, src->p[0].p_pixels, src->p[0].i_pitch,
+                          0, 0, w, h, 0xff);
     dmabuf_write_end(dh);
 
     params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1_bind);
@@ -211,13 +261,14 @@ copy_pic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, picture
     w_buffer = zwp_linux_buffer_params_v1_create_immed(params, w, h, drm_fmt, 0);
     zwp_linux_buffer_params_v1_destroy(params);
 
-    wl_buffer_add_listener(w_buffer, &subpic_buffer_listener, dh);
+    *pW_buffer = w_buffer;
+    *pDmabuf_h = dh;
 
-    return w_buffer;
+    return VLC_SUCCESS;
 
 error:
     dmabuf_unref(&dh);
-    return NULL;
+    return VLC_EGENERIC;
 }
 
 
@@ -437,6 +488,21 @@ out:
     return NULL;
 }
 
+static void
+subpic_ent_flush(subpic_ent_t * const spe)
+{
+    if (spe->pic != NULL) {
+        picture_Release(spe->pic);
+        spe->pic = NULL;
+    }
+    if (spe->wb)
+    {
+        wl_buffer_destroy(spe->wb);
+        spe->wb = NULL;
+    }
+    dmabuf_unref(&spe->dh);
+}
+
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 {
     vout_display_sys_t *sys = vd->sys;
@@ -456,18 +522,13 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
             // We keep a ref to the previous pic to ensure that the same picture
             // structure doesn't get reused and confuse us.
             if (src != dst->pic) {
-                wl_buffer_destroy(dst->wb);
-                dst->wb = NULL;
-                if (dst->pic != NULL) {
-                    picture_Release(dst->pic);
-                    dst->pic = NULL;
-                }
+                subpic_ent_flush(dst);
 
-                dst->wb = copy_pic_to_w_buffer(vd, sys, src);
-                if (dst->wb == NULL)
+                if (copy_subpic_to_w_buffer(vd, sys, src, &dst->dh, &dst->wb) != 0)
                     continue;
 
                 dst->pic = picture_Hold(src);
+                dst->update = true;
             }
 
             if (++n == MAX_SUBPICS)
@@ -479,25 +540,38 @@ subpics_done:
     // Clear any other entries
     for (; n != MAX_SUBPICS; ++n) {
         subpic_ent_t * const dst = sys->subpics + n;
-        if (dst->pic != NULL) {
-            picture_Release(dst->pic);
-            dst->pic = NULL;
-        }
-        if (dst->wb != NULL)
-        {
-            wl_buffer_destroy(dst->wb);
-            dst->wb = NULL;
-        }
+
+        if (dst->dh != NULL)
+            dst->update = true;
+        subpic_ent_flush(dst);
     }
 
     (void)pic;
-    (void) subpic;
 }
 
 static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 {
     vout_display_sys_t *sys = vd->sys;
     struct wl_display *display = sys->embed->display.wl;
+
+    msg_Info(vd, "%s: surface=%p", __func__, sys->embed->handle.wl);
+
+    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
+    {
+        subpic_ent_t * const spe = sys->subpics + i;
+
+        if (!spe->update)
+            continue;
+
+        msg_Info(vd, "%s: Update subpic %i: wb=%p dh=%p", __func__, i, spe->wb, spe->dh);
+        if (spe->wb != NULL)
+            wl_buffer_add_listener(spe->wb, &subpic_buffer_listener, dmabuf_ref(spe->dh));
+        wl_surface_attach(sys->subplanes[i].surface, spe->wb, 0, 0);
+        wl_subsurface_set_position(sys->subplanes[i].subsurface, 20, 20);
+        wl_surface_commit(sys->subplanes[i].surface);
+        spe->wb = NULL;
+        spe->update = false;
+    }
 
     do_display_dmabuf(vd, sys, pic);
 
@@ -695,47 +769,35 @@ static const struct wl_registry_listener registry_cbs =
 static void
 shm_buffer_release(void *data, struct wl_buffer *wl_buffer)
 {
-	(void)data;
-	/* Sent by the compositor when it's no longer using this buffer */
-	wl_buffer_destroy(wl_buffer);
+    (void)data;
+    /* Sent by the compositor when it's no longer using this buffer */
+    wl_buffer_destroy(wl_buffer);
 }
 
 static const struct wl_buffer_listener shm_buffer_listener = {
-	.release = shm_buffer_release,
+    .release = shm_buffer_release,
 };
-
-static void
-chequerboard(uint32_t *const data, unsigned int stride, const unsigned int width, const unsigned int height)
-{
-    stride /= sizeof(uint32_t);
-
-	/* Draw checkerboxed background */
-	for (unsigned int y = 0; y < height; ++y) {
-		for (unsigned int x = 0; x < width; ++x) {
-			if ((x + y / 8 * 8) % 16 < 8)
-				data[y * stride + x] = 0xFF666666;
-			else
-				data[y * stride + x] = 0xFFEEEEEE;
-		}
-	}
-}
 
 static struct wl_buffer *
 draw_frame(vout_display_sys_t *sys)
 {
-	const int width = 640, height = 480;
-	int stride = width * 4;
+    const int width = 640, height = 480;
+    int stride = width * 4;
     uint32_t *data = sys->shm_mmap;
 
-	struct wl_buffer *buffer = wl_shm_pool_create_buffer(sys->shm_pool, 0,
-			width, height, stride, WL_SHM_FORMAT_XRGB8888);
+    struct wl_buffer *buffer = wl_shm_pool_create_buffer(sys->shm_pool, 0,
+            width, height, stride, WL_SHM_FORMAT_XRGB8888);
 
     chequerboard(data, stride, width, height);
 
-	wl_buffer_add_listener(buffer, &shm_buffer_listener, NULL);
-	return buffer;
+    wl_buffer_add_listener(buffer, &shm_buffer_listener, NULL);
+    return buffer;
 }
 
+static const vlc_fourcc_t subpic_chromas[] = {
+    VLC_CODEC_RGBA,
+    0
+};
 
 static int Open(vlc_object_t *obj)
 {
@@ -854,7 +916,7 @@ static int Open(vlc_object_t *obj)
         wl_surface_commit(sys->subplanes[0].surface);
 #endif
     }
-
+#if 1
     {
         unsigned int width = 640;
         unsigned int height = 480;
@@ -881,11 +943,13 @@ static int Open(vlc_object_t *obj)
         wl_surface_attach(sys->subplanes[0].surface, w_buffer, 0, 0);
         wl_surface_commit(sys->subplanes[0].surface);
 
+        msg_Info(vd, "%s: surface=%p", __func__, sys->embed->handle.wl);
     }
-
+#endif
     sys->curr_aspect = vd->source;
 
     vd->info.has_pictures_invalid = sys->viewport == NULL;
+    vd->info.subpicture_chromas = subpic_chromas;
 
     vd->pool = vd_dmabuf_pool;
     vd->prepare = Prepare;

@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 
@@ -170,7 +171,7 @@ static pool_ent_t * pool_ent_alloc_new(picpool_ctl_t * const pc, size_t req_size
     // Alloc
     if ((ent->db = dmabuf_realloc(pc->dbsc, NULL, req_size)) == NULL)
         goto fail1;
-
+    fprintf(stderr, "%s: ent %p db %p\n", __func__, ent, ent->db);
     ent->size = alloc_size;
     return ent;
 
@@ -197,12 +198,10 @@ static void pool_recycle(picpool_ctl_t * const pc, pool_ent_t * const ent)
 
     n = atomic_fetch_sub(&ent->ref_count, 1) - 1;
 
-//    printf("%s: Pool: %p: Ent: %p: %d\n", __func__, &pc->ent_pool, ent, n);
+    fprintf(stderr, "%s: Pool: %p: Ent: %p: %d dh: %p\n", __func__, &pc->ent_pool, ent, n, ent->db);
 
     if (n != 0)
         return;
-
-#warning Release CB
 
     vlc_mutex_lock(&pc->lock);
 
@@ -232,12 +231,14 @@ static int pool_predel_cb(struct dmabuf_h * dh, void * v)
     pool_ent_t * const ent = v;
     picpool_ctl_t * pc = ent->pc;
 
+    assert(ent->db == dh);
+
     ent->pc = NULL;
     dmabuf_ref(dh);
     dmabuf_predel_cb_unset(dh);
     pool_recycle(pc, ent);
     picpool_unref(&pc);
-    return 0;
+    return 1;  // Do not delete
 }
 
 struct dmabuf_h * picpool_get(picpool_ctl_t * const pc, size_t req_size)
@@ -272,6 +273,7 @@ struct dmabuf_h * picpool_get(picpool_ctl_t * const pc, size_t req_size)
     atomic_store(&best->ref_count, 1);
     best->pc = picpool_ref(pc);
     dmabuf_predel_cb_set(best->db, pool_predel_cb, best);
+    fprintf(stderr, "%s: find ent %p db %p\n", __func__, best, best->db);
     return best->db;
 }
 
