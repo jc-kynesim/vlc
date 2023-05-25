@@ -52,7 +52,7 @@
 #include "../../codec/avcodec/drm_pic.h"
 #include <libavutil/hwcontext_drm.h>
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 #define MAX_PICTURES 4
 #define MAX_SUBPICS  6
@@ -96,12 +96,6 @@ struct vout_display_sys_t
     struct zwp_linux_dmabuf_v1 * linux_dmabuf_v1_bind;
     struct wl_subcompositor *subcompositor;
 
-    struct wl_shm *shm;
-    int shm_fd;
-    struct wl_shm_pool *shm_pool;
-    void * shm_mmap;
-    unsigned int shm_size;
-
     picture_pool_t *vlc_pic_pool; /* picture pool */
 
     int x;
@@ -144,7 +138,13 @@ video_compositor(const vout_display_sys_t * const sys)
     return sys->embed->compositor.wl;
 }
 
-
+#if VIDEO_ON_SUBSURFACE
+static inline struct wl_surface *
+bkg_surface(const vout_display_sys_t * const sys)
+{
+    return sys->embed->handle.wl;
+}
+#endif
 
 static inline int_fast32_t
 place_rescale_1s(int_fast32_t x, uint_fast32_t mul, uint_fast32_t div)
@@ -415,80 +415,6 @@ chequerboard(uint32_t *const data, unsigned int stride, const unsigned int width
     }
 }
 
-
-static void
-shm_pool_init(vout_display_sys_t * const sys)
-{
-    sys->shm_fd = -1;
-    sys->shm_mmap = MAP_FAILED;
-    sys->shm_size = 0;
-    sys->shm_pool = NULL;
-}
-
-static void
-shm_pool_close(vout_display_sys_t * const sys)
-{
-    if (sys->shm_pool != NULL)
-    {
-        wl_shm_pool_destroy(sys->shm_pool);
-        sys->shm_pool = NULL;
-    }
-    if (sys->shm_mmap != MAP_FAILED)
-    {
-        munmap(sys->shm_mmap, sys->shm_size);
-        sys->shm_mmap = MAP_FAILED;
-    }
-    sys->shm_size = 0;
-    if (sys->shm_fd != -1)
-    {
-        vlc_close(sys->shm_fd);
-        sys->shm_fd = -1;
-    }
-}
-
-static int
-shm_pool_create(vout_display_t * const vd, vout_display_sys_t * const sys, unsigned int shm_size)
-{
-    const long pagemask = sysconf(_SC_PAGE_SIZE) - 1;
-
-    sys->shm_fd = vlc_memfd();
-    if (sys->shm_fd == -1)
-    {
-        msg_Err(vd, "cannot create buffers: %s", vlc_strerror_c(errno));
-        goto error;
-    }
-
-    sys->shm_size = (shm_size + pagemask) & ~pagemask;
-
-    if (ftruncate(sys->shm_fd, sys->shm_size))
-    {
-        msg_Err(vd, "cannot allocate buffers: %s", vlc_strerror_c(errno));
-        goto error;
-    }
-
-    sys->shm_mmap = mmap(NULL, sys->shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, sys->shm_fd, 0);
-    if (sys->shm_mmap == MAP_FAILED)
-    {
-        msg_Err(vd, "cannot map buffers: %s", vlc_strerror_c(errno));
-        goto error;
-    }
-
-    memset(sys->shm_mmap, 0x80, sys->shm_size); /* gray fill */
-
-    sys->shm_pool = wl_shm_create_pool(sys->shm, sys->shm_fd, sys->shm_size);
-    if (sys->shm_pool == NULL)
-    {
-        msg_Err(vd, "failed wl_shm_create_pool");
-        goto error;
-    }
-
-    return VLC_SUCCESS;
-
-error:
-    shm_pool_close(sys);
-    return VLC_EGENERIC;
-}
-
 static void
 subpic_buffer_release(void *data, struct wl_buffer *wl_buffer)
 {
@@ -544,8 +470,8 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
     const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format);
     struct wl_buffer * w_buffer = NULL;
 
-    fprintf(stderr, "%s: %.4s %dx%d, stride=%zd, surface=%p\n", __func__,
-            (char*)&drm_fmt, w, h, stride, video_surface(sys));
+    fprintf(stderr, "%s: %.4s %dx%d, stride=%zd, surface=%p, ftell=%zd\n", __func__,
+            (char*)&drm_fmt, w, h, stride, video_surface(sys), (size_t)lseek(dmabuf_fd(dh), 0, SEEK_END));
 
     dmabuf_write_start(dh);
     copy_xxxa_with_premul(dmabuf_map(dh), stride, src->p[0].p_pixels, src->p[0].i_pitch,
@@ -699,6 +625,7 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
 
     zwp_linux_buffer_params_v1_destroy(params);
 
+    wl_proxy_set_queue((struct wl_proxy *)w_buffer, sys->eventq);
     wl_buffer_add_listener(w_buffer, &w_buffer_listener, dmabuf_w_env_new(vd, pic->context));
 
     // All offsetting seems bust right now
@@ -707,9 +634,11 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     wl_surface_damage(surface, 0, 0, INT32_MAX, INT32_MAX);
     wl_surface_commit(surface);
 
-#if VIDEO_ON_SUBSURFACE
-//    wl_surface_commit(sys->embed->handle.wl);
-#endif
+    // With VIDEO_ON_SUBSURFACE we need a sync on the background here
+    // too if the video surface isn't desync.  Desync is set, but wayland
+    // can force sync if the bkg surface is a sync subsurface.
+    // Try adding a bkg surface sync here if things freeze with
+    // VIDEO_ON_SUBSURFACE set but don't with it unset
 
     return NULL;
 }
@@ -731,8 +660,12 @@ subpic_ent_flush(subpic_ent_t * const spe)
 
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 {
-    vout_display_sys_t *sys = vd->sys;
+    vout_display_sys_t * const sys = vd->sys;
     unsigned int n = 0;
+
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
+#endif
 
     // Attempt to import the subpics
     for (subpicture_t * spic = subpic; spic != NULL; spic = spic->p_next)
@@ -749,7 +682,6 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 
                 if (copy_subpic_to_w_buffer(vd, sys, src, &dst->dh, &dst->wb) != 0)
                     continue;
-
 
                 dst->pic = picture_Hold(src);
                 dst->update = true;
@@ -792,12 +724,20 @@ subpics_done:
     }
 
     (void)pic;
+
+#if TRACE_ALL
+    msg_Dbg(vd, ">>> %s: Surface: %p", __func__, sys->embed->handle.wl);
+#endif
 }
 
 static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 {
-    vout_display_sys_t *sys = vd->sys;
-    struct wl_display *display = sys->embed->display.wl;
+    vout_display_sys_t * const sys = vd->sys;
+    struct wl_display * const display = sys->embed->display.wl;
+
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
+#endif
 
     for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
     {
@@ -830,18 +770,34 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     if (subpic)
         subpicture_Delete(subpic);
     picture_Release(pic);
+
+#if TRACE_ALL
+    msg_Dbg(vd, ">>> %s: Surface: %p", __func__, sys->embed->handle.wl);
+#endif
 }
 
 static void ResetPictures(vout_display_t *vd)
 {
     vout_display_sys_t *sys = vd->sys;
 
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
+#endif
+
     kill_pool(sys);
+
+#if TRACE_ALL
+    msg_Dbg(vd, ">>> %s: Surface: %p", __func__, sys->embed->handle.wl);
+#endif
 }
 
 static int Control(vout_display_t *vd, int query, va_list ap)
 {
-    vout_display_sys_t *sys = vd->sys;
+    vout_display_sys_t * const sys = vd->sys;
+
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
+#endif
 
     switch (query)
     {
@@ -888,8 +844,9 @@ static int Control(vout_display_t *vd, int query, va_list ap)
                 cfg = va_arg(ap, const vout_display_cfg_t *);
             }
 
-            vout_display_place_t place;
 #if !VIDEO_ON_SUBSURFACE
+            vout_display_place_t place;
+
             vout_display_PlacePicture(&place, &sys->curr_aspect, vd->cfg, false);
             sys->x += place.width / 2;
             sys->y += place.height / 2;
@@ -936,6 +893,10 @@ static int Control(vout_display_t *vd, int query, va_list ap)
              msg_Err(vd, "unknown request %d", query);
              return VLC_EGENERIC;
     }
+
+#if TRACE_ALL
+    msg_Dbg(vd, ">>> %s: Surface: %p", __func__, sys->embed->handle.wl);
+#endif
     return VLC_SUCCESS;
 }
 
@@ -974,26 +935,6 @@ static const struct zwp_linux_dmabuf_v1_listener linux_dmabuf_v1_listener = {
     .modifier = linux_dmabuf_v1_listener_modifier,
 };
 
-
-static void shm_format_cb(void *data, struct wl_shm *shm, uint32_t format)
-{
-    vout_display_t *vd = data;
-    char str[4];
-
-    memcpy(str, &format, sizeof (str));
-
-    if (format >= 0x20202020)
-        msg_Dbg(vd, "format %.4s (0x%08"PRIx32")", str, format);
-    else
-        msg_Dbg(vd, "format %4"PRIu32" (0x%08"PRIx32")", format, format);
-    (void) shm;
-}
-
-static const struct wl_shm_listener shm_cbs =
-{
-    shm_format_cb,
-};
-
 static void registry_global_cb(void *data, struct wl_registry *registry,
                                uint32_t name, const char *iface, uint32_t vers)
 {
@@ -1005,11 +946,6 @@ static void registry_global_cb(void *data, struct wl_registry *registry,
     if (strcmp(iface, wl_subcompositor_interface.name) == 0)
         sys->subcompositor = wl_registry_bind(registry, name, &wl_subcompositor_interface, 1);
     else
-    if (!strcmp(iface, "wl_shm")) {
-        sys->shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
-        wl_shm_add_listener(sys->shm, &shm_cbs, vd);
-    }
-    else
     if (!strcmp(iface, "wp_viewporter"))
         sys->viewporter = wl_registry_bind(registry, name,
                                            &wp_viewporter_interface, 1);
@@ -1019,6 +955,7 @@ static void registry_global_cb(void *data, struct wl_registry *registry,
     else
     if (strcmp(iface, zwp_linux_dmabuf_v1_interface.name) == 0) {
         sys->linux_dmabuf_v1_bind = wl_registry_bind(registry, name, &zwp_linux_dmabuf_v1_interface, 3);
+        wl_proxy_set_queue((struct wl_proxy *)sys->linux_dmabuf_v1_bind, sys->eventq);
         zwp_linux_dmabuf_v1_add_listener(sys->linux_dmabuf_v1_bind, &linux_dmabuf_v1_listener, vd);
     }
 }
@@ -1038,32 +975,133 @@ static const struct wl_registry_listener registry_cbs =
     registry_global_remove_cb,
 };
 
+
 static void
-shm_buffer_release(void *data, struct wl_buffer *wl_buffer)
+clear_surface_buffer(struct wl_surface * surface)
 {
-    (void)data;
-    /* Sent by the compositor when it's no longer using this buffer */
-    wl_buffer_destroy(wl_buffer);
+    if (surface == NULL)
+        return;
+    wl_surface_attach(surface, NULL, 0, 0);
+    wl_surface_commit(surface);
 }
 
-static const struct wl_buffer_listener shm_buffer_listener = {
-    .release = shm_buffer_release,
-};
-
-static struct wl_buffer *
-draw_frame(vout_display_sys_t *sys)
+static void
+clear_all_buffers(vout_display_sys_t *sys)
 {
-    const int width = 640, height = 480;
-    int stride = width * 4;
-    uint32_t *data = sys->shm_mmap;
+    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
+    {
+        subpic_ent_t * const spe = sys->subpics + i;
+        subpic_ent_flush(spe);
 
-    struct wl_buffer *buffer = wl_shm_pool_create_buffer(sys->shm_pool, 0,
-            width, height, stride, WL_SHM_FORMAT_XRGB8888);
+        clear_surface_buffer(sys->subplanes[i].surface);
+    }
 
-    chequerboard(data, stride, width, height);
+    clear_surface_buffer(video_surface(sys));
 
-    wl_buffer_add_listener(buffer, &shm_buffer_listener, NULL);
-    return buffer;
+#if VIDEO_ON_SUBSURFACE
+    clear_surface_buffer(bkg_surface(sys));
+#endif
+}
+
+static void
+subsurface_destroy(struct wl_subsurface ** const ppsubsurface)
+{
+    if (*ppsubsurface == NULL)
+        return;
+    wl_subsurface_destroy(*ppsubsurface);
+    *ppsubsurface = NULL;
+}
+
+static void
+surface_destroy(struct wl_surface ** const ppsurface)
+{
+    if (*ppsurface == NULL)
+        return;
+    wl_surface_destroy(*ppsurface);
+    *ppsurface = NULL;
+}
+
+static void
+viewport_destroy(struct wp_viewport ** const ppviewport)
+{
+    if (*ppviewport == NULL)
+        return;
+    wp_viewport_destroy(*ppviewport);
+    *ppviewport = NULL;
+}
+
+
+static void Close(vlc_object_t *obj)
+{
+    vout_display_t *vd = (vout_display_t *)obj;
+    vout_display_sys_t *sys = vd->sys;
+
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
+#endif
+
+    wl_display_flush(sys->embed->display.wl);
+
+    clear_all_buffers(sys);
+
+    // This should be the last point we need to process anything on the event Q
+    if (sys->eventq != NULL)
+    {
+        wl_display_roundtrip_queue(sys->embed->display.wl, sys->eventq);
+    }
+
+    // Free subpic resources
+    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
+    {
+        subplane_t * const spe = sys->subplanes + i;
+
+        viewport_destroy(&spe->viewport);
+        subsurface_destroy(&spe->subsurface);
+        surface_destroy(&spe->surface);
+    }
+
+    viewport_destroy(&sys->viewport);
+
+#if VIDEO_ON_SUBSURFACE
+    subsurface_destroy(&sys->video_subsurface);
+    surface_destroy(&sys->video_surface);
+
+    viewport_destroy(&sys->bkg_viewport);
+#endif
+
+    msg_Dbg(vd, "--- %s: 10", __func__);
+
+    wl_display_roundtrip_queue(sys->embed->display.wl, sys->eventq);
+
+    msg_Dbg(vd, "--- %s: 20", __func__);
+
+    ResetPictures(vd);
+    picpool_unref(&sys->subpic_pool);
+
+#warning Event Q leak - but crash due to trying to put stuff on this Q otherwise
+//    wl_event_queue_destroy(sys->eventq);
+    sys->eventq = NULL;
+
+    if (sys->viewporter != NULL)
+        wp_viewporter_destroy(sys->viewporter);
+    if (sys->linux_dmabuf_v1_bind != NULL)
+        zwp_linux_dmabuf_v1_destroy(sys->linux_dmabuf_v1_bind);
+    if (sys->subcompositor != NULL)
+        wl_subcompositor_destroy(sys->subcompositor);
+
+    msg_Dbg(vd, "--- %s: 30", __func__);
+
+    vout_display_DeleteWindow(vd, sys->embed);
+
+    msg_Dbg(vd, "--- %s: 40", __func__);
+
+    free(sys->subpic_chromas);
+
+    free(sys);
+
+#if TRACE_ALL
+    msg_Dbg(vd, ">>> %s", __func__);
+#endif
 }
 
 static void
@@ -1092,12 +1130,12 @@ static int Open(vlc_object_t *obj)
         return VLC_ENOMEM;
 
     vd->sys = sys;
-    shm_pool_init(sys);
 
     /* Get window */
     sys->embed = vout_display_NewWindow(vd, VOUT_WINDOW_TYPE_WAYLAND);
     if (sys->embed == NULL)
         goto error;
+
 
     struct wl_display *display = sys->embed->display.wl;
 
@@ -1138,13 +1176,6 @@ static int Open(vlc_object_t *obj)
 
         if (n == 0)
             msg_Warn(vd, "No compatible subpic formats found");
-    }
-
-    // Create a backing store pool for subs etc.
-    if (shm_pool_create(vd, sys, 0x1000000) != 0)
-    {
-        msg_Err(vd, "shm pool create failed");
-        goto error;
     }
 
     {
@@ -1252,6 +1283,8 @@ static int Open(vlc_object_t *obj)
         zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), 0, 0, stride, 0, 0);
         w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, DRM_FORMAT_XRGB8888, 0);
         zwp_linux_buffer_params_v1_destroy(params);
+
+        wl_proxy_set_queue((struct wl_proxy *)w_buffer, sys->eventq);
         wl_buffer_add_listener(w_buffer, &subpic_buffer_listener, dh);
 
         wl_surface_attach(bkg_surface, w_buffer, 0, 0);
@@ -1259,9 +1292,11 @@ static int Open(vlc_object_t *obj)
         sys->bkg_viewport = wp_viewporter_get_viewport(sys->viewporter, bkg_surface);
         wp_viewport_set_destination(sys->bkg_viewport, vd->cfg->display.width, vd->cfg->display.height);
         mark_all_surface_opaque(video_compositor(sys), bkg_surface);
+
         wl_surface_commit(bkg_surface);
     }
 #endif
+
     sys->curr_aspect = vd->source;
 
     vd->info.has_pictures_invalid = sys->viewport == NULL;
@@ -1275,35 +1310,10 @@ static int Open(vlc_object_t *obj)
     return VLC_SUCCESS;
 
 error:
-    if (sys->eventq != NULL)
-        wl_event_queue_destroy(sys->eventq);
-    if (sys->embed != NULL)
-        vout_display_DeleteWindow(vd, sys->embed);
-    free(sys);
+    Close(obj);
     return VLC_EGENERIC;
 }
 
-static void Close(vlc_object_t *obj)
-{
-    vout_display_t *vd = (vout_display_t *)obj;
-    vout_display_sys_t *sys = vd->sys;
-
-    ResetPictures(vd);
-    shm_pool_close(sys);
-    picpool_unref(&sys->subpic_pool);
-
-    if (sys->viewport != NULL)
-        wp_viewport_destroy(sys->viewport);
-    if (sys->viewporter != NULL)
-        wp_viewporter_destroy(sys->viewporter);
-    wl_display_flush(sys->embed->display.wl);
-    wl_event_queue_destroy(sys->eventq);
-    vout_display_DeleteWindow(vd, sys->embed);
-
-    free(sys->subpic_chromas);
-
-    free(sys);
-}
 
 vlc_module_begin()
     set_shortname(N_("WL DMABUF"))

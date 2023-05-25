@@ -389,6 +389,10 @@ static int buf_cma_alloc(struct dmabufs_ctl * const dbsc, struct dmabuf_h * dh, 
 
     dh->fd = data.fd;
     dh->size = (size_t)data.len;
+
+    fprintf(stderr, "%s: size=%#zx, ftell=%#zx\n", __func__,
+            dh->size, (size_t)lseek(dh->fd, 0, SEEK_END));
+
     return 0;
 }
 

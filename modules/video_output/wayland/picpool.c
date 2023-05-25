@@ -169,10 +169,10 @@ static pool_ent_t * pool_ent_alloc_new(picpool_ctl_t * const pc, size_t req_size
     ent->next = ent->prev = NULL;
 
     // Alloc
-    if ((ent->db = dmabuf_realloc(pc->dbsc, NULL, req_size)) == NULL)
+    if ((ent->db = dmabuf_realloc(pc->dbsc, NULL, alloc_size)) == NULL)
         goto fail1;
-    fprintf(stderr, "%s: ent %p db %p\n", __func__, ent, ent->db);
-    ent->size = alloc_size;
+    fprintf(stderr, "%s: ent %p db %p req=%zd size=%zd\n", __func__, ent, ent->db, req_size, alloc_size);
+    ent->size = dmabuf_size(ent->db);
     return ent;
 
 fail1:
@@ -273,7 +273,7 @@ struct dmabuf_h * picpool_get(picpool_ctl_t * const pc, size_t req_size)
     atomic_store(&best->ref_count, 1);
     best->pc = picpool_ref(pc);
     dmabuf_predel_cb_set(best->db, pool_predel_cb, best);
-    fprintf(stderr, "%s: find ent %p db %p\n", __func__, best, best->db);
+    fprintf(stderr, "%s: find ent %p db %p size %zd\n", __func__, best, best->db, best->size);
     return best->db;
 }
 
