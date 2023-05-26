@@ -135,9 +135,6 @@ void VideoWidget::refreshHandles()
     p_window->handle.wl = static_cast<wl_surface*>(
         qni->nativeResourceForWindow(QByteArrayLiteral("surface"),
                                      window));
-    p_window->compositor.wl = static_cast<wl_compositor*>(
-        qni->nativeResourceForWindow(QByteArrayLiteral("compositor"),
-                                     window));
     p_window->display.wl = static_cast<wl_display*>(
         qni->nativeResourceForIntegration(QByteArrayLiteral("wl_display")));
 #endif
