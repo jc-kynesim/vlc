@@ -470,8 +470,8 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
     const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format);
     struct wl_buffer * w_buffer = NULL;
 
-    fprintf(stderr, "%s: %.4s %dx%d, stride=%zd, surface=%p, ftell=%zd\n", __func__,
-            (char*)&drm_fmt, w, h, stride, video_surface(sys), (size_t)lseek(dmabuf_fd(dh), 0, SEEK_END));
+//    fprintf(stderr, "%s: %.4s %dx%d, stride=%zd, surface=%p, ftell=%zd\n", __func__,
+//            (char*)&drm_fmt, w, h, stride, video_surface(sys), (size_t)lseek(dmabuf_fd(dh), 0, SEEK_END));
 
     dmabuf_write_start(dh);
     copy_xxxa_with_premul(dmabuf_map(dh), stride, src->p[0].p_pixels, src->p[0].i_pitch,
@@ -523,51 +523,16 @@ static picture_pool_t *vd_dmabuf_pool(vout_display_t * const vd, unsigned count)
     return sys->vlc_pic_pool;
 }
 
-struct dmabuf_w_env_s {
-    picture_context_t * pic_ctx;
-    vout_display_t * vd;
-    int x, y;
-    int w;
-    int h;
-};
-
-static struct dmabuf_w_env_s *
-dmabuf_w_env_new(vout_display_t * const vd, picture_context_t * pic_ctx)
-{
-    vout_display_sys_t * const sys = vd->sys;
-    struct dmabuf_w_env_s * const dbe = calloc(1, sizeof(*dbe));
-    if (!dbe)
-        return NULL;
-    dbe->pic_ctx = pic_ctx->copy(pic_ctx);
-    dbe->vd = vd;
-//    dbe->w = vd->cfg->display.width;
-//    dbe->h = vd->cfg->display.height;
-    msg_Dbg(vd, "%s: (%d,%d)", __func__, sys->x, sys->y);
-    dbe->x = sys->x;
-    dbe->y = sys->y;
-    dbe->w = vd->fmt.i_visible_width;
-    dbe->h = vd->fmt.i_visible_height;
-
-    return dbe;
-}
-
-static void
-dmabuf_w_env_delete(struct dmabuf_w_env_s * const dbe)
-{
-    msg_Dbg(dbe->vd, "%s", __func__);
-    dbe->pic_ctx->destroy(dbe->pic_ctx);
-    free(dbe);
-}
-
+// Avoid use of vd here as there's a possibility this will be called after
+// it has gone
 static void
 w_buffer_release(void *data, struct wl_buffer *wl_buffer)
 {
-    struct dmabuf_w_env_s * const dbe = data;
-    msg_Dbg(dbe->vd, "%s", __func__);
+    struct picture_context_t * const ctx = data;
 
     /* Sent by the compositor when it's no longer using this buffer */
     wl_buffer_destroy(wl_buffer);
-    dmabuf_w_env_delete(dbe);
+    ctx->destroy(ctx);
 }
 
 static const struct wl_buffer_listener w_buffer_listener = {
@@ -626,9 +591,10 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     zwp_linux_buffer_params_v1_destroy(params);
 
     wl_proxy_set_queue((struct wl_proxy *)w_buffer, sys->eventq);
-    wl_buffer_add_listener(w_buffer, &w_buffer_listener, dmabuf_w_env_new(vd, pic->context));
+    wl_buffer_add_listener(w_buffer, &w_buffer_listener, pic->context->copy(pic->context));
 
-    // All offsetting seems bust right now
+    // Don't try to offset - it doesn't seem to work
+    // (and the API is version dependant)
     wl_surface_attach(surface, w_buffer, 0, 0);
 
     wl_surface_damage(surface, 0, 0, INT32_MAX, INT32_MAX);

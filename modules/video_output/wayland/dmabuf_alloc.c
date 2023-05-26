@@ -138,7 +138,7 @@ void dmabuf_unref(struct dmabuf_h ** const ppdh)
     *ppdh = NULL;
 
     n = atomic_fetch_sub(&dh->ref_count, 1);
-    fprintf(stderr, "%s[%p]: Ref: %d\n", __func__, dh, n);
+//    fprintf(stderr, "%s[%p]: Ref: %d\n", __func__, dh, n);
     if (n != 0)
         return;
 
@@ -153,7 +153,8 @@ struct dmabuf_h * dmabuf_ref(struct dmabuf_h * const dh)
     if (dh != NULL)
     {
         int n = atomic_fetch_add(&dh->ref_count, 1);
-        fprintf(stderr, "%s[%p]: Ref: %d\n", __func__, dh, n);
+//        fprintf(stderr, "%s[%p]: Ref: %d\n", __func__, dh, n);
+        (void)n;
     }
     return dh;
 }
@@ -390,8 +391,8 @@ static int buf_cma_alloc(struct dmabufs_ctl * const dbsc, struct dmabuf_h * dh, 
     dh->fd = data.fd;
     dh->size = (size_t)data.len;
 
-    fprintf(stderr, "%s: size=%#zx, ftell=%#zx\n", __func__,
-            dh->size, (size_t)lseek(dh->fd, 0, SEEK_END));
+//    fprintf(stderr, "%s: size=%#zx, ftell=%#zx\n", __func__,
+//            dh->size, (size_t)lseek(dh->fd, 0, SEEK_END));
 
     return 0;
 }
