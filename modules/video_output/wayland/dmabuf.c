@@ -93,6 +93,7 @@ struct vout_display_sys_t
     struct wp_viewporter *viewporter;
     struct wp_viewport *viewport;
     struct zwp_linux_dmabuf_v1 * linux_dmabuf_v1;
+    struct wl_compositor *compositor;
     struct wl_subcompositor *subcompositor;
 
     picture_pool_t *vlc_pic_pool; /* picture pool */
@@ -134,7 +135,8 @@ video_surface(const vout_display_sys_t * const sys)
 static inline struct wl_compositor *
 video_compositor(const vout_display_sys_t * const sys)
 {
-    return sys->embed->compositor.wl;
+    return sys->compositor;
+//    return sys->embed->compositor.wl;
 }
 
 #if VIDEO_ON_SUBSURFACE
@@ -961,7 +963,12 @@ static void registry_global_cb(void *data, struct wl_registry *registry,
         sys->viewporter = wl_registry_bind(registry, name, &wp_viewporter_interface, 1);
     else
     if (!strcmp(iface, "wl_compositor"))
-        sys->use_buffer_transform = vers >= 2;
+    {
+        if (vers >= 4)
+            sys->compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 4);
+        else
+            msg_Warn(vd, "Interface %s wanted v 4 got v %d", wl_compositor_interface.name, vers);
+    }
     else
     if (strcmp(iface, zwp_linux_dmabuf_v1_interface.name) == 0)
     {
@@ -1059,6 +1066,8 @@ static void Close(vlc_object_t *obj)
         zwp_linux_dmabuf_v1_destroy(sys->linux_dmabuf_v1);
     if (sys->subcompositor != NULL)
         wl_subcompositor_destroy(sys->subcompositor);
+    if (sys->compositor != NULL)
+        wl_compositor_destroy(sys->compositor);
 
     wl_display_flush(sys->embed->display.wl);
 
