@@ -38,6 +38,7 @@
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 
 #include <vlc_common.h>
+#include <vlc_cpu.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
 #include <vlc_picture_pool.h>
@@ -48,6 +49,7 @@
 
 #include "dmabuf_alloc.h"
 #include "picpool.h"
+#include "rgba_premul_aarch64.h"
 #include "../drmu/drmu_vlc_fmts.h"
 #include "../../codec/avcodec/drm_pic.h"
 #include <libavutil/hwcontext_drm.h>
@@ -488,15 +490,9 @@ static const struct wl_buffer_listener subpic_buffer_listener = {
     .release = subpic_buffer_release,
 };
 
-void
-copy_xxxa_with_premul_aarch64(void * dst_data, int dst_stride,
-                      const void * src_data, int src_stride,
-                      const unsigned int w, const unsigned int h,
-                      const unsigned int global_alpha);
-
 // x, y src offset, not dest
 static void
-copy_xxxa_with_premul(void * dst_data, int dst_stride,
+copy_xxxa_with_premul_c(void * dst_data, int dst_stride,
                       const void * src_data, int src_stride,
                       const unsigned int w, const unsigned int h,
                       const unsigned int global_alpha)
@@ -522,6 +518,36 @@ copy_xxxa_with_premul(void * dst_data, int dst_stride,
     }
 }
 
+static void
+copy_xxxa_with_premul(void * dst_data, int dst_stride,
+                      const void * src_data, int src_stride,
+                      const unsigned int w, const unsigned int h,
+                      const unsigned int global_alpha)
+{
+#ifdef HAVE_AARCH64_ASM
+    if (vlc_CPU_ARM64_NEON())
+        copy_xxxa_with_premul_aarch64(dst_data, dst_stride, src_data, src_stride, w, h, global_alpha);
+    else
+#endif
+    copy_xxxa_with_premul_c(dst_data, dst_stride, src_data, src_stride, w, h, global_alpha);
+}
+
+// Has the optimization of copying as a single lump if strides are the same
+// and the width is fairly close to the stride
+// at the expense of possibly overwriting some bytes outside the active area
+// (but within the frame)
+static void
+copy_frame_xxxa_with_premul(void * dst_data, int dst_stride,
+                      const void * src_data, int src_stride,
+                      const unsigned int w, const unsigned int h,
+                      const unsigned int global_alpha)
+{
+    if (dst_stride == src_stride && (dst_stride & 3) == 0 && (int)w * 4 <= dst_stride && (int)w * 4 + 64 >= dst_stride)
+        copy_xxxa_with_premul(dst_data, dst_stride, src_data, src_stride, h * dst_stride / 4, 1, global_alpha);
+    else
+        copy_xxxa_with_premul(dst_data, dst_stride, src_data, src_stride, w, h, global_alpha);
+}
+
 static int
 copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, picture_t * const src,
                         struct dmabuf_h ** pDmabuf_h, struct wl_buffer ** pW_buffer)
@@ -545,7 +571,7 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
     }
 
     dmabuf_write_start(dh);
-    copy_xxxa_with_premul_aarch64(dmabuf_map(dh), stride, src->p[0].p_pixels, src->p[0].i_pitch, w, h, 0xff);
+    copy_frame_xxxa_with_premul(dmabuf_map(dh), stride, src->p[0].p_pixels, src->p[0].i_pitch, w, h, 0xff);
     dmabuf_write_end(dh);
 
     params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1);

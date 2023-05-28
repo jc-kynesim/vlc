@@ -236,18 +236,21 @@ video_output/wayland/linux-dmabuf-unstable-v1-protocol.c: \
 libwl_dmabuf_plugin_la_SOURCES = video_output/wayland/dmabuf.c\
 	video_output/wayland/picpool.c video_output/wayland/picpool.h\
 	video_output/wayland/dmabuf_alloc.c video_output/wayland/dmabuf_alloc.h\
-	video_output/drmu/drmu_vlc_fmts.c video_output/drmu/drmu_vlc_fmts.h\
-	video_output/wayland/rgba_premul.S
+	video_output/drmu/drmu_vlc_fmts.c video_output/drmu/drmu_vlc_fmts.h
 nodist_libwl_dmabuf_plugin_la_SOURCES = \
 	video_output/wayland/viewporter-client-protocol.h \
 	video_output/wayland/viewporter-protocol.c \
 	video_output/wayland/linux-dmabuf-unstable-v1-client-protocol.h \
 	video_output/wayland/linux-dmabuf-unstable-v1-protocol.c
-
 libwl_dmabuf_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
 	-I$(builddir)/video_output/wayland
 libwl_dmabuf_plugin_la_CFLAGS = $(WAYLAND_CLIENT_CFLAGS)
 libwl_dmabuf_plugin_la_LIBADD = $(WAYLAND_CLIENT_LIBS)
+if HAVE_ARM64
+libwl_dmabuf_plugin_la_SOURCES += video_output/wayland/rgba_premul_aarch64.S\
+	video_output/wayland/rgba_premul_aarch64.h
+libwl_dmabuf_plugin_la_CFLAGS += -DHAVE_AARCH64_ASM=1
+endif
 CLEANFILES += $(nodist_libwl_dmabuf_plugin_la_SOURCES)
 
 libwl_shell_plugin_la_SOURCES = video_output/wayland/shell.c
