@@ -1,6 +1,33 @@
 set -e
 BASE=`pwd`
 
+DO_BOOTSTRAP=
+DO_MAKE=
+
+while [ "$1" != "" ] ; do
+    case $1 in
+	--make)
+	    DO_MAKE=1
+	    ;;
+	--bootstrap)
+	    DO_BOOTSTRAP=1
+	    ;;
+	*)
+	    echo "Usage $0: [--bootstrap] [--make]"
+	    echo "  bootstrap Do bootstrap before configure"
+	    echo "            (will always bootstrap if clean)"
+	    echo "  make      Do make after configure"
+	    exit 1
+	    ;;
+    esac
+    shift
+done
+
+if [ ! -f $BASE/configure ]; then
+  echo "configure not found - will bootstrap"
+  DO_BOOTSTRAP=1
+fi
+
 CONF_MMAL=--disable-mmal
 
 # uname -m gives kernel type which may not have the same
@@ -31,6 +58,11 @@ USR_PREFIX=$OUT/install
 LIB_PREFIX=$USR_PREFIX/lib/$A
 INC_PREFIX=$USR_PREFIX/include/$A
 
+if [ $DO_BOOTSTRAP ]; then
+  echo "Bootstrapping"
+  ./bootstrap
+fi
+
 echo "Configuring in $OUT"
 mkdir -p $OUT
 # Nothing under here need worry git - including this .gitignore!
@@ -48,3 +80,6 @@ $BASE/configure \
  $CONF_MMAL
 echo "Configured in $OUT"
 
+if [ $DO_MAKE ]; then
+  make -j8
+fi
