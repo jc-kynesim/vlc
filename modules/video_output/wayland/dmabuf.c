@@ -38,7 +38,6 @@
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 
 #include <vlc_common.h>
-#include <vlc_cpu.h>
 #include <vlc_plugin.h>
 #include <vlc_vout_display.h>
 #include <vlc_picture_pool.h>
@@ -49,7 +48,7 @@
 
 #include "dmabuf_alloc.h"
 #include "picpool.h"
-#include "rgba_premul_aarch64.h"
+#include "rgba_premul.h"
 #include "../drmu/drmu_vlc_fmts.h"
 #include "../../codec/avcodec/drm_pic.h"
 #include <libavutil/hwcontext_drm.h>
@@ -489,64 +488,6 @@ subpic_buffer_release(void *data, struct wl_buffer *wl_buffer)
 static const struct wl_buffer_listener subpic_buffer_listener = {
     .release = subpic_buffer_release,
 };
-
-// x, y src offset, not dest
-static void
-copy_xxxa_with_premul_c(void * dst_data, int dst_stride,
-                      const void * src_data, int src_stride,
-                      const unsigned int w, const unsigned int h,
-                      const unsigned int global_alpha)
-{
-    uint8_t * dst = (uint8_t*)dst_data;
-    const uint8_t * src = (uint8_t*)src_data;
-    const int src_inc = src_stride - (int)w * 4;
-    const int dst_inc = dst_stride - (int)w * 4;
-
-    for (unsigned int i = 0; i != h; ++i)
-    {
-        for (unsigned int j = 0; j != w; ++j, src+=4, dst += 4)
-        {
-            unsigned int a = src[3] * global_alpha * 258;
-            const unsigned int k = 0x800000;
-            dst[0] = (src[0] * a + k) >> 24;
-            dst[1] = (src[1] * a + k) >> 24;
-            dst[2] = (src[2] * a + k) >> 24;
-            dst[3] = (src[3] * global_alpha * 257 + 0x8000) >> 16;
-        }
-        src += src_inc;
-        dst += dst_inc;
-    }
-}
-
-static void
-copy_xxxa_with_premul(void * dst_data, int dst_stride,
-                      const void * src_data, int src_stride,
-                      const unsigned int w, const unsigned int h,
-                      const unsigned int global_alpha)
-{
-#ifdef HAVE_AARCH64_ASM
-    if (vlc_CPU_ARM64_NEON())
-        copy_xxxa_with_premul_aarch64(dst_data, dst_stride, src_data, src_stride, w, h, global_alpha);
-    else
-#endif
-    copy_xxxa_with_premul_c(dst_data, dst_stride, src_data, src_stride, w, h, global_alpha);
-}
-
-// Has the optimization of copying as a single lump if strides are the same
-// and the width is fairly close to the stride
-// at the expense of possibly overwriting some bytes outside the active area
-// (but within the frame)
-static void
-copy_frame_xxxa_with_premul(void * dst_data, int dst_stride,
-                      const void * src_data, int src_stride,
-                      const unsigned int w, const unsigned int h,
-                      const unsigned int global_alpha)
-{
-    if (dst_stride == src_stride && (dst_stride & 3) == 0 && (int)w * 4 <= dst_stride && (int)w * 4 + 64 >= dst_stride)
-        copy_xxxa_with_premul(dst_data, dst_stride, src_data, src_stride, h * dst_stride / 4, 1, global_alpha);
-    else
-        copy_xxxa_with_premul(dst_data, dst_stride, src_data, src_stride, w, h, global_alpha);
-}
 
 static int
 copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, picture_t * const src,
