@@ -53,6 +53,11 @@
 .endm
 
 function copy_xxxa_with_premul_aarch64
+        mov             x29, lr         // Stash return addr
+        // Sanity check w & h
+        cbz             w4, 90f
+        cbz             w5, 90f
+
         // Put alpha values somewhere we can use them
         mov             w7, #257        // Would like 258 but 258*255 overflows h
         mul             w7, w7, w6
@@ -63,17 +68,26 @@ function copy_xxxa_with_premul_aarch64
         sub             w1, w1, w4, LSL #2
         sub             w3, w3, w4, LSL #2
 
-        // If w % 16 != 0 then -16 so the main loop runs 1 fewer times with
-        // the remainder done in the tail
-        tst             w4, #15
-        beq             1f
-        sub             w4, w4, #16
-1:
-
         // Top of height loop
 20:
+        // Align destination before main loop
+        tst             x0, #63
         mov             w6, w4
+        beq             1f
 
+        ubfm            w6, w0, #2, #5
+        eor             w6, w6, #15
+        bl              50f
+        sub             w6, w4, w6
+1:
+        // If w % 16 != 0 then -16 so the main loop runs 1 fewer times with
+        // the remainder done in the tail
+        tst             w6, #15
+        beq             1f
+        subs            w6, w6, #16
+        // Check for no iterations of main loop
+        ble             15f
+1:
         // Top of width loop
 10:
         ld4             {v0.16b, v1.16b, v2.16b, v3.16b}, [x2], #64
@@ -83,15 +97,29 @@ function copy_xxxa_with_premul_aarch64
         mul_rgb         v2, v3, v7.h[1], v16, v17
 
         mul_a           v3, v6, v16, v17
+        subs            w6, w6, #16
 
         st4             {v0.16b, v1.16b, v2.16b, v3.16b}, [x0], #64
 
-        subs            w6, w6, #16
         bgt             10b
-
-// Tail
+15:
+        // Tail
         beq             30f
 
+        bl              50f
+
+// Height loop
+30:
+        add             x2, x2, w3, SXTW
+        add             x0, x0, w1, SXTW
+        subs            w5, w5, #1
+        bne             20b
+
+90:
+        mov             lr, x29
+        ret
+
+50:
         tbz             w6, #3, 1f
         ld4             {v0.8b, v1.8b, v2.8b, v3.8b}, [x2], #32
 1:      tbz             w6, #2, 1f
@@ -125,13 +153,5 @@ function copy_xxxa_with_premul_aarch64
 1:      tbz             w6, #0, 1f
         st4             {v0.b, v1.b, v2.b, v3.b}[14], [x0], #4
 1:
-
-// Height loop
-30:
-        add             x2, x2, w3, SXTW
-        add             x0, x0, w1, SXTW
-        subs            w5, w5, #1
-        bne             20b
-
         ret
 
