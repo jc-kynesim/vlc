@@ -17,22 +17,25 @@
 //
 // vC = (vC * vA * 257/256 * sG + 0x800000) >> 24
 .macro  mul_rgb vC, vA, sG, vT1, vT2
-        umull2          \vT1\().8h, \vC\().16b, \vA\().16b
-        usra            \vT1\().8h, \vT1\().8h, #8
-        umull2          \vT2\().4s, \vT1\().8h, \sG
-        umull           \vT1\().4s, \vT1\().4h, \sG
-        shrn            \vT1\().4h, \vT1\().4s, #16
-        shrn2           \vT1\().8h, \vT2\().4s, #16
 
-        umull           \vC\().8h,  \vC\().8b,  \vA\().8b
-        usra            \vC\().8h,  \vC\().8h,  #8
-        umull2          \vT2\().4s, \vC\().8h,  \sG
-        umull           \vC\().4s,  \vC\().4h,  \sG
+        umull           \vT2\().8h, \vC\().8b,  \vA\().8b
+        umull2          \vT1\().8h, \vC\().16b, \vA\().16b
+
+        usra            \vT2\().8h, \vT2\().8h, #8
+        usra            \vT1\().8h, \vT1\().8h, #8
+
+        umull           \vC\().4s,  \vT2\().4h, \sG
+        umull2          \vT2\().4s, \vT2\().8h, \sG
         shrn            \vC\().4h,  \vC\().4s,  #16
         shrn2           \vC\().8h,  \vT2\().4s, #16
 
+        umull           \vT2\().4s, \vT1\().4h, \sG
+        umull2          \vT1\().4s, \vT1\().8h, \sG
+        shrn            \vT2\().4h, \vT2\().4s, #16
+        shrn2           \vT2\().8h, \vT1\().4s, #16
+
         uqrshrn         \vC\().8b,  \vC\().8h,  #8
-        uqrshrn2        \vC\().16b, \vT1\().8h, #8
+        uqrshrn2        \vC\().16b, \vT2\().8h, #8
 .endm
 
 // rA   A         In/Out
@@ -40,13 +43,13 @@
 // rT1  tmp
 //
 // vA = (vA * vG *257/256 + 0x80) >> 8
-.macro  mul_a vA, vG, vT1
-        umull2          \vT1\().8h, \vA\().16b, \vG\().16b           // Alpha
+.macro  mul_a vA, vG, vT1, vT2
+        umull           \vT1\().8h, \vA\().8b,  \vG\().8b           // Alpha
+        umull2          \vT2\().8h, \vA\().16b, \vG\().16b
         usra            \vT1\().8h, \vT1\().8h, #8              // * 257/256
-        umull           \vA\().8h,  \vA\().8b,  \vG\().8b
-        usra            \vA\().8h,  \vA\().8h,  #8
-        uqrshrn         \vA\().8b,  \vA\().8h,  #8
-        uqrshrn2        \vA\().16b, \vT1\().8h, #8
+        usra            \vT2\().8h, \vT2\().8h, #8
+        uqrshrn         \vA\().8b,  \vT1\().8h, #8
+        uqrshrn2        \vA\().16b, \vT2\().8h, #8
 .endm
 
 function copy_xxxa_with_premul_aarch64
@@ -79,7 +82,7 @@ function copy_xxxa_with_premul_aarch64
         mul_rgb         v1, v3, v7.h[1], v16, v17
         mul_rgb         v2, v3, v7.h[1], v16, v17
 
-        mul_a           v3, v6, v16
+        mul_a           v3, v6, v16, v17
 
         st4             {v0.16b, v1.16b, v2.16b, v3.16b}, [x0], #64
 
@@ -107,7 +110,7 @@ function copy_xxxa_with_premul_aarch64
         mul_rgb         v1, v3, v7.h[1], v16, v17
         mul_rgb         v2, v3, v7.h[1], v16, v17
 
-        mul_a           v3, v6, v16
+        mul_a           v3, v6, v16, v17
 
         tbz             w6, #3, 1f
         st4             {v0.8b, v1.8b, v2.8b, v3.8b}, [x0], #32
