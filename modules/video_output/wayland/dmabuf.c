@@ -82,6 +82,7 @@ typedef struct subpic_ent_s {
     struct wl_buffer * wb;
     struct dmabuf_h * dh;
     picture_t * pic;
+    int alpha;
     vout_display_place_t dst_rect;
     vout_display_place_t src_rect;
     bool update;
@@ -491,6 +492,7 @@ static const struct wl_buffer_listener subpic_buffer_listener = {
 
 static int
 copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, picture_t * const src,
+                        int alpha,
                         struct dmabuf_h ** pDmabuf_h, struct wl_buffer ** pW_buffer)
 {
     unsigned int w = src->format.i_width;
@@ -512,7 +514,7 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
     }
 
     dmabuf_write_start(dh);
-    copy_frame_xxxa_with_premul(dmabuf_map(dh), stride, src->p[0].p_pixels, src->p[0].i_pitch, w, h, 0xff);
+    copy_xxxa_with_premul(dmabuf_map(dh), stride, src->p[0].p_pixels, src->p[0].i_pitch, w, h, alpha);
     dmabuf_write_end(dh);
 
     params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1);
@@ -676,13 +678,14 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
             // If the same picture then assume the same contents
             // We keep a ref to the previous pic to ensure that the same picture
             // structure doesn't get reused and confuse us.
-            if (src != dst->pic) {
+            if (src != dst->pic || sreg->i_alpha != dst->alpha) {
                 subpic_ent_flush(dst);
 
-                if (copy_subpic_to_w_buffer(vd, sys, src, &dst->dh, &dst->wb) != 0)
+                if (copy_subpic_to_w_buffer(vd, sys, src, sreg->i_alpha, &dst->dh, &dst->wb) != 0)
                     continue;
 
                 dst->pic = picture_Hold(src);
+                dst->alpha = sreg->i_alpha;
                 dst->update = true;
             }
 
@@ -744,7 +747,7 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
         if (!spe->update)
             continue;
 
-        msg_Dbg(vd, "%s: Update subpic %i: wb=%p dh=%p", __func__, i, spe->wb, spe->dh);
+        msg_Dbg(vd, "%s: Update subpic %i: wb=%p dh=%p alpha=%d", __func__, i, spe->wb, spe->dh, spe->alpha);
         if (spe->wb != NULL)
             wl_buffer_add_listener(spe->wb, &subpic_buffer_listener, dmabuf_ref(spe->dh));
         wl_surface_attach(sys->subplanes[i].surface, spe->wb, 0, 0);
