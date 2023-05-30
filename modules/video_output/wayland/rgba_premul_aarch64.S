@@ -53,7 +53,7 @@
 .endm
 
 function copy_xxxa_with_premul_aarch64
-        mov             x29, lr         // Stash return addr
+        mov             x15, lr         // Stash return addr
         // Sanity check w & h
         cbz             w4, 90f
         cbz             w5, 90f
@@ -129,7 +129,7 @@ function copy_xxxa_with_premul_aarch64
 
         // Return
 90:
-        mov             lr, x29
+        mov             lr, x15
         ret
 
 // Tail & Head core
