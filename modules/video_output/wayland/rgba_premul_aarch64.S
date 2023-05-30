@@ -68,30 +68,45 @@ function copy_xxxa_with_premul_aarch64
         sub             w1, w1, w4, LSL #2
         sub             w3, w3, w4, LSL #2
 
+        // Deal with very short stuff separately
+        // Saves annoying conditionals later
+        cmp             w4, #16
+        bge             22f
+
+        // Loop for w < 16
+        mov             w6, w4
+1:
+        bl              50f
+        add             x2, x2, w3, SXTW
+        add             x0, x0, w1, SXTW
+        subs            w5, w5, #1
+        bne             1b
+        b               90f
+
         // Top of height loop
 20:
+        add             x2, x2, w3, SXTW
+        add             x0, x0, w1, SXTW
+        subs            w5, w5, #1
+        beq             90f
+
+22:
         // Align destination before main loop
         tst             x0, #63
         mov             w6, w4
         beq             1f
+
         mov             w7, #16
         ubfm            w6, w0, #2, #5
         sub             w6, w7, w6
-        cmp             w6, w4
-        csel            w6, w6, w4, le
-
         bl              50f
-        subs            w6, w4, w6
-        beq             30f
+        sub             w6, w4, w6
 1:
         // If w % 16 != 0 then -16 so the main loop runs 1 fewer times with
         // the remainder done in the tail
         tst             w6, #15
-        beq             1f
-        subs            w6, w6, #16
-        // Check for no iterations of main loop
-        ble             15f
-1:
+        bne             15f
+
         // Top of width loop
 10:
         ld4             {v0.16b, v1.16b, v2.16b, v3.16b}, [x2], #64
@@ -99,33 +114,40 @@ function copy_xxxa_with_premul_aarch64
         mul_rgb         v0, v3, v7.h[1], v16, v17
         mul_rgb         v1, v3, v7.h[1], v16, v17
         mul_rgb         v2, v3, v7.h[1], v16, v17
-
         mul_a           v3, v6, v16, v17
-        subs            w6, w6, #16
 
         st4             {v0.16b, v1.16b, v2.16b, v3.16b}, [x0], #64
 
-        bgt             10b
 15:
+        subs            w6, w6, #16
+        bgt             10b
+        beq             20b             // No tail
+
         // Tail
-        beq             30f
-
         bl              50f
+        b               20b
 
-// Height loop
-30:
-        add             x2, x2, w3, SXTW
-        add             x0, x0, w1, SXTW
-        subs            w5, w5, #1
-        bne             20b
-
+        // Return
 90:
         mov             lr, x29
         ret
 
+// Tail & Head core
+// x8 written out as 8xst4 rather than as a single .8b as this should
+// still work for the head if we have dest that requires aligned writes
+//
+// w6   Noof pixels to convert
+//      Only bottom 3 bits considered, left unchanged on exit
 50:
         tbz             w6, #3, 1f
-        ld4             {v0.8b, v1.8b, v2.8b, v3.8b}, [x2], #32
+        ld4             {v0.b, v1.b, v2.b, v3.b}[0],  [x2], #4
+        ld4             {v0.b, v1.b, v2.b, v3.b}[1],  [x2], #4
+        ld4             {v0.b, v1.b, v2.b, v3.b}[2],  [x2], #4
+        ld4             {v0.b, v1.b, v2.b, v3.b}[3],  [x2], #4
+        ld4             {v0.b, v1.b, v2.b, v3.b}[4],  [x2], #4
+        ld4             {v0.b, v1.b, v2.b, v3.b}[5],  [x2], #4
+        ld4             {v0.b, v1.b, v2.b, v3.b}[6],  [x2], #4
+        ld4             {v0.b, v1.b, v2.b, v3.b}[7],  [x2], #4
 1:      tbz             w6, #2, 1f
         ld4             {v0.b, v1.b, v2.b, v3.b}[8],  [x2], #4
         ld4             {v0.b, v1.b, v2.b, v3.b}[9],  [x2], #4
@@ -141,11 +163,17 @@ function copy_xxxa_with_premul_aarch64
         mul_rgb         v0, v3, v7.h[1], v16, v17
         mul_rgb         v1, v3, v7.h[1], v16, v17
         mul_rgb         v2, v3, v7.h[1], v16, v17
-
         mul_a           v3, v6, v16, v17
 
         tbz             w6, #3, 1f
-        st4             {v0.8b, v1.8b, v2.8b, v3.8b}, [x0], #32
+        st4             {v0.b, v1.b, v2.b, v3.b}[0],  [x0], #4
+        st4             {v0.b, v1.b, v2.b, v3.b}[1],  [x0], #4
+        st4             {v0.b, v1.b, v2.b, v3.b}[2] , [x0], #4
+        st4             {v0.b, v1.b, v2.b, v3.b}[3],  [x0], #4
+        st4             {v0.b, v1.b, v2.b, v3.b}[4],  [x0], #4
+        st4             {v0.b, v1.b, v2.b, v3.b}[5],  [x0], #4
+        st4             {v0.b, v1.b, v2.b, v3.b}[6],  [x0], #4
+        st4             {v0.b, v1.b, v2.b, v3.b}[7],  [x0], #4
 1:      tbz             w6, #2, 1f
         st4             {v0.b, v1.b, v2.b, v3.b}[8],  [x0], #4
         st4             {v0.b, v1.b, v2.b, v3.b}[9],  [x0], #4

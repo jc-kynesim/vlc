@@ -161,6 +161,10 @@ static int
 docheck(const uint8_t * const a, const uint8_t * const b, const size_t n)
 {
     int t = 0;
+
+    if (!verbose)
+        return memcmp(a, b, n);
+
     for (size_t i = 0; i != n && t < 128; ++i)
     {
         if (a[i] != b[i])
@@ -213,6 +217,9 @@ checktest(const unsigned int w, const unsigned int h, const int stride, const in
 int
 main (int argc, char *argv[])
 {
+    if (argc >= 2 && strcmp(argv[1], "-v") == 0)
+        verbose = true;
+
     timetest(1920, 1080, 1920 * 4, true);
     timetest(1920, 1080, 1920 * 4, false);
     timetest(1917, 1080, 1920 * 4, false);
@@ -221,23 +228,18 @@ main (int argc, char *argv[])
 
     checktest(1920, 1080, 1920 * 4, 0);
 
+    // Stride of 65pel will rotate alignment vertically
     for (unsigned int i = 1; i != 64; ++i)
     {
-        checktest(i, 16, 64 * 4, 0);
-    }
-    for (unsigned int i = 0; i != 16; ++i)
-    {
-        checktest(5, 16, 64 * 4, i * 4);
-        checktest(15, 16, 64 * 4, i * 4);
-        checktest(32, 16, 64 * 4, i * 4);
-        checktest(43, 16, 64 * 4, i * 4);
+        checktest(i, 32, 65 * 4, 0);
     }
 
     if (!checkfail)
     {
         printf("All chacks passed\n");
     }
-    return 0;
+
+    return checkfail;
 }
 
 
