@@ -74,11 +74,15 @@ function copy_xxxa_with_premul_aarch64
         tst             x0, #63
         mov             w6, w4
         beq             1f
-
+        mov             w7, #16
         ubfm            w6, w0, #2, #5
-        eor             w6, w6, #15
+        sub             w6, w7, w6
+        cmp             w6, w4
+        csel            w6, w6, w4, le
+
         bl              50f
-        sub             w6, w4, w6
+        subs            w6, w4, w6
+        beq             30f
 1:
         // If w % 16 != 0 then -16 so the main loop runs 1 fewer times with
         // the remainder done in the tail
