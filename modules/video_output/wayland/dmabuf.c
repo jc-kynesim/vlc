@@ -514,7 +514,7 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
     }
 
     dmabuf_write_start(dh);
-    copy_xxxa_with_premul(dmabuf_map(dh), stride, src->p[0].p_pixels, src->p[0].i_pitch, w, h, alpha);
+    copy_frame_xxxa_with_premul(dmabuf_map(dh), stride, src->p[0].p_pixels, src->p[0].i_pitch, w, h, alpha);
     dmabuf_write_end(dh);
 
     params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1);
