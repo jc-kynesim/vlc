@@ -18,8 +18,8 @@
 // This won't be bit exact with aarch64 asm which has slightly different
 // rounding (this is faster when done in C)
 static void
-copy_xxxa_with_premul_c(void * dst_data, int dst_stride,
-                      const void * src_data, int src_stride,
+copy_xxxa_with_premul_c(void * restrict dst_data, int dst_stride,
+                      const void * restrict src_data, int src_stride,
                       const unsigned int w, const unsigned int h,
                       const unsigned int global_alpha)
 {
@@ -95,10 +95,10 @@ utime(void)
 
 // What the ASM is meant to do exactly
 static void
-copy_xxxa_with_premul_c_asm(void * dst_data, int dst_stride,
-                      const void * src_data, int src_stride,
+copy_xxxa_with_premul_c_asm(void * restrict dst_data, int dst_stride,
+                      const void * restrict src_data, int src_stride,
                       const unsigned int w, const unsigned int h,
-                      const unsigned int global_alpha)
+                      const uint8_t global_alpha)
 {
     uint8_t * dst = (uint8_t*)dst_data;
     const uint8_t * src = (uint8_t*)src_data;
