@@ -133,21 +133,12 @@ function copy_xxxa_with_premul_aarch64
         ret
 
 // Tail & Head core
-// x8 written out as 8xst4 rather than as a single .8b as this should
-// still work for the head if we have dest that requires aligned writes
 //
 // w6   Noof pixels to convert
 //      Only bottom 3 bits considered, left unchanged on exit
 50:
         tbz             w6, #3, 1f
-        ld4             {v0.b, v1.b, v2.b, v3.b}[0],  [x2], #4
-        ld4             {v0.b, v1.b, v2.b, v3.b}[1],  [x2], #4
-        ld4             {v0.b, v1.b, v2.b, v3.b}[2],  [x2], #4
-        ld4             {v0.b, v1.b, v2.b, v3.b}[3],  [x2], #4
-        ld4             {v0.b, v1.b, v2.b, v3.b}[4],  [x2], #4
-        ld4             {v0.b, v1.b, v2.b, v3.b}[5],  [x2], #4
-        ld4             {v0.b, v1.b, v2.b, v3.b}[6],  [x2], #4
-        ld4             {v0.b, v1.b, v2.b, v3.b}[7],  [x2], #4
+        ld4             {v0.8b, v1.8b, v2.8b, v3.8b}, [x2], #32
 1:      tbz             w6, #2, 1f
         ld4             {v0.b, v1.b, v2.b, v3.b}[8],  [x2], #4
         ld4             {v0.b, v1.b, v2.b, v3.b}[9],  [x2], #4
@@ -166,14 +157,7 @@ function copy_xxxa_with_premul_aarch64
         mul_a           v3, v6, v16, v17
 
         tbz             w6, #3, 1f
-        st4             {v0.b, v1.b, v2.b, v3.b}[0],  [x0], #4
-        st4             {v0.b, v1.b, v2.b, v3.b}[1],  [x0], #4
-        st4             {v0.b, v1.b, v2.b, v3.b}[2] , [x0], #4
-        st4             {v0.b, v1.b, v2.b, v3.b}[3],  [x0], #4
-        st4             {v0.b, v1.b, v2.b, v3.b}[4],  [x0], #4
-        st4             {v0.b, v1.b, v2.b, v3.b}[5],  [x0], #4
-        st4             {v0.b, v1.b, v2.b, v3.b}[6],  [x0], #4
-        st4             {v0.b, v1.b, v2.b, v3.b}[7],  [x0], #4
+        st4             {v0.8b, v1.8b, v2.8b, v3.8b}, [x0], #32
 1:      tbz             w6, #2, 1f
         st4             {v0.b, v1.b, v2.b, v3.b}[8],  [x0], #4
         st4             {v0.b, v1.b, v2.b, v3.b}[9],  [x0], #4
