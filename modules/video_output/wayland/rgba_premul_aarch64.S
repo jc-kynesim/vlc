@@ -26,13 +26,11 @@
 
         umull           \vC\().4s,  \vT2\().4h, \sG
         umull2          \vT2\().4s, \vT2\().8h, \sG
-        shrn            \vC\().4h,  \vC\().4s,  #16
-        shrn2           \vC\().8h,  \vT2\().4s, #16
+	uzp2		\vC\().8h,  \vC\().8h,  \vT2\().8h
 
         umull           \vT2\().4s, \vT1\().4h, \sG
         umull2          \vT1\().4s, \vT1\().8h, \sG
-        shrn            \vT2\().4h, \vT2\().4s, #16
-        shrn2           \vT2\().8h, \vT1\().4s, #16
+	uzp2		\vT2\().8h, \vT2\().8h, \vT1\().8h
 
         uqrshrn         \vC\().8b,  \vC\().8h,  #8
         uqrshrn2        \vC\().16b, \vT2\().8h, #8
