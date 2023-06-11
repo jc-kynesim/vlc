@@ -61,6 +61,9 @@ struct decoder_sys_t
     /* Video decoder specific part */
     date_t  pts;
 
+    mtime_t dts0;
+    bool dts0_used;
+
     /* Closed captions for decoders */
     cc_data_t cc;
 
@@ -587,6 +590,8 @@ static int InitVideoDecCommon( decoder_t *p_dec )
     /* ***** misc init ***** */
     date_Init(&p_sys->pts, 1, 30001);
     date_Set(&p_sys->pts, VLC_TICK_INVALID);
+    p_sys->dts0 = VLC_TICK_INVALID;
+    p_sys->dts0_used = false;
     p_sys->b_first_frame = true;
     p_sys->i_late_frames = 0;
     p_sys->b_from_preroll = false;
@@ -848,6 +853,8 @@ static void Flush( decoder_t *p_dec )
     AVCodecContext *p_context = p_sys->p_context;
 
     date_Set(&p_sys->pts, VLC_TICK_INVALID); /* To make sure we recover properly */
+    p_sys->dts0 = VLC_TICK_INVALID;
+    p_sys->dts0_used = false;
     p_sys->i_late_frames = 0;
     p_sys->b_draining = false;
     cc_Flush( &p_sys->cc );
@@ -875,6 +882,8 @@ static bool check_block_validity( decoder_sys_t *p_sys, block_t *block )
     if( block->i_flags & (BLOCK_FLAG_DISCONTINUITY|BLOCK_FLAG_CORRUPTED) )
     {
         date_Set( &p_sys->pts, VLC_TICK_INVALID ); /* To make sure we recover properly */
+        p_sys->dts0 = VLC_TICK_INVALID;
+        p_sys->dts0_used = false;
         cc_Flush( &p_sys->cc );
 
         p_sys->i_late_frames = 0;
@@ -1215,6 +1224,10 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
             }
             if( b_has_data )
             {
+                /* Remember 1st DTS in case we need to invent a timebase */
+                if (p_sys->dts0 <= VLC_TICK_INVALID)
+                    p_sys->dts0 = p_block->i_dts;
+
                 pkt->data = p_block->p_buffer;
                 pkt->size = p_block->i_buffer;
                 pkt->pts = p_block->i_pts > VLC_TICK_INVALID ? p_block->i_pts : AV_NOPTS_VALUE;
@@ -1320,6 +1333,17 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
 
         if( i_pts == AV_NOPTS_VALUE )
             i_pts = date_Get( &p_sys->pts );
+
+        /* VLC doesn't like having no pts - but a simple timestamp at the
+         * start of time is all that is needed to get it going - pick the
+         * first dts we saw as being in the right general area */
+        if (i_pts > VLC_TICK_INVALID)
+            p_sys->dts0_used = true;
+        else if (p_sys->dts0 > VLC_TICK_INVALID && !p_sys->dts0_used)
+        {
+            i_pts = p_sys->dts0;
+            p_sys->dts0_used = true;
+        }
 
         /* Interpolate the next PTS */
         if( i_pts > VLC_TICK_INVALID )
