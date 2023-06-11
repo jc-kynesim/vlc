@@ -237,7 +237,7 @@ static int load_display_module(vout_display_t * const vd,
 
     if ((x_vout->module = module_need(x_vout, cap, module_name, true)) == NULL)
     {
-        msg_Err(vd, "Failed to open Xsplitter:%s module", module_name);
+        msg_Dbg(vd, "Failed to open Xsplitter:%s module", module_name);
         goto fail;
     }
 
@@ -593,7 +593,7 @@ static int OpenMmalX11(vlc_object_t *object)
     sys->cur_desc = wanted_display(vd, sys);
     if (sys->cur_desc == NULL) {
         char dbuf0[5], dbuf1[5];
-        msg_Info(vd, "No valid output found for vout (%s/%s)", str_fourcc(dbuf0, vd->fmt.i_chroma), str_fourcc(dbuf1, vd->source.i_chroma));
+        msg_Warn(vd, "No valid output found for vout (%s/%s)", str_fourcc(dbuf0, vd->fmt.i_chroma), str_fourcc(dbuf1, vd->source.i_chroma));
         goto fail;
     }
 
