@@ -61,7 +61,6 @@
 
 #define DRM_VOUT_MODE_NAME "drm-vout-mode"
 #define DRM_VOUT_MODE_TEXT N_("Set this mode for display")
-
 #define DRM_VOUT_MODE_LONGTEXT N_("arg: <w>x<h>@<hz> Force mode to arg")
 
 #define DRM_VOUT_NO_MODESET_NAME "drm-vout-no-modeset"
@@ -82,7 +81,7 @@
 #define DRM_VOUT_DISPLAY_NAME "drm-vout-display"
 #define DRM_VOUT_DISPLAY_TEXT N_("Output device for Rpi fullscreen.")
 #define DRM_VOUT_DISPLAY_LONGTEXT N_("Output device for Rpi fullscreen. " \
-"Valid values are HDMI-1,HDMI-2.  By default if qt-fullscreen-screennumber " \
+"Valid values are HDMI-1,HDMI-2 or a drm connector name.  By default if qt-fullscreen-screennumber " \
 "is specified (or set by Fullscreen Output Device in Preferences) " \
 "HDMI-<qt-fullscreen-screennumber+1> will be used, otherwise HDMI-1.")
 
@@ -888,6 +887,8 @@ static int OpenDrmVout(vlc_object_t *object)
                 conn_name = "HDMI-A-1";
             else if (strcasecmp(display_name, "hdmi-2") == 0)
                 conn_name = "HDMI-A-2";
+            else
+                conn_name = display_name;
         }
 
         dname = conn_name != NULL ? conn_name : "<auto>";
