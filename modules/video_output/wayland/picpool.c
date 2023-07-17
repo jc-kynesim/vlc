@@ -264,8 +264,10 @@ struct dmabuf_h * picpool_get(picpool_ctl_t * const pc, size_t req_size)
 
     vlc_mutex_unlock(&pc->lock);
 
-    if (best == NULL)
-        best = pool_ent_alloc_new(pc, req_size);
+    if (best == NULL) {
+        if ((best = pool_ent_alloc_new(pc, req_size)) == NULL)
+            return NULL;
+    }
 
     if ((best->seq = ++pc->seq) == 0)
         best->seq = ++pc->seq;  // Never allow to be zero
