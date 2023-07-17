@@ -186,6 +186,7 @@ endif
 
 libdrm_vout_plugin_la_SOURCES = video_output/drmu/drm_vout.c \
 	video_output/drmu/drmu_vlc.c video_output/drmu/drmu_vlc.h \
+	video_output/drmu/drmu_vlc_fmts.c video_output/drmu/drmu_vlc_fmts.h \
 	video_output/drmu/drmu_fmts.c video_output/drmu/drmu_fmts.h \
 	video_output/drmu/drmu_chroma.h \
 	video_output/drmu/drmu_log.h video_output/drmu/drmu.c \
@@ -222,7 +223,31 @@ video_output/wayland/viewporter-client-protocol.h: \
 
 video_output/wayland/viewporter-protocol.c: \
 		$(WAYLAND_PROTOCOLS)/stable/viewporter/viewporter.xml
-	$(AM_V_GEN)$(WAYLAND_SCANNER) code $< $@
+	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
+
+video_output/wayland/linux-dmabuf-unstable-v1-client-protocol.h: \
+		$(WAYLAND_PROTOCOLS)/unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
+
+video_output/wayland/linux-dmabuf-unstable-v1-protocol.c: \
+		$(WAYLAND_PROTOCOLS)/unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
+
+libwl_dmabuf_plugin_la_SOURCES = video_output/wayland/dmabuf.c\
+	video_output/wayland/picpool.c video_output/wayland/picpool.h\
+	video_output/wayland/dmabuf_alloc.c video_output/wayland/dmabuf_alloc.h\
+	video_output/wayland/rgba_premul.c video_output/wayland/rgba_premul.h\
+	video_output/drmu/drmu_vlc_fmts.c video_output/drmu/drmu_vlc_fmts.h
+nodist_libwl_dmabuf_plugin_la_SOURCES = \
+	video_output/wayland/viewporter-client-protocol.h \
+	video_output/wayland/viewporter-protocol.c \
+	video_output/wayland/linux-dmabuf-unstable-v1-client-protocol.h \
+	video_output/wayland/linux-dmabuf-unstable-v1-protocol.c
+libwl_dmabuf_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
+	-I$(builddir)/video_output/wayland
+libwl_dmabuf_plugin_la_CFLAGS = $(WAYLAND_CLIENT_CFLAGS)
+libwl_dmabuf_plugin_la_LIBADD = $(WAYLAND_CLIENT_LIBS)
+CLEANFILES += $(nodist_libwl_dmabuf_plugin_la_SOURCES)
 
 libwl_shell_plugin_la_SOURCES = video_output/wayland/shell.c
 libwl_shell_plugin_la_CFLAGS = $(WAYLAND_CLIENT_CFLAGS)
@@ -261,6 +286,8 @@ libegl_wl_plugin_la_LIBADD = $(EGL_LIBS) $(WAYLAND_EGL_LIBS)
 if HAVE_WAYLAND
 BUILT_SOURCES += $(nodist_libwl_shm_plugin_la_SOURCES)
 vout_LTLIBRARIES += libwl_shm_plugin.la
+BUILT_SOURCES += $(nodist_libwl_dmabuf_plugin_la_SOURCES)
+vout_LTLIBRARIES += libwl_dmabuf_plugin.la
 vout_LTLIBRARIES += libwl_shell_plugin.la
 BUILT_SOURCES += $(nodist_libxdg_shell_plugin_la_SOURCES)
 vout_LTLIBRARIES += libxdg_shell_plugin.la
