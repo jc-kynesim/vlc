@@ -1233,7 +1233,7 @@ static int Open(vlc_object_t *obj)
 #if VIDEO_ON_SUBSURFACE
     // Build a background
     // This would be a perfect use of the single_pixel_surface extension
-    // However we don't seemn to support it
+    // However we don't seem to support it
     {
         unsigned int width = 640;
         unsigned int height = 480;
