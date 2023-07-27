@@ -29,6 +29,10 @@
 
 #define TRACE_PROP_NEW 0
 
+#ifndef OPT_IO_CALLOC
+#define OPT_IO_CALLOC 0
+#endif
+
 #ifndef DRM_FORMAT_P030
 #define DRM_FORMAT_P030 fourcc_code('P', '0', '3', '0')
 #endif
@@ -46,6 +50,18 @@ static inline int rvup(int rv1, int rv2)
     return rv2 ? rv2 : rv1;
 }
 
+// Use io_alloc when allocating arrays to pass into ioctls.
+//
+// When debugging with valgrind use calloc rather than malloc otherwise arrays
+// set by ioctls that valgrind doesn't know about (e.g. all drm ioctls) will
+// still be full of 'undefined'.
+// For normal use malloc should be fine
+#if OPT_IO_CALLOC
+#define io_alloc(p, n) (uintptr_t)((p) = calloc((n), sizeof(*(p))))
+#else
+#define io_alloc(p, n) (uintptr_t)((p) = malloc((n) * sizeof(*(p))))
+#endif
+
 // Alloc retry helper
 static inline int
 retry_alloc_u32(uint32_t ** const pp, uint32_t * const palloc_count, uint32_t const new_count)
@@ -54,7 +70,7 @@ retry_alloc_u32(uint32_t ** const pp, uint32_t * const palloc_count, uint32_t co
         return 0;
     free(*pp);
     *palloc_count = 0;
-    if ((*pp = malloc(sizeof(**pp) * new_count)) == NULL)
+    if (io_alloc(*pp, new_count) == 0)
         return -ENOMEM;
     *palloc_count = new_count;
     return 1;
@@ -255,7 +271,7 @@ drmu_blob_update(drmu_env_t * const du, drmu_blob_t ** const ppblob, const void 
 static int
 blob_data_read(drmu_env_t * const du, uint32_t blob_id, void ** const ppdata, size_t * plen)
 {
-    void * data;
+    uint8_t * data;
     struct drm_mode_get_blob gblob = {.blob_id = blob_id};
     int rv;
 
@@ -271,10 +287,9 @@ blob_data_read(drmu_env_t * const du, uint32_t blob_id, void ** const ppdata, si
     if (gblob.length == 0)
         return 0;
 
-    if ((data = malloc(gblob.length)) == NULL)
+    if ((gblob.data = io_alloc(data, gblob.length)) == 0)
         return -ENOMEM;
 
-    gblob.data = (uintptr_t)data;
     if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_GETPROPBLOB, &gblob)) != 0) {
         free(data);
         return rv;
@@ -458,7 +473,7 @@ drmu_prop_enum_new(drmu_env_t * const du, const uint32_t id)
         free(enums);
 
         pen->n = prop.count_enum_blobs;
-        if ((enums = malloc(pen->n * sizeof(*enums))) == NULL)
+        if (io_alloc(enums, pen->n) == 0)
             goto fail;
     }
     if (retries >= 8) {
@@ -1734,14 +1749,12 @@ props_get_properties(drmu_env_t * const du, const uint32_t objid, const uint32_t
         free(propids);
         propids = NULL;
         n = obj_props.count_props;
-        if ((values = malloc(n * sizeof(*values))) == NULL ||
-            (propids = malloc(n * sizeof(*propids))) == NULL) {
+        if ((obj_props.prop_values_ptr = io_alloc(values, n)) == 0 ||
+            (obj_props.props_ptr =       io_alloc(propids, n)) == 0) {
             drmu_err(du, "obj/value array alloc failed");
             rv = -ENOMEM;
             goto fail;
         }
-        obj_props.prop_values_ptr = (uintptr_t)values;
-        obj_props.props_ptr = (uintptr_t)propids;
     }
 
     *ppValues = values;
@@ -1913,16 +1926,17 @@ typedef struct drmu_crtc_s {
 } drmu_crtc_t;
 
 static void
-free_crtc(drmu_crtc_t * const dc)
+crtc_uninit(drmu_crtc_t * const dc)
 {
+    drmu_prop_range_delete(&dc->pid.active);
     drmu_blob_unref(&dc->mode_id_blob);
-    free(dc);
 }
 
 static void
-crtc_uninit(drmu_crtc_t * const dc)
+crtc_free(drmu_crtc_t * const dc)
 {
-    (void)dc;
+    crtc_uninit(dc);
+    free(dc);
 }
 
 
@@ -1995,7 +2009,7 @@ drmu_crtc_delete(drmu_crtc_t ** ppdc)
         return;
     *ppdc = NULL;
 
-    free_crtc(dc);
+    crtc_free(dc);
 }
 
 drmu_env_t *
@@ -2414,7 +2428,7 @@ conn_init(drmu_env_t * const du, drmu_conn_t * const dn, unsigned int conn_idx, 
 
         if (modes_req > dn->modes_size) {
             free(dn->modes);
-            if ((dn->modes = malloc(modes_req * sizeof(*dn->modes))) == NULL) {
+            if (io_alloc(dn->modes, modes_req) == 0) {
                 drmu_err(du, "Failed to alloc modes array");
                 goto fail;
             }
@@ -2425,7 +2439,7 @@ conn_init(drmu_env_t * const du, drmu_conn_t * const dn, unsigned int conn_idx, 
 
         if (encs_req > dn->enc_ids_size) {
             free(dn->enc_ids);
-            if ((dn->enc_ids = malloc(encs_req * sizeof(*dn->enc_ids))) == NULL) {
+            if (io_alloc(dn->enc_ids, encs_req) == 0) {
                 drmu_err(du, "Failed to alloc encs array");
                 goto fail;
             }
@@ -2618,17 +2632,10 @@ atomic_q_retry(drmu_atomic_q_t * const aq, drmu_env_t * const du)
 // Called after an atomic commit has completed
 // not called on every vsync, so if we haven't committed anything this won't be called
 static void
-drmu_atomic_page_flip_cb(int fd, unsigned int sequence, unsigned int tv_sec, unsigned int tv_usec, unsigned int crtc_id, void *user_data)
+drmu_atomic_page_flip_cb(drmu_env_t * const du, void *user_data)
 {
     drmu_atomic_t * const da = user_data;
-    drmu_env_t * const du = drmu_atomic_env(da);
     drmu_atomic_q_t * const aq = env_atomic_q(du);
-
-    (void)fd;
-    (void)sequence;
-    (void)tv_sec;
-    (void)tv_usec;
-    (void)crtc_id;
 
     // At this point:
     //  next   The atomic we are about to commit
@@ -2775,7 +2782,7 @@ typedef struct drmu_pool_s {
     struct drmu_env_s * du;
 
     pthread_mutex_t lock;
-    int dead;
+    bool dead;
 
     unsigned int seq;  // debug
 
@@ -2972,8 +2979,10 @@ drmu_pool_delete(drmu_pool_t ** const pppool)
         return;
     *pppool = NULL;
 
-    pool->dead = 1;
+    pool->dead = true;
+    pthread_mutex_lock(&pool->lock);
     pool_free_pool(pool);
+    pthread_mutex_unlock(&pool->lock);
 
     drmu_pool_unref(&pool);
 }
@@ -3260,6 +3269,7 @@ plane_uninit(drmu_plane_t * const dp)
     drmu_prop_enum_delete(&dp->pid.color_range);
     drmu_prop_enum_delete(&dp->pid.pixel_blend_mode);
     drmu_prop_enum_delete(&dp->pid.rotation);
+    drmu_prop_range_delete(&dp->pid.zpos);
     free(dp->formats_in);
     dp->formats_in = NULL;
 }
@@ -3686,20 +3696,56 @@ drmu_atomic_env_restore_add_snapshot(drmu_atomic_t ** const ppda)
     return drmu_atomic_merge(du->da_restore, &da);
 }
 
+#define EVT(p) ((const struct drm_event *)(p))
+static int
+evt_read(drmu_env_t * const du)
+{
+    uint8_t buf[128];
+    const ssize_t rlen = read(drmu_fd(du), buf, sizeof(buf));
+    size_t i;
+
+    if (rlen < 0) {
+        const int err = errno;
+        drmu_err(du, "Event read failure: %s", strerror(err));
+        return -err;
+    }
+
+    for (i = 0;
+         i + sizeof(struct drm_event) <= (size_t)rlen && EVT(buf + i)->length <= (size_t)rlen - i;
+         i += EVT(buf + i)->length) {
+        switch (EVT(buf + i)->type) {
+            case DRM_EVENT_FLIP_COMPLETE:
+            {
+                const struct drm_event_vblank * const vb = (struct drm_event_vblank*)(buf + i);
+                if (EVT(buf + i)->length < sizeof(*vb))
+                    break;
+
+                drmu_atomic_page_flip_cb(du, (void *)(uintptr_t)vb->user_data);
+                break;
+            }
+            default:
+                drmu_warn(du, "Unexpected DRM event #%x", EVT(buf + i)->type);
+                break;
+        }
+    }
+
+    if (i != (size_t)rlen)
+        drmu_warn(du, "Partial event received: len=%zd, processed=%zd", rlen, i);
+
+    return 0;
+}
+#undef EVT
+
 static void
 drmu_env_polltask_cb(void * v, short revents)
 {
     drmu_env_t * const du = v;
-    drmEventContext ctx = {
-        .version = DRM_EVENT_CONTEXT_VERSION,
-        .page_flip_handler2 = drmu_atomic_page_flip_cb,
-    };
 
     if (revents == 0) {
         drmu_debug(du, "%s: Timeout", __func__);
     }
     else {
-        drmHandleEvent(du->fd, &ctx);
+        evt_read(du);
     }
 
     pollqueue_add_task(du->pt, 1000);
