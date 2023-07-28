@@ -726,7 +726,8 @@ static void CloseDrmVout(vout_display_t *vd)
 
     for (i = 0; i != SUBPICS_MAX; ++i)
         drmu_plane_unref(sys->subplanes + i);
-    subpic_cache_flush(sys);
+
+    kill_pool(sys);
 
     drmu_plane_unref(&sys->dp);
     drmu_output_unref(&sys->dout);
@@ -861,9 +862,15 @@ static int OpenDrmVout(vlc_object_t *object)
             .v = vd,
             .max_level = DRMU_LOG_LEVEL_ALL
         };
-        if ((sys->du = drmu_env_new_xlease(&log)) == NULL &&
-            (sys->du = drmu_env_new_open(var_InheritString(vd, DRM_VOUT_MODULE_NAME), &log)) == NULL)
-            goto fail;
+
+        sys->du = drmu_env_new_xlease(&log);
+        if (sys->du == NULL) {
+            char * module_name = var_InheritString(vd, DRM_VOUT_MODULE_NAME);
+            sys->du = drmu_env_new_open(module_name, &log);
+            free(module_name);
+            if (sys->du == NULL)
+                goto fail;
+        }
     }
 
     drmu_env_restore_enable(sys->du);
@@ -876,9 +883,8 @@ static int OpenDrmVout(vlc_object_t *object)
     drmu_output_modeset_allow(sys->dout, !var_InheritBool(vd, DRM_VOUT_NO_MODESET_NAME));
     drmu_output_max_bpc_allow(sys->dout, !var_InheritBool(vd, DRM_VOUT_NO_MAX_BPC));
 
-
     {
-        const char *display_name = var_InheritString(vd, DRM_VOUT_DISPLAY_NAME);
+        char * const display_name = var_InheritString(vd, DRM_VOUT_DISPLAY_NAME);
         int qt_num = var_InheritInteger(vd, "qt-fullscreen-screennumber");
         const char * conn_name = qt_num == 0 ? "HDMI-A-1" :  qt_num == 1 ? "HDMI-A-2" : NULL;
         const char * dname;
@@ -894,11 +900,15 @@ static int OpenDrmVout(vlc_object_t *object)
 
         dname = conn_name != NULL ? conn_name : "<auto>";
 
-        if ((rv = drmu_output_add_output(sys->dout, conn_name)) != 0) {
+        if ((rv = drmu_output_add_output(sys->dout, conn_name)) != 0)
             msg_Err(vd, "Failed to find output %s: %s", dname, strerror(-rv));
+        else
+            msg_Dbg(vd, "Using conn %s", dname);
+
+        free(display_name);
+
+        if (rv != 0)
             goto fail;
-        }
-        msg_Dbg(vd, "Using conn %s", dname);
     }
 
     if ((sys->sub_fb_pool = drmu_pool_new(sys->du, 10)) == NULL)
@@ -940,11 +950,17 @@ static int OpenDrmVout(vlc_object_t *object)
     vd->display = vd_drm_display;
     vd->control = vd_drm_control;
 
-    const char *modestr = var_InheritString(vd, DRM_VOUT_MODE_NAME);
     sys->mode_id = -1;
+
+    char * mode_name = NULL;
+    const char * modestr;
 
     if (var_InheritBool(vd, DRM_VOUT_SOURCE_MODESET_NAME))
         modestr = "source";
+    else {
+        mode_name = var_InheritString(vd, DRM_VOUT_MODE_NAME);
+        modestr = mode_name;
+    }
 
     if (modestr != NULL && strcmp(modestr, "none") != 0) {
         drmu_mode_simple_params_t pick = {
@@ -984,6 +1000,7 @@ static int OpenDrmVout(vlc_object_t *object)
                         mode->sar.num, mode->sar.den, pick.width, pick.height, pick.hz_x_1000 / 1000, pick.hz_x_1000 % 1000);
         }
     }
+    free(mode_name);
 
     set_format(vd, sys, fmtp);
 
@@ -991,7 +1008,7 @@ static int OpenDrmVout(vlc_object_t *object)
 //                               drmu_ufrac_vlc_to_rational(drmu_crtc_sar(sys->dc)));
 
     {
-        const char *window_str = var_InheritString(vd, DRM_VOUT_WINDOW_NAME);
+        char * const window_str = var_InheritString(vd, DRM_VOUT_WINDOW_NAME);
         if (strcmp(window_str, "fullscreen") == 0) {
             /* Leave req_win null */
             msg_Dbg(vd, "Window: fullscreen");
@@ -1005,6 +1022,7 @@ static int OpenDrmVout(vlc_object_t *object)
             else
                 msg_Warn(vd, "Window: '%s': cannot parse (usage: <w>x<h>+<x>+<y>) - using fullscreen", window_str);
         }
+        free(window_str);
     }
 
     if (src_chroma != vd->fmt.i_chroma)
