@@ -44,7 +44,6 @@ static int drm_va_get(vlc_va_t *va, picture_t *pic, uint8_t **data)
 static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
                 const es_format_t *fmt, picture_sys_t *p_sys)
 {
-    int err;
     VLC_UNUSED(fmt);
     VLC_UNUSED(p_sys);
 
@@ -53,18 +52,6 @@ static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
     if (pix_fmt != AV_PIX_FMT_DRM_PRIME)
         return VLC_EGENERIC;
 
-    enum AVHWDeviceType devtype = av_hwdevice_find_type_by_name("drm");
-    if (devtype == AV_HWDEVICE_TYPE_NONE) {
-        msg_Dbg(va, "No DRM device found in ffmpeg");
-        return VLC_EGENERIC;
-    }
-
-    // ctx->hw_device_ctx gets freed when we call avcodec_free_context
-    if ((err = av_hwdevice_ctx_create(&avctx->hw_device_ctx, devtype, NULL, NULL, 0)) < 0) {
-        msg_Err(va, "Failed to create specified HW device: %s", av_err2str(err));
-        goto error;
-    }
-
     // This gives us whatever the decode requires + 6 frames that will be
     // alloced by ffmpeg before it blocks (at least for Pi HEVC)
     avctx->extra_hw_frames = 6;
@@ -72,9 +59,6 @@ static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
     va->description = "DRM Video Accel";
     va->get = drm_va_get;
     return VLC_SUCCESS;
-
-error:
-    return VLC_EGENERIC;
 }
 
 static void Close(vlc_va_t *va, void **hwctx)

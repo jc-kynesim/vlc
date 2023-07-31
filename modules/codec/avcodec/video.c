@@ -671,17 +671,31 @@ static int InitVideoDec2( vlc_object_t *obj, const int hw )
     } else
         p_sys->palette_sent = true;
 
+    // If we want DRM_PRIME then we need to create the context before Open
+    // * This probably applies to anything that wants device_ctx init
+    {
+        const AVCodecHWConfig * hw_config;
+        for (int i = 0; (hw_config = avcodec_get_hw_config(p_codec, i)) != NULL; ++i)
+        {
+            if ((hw_config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) != 0 &&
+                hw_config->device_type == AV_HWDEVICE_TYPE_DRM)
+            {
+                int err;
+                if ((err = av_hwdevice_ctx_create(&p_context->hw_device_ctx, hw_config->device_type, NULL, NULL, 0)) < 0) {
+                    msg_Dbg(p_dec, "Failed to create specified HW device: %s", av_err2str(err));
+                    goto error;
+                }
+                break;
+            }
+        }
+    }
+
     /* ***** init this codec with special data ***** */
     ffmpeg_InitCodec( p_dec );
 
     /* ***** Open the codec ***** */
     if( OpenVideoCodec( p_dec ) < 0 )
-    {
-        vlc_sem_destroy( &p_sys->sem_mt );
-        free( p_sys );
-        avcodec_free_context( &p_context );
-        return VLC_EGENERIC;
-    }
+        goto error;
 
     p_dec->pf_decode = DecodeVideo;
     p_dec->pf_flush  = Flush;
@@ -692,6 +706,12 @@ static int InitVideoDec2( vlc_object_t *obj, const int hw )
     if( p_context->level != FF_LEVEL_UNKNOWN )
         p_dec->fmt_in.i_level = p_context->level;
     return VLC_SUCCESS;
+
+error:
+    vlc_sem_destroy( &p_sys->sem_mt );
+    free( p_sys );
+    avcodec_free_context( &p_context );
+    return VLC_EGENERIC;
 }
 
 int InitVideoDec( vlc_object_t *obj )
@@ -1624,7 +1644,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
     video_format_t fmt;
 
     /* Enumerate available formats */
-    enum PixelFormat def_swfmt = avcodec_default_get_format(p_context, pi_fmt);
+    enum PixelFormat def_swfmt = AV_PIX_FMT_NONE;
     bool can_hwaccel = false;
 
     for (size_t i = 0; pi_fmt[i] != AV_PIX_FMT_NONE; i++)
@@ -1638,6 +1658,8 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
                  hwaccel ? "hard" : "soft", pi_fmt[i], dsc->name );
         if (hwaccel)
             can_hwaccel = true;
+        else
+            def_swfmt = pi_fmt[i];
     }
 
     if (p_sys->pix_fmt == AV_PIX_FMT_NONE)
