@@ -964,17 +964,6 @@ static picture_t *ConvertRGB32AndBlend(vout_thread_t *vout, picture_t *pic,
     return NULL;
 }
 
-
-static inline bool is_zc_chroma(const vlc_fourcc_t i_chroma)
-{
-    return i_chroma == VLC_CODEC_MMAL_OPAQUE ||
-        i_chroma == VLC_CODEC_MMAL_ZC_I420 ||
-        i_chroma == VLC_CODEC_MMAL_ZC_RGB32 ||
-        i_chroma == VLC_CODEC_MMAL_ZC_SAND10 ||
-        i_chroma == VLC_CODEC_MMAL_ZC_SAND30 ||
-        i_chroma == VLC_CODEC_MMAL_ZC_SAND8;
-}
-
 static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
 {
     vout_thread_sys_t *sys = vout->p;
@@ -1109,7 +1098,7 @@ static int ThreadDisplayRenderPicture(vout_thread_t *vout, bool is_forced)
     }
 
     assert(vout_IsDisplayFiltered(vd) == !sys->display.use_dr);
-    if (sys->display.use_dr && !is_direct && !is_zc_chroma(todisplay->format.i_chroma)) {
+    if (sys->display.use_dr && !is_direct) {
         picture_t *direct = NULL;
         if (likely(vout->p->display_pool != NULL))
             direct = picture_pool_Get(vout->p->display_pool);
