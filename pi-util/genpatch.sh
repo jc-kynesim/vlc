@@ -61,7 +61,6 @@ git diff $REFNAME -- modules/video_chroma/chain.c > $DIFFBASE-002-chain.patch
 git diff $REFNAME -- bin/vlc.c > $DIFFBASE-003-vlc.patch
 git diff $REFNAME -- modules/video_output/caca.c > $DIFFBASE-004-caca.patch
 git diff $REFNAME -- modules/gui/qt/components/interface_widgets.* > $DIFFBASE-005-qt-wayland.patch
-git diff $REFNAME -- modules/gui/qt/qt.cpp > $DIFFBASE-006-qt-no-1st-run-dlg.patch
 cd $DSTDIR
 zip -m $ZIPNAME $PATCHNAME-*.patch
 
