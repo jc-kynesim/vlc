@@ -52,6 +52,7 @@ git diff $REFNAME -- \
  modules/video_output/Makefile.am \
  modules/video_output/drmu \
  modules/video_output/opengl \
+ modules/video_output/wayland \
  src/audio_output \
  src/input \
  src/misc \
