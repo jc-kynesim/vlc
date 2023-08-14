@@ -50,6 +50,7 @@
 #include "picpool.h"
 #include "rgba_premul.h"
 #include "../drmu/drmu_vlc_fmts.h"
+#include "../drmu/pollqueue.h"
 #include "../../codec/avcodec/drm_pic.h"
 #include <libavutil/hwcontext_drm.h>
 
@@ -120,6 +121,8 @@ struct vout_display_sys_t
     unsigned int bkg_w;
     unsigned int bkg_h;
 #endif
+
+    struct pollqueue * pollq;
 
     picpool_ctl_t * subpic_pool;
     subplane_t subplanes[MAX_SUBPICS];
@@ -614,21 +617,55 @@ static picture_pool_t *vd_dmabuf_pool(vout_display_t * const vd, unsigned count)
     return sys->vlc_pic_pool;
 }
 
+typedef struct video_dmabuf_release_env_ss
+{
+    struct picture_context_t * ctx;
+    struct pollqueue * pq;
+    int fd;
+    struct polltask * pt;
+} video_dmabuf_release_env_t;
+
+static void
+w_ctx_release(void * v, short revents)
+{
+    video_dmabuf_release_env_t * const vdre = v;
+    VLC_UNUSED(revents);
+
+    vdre->ctx->destroy(vdre->ctx);
+    polltask_delete(&vdre->pt);
+    free(vdre);
+}
+
 // Avoid use of vd here as there's a possibility this will be called after
 // it has gone
 static void
 w_buffer_release(void *data, struct wl_buffer *wl_buffer)
 {
-    struct picture_context_t * const ctx = data;
+    video_dmabuf_release_env_t * const vdre = data;
 
     /* Sent by the compositor when it's no longer using this buffer */
     buffer_destroy(&wl_buffer);
-    ctx->destroy(ctx);
+
+    vdre->pt = polltask_new(vdre->pq, vdre->fd, POLLOUT, w_ctx_release, vdre);
+    pollqueue_unref(&vdre->pq);
+    pollqueue_add_task(vdre->pt, -1);
 }
 
 static const struct wl_buffer_listener w_buffer_listener = {
     .release = w_buffer_release,
 };
+
+static video_dmabuf_release_env_t *
+vdre_new(struct picture_context_t * ctx, struct pollqueue * pq, int fd)
+{
+    video_dmabuf_release_env_t * vdre = malloc(sizeof(*vdre));
+    vdre->ctx = ctx->copy(ctx);
+    vdre->pq = pollqueue_ref(pq);
+    vdre->fd = fd;
+    vdre->pt = NULL;
+    return vdre;
+}
+
 
 
 static struct wl_buffer*
@@ -678,7 +715,7 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, format, flags);
     zwp_linux_buffer_params_v1_destroy(params);
 
-    wl_buffer_add_listener(w_buffer, &w_buffer_listener, pic->context->copy(pic->context));
+    wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre_new(pic->context, sys->pollq, desc->objects[0].fd));
 
     // Don't try to offset - it doesn't seem to work
     // (and the API is version dependant)
@@ -1293,6 +1330,7 @@ static void Close(vlc_object_t *obj)
 
     kill_pool(sys);
     picpool_unref(&sys->subpic_pool);
+    pollqueue_unref(&sys->pollq);
 
     free(sys->subpic_chromas);
 
@@ -1414,6 +1452,12 @@ static int Open(vlc_object_t *obj)
             msg_Err(vd, "Failed to create picpool");
             goto error;
         }
+    }
+
+    if ((sys->pollq = pollqueue_new()) == NULL)
+    {
+        msg_Err(vd, "Failed to create pollqueue");
+        goto error;
     }
 
     sys->curr_aspect = vd->source;
