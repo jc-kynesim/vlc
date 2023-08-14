@@ -620,20 +620,47 @@ static picture_pool_t *vd_dmabuf_pool(vout_display_t * const vd, unsigned count)
 typedef struct video_dmabuf_release_env_ss
 {
     struct picture_context_t * ctx;
-    struct pollqueue * pq;
-    int fd;
-    struct polltask * pt;
+    unsigned int rel_count;
+    unsigned int pt_count;
+    struct polltask * pt[AV_DRM_MAX_PLANES];
 } video_dmabuf_release_env_t;
+
+static video_dmabuf_release_env_t *
+vdre_new(struct picture_context_t * ctx)
+{
+    video_dmabuf_release_env_t * const vdre = calloc(1, sizeof(*vdre));
+    if ((vdre->ctx = ctx->copy(ctx)) == NULL) {
+        free(vdre);
+        return NULL;
+    }
+    return vdre;
+}
+
+static void
+vdre_free(video_dmabuf_release_env_t * const vdre)
+{
+    unsigned int i;
+    vdre->ctx->destroy(vdre->ctx);
+    for (i = 0; i != vdre->pt_count; ++i)
+        polltask_delete(vdre->pt + i);
+    free(vdre);
+}
 
 static void
 w_ctx_release(void * v, short revents)
 {
     video_dmabuf_release_env_t * const vdre = v;
     VLC_UNUSED(revents);
+    // Wait for all callbacks to come back before releasing buffer
+    if (++vdre->rel_count >= vdre->pt_count)
+        vdre_free(vdre);
+}
 
-    vdre->ctx->destroy(vdre->ctx);
-    polltask_delete(&vdre->pt);
-    free(vdre);
+static void
+vdre_add_pt(video_dmabuf_release_env_t * const vdre, struct pollqueue * pq, int fd)
+{
+    assert(vdre->pt_count < AV_DRM_MAX_PLANES);
+    vdre->pt[vdre->pt_count++] = polltask_new(pq, fd, POLLOUT, w_ctx_release, vdre);
 }
 
 // Avoid use of vd here as there's a possibility this will be called after
@@ -642,31 +669,21 @@ static void
 w_buffer_release(void *data, struct wl_buffer *wl_buffer)
 {
     video_dmabuf_release_env_t * const vdre = data;
+    unsigned int i = vdre->pt_count;
 
     /* Sent by the compositor when it's no longer using this buffer */
     buffer_destroy(&wl_buffer);
 
-    vdre->pt = polltask_new(vdre->pq, vdre->fd, POLLOUT, w_ctx_release, vdre);
-    pollqueue_unref(&vdre->pq);
-    pollqueue_add_task(vdre->pt, -1);
+    // Whilst we can happily destroy the buffer that doesn't mean we can reuse
+    // the dmabufs yet - we have to wait for them to be free of fences.
+    // We don't want to wait in this callback so do the waiting in pollqueue
+    while (i-- != 0)
+        pollqueue_add_task(vdre->pt[i], 1000);
 }
 
 static const struct wl_buffer_listener w_buffer_listener = {
     .release = w_buffer_release,
 };
-
-static video_dmabuf_release_env_t *
-vdre_new(struct picture_context_t * ctx, struct pollqueue * pq, int fd)
-{
-    video_dmabuf_release_env_t * vdre = malloc(sizeof(*vdre));
-    vdre->ctx = ctx->copy(ctx);
-    vdre->pq = pollqueue_ref(pq);
-    vdre->fd = fd;
-    vdre->pt = NULL;
-    return vdre;
-}
-
-
 
 static struct wl_buffer*
 do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, picture_t * const pic)
@@ -681,12 +698,22 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     int i;
     struct wl_buffer * w_buffer;
     struct wl_surface * const surface = video_surface(sys);
+    video_dmabuf_release_env_t * vdre = vdre_new(pic->context);
+
+    if (vdre == NULL) {
+        msg_Err(vd, "Failed to create vdre");
+        return NULL;
+    }
+
+    for (i = 0; i != desc->nb_objects; ++i)
+        vdre_add_pt(vdre, sys->pollq, desc->objects[i].fd);
 
     /* Creation and configuration of planes  */
     params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1);
     if (!params)
     {
         msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
+        vdre_free(vdre);
         return NULL;
     }
 
@@ -715,7 +742,7 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, format, flags);
     zwp_linux_buffer_params_v1_destroy(params);
 
-    wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre_new(pic->context, sys->pollq, desc->objects[0].fd));
+    wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre);
 
     // Don't try to offset - it doesn't seem to work
     // (and the API is version dependant)
