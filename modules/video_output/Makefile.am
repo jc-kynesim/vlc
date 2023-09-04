@@ -245,9 +245,10 @@ nodist_libwl_dmabuf_plugin_la_SOURCES = \
 	video_output/wayland/linux-dmabuf-unstable-v1-client-protocol.h \
 	video_output/wayland/linux-dmabuf-unstable-v1-protocol.c
 libwl_dmabuf_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
-	-I$(builddir)/video_output/wayland
-libwl_dmabuf_plugin_la_CFLAGS = $(WAYLAND_CLIENT_CFLAGS)
+	-I$(builddir)/video_output/wayland -pthread
+libwl_dmabuf_plugin_la_CFLAGS = $(WAYLAND_CLIENT_CFLAGS) -pthread
 libwl_dmabuf_plugin_la_LIBADD = $(WAYLAND_CLIENT_LIBS)
+libwl_dmabuf_plugin_la_LDFLAGS = $(AM_LDFLAGS) -pthread
 if HAVE_ARM64
 libwl_dmabuf_plugin_la_SOURCES += video_output/wayland/rgba_premul_aarch64.S\
 	video_output/wayland/rgba_premul_aarch64.h
