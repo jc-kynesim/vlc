@@ -3,22 +3,24 @@ BASE=`pwd`
 
 DO_BOOTSTRAP=
 DO_MAKE=
+DO_CONFIGURE=1
 
 while [ "$1" != "" ] ; do
     case $1 in
-	--make)
-	    DO_MAKE=1
-	    ;;
-	--bootstrap)
-	    DO_BOOTSTRAP=1
-	    ;;
-	*)
-	    echo "Usage $0: [--bootstrap] [--make]"
-	    echo "  bootstrap Do bootstrap before configure"
-	    echo "            (will always bootstrap if clean)"
-	    echo "  make      Do make after configure"
-	    exit 1
-	    ;;
+        --make)
+            DO_MAKE=1
+            DO_CONFIGURE=
+            ;;
+        --bootstrap)
+            DO_BOOTSTRAP=1
+            ;;
+        *)
+            echo "Usage $0: [--bootstrap] [--make]"
+            echo "  bootstrap Do bootstrap before configure"
+            echo "            (will always bootstrap if clean)"
+            echo "  make      Do make after configure"
+            exit 1
+            ;;
     esac
     shift
 done
@@ -54,32 +56,41 @@ else
 fi
 OUT=$BASE/out/$ARM-`lsb_release -sc`-rel
 
+if [ $DO_BOOTSTRAP ]; then
+    echo "==== Bootstrapping & cleaning $OUT"
+    rm -rf $OUT
+    ./bootstrap
+fi
+
+if [ ! -f $OUT/Makefile ]; then
+    DO_CONFIGURE=1
+fi
+
 USR_PREFIX=$OUT/install
 LIB_PREFIX=$USR_PREFIX/lib/$A
 INC_PREFIX=$USR_PREFIX/include/$A
 
-if [ $DO_BOOTSTRAP ]; then
-  echo "Bootstrapping"
-  ./bootstrap
-fi
-
-echo "Configuring in $OUT"
+echo "==== Configuring in $OUT"
 mkdir -p $OUT
 # Nothing under here need worry git - including this .gitignore!
 echo "**" > $BASE/out/.gitignore
 
 cd $OUT
-$BASE/configure \
- --build=$A \
- --prefix=$USR_PREFIX\
- --libdir=$LIB_PREFIX\
- --includedir=$INC_PREFIX\
- --disable-vdpau\
- --enable-wayland\
- --enable-gles2\
- $CONF_MMAL
-echo "Configured in $OUT"
+if [ $DO_CONFIGURE ]; then
+    $BASE/configure \
+     --build=$A \
+     --prefix=$USR_PREFIX\
+     --libdir=$LIB_PREFIX\
+     --includedir=$INC_PREFIX\
+     --disable-vdpau\
+     --enable-wayland\
+     --enable-gles2\
+     $CONF_MMAL
+    echo "==== Configured in $OUT"
+fi
 
 if [ $DO_MAKE ]; then
-  make -j8
+    echo "==== Making $OUT"
+    make -j8
+    echo "==== Made $OUT"
 fi
