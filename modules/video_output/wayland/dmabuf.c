@@ -59,7 +59,11 @@
 #define MAX_PICTURES 4
 #define MAX_SUBPICS  6
 
-#define VIDEO_ON_SUBSURFACE 1
+#define VIDEO_ON_SUBSURFACE 0
+
+#define WL_DMABUF_USE_SHM_NAME "wl-dmabuf-use-shm"
+#define WL_DMABUF_USE_SHM_TEXT N_("Attempt to map via shm")
+#define WL_DMABUF_USE_SHM_LONGTEXT N_("Attempt to map via shm rather than linux_dmabuf")
 
 typedef struct fmt_ent_s {
     uint32_t fmt;
@@ -105,6 +109,7 @@ struct vout_display_sys_t
     struct zwp_linux_dmabuf_v1 * linux_dmabuf_v1;
     struct wl_compositor *compositor;
     struct wl_subcompositor *subcompositor;
+    struct wl_shm *shm;
 
     picture_pool_t *vlc_pic_pool; /* picture pool */
 
@@ -114,6 +119,7 @@ struct vout_display_sys_t
     int y;
     bool video_attached;
     bool viewport_set;
+    bool use_shm;
 
     vout_display_place_t spu_rect;  // Window that subpic coords orignate from
     vout_display_place_t dst_rect;  // Window in the display size that holds the video
@@ -139,6 +145,7 @@ struct vout_display_sys_t
     vlc_fourcc_t * subpic_chromas;
 
     fmt_list_t dmabuf_fmts;
+    fmt_list_t shm_fmts;
 };
 
 static inline struct wl_display *
@@ -218,6 +225,15 @@ surface_destroy(struct wl_surface ** const ppsurface)
         return;
     wl_surface_destroy(*ppsurface);
     *ppsurface = NULL;
+}
+
+static void
+shm_destroy(struct wl_shm ** const ppshm)
+{
+    if (*ppshm == NULL)
+        return;
+    wl_shm_destroy(*ppshm);
+    *ppshm = NULL;
 }
 
 static void
@@ -545,11 +561,16 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
     unsigned int w = src->format.i_width;
     unsigned int h = src->format.i_height;
     struct zwp_linux_buffer_params_v1 *params = NULL;
-    const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format);
+    uint64_t mod;
+    const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format, &mod);
     size_t total_size = 0;
     size_t offset = 0;
     struct dmabuf_h * dh = NULL;
     int i;
+
+    if (sys->use_shm) {
+        msg_Warn(vd, "Shm not dmabuf");
+    }
 
     for (i = 0; i != src->i_planes; ++i)
         total_size += cpypic_plane_alloc_size(src->p + i);
@@ -706,7 +727,7 @@ static int
 do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, picture_t * const pic,
                   video_dmabuf_release_env_t ** const pVdre, struct wl_buffer ** const pWbuffer)
 {
-    struct zwp_linux_buffer_params_v1 *params;
+    struct zwp_linux_buffer_params_v1 *params = NULL;
     const AVDRMFrameDescriptor * const desc = drm_prime_get_desc(pic);
     const uint32_t format = desc->layers[0].format;
     const unsigned int width = pic->format.i_visible_width;
@@ -728,43 +749,67 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     for (i = 0; i != desc->nb_objects; ++i)
         vdre_add_pt(vdre, sys->pollq, desc->objects[i].fd);
 
-    /* Creation and configuration of planes  */
-    params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1);
-    if (!params)
+    if (1)
     {
-        msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
-        goto error;
-    }
+        const AVDRMPlaneDescriptor *const p = desc->layers[0].planes + 0;
+        struct wl_shm_pool *pool = wl_shm_create_pool(sys->shm, desc->objects[0].fd, desc->objects[0].size);
+        const uint32_t w_fmt = format == DRM_FORMAT_ARGB8888 ? 0 :
+            format == DRM_FORMAT_XRGB8888 ? 1 : format;
 
-    for (i = 0; i < desc->nb_layers; ++i)
-    {
-        int j;
-        for (j = 0; j < desc->layers[i].nb_planes; ++j)
+        if (pool == NULL)
         {
-            const AVDRMPlaneDescriptor *const p = desc->layers[i].planes + j;
-            const AVDRMObjectDescriptor *const obj = desc->objects + p->object_index;
-
-            zwp_linux_buffer_params_v1_add(params, obj->fd, n++, p->offset, p->pitch,
-                               (unsigned int)(obj->format_modifier >> 32),
-                               (unsigned int)(obj->format_modifier & 0xFFFFFFFF));
+            msg_Err(vd, "Failed to create pool from dmabuf");
+            goto error;
+        }
+        w_buffer = wl_shm_pool_create_buffer(pool, p->offset, width, height, p->pitch, w_fmt);
+        wl_shm_pool_destroy(pool);
+        if (w_buffer == NULL)
+        {
+            msg_Err(vd, "Failed to create buffer from pool");
+            goto error;
         }
     }
-
-    if (!pic->b_progressive)
+    else
     {
-        flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_INTERLACED;
-        if (!pic->b_top_field_first)
-            flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_BOTTOM_FIRST;
-    }
+        /* Creation and configuration of planes  */
+        params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1);
+        if (!params)
+        {
+            msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
+            goto error;
+        }
 
-    /* Request buffer creation */
-    if ((w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, format, flags)) == NULL)
-    {
-        msg_Err(vd, "zwp_linux_buffer_params_v1_create_immed FAILED");
-        goto error;
-    }
+        for (i = 0; i < desc->nb_layers; ++i)
+        {
+            int j;
+            for (j = 0; j < desc->layers[i].nb_planes; ++j)
+            {
+                const AVDRMPlaneDescriptor *const p = desc->layers[i].planes + j;
+                const AVDRMObjectDescriptor *const obj = desc->objects + p->object_index;
 
-    zwp_linux_buffer_params_v1_destroy(params);
+                zwp_linux_buffer_params_v1_add(params, obj->fd, n++, p->offset, p->pitch,
+                                   (unsigned int)(obj->format_modifier >> 32),
+                                   (unsigned int)(obj->format_modifier & 0xFFFFFFFF));
+            }
+        }
+
+        if (!pic->b_progressive)
+        {
+            flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_INTERLACED;
+            if (!pic->b_top_field_first)
+                flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_BOTTOM_FIRST;
+        }
+
+        /* Request buffer creation */
+        if ((w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, format, flags)) == NULL)
+        {
+            msg_Err(vd, "zwp_linux_buffer_params_v1_create_immed FAILED");
+            goto error;
+        }
+
+        zwp_linux_buffer_params_v1_destroy(params);
+        params = NULL;
+    }
 
     wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre);
 
@@ -773,6 +818,8 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     return VLC_SUCCESS;
 
 error:
+    if (params)
+        zwp_linux_buffer_params_v1_destroy(params);
     vdre_free(vdre);
     return VLC_EGENERIC;
 }
@@ -948,7 +995,9 @@ set_video_viewport(vout_display_t * const vd, vout_display_sys_t * const sys)
                     wl_fixed_from_int(fmt.i_visible_height));
     wp_viewport_set_destination(sys->viewport,
                     sys->dst_rect.width, sys->dst_rect.height);
+#if VIDEO_ON_SUBSURFACE
     wl_subsurface_set_position(sys->video_subsurface, sys->dst_rect.x, sys->dst_rect.y);
+#endif
 }
 
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
@@ -961,7 +1010,7 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 #endif
     check_embed(vd, sys, __func__);
 
-    if (drmu_format_vlc_to_drm_prime(pic->format.i_chroma, NULL) == 0) {
+    if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) == 0) {
         copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &sys->piccpy.dh, &sys->piccpy.wb);
     }
     else {
@@ -1251,6 +1300,28 @@ static const struct zwp_linux_dmabuf_v1_listener linux_dmabuf_v1_listener = {
     .modifier = linux_dmabuf_v1_listener_modifier,
 };
 
+static void shm_listener_format(void *data,
+               struct wl_shm *shm,
+               uint32_t format)
+{
+    vout_display_t * const vd = data;
+    vout_display_sys_t * const sys = vd->sys;
+    (void)shm;
+
+    if (format == 0)
+        format = DRM_FORMAT_ARGB8888;
+    else if (format == 1)
+        format = DRM_FORMAT_XRGB8888;
+
+    msg_Dbg(vd, "%s[%p], %.4s", __func__, (void*)vd, (const char *)&format);
+
+    fmt_list_add(&sys->shm_fmts, format, DRM_FORMAT_MOD_LINEAR, 0);
+}
+
+static const struct wl_shm_listener shm_listener = {
+    .format = shm_listener_format,
+};
+
 
 static void registry_global_cb(void *data, struct wl_registry *registry,
                                uint32_t name, const char *iface, uint32_t vers)
@@ -1263,10 +1334,13 @@ static void registry_global_cb(void *data, struct wl_registry *registry,
     if (strcmp(iface, wl_subcompositor_interface.name) == 0)
         sys->subcompositor = wl_registry_bind(registry, name, &wl_subcompositor_interface, 1);
     else
-    if (!strcmp(iface, "wp_viewporter"))
+    if (strcmp(iface, wl_shm_interface.name) == 0)
+        sys->shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
+    else
+    if (!strcmp(iface, wp_viewporter_interface.name))
         sys->viewporter = wl_registry_bind(registry, name, &wp_viewporter_interface, 1);
     else
-    if (!strcmp(iface, "wl_compositor"))
+    if (!strcmp(iface, wl_compositor_interface.name))
     {
         if (vers >= 4)
             sys->compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 4);
@@ -1380,7 +1454,7 @@ static void Close(vlc_object_t *obj)
         wl_subcompositor_destroy(sys->subcompositor);
     if (sys->compositor != NULL)
         wl_compositor_destroy(sys->compositor);
-
+    shm_destroy(&sys->shm);
     wl_display_flush(video_display(sys));
 
     vout_display_DeleteWindow(vd, sys->embed);
@@ -1394,6 +1468,7 @@ static void Close(vlc_object_t *obj)
 
 no_window:
     fmt_list_uninit(&sys->dmabuf_fmts);
+    fmt_list_uninit(&sys->shm_fmts);
     free(sys);
 
 #if TRACE_ALL
@@ -1412,8 +1487,7 @@ static int Open(vlc_object_t *obj)
              (const char*)&vd->fmt.i_chroma, vd->fmt.i_width, vd->fmt.i_height,
              vd->cfg->display.width, vd->cfg->display.height);
 
-    if (!(pic_drm_fmt = drmu_format_vlc_to_drm(&vd->fmt)) &&
-        !(pic_drm_fmt = drmu_format_vlc_to_drm_prime(vd->fmt.i_chroma, &pic_drm_mod)))
+    if (!(pic_drm_fmt = drmu_format_vlc_to_drm(&vd->fmt, &pic_drm_mod)))
         return VLC_EGENERIC;
 
     sys = calloc(1, sizeof(*sys));
@@ -1423,11 +1497,17 @@ static int Open(vlc_object_t *obj)
     vd->sys = sys;
 
     if (fmt_list_init(&sys->dmabuf_fmts, 128)) {
-        msg_Err(vd, "Failed to allocate format list!");
+        msg_Err(vd, "Failed to allocate dmabuf format list!");
+        goto error;
+    }
+    if (fmt_list_init(&sys->shm_fmts, 32)) {
+        msg_Err(vd, "Failed to allocate shm format list!");
         goto error;
     }
 
-    /* Get window */
+    sys->use_shm = var_InheritBool(vd, WL_DMABUF_USE_SHM_NAME);
+
+        /* Get window */
     sys->embed = vout_display_NewWindow(vd, VOUT_WINDOW_TYPE_WAYLAND);
     if (sys->embed == NULL)
         goto error;
@@ -1457,20 +1537,23 @@ static int Open(vlc_object_t *obj)
         msg_Warn(vd, "Interface %s missing", wp_viewporter_interface.name);
         goto error;
     }
-    if (sys->linux_dmabuf_v1 == NULL) {
+    if (!sys->use_shm && sys->linux_dmabuf_v1 == NULL) {
         msg_Warn(vd, "Interface %s missing", zwp_linux_dmabuf_v1_interface.name);
         goto error;
     }
 
     // And again for registering formats
-    zwp_linux_dmabuf_v1_add_listener(sys->linux_dmabuf_v1, &linux_dmabuf_v1_listener, vd);
+    if (sys->linux_dmabuf_v1)
+        zwp_linux_dmabuf_v1_add_listener(sys->linux_dmabuf_v1, &linux_dmabuf_v1_listener, vd);
+    wl_shm_add_listener(sys->shm, &shm_listener, vd);
 
     roundtrip(sys);
 
     fmt_list_sort(&sys->dmabuf_fmts);
+    fmt_list_sort(&sys->shm_fmts);
 
     // Check PIC DRM format here
-    if (fmt_list_find(&sys->dmabuf_fmts, pic_drm_fmt, pic_drm_mod) < 0) {
+    if (fmt_list_find(sys->use_shm ? &sys->shm_fmts : &sys->dmabuf_fmts, pic_drm_fmt, pic_drm_mod) < 0) {
         msg_Warn(vd, "Could not find %.4s mod %#"PRIx64" in supported formats", (char*)&pic_drm_fmt, pic_drm_mod);
         goto error;
     }
@@ -1519,8 +1602,10 @@ static int Open(vlc_object_t *obj)
     }
 
     sys->curr_aspect = vd->source;
+#if VIDEO_ON_SUBSURFACE
     sys->bkg_w = vd->cfg->display.width;
     sys->bkg_h = vd->cfg->display.height;
+#endif
 
     vd->info.has_pictures_invalid = sys->viewport == NULL;
     vd->info.subpicture_chromas = sys->subpic_chromas;
@@ -1551,4 +1636,5 @@ vlc_module_begin()
     set_capability("vout display", 0)
     set_callbacks(Open, Close)
     add_shortcut("wl-dmabuf")
+    add_bool(WL_DMABUF_USE_SHM_NAME, false, WL_DMABUF_USE_SHM_TEXT, WL_DMABUF_USE_SHM_LONGTEXT, false)
 vlc_module_end()

@@ -393,6 +393,7 @@
 #define VLC_CODEC_DRM_PRIME_NV12        VLC_FOURCC('D','P','N','1')
 #define VLC_CODEC_DRM_PRIME_SAND8       VLC_FOURCC('D','P','S','8')
 #define VLC_CODEC_DRM_PRIME_SAND30      VLC_FOURCC('D','P','S','3')
+#define VLC_CODEC_DRM_PRIME_RGB32       VLC_FOURCC('D','P','3','2')
 
 /* CVPixelBuffer opaque buffer type */
 #define VLC_CODEC_CVPX_NV12       VLC_FOURCC('C','V','P','N')
