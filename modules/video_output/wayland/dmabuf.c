@@ -568,10 +568,6 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
     struct dmabuf_h * dh = NULL;
     int i;
 
-    if (sys->use_shm) {
-        msg_Warn(vd, "Shm not dmabuf");
-    }
-
     for (i = 0; i != src->i_planes; ++i)
         total_size += cpypic_plane_alloc_size(src->p + i);
 
@@ -585,37 +581,70 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
     }
     *pDmabuf_h = dh;
 
-    if ((params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1)) == NULL)
+    if (sys->use_shm)
     {
-        msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
-        goto error;
-    }
+        struct wl_shm_pool *pool = wl_shm_create_pool(sys->shm, dmabuf_fd(dh), dmabuf_size(dh));
+        const uint32_t w_fmt = drm_fmt == DRM_FORMAT_ARGB8888 ? 0 :
+            drm_fmt == DRM_FORMAT_XRGB8888 ? 1 : drm_fmt;
+        const size_t stride = src->p[0].i_pitch;
+        const size_t size = cpypic_plane_alloc_size(src->p + 0);
 
-    dmabuf_write_start(dh);
-    for (i = 0; i != src->i_planes; ++i)
-    {
-        const size_t stride = src->p[i].i_pitch;
-        const size_t size = cpypic_plane_alloc_size(src->p + i);
+        assert(src->i_planes == 1);
+
+        if (pool == NULL)
+        {
+            msg_Err(vd, "Failed to create pool from dmabuf");
+            goto error;
+        }
+        *pW_buffer = wl_shm_pool_create_buffer(pool, 0, w, h, stride, w_fmt);
+        wl_shm_pool_destroy(pool);
+
+        if (*pW_buffer == NULL)
+        {
+            msg_Err(vd, "Failed to create buffer from pool");
+            goto error;
+        }
 
         if (src->format.i_chroma == VLC_CODEC_RGBA ||
             src->format.i_chroma == VLC_CODEC_BGRA)
-            copy_frame_xxxa_with_premul(dmabuf_map(dh), stride, src->p[i].p_pixels, src->p[i].i_pitch, w, h, alpha);
+            copy_frame_xxxa_with_premul(dmabuf_map(dh), stride, src->p[0].p_pixels, stride, w, h, alpha);
         else
-            memcpy((char *)dmabuf_map(dh) + offset, src->p[i].p_pixels, size);
-
-        zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), i, offset, stride, 0, 0);
-
-        offset += size;
+            memcpy((char *)dmabuf_map(dh) + offset, src->p[0].p_pixels, size);
     }
-    dmabuf_write_end(dh);
-
-    if ((*pW_buffer = zwp_linux_buffer_params_v1_create_immed(params, w, h, drm_fmt, 0)) == NULL)
+    else
     {
-        msg_Err(vd, "zwp_linux_buffer_params_v1_create_immed FAILED");
-        goto error;
-    }
+        if ((params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1)) == NULL)
+        {
+            msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
+            goto error;
+        }
 
-    zwp_linux_buffer_params_v1_destroy(params);
+        dmabuf_write_start(dh);
+        for (i = 0; i != src->i_planes; ++i)
+        {
+            const size_t stride = src->p[i].i_pitch;
+            const size_t size = cpypic_plane_alloc_size(src->p + i);
+
+            if (src->format.i_chroma == VLC_CODEC_RGBA ||
+                src->format.i_chroma == VLC_CODEC_BGRA)
+                copy_frame_xxxa_with_premul(dmabuf_map(dh), stride, src->p[i].p_pixels, stride, w, h, alpha);
+            else
+                memcpy((char *)dmabuf_map(dh) + offset, src->p[i].p_pixels, size);
+
+            zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), i, offset, stride, 0, 0);
+
+            offset += size;
+        }
+        dmabuf_write_end(dh);
+
+        if ((*pW_buffer = zwp_linux_buffer_params_v1_create_immed(params, w, h, drm_fmt, 0)) == NULL)
+        {
+            msg_Err(vd, "zwp_linux_buffer_params_v1_create_immed FAILED");
+            goto error;
+        }
+
+        zwp_linux_buffer_params_v1_destroy(params);
+    }
     wl_buffer_add_listener(*pW_buffer, &subpic_buffer_listener, dh);
 
     return VLC_SUCCESS;
@@ -749,7 +778,7 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     for (i = 0; i != desc->nb_objects; ++i)
         vdre_add_pt(vdre, sys->pollq, desc->objects[i].fd);
 
-    if (1)
+    if (sys->use_shm)
     {
         const AVDRMPlaneDescriptor *const p = desc->layers[0].planes + 0;
         struct wl_shm_pool *pool = wl_shm_create_pool(sys->shm, desc->objects[0].fd, desc->objects[0].size);
@@ -1476,12 +1505,28 @@ no_window:
 #endif
 }
 
+
+static void reg_done_sync_cb(void * data, struct wl_callback * cb, unsigned int cb_data)
+{
+    vout_display_t * const vd = data;
+    VLC_UNUSED(cb);
+    VLC_UNUSED(cb_data);
+
+    msg_Info(vd, "%s", __func__);
+}
+
+static const struct wl_callback_listener reg_done_sync_listener =
+{
+    .done = reg_done_sync_cb
+};
+
 static int Open(vlc_object_t *obj)
 {
     vout_display_t * const vd = (vout_display_t *)obj;
     vout_display_sys_t *sys;
     uint32_t pic_drm_fmt = 0;
     uint64_t pic_drm_mod = DRM_FORMAT_MOD_LINEAR;
+    fmt_list_t * flist = NULL;
 
     msg_Info(vd, "<<< %s: %.4s %dx%d, cfg.display: %dx%d", __func__,
              (const char*)&vd->fmt.i_chroma, vd->fmt.i_width, vd->fmt.i_height,
@@ -1514,6 +1559,7 @@ static int Open(vlc_object_t *obj)
     sys->last_embed_surface = sys->embed->handle.wl;
 
     {
+        struct wl_callback * cb;
         struct wl_registry * const registry = wl_display_get_registry(video_display(sys));
         if (registry == NULL) {
             msg_Err(vd, "Cannot get registry for display");
@@ -1521,6 +1567,9 @@ static int Open(vlc_object_t *obj)
         }
 
         wl_registry_add_listener(registry, &registry_cbs, vd);
+        cb = wl_display_sync(video_display(sys));
+        wl_callback_add_listener(cb, &reg_done_sync_listener, vd);
+
         roundtrip(sys);
         wl_registry_destroy(registry);
     }
@@ -1551,9 +1600,10 @@ static int Open(vlc_object_t *obj)
 
     fmt_list_sort(&sys->dmabuf_fmts);
     fmt_list_sort(&sys->shm_fmts);
+    flist = sys->use_shm ? &sys->shm_fmts : &sys->dmabuf_fmts;
 
     // Check PIC DRM format here
-    if (fmt_list_find(sys->use_shm ? &sys->shm_fmts : &sys->dmabuf_fmts, pic_drm_fmt, pic_drm_mod) < 0) {
+    if (fmt_list_find(flist, pic_drm_fmt, pic_drm_mod) < 0) {
         msg_Warn(vd, "Could not find %.4s mod %#"PRIx64" in supported formats", (char*)&pic_drm_fmt, pic_drm_mod);
         goto error;
     }
@@ -1562,6 +1612,7 @@ static int Open(vlc_object_t *obj)
         static vlc_fourcc_t const tryfmts[] = {
             VLC_CODEC_RGBA,
             VLC_CODEC_BGRA,
+            VLC_CODEC_ARGB,
         };
         unsigned int n = 0;
 
@@ -1571,7 +1622,7 @@ static int Open(vlc_object_t *obj)
         {
             uint32_t drmfmt = drmu_format_vlc_chroma_to_drm(tryfmts[i]);
             msg_Dbg(vd, "Look for %.4s", (char*)&drmfmt);
-            if (fmt_list_find(&sys->dmabuf_fmts, drmfmt, DRM_FORMAT_MOD_LINEAR) >= 0)
+            if (fmt_list_find(flist, drmfmt, DRM_FORMAT_MOD_LINEAR) >= 0)
                 sys->subpic_chromas[n++] = tryfmts[i];
         }
 
