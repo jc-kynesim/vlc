@@ -26,6 +26,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <semaphore.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -59,7 +60,7 @@
 #define MAX_PICTURES 4
 #define MAX_SUBPICS  6
 
-#define VIDEO_ON_SUBSURFACE 0
+#define VIDEO_ON_SUBSURFACE 1
 
 #define WL_DMABUF_USE_SHM_NAME "wl-dmabuf-use-shm"
 #define WL_DMABUF_USE_SHM_TEXT N_("Attempt to map via shm")
@@ -110,6 +111,8 @@ struct vout_display_sys_t
     struct wl_compositor *compositor;
     struct wl_subcompositor *subcompositor;
     struct wl_shm *shm;
+    struct wl_event_queue *eventq;
+    struct wl_display *wrapped_display;
 
     picture_pool_t *vlc_pic_pool; /* picture pool */
 
@@ -191,12 +194,6 @@ check_embed(vout_display_t * const vd, vout_display_sys_t * const sys, const cha
         return 1;
     }
     return 0;
-}
-
-static inline void
-roundtrip(const vout_display_sys_t * const sys)
-{
-    wl_display_roundtrip(video_display(sys));
 }
 
 static void
@@ -516,6 +513,34 @@ fmt_list_init(fmt_list_t * const fl, const size_t initial_size)
         return VLC_ENOMEM;
     fl->size = initial_size;
     return VLC_SUCCESS;
+}
+
+static void reg_done_sync_cb(void * data, struct wl_callback * cb, unsigned int cb_data)
+{
+    sem_t * const sem = data;
+    VLC_UNUSED(cb);
+    VLC_UNUSED(cb_data);
+    sem_post(sem);
+}
+
+static const struct wl_callback_listener reg_done_sync_listener =
+{
+    .done = reg_done_sync_cb
+};
+
+static void
+eventq_sync(vout_display_sys_t *const sys)
+{
+    sem_t sem;
+    struct wl_callback * cb;
+
+    sem_init(&sem, 0, 0);
+    cb = wl_display_sync(sys->wrapped_display);
+    wl_callback_add_listener(cb, &reg_done_sync_listener, &sem);
+    wl_display_flush(video_display(sys));
+    sem_wait(&sem);
+    sem_destroy(&sem);
+    wl_callback_destroy(cb);
 }
 
 static void
@@ -1484,14 +1509,26 @@ static void Close(vlc_object_t *obj)
     if (sys->compositor != NULL)
         wl_compositor_destroy(sys->compositor);
     shm_destroy(&sys->shm);
-    wl_display_flush(video_display(sys));
+
+    wl_display_roundtrip(video_display(sys));
+
+    if (sys->pollq) {
+        eventq_sync(sys);
+        pollqueue_set_pre_post(sys->pollq, 0, 0, NULL);
+        pollqueue_unref(&sys->pollq);
+    }
+
+    if (sys->wrapped_display)
+        wl_proxy_wrapper_destroy(sys->wrapped_display);
+
+    if (sys->eventq)
+        wl_event_queue_destroy(sys->eventq);
 
     vout_display_DeleteWindow(vd, sys->embed);
     sys->embed = NULL;
 
     kill_pool(sys);
     picpool_unref(&sys->subpic_pool);
-    pollqueue_unref(&sys->pollq);
 
     free(sys->subpic_chromas);
 
@@ -1505,20 +1542,36 @@ no_window:
 #endif
 }
 
-
-static void reg_done_sync_cb(void * data, struct wl_callback * cb, unsigned int cb_data)
+static void
+pollq_pre_cb(void * v, struct pollfd * pfd)
 {
-    vout_display_t * const vd = data;
-    VLC_UNUSED(cb);
-    VLC_UNUSED(cb_data);
+    vout_display_t * const vd = v;
+    vout_display_sys_t *const sys = vd->sys;
+    struct wl_display * const display = video_display(sys);
 
-    msg_Info(vd, "%s", __func__);
+    while (wl_display_prepare_read_queue(display, sys->eventq) != 0)
+        wl_display_dispatch_queue_pending(display, sys->eventq);
+    if (wl_display_flush(display) == 0)
+        pfd->events = POLLOUT;
+    else
+        pfd->events = POLLOUT | POLLIN;
+    pfd->fd = wl_display_get_fd(display);
 }
 
-static const struct wl_callback_listener reg_done_sync_listener =
+static void
+pollq_post_cb(void *v, short revents)
 {
-    .done = reg_done_sync_cb
-};
+    vout_display_t * const vd = v;
+    vout_display_sys_t *const sys = vd->sys;
+    struct wl_display * const display = video_display(sys);
+
+    if ((revents & POLLIN) == 0)
+        wl_display_cancel_read(display);
+    else
+        wl_display_read_events(display);
+
+    wl_display_dispatch_queue_pending(display, sys->eventq);
+}
 
 static int Open(vlc_object_t *obj)
 {
@@ -1558,19 +1611,37 @@ static int Open(vlc_object_t *obj)
         goto error;
     sys->last_embed_surface = sys->embed->handle.wl;
 
+    sys->eventq = wl_display_create_queue(video_display(sys));
+    if (sys->eventq == NULL) {
+        msg_Err(vd, "Failed to create event Q");
+        goto error;
+    }
+    if ((sys->wrapped_display = wl_proxy_create_wrapper(video_display(sys))) == NULL)
     {
-        struct wl_callback * cb;
-        struct wl_registry * const registry = wl_display_get_registry(video_display(sys));
+        msg_Err(vd, "Failed to create wrapper");
+        goto error;
+    }
+    wl_proxy_set_queue((struct wl_proxy *)sys->wrapped_display, sys->eventq);
+
+    if ((sys->pollq = pollqueue_new()) == NULL)
+    {
+        msg_Err(vd, "Failed to create pollqueue");
+        goto error;
+    }
+    pollqueue_set_pre_post(sys->pollq, pollq_pre_cb, pollq_post_cb, vd);
+
+    // N.B. Having got the registry with a wrapped display
+    // by default everything we do with the newly bound interfaces will turn
+    // up on the wrapped queue
+    {
+        struct wl_registry *const registry = wl_display_get_registry(sys->wrapped_display);
         if (registry == NULL) {
             msg_Err(vd, "Cannot get registry for display");
             goto error;
         }
 
         wl_registry_add_listener(registry, &registry_cbs, vd);
-        cb = wl_display_sync(video_display(sys));
-        wl_callback_add_listener(cb, &reg_done_sync_listener, vd);
-
-        roundtrip(sys);
+        eventq_sync(sys);
         wl_registry_destroy(registry);
     }
 
@@ -1596,7 +1667,7 @@ static int Open(vlc_object_t *obj)
         zwp_linux_dmabuf_v1_add_listener(sys->linux_dmabuf_v1, &linux_dmabuf_v1_listener, vd);
     wl_shm_add_listener(sys->shm, &shm_listener, vd);
 
-    roundtrip(sys);
+    eventq_sync(sys);
 
     fmt_list_sort(&sys->dmabuf_fmts);
     fmt_list_sort(&sys->shm_fmts);
@@ -1644,12 +1715,6 @@ static int Open(vlc_object_t *obj)
             msg_Err(vd, "Failed to create picpool");
             goto error;
         }
-    }
-
-    if ((sys->pollq = pollqueue_new()) == NULL)
-    {
-        msg_Err(vd, "Failed to create pollqueue");
-        goto error;
     }
 
     sys->curr_aspect = vd->source;
