@@ -789,6 +789,7 @@ static const struct
     { { VLC_CODEC_DRM_PRIME_I420,  VLC_CODEC_DRM_PRIME_NV12,
         VLC_CODEC_DRM_PRIME_SAND8, VLC_CODEC_DRM_PRIME_SAND30 },
                                                FAKE_FMT() },
+    { { VLC_CODEC_DRM_PRIME_RGB32, 0 },        FAKE_FMT() },
 
     { { VLC_CODEC_CVPX_NV12, VLC_CODEC_CVPX_UYVY,
         VLC_CODEC_CVPX_I420, VLC_CODEC_CVPX_BGRA },
