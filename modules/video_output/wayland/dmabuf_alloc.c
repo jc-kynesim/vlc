@@ -1,3 +1,4 @@
+#define _GNU_SOURCE 1
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,7 +9,6 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <linux/mman.h>
 #include <linux/dma-buf.h>
 #include <linux/dma-heap.h>
 
@@ -40,6 +40,8 @@ struct dmabufs_ctl {
     const struct dmabuf_fns * fns;
 };
 
+#define DH_FLAG_FAKE 1
+
 struct dmabuf_h {
     atomic_int ref_count;
     int fd;
@@ -48,6 +50,7 @@ struct dmabuf_h {
     void * mapptr;
     void * v;
     const struct dmabuf_fns * fns;
+    unsigned int flags;
 
     void * predel_v;
     int (* predel_fn)(struct dmabuf_h * dh, void * v);
@@ -72,7 +75,8 @@ struct dmabuf_h * dmabuf_import_mmap(void * mapptr, size_t size)
     *dh = (struct dmabuf_h) {
         .fd = -1,
         .size = size,
-        .mapptr = mapptr
+        .mapptr = mapptr,
+        .flags = DH_FLAG_FAKE,
     };
 
     return dh;
@@ -208,7 +212,7 @@ int dmabuf_sync(struct dmabuf_h * const dh, unsigned int flags)
     struct dma_buf_sync sync = {
         .flags = flags
     };
-    if (dh->fd == -1)
+    if ((dh->flags & DH_FLAG_FAKE) != 0)
         return 0;
     while (ioctl(dh->fd, DMA_BUF_IOCTL_SYNC, &sync) == -1) {
         const int err = errno;
@@ -257,6 +261,7 @@ void * dmabuf_map(struct dmabuf_h * const dh)
         request_log("%s: Map failed\n", __func__);
         return NULL;
     }
+//    fprintf(stderr, "map to %p\n", dh->mapptr);
     return dh->mapptr;
 }
 
@@ -286,6 +291,11 @@ void dmabuf_len_set(struct dmabuf_h * const dh, const size_t len)
     dh->len = len;
 }
 
+bool dmabuf_is_fake(const struct dmabuf_h * const dh)
+{
+    return (dh->flags & DH_FLAG_FAKE) != 0;
+}
+
 static struct dmabufs_ctl * dmabufs_ctl_new2(const struct dmabuf_fns * const fns)
 {
     struct dmabufs_ctl * dbsc = calloc(1, sizeof(*dbsc));
@@ -295,7 +305,12 @@ static struct dmabufs_ctl * dmabufs_ctl_new2(const struct dmabuf_fns * const fns
 
     dbsc->fd = -1;
     dbsc->fns = fns;
+
     dbsc->page_size = (size_t)sysconf(_SC_PAGE_SIZE);
+    // Check page size for plausability & power of 2 - set to 4k if not
+    if (dbsc->page_size < 0x1000 || dbsc->page_size > 0x1000000 ||
+        (dbsc->page_size & (dbsc->page_size - 1)) != 0)
+        dbsc->page_size = 0x1000;
 
     if (fns->ctl_new(dbsc) != 0)
         goto fail;
@@ -415,3 +430,80 @@ struct dmabufs_ctl * dmabufs_ctl_new(void)
     request_debug(NULL, "Dmabufs using CMA\n");;
     return dmabufs_ctl_new2(&dmabuf_cma_fns);
 }
+
+//-----------------------------------------------------------------------------
+//
+// Alloc "dmabuf" via shm (one file per alloc)
+
+static int ctl_shm_new(struct dmabufs_ctl * dbsc)
+{
+    (void)dbsc;
+    return 0;
+}
+
+static void ctl_shm_free(struct dmabufs_ctl * dbsc)
+{
+    (void)dbsc;
+}
+
+static int buf_shm_alloc(struct dmabufs_ctl * const dbsc, struct dmabuf_h * dh, size_t size)
+{
+    int fd;
+
+#if 0
+    const char * const tmpdir = "/tmp";
+    fd = open(tmpdir, __O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR);
+    if (fd == -1) {
+        const int err = errno;
+        request_log("Failed to open tmp file in %s: %s\n", tmpdir, strerror(err));
+        return -err;
+    }
+#else
+    fd = memfd_create("vlc/shm_buf", 0);
+    if (fd == -1) {
+        const int err = errno;
+        request_log("Failed to create memfd: %s\n", strerror(err));
+        return -err;
+    }
+#endif
+
+    // Round up to page size
+    size = (size + dbsc->page_size - 1) & ~(dbsc->page_size - 1);
+
+    if (ftruncate(fd, (off_t)size) != 0)
+    {
+        const int err = errno;
+        request_log("Failed to extend tmp file to %zd: %s\n", size, strerror(err));
+        return -err;
+    }
+
+    dh->fd = fd;
+    dh->size = size;
+    dh->flags = DH_FLAG_FAKE;
+
+//    fprintf(stderr, "%s: size=%#zx, ftell=%#zx\n", __func__,
+//            dh->size, (size_t)lseek(dh->fd, 0, SEEK_END));
+
+    return 0;
+}
+
+static void buf_shm_free(struct dmabuf_h * dh)
+{
+    (void)dh;
+    // Nothing needed
+}
+
+static const struct dmabuf_fns dmabuf_shm_fns = {
+    .buf_alloc  = buf_shm_alloc,
+    .buf_free   = buf_shm_free,
+    .ctl_new    = ctl_shm_new,
+    .ctl_free   = ctl_shm_free,
+};
+
+struct dmabufs_ctl * dmabufs_shm_new()
+{
+    request_debug(NULL, "Dmabufs using SHM\n");;
+    return dmabufs_ctl_new2(&dmabuf_shm_fns);
+}
+
+
