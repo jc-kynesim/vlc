@@ -129,11 +129,12 @@ typedef struct vout_display_sys_t {
 static drmu_fb_t *
 copy_pic_to_fb(vout_display_t *vd, drmu_pool_t * const pool, picture_t * const src)
 {
-    const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format);
+    uint64_t mod;
+    const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format, &mod);
     drmu_fb_t * fb;
     int i;
 
-    if (drm_fmt == 0) {
+    if (drm_fmt == 0 || mod != DRM_FORMAT_MOD_LINEAR) {
         msg_Warn(vd, "Failed vlc->drm format for copy_pic: %s", drmu_log_fourcc(src->format.i_chroma));
         return NULL;
     }
@@ -501,13 +502,13 @@ subpics_done:
 #endif
 
 #if HAS_ZC_CMA
-    if (drmu_format_vlc_to_drm_cma(pic->format.i_chroma) != 0) {
+    if (drmu_format_vlc_to_drm_cma(&pic->format, NULL) != 0) {
         dfb = drmu_fb_vlc_new_pic_cma_attach(sys->du, pic);
     }
     else
 #endif
 #if HAS_DRMPRIME
-    if (drmu_format_vlc_to_drm_prime(pic->format.i_chroma, NULL) != 0) {
+    if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) != 0) {
         dfb = drmu_fb_vlc_new_pic_attach(sys->du, pic);
     }
     else
@@ -635,20 +636,16 @@ static picture_pool_t *vd_drm_pool(vout_display_t *vd, unsigned count)
 static void
 set_format(vout_display_t * const vd, vout_display_sys_t * const sys, const video_format_t *const fmtp)
 {
-#if HAS_DRMPRIME
-    uint32_t drm_fmt;
-    uint64_t drm_mod;
+    const drmu_vlc_fmt_info_t * const fi = drmu_vlc_fmt_info_find_vlc(fmtp);
+    const uint64_t drm_mod = drmu_vlc_fmt_info_drm_modifier(fi);
+    const uint32_t drm_fmt = drmu_vlc_fmt_info_drm_pixelformat(fi);
 
-    // We think we can deal with the source format so set requested
-    // input format to source
+    msg_Dbg(vd, "%s: %s -> %s (%#"PRIx64"): prime: %d", __func__,
+            drmu_log_fourcc(fmtp->i_chroma), drmu_log_fourcc(drm_fmt), drm_mod,
+            drmu_vlc_fmt_info_is_drmprime(fi));
+
     vd->fmt = *fmtp;
 
-    if ((drm_fmt = drmu_format_vlc_to_drm_prime(fmtp->i_chroma, &drm_mod)) != 0 &&
-        drmu_plane_format_check(sys->dp, drm_fmt, drm_mod)) {
-        // Hurrah!
-    }
-    else
-#endif
 #if HAS_ZC_CMA
     if (fmtp->i_chroma == VLC_CODEC_MMAL_OPAQUE) {
         // Can't deal directly with opaque - but we can always convert it to ZC I420
@@ -656,15 +653,15 @@ set_format(vout_display_t * const vd, vout_display_sys_t * const sys, const vide
     }
     else
 #endif
-    if ((drm_fmt = drmu_format_vlc_to_drm(fmtp)) != 0 &&
-        drmu_plane_format_check(sys->dp, drm_fmt, 0)) {
-        // It is a format where simple byte copying works
+    if (drmu_plane_format_check(sys->dp, drm_fmt, drm_mod)) {
+        // DRMP or it is a format where simple byte copying works
     }
     else {
         const vlc_fourcc_t *fallback = vlc_fourcc_IsYUV(fmtp->i_chroma) ?
             vlc_fourcc_GetYUVFallback(fmtp->i_chroma) :
             vlc_fourcc_GetRGBFallback(fmtp->i_chroma);
 
+        // *** How should we check RGB fallbacks given we need masks too?
         for (; *fallback; ++fallback) {
             if (drmu_plane_format_check(sys->dp, drmu_format_vlc_chroma_to_drm(*fallback), 0))
                 break;
@@ -780,7 +777,7 @@ subpic_make_chromas_from_drm(const uint32_t * const drm_chromas, const unsigned 
         return NULL;
 
     for (unsigned int j = 0; j != n; ++j) {
-        if ((*p = drmu_format_vlc_to_vlc(drm_chromas[j])) != 0)
+        if ((*p = drmu_vlc_fmt_info_vlc_chroma(drmu_vlc_fmt_info_find_drm(drm_chromas[j], 0))) != 0)
             ++p;
     }
 
