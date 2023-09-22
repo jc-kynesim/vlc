@@ -1710,7 +1710,10 @@ no_reuse:
     p_sys->level = p_context->level;
 
     if (!can_hwaccel)
+    {
+        msg_Dbg(p_dec, "No hwaccel - using %s", av_get_pix_fmt_name(def_swfmt));
         return def_swfmt;
+    }
 
 #if (LIBAVCODEC_VERSION_MICRO >= 100) \
   && (LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 83, 101))
