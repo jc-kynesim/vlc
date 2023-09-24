@@ -261,7 +261,7 @@ void * dmabuf_map(struct dmabuf_h * const dh)
         request_log("%s: Map failed\n", __func__);
         return NULL;
     }
-    fprintf(stderr, "map to %p\n", dh->mapptr);
+//    fprintf(stderr, "map to %p\n", dh->mapptr);
     return dh->mapptr;
 }
 
