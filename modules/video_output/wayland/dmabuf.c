@@ -543,21 +543,21 @@ eq_wrapper(eq_env_t * const eq)
 static void
 eq_ref(eq_env_t * const eq)
 {
-    int n;
-    n = atomic_fetch_add(&eq->eq_count, 1);
-    fprintf(stderr, "Ref: count=%d\n", n + 1);
+    const int n = atomic_fetch_add(&eq->eq_count, 1);
+    (void)n;
+//    fprintf(stderr, "Ref: count=%d\n", n + 1);
 }
 
 static void
 eq_unref(eq_env_t ** const ppeq)
 {
-    int n;
     eq_env_t * eq = *ppeq;
     if (eq != NULL)
     {
+        int n;
         *ppeq = NULL;
         n = atomic_fetch_sub(&eq->eq_count, 1);
-        fprintf(stderr, "Unref: Buffer count=%d\n", n);
+//        fprintf(stderr, "Unref: Buffer count=%d\n", n);
         if (n == 0)
         {
             wl_proxy_wrapper_destroy(eq->wrapped_display);
@@ -567,7 +567,7 @@ eq_unref(eq_env_t ** const ppeq)
             pollqueue_unref(&eq->pq);
             sem_destroy(&eq->sem);
             free(eq);
-            fprintf(stderr, "Eq closed\n");
+//            fprintf(stderr, "Eq closed\n");
         }
     }
 }
@@ -592,11 +592,12 @@ pollq_pre_cb(void * v, struct pollfd * pfd)
     int ferr;
     int frv;
 
-    fprintf(stderr, "Start Prepare\n");
+//    fprintf(stderr, "Start Prepare\n");
 
     while (wl_display_prepare_read_queue(display, eq->q) != 0) {
         int n = wl_display_dispatch_queue_pending(display, eq->q);
-        fprintf(stderr, "Dispatch=%d\n", n);
+        (void)n;
+//        fprintf(stderr, "Dispatch=%d\n", n);
     }
     if ((frv = wl_display_flush(display)) >= 0) {
         pfd->events = POLLIN;
@@ -607,8 +608,8 @@ pollq_pre_cb(void * v, struct pollfd * pfd)
         pfd->events = POLLOUT | POLLIN;
     }
     pfd->fd = wl_display_get_fd(display);
-
-    fprintf(stderr, "Done Prepare: fd=%d, evts=%#x, frv=%d, ferr=%s\n", pfd->fd, pfd->events, frv, ferr == 0 ? "ok" : strerror(ferr));
+(void)ferr;
+//    fprintf(stderr, "Done Prepare: fd=%d, evts=%#x, frv=%d, ferr=%s\n", pfd->fd, pfd->events, frv, ferr == 0 ? "ok" : strerror(ferr));
 }
 
 static void
@@ -616,20 +617,21 @@ pollq_post_cb(void *v, short revents)
 {
     eq_env_t * const eq = v;
     struct wl_display *const display = eq->display;
+    int n;
 
     if ((revents & POLLIN) == 0) {
-        fprintf(stderr, "Cancel read: Events=%#x: IN=%#x, OUT=%#x, ERR=%#x\n", (int)revents, POLLIN, POLLOUT, POLLERR);
+//        fprintf(stderr, "Cancel read: Events=%#x: IN=%#x, OUT=%#x, ERR=%#x\n", (int)revents, POLLIN, POLLOUT, POLLERR);
         wl_display_cancel_read(display);
     }
     else {
-        fprintf(stderr, "Read events: Events=%#x: IN=%#x, OUT=%#x, ERR=%#x\n", (int)revents, POLLIN, POLLOUT, POLLERR);
+//        fprintf(stderr, "Read events: Events=%#x: IN=%#x, OUT=%#x, ERR=%#x\n", (int)revents, POLLIN, POLLOUT, POLLERR);
         wl_display_read_events(display);
     }
 
-    fprintf(stderr, "Start Dispatch\n");
-    int n =
-    wl_display_dispatch_queue_pending(display, eq->q);
-    fprintf(stderr, "Dispatch=%d\n", n);
+//    fprintf(stderr, "Start Dispatch\n");
+    n = wl_display_dispatch_queue_pending(display, eq->q);
+    (void)n;
+//    fprintf(stderr, "Dispatch=%d\n", n);
 }
 
 static void
@@ -673,7 +675,7 @@ static void eventq_sync_cb(void * data, struct wl_callback * cb, unsigned int cb
     VLC_UNUSED(cb_data);
     wl_callback_destroy(cb);
     sem_post(sem);
-    fprintf(stderr, "Sync cb: Q %p\n", ((void**)cb)[4]);
+//    fprintf(stderr, "Sync cb: Q %p\n", ((void**)cb)[4]);
 }
 
 static const struct wl_callback_listener eq_sync_listener = {.done = eventq_sync_cb};
@@ -1410,8 +1412,9 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 
         if (!spe->update)
             continue;
-
+#if TRACE_ALL
         msg_Dbg(vd, "%s: Update subpic %i: wb=%p alpha=%d", __func__, i, spe->wb, spe->alpha);
+#endif
         subpic_ent_attach(sys->subplanes[i].surface, spe, sys->eq);
 
         wl_subsurface_set_position(sys->subplanes[i].subsurface, spe->dst_rect.x, spe->dst_rect.y);
@@ -1581,9 +1584,9 @@ static void linux_dmabuf_v1_listener_format(void *data,
     vout_display_t * const vd = data;
     vout_display_sys_t * const sys = vd->sys;
     (void)zwp_linux_dmabuf_v1;
-
+#if TRACE_ALL
     msg_Dbg(vd, "%s[%p], %.4s", __func__, (void*)vd, (const char *)&format);
-
+#endif
     // Only post sync once
     if (fmt_list_is_empty(&sys->dmabuf_fmts))
         eventq_rsync_post(sys->eq);
@@ -1601,9 +1604,9 @@ linux_dmabuf_v1_listener_modifier(void *data,
     vout_display_t * const vd = data;
     vout_display_sys_t * const sys = vd->sys;
     (void)zwp_linux_dmabuf_v1;
-
+#if TRACE_ALL
     msg_Dbg(vd, "%s[%p], %.4s %08x%08x", __func__, (void*)vd, (const char *)&format, modifier_hi, modifier_lo);
-
+#endif
     // Only post sync once
     if (fmt_list_is_empty(&sys->dmabuf_fmts))
         eventq_rsync_post(sys->eq);
@@ -1629,8 +1632,9 @@ static void shm_listener_format(void *data,
     else if (format == 1)
         format = DRM_FORMAT_XRGB8888;
 
+#if TRACE_ALL
     msg_Dbg(vd, "%s[%p], %.4s: Q %p", __func__, (void*)vd, (const char *)&format, ((void**)shm)[4]);
-
+#endif
     // Only post sync once
     if (fmt_list_is_empty(&sys->shm_fmts))
         eventq_rsync_post(sys->eq);
@@ -1647,8 +1651,9 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
                         struct wl_registry * const registry,
                         const uint32_t name, const char *const iface, const uint32_t vers)
 {
+#if TRACE_ALL
     msg_Dbg(vd, "global %3"PRIu32": %s version %"PRIu32" Q %p", name, iface, vers, ((void**)registry)[4]);
-
+#endif
     if (strcmp(iface, wl_subcompositor_interface.name) == 0)
         b->subcompositor = wl_registry_bind(registry, name, &wl_subcompositor_interface, 1);
     else
@@ -1758,9 +1763,7 @@ static void Close(vlc_object_t *obj)
     vout_display_t * const vd = (vout_display_t *)obj;
     vout_display_sys_t * const sys = vd->sys;
 
-#if TRACE_ALL || 1
     msg_Dbg(vd, "<<< %s", __func__);
-#endif
 
     if (sys == NULL)
         return;
@@ -1813,9 +1816,7 @@ no_window:
     fmt_list_uninit(&sys->shm_fmts);
     free(sys);
 
-#if TRACE_ALL
     msg_Dbg(vd, ">>> %s", __func__);
-#endif
 }
 
 // N.B. Having got the registry with a wrapped display
@@ -1891,7 +1892,6 @@ static int Open(vlc_object_t *obj)
         msg_Err(vd, "Cannot get registry for display");
         goto error;
     }
-    msg_Info(vd, "Sync 1 done: Q=%p", sys->eq->q);
 
     // Wait as may times as we should invoke post
     // Doesn't matter if one wait triggers on the other condition
@@ -1899,8 +1899,6 @@ static int Open(vlc_object_t *obj)
         eventq_rsync_wait(sys->eq);
     if (sys->bound.linux_dmabuf_v1 != NULL)
         eventq_rsync_wait(sys->eq);
-
-    msg_Info(vd, "Sync 2 done");
 
     if (sys->bound.compositor == NULL) {
         msg_Warn(vd, "Interface %s missing", wl_compositor_interface.name);
@@ -1981,16 +1979,12 @@ static int Open(vlc_object_t *obj)
     vd->display = Display;
     vd->control = Control;
 
-#if TRACE_ALL || 1
     msg_Dbg(vd, ">>> %s: OK", __func__);
-#endif
     return VLC_SUCCESS;
 
 error:
     Close(obj);
-#if TRACE_ALL || 1
     msg_Dbg(vd, ">>> %s: ERROR", __func__);
-#endif
     return VLC_EGENERIC;
 }
 
