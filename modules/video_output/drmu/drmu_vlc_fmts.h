@@ -12,7 +12,6 @@
 #include <stdint.h>
 
 #include <vlc_common.h>
-//#include <vlc_picture.h>
 
 #ifdef __cplusplus
 extern "C" {
