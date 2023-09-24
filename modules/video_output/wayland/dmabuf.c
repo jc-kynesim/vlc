@@ -25,7 +25,9 @@
 #endif
 
 #include <assert.h>
+#include <stdatomic.h>
 #include <errno.h>
+#include <semaphore.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -61,6 +63,14 @@
 
 #define VIDEO_ON_SUBSURFACE 1
 
+#define WL_DMABUF_USE_SHM_NAME "wl-dmabuf-use-shm"
+#define WL_DMABUF_USE_SHM_TEXT N_("Attempt to map via shm")
+#define WL_DMABUF_USE_SHM_LONGTEXT N_("Attempt to map via shm rather than linux_dmabuf")
+
+#define WL_DMABUF_CHEQUERBOARD_NAME "wl-dmabuf-chequerboard"
+#define WL_DMABUF_CHEQUERBOARD_TEXT N_("Chequerboard background")
+#define WL_DMABUF_CHEQUERBOARD_LONGTEXT N_("Fill unused window area with chequerboard rather than black")
+
 typedef struct fmt_ent_s {
     uint32_t fmt;
     int32_t pri;
@@ -73,15 +83,40 @@ typedef struct fmt_list_s {
     unsigned int len;
 } fmt_list_t;
 
+typedef struct eq_env_ss {
+    atomic_int eq_count;
+    sem_t sem;
+
+    struct wl_display *display;
+    struct pollqueue *pq;
+    struct wl_event_queue *q;
+    struct wl_display *wrapped_display;
+} eq_env_t;
+
+typedef struct video_dmabuf_release_env_ss
+{
+    void (* dma_rel_fn)(void *);
+    void * dma_rel_v;
+    eq_env_t * eq;
+    unsigned int rel_count;
+    unsigned int pt_count;
+    struct polltask * pt[AV_DRM_MAX_PLANES];
+} video_dmabuf_release_env_t;
+
 typedef struct subplane_s {
     struct wl_surface * surface;
     struct wl_subsurface * subsurface;
     struct wp_viewport * viewport;
+
+    vout_display_place_t dst_rect;
+    vout_display_place_t src_rect;
+    bool has_pic;
 } subplane_t;
 
 typedef struct subpic_ent_s {
     struct wl_buffer * wb;
     struct dmabuf_h * dh;
+    video_dmabuf_release_env_t * vdre;
     picture_t * pic;
     int alpha;
     vout_display_place_t dst_rect;
@@ -89,22 +124,22 @@ typedef struct subpic_ent_s {
     bool update;
 } subpic_ent_t;
 
-typedef struct video_dmabuf_release_env_ss
+typedef struct w_bound_ss
 {
-    struct picture_context_t * ctx;
-    unsigned int rel_count;
-    unsigned int pt_count;
-    struct polltask * pt[AV_DRM_MAX_PLANES];
-} video_dmabuf_release_env_t;
+    struct wp_viewporter *viewporter;
+    struct zwp_linux_dmabuf_v1 * linux_dmabuf_v1;
+    struct wl_compositor *compositor;
+    struct wl_subcompositor *subcompositor;
+    struct wl_shm *shm;
+} w_bound_t;
 
 struct vout_display_sys_t
 {
     vout_window_t *embed; /* VLC window */
-    struct wp_viewporter *viewporter;
+
+    w_bound_t bound;
+
     struct wp_viewport *viewport;
-    struct zwp_linux_dmabuf_v1 * linux_dmabuf_v1;
-    struct wl_compositor *compositor;
-    struct wl_subcompositor *subcompositor;
 
     picture_pool_t *vlc_pic_pool; /* picture pool */
 
@@ -114,6 +149,8 @@ struct vout_display_sys_t
     int y;
     bool video_attached;
     bool viewport_set;
+    bool use_shm;
+    bool chequerboard;
 
     vout_display_place_t spu_rect;  // Window that subpic coords orignate from
     vout_display_place_t dst_rect;  // Window in the display size that holds the video
@@ -129,16 +166,18 @@ struct vout_display_sys_t
     unsigned int bkg_h;
 #endif
 
+    eq_env_t * eq;
+
     struct pollqueue * pollq;
 
     picpool_ctl_t * subpic_pool;
     subplane_t subplanes[MAX_SUBPICS];
     subpic_ent_t subpics[MAX_SUBPICS];
     subpic_ent_t piccpy;
-    video_dmabuf_release_env_t * pic_vdre;
     vlc_fourcc_t * subpic_chromas;
 
     fmt_list_t dmabuf_fmts;
+    fmt_list_t shm_fmts;
 };
 
 static inline struct wl_display *
@@ -160,7 +199,7 @@ video_surface(const vout_display_sys_t * const sys)
 static inline struct wl_compositor *
 video_compositor(const vout_display_sys_t * const sys)
 {
-    return sys->compositor;
+    return sys->bound.compositor;
 }
 
 #if VIDEO_ON_SUBSURFACE
@@ -184,12 +223,6 @@ check_embed(vout_display_t * const vd, vout_display_sys_t * const sys, const cha
         return 1;
     }
     return 0;
-}
-
-static inline void
-roundtrip(const vout_display_sys_t * const sys)
-{
-    wl_display_roundtrip(video_display(sys));
 }
 
 static void
@@ -255,6 +288,12 @@ place_rescale(const vout_display_place_t s, const vout_display_place_t mul, cons
         .width  = place_rescale_1u(s.width,     mul.width,  div.width),
         .height = place_rescale_1u(s.height,    mul.height, div.height)
     };
+}
+
+static inline bool
+place_eq(const vout_display_place_t a, const vout_display_place_t b)
+{
+    return a.x == b.x && a.y == b.y && a.width == b.width && a.height == b.height;
 }
 
 
@@ -502,6 +541,184 @@ fmt_list_init(fmt_list_t * const fl, const size_t initial_size)
     return VLC_SUCCESS;
 }
 
+// ----------------------------------------------------------------------------
+
+static struct wl_display *
+eq_wrapper(eq_env_t * const eq)
+{
+    return eq->wrapped_display;
+}
+
+static void
+eq_ref(eq_env_t * const eq)
+{
+    const int n = atomic_fetch_add(&eq->eq_count, 1);
+    (void)n;
+//    fprintf(stderr, "Ref: count=%d\n", n + 1);
+}
+
+static void
+eq_unref(eq_env_t ** const ppeq)
+{
+    eq_env_t * eq = *ppeq;
+    if (eq != NULL)
+    {
+        int n;
+        *ppeq = NULL;
+        n = atomic_fetch_sub(&eq->eq_count, 1);
+//        fprintf(stderr, "Unref: Buffer count=%d\n", n);
+        if (n == 0)
+        {
+            wl_proxy_wrapper_destroy(eq->wrapped_display);
+            wl_event_queue_destroy(eq->q);
+
+            pollqueue_set_pre_post(eq->pq, 0, 0, NULL);
+            pollqueue_unref(&eq->pq);
+            sem_destroy(&eq->sem);
+            free(eq);
+//            fprintf(stderr, "Eq closed\n");
+        }
+    }
+}
+
+static int
+eq_finish(eq_env_t ** const ppeq)
+{
+    eq_env_t * const eq = *ppeq;
+
+    if (eq == NULL)
+        return 0;
+
+    eq_unref(ppeq);
+    return 0;
+}
+
+static void
+pollq_pre_cb(void * v, struct pollfd * pfd)
+{
+    eq_env_t * const eq = v;
+    struct wl_display *const display = eq->display;
+    int ferr;
+    int frv;
+
+//    fprintf(stderr, "Start Prepare\n");
+
+    while (wl_display_prepare_read_queue(display, eq->q) != 0) {
+        int n = wl_display_dispatch_queue_pending(display, eq->q);
+        (void)n;
+//        fprintf(stderr, "Dispatch=%d\n", n);
+    }
+    if ((frv = wl_display_flush(display)) >= 0) {
+        pfd->events = POLLIN;
+        ferr = 0;
+    }
+    else {
+        ferr = errno;
+        pfd->events = POLLOUT | POLLIN;
+    }
+    pfd->fd = wl_display_get_fd(display);
+(void)ferr;
+//    fprintf(stderr, "Done Prepare: fd=%d, evts=%#x, frv=%d, ferr=%s\n", pfd->fd, pfd->events, frv, ferr == 0 ? "ok" : strerror(ferr));
+}
+
+static void
+pollq_post_cb(void *v, short revents)
+{
+    eq_env_t * const eq = v;
+    struct wl_display *const display = eq->display;
+    int n;
+
+    if ((revents & POLLIN) == 0) {
+//        fprintf(stderr, "Cancel read: Events=%#x: IN=%#x, OUT=%#x, ERR=%#x\n", (int)revents, POLLIN, POLLOUT, POLLERR);
+        wl_display_cancel_read(display);
+    }
+    else {
+//        fprintf(stderr, "Read events: Events=%#x: IN=%#x, OUT=%#x, ERR=%#x\n", (int)revents, POLLIN, POLLOUT, POLLERR);
+        wl_display_read_events(display);
+    }
+
+//    fprintf(stderr, "Start Dispatch\n");
+    n = wl_display_dispatch_queue_pending(display, eq->q);
+    (void)n;
+//    fprintf(stderr, "Dispatch=%d\n", n);
+}
+
+static eq_env_t *
+eq_new(struct wl_display * const display, struct pollqueue * const pq)
+{
+    eq_env_t * eq = calloc(1, sizeof(*eq));
+
+    if (eq == NULL)
+        return NULL;
+
+    atomic_init(&eq->eq_count, 0);
+    sem_init(&eq->sem, 0, 0);
+
+    if ((eq->q = wl_display_create_queue(display)) == NULL)
+        goto err1;
+    if ((eq->wrapped_display = wl_proxy_create_wrapper(display)) == NULL)
+        goto err2;
+    wl_proxy_set_queue((struct wl_proxy *)eq->wrapped_display, eq->q);
+
+    eq->display = display;
+    eq->pq = pollqueue_ref(pq);
+
+    pollqueue_set_pre_post(eq->pq, pollq_pre_cb, pollq_post_cb, eq);
+
+    return eq;
+
+err2:
+    wl_event_queue_destroy(eq->q);
+err1:
+    free(eq);
+    return NULL;
+}
+
+static void eventq_sync_cb(void * data, struct wl_callback * cb, unsigned int cb_data)
+{
+    sem_t * const sem = data;
+    VLC_UNUSED(cb_data);
+    wl_callback_destroy(cb);
+    sem_post(sem);
+}
+
+static const struct wl_callback_listener eq_sync_listener = {.done = eventq_sync_cb};
+
+struct eq_sync_env_ss {
+    eq_env_t * eq;
+    sem_t sem;
+};
+
+static void
+eq_sync_pq_cb(void * v, short revents)
+{
+    struct eq_sync_env_ss * const eqs = v;
+    struct wl_callback * const cb = wl_display_sync(eq_wrapper(eqs->eq));
+    VLC_UNUSED(revents);
+    wl_callback_add_listener(cb, &eq_sync_listener, &eqs->sem);
+    // No flush needed as that will occur as part of the pollqueue loop
+}
+
+static int
+eventq_sync(eq_env_t * const eq)
+{
+    struct eq_sync_env_ss eqs = {.eq = eq};
+    int rv;
+
+    if (!eq)
+        return -1;
+
+    sem_init(&eqs.sem, 0, 0);
+    // Bounce execution to pollqueue to avoid race setting up listener
+    pollqueue_callback_once(eq->pq, eq_sync_pq_cb, &eqs);
+    while ((rv = sem_wait(&eqs.sem)) == -1 && errno == EINTR)
+        /* Loop */;
+    sem_destroy(&eqs.sem);
+    return rv;
+}
+
+// ----------------------------------------------------------------------------
+
 static void
 chequerboard(uint32_t *const data, unsigned int stride, const unsigned int width, const unsigned int height)
 {
@@ -518,34 +735,162 @@ chequerboard(uint32_t *const data, unsigned int stride, const unsigned int width
     }
 }
 
-/* Sent by the compositor when it's no longer using this buffer */
 static void
-subpic_buffer_release(void *data, struct wl_buffer *wl_buffer)
+fill_uniform(uint32_t *const data, unsigned int stride, const unsigned int width, const unsigned int height, const uint32_t val)
 {
-    struct dmabuf_h * dh = data;
+    stride /= sizeof(uint32_t);
 
-    buffer_destroy(&wl_buffer);
+    /* Draw solid background */
+    for (unsigned int y = 0; y < height; ++y) {
+        for (unsigned int x = 0; x < width; ++x)
+            data[y * stride + x] = val;
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+static void
+vdre_dma_rel_cb(void * v)
+{
+    struct picture_context_t * ctx = v;
+    ctx->destroy(ctx);
+}
+
+static video_dmabuf_release_env_t *
+vdre_new_ctx(struct picture_context_t * ctx)
+{
+    video_dmabuf_release_env_t * const vdre = calloc(1, sizeof(*vdre));
+    if (vdre == NULL)
+        return NULL;
+    if ((vdre->dma_rel_v = ctx->copy(ctx)) == NULL)
+    {
+        free(vdre);
+        return NULL;
+    }
+    vdre->dma_rel_fn = vdre_dma_rel_cb;
+    return vdre;
+}
+
+static void
+vdre_free(video_dmabuf_release_env_t * const vdre)
+{
+    unsigned int i;
+    vdre->dma_rel_fn(vdre->dma_rel_v);
+    for (i = 0; i != vdre->pt_count; ++i)
+        polltask_delete(vdre->pt + i);
+    eq_unref(&vdre->eq);
+    free(vdre);
+}
+
+static void
+vdre_delete(video_dmabuf_release_env_t ** const ppvdre)
+{
+    video_dmabuf_release_env_t * const vdre = *ppvdre;
+    if (vdre == NULL)
+        return;
+    *ppvdre = NULL;
+    vdre_free(vdre);
+}
+
+static void
+w_ctx_release(void * v, short revents)
+{
+    video_dmabuf_release_env_t * const vdre = v;
+    VLC_UNUSED(revents);
+    // Wait for all callbacks to come back before releasing buffer
+    if (++vdre->rel_count >= vdre->pt_count)
+        vdre_free(vdre);
+}
+
+static void
+vdre_eq_ref(video_dmabuf_release_env_t * const vdre, eq_env_t * const eq)
+{
+    if (vdre == NULL)
+        return;
+    vdre->eq = eq;
+    eq_ref(vdre->eq);
+}
+
+static void
+vdre_add_pt(video_dmabuf_release_env_t * const vdre, struct pollqueue * pq, int fd)
+{
+    assert(vdre->pt_count < AV_DRM_MAX_PLANES);
+    vdre->pt[vdre->pt_count++] = polltask_new(pq, fd, POLLOUT, w_ctx_release, vdre);
+}
+
+static void
+vdre_dh_rel_cb(void * v)
+{
+    struct dmabuf_h * dh = v;
     dmabuf_unref(&dh);
 }
 
-static const struct wl_buffer_listener subpic_buffer_listener = {
-    .release = subpic_buffer_release,
+static video_dmabuf_release_env_t *
+vdre_new_dh(struct dmabuf_h *const dh, struct pollqueue *const pq)
+{
+    video_dmabuf_release_env_t * const vdre = calloc(1, sizeof(*vdre));
+
+    vdre->dma_rel_fn = vdre_dh_rel_cb;
+    vdre->dma_rel_v = dh;
+
+    if (!dmabuf_is_fake(dh))
+        vdre_add_pt(vdre, pq, dmabuf_fd(dh));
+    return vdre;
+}
+
+// Avoid use of vd here as there's a possibility this will be called after
+// it has gone
+static void
+w_buffer_release(void *data, struct wl_buffer *wl_buffer)
+{
+    video_dmabuf_release_env_t * const vdre = data;
+    unsigned int i = vdre->pt_count;
+
+    /* Sent by the compositor when it's no longer using this buffer */
+    buffer_destroy(&wl_buffer);
+
+    eq_unref(&vdre->eq);
+
+    if (i == 0)
+        vdre_free(vdre);
+    else
+    {
+        // Whilst we can happily destroy the buffer that doesn't mean we can reuse
+        // the dmabufs yet - we have to wait for them to be free of fences.
+        // We don't want to wait in this callback so do the waiting in pollqueue
+        while (i-- != 0)
+            pollqueue_add_task(vdre->pt[i], 1000);
+    }
+}
+
+static const struct wl_buffer_listener w_buffer_listener = {
+    .release = w_buffer_release,
 };
+
+// ----------------------------------------------------------------------------
 
 static inline size_t cpypic_plane_alloc_size(const plane_t * const p)
 {
     return p->i_pitch * p->i_lines;
 }
 
+static inline uint32_t
+drm_fmt_to_wl_shm(const uint32_t drm_fmt)
+{
+    return (drm_fmt == DRM_FORMAT_ARGB8888) ? WL_SHM_FORMAT_ARGB8888 :
+           (drm_fmt == DRM_FORMAT_XRGB8888) ? WL_SHM_FORMAT_XRGB8888 : drm_fmt;
+}
+
 static int
 copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, picture_t * const src,
                         int alpha,
-                        struct dmabuf_h ** pDmabuf_h, struct wl_buffer ** pW_buffer)
+                        video_dmabuf_release_env_t ** pVdre, struct wl_buffer ** pW_buffer)
 {
     unsigned int w = src->format.i_width;
     unsigned int h = src->format.i_height;
     struct zwp_linux_buffer_params_v1 *params = NULL;
-    const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format);
+    uint64_t mod;
+    const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format, &mod);
     size_t total_size = 0;
     size_t offset = 0;
     struct dmabuf_h * dh = NULL;
@@ -555,54 +900,91 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
         total_size += cpypic_plane_alloc_size(src->p + i);
 
     *pW_buffer = NULL;
-    *pDmabuf_h = NULL;
+    *pVdre = NULL;
 
     if ((dh = picpool_get(sys->subpic_pool, total_size)) == NULL)
     {
         msg_Warn(vd, "Failed to alloc dmabuf for subpic");
         goto error;
     }
-    *pDmabuf_h = dh;
-
-    if ((params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1)) == NULL)
+    if ((*pVdre = vdre_new_dh(dh, sys->pollq)) == NULL)
     {
-        msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
+        msg_Warn(vd, "Failed to alloc vdre for subpic");
+        dmabuf_unref(&dh);
         goto error;
     }
 
-    dmabuf_write_start(dh);
-    for (i = 0; i != src->i_planes; ++i)
+    if (dmabuf_is_fake(dh) || !sys->bound.linux_dmabuf_v1)
     {
-        const size_t stride = src->p[i].i_pitch;
-        const size_t size = cpypic_plane_alloc_size(src->p + i);
+        struct wl_shm_pool *pool = wl_shm_create_pool(sys->bound.shm, dmabuf_fd(dh), dmabuf_size(dh));
+        const uint32_t w_fmt = drm_fmt_to_wl_shm(drm_fmt);
+        const size_t stride = src->p[0].i_pitch;
+        const size_t size = cpypic_plane_alloc_size(src->p + 0);
+
+        assert(src->i_planes == 1);
+
+        if (pool == NULL)
+        {
+            msg_Err(vd, "Failed to create pool from dmabuf");
+            goto error;
+        }
+        *pW_buffer = wl_shm_pool_create_buffer(pool, 0, w, h, stride, w_fmt);
+        wl_shm_pool_destroy(pool);
+
+        if (*pW_buffer == NULL)
+        {
+            msg_Err(vd, "Failed to create buffer from pool");
+            goto error;
+        }
 
         if (src->format.i_chroma == VLC_CODEC_RGBA ||
             src->format.i_chroma == VLC_CODEC_BGRA)
-            copy_frame_xxxa_with_premul(dmabuf_map(dh), stride, src->p[i].p_pixels, src->p[i].i_pitch, w, h, alpha);
+            copy_frame_xxxa_with_premul(dmabuf_map(dh), stride, src->p[0].p_pixels, stride, w, h, alpha);
         else
-            memcpy((char *)dmabuf_map(dh) + offset, src->p[i].p_pixels, size);
-
-        zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), i, offset, stride, 0, 0);
-
-        offset += size;
+            memcpy((char *)dmabuf_map(dh) + offset, src->p[0].p_pixels, size);
     }
-    dmabuf_write_end(dh);
-
-    if ((*pW_buffer = zwp_linux_buffer_params_v1_create_immed(params, w, h, drm_fmt, 0)) == NULL)
+    else
     {
-        msg_Err(vd, "zwp_linux_buffer_params_v1_create_immed FAILED");
-        goto error;
-    }
+        if ((params = zwp_linux_dmabuf_v1_create_params(sys->bound.linux_dmabuf_v1)) == NULL)
+        {
+            msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
+            goto error;
+        }
 
-    zwp_linux_buffer_params_v1_destroy(params);
-    wl_buffer_add_listener(*pW_buffer, &subpic_buffer_listener, dh);
+        dmabuf_write_start(dh);
+        for (i = 0; i != src->i_planes; ++i)
+        {
+            const size_t stride = src->p[i].i_pitch;
+            const size_t size = cpypic_plane_alloc_size(src->p + i);
+
+            if (src->format.i_chroma == VLC_CODEC_RGBA ||
+                src->format.i_chroma == VLC_CODEC_BGRA)
+                copy_frame_xxxa_with_premul(dmabuf_map(dh), stride, src->p[i].p_pixels, stride, w, h, alpha);
+            else
+                memcpy((char *)dmabuf_map(dh) + offset, src->p[i].p_pixels, size);
+
+            zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), i, offset, stride, 0, 0);
+
+            offset += size;
+        }
+        dmabuf_write_end(dh);
+
+        if ((*pW_buffer = zwp_linux_buffer_params_v1_create_immed(params, w, h, drm_fmt, 0)) == NULL)
+        {
+            msg_Err(vd, "zwp_linux_buffer_params_v1_create_immed FAILED");
+            goto error;
+        }
+
+        zwp_linux_buffer_params_v1_destroy(params);
+    }
+    wl_buffer_add_listener(*pW_buffer, &w_buffer_listener, *pVdre);
 
     return VLC_SUCCESS;
 
 error:
     if (params)
         zwp_linux_buffer_params_v1_destroy(params);
-    dmabuf_unref(pDmabuf_h);
+    vdre_delete(pVdre);
     return VLC_EGENERIC;
 }
 
@@ -631,82 +1013,11 @@ static picture_pool_t *vd_dmabuf_pool(vout_display_t * const vd, unsigned count)
     return sys->vlc_pic_pool;
 }
 
-static video_dmabuf_release_env_t *
-vdre_new(struct picture_context_t * ctx)
-{
-    video_dmabuf_release_env_t * const vdre = calloc(1, sizeof(*vdre));
-    if ((vdre->ctx = ctx->copy(ctx)) == NULL)
-    {
-        free(vdre);
-        return NULL;
-    }
-    return vdre;
-}
-
-static void
-vdre_free(video_dmabuf_release_env_t * const vdre)
-{
-    unsigned int i;
-    vdre->ctx->destroy(vdre->ctx);
-    for (i = 0; i != vdre->pt_count; ++i)
-        polltask_delete(vdre->pt + i);
-    free(vdre);
-}
-
-static void
-vdre_delete(video_dmabuf_release_env_t ** const ppvdre)
-{
-    video_dmabuf_release_env_t * const vdre = *ppvdre;
-    if (vdre == NULL)
-        return;
-    *ppvdre = NULL;
-    vdre_free(vdre);
-}
-
-static void
-w_ctx_release(void * v, short revents)
-{
-    video_dmabuf_release_env_t * const vdre = v;
-    VLC_UNUSED(revents);
-    // Wait for all callbacks to come back before releasing buffer
-    if (++vdre->rel_count >= vdre->pt_count)
-        vdre_free(vdre);
-}
-
-static void
-vdre_add_pt(video_dmabuf_release_env_t * const vdre, struct pollqueue * pq, int fd)
-{
-    assert(vdre->pt_count < AV_DRM_MAX_PLANES);
-    vdre->pt[vdre->pt_count++] = polltask_new(pq, fd, POLLOUT, w_ctx_release, vdre);
-}
-
-// Avoid use of vd here as there's a possibility this will be called after
-// it has gone
-static void
-w_buffer_release(void *data, struct wl_buffer *wl_buffer)
-{
-    video_dmabuf_release_env_t * const vdre = data;
-    unsigned int i = vdre->pt_count;
-
-    /* Sent by the compositor when it's no longer using this buffer */
-    buffer_destroy(&wl_buffer);
-
-    // Whilst we can happily destroy the buffer that doesn't mean we can reuse
-    // the dmabufs yet - we have to wait for them to be free of fences.
-    // We don't want to wait in this callback so do the waiting in pollqueue
-    while (i-- != 0)
-        pollqueue_add_task(vdre->pt[i], 1000);
-}
-
-static const struct wl_buffer_listener w_buffer_listener = {
-    .release = w_buffer_release,
-};
-
 static int
 do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, picture_t * const pic,
                   video_dmabuf_release_env_t ** const pVdre, struct wl_buffer ** const pWbuffer)
 {
-    struct zwp_linux_buffer_params_v1 *params;
+    struct zwp_linux_buffer_params_v1 *params = NULL;
     const AVDRMFrameDescriptor * const desc = drm_prime_get_desc(pic);
     const uint32_t format = desc->layers[0].format;
     const unsigned int width = pic->format.i_visible_width;
@@ -715,7 +1026,7 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     unsigned int flags = 0;
     int i;
     struct wl_buffer * w_buffer;
-    video_dmabuf_release_env_t * const vdre = vdre_new(pic->context);
+    video_dmabuf_release_env_t * const vdre = vdre_new_ctx(pic->context);
 
     assert(*pWbuffer == NULL);
     assert(*pVdre == NULL);
@@ -728,43 +1039,67 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     for (i = 0; i != desc->nb_objects; ++i)
         vdre_add_pt(vdre, sys->pollq, desc->objects[i].fd);
 
-    /* Creation and configuration of planes  */
-    params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1);
-    if (!params)
+    if (!sys->bound.linux_dmabuf_v1)
     {
-        msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
-        goto error;
-    }
+        const AVDRMPlaneDescriptor *const p = desc->layers[0].planes + 0;
+        struct wl_shm_pool *pool = wl_shm_create_pool(sys->bound.shm, desc->objects[0].fd, desc->objects[0].size);
+        const uint32_t w_fmt = format == DRM_FORMAT_ARGB8888 ? 0 :
+            format == DRM_FORMAT_XRGB8888 ? 1 : format;
 
-    for (i = 0; i < desc->nb_layers; ++i)
-    {
-        int j;
-        for (j = 0; j < desc->layers[i].nb_planes; ++j)
+        if (pool == NULL)
         {
-            const AVDRMPlaneDescriptor *const p = desc->layers[i].planes + j;
-            const AVDRMObjectDescriptor *const obj = desc->objects + p->object_index;
-
-            zwp_linux_buffer_params_v1_add(params, obj->fd, n++, p->offset, p->pitch,
-                               (unsigned int)(obj->format_modifier >> 32),
-                               (unsigned int)(obj->format_modifier & 0xFFFFFFFF));
+            msg_Err(vd, "Failed to create pool from dmabuf");
+            goto error;
+        }
+        w_buffer = wl_shm_pool_create_buffer(pool, p->offset, width, height, p->pitch, w_fmt);
+        wl_shm_pool_destroy(pool);
+        if (w_buffer == NULL)
+        {
+            msg_Err(vd, "Failed to create buffer from pool");
+            goto error;
         }
     }
-
-    if (!pic->b_progressive)
+    else
     {
-        flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_INTERLACED;
-        if (!pic->b_top_field_first)
-            flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_BOTTOM_FIRST;
-    }
+        /* Creation and configuration of planes  */
+        params = zwp_linux_dmabuf_v1_create_params(sys->bound.linux_dmabuf_v1);
+        if (!params)
+        {
+            msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
+            goto error;
+        }
 
-    /* Request buffer creation */
-    if ((w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, format, flags)) == NULL)
-    {
-        msg_Err(vd, "zwp_linux_buffer_params_v1_create_immed FAILED");
-        goto error;
-    }
+        for (i = 0; i < desc->nb_layers; ++i)
+        {
+            int j;
+            for (j = 0; j < desc->layers[i].nb_planes; ++j)
+            {
+                const AVDRMPlaneDescriptor *const p = desc->layers[i].planes + j;
+                const AVDRMObjectDescriptor *const obj = desc->objects + p->object_index;
 
-    zwp_linux_buffer_params_v1_destroy(params);
+                zwp_linux_buffer_params_v1_add(params, obj->fd, n++, p->offset, p->pitch,
+                                   (unsigned int)(obj->format_modifier >> 32),
+                                   (unsigned int)(obj->format_modifier & 0xFFFFFFFF));
+            }
+        }
+
+        if (!pic->b_progressive)
+        {
+            flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_INTERLACED;
+            if (!pic->b_top_field_first)
+                flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_BOTTOM_FIRST;
+        }
+
+        /* Request buffer creation */
+        if ((w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, format, flags)) == NULL)
+        {
+            msg_Err(vd, "zwp_linux_buffer_params_v1_create_immed FAILED");
+            goto error;
+        }
+
+        zwp_linux_buffer_params_v1_destroy(params);
+        params = NULL;
+    }
 
     wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre);
 
@@ -773,6 +1108,8 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     return VLC_SUCCESS;
 
 error:
+    if (params)
+        zwp_linux_buffer_params_v1_destroy(params);
     vdre_free(vdre);
     return VLC_EGENERIC;
 }
@@ -785,15 +1122,20 @@ subpic_ent_flush(subpic_ent_t * const spe)
         spe->pic = NULL;
     }
     buffer_destroy(&spe->wb);
+    vdre_delete(&spe->vdre);
     dmabuf_unref(&spe->dh);
 }
 
-static void
-subpic_ent_attach(struct wl_surface * const surface, subpic_ent_t * const spe)
+static bool
+subpic_ent_attach(struct wl_surface * const surface, subpic_ent_t * const spe, eq_env_t * eq)
 {
+    const bool has_pic = (spe->wb != NULL);
+    vdre_eq_ref(spe->vdre, eq);
     wl_surface_attach(surface, spe->wb, 0, 0);
-    spe->dh = NULL;
+    spe->vdre = NULL;
     spe->wb = NULL;
+    wl_surface_damage(surface, 0, 0, INT32_MAX, INT32_MAX);
+    return has_pic;
 }
 
 static void
@@ -816,7 +1158,7 @@ make_video_surface(vout_display_t * const vd, vout_display_sys_t * const sys)
 #if VIDEO_ON_SUBSURFACE
     // Make a new subsurface to use for video
     sys->video_surface = wl_compositor_create_surface(video_compositor(sys));
-    sys->video_subsurface = wl_subcompositor_get_subsurface(sys->subcompositor, sys->video_surface, bkg_surface(sys));
+    sys->video_subsurface = wl_subcompositor_get_subsurface(sys->bound.subcompositor, sys->video_surface, bkg_surface(sys));
     wl_subsurface_place_above(sys->video_subsurface, bkg_surface(sys));
     wl_subsurface_set_desync(sys->video_subsurface);  // Video update can be desync from main window
 #endif
@@ -826,7 +1168,7 @@ make_video_surface(vout_display_t * const vd, vout_display_sys_t * const sys)
     // Video is opaque
     mark_all_surface_opaque(video_compositor(sys), surface);
 
-    sys->viewport = wp_viewporter_get_viewport(sys->viewporter, surface);
+    sys->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, surface);
 
     /* Determine our pixel format */
     static const enum wl_output_transform transforms[8] = {
@@ -859,11 +1201,11 @@ make_subpic_surfaces(vout_display_t * const vd, vout_display_sys_t * const sys)
     {
         subplane_t *plane = sys->subplanes + i;
         plane->surface = wl_compositor_create_surface(video_compositor(sys));
-        plane->subsurface = wl_subcompositor_get_subsurface(sys->subcompositor, plane->surface, surface);
+        plane->subsurface = wl_subcompositor_get_subsurface(sys->bound.subcompositor, plane->surface, surface);
         wl_subsurface_place_above(plane->subsurface, below);
         below = plane->surface;
         wl_subsurface_set_sync(plane->subsurface);
-        plane->viewport = wp_viewporter_get_viewport(sys->viewporter, plane->surface);
+        plane->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, plane->surface);
     }
     return VLC_SUCCESS;
 }
@@ -883,11 +1225,11 @@ make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
 
     if (!sys->bkg_viewport)
     {
-        unsigned int width = 640;
-        unsigned int height = 480;
-        unsigned int stride = 640 * 4;
-        struct zwp_linux_buffer_params_v1 *params;
+        unsigned int width = sys->chequerboard ? 640 : 32;
+        unsigned int height = sys->chequerboard ? 480 : 32;
+        unsigned int stride = width * 4;
         struct wl_buffer * w_buffer;
+        video_dmabuf_release_env_t * vdre = NULL;
 
         if ((dh = picpool_get(sys->subpic_pool, stride * height)) == NULL) {
             msg_Err(vd, "Failed to get DmaBuf for background");
@@ -895,31 +1237,52 @@ make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
         }
 
         dmabuf_write_start(dh);
-        chequerboard(dmabuf_map(dh), stride, width, height);
+        if (sys->chequerboard)
+            chequerboard(dmabuf_map(dh), stride, width, height);
+        else
+            fill_uniform(dmabuf_map(dh), stride, width, height, 0xff000000);
         dmabuf_write_end(dh);
 
-        params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1);
-        if (!params) {
-            msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
-            goto error;
+        if (sys->use_shm)
+        {
+            struct wl_shm_pool *pool = wl_shm_create_pool(sys->bound.shm, dmabuf_fd(dh), dmabuf_size(dh));
+            if (pool == NULL)
+            {
+                msg_Err(vd, "Failed to create pool from dmabuf");
+                goto error;
+            }
+            w_buffer = wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_XRGB8888);
+            wl_shm_pool_destroy(pool);
         }
-        zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), 0, 0, stride, 0, 0);
-        w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, DRM_FORMAT_XRGB8888, 0);
-        zwp_linux_buffer_params_v1_destroy(params);
+        else
+        {
+            struct zwp_linux_buffer_params_v1 *params;
+            params = zwp_linux_dmabuf_v1_create_params(sys->bound.linux_dmabuf_v1);
+            if (!params) {
+                msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
+                goto error;
+            }
+            zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), 0, 0, stride, 0, 0);
+            w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, DRM_FORMAT_XRGB8888, 0);
+            zwp_linux_buffer_params_v1_destroy(params);
+        }
         if (!w_buffer) {
             msg_Err(vd, "Failed to create background buffer");
             goto error;
         }
 
-        sys->bkg_viewport = wp_viewporter_get_viewport(sys->viewporter, bkg_surface(sys));
+        sys->bkg_viewport = wp_viewporter_get_viewport(sys->bound.viewporter, bkg_surface(sys));
 
-        wl_buffer_add_listener(w_buffer, &subpic_buffer_listener, dh);
+        vdre = vdre_new_dh(dh, sys->pollq);
+        vdre_eq_ref(vdre, sys->eq);
+        wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre);
         wl_surface_attach(bkg_surface(sys), w_buffer, 0, 0);
         dh = NULL;
 
         wp_viewport_set_destination(sys->bkg_viewport, sys->bkg_w, sys->bkg_h);
-        mark_all_surface_opaque(video_compositor(sys), bkg_surface(sys));
+        mark_all_surface_opaque(sys->bound.compositor, bkg_surface(sys));
 
+        wl_surface_damage(bkg_surface(sys), 0, 0, INT32_MAX, INT32_MAX);
         wl_surface_commit(bkg_surface(sys));
     }
     return VLC_SUCCESS;
@@ -948,7 +1311,9 @@ set_video_viewport(vout_display_t * const vd, vout_display_sys_t * const sys)
                     wl_fixed_from_int(fmt.i_visible_height));
     wp_viewport_set_destination(sys->viewport,
                     sys->dst_rect.width, sys->dst_rect.height);
+#if VIDEO_ON_SUBSURFACE
     wl_subsurface_set_position(sys->video_subsurface, sys->dst_rect.x, sys->dst_rect.y);
+#endif
 }
 
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
@@ -961,11 +1326,11 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 #endif
     check_embed(vd, sys, __func__);
 
-    if (drmu_format_vlc_to_drm_prime(pic->format.i_chroma, NULL) == 0) {
-        copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &sys->piccpy.dh, &sys->piccpy.wb);
+    if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) == 0) {
+        copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &sys->piccpy.vdre, &sys->piccpy.wb);
     }
     else {
-        do_display_dmabuf(vd, sys, pic, &sys->pic_vdre, &sys->piccpy.wb);
+        do_display_dmabuf(vd, sys, pic, &sys->piccpy.vdre, &sys->piccpy.wb);
     }
 
     // Attempt to import the subpics
@@ -981,7 +1346,7 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
             if (src != dst->pic || sreg->i_alpha != dst->alpha) {
                 subpic_ent_flush(dst);
 
-                if (copy_subpic_to_w_buffer(vd, sys, src, sreg->i_alpha, &dst->dh, &dst->wb) != 0)
+                if (copy_subpic_to_w_buffer(vd, sys, src, sreg->i_alpha, &dst->vdre, &dst->wb) != 0)
                     continue;
 
                 dst->pic = picture_Hold(src);
@@ -1020,7 +1385,7 @@ subpics_done:
     for (; n != MAX_SUBPICS; ++n) {
         subpic_ent_t * const dst = sys->subpics + n;
 
-        if (dst->dh != NULL)
+        if (dst->pic != NULL)
             dst->update = true;
         subpic_ent_flush(dst);
     }
@@ -1049,37 +1414,50 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
     {
         subpic_ent_t * const spe = sys->subpics + i;
+        subplane_t * const dst = sys->subplanes + i;
+        const bool had_pic = dst->has_pic;
+        bool commit = false;
 
-        if (!spe->update)
-            continue;
+        if (spe->update)
+        {
+    #if TRACE_ALL
+            msg_Dbg(vd, "%s: Update subpic %i: wb=%p alpha=%d", __func__, i, spe->wb, spe->alpha);
+    #endif
+            spe->update = false;
+            dst->has_pic = subpic_ent_attach(dst->surface, spe, sys->eq);
+            commit = true;
+        }
 
-        msg_Dbg(vd, "%s: Update subpic %i: wb=%p alpha=%d", __func__, i, spe->wb, spe->alpha);
-        subpic_ent_attach(sys->subplanes[i].surface, spe);
+        if (dst->has_pic &&
+            (!had_pic ||
+             !place_eq(dst->src_rect, spe->src_rect) ||
+             !place_eq(dst->dst_rect, spe->dst_rect)))
+        {
+            wl_subsurface_set_position(dst->subsurface, spe->dst_rect.x, spe->dst_rect.y);
+            wp_viewport_set_source(dst->viewport,
+                                   wl_fixed_from_int(spe->src_rect.x), wl_fixed_from_int(spe->src_rect.y),
+                                   wl_fixed_from_int(spe->src_rect.width), wl_fixed_from_int(spe->src_rect.height));
+            wp_viewport_set_destination(dst->viewport, spe->dst_rect.width, spe->dst_rect.height);
 
-        wl_subsurface_set_position(sys->subplanes[i].subsurface, spe->dst_rect.x, spe->dst_rect.y);
-        wp_viewport_set_source(sys->subplanes[i].viewport,
-                               wl_fixed_from_int(spe->src_rect.x), wl_fixed_from_int(spe->src_rect.y),
-                               wl_fixed_from_int(spe->src_rect.width), wl_fixed_from_int(spe->src_rect.height));
-        wp_viewport_set_destination(sys->subplanes[i].viewport, spe->dst_rect.width, spe->dst_rect.height);
-        wl_surface_damage(sys->subplanes[i].surface, 0, 0, INT32_MAX, INT32_MAX);
+            dst->src_rect = spe->src_rect;
+            dst->dst_rect = spe->dst_rect;
+            commit = true;
+        }
 
-        wl_surface_commit(sys->subplanes[i].surface);
-        spe->update = false;
+        if (commit)
+            wl_surface_commit(dst->surface);
     }
 
     if (!sys->piccpy.wb) {
-        msg_Warn(vd, "Display called but prepared pic buffer");
+        msg_Warn(vd, "Display called but no prepared pic buffer");
     }
     else {
-        subpic_ent_attach(video_surface(sys), &sys->piccpy);
+        subpic_ent_attach(video_surface(sys), &sys->piccpy, sys->eq);
         sys->video_attached = true;
-        // Now up to the buffer callback to free stuff
-        sys->pic_vdre = NULL;
     }
 
     set_video_viewport(vd, sys);
 
-    wl_surface_damage(video_surface(sys), 0, 0, INT32_MAX, INT32_MAX);
     wl_surface_commit(video_surface(sys));
 
     // With VIDEO_ON_SUBSURFACE we need a commit on the background here
@@ -1089,7 +1467,6 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     // VIDEO_ON_SUBSURFACE set but don't with it unset
 
     wl_display_flush(video_display(sys));
-//    roundtrip(sys);
 
     if (subpic)
         subpicture_Delete(subpic);
@@ -1224,9 +1601,9 @@ static void linux_dmabuf_v1_listener_format(void *data,
     vout_display_t * const vd = data;
     vout_display_sys_t * const sys = vd->sys;
     (void)zwp_linux_dmabuf_v1;
-
+#if TRACE_ALL
     msg_Dbg(vd, "%s[%p], %.4s", __func__, (void*)vd, (const char *)&format);
-
+#endif
     fmt_list_add(&sys->dmabuf_fmts, format, DRM_FORMAT_MOD_LINEAR, 0);
 }
 
@@ -1240,9 +1617,9 @@ linux_dmabuf_v1_listener_modifier(void *data,
     vout_display_t * const vd = data;
     vout_display_sys_t * const sys = vd->sys;
     (void)zwp_linux_dmabuf_v1;
-
+#if TRACE_ALL
     msg_Dbg(vd, "%s[%p], %.4s %08x%08x", __func__, (void*)vd, (const char *)&format, modifier_hi, modifier_lo);
-
+#endif
     fmt_list_add(&sys->dmabuf_fmts, format, modifier_lo | ((uint64_t)modifier_hi << 32), 0);
 }
 
@@ -1251,6 +1628,83 @@ static const struct zwp_linux_dmabuf_v1_listener linux_dmabuf_v1_listener = {
     .modifier = linux_dmabuf_v1_listener_modifier,
 };
 
+static void shm_listener_format(void *data,
+               struct wl_shm *shm,
+               uint32_t format)
+{
+    vout_display_t * const vd = data;
+    vout_display_sys_t * const sys = vd->sys;
+    (void)shm;
+
+    if (format == 0)
+        format = DRM_FORMAT_ARGB8888;
+    else if (format == 1)
+        format = DRM_FORMAT_XRGB8888;
+
+#if TRACE_ALL
+    msg_Dbg(vd, "%s[%p], %.4s", __func__, (void*)vd, (const char *)&format);
+#endif
+    fmt_list_add(&sys->shm_fmts, format, DRM_FORMAT_MOD_LINEAR, 0);
+}
+
+static const struct wl_shm_listener shm_listener = {
+    .format = shm_listener_format,
+};
+
+
+static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
+                        struct wl_registry * const registry,
+                        const uint32_t name, const char *const iface, const uint32_t vers)
+{
+#if TRACE_ALL
+    msg_Dbg(vd, "global %3"PRIu32": %s version %"PRIu32, name, iface, vers);
+#endif
+    if (strcmp(iface, wl_subcompositor_interface.name) == 0)
+        b->subcompositor = wl_registry_bind(registry, name, &wl_subcompositor_interface, 1);
+    else
+    if (strcmp(iface, wl_shm_interface.name) == 0)
+    {
+        b->shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
+        wl_shm_add_listener(b->shm, &shm_listener, vd);
+    }
+    else
+    if (strcmp(iface, wp_viewporter_interface.name) == 0)
+        b->viewporter = wl_registry_bind(registry, name, &wp_viewporter_interface, 1);
+    else
+    if (!strcmp(iface, wl_compositor_interface.name))
+    {
+        if (vers >= 4)
+            b->compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 4);
+        else
+            msg_Warn(vd, "Interface %s wanted v 4 got v %d", wl_compositor_interface.name, vers);
+    }
+    else
+    if (!vd->sys->use_shm && strcmp(iface, zwp_linux_dmabuf_v1_interface.name) == 0)
+    {
+        if (vers >= 3)
+        {
+            b->linux_dmabuf_v1 = wl_registry_bind(registry, name, &zwp_linux_dmabuf_v1_interface, 3);
+            zwp_linux_dmabuf_v1_add_listener(b->linux_dmabuf_v1, &linux_dmabuf_v1_listener, vd);
+        }
+        else
+            msg_Warn(vd, "Interface %s wanted v 3 got v %d", zwp_linux_dmabuf_v1_interface.name, vers);
+    }
+}
+
+static void w_bound_destroy(w_bound_t * const b)
+{
+    if (b->viewporter != NULL)
+        wp_viewporter_destroy(b->viewporter);
+    if (b->linux_dmabuf_v1 != NULL)
+        zwp_linux_dmabuf_v1_destroy(b->linux_dmabuf_v1);
+    if (b->subcompositor != NULL)
+        wl_subcompositor_destroy(b->subcompositor);
+    if (b->compositor != NULL)
+        wl_compositor_destroy(b->compositor);
+    if (b->shm != NULL)
+        wl_shm_destroy(b->shm);
+    memset(b, 0, sizeof(*b));
+}
 
 static void registry_global_cb(void *data, struct wl_registry *registry,
                                uint32_t name, const char *iface, uint32_t vers)
@@ -1258,30 +1712,7 @@ static void registry_global_cb(void *data, struct wl_registry *registry,
     vout_display_t * const vd = data;
     vout_display_sys_t * const sys = vd->sys;
 
-    msg_Dbg(vd, "global %3"PRIu32": %s version %"PRIu32, name, iface, vers);
-
-    if (strcmp(iface, wl_subcompositor_interface.name) == 0)
-        sys->subcompositor = wl_registry_bind(registry, name, &wl_subcompositor_interface, 1);
-    else
-    if (!strcmp(iface, "wp_viewporter"))
-        sys->viewporter = wl_registry_bind(registry, name, &wp_viewporter_interface, 1);
-    else
-    if (!strcmp(iface, "wl_compositor"))
-    {
-        if (vers >= 4)
-            sys->compositor = wl_registry_bind(registry, name, &wl_compositor_interface, 4);
-        else
-            msg_Warn(vd, "Interface %s wanted v 4 got v %d", wl_compositor_interface.name, vers);
-    }
-    else
-    if (strcmp(iface, zwp_linux_dmabuf_v1_interface.name) == 0)
-    {
-        if (vers >= 3)
-            sys->linux_dmabuf_v1 = wl_registry_bind(registry, name, &zwp_linux_dmabuf_v1_interface, 3);
-        else
-            msg_Warn(vd, "Interface %s wanted v 3 got v %d", zwp_linux_dmabuf_v1_interface.name, vers);
-    }
-
+    w_bound_add(vd, &sys->bound, registry, name, iface, vers);
 }
 
 static void registry_global_remove_cb(void *data, struct wl_registry *registry,
@@ -1299,6 +1730,49 @@ static const struct wl_registry_listener registry_cbs =
     registry_global_remove_cb,
 };
 
+struct registry_scan_bounce_env {
+    struct wl_registry * registry;
+    eq_env_t * const eq;
+    vout_display_t * const vd;
+};
+
+// Only safe place to add a listener is on pollq thread
+static void
+registry_scan_bounce_cb(void * v, short revents)
+{
+    struct registry_scan_bounce_env * rsbe = v;
+    (void)revents;
+    rsbe->registry = wl_display_get_registry(eq_wrapper(rsbe->eq)),
+    wl_registry_add_listener(rsbe->registry, &registry_cbs, rsbe->vd);
+}
+
+// N.B. Having got the registry with a wrapped display
+// by default everything we do with the newly bound interfaces will turn
+// up on the wrapped queue
+
+static int
+registry_scan(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+    struct registry_scan_bounce_env rsbe = {
+        .registry = NULL,
+        .eq = sys->eq,
+        .vd = vd
+    };
+
+    pollqueue_callback_once(rsbe.eq->pq, registry_scan_bounce_cb, &rsbe);
+
+    eventq_sync(rsbe.eq);
+    // Registry callback provokes shm & fmt callbacks so another sync needed
+    eventq_sync(rsbe.eq);
+
+    if (rsbe.registry == NULL)
+        return -1;
+
+    wl_registry_destroy(rsbe.registry);
+    return 0;
+}
+
+
 
 static void
 clear_surface_buffer(struct wl_surface * surface)
@@ -1306,6 +1780,7 @@ clear_surface_buffer(struct wl_surface * surface)
     if (surface == NULL)
         return;
     wl_surface_attach(surface, NULL, 0, 0);
+    wl_surface_damage(surface, 0, 0, INT32_MAX, INT32_MAX);
     wl_surface_commit(surface);
 }
 
@@ -1328,7 +1803,6 @@ clear_all_buffers(vout_display_sys_t *sys)
 #endif
 
     subpic_ent_flush(&sys->piccpy);
-    vdre_delete(&sys->pic_vdre);
 }
 
 
@@ -1337,9 +1811,7 @@ static void Close(vlc_object_t *obj)
     vout_display_t * const vd = (vout_display_t *)obj;
     vout_display_sys_t * const sys = vd->sys;
 
-#if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
-#endif
 
     if (sys == NULL)
         return;
@@ -1370,35 +1842,29 @@ static void Close(vlc_object_t *obj)
     viewport_destroy(&sys->bkg_viewport);
 #endif
 
-    wl_display_flush(video_display(sys));
+    w_bound_destroy(&sys->bound);
 
-    if (sys->viewporter != NULL)
-        wp_viewporter_destroy(sys->viewporter);
-    if (sys->linux_dmabuf_v1 != NULL)
-        zwp_linux_dmabuf_v1_destroy(sys->linux_dmabuf_v1);
-    if (sys->subcompositor != NULL)
-        wl_subcompositor_destroy(sys->subcompositor);
-    if (sys->compositor != NULL)
-        wl_compositor_destroy(sys->compositor);
+    eventq_sync(sys->eq);
 
-    wl_display_flush(video_display(sys));
+    if (eq_finish(&sys->eq) != 0)
+        msg_Err(vd, "Failed to reclaim all buffers on close");
+
+    pollqueue_unref(&sys->pollq);
 
     vout_display_DeleteWindow(vd, sys->embed);
     sys->embed = NULL;
 
     kill_pool(sys);
     picpool_unref(&sys->subpic_pool);
-    pollqueue_unref(&sys->pollq);
 
     free(sys->subpic_chromas);
 
 no_window:
     fmt_list_uninit(&sys->dmabuf_fmts);
+    fmt_list_uninit(&sys->shm_fmts);
     free(sys);
 
-#if TRACE_ALL
     msg_Dbg(vd, ">>> %s", __func__);
-#endif
 }
 
 static int Open(vlc_object_t *obj)
@@ -1407,13 +1873,13 @@ static int Open(vlc_object_t *obj)
     vout_display_sys_t *sys;
     uint32_t pic_drm_fmt = 0;
     uint64_t pic_drm_mod = DRM_FORMAT_MOD_LINEAR;
+    fmt_list_t * flist = NULL;
 
     msg_Info(vd, "<<< %s: %.4s %dx%d, cfg.display: %dx%d", __func__,
              (const char*)&vd->fmt.i_chroma, vd->fmt.i_width, vd->fmt.i_height,
              vd->cfg->display.width, vd->cfg->display.height);
 
-    if (!(pic_drm_fmt = drmu_format_vlc_to_drm(&vd->fmt)) &&
-        !(pic_drm_fmt = drmu_format_vlc_to_drm_prime(vd->fmt.i_chroma, &pic_drm_mod)))
+    if (!(pic_drm_fmt = drmu_format_vlc_to_drm(&vd->fmt, &pic_drm_mod)))
         return VLC_EGENERIC;
 
     sys = calloc(1, sizeof(*sys));
@@ -1421,56 +1887,64 @@ static int Open(vlc_object_t *obj)
         return VLC_ENOMEM;
 
     vd->sys = sys;
-
     if (fmt_list_init(&sys->dmabuf_fmts, 128)) {
-        msg_Err(vd, "Failed to allocate format list!");
+        msg_Err(vd, "Failed to allocate dmabuf format list!");
+        goto error;
+    }
+    if (fmt_list_init(&sys->shm_fmts, 32)) {
+        msg_Err(vd, "Failed to allocate shm format list!");
         goto error;
     }
 
-    /* Get window */
+    sys->use_shm = var_InheritBool(vd, WL_DMABUF_USE_SHM_NAME);
+    sys->chequerboard = var_InheritBool(vd, WL_DMABUF_CHEQUERBOARD_NAME);
+
+        /* Get window */
     sys->embed = vout_display_NewWindow(vd, VOUT_WINDOW_TYPE_WAYLAND);
     if (sys->embed == NULL)
         goto error;
     sys->last_embed_surface = sys->embed->handle.wl;
 
+    if ((sys->pollq = pollqueue_new()) == NULL)
     {
-        struct wl_registry * const registry = wl_display_get_registry(video_display(sys));
-        if (registry == NULL) {
-            msg_Err(vd, "Cannot get registry for display");
-            goto error;
-        }
-
-        wl_registry_add_listener(registry, &registry_cbs, vd);
-        roundtrip(sys);
-        wl_registry_destroy(registry);
+        msg_Err(vd, "Failed to create pollqueue");
+        goto error;
+    }
+    if ((sys->eq = eq_new(video_display(sys), sys->pollq)) == NULL)
+    {
+        msg_Err(vd, "Failed to create event Q");
+        goto error;
     }
 
-    if (sys->compositor == NULL) {
+    if (registry_scan(vd, sys) != 0)
+    {
+        msg_Err(vd, "Cannot get registry for display");
+        goto error;
+    }
+
+    if (sys->bound.compositor == NULL) {
         msg_Warn(vd, "Interface %s missing", wl_compositor_interface.name);
         goto error;
     }
-    if (sys->subcompositor == NULL) {
+    if (sys->bound.subcompositor == NULL) {
         msg_Warn(vd, "Interface %s missing", wl_subcompositor_interface.name);
         goto error;
     }
-    if (sys->viewporter == NULL) {
+    if (sys->bound.viewporter == NULL) {
         msg_Warn(vd, "Interface %s missing", wp_viewporter_interface.name);
         goto error;
     }
-    if (sys->linux_dmabuf_v1 == NULL) {
+    if (!sys->use_shm && sys->bound.linux_dmabuf_v1 == NULL) {
         msg_Warn(vd, "Interface %s missing", zwp_linux_dmabuf_v1_interface.name);
         goto error;
     }
 
-    // And again for registering formats
-    zwp_linux_dmabuf_v1_add_listener(sys->linux_dmabuf_v1, &linux_dmabuf_v1_listener, vd);
-
-    roundtrip(sys);
-
     fmt_list_sort(&sys->dmabuf_fmts);
+    fmt_list_sort(&sys->shm_fmts);
+    flist = sys->use_shm ? &sys->shm_fmts : &sys->dmabuf_fmts;
 
     // Check PIC DRM format here
-    if (fmt_list_find(&sys->dmabuf_fmts, pic_drm_fmt, pic_drm_mod) < 0) {
+    if (fmt_list_find(flist, pic_drm_fmt, pic_drm_mod) < 0) {
         msg_Warn(vd, "Could not find %.4s mod %#"PRIx64" in supported formats", (char*)&pic_drm_fmt, pic_drm_mod);
         goto error;
     }
@@ -1479,6 +1953,7 @@ static int Open(vlc_object_t *obj)
         static vlc_fourcc_t const tryfmts[] = {
             VLC_CODEC_RGBA,
             VLC_CODEC_BGRA,
+            VLC_CODEC_ARGB,
         };
         unsigned int n = 0;
 
@@ -1488,7 +1963,7 @@ static int Open(vlc_object_t *obj)
         {
             uint32_t drmfmt = drmu_format_vlc_chroma_to_drm(tryfmts[i]);
             msg_Dbg(vd, "Look for %.4s", (char*)&drmfmt);
-            if (fmt_list_find(&sys->dmabuf_fmts, drmfmt, DRM_FORMAT_MOD_LINEAR) >= 0)
+            if (fmt_list_find(flist, drmfmt, DRM_FORMAT_MOD_LINEAR) >= 0)
                 sys->subpic_chromas[n++] = tryfmts[i];
         }
 
@@ -1497,7 +1972,7 @@ static int Open(vlc_object_t *obj)
     }
 
     {
-        struct dmabufs_ctl * dbsc = dmabufs_ctl_new();
+        struct dmabufs_ctl *dbsc = sys->use_shm ? dmabufs_shm_new() : dmabufs_ctl_new();
         if (dbsc == NULL)
         {
             msg_Err(vd, "Failed to create dmabuf ctl");
@@ -1512,15 +1987,11 @@ static int Open(vlc_object_t *obj)
         }
     }
 
-    if ((sys->pollq = pollqueue_new()) == NULL)
-    {
-        msg_Err(vd, "Failed to create pollqueue");
-        goto error;
-    }
-
     sys->curr_aspect = vd->source;
+#if VIDEO_ON_SUBSURFACE
     sys->bkg_w = vd->cfg->display.width;
     sys->bkg_h = vd->cfg->display.height;
+#endif
 
     vd->info.has_pictures_invalid = sys->viewport == NULL;
     vd->info.subpicture_chromas = sys->subpic_chromas;
@@ -1530,16 +2001,12 @@ static int Open(vlc_object_t *obj)
     vd->display = Display;
     vd->control = Control;
 
-#if TRACE_ALL
     msg_Dbg(vd, ">>> %s: OK", __func__);
-#endif
     return VLC_SUCCESS;
 
 error:
     Close(obj);
-#if TRACE_ALL
     msg_Dbg(vd, ">>> %s: ERROR", __func__);
-#endif
     return VLC_EGENERIC;
 }
 
@@ -1551,4 +2018,6 @@ vlc_module_begin()
     set_capability("vout display", 0)
     set_callbacks(Open, Close)
     add_shortcut("wl-dmabuf")
+    add_bool(WL_DMABUF_USE_SHM_NAME, false, WL_DMABUF_USE_SHM_TEXT, WL_DMABUF_USE_SHM_LONGTEXT, false)
+    add_bool(WL_DMABUF_CHEQUERBOARD_NAME, false, WL_DMABUF_CHEQUERBOARD_TEXT, WL_DMABUF_CHEQUERBOARD_LONGTEXT, false)
 vlc_module_end()
