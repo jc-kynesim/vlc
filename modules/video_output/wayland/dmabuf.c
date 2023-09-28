@@ -67,6 +67,10 @@
 #define WL_DMABUF_USE_SHM_TEXT N_("Attempt to map via shm")
 #define WL_DMABUF_USE_SHM_LONGTEXT N_("Attempt to map via shm rather than linux_dmabuf")
 
+#define WL_DMABUF_CHEQUERBOARD_NAME "wl-dmabuf-chequerboard"
+#define WL_DMABUF_CHEQUERBOARD_TEXT N_("Chequerboard background")
+#define WL_DMABUF_CHEQUERBOARD_LONGTEXT N_("Fill unused window area with chequerboard rather than black")
+
 typedef struct fmt_ent_s {
     uint32_t fmt;
     int32_t pri;
@@ -103,6 +107,10 @@ typedef struct subplane_s {
     struct wl_surface * surface;
     struct wl_subsurface * subsurface;
     struct wp_viewport * viewport;
+
+    vout_display_place_t dst_rect;
+    vout_display_place_t src_rect;
+    bool has_pic;
 } subplane_t;
 
 typedef struct subpic_ent_s {
@@ -142,6 +150,7 @@ struct vout_display_sys_t
     bool video_attached;
     bool viewport_set;
     bool use_shm;
+    bool chequerboard;
 
     vout_display_place_t spu_rect;  // Window that subpic coords orignate from
     vout_display_place_t dst_rect;  // Window in the display size that holds the video
@@ -279,6 +288,12 @@ place_rescale(const vout_display_place_t s, const vout_display_place_t mul, cons
         .width  = place_rescale_1u(s.width,     mul.width,  div.width),
         .height = place_rescale_1u(s.height,    mul.height, div.height)
     };
+}
+
+static inline bool
+place_eq(const vout_display_place_t a, const vout_display_place_t b)
+{
+    return a.x == b.x && a.y == b.y && a.width == b.width && a.height == b.height;
 }
 
 
@@ -761,6 +776,18 @@ chequerboard(uint32_t *const data, unsigned int stride, const unsigned int width
     }
 }
 
+static void
+fill_uniform(uint32_t *const data, unsigned int stride, const unsigned int width, const unsigned int height, const uint32_t val)
+{
+    stride /= sizeof(uint32_t);
+
+    /* Draw solid background */
+    for (unsigned int y = 0; y < height; ++y) {
+        for (unsigned int x = 0; x < width; ++x)
+            data[y * stride + x] = val;
+    }
+}
+
 // ----------------------------------------------------------------------------
 
 static void
@@ -1140,13 +1167,16 @@ subpic_ent_flush(subpic_ent_t * const spe)
     dmabuf_unref(&spe->dh);
 }
 
-static void
+static bool
 subpic_ent_attach(struct wl_surface * const surface, subpic_ent_t * const spe, eq_env_t * eq)
 {
+    const bool has_pic = (spe->wb != NULL);
     vdre_eq_ref(spe->vdre, eq);
     wl_surface_attach(surface, spe->wb, 0, 0);
     spe->vdre = NULL;
     spe->wb = NULL;
+    wl_surface_damage(surface, 0, 0, INT32_MAX, INT32_MAX);
+    return has_pic;
 }
 
 static void
@@ -1236,9 +1266,9 @@ make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
 
     if (!sys->bkg_viewport)
     {
-        unsigned int width = 640;
-        unsigned int height = 480;
-        unsigned int stride = 640 * 4;
+        unsigned int width = sys->chequerboard ? 640 : 32;
+        unsigned int height = sys->chequerboard ? 480 : 32;
+        unsigned int stride = width * 4;
         struct wl_buffer * w_buffer;
         video_dmabuf_release_env_t * vdre = NULL;
 
@@ -1248,7 +1278,10 @@ make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
         }
 
         dmabuf_write_start(dh);
-        chequerboard(dmabuf_map(dh), stride, width, height);
+        if (sys->chequerboard)
+            chequerboard(dmabuf_map(dh), stride, width, height);
+        else
+            fill_uniform(dmabuf_map(dh), stride, width, height, 0xff000000);
         dmabuf_write_end(dh);
 
         if (sys->use_shm)
@@ -1393,7 +1426,7 @@ subpics_done:
     for (; n != MAX_SUBPICS; ++n) {
         subpic_ent_t * const dst = sys->subpics + n;
 
-        if (dst->vdre != NULL)
+        if (dst->pic != NULL)
             dst->update = true;
         subpic_ent_flush(dst);
     }
@@ -1422,27 +1455,42 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
     {
         subpic_ent_t * const spe = sys->subpics + i;
+        subplane_t * const dst = sys->subplanes + i;
+        const bool had_pic = dst->has_pic;
+        bool commit = false;
 
-        if (!spe->update)
-            continue;
-#if TRACE_ALL
-        msg_Dbg(vd, "%s: Update subpic %i: wb=%p alpha=%d", __func__, i, spe->wb, spe->alpha);
-#endif
-        subpic_ent_attach(sys->subplanes[i].surface, spe, sys->eq);
+        if (spe->update)
+        {
+    #if TRACE_ALL
+            msg_Dbg(vd, "%s: Update subpic %i: wb=%p alpha=%d", __func__, i, spe->wb, spe->alpha);
+    #endif
+            spe->update = false;
+            dst->has_pic = subpic_ent_attach(dst->surface, spe, sys->eq);
+            commit = true;
+        }
 
-        wl_subsurface_set_position(sys->subplanes[i].subsurface, spe->dst_rect.x, spe->dst_rect.y);
-        wp_viewport_set_source(sys->subplanes[i].viewport,
-                               wl_fixed_from_int(spe->src_rect.x), wl_fixed_from_int(spe->src_rect.y),
-                               wl_fixed_from_int(spe->src_rect.width), wl_fixed_from_int(spe->src_rect.height));
-        wp_viewport_set_destination(sys->subplanes[i].viewport, spe->dst_rect.width, spe->dst_rect.height);
-        wl_surface_damage(sys->subplanes[i].surface, 0, 0, INT32_MAX, INT32_MAX);
+        if (dst->has_pic &&
+            (!had_pic ||
+             !place_eq(dst->src_rect, spe->src_rect) ||
+             !place_eq(dst->dst_rect, spe->dst_rect)))
+        {
+            wl_subsurface_set_position(dst->subsurface, spe->dst_rect.x, spe->dst_rect.y);
+            wp_viewport_set_source(dst->viewport,
+                                   wl_fixed_from_int(spe->src_rect.x), wl_fixed_from_int(spe->src_rect.y),
+                                   wl_fixed_from_int(spe->src_rect.width), wl_fixed_from_int(spe->src_rect.height));
+            wp_viewport_set_destination(dst->viewport, spe->dst_rect.width, spe->dst_rect.height);
 
-        wl_surface_commit(sys->subplanes[i].surface);
-        spe->update = false;
+            dst->src_rect = spe->src_rect;
+            dst->dst_rect = spe->dst_rect;
+            commit = true;
+        }
+
+        if (commit)
+            wl_surface_commit(dst->surface);
     }
 
     if (!sys->piccpy.wb) {
-        msg_Warn(vd, "Display called but prepared pic buffer");
+        msg_Warn(vd, "Display called but no prepared pic buffer");
     }
     else {
         subpic_ent_attach(video_surface(sys), &sys->piccpy, sys->eq);
@@ -1451,7 +1499,6 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 
     set_video_viewport(vd, sys);
 
-    wl_surface_damage(video_surface(sys), 0, 0, INT32_MAX, INT32_MAX);
     wl_surface_commit(video_surface(sys));
 
     // With VIDEO_ON_SUBSURFACE we need a commit on the background here
@@ -1882,6 +1929,7 @@ static int Open(vlc_object_t *obj)
     }
 
     sys->use_shm = var_InheritBool(vd, WL_DMABUF_USE_SHM_NAME);
+    sys->chequerboard = var_InheritBool(vd, WL_DMABUF_CHEQUERBOARD_NAME);
 
         /* Get window */
     sys->embed = vout_display_NewWindow(vd, VOUT_WINDOW_TYPE_WAYLAND);
@@ -2010,4 +2058,5 @@ vlc_module_begin()
     set_callbacks(Open, Close)
     add_shortcut("wl-dmabuf")
     add_bool(WL_DMABUF_USE_SHM_NAME, false, WL_DMABUF_USE_SHM_TEXT, WL_DMABUF_USE_SHM_LONGTEXT, false)
+    add_bool(WL_DMABUF_CHEQUERBOARD_NAME, false, WL_DMABUF_CHEQUERBOARD_TEXT, WL_DMABUF_CHEQUERBOARD_LONGTEXT, false)
 vlc_module_end()
