@@ -28,6 +28,8 @@ enum polltask_state {
     POLLTASK_RUN_KILL,
 };
 
+#define POLLTASK_FLAG_ONCE 1
+
 struct polltask {
     struct polltask *next;
     struct polltask *prev;
@@ -36,6 +38,7 @@ struct polltask {
 
     int fd;
     short events;
+    unsigned short flags;
 
     void (*fn)(void *v, short revents);
     void * v;
@@ -68,10 +71,12 @@ struct pollqueue {
     pthread_t worker;
 };
 
-struct polltask *polltask_new(struct pollqueue *const pq,
-                              const int fd, const short events,
-                  void (*const fn)(void *v, short revents),
-                  void *const v)
+static struct polltask *
+polltask_new2(struct pollqueue *const pq,
+              const int fd, const short events,
+              void (*const fn)(void *v, short revents),
+              void *const v,
+              const unsigned short flags)
 {
     struct polltask *pt;
 
@@ -88,6 +93,7 @@ struct polltask *polltask_new(struct pollqueue *const pq,
         .q = pollqueue_ref(pq),
         .fd = fd,
         .events = events,
+        .flags = flags,
         .fn = fn,
         .v = v
     };
@@ -95,11 +101,32 @@ struct polltask *polltask_new(struct pollqueue *const pq,
     return pt;
 }
 
+struct polltask *
+polltask_new(struct pollqueue *const pq,
+             const int fd, const short events,
+             void (*const fn)(void *v, short revents),
+             void *const v)
+{
+    return polltask_new2(pq, fd, events, fn, v, 0);
+}
+
 struct polltask *polltask_new_timer(struct pollqueue *const pq,
                   void (*const fn)(void *v, short revents),
                   void *const v)
 {
     return polltask_new(pq, -1, 0, fn, v);
+}
+
+int
+pollqueue_callback_once(struct pollqueue *const pq,
+                        void (*const fn)(void *v, short revents),
+                        void *const v)
+{
+    struct polltask * const pt = polltask_new2(pq, -1, 0, fn, v, POLLTASK_FLAG_ONCE);
+    if (pt == NULL)
+        return -EINVAL;
+    pollqueue_add_task(pt, 0);
+    return 0;
 }
 
 static void pollqueue_rem_task(struct pollqueue *const pq, struct polltask *const pt)
@@ -338,7 +365,8 @@ static void *poll_thread(void *v)
                 pthread_mutex_lock(&pq->lock);
                 if (pt->state == POLLTASK_RUNNING)
                     pt->state = POLLTASK_UNQUEUED;
-                if (pt->state == POLLTASK_RUN_KILL)
+                if (pt->state == POLLTASK_RUN_KILL ||
+                    (pt->flags & POLLTASK_FLAG_ONCE) != 0)
                     polltask_kill(pt);
             }
         }
