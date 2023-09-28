@@ -1509,8 +1509,6 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 
     wl_display_flush(video_display(sys));
 
-    eventq_sync(sys->eq);
-
     if (subpic)
         subpicture_Delete(subpic);
     picture_Release(pic);
