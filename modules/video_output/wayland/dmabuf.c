@@ -710,23 +710,36 @@ eventq_rsync_wait(eq_env_t * const eq)
     return rv;
 }
 
+struct eq_sync_env_ss {
+    eq_env_t * eq;
+    sem_t sem;
+};
+
+static void
+eq_sync_pq_cb(void * v, short revents)
+{
+    struct eq_sync_env_ss * const eqs = v;
+    struct wl_callback * const cb = wl_display_sync(eq_wrapper(eqs->eq));
+    VLC_UNUSED(revents);
+    wl_callback_add_listener(cb, &eq_sync_listener, &eqs->sem);
+    // No flush needed as that will occur as part of the pollqueue loop
+}
+
 static int
 eventq_sync(eq_env_t * const eq)
 {
-    sem_t sem;
-    struct wl_callback * cb;
+    struct eq_sync_env_ss eqs = {.eq = eq};
     int rv;
 
     if (!eq)
         return -1;
 
-    sem_init(&sem, 0, 0);
-    cb = wl_display_sync(eq_wrapper(eq));
-    wl_callback_add_listener(cb, &eq_sync_listener, &sem);
-    wl_display_flush(eq->display);
-    while ((rv = sem_wait(&sem)) == -1 && errno == EINTR)
+    sem_init(&eqs.sem, 0, 0);
+    // Bounce execution to pollqueue to avoid race setting up listener
+    pollqueue_callback_once(eq->pq, eq_sync_pq_cb, &eqs);
+    while ((rv = sem_wait(&eqs.sem)) == -1 && errno == EINTR)
         /* Loop */;
-    sem_destroy(&sem);
+    sem_destroy(&eqs.sem);
     return rv;
 }
 
