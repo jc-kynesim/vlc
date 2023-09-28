@@ -44,6 +44,11 @@ void polltask_delete(struct polltask **const ppt);
 // May only be added once (currently)
 void pollqueue_add_task(struct polltask *const pt, const int timeout);
 
+// Run a callback once on the poll thread
+int pollqueue_callback_once(struct pollqueue *const pq,
+                            void (*const fn)(void *v, short revents),
+                            void *const v);
+
 // Create a pollqueue
 // Generates a new thread to do the polltask callbacks
 struct pollqueue * pollqueue_new(void);
