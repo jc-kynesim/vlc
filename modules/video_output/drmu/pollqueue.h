@@ -68,6 +68,8 @@ struct pollqueue * pollqueue_ref(struct pollqueue *const pq);
 // changing the fns.
 // pollfd will be added to polls if *pfd set (leave unset if not wanted)
 // One or both of pre/post may be 0 (uncalled)
+// Will wait if needed until the poll thread is not in the old pre/poll/post
+// sequence
 void pollqueue_set_pre_post(struct pollqueue *const pq,
                             void (*fn_pre)(void *v, struct pollfd *pfd),
                             void (*fn_post)(void *v, short revents),

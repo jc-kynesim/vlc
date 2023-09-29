@@ -62,6 +62,10 @@ struct pollqueue {
 
     bool kill;
     bool no_prod;
+
+    bool sig_seq; // Signal cond when seq incremented
+    uint32_t seq;
+
     int prod_fd;
     struct polltask *prod_pt;
     pthread_t worker;
@@ -331,6 +335,14 @@ static void *poll_thread(void *v)
          * infinite looping
         */
         pq->no_prod = true;
+
+        // Sync for prepost changes
+        ++pq->seq;
+        if (pq->sig_seq) {
+            pq->sig_seq = false;
+            pthread_cond_broadcast(&pq->cond);
+        }
+
         for (i = 0, j = 0, pt = pq->head; i < nall; ++i, pt = pt_next) {
             const short r = pt->fd == -1 ? 0 : a[j++].revents;
             pt_next = pt->next;
@@ -466,13 +478,23 @@ void pollqueue_set_pre_post(struct pollqueue *const pq,
                             void *v)
 {
     bool no_prod;
+
     pthread_mutex_lock(&pq->lock);
     pq->prepost.pre = fn_pre;
     pq->prepost.post = fn_post;
     pq->prepost.v = v;
     no_prod = pq->no_prod;
-    pthread_mutex_unlock(&pq->lock);
-    if (!no_prod)
+
+    if (!no_prod) {
+        const uint32_t seq = pq->seq;
+        int rv = 0;
+
         pollqueue_prod(pq);
+
+        pq->sig_seq = true;
+        while (rv == 0 && pq->seq == seq)
+            rv = pthread_cond_wait(&pq->cond, &pq->lock);
+    }
+    pthread_mutex_unlock(&pq->lock);
 }
 
