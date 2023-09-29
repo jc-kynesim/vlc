@@ -1388,13 +1388,13 @@ spe_changed(const subpic_ent_t * const spe, const subpicture_region_t * const sr
 static bool
 spe_update_rect(subpic_ent_t * const spe, vout_display_sys_t * const sys, const subpicture_region_t * const sreg)
 {
-    spe->src_rect = (vout_display_place_t) {
+    const vout_display_place_t src = (vout_display_place_t) {
         .x = sreg->fmt.i_x_offset,
         .y = sreg->fmt.i_y_offset,
         .width = sreg->fmt.i_visible_width,
         .height = sreg->fmt.i_visible_height,
     };
-    spe->dst_rect = place_rescale(
+    const vout_display_place_t dst = place_rescale(
         (vout_display_place_t) {
             .x = sreg->i_x,
             .y = sreg->i_y,
@@ -1408,8 +1408,13 @@ spe_update_rect(subpic_ent_t * const spe, vout_display_sys_t * const sys, const 
             .height = sys->dst_rect.height,
         },
         sys->spu_rect);
-    spe->rect_update = true;
 
+    if (place_eq(spe->src_rect, src) && place_eq(spe->dst_rect, dst))
+        return false;
+
+    spe->src_rect = src;
+    spe->dst_rect = dst;
+    spe->rect_update = true;
     return true;
 }
 
@@ -1471,20 +1476,20 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 #endif
     check_embed(vd, sys, __func__);
 
-    if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) == 0) {
+    if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) == 0)
         copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &sys->piccpy.vdre, &sys->piccpy.wb);
-    }
-    else {
+    else
         do_display_dmabuf(vd, sys, pic, &sys->piccpy.vdre, &sys->piccpy.wb);
-    }
 
     // Attempt to import the subpics
     for (subpicture_t * spic = subpic; spic != NULL; spic = spic->p_next)
     {
-        for (const subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
+        for (const subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next)
+        {
             subplane_t * const plane = sys->subplanes + n;
 
-            if (plane->spe_next != NULL) {
+            if (plane->spe_next != NULL)
+            {
                 if (!spe_changed(plane->spe_next, sreg))
                     spe_update_rect(plane->spe_next, sys, sreg);
                 // else if changed ignore as we are already doing stuff
@@ -1493,48 +1498,12 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
             {
                 if (!spe_changed(plane->spe_cur, sreg))
                     spe_update_rect(plane->spe_cur, sys, sreg);
-                else {
+                else
+                {
                     plane->spe_next = spe_new(vd, sys, sreg);
                     spe_convert(plane->spe_next);
                 }
             }
-
-#if 0
-            // If the same picture then assume the same contents
-            // We keep a ref to the previous pic to ensure that the same picture
-            // structure doesn't get reused and confuse us.
-            if (src != dst->pic || sreg->i_alpha != dst->alpha) {
-                subpic_ent_flush(dst);
-
-                if (copy_subpic_to_w_buffer(vd, sys, src, sreg->i_alpha, &dst->vdre, &dst->wb) != 0)
-                    continue;
-
-                dst->pic = picture_Hold(src);
-                dst->alpha = sreg->i_alpha;
-                dst->update = true;
-            }
-
-            dst->src_rect = (vout_display_place_t) {
-                .x = sreg->fmt.i_x_offset,
-                .y = sreg->fmt.i_y_offset,
-                .width = sreg->fmt.i_visible_width,
-                .height = sreg->fmt.i_visible_height,
-            };
-            dst->dst_rect = place_rescale(
-                (vout_display_place_t) {
-                    .x = sreg->i_x,
-                    .y = sreg->i_y,
-                    .width = sreg->fmt.i_visible_width,
-                    .height = sreg->fmt.i_visible_height,
-                },
-                (vout_display_place_t) {
-                    .x = 0,
-                    .y = 0,
-                    .width  = sys->dst_rect.width,
-                    .height = sys->dst_rect.height,
-                },
-                sys->spu_rect);
-#endif
 
             if (++n == MAX_SUBPICS)
                 goto subpics_done;
@@ -1547,16 +1516,7 @@ subpics_done:
         subplane_t * const plane = sys->subplanes + n;
         if (plane->spe_next == NULL && spe_changed(plane->spe_cur, NULL))
             plane->spe_next = spe_new(vd, sys, NULL);
-#if 0
-        subpic_ent_t * const dst = sys->subpics + n;
-
-        if (dst->pic != NULL)
-            dst->update = true;
-        subpic_ent_flush(dst);
-#endif
     }
-
-    (void)pic;
 
 #if TRACE_ALL
     msg_Dbg(vd, ">>> %s: Surface: %p", __func__, sys->embed->handle.wl);
@@ -1579,38 +1539,40 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 
     for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
     {
-        subplane_t * const dst = sys->subplanes + i;
+        subplane_t * const plane = sys->subplanes + i;
         bool commit = false;
-        subpic_ent_t * spe = dst->spe_cur;
+        subpic_ent_t * spe = plane->spe_cur;
 
-        if (dst->spe_next && atomic_load(&dst->spe_next->ready))
+        if (plane->spe_next && atomic_load(&plane->spe_next->ready))
         {
-            spe_delete(&dst->spe_cur);
-            spe = dst->spe_cur = dst->spe_next;
-            dst->spe_next = NULL;
-            subpic_ent_attach(dst->surface, spe, sys->eq);
+            spe_delete(&plane->spe_cur);
+            spe = plane->spe_cur = plane->spe_next;
+            plane->spe_next = NULL;
+            subpic_ent_attach(plane->surface, spe, sys->eq);
             commit = true;
         }
 
         if (spe != NULL && spe->rect_update)
         {
-            wl_subsurface_set_position(dst->subsurface, spe->dst_rect.x, spe->dst_rect.y);
-            wp_viewport_set_source(dst->viewport,
+            wl_subsurface_set_position(plane->subsurface, spe->dst_rect.x, spe->dst_rect.y);
+            wp_viewport_set_source(plane->viewport,
                                    wl_fixed_from_int(spe->src_rect.x), wl_fixed_from_int(spe->src_rect.y),
                                    wl_fixed_from_int(spe->src_rect.width), wl_fixed_from_int(spe->src_rect.height));
-            wp_viewport_set_destination(dst->viewport, spe->dst_rect.width, spe->dst_rect.height);
+            wp_viewport_set_destination(plane->viewport, spe->dst_rect.width, spe->dst_rect.height);
             spe->rect_update = false;
             commit = true;
         }
 
         if (commit)
-            wl_surface_commit(dst->surface);
+            wl_surface_commit(plane->surface);
     }
 
-    if (!sys->piccpy.wb) {
+    if (!sys->piccpy.wb)
+    {
         msg_Warn(vd, "Display called but no prepared pic buffer");
     }
-    else {
+    else
+    {
         subpic_ent_attach(video_surface(sys), &sys->piccpy, sys->eq);
         sys->video_attached = true;
     }
