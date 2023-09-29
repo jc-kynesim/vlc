@@ -103,16 +103,6 @@ typedef struct video_dmabuf_release_env_ss
     struct polltask * pt[AV_DRM_MAX_PLANES];
 } video_dmabuf_release_env_t;
 
-typedef struct subplane_s {
-    struct wl_surface * surface;
-    struct wl_subsurface * subsurface;
-    struct wp_viewport * viewport;
-
-    vout_display_place_t dst_rect;
-    vout_display_place_t src_rect;
-    bool has_pic;
-} subplane_t;
-
 typedef struct subpic_ent_s {
     struct wl_buffer * wb;
     struct dmabuf_h * dh;
@@ -121,8 +111,24 @@ typedef struct subpic_ent_s {
     int alpha;
     vout_display_place_t dst_rect;
     vout_display_place_t src_rect;
+    bool rect_update;
+
     bool update;
+    atomic_int ready;
+
+    struct polltask * pt;
+    vout_display_t * vd;
+    vout_display_sys_t * sys;
 } subpic_ent_t;
+
+typedef struct subplane_s {
+    struct wl_surface * surface;
+    struct wl_subsurface * subsurface;
+    struct wp_viewport * viewport;
+
+    subpic_ent_t * spe_cur;
+    subpic_ent_t * spe_next;
+} subplane_t;
 
 typedef struct w_bound_ss
 {
@@ -169,10 +175,10 @@ struct vout_display_sys_t
     eq_env_t * eq;
 
     struct pollqueue * pollq;
+    struct pollqueue * speq;
 
     picpool_ctl_t * subpic_pool;
     subplane_t subplanes[MAX_SUBPICS];
-    subpic_ent_t subpics[MAX_SUBPICS];
     subpic_ent_t piccpy;
     vlc_fourcc_t * subpic_chromas;
 
@@ -575,11 +581,12 @@ eq_unref(eq_env_t ** const ppeq)
 //        fprintf(stderr, "Unref: Buffer count=%d\n", n);
         if (n == 0)
         {
+            pollqueue_set_pre_post(eq->pq, 0, 0, NULL);
+            pollqueue_unref(&eq->pq);
+
             wl_proxy_wrapper_destroy(eq->wrapped_display);
             wl_event_queue_destroy(eq->q);
 
-            pollqueue_set_pre_post(eq->pq, 0, 0, NULL);
-            pollqueue_unref(&eq->pq);
             sem_destroy(&eq->sem);
             free(eq);
 //            fprintf(stderr, "Eq closed\n");
@@ -1357,6 +1364,103 @@ set_video_viewport(vout_display_t * const vd, vout_display_sys_t * const sys)
 #endif
 }
 
+static void
+spe_convert_cb(void * v, short revents)
+{
+    subpic_ent_t * const spe = v;
+    VLC_UNUSED(revents);
+
+    copy_subpic_to_w_buffer(spe->vd, spe->sys, spe->pic, spe->alpha, &spe->vdre, &spe->wb);
+    atomic_store(&spe->ready, 1);
+}
+
+static bool
+spe_changed(const subpic_ent_t * const spe, const subpicture_region_t * const sreg)
+{
+    const bool no_pic = (sreg == NULL || sreg->i_alpha == 0);
+    if (spe == NULL)
+        return true;  // spe missing matches nothing
+    if (no_pic && spe->pic == NULL)
+        return false;
+    return no_pic || spe->pic != sreg->p_picture || spe->alpha != sreg->i_alpha;
+}
+
+static bool
+spe_update_rect(subpic_ent_t * const spe, vout_display_sys_t * const sys, const subpicture_region_t * const sreg)
+{
+    spe->src_rect = (vout_display_place_t) {
+        .x = sreg->fmt.i_x_offset,
+        .y = sreg->fmt.i_y_offset,
+        .width = sreg->fmt.i_visible_width,
+        .height = sreg->fmt.i_visible_height,
+    };
+    spe->dst_rect = place_rescale(
+        (vout_display_place_t) {
+            .x = sreg->i_x,
+            .y = sreg->i_y,
+            .width = sreg->fmt.i_visible_width,
+            .height = sreg->fmt.i_visible_height,
+        },
+        (vout_display_place_t) {
+            .x = 0,
+            .y = 0,
+            .width  = sys->dst_rect.width,
+            .height = sys->dst_rect.height,
+        },
+        sys->spu_rect);
+    spe->rect_update = true;
+
+    return true;
+}
+
+static subpic_ent_t *
+spe_new(vout_display_t * const vd, vout_display_sys_t * const sys, const subpicture_region_t * const sreg)
+{
+    subpic_ent_t * const spe = calloc(1, sizeof(*spe));
+
+    if (spe == NULL)
+        return NULL;
+
+    atomic_init(&spe->ready, 0);
+    spe->vd = vd;
+    spe->sys = sys;
+
+    if (sreg == NULL || sreg->i_alpha == 0)
+    {
+        atomic_init(&spe->ready, 1);
+        return spe;
+    }
+
+    spe->pic = picture_Hold(sreg->p_picture);
+    spe->alpha = sreg->i_alpha;
+
+    spe_update_rect(spe, sys, sreg);
+
+    spe->pt = polltask_new_timer(sys->speq, spe_convert_cb, spe);
+
+    return spe;
+}
+
+static void
+spe_delete(subpic_ent_t ** const ppspe)
+{
+    subpic_ent_t * const spe = *ppspe;
+
+    if (spe == NULL)
+        return;
+
+    polltask_delete(&spe->pt);
+    subpic_ent_flush(spe);
+    free(spe);
+}
+
+static int
+spe_convert(subpic_ent_t * const spe)
+{
+    pollqueue_add_task(spe->pt, 0);
+    return 0;
+}
+
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 {
     vout_display_sys_t * const sys = vd->sys;
@@ -1377,10 +1481,25 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     // Attempt to import the subpics
     for (subpicture_t * spic = subpic; spic != NULL; spic = spic->p_next)
     {
-        for (subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
-            picture_t * const src = sreg->p_picture;
-            subpic_ent_t * const dst = sys->subpics + n;
+        for (const subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
+            subplane_t * const plane = sys->subplanes + n;
 
+            if (plane->spe_next != NULL) {
+                if (!spe_changed(plane->spe_next, sreg))
+                    spe_update_rect(plane->spe_next, sys, sreg);
+                // else if changed ignore as we are already doing stuff
+            }
+            else
+            {
+                if (!spe_changed(plane->spe_cur, sreg))
+                    spe_update_rect(plane->spe_cur, sys, sreg);
+                else {
+                    plane->spe_next = spe_new(vd, sys, sreg);
+                    spe_convert(plane->spe_next);
+                }
+            }
+
+#if 0
             // If the same picture then assume the same contents
             // We keep a ref to the previous pic to ensure that the same picture
             // structure doesn't get reused and confuse us.
@@ -1415,6 +1534,7 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
                     .height = sys->dst_rect.height,
                 },
                 sys->spu_rect);
+#endif
 
             if (++n == MAX_SUBPICS)
                 goto subpics_done;
@@ -1424,11 +1544,16 @@ subpics_done:
 
     // Clear any other entries
     for (; n != MAX_SUBPICS; ++n) {
+        subplane_t * const plane = sys->subplanes + n;
+        if (plane->spe_next == NULL && spe_changed(plane->spe_cur, NULL))
+            plane->spe_next = spe_new(vd, sys, NULL);
+#if 0
         subpic_ent_t * const dst = sys->subpics + n;
 
         if (dst->pic != NULL)
             dst->update = true;
         subpic_ent_flush(dst);
+#endif
     }
 
     (void)pic;
@@ -1454,34 +1579,27 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 
     for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
     {
-        subpic_ent_t * const spe = sys->subpics + i;
         subplane_t * const dst = sys->subplanes + i;
-        const bool had_pic = dst->has_pic;
         bool commit = false;
+        subpic_ent_t * spe = dst->spe_cur;
 
-        if (spe->update)
+        if (dst->spe_next && atomic_load(&dst->spe_next->ready))
         {
-    #if TRACE_ALL
-            msg_Dbg(vd, "%s: Update subpic %i: wb=%p alpha=%d", __func__, i, spe->wb, spe->alpha);
-    #endif
-            spe->update = false;
-            dst->has_pic = subpic_ent_attach(dst->surface, spe, sys->eq);
+            spe_delete(&dst->spe_cur);
+            spe = dst->spe_cur = dst->spe_next;
+            dst->spe_next = NULL;
+            subpic_ent_attach(dst->surface, spe, sys->eq);
             commit = true;
         }
 
-        if (dst->has_pic &&
-            (!had_pic ||
-             !place_eq(dst->src_rect, spe->src_rect) ||
-             !place_eq(dst->dst_rect, spe->dst_rect)))
+        if (spe != NULL && spe->rect_update)
         {
             wl_subsurface_set_position(dst->subsurface, spe->dst_rect.x, spe->dst_rect.y);
             wp_viewport_set_source(dst->viewport,
                                    wl_fixed_from_int(spe->src_rect.x), wl_fixed_from_int(spe->src_rect.y),
                                    wl_fixed_from_int(spe->src_rect.width), wl_fixed_from_int(spe->src_rect.height));
             wp_viewport_set_destination(dst->viewport, spe->dst_rect.width, spe->dst_rect.height);
-
-            dst->src_rect = spe->src_rect;
-            dst->dst_rect = spe->dst_rect;
+            spe->rect_update = false;
             commit = true;
         }
 
@@ -1799,10 +1917,10 @@ clear_all_buffers(vout_display_sys_t *sys)
 {
     for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
     {
-        subpic_ent_t * const spe = sys->subpics + i;
-        subpic_ent_flush(spe);
-
-        clear_surface_buffer(sys->subplanes[i].surface);
+        subplane_t *const plane = sys->subplanes + i;
+        spe_delete(&plane->spe_next);
+        spe_delete(&plane->spe_cur);
+        clear_surface_buffer(plane->surface);
     }
 
     clear_surface_buffer(video_surface(sys));
@@ -1832,6 +1950,7 @@ static void Close(vlc_object_t *obj)
     check_embed(vd, sys, __func__);
 
     clear_all_buffers(sys);
+    pollqueue_unref(&sys->speq);
 
     // Free subpic resources
     for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
@@ -1935,9 +2054,10 @@ static int Open(vlc_object_t *obj)
         goto error;
     sys->last_embed_surface = sys->embed->handle.wl;
 
-    if ((sys->pollq = pollqueue_new()) == NULL)
+    if ((sys->pollq = pollqueue_new()) == NULL ||
+        (sys->speq = pollqueue_new()) == NULL)
     {
-        msg_Err(vd, "Failed to create pollqueue");
+        msg_Err(vd, "Failed to create pollqueues");
         goto error;
     }
     if ((sys->eq = eq_new(video_display(sys), sys->pollq)) == NULL)
