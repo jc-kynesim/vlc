@@ -350,23 +350,30 @@ struct dmabufs_ctl * dmabufs_ctl_ref(struct dmabufs_ctl * const dbsc)
 //
 // Alloc dmabuf via CMA
 
-static int ctl_cma_new(struct dmabufs_ctl * dbsc)
+static int ctl_cma_new2(struct dmabufs_ctl * dbsc, const char * const * names)
 {
-    while ((dbsc->fd = open(DMABUF_NAME1, O_RDWR)) == -1 &&
-           errno == EINTR)
-        /* Loop */;
-
-    if (dbsc->fd == -1) {
-        while ((dbsc->fd = open(DMABUF_NAME2, O_RDWR)) == -1 &&
+    for (; *names != NULL; ++names)
+    {
+        while ((dbsc->fd = open(*names, O_RDWR | __O_CLOEXEC)) == -1 &&
                errno == EINTR)
             /* Loop */;
-        if (dbsc->fd == -1) {
-            request_log("Unable to open either %s or %s\n",
-                    DMABUF_NAME1, DMABUF_NAME2);
-            return -1;
-        }
+        if (dbsc->fd != -1)
+            return 0;
     }
-    return 0;
+    request_log("Unable to open any dma_heap device\n");
+    return -1;
+}
+
+static int ctl_cma_new(struct dmabufs_ctl * dbsc)
+{
+    static const char * const names[] = {
+        "/dev/dma_heap/vidbuf_cached",
+        "/dev/dma_heap/linux,cma",
+        "/dev/dma_heap/reserved",
+        NULL
+    };
+
+    return ctl_cma_new2(dbsc, names);
 }
 
 static void ctl_cma_free(struct dmabufs_ctl * dbsc)
