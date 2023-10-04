@@ -472,7 +472,7 @@ static const struct {
 };
 
 /**
- * Proccess pending event
+ * Process pending event
  */
 static void Manage(vout_display_t *vd)
 {

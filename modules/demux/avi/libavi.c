@@ -180,7 +180,7 @@ static int AVI_ChunkRead_list( stream_t *s, avi_chunk_t *p_container )
         if( !b_seekable )
             return VLC_SUCCESS;
         msg_Dbg( (vlc_object_t*)s, "skipping movi chunk" );
-        return AVI_NextChunk( s, p_container ); /* points at begining of LIST-movi if not seekable */
+        return AVI_NextChunk( s, p_container ); /* points at beginning of LIST-movi if not seekable */
     }
 
     if( vlc_stream_Read( s, NULL, 12 ) != 12 )
@@ -539,8 +539,9 @@ static int AVI_ChunkRead_strf( stream_t *s, avi_chunk_t *p_chk )
             msg_Dbg( (vlc_object_t*)s,
                      "strf: video:%4.4s %"PRIu32"x%"PRIu32" planes:%d %dbpp",
                      (char*)&p_bih->biCompression,
-                     (uint32_t)p_bih->biWidth,
-                     (uint32_t)p_bih->biHeight,
+                     p_bih->biWidth,
+                     p_bih->biHeight <= INT32_MAX ? p_bih->biHeight
+                                                  : -1 * p_bih->biHeight,
                      p_bih->biPlanes,
                      p_bih->biBitCount );
 #endif

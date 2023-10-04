@@ -141,7 +141,7 @@ void vout_control_PushInteger(vout_control_t *ctrl, int type, int integer)
     cmd.u.integer = integer;
     vout_control_Push(ctrl, &cmd);
 }
-void vout_control_PushTime(vout_control_t *ctrl, int type, mtime_t time)
+void vout_control_PushTime(vout_control_t *ctrl, int type, vlc_tick_t time)
 {
     vout_control_cmd_t cmd;
 
@@ -177,7 +177,7 @@ void vout_control_PushString(vout_control_t *ctrl, int type, const char *string)
 }
 
 int vout_control_Pop(vout_control_t *ctrl, vout_control_cmd_t *cmd,
-                     mtime_t deadline)
+                     vlc_tick_t deadline)
 {
     vlc_mutex_lock(&ctrl->lock);
     if (ctrl->cmd.i_size <= 0) {
@@ -185,7 +185,7 @@ int vout_control_Pop(vout_control_t *ctrl, vout_control_cmd_t *cmd,
         vlc_cond_broadcast(&ctrl->wait_acknowledge);
 
         /* Spurious wakeups are perfectly fine */
-        if (deadline > VLC_TS_INVALID && ctrl->can_sleep)
+        if (deadline > VLC_TICK_INVALID && ctrl->can_sleep)
             vlc_cond_timedwait(&ctrl->wait_request, &ctrl->lock, deadline);
     }
 

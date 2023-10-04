@@ -367,7 +367,7 @@ static subpicture_t *ParseText( decoder_t *p_dec, block_t *p_block )
         return NULL;
 
     /* We cannot display a subpicture with no date */
-    if( p_block->i_pts <= VLC_TS_INVALID )
+    if( p_block->i_pts <= VLC_TICK_INVALID )
     {
         msg_Warn( p_dec, "subtitle without a date" );
         return NULL;
@@ -621,7 +621,7 @@ static bool IsClosed( const char* psz_subtitle, const char* psz_tagname )
     const char* psz_tagpos = strcasestr( psz_subtitle, psz_tagname );
     if ( !psz_tagpos )
         return false;
-    // Search for '</' and '>' immediatly before & after (minding the potential spaces)
+    // Search for '</' and '>' immediately before & after (minding the potential spaces)
     const char* psz_endtag = psz_tagpos + strlen( psz_tagname );
     while ( *psz_endtag == ' ' )
         psz_endtag++;

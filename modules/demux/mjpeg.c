@@ -71,9 +71,9 @@ struct demux_sys_t
     es_out_id_t     *p_es;
 
     bool            b_still;
-    mtime_t         i_still_end;
-    mtime_t         i_time;
-    mtime_t         i_frame_length;
+    vlc_tick_t      i_still_end;
+    vlc_tick_t      i_time;
+    vlc_tick_t      i_frame_length;
     char            *psz_separator;
     int             i_frame_size_estimate;
     const uint8_t   *p_peek;
@@ -309,7 +309,7 @@ static int Open( vlc_object_t * p_this )
     p_demux->pf_control = Control;
     p_demux->p_sys      = p_sys;
     p_sys->p_es         = NULL;
-    p_sys->i_time       = VLC_TS_0;
+    p_sys->i_time       = VLC_TICK_0;
     p_sys->i_level      = 0;
 
     p_sys->psz_separator = NULL;
