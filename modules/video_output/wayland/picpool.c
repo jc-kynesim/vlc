@@ -363,6 +363,7 @@ picpool_ctl_t * picpool_new(struct dmabufs_ctl * dbsc)
     pc->max_n = 8;
     pc->dbsc = dmabufs_ctl_ref(dbsc);
     atomic_store(&pc->ref_count, 1);
+    vlc_mutex_init(&pc->lock);
 
     return pc;
 }
