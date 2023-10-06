@@ -105,6 +105,7 @@ struct decoder_sys_t
     /* VA API */
     vlc_va_t *p_va;
     enum PixelFormat pix_fmt;
+    enum PixelFormat sw_pix_fmt;
     int profile;
     int level;
 
@@ -444,6 +445,9 @@ static int OpenVideoCodec( decoder_t *p_dec )
 
     ctx->bits_per_coded_sample = p_dec->fmt_in.video.i_bits_per_pixel;
     p_sys->pix_fmt = AV_PIX_FMT_NONE;
+    p_sys->sw_pix_fmt = AV_PIX_FMT_NONE;
+    p_sys->profile = -1;
+    p_sys->level = -1;
     cc_Init( &p_sys->cc );
 
     set_video_color_settings( &p_dec->fmt_in.video, ctx );
@@ -659,17 +663,31 @@ static int InitVideoDecCommon( decoder_t *p_dec )
     } else
         p_sys->palette_sent = true;
 
+    // If we want DRM_PRIME then we need to create the context before Open
+    // * This probably applies to anything that wants device_ctx init
+    {
+        const AVCodecHWConfig * hw_config;
+        for (int i = 0; (hw_config = avcodec_get_hw_config(p_codec, i)) != NULL; ++i)
+        {
+            if ((hw_config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) != 0 &&
+                hw_config->device_type == AV_HWDEVICE_TYPE_DRM)
+            {
+                int err;
+                if ((err = av_hwdevice_ctx_create(&p_context->hw_device_ctx, hw_config->device_type, NULL, NULL, 0)) < 0) {
+                    msg_Dbg(p_dec, "Failed to create specified HW device: %s", av_err2str(err));
+                    goto error;
+                }
+                break;
+            }
+        }
+    }
+
     /* ***** init this codec with special data ***** */
     ffmpeg_InitCodec( p_dec );
 
     /* ***** Open the codec ***** */
     if( OpenVideoCodec( p_dec ) < 0 )
-    {
-        vlc_sem_destroy( &p_sys->sem_mt );
-        free( p_sys );
-        avcodec_free_context( &p_context );
-        return VLC_EGENERIC;
-    }
+        goto error;
 
     p_dec->pf_decode = DecodeVideo;
     p_dec->pf_flush  = Flush;
@@ -680,6 +698,12 @@ static int InitVideoDecCommon( decoder_t *p_dec )
     if( p_context->level != FF_LEVEL_UNKNOWN )
         p_dec->fmt_in.i_level = p_context->level;
     return VLC_SUCCESS;
+
+error:
+    vlc_sem_destroy( &p_sys->sem_mt );
+    free( p_sys );
+    avcodec_free_context( &p_context );
+    return VLC_EGENERIC;
 }
 
 static int ffmpeg_OpenVa(decoder_t *p_dec, AVCodecContext *p_context,
@@ -735,6 +759,10 @@ static int ffmpeg_OpenVa(decoder_t *p_dec, AVCodecContext *p_context,
 
 static const enum PixelFormat hwfmts[] =
 {
+#if OPT_RPI
+    // If Pi then do not bother with stuff we know will fail
+    AV_PIX_FMT_DRM_PRIME,
+#else
 #ifdef _WIN32
 #if LIBAVUTIL_VERSION_CHECK(54, 13, 1, 24, 100)
     AV_PIX_FMT_D3D11VA_VLD,
@@ -744,6 +772,7 @@ static const enum PixelFormat hwfmts[] =
     AV_PIX_FMT_VAAPI,
 #if (LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(52, 4, 0))
     AV_PIX_FMT_VDPAU,
+#endif
 #endif
     AV_PIX_FMT_NONE,
 };
@@ -863,11 +892,11 @@ failed:
  * the ffmpeg codec will be opened, some memory allocated. The vout is not yet
  * opened (done after the first decoded frame).
  *****************************************************************************/
-int InitVideoDec( vlc_object_t *obj )
+static int InitVideoDec2( vlc_object_t *obj, const int hw )
 {
     decoder_t *p_dec = (decoder_t *)obj;
     const AVCodec *p_codec;
-    AVCodecContext *p_context = ffmpeg_AllocContext( p_dec, &p_codec );
+    AVCodecContext *p_context = ffmpeg_AllocContextHw( p_dec, &p_codec, hw );
     if( p_context == NULL )
         return VLC_EGENERIC;
 
@@ -887,6 +916,27 @@ int InitVideoDec( vlc_object_t *obj )
     p_sys->b_hardware_only = false;
 
     return InitVideoDecCommon( p_dec );
+}
+
+int InitVideoDec( vlc_object_t *obj )
+{
+    decoder_t * const p_dec = (decoder_t *)obj;
+
+    // Don't retry something we know failed
+    if (!hw_check_bad(&p_dec->fmt_in))
+    {
+        if (InitVideoDec2(obj, 1) == 0)
+            return 0;
+
+        hw_set_bad(&p_dec->fmt_in);
+        msg_Dbg(p_dec, "Set hw fail for %4.4s %dx%d", (char *)&p_dec->fmt_in.i_codec, p_dec->fmt_in.video.i_width, p_dec->fmt_in.video.i_height);
+    }
+    else
+    {
+        msg_Dbg(p_dec, "Avoid trying hw decoder for %4.4s %dx%d", (char *)&p_dec->fmt_in.i_codec, p_dec->fmt_in.video.i_width, p_dec->fmt_in.video.i_height);
+    }
+
+    return InitVideoDec2(obj, 0);
 }
 
 /*****************************************************************************
@@ -1442,9 +1492,10 @@ static picture_t *DecodeBlock( decoder_t *p_dec, block_t **pp_block, bool *error
         {   /* When direct rendering is not used, get_format() and get_buffer()
              * might not be called. The output video format must be set here
              * then picture buffer can be allocated. */
-            if (p_sys->p_va == NULL
+            if ((frame->format == AV_PIX_FMT_DRM_PRIME ||
+                 p_sys->p_va == NULL)
              && lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
-                                       p_context->pix_fmt) == 0)
+                                       p_context->sw_pix_fmt) == 0)
                 p_pic = decoder_NewPicture(p_dec);
 
             if( !p_pic )
@@ -1837,6 +1888,7 @@ static enum PixelFormat ffmpeg_GetFormat( AVCodecContext *p_context,
         }
         swfmt = defaultfmt;
     }
+    p_sys->sw_pix_fmt = swfmt;
 
     if (p_sys->pix_fmt == AV_PIX_FMT_NONE)
         goto no_reuse;
