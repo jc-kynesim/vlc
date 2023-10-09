@@ -689,7 +689,6 @@ static void eventq_sync_cb(void * data, struct wl_callback * cb, unsigned int cb
     VLC_UNUSED(cb_data);
     wl_callback_destroy(cb);
     sem_post(sem);
-//    fprintf(stderr, "Sync cb: Q %p\n", ((void**)cb)[4]);
 }
 
 static const struct wl_callback_listener eq_sync_listener = {.done = eventq_sync_cb};
@@ -1757,7 +1756,7 @@ static void shm_listener_format(void *data,
         format = DRM_FORMAT_XRGB8888;
 
 #if TRACE_ALL
-    msg_Dbg(vd, "%s[%p], %.4s: Q %p", __func__, (void*)vd, (const char *)&format, ((void**)shm)[4]);
+    msg_Dbg(vd, "%s[%p], %.4s", __func__, (void*)vd, (const char *)&format);
 #endif
     fmt_list_add(&sys->shm_fmts, format, DRM_FORMAT_MOD_LINEAR, 0);
 }
@@ -1772,7 +1771,7 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
                         const uint32_t name, const char *const iface, const uint32_t vers)
 {
 #if TRACE_ALL
-    msg_Dbg(vd, "global %3"PRIu32": %s version %"PRIu32" Q %p", name, iface, vers, ((void**)registry)[4]);
+    msg_Dbg(vd, "global %3"PRIu32": %s version %"PRIu32, name, iface, vers);
 #endif
     if (strcmp(iface, wl_subcompositor_interface.name) == 0)
         b->subcompositor = wl_registry_bind(registry, name, &wl_subcompositor_interface, 1);
