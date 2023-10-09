@@ -499,12 +499,6 @@ fmt_sort_cb(const void * va, const void * vb)
            a->mod < b->mod ? -1 : a->mod != b->mod ? 1 : 0;
 }
 
-static bool
-fmt_list_is_empty(const fmt_list_t * const fl)
-{
-    return fl == NULL || fl->len == 0;
-}
-
 static void
 fmt_list_sort(fmt_list_t * const fl)
 {
@@ -656,12 +650,6 @@ pollq_post_cb(void *v, short revents)
 //    fprintf(stderr, "Dispatch=%d\n", n);
 }
 
-static void
-eq_start(eq_env_t * const eq)
-{
-    pollqueue_set_pre_post(eq->pq, pollq_pre_cb, pollq_post_cb, eq);
-}
-
 static eq_env_t *
 eq_new(struct wl_display * const display, struct pollqueue * const pq)
 {
@@ -682,6 +670,8 @@ eq_new(struct wl_display * const display, struct pollqueue * const pq)
     eq->display = display;
     eq->pq = pollqueue_ref(pq);
 
+    pollqueue_set_pre_post(eq->pq, pollq_pre_cb, pollq_post_cb, eq);
+
     return eq;
 
 err2:
@@ -701,36 +691,6 @@ static void eventq_sync_cb(void * data, struct wl_callback * cb, unsigned int cb
 }
 
 static const struct wl_callback_listener eq_sync_listener = {.done = eventq_sync_cb};
-
-// The rsync fns are a kludge
-// For reasons unknown sometimes the add_listener / sync sequence doesn't
-// give the sync after the results (shm in particular). This allows us to wait
-// for the results to start appearing before asking for a callback.
-
-static void
-eventq_rsync_post(eq_env_t * const eq)
-{
-    struct wl_callback * cb;
-
-    cb = wl_display_sync(eq_wrapper(eq));
-    wl_callback_add_listener(cb, &eq_sync_listener, &eq->sem);
-    wl_display_flush(eq->display);
-}
-
-static int
-eventq_rsync_wait(eq_env_t * const eq)
-{
-    int rv;
-
-    if (!eq)
-        return -1;
-
-    wl_display_flush(eq->display);
-    while ((rv = sem_wait(&eq->sem)) == -1 && errno == EINTR)
-        /* Loop */;
-
-    return rv;
-}
 
 struct eq_sync_env_ss {
     eq_env_t * eq;
@@ -1725,10 +1685,6 @@ static void linux_dmabuf_v1_listener_format(void *data,
 #if TRACE_ALL
     msg_Dbg(vd, "%s[%p], %.4s", __func__, (void*)vd, (const char *)&format);
 #endif
-    // Only post sync once
-    if (fmt_list_is_empty(&sys->dmabuf_fmts))
-        eventq_rsync_post(sys->eq);
-
     fmt_list_add(&sys->dmabuf_fmts, format, DRM_FORMAT_MOD_LINEAR, 0);
 }
 
@@ -1745,10 +1701,6 @@ linux_dmabuf_v1_listener_modifier(void *data,
 #if TRACE_ALL
     msg_Dbg(vd, "%s[%p], %.4s %08x%08x", __func__, (void*)vd, (const char *)&format, modifier_hi, modifier_lo);
 #endif
-    // Only post sync once
-    if (fmt_list_is_empty(&sys->dmabuf_fmts))
-        eventq_rsync_post(sys->eq);
-
     fmt_list_add(&sys->dmabuf_fmts, format, modifier_lo | ((uint64_t)modifier_hi << 32), 0);
 }
 
@@ -1773,10 +1725,6 @@ static void shm_listener_format(void *data,
 #if TRACE_ALL
     msg_Dbg(vd, "%s[%p], %.4s: Q %p", __func__, (void*)vd, (const char *)&format, ((void**)shm)[4]);
 #endif
-    // Only post sync once
-    if (fmt_list_is_empty(&sys->shm_fmts))
-        eventq_rsync_post(sys->eq);
-
     fmt_list_add(&sys->shm_fmts, format, DRM_FORMAT_MOD_LINEAR, 0);
 }
 
@@ -1862,6 +1810,49 @@ static const struct wl_registry_listener registry_cbs =
     registry_global_cb,
     registry_global_remove_cb,
 };
+
+struct registry_scan_bounce_env {
+    struct wl_registry * registry;
+    eq_env_t * const eq;
+    vout_display_t * const vd;
+};
+
+// Only safe place to add a listener is on pollq thread
+static void
+registry_scan_bounce_cb(void * v, short revents)
+{
+    struct registry_scan_bounce_env * rsbe = v;
+    (void)revents;
+    rsbe->registry = wl_display_get_registry(eq_wrapper(rsbe->eq)),
+    wl_registry_add_listener(rsbe->registry, &registry_cbs, rsbe->vd);
+}
+
+// N.B. Having got the registry with a wrapped display
+// by default everything we do with the newly bound interfaces will turn
+// up on the wrapped queue
+
+static int
+registry_scan(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+    struct registry_scan_bounce_env rsbe = {
+        .registry = NULL,
+        .eq = sys->eq,
+        .vd = vd
+    };
+
+    pollqueue_callback_once(rsbe.eq->pq, registry_scan_bounce_cb, &rsbe);
+
+    eventq_sync(rsbe.eq);
+    // Registry callback provokes shm & fmt callbacks so another sync needed
+    eventq_sync(rsbe.eq);
+
+    if (rsbe.registry == NULL)
+        return -1;
+
+    wl_registry_destroy(rsbe.registry);
+    return 0;
+}
+
 
 
 static void
@@ -1958,26 +1949,6 @@ no_window:
     msg_Dbg(vd, ">>> %s", __func__);
 }
 
-// N.B. Having got the registry with a wrapped display
-// by default everything we do with the newly bound interfaces will turn
-// up on the wrapped queue
-
-static int
-registry_scan(vout_display_t * const vd, vout_display_sys_t * const sys)
-{
-    eq_env_t * const eq = sys->eq;
-    struct wl_registry * const registry = wl_display_get_registry(eq_wrapper(eq));
-    if (registry == NULL)
-        return -1;
-
-    wl_registry_add_listener(registry, &registry_cbs, vd);
-    eq_start(eq);
-    eventq_sync(eq);
-
-    wl_registry_destroy(registry);
-    return 0;
-}
-
 static int Open(vlc_object_t *obj)
 {
     vout_display_t * const vd = (vout_display_t *)obj;
@@ -2033,13 +2004,6 @@ static int Open(vlc_object_t *obj)
         msg_Err(vd, "Cannot get registry for display");
         goto error;
     }
-
-    // Wait as may times as we should invoke post
-    // Doesn't matter if one wait triggers on the other condition
-    if (sys->bound.shm != NULL)
-        eventq_rsync_wait(sys->eq);
-    if (sys->bound.linux_dmabuf_v1 != NULL)
-        eventq_rsync_wait(sys->eq);
 
     if (sys->bound.compositor == NULL) {
         msg_Warn(vd, "Interface %s missing", wl_compositor_interface.name);
