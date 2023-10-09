@@ -1422,7 +1422,8 @@ spe_delete(subpic_ent_t ** const ppspe)
 static int
 spe_convert(subpic_ent_t * const spe)
 {
-    pollqueue_add_task(spe->pt, 0);
+    if (spe->pt != NULL)
+        pollqueue_add_task(spe->pt, 0);
     return 0;
 }
 
