@@ -233,6 +233,14 @@ video_output/wayland/linux-dmabuf-unstable-v1-protocol.c: \
 		$(WAYLAND_PROTOCOLS)/unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml
 	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
 
+video_output/wayland/single-pixel-buffer-v1-client-protocol.h: \
+		$(WAYLAND_PROTOCOLS)/staging/single-pixel-buffer/single-pixel-buffer-v1.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
+
+video_output/wayland/single-pixel-buffer-v1-protocol.c: \
+		$(WAYLAND_PROTOCOLS)/staging/single-pixel-buffer/single-pixel-buffer-v1.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
+
 libwl_dmabuf_plugin_la_SOURCES = video_output/wayland/dmabuf.c\
 	video_output/wayland/picpool.c video_output/wayland/picpool.h\
 	video_output/wayland/dmabuf_alloc.c video_output/wayland/dmabuf_alloc.h\
@@ -243,7 +251,9 @@ nodist_libwl_dmabuf_plugin_la_SOURCES = \
 	video_output/wayland/viewporter-client-protocol.h \
 	video_output/wayland/viewporter-protocol.c \
 	video_output/wayland/linux-dmabuf-unstable-v1-client-protocol.h \
-	video_output/wayland/linux-dmabuf-unstable-v1-protocol.c
+	video_output/wayland/linux-dmabuf-unstable-v1-protocol.c \
+	video_output/wayland/single-pixel-buffer-v1-client-protocol.h \
+	video_output/wayland/single-pixel-buffer-v1-protocol.c
 libwl_dmabuf_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
 	-I$(builddir)/video_output/wayland -pthread
 libwl_dmabuf_plugin_la_CFLAGS = $(WAYLAND_CLIENT_CFLAGS) -pthread
