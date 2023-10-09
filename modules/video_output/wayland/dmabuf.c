@@ -36,6 +36,7 @@
 #include <unistd.h>
 
 #include <wayland-client.h>
+#include "single-pixel-buffer-v1-client-protocol.h"
 #include "viewporter-client-protocol.h"
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 
@@ -137,6 +138,7 @@ typedef struct w_bound_ss
     struct wl_compositor *compositor;
     struct wl_subcompositor *subcompositor;
     struct wl_shm *shm;
+    struct wp_single_pixel_buffer_manager_v1 *single_pixel_buffer_manager_v1;
 } w_bound_t;
 
 struct vout_display_sys_t
@@ -757,6 +759,25 @@ fill_uniform(uint32_t *const data, unsigned int stride, const unsigned int width
 // ----------------------------------------------------------------------------
 
 static void
+vdre_free(video_dmabuf_release_env_t * const vdre)
+{
+    unsigned int i;
+    if (vdre->dma_rel_fn)
+        vdre->dma_rel_fn(vdre->dma_rel_v);
+    for (i = 0; i != vdre->pt_count; ++i)
+        polltask_delete(vdre->pt + i);
+    eq_unref(&vdre->eq);
+    free(vdre);
+}
+
+static video_dmabuf_release_env_t *
+vdre_new_null(void)
+{
+    video_dmabuf_release_env_t * const vdre = calloc(1, sizeof(*vdre));
+    return vdre;
+}
+
+static void
 vdre_dma_rel_cb(void * v)
 {
     struct picture_context_t * ctx = v;
@@ -766,7 +787,7 @@ vdre_dma_rel_cb(void * v)
 static video_dmabuf_release_env_t *
 vdre_new_ctx(struct picture_context_t * ctx)
 {
-    video_dmabuf_release_env_t * const vdre = calloc(1, sizeof(*vdre));
+    video_dmabuf_release_env_t * const vdre = vdre_new_null();
     if (vdre == NULL)
         return NULL;
     if ((vdre->dma_rel_v = ctx->copy(ctx)) == NULL)
@@ -776,17 +797,6 @@ vdre_new_ctx(struct picture_context_t * ctx)
     }
     vdre->dma_rel_fn = vdre_dma_rel_cb;
     return vdre;
-}
-
-static void
-vdre_free(video_dmabuf_release_env_t * const vdre)
-{
-    unsigned int i;
-    vdre->dma_rel_fn(vdre->dma_rel_v);
-    for (i = 0; i != vdre->pt_count; ++i)
-        polltask_delete(vdre->pt + i);
-    eq_unref(&vdre->eq);
-    free(vdre);
 }
 
 static void
@@ -835,7 +845,7 @@ vdre_dh_rel_cb(void * v)
 static video_dmabuf_release_env_t *
 vdre_new_dh(struct dmabuf_h *const dh, struct pollqueue *const pq)
 {
-    video_dmabuf_release_env_t * const vdre = calloc(1, sizeof(*vdre));
+    video_dmabuf_release_env_t * const vdre = vdre_new_null();
 
     vdre->dma_rel_fn = vdre_dh_rel_cb;
     vdre->dma_rel_v = dh;
@@ -1226,19 +1236,31 @@ make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
     return VLC_SUCCESS;
 #else
     // Build a background
-    // This would be a perfect use of the single_pixel_surface extension
-    // However we don't seem to support it
+    // Use single_pixel_surface extension if we have it & want a simple
+    // single colour (black) patch
     struct dmabuf_h * dh = NULL;
+    video_dmabuf_release_env_t * vdre = NULL;
+    struct wl_buffer * w_buffer = NULL;
 
-    if (!sys->bkg_viewport)
+    if (sys->bkg_viewport)
+        return VLC_SUCCESS;
+
+    if (sys->bound.single_pixel_buffer_manager_v1 && !sys->chequerboard)
     {
-        unsigned int width = sys->chequerboard ? 640 : 32;
-        unsigned int height = sys->chequerboard ? 480 : 32;
-        unsigned int stride = width * 4;
-        struct wl_buffer * w_buffer;
-        video_dmabuf_release_env_t * vdre = NULL;
+        w_buffer = wp_single_pixel_buffer_manager_v1_create_u32_rgba_buffer(
+            sys->bound.single_pixel_buffer_manager_v1,
+            0, 0, 0, UINT32_MAX);  // R, G, B, A
+        vdre = vdre_new_null();
+    }
+    else
+    {
+        // Buffer width & height - not display
+        const unsigned int width = sys->chequerboard ? 640 : 32;
+        const unsigned int height = sys->chequerboard ? 480 : 32;
+        const unsigned int stride = width * 4;
 
-        if ((dh = picpool_get(sys->subpic_pool, stride * height)) == NULL) {
+        if ((dh = picpool_get(sys->subpic_pool, stride * height)) == NULL)
+        {
             msg_Err(vd, "Failed to get DmaBuf for background");
             goto error;
         }
@@ -1273,28 +1295,39 @@ make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
             w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, DRM_FORMAT_XRGB8888, 0);
             zwp_linux_buffer_params_v1_destroy(params);
         }
-        if (!w_buffer) {
-            msg_Err(vd, "Failed to create background buffer");
-            goto error;
-        }
-
-        sys->bkg_viewport = wp_viewporter_get_viewport(sys->bound.viewporter, bkg_surface(sys));
 
         vdre = vdre_new_dh(dh, sys->pollq);
-        vdre_eq_ref(vdre, sys->eq);
-        wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre);
-        wl_surface_attach(bkg_surface(sys), w_buffer, 0, 0);
         dh = NULL;
-
-        wp_viewport_set_destination(sys->bkg_viewport, sys->bkg_w, sys->bkg_h);
-        mark_all_surface_opaque(sys->bound.compositor, bkg_surface(sys));
-
-        wl_surface_damage(bkg_surface(sys), 0, 0, INT32_MAX, INT32_MAX);
-        wl_surface_commit(bkg_surface(sys));
     }
+    if (!w_buffer || !vdre)
+    {
+        msg_Err(vd, "Failed to create background buffer");
+        goto error;
+    }
+
+    sys->bkg_viewport = wp_viewporter_get_viewport(sys->bound.viewporter, bkg_surface(sys));
+    if (sys->bkg_viewport == NULL)
+    {
+        msg_Err(vd, "Failed to create get viewport");
+        goto error;
+    }
+
+    vdre_eq_ref(vdre, sys->eq);
+    wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre);
+    wl_surface_attach(bkg_surface(sys), w_buffer, 0, 0);
+    vdre = NULL;
+    w_buffer = NULL;
+
+    wp_viewport_set_destination(sys->bkg_viewport, sys->bkg_w, sys->bkg_h);
+    mark_all_surface_opaque(sys->bound.compositor, bkg_surface(sys));
+
+    wl_surface_damage(bkg_surface(sys), 0, 0, INT32_MAX, INT32_MAX);
+    wl_surface_commit(bkg_surface(sys));
     return VLC_SUCCESS;
 
 error:
+    buffer_destroy(&w_buffer);
+    vdre_delete(&vdre);
     dmabuf_unref(&dh);
     return VLC_ENOMEM;
 #endif
@@ -1770,6 +1803,9 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
         else
             msg_Warn(vd, "Interface %s wanted v 3 got v %d", zwp_linux_dmabuf_v1_interface.name, vers);
     }
+    else
+    if (strcmp(iface, wp_single_pixel_buffer_manager_v1_interface.name) == 0)
+        b->single_pixel_buffer_manager_v1 = wl_registry_bind(registry, name, &wp_single_pixel_buffer_manager_v1_interface, 1);
 }
 
 static void w_bound_destroy(w_bound_t * const b)
@@ -1784,6 +1820,8 @@ static void w_bound_destroy(w_bound_t * const b)
         wl_compositor_destroy(b->compositor);
     if (b->shm != NULL)
         wl_shm_destroy(b->shm);
+    if (b->single_pixel_buffer_manager_v1)
+        wp_single_pixel_buffer_manager_v1_destroy(b->single_pixel_buffer_manager_v1);
     memset(b, 0, sizeof(*b));
 }
 
