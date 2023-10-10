@@ -1804,7 +1804,7 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
             msg_Warn(vd, "Interface %s wanted v 3 got v %d", zwp_linux_dmabuf_v1_interface.name, vers);
     }
     else
-    if (!strcmp(iface, wp_single_pixel_buffer_manager_v1_interface.name))
+    if (strcmp(iface, wp_single_pixel_buffer_manager_v1_interface.name) == 0)
         b->single_pixel_buffer_manager_v1 = wl_registry_bind(registry, name, &wp_single_pixel_buffer_manager_v1_interface, 1);
 }
 
@@ -1820,6 +1820,8 @@ static void w_bound_destroy(w_bound_t * const b)
         wl_compositor_destroy(b->compositor);
     if (b->shm != NULL)
         wl_shm_destroy(b->shm);
+    if (b->single_pixel_buffer_manager_v1)
+        wp_single_pixel_buffer_manager_v1_destroy(b->single_pixel_buffer_manager_v1);
     memset(b, 0, sizeof(*b));
 }
 
