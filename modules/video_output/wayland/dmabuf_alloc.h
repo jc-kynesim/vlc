@@ -44,7 +44,7 @@ size_t dmabuf_size(const struct dmabuf_h * const dh);
 size_t dmabuf_len(const struct dmabuf_h * const dh);
 /* Set bytes in use */
 void dmabuf_len_set(struct dmabuf_h * const dh, const size_t len);
-/* Are these real dmabufs (true) or is this just something else mmapable (false) */
+/* Are these real dmabufs (false) or is this just something else mmapable (true) */
 bool dmabuf_is_fake(const struct dmabuf_h * const dh);
 
 void dmabuf_predel_cb_set(struct dmabuf_h * const dh,
