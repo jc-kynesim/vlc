@@ -931,7 +931,7 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
         goto error;
     }
 
-    if (sys->use_shm)
+    if (dmabuf_is_fake(dh) || !sys->bound.linux_dmabuf_v1)
     {
         struct wl_shm_pool *pool = wl_shm_create_pool(sys->bound.shm, dmabuf_fd(dh), dmabuf_size(dh));
         const uint32_t w_fmt = drm_fmt_to_wl_shm(drm_fmt);
@@ -1056,7 +1056,7 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     for (i = 0; i != desc->nb_objects; ++i)
         vdre_add_pt(vdre, sys->pollq, desc->objects[i].fd);
 
-    if (sys->use_shm)
+    if (!sys->bound.linux_dmabuf_v1)
     {
         const AVDRMPlaneDescriptor *const p = desc->layers[0].planes + 0;
         struct wl_shm_pool *pool = wl_shm_create_pool(sys->bound.shm, desc->objects[0].fd, desc->objects[0].size);
@@ -1782,7 +1782,7 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
         wl_shm_add_listener(b->shm, &shm_listener, vd);
     }
     else
-    if (!strcmp(iface, wp_viewporter_interface.name))
+    if (strcmp(iface, wp_viewporter_interface.name) == 0)
         b->viewporter = wl_registry_bind(registry, name, &wp_viewporter_interface, 1);
     else
     if (!strcmp(iface, wl_compositor_interface.name))
