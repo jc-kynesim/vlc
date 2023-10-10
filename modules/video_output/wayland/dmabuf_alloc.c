@@ -1,3 +1,4 @@
+#define _GNU_SOURCE 1
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,7 +9,6 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <linux/mman.h>
 #include <linux/dma-buf.h>
 #include <linux/dma-heap.h>
 
@@ -305,7 +305,12 @@ static struct dmabufs_ctl * dmabufs_ctl_new2(const struct dmabuf_fns * const fns
 
     dbsc->fd = -1;
     dbsc->fns = fns;
+
     dbsc->page_size = (size_t)sysconf(_SC_PAGE_SIZE);
+    // Check page size for plausability & power of 2 - set to 4k if not
+    if (dbsc->page_size < 0x1000 || dbsc->page_size > 0x1000000 ||
+        (dbsc->page_size & (dbsc->page_size - 1)) != 0)
+        dbsc->page_size = 0x1000;
 
     if (fns->ctl_new(dbsc) != 0)
         goto fail;
@@ -451,15 +456,26 @@ static void ctl_shm_free(struct dmabufs_ctl * dbsc)
 static int buf_shm_alloc(struct dmabufs_ctl * const dbsc, struct dmabuf_h * dh, size_t size)
 {
     int fd;
-    const char * const tmpdir = "/tmp";
-    (void)dbsc;
 
+#if 0
+    const char * const tmpdir = "/tmp";
     fd = open(tmpdir, __O_TMPFILE | O_RDWR, S_IRUSR | S_IWUSR);
     if (fd == -1) {
         const int err = errno;
         request_log("Failed to open tmp file in %s: %s\n", tmpdir, strerror(err));
         return -err;
     }
+#else
+    fd = memfd_create("vlc/shm_buf", 0);
+    if (fd == -1) {
+        const int err = errno;
+        request_log("Failed to create memfd: %s\n", strerror(err));
+        return -err;
+    }
+#endif
+
+    // Round up to page size
+    size = (size + dbsc->page_size - 1) & ~(dbsc->page_size - 1);
 
     if (ftruncate(fd, (off_t)size) != 0)
     {
