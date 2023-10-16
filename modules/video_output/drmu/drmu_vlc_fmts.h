@@ -21,7 +21,11 @@ struct drmu_vlc_fmt_info_ss;
 typedef struct drmu_vlc_fmt_info_ss drmu_vlc_fmt_info_t;
 
 const drmu_vlc_fmt_info_t * drmu_vlc_fmt_info_find_vlc(const video_frame_format_t * const vf_vlc);
+// f == NULL => start at the beginning
+const drmu_vlc_fmt_info_t * drmu_vlc_fmt_info_find_vlc_next(const video_frame_format_t * const vf_vlc, const drmu_vlc_fmt_info_t * f);
 const drmu_vlc_fmt_info_t * drmu_vlc_fmt_info_find_drm(const uint32_t pixelformat, const uint64_t modifier);
+// f == NULL => start at the beginning
+const drmu_vlc_fmt_info_t * drmu_vlc_fmt_info_find_drm_next(const uint32_t pixelformat, const uint64_t modifier, const drmu_vlc_fmt_info_t * f);
 
 vlc_fourcc_t drmu_vlc_fmt_info_vlc_chroma(const drmu_vlc_fmt_info_t * const f);
 uint32_t drmu_vlc_fmt_info_drm_pixelformat(const drmu_vlc_fmt_info_t * const f);

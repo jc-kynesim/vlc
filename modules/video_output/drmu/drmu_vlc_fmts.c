@@ -85,13 +85,15 @@ static const drmu_vlc_fmt_info_t fmt_table[] = {
 // *** Sorted lookups?
 
 const drmu_vlc_fmt_info_t *
-drmu_vlc_fmt_info_find_vlc(const video_frame_format_t * const vf_vlc)
+drmu_vlc_fmt_info_find_vlc_next(const video_frame_format_t * const vf_vlc, const drmu_vlc_fmt_info_t * f)
 {
-    for (const drmu_vlc_fmt_info_t * f = fmt_table; f->vlc_chroma != 0; ++f)
+    if (f == NULL)
+        f = fmt_table;
+    for (; f->vlc_chroma != 0; ++f)
     {
         if (f->vlc_chroma != vf_vlc->i_chroma)
             continue;
-        if (f->rmask != 0 && vf_vlc != 0 &&
+        if (f->rmask != 0 && vf_vlc->i_rmask != 0 &&
             (f->rmask != vf_vlc->i_rmask || f->gmask != vf_vlc->i_gmask || f->bmask != vf_vlc->i_bmask))
             continue;
         return f;
@@ -100,9 +102,17 @@ drmu_vlc_fmt_info_find_vlc(const video_frame_format_t * const vf_vlc)
 }
 
 const drmu_vlc_fmt_info_t *
-drmu_vlc_fmt_info_find_drm(const uint32_t pixelformat, const uint64_t modifier)
+drmu_vlc_fmt_info_find_vlc(const video_frame_format_t * const vf_vlc)
 {
-    for (const drmu_vlc_fmt_info_t * f = fmt_table; f->vlc_chroma != 0; ++f)
+    return drmu_vlc_fmt_info_find_vlc_next(vf_vlc, NULL);
+}
+
+const drmu_vlc_fmt_info_t *
+drmu_vlc_fmt_info_find_drm_next(const uint32_t pixelformat, const uint64_t modifier, const drmu_vlc_fmt_info_t * f)
+{
+    if (f == NULL)
+        f = fmt_table;
+    for (; f->vlc_chroma != 0; ++f)
     {
         if (f->drm_pixelformat != pixelformat || f->drm_modifier != modifier)
             continue;
@@ -112,6 +122,12 @@ drmu_vlc_fmt_info_find_drm(const uint32_t pixelformat, const uint64_t modifier)
         return f;
     }
     return NULL;
+}
+
+const drmu_vlc_fmt_info_t *
+drmu_vlc_fmt_info_find_drm(const uint32_t pixelformat, const uint64_t modifier, const drmu_vlc_fmt_info_t * f)
+{
+    return drmu_vlc_fmt_info_find_drm_next(pixelformat, modifier, NULL);
 }
 
 vlc_fourcc_t

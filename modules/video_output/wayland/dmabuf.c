@@ -2067,7 +2067,17 @@ static int Open(vlc_object_t *obj)
     // Check PIC DRM format here
     if (fmt_list_find(flist, pic_drm_fmt, pic_drm_mod) < 0) {
         msg_Warn(vd, "Could not find %.4s mod %#"PRIx64" in supported formats", (char*)&pic_drm_fmt, pic_drm_mod);
-        goto error;
+
+        const vlc_fourcc_t *fallback = vlc_fourcc_IsYUV(fmtp->i_chroma) ?
+            vlc_fourcc_GetYUVFallback(fmtp->i_chroma) :
+            vlc_fourcc_GetRGBFallback(fmtp->i_chroma);
+
+        // *** How should we check RGB fallbacks given we need masks too?
+        for (; *fallback; ++fallback) {
+            if (fmt_list_find(sys->dp, drmu_format_vlc_chroma_to_drm(*fallback), 0))
+                break;
+        }
+
     }
 
     {
