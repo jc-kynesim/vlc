@@ -89,6 +89,13 @@ typedef struct subpic_ent_s {
     bool update;
 } subpic_ent_t;
 
+typedef struct video_dmabuf_release_env_ss
+{
+    struct picture_context_t * ctx;
+    unsigned int rel_count;
+    unsigned int pt_count;
+    struct polltask * pt[AV_DRM_MAX_PLANES];
+} video_dmabuf_release_env_t;
 
 struct vout_display_sys_t
 {
@@ -128,6 +135,7 @@ struct vout_display_sys_t
     subplane_t subplanes[MAX_SUBPICS];
     subpic_ent_t subpics[MAX_SUBPICS];
     subpic_ent_t piccpy;
+    video_dmabuf_release_env_t * pic_vdre;
     vlc_fourcc_t * subpic_chromas;
 
     fmt_list_t dmabuf_fmts;
@@ -536,7 +544,7 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
 {
     unsigned int w = src->format.i_width;
     unsigned int h = src->format.i_height;
-    struct zwp_linux_buffer_params_v1 *params;
+    struct zwp_linux_buffer_params_v1 *params = NULL;
     const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format);
     size_t total_size = 0;
     size_t offset = 0;
@@ -549,30 +557,30 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
     *pW_buffer = NULL;
     *pDmabuf_h = NULL;
 
-    if ((dh = picpool_get(sys->subpic_pool, total_size)) == NULL) {
+    if ((dh = picpool_get(sys->subpic_pool, total_size)) == NULL)
+    {
         msg_Warn(vd, "Failed to alloc dmabuf for subpic");
         goto error;
     }
     *pDmabuf_h = dh;
 
-    if ((params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1)) == NULL) {
+    if ((params = zwp_linux_dmabuf_v1_create_params(sys->linux_dmabuf_v1)) == NULL)
+    {
         msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
         goto error;
     }
 
     dmabuf_write_start(dh);
-    for (i = 0; i != src->i_planes; ++i) {
-        size_t stride = src->p[i].i_pitch;
-        size_t size = cpypic_plane_alloc_size(src->p + i);
+    for (i = 0; i != src->i_planes; ++i)
+    {
+        const size_t stride = src->p[i].i_pitch;
+        const size_t size = cpypic_plane_alloc_size(src->p + i);
 
         if (src->format.i_chroma == VLC_CODEC_RGBA ||
-            src->format.i_chroma == VLC_CODEC_BGRA) {
+            src->format.i_chroma == VLC_CODEC_BGRA)
             copy_frame_xxxa_with_premul(dmabuf_map(dh), stride, src->p[i].p_pixels, src->p[i].i_pitch, w, h, alpha);
-        }
         else
-        {
             memcpy((char *)dmabuf_map(dh) + offset, src->p[i].p_pixels, size);
-        }
 
         zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), i, offset, stride, 0, 0);
 
@@ -580,8 +588,14 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
     }
     dmabuf_write_end(dh);
 
-    *pW_buffer = zwp_linux_buffer_params_v1_create_immed(params, w, h, drm_fmt, 0);
+    if ((*pW_buffer = zwp_linux_buffer_params_v1_create_immed(params, w, h, drm_fmt, 0)) == NULL)
+    {
+        msg_Err(vd, "zwp_linux_buffer_params_v1_create_immed FAILED");
+        goto error;
+    }
+
     zwp_linux_buffer_params_v1_destroy(params);
+    wl_buffer_add_listener(*pW_buffer, &subpic_buffer_listener, dh);
 
     return VLC_SUCCESS;
 
@@ -617,19 +631,12 @@ static picture_pool_t *vd_dmabuf_pool(vout_display_t * const vd, unsigned count)
     return sys->vlc_pic_pool;
 }
 
-typedef struct video_dmabuf_release_env_ss
-{
-    struct picture_context_t * ctx;
-    unsigned int rel_count;
-    unsigned int pt_count;
-    struct polltask * pt[AV_DRM_MAX_PLANES];
-} video_dmabuf_release_env_t;
-
 static video_dmabuf_release_env_t *
 vdre_new(struct picture_context_t * ctx)
 {
     video_dmabuf_release_env_t * const vdre = calloc(1, sizeof(*vdre));
-    if ((vdre->ctx = ctx->copy(ctx)) == NULL) {
+    if ((vdre->ctx = ctx->copy(ctx)) == NULL)
+    {
         free(vdre);
         return NULL;
     }
@@ -644,6 +651,16 @@ vdre_free(video_dmabuf_release_env_t * const vdre)
     for (i = 0; i != vdre->pt_count; ++i)
         polltask_delete(vdre->pt + i);
     free(vdre);
+}
+
+static void
+vdre_delete(video_dmabuf_release_env_t ** const ppvdre)
+{
+    video_dmabuf_release_env_t * const vdre = *ppvdre;
+    if (vdre == NULL)
+        return;
+    *ppvdre = NULL;
+    vdre_free(vdre);
 }
 
 static void
@@ -685,8 +702,9 @@ static const struct wl_buffer_listener w_buffer_listener = {
     .release = w_buffer_release,
 };
 
-static struct wl_buffer*
-do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, picture_t * const pic)
+static int
+do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, picture_t * const pic,
+                  video_dmabuf_release_env_t ** const pVdre, struct wl_buffer ** const pWbuffer)
 {
     struct zwp_linux_buffer_params_v1 *params;
     const AVDRMFrameDescriptor * const desc = drm_prime_get_desc(pic);
@@ -697,12 +715,14 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     unsigned int flags = 0;
     int i;
     struct wl_buffer * w_buffer;
-    struct wl_surface * const surface = video_surface(sys);
-    video_dmabuf_release_env_t * vdre = vdre_new(pic->context);
+    video_dmabuf_release_env_t * const vdre = vdre_new(pic->context);
+
+    assert(*pWbuffer == NULL);
+    assert(*pVdre == NULL);
 
     if (vdre == NULL) {
         msg_Err(vd, "Failed to create vdre");
-        return NULL;
+        return VLC_ENOMEM;
     }
 
     for (i = 0; i != desc->nb_objects; ++i)
@@ -713,8 +733,7 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     if (!params)
     {
         msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
-        vdre_free(vdre);
-        return NULL;
+        goto error;
     }
 
     for (i = 0; i < desc->nb_layers; ++i)
@@ -739,17 +758,23 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     }
 
     /* Request buffer creation */
-    w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, format, flags);
+    if ((w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, format, flags)) == NULL)
+    {
+        msg_Err(vd, "zwp_linux_buffer_params_v1_create_immed FAILED");
+        goto error;
+    }
+
     zwp_linux_buffer_params_v1_destroy(params);
 
     wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre);
 
-    // Don't try to offset - it doesn't seem to work
-    // (and the API is version dependant)
-    wl_surface_attach(surface, w_buffer, 0, 0);
-    sys->video_attached = true;
+    *pVdre = vdre;
+    *pWbuffer = w_buffer;
+    return VLC_SUCCESS;
 
-    return NULL;
+error:
+    vdre_free(vdre);
+    return VLC_EGENERIC;
 }
 
 static void
@@ -761,6 +786,14 @@ subpic_ent_flush(subpic_ent_t * const spe)
     }
     buffer_destroy(&spe->wb);
     dmabuf_unref(&spe->dh);
+}
+
+static void
+subpic_ent_attach(struct wl_surface * const surface, subpic_ent_t * const spe)
+{
+    wl_surface_attach(surface, spe->wb, 0, 0);
+    spe->dh = NULL;
+    spe->wb = NULL;
 }
 
 static void
@@ -931,6 +964,9 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     if (drmu_format_vlc_to_drm_prime(pic->format.i_chroma, NULL) == 0) {
         copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &sys->piccpy.dh, &sys->piccpy.wb);
     }
+    else {
+        do_display_dmabuf(vd, sys, pic, &sys->pic_vdre, &sys->piccpy.wb);
+    }
 
     // Attempt to import the subpics
     for (subpicture_t * spic = subpic; spic != NULL; spic = spic->p_next)
@@ -1018,9 +1054,7 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
             continue;
 
         msg_Dbg(vd, "%s: Update subpic %i: wb=%p alpha=%d", __func__, i, spe->wb, spe->alpha);
-        if (spe->wb != NULL)
-            wl_buffer_add_listener(spe->wb, &subpic_buffer_listener, dmabuf_ref(spe->dh));
-        wl_surface_attach(sys->subplanes[i].surface, spe->wb, 0, 0);
+        subpic_ent_attach(sys->subplanes[i].surface, spe);
 
         wl_subsurface_set_position(sys->subplanes[i].subsurface, spe->dst_rect.x, spe->dst_rect.y);
         wp_viewport_set_source(sys->subplanes[i].viewport,
@@ -1030,21 +1064,17 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
         wl_surface_damage(sys->subplanes[i].surface, 0, 0, INT32_MAX, INT32_MAX);
 
         wl_surface_commit(sys->subplanes[i].surface);
-        spe->wb = NULL;
         spe->update = false;
     }
 
     if (!sys->piccpy.wb) {
-        do_display_dmabuf(vd, sys, pic);
+        msg_Warn(vd, "Display called but prepared pic buffer");
     }
     else {
-        subpic_ent_t *const spe = &sys->piccpy;
-        wl_buffer_add_listener(spe->wb, &subpic_buffer_listener, spe->dh);
-        wl_surface_attach(video_surface(sys), spe->wb, 0, 0);
+        subpic_ent_attach(video_surface(sys), &sys->piccpy);
         sys->video_attached = true;
         // Now up to the buffer callback to free stuff
-        spe->wb = NULL;
-        spe->dh = NULL;
+        sys->pic_vdre = NULL;
     }
 
     set_video_viewport(vd, sys);
@@ -1298,6 +1328,7 @@ clear_all_buffers(vout_display_sys_t *sys)
 #endif
 
     subpic_ent_flush(&sys->piccpy);
+    vdre_delete(&sys->pic_vdre);
 }
 
 
@@ -1323,11 +1354,11 @@ static void Close(vlc_object_t *obj)
     // Free subpic resources
     for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
     {
-        subplane_t * const spe = sys->subplanes + i;
+        subplane_t * const spl = sys->subplanes + i;
 
-        viewport_destroy(&spe->viewport);
-        subsurface_destroy(&spe->subsurface);
-        surface_destroy(&spe->surface);
+        viewport_destroy(&spl->viewport);
+        subsurface_destroy(&spl->subsurface);
+        surface_destroy(&spl->surface);
     }
 
     viewport_destroy(&sys->viewport);
