@@ -27,6 +27,7 @@
 #include <assert.h>
 #include <stdatomic.h>
 #include <errno.h>
+#include <limits.h>
 #include <semaphore.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,6 +53,7 @@
 #include "dmabuf_alloc.h"
 #include "picpool.h"
 #include "rgba_premul.h"
+#include "../drmu/drmu_log.h"
 #include "../drmu/drmu_vlc_fmts.h"
 #include "../drmu/pollqueue.h"
 #include "../../codec/avcodec/drm_pic.h"
@@ -518,15 +520,22 @@ fmt_list_sort(fmt_list_t * const fl)
 }
 
 static int
-fmt_list_find(const fmt_list_t * const fl, uint32_t fmt, uint64_t mod)
+fmt_list_find(const fmt_list_t * const fl, const drmu_vlc_fmt_info_t * const fmti)
 {
-    const fmt_ent_t x = {
-        .fmt = fmt,
-        .mod = mod
-    };
-    const fmt_ent_t * const fe = (fl->len == 0) ? NULL :
-        bsearch(&x, fl->fmts, fl->len, sizeof(x), fmt_sort_cb);
-    return fe == NULL ? -1 : fe->pri;
+    if (fmti == NULL || fl->len == 0)
+    {
+        return -1;
+    }
+    else
+    {
+        const fmt_ent_t x = {
+            .fmt = drmu_vlc_fmt_info_drm_pixelformat(fmti),
+            .mod = drmu_vlc_fmt_info_drm_modifier(fmti),
+        };
+        const fmt_ent_t * const fe =
+            bsearch(&x, fl->fmts, fl->len, sizeof(x), fmt_sort_cb);
+        return fe == NULL ? -1 : fe->pri;
+    }
 }
 
 static void
@@ -1924,6 +1933,41 @@ clear_all_buffers(vout_display_sys_t *sys)
     subpic_ent_flush(&sys->piccpy);
 }
 
+static const drmu_vlc_fmt_info_t *
+find_fmt_fallback(vout_display_t * const vd, const fmt_list_t * const flist, const vlc_fourcc_t * fallback)
+{
+    const drmu_vlc_fmt_info_t * fmti_best = NULL;
+    int pri_best = INT_MAX;
+
+    for (; *fallback != 0; ++fallback)
+    {
+        const video_frame_format_t vf = {.i_chroma = *fallback};
+        const drmu_vlc_fmt_info_t * fmti = NULL;
+
+        msg_Dbg(vd, "Try %s", drmu_log_fourcc(*fallback));
+
+        for (fmti = drmu_vlc_fmt_info_find_vlc(&vf);
+             fmti != NULL;
+             fmti = drmu_vlc_fmt_info_find_vlc_next(&vf, fmti))
+        {
+            const int pri = fmt_list_find(flist, fmti);
+            msg_Dbg(vd, "Try %s -> %s %"PRIx64": %d", drmu_log_fourcc(*fallback),
+                    drmu_log_fourcc(drmu_vlc_fmt_info_drm_pixelformat(fmti)),
+                    drmu_vlc_fmt_info_drm_modifier(fmti), pri);
+            if (pri >= 0 && pri < pri_best)
+            {
+                fmti_best = fmti;
+                pri_best = pri;
+
+                // If we've got pri 0 then might as well stop now
+                if (pri == 0)
+                    return fmti_best;
+            }
+        }
+    }
+
+    return fmti_best;
+}
 
 static void Close(vlc_object_t *obj)
 {
@@ -1991,16 +2035,12 @@ static int Open(vlc_object_t *obj)
 {
     vout_display_t * const vd = (vout_display_t *)obj;
     vout_display_sys_t *sys;
-    uint32_t pic_drm_fmt = 0;
-    uint64_t pic_drm_mod = DRM_FORMAT_MOD_LINEAR;
+    const drmu_vlc_fmt_info_t * pic_fmti;
     fmt_list_t * flist = NULL;
 
     msg_Info(vd, "<<< %s: %.4s %dx%d, cfg.display: %dx%d", __func__,
              (const char*)&vd->fmt.i_chroma, vd->fmt.i_width, vd->fmt.i_height,
              vd->cfg->display.width, vd->cfg->display.height);
-
-    if (!(pic_drm_fmt = drmu_format_vlc_to_drm(&vd->fmt, &pic_drm_mod)))
-        return VLC_EGENERIC;
 
     sys = calloc(1, sizeof(*sys));
     if (unlikely(sys == NULL))
@@ -2065,9 +2105,28 @@ static int Open(vlc_object_t *obj)
     flist = sys->use_shm ? &sys->shm_fmts : &sys->dmabuf_fmts;
 
     // Check PIC DRM format here
-    if (fmt_list_find(flist, pic_drm_fmt, pic_drm_mod) < 0) {
-        msg_Warn(vd, "Could not find %.4s mod %#"PRIx64" in supported formats", (char*)&pic_drm_fmt, pic_drm_mod);
-        goto error;
+    if ((pic_fmti = drmu_vlc_fmt_info_find_vlc(&vd->fmt)) == NULL ||
+        fmt_list_find(flist, pic_fmti) < 0)
+    {
+        static const vlc_fourcc_t fallback2[] = {
+            VLC_CODEC_I420,
+            VLC_CODEC_RGB32,
+            0
+        };
+
+        msg_Warn(vd, "Could not find %s mod %#"PRIx64" in supported formats",
+                 drmu_log_fourcc(drmu_vlc_fmt_info_drm_pixelformat(pic_fmti)),
+                 drmu_vlc_fmt_info_drm_modifier(pic_fmti));
+
+        if ((pic_fmti = find_fmt_fallback(vd, flist,
+                                          vlc_fourcc_IsYUV(vd->fmt.i_chroma) ?
+                                              vlc_fourcc_GetYUVFallback(vd->fmt.i_chroma) :
+                                              vlc_fourcc_GetRGBFallback(vd->fmt.i_chroma))) == NULL &&
+            (pic_fmti = find_fmt_fallback(vd, flist, fallback2)) == NULL)
+        {
+            msg_Warn(vd, "Failed to find any usable fallback format");
+            goto error;
+        }
     }
 
     {
@@ -2075,6 +2134,8 @@ static int Open(vlc_object_t *obj)
             VLC_CODEC_RGBA,
             VLC_CODEC_BGRA,
             VLC_CODEC_ARGB,
+            VLC_CODEC_VUYA,
+            VLC_CODEC_YUVA,
         };
         unsigned int n = 0;
 
@@ -2082,9 +2143,8 @@ static int Open(vlc_object_t *obj)
             goto error;
         for (unsigned int i = 0; i != ARRAY_SIZE(tryfmts); ++i)
         {
-            uint32_t drmfmt = drmu_format_vlc_chroma_to_drm(tryfmts[i]);
-            msg_Dbg(vd, "Look for %.4s", (char*)&drmfmt);
-            if (fmt_list_find(flist, drmfmt, DRM_FORMAT_MOD_LINEAR) >= 0)
+            const video_frame_format_t vf = {.i_chroma = tryfmts[i]};
+            if (fmt_list_find(flist, drmu_vlc_fmt_info_find_vlc(&vf)) >= 0)
                 sys->subpic_chromas[n++] = tryfmts[i];
         }
 
@@ -2114,6 +2174,9 @@ static int Open(vlc_object_t *obj)
     sys->bkg_h = vd->cfg->display.height;
 #endif
 
+    vd->fmt.i_chroma = drmu_vlc_fmt_info_vlc_chroma(pic_fmti);
+    drmu_vlc_fmt_info_vlc_rgb_masks(pic_fmti, &vd->fmt.i_rmask, &vd->fmt.i_gmask, &vd->fmt.i_bmask);
+
     vd->info.has_pictures_invalid = sys->viewport == NULL;
     vd->info.subpicture_chromas = sys->subpic_chromas;
 
@@ -2122,7 +2185,9 @@ static int Open(vlc_object_t *obj)
     vd->display = Display;
     vd->control = Control;
 
-    msg_Dbg(vd, ">>> %s: OK", __func__);
+    msg_Dbg(vd, ">>> %s: OK: %.4s (%#x/%#x/%#x)", __func__,
+            (char*)&vd->fmt.i_chroma,
+            vd->fmt.i_rmask, vd->fmt.i_gmask, vd->fmt.i_bmask);
     return VLC_SUCCESS;
 
 error:
