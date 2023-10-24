@@ -66,6 +66,10 @@
 
 #define VIDEO_ON_SUBSURFACE 1
 
+#define WL_DMABUF_DISABLE_NAME "wl-dmabuf-disable"
+#define WL_DMABUF_DISABLE_TEXT N_("Disable wl-dmabuf")
+#define WL_DMABUF_DISABLE_LONGTEXT N_("Disable wl-dmabuf - useful if auto selection is wanted but not wl-dmabuf")
+
 #define WL_DMABUF_USE_SHM_NAME "wl-dmabuf-use-shm"
 #define WL_DMABUF_USE_SHM_TEXT N_("Attempt to map via shm")
 #define WL_DMABUF_USE_SHM_LONGTEXT N_("Attempt to map via shm rather than linux_dmabuf")
@@ -2038,6 +2042,9 @@ static int Open(vlc_object_t *obj)
     const drmu_vlc_fmt_info_t * pic_fmti;
     fmt_list_t * flist = NULL;
 
+    if (var_InheritBool(vd, WL_DMABUF_DISABLE_NAME))
+        return VLC_EGENERIC;
+
     msg_Info(vd, "<<< %s: %.4s %dx%d, cfg.display: %dx%d", __func__,
              (const char*)&vd->fmt.i_chroma, vd->fmt.i_width, vd->fmt.i_height,
              vd->cfg->display.width, vd->cfg->display.height);
@@ -2061,8 +2068,10 @@ static int Open(vlc_object_t *obj)
 
         /* Get window */
     sys->embed = vout_display_NewWindow(vd, VOUT_WINDOW_TYPE_WAYLAND);
-    if (sys->embed == NULL)
+    if (sys->embed == NULL) {
+        msg_Dbg(vd, "Cannot create window - probably not using Wayland");
         goto error;
+    }
     sys->last_embed_surface = sys->embed->handle.wl;
 
     if ((sys->pollq = pollqueue_new()) == NULL ||
@@ -2204,6 +2213,7 @@ vlc_module_begin()
     set_capability("vout display", 0)
     set_callbacks(Open, Close)
     add_shortcut("wl-dmabuf")
+    add_bool(WL_DMABUF_DISABLE_NAME, false, WL_DMABUF_DISABLE_TEXT, WL_DMABUF_DISABLE_LONGTEXT, false)
     add_bool(WL_DMABUF_USE_SHM_NAME, false, WL_DMABUF_USE_SHM_TEXT, WL_DMABUF_USE_SHM_LONGTEXT, false)
     add_bool(WL_DMABUF_CHEQUERBOARD_NAME, false, WL_DMABUF_CHEQUERBOARD_TEXT, WL_DMABUF_CHEQUERBOARD_LONGTEXT, false)
 vlc_module_end()
