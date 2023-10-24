@@ -2045,10 +2045,6 @@ static int Open(vlc_object_t *obj)
     if (var_InheritBool(vd, WL_DMABUF_DISABLE_NAME))
         return VLC_EGENERIC;
 
-    msg_Info(vd, "<<< %s: %.4s %dx%d, cfg.display: %dx%d", __func__,
-             (const char*)&vd->fmt.i_chroma, vd->fmt.i_width, vd->fmt.i_height,
-             vd->cfg->display.width, vd->cfg->display.height);
-
     sys = calloc(1, sizeof(*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
@@ -2073,6 +2069,10 @@ static int Open(vlc_object_t *obj)
         goto error;
     }
     sys->last_embed_surface = sys->embed->handle.wl;
+
+    msg_Info(vd, "<<< %s: %.4s %dx%d, cfg.display: %dx%d", __func__,
+             (const char*)&vd->fmt.i_chroma, vd->fmt.i_width, vd->fmt.i_height,
+             vd->cfg->display.width, vd->cfg->display.height);
 
     if ((sys->pollq = pollqueue_new()) == NULL ||
         (sys->speq = pollqueue_new()) == NULL)
