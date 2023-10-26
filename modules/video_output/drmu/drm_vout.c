@@ -1040,7 +1040,7 @@ vlc_module_begin()
     set_shortname(N_("DRM vout"))
     set_description(N_("DRM vout plugin"))
     set_capability("vout display", 16)  // 1 point better than ASCII art
-    add_shortcut("drm_vout")
+    add_shortcut("drm-vout")
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
 
