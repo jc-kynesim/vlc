@@ -971,6 +971,7 @@ static int OpenDrmVout(vlc_object_t *object)
             unsigned int w, h, hz;
             if (*drmu_util_parse_mode(modestr, &w, &h, &hz) != 0) {
                 msg_Err(vd, "Bad mode string: '%s'", modestr);
+                free(mode_name);
                 ret = VLC_EGENERIC;
                 goto fail;
             }
