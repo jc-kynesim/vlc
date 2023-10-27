@@ -246,7 +246,7 @@ video_output/wayland/single-pixel-buffer-v1-protocol.c: \
 		$(WAYLAND_PROTOCOLS)/staging/single-pixel-buffer/single-pixel-buffer-v1.xml
 	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
 
-libwl_dmabuf_plugin_la_SOURCES = video_output/wayland/dmabuf.c\
+libwl_dmabuf_plugin_la_SOURCES = video_output/wayland/wl_dmabuf.c\
 	video_output/wayland/picpool.c video_output/wayland/picpool.h\
 	video_output/wayland/dmabuf_alloc.c video_output/wayland/dmabuf_alloc.h\
 	video_output/wayland/rgba_premul.c video_output/wayland/rgba_premul.h\
