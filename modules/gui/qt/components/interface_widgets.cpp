@@ -95,12 +95,14 @@ VideoWidget::VideoWidget( intf_thread_t *_p_i, QWidget* p_parent )
 VideoWidget::~VideoWidget()
 {
     /* Ensure we are not leaking the video output. This would crash. */
+    fprintf(stderr, "%s\n", __func__);
     assert( !stable );
     assert( !p_window );
 }
 
 void VideoWidget::sync( void )
 {
+    fprintf(stderr, "%s\n", __func__);
     /* Make sure the X server has processed all requests.
      * This protects other threads using distinct connections from getting
      * the video widget window in an inconsistent states. */
@@ -122,9 +124,6 @@ void VideoWidget::refreshHandles()
     if (!p_window || p_window->type != VOUT_WINDOW_TYPE_WAYLAND)
         return;
 
-    /* Ensure only the video widget is native (needed for Wayland) */
-    stable->setAttribute( Qt::WA_DontCreateNativeAncestors, true);
-
     QWindow *window = stable->windowHandle();
     assert(window != NULL);
     window->create();
@@ -135,6 +134,8 @@ void VideoWidget::refreshHandles()
     p_window->handle.wl = static_cast<wl_surface*>(
         qni->nativeResourceForWindow(QByteArrayLiteral("surface"),
                                      window));
+    fprintf(stderr, "%s: surface=%p\n", __func__, p_window->handle.wl);
+
     p_window->display.wl = static_cast<wl_display*>(
         qni->nativeResourceForIntegration(QByteArrayLiteral("wl_display")));
 #endif
@@ -168,8 +169,7 @@ bool VideoWidget::request( struct vout_window_t *p_wnd )
        management */
     /* This is currently disabled on X11 as it does not seem to improve
      * performance, but causes the video widget to be transparent... */
-//#if !defined (QT5_HAS_X11)
-#if 1
+#if !defined (QT5_HAS_X11)
     stable->setAttribute( Qt::WA_PaintOnScreen, true );
 #else
     stable->setMouseTracking( true );
@@ -196,6 +196,9 @@ bool VideoWidget::request( struct vout_window_t *p_wnd )
 #ifdef QT5_HAS_WAYLAND
         case VOUT_WINDOW_TYPE_WAYLAND:
         {
+            /* Ensure only the video widget is native (needed for Wayland) */
+            stable->setAttribute( Qt::WA_DontCreateNativeAncestors, true);
+
             refreshHandles();
             break;
         }
@@ -252,12 +255,14 @@ void WindowOrphaned(vout_window_t *);
 
 void VideoWidget::reportSize()
 {
+    fprintf(stderr, "%s\n", __func__);
     if( !p_window )
         return;
 
     refreshHandles();
     QSize size = physicalSize();
     WindowResized(p_window, size);
+    fprintf(stderr, "%s 2\n", __func__);
 }
 
 /* Set the Widget to the correct Size */
@@ -275,7 +280,6 @@ void VideoWidget::setSize( unsigned int w, unsigned int h )
     }
 
     resize( w, h );
-    refreshHandles();
     emit sizeChanged( w, h );
     /* Work-around a bug?misconception? that would happen when vout core resize
        twice to the same size and would make the vout not centered.
@@ -284,12 +288,11 @@ void VideoWidget::setSize( unsigned int w, unsigned int h )
      */
     if( (unsigned)size().width() == w && (unsigned)size().height() == h )
         updateGeometry();
-    refreshHandles();
+    sync();
 }
 
 bool VideoWidget::nativeEvent( const QByteArray& eventType, void* message, long* )
 {
-    refreshHandles();
 #if defined(QT5_HAS_X11)
 # if defined(QT5_HAS_XCB)
     if ( eventType == "xcb_generic_event_t" )
@@ -311,6 +314,21 @@ bool VideoWidget::nativeEvent( const QByteArray& eventType, void* message, long*
 #endif
     // Let Qt handle that event in any case
     return false;
+}
+
+void VideoWidget::showEvent(QShowEvent *event)
+{
+    fprintf(stderr, "%s\n", __func__);
+    QFrame::showEvent(event);
+    refreshHandles();
+}
+
+void VideoWidget::hideEvent(QHideEvent *event)
+{
+    fprintf(stderr, "%s\n", __func__);
+    if (p_window && p_window->type == VOUT_WINDOW_TYPE_WAYLAND)
+        p_window->handle.wl = NULL;
+    QFrame::hideEvent(event);
 }
 
 void VideoWidget::resizeEvent( QResizeEvent *event )
@@ -430,11 +448,7 @@ void VideoWidget::release( bool forced )
     {
         if( forced )
             WindowOrphaned(p_window);
-        if ( p_window ) {
-            p_window->handle.wl = NULL;
-            p_window->display.wl = NULL;
-        }
-        layout->removeWidget(stable);
+        layout->removeWidget( stable );
         stable->deleteLater();
         stable = NULL;
         p_window = NULL;

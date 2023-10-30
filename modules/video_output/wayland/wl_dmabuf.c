@@ -1772,6 +1772,7 @@ static int Control(vout_display_t *vd, int query, va_list ap)
                 wl_surface_commit(bkg_surface(sys));
             }
 #endif
+            wl_display_flush(video_display(sys));
 
             sys->curr_aspect = vd->source;
             break;
