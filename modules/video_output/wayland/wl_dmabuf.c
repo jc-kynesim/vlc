@@ -59,7 +59,7 @@
 #include "../../codec/avcodec/drm_pic.h"
 #include <libavutil/hwcontext_drm.h>
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 
 #define MAX_PICTURES 4
 #define MAX_SUBPICS  6
@@ -224,7 +224,7 @@ bkg_surface(const vout_display_sys_t * const sys)
 }
 #endif
 
-static int
+static bool
 check_embed(vout_display_t * const vd, vout_display_sys_t * const sys, const char * const func)
 {
     if (!sys->embed) {
@@ -1018,7 +1018,6 @@ error:
     return VLC_EGENERIC;
 }
 
-
 static void kill_pool(vout_display_sys_t * const sys)
 {
     if (sys->vlc_pic_pool != NULL)
@@ -1458,6 +1457,7 @@ spe_delete(subpic_ent_t ** const ppspe)
 
     if (spe == NULL)
         return;
+    *ppspe = NULL;
 
     polltask_delete(&spe->pt);
     subpic_ent_flush(spe);
@@ -1472,6 +1472,62 @@ spe_convert(subpic_ent_t * const spe)
     return 0;
 }
 
+static void
+clear_surface_buffer(struct wl_surface * surface)
+{
+    if (surface == NULL)
+        return;
+    wl_surface_attach(surface, NULL, 0, 0);
+    wl_surface_commit(surface);
+}
+
+static void
+clear_all_buffers(vout_display_sys_t * const sys, const bool bkg_valid)
+{
+    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
+    {
+        subplane_t *const plane = sys->subplanes + i;
+        spe_delete(&plane->spe_next);
+        spe_delete(&plane->spe_cur);
+        clear_surface_buffer(plane->surface);
+    }
+
+    clear_surface_buffer(video_surface(sys));
+    sys->video_attached = false;
+
+#if VIDEO_ON_SUBSURFACE
+    if (bkg_valid)
+        clear_surface_buffer(bkg_surface(sys));
+#endif
+
+    subpic_ent_flush(&sys->piccpy);
+}
+
+static void
+unmap_all(vout_display_sys_t * const sys, const bool bkg_valid)
+{
+    clear_all_buffers(sys, bkg_valid);
+
+    // Free subpic resources
+    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
+    {
+        subplane_t * const spl = sys->subplanes + i;
+
+        viewport_destroy(&spl->viewport);
+        subsurface_destroy(&spl->subsurface);
+        surface_destroy(&spl->surface);
+    }
+
+    viewport_destroy(&sys->viewport);
+
+#if VIDEO_ON_SUBSURFACE
+    subsurface_destroy(&sys->video_subsurface);
+    surface_destroy(&sys->video_surface);
+
+    viewport_destroy(&sys->bkg_viewport);
+#endif
+}
+
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 {
     vout_display_sys_t * const sys = vd->sys;
@@ -1480,8 +1536,10 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
 #endif
-    check_embed(vd, sys, __func__);
+    if (check_embed(vd, sys, __func__) != 0)
+        unmap_all(sys, false);
 
+    subpic_ent_flush(&sys->piccpy); // If somehow we have a buffer here - avoid leaking
     if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) == 0)
         copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &sys->piccpy.vdre, &sys->piccpy.wb);
     else
@@ -1537,7 +1595,14 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
 #endif
 
-    check_embed(vd, sys, __func__);
+    if (check_embed(vd, sys, __func__) != 0)
+        unmap_all(sys, false);
+
+    if (bkg_surface(sys) == NULL)
+    {
+        msg_Warn(vd, "%s: No background surface", __func__);
+        goto done;
+    }
 
     make_video_surface(vd, sys);
     make_subpic_surfaces(vd, sys);
@@ -1595,6 +1660,7 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 
     wl_display_flush(video_display(sys));
 
+done:
     if (subpic)
         subpicture_Delete(subpic);
     picture_Release(pic);
@@ -1627,7 +1693,8 @@ static int Control(vout_display_t *vd, int query, va_list ap)
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s: Query=%d", __func__, query);
 #endif
-    check_embed(vd, sys, __func__);
+    if (check_embed(vd, sys, __func__) != 0)
+        unmap_all(sys, false);
 
     switch (query)
     {
@@ -1904,39 +1971,6 @@ registry_scan(vout_display_t * const vd, vout_display_sys_t * const sys)
     return 0;
 }
 
-
-
-static void
-clear_surface_buffer(struct wl_surface * surface)
-{
-    if (surface == NULL)
-        return;
-    wl_surface_attach(surface, NULL, 0, 0);
-    wl_surface_damage(surface, 0, 0, INT32_MAX, INT32_MAX);
-    wl_surface_commit(surface);
-}
-
-static void
-clear_all_buffers(vout_display_sys_t *sys)
-{
-    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
-    {
-        subplane_t *const plane = sys->subplanes + i;
-        spe_delete(&plane->spe_next);
-        spe_delete(&plane->spe_cur);
-        clear_surface_buffer(plane->surface);
-    }
-
-    clear_surface_buffer(video_surface(sys));
-    sys->video_attached = false;
-
-#if VIDEO_ON_SUBSURFACE
-    clear_surface_buffer(bkg_surface(sys));
-#endif
-
-    subpic_ent_flush(&sys->piccpy);
-}
-
 static const drmu_vlc_fmt_info_t *
 find_fmt_fallback(vout_display_t * const vd, const fmt_list_t * const flist, const vlc_fourcc_t * fallback)
 {
@@ -1986,29 +2020,8 @@ static void Close(vlc_object_t *obj)
     if (sys->embed == NULL)
         goto no_window;
 
-    check_embed(vd, sys, __func__);
-
-    clear_all_buffers(sys);
+    unmap_all(sys, check_embed(vd, sys, __func__) == 0);
     pollqueue_unref(&sys->speq);
-
-    // Free subpic resources
-    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
-    {
-        subplane_t * const spl = sys->subplanes + i;
-
-        viewport_destroy(&spl->viewport);
-        subsurface_destroy(&spl->subsurface);
-        surface_destroy(&spl->surface);
-    }
-
-    viewport_destroy(&sys->viewport);
-
-#if VIDEO_ON_SUBSURFACE
-    subsurface_destroy(&sys->video_subsurface);
-    surface_destroy(&sys->video_surface);
-
-    viewport_destroy(&sys->bkg_viewport);
-#endif
 
     w_bound_destroy(&sys->bound);
 

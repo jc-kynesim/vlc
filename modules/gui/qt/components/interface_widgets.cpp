@@ -168,7 +168,8 @@ bool VideoWidget::request( struct vout_window_t *p_wnd )
        management */
     /* This is currently disabled on X11 as it does not seem to improve
      * performance, but causes the video widget to be transparent... */
-#if !defined (QT5_HAS_X11)
+//#if !defined (QT5_HAS_X11)
+#if 1
     stable->setAttribute( Qt::WA_PaintOnScreen, true );
 #else
     stable->setMouseTracking( true );
@@ -254,6 +255,7 @@ void VideoWidget::reportSize()
     if( !p_window )
         return;
 
+    refreshHandles();
     QSize size = physicalSize();
     WindowResized(p_window, size);
 }
@@ -273,6 +275,7 @@ void VideoWidget::setSize( unsigned int w, unsigned int h )
     }
 
     resize( w, h );
+    refreshHandles();
     emit sizeChanged( w, h );
     /* Work-around a bug?misconception? that would happen when vout core resize
        twice to the same size and would make the vout not centered.
@@ -281,11 +284,12 @@ void VideoWidget::setSize( unsigned int w, unsigned int h )
      */
     if( (unsigned)size().width() == w && (unsigned)size().height() == h )
         updateGeometry();
-    sync();
+    refreshHandles();
 }
 
 bool VideoWidget::nativeEvent( const QByteArray& eventType, void* message, long* )
 {
+    refreshHandles();
 #if defined(QT5_HAS_X11)
 # if defined(QT5_HAS_XCB)
     if ( eventType == "xcb_generic_event_t" )
@@ -426,7 +430,11 @@ void VideoWidget::release( bool forced )
     {
         if( forced )
             WindowOrphaned(p_window);
-        layout->removeWidget( stable );
+        if ( p_window ) {
+            p_window->handle.wl = NULL;
+            p_window->display.wl = NULL;
+        }
+        layout->removeWidget(stable);
         stable->deleteLater();
         stable = NULL;
         p_window = NULL;
