@@ -108,7 +108,12 @@ void VideoWidget::sync( void )
     if( QX11Info::isPlatformX11() )
         XSync( QX11Info::display(), False );
 #endif
-    refreshHandles();
+}
+
+static inline void incnz(unsigned int * px)
+{
+    if ( ++*px == 0 )
+        *px = 1;
 }
 
 /**
@@ -116,14 +121,11 @@ void VideoWidget::sync( void )
  * seems to happen sometimes on resize
  * In Qt it looks like this happens if the window is hidden
  **/
-void VideoWidget::refreshHandles()
+void VideoWidget::refreshHandle()
 {
 #ifdef QT5_HAS_WAYLAND
     if (!p_window || p_window->type != VOUT_WINDOW_TYPE_WAYLAND)
         return;
-
-    /* Ensure only the video widget is native (needed for Wayland) */
-    stable->setAttribute( Qt::WA_DontCreateNativeAncestors, true);
 
     QWindow *window = stable->windowHandle();
     assert(window != NULL);
@@ -132,11 +134,17 @@ void VideoWidget::refreshHandles()
     QPlatformNativeInterface *qni = qApp->platformNativeInterface();
     assert(qni != NULL);
 
-    p_window->handle.wl = static_cast<wl_surface*>(
+    struct wl_surface * const new_surface = static_cast<wl_surface*>(
         qni->nativeResourceForWindow(QByteArrayLiteral("surface"),
                                      window));
-    p_window->display.wl = static_cast<wl_display*>(
-        qni->nativeResourceForIntegration(QByteArrayLiteral("wl_display")));
+
+    if ( p_window->handle.wl != new_surface )
+    {
+        vlc_mutex_lock(&p_window->handle_lock);
+        p_window->handle.wl = new_surface;
+        incnz(&p_window->handle_seq);
+        vlc_mutex_unlock(&p_window->handle_lock);
+    }
 #endif
 }
 
@@ -195,7 +203,22 @@ bool VideoWidget::request( struct vout_window_t *p_wnd )
 #ifdef QT5_HAS_WAYLAND
         case VOUT_WINDOW_TYPE_WAYLAND:
         {
-            refreshHandles();
+            /* Ensure only the video widget is native (needed for Wayland) */
+            stable->setAttribute( Qt::WA_DontCreateNativeAncestors, true);
+
+            QWindow *window = stable->windowHandle();
+            assert(window != NULL);
+            window->create();
+
+            QPlatformNativeInterface *qni = qApp->platformNativeInterface();
+            assert(qni != NULL);
+
+            p_wnd->handle.wl = static_cast<wl_surface*>(
+                qni->nativeResourceForWindow(QByteArrayLiteral("surface"),
+                                             window));
+            p_wnd->display.wl = static_cast<wl_display*>(
+                qni->nativeResourceForIntegration(QByteArrayLiteral("wl_display")));
+            p_wnd->handle_seq = 1;
             break;
         }
 #endif
@@ -254,6 +277,8 @@ void VideoWidget::reportSize()
     if( !p_window )
         return;
 
+    refreshHandle();
+
     QSize size = physicalSize();
     WindowResized(p_window, size);
 }
@@ -307,6 +332,27 @@ bool VideoWidget::nativeEvent( const QByteArray& eventType, void* message, long*
 #endif
     // Let Qt handle that event in any case
     return false;
+}
+
+void VideoWidget::showEvent(QShowEvent *event)
+{
+    QFrame::showEvent(event);
+
+    if (p_window && p_window->type == VOUT_WINDOW_TYPE_WAYLAND && p_window->handle.wl == NULL)
+        refreshHandle();
+}
+
+void VideoWidget::hideEvent(QHideEvent *event)
+{
+    if (p_window && p_window->type == VOUT_WINDOW_TYPE_WAYLAND && p_window->handle.wl != NULL)
+    {
+        vlc_mutex_lock(&p_window->handle_lock);
+        p_window->handle.wl = NULL;
+        incnz(&p_window->handle_seq);
+        vlc_mutex_unlock(&p_window->handle_lock);
+    }
+
+    QFrame::hideEvent(event);
 }
 
 void VideoWidget::resizeEvent( QResizeEvent *event )
