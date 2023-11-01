@@ -158,6 +158,7 @@ struct vout_display_sys_t
     picture_pool_t *vlc_pic_pool; /* picture pool */
 
     struct wl_surface * last_embed_surface;
+    unsigned int last_embed_seq;
 
     int x;
     int y;
@@ -176,6 +177,8 @@ struct vout_display_sys_t
     struct wl_subsurface * video_subsurface;
 
     struct wp_viewport * bkg_viewport;
+    // Current size of background viewport if we have one
+    // If not created yet then the size that the viewport should be created
     unsigned int bkg_w;
     unsigned int bkg_h;
 #endif
@@ -214,29 +217,6 @@ static inline struct wl_compositor *
 video_compositor(const vout_display_sys_t * const sys)
 {
     return sys->bound.compositor;
-}
-
-#if VIDEO_ON_SUBSURFACE
-static inline struct wl_surface *
-bkg_surface(const vout_display_sys_t * const sys)
-{
-    return sys->embed->handle.wl;
-}
-#endif
-
-static int
-check_embed(vout_display_t * const vd, vout_display_sys_t * const sys, const char * const func)
-{
-    if (!sys->embed) {
-        msg_Err(vd, "%s: Embed NULL", func);
-        return -1;
-    }
-    if (sys->embed->handle.wl != sys->last_embed_surface) {
-        msg_Warn(vd, "%s: Embed surface changed %p->%p", func, sys->last_embed_surface, sys->embed->handle.wl);
-        sys->last_embed_surface = sys->embed->handle.wl;
-        return 1;
-    }
-    return 0;
 }
 
 static void
@@ -1018,7 +998,6 @@ error:
     return VLC_EGENERIC;
 }
 
-
 static void kill_pool(vout_display_sys_t * const sys)
 {
     if (sys->vlc_pic_pool != NULL)
@@ -1169,207 +1148,6 @@ subpic_ent_attach(struct wl_surface * const surface, subpic_ent_t * const spe, e
 }
 
 static void
-mark_all_surface_opaque(struct wl_compositor * compositor, struct wl_surface * surface)
-{
-    struct wl_region * region_all = wl_compositor_create_region(compositor);
-    wl_region_add(region_all, 0, 0, INT32_MAX, INT32_MAX);
-    wl_surface_set_opaque_region(surface, region_all);
-    wl_region_destroy(region_all);
-}
-
-static int
-make_video_surface(vout_display_t * const vd, vout_display_sys_t * const sys)
-{
-    VLC_UNUSED(vd);
-
-    if (sys->viewport)
-        return VLC_SUCCESS;
-
-#if VIDEO_ON_SUBSURFACE
-    // Make a new subsurface to use for video
-    sys->video_surface = wl_compositor_create_surface(video_compositor(sys));
-    sys->video_subsurface = wl_subcompositor_get_subsurface(sys->bound.subcompositor, sys->video_surface, bkg_surface(sys));
-    wl_subsurface_place_above(sys->video_subsurface, bkg_surface(sys));
-    wl_subsurface_set_desync(sys->video_subsurface);  // Video update can be desync from main window
-#endif
-
-    struct wl_surface * const surface = video_surface(sys);
-
-    // Video is opaque
-    mark_all_surface_opaque(video_compositor(sys), surface);
-
-    sys->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, surface);
-
-    /* Determine our pixel format */
-    static const enum wl_output_transform transforms[8] = {
-        [ORIENT_TOP_LEFT] = WL_OUTPUT_TRANSFORM_NORMAL,
-        [ORIENT_TOP_RIGHT] = WL_OUTPUT_TRANSFORM_FLIPPED,
-        [ORIENT_BOTTOM_LEFT] = WL_OUTPUT_TRANSFORM_FLIPPED_180,
-        [ORIENT_BOTTOM_RIGHT] = WL_OUTPUT_TRANSFORM_180,
-        [ORIENT_LEFT_TOP] = WL_OUTPUT_TRANSFORM_FLIPPED_270,
-        [ORIENT_LEFT_BOTTOM] = WL_OUTPUT_TRANSFORM_90,
-        [ORIENT_RIGHT_TOP] = WL_OUTPUT_TRANSFORM_270,
-        [ORIENT_RIGHT_BOTTOM] = WL_OUTPUT_TRANSFORM_FLIPPED_90,
-    };
-
-    wl_surface_set_buffer_transform(surface, transforms[vd->fmt.orientation]);
-    return VLC_SUCCESS;
-}
-
-static int
-make_subpic_surfaces(vout_display_t * const vd, vout_display_sys_t * const sys)
-{
-    unsigned int i;
-    struct wl_surface * const surface = video_surface(sys);
-    struct wl_surface * below = surface;
-    VLC_UNUSED(vd);
-
-    if (sys->subplanes[0].surface)
-        return VLC_SUCCESS;
-
-    for (i = 0; i != MAX_SUBPICS; ++i)
-    {
-        subplane_t *plane = sys->subplanes + i;
-        plane->surface = wl_compositor_create_surface(video_compositor(sys));
-        plane->subsurface = wl_subcompositor_get_subsurface(sys->bound.subcompositor, plane->surface, surface);
-        wl_subsurface_place_above(plane->subsurface, below);
-        below = plane->surface;
-        wl_subsurface_set_sync(plane->subsurface);
-        plane->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, plane->surface);
-    }
-    return VLC_SUCCESS;
-}
-
-static int
-make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
-{
-#if !VIDEO_ON_SUBSURFACE
-    VLC_UNUSED(vd);
-    VLC_UNUSED(sys);
-    return VLC_SUCCESS;
-#else
-    // Build a background
-    // Use single_pixel_surface extension if we have it & want a simple
-    // single colour (black) patch
-    struct dmabuf_h * dh = NULL;
-    video_dmabuf_release_env_t * vdre = NULL;
-    struct wl_buffer * w_buffer = NULL;
-
-    if (sys->bkg_viewport)
-        return VLC_SUCCESS;
-
-    if (sys->bound.single_pixel_buffer_manager_v1 && !sys->chequerboard)
-    {
-        w_buffer = wp_single_pixel_buffer_manager_v1_create_u32_rgba_buffer(
-            sys->bound.single_pixel_buffer_manager_v1,
-            0, 0, 0, UINT32_MAX);  // R, G, B, A
-        vdre = vdre_new_null();
-    }
-    else
-    {
-        // Buffer width & height - not display
-        const unsigned int width = sys->chequerboard ? 640 : 32;
-        const unsigned int height = sys->chequerboard ? 480 : 32;
-        const unsigned int stride = width * 4;
-
-        if ((dh = picpool_get(sys->subpic_pool, stride * height)) == NULL)
-        {
-            msg_Err(vd, "Failed to get DmaBuf for background");
-            goto error;
-        }
-
-        dmabuf_write_start(dh);
-        if (sys->chequerboard)
-            chequerboard(dmabuf_map(dh), stride, width, height);
-        else
-            fill_uniform(dmabuf_map(dh), stride, width, height, 0xff000000);
-        dmabuf_write_end(dh);
-
-        if (sys->use_shm)
-        {
-            struct wl_shm_pool *pool = wl_shm_create_pool(sys->bound.shm, dmabuf_fd(dh), dmabuf_size(dh));
-            if (pool == NULL)
-            {
-                msg_Err(vd, "Failed to create pool from dmabuf");
-                goto error;
-            }
-            w_buffer = wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_XRGB8888);
-            wl_shm_pool_destroy(pool);
-        }
-        else
-        {
-            struct zwp_linux_buffer_params_v1 *params;
-            params = zwp_linux_dmabuf_v1_create_params(sys->bound.linux_dmabuf_v1);
-            if (!params) {
-                msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
-                goto error;
-            }
-            zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), 0, 0, stride, 0, 0);
-            w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, DRM_FORMAT_XRGB8888, 0);
-            zwp_linux_buffer_params_v1_destroy(params);
-        }
-
-        vdre = vdre_new_dh(dh, sys->pollq);
-        dh = NULL;
-    }
-    if (!w_buffer || !vdre)
-    {
-        msg_Err(vd, "Failed to create background buffer");
-        goto error;
-    }
-
-    sys->bkg_viewport = wp_viewporter_get_viewport(sys->bound.viewporter, bkg_surface(sys));
-    if (sys->bkg_viewport == NULL)
-    {
-        msg_Err(vd, "Failed to create get viewport");
-        goto error;
-    }
-
-    vdre_eq_ref(vdre, sys->eq);
-    wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre);
-    wl_surface_attach(bkg_surface(sys), w_buffer, 0, 0);
-    vdre = NULL;
-    w_buffer = NULL;
-
-    wp_viewport_set_destination(sys->bkg_viewport, sys->bkg_w, sys->bkg_h);
-    mark_all_surface_opaque(sys->bound.compositor, bkg_surface(sys));
-
-    wl_surface_damage(bkg_surface(sys), 0, 0, INT32_MAX, INT32_MAX);
-    wl_surface_commit(bkg_surface(sys));
-    return VLC_SUCCESS;
-
-error:
-    buffer_destroy(&w_buffer);
-    vdre_delete(&vdre);
-    dmabuf_unref(&dh);
-    return VLC_ENOMEM;
-#endif
-}
-
-static void
-set_video_viewport(vout_display_t * const vd, vout_display_sys_t * const sys)
-{
-    video_format_t fmt;
-
-    if (!sys->video_attached || sys->viewport_set)
-        return;
-
-    sys->viewport_set = true;
-
-    video_format_ApplyRotation(&fmt, &vd->source);
-    wp_viewport_set_source(sys->viewport,
-                    wl_fixed_from_int(fmt.i_x_offset),
-                    wl_fixed_from_int(fmt.i_y_offset),
-                    wl_fixed_from_int(fmt.i_visible_width),
-                    wl_fixed_from_int(fmt.i_visible_height));
-    wp_viewport_set_destination(sys->viewport,
-                    sys->dst_rect.width, sys->dst_rect.height);
-#if VIDEO_ON_SUBSURFACE
-    wl_subsurface_set_position(sys->video_subsurface, sys->dst_rect.x, sys->dst_rect.y);
-#endif
-}
-
-static void
 spe_convert_cb(void * v, short revents)
 {
     subpic_ent_t * const spe = v;
@@ -1458,6 +1236,7 @@ spe_delete(subpic_ent_t ** const ppspe)
 
     if (spe == NULL)
         return;
+    *ppspe = NULL;
 
     polltask_delete(&spe->pt);
     subpic_ent_flush(spe);
@@ -1472,6 +1251,308 @@ spe_convert(subpic_ent_t * const spe)
     return 0;
 }
 
+static void
+mark_all_surface_opaque(struct wl_compositor * compositor, struct wl_surface * surface)
+{
+    struct wl_region * region_all = wl_compositor_create_region(compositor);
+    wl_region_add(region_all, 0, 0, INT32_MAX, INT32_MAX);
+    wl_surface_set_opaque_region(surface, region_all);
+    wl_region_destroy(region_all);
+}
+
+static void
+clear_surface_buffer(struct wl_surface * surface)
+{
+    if (surface == NULL)
+        return;
+    wl_surface_attach(surface, NULL, 0, 0);
+    wl_surface_commit(surface);
+}
+
+static void
+clear_all_buffers(vout_display_sys_t * const sys, const bool bkg_valid)
+{
+    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
+    {
+        subplane_t *const plane = sys->subplanes + i;
+        spe_delete(&plane->spe_next);
+        spe_delete(&plane->spe_cur);
+        clear_surface_buffer(plane->surface);
+    }
+
+    clear_surface_buffer(video_surface(sys));
+    sys->video_attached = false;
+
+#if VIDEO_ON_SUBSURFACE
+    if (bkg_valid)
+        clear_surface_buffer(sys->last_embed_surface);
+#endif
+
+    subpic_ent_flush(&sys->piccpy);
+}
+
+static void
+unmap_all(vout_display_sys_t * const sys, const bool bkg_valid)
+{
+    clear_all_buffers(sys, bkg_valid);
+
+    // Free subpic resources
+    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
+    {
+        subplane_t * const spl = sys->subplanes + i;
+
+        viewport_destroy(&spl->viewport);
+        subsurface_destroy(&spl->subsurface);
+        surface_destroy(&spl->surface);
+    }
+
+    viewport_destroy(&sys->viewport);
+
+#if VIDEO_ON_SUBSURFACE
+    subsurface_destroy(&sys->video_subsurface);
+    surface_destroy(&sys->video_surface);
+
+    viewport_destroy(&sys->bkg_viewport);
+#endif
+}
+
+static struct wl_surface *
+bkg_surface_get_lock(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+    if (!sys->embed) {
+        msg_Err(vd, "%s: Embed NULL", __func__);
+        return NULL;
+    }
+
+    vlc_mutex_lock(&sys->embed->handle_lock);
+
+    if (sys->embed->handle.wl != sys->last_embed_surface || sys->embed->handle_seq != sys->last_embed_seq)
+    {
+        msg_Warn(vd, "%s: Embed surface changed %p (%u)->%p (%u)", __func__,
+                 sys->last_embed_surface, sys->last_embed_seq,
+                 sys->embed->handle.wl, sys->embed->handle_seq);
+
+        sys->last_embed_surface = sys->embed->handle.wl;
+        sys->last_embed_seq = sys->embed->handle_seq;
+        unmap_all(sys, false);
+    }
+
+    if (sys->last_embed_surface == NULL)
+        vlc_mutex_unlock(&sys->embed->handle_lock);
+
+    return sys->last_embed_surface;
+}
+
+static void
+bkg_surface_unlock(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+    VLC_UNUSED(vd);
+    vlc_mutex_unlock(&sys->embed->handle_lock);
+}
+
+
+static int
+make_video_surface(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+    VLC_UNUSED(vd);
+
+    if (sys->viewport)
+        return VLC_SUCCESS;
+
+    struct wl_surface * const surface = video_surface(sys);
+
+    // Video is opaque
+    mark_all_surface_opaque(video_compositor(sys), surface);
+
+    sys->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, surface);
+
+    /* Determine our pixel format */
+    static const enum wl_output_transform transforms[8] = {
+        [ORIENT_TOP_LEFT] = WL_OUTPUT_TRANSFORM_NORMAL,
+        [ORIENT_TOP_RIGHT] = WL_OUTPUT_TRANSFORM_FLIPPED,
+        [ORIENT_BOTTOM_LEFT] = WL_OUTPUT_TRANSFORM_FLIPPED_180,
+        [ORIENT_BOTTOM_RIGHT] = WL_OUTPUT_TRANSFORM_180,
+        [ORIENT_LEFT_TOP] = WL_OUTPUT_TRANSFORM_FLIPPED_270,
+        [ORIENT_LEFT_BOTTOM] = WL_OUTPUT_TRANSFORM_90,
+        [ORIENT_RIGHT_TOP] = WL_OUTPUT_TRANSFORM_270,
+        [ORIENT_RIGHT_BOTTOM] = WL_OUTPUT_TRANSFORM_FLIPPED_90,
+    };
+
+    wl_surface_set_buffer_transform(surface, transforms[vd->fmt.orientation]);
+    return VLC_SUCCESS;
+}
+
+static int
+make_subpic_surfaces(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+    unsigned int i;
+    struct wl_surface * const surface = video_surface(sys);
+    struct wl_surface * below = surface;
+    VLC_UNUSED(vd);
+
+    if (sys->subplanes[0].surface)
+        return VLC_SUCCESS;
+
+    for (i = 0; i != MAX_SUBPICS; ++i)
+    {
+        subplane_t *plane = sys->subplanes + i;
+        plane->surface = wl_compositor_create_surface(video_compositor(sys));
+        plane->subsurface = wl_subcompositor_get_subsurface(sys->bound.subcompositor, plane->surface, surface);
+        wl_subsurface_place_above(plane->subsurface, below);
+        below = plane->surface;
+        wl_subsurface_set_sync(plane->subsurface);
+        plane->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, plane->surface);
+    }
+    return VLC_SUCCESS;
+}
+
+static int
+make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+#if !VIDEO_ON_SUBSURFACE
+    VLC_UNUSED(vd);
+    VLC_UNUSED(sys);
+    return VLC_SUCCESS;
+#else
+    // Build a background
+    // Use single_pixel_surface extension if we have it & want a simple
+    // single colour (black) patch
+    struct dmabuf_h * dh = NULL;
+    video_dmabuf_release_env_t * vdre = NULL;
+    struct wl_buffer * w_buffer = NULL;
+    struct wl_surface * bkg_surface = NULL;
+
+    if (sys->bkg_viewport)
+        return VLC_SUCCESS;
+
+    if (sys->bound.single_pixel_buffer_manager_v1 && !sys->chequerboard)
+    {
+        w_buffer = wp_single_pixel_buffer_manager_v1_create_u32_rgba_buffer(
+            sys->bound.single_pixel_buffer_manager_v1,
+            0, 0, 0, UINT32_MAX);  // R, G, B, A
+        vdre = vdre_new_null();
+    }
+    else
+    {
+        // Buffer width & height - not display
+        const unsigned int width = sys->chequerboard ? 640 : 32;
+        const unsigned int height = sys->chequerboard ? 480 : 32;
+        const unsigned int stride = width * 4;
+
+        if ((dh = picpool_get(sys->subpic_pool, stride * height)) == NULL)
+        {
+            msg_Err(vd, "Failed to get DmaBuf for background");
+            goto error;
+        }
+
+        dmabuf_write_start(dh);
+        if (sys->chequerboard)
+            chequerboard(dmabuf_map(dh), stride, width, height);
+        else
+            fill_uniform(dmabuf_map(dh), stride, width, height, 0xff000000);
+        dmabuf_write_end(dh);
+
+        if (sys->use_shm)
+        {
+            struct wl_shm_pool *pool = wl_shm_create_pool(sys->bound.shm, dmabuf_fd(dh), dmabuf_size(dh));
+            if (pool == NULL)
+            {
+                msg_Err(vd, "Failed to create pool from dmabuf");
+                goto error;
+            }
+            w_buffer = wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_XRGB8888);
+            wl_shm_pool_destroy(pool);
+        }
+        else
+        {
+            struct zwp_linux_buffer_params_v1 *params;
+            params = zwp_linux_dmabuf_v1_create_params(sys->bound.linux_dmabuf_v1);
+            if (!params) {
+                msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
+                goto error;
+            }
+            zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), 0, 0, stride, 0, 0);
+            w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, DRM_FORMAT_XRGB8888, 0);
+            zwp_linux_buffer_params_v1_destroy(params);
+        }
+
+        vdre = vdre_new_dh(dh, sys->pollq);
+        dh = NULL;
+    }
+    if (!w_buffer || !vdre)
+    {
+        msg_Err(vd, "Failed to create background buffer");
+        goto error;
+    }
+
+    if ((bkg_surface = bkg_surface_get_lock(vd, sys)) == NULL)
+        goto error;
+
+    sys->bkg_viewport = wp_viewporter_get_viewport(sys->bound.viewporter, bkg_surface);
+    if (sys->bkg_viewport == NULL)
+    {
+        msg_Err(vd, "Failed to create get viewport");
+        goto err_unlock;
+    }
+
+    vdre_eq_ref(vdre, sys->eq);
+    wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre);
+    wl_surface_attach(bkg_surface, w_buffer, 0, 0);
+    vdre = NULL;
+    w_buffer = NULL;
+
+    wp_viewport_set_destination(sys->bkg_viewport, sys->bkg_w, sys->bkg_h);
+    mark_all_surface_opaque(sys->bound.compositor, bkg_surface);
+
+    wl_surface_damage(bkg_surface, 0, 0, INT32_MAX, INT32_MAX);
+
+    // Make a new subsurface to use for video
+    assert(sys->video_surface == NULL);
+    assert(sys->video_subsurface == NULL);
+    sys->video_surface = wl_compositor_create_surface(video_compositor(sys));
+    sys->video_subsurface = wl_subcompositor_get_subsurface(sys->bound.subcompositor, sys->video_surface, bkg_surface);
+    wl_subsurface_place_above(sys->video_subsurface, bkg_surface);
+    wl_subsurface_set_desync(sys->video_subsurface);  // Video update can be desync from main window
+
+    wl_surface_commit(bkg_surface);
+
+    bkg_surface_unlock(vd, sys);
+
+    return VLC_SUCCESS;
+
+err_unlock:
+    bkg_surface_unlock(vd, sys);
+error:
+    buffer_destroy(&w_buffer);
+    vdre_delete(&vdre);
+    dmabuf_unref(&dh);
+    return VLC_ENOMEM;
+#endif
+}
+
+static void
+set_video_viewport(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+    video_format_t fmt;
+
+    if (!sys->video_attached || sys->viewport_set)
+        return;
+
+    sys->viewport_set = true;
+
+    video_format_ApplyRotation(&fmt, &vd->source);
+    wp_viewport_set_source(sys->viewport,
+                    wl_fixed_from_int(fmt.i_x_offset),
+                    wl_fixed_from_int(fmt.i_y_offset),
+                    wl_fixed_from_int(fmt.i_visible_width),
+                    wl_fixed_from_int(fmt.i_visible_height));
+    wp_viewport_set_destination(sys->viewport,
+                    sys->dst_rect.width, sys->dst_rect.height);
+#if VIDEO_ON_SUBSURFACE
+    wl_subsurface_set_position(sys->video_subsurface, sys->dst_rect.x, sys->dst_rect.y);
+#endif
+}
+
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 {
     vout_display_sys_t * const sys = vd->sys;
@@ -1480,8 +1561,8 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
 #endif
-    check_embed(vd, sys, __func__);
 
+    subpic_ent_flush(&sys->piccpy); // If somehow we have a buffer here - avoid leaking
     if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) == 0)
         copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &sys->piccpy.vdre, &sys->piccpy.wb);
     else
@@ -1537,11 +1618,21 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
 #endif
 
-    check_embed(vd, sys, __func__);
+    // Check we have a surface to put the video on
+    if (bkg_surface_get_lock(vd, sys) == NULL)
+    {
+        msg_Warn(vd, "%s: No background surface", __func__);
+        goto done;
+    }
+    bkg_surface_unlock(vd, sys);
 
+    if (make_background(vd, sys) != 0)
+    {
+        msg_Warn(vd, "%s: Make background fail", __func__);
+        goto done;
+    }
     make_video_surface(vd, sys);
     make_subpic_surfaces(vd, sys);
-    make_background(vd, sys);
 
     for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
     {
@@ -1595,6 +1686,7 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 
     wl_display_flush(video_display(sys));
 
+done:
     if (subpic)
         subpicture_Delete(subpic);
     picture_Release(pic);
@@ -1611,7 +1703,6 @@ static void ResetPictures(vout_display_t *vd)
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
-    check_embed(vd, sys, __func__);
 
     kill_pool(sys);
 
@@ -1627,7 +1718,6 @@ static int Control(vout_display_t *vd, int query, va_list ap)
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s: Query=%d", __func__, query);
 #endif
-    check_embed(vd, sys, __func__);
 
     switch (query)
     {
@@ -1697,14 +1787,19 @@ static int Control(vout_display_t *vd, int query, va_list ap)
 #if VIDEO_ON_SUBSURFACE
             if (sys->bkg_viewport != NULL && (cfg->display.width != sys->bkg_w || cfg->display.height != sys->bkg_h))
             {
-                sys->bkg_w = cfg->display.width;
-                sys->bkg_h = cfg->display.height;
-
-                msg_Dbg(vd, "Resize background: %dx%d; surface=%p", cfg->display.width, cfg->display.height, bkg_surface(sys));
-                wp_viewport_set_destination(sys->bkg_viewport, cfg->display.width, cfg->display.height);
-                wl_surface_commit(bkg_surface(sys));
+                struct wl_surface * bkg_surface;
+                if ((bkg_surface = bkg_surface_get_lock(vd, sys)) != NULL)
+                {
+                    wp_viewport_set_destination(sys->bkg_viewport, cfg->display.width, cfg->display.height);
+                    wl_surface_commit(bkg_surface);
+                    bkg_surface_unlock(vd, sys);
+                }
+                msg_Dbg(vd, "Resize background: %dx%d; surface=%p", cfg->display.width, cfg->display.height, bkg_surface);
             }
+            sys->bkg_w = cfg->display.width;
+            sys->bkg_h = cfg->display.height;
 #endif
+            wl_display_flush(video_display(sys));
 
             sys->curr_aspect = vd->source;
             break;
@@ -1904,39 +1999,6 @@ registry_scan(vout_display_t * const vd, vout_display_sys_t * const sys)
     return 0;
 }
 
-
-
-static void
-clear_surface_buffer(struct wl_surface * surface)
-{
-    if (surface == NULL)
-        return;
-    wl_surface_attach(surface, NULL, 0, 0);
-    wl_surface_damage(surface, 0, 0, INT32_MAX, INT32_MAX);
-    wl_surface_commit(surface);
-}
-
-static void
-clear_all_buffers(vout_display_sys_t *sys)
-{
-    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
-    {
-        subplane_t *const plane = sys->subplanes + i;
-        spe_delete(&plane->spe_next);
-        spe_delete(&plane->spe_cur);
-        clear_surface_buffer(plane->surface);
-    }
-
-    clear_surface_buffer(video_surface(sys));
-    sys->video_attached = false;
-
-#if VIDEO_ON_SUBSURFACE
-    clear_surface_buffer(bkg_surface(sys));
-#endif
-
-    subpic_ent_flush(&sys->piccpy);
-}
-
 static const drmu_vlc_fmt_info_t *
 find_fmt_fallback(vout_display_t * const vd, const fmt_list_t * const flist, const vlc_fourcc_t * fallback)
 {
@@ -1986,29 +2048,13 @@ static void Close(vlc_object_t *obj)
     if (sys->embed == NULL)
         goto no_window;
 
-    check_embed(vd, sys, __func__);
-
-    clear_all_buffers(sys);
-    pollqueue_unref(&sys->speq);
-
-    // Free subpic resources
-    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
+    if (bkg_surface_get_lock(vd, sys) != NULL)
     {
-        subplane_t * const spl = sys->subplanes + i;
-
-        viewport_destroy(&spl->viewport);
-        subsurface_destroy(&spl->subsurface);
-        surface_destroy(&spl->surface);
+        unmap_all(sys, true);
+        bkg_surface_unlock(vd, sys);
     }
 
-    viewport_destroy(&sys->viewport);
-
-#if VIDEO_ON_SUBSURFACE
-    subsurface_destroy(&sys->video_subsurface);
-    surface_destroy(&sys->video_surface);
-
-    viewport_destroy(&sys->bkg_viewport);
-#endif
+    pollqueue_unref(&sys->speq);
 
     w_bound_destroy(&sys->bound);
 
@@ -2069,6 +2115,7 @@ static int Open(vlc_object_t *obj)
         goto error;
     }
     sys->last_embed_surface = sys->embed->handle.wl;
+    sys->last_embed_seq = sys->embed->handle_seq;
 
     msg_Info(vd, "<<< %s: %.4s %dx%d, cfg.display: %dx%d", __func__,
              (const char*)&vd->fmt.i_chroma, vd->fmt.i_width, vd->fmt.i_height,
