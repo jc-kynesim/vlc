@@ -56,6 +56,7 @@ git diff $REFNAME -- \
  src/audio_output \
  src/input \
  src/misc \
+ src/video_output \
  > $DIFFBASE-001-rpi.patch
 git diff $REFNAME -- modules/video_chroma/chain.c > $DIFFBASE-002-chain.patch
 git diff $REFNAME -- bin/vlc.c > $DIFFBASE-003-vlc.patch
