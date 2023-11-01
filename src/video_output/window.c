@@ -51,6 +51,12 @@ static int vout_window_start(void *func, va_list ap)
     return activate(wnd, cfg);
 }
 
+static void vout_window_destructor(vlc_object_t *obj)
+{
+    vout_window_t *window = (vout_window_t *)obj;
+    vlc_mutex_destroy(&window->handle_lock);
+}
+
 vout_window_t *vout_window_New(vlc_object_t *obj, const char *module,
                                const vout_window_cfg_t *cfg,
                                const vout_window_owner_t *owner)
@@ -58,10 +64,7 @@ vout_window_t *vout_window_New(vlc_object_t *obj, const char *module,
     window_t *w = vlc_custom_create(obj, sizeof(*w), "window");
     vout_window_t *window = &w->wnd;
 
-    memset(&window->handle, 0, sizeof(window->handle));
-    window->info.has_double_click = false;
-    window->control = NULL;
-    window->sys = NULL;
+    memset((char*)window + sizeof(window->obj), 0, sizeof(*window) - sizeof(window->obj));
 
     if (owner != NULL)
         window->owner = *owner;
@@ -87,6 +90,13 @@ vout_window_t *vout_window_New(vlc_object_t *obj, const char *module,
     }
     else
         w->inhibit = NULL;
+
+    if (window->type == VOUT_WINDOW_TYPE_WAYLAND)
+    {
+        vlc_mutex_init(&window->handle_lock);
+        vlc_object_set_destructor(window, vout_window_destructor);
+    }
+
     return window;
 }
 
