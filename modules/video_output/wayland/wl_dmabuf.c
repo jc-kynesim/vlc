@@ -23,6 +23,9 @@
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
+#ifndef HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
+#define HAVE_WAYLAND_SINGLE_PIXEL_BUFFER 0
+#endif
 
 #include <assert.h>
 #include <stdatomic.h>
@@ -37,7 +40,9 @@
 #include <unistd.h>
 
 #include <wayland-client.h>
+#if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
 #include "single-pixel-buffer-v1-client-protocol.h"
+#endif
 #include "viewporter-client-protocol.h"
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 
@@ -144,7 +149,9 @@ typedef struct w_bound_ss
     struct wl_compositor *compositor;
     struct wl_subcompositor *subcompositor;
     struct wl_shm *shm;
+#if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
     struct wp_single_pixel_buffer_manager_v1 *single_pixel_buffer_manager_v1;
+#endif
 } w_bound_t;
 
 struct vout_display_sys_t
@@ -1425,6 +1432,7 @@ make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
     if (sys->bkg_viewport)
         return VLC_SUCCESS;
 
+#if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
     if (sys->bound.single_pixel_buffer_manager_v1 && !sys->chequerboard)
     {
         w_buffer = wp_single_pixel_buffer_manager_v1_create_u32_rgba_buffer(
@@ -1433,6 +1441,7 @@ make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
         vdre = vdre_new_null();
     }
     else
+#endif
     {
         // Buffer width & height - not display
         const unsigned int width = sys->chequerboard ? 640 : 32;
@@ -1911,9 +1920,11 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
         else
             msg_Warn(vd, "Interface %s wanted v 3 got v %d", zwp_linux_dmabuf_v1_interface.name, vers);
     }
+#if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
     else
     if (strcmp(iface, wp_single_pixel_buffer_manager_v1_interface.name) == 0)
         b->single_pixel_buffer_manager_v1 = wl_registry_bind(registry, name, &wp_single_pixel_buffer_manager_v1_interface, 1);
+#endif
 }
 
 static void w_bound_destroy(w_bound_t * const b)
@@ -1928,8 +1939,10 @@ static void w_bound_destroy(w_bound_t * const b)
         wl_compositor_destroy(b->compositor);
     if (b->shm != NULL)
         wl_shm_destroy(b->shm);
+#if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
     if (b->single_pixel_buffer_manager_v1)
         wp_single_pixel_buffer_manager_v1_destroy(b->single_pixel_buffer_manager_v1);
+#endif
     memset(b, 0, sizeof(*b));
 }
 
