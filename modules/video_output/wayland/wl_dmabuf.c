@@ -1259,6 +1259,15 @@ spe_convert(subpic_ent_t * const spe)
 }
 
 static void
+mark_surface_no_input(struct wl_compositor * compositor, struct wl_surface * surface)
+{
+    struct wl_region * region_none = wl_compositor_create_region(compositor);
+    wl_region_add(region_none, 0, 0, 0, 0);
+    wl_surface_set_input_region(surface, region_none);
+    wl_region_destroy(region_none);
+}
+
+static void
 mark_all_surface_opaque(struct wl_compositor * compositor, struct wl_surface * surface)
 {
     struct wl_region * region_all = wl_compositor_create_region(compositor);
@@ -1368,8 +1377,9 @@ make_video_surface(vout_display_t * const vd, vout_display_sys_t * const sys)
 
     struct wl_surface * const surface = video_surface(sys);
 
-    // Video is opaque
+    // Video is opaque but doesn't take input
     mark_all_surface_opaque(video_compositor(sys), surface);
+    mark_surface_no_input(video_compositor(sys), surface);
 
     sys->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, surface);
 
@@ -1409,6 +1419,7 @@ make_subpic_surfaces(vout_display_t * const vd, vout_display_sys_t * const sys)
         below = plane->surface;
         wl_subsurface_set_sync(plane->subsurface);
         plane->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, plane->surface);
+        mark_surface_no_input(video_compositor(sys), plane->surface);
     }
     return VLC_SUCCESS;
 }
