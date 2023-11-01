@@ -1802,7 +1802,10 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             sys->viewport_set = false;
 
             if (sys->viewport)
+            {
                 set_video_viewport(vd, sys);
+                wl_surface_commit(video_surface(sys));
+            }
 
 #if VIDEO_ON_SUBSURFACE
             if (sys->bkg_viewport != NULL && (cfg->display.width != sys->bkg_w || cfg->display.height != sys->bkg_h))
