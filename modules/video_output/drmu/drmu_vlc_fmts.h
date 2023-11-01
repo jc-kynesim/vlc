@@ -48,7 +48,7 @@ uint32_t drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc, uint6
 uint32_t drmu_format_vlc_to_drm_prime(const video_frame_format_t * const vf_vlc, uint64_t * const pmod);
 #endif
 #if HAS_ZC_CMA
-uint32_t drmu_format_vlc_to_drm_cma(const vlc_fourcc_t chroma_in);
+uint32_t drmu_format_vlc_to_drm_cma(const video_frame_format_t * const vf_vlc, uint64_t * const pMod);
 #endif
 
 #ifdef __cplusplus

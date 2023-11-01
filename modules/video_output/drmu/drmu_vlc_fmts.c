@@ -198,7 +198,7 @@ drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc, uint64_t * con
 
 #if HAS_ZC_CMA
 uint32_t
-drmu_format_vlc_to_drm_cma(const vlc_fourcc_t chroma_in, uint64_t * const pMod)
+drmu_format_vlc_to_drm_cma(const video_frame_format_t * const vf_vlc, uint64_t * const pMod)
 {
     const drmu_vlc_fmt_info_t * f = drmu_vlc_fmt_info_find_vlc(vf_vlc);
 

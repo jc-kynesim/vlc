@@ -502,7 +502,7 @@ subpics_done:
 #endif
 
 #if HAS_ZC_CMA
-    if (drmu_format_vlc_to_drm_cma(pic->format.i_chroma) != 0) {
+    if (drmu_format_vlc_to_drm_cma(&pic->format, NULL) != 0) {
         dfb = drmu_fb_vlc_new_pic_cma_attach(sys->du, pic);
     }
     else
