@@ -197,6 +197,14 @@ struct vout_window_t {
     vout_window_sys_t *sys;
 
     vout_window_owner_t owner;
+
+    /* Wayland handle sync objects  - potentially other windowing systems
+     * too if the handle might change
+     * handle seq incremented if there is a possibility that the handle has
+     * changed - 0 => handle is fixed
+     */
+     vlc_mutex_t handle_lock;
+     unsigned int handle_seq;
 };
 
 /**
