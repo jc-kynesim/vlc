@@ -814,7 +814,13 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
 
 #ifdef QT5_HAS_WAYLAND
     if( b_hasWayland )
-        setWindowFlags( Qt::Popup );
+    {
+        // Popup is less than perfect in that it seems impossible to make it non-modal
+        // and you can't get it to fade but at least it goes where it is asked to and
+        // does less confusing things with other popups
+        setWindowFlags( Qt::Popup | Qt::FramelessWindowHint);
+        setWindowModality( Qt::NonModal );
+    }
     else
 #endif
     setWindowFlags( Qt::Tool | Qt::FramelessWindowHint | Qt::X11BypassWindowManagerHint );
