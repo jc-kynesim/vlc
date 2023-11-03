@@ -154,6 +154,10 @@ typedef struct w_bound_ss
 #endif
 } w_bound_t;
 
+#define COMMIT_BKG 0
+#define COMMIT_VID 1
+#define COMMIT_SUB 2
+
 struct vout_display_sys_t
 {
     vout_window_t *embed; /* VLC window */
@@ -181,6 +185,7 @@ struct vout_display_sys_t
 
 #if VIDEO_ON_SUBSURFACE
     struct wl_surface * video_surface;
+    // Beware: calls using this need a bkg_surface commit to take effect
     struct wl_subsurface * video_subsurface;
 
     struct wp_viewport * bkg_viewport;
@@ -197,12 +202,18 @@ struct vout_display_sys_t
 
     picpool_ctl_t * subpic_pool;
     subplane_t subplanes[MAX_SUBPICS];
+    bool commit_req[MAX_SUBPICS + 2];
     subpic_ent_t piccpy;
     vlc_fourcc_t * subpic_chromas;
 
     fmt_list_t dmabuf_fmts;
     fmt_list_t shm_fmts;
 };
+
+
+static struct wl_surface * bkg_surface_get_lock(vout_display_t * const vd, vout_display_sys_t * const sys);
+static void bkg_surface_unlock(vout_display_t * const vd, vout_display_sys_t * const sys);
+
 
 static inline struct wl_display *
 video_display(const vout_display_sys_t * const sys)
@@ -1283,6 +1294,49 @@ spe_convert(subpic_ent_t * const spe)
 }
 
 static void
+commit_req(vout_display_sys_t * const sys, const unsigned int layer)
+{
+    sys->commit_req[layer] = true;
+}
+
+static void
+commit_do(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+    int i;
+    bool flush_req = false;
+
+    for (i = MAX_SUBPICS - 1; i >= 0; --i)
+    {
+        if (sys->commit_req[i + COMMIT_SUB])
+        {
+            sys->commit_req[i + COMMIT_SUB] = false;
+            wl_surface_commit(sys->subplanes[i].surface);
+            flush_req = true;
+        }
+    }
+    if (sys->commit_req[COMMIT_VID])
+    {
+        sys->commit_req[COMMIT_VID] = false;
+        wl_surface_commit(video_surface(sys));
+        flush_req = true;
+    }
+    if (sys->commit_req[COMMIT_BKG])
+    {
+        struct wl_surface * const bkg_surface = bkg_surface_get_lock(vd, sys);
+        if (bkg_surface != NULL)
+        {
+            wp_viewport_set_destination(sys->bkg_viewport, sys->bkg_w, sys->bkg_h);
+            wl_surface_commit(bkg_surface);
+            bkg_surface_unlock(vd, sys);
+            flush_req = true;
+        }
+        sys->commit_req[COMMIT_BKG] = false;
+    }
+    if (flush_req)
+        wl_display_flush(video_display(sys));
+}
+
+static void
 mark_surface_no_input(struct wl_compositor * compositor, struct wl_surface * surface)
 {
     struct wl_region * region_none = wl_compositor_create_region(compositor);
@@ -1592,8 +1646,10 @@ set_video_viewport(vout_display_t * const vd, vout_display_sys_t * const sys)
                     wl_fixed_from_int(fmt.i_visible_height));
     wp_viewport_set_destination(sys->viewport,
                     sys->dst_rect.width, sys->dst_rect.height);
+    commit_req(sys, COMMIT_VID);
 #if VIDEO_ON_SUBSURFACE
     wl_subsurface_set_position(sys->video_subsurface, sys->dst_rect.x, sys->dst_rect.y);
+    commit_req(sys, COMMIT_BKG);
 #endif
 }
 
@@ -1611,6 +1667,7 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
         copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &sys->piccpy.vdre, &sys->piccpy.wb);
     else
         do_display_dmabuf(vd, sys, pic, &sys->piccpy.vdre, &sys->piccpy.wb);
+    wl_display_flush(video_display(sys)); // Kick off any work required by Wayland
 
     // Attempt to import the subpics
     for (subpicture_t * spic = subpic; spic != NULL; spic = spic->p_next)
@@ -1681,7 +1738,6 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
     {
         subplane_t * const plane = sys->subplanes + i;
-        bool commit = false;
         subpic_ent_t * spe = plane->spe_cur;
 
         if (plane->spe_next && atomic_load(&plane->spe_next->ready))
@@ -1690,7 +1746,7 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
             spe = plane->spe_cur = plane->spe_next;
             plane->spe_next = NULL;
             subpic_ent_attach(plane->surface, spe, sys->eq);
-            commit = true;
+            commit_req(sys, COMMIT_SUB + i);
         }
 
         if (spe != NULL && spe->rect_update)
@@ -1701,11 +1757,9 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
                                    wl_fixed_from_int(spe->src_rect.width), wl_fixed_from_int(spe->src_rect.height));
             wp_viewport_set_destination(plane->viewport, spe->dst_rect.width, spe->dst_rect.height);
             spe->rect_update = false;
-            commit = true;
+            commit_req(sys, COMMIT_SUB + i);
+            commit_req(sys, COMMIT_SUB + i - 1); // Subsurface pos needs parent commit (sub 0 needs video)
         }
-
-        if (commit)
-            wl_surface_commit(plane->surface);
     }
 
     if (!sys->piccpy.wb)
@@ -1716,19 +1770,12 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     {
         subpic_ent_attach(video_surface(sys), &sys->piccpy, sys->eq);
         sys->video_attached = true;
+        commit_req(sys, COMMIT_VID);
     }
 
     set_video_viewport(vd, sys);
 
-    wl_surface_commit(video_surface(sys));
-
-    // With VIDEO_ON_SUBSURFACE we need a commit on the background here
-    // too if the video surface isn't desync.  Desync is set, but wayland
-    // can force sync if the bkg surface is a sync subsurface.
-    // Try adding a bkg surface commit here if things freeze with
-    // VIDEO_ON_SUBSURFACE set but don't with it unset
-
-    wl_display_flush(video_display(sys));
+    commit_do(vd, sys);
 
 done:
     if (subpic)
@@ -1813,27 +1860,18 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             sys->viewport_set = false;
 
             if (sys->viewport)
-            {
                 set_video_viewport(vd, sys);
-                wl_surface_commit(video_surface(sys));
-            }
 
 #if VIDEO_ON_SUBSURFACE
             if (sys->bkg_viewport != NULL && (cfg->display.width != sys->bkg_w || cfg->display.height != sys->bkg_h))
             {
-                struct wl_surface * bkg_surface;
-                if ((bkg_surface = bkg_surface_get_lock(vd, sys)) != NULL)
-                {
-                    wp_viewport_set_destination(sys->bkg_viewport, cfg->display.width, cfg->display.height);
-                    wl_surface_commit(bkg_surface);
-                    bkg_surface_unlock(vd, sys);
-                }
-                msg_Dbg(vd, "Resize background: %dx%d; surface=%p", cfg->display.width, cfg->display.height, bkg_surface);
+                msg_Dbg(vd, "Resize background: %dx%d", cfg->display.width, cfg->display.height);
+                commit_req(sys, COMMIT_BKG);
             }
             sys->bkg_w = cfg->display.width;
             sys->bkg_h = cfg->display.height;
 #endif
-            wl_display_flush(video_display(sys));
+            commit_do(vd, sys);
 
             sys->curr_aspect = vd->source;
             break;
