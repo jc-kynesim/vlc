@@ -2193,9 +2193,14 @@ static int Open(vlc_object_t *obj)
     sys->last_embed_surface = sys->embed->handle.wl;
     sys->last_embed_seq = sys->embed->handle_seq;
 
-    msg_Info(vd, "<<< %s: %.4s %dx%d, cfg.display: %dx%d", __func__,
-             (const char*)&vd->fmt.i_chroma, vd->fmt.i_width, vd->fmt.i_height,
-             vd->cfg->display.width, vd->cfg->display.height);
+    msg_Info(vd, "<<< %s: %s %dx%d(%dx%d @ %d,%d %d/%d), cfg.display: %dx%d, source: %dx%d(%dx%d @ %d,%d %d/%d)", __func__,
+             drmu_log_fourcc(vd->fmt.i_chroma), vd->fmt.i_width, vd->fmt.i_height,
+             vd->fmt.i_visible_width, vd->fmt.i_visible_height, vd->fmt.i_x_offset, vd->fmt.i_y_offset,
+             vd->fmt.i_sar_num, vd->fmt.i_sar_den,
+             vd->cfg->display.width, vd->cfg->display.height,
+             vd->source.i_width, vd->source.i_height,
+             vd->source.i_visible_width, vd->source.i_visible_height, vd->source.i_x_offset, vd->source.i_y_offset,
+             vd->source.i_sar_num, vd->source.i_sar_den);
 
     if ((sys->pollq = pollqueue_new()) == NULL ||
         (sys->speq = pollqueue_new()) == NULL)
