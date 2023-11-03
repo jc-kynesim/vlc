@@ -812,6 +812,11 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
 
     vout.clear();
 
+#ifdef QT5_HAS_WAYLAND
+    if( b_hasWayland )
+        setWindowFlags( Qt::Popup );
+    else
+#endif
     setWindowFlags( Qt::Tool | Qt::FramelessWindowHint | Qt::X11BypassWindowManagerHint );
     setAttribute( Qt::WA_ShowWithoutActivating );
     setMinimumWidth( FSC_WIDTH );
@@ -872,8 +877,11 @@ FullscreenControllerWidget::~FullscreenControllerWidget()
 
 void FullscreenControllerWidget::restoreFSC()
 {
+    msg_Info(p_intf, "%s", __func__);
     if( !isWideFSC )
     {
+        msg_Info(p_intf, "%s: 1", __func__);
+
         /* Restore half-bar and re-centre if needed */
         setMinimumWidth( FSC_WIDTH );
         adjustSize();
@@ -896,6 +904,7 @@ void FullscreenControllerWidget::restoreFSC()
         if( currentRes == screenRes &&
             currentRes.contains( previousPosition, true ) )
         {
+            msg_Info(p_intf, "%s: prev: %d, %d", __func__, previousPosition.x(), previousPosition.y());
             /* Restore to the last known position */
             move( previousPosition );
         }
@@ -910,6 +919,7 @@ void FullscreenControllerWidget::restoreFSC()
     }
     else
     {
+        msg_Info(p_intf, "%s: 1", __func__);
         /* Dock at the bottom of the screen */
         updateFullwidthGeometry( targetScreen() );
     }
@@ -922,6 +932,7 @@ void FullscreenControllerWidget::centerFSC( int number )
     /* screen has changed, calculate new position */
     QPoint pos = QPoint( currentRes.x() + (currentRes.width() / 2) - (width() / 2),
             currentRes.y() + currentRes.height() - height());
+    msg_Info(p_intf, "%s: move to %d, %d", __func__, pos.x(), pos.y());
     move( pos );
 }
 
