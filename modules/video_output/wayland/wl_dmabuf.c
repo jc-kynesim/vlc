@@ -441,11 +441,10 @@ place_dest_rect(vout_display_t * const vd,
 #endif
 
 static void
-place_spu_rect(vout_display_t * const vd,
+place_spu_rect(vout_display_sys_t * const sys,
           const vout_display_cfg_t * const cfg,
           const video_format_t * fmt)
 {
-    vout_display_sys_t * const sys = vd->sys;
     static const vout_display_place_t r0 = {0};
 
     sys->spu_rect = place_out(cfg, fmt, r0);
@@ -462,6 +461,31 @@ place_spu_rect(vout_display_t * const vd,
 
     if (ORIENT_IS_SWAP(fmt->orientation))
         sys->spu_rect = vplace_transpose(sys->spu_rect);
+}
+
+
+static void
+place_rects(vout_display_t * const vd,
+          const vout_display_cfg_t * const cfg,
+          const video_format_t * fmt)
+{
+    vout_display_sys_t * const sys = vd->sys;
+
+#if !VIDEO_ON_SUBSURFACE
+    vout_display_place_t place;
+
+    vout_display_PlacePicture(&place, &sys->curr_aspect, vd->cfg, false);
+    sys->x += place.width / 2;
+    sys->y += place.height / 2;
+
+    vout_display_PlacePicture(&sys->dst_rect, &vd->source, cfg, false);
+    sys->x -= sys->dst_rect.width / 2;
+    sys->y -= sys->dst_rect.height / 2;
+#else
+    vout_display_PlacePicture(&sys->dst_rect, &vd->source, cfg, true);
+#endif
+
+    place_spu_rect(sys, cfg, fmt);
 }
 
 
@@ -1784,21 +1808,8 @@ static int Control(vout_display_t *vd, int query, va_list ap)
                 cfg = va_arg(ap, const vout_display_cfg_t *);
             }
 
-#if !VIDEO_ON_SUBSURFACE
-            vout_display_place_t place;
+            place_rects(vd, cfg, &vd->fmt);
 
-            vout_display_PlacePicture(&place, &sys->curr_aspect, vd->cfg, false);
-            sys->x += place.width / 2;
-            sys->y += place.height / 2;
-
-            vout_display_PlacePicture(&sys->dst_rect, &vd->source, cfg, false);
-            sys->x -= sys->dst_rect.width / 2;
-            sys->y -= sys->dst_rect.height / 2;
-#else
-            vout_display_PlacePicture(&sys->dst_rect, &vd->source, cfg, true);
-#endif
-
-            place_spu_rect(vd, cfg, &vd->fmt);
             sys->viewport_set = false;
 
             if (sys->viewport)
@@ -2257,7 +2268,9 @@ static int Open(vlc_object_t *obj)
     vd->fmt.i_chroma = drmu_vlc_fmt_info_vlc_chroma(pic_fmti);
     drmu_vlc_fmt_info_vlc_rgb_masks(pic_fmti, &vd->fmt.i_rmask, &vd->fmt.i_gmask, &vd->fmt.i_bmask);
 
-    vd->info.has_pictures_invalid = sys->viewport == NULL;
+    place_rects(vd, vd->cfg, &vd->fmt);
+
+    vd->info.has_pictures_invalid = false;
     vd->info.subpicture_chromas = sys->subpic_chromas;
 
     vd->pool = vd_dmabuf_pool;
