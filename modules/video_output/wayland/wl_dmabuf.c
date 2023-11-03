@@ -1071,8 +1071,8 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     struct zwp_linux_buffer_params_v1 *params = NULL;
     const AVDRMFrameDescriptor * const desc = drm_prime_get_desc(pic);
     const uint32_t format = desc->layers[0].format;
-    const unsigned int width = pic->format.i_visible_width;
-    const unsigned int height = pic->format.i_visible_height;
+    const unsigned int width = pic->format.i_width;
+    const unsigned int height = pic->format.i_height;
     unsigned int n = 0;
     unsigned int flags = 0;
     int i;
