@@ -41,11 +41,13 @@ static int drm_va_get(vlc_va_t *va, picture_t *pic, uint8_t **data)
     return VLC_SUCCESS;
 }
 
-static int Open(vlc_va_t *va, AVCodecContext *avctx, enum PixelFormat pix_fmt,
+static int Open(vlc_va_t *va, AVCodecContext *avctx, const AVPixFmtDescriptor *desc,
+                enum PixelFormat pix_fmt,
                 const es_format_t *fmt, picture_sys_t *p_sys)
 {
     VLC_UNUSED(fmt);
     VLC_UNUSED(p_sys);
+    VLC_UNUSED(desc);
 
     msg_Dbg(va, "%s: pix_fmt=%d", __func__, pix_fmt);
 
