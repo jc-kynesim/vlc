@@ -178,7 +178,6 @@ struct vout_display_sys_t
     bool use_shm;
     bool chequerboard;
 
-    vout_display_place_t spu_rect;  // Window that subpic coords orignate from
     vout_display_place_t dst_rect;  // Window in the display size that holds the video
 
     video_format_t curr_aspect;
@@ -392,41 +391,6 @@ static inline vout_display_place_t vplace_vflip(const vout_display_place_t s, co
     };
 }
 
-static vout_display_place_t
-place_out(const vout_display_cfg_t * cfg,
-          const video_format_t * fmt,
-          const vout_display_place_t r)
-{
-    video_format_t tfmt;
-    vout_display_cfg_t tcfg;
-    vout_display_place_t place;
-
-    // Fix SAR if unknown
-    if (fmt->i_sar_den == 0 || fmt->i_sar_num == 0) {
-        tfmt = *fmt;
-        tfmt.i_sar_den = 1;
-        tfmt.i_sar_num = 1;
-        fmt = &tfmt;
-    }
-
-    // Override what VLC thinks might be going on with display size
-    // if we know better
-    if (r.width != 0 && r.height != 0)
-    {
-        tcfg = *cfg;
-        tcfg.display.width = r.width;
-        tcfg.display.height = r.height;
-        cfg = &tcfg;
-    }
-
-    vout_display_PlacePicture(&place, fmt, cfg, false);
-
-    place.x += r.x;
-    place.y += r.y;
-
-    return place;
-}
-
 #if 0
 static vout_display_place_t
 rect_transform(vout_display_place_t s, const vout_display_place_t c, const video_transform_t t)
@@ -452,33 +416,8 @@ place_dest_rect(vout_display_t * const vd,
 #endif
 
 static void
-place_spu_rect(vout_display_sys_t * const sys,
-          const vout_display_cfg_t * const cfg,
-          const video_format_t * fmt)
-{
-    static const vout_display_place_t r0 = {0};
-
-    sys->spu_rect = place_out(cfg, fmt, r0);
-    sys->spu_rect.x = 0;
-    sys->spu_rect.y = 0;
-
-    // Copy place override logic for spu pos from video_output.c
-    // This info doesn't appear to reside anywhere natively
-
-    if (fmt->i_width * fmt->i_height >= (unsigned int)(sys->spu_rect.width * sys->spu_rect.height)) {
-        sys->spu_rect.width  = fmt->i_visible_width;
-        sys->spu_rect.height = fmt->i_visible_height;
-    }
-
-    if (ORIENT_IS_SWAP(fmt->orientation))
-        sys->spu_rect = vplace_transpose(sys->spu_rect);
-}
-
-
-static void
 place_rects(vout_display_t * const vd,
-          const vout_display_cfg_t * const cfg,
-          const video_format_t * fmt)
+          const vout_display_cfg_t * const cfg)
 {
     vout_display_sys_t * const sys = vd->sys;
 
@@ -495,8 +434,6 @@ place_rects(vout_display_t * const vd,
 #else
     vout_display_PlacePicture(&sys->dst_rect, &vd->source, cfg, true);
 #endif
-
-    place_spu_rect(sys, cfg, fmt);
 }
 
 
@@ -1211,7 +1148,9 @@ spe_changed(const subpic_ent_t * const spe, const subpicture_region_t * const sr
 }
 
 static bool
-spe_update_rect(subpic_ent_t * const spe, vout_display_sys_t * const sys, const subpicture_region_t * const sreg)
+spe_update_rect(subpic_ent_t * const spe, vout_display_sys_t * const sys,
+                const subpicture_t * const spic,
+                const subpicture_region_t * const sreg)
 {
     const vout_display_place_t src = (vout_display_place_t) {
         .x = sreg->fmt.i_x_offset,
@@ -1232,7 +1171,12 @@ spe_update_rect(subpic_ent_t * const spe, vout_display_sys_t * const sys, const 
             .width  = sys->dst_rect.width,
             .height = sys->dst_rect.height,
         },
-        sys->spu_rect);
+        (vout_display_place_t) {
+            .x = 0,
+            .y = 0,
+            .width  = spic->i_original_picture_width,
+            .height = spic->i_original_picture_height,
+        });
 
     if (place_eq(spe->src_rect, src) && place_eq(spe->dst_rect, dst))
         return false;
@@ -1244,7 +1188,9 @@ spe_update_rect(subpic_ent_t * const spe, vout_display_sys_t * const sys, const 
 }
 
 static subpic_ent_t *
-spe_new(vout_display_t * const vd, vout_display_sys_t * const sys, const subpicture_region_t * const sreg)
+spe_new(vout_display_t * const vd, vout_display_sys_t * const sys,
+        const subpicture_t * const spic,
+        const subpicture_region_t * const sreg)
 {
     subpic_ent_t * const spe = calloc(1, sizeof(*spe));
 
@@ -1264,7 +1210,7 @@ spe_new(vout_display_t * const vd, vout_display_sys_t * const sys, const subpict
     spe->pic = picture_Hold(sreg->p_picture);
     spe->alpha = sreg->i_alpha;
 
-    spe_update_rect(spe, sys, sreg);
+    spe_update_rect(spe, sys, spic, sreg);
 
     spe->pt = polltask_new_timer(sys->speq, spe_convert_cb, spe);
 
@@ -1670,7 +1616,7 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     wl_display_flush(video_display(sys)); // Kick off any work required by Wayland
 
     // Attempt to import the subpics
-    for (subpicture_t * spic = subpic; spic != NULL; spic = spic->p_next)
+    for (const subpicture_t * spic = subpic; spic != NULL; spic = spic->p_next)
     {
         for (const subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next)
         {
@@ -1679,16 +1625,16 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
             if (plane->spe_next != NULL)
             {
                 if (!spe_changed(plane->spe_next, sreg))
-                    spe_update_rect(plane->spe_next, sys, sreg);
+                    spe_update_rect(plane->spe_next, sys, spic, sreg);
                 // else if changed ignore as we are already doing stuff
             }
             else
             {
                 if (!spe_changed(plane->spe_cur, sreg))
-                    spe_update_rect(plane->spe_cur, sys, sreg);
+                    spe_update_rect(plane->spe_cur, sys, spic, sreg);
                 else
                 {
-                    plane->spe_next = spe_new(vd, sys, sreg);
+                    plane->spe_next = spe_new(vd, sys, spic, sreg);
                     spe_convert(plane->spe_next);
                 }
             }
@@ -1703,7 +1649,7 @@ subpics_done:
     for (; n != MAX_SUBPICS; ++n) {
         subplane_t * const plane = sys->subplanes + n;
         if (plane->spe_next == NULL && spe_changed(plane->spe_cur, NULL))
-            plane->spe_next = spe_new(vd, sys, NULL);
+            plane->spe_next = spe_new(vd, sys, NULL, NULL);
     }
 
 #if TRACE_ALL
@@ -1855,7 +1801,7 @@ static int Control(vout_display_t *vd, int query, va_list ap)
                 cfg = va_arg(ap, const vout_display_cfg_t *);
             }
 
-            place_rects(vd, cfg, &vd->fmt);
+            place_rects(vd, cfg);
 
             sys->viewport_set = false;
 
@@ -2314,7 +2260,7 @@ static int Open(vlc_object_t *obj)
     vd->fmt.i_chroma = drmu_vlc_fmt_info_vlc_chroma(pic_fmti);
     drmu_vlc_fmt_info_vlc_rgb_masks(pic_fmti, &vd->fmt.i_rmask, &vd->fmt.i_gmask, &vd->fmt.i_bmask);
 
-    place_rects(vd, vd->cfg, &vd->fmt);
+    place_rects(vd, vd->cfg);
 
     vd->info.has_pictures_invalid = false;
     vd->info.subpicture_chromas = sys->subpic_chromas;
