@@ -177,8 +177,6 @@ struct vout_display_sys_t
     bool use_shm;
     bool chequerboard;
 
-    video_format_t curr_aspect;
-
     struct wp_viewport * bkg_viewport;
     // Current size of background viewport if we have one
     // If not created yet then the size that the viewport should be created
@@ -196,6 +194,9 @@ struct vout_display_sys_t
     bool commit_req[MAX_SUBPICS + 2];
     subpic_ent_t video_spe;
     vlc_fourcc_t * subpic_chromas;
+
+    struct wl_region * region_none;
+    struct wl_region * region_all;
 
     fmt_list_t dmabuf_fmts;
     fmt_list_t shm_fmts;
@@ -232,6 +233,15 @@ buffer_destroy(struct wl_buffer ** ppbuffer)
         return;
     *ppbuffer = NULL;
     wl_buffer_destroy(buffer);
+}
+
+static void
+region_destroy(struct wl_region ** const ppregion)
+{
+    if (*ppregion == NULL)
+        return;
+    wl_region_destroy(*ppregion);
+    *ppregion = NULL;
 }
 
 static void
@@ -1134,11 +1144,9 @@ static bool
 spe_changed(const subpic_ent_t * const spe, const subpicture_region_t * const sreg)
 {
     const bool no_pic = (sreg == NULL || sreg->i_alpha == 0);
-    if (spe == NULL)
-        return true;  // spe missing matches nothing
     if (no_pic && spe_no_pic(spe))
         return false;
-    return no_pic || spe->pic != sreg->p_picture || spe->alpha != sreg->i_alpha;
+    return no_pic || spe_no_pic(spe) || spe->pic != sreg->p_picture || spe->alpha != sreg->i_alpha;
 }
 
 static void
@@ -1269,24 +1277,6 @@ commit_do(vout_display_t * const vd, vout_display_sys_t * const sys)
 }
 
 static void
-mark_surface_no_input(struct wl_compositor * compositor, struct wl_surface * surface)
-{
-    struct wl_region * region_none = wl_compositor_create_region(compositor);
-    wl_region_add(region_none, 0, 0, 0, 0);
-    wl_surface_set_input_region(surface, region_none);
-    wl_region_destroy(region_none);
-}
-
-static void
-mark_all_surface_opaque(struct wl_compositor * compositor, struct wl_surface * surface)
-{
-    struct wl_region * region_all = wl_compositor_create_region(compositor);
-    wl_region_add(region_all, 0, 0, INT32_MAX, INT32_MAX);
-    wl_surface_set_opaque_region(surface, region_all);
-    wl_region_destroy(region_all);
-}
-
-static void
 clear_surface_buffer(struct wl_surface * surface)
 {
     if (surface == NULL)
@@ -1321,6 +1311,8 @@ plane_destroy(subplane_t * const spl)
     viewport_destroy(&spl->viewport);
     subsurface_destroy(&spl->subsurface);
     surface_destroy(&spl->surface);
+    // Zap all tracking vars
+    spl->trans = 0;
     memset(&spl->src_rect, 0, sizeof(spl->src_rect));
     memset(&spl->dst_rect, 0, sizeof(spl->dst_rect));
 }
@@ -1385,8 +1377,8 @@ make_video_surface(vout_display_t * const vd, vout_display_sys_t * const sys)
     struct wl_surface * const surface = video_surface(sys);
 
     // Video is opaque but doesn't take input
-    mark_all_surface_opaque(video_compositor(sys), surface);
-    mark_surface_no_input(video_compositor(sys), surface);
+    wl_surface_set_opaque_region(surface, sys->region_all);
+    wl_surface_set_input_region(surface, sys->region_none);
 
     sys->video_plane->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, surface);
     return VLC_SUCCESS;
@@ -1412,7 +1404,7 @@ make_subpic_surfaces(vout_display_t * const vd, vout_display_sys_t * const sys)
         below = plane->surface;
         wl_subsurface_set_sync(plane->subsurface);
         plane->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, plane->surface);
-        mark_surface_no_input(video_compositor(sys), plane->surface);
+        wl_surface_set_input_region(plane->surface, sys->region_none);
     }
     return VLC_SUCCESS;
 }
@@ -1510,7 +1502,7 @@ make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
     w_buffer = NULL;
 
     wp_viewport_set_destination(sys->bkg_viewport, sys->bkg_w, sys->bkg_h);
-    mark_all_surface_opaque(sys->bound.compositor, bkg_surface);
+    wl_surface_set_opaque_region(bkg_surface, sys->region_all);
 
     wl_surface_damage(bkg_surface, 0, 0, INT32_MAX, INT32_MAX);
 
@@ -1827,7 +1819,6 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             vd->fmt.i_y_offset = src.i_y_offset * place.height
                                                 / src.i_visible_height;
             ResetPictures(vd);
-            sys->curr_aspect = vd->source;
             break;
         }
 
@@ -1862,8 +1853,6 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             sys->bkg_w = cfg->display.width;
             sys->bkg_h = cfg->display.height;
             commit_do(vd, sys);
-
-            sys->curr_aspect = vd->source;
             break;
         }
         default:
@@ -2120,6 +2109,9 @@ static void Close(vlc_object_t *obj)
         bkg_surface_unlock(vd, sys);
     }
 
+    region_destroy(&sys->region_all);
+    region_destroy(&sys->region_none);
+
     pollqueue_unref(&sys->speq);
 
     w_bound_destroy(&sys->bound);
@@ -2295,9 +2287,13 @@ static int Open(vlc_object_t *obj)
         }
     }
 
-    sys->curr_aspect = vd->source;
     sys->bkg_w = vd->cfg->display.width;
     sys->bkg_h = vd->cfg->display.height;
+
+    sys->region_all = wl_compositor_create_region(video_compositor(sys));
+    wl_region_add(sys->region_all, 0, 0, INT32_MAX, INT32_MAX);
+    sys->region_none = wl_compositor_create_region(video_compositor(sys));
+    wl_region_add(sys->region_all, 0, 0, 0, 0);
 
     vd->fmt.i_chroma = drmu_vlc_fmt_info_vlc_chroma(pic_fmti);
     drmu_vlc_fmt_info_vlc_rgb_masks(pic_fmti, &vd->fmt.i_rmask, &vd->fmt.i_gmask, &vd->fmt.i_bmask);
