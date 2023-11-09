@@ -119,6 +119,7 @@ typedef struct subpic_ent_s {
     video_dmabuf_release_env_t * vdre;
     picture_t * pic;
     int alpha;
+    enum wl_output_transform trans;
     vout_display_place_t src_rect;
     vout_display_place_t dst_rect;
 
@@ -135,6 +136,7 @@ typedef struct subplane_s {
     struct wl_subsurface * subsurface;
     struct wp_viewport * viewport;
 
+    enum wl_output_transform trans;
     vout_display_place_t src_rect;
     vout_display_place_t dst_rect;
 
@@ -172,11 +174,8 @@ struct vout_display_sys_t
     int x;
     int y;
     bool video_attached;
-    bool viewport_set;
     bool use_shm;
     bool chequerboard;
-
-    vout_display_place_t dst_rect;  // Window in the display size that holds the video
 
     video_format_t curr_aspect;
 
@@ -422,7 +421,7 @@ place_rects(vout_display_t * const vd,
 {
     vout_display_sys_t * const sys = vd->sys;
 
-    vout_display_PlacePicture(&sys->dst_rect, &vd->source, cfg, true);
+    vout_display_PlacePicture(&sys->piccpy.dst_rect, &vd->source, cfg, true);
 }
 
 
@@ -1163,8 +1162,8 @@ spe_update_rect(subpic_ent_t * const spe, vout_display_sys_t * const sys,
         (vout_display_place_t) {
             .x = 0,
             .y = 0,
-            .width  = sys->dst_rect.width,
-            .height = sys->dst_rect.height,
+            .width  = sys->piccpy.dst_rect.width,
+            .height = sys->piccpy.dst_rect.height,
         },
         (vout_display_place_t) {
             .x = 0,
@@ -1390,20 +1389,6 @@ make_video_surface(vout_display_t * const vd, vout_display_sys_t * const sys)
     mark_surface_no_input(video_compositor(sys), surface);
 
     sys->video_plane->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, surface);
-
-    /* Determine our pixel format */
-    static const enum wl_output_transform transforms[8] = {
-        [ORIENT_TOP_LEFT] = WL_OUTPUT_TRANSFORM_NORMAL,
-        [ORIENT_TOP_RIGHT] = WL_OUTPUT_TRANSFORM_FLIPPED,
-        [ORIENT_BOTTOM_LEFT] = WL_OUTPUT_TRANSFORM_FLIPPED_180,
-        [ORIENT_BOTTOM_RIGHT] = WL_OUTPUT_TRANSFORM_180,
-        [ORIENT_LEFT_TOP] = WL_OUTPUT_TRANSFORM_FLIPPED_270,
-        [ORIENT_LEFT_BOTTOM] = WL_OUTPUT_TRANSFORM_90,
-        [ORIENT_RIGHT_TOP] = WL_OUTPUT_TRANSFORM_270,
-        [ORIENT_RIGHT_BOTTOM] = WL_OUTPUT_TRANSFORM_FLIPPED_90,
-    };
-
-    wl_surface_set_buffer_transform(surface, transforms[vd->fmt.orientation]);
     return VLC_SUCCESS;
 }
 
@@ -1556,11 +1541,14 @@ error:
 static enum wl_output_transform
 transform_from_fmt(const video_format_t * const fmt, vout_display_place_t * const s)
 {
+    const int rx_offset = fmt->i_width - (fmt->i_visible_width + fmt->i_x_offset);
+    const int by_offset = fmt->i_height - (fmt->i_visible_height + fmt->i_y_offset);
+
     switch (fmt->orientation)
     {
         case ORIENT_ROTATED_90:  // ORIENT_RIGHT_TOP,
             *s = (vout_display_place_t){
-                .x      = fmt->i_height - fmt->i_visible_height,
+                .x      = by_offset,
                 .y      = fmt->i_x_offset,
                 .width  = fmt->i_visible_height,
                 .height = fmt->i_visible_width};
@@ -1568,8 +1556,8 @@ transform_from_fmt(const video_format_t * const fmt, vout_display_place_t * cons
 
         case ORIENT_ROTATED_180: // ORIENT_BOTTOM_RIGHT,
             *s = (vout_display_place_t){
-                .x      = fmt->i_height - fmt->i_visible_height,
-                .y      = fmt->i_width - fmt->i_visible_width,
+                .x      = by_offset,
+                .y      = rx_offset,
                 .width  = fmt->i_visible_width,
                 .height = fmt->i_visible_height};
             return WL_OUTPUT_TRANSFORM_180;
@@ -1577,14 +1565,14 @@ transform_from_fmt(const video_format_t * const fmt, vout_display_place_t * cons
         case ORIENT_ROTATED_270: // ORIENT_LEFT_BOTTOM,
             *s = (vout_display_place_t){
                 .x      = fmt->i_y_offset,
-                .y      = fmt->i_width - fmt->i_visible_width,
+                .y      = rx_offset,
                 .width  = fmt->i_visible_height,
                 .height = fmt->i_visible_width};
             return WL_OUTPUT_TRANSFORM_270;
 
         case ORIENT_HFLIPPED:    // ORIENT_TOP_RIGHT,
             *s = (vout_display_place_t){
-                .x      = fmt->i_width - fmt->i_visible_width,
+                .x      = rx_offset,
                 .y      = fmt->i_y_offset,
                 .width  = fmt->i_visible_width,
                 .height = fmt->i_visible_height};
@@ -1593,7 +1581,7 @@ transform_from_fmt(const video_format_t * const fmt, vout_display_place_t * cons
         case ORIENT_VFLIPPED:    // ORIENT_BOTTOM_LEFT,
             *s = (vout_display_place_t){
                 .x      = fmt->i_x_offset,
-                .y      = fmt->i_height - fmt->i_visible_height,
+                .y      = by_offset,
                 .width  = fmt->i_visible_width,
                 .height = fmt->i_visible_height};
             return WL_OUTPUT_TRANSFORM_FLIPPED_180;
@@ -1608,8 +1596,8 @@ transform_from_fmt(const video_format_t * const fmt, vout_display_place_t * cons
 
         case ORIENT_ANTI_TRANSPOSED: // ORIENT_RIGHT_BOTTOM,
             *s = (vout_display_place_t){
-                .x      = fmt->i_width - fmt->i_visible_width,
-                .y      = fmt->i_height - fmt->i_visible_height,
+                .x      = rx_offset,
+                .y      = by_offset,
                 .width  = fmt->i_visible_height,
                 .height = fmt->i_visible_width};
             return WL_OUTPUT_TRANSFORM_FLIPPED_270;
@@ -1626,54 +1614,46 @@ transform_from_fmt(const video_format_t * const fmt, vout_display_place_t * cons
 }
 
 static void
-set_video_viewport(vout_display_t * const vd, vout_display_sys_t * const sys)
+plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const subpic_ent_t * const spe,
+               const unsigned int commit_this, const unsigned int commit_parent)
 {
-    vout_display_place_t s;
-
-    if (!sys->video_attached || sys->viewport_set)
-        return;
-
-    sys->viewport_set = true;
-
-    wl_surface_set_buffer_transform(video_surface(sys), transform_from_fmt(&vd->fmt, &s));
-    wp_viewport_set_source(sys->video_plane->viewport,
-                    wl_fixed_from_int(s.x),
-                    wl_fixed_from_int(s.y),
-                    wl_fixed_from_int(s.width),
-                    wl_fixed_from_int(s.height));
-    wp_viewport_set_destination(sys->video_plane->viewport,
-                    sys->dst_rect.width, sys->dst_rect.height);
-    commit_req(sys, COMMIT_VID);
-    wl_subsurface_set_position(sys->video_plane->subsurface, sys->dst_rect.x, sys->dst_rect.y);
-    commit_req(sys, COMMIT_BKG);
-}
-
-static void
-plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, subpic_ent_t * const spe, const unsigned int commit_no)
-{
-    if (spe_no_pic(spe))
-        return;
-
+    if (spe->trans != plane->trans)
+    {
+        wl_surface_set_buffer_transform(plane->surface, spe->trans);
+        commit_req(sys, commit_this);
+    }
     if (!place_eq(spe->src_rect, plane->src_rect))
     {
         wp_viewport_set_source(plane->viewport,
                                wl_fixed_from_int(spe->src_rect.x), wl_fixed_from_int(spe->src_rect.y),
                                wl_fixed_from_int(spe->src_rect.width), wl_fixed_from_int(spe->src_rect.height));
-        commit_req(sys, commit_no);
+        commit_req(sys, commit_this);
     }
     if (!place_xy_eq(spe->dst_rect, plane->dst_rect))
     {
         wl_subsurface_set_position(plane->subsurface, spe->dst_rect.x, spe->dst_rect.y);
-        commit_req(sys, commit_no);
+        commit_req(sys, commit_this);
     }
     if (!place_wh_eq(spe->dst_rect, plane->dst_rect))
     {
         wp_viewport_set_destination(plane->viewport, spe->dst_rect.width, spe->dst_rect.height);
-        commit_req(sys, COMMIT_VID); // Subsurface pos needs parent commit (video)
+        commit_req(sys, commit_parent); // Subsurface pos needs parent commit (video)
     }
 
+    plane->trans = spe->trans;
     plane->src_rect = spe->src_rect;
     plane->dst_rect = spe->dst_rect;
+}
+
+static void
+set_video_viewport(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+    if (!sys->video_attached)
+        return;
+
+    sys->piccpy.trans = transform_from_fmt(&vd->fmt, &sys->piccpy.src_rect);
+
+    plane_set_rect(sys, sys->video_plane, &sys->piccpy, COMMIT_VID, COMMIT_BKG);
 }
 
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
@@ -1772,7 +1752,8 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
             commit_req(sys, COMMIT_SUB + i);
         }
 
-        plane_set_rect(sys, plane, spe, COMMIT_SUB + i);
+        if (!spe_no_pic(spe))
+            plane_set_rect(sys, plane, spe, COMMIT_SUB + i, COMMIT_VID);
     }
 
     if (!sys->piccpy.wb)
@@ -1869,8 +1850,6 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             }
 
             place_rects(vd, cfg);
-
-            sys->viewport_set = false;
 
             if (sys->video_plane->viewport)
                 set_video_viewport(vd, sys);
