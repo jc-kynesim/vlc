@@ -69,8 +69,6 @@
 #define MAX_PICTURES 4
 #define MAX_SUBPICS  6
 
-#define VIDEO_ON_SUBSURFACE 1
-
 #define WL_DMABUF_DISABLE_NAME "wl-dmabuf-disable"
 #define WL_DMABUF_DISABLE_TEXT N_("Disable wl-dmabuf")
 #define WL_DMABUF_DISABLE_LONGTEXT N_("Disable wl-dmabuf - useful if auto selection is wanted but not wl-dmabuf")
@@ -121,9 +119,8 @@ typedef struct subpic_ent_s {
     video_dmabuf_release_env_t * vdre;
     picture_t * pic;
     int alpha;
-    vout_display_place_t dst_rect;
     vout_display_place_t src_rect;
-    bool rect_update;
+    vout_display_place_t dst_rect;
 
     bool update;
     atomic_int ready;
@@ -137,6 +134,9 @@ typedef struct subplane_s {
     struct wl_surface * surface;
     struct wl_subsurface * subsurface;
     struct wp_viewport * viewport;
+
+    vout_display_place_t src_rect;
+    vout_display_place_t dst_rect;
 
     subpic_ent_t * spe_cur;
     subpic_ent_t * spe_next;
@@ -182,7 +182,6 @@ struct vout_display_sys_t
 
     video_format_t curr_aspect;
 
-#if VIDEO_ON_SUBSURFACE
     struct wl_surface * video_surface;
     // Beware: calls using this need a bkg_surface commit to take effect
     struct wl_subsurface * video_subsurface;
@@ -192,7 +191,6 @@ struct vout_display_sys_t
     // If not created yet then the size that the viewport should be created
     unsigned int bkg_w;
     unsigned int bkg_h;
-#endif
 
     eq_env_t * eq;
 
@@ -223,11 +221,7 @@ video_display(const vout_display_sys_t * const sys)
 static inline struct wl_surface *
 video_surface(const vout_display_sys_t * const sys)
 {
-#if VIDEO_ON_SUBSURFACE
     return sys->video_surface;
-#else
-    return sys->embed->handle.wl;
-#endif
 }
 
 static inline struct wl_compositor *
@@ -302,9 +296,21 @@ place_rescale(const vout_display_place_t s, const vout_display_place_t mul, cons
 }
 
 static inline bool
+place_xy_eq(const vout_display_place_t a, const vout_display_place_t b)
+{
+    return a.x == b.x && a.y == b.y;
+}
+
+static inline bool
+place_wh_eq(const vout_display_place_t a, const vout_display_place_t b)
+{
+    return a.width == b.width && a.height == b.height;
+}
+
+static inline bool
 place_eq(const vout_display_place_t a, const vout_display_place_t b)
 {
-    return a.x == b.x && a.y == b.y && a.width == b.width && a.height == b.height;
+    return place_xy_eq(a, b) && place_wh_eq(a, b);
 }
 
 
@@ -421,19 +427,7 @@ place_rects(vout_display_t * const vd,
 {
     vout_display_sys_t * const sys = vd->sys;
 
-#if !VIDEO_ON_SUBSURFACE
-    vout_display_place_t place;
-
-    vout_display_PlacePicture(&place, &sys->curr_aspect, vd->cfg, false);
-    sys->x += place.width / 2;
-    sys->y += place.height / 2;
-
-    vout_display_PlacePicture(&sys->dst_rect, &vd->source, cfg, false);
-    sys->x -= sys->dst_rect.width / 2;
-    sys->y -= sys->dst_rect.height / 2;
-#else
     vout_display_PlacePicture(&sys->dst_rect, &vd->source, cfg, true);
-#endif
 }
 
 
@@ -1136,29 +1130,35 @@ spe_convert_cb(void * v, short revents)
     atomic_store(&spe->ready, 1);
 }
 
+static inline bool
+spe_no_pic(const subpic_ent_t * const spe)
+{
+    return spe == NULL || spe->pic == NULL;
+}
+
 static bool
 spe_changed(const subpic_ent_t * const spe, const subpicture_region_t * const sreg)
 {
     const bool no_pic = (sreg == NULL || sreg->i_alpha == 0);
     if (spe == NULL)
         return true;  // spe missing matches nothing
-    if (no_pic && spe->pic == NULL)
+    if (no_pic && spe_no_pic(spe))
         return false;
     return no_pic || spe->pic != sreg->p_picture || spe->alpha != sreg->i_alpha;
 }
 
-static bool
+static void
 spe_update_rect(subpic_ent_t * const spe, vout_display_sys_t * const sys,
                 const subpicture_t * const spic,
                 const subpicture_region_t * const sreg)
 {
-    const vout_display_place_t src = (vout_display_place_t) {
+    spe->src_rect = (vout_display_place_t) {
         .x = sreg->fmt.i_x_offset,
         .y = sreg->fmt.i_y_offset,
         .width = sreg->fmt.i_visible_width,
         .height = sreg->fmt.i_visible_height,
     };
-    const vout_display_place_t dst = place_rescale(
+    spe->dst_rect = place_rescale(
         (vout_display_place_t) {
             .x = sreg->i_x,
             .y = sreg->i_y,
@@ -1177,14 +1177,6 @@ spe_update_rect(subpic_ent_t * const spe, vout_display_sys_t * const sys,
             .width  = spic->i_original_picture_width,
             .height = spic->i_original_picture_height,
         });
-
-    if (place_eq(spe->src_rect, src) && place_eq(spe->dst_rect, dst))
-        return false;
-
-    spe->src_rect = src;
-    spe->dst_rect = dst;
-    spe->rect_update = true;
-    return true;
 }
 
 static subpic_ent_t *
@@ -1323,10 +1315,8 @@ clear_all_buffers(vout_display_sys_t * const sys, const bool bkg_valid)
     clear_surface_buffer(video_surface(sys));
     sys->video_attached = false;
 
-#if VIDEO_ON_SUBSURFACE
     if (bkg_valid)
         clear_surface_buffer(sys->last_embed_surface);
-#endif
 
     subpic_ent_flush(&sys->piccpy);
 }
@@ -1344,16 +1334,16 @@ unmap_all(vout_display_sys_t * const sys, const bool bkg_valid)
         viewport_destroy(&spl->viewport);
         subsurface_destroy(&spl->subsurface);
         surface_destroy(&spl->surface);
+        memset(&spl->src_rect, 0, sizeof(spl->src_rect));
+        memset(&spl->dst_rect, 0, sizeof(spl->dst_rect));
     }
 
     viewport_destroy(&sys->viewport);
 
-#if VIDEO_ON_SUBSURFACE
     subsurface_destroy(&sys->video_subsurface);
     surface_destroy(&sys->video_surface);
 
     viewport_destroy(&sys->bkg_viewport);
-#endif
 }
 
 static struct wl_surface *
@@ -1451,11 +1441,6 @@ make_subpic_surfaces(vout_display_t * const vd, vout_display_sys_t * const sys)
 static int
 make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
 {
-#if !VIDEO_ON_SUBSURFACE
-    VLC_UNUSED(vd);
-    VLC_UNUSED(sys);
-    return VLC_SUCCESS;
-#else
     // Build a background
     // Use single_pixel_surface extension if we have it & want a simple
     // single colour (black) patch
@@ -1571,32 +1556,130 @@ error:
     vdre_delete(&vdre);
     dmabuf_unref(&dh);
     return VLC_ENOMEM;
-#endif
+}
+
+// Get tranform & adjusted source coords for orientation
+static enum wl_output_transform
+transform_from_fmt(const video_format_t * const fmt, vout_display_place_t * const s)
+{
+    switch (fmt->orientation)
+    {
+        case ORIENT_ROTATED_90:  // ORIENT_RIGHT_TOP,
+            *s = (vout_display_place_t){
+                .x      = fmt->i_height - fmt->i_visible_height,
+                .y      = fmt->i_x_offset,
+                .width  = fmt->i_visible_height,
+                .height = fmt->i_visible_width};
+            return WL_OUTPUT_TRANSFORM_90;
+
+        case ORIENT_ROTATED_180: // ORIENT_BOTTOM_RIGHT,
+            *s = (vout_display_place_t){
+                .x      = fmt->i_height - fmt->i_visible_height,
+                .y      = fmt->i_width - fmt->i_visible_width,
+                .width  = fmt->i_visible_width,
+                .height = fmt->i_visible_height};
+            return WL_OUTPUT_TRANSFORM_180;
+
+        case ORIENT_ROTATED_270: // ORIENT_LEFT_BOTTOM,
+            *s = (vout_display_place_t){
+                .x      = fmt->i_y_offset,
+                .y      = fmt->i_width - fmt->i_visible_width,
+                .width  = fmt->i_visible_height,
+                .height = fmt->i_visible_width};
+            return WL_OUTPUT_TRANSFORM_270;
+
+        case ORIENT_HFLIPPED:    // ORIENT_TOP_RIGHT,
+            *s = (vout_display_place_t){
+                .x      = fmt->i_width - fmt->i_visible_width,
+                .y      = fmt->i_y_offset,
+                .width  = fmt->i_visible_width,
+                .height = fmt->i_visible_height};
+            return WL_OUTPUT_TRANSFORM_FLIPPED;
+
+        case ORIENT_VFLIPPED:    // ORIENT_BOTTOM_LEFT,
+            *s = (vout_display_place_t){
+                .x      = fmt->i_x_offset,
+                .y      = fmt->i_height - fmt->i_visible_height,
+                .width  = fmt->i_visible_width,
+                .height = fmt->i_visible_height};
+            return WL_OUTPUT_TRANSFORM_FLIPPED_180;
+
+        case ORIENT_TRANSPOSED:  // ORIENT_LEFT_TOP,
+            *s = (vout_display_place_t){
+                .x      = fmt->i_y_offset,
+                .y      = fmt->i_x_offset,
+                .width  = fmt->i_visible_height,
+                .height = fmt->i_visible_width};
+            return WL_OUTPUT_TRANSFORM_FLIPPED_90;
+
+        case ORIENT_ANTI_TRANSPOSED: // ORIENT_RIGHT_BOTTOM,
+            *s = (vout_display_place_t){
+                .x      = fmt->i_width - fmt->i_visible_width,
+                .y      = fmt->i_height - fmt->i_visible_height,
+                .width  = fmt->i_visible_height,
+                .height = fmt->i_visible_width};
+            return WL_OUTPUT_TRANSFORM_FLIPPED_270;
+
+        case ORIENT_NORMAL:      // ORIENT_TOP_LEFT,
+        default:
+            *s = (vout_display_place_t){
+                .x      = fmt->i_x_offset,
+                .y      = fmt->i_y_offset,
+                .width  = fmt->i_visible_width,
+                .height = fmt->i_visible_height};
+            return WL_OUTPUT_TRANSFORM_NORMAL;
+    }
 }
 
 static void
 set_video_viewport(vout_display_t * const vd, vout_display_sys_t * const sys)
 {
-    video_format_t fmt;
+    vout_display_place_t s;
 
     if (!sys->video_attached || sys->viewport_set)
         return;
 
     sys->viewport_set = true;
 
-    video_format_ApplyRotation(&fmt, &vd->source);
+    wl_surface_set_buffer_transform(video_surface(sys), transform_from_fmt(&vd->fmt, &s));
     wp_viewport_set_source(sys->viewport,
-                    wl_fixed_from_int(fmt.i_x_offset),
-                    wl_fixed_from_int(fmt.i_y_offset),
-                    wl_fixed_from_int(fmt.i_visible_width),
-                    wl_fixed_from_int(fmt.i_visible_height));
+                    wl_fixed_from_int(s.x),
+                    wl_fixed_from_int(s.y),
+                    wl_fixed_from_int(s.width),
+                    wl_fixed_from_int(s.height));
     wp_viewport_set_destination(sys->viewport,
                     sys->dst_rect.width, sys->dst_rect.height);
     commit_req(sys, COMMIT_VID);
-#if VIDEO_ON_SUBSURFACE
     wl_subsurface_set_position(sys->video_subsurface, sys->dst_rect.x, sys->dst_rect.y);
     commit_req(sys, COMMIT_BKG);
-#endif
+}
+
+static void
+plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, subpic_ent_t * const spe, const unsigned int commit_no)
+{
+    if (spe_no_pic(spe))
+        return;
+
+    if (!place_eq(spe->src_rect, plane->src_rect))
+    {
+        wp_viewport_set_source(plane->viewport,
+                               wl_fixed_from_int(spe->src_rect.x), wl_fixed_from_int(spe->src_rect.y),
+                               wl_fixed_from_int(spe->src_rect.width), wl_fixed_from_int(spe->src_rect.height));
+        commit_req(sys, commit_no);
+    }
+    if (!place_xy_eq(spe->dst_rect, plane->dst_rect))
+    {
+        wl_subsurface_set_position(plane->subsurface, spe->dst_rect.x, spe->dst_rect.y);
+        commit_req(sys, commit_no);
+    }
+    if (!place_wh_eq(spe->dst_rect, plane->dst_rect))
+    {
+        wp_viewport_set_destination(plane->viewport, spe->dst_rect.width, spe->dst_rect.height);
+        commit_req(sys, COMMIT_VID); // Subsurface pos needs parent commit (video)
+    }
+
+    plane->src_rect = spe->src_rect;
+    plane->dst_rect = spe->dst_rect;
 }
 
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
@@ -1695,17 +1778,7 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
             commit_req(sys, COMMIT_SUB + i);
         }
 
-        if (spe != NULL && spe->rect_update)
-        {
-            wl_subsurface_set_position(plane->subsurface, spe->dst_rect.x, spe->dst_rect.y);
-            wp_viewport_set_source(plane->viewport,
-                                   wl_fixed_from_int(spe->src_rect.x), wl_fixed_from_int(spe->src_rect.y),
-                                   wl_fixed_from_int(spe->src_rect.width), wl_fixed_from_int(spe->src_rect.height));
-            wp_viewport_set_destination(plane->viewport, spe->dst_rect.width, spe->dst_rect.height);
-            spe->rect_update = false;
-            commit_req(sys, COMMIT_SUB + i);
-            commit_req(sys, COMMIT_SUB + i - 1); // Subsurface pos needs parent commit (sub 0 needs video)
-        }
+        plane_set_rect(sys, plane, spe, COMMIT_SUB + i);
     }
 
     if (!sys->piccpy.wb)
@@ -1808,7 +1881,6 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             if (sys->viewport)
                 set_video_viewport(vd, sys);
 
-#if VIDEO_ON_SUBSURFACE
             if (sys->bkg_viewport != NULL && (cfg->display.width != sys->bkg_w || cfg->display.height != sys->bkg_h))
             {
                 msg_Dbg(vd, "Resize background: %dx%d", cfg->display.width, cfg->display.height);
@@ -1816,7 +1888,6 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             }
             sys->bkg_w = cfg->display.width;
             sys->bkg_h = cfg->display.height;
-#endif
             commit_do(vd, sys);
 
             sys->curr_aspect = vd->source;
@@ -2252,10 +2323,8 @@ static int Open(vlc_object_t *obj)
     }
 
     sys->curr_aspect = vd->source;
-#if VIDEO_ON_SUBSURFACE
     sys->bkg_w = vd->cfg->display.width;
     sys->bkg_h = vd->cfg->display.height;
-#endif
 
     vd->fmt.i_chroma = drmu_vlc_fmt_info_vlc_chroma(pic_fmti);
     drmu_vlc_fmt_info_vlc_rgb_masks(pic_fmti, &vd->fmt.i_rmask, &vd->fmt.i_gmask, &vd->fmt.i_bmask);
