@@ -194,7 +194,7 @@ struct vout_display_sys_t
     subplane_t video_plane[1];
     subplane_t subplanes[MAX_SUBPICS];
     bool commit_req[MAX_SUBPICS + 2];
-    subpic_ent_t piccpy;
+    subpic_ent_t video_spe;
     vlc_fourcc_t * subpic_chromas;
 
     fmt_list_t dmabuf_fmts;
@@ -421,7 +421,7 @@ place_rects(vout_display_t * const vd,
 {
     vout_display_sys_t * const sys = vd->sys;
 
-    vout_display_PlacePicture(&sys->piccpy.dst_rect, &vd->source, cfg, true);
+    vout_display_PlacePicture(&sys->video_spe.dst_rect, &vd->source, cfg, true);
 }
 
 
@@ -1162,8 +1162,8 @@ spe_update_rect(subpic_ent_t * const spe, vout_display_sys_t * const sys,
         (vout_display_place_t) {
             .x = 0,
             .y = 0,
-            .width  = sys->piccpy.dst_rect.width,
-            .height = sys->piccpy.dst_rect.height,
+            .width  = sys->video_spe.dst_rect.width,
+            .height = sys->video_spe.dst_rect.height,
         },
         (vout_display_place_t) {
             .x = 0,
@@ -1312,7 +1312,7 @@ clear_all_buffers(vout_display_sys_t * const sys, const bool bkg_valid)
     if (bkg_valid)
         clear_surface_buffer(sys->last_embed_surface);
 
-    subpic_ent_flush(&sys->piccpy);
+    subpic_ent_flush(&sys->video_spe);
 }
 
 static void
@@ -1651,9 +1651,9 @@ set_video_viewport(vout_display_t * const vd, vout_display_sys_t * const sys)
     if (!sys->video_attached)
         return;
 
-    sys->piccpy.trans = transform_from_fmt(&vd->fmt, &sys->piccpy.src_rect);
+    sys->video_spe.trans = transform_from_fmt(&vd->fmt, &sys->video_spe.src_rect);
 
-    plane_set_rect(sys, sys->video_plane, &sys->piccpy, COMMIT_VID, COMMIT_BKG);
+    plane_set_rect(sys, sys->video_plane, &sys->video_spe, COMMIT_VID, COMMIT_BKG);
 }
 
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
@@ -1665,11 +1665,11 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
 #endif
 
-    subpic_ent_flush(&sys->piccpy); // If somehow we have a buffer here - avoid leaking
+    subpic_ent_flush(&sys->video_spe); // If somehow we have a buffer here - avoid leaking
     if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) == 0)
-        copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &sys->piccpy.vdre, &sys->piccpy.wb);
+        copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &sys->video_spe.vdre, &sys->video_spe.wb);
     else
-        do_display_dmabuf(vd, sys, pic, &sys->piccpy.vdre, &sys->piccpy.wb);
+        do_display_dmabuf(vd, sys, pic, &sys->video_spe.vdre, &sys->video_spe.wb);
     wl_display_flush(video_display(sys)); // Kick off any work required by Wayland
 
     // Attempt to import the subpics
@@ -1756,13 +1756,13 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
             plane_set_rect(sys, plane, spe, COMMIT_SUB + i, COMMIT_VID);
     }
 
-    if (!sys->piccpy.wb)
+    if (!sys->video_spe.wb)
     {
         msg_Warn(vd, "Display called but no prepared pic buffer");
     }
     else
     {
-        subpic_ent_attach(video_surface(sys), &sys->piccpy, sys->eq);
+        subpic_ent_attach(video_surface(sys), &sys->video_spe, sys->eq);
         sys->video_attached = true;
         commit_req(sys, COMMIT_VID);
     }
