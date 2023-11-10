@@ -363,11 +363,13 @@ static void *poll_thread(void *v)
                 pt->fn(pt->v, r);
 
                 pthread_mutex_lock(&pq->lock);
-                if (pt->state == POLLTASK_RUNNING)
-                    pt->state = POLLTASK_UNQUEUED;
-                if (pt->state == POLLTASK_RUN_KILL ||
+                if (pt->state == POLLTASK_Q_KILL)
+                    polltask_dead(pt);
+                else if (pt->state == POLLTASK_RUN_KILL ||
                     (pt->flags & POLLTASK_FLAG_ONCE) != 0)
                     polltask_kill(pt);
+                else if (pt->state == POLLTASK_RUNNING)
+                    pt->state = POLLTASK_UNQUEUED;
             }
         }
         pq->no_prod = false;
