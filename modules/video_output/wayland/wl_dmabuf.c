@@ -782,7 +782,7 @@ vdre_delete(video_dmabuf_release_env_t ** const ppvdre)
 }
 
 static void
-w_ctx_release(void * v, short revents)
+vdre_polltask_cb(void * v, short revents)
 {
     video_dmabuf_release_env_t * const vdre = v;
     VLC_UNUSED(revents);
@@ -813,7 +813,7 @@ static void
 vdre_add_pt(video_dmabuf_release_env_t * const vdre, struct pollqueue * pq, int fd)
 {
     assert(vdre->pt_count < AV_DRM_MAX_PLANES);
-    vdre->pt[vdre->pt_count++] = polltask_new(pq, fd, POLLOUT, w_ctx_release, vdre);
+    vdre->pt[vdre->pt_count++] = polltask_new(pq, fd, POLLOUT, vdre_polltask_cb, vdre);
 }
 
 static void
@@ -839,7 +839,7 @@ vdre_new_dh(struct dmabuf_h *const dh, struct pollqueue *const pq)
 // Avoid use of vd here as there's a possibility this will be called after
 // it has gone
 static void
-w_buffer_release(void *data, struct wl_buffer *wl_buffer)
+vdre_buffer_release_cb(void *data, struct wl_buffer *wl_buffer)
 {
     video_dmabuf_release_env_t * const vdre = data;
     unsigned int i = vdre->pt_count;
@@ -861,8 +861,8 @@ w_buffer_release(void *data, struct wl_buffer *wl_buffer)
     }
 }
 
-static const struct wl_buffer_listener w_buffer_listener = {
-    .release = w_buffer_release,
+static const struct wl_buffer_listener vdre_buffer_listener = {
+    .release = vdre_buffer_release_cb,
 };
 
 // ----------------------------------------------------------------------------
@@ -979,7 +979,6 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
 #if CHECK_VDRE_COUNTS
     vdre_add_check(*pVdre, &sys->vdre_check_fg);
 #endif
-    wl_buffer_add_listener(*pW_buffer, &w_buffer_listener, *pVdre);
 
     return VLC_SUCCESS;
 
@@ -1102,8 +1101,6 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
         params = NULL;
     }
 
-    wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre);
-
     *pVdre = vdre;
     *pWbuffer = w_buffer;
     return VLC_SUCCESS;
@@ -1127,16 +1124,23 @@ subpic_ent_flush(subpic_ent_t * const spe)
     dmabuf_unref(&spe->dh);
 }
 
-static bool
+static void
 subpic_ent_attach(struct wl_surface * const surface, subpic_ent_t * const spe, eq_env_t * eq)
 {
-    const bool has_pic = (spe->wb != NULL);
-    vdre_eq_ref(spe->vdre, eq);
-    wl_surface_attach(surface, spe->wb, 0, 0);
-    spe->vdre = NULL;
-    spe->wb = NULL;
-    wl_surface_damage(surface, 0, 0, INT32_MAX, INT32_MAX);
-    return has_pic;
+    if (spe->wb == NULL)
+    {
+        vdre_delete(&spe->vdre);
+        wl_surface_attach(surface, NULL, 0, 0);
+    }
+    else
+    {
+        vdre_eq_ref(spe->vdre, eq);
+        wl_buffer_add_listener(spe->wb, &vdre_buffer_listener, spe->vdre);
+        wl_surface_attach(surface, spe->wb, 0, 0);
+        spe->vdre = NULL;
+        spe->wb = NULL;
+        wl_surface_damage(surface, 0, 0, INT32_MAX, INT32_MAX);
+    }
 }
 
 static void
@@ -1513,7 +1517,7 @@ make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const 
     vdre_add_check(vdre, &sys->vdre_check_bkg);
 #endif
     vdre_eq_ref(vdre, sys->eq);
-    wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre);
+    wl_buffer_add_listener(w_buffer, &vdre_buffer_listener, vdre);
     wl_surface_attach(bkg_surface, w_buffer, 0, 0);
     vdre = NULL;
     w_buffer = NULL;
