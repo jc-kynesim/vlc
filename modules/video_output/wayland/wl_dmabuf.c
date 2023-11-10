@@ -1317,6 +1317,25 @@ plane_destroy(subplane_t * const spl)
     memset(&spl->dst_rect, 0, sizeof(spl->dst_rect));
 }
 
+static int
+plane_create(vout_display_sys_t * const sys, subplane_t * const plane,
+             struct wl_surface * const parent,
+             struct wl_surface * const above,
+             const bool sync)
+{
+    if ((plane->surface = wl_compositor_create_surface(video_compositor(sys))) == NULL ||
+        (plane->subsurface = wl_subcompositor_get_subsurface(sys->bound.subcompositor, plane->surface, parent)) == NULL ||
+        (plane->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, plane->surface)) == NULL)
+        return VLC_EGENERIC;
+    wl_subsurface_place_above(plane->subsurface, above);
+    if (sync)
+        wl_subsurface_set_sync(plane->subsurface);
+    else
+        wl_subsurface_set_desync(plane->subsurface);
+    wl_surface_set_input_region(plane->surface, sys->region_none);
+    return 0;
+}
+
 static void
 unmap_all(vout_display_sys_t * const sys, const bool bkg_valid)
 {
@@ -1365,52 +1384,32 @@ bkg_surface_unlock(vout_display_t * const vd, vout_display_sys_t * const sys)
     vlc_mutex_unlock(&sys->embed->handle_lock);
 }
 
-
-static int
-make_video_surface(vout_display_t * const vd, vout_display_sys_t * const sys)
-{
-    VLC_UNUSED(vd);
-
-    if (sys->video_plane->viewport)
-        return VLC_SUCCESS;
-
-    struct wl_surface * const surface = video_surface(sys);
-
-    // Video is opaque but doesn't take input
-    wl_surface_set_opaque_region(surface, sys->region_all);
-    wl_surface_set_input_region(surface, sys->region_none);
-
-    sys->video_plane->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, surface);
-    return VLC_SUCCESS;
-}
-
 static int
 make_subpic_surfaces(vout_display_t * const vd, vout_display_sys_t * const sys)
 {
     unsigned int i;
     struct wl_surface * const surface = video_surface(sys);
     struct wl_surface * below = surface;
-    VLC_UNUSED(vd);
+    int rv;
 
     if (sys->subplanes[0].surface)
         return VLC_SUCCESS;
 
     for (i = 0; i != MAX_SUBPICS; ++i)
     {
-        subplane_t *plane = sys->subplanes + i;
-        plane->surface = wl_compositor_create_surface(video_compositor(sys));
-        plane->subsurface = wl_subcompositor_get_subsurface(sys->bound.subcompositor, plane->surface, surface);
-        wl_subsurface_place_above(plane->subsurface, below);
+        subplane_t * const plane = sys->subplanes + i;
+        if ((rv = plane_create(sys, plane, surface, below, true)) != 0)
+        {
+            msg_Err(vd, "%s: Failed to create subpic plane %d", __func__, i);
+            return rv;
+        }
         below = plane->surface;
-        wl_subsurface_set_sync(plane->subsurface);
-        plane->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, plane->surface);
-        wl_surface_set_input_region(plane->surface, sys->region_none);
     }
     return VLC_SUCCESS;
 }
 
 static int
-make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
+make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const sys)
 {
     // Build a background
     // Use single_pixel_surface extension if we have it & want a simple
@@ -1491,7 +1490,7 @@ make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
     sys->bkg_viewport = wp_viewporter_get_viewport(sys->bound.viewporter, bkg_surface);
     if (sys->bkg_viewport == NULL)
     {
-        msg_Err(vd, "Failed to create get viewport");
+        msg_Err(vd, "Failed to create background viewport");
         goto err_unlock;
     }
 
@@ -1506,13 +1505,13 @@ make_background(vout_display_t * const vd, vout_display_sys_t * const sys)
 
     wl_surface_damage(bkg_surface, 0, 0, INT32_MAX, INT32_MAX);
 
-    // Make a new subsurface to use for video
-    assert(sys->video_plane->surface == NULL);
-    assert(sys->video_plane->subsurface == NULL);
-    sys->video_plane->surface = wl_compositor_create_surface(video_compositor(sys));
-    sys->video_plane->subsurface = wl_subcompositor_get_subsurface(sys->bound.subcompositor, sys->video_plane->surface, bkg_surface);
-    wl_subsurface_place_above(sys->video_plane->subsurface, bkg_surface);
-    wl_subsurface_set_desync(sys->video_plane->subsurface);  // Video update can be desync from main window
+    if (plane_create(sys, sys->video_plane, bkg_surface, bkg_surface, false) != 0)
+    {
+        msg_Err(vd, "Failed to create video plane");
+        goto err_unlock;
+    }
+
+    wl_surface_set_opaque_region(sys->video_plane->surface, sys->region_all);
 
     commit_req(sys, COMMIT_BKG);
 
@@ -1722,12 +1721,11 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     }
     bkg_surface_unlock(vd, sys);
 
-    if (make_background(vd, sys) != 0)
+    if (make_background_and_video(vd, sys) != 0)
     {
         msg_Warn(vd, "%s: Make background fail", __func__);
         goto done;
     }
-    make_video_surface(vd, sys);
     make_subpic_surfaces(vd, sys);
 
     for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
