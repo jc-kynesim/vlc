@@ -65,6 +65,7 @@
 #include <libavutil/hwcontext_drm.h>
 
 #define TRACE_ALL 0
+#define CHECK_VDRE_COUNTS 0
 
 #define MAX_PICTURES 4
 #define MAX_SUBPICS  6
@@ -111,6 +112,9 @@ typedef struct video_dmabuf_release_env_ss
     unsigned int rel_count;
     unsigned int pt_count;
     struct polltask * pt[AV_DRM_MAX_PLANES];
+#if CHECK_VDRE_COUNTS
+    atomic_int * vdre_check;
+#endif
 } video_dmabuf_release_env_t;
 
 typedef struct subpic_ent_s {
@@ -123,7 +127,6 @@ typedef struct subpic_ent_s {
     vout_display_place_t src_rect;
     vout_display_place_t dst_rect;
 
-    bool update;
     atomic_int ready;
 
     struct polltask * pt;
@@ -182,6 +185,11 @@ struct vout_display_sys_t
     // If not created yet then the size that the viewport should be created
     unsigned int bkg_w;
     unsigned int bkg_h;
+
+#if CHECK_VDRE_COUNTS
+    atomic_int vdre_check_bkg;
+    atomic_int vdre_check_fg;
+#endif
 
     eq_env_t * eq;
 
@@ -727,6 +735,10 @@ vdre_free(video_dmabuf_release_env_t * const vdre)
     for (i = 0; i != vdre->pt_count; ++i)
         polltask_delete(vdre->pt + i);
     eq_unref(&vdre->eq);
+#if CHECK_VDRE_COUNTS
+    if (vdre->vdre_check != NULL)
+        atomic_fetch_sub(vdre->vdre_check, 1);
+#endif
     free(vdre);
 }
 
@@ -787,6 +799,15 @@ vdre_eq_ref(video_dmabuf_release_env_t * const vdre, eq_env_t * const eq)
     vdre->eq = eq;
     eq_ref(vdre->eq);
 }
+
+#if CHECK_VDRE_COUNTS
+static void
+vdre_add_check(video_dmabuf_release_env_t * const vdre, atomic_int * const pa)
+{
+    vdre->vdre_check = pa;
+    atomic_fetch_add(pa, 1);
+}
+#endif
 
 static void
 vdre_add_pt(video_dmabuf_release_env_t * const vdre, struct pollqueue * pq, int fd)
@@ -954,6 +975,10 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
 
         zwp_linux_buffer_params_v1_destroy(params);
     }
+
+#if CHECK_VDRE_COUNTS
+    vdre_add_check(*pVdre, &sys->vdre_check_fg);
+#endif
     wl_buffer_add_listener(*pW_buffer, &w_buffer_listener, *pVdre);
 
     return VLC_SUCCESS;
@@ -1484,6 +1509,9 @@ make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const 
         goto err_unlock;
     }
 
+#if CHECK_VDRE_COUNTS
+    vdre_add_check(vdre, &sys->vdre_check_bkg);
+#endif
     vdre_eq_ref(vdre, sys->eq);
     wl_buffer_add_listener(w_buffer, &w_buffer_listener, vdre);
     wl_surface_attach(bkg_surface, w_buffer, 0, 0);
@@ -1637,7 +1665,7 @@ plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const s
 }
 
 static void
-set_video_viewport(vout_display_t * const vd, vout_display_sys_t * const sys)
+set_video_viewport(vout_display_sys_t * const sys)
 {
     if (!sys->video_attached)
         return;
@@ -1755,7 +1783,7 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
         commit_req(sys, COMMIT_VID);
     }
 
-    set_video_viewport(vd, sys);
+    set_video_viewport(sys);
 
     commit_do(vd, sys);
 
@@ -1838,7 +1866,7 @@ static int Control(vout_display_t *vd, int query, va_list ap)
 
             place_rects(vd, cfg);
 
-            set_video_viewport(vd, sys);
+            set_video_viewport(sys);
 
             if (sys->bkg_viewport != NULL && (cfg->display.width != sys->bkg_w || cfg->display.height != sys->bkg_h))
             {
@@ -2129,6 +2157,12 @@ static void Close(vlc_object_t *obj)
 no_window:
     fmt_list_uninit(&sys->dmabuf_fmts);
     fmt_list_uninit(&sys->shm_fmts);
+
+#if CHECK_VDRE_COUNTS
+    msg_Info(vd, "%s: vdre_check_bkg: %d", __func__, atomic_load(&sys->vdre_check_bkg));
+    msg_Info(vd, "%s: vdre_check_fg: %d", __func__, atomic_load(&sys->vdre_check_fg));
+#endif
+
     free(sys);
 
     msg_Dbg(vd, ">>> %s", __func__);
