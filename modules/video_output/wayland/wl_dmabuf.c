@@ -425,16 +425,6 @@ place_dest_rect(vout_display_t * const vd,
 }
 #endif
 
-static void
-place_rects(vout_display_t * const vd,
-          const vout_display_cfg_t * const cfg)
-{
-    vout_display_sys_t * const sys = vd->sys;
-
-    vout_display_PlacePicture(&sys->video_spe.dst_rect, &vd->source, cfg, true);
-}
-
-
 static int
 fmt_list_add(fmt_list_t * const fl, uint32_t fmt, uint64_t mod, int32_t pri)
 {
@@ -1605,6 +1595,16 @@ transform_from_fmt(const video_format_t * const fmt, vout_display_place_t * cons
 }
 
 static void
+place_rects(vout_display_t * const vd,
+          const vout_display_cfg_t * const cfg)
+{
+    vout_display_sys_t * const sys = vd->sys;
+
+    vout_display_PlacePicture(&sys->video_spe.dst_rect, &vd->source, cfg, true);
+    sys->video_spe.trans = transform_from_fmt(&vd->fmt, &sys->video_spe.src_rect);
+}
+
+static void
 plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const subpic_ent_t * const spe,
                const unsigned int commit_this, const unsigned int commit_parent)
 {
@@ -1641,8 +1641,6 @@ set_video_viewport(vout_display_t * const vd, vout_display_sys_t * const sys)
 {
     if (!sys->video_attached)
         return;
-
-    sys->video_spe.trans = transform_from_fmt(&vd->fmt, &sys->video_spe.src_rect);
 
     plane_set_rect(sys, sys->video_plane, &sys->video_spe, COMMIT_VID, COMMIT_BKG);
 }
@@ -1840,8 +1838,7 @@ static int Control(vout_display_t *vd, int query, va_list ap)
 
             place_rects(vd, cfg);
 
-            if (sys->video_plane->viewport)
-                set_video_viewport(vd, sys);
+            set_video_viewport(vd, sys);
 
             if (sys->bkg_viewport != NULL && (cfg->display.width != sys->bkg_w || cfg->display.height != sys->bkg_h))
             {
