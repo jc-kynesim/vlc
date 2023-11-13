@@ -879,6 +879,66 @@ drm_fmt_to_wl_shm(const uint32_t drm_fmt)
            (drm_fmt == DRM_FORMAT_XRGB8888) ? WL_SHM_FORMAT_XRGB8888 : drm_fmt;
 }
 
+static struct wl_buffer *
+dfd_make_buffer(vout_display_t * const vd, vout_display_sys_t * const sys,
+                const bool use_shm,
+                const AVDRMFrameDescriptor * const desc,
+                const unsigned int width, const unsigned int height,
+                const uint32_t flags)
+{
+    struct wl_buffer * w_buffer;
+
+    if (!sys->bound.linux_dmabuf_v1 || use_shm)
+    {
+        const AVDRMPlaneDescriptor *const p = desc->layers[0].planes + 0;
+        struct wl_shm_pool *pool = wl_shm_create_pool(sys->bound.shm, desc->objects[0].fd, desc->objects[0].size);
+        const uint32_t w_fmt = drm_fmt_to_wl_shm(desc->layers[0].format);
+
+        if (pool == NULL)
+        {
+            msg_Err(vd, "Failed to create pool from dmabuf");
+            return NULL;
+        }
+        w_buffer = wl_shm_pool_create_buffer(pool, p->offset, width, height, p->pitch, w_fmt);
+        wl_shm_pool_destroy(pool);
+        if (w_buffer == NULL)
+            msg_Err(vd, "Failed to create buffer from pool");
+    }
+    else
+    {
+        /* Creation and configuration of planes  */
+        int i;
+        unsigned int n = 0;
+        struct zwp_linux_buffer_params_v1 * const params = zwp_linux_dmabuf_v1_create_params(sys->bound.linux_dmabuf_v1);
+
+        if (!params)
+        {
+            msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
+            return NULL;
+        }
+
+        for (i = 0; i < desc->nb_layers; ++i)
+        {
+            int j;
+            for (j = 0; j < desc->layers[i].nb_planes; ++j)
+            {
+                const AVDRMPlaneDescriptor *const p = desc->layers[i].planes + j;
+                const AVDRMObjectDescriptor *const obj = desc->objects + p->object_index;
+
+                zwp_linux_buffer_params_v1_add(params, obj->fd, n++, p->offset, p->pitch,
+                                   (unsigned int)(obj->format_modifier >> 32),
+                                   (unsigned int)(obj->format_modifier & 0xFFFFFFFF));
+            }
+        }
+
+        /* Request buffer creation */
+        if ((w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, desc->layers[0].format, flags)) == NULL)
+            msg_Err(vd, "zwp_linux_buffer_params_v1_create_immed FAILED");
+        zwp_linux_buffer_params_v1_destroy(params);
+    }
+    return w_buffer;
+}
+
 static int
 copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, picture_t * const src,
                         int alpha,
@@ -889,22 +949,40 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
     struct zwp_linux_buffer_params_v1 *params = NULL;
     uint64_t mod;
     const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format, &mod);
-    size_t total_size = 0;
-    size_t offset = 0;
     struct dmabuf_h * dh = NULL;
     int i;
+    AVDRMFrameDescriptor dfd = {
+        .nb_objects = 1,
+        .objects = {{
+            .fd = -1,
+            .size = 0,
+            .format_modifier = mod
+        }},
+        .nb_layers = 1,
+        .layers = {{
+            .format = drm_fmt,
+            .nb_planes = src->i_planes,
+        }}
+    };
 
     for (i = 0; i != src->i_planes; ++i)
-        total_size += cpypic_plane_alloc_size(src->p + i);
+    {
+        dfd.layers[0].planes[i].object_index = 0;
+        dfd.layers[0].planes[i].offset = dfd.objects[0].size;
+        dfd.layers[0].planes[i].pitch = src->p[i].i_pitch;
+        dfd.objects[0].size += cpypic_plane_alloc_size(src->p + i);
+    }
 
     *pW_buffer = NULL;
     *pVdre = NULL;
 
-    if ((dh = picpool_get(sys->subpic_pool, total_size)) == NULL)
+    if ((dh = picpool_get(sys->subpic_pool, dfd.objects[0].size)) == NULL)
     {
         msg_Warn(vd, "Failed to alloc dmabuf for subpic");
         goto error;
     }
+    dfd.objects[0].fd = dmabuf_fd(dh);
+
     if ((*pVdre = vdre_new_dh(dh, sys->pollq)) == NULL)
     {
         msg_Warn(vd, "Failed to alloc vdre for subpic");
@@ -912,69 +990,25 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
         goto error;
     }
 
-    if (dmabuf_is_fake(dh) || !sys->bound.linux_dmabuf_v1)
+    // Copy to dh
+    dmabuf_write_start(dh);
+    for (i = 0; i != dfd.layers[0].nb_planes; ++i)
     {
-        struct wl_shm_pool *pool = wl_shm_create_pool(sys->bound.shm, dmabuf_fd(dh), dmabuf_size(dh));
-        const uint32_t w_fmt = drm_fmt_to_wl_shm(drm_fmt);
-        const size_t stride = src->p[0].i_pitch;
-        const size_t size = cpypic_plane_alloc_size(src->p + 0);
-
-        assert(src->i_planes == 1);
-
-        if (pool == NULL)
-        {
-            msg_Err(vd, "Failed to create pool from dmabuf");
-            goto error;
-        }
-        *pW_buffer = wl_shm_pool_create_buffer(pool, 0, w, h, stride, w_fmt);
-        wl_shm_pool_destroy(pool);
-
-        if (*pW_buffer == NULL)
-        {
-            msg_Err(vd, "Failed to create buffer from pool");
-            goto error;
-        }
+        const size_t stride = dfd.layers[0].planes[i].pitch;
+        const size_t offset = dfd.layers[0].planes[i].offset;
+        void * const dst_data = (char *)dmabuf_map(dh) + offset;
 
         if (src->format.i_chroma == VLC_CODEC_RGBA ||
             src->format.i_chroma == VLC_CODEC_BGRA)
-            copy_frame_xxxa_with_premul(dmabuf_map(dh), stride, src->p[0].p_pixels, stride, w, h, alpha);
+            copy_frame_xxxa_with_premul(dst_data, stride, src->p[i].p_pixels, stride, w, h, alpha);
         else
-            memcpy((char *)dmabuf_map(dh) + offset, src->p[0].p_pixels, size);
+            memcpy(dst_data, src->p[i].p_pixels, cpypic_plane_alloc_size(src->p + i));
     }
-    else
-    {
-        if ((params = zwp_linux_dmabuf_v1_create_params(sys->bound.linux_dmabuf_v1)) == NULL)
-        {
-            msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
-            goto error;
-        }
+    dmabuf_write_end(dh);
 
-        dmabuf_write_start(dh);
-        for (i = 0; i != src->i_planes; ++i)
-        {
-            const size_t stride = src->p[i].i_pitch;
-            const size_t size = cpypic_plane_alloc_size(src->p + i);
-
-            if (src->format.i_chroma == VLC_CODEC_RGBA ||
-                src->format.i_chroma == VLC_CODEC_BGRA)
-                copy_frame_xxxa_with_premul(dmabuf_map(dh), stride, src->p[i].p_pixels, stride, w, h, alpha);
-            else
-                memcpy((char *)dmabuf_map(dh) + offset, src->p[i].p_pixels, size);
-
-            zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), i, offset, stride, 0, 0);
-
-            offset += size;
-        }
-        dmabuf_write_end(dh);
-
-        if ((*pW_buffer = zwp_linux_buffer_params_v1_create_immed(params, w, h, drm_fmt, 0)) == NULL)
-        {
-            msg_Err(vd, "zwp_linux_buffer_params_v1_create_immed FAILED");
-            goto error;
-        }
-
-        zwp_linux_buffer_params_v1_destroy(params);
-    }
+    *pW_buffer = dfd_make_buffer(vd, sys, dmabuf_is_fake(dh), &dfd, w, h, 0);
+    if (*pW_buffer == NULL)
+        goto error;
 
 #if CHECK_VDRE_COUNTS
     vdre_add_check(*pVdre, &sys->vdre_check_fg);
@@ -1017,15 +1051,11 @@ static int
 do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, picture_t * const pic,
                   video_dmabuf_release_env_t ** const pVdre, struct wl_buffer ** const pWbuffer)
 {
-    struct zwp_linux_buffer_params_v1 *params = NULL;
     const AVDRMFrameDescriptor * const desc = drm_prime_get_desc(pic);
-    const uint32_t format = desc->layers[0].format;
     const unsigned int width = pic->format.i_width;
     const unsigned int height = pic->format.i_height;
-    unsigned int n = 0;
     unsigned int flags = 0;
     int i;
-    struct wl_buffer * w_buffer;
     video_dmabuf_release_env_t * const vdre = vdre_new_ctx(pic->context);
 
     assert(*pWbuffer == NULL);
@@ -1039,75 +1069,21 @@ do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, pic
     for (i = 0; i != desc->nb_objects; ++i)
         vdre_add_pt(vdre, sys->pollq, desc->objects[i].fd);
 
-    if (!sys->bound.linux_dmabuf_v1)
+    if (!pic->b_progressive)
     {
-        const AVDRMPlaneDescriptor *const p = desc->layers[0].planes + 0;
-        struct wl_shm_pool *pool = wl_shm_create_pool(sys->bound.shm, desc->objects[0].fd, desc->objects[0].size);
-        const uint32_t w_fmt = format == DRM_FORMAT_ARGB8888 ? 0 :
-            format == DRM_FORMAT_XRGB8888 ? 1 : format;
-
-        if (pool == NULL)
-        {
-            msg_Err(vd, "Failed to create pool from dmabuf");
-            goto error;
-        }
-        w_buffer = wl_shm_pool_create_buffer(pool, p->offset, width, height, p->pitch, w_fmt);
-        wl_shm_pool_destroy(pool);
-        if (w_buffer == NULL)
-        {
-            msg_Err(vd, "Failed to create buffer from pool");
-            goto error;
-        }
+        flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_INTERLACED;
+        if (!pic->b_top_field_first)
+            flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_BOTTOM_FIRST;
     }
-    else
-    {
-        /* Creation and configuration of planes  */
-        params = zwp_linux_dmabuf_v1_create_params(sys->bound.linux_dmabuf_v1);
-        if (!params)
-        {
-            msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
-            goto error;
-        }
 
-        for (i = 0; i < desc->nb_layers; ++i)
-        {
-            int j;
-            for (j = 0; j < desc->layers[i].nb_planes; ++j)
-            {
-                const AVDRMPlaneDescriptor *const p = desc->layers[i].planes + j;
-                const AVDRMObjectDescriptor *const obj = desc->objects + p->object_index;
-
-                zwp_linux_buffer_params_v1_add(params, obj->fd, n++, p->offset, p->pitch,
-                                   (unsigned int)(obj->format_modifier >> 32),
-                                   (unsigned int)(obj->format_modifier & 0xFFFFFFFF));
-            }
-        }
-
-        if (!pic->b_progressive)
-        {
-            flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_INTERLACED;
-            if (!pic->b_top_field_first)
-                flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_BOTTOM_FIRST;
-        }
-
-        /* Request buffer creation */
-        if ((w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, format, flags)) == NULL)
-        {
-            msg_Err(vd, "zwp_linux_buffer_params_v1_create_immed FAILED");
-            goto error;
-        }
-
-        zwp_linux_buffer_params_v1_destroy(params);
-        params = NULL;
-    }
+    *pWbuffer = dfd_make_buffer(vd, sys, false, desc, width, height, flags);
+    if (*pWbuffer == NULL)
+        goto error;
 
     *pVdre = vdre;
-    *pWbuffer = w_buffer;
     return VLC_SUCCESS;
 
 error:
-    if (params)
-        zwp_linux_buffer_params_v1_destroy(params);
     vdre_free(vdre);
     return VLC_EGENERIC;
 }
@@ -1433,7 +1409,6 @@ make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const 
     // Build a background
     // Use single_pixel_surface extension if we have it & want a simple
     // single colour (black) patch
-    struct dmabuf_h * dh = NULL;
     video_dmabuf_release_env_t * vdre = NULL;
     struct wl_buffer * w_buffer = NULL;
     struct wl_surface * bkg_surface = NULL;
@@ -1456,12 +1431,27 @@ make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const 
         const unsigned int width = sys->chequerboard ? 640 : 32;
         const unsigned int height = sys->chequerboard ? 480 : 32;
         const unsigned int stride = width * 4;
+        struct dmabuf_h * const dh = picpool_get(sys->subpic_pool, stride * height);
+        const AVDRMFrameDescriptor dfd = {
+            .nb_objects = 1,
+            .objects = {{
+                .fd = dmabuf_fd(dh),
+                .size = dmabuf_size(dh)}},
+            .nb_layers = 1,
+            .layers = {{
+                .format = DRM_FORMAT_XRGB8888,
+                .nb_planes = 1,
+                .planes = {{.pitch = stride}}
+            }}
+        };
 
-        if ((dh = picpool_get(sys->subpic_pool, stride * height)) == NULL)
+        if (dh == NULL)
         {
             msg_Err(vd, "Failed to get DmaBuf for background");
             goto error;
         }
+
+        vdre = vdre_new_dh(dh, sys->pollq);
 
         dmabuf_write_start(dh);
         if (sys->chequerboard)
@@ -1470,32 +1460,7 @@ make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const 
             fill_uniform(dmabuf_map(dh), stride, width, height, 0xff000000);
         dmabuf_write_end(dh);
 
-        if (sys->use_shm)
-        {
-            struct wl_shm_pool *pool = wl_shm_create_pool(sys->bound.shm, dmabuf_fd(dh), dmabuf_size(dh));
-            if (pool == NULL)
-            {
-                msg_Err(vd, "Failed to create pool from dmabuf");
-                goto error;
-            }
-            w_buffer = wl_shm_pool_create_buffer(pool, 0, width, height, stride, WL_SHM_FORMAT_XRGB8888);
-            wl_shm_pool_destroy(pool);
-        }
-        else
-        {
-            struct zwp_linux_buffer_params_v1 *params;
-            params = zwp_linux_dmabuf_v1_create_params(sys->bound.linux_dmabuf_v1);
-            if (!params) {
-                msg_Err(vd, "zwp_linux_dmabuf_v1_create_params FAILED");
-                goto error;
-            }
-            zwp_linux_buffer_params_v1_add(params, dmabuf_fd(dh), 0, 0, stride, 0, 0);
-            w_buffer = zwp_linux_buffer_params_v1_create_immed(params, width, height, DRM_FORMAT_XRGB8888, 0);
-            zwp_linux_buffer_params_v1_destroy(params);
-        }
-
-        vdre = vdre_new_dh(dh, sys->pollq);
-        dh = NULL;
+        w_buffer = dfd_make_buffer(vd, sys, dmabuf_is_fake(dh), &dfd, width, height, 0);
     }
     if (!w_buffer || !vdre)
     {
@@ -1546,7 +1511,6 @@ err_unlock:
 error:
     buffer_destroy(&w_buffer);
     vdre_delete(&vdre);
-    dmabuf_unref(&dh);
     return VLC_ENOMEM;
 }
 
