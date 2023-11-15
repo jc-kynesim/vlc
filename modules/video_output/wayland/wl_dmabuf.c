@@ -139,6 +139,8 @@ typedef struct subplane_s {
     struct wl_subsurface * subsurface;
     struct wp_viewport * viewport;
 
+    bool buffer_attached;
+
     enum wl_output_transform trans;
     vout_display_place_t src_rect;
     vout_display_place_t dst_rect;
@@ -176,7 +178,6 @@ struct vout_display_sys_t
 
     int x;
     int y;
-    bool video_attached;
     bool use_shm;
     bool chequerboard;
 
@@ -1101,12 +1102,18 @@ subpic_ent_flush(subpic_ent_t * const spe)
 }
 
 static void
-subpic_ent_attach(struct wl_surface * const surface, subpic_ent_t * const spe, eq_env_t * eq)
+subpic_ent_attach(subplane_t * const plane, subpic_ent_t * const spe, eq_env_t * const eq)
 {
+    struct wl_surface *const surface = plane->surface;
+
     if (spe->wb == NULL)
     {
         vdre_delete(&spe->vdre);
-        wl_surface_attach(surface, NULL, 0, 0);
+        if (plane->buffer_attached)
+        {
+            wl_surface_attach(surface, NULL, 0, 0);
+            plane->buffer_attached = false;
+        }
     }
     else
     {
@@ -1116,6 +1123,7 @@ subpic_ent_attach(struct wl_surface * const surface, subpic_ent_t * const spe, e
         spe->vdre = NULL;
         spe->wb = NULL;
         wl_surface_damage(surface, 0, 0, INT32_MAX, INT32_MAX);
+        plane->buffer_attached = true;
     }
 }
 
@@ -1281,18 +1289,21 @@ clear_surface_buffer(struct wl_surface * surface)
 }
 
 static void
+plane_clear(subplane_t * const plane)
+{
+    spe_delete(&plane->spe_next);
+    spe_delete(&plane->spe_cur);
+    plane->buffer_attached = false;
+    clear_surface_buffer(plane->surface);
+}
+
+static void
 clear_all_buffers(vout_display_sys_t * const sys, const bool bkg_valid)
 {
     for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
-    {
-        subplane_t *const plane = sys->subplanes + i;
-        spe_delete(&plane->spe_next);
-        spe_delete(&plane->spe_cur);
-        clear_surface_buffer(plane->surface);
-    }
+        plane_clear(sys->subplanes + i);
 
-    clear_surface_buffer(video_surface(sys));
-    sys->video_attached = false;
+    plane_clear(sys->video_plane);
 
     if (bkg_valid)
         clear_surface_buffer(sys->last_embed_surface);
@@ -1307,6 +1318,7 @@ plane_destroy(subplane_t * const spl)
     subsurface_destroy(&spl->subsurface);
     surface_destroy(&spl->surface);
     // Zap all tracking vars
+    spl->buffer_attached = false;
     spl->trans = 0;
     memset(&spl->src_rect, 0, sizeof(spl->src_rect));
     memset(&spl->dst_rect, 0, sizeof(spl->dst_rect));
@@ -1604,6 +1616,10 @@ static void
 plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const subpic_ent_t * const spe,
                const unsigned int commit_this, const unsigned int commit_parent)
 {
+    // Always called after the attach
+    if (!plane->buffer_attached || spe == NULL)
+        return;
+
     if (spe->trans != plane->trans)
     {
         wl_surface_set_buffer_transform(plane->surface, spe->trans);
@@ -1630,15 +1646,6 @@ plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const s
     plane->trans = spe->trans;
     plane->src_rect = spe->src_rect;
     plane->dst_rect = spe->dst_rect;
-}
-
-static void
-set_video_viewport(vout_display_sys_t * const sys)
-{
-    if (!sys->video_attached)
-        return;
-
-    plane_set_rect(sys, sys->video_plane, &sys->video_spe, COMMIT_VID, COMMIT_BKG);
 }
 
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
@@ -1732,12 +1739,11 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
             spe_delete(&plane->spe_cur);
             spe = plane->spe_cur = plane->spe_next;
             plane->spe_next = NULL;
-            subpic_ent_attach(plane->surface, spe, sys->eq);
+            subpic_ent_attach(plane, spe, sys->eq);
             commit_req(sys, COMMIT_SUB + i);
         }
 
-        if (!spe_no_pic(spe))
-            plane_set_rect(sys, plane, spe, COMMIT_SUB + i, COMMIT_VID);
+        plane_set_rect(sys, plane, spe, COMMIT_SUB + i, COMMIT_VID);
     }
 
     if (!sys->video_spe.wb)
@@ -1746,12 +1752,11 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     }
     else
     {
-        subpic_ent_attach(video_surface(sys), &sys->video_spe, sys->eq);
-        sys->video_attached = true;
+        subpic_ent_attach(sys->video_plane, &sys->video_spe, sys->eq);
         commit_req(sys, COMMIT_VID);
     }
 
-    set_video_viewport(sys);
+    plane_set_rect(sys, sys->video_plane, &sys->video_spe, COMMIT_VID, COMMIT_BKG);
 
     commit_do(vd, sys);
 
@@ -1833,8 +1838,7 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             }
 
             place_rects(vd, cfg);
-
-            set_video_viewport(sys);
+            plane_set_rect(sys, sys->video_plane, &sys->video_spe, COMMIT_VID, COMMIT_BKG);
 
             if (sys->bkg_viewport != NULL && (cfg->display.width != sys->bkg_w || cfg->display.height != sys->bkg_h))
             {
