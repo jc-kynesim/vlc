@@ -947,7 +947,6 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
 {
     unsigned int w = src->format.i_width;
     unsigned int h = src->format.i_height;
-    struct zwp_linux_buffer_params_v1 *params = NULL;
     uint64_t mod;
     const uint32_t drm_fmt = drmu_format_vlc_to_drm(&src->format, &mod);
     struct dmabuf_h * dh = NULL;
@@ -1018,8 +1017,6 @@ copy_subpic_to_w_buffer(vout_display_t *vd, vout_display_sys_t * const sys, pict
     return VLC_SUCCESS;
 
 error:
-    if (params)
-        zwp_linux_buffer_params_v1_destroy(params);
     vdre_delete(pVdre);
     return VLC_EGENERIC;
 }
