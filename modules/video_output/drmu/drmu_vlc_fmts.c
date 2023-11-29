@@ -54,17 +54,17 @@ static const drmu_vlc_fmt_info_t fmt_table[] = {
     I2(VLC_CODEC_I444, DRM_FORMAT_YUV444),
     { VLC_CODEC_J444, DRM_FORMAT_YUV444, 0, 0, 0, DRM_FORMAT_MOD_LINEAR, DRMU_VLC_FMTS_FLAG_FULL_RANGE },
 #if HAS_DRMPRIME
-    { VLC_CODEC_DRM_PRIME_I420,   DRM_FORMAT_YUV420,   0, 0, 0, DRM_FORMAT_MOD_LINEAR,                         DRMU_VLC_FMTS_FLAG_DRMP },
-    { VLC_CODEC_DRM_PRIME_NV12,   DRM_FORMAT_NV12,     0, 0, 0, DRM_FORMAT_MOD_LINEAR,                         DRMU_VLC_FMTS_FLAG_DRMP },
-    { VLC_CODEC_DRM_PRIME_SAND8,  DRM_FORMAT_NV12,     0, 0, 0, DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(0), DRMU_VLC_FMTS_FLAG_DRMP },
-    { VLC_CODEC_DRM_PRIME_SAND30, DRM_FORMAT_P030,     0, 0, 0, DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(0), DRMU_VLC_FMTS_FLAG_DRMP },
-    { VLC_CODEC_DRM_PRIME_RGB32,  DRM_FORMAT_XRGB8888, 0, 0, 0, DRM_FORMAT_MOD_LINEAR,                         DRMU_VLC_FMTS_FLAG_DRMP },
+    { VLC_CODEC_DRM_PRIME_I420,   DRM_FORMAT_YUV420,   0, 0, 0, DRM_FORMAT_MOD_LINEAR,           DRMU_VLC_FMTS_FLAG_DRMP },
+    { VLC_CODEC_DRM_PRIME_NV12,   DRM_FORMAT_NV12,     0, 0, 0, DRM_FORMAT_MOD_LINEAR,           DRMU_VLC_FMTS_FLAG_DRMP },
+    { VLC_CODEC_DRM_PRIME_SAND8,  DRM_FORMAT_NV12,     0, 0, 0, DRM_FORMAT_MOD_BROADCOM_SAND128, DRMU_VLC_FMTS_FLAG_DRMP },
+    { VLC_CODEC_DRM_PRIME_SAND30, DRM_FORMAT_P030,     0, 0, 0, DRM_FORMAT_MOD_BROADCOM_SAND128, DRMU_VLC_FMTS_FLAG_DRMP },
+    { VLC_CODEC_DRM_PRIME_RGB32,  DRM_FORMAT_XRGB8888, 0, 0, 0, DRM_FORMAT_MOD_LINEAR,           DRMU_VLC_FMTS_FLAG_DRMP },
 #endif
 #if HAS_ZC_CMA
-    { VLC_CODEC_MMAL_ZC_I420,     DRM_FORMAT_YUV420,   0, 0, 0, DRM_FORMAT_MOD_LINEAR,                         DRMU_VLC_FMTS_FLAG_ZC },
-    { VLC_CODEC_MMAL_ZC_SAND8,    DRM_FORMAT_NV12,     0, 0, 0, DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(0), DRMU_VLC_FMTS_FLAG_ZC },
-    { VLC_CODEC_MMAL_ZC_SAND30,   DRM_FORMAT_P030,     0, 0, 0, DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(0), DRMU_VLC_FMTS_FLAG_ZC },
-    { VLC_CODEC_MMAL_ZC_RGB32,    DRM_FORMAT_RGBX8888, 0, 0, 0, DRM_FORMAT_MOD_LINEAR,                         DRMU_VLC_FMTS_FLAG_ZC },
+    { VLC_CODEC_MMAL_ZC_I420,     DRM_FORMAT_YUV420,   0, 0, 0, DRM_FORMAT_MOD_LINEAR,           DRMU_VLC_FMTS_FLAG_ZC },
+    { VLC_CODEC_MMAL_ZC_SAND8,    DRM_FORMAT_NV12,     0, 0, 0, DRM_FORMAT_MOD_BROADCOM_SAND128, DRMU_VLC_FMTS_FLAG_ZC },
+    { VLC_CODEC_MMAL_ZC_SAND30,   DRM_FORMAT_P030,     0, 0, 0, DRM_FORMAT_MOD_BROADCOM_SAND128, DRMU_VLC_FMTS_FLAG_ZC },
+    { VLC_CODEC_MMAL_ZC_RGB32,    DRM_FORMAT_RGBX8888, 0, 0, 0, DRM_FORMAT_MOD_LINEAR,           DRMU_VLC_FMTS_FLAG_ZC },
 #endif
 
     RM(VLC_CODEC_RGB32, DRM_FORMAT_XRGB8888, 0xff0000, 0xff00, 0xff),
@@ -107,14 +107,22 @@ drmu_vlc_fmt_info_find_vlc(const video_frame_format_t * const vf_vlc)
     return drmu_vlc_fmt_info_find_vlc_next(vf_vlc, NULL);
 }
 
+// Remove any params from a modifier
+static inline uint64_t canon_mod(const uint64_t m)
+{
+    return fourcc_mod_is_vendor(m, BROADCOM) ? fourcc_mod_broadcom_mod(m) : m;
+}
+
 const drmu_vlc_fmt_info_t *
 drmu_vlc_fmt_info_find_drm_next(const uint32_t pixelformat, const uint64_t modifier, const drmu_vlc_fmt_info_t * f)
 {
+    const uint64_t cmod = canon_mod(modifier);
+
     f = (f == NULL) ? fmt_table : f + 1;
 
     for (; f->vlc_chroma != 0; ++f)
     {
-        if (f->drm_pixelformat != pixelformat || f->drm_modifier != modifier)
+        if (f->drm_pixelformat != pixelformat || f->drm_modifier != cmod)
             continue;
         // Only return the "base" version
         if (f->flags != 0)
