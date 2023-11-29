@@ -1,5 +1,6 @@
 set -e
 BASE=`pwd`
+OUT_BASE=$BASE/out
 
 DO_BOOTSTRAP=
 DO_MAKE=
@@ -54,7 +55,7 @@ else
   echo "Unknown machine name: $MC"
   exit 1
 fi
-OUT=$BASE/out/$ARM-`lsb_release -sc`-rel
+OUT=$OUT_BASE/$ARM-`lsb_release -sc`-rel
 
 if [ $DO_BOOTSTRAP ]; then
     echo "==== Bootstrapping & cleaning $OUT"
@@ -73,7 +74,7 @@ INC_PREFIX=$USR_PREFIX/include/$A
 echo "==== Configuring in $OUT"
 mkdir -p $OUT
 # Nothing under here need worry git - including this .gitignore!
-echo "**" > $BASE/out/.gitignore
+echo "**" > $OUT_BASE/.gitignore
 
 cd $OUT
 if [ $DO_CONFIGURE ]; then
