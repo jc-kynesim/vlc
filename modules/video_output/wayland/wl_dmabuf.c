@@ -1652,6 +1652,8 @@ plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const s
     }
     if (!place_eq(spe->src_rect, plane->src_rect))
     {
+        fprintf(stderr, "%s[%d]: %dx%d @ %d,%d tr %d\n", __func__, (int)(plane - sys->subplanes) + 1,
+                 spe->src_rect.width, spe->src_rect.height, spe->src_rect.x, spe->src_rect.y, spe->trans);
         wp_viewport_set_source(plane->viewport,
                                wl_fixed_from_int(spe->src_rect.x), wl_fixed_from_int(spe->src_rect.y),
                                wl_fixed_from_int(spe->src_rect.width), wl_fixed_from_int(spe->src_rect.height));
@@ -1664,6 +1666,8 @@ plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const s
     }
     if (!place_wh_eq(spe->dst_rect, plane->dst_rect))
     {
+        fprintf(stderr, "%s[%d]: %dx%d @ %d,%d tr %d\n", __func__, (int)(plane - sys->subplanes) + 1,
+                 spe->dst_rect.width, spe->dst_rect.height, spe->dst_rect.x, spe->dst_rect.y, spe->trans);
         wp_viewport_set_destination(plane->viewport, spe->dst_rect.width, spe->dst_rect.height);
         commit_req(sys, commit_parent); // Subsurface pos needs parent commit (video)
     }
@@ -1782,14 +1786,6 @@ do_display(void * v, short revents)
 
     msg_Info(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
 
-    // Check we have a surface to put the video on
-    if (bkg_surface_get_lock(vd, sys) == NULL)
-    {
-        msg_Warn(vd, "%s: No background surface", __func__);
-        return;
-    }
-    bkg_surface_unlock(vd, sys);
-
     pthread_mutex_lock(&sys->display_lock);
 
     if (spe_no_pic(sys->video_plane->spe_cur))
@@ -1827,16 +1823,24 @@ do_display(void * v, short revents)
         subpic_ent_t * spe = spe = plane->spe_cur;
 
         subpic_ent_attach(plane, spe, sys->eq);
-        spe_delete(&plane->spe_cur);
+        commit_req(sys, COMMIT_VID);
+
+        plane_set_rect(sys, plane, spe, COMMIT_VID, COMMIT_BKG);
 
         sys->video_frame_done = false;
         sys->video_frame_callback = wl_surface_frame(video_surface(sys));
         wl_callback_add_listener(sys->video_frame_callback, &video_frame_callback_listener, vd);
 
-        commit_req(sys, COMMIT_VID);
-
-        plane_set_rect(sys, plane, spe, COMMIT_VID, COMMIT_BKG);
+        spe_delete(&plane->spe_cur);
     }
+
+    if (sys->bkg_viewport != NULL && (vd->cfg->display.width != sys->bkg_w || vd->cfg->display.height != sys->bkg_h))
+    {
+        msg_Dbg(vd, "Resize background: %dx%d", vd->cfg->display.width, vd->cfg->display.height);
+        commit_req(sys, COMMIT_BKG);
+    }
+    sys->bkg_w = vd->cfg->display.width;
+    sys->bkg_h = vd->cfg->display.height;
 
     commit_do(vd, sys);
 
@@ -1853,14 +1857,24 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 #endif
 
 #if 1
-    bool kick;
+    bool kick = false;
     pthread_mutex_lock(&sys->display_lock);
-    kick = sys->video_frame_done;
+
+    // Check we have a surface to put the video on
+    if (bkg_surface_get_lock(vd, sys) == NULL)
+    {
+        msg_Warn(vd, "%s: No background surface", __func__);
+        goto done;
+    }
+    bkg_surface_unlock(vd, sys);
+
     if (!sys->video_plane->spe_next)
     {
         msg_Warn(vd, "No next video spe");
         goto done;
     }
+
+    kick = sys->video_frame_done;
     if (sys->video_plane->spe_cur)
     {
         msg_Warn(vd, "Current video spe discarded");
@@ -1869,7 +1883,9 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     }
     sys->video_plane->spe_cur = sys->video_plane->spe_next;
     sys->video_plane->spe_next = NULL;
+done:
     pthread_mutex_unlock(&sys->display_lock);
+    msg_Dbg(vd, "kick: %d, frame_done: %d", kick, sys->video_frame_done);
 
     if (kick)
         pollqueue_add_task(sys->display_pt, 0);
@@ -1923,9 +1939,9 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     plane_set_rect(sys, sys->video_plane, &sys->video_spe, COMMIT_VID, COMMIT_BKG);
 
     commit_do(vd, sys);
+done:
 #endif
 
-done:
     if (subpic)
         subpicture_Delete(subpic);
     picture_Release(pic);
@@ -2004,7 +2020,7 @@ static int Control(vout_display_t *vd, int query, va_list ap)
 
             place_rects(vd, cfg);
 //            plane_set_rect(sys, sys->video_plane, &sys->video_spe, COMMIT_VID, COMMIT_BKG);
-
+#if 0
             if (sys->bkg_viewport != NULL && (cfg->display.width != sys->bkg_w || cfg->display.height != sys->bkg_h))
             {
                 msg_Dbg(vd, "Resize background: %dx%d", cfg->display.width, cfg->display.height);
@@ -2013,6 +2029,7 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             sys->bkg_w = cfg->display.width;
             sys->bkg_h = cfg->display.height;
             commit_do(vd, sys);
+#endif
             break;
         }
         default:
