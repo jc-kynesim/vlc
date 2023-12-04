@@ -210,6 +210,7 @@ struct vout_display_sys_t
     picpool_ctl_t * subpic_pool;
     subplane_t planes[MAX_SUBPICS + 2];
     bool video_frame_done;
+    subpic_ent_t * video_spe_prep;
     struct wl_callback * video_frame_callback;
     vlc_fourcc_t * subpic_chromas;
 
@@ -1309,8 +1310,11 @@ commit_do(vout_display_t * const vd, vout_display_sys_t * const sys)
         struct wl_surface * const bkg_surface = bkg_surface_get_lock(vd, sys);
         if (bkg_surface != NULL)
         {
-            wp_viewport_set_destination(sys->bkg_viewport, sys->bkg_w, sys->bkg_h);
-            wl_surface_commit(bkg_surface);
+            if (sys->bkg_viewport)
+            {
+                wp_viewport_set_destination(sys->bkg_viewport, sys->bkg_w, sys->bkg_h);
+                wl_surface_commit(bkg_surface);
+            }
             bkg_surface_unlock(vd, sys);
             flush_req = true;
         }
@@ -1343,6 +1347,7 @@ clear_all_buffers(vout_display_sys_t * const sys, const bool bkg_valid)
 {
     for (unsigned int i = MAX_SUBPICS + 1; i != 0; --i)
         plane_clear(sys->planes + i);
+    spe_delete(&sys->video_spe_prep);
 
     if (bkg_valid)
         clear_surface_buffer(sys->last_embed_surface);
@@ -1710,7 +1715,7 @@ video_frame_callback_cb(void *data, struct wl_callback *callback, uint32_t time_
 
     pthread_mutex_lock(&sys->display_lock);
     sys->video_frame_done = true;
-    if (sys->planes[COMMIT_VID].spe_cur)
+    if (sys->planes[COMMIT_VID].spe_next)
     {
         ++sys->stats.frame_frame;
         do_display(vd, sys);
@@ -1746,13 +1751,19 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
         spe->dst_rect = sys->video_dst_rect;
         spe->orig_rect = spe->dst_rect;
 
-        spe_delete(&sys->planes[COMMIT_VID].spe_next);
-        sys->planes[COMMIT_VID].spe_next = spe;
+        if (sys->video_spe_prep)
+        {
+            msg_Err(vd, "Spe prep != NULL");
+            spe_delete(&sys->video_spe_prep);
+            ++sys->stats.frame_discard;
+        }
+        sys->video_spe_prep = spe;
 
         if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) == 0)
             copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &spe->vdre, &spe->wb);
         else
             do_display_dmabuf(vd, sys, pic, &spe->vdre, &spe->wb);
+        atomic_store(&spe->ready, 1);
         wl_display_flush(video_display(sys)); // Kick off any work required by Wayland
     }
 
@@ -1803,6 +1814,29 @@ subpics_done:
 }
 
 static void
+do_resize(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+    if (!sys->bkg_viewport)
+        return;
+
+    for (unsigned int i = COMMIT_VID; i != COMMIT_SUB + MAX_SUBPICS; ++i)
+    {
+        subplane_t * const plane = sys->planes + i;
+        subpic_ent_t * spe = plane->spe_cur;
+
+        plane_set_rect(sys, plane, spe);
+    }
+
+    if (sys->bkg_viewport != NULL && (vd->cfg->display.width != sys->bkg_w || vd->cfg->display.height != sys->bkg_h))
+    {
+        msg_Dbg(vd, "Resize background: %dx%d", vd->cfg->display.width, vd->cfg->display.height);
+        commit_req(sys, COMMIT_BKG);
+    }
+    sys->bkg_w = vd->cfg->display.width;
+    sys->bkg_h = vd->cfg->display.height;
+}
+
+static void
 do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
 {
 //    msg_Info(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
@@ -1812,22 +1846,22 @@ do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
         sys->stats.time_frame0 = sys->stats.time_frameN;
     ++sys->stats.frame_n;
 
-    if (spe_no_pic(sys->planes[COMMIT_VID].spe_cur))
+    if (spe_no_pic(sys->planes[COMMIT_VID].spe_next))
     {
         msg_Warn(vd, "%s: No current pic", __func__);
-        return;
+        goto fail;
     }
 
     if (make_background_and_video(vd, sys) != 0)
     {
         msg_Warn(vd, "%s: Make background fail", __func__);
-        return;
+        goto fail;
     }
     make_subpic_surfaces(vd, sys);
 
-    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
+    for (unsigned int i = COMMIT_VID; i != COMMIT_SUB + MAX_SUBPICS; ++i)
     {
-        subplane_t * const plane = sys->planes + i + COMMIT_SUB;
+        subplane_t * const plane = sys->planes + i;
         subpic_ent_t * spe = plane->spe_cur;
 
         if (plane->spe_next && atomic_load(&plane->spe_next->ready))
@@ -1837,10 +1871,13 @@ do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
             plane->spe_next = NULL;
             subpic_ent_attach(plane, spe, sys->eq);
         }
-
-        plane_set_rect(sys, plane, spe);
     }
 
+#if 1
+    sys->video_frame_done = false;
+    sys->video_frame_callback = wl_surface_frame(video_surface(sys));
+    wl_callback_add_listener(sys->video_frame_callback, &video_frame_callback_listener, vd);
+#else
     {
         subplane_t * const plane = sys->planes + COMMIT_VID;
         subpic_ent_t * spe = spe = plane->spe_cur;
@@ -1855,16 +1892,15 @@ do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
 
         spe_delete(&plane->spe_cur);
     }
-
-    if (sys->bkg_viewport != NULL && (vd->cfg->display.width != sys->bkg_w || vd->cfg->display.height != sys->bkg_h))
-    {
-        msg_Dbg(vd, "Resize background: %dx%d", vd->cfg->display.width, vd->cfg->display.height);
-        commit_req(sys, COMMIT_BKG);
-    }
-    sys->bkg_w = vd->cfg->display.width;
-    sys->bkg_h = vd->cfg->display.height;
+#endif
+    do_resize(vd, sys);
 
     commit_do(vd, sys);
+    return;
+
+fail:
+    // On error we haven't re-registered the frame callback so pretend it has already run
+    sys->video_frame_done = true;
 }
 
 static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
@@ -1875,7 +1911,6 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
 #endif
 
-#if 1
     bool kick = false;
     pthread_mutex_lock(&sys->display_lock);
 
@@ -1887,22 +1922,22 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     }
     bkg_surface_unlock(vd, sys);
 
-    if (!sys->planes[COMMIT_VID].spe_next)
+    if (!sys->video_spe_prep)
     {
-        msg_Warn(vd, "No next video spe");
+        msg_Warn(vd, "No prepared video spe");
         goto done;
     }
 
     kick = sys->video_frame_done;
-    if (sys->planes[COMMIT_VID].spe_cur)
+    if (sys->planes[COMMIT_VID].spe_next)
     {
         msg_Warn(vd, "Current video spe discarded");
-        spe_delete(&sys->planes[COMMIT_VID].spe_cur);
+        spe_delete(&sys->planes[COMMIT_VID].spe_next);
         ++sys->stats.frame_discard;
         kick = false; // Must have already kicked
     }
-    sys->planes[COMMIT_VID].spe_cur = sys->planes[COMMIT_VID].spe_next;
-    sys->planes[COMMIT_VID].spe_next = NULL;
+    sys->planes[COMMIT_VID].spe_next = sys->video_spe_prep;
+    sys->video_spe_prep = NULL;
 done:
     if (kick)
     {
@@ -1911,61 +1946,6 @@ done:
     }
     pthread_mutex_unlock(&sys->display_lock);
     msg_Dbg(vd, "kick: %d, frame_done: %d", kick, sys->video_frame_done);
-
-//    if (kick)
-//        pollqueue_add_task(sys->display_pt, 0);
-#else
-    // Check we have a surface to put the video on
-    if (bkg_surface_get_lock(vd, sys) == NULL)
-    {
-        msg_Warn(vd, "%s: No background surface", __func__);
-        goto done;
-    }
-    bkg_surface_unlock(vd, sys);
-
-    if (make_background_and_video(vd, sys) != 0)
-    {
-        msg_Warn(vd, "%s: Make background fail", __func__);
-        goto done;
-    }
-    make_subpic_surfaces(vd, sys);
-
-    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
-    {
-        subplane_t * const plane = sys->subplanes + i;
-        subpic_ent_t * spe = plane->spe_cur;
-
-        if (plane->spe_next && atomic_load(&plane->spe_next->ready))
-        {
-            spe_delete(&plane->spe_cur);
-            spe = plane->spe_cur = plane->spe_next;
-            plane->spe_next = NULL;
-            subpic_ent_attach(plane, spe, sys->eq);
-            commit_req(sys, COMMIT_SUB + i);
-        }
-
-        plane_set_rect(sys, plane, spe, COMMIT_SUB + i, COMMIT_VID);
-    }
-
-    if (!sys->video_spe.wb)
-    {
-        msg_Warn(vd, "Display called but no prepared pic buffer");
-    }
-    else
-    {
-        subpic_ent_attach(sys->video_plane, &sys->video_spe, sys->eq);
-
-        sys->video_frame_callback = wl_surface_frame(video_surface(sys));
-        wl_callback_add_listener(sys->video_frame_callback, &video_frame_callback_listener, sys);
-
-        commit_req(sys, COMMIT_VID);
-    }
-
-    plane_set_rect(sys, sys->video_plane, &sys->video_spe, COMMIT_VID, COMMIT_BKG);
-
-    commit_do(vd, sys);
-done:
-#endif
 
     if (subpic)
         subpicture_Delete(subpic);
@@ -2043,7 +2023,11 @@ static int Control(vout_display_t *vd, int query, va_list ap)
                 cfg = va_arg(ap, const vout_display_cfg_t *);
             }
 
+            pthread_mutex_lock(&sys->display_lock);
             place_rects(vd, cfg);
+            do_resize(vd, sys);
+            commit_do(vd, sys);
+            pthread_mutex_unlock(&sys->display_lock);
 //            plane_set_rect(sys, sys->video_plane, &sys->video_spe, COMMIT_VID, COMMIT_BKG);
 #if 0
             if (sys->bkg_viewport != NULL && (cfg->display.width != sys->bkg_w || cfg->display.height != sys->bkg_h))
