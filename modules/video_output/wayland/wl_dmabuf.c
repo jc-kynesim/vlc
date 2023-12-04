@@ -218,11 +218,31 @@ struct vout_display_sys_t
 
     fmt_list_t dmabuf_fmts;
     fmt_list_t shm_fmts;
+
+    struct display_stats_s {
+        unsigned int frame_n;
+        unsigned int frame_frame;
+        unsigned int frame_display;
+        unsigned int frame_discard;
+        vlc_tick_t time_frame0;
+        vlc_tick_t time_frameN;
+    } stats;
 };
 
 
 static struct wl_surface * bkg_surface_get_lock(vout_display_t * const vd, vout_display_sys_t * const sys);
 static void bkg_surface_unlock(vout_display_t * const vd, vout_display_sys_t * const sys);
+
+static void
+msg_stats(vout_display_t * const vd, const struct display_stats_s * const s)
+{
+    unsigned int tframes = (s->frame_n + s->frame_discard);
+    unsigned int frx1000 = tframes < 2 ? 0 :
+            (unsigned int)((uint64_t)(tframes - 1) * 1000000000ULL / (s->time_frameN - s->time_frame0));
+    msg_Info(vd, "Frames: Total: %d, Discarded %d, Display %d:Frame %d FpS(total):%d.%03d",
+             tframes, s->frame_discard, s->frame_display, s->frame_frame,
+             frx1000 / 1000, frx1000 % 1000);
+}
 
 
 static inline struct wl_display *
@@ -1677,6 +1697,8 @@ plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const s
     plane->dst_rect = spe->dst_rect;
 }
 
+static void do_display(vout_display_t * const vd, vout_display_sys_t * const sys);
+
 static void
 video_frame_callback_cb(void *data, struct wl_callback *callback, uint32_t time_ms)
 {
@@ -1690,10 +1712,13 @@ video_frame_callback_cb(void *data, struct wl_callback *callback, uint32_t time_
     pthread_mutex_lock(&sys->display_lock);
     sys->video_frame_done = true;
     if (sys->video_plane->spe_cur)
-        pollqueue_add_task(sys->display_pt, 0);
+    {
+        ++sys->stats.frame_frame;
+        do_display(vd, sys);
+    }
     pthread_mutex_unlock(&sys->display_lock);
 
-    msg_Info(vd, "%s", __func__);
+    msg_Dbg(vd, "%s", __func__);
 }
 
 static const struct wl_callback_listener video_frame_callback_listener = {
@@ -1778,15 +1803,16 @@ subpics_done:
 }
 
 static void
-do_display(void * v, short revents)
+do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
 {
-    vout_display_t * const vd = v;
-    vout_display_sys_t * const sys = vd->sys;
-    VLC_UNUSED(revents);
+//    msg_Info(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
 
-    msg_Info(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
+//    pthread_mutex_lock(&sys->display_lock);
 
-    pthread_mutex_lock(&sys->display_lock);
+    sys->stats.time_frameN = mdate();
+    if (!sys->stats.time_frame0)
+        sys->stats.time_frame0 = sys->stats.time_frameN;
+    ++sys->stats.frame_n;
 
     if (spe_no_pic(sys->video_plane->spe_cur))
     {
@@ -1845,7 +1871,7 @@ do_display(void * v, short revents)
     commit_do(vd, sys);
 
 done_release:
-    pthread_mutex_unlock(&sys->display_lock);
+//    pthread_mutex_unlock(&sys->display_lock);
 }
 
 static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
@@ -1879,16 +1905,22 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     {
         msg_Warn(vd, "Current video spe discarded");
         spe_delete(&sys->video_plane->spe_cur);
+        ++sys->stats.frame_discard;
         kick = false; // Must have already kicked
     }
     sys->video_plane->spe_cur = sys->video_plane->spe_next;
     sys->video_plane->spe_next = NULL;
 done:
+    if (kick)
+    {
+        ++sys->stats.frame_display;
+        do_display(vd, sys);
+    }
     pthread_mutex_unlock(&sys->display_lock);
     msg_Dbg(vd, "kick: %d, frame_done: %d", kick, sys->video_frame_done);
 
-    if (kick)
-        pollqueue_add_task(sys->display_pt, 0);
+//    if (kick)
+//        pollqueue_add_task(sys->display_pt, 0);
 #else
     // Check we have a surface to put the video on
     if (bkg_surface_get_lock(vd, sys) == NULL)
@@ -2277,6 +2309,8 @@ static void Close(vlc_object_t *obj)
     if (sys == NULL)
         return;
 
+    msg_stats(vd, &sys->stats);
+
     // Kill all pending tasks that we can
     polltask_delete(&sys->display_pt);
 
@@ -2386,11 +2420,11 @@ static int Open(vlc_object_t *obj)
         msg_Err(vd, "Failed to create event Q");
         goto error;
     }
-    if ((sys->display_pt = polltask_new_timer(sys->pollq, do_display, vd)) == NULL)
-    {
-        msg_Err(vd, "Failed to create display polltask");
-        goto error;
-    }
+//    if ((sys->display_pt = polltask_new_timer(sys->pollq, do_display, vd)) == NULL)
+//    {
+//        msg_Err(vd, "Failed to create display polltask");
+//        goto error;
+//    }
 
     if (registry_scan(vd, sys) != 0)
     {
