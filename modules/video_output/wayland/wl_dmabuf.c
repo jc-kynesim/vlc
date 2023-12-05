@@ -64,7 +64,7 @@
 #include "../../codec/avcodec/drm_pic.h"
 #include <libavutil/hwcontext_drm.h>
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 #define CHECK_VDRE_COUNTS 0
 
 #define MAX_PICTURES 4
