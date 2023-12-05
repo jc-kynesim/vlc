@@ -169,9 +169,9 @@ typedef struct w_bound_ss
 #endif
 } w_bound_t;
 
-#define COMMIT_BKG 0
-#define COMMIT_VID 1
-#define COMMIT_SUB 2
+#define PLANE_BKG 0
+#define PLANE_VID 1
+#define PLANE_SUB 2
 
 struct vout_display_sys_t
 {
@@ -257,7 +257,7 @@ video_display(const vout_display_sys_t * const sys)
 static inline struct wl_surface *
 video_surface(const vout_display_sys_t * const sys)
 {
-    return sys->planes[COMMIT_VID].surface;
+    return sys->planes[PLANE_VID].surface;
 }
 
 static inline struct wl_compositor *
@@ -452,30 +452,6 @@ static inline vout_display_place_t vplace_vflip(const vout_display_place_t s, co
         .height = s.height
     };
 }
-
-#if 0
-static vout_display_place_t
-rect_transform(vout_display_place_t s, const vout_display_place_t c, const video_transform_t t)
-{
-    if (is_vxf_transpose(t))
-        s = vplace_transpose(s);
-    if (is_vxf_hflip(t))
-        s = vplace_hflip(s, c);
-    if (is_vxf_vflip(t) != 0)
-        s = vplace_vflip(s, c);
-    return s;
-}
-
-static void
-place_dest_rect(vout_display_t * const vd,
-          const vout_display_cfg_t * const cfg,
-          const video_format_t * fmt)
-{
-    vout_display_sys_t * const sys = vd->sys;
-    sys->dest_rect = rect_transform(place_out(cfg, fmt, sys->win_rect),
-                                    sys->display_rect, sys->dest_transform);
-}
-#endif
 
 static int
 fmt_list_add(fmt_list_t * const fl, uint32_t fmt, uint64_t mod, int32_t pri)
@@ -1298,7 +1274,7 @@ commit_do(vout_display_t * const vd, vout_display_sys_t * const sys)
     int i;
     bool flush_req = false;
 
-    for (i = MAX_SUBPICS + COMMIT_SUB - 1; i >= COMMIT_VID; --i)
+    for (i = MAX_SUBPICS + PLANE_SUB - 1; i >= PLANE_VID; --i)
     {
         if (sys->planes[i].commit_req)
         {
@@ -1307,7 +1283,7 @@ commit_do(vout_display_t * const vd, vout_display_sys_t * const sys)
             flush_req = true;
         }
     }
-    if (sys->planes[COMMIT_BKG].commit_req)
+    if (sys->planes[PLANE_BKG].commit_req)
     {
         struct wl_surface * const bkg_surface = bkg_surface_get_lock(vd, sys);
         if (bkg_surface != NULL)
@@ -1320,7 +1296,7 @@ commit_do(vout_display_t * const vd, vout_display_sys_t * const sys)
             bkg_surface_unlock(vd, sys);
             flush_req = true;
         }
-        sys->planes[COMMIT_BKG].commit_req = false;
+        sys->planes[PLANE_BKG].commit_req = false;
     }
     if (flush_req)
         wl_display_flush(video_display(sys));
@@ -1347,7 +1323,7 @@ plane_clear(subplane_t * const plane)
 static void
 clear_all_buffers(vout_display_sys_t * const sys, const bool bkg_valid)
 {
-    for (unsigned int i = MAX_SUBPICS + 1; i != 0; --i)
+    for (unsigned int i = MAX_SUBPICS + PLANE_SUB - 1; i >= PLANE_VID; --i)
         plane_clear(sys->planes + i);
     spe_delete(&sys->video_spe_prep);
 
@@ -1395,7 +1371,7 @@ unmap_all(vout_display_sys_t * const sys, const bool bkg_valid)
     clear_all_buffers(sys, bkg_valid);
 
     // Free subpic resources
-    for (unsigned int i = MAX_SUBPICS + 1; i != 0; --i)
+    for (unsigned int i = MAX_SUBPICS + PLANE_SUB - 1; i >= PLANE_VID; --i)
         plane_destroy(sys->planes + i);
 
     viewport_destroy(&sys->bkg_viewport);
@@ -1439,7 +1415,7 @@ static int
 make_subpic_surfaces(vout_display_t * const vd, vout_display_sys_t * const sys)
 {
     unsigned int i;
-    subplane_t * const subplanes = sys->planes + COMMIT_SUB;
+    subplane_t * const subplanes = sys->planes + PLANE_SUB;
     struct wl_surface * const surface = video_surface(sys);
     struct wl_surface * below = surface;
     int rv;
@@ -1450,7 +1426,7 @@ make_subpic_surfaces(vout_display_t * const vd, vout_display_sys_t * const sys)
     for (i = 0; i != MAX_SUBPICS; ++i)
     {
         subplane_t * const plane = subplanes + i;
-        if ((rv = plane_create(sys, plane, surface, COMMIT_VID, below, true)) != 0)
+        if ((rv = plane_create(sys, plane, surface, PLANE_VID, below, true)) != 0)
         {
             msg_Err(vd, "%s: Failed to create subpic plane %d", __func__, i);
             return rv;
@@ -1549,7 +1525,7 @@ make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const 
 
     wl_surface_damage(bkg_surface, 0, 0, INT32_MAX, INT32_MAX);
 
-    if (plane_create(sys, sys->planes + COMMIT_VID, bkg_surface, COMMIT_BKG, bkg_surface, false) != 0)
+    if (plane_create(sys, sys->planes + PLANE_VID, bkg_surface, PLANE_BKG, bkg_surface, false) != 0)
     {
         msg_Err(vd, "Failed to create video plane");
         goto err_unlock;
@@ -1557,7 +1533,7 @@ make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const 
 
     wl_surface_set_opaque_region(video_surface(sys), sys->region_all);
 
-    commit_req(sys, COMMIT_BKG);
+    commit_req(sys, PLANE_BKG);
 
     bkg_surface_unlock(vd, sys);
 
@@ -1665,7 +1641,7 @@ plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const s
         return;
 
     const vout_display_place_t dst_rect = place_rescale(spe->dst_rect,
-                                                        plane->commit_parent == COMMIT_VID ? place_zoffset(sys->video_dst_rect) : sys->video_dst_rect,
+                                                        plane->commit_parent == PLANE_VID ? place_zoffset(sys->video_dst_rect) : sys->video_dst_rect,
                                                         spe->orig_rect);
 
     if (spe->trans != plane->trans)
@@ -1738,7 +1714,7 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     {
         for (const subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next)
         {
-            subplane_t * const plane = sys->planes + n + COMMIT_SUB;
+            subplane_t * const plane = sys->planes + n + PLANE_SUB;
 
             if (plane->spe_next != NULL)
             {
@@ -1765,7 +1741,7 @@ subpics_done:
 
     // Clear any other entries
     for (; n != MAX_SUBPICS; ++n) {
-        subplane_t * const plane = sys->planes + n + COMMIT_SUB;
+        subplane_t * const plane = sys->planes + n + PLANE_SUB;
         if (plane->spe_next == NULL && spe_changed(plane->spe_cur, NULL))
             plane->spe_next = spe_new(vd, sys, NULL, NULL);
     }
@@ -1781,7 +1757,7 @@ do_resize(vout_display_t * const vd, vout_display_sys_t * const sys)
     if (!sys->bkg_viewport)
         return;
 
-    for (unsigned int i = COMMIT_VID; i != COMMIT_SUB + MAX_SUBPICS; ++i)
+    for (unsigned int i = PLANE_VID; i != PLANE_SUB + MAX_SUBPICS; ++i)
     {
         subplane_t * const plane = sys->planes + i;
         subpic_ent_t * spe = plane->spe_cur;
@@ -1792,7 +1768,7 @@ do_resize(vout_display_t * const vd, vout_display_sys_t * const sys)
     if (sys->bkg_viewport != NULL && (vd->cfg->display.width != sys->bkg_w || vd->cfg->display.height != sys->bkg_h))
     {
         msg_Dbg(vd, "Resize background: %dx%d", vd->cfg->display.width, vd->cfg->display.height);
-        commit_req(sys, COMMIT_BKG);
+        commit_req(sys, PLANE_BKG);
     }
     sys->bkg_w = vd->cfg->display.width;
     sys->bkg_h = vd->cfg->display.height;
@@ -1808,7 +1784,7 @@ do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
         sys->stats.time_frame0 = sys->stats.time_frameN;
     ++sys->stats.frame_n;
 
-    if (spe_no_pic(sys->planes[COMMIT_VID].spe_next))
+    if (spe_no_pic(sys->planes[PLANE_VID].spe_next))
     {
         msg_Warn(vd, "%s: No current pic", __func__);
         return;
@@ -1821,7 +1797,7 @@ do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
     }
     make_subpic_surfaces(vd, sys);
 
-    for (unsigned int i = COMMIT_VID; i != COMMIT_SUB + MAX_SUBPICS; ++i)
+    for (unsigned int i = PLANE_VID; i != PLANE_SUB + MAX_SUBPICS; ++i)
     {
         subplane_t * const plane = sys->planes + i;
         subpic_ent_t * spe = plane->spe_cur;
@@ -1863,13 +1839,13 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
         goto done;
     }
 
-    if (sys->planes[COMMIT_VID].spe_next)
+    if (sys->planes[PLANE_VID].spe_next)
     {
         msg_Warn(vd, "Current video spe discarded");
-        spe_delete(&sys->planes[COMMIT_VID].spe_next);
+        spe_delete(&sys->planes[PLANE_VID].spe_next);
         ++sys->stats.frame_discard;
     }
-    sys->planes[COMMIT_VID].spe_next = sys->video_spe_prep;
+    sys->planes[PLANE_VID].spe_next = sys->video_spe_prep;
     sys->video_spe_prep = NULL;
 
     ++sys->stats.frame_display;
@@ -1915,7 +1891,7 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             vout_display_place_t place;
             video_format_t src;
 
-            assert(sys->planes[COMMIT_VID].viewport == NULL);
+            assert(sys->planes[PLANE_VID].viewport == NULL);
 
             vout_display_PlacePicture(&place, &vd->source, vd->cfg, false);
             video_format_ApplyRotation(&src, &vd->source);
@@ -1955,17 +1931,6 @@ static int Control(vout_display_t *vd, int query, va_list ap)
             place_rects(vd, cfg);
             do_resize(vd, sys);
             commit_do(vd, sys);
-//            plane_set_rect(sys, sys->video_plane, &sys->video_spe, COMMIT_VID, COMMIT_BKG);
-#if 0
-            if (sys->bkg_viewport != NULL && (cfg->display.width != sys->bkg_w || cfg->display.height != sys->bkg_h))
-            {
-                msg_Dbg(vd, "Resize background: %dx%d", cfg->display.width, cfg->display.height);
-                commit_req(sys, COMMIT_BKG);
-            }
-            sys->bkg_w = cfg->display.width;
-            sys->bkg_h = cfg->display.height;
-            commit_do(vd, sys);
-#endif
             break;
         }
         default:
