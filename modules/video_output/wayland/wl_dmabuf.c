@@ -2275,8 +2275,6 @@ static int Open(vlc_object_t *obj)
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
 
-    sys->video_frame_done = true;
-
     vd->sys = sys;
     if (fmt_list_init(&sys->dmabuf_fmts, 128)) {
         msg_Err(vd, "Failed to allocate dmabuf format list!");
