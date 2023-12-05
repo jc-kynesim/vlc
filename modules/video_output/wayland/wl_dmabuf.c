@@ -204,12 +204,8 @@ struct vout_display_sys_t
     struct pollqueue * pollq;
     struct pollqueue * speq;
 
-    pthread_mutex_t display_lock;  // Coarse lock between fg & bg on all wayland display
-    struct polltask * display_pt;
-
     picpool_ctl_t * subpic_pool;
     subplane_t planes[MAX_SUBPICS + 2];
-    bool video_frame_done;
     subpic_ent_t * video_spe_prep;
     struct wl_callback * video_frame_callback;
     vlc_fourcc_t * subpic_chromas;
@@ -240,8 +236,8 @@ msg_stats(vout_display_t * const vd, const struct display_stats_s * const s)
     unsigned int tframes = (s->frame_n + s->frame_discard);
     unsigned int frx1000 = tframes < 2 ? 0 :
             (unsigned int)((uint64_t)(tframes - 1) * 1000000000ULL / (s->time_frameN - s->time_frame0));
-    msg_Info(vd, "Frames: Total: %d, Discarded %d, Display %d:Frame %d FpS(total):%d.%03d",
-             tframes, s->frame_discard, s->frame_display, s->frame_frame,
+    msg_Info(vd, "Frames: Total: %d, Discarded %d, Display %d FpS(total):%d.%03d",
+             tframes, s->frame_discard, s->frame_display,
              frx1000 / 1000, frx1000 % 1000);
 }
 
@@ -1396,13 +1392,6 @@ unmap_all(vout_display_sys_t * const sys, const bool bkg_valid)
     for (unsigned int i = MAX_SUBPICS + 1; i != 0; --i)
         plane_destroy(sys->planes + i);
 
-    if (sys->video_frame_callback)
-    {
-        wl_callback_destroy(sys->video_frame_callback);
-        sys->video_frame_callback = NULL;
-    }
-    sys->video_frame_done = true;
-
     viewport_destroy(&sys->bkg_viewport);
 }
 
@@ -1701,35 +1690,6 @@ plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const s
     plane->dst_rect = dst_rect;
 }
 
-static void do_display(vout_display_t * const vd, vout_display_sys_t * const sys);
-
-static void
-video_frame_callback_cb(void *data, struct wl_callback *callback, uint32_t time_ms)
-{
-    vout_display_t * const vd = data;
-    vout_display_sys_t * const sys = vd->sys;
-    VLC_UNUSED(time_ms);
-
-    wl_callback_destroy(callback);
-    sys->video_frame_callback = NULL;
-
-    pthread_mutex_lock(&sys->display_lock);
-    sys->video_frame_done = true;
-    if (sys->planes[COMMIT_VID].spe_next)
-    {
-        ++sys->stats.frame_frame;
-        do_display(vd, sys);
-    }
-    pthread_mutex_unlock(&sys->display_lock);
-
-    msg_Dbg(vd, "%s", __func__);
-}
-
-static const struct wl_callback_listener video_frame_callback_listener = {
-    .done = video_frame_callback_cb
-};
-
-
 static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 {
     vout_display_sys_t * const sys = vd->sys;
@@ -1767,8 +1727,6 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
         wl_display_flush(video_display(sys)); // Kick off any work required by Wayland
     }
 
-    pthread_mutex_lock(&sys->display_lock);
-
     // Attempt to import the subpics
     for (const subpicture_t * spic = subpic; spic != NULL; spic = spic->p_next)
     {
@@ -1805,8 +1763,6 @@ subpics_done:
         if (plane->spe_next == NULL && spe_changed(plane->spe_cur, NULL))
             plane->spe_next = spe_new(vd, sys, NULL, NULL);
     }
-
-    pthread_mutex_unlock(&sys->display_lock);
 
 #if TRACE_ALL
     msg_Dbg(vd, ">>> %s: Surface: %p", __func__, sys->embed->handle.wl);
@@ -1849,13 +1805,13 @@ do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
     if (spe_no_pic(sys->planes[COMMIT_VID].spe_next))
     {
         msg_Warn(vd, "%s: No current pic", __func__);
-        goto fail;
+        return;
     }
 
     if (make_background_and_video(vd, sys) != 0)
     {
         msg_Warn(vd, "%s: Make background fail", __func__);
-        goto fail;
+        return;
     }
     make_subpic_surfaces(vd, sys);
 
@@ -1873,34 +1829,10 @@ do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
         }
     }
 
-#if 1
-    sys->video_frame_done = false;
-    sys->video_frame_callback = wl_surface_frame(video_surface(sys));
-    wl_callback_add_listener(sys->video_frame_callback, &video_frame_callback_listener, vd);
-#else
-    {
-        subplane_t * const plane = sys->planes + COMMIT_VID;
-        subpic_ent_t * spe = spe = plane->spe_cur;
-
-        subpic_ent_attach(plane, spe, sys->eq);
-
-        plane_set_rect(sys, plane, spe);
-
-        sys->video_frame_done = false;
-        sys->video_frame_callback = wl_surface_frame(video_surface(sys));
-        wl_callback_add_listener(sys->video_frame_callback, &video_frame_callback_listener, vd);
-
-        spe_delete(&plane->spe_cur);
-    }
-#endif
     do_resize(vd, sys);
 
     commit_do(vd, sys);
     return;
-
-fail:
-    // On error we haven't re-registered the frame callback so pretend it has already run
-    sys->video_frame_done = true;
 }
 
 static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
@@ -1910,9 +1842,6 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
 #if TRACE_ALL || 1
     msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
 #endif
-
-    bool kick = false;
-    pthread_mutex_lock(&sys->display_lock);
 
     // Check we have a surface to put the video on
     if (bkg_surface_get_lock(vd, sys) == NULL)
@@ -1928,25 +1857,19 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
         goto done;
     }
 
-    kick = sys->video_frame_done;
     if (sys->planes[COMMIT_VID].spe_next)
     {
         msg_Warn(vd, "Current video spe discarded");
         spe_delete(&sys->planes[COMMIT_VID].spe_next);
         ++sys->stats.frame_discard;
-        kick = false; // Must have already kicked
     }
     sys->planes[COMMIT_VID].spe_next = sys->video_spe_prep;
     sys->video_spe_prep = NULL;
-done:
-    if (kick)
-    {
-        ++sys->stats.frame_display;
-        do_display(vd, sys);
-    }
-    pthread_mutex_unlock(&sys->display_lock);
-    msg_Dbg(vd, "kick: %d, frame_done: %d", kick, sys->video_frame_done);
 
+    ++sys->stats.frame_display;
+    do_display(vd, sys);
+
+done:
     if (subpic)
         subpicture_Delete(subpic);
     picture_Release(pic);
@@ -2023,11 +1946,9 @@ static int Control(vout_display_t *vd, int query, va_list ap)
                 cfg = va_arg(ap, const vout_display_cfg_t *);
             }
 
-            pthread_mutex_lock(&sys->display_lock);
             place_rects(vd, cfg);
             do_resize(vd, sys);
             commit_do(vd, sys);
-            pthread_mutex_unlock(&sys->display_lock);
 //            plane_set_rect(sys, sys->video_plane, &sys->video_spe, COMMIT_VID, COMMIT_BKG);
 #if 0
             if (sys->bkg_viewport != NULL && (cfg->display.width != sys->bkg_w || cfg->display.height != sys->bkg_h))
@@ -2288,9 +2209,6 @@ static void Close(vlc_object_t *obj)
 
     msg_stats(vd, &sys->stats);
 
-    // Kill all pending tasks that we can
-    polltask_delete(&sys->display_pt);
-
     if (sys->embed == NULL)
         goto no_window;
 
@@ -2331,8 +2249,6 @@ no_window:
     msg_Info(vd, "%s: vdre_check_fg: %d", __func__, atomic_load(&sys->vdre_check_fg));
 #endif
 
-    pthread_mutex_destroy(&sys->display_lock);
-
     free(sys);
 
     msg_Dbg(vd, ">>> %s", __func__);
@@ -2353,7 +2269,6 @@ static int Open(vlc_object_t *obj)
         return VLC_ENOMEM;
 
     sys->video_frame_done = true;
-    pthread_mutex_init(&sys->display_lock, NULL);
 
     vd->sys = sys;
     if (fmt_list_init(&sys->dmabuf_fmts, 128)) {
