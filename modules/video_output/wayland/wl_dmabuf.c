@@ -82,6 +82,11 @@
 #define WL_DMABUF_CHEQUERBOARD_TEXT N_("Chequerboard background")
 #define WL_DMABUF_CHEQUERBOARD_LONGTEXT N_("Fill unused window area with chequerboard rather than black")
 
+#define WL_DMABUF_STATS_NAME "wl-dmabuf-stats"
+#define WL_DMABUF_STATS_TEXT N_("Display some display stats")
+#define WL_DMABUF_STATS_LONGTEXT N_("When display is closed report frames displayed/discarded and avg fps. "\
+    "N.B. Unfortunately current implementation cannot track frames discarded by Wayland before display")
+
 typedef struct fmt_ent_s {
     uint32_t fmt;
     int32_t pri;
@@ -183,6 +188,7 @@ struct vout_display_sys_t
     int y;
     bool use_shm;
     bool chequerboard;
+    bool want_stats;
 
     struct wp_viewport * bkg_viewport;
     // Current size of background viewport if we have one
@@ -2207,10 +2213,11 @@ static void Close(vlc_object_t *obj)
     if (sys == NULL)
         return;
 
-    msg_stats(vd, &sys->stats);
-
     if (sys->embed == NULL)
         goto no_window;
+
+    if (sys->want_stats)
+        msg_stats(vd, &sys->stats);
 
     if (bkg_surface_get_lock(vd, sys) != NULL)
     {
@@ -2422,6 +2429,8 @@ static int Open(vlc_object_t *obj)
 
     place_rects(vd, vd->cfg);
 
+    sys->want_stats = var_InheritBool(vd, WL_DMABUF_STATS_NAME);
+
     vd->info.has_pictures_invalid = false;
     vd->info.subpicture_chromas = sys->subpic_chromas;
 
@@ -2452,4 +2461,5 @@ vlc_module_begin()
     add_bool(WL_DMABUF_DISABLE_NAME, false, WL_DMABUF_DISABLE_TEXT, WL_DMABUF_DISABLE_LONGTEXT, false)
     add_bool(WL_DMABUF_USE_SHM_NAME, false, WL_DMABUF_USE_SHM_TEXT, WL_DMABUF_USE_SHM_LONGTEXT, false)
     add_bool(WL_DMABUF_CHEQUERBOARD_NAME, false, WL_DMABUF_CHEQUERBOARD_TEXT, WL_DMABUF_CHEQUERBOARD_LONGTEXT, false)
+    add_bool(WL_DMABUF_STATS_NAME, false, WL_DMABUF_STATS_TEXT, WL_DMABUF_STATS_LONGTEXT, false)
 vlc_module_end()
