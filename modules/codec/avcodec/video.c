@@ -725,7 +725,8 @@ static int ffmpeg_OpenVa(decoder_t *p_dec, AVCodecContext *p_context,
         return VLC_EGENERIC;
     }
     const AVPixFmtDescriptor *dsc = av_pix_fmt_desc_get(hwfmt);
-    msg_Dbg(p_dec, "trying format %s", dsc ? dsc->name : "unknown");
+    const AVPixFmtDescriptor *dsc_sw = av_pix_fmt_desc_get(swfmt);
+    msg_Dbg(p_dec, "trying format %s:%s", dsc ? dsc->name : "unknown", dsc_sw ? dsc_sw->name : "unknown");
     if (lavc_UpdateVideoFormat(p_dec, p_context, hwfmt, swfmt))
         return VLC_EGENERIC; /* Unsupported brand of hardware acceleration */
 
@@ -1963,11 +1964,23 @@ no_reuse:
     for( size_t i = 0; hwfmts[i] != AV_PIX_FMT_NONE; i++ )
     {
         enum PixelFormat hwfmt = AV_PIX_FMT_NONE;
+        enum PixelFormat defsw = swfmt;
+
         for( size_t j = 0; hwfmt == AV_PIX_FMT_NONE && pi_fmt[j] != AV_PIX_FMT_NONE; j++ )
             if( hwfmts[i] == pi_fmt[j] )
                 hwfmt = hwfmts[i];
 
-        if (ffmpeg_OpenVa(p_dec, p_context, hwfmt, swfmt, src_desc, &p_sys->sem_mt) != VLC_SUCCESS)
+#if OPT_RPI
+        if (hwfmt == AV_PIX_FMT_DRM_PRIME && p_context->codec_id == AV_CODEC_ID_HEVC)
+        {
+            if (swfmt == AV_PIX_FMT_P010)
+                defsw = AV_PIX_FMT_RPI4_10;
+            if (swfmt == AV_PIX_FMT_YUV420P)
+                defsw = AV_PIX_FMT_RPI4_8;
+        }
+#endif
+
+        if (ffmpeg_OpenVa(p_dec, p_context, hwfmt, defsw, src_desc, &p_sys->sem_mt) != VLC_SUCCESS)
             continue;
 
         post_mt(p_sys);
