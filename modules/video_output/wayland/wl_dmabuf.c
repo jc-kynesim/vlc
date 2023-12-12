@@ -2193,7 +2193,7 @@ static void Close(vlc_object_t *obj)
     region_destroy(&sys->region_all);
     region_destroy(&sys->region_none);
 
-    pollqueue_unref(&sys->speq);
+    pollqueue_finish(&sys->speq);
 
     w_bound_destroy(&sys->bound);
 
@@ -2202,6 +2202,9 @@ static void Close(vlc_object_t *obj)
     if (eq_finish(&sys->eq) != 0)
         msg_Err(vd, "Failed to reclaim all buffers on close");
 
+    // There is a risk of deadlock here if we wait for the pq to die as some
+    // wl buffers may only be relased after close returns so just unref and the
+    // pq will clean up after itself once the last buffer has been released.
     pollqueue_unref(&sys->pollq);
 
     vout_display_DeleteWindow(vd, sys->embed);

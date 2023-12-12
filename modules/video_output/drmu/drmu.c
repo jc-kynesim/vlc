@@ -3573,8 +3573,8 @@ env_free(drmu_env_t * const du)
 
     atomic_q_flush(&du->aq);
 
-    pollqueue_unref(&du->pq);
     polltask_delete(&du->pt);
+    pollqueue_finish(&du->pq);
 
     // Restore previous values after shutting down the polltask but
     // before uniniting the Q commits
