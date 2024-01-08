@@ -306,11 +306,17 @@ char *vlc_http_msg_format(const struct vlc_http_msg *m, size_t *restrict lenp,
 
     if (m->status < 0)
     {
+        int hlen = (int)strlen(m->authority);
+        if (hlen > 4 && strcmp(m->scheme, "https") == 0 && strcmp(m->authority + hlen - 4, ":443") == 0)
+            hlen -= 4;
+        else if (hlen > 3 && strcmp(m->scheme, "http") == 0 && strcmp(m->authority + hlen - 3, ":80") == 0)
+            hlen -= 3;
+
         vlc_memstream_printf(&stream, "%s ", m->method);
         if (proxied)
             vlc_memstream_printf(&stream, "%s://%s", m->scheme, m->authority);
-        vlc_memstream_printf(&stream, "%s HTTP/1.1\r\nHost: %s\r\n",
-                             m->path ? m->path : m->authority, m->authority);
+        vlc_memstream_printf(&stream, "%s HTTP/1.1\r\nHost: %.*s\r\n",
+                             m->path ? m->path : m->authority, hlen, m->authority);
     }
     else
         vlc_memstream_printf(&stream, "HTTP/1.1 %03hd .\r\n", m->status);
