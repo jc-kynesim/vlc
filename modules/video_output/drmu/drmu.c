@@ -27,7 +27,7 @@
 #include <libdrm/drm_fourcc.h>
 #include <xf86drm.h>
 
-#define TRACE_PROP_NEW 0
+#define TRACE_PROP_NEW 1
 
 #ifndef OPT_IO_CALLOC
 #define OPT_IO_CALLOC 0
@@ -2186,6 +2186,17 @@ drmu_crtc_ref(drmu_crtc_t * const dc)
     return dc;
 }
 
+static int
+crtc_state_save(drmu_env_t * const du, drmu_crtc_t * const dc)
+{
+    int rv = 0;
+    // 1st time through save state
+    if (!dc->saved &&
+        (rv = env_object_state_save(du, dc->crtc.crtc_id, DRM_MODE_OBJECT_CRTC)) == 0)
+        dc->saved = true;
+    return rv;
+}
+
 // A Conn should be claimed before any op that might change its state
 int
 drmu_crtc_claim_ref(drmu_crtc_t * const dc)
@@ -2196,8 +2207,7 @@ drmu_crtc_claim_ref(drmu_crtc_t * const dc)
         return -EBUSY;
 
     // 1st time through save state
-    if (!dc->saved && env_object_state_save(du, dc->crtc.crtc_id, DRM_MODE_OBJECT_CRTC) == 0)
-        dc->saved = true;
+    crtc_state_save(du, dc);
 
     return 0;
 }
@@ -2539,6 +2549,17 @@ drmu_conn_ref(drmu_conn_t * const dn)
     return dn;
 }
 
+static int
+conn_state_save(drmu_env_t * const du, drmu_conn_t * const dn)
+{
+    int rv = 0;
+    // 1st time through save state
+    if (!dn->saved &&
+        (rv = env_object_state_save(du, dn->conn.connector_id, DRM_MODE_OBJECT_CONNECTOR)) == 0)
+        dn->saved = true;
+    return rv;
+}
+
 // A Conn should be claimed before any op that might change its state
 int
 drmu_conn_claim_ref(drmu_conn_t * const dn)
@@ -2549,8 +2570,7 @@ drmu_conn_claim_ref(drmu_conn_t * const dn)
         return -EBUSY;
 
     // 1st time through save state
-    if (!dn->saved && env_object_state_save(du, dn->conn.connector_id, DRM_MODE_OBJECT_CONNECTOR) == 0)
-        dn->saved = true;
+    conn_state_save(du, dn);
 
     return 0;
 }
@@ -3010,12 +3030,12 @@ typedef struct drmu_plane_s {
     struct {
         uint32_t crtc_id;
         uint32_t fb_id;
-        uint32_t crtc_h;
-        uint32_t crtc_w;
+        drmu_prop_range_t * crtc_h;
+        drmu_prop_range_t * crtc_w;
         uint32_t crtc_x;
         uint32_t crtc_y;
-        uint32_t src_h;
-        uint32_t src_w;
+        drmu_prop_range_t * src_h;
+        drmu_prop_range_t * src_w;
         uint32_t src_x;
         uint32_t src_y;
         drmu_prop_range_t * alpha;
@@ -3045,12 +3065,12 @@ plane_set_atomic(drmu_atomic_t * const da,
     drmu_atomic_add_prop_fb(da, plid, dp->pid.fb_id, dfb);
     drmu_atomic_add_prop_value(da, plid, dp->pid.crtc_x, crtc_x);
     drmu_atomic_add_prop_value(da, plid, dp->pid.crtc_y, crtc_y);
-    drmu_atomic_add_prop_value(da, plid, dp->pid.crtc_w, crtc_w);
-    drmu_atomic_add_prop_value(da, plid, dp->pid.crtc_h, crtc_h);
+    drmu_atomic_add_prop_range(da, plid, dp->pid.crtc_w, crtc_w);
+    drmu_atomic_add_prop_range(da, plid, dp->pid.crtc_h, crtc_h);
     drmu_atomic_add_prop_value(da, plid, dp->pid.src_x,  src_x);
     drmu_atomic_add_prop_value(da, plid, dp->pid.src_y,  src_y);
-    drmu_atomic_add_prop_value(da, plid, dp->pid.src_w,  src_w);
-    drmu_atomic_add_prop_value(da, plid, dp->pid.src_h,  src_h);
+    drmu_atomic_add_prop_range(da, plid, dp->pid.src_w,  src_w);
+    drmu_atomic_add_prop_range(da, plid, dp->pid.src_h,  src_h);
     return 0;
 }
 
@@ -3175,6 +3195,12 @@ drmu_plane_format_check(const drmu_plane_t * const dp, const uint32_t format, co
     return false;
 }
 
+bool
+drmu_plane_is_claimed(drmu_plane_t * const dp)
+{
+    return atomic_load(&dp->ref_count) != 0;
+}
+
 void
 drmu_plane_unref(drmu_plane_t ** const ppdp)
 {
@@ -3198,6 +3224,18 @@ drmu_plane_ref(drmu_plane_t * const dp)
     return dp;
 }
 
+static int
+plane_state_save(drmu_env_t * const du, drmu_plane_t * const dp)
+{
+    int rv = 0;
+
+    // 1st time through save state
+    if (!dp->saved &&
+        (rv = env_object_state_save(du, drmu_plane_id(dp), DRM_MODE_OBJECT_PLANE)) == 0)
+        dp->saved = true;
+    return rv;
+}
+
 // Associate a plane with a crtc and ref it
 // Returns -EBUSY if plane already associated
 int
@@ -3210,9 +3248,8 @@ drmu_plane_ref_crtc(drmu_plane_t * const dp, drmu_crtc_t * const dc)
         return -EBUSY;
     dp->dc = dc;
 
-    // 1st time through save state
-    if (!dp->saved && env_object_state_save(du, drmu_plane_id(dp), DRM_MODE_OBJECT_PLANE) == 0)
-        dp->saved = true;
+    // 1st time through save state if required - ignore fail
+    plane_state_save(du, dp);
 
     return 0;
 }
@@ -3262,6 +3299,8 @@ drmu_plane_new_find_type(drmu_crtc_t * const dc, const unsigned int req_type)
 static void
 plane_uninit(drmu_plane_t * const dp)
 {
+    drmu_prop_range_delete(&dp->pid.src_h);
+    drmu_prop_range_delete(&dp->pid.src_w);
     drmu_prop_range_delete(&dp->pid.alpha);
     drmu_prop_range_delete(&dp->pid.chroma_siting_h);
     drmu_prop_range_delete(&dp->pid.chroma_siting_v);
@@ -3300,12 +3339,12 @@ plane_init(drmu_env_t * const du, drmu_plane_t * const dp, const uint32_t plane_
 
     if ((dp->pid.crtc_id = props_name_to_id(props, "CRTC_ID")) == 0 ||
         (dp->pid.fb_id  = props_name_to_id(props, "FB_ID")) == 0 ||
-        (dp->pid.crtc_h = props_name_to_id(props, "CRTC_H")) == 0 ||
-        (dp->pid.crtc_w = props_name_to_id(props, "CRTC_W")) == 0 ||
+        (dp->pid.crtc_h = drmu_prop_range_new(du, props_name_to_id(props, "CRTC_H"))) == NULL ||
+        (dp->pid.crtc_w = drmu_prop_range_new(du, props_name_to_id(props, "CRTC_W"))) == NULL ||
         (dp->pid.crtc_x = props_name_to_id(props, "CRTC_X")) == 0 ||
         (dp->pid.crtc_y = props_name_to_id(props, "CRTC_Y")) == 0 ||
-        (dp->pid.src_h  = props_name_to_id(props, "SRC_H")) == 0 ||
-        (dp->pid.src_w  = props_name_to_id(props, "SRC_W")) == 0 ||
+        (dp->pid.src_h  = drmu_prop_range_new(du, props_name_to_id(props, "SRC_H"))) == NULL ||
+        (dp->pid.src_w  = drmu_prop_range_new(du, props_name_to_id(props, "SRC_W"))) == NULL ||
         (dp->pid.src_x  = props_name_to_id(props, "SRC_X")) == 0 ||
         (dp->pid.src_y  = props_name_to_id(props, "SRC_Y")) == 0 ||
         props_name_get_blob(props, "IN_FORMATS", &dp->formats_in, &dp->formats_in_len) != 0)
@@ -3665,10 +3704,26 @@ fail:
 int
 drmu_env_restore_enable(drmu_env_t * const du)
 {
+    uint32_t i;
+
     if (du->da_restore)
         return 0;
     if ((du->da_restore = drmu_atomic_new(du)) == NULL)
         return -ENOMEM;
+
+    // Save state of anything already claimed
+    // Cannot rewind time but this allows us to be a bit lax with the
+    // precise ordering of calls on setup (which is handy for scan)
+    for (i = 0; i != du->conn_count; ++i)
+        if (drmu_conn_is_claimed(du->conns + i))
+            conn_state_save(du, du->conns + i);
+    for (i = 0; i != du->crtc_count; ++i)
+        if (drmu_crtc_is_claimed(du->crtcs + i))
+            crtc_state_save(du, du->crtcs + i);
+    for (i = 0; i != du->plane_count; ++i)
+        if (drmu_plane_is_claimed(du->planes + i))
+            plane_state_save(du, du->planes + i);
+
     return 0;
 }
 

@@ -454,6 +454,9 @@ int drmu_atomic_plane_add_chroma_siting(struct drmu_atomic_s * const da, const d
 // pos is dest rect on the plane in full pixels (not frac)
 int drmu_atomic_plane_add_fb(struct drmu_atomic_s * const da, drmu_plane_t * const dp, drmu_fb_t * const dfb, const drmu_rect_t pos);
 
+// Is this plane reffed?
+bool drmu_plane_is_claimed(drmu_plane_t * const dp);
+
 // Unref a plane
 void drmu_plane_unref(drmu_plane_t ** const ppdp);
 
@@ -506,7 +509,9 @@ bool drmu_env_restore_is_enabled(const drmu_env_t * const du);
 int drmu_atomic_env_restore_add_snapshot(struct drmu_atomic_s ** const ppda);
 
 // Open a drmu environment with the drm fd
-// Takes a logging structure so early errors can be reported.
+// Takes a logging structure so early errors can be reported. The logging
+// environment is copied so does not have to be valid for greater than the
+// duration of the call.
 // If log = NULL logging is disabled (set to drmu_log_env_none).
 drmu_env_t * drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log);
 drmu_env_t * drmu_env_new_open(const char * name, const struct drmu_log_env_s * const log);
