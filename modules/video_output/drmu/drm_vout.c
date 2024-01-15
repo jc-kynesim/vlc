@@ -172,9 +172,9 @@ copy_pic_to_fixed_fb(vout_display_t * const vd, vout_display_sys_t * const sys,
         return NULL;
     }
 
-    fb = drmu_pool_fb_new_dumb(pool, sys->win_rect.width, sys->win_rect.height, drm_fmt);
+    fb = drmu_pool_fb_new_dumb(pool, sys->display_rect.width, sys->display_rect.height, drm_fmt);
     if (fb == NULL) {
-        msg_Warn(vd, "Failed alloc for copy_pic_fixed: %dx%d", sys->win_rect.width, sys->win_rect.height);
+        msg_Warn(vd, "Failed alloc for copy_pic_fixed: %dx%d", sys->display_rect.width, sys->display_rect.height);
         return NULL;
     }
 
@@ -183,9 +183,12 @@ copy_pic_to_fixed_fb(vout_display_t * const vd, vout_display_sys_t * const sys,
     for (i = 0; i != src->i_planes; ++i) {
         plane_t dst_plane;
         dst_plane = drmu_fb_vlc_plane(fb, i);
-        // *** Offset src for src cropping
+        // *** Offset src for src cropping maybe
         plane_CopyPixels(&dst_plane, src->p + i);
     }
+
+    // Reset crop for display after we've used it for copy
+    drmu_fb_crop_frac_set(fb, drmu_rect_shl16(drmu_fb_active(fb)));
 
     drmu_fb_vlc_pic_set_metadata(fb, src);
 
@@ -510,7 +513,7 @@ subpics_done:
         drmu_fb_unref(&dst->fb);
     }
 
-    r = sys->output_simple ? drmu_rect_vlc_place(&sys->win_rect): drmu_rect_vlc_place(&sys->dest_rect);
+    r = sys->output_simple ? drmu_rect_vlc_place(&sys->display_rect): drmu_rect_vlc_place(&sys->dest_rect);
 
 #if 1
     {
@@ -549,7 +552,10 @@ subpics_done:
     }
     else
 #endif
-    {
+    if (sys->output_simple) {
+        dfb = copy_pic_to_fixed_fb(vd, sys, sys->pic_pool, pic);
+    }
+    else {
         dfb = copy_pic_to_fb(vd, sys->pic_pool, pic);
     }
 
@@ -1126,8 +1132,8 @@ static int OpenDrmVout(vlc_object_t *object)
     configure_display(vd, vd->cfg, &vd->source);
 
     if (sys->output_simple) {
-        vd->fmt.i_height = sys->win_rect.height;
-        vd->fmt.i_width = sys->win_rect.width;
+        vd->fmt.i_height = sys->dest_rect.height;
+        vd->fmt.i_width = sys->dest_rect.width;
         vd->fmt.i_visible_height = vd->fmt.i_height;
         vd->fmt.i_visible_width = vd->fmt.i_width;
         vd->fmt.i_x_offset = 0;

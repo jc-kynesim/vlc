@@ -321,7 +321,8 @@ drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n)
     }
 
     return (plane_t){
-        .p_pixels = drmu_fb_data(dfb, plane_n),
+        .p_pixels = (uint8_t *)drmu_fb_data(dfb, plane_n) +
+            pitch_n * ((crop.y >> 16) / hdiv) + (bpp / 8) * (((crop.w >> 16) * bpp / 8) / wdiv),
         .i_lines = drmu_fb_height(dfb) / hdiv,
         .i_pitch = pitch_n,
         .i_pixel_pitch = bpp / 8,
