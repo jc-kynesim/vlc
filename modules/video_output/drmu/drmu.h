@@ -142,6 +142,30 @@ drmu_rect_shl16(const drmu_rect_t a)
     };
 }
 
+static inline drmu_rect_t
+drmu_rect_shr16(const drmu_rect_t a)
+{
+    return (drmu_rect_t){
+        .x = a.x >> 16,
+        .y = a.y >> 16,
+        .w = a.w >> 16,
+        .h = a.h >> 16
+    };
+}
+
+static inline drmu_rect_t
+drmu_rect_shr16_rnd(const drmu_rect_t a)
+{
+    return (drmu_rect_t){
+        .x = ((a.x >> 15) + 1) >> 1,
+        .y = ((a.y >> 15) + 1) >> 1,
+        .w = ((a.w >> 15) + 1) >> 1,
+        .h = ((a.h >> 15) + 1) >> 1
+    };
+}
+
+
+
 // Blob
 
 void drmu_blob_unref(drmu_blob_t ** const ppBlob);
