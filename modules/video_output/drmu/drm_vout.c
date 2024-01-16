@@ -30,6 +30,7 @@
 #include <pthread.h>
 
 #include "drmu.h"
+#include "drmu_fmts.h"
 #include "drmu_log.h"
 #include "drmu_output.h"
 #include "drmu_scan.h"
@@ -158,6 +159,44 @@ copy_pic_to_fb(vout_display_t *const vd, drmu_pool_t *const pool, picture_t *con
     return fb;
 }
 
+static void
+create_box(drmu_fb_t * const fb, const unsigned int layer_no)
+{
+    const drmu_fmt_info_t *const f = drmu_fb_format_info_get(fb);
+    unsigned int hdiv = drmu_fmt_info_hdiv(f, layer_no);
+    unsigned int wdiv = drmu_fmt_info_wdiv(f, layer_no);
+    const unsigned int pby = (drmu_fmt_info_pixel_bits(f) + 7) >> 8;
+    const uint32_t pitch_n = drmu_fb_pitch(fb, layer_no);
+    const drmu_rect_t crop = drmu_rect_shr16_rnd(drmu_fb_crop_frac(fb));
+    const drmu_rect_t active = drmu_fb_active(fb);
+
+    uint8_t * const p0 = drmu_fb_data(fb, layer_no);
+    uint8_t * p1 = p0;
+    uint8_t * p2;
+
+    // Assumes RGB as currently no better idea (and it is RGB in the case we expect)
+    const unsigned int c = 0;
+
+    // Top
+    p2 = p1 + pitch_n * (crop.y / hdiv) + (crop.x / wdiv) * pby;
+    if (p1 != p2)
+        memset(p1, c, p2 - p1);
+    if (active.w == crop.w) {
+        p1 = p2 + (crop.h / hdiv) * pitch_n; // We expect crop.x == 0
+    }
+    else {
+        unsigned int i;
+        for (i = 1; i < (crop.h / hdiv); ++i) {
+            p1 = p2 + (crop.w / wdiv) * pby;
+            p2 = p2 + pitch_n;
+            memset(p1, c, p2 - p1);
+        }
+    }
+    p2 = p0 + pitch_n * (active.h / hdiv);
+    if (p1 != p2)
+        memset(p1, c, p2 - p1);
+}
+
 static drmu_fb_t *
 copy_pic_to_fixed_fb(vout_display_t * const vd, vout_display_sys_t * const sys,
                      drmu_pool_t *const pool, picture_t *const src)
@@ -185,6 +224,7 @@ copy_pic_to_fixed_fb(vout_display_t * const vd, vout_display_sys_t * const sys,
         dst_plane = drmu_fb_vlc_plane(fb, i);
         // *** Offset src for src cropping maybe
         plane_CopyPixels(&dst_plane, src->p + i);
+        create_box(fb, i);
     }
 
     // Reset crop for display after we've used it for copy
