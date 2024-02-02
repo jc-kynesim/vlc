@@ -198,6 +198,7 @@ libdrm_vout_plugin_la_SOURCES = video_output/drmu/drm_vout.c \
 	video_output/drmu/drmu_xlease.c video_output/drmu/drmu_atomic.c \
 	video_output/drmu/drmu_util.c video_output/drmu/drmu_util.h \
 	video_output/drmu/drmu_output.c video_output/drmu/drmu_output.h \
+	video_output/drmu/drmu_scan.c video_output/drmu/drmu_scan.h \
 	video_output/drmu/drmu.h\
 	video_output/drmu/pollqueue.c video_output/drmu/pollqueue.h
 libdrm_vout_plugin_la_CFLAGS = $(AM_CFLAGS) -pthread -I/usr/include/libdrm
