@@ -63,6 +63,7 @@ git diff $REFNAME -- bin/vlc.c > $DIFFBASE-003-vlc.patch
 git diff $REFNAME -- modules/video_output/caca.c > $DIFFBASE-004-caca.patch
 git diff $REFNAME -- modules/gui/qt/components/interface_widgets.* > $DIFFBASE-005-qt-wayland.patch
 git diff $REFNAME -- modules/gui/qt/components/controller.cpp > $DIFFBASE-006-qt-fullscreen.patch
+git diff $REFNAME -- modules/demux/adaptive/http/ConnectionParams.cpp > $DIFFBASE-007-http-port-fix.patch
 cd $DSTDIR
 zip -m $ZIPNAME $PATCHNAME-*.patch
 
