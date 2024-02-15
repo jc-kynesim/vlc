@@ -221,12 +221,21 @@ copy_pic_to_fixed_fb(vout_display_t * const vd, vout_display_sys_t * const sys,
 
     drmu_fb_crop_frac_set(fb, drmu_rect_shl16(drmu_rect_vlc_place(&sys->dest_rect)));
 
-    for (i = 0; i != src->i_planes; ++i) {
-        plane_t dst_plane;
-        dst_plane = drmu_fb_vlc_plane(fb, i);
-        // *** Offset src for src cropping maybe
-        plane_CopyPixels(&dst_plane, src->p + i);
-        create_box(fb, i);
+    {
+        const drmu_fmt_info_t *const f = drmu_fb_format_info_get(fb);
+        const drmu_rect_t crop = drmu_rect_shr16_rnd(drmu_fb_crop_frac(fb));
+        const unsigned int bypp = (drmu_fmt_info_pixel_bits(f) + 7) / 8;
+
+        for (i = 0; i != src->i_planes; ++i) {
+            // It would seem more logical to use src->format than to use vd->fmt
+            // for the source rect but src->fmt doesn't have offset_x/y set (bug?)
+            drmu_memcpy_rect(drmu_fb_data(fb, i), drmu_fb_pitch(fb, i),
+                             drmu_rect_div_xy(crop, drmu_fmt_info_wdiv(f, i), drmu_fmt_info_hdiv(f, i)),
+                             src->p[i].p_pixels, src->p[i].i_pitch,
+                             drmu_rect_vlc_format_crop(&vd->fmt),
+                             bypp);
+            create_box(fb, i);
+        }
     }
 
     // Reset crop for display after we've used it for copy
