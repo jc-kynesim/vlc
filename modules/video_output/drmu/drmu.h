@@ -100,6 +100,7 @@ drmu_rect_rescale_1u(uint_fast32_t x, uint_fast32_t mul, uint_fast32_t div)
     return (uint_fast32_t)(div == 0 ? m : (m + div/2) / div);
 }
 
+// Scale and adjust for offsets
 static inline drmu_rect_t
 drmu_rect_rescale(const drmu_rect_t s, const drmu_rect_t mul, const drmu_rect_t div)
 {
@@ -108,6 +109,18 @@ drmu_rect_rescale(const drmu_rect_t s, const drmu_rect_t mul, const drmu_rect_t 
         .y = drmu_rect_rescale_1s(s.y - div.y, mul.h, div.h) + mul.y,
         .w = drmu_rect_rescale_1u(s.w,         mul.w, div.w),
         .h = drmu_rect_rescale_1u(s.h,         mul.h, div.h)
+    };
+}
+
+// Scale ignoring offsets
+static inline drmu_rect_t
+drmu_rect_resize(const drmu_rect_t s, const drmu_rect_t mul, const drmu_rect_t div)
+{
+    return (drmu_rect_t){
+        .x = drmu_rect_rescale_1s(s.x, mul.w, div.w),
+        .y = drmu_rect_rescale_1s(s.y, mul.h, div.h),
+        .w = drmu_rect_rescale_1u(s.w, mul.w, div.w),
+        .h = drmu_rect_rescale_1u(s.h, mul.h, div.h)
     };
 }
 
@@ -171,6 +184,35 @@ static inline drmu_rect_t
 drmu_rect_shr16_rnd(const drmu_rect_t a)
 {
     return drmu_rect_shr_rnd(a, 16);
+}
+
+static inline drmu_rect_t
+drmu_rect_div_xy(const drmu_rect_t a, const unsigned int dx, const unsigned int dy)
+{
+    return (drmu_rect_t) {
+        .x = a.x / (int)dx,
+        .y = a.y / (int)dy,
+        .w = a.w / dx,
+        .h = a.h / dy
+    };
+}
+
+// Misc memcpy util
+
+// Simple 2d memcpy
+void drmu_memcpy_2d(void * const dst_p, const size_t dst_stride,
+               const void * const src_p, const size_t src_stride,
+               const size_t width, const size_t height);
+// 'FB' copy
+static inline void
+drmu_memcpy_rect(void * const dst_p, const size_t dst_stride, const drmu_rect_t dst_rect,
+                    const void * const src_p, const size_t src_stride, const drmu_rect_t src_rect,
+                    const unsigned int pixel_stride)
+{
+    drmu_memcpy_2d((char *)dst_p + dst_rect.x * pixel_stride + dst_rect.y * dst_stride, dst_stride,
+                   (char *)src_p + src_rect.x * pixel_stride + src_rect.y * src_stride, src_stride,
+                   (src_rect.w < dst_rect.w ? src_rect.w : dst_rect.w) * pixel_stride,
+                   src_rect.h < dst_rect.h ? src_rect.h : dst_rect.h);
 }
 
 // Blob
