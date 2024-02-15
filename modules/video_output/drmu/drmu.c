@@ -3149,9 +3149,12 @@ drmu_atomic_plane_add_fb(drmu_atomic_t * const da, drmu_plane_t * const dp,
     if (rv != 0 || dfb == NULL)
         return rv;
 
-    drmu_atomic_add_prop_enum(da, plid, dp->pid.pixel_blend_mode, dfb->pixel_blend_mode);
-    drmu_atomic_add_prop_enum(da, plid, dp->pid.color_encoding,   dfb->color_encoding);
-    drmu_atomic_add_prop_enum(da, plid, dp->pid.color_range,      dfb->color_range);
+    if (dp->pid.pixel_blend_mode)
+        drmu_atomic_add_prop_enum(da, plid, dp->pid.pixel_blend_mode, dfb->pixel_blend_mode);
+    if (dp->pid.color_encoding)
+        drmu_atomic_add_prop_enum(da, plid, dp->pid.color_encoding,   dfb->color_encoding);
+    if (dp->pid.color_range)
+        drmu_atomic_add_prop_enum(da, plid, dp->pid.color_range,      dfb->color_range);
     drmu_atomic_plane_add_chroma_siting(da, dp, dfb->chroma_siting);
     return rv != 0 ? -errno : 0;
 }
