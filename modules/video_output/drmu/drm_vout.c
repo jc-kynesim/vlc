@@ -165,7 +165,7 @@ create_box(drmu_fb_t * const fb, const unsigned int layer_no)
     const drmu_fmt_info_t *const f = drmu_fb_format_info_get(fb);
     unsigned int hdiv = drmu_fmt_info_hdiv(f, layer_no);
     unsigned int wdiv = drmu_fmt_info_wdiv(f, layer_no);
-    const unsigned int pby = (drmu_fmt_info_pixel_bits(f) + 7) >> 8;
+    const unsigned int pby = (drmu_fmt_info_pixel_bits(f) + 7) / 8;
     const uint32_t pitch_n = drmu_fb_pitch(fb, layer_no);
     const drmu_rect_t crop = drmu_rect_shr16_rnd(drmu_fb_crop_frac(fb));
     const drmu_rect_t active = drmu_fb_active(fb);
@@ -186,11 +186,13 @@ create_box(drmu_fb_t * const fb, const unsigned int layer_no)
     }
     else {
         unsigned int i;
+        const unsigned int vis_pitch = (crop.w / wdiv) * pby;
         for (i = 1; i < (crop.h / hdiv); ++i) {
-            p1 = p2 + (crop.w / wdiv) * pby;
+            p1 = p2 + vis_pitch;
             p2 = p2 + pitch_n;
             memset(p1, c, p2 - p1);
         }
+        p1 = p2 + vis_pitch;
     }
     p2 = p0 + pitch_n * (active.h / hdiv);
     if (p1 != p2)
