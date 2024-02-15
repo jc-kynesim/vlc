@@ -405,21 +405,19 @@ rect_transform(vout_display_place_t s, const vout_display_place_t c, const video
 }
 
 static void
-place_dest_rect(vout_display_t * const vd,
+place_dest_rect(vout_display_sys_t * const sys,
           const vout_display_cfg_t * const cfg,
           const video_format_t * fmt)
 {
-    vout_display_sys_t * const sys = vd->sys;
     sys->dest_rect = rect_transform(place_out(cfg, fmt, sys->win_rect),
                                     sys->display_rect, sys->dest_transform);
 }
 
 static void
-place_spu_rect(vout_display_t * const vd,
-          const vout_display_cfg_t * const cfg,
-          const video_format_t * fmt)
+place_spu_rect(vout_display_sys_t * const sys,
+               const vout_display_cfg_t * const cfg,
+               const video_format_t * fmt)
 {
-    vout_display_sys_t * const sys = vd->sys;
     static const vout_display_place_t r0 = {0};
 
     sys->spu_rect = place_out(cfg, fmt, r0);
@@ -439,19 +437,17 @@ place_spu_rect(vout_display_t * const vd,
 }
 
 static void
-place_rects(vout_display_t * const vd,
-          const vout_display_cfg_t * const cfg,
-          const video_format_t * fmt)
+place_rects(vout_display_sys_t * const sys,
+            const vout_display_cfg_t * const cfg,
+            const video_format_t * fmt)
 {
-    place_dest_rect(vd, cfg, fmt);
-    place_spu_rect(vd, cfg, fmt);
+    place_dest_rect(sys, cfg, fmt);
+    place_spu_rect(sys, cfg, fmt);
 }
 
-static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
-                const video_format_t *fmt)
+static int configure_display(const vout_display_t *vd, vout_display_sys_t *const sys,
+                             const vout_display_cfg_t *cfg, const video_format_t *fmt)
 {
-    vout_display_sys_t * const sys = vd->sys;
-
     if (!cfg && !fmt)
     {
         msg_Err(vd, "%s: Missing cfg & fmt", __func__);
@@ -466,7 +462,7 @@ static int configure_display(vout_display_t *vd, const vout_display_cfg_t *cfg,
 
     sys->video_transform = combine_vxf((video_transform_t)fmt->orientation, sys->display_transform);
 
-    place_rects(vd, cfg, fmt);
+    place_rects(sys, cfg, fmt);
     return 0;
 }
 
@@ -726,7 +722,7 @@ static picture_pool_t *vd_drm_pool(vout_display_t *vd, unsigned count)
 }
 
 static const drmu_vlc_fmt_info_t *
-find_fmt_fallback(vout_display_t * const vd, vout_display_sys_t * const sys, const vlc_fourcc_t * fallback)
+find_fmt_fallback(const vout_display_t * const vd, const vout_display_sys_t * const sys, const vlc_fourcc_t * fallback)
 {
     VLC_UNUSED(vd);
 
@@ -746,10 +742,9 @@ find_fmt_fallback(vout_display_t * const vd, vout_display_sys_t * const sys, con
 }
 
 
-// Copy format from *fmtp into vd->fmt and make any necessary adjustments to
-// ensure display (tweak chroma)
+// Adjust *fmtp to fix format for display (tweak chroma)
 static int
-set_format(vout_display_t * const vd, vout_display_sys_t * const sys, const video_format_t *const fmtp)
+set_format(const vout_display_t * const vd, vout_display_sys_t * const sys, video_format_t *const fmtp)
 {
     const drmu_vlc_fmt_info_t * fi = drmu_vlc_fmt_info_find_vlc(fmtp);
     const uint64_t drm_mod = drmu_vlc_fmt_info_drm_modifier(fi);
@@ -759,12 +754,10 @@ set_format(vout_display_t * const vd, vout_display_sys_t * const sys, const vide
             drmu_log_fourcc(fmtp->i_chroma), drmu_log_fourcc(drm_fmt), drm_mod,
             drmu_vlc_fmt_info_is_drmprime(fi));
 
-    vd->fmt = *fmtp;
-
 #if HAS_ZC_CMA
     if (fmtp->i_chroma == VLC_CODEC_MMAL_OPAQUE) {
         // Can't deal directly with opaque - but we can always convert it to ZC I420
-        vd->fmt.i_chroma = VLC_CODEC_MMAL_ZC_I420;
+        fmtp->i_chroma = VLC_CODEC_MMAL_ZC_I420;
     }
     else
 #endif
@@ -783,24 +776,55 @@ set_format(vout_display_t * const vd, vout_display_sys_t * const sys, const vide
 
         if ((fi = find_fmt_fallback(vd, sys, fallback)) == NULL &&
             (fi = find_fmt_fallback(vd, sys, fallback2)) == NULL)
-            return -1;
+            return VLC_EGENERIC;
 
-        vd->fmt.i_chroma = drmu_vlc_fmt_info_vlc_chroma(fi);
-        drmu_vlc_fmt_info_vlc_rgb_masks(fi, &vd->fmt.i_rmask, &vd->fmt.i_gmask, &vd->fmt.i_bmask);
+        fmtp->i_chroma = drmu_vlc_fmt_info_vlc_chroma(fi);
+        drmu_vlc_fmt_info_vlc_rgb_masks(fi, &fmtp->i_rmask, &fmtp->i_gmask, &fmtp->i_bmask);
 
         msg_Dbg(vd, "%s: Fallback %s/%x/%x/%x -> %s %"PRIx64, __func__,
-                drmu_log_fourcc(vd->fmt.i_chroma),
-                vd->fmt.i_rmask, vd->fmt.i_gmask, vd->fmt.i_bmask,
+                drmu_log_fourcc(fmtp->i_chroma),
+                fmtp->i_rmask, fmtp->i_gmask, fmtp->i_bmask,
                 drmu_log_fourcc(drmu_vlc_fmt_info_drm_pixelformat(fi)),
                 drmu_vlc_fmt_info_drm_modifier(fi));
     }
     return 0;
 }
 
+static void
+set_simple_format_size(video_format_t * const dst_fmt, const video_format_t * const src_fmt, const drmu_rect_t dst_rect)
+{
+    const drmu_rect_t fmt_crop = drmu_rect_vlc_format_crop(src_fmt);
+    const drmu_rect_t src_rect = drmu_rect_resize(drmu_rect_wh(src_fmt->i_width, src_fmt->i_height), dst_rect, fmt_crop);
+    const drmu_rect_t crop_rect = drmu_rect_resize(fmt_crop, dst_rect, fmt_crop);
+
+    dst_fmt->i_width = src_rect.w;
+    dst_fmt->i_height = src_rect.h;
+    dst_fmt->i_visible_width = crop_rect.w;
+    dst_fmt->i_visible_height = crop_rect.h;
+    dst_fmt->i_x_offset = crop_rect.x;
+    dst_fmt->i_y_offset = crop_rect.y;
+}
+
+// Updates sys but shouldn't touch vd
+// Sets fmt
+static int
+reconfigure_display(const vout_display_t * const vd, vout_display_sys_t * const sys,
+                    const vout_display_cfg_t * const cfg, video_format_t * const fmt)
+{
+    int ret;
+    *fmt = vd->source;
+    if ((ret = set_format(vd, sys, fmt)) != 0)
+        return ret;
+    configure_display(vd, sys, cfg, fmt);
+    if (sys->output_simple)
+        set_simple_format_size(fmt, &vd->source, drmu_rect_vlc_place(&sys->dest_rect));
+    return 0;
+}
 
 static int vd_drm_control(vout_display_t *vd, int query, va_list args)
 {
     vout_display_sys_t * const sys = vd->sys;
+    video_format_t fmt;
     int ret = VLC_EGENERIC;
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s: query=%d", __func__, query);
@@ -809,26 +833,27 @@ static int vd_drm_control(vout_display_t *vd, int query, va_list args)
     switch (query) {
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
-            if (configure_display(vd, vd->cfg, &vd->source) >= 0)
-                ret = VLC_SUCCESS;
+            if ((ret = reconfigure_display(vd, sys, NULL, &fmt)) != 0)
+                break;
+            if (!video_format_IsSimilar(&vd->fmt, &fmt))
+                vout_display_SendEventPicturesInvalid(vd);
             break;
 
         case VOUT_DISPLAY_CHANGE_ZOOM:
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
         case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
-        {
-            const vout_display_cfg_t * const cfg = va_arg(args, const vout_display_cfg_t *);
-
-            if (configure_display(vd, cfg, &vd->source) >= 0)
-                ret = VLC_SUCCESS;
+            if ((ret = reconfigure_display(vd, sys, va_arg(args, const vout_display_cfg_t *), &fmt)) != 0)
+                break;
+            if (!video_format_IsSimilar(&vd->fmt, &fmt))
+                vout_display_SendEventPicturesInvalid(vd);
             break;
-        }
 
         case VOUT_DISPLAY_RESET_PICTURES:
-            msg_Warn(vd, "Reset Pictures");
             kill_pool(sys);
-            set_format(vd, sys, &vd->source);
-            ret = VLC_SUCCESS;
+
+            if ((ret = reconfigure_display(vd, sys, NULL, &fmt)) != 0)
+                break;
+            vd->fmt = fmt;
             break;
 
         default:
@@ -927,13 +952,14 @@ subpic_make_chromas_from_drm(const uint32_t * const drm_chromas, const unsigned 
 
 static int
 test_simple_plane_set(vout_display_t * const vd, vout_display_sys_t * const sys,
+                      const video_format_t * const fmt,
                       unsigned int w, unsigned int h,
                       const drmu_rect_t dst_rect)
 {
     drmu_atomic_t *da = drmu_atomic_new(sys->du);
     drmu_fb_t *fb;
     int rv = -ENOMEM;
-    const drmu_vlc_fmt_info_t * const fi = drmu_vlc_fmt_info_find_vlc(&vd->fmt);
+    const drmu_vlc_fmt_info_t * const fi = drmu_vlc_fmt_info_find_vlc(fmt);
 
     if (fi == NULL) {
         msg_Err(vd, "Can't find chroma format");
@@ -972,13 +998,14 @@ static int OpenDrmVout(vlc_object_t *object)
 {
     vout_display_t * const vd = (vout_display_t *)object;
 //    video_format_t * const fmtp = &vd->fmt;
-    const video_format_t *const fmtp = &vd->source;
-    const uint32_t src_chroma = fmtp->i_chroma;
+    video_format_t out_fmt = vd->source;
+    const video_format_t *const src_fmt = &vd->source;
+    const uint32_t src_chroma = src_fmt->i_chroma;
     vout_display_sys_t *sys;
     char * display_name = NULL;
     int ret = VLC_EGENERIC;
     int rv;
-    msg_Info(vd, "<<< %s: Fmt=%4.4s", __func__, (const char *)&fmtp->i_chroma);
+    msg_Info(vd, "<<< %s: Fmt=%4.4s", __func__, (const char *)&src_fmt->i_chroma);
 
 //    if (!var_InheritBool(vd, "fullscreen")) {
 //        msg_Dbg(vd, ">>> %s: Not fullscreen", __func__);
@@ -1074,23 +1101,10 @@ static int OpenDrmVout(vlc_object_t *object)
         }
     }
 
-    if (set_format(vd, sys, fmtp)) {
+    if (set_format(vd, sys, &out_fmt)) {
         msg_Warn(vd, "Failed to find compatible output format");
         goto fail;
     }
-
-    vd->info = (vout_display_info_t){
-        .is_slow = false,
-        .has_double_click = false,
-        .needs_hide_mouse = false,
-        .has_pictures_invalid = true,
-        .subpicture_chromas = sys->subpic_chromas
-    };
-
-    vd->pool = vd_drm_pool;
-    vd->prepare = vd_drm_prepare;
-    vd->display = vd_drm_display;
-    vd->control = vd_drm_control;
 
     sys->mode_id = -1;
 
@@ -1106,10 +1120,10 @@ static int OpenDrmVout(vlc_object_t *object)
 
     if (modestr != NULL && strcmp(modestr, "none") != 0) {
         drmu_mode_simple_params_t pick = {
-            .width = fmtp->i_visible_width,
-            .height = fmtp->i_visible_height,
-            .hz_x_1000 = fmtp->i_frame_rate_base == 0 ? 0 :
-                (unsigned int)(((uint64_t)fmtp->i_frame_rate * 1000) / fmtp->i_frame_rate_base),
+            .width = src_fmt->i_visible_width,
+            .height = src_fmt->i_visible_height,
+            .hz_x_1000 = src_fmt->i_frame_rate_base == 0 ? 0 :
+                (unsigned int)(((uint64_t)src_fmt->i_frame_rate * 1000) / src_fmt->i_frame_rate_base),
         };
 
         if (strcmp(modestr, "source") != 0) {
@@ -1163,8 +1177,8 @@ static int OpenDrmVout(vlc_object_t *object)
         free(window_str);
     }
 
-    if (src_chroma != vd->fmt.i_chroma)
-        msg_Warn(vd, "Cannot display %s directly trying %s", drmu_log_fourcc(src_chroma), drmu_log_fourcc(vd->fmt.i_chroma));
+    if (src_chroma != out_fmt.i_chroma)
+        msg_Warn(vd, "Cannot display %s directly trying %s", drmu_log_fourcc(src_chroma), drmu_log_fourcc(out_fmt.i_chroma));
 
     set_display_windows(vd, sys);
 
@@ -1172,7 +1186,7 @@ static int OpenDrmVout(vlc_object_t *object)
         const unsigned int w = sys->display_rect.width;
         const unsigned int h = sys->display_rect.height;
         const drmu_rect_t sr = {.x = w / 5, .y = h / 5, .w = w / 3, .h = h / 3};
-        if (test_simple_plane_set(vd, sys, w, h, drmu_rect_wh(w, h)) != 0) {
+        if (test_simple_plane_set(vd, sys, &out_fmt, w, h, drmu_rect_wh(w, h)) != 0) {
             msg_Warn(vd, "Failed simple pic test for mode %dx%d", w, h);
             goto fail;
         }
@@ -1183,7 +1197,7 @@ static int OpenDrmVout(vlc_object_t *object)
         // Test for full scale & position capability - the incoming stream
         // might not need it but if anything changes it is better to be sure we
         // can cope with it
-        if (test_simple_plane_set(vd, sys, vd->source.i_visible_width, vd->source.i_visible_height, sr) != 0) {
+        if (test_simple_plane_set(vd, sys, &out_fmt, vd->source.i_visible_width, vd->source.i_visible_height, sr) != 0) {
             msg_Warn(vd, "Failed scale pic test for %dx%d->%dx%d", vd->source.i_visible_width, vd->source.i_visible_height, sr.w, sr.h);
             sys->output_simple = true;
         }
@@ -1192,24 +1206,39 @@ static int OpenDrmVout(vlc_object_t *object)
         }
     }
 
-    configure_display(vd, vd->cfg, &vd->source);
+    configure_display(vd, sys, vd->cfg, &vd->source);
 
-    if (sys->output_simple) {
-        vd->fmt.i_height = sys->dest_rect.height;
-        vd->fmt.i_width = sys->dest_rect.width;
-        vd->fmt.i_visible_height = vd->fmt.i_height;
-        vd->fmt.i_visible_width = vd->fmt.i_width;
-        vd->fmt.i_x_offset = 0;
-        vd->fmt.i_y_offset = 0;
-    }
+    if (sys->output_simple)
+        set_simple_format_size(&out_fmt, src_fmt, drmu_rect_vlc_place(&sys->dest_rect));
+
+    // All setup done - no possibility of error from here on
+    // Do final config setup & cleanup
+
+    free(display_name);
+
+    vd->fmt = out_fmt;
+
+    vd->info = (vout_display_info_t){
+        .is_slow = false,
+        .has_double_click = false,
+        .needs_hide_mouse = false,
+        .has_pictures_invalid = true,
+        .subpicture_chromas = sys->subpic_chromas
+    };
+
+    vd->pool = vd_drm_pool;
+    vd->prepare = vd_drm_prepare;
+    vd->display = vd_drm_display;
+    vd->control = vd_drm_control;
 
     {
         const drmu_mode_simple_params_t * const mode = drmu_output_mode_simple_params(sys->dout);
-        if (vd->cfg->display.width != mode->width || vd->cfg->display.height != mode->height)
+        if (vd->cfg->display.width != mode->width || vd->cfg->display.height != mode->height) {
+            msg_Dbg(vd, "Set display size to %ux%u", mode->width, mode->height);
             vout_display_SendEventDisplaySize(vd, mode->width, mode->height);
+        }
     }
 
-    free(display_name);
     msg_Dbg(vd, ">>> %s", __func__);
     return VLC_SUCCESS;
 
