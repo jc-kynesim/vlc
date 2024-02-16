@@ -793,6 +793,8 @@ set_format(const vout_display_t * const vd, vout_display_sys_t * const sys, vide
 static void
 set_simple_format_size(video_format_t * const dst_fmt, const video_format_t * const src_fmt, const drmu_rect_t dst_rect)
 {
+#if 0
+    // Create a full pic with a centre cropping region
     const drmu_rect_t fmt_crop = drmu_rect_vlc_format_crop(src_fmt);
     const drmu_rect_t src_rect = drmu_rect_resize(drmu_rect_wh(src_fmt->i_width, src_fmt->i_height), dst_rect, fmt_crop);
     const drmu_rect_t crop_rect = drmu_rect_resize(fmt_crop, dst_rect, fmt_crop);
@@ -803,6 +805,16 @@ set_simple_format_size(video_format_t * const dst_fmt, const video_format_t * co
     dst_fmt->i_visible_height = crop_rect.h;
     dst_fmt->i_x_offset = crop_rect.x;
     dst_fmt->i_y_offset = crop_rect.y;
+#else
+    // Just give us the cropped bit
+    VLC_UNUSED(src_fmt);
+    dst_fmt->i_width = dst_rect.w;
+    dst_fmt->i_height = dst_rect.h;
+    dst_fmt->i_visible_width = dst_rect.w;
+    dst_fmt->i_visible_height = dst_rect.h;
+    dst_fmt->i_x_offset = 0;
+    dst_fmt->i_y_offset = 0;
+#endif
 }
 
 // Updates sys but shouldn't touch vd
