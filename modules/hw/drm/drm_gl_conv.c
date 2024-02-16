@@ -122,6 +122,64 @@ tc_drm_update(const opengl_tex_converter_t *tc, GLuint *textures,
         *a++ = EGL_LINUX_DRM_FOURCC_EXT;
         *a++ = desc->layers[0].format;
 
+        if (vlc_fourcc_IsYUV(pic->format.i_chroma))
+        {
+            *a++ = EGL_SAMPLE_RANGE_HINT_EXT;
+            *a++ = pic->format.b_color_range_full ? EGL_YUV_FULL_RANGE_EXT : EGL_YUV_NARROW_RANGE_EXT;
+
+            switch (pic->format.chroma_location)
+            {
+                case CHROMA_LOCATION_LEFT:
+                    *a++ = EGL_YUV_CHROMA_HORIZONTAL_SITING_HINT_EXT;
+                    *a++ = EGL_YUV_CHROMA_SITING_0_EXT;
+                    *a++ = EGL_YUV_CHROMA_VERTICAL_SITING_HINT_EXT;
+                    *a++ = EGL_YUV_CHROMA_SITING_0_5_EXT;
+                    break;
+                case CHROMA_LOCATION_CENTER:
+                    *a++ = EGL_YUV_CHROMA_HORIZONTAL_SITING_HINT_EXT;
+                    *a++ = EGL_YUV_CHROMA_SITING_0_5_EXT;
+                    *a++ = EGL_YUV_CHROMA_VERTICAL_SITING_HINT_EXT;
+                    *a++ = EGL_YUV_CHROMA_SITING_0_5_EXT;
+                    break;
+                case CHROMA_LOCATION_TOP_LEFT:
+                    *a++ = EGL_YUV_CHROMA_HORIZONTAL_SITING_HINT_EXT;
+                    *a++ = EGL_YUV_CHROMA_SITING_0_EXT;
+                    *a++ = EGL_YUV_CHROMA_VERTICAL_SITING_HINT_EXT;
+                    *a++ = EGL_YUV_CHROMA_SITING_0_EXT;
+                    break;
+                case CHROMA_LOCATION_TOP_CENTER:
+                    *a++ = EGL_YUV_CHROMA_HORIZONTAL_SITING_HINT_EXT;
+                    *a++ = EGL_YUV_CHROMA_SITING_0_5_EXT;
+                    *a++ = EGL_YUV_CHROMA_VERTICAL_SITING_HINT_EXT;
+                    *a++ = EGL_YUV_CHROMA_SITING_0_EXT;
+                    break;
+                case CHROMA_LOCATION_BOTTOM_LEFT:
+                case CHROMA_LOCATION_BOTTOM_CENTER:
+                case CHROMA_LOCATION_UNDEF:
+                default:
+                    break;
+            }
+
+            switch (pic->format.space)
+            {
+                case COLOR_SPACE_BT2020:
+                    *a++ = EGL_YUV_COLOR_SPACE_HINT_EXT;
+                    *a++ = EGL_ITU_REC2020_EXT;
+                    break;
+                case COLOR_SPACE_BT601:
+                    *a++ = EGL_YUV_COLOR_SPACE_HINT_EXT;
+                    *a++ = EGL_ITU_REC601_EXT;
+                    break;
+                case COLOR_SPACE_BT709:
+                    *a++ = EGL_YUV_COLOR_SPACE_HINT_EXT;
+                    *a++ = EGL_ITU_REC709_EXT;
+                    break;
+                case COLOR_SPACE_UNDEF:
+                default:
+                    break;
+            }
+        }
+
         const EGLint * ext = plane_exts;
 
         for (int i = 0; i < desc->nb_layers; ++i)
@@ -138,7 +196,7 @@ tc_drm_update(const opengl_tex_converter_t *tc, GLuint *textures,
                 *a++ = plane->offset;
                 *a++ = *ext++; // PITCH
                 *a++ = plane->pitch;
-                if (!obj->format_modifier || obj->format_modifier == DRM_FORMAT_MOD_INVALID)
+                if (obj->format_modifier == DRM_FORMAT_MOD_INVALID)
                 {
                     ext += 2;
                 }
