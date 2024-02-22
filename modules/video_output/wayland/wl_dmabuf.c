@@ -1629,7 +1629,92 @@ place_rects(vout_display_t * const vd,
     vout_display_sys_t * const sys = vd->sys;
 
     vout_display_PlacePicture(&sys->video_dst_rect, &vd->source, cfg, true);
-    sys->video_trans = transform_from_fmt(&vd->fmt, &sys->video_src_rect);
+    sys->video_trans = transform_from_fmt(&vd->source, &sys->video_src_rect);
+}
+
+static const drmu_vlc_fmt_info_t *
+find_fmt_fallback(vout_display_t * const vd, const fmt_list_t * const flist, const vlc_fourcc_t * fallback)
+{
+    const drmu_vlc_fmt_info_t * fmti_best = NULL;
+    int pri_best = INT_MAX;
+
+    for (; *fallback != 0; ++fallback)
+    {
+        const video_frame_format_t vf = {.i_chroma = *fallback};
+        const drmu_vlc_fmt_info_t * fmti = NULL;
+
+        msg_Dbg(vd, "Try %s", drmu_log_fourcc(*fallback));
+
+        for (fmti = drmu_vlc_fmt_info_find_vlc(&vf);
+             fmti != NULL;
+             fmti = drmu_vlc_fmt_info_find_vlc_next(&vf, fmti))
+        {
+            const int pri = fmt_list_find(flist, fmti);
+            msg_Dbg(vd, "Try %s -> %s %"PRIx64": %d", drmu_log_fourcc(*fallback),
+                    drmu_log_fourcc(drmu_vlc_fmt_info_drm_pixelformat(fmti)),
+                    drmu_vlc_fmt_info_drm_modifier(fmti), pri);
+            if (pri >= 0 && pri < pri_best)
+            {
+                fmti_best = fmti;
+                pri_best = pri;
+
+                // If we've got pri 0 then might as well stop now
+                if (pri == 0)
+                    return fmti_best;
+            }
+        }
+    }
+
+    return fmti_best;
+}
+
+static const drmu_vlc_fmt_info_t *
+get_usable_format(vout_display_t * const vd,
+                  const fmt_list_t * const flist,
+                  const video_format_t * const fmt)
+{
+    const drmu_vlc_fmt_info_t * pic_fmti;
+
+    // Check PIC DRM format here
+    if ((pic_fmti = drmu_vlc_fmt_info_find_vlc(fmt)) == NULL ||
+        fmt_list_find(flist, pic_fmti) < 0)
+    {
+        static const vlc_fourcc_t fallback2[] = {
+            VLC_CODEC_I420,
+            VLC_CODEC_RGB32,
+            0
+        };
+
+        msg_Warn(vd, "Could not find %s -> %s mod %#"PRIx64" in supported formats",
+                 drmu_log_fourcc(fmt->i_chroma),
+                 drmu_log_fourcc(drmu_vlc_fmt_info_drm_pixelformat(pic_fmti)),
+                 drmu_vlc_fmt_info_drm_modifier(pic_fmti));
+
+        if ((pic_fmti = find_fmt_fallback(vd, flist,
+                                          vlc_fourcc_IsYUV(fmt->i_chroma) ?
+                                              vlc_fourcc_GetYUVFallback(fmt->i_chroma) :
+                                              vlc_fourcc_GetRGBFallback(fmt->i_chroma))) == NULL &&
+            (pic_fmti = find_fmt_fallback(vd, flist, fallback2)) == NULL) {
+            msg_Warn(vd, "Failed to find any usable fallback format");
+        }
+    }
+    return pic_fmti;
+}
+
+static int
+set_req_format(vout_display_t * const vd, const vout_display_sys_t * const sys, video_format_t * const fmt)
+{
+    const video_format_t * const src_fmt = &vd->source;
+    const drmu_vlc_fmt_info_t * const fmti = get_usable_format(vd, sys->use_shm ? &sys->shm_fmts : &sys->dmabuf_fmts, src_fmt);
+
+    if (fmti == NULL)
+        return VLC_EGENERIC;
+
+    *fmt = *src_fmt;
+    fmt->i_chroma = drmu_vlc_fmt_info_vlc_chroma(fmti);
+    drmu_vlc_fmt_info_vlc_rgb_masks(fmti, &fmt->i_rmask, &fmt->i_gmask, &fmt->i_bmask);
+
+    return VLC_SUCCESS;
 }
 
 static void
@@ -2092,42 +2177,6 @@ registry_scan(vout_display_t * const vd, vout_display_sys_t * const sys)
     return 0;
 }
 
-static const drmu_vlc_fmt_info_t *
-find_fmt_fallback(vout_display_t * const vd, const fmt_list_t * const flist, const vlc_fourcc_t * fallback)
-{
-    const drmu_vlc_fmt_info_t * fmti_best = NULL;
-    int pri_best = INT_MAX;
-
-    for (; *fallback != 0; ++fallback)
-    {
-        const video_frame_format_t vf = {.i_chroma = *fallback};
-        const drmu_vlc_fmt_info_t * fmti = NULL;
-
-        msg_Dbg(vd, "Try %s", drmu_log_fourcc(*fallback));
-
-        for (fmti = drmu_vlc_fmt_info_find_vlc(&vf);
-             fmti != NULL;
-             fmti = drmu_vlc_fmt_info_find_vlc_next(&vf, fmti))
-        {
-            const int pri = fmt_list_find(flist, fmti);
-            msg_Dbg(vd, "Try %s -> %s %"PRIx64": %d", drmu_log_fourcc(*fallback),
-                    drmu_log_fourcc(drmu_vlc_fmt_info_drm_pixelformat(fmti)),
-                    drmu_vlc_fmt_info_drm_modifier(fmti), pri);
-            if (pri >= 0 && pri < pri_best)
-            {
-                fmti_best = fmti;
-                pri_best = pri;
-
-                // If we've got pri 0 then might as well stop now
-                if (pri == 0)
-                    return fmti_best;
-            }
-        }
-    }
-
-    return fmti_best;
-}
-
 static void Close(vlc_object_t *obj)
 {
     vout_display_t * const vd = (vout_display_t *)obj;
@@ -2193,8 +2242,8 @@ static int Open(vlc_object_t *obj)
 {
     vout_display_t * const vd = (vout_display_t *)obj;
     vout_display_sys_t *sys;
-    const drmu_vlc_fmt_info_t * pic_fmti;
     fmt_list_t * flist = NULL;
+    video_format_t req_fmt;
 
     if (var_InheritBool(vd, WL_DMABUF_DISABLE_NAME))
         return VLC_EGENERIC;
@@ -2274,30 +2323,10 @@ static int Open(vlc_object_t *obj)
     flist = sys->use_shm ? &sys->shm_fmts : &sys->dmabuf_fmts;
 
     // Check PIC DRM format here
-    if ((pic_fmti = drmu_vlc_fmt_info_find_vlc(&vd->fmt)) == NULL ||
-        fmt_list_find(flist, pic_fmti) < 0)
-    {
-        static const vlc_fourcc_t fallback2[] = {
-            VLC_CODEC_I420,
-            VLC_CODEC_RGB32,
-            0
-        };
+    if (set_req_format(vd, sys, &req_fmt) != VLC_SUCCESS)
+        goto error;
 
-        msg_Warn(vd, "Could not find %s mod %#"PRIx64" in supported formats",
-                 drmu_log_fourcc(drmu_vlc_fmt_info_drm_pixelformat(pic_fmti)),
-                 drmu_vlc_fmt_info_drm_modifier(pic_fmti));
-
-        if ((pic_fmti = find_fmt_fallback(vd, flist,
-                                          vlc_fourcc_IsYUV(vd->fmt.i_chroma) ?
-                                              vlc_fourcc_GetYUVFallback(vd->fmt.i_chroma) :
-                                              vlc_fourcc_GetRGBFallback(vd->fmt.i_chroma))) == NULL &&
-            (pic_fmti = find_fmt_fallback(vd, flist, fallback2)) == NULL)
-        {
-            msg_Warn(vd, "Failed to find any usable fallback format");
-            goto error;
-        }
-    }
-
+    // Get subpic format(s) - it is a list but VLC only looks at list[0]
     {
         static vlc_fourcc_t const tryfmts[] = {
             VLC_CODEC_RGBA,
@@ -2345,15 +2374,20 @@ static int Open(vlc_object_t *obj)
     sys->region_none = wl_compositor_create_region(video_compositor(sys));
     wl_region_add(sys->region_all, 0, 0, 0, 0);
 
-    vd->fmt.i_chroma = drmu_vlc_fmt_info_vlc_chroma(pic_fmti);
-    drmu_vlc_fmt_info_vlc_rgb_masks(pic_fmti, &vd->fmt.i_rmask, &vd->fmt.i_gmask, &vd->fmt.i_bmask);
+    vd->fmt = req_fmt;
 
     place_rects(vd, vd->cfg);
 
     sys->want_stats = var_InheritBool(vd, WL_DMABUF_STATS_NAME);
 
-    vd->info.has_pictures_invalid = false;
-    vd->info.subpicture_chromas = sys->subpic_chromas;
+    // If we can invalidate the pic pool then DRI is disabled - we want DRI
+    vd->info = (vout_display_info_t){
+        .is_slow = false,
+        .has_double_click = false,
+        .needs_hide_mouse = false,
+        .has_pictures_invalid = false,
+        .subpicture_chromas = sys->subpic_chromas,
+    };
 
     vd->pool = vd_dmabuf_pool;
     vd->prepare = Prepare;
