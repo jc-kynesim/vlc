@@ -1861,21 +1861,6 @@ done:
 #endif
 }
 
-static void ResetPictures(vout_display_t *vd)
-{
-    vout_display_sys_t *sys = vd->sys;
-
-#if TRACE_ALL
-    msg_Dbg(vd, "<<< %s", __func__);
-#endif
-
-    kill_pool(sys);
-
-#if TRACE_ALL
-    msg_Dbg(vd, ">>> %s", __func__);
-#endif
-}
-
 static int Control(vout_display_t *vd, int query, va_list ap)
 {
     vout_display_sys_t * const sys = vd->sys;
@@ -1886,56 +1871,32 @@ static int Control(vout_display_t *vd, int query, va_list ap)
 
     switch (query)
     {
-        case VOUT_DISPLAY_RESET_PICTURES:
-        {
-            vout_display_place_t place;
-            video_format_t src;
-
-            assert(sys->planes[PLANE_VID].viewport == NULL);
-
-            vout_display_PlacePicture(&place, &vd->source, vd->cfg, false);
-            video_format_ApplyRotation(&src, &vd->source);
-
-            vd->fmt.i_width  = src.i_width  * place.width
-                                            / src.i_visible_width;
-            vd->fmt.i_height = src.i_height * place.height
-                                            / src.i_visible_height;
-            vd->fmt.i_visible_width  = place.width;
-            vd->fmt.i_visible_height = place.height;
-            vd->fmt.i_x_offset = src.i_x_offset * place.width
-                                                / src.i_visible_width;
-            vd->fmt.i_y_offset = src.i_y_offset * place.height
-                                                / src.i_visible_height;
-            ResetPictures(vd);
+        case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
+        case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
+            place_rects(vd, vd->cfg);
+            do_resize(vd, sys);
+            commit_do(vd, sys);
             break;
-        }
 
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
         case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
         case VOUT_DISPLAY_CHANGE_ZOOM:
-        case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
-        case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
         {
-            const vout_display_cfg_t *cfg;
-
-            if (query == VOUT_DISPLAY_CHANGE_SOURCE_ASPECT
-             || query == VOUT_DISPLAY_CHANGE_SOURCE_CROP)
-            {
-                cfg = vd->cfg;
-            }
-            else
-            {
-                cfg = va_arg(ap, const vout_display_cfg_t *);
-            }
+            const vout_display_cfg_t * const cfg = va_arg(ap, const vout_display_cfg_t *);
 
             place_rects(vd, cfg);
             do_resize(vd, sys);
             commit_do(vd, sys);
             break;
         }
+
+        case VOUT_DISPLAY_RESET_PICTURES:
+            msg_Err(vd, "Unexpected reset pictures");
+            return VLC_EGENERIC;
+
         default:
-             msg_Err(vd, "unknown request %d", query);
-             return VLC_EGENERIC;
+            msg_Err(vd, "unknown request %d", query);
+            return VLC_EGENERIC;
     }
 
 #if TRACE_ALL
