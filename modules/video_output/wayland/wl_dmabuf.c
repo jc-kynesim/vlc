@@ -1054,10 +1054,9 @@ static picture_pool_t *vd_dmabuf_pool(vout_display_t * const vd, unsigned count)
 {
     vout_display_sys_t * const sys = vd->sys;
 
-#if TRACE_ALL
-    msg_Dbg(vd, "%s: fmt:%dx%d,sar:%d/%d; source:%dx%d", __func__,
-            vd->fmt.i_width, vd->fmt.i_height, vd->fmt.i_sar_num, vd->fmt.i_sar_den, vd->source.i_width, vd->source.i_height);
-#endif
+    msg_Dbg(vd, "%s: fmt:%dx%d,sar:%d/%d; source:%dx%d, count=%u", __func__,
+            vd->fmt.i_width, vd->fmt.i_height, vd->fmt.i_sar_num, vd->fmt.i_sar_den,
+            vd->source.i_width, vd->source.i_height, count);
 
     if (sys->vlc_pic_pool == NULL)
         sys->vlc_pic_pool = picture_pool_NewFromFormat(&vd->fmt, count);
