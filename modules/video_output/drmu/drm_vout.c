@@ -49,6 +49,7 @@
 #include <libdrm/drm_fourcc.h>
 
 #define TRACE_ALL 0
+#define PIC_POOL_FB 1
 
 #define SUBPICS_MAX 4
 
@@ -128,6 +129,11 @@ typedef struct vout_display_sys_t {
 
     picture_pool_t * vlc_pic_pool;
 } vout_display_sys_t;
+
+// pic->p_sys when we are allocating our own pics
+struct picture_sys_t {
+    drmu_fb_t * fb;
+};
 
 static drmu_fb_t *
 copy_pic_to_fb(vout_display_t *const vd, drmu_pool_t *const pool, picture_t *const src)
@@ -599,12 +605,19 @@ subpics_done:
     }
     else
 #endif
+
+#if !PIC_POOL_FB
     if (sys->output_simple) {
         dfb = copy_pic_to_fixed_fb(vd, sys, sys->pic_pool, pic);
     }
     else {
         dfb = copy_pic_to_fb(vd, sys->pic_pool, pic);
     }
+#else
+    {
+        dfb = drmu_fb_ref(pic->p_sys->fb);
+    }
+#endif
 
     if (dfb == NULL) {
         msg_Err(vd, "Failed to create frme buffer from pic");
@@ -683,6 +696,67 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic,
     return;
 }
 
+static void
+destroy_drmu_pic(picture_t * pic)
+{
+    drmu_fb_unref(&pic->p_sys->fb);
+    free(pic->p_sys);
+    free(pic);
+}
+
+static picture_t *
+alloc_drmu_pic(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+    const video_format_t * const fmt = &vd->fmt;
+    drmu_pool_t *const pool = sys->sub_fb_pool;
+    uint64_t mod;
+    const uint32_t drm_fmt = drmu_format_vlc_to_drm(fmt, &mod);
+    const drmu_fmt_info_t * fmti;
+    drmu_fb_t * fb;
+    unsigned int layers;
+    unsigned int i;
+    picture_t * pic;
+    picture_resource_t res = {
+        .p_sys = NULL,
+        .pf_destroy = destroy_drmu_pic,
+    };
+
+    if (drm_fmt == 0 || mod != DRM_FORMAT_MOD_LINEAR) {
+        msg_Warn(vd, "Failed vlc->drm format for copy_pic: %s", drmu_log_fourcc(fmt->i_chroma));
+        return NULL;
+    }
+
+    fb = drmu_pool_fb_new_dumb_mod(pool, fmt->i_width, fmt->i_height, drm_fmt, mod);
+    if (fb == NULL) {
+        msg_Warn(vd, "Failed alloc for copy_pic: %dx%d", fmt->i_width, fmt->i_height);
+        return NULL;
+    }
+
+    if ((res.p_sys = calloc(1, sizeof(*res.p_sys))) == NULL)
+        goto fail;
+
+    res.p_sys->fb = fb;
+
+    fmti = drmu_fb_format_info_get(fb);
+    layers = drmu_fmt_info_plane_count(fmti);
+
+    for (i = 0; i != layers; ++i) {
+        res.p[i].p_pixels = drmu_fb_data(fb, i);
+        res.p[i].i_lines = drmu_fb_height(fb) / drmu_fmt_info_hdiv(fmti, i);
+        res.p[i].i_pitch = drmu_fb_pitch(fb, i);
+    }
+
+    if ((pic = picture_NewFromResource(fmt, &res)) == NULL)
+        goto fail;
+
+    return pic;
+
+fail:
+    drmu_fb_unref(&fb);
+    free(res.p_sys);
+    return NULL;
+}
+
 static void subpic_cache_flush(vout_display_sys_t * const sys)
 {
     for (unsigned int i = 0; i != SUBPICS_MAX; ++i) {
@@ -709,16 +783,47 @@ static void kill_pool(vout_display_sys_t * const sys)
 static picture_pool_t *vd_drm_pool(vout_display_t *vd, unsigned count)
 {
     vout_display_sys_t * const sys = vd->sys;
+    picture_t * pics[32];
+    unsigned int pics_alloc;
 
-#if TRACE_ALL
-    msg_Dbg(vd, "%s: fmt:%dx%d,sar:%d/%d; source:%dx%d", __func__,
-            vd->fmt.i_width, vd->fmt.i_height, vd->fmt.i_sar_num, vd->fmt.i_sar_den, vd->source.i_width, vd->source.i_height);
-#endif
+    msg_Info(vd, "%s: fmt:%dx%d,sar:%d/%d; source:%dx%d, count=%d", __func__,
+            vd->fmt.i_width, vd->fmt.i_height, vd->fmt.i_sar_num, vd->fmt.i_sar_den,
+            vd->source.i_width, vd->source.i_height, count);
 
-    if (sys->vlc_pic_pool == NULL) {
-        sys->vlc_pic_pool = picture_pool_NewFromFormat(&vd->fmt, count);
-    }
+    if (sys->vlc_pic_pool != NULL)
+        return sys->vlc_pic_pool;
+
+#if !PIC_POOL_FB
+    sys->vlc_pic_pool = picture_pool_NewFromFormat(&vd->fmt, count);
     return sys->vlc_pic_pool;
+#else
+    if (drmu_format_vlc_to_drm_prime(&vd->fmt, NULL) != 0) {
+        sys->vlc_pic_pool = picture_pool_NewFromFormat(&vd->fmt, count);
+        return sys->vlc_pic_pool;
+    }
+
+    if (count > ARRAY_SIZE(pics))
+        count = ARRAY_SIZE(pics);
+
+    for (pics_alloc = 0; pics_alloc != count; ++pics_alloc) {
+        if ((pics[pics_alloc] = alloc_drmu_pic(vd, sys)) == NULL) {
+            msg_Err(vd, "Failed to alloc pic poll entry %u", pics_alloc);
+            goto fail;
+        }
+    }
+
+    if ((sys->vlc_pic_pool = picture_pool_New(pics_alloc, pics)) == NULL) {
+        msg_Err(vd, "Failed to alloc picture pool");
+        goto fail;
+    }
+
+    return sys->vlc_pic_pool;
+
+fail:
+    while (pics_alloc != 0)
+        picture_Release(pics[--pics_alloc]);
+    return NULL;
+#endif
 }
 
 static const drmu_vlc_fmt_info_t *
