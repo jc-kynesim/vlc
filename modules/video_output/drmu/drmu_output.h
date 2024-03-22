@@ -66,10 +66,16 @@ int drmu_output_add_writeback(drmu_output_t * const dout);
 drmu_crtc_t * drmu_output_crtc(const drmu_output_t * const dout);
 drmu_conn_t * drmu_output_conn(const drmu_output_t * const dout, const unsigned int n);
 
+// Return the in-use drmu environment
+drmu_env_t * drmu_output_env(const drmu_output_t * const dout);
+
 // Create a new empty output - has no crtc or conn
+// Takes a ref on the env  (released when the output is deleted)
 drmu_output_t * drmu_output_new(drmu_env_t * const du);
 
-// Unref an output
+// Increment ref count on an output - cannot fail
+drmu_output_t * drmu_output_ref(drmu_output_t * const dout);
+// Unref an output - delete if ref count now zero
 void drmu_output_unref(drmu_output_t ** const ppdout);
 
 #ifdef __cplusplus
