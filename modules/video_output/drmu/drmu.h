@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 #include "drmu_chroma.h"
+#include "drmu_math.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,9 +33,6 @@ typedef struct drmu_fb_s drmu_fb_t;
 struct drmu_prop_object_s;
 typedef struct drmu_prop_object_s drmu_prop_object_t;
 
-struct drmu_pool_s;
-typedef struct drmu_pool_s drmu_pool_t;
-
 struct drmu_crtc_s;
 typedef struct drmu_crtc_s drmu_crtc_t;
 
@@ -51,16 +49,6 @@ typedef struct drmu_env_s drmu_env_t;
 
 struct drm_log_env_s;
 typedef struct drmu_log_env_s drmu_log_env_t;
-
-typedef struct drmu_rect_s {
-    int32_t x, y;
-    uint32_t w, h;
-} drmu_rect_t;
-
-typedef struct drmu_ufrac_s {
-    unsigned int num;
-    unsigned int den;
-} drmu_ufrac_t;
 
 // HDR enums is copied from linux include/linux/hdmi.h (strangely not part of uapi)
 enum hdmi_metadata_type
@@ -80,140 +68,6 @@ typedef enum drmu_isset_e {
     DRMU_ISSET_NULL,       // Thing is empty
     DRMU_ISSET_SET,        // Thing has valid data
 } drmu_isset_t;
-
-drmu_ufrac_t drmu_ufrac_reduce(drmu_ufrac_t x);
-
-static inline int_fast32_t
-drmu_rect_rescale_1s(int_fast32_t x, uint_fast32_t mul, uint_fast32_t div)
-{
-    const int_fast64_t m = x * (int_fast64_t)mul;
-    const uint_fast32_t d2 = div/2;
-    return div == 0 ? (int_fast32_t)m :
-        m >= 0 ? (int_fast32_t)(((uint_fast64_t)m + d2) / div) :
-            -(int_fast32_t)(((uint_fast64_t)(-m) + d2) / div);
-}
-
-static inline uint_fast32_t
-drmu_rect_rescale_1u(uint_fast32_t x, uint_fast32_t mul, uint_fast32_t div)
-{
-    const uint_fast64_t m = x * (uint_fast64_t)mul;
-    return (uint_fast32_t)(div == 0 ? m : (m + div/2) / div);
-}
-
-// Scale and adjust for offsets
-static inline drmu_rect_t
-drmu_rect_rescale(const drmu_rect_t s, const drmu_rect_t mul, const drmu_rect_t div)
-{
-    return (drmu_rect_t){
-        .x = drmu_rect_rescale_1s(s.x - div.x, mul.w, div.w) + mul.x,
-        .y = drmu_rect_rescale_1s(s.y - div.y, mul.h, div.h) + mul.y,
-        .w = drmu_rect_rescale_1u(s.w,         mul.w, div.w),
-        .h = drmu_rect_rescale_1u(s.h,         mul.h, div.h)
-    };
-}
-
-// Scale ignoring offsets
-static inline drmu_rect_t
-drmu_rect_resize(const drmu_rect_t s, const drmu_rect_t mul, const drmu_rect_t div)
-{
-    return (drmu_rect_t){
-        .x = drmu_rect_rescale_1s(s.x, mul.w, div.w),
-        .y = drmu_rect_rescale_1s(s.y, mul.h, div.h),
-        .w = drmu_rect_rescale_1u(s.w, mul.w, div.w),
-        .h = drmu_rect_rescale_1u(s.h, mul.h, div.h)
-    };
-}
-
-static inline drmu_rect_t
-drmu_rect_add_xy(const drmu_rect_t a, const drmu_rect_t b)
-{
-    return (drmu_rect_t){
-        .x = a.x + b.x,
-        .y = a.y + b.y,
-        .w = a.w,
-        .h = a.h
-    };
-}
-
-static inline drmu_rect_t
-drmu_rect_wh(const unsigned int w, const unsigned int h)
-{
-    return (drmu_rect_t){
-        .w = w,
-        .h = h
-    };
-}
-
-static inline drmu_rect_t
-drmu_rect_shl16(const drmu_rect_t a)
-{
-    return (drmu_rect_t){
-        .x = a.x << 16,
-        .y = a.y << 16,
-        .w = a.w << 16,
-        .h = a.h << 16
-    };
-}
-
-static inline drmu_rect_t
-drmu_rect_shr16(const drmu_rect_t a)
-{
-    return (drmu_rect_t){
-        .x = a.x >> 16,
-        .y = a.y >> 16,
-        .w = a.w >> 16,
-        .h = a.h >> 16
-    };
-}
-
-static inline drmu_rect_t
-drmu_rect_shr_rnd(const drmu_rect_t a, unsigned int n)
-{
-    if (n == 0)
-        return a;
-    --n;
-    return (drmu_rect_t) {
-        .x = ((a.x >> n) + 1) >> 1,
-        .y = ((a.y >> n) + 1) >> 1,
-        .w = ((a.w >> n) + 1) >> 1,
-        .h = ((a.h >> n) + 1) >> 1
-    };
-}
-
-static inline drmu_rect_t
-drmu_rect_shr16_rnd(const drmu_rect_t a)
-{
-    return drmu_rect_shr_rnd(a, 16);
-}
-
-static inline drmu_rect_t
-drmu_rect_div_xy(const drmu_rect_t a, const unsigned int dx, const unsigned int dy)
-{
-    return (drmu_rect_t) {
-        .x = a.x / (int)dx,
-        .y = a.y / (int)dy,
-        .w = a.w / dx,
-        .h = a.h / dy
-    };
-}
-
-// Misc memcpy util
-
-// Simple 2d memcpy
-void drmu_memcpy_2d(void * const dst_p, const size_t dst_stride,
-               const void * const src_p, const size_t src_stride,
-               const size_t width, const size_t height);
-// 'FB' copy
-static inline void
-drmu_memcpy_rect(void * const dst_p, const size_t dst_stride, const drmu_rect_t dst_rect,
-                    const void * const src_p, const size_t src_stride, const drmu_rect_t src_rect,
-                    const unsigned int pixel_stride)
-{
-    drmu_memcpy_2d((char *)dst_p + dst_rect.x * pixel_stride + dst_rect.y * dst_stride, dst_stride,
-                   (char *)src_p + src_rect.x * pixel_stride + src_rect.y * src_stride, src_stride,
-                   (src_rect.w < dst_rect.w ? src_rect.w : dst_rect.w) * pixel_stride,
-                   src_rect.h < dst_rect.h ? src_rect.h : dst_rect.h);
-}
 
 // Blob
 
@@ -267,10 +121,16 @@ int drmu_atomic_add_prop_range(struct drmu_atomic_s * const da, const uint32_t o
 
 struct drm_mode_create_dumb;
 
+// Create an fd from a bo
+// fd not tracked by the bo so it is the callers reponsibility to free it
+// if flags are 0 then RDWR | CLOEXEC will be used
+int drmu_bo_export_fd(drmu_bo_t * bo, uint32_t flags);
+
 void drmu_bo_unref(drmu_bo_t ** const ppbo);
 drmu_bo_t * drmu_bo_ref(drmu_bo_t * const bo);
 drmu_bo_t * drmu_bo_new_fd(drmu_env_t *const du, const int fd);
 drmu_bo_t * drmu_bo_new_dumb(drmu_env_t *const du, struct drm_mode_create_dumb * const d);
+drmu_bo_t * drmu_bo_new_external(drmu_env_t *const du, const uint32_t bo_handle);
 void drmu_bo_env_uninit(drmu_bo_env_t * const boe);
 void drmu_bo_env_init(drmu_bo_env_t * boe);
 
@@ -296,6 +156,9 @@ drmu_fb_t * drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, cons
 drmu_fb_t * drmu_fb_new_dumb_mod(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format, const uint64_t mod);
 drmu_fb_t * drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format);
 drmu_fb_t * drmu_fb_realloc_dumb_mod(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format, const uint64_t mod);
+// Try to reset geometry to these values
+// True if done, false if not
+bool drmu_fb_try_reuse(drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format, const uint64_t mod);
 void drmu_fb_unref(drmu_fb_t ** const ppdfb);
 drmu_fb_t * drmu_fb_ref(drmu_fb_t * const dfb);
 
@@ -309,6 +172,8 @@ uint32_t drmu_fb_pitch(const drmu_fb_t *const dfb, const unsigned int layer);
 // Pitch2 is only a sand thing
 uint32_t drmu_fb_pitch2(const drmu_fb_t *const dfb, const unsigned int layer);
 void * drmu_fb_data(const drmu_fb_t *const dfb, const unsigned int layer);
+drmu_bo_t * drmu_fb_bo(const drmu_fb_t * const dfb, const unsigned int layer);
+// Allocated width height - may be rounded up from requested w/h
 uint32_t drmu_fb_width(const drmu_fb_t *const dfb);
 uint32_t drmu_fb_height(const drmu_fb_t *const dfb);
 // Set cropping (fractional) - x, y, relative to active x, y (and must be +ve)
@@ -361,12 +226,14 @@ typedef const char * drmu_broadcast_rgb_t;
 #define DRMU_BROADCAST_RGB_FULL                 "Full"
 #define DRMU_BROADCAST_RGB_LIMITED_16_235       "Limited 16:235"
 static inline bool drmu_broadcast_rgb_is_set(const drmu_broadcast_rgb_t x) {return x != NULL;}
-void drmu_fb_int_color_set(drmu_fb_t *const dfb, const drmu_color_encoding_t enc, const drmu_color_range_t range, const drmu_colorspace_t space);
-void drmu_fb_int_chroma_siting_set(drmu_fb_t *const dfb, const drmu_chroma_siting_t siting);
+void drmu_fb_color_set(drmu_fb_t *const dfb, const drmu_color_encoding_t enc, const drmu_color_range_t range, const drmu_colorspace_t space);
+void drmu_fb_chroma_siting_set(drmu_fb_t *const dfb, const drmu_chroma_siting_t siting);
 void drmu_fb_int_on_delete_set(drmu_fb_t *const dfb, drmu_fb_on_delete_fn fn, void * v);
 void drmu_fb_int_bo_set(drmu_fb_t *const dfb, unsigned int i, drmu_bo_t * const bo);
 void drmu_fb_int_layer_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset);
 void drmu_fb_int_layer_mod_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset, uint64_t modifier);
+void drmu_fb_int_fd_set(drmu_fb_t *const dfb, const int fd);
+void drmu_fb_int_mmap_set(drmu_fb_t *const dfb, void * const buf, const size_t size, const size_t pitch);
 drmu_isset_t drmu_fb_hdr_metadata_isset(const drmu_fb_t *const dfb);
 const struct hdr_output_metadata * drmu_fb_hdr_metadata_get(const drmu_fb_t *const dfb);
 drmu_broadcast_rgb_t drmu_color_range_to_broadcast_rgb(const drmu_color_range_t range);
@@ -376,21 +243,18 @@ const struct drmu_fmt_info_s * drmu_fb_format_info_get(const drmu_fb_t * const d
 void drmu_fb_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta);
 int drmu_fb_int_make(drmu_fb_t *const dfb);
 
+// Cached fb sync ops
+int drmu_fb_write_start(drmu_fb_t * const dfb);
+int drmu_fb_write_end(drmu_fb_t * const dfb);
+int drmu_fb_read_start(drmu_fb_t * const dfb);
+int drmu_fb_read_end(drmu_fb_t * const dfb);
+
 // Wait for data to become ready when fb used as destination of writeback
 // Returns:
 //  -ve   error
 //  0     timeout
 //  1     ready
 int drmu_fb_out_fence_wait(drmu_fb_t * const fb, const int timeout_ms);
-
-// fb pool
-
-void drmu_pool_unref(drmu_pool_t ** const pppool);
-drmu_pool_t * drmu_pool_ref(drmu_pool_t * const pool);
-drmu_pool_t * drmu_pool_new(drmu_env_t * const du, unsigned int total_fbs_max);
-drmu_fb_t * drmu_pool_fb_new_dumb(drmu_pool_t * const pool, uint32_t w, uint32_t h, const uint32_t format);
-drmu_fb_t * drmu_pool_fb_new_dumb_mod(drmu_pool_t * const pool, uint32_t w, uint32_t h, const uint32_t format, const uint64_t mod);
-void drmu_pool_delete(drmu_pool_t ** const pppool);
 
 // Object Id
 
@@ -525,7 +389,11 @@ int drmu_atomic_plane_add_rotation(struct drmu_atomic_s * const da, const drmu_p
 
 int drmu_atomic_plane_add_chroma_siting(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const drmu_chroma_siting_t siting);
 
+// Set FB to 0 (i.e. clear the plane)
+int drmu_atomic_plane_clear_add(struct drmu_atomic_s * const da, drmu_plane_t * const dp);
+
 // Adds the fb to the plane along with all fb properties that apply to a plane
+// If fb == NULL is equivalent to _plane_clear_add
 // pos is dest rect on the plane in full pixels (not frac)
 int drmu_atomic_plane_add_fb(struct drmu_atomic_s * const da, drmu_plane_t * const dp, drmu_fb_t * const dfb, const drmu_rect_t pos);
 
@@ -563,7 +431,11 @@ struct drmu_log_env_s;
 // pending     = Commit Qed to be done when the in-progress commit has
 //               completed
 //
-// If there is a pending commit this atomic wiill be merged with it
+// If no in-progress commit then this will be committed immediately
+// otherwise it becomes the pending commit
+// If there is a pending commit this atomic will be merged with it
+// Commits are done with the PAGE_FLIP flag set so we expect the ack
+// on the next page flip.
 int drmu_atomic_queue(struct drmu_atomic_s ** ppda);
 // Wait for there to be no pending commit (there may be a commit in
 // progress)
@@ -576,6 +448,11 @@ int drmu_fd(const drmu_env_t * const du);
 const struct drmu_log_env_s * drmu_env_log(const drmu_env_t * const du);
 void drmu_env_unref(drmu_env_t ** const ppdu);
 drmu_env_t * drmu_env_ref(drmu_env_t * const du);
+// Disable queue, restore saved state and unref
+// Doesn't guarantee that the env will be freed by exit as there may still be
+// buffers that hold a ref for logging or DRM fd but it should resolve circular
+// reference problems where buffers on the screen hold refs to the env.
+void drmu_env_kill(drmu_env_t ** const ppdu);
 // Restore state on env close
 int drmu_env_restore_enable(drmu_env_t * const du);
 bool drmu_env_restore_is_enabled(const drmu_env_t * const du);
@@ -605,7 +482,28 @@ drmu_env_t * drmu_atomic_env(const drmu_atomic_t * const da);
 void drmu_atomic_unref(drmu_atomic_t ** const ppda);
 drmu_atomic_t * drmu_atomic_ref(drmu_atomic_t * const da);
 drmu_atomic_t * drmu_atomic_new(drmu_env_t * const du);
+
+// Copy (rather than just ref) b
+drmu_atomic_t * drmu_atomic_copy(drmu_atomic_t * const b);
+
+// 'Move' b to the return value
+// If b has a single ref then rv is simply b otherwise it is a copy of b
+drmu_atomic_t * drmu_atomic_move(drmu_atomic_t ** const ppb);
+
+// Merge b into a
+// This reference to b is unrefed (inc. on error); if this was the only
+// reference to b this allows the code to simply move properites from b
+// to a rather than having to copy. If there is >1 ref then the merge
+// will copy safely without breaking the other refs to b.
 int drmu_atomic_merge(drmu_atomic_t * const a, drmu_atomic_t ** const ppb);
+
+static inline int drmu_atomic_move_merge(drmu_atomic_t ** const ppa, drmu_atomic_t ** const ppb)
+{
+    if (*ppa)
+        return drmu_atomic_merge(*ppa, ppb);
+    *ppa = drmu_atomic_move(ppb);
+    return 0;
+}
 
 // Remove all els in a that are also in b
 // b may be sorted (if not already) but is otherwise unchanged
@@ -616,6 +514,17 @@ int drmu_atomic_commit(const drmu_atomic_t * const da, uint32_t flags);
 // Attempt commit - if it fails add failing members to da_fail
 // This does NOT remove failing props from da.  If da_fail == NULL then same as _commit
 int drmu_atomic_commit_test(const drmu_atomic_t * const da, uint32_t flags, drmu_atomic_t * const da_fail);
+
+// Add a callback that occurs when the atomic has been committed
+// This will occur on flip if atomic queued via _atomic_queue - if multiple
+// atomics are queued before flip then all fill occur on the same flip
+// If cb is 0 then NOP
+typedef void drmu_atomic_commit_fn(void * v);
+int drmu_atomic_add_commit_callback(drmu_atomic_t * const da, drmu_atomic_commit_fn * const cb, void * const v);
+// Clear all commit callbacks from this atomic
+void drmu_atomic_clear_commit_callbacks(drmu_atomic_t * const da);
+// Run all commit callbacks on this atomic. Callbacks are not cleared.
+void drmu_atomic_run_commit_callbacks(const drmu_atomic_t * const da);
 
 typedef void drmu_prop_unref_fn(void * v);
 typedef void drmu_prop_ref_fn(void * v);

@@ -4,6 +4,7 @@
 #include "drmu_log.h"
 
 #include <errno.h>
+#include <stdatomic.h>
 #include <string.h>
 
 #include <libdrm/drm.h>
@@ -16,6 +17,8 @@ static inline int rvup(int rv1, int rv2)
 }
 
 struct drmu_output_s {
+    atomic_int ref_count;
+
     drmu_env_t * du;
     drmu_crtc_t * dc;
     unsigned int conn_n;
@@ -577,6 +580,12 @@ drmu_output_conn(const drmu_output_t * const dout, const unsigned int n)
     return !dout || n >= dout->conn_n ? NULL : dout->dns[n];
 }
 
+drmu_env_t *
+drmu_output_env(const drmu_output_t * const dout)
+{
+    return dout->du;
+}
+
 static void
 output_free(drmu_output_t * const dout)
 {
@@ -585,6 +594,7 @@ output_free(drmu_output_t * const dout)
         drmu_conn_unref(dout->dns + i);
     free(dout->dns);
     drmu_crtc_unref(&dout->dc);
+    drmu_env_unref(&dout->du);
     free(dout);
 }
 
@@ -596,7 +606,16 @@ drmu_output_unref(drmu_output_t ** const ppdout)
         return;
     *ppdout = NULL;
 
-    output_free(dout);
+    if (atomic_fetch_sub(&dout->ref_count, 1) == 0)
+        output_free(dout);
+}
+
+drmu_output_t *
+drmu_output_ref(drmu_output_t * const dout)
+{
+    if (dout != NULL)
+        atomic_fetch_add(&dout->ref_count, 1);
+    return dout;
 }
 
 drmu_output_t *
@@ -609,7 +628,7 @@ drmu_output_new(drmu_env_t * const du)
         return NULL;
     }
 
-    dout->du = du;
+    dout->du = drmu_env_ref(du);
     dout->mode_id = -1;
     return dout;
 }

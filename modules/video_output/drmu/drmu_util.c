@@ -1,5 +1,6 @@
-#include "drmu.h"
 #include "drmu_util.h"
+
+#include "drmu.h"
 
 #include <ctype.h>
 #include <error.h>
@@ -122,4 +123,41 @@ drmu_util_parse_mode(const char * s, unsigned int * pw, unsigned int * ph, unsig
     return r;
 }
 
+drmu_ufrac_t
+drmu_util_guess_par(const unsigned int w, const unsigned int h)
+{
+    if (((w == 720 || w == 704) && (h == 480 || h == 576)) ||
+        ((w == 360 || w == 352) && (h == 240 || h == 288)))
+    {
+        return (drmu_ufrac_t){.num = 4, .den = 3};
+    }
+    return drmu_ufrac_reduce((drmu_ufrac_t){.num = w, .den = h});
+}
 
+drmu_ufrac_t
+drmu_util_guess_simple_mode_par(const drmu_mode_simple_params_t * const p)
+{
+    if (p->par.den != 0 && p->par.num != 0)
+        return p->par;
+    return drmu_util_guess_par(p->width, p->height);
+}
+
+void
+drmu_memcpy_2d(void * const dst_p, const size_t dst_stride,
+               const void * const src_p, const size_t src_stride,
+               const size_t width, const size_t height)
+{
+    if (dst_stride == src_stride && dst_stride == width) {
+        memcpy(dst_p, src_p, width * height);
+    }
+    else {
+        size_t i;
+        char * d = dst_p;
+        const char * s = src_p;
+        for (i = 0; i != height; ++i) {
+            memcpy(d, s, width);
+            d += dst_stride;
+            s += src_stride;
+        }
+    }
+}

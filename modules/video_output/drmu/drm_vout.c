@@ -33,6 +33,7 @@
 #include "drmu_fmts.h"
 #include "drmu_log.h"
 #include "drmu_output.h"
+#include "drmu_pool.h"
 #include "drmu_scan.h"
 #include "drmu_util.h"
 #include "drmu_vlc.h"
@@ -142,7 +143,7 @@ copy_pic_to_fb(vout_display_t *const vd, drmu_pool_t *const pool, picture_t *con
         return NULL;
     }
 
-    fb = drmu_pool_fb_new_dumb(pool, src->format.i_width, src->format.i_height, drm_fmt);
+    fb = drmu_pool_fb_new(pool, src->format.i_width, src->format.i_height, drm_fmt, mod);
     if (fb == NULL) {
         msg_Warn(vd, "Failed alloc for copy_pic: %dx%d", src->format.i_width, src->format.i_height);
         return NULL;
@@ -213,7 +214,7 @@ copy_pic_to_fixed_fb(vout_display_t * const vd, vout_display_sys_t * const sys,
         return NULL;
     }
 
-    fb = drmu_pool_fb_new_dumb(pool, sys->display_rect.width, sys->display_rect.height, drm_fmt);
+    fb = drmu_pool_fb_new(pool, sys->display_rect.width, sys->display_rect.height, drm_fmt, mod);
     if (fb == NULL) {
         msg_Warn(vd, "Failed alloc for copy_pic_fixed: %dx%d", sys->display_rect.width, sys->display_rect.height);
         return NULL;
@@ -883,8 +884,8 @@ static void CloseDrmVout(vout_display_t *vd)
 
     msg_Dbg(vd, "<<< %s", __func__);
 
-    drmu_pool_delete(&sys->sub_fb_pool);
-    drmu_pool_delete(&sys->pic_pool);
+    drmu_pool_kill(&sys->sub_fb_pool);
+    drmu_pool_kill(&sys->pic_pool);
 
     for (i = 0; i != SUBPICS_MAX; ++i)
         drmu_plane_unref(sys->subplanes + i);
@@ -893,7 +894,7 @@ static void CloseDrmVout(vout_display_t *vd)
 
     drmu_plane_unref(&sys->dp);
     drmu_output_unref(&sys->dout);
-    drmu_env_unref(&sys->du);
+    drmu_env_kill(&sys->du);
 
     free(sys->subpic_chromas);
     vd->info.subpicture_chromas = NULL;
@@ -983,9 +984,9 @@ test_simple_plane_set(vout_display_t * const vd, vout_display_sys_t * const sys,
         goto fail;
     }
 
-    if ((fb = drmu_pool_fb_new_dumb_mod(sys->sub_fb_pool, w, h,
-                                    drmu_vlc_fmt_info_drm_pixelformat(fi),
-                                    drmu_vlc_fmt_info_drm_modifier(fi))) == NULL) {
+    if ((fb = drmu_pool_fb_new(sys->sub_fb_pool, w, h,
+                               drmu_vlc_fmt_info_drm_pixelformat(fi),
+                               drmu_vlc_fmt_info_drm_modifier(fi))) == NULL) {
         msg_Warn(vd, "Failed to alloc test FB");
         goto fail;
     }
@@ -1092,9 +1093,9 @@ static int OpenDrmVout(vlc_object_t *object)
     drmu_output_modeset_allow(sys->dout, !var_InheritBool(vd, DRM_VOUT_NO_MODESET_NAME));
     drmu_output_max_bpc_allow(sys->dout, !var_InheritBool(vd, DRM_VOUT_NO_MAX_BPC));
 
-    if ((sys->sub_fb_pool = drmu_pool_new(sys->du, 10)) == NULL)
+    if ((sys->sub_fb_pool = drmu_pool_new_dumb(sys->du, 10)) == NULL)
         goto fail;
-    if ((sys->pic_pool = drmu_pool_new(sys->du, 5)) == NULL)
+    if ((sys->pic_pool = drmu_pool_new_dumb(sys->du, 5)) == NULL)
         goto fail;
 
     // This wants to be the primary
