@@ -3542,10 +3542,9 @@ drmu_env_unref(drmu_env_t ** const ppdu)
 // Must be done in that order or we end up destroying buffers that are
 // still in use
 void
-drmu_env_kill(drmu_env_t ** const ppdu, const unsigned int flags)
+drmu_env_kill(drmu_env_t ** const ppdu)
 {
     drmu_env_t * du = *ppdu;
-    (void)flags;
 
     if (!du)
         return;
