@@ -149,11 +149,13 @@ copy_pic_to_fb(vout_display_t *const vd, drmu_pool_t *const pool, picture_t *con
         return NULL;
     }
 
+    drmu_fb_write_start(fb);
     for (i = 0; i != src->i_planes; ++i) {
         plane_t dst_plane;
         dst_plane = drmu_fb_vlc_plane(fb, i);
         plane_CopyPixels(&dst_plane, src->p + i);
     }
+    drmu_fb_write_end(fb);
 
     drmu_fb_vlc_pic_set_metadata(fb, src);
 
@@ -227,6 +229,7 @@ copy_pic_to_fixed_fb(vout_display_t * const vd, vout_display_sys_t * const sys,
         const drmu_rect_t crop = drmu_rect_shr16_rnd(drmu_fb_crop_frac(fb));
         const unsigned int bypp = (drmu_fmt_info_pixel_bits(f) + 7) / 8;
 
+        drmu_fb_write_start(fb);
         for (i = 0; i != src->i_planes; ++i) {
             // It would seem more logical to use src->format than to use vd->fmt
             // for the source rect but src->fmt doesn't have offset_x/y set (bug?)
@@ -237,6 +240,7 @@ copy_pic_to_fixed_fb(vout_display_t * const vd, vout_display_sys_t * const sys,
                              bypp);
             create_box(fb, i);
         }
+        drmu_fb_write_end(fb);
     }
 
     // Reset crop for display after we've used it for copy
