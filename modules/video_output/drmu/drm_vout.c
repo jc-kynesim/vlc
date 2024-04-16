@@ -731,7 +731,7 @@ alloc_drmu_pic(vout_display_t * const vd, vout_display_sys_t * const sys)
         return NULL;
     }
 
-    fb = drmu_pool_fb_new_dumb_mod(pool, fmt->i_width, fmt->i_height, drm_fmt, mod);
+    fb = drmu_pool_fb_new(pool, fmt->i_width, fmt->i_height, drm_fmt, mod);
     if (fb == NULL) {
         msg_Warn(vd, "Failed alloc for copy_pic: %dx%d", fmt->i_width, fmt->i_height);
         return NULL;
