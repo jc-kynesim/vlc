@@ -30,6 +30,7 @@
 #include <pthread.h>
 
 #include "drmu.h"
+#include "drmu_dmabuf.h"
 #include "drmu_fmts.h"
 #include "drmu_log.h"
 #include "drmu_output.h"
@@ -1097,9 +1098,13 @@ static int OpenDrmVout(vlc_object_t *object)
     drmu_output_modeset_allow(sys->dout, !var_InheritBool(vd, DRM_VOUT_NO_MODESET_NAME));
     drmu_output_max_bpc_allow(sys->dout, !var_InheritBool(vd, DRM_VOUT_NO_MAX_BPC));
 
-    if ((sys->sub_fb_pool = drmu_pool_new_dumb(sys->du, 10)) == NULL)
+    // Get frame buffer pools - try generic dmabufs first for cached
+    // buffers that are faster than uncached BOs
+    if ((sys->sub_fb_pool = drmu_pool_new_dmabuf_video(sys->du, 10)) == NULL &&
+        (sys->sub_fb_pool = drmu_pool_new_dumb(sys->du, 10)) == NULL)
         goto fail;
-    if ((sys->pic_pool = drmu_pool_new_dumb(sys->du, 5)) == NULL)
+    if ((sys->pic_pool = drmu_pool_new_dmabuf_video(sys->du, 10)) == NULL &&
+        (sys->pic_pool = drmu_pool_new_dumb(sys->du, 5)) == NULL)
         goto fail;
 
     // This wants to be the primary
