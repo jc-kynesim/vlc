@@ -1406,7 +1406,7 @@ fail:
 vlc_module_begin()
     set_shortname(N_("DRM vout"))
     set_description(N_("DRM vout plugin"))
-    set_capability("vout display", 16)  // 1 point better than ASCII art
+    set_capability("vout display", 32)  // 2 points better than fb(30), ascii(15)
     add_shortcut("drm-vout")
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
