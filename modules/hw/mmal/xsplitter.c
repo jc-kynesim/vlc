@@ -268,11 +268,15 @@ static int start_drm(vout_display_t *const vd, mmal_x11_sys_t *const sys)
  * pictures.
  * The vout display module keeps the ownership of the pool and can
  * destroy it only when closing or on invalid pictures control.
+ *
+ * If the X pool doesn't have pictures invalid then it isn't safe
+ * to swap pools so always use that one (MMAL & DRM can cope with
+ * most stuff)
  */
 static picture_pool_t * mmal_x11_pool(vout_display_t * vd, unsigned count)
 {
     mmal_x11_sys_t * const sys = (mmal_x11_sys_t *)vd->sys;
-    vout_display_t * const x_vd = sys->cur_desc->vout;
+    vout_display_t * const x_vd = vd->info.has_pictures_invalid ? sys->cur_desc->vout : sys->x_desc.vout;
 #if TRACE_ALL
     char buf0[5];
     char buf1[5];
@@ -547,7 +551,7 @@ static int OpenMmalX11(vlc_object_t *object)
         .is_slow = false,
         .has_double_click = false,
         .needs_hide_mouse = false,
-        .has_pictures_invalid = true,
+        .has_pictures_invalid = false,
         .subpicture_chromas = NULL
     };
 
@@ -572,11 +576,15 @@ static int OpenMmalX11(vlc_object_t *object)
     {
         msg_Dbg(vd, "Opengles2 output found");
     }
-    else
+    else if (load_display_module(vd, &sys->x_desc, "vout display", "xcb_x11") == 0)
     {
         sys->x_desc.max_pels = MAX_MMAL_PELS;
-        if (load_display_module(vd, &sys->x_desc, "vout display", "xcb_x11") == 0)
-            msg_Dbg(vd, "X11 XCB output found");
+        msg_Dbg(vd, "X11 XCB output found");
+    }
+    else
+    {
+        msg_Dbg(vd, "No X output found");
+        goto fail;
     }
 
     if ((load_display_module(vd, &sys->mmal_desc, "vout display", "mmal_vout")) == 0)
@@ -597,9 +605,8 @@ static int OpenMmalX11(vlc_object_t *object)
         goto fail;
     }
 
-    if (sys->mmal_desc.vout == NULL || sys->x_desc.vout == NULL) {
+    if (sys->mmal_desc.vout == NULL) {
         vd->info = sys->cur_desc->vout->info;
-        vd->info.has_pictures_invalid = true;  // Should make this unwanted
     }
     else {
         // We have both - construct a combination
