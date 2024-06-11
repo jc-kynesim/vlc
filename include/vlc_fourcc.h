@@ -374,6 +374,11 @@
 
 /* Broadcom MMAL opaque buffer type */
 #define VLC_CODEC_MMAL_OPAQUE     VLC_FOURCC('M','M','A','L')
+#define VLC_CODEC_MMAL_ZC_SAND8   VLC_FOURCC('Z','S','D','8')
+#define VLC_CODEC_MMAL_ZC_SAND10  VLC_FOURCC('Z','S','D','0')
+#define VLC_CODEC_MMAL_ZC_SAND30  VLC_FOURCC('Z','S','D','3')
+#define VLC_CODEC_MMAL_ZC_I420    VLC_FOURCC('Z','4','2','0')
+#define VLC_CODEC_MMAL_ZC_RGB32   VLC_FOURCC('Z','R','G','B')
 
 /* DXVA2 opaque video surface for use with D3D9 */
 #define VLC_CODEC_D3D9_OPAQUE     VLC_FOURCC('D','X','A','9') /* 4:2:0  8 bpc */
