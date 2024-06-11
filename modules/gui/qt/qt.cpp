@@ -31,6 +31,7 @@
 #include <QApplication>
 #include <QDate>
 #include <QMutex>
+#include <QScreen>
 
 #include "qt.hpp"
 
@@ -595,6 +596,22 @@ static void *ThreadPlatform( void *obj, char *platform_name )
 #if HAS_QT57
     QApplication::setAttribute( Qt::AA_UseStyleSheetPropagationInWidgetStyles, true);
 #endif
+
+    bool do_disable = false;
+    {
+        QVLCApp app( argc, argv );
+        const double dpr = app.devicePixelRatio();
+        if( dpr > 2.1 )
+        {
+            do_disable = true;
+            msg_Warn(p_intf, "devicePixelRatio (%g) > 2.1: assuming broken", dpr);
+        }
+        app.quit();
+    }
+    if( do_disable )
+    {
+        QApplication::setAttribute( Qt::AA_DisableHighDpiScaling );
+    }
 
     /* Start the QApplication here */
     QVLCApp app( argc, argv );
