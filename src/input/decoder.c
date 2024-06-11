@@ -2001,6 +2001,11 @@ void input_DecoderDelete( decoder_t *p_dec )
     p_owner->b_waiting = false;
     vlc_cond_signal( &p_owner->wait_request );
 
+    /* RPI: V4L2 stateful (H265) can deadlock on buffer starvation if output
+     * buffers not returned */
+    if( p_owner->p_vout != NULL )
+        vout_Flush(p_owner->p_vout, 0);
+
     /* If the video output is paused or slow, or if the picture pool size was
      * under-estimated (e.g. greedy video filter, buggy decoder...), the
      * the picture pool may be empty, and the decoder thread or any decoder
