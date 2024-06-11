@@ -57,6 +57,24 @@ vlc_fourcc_t vlc_va_GetChroma(enum PixelFormat hwfmt, enum PixelFormat swfmt)
                     return VLC_CODEC_D3D9_OPAQUE;
             }
             break;
+        case AV_PIX_FMT_DRM_PRIME:
+            switch (swfmt)
+            {
+                case AV_PIX_FMT_YUV420P:
+                    return VLC_CODEC_DRM_PRIME_I420;
+                case AV_PIX_FMT_NV12:
+                    return VLC_CODEC_DRM_PRIME_NV12;
+                case AV_PIX_FMT_RPI4_8:
+                    return VLC_CODEC_DRM_PRIME_SAND8;
+                case AV_PIX_FMT_RPI4_10:
+                case AV_PIX_FMT_YUV420P10LE:  // When probing this is the swfmt given
+                    return VLC_CODEC_DRM_PRIME_SAND30;
+                case AV_PIX_FMT_BGR0:
+                    return VLC_CODEC_DRM_PRIME_RGB32;
+                default:
+                    return 0;
+            }
+            break;
 
 #if LIBAVUTIL_VERSION_CHECK(54, 13, 1, 24, 100)
         case AV_PIX_FMT_D3D11VA_VLD:
