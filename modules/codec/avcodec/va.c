@@ -34,6 +34,7 @@ bool vlc_va_MightDecode(enum AVPixelFormat hwfmt)
 {
     switch (hwfmt)
     {
+        case AV_PIX_FMT_DRM_PRIME:
         case AV_PIX_FMT_VAAPI:
         case AV_PIX_FMT_DXVA2_VLD:
         case AV_PIX_FMT_D3D11VA_VLD:
