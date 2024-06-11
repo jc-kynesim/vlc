@@ -74,6 +74,9 @@ protected:
 #else
     bool nativeEventFilter(const QByteArray &eventType, void *message, long *result) override;
 #endif
+    void hideEvent(QHideEvent *event) Q_DECL_OVERRIDE;
+    void showEvent(QShowEvent *event) Q_DECL_OVERRIDE;
+    bool nativeEvent(const QByteArray &eventType, void *message, long *result) Q_DECL_OVERRIDE;
     virtual void resizeEvent(QResizeEvent *) Q_DECL_OVERRIDE;
     void mousePressEvent(QMouseEvent *) Q_DECL_OVERRIDE;
     void mouseMoveEvent(QMouseEvent *) Q_DECL_OVERRIDE;
@@ -85,6 +88,7 @@ private:
     int qtMouseButton2VLC( Qt::MouseButton );
     intf_thread_t *p_intf;
     vout_window_t *p_window;
+    vout_window_t *p_last_window;
 
     QWidget *stable;
     QLayout *layout;
@@ -92,6 +96,7 @@ private:
     bool enable_mouse_events;
 
     void reportSize();
+    void refreshHandle();
 
 signals:
     void sizeChanged( int, int );
