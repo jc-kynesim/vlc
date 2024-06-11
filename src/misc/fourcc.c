@@ -437,6 +437,11 @@ static const vlc_chroma_description_t p_list_chroma_description[] = {
     { VLC_CODEC_VAAPI_420,             GPU_FMT(YUV420, 8) },
     { VLC_CODEC_VAAPI_420_10BPP,       GPU_FMT(YUV420, 10) },
     { VLC_CODEC_VAAPI_420_12BPP,       GPU_FMT(YUV420, 12) },
+
+    { VLC_CODEC_DRM_PRIME_I420,        GPU_FMT(YUV420, 8) },
+    { VLC_CODEC_DRM_PRIME_NV12,        GPU_FMT(YUV420, 8) },
+    { VLC_CODEC_DRM_PRIME_SAND8,       GPU_FMT(YUV420, 8) },
+    { VLC_CODEC_DRM_PRIME_SAND30,      GPU_FMT(YUV420, 10) },
 };
 
 #undef PACKED_FMT
