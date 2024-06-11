@@ -365,10 +365,30 @@ void picture_CopyProperties( picture_t *p_dst, const picture_t *p_src )
     p_dst->b_top_field_first = p_src->b_top_field_first;
 }
 
+static inline bool is_zc_chroma(const vlc_fourcc_t i_chroma)
+{
+    return i_chroma == VLC_CODEC_MMAL_OPAQUE ||
+        i_chroma == VLC_CODEC_MMAL_ZC_I420 ||
+        i_chroma == VLC_CODEC_MMAL_ZC_RGB32 ||
+        i_chroma == VLC_CODEC_MMAL_ZC_SAND10 ||
+        i_chroma == VLC_CODEC_MMAL_ZC_SAND30 ||
+        i_chroma == VLC_CODEC_MMAL_ZC_SAND8;
+}
+
 void picture_CopyPixels( picture_t *p_dst, const picture_t *p_src )
 {
-    for( int i = 0; i < p_src->i_planes ; i++ )
-        plane_CopyPixels( p_dst->p+i, p_src->p+i );
+    if( is_zc_chroma(p_src->format.i_chroma) )
+    {
+        assert(p_dst->i_planes == 0);
+        p_dst->i_planes = p_src->i_planes;
+        for( int i = 0; i < p_src->i_planes; i++ )
+            p_dst->p[i] = p_src->p[i];
+    }
+    else
+    {
+        for( int i = 0; i < p_src->i_planes; i++ )
+            plane_CopyPixels( p_dst->p+i, p_src->p+i );
+    }
 
     assert( p_dst->context == NULL );
 
