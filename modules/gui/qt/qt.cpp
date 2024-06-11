@@ -284,7 +284,7 @@ vlc_module_begin ()
     add_string( "qt-slider-colours", "153;210;153;20;210;20;255;199;15;245;39;29",
                 SLIDERCOL_TEXT, SLIDERCOL_LONGTEXT, false )
 
-    add_bool( "qt-privacy-ask", true, PRIVACY_TEXT, PRIVACY_TEXT,
+    add_bool( "qt-privacy-ask", false, PRIVACY_TEXT, PRIVACY_TEXT,
               false )
         change_private ()
 
