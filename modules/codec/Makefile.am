@@ -378,6 +378,7 @@ libavcodec_plugin_la_SOURCES = \
 	codec/avcodec/subtitle.c \
 	codec/avcodec/audio.c \
 	codec/avcodec/va.c codec/avcodec/va.h \
+	codec/avcodec/drm_pic.c codec/avcodec/drm_pic.h \
 	codec/avcodec/avcodec.c codec/avcodec/avcodec.h \
 	packetizer/av1_obu.c packetizer/av1_obu.h packetizer/av1.h
 if ENABLE_SOUT
