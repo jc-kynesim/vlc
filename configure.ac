@@ -3109,6 +3109,21 @@ dnl OpenGL ES 2: depends on EGL 1.1
 PKG_ENABLE_MODULES_VLC([GLES2], [], [glesv2], [OpenGL ES v2 support], [disabled])
 
 dnl
+dnl DRM
+dnl
+AC_ARG_ENABLE(drm,
+  [  --enable-drm            DRM output support (default enabled)],, [
+    enable_drm="yes"
+])
+
+have_drm="no"
+AS_IF([test "${enable_drm}" != "no"], [
+  PKG_CHECK_MODULES(DRM, [libdrm])
+  have_drm="yes"
+])
+AM_CONDITIONAL([HAVE_DRM], [test "${have_drm}" = "yes"])
+
+dnl
 dnl  Xlib
 dnl
 
