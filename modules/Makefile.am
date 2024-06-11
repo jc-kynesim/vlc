@@ -11,9 +11,7 @@ EXTRA_SUBDIRS = \
 
 SUBDIRS = .
 DIST_SUBDIRS = . $(EXTRA_SUBDIRS)
-if HAVE_MMAL
 SUBDIRS += hw/mmal
-endif
 
 TESTS =
 
