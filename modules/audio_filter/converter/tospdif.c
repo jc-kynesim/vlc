@@ -484,6 +484,7 @@ static int write_buffer_dtshd( filter_t *p_filter, block_t *p_in_buf )
                               p_in_buf->i_buffer ) != VLC_SUCCESS )
         return SPDIF_ERROR;
     unsigned i_period = p_filter->fmt_out.audio.i_rate
+                      * (p_filter->fmt_out.audio.i_bytes_per_frame / p_filter->fmt_out.audio.i_frame_length) / 4
                       * core.i_frame_length / core.i_rate;
 
     int i_subtype = dtshd_get_subtype( i_period );
