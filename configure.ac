@@ -3562,6 +3562,21 @@ AS_IF([test "$enable_vulkan" != "no"], [
 AM_CONDITIONAL(HAVE_VULKAN, [test "$enable_vulkan" != "no"])
 
 dnl
+dnl DRM
+dnl
+AC_ARG_ENABLE(drm,
+  [  --enable-drm            DRM output support (default enabled)],, [
+    enable_drm="yes"
+])
+
+have_drm="no"
+AS_IF([test "${enable_drm}" != "no"], [
+  PKG_CHECK_MODULES(DRM, [libdrm])
+  have_drm="yes"
+])
+AM_CONDITIONAL([HAVE_DRM], [test "${have_drm}" = "yes"])
+
+dnl
 dnl  Xlib
 dnl
 
