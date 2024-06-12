@@ -416,6 +416,10 @@ static const vlc_fourcc_t p_D3D11_OPAQUE_10B_fallback[] = {
     VLC_CODEC_D3D11_OPAQUE_10B, VLC_CODEC_P010, VLC_CODEC_I420_10L, 0,
 };
 
+static const vlc_fourcc_t p_DRM_PRIME_SAND30_fallback[] = {
+    VLC_CODEC_DRM_PRIME_SAND30, VLC_CODEC_I420_10L, VLC_CODEC_NV12, 0,
+};
+
 static const vlc_fourcc_t p_I440_fallback[] = {
     VLC_CODEC_I440,
     VLC_CODEC_YUV_PLANAR_420,
@@ -506,6 +510,7 @@ static const vlc_fourcc_t *pp_YUV_fallback[] = {
     p_D3D9_OPAQUE_10B_fallback,
     p_D3D11_OPAQUE_fallback,
     p_D3D11_OPAQUE_10B_fallback,
+    p_DRM_PRIME_SAND30_fallback,
     NULL,
 };
 
@@ -542,6 +547,10 @@ static const vlc_fourcc_t p_list_YUV[] = {
     VLC_CODEC_MMAL_ZC_SAND10,
     VLC_CODEC_MMAL_ZC_SAND30,
     VLC_CODEC_MMAL_ZC_I420,
+    VLC_CODEC_DRM_PRIME_I420,
+    VLC_CODEC_DRM_PRIME_NV12,
+    VLC_CODEC_DRM_PRIME_SAND8,
+    VLC_CODEC_DRM_PRIME_SAND30,
     0,
 };
 
@@ -777,6 +786,10 @@ static const struct
                                                FAKE_FMT() },
     { { VLC_CODEC_D3D11_OPAQUE_10B, VLC_CODEC_D3D9_OPAQUE_10B },
                                                FAKE_FMT() },
+    { { VLC_CODEC_DRM_PRIME_I420,  VLC_CODEC_DRM_PRIME_NV12,
+        VLC_CODEC_DRM_PRIME_SAND8, VLC_CODEC_DRM_PRIME_SAND30 },
+                                               FAKE_FMT() },
+    { { VLC_CODEC_DRM_PRIME_RGB32, 0 },        FAKE_FMT() },
 
     { { VLC_CODEC_CVPX_NV12, VLC_CODEC_CVPX_UYVY,
         VLC_CODEC_CVPX_I420, VLC_CODEC_CVPX_BGRA },
