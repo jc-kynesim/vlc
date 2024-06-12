@@ -896,7 +896,7 @@ vlc_module_begin ()
     add_shortcut ("egl")
 
     add_submodule ()
-    set_callback_opengl_es2(OpenGLES2, VLC_PRIORITY)
+    set_callback_opengl_es2(OpenGLES2, VLC_PRIORITY + 1)
     add_shortcut ("egl")
 
 vlc_module_end ()
