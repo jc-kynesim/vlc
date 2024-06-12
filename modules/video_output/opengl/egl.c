@@ -43,6 +43,8 @@
 # include "../android/utils.h"
 #endif
 
+#define REQUIRE_DMA_BUF_IMPORT 1
+
 typedef struct vlc_gl_sys_t
 {
     EGLDisplay display;
@@ -380,6 +382,14 @@ static int Open (vlc_object_t *obj, const struct gl_api *api)
         msg_Err(obj, "cannot select %s API", api->name);
         goto error;
     }
+
+#if REQUIRE_DMA_BUF_IMPORT
+    if (!CheckToken(ext, "EGL_EXT_image_dma_buf_import"))
+    {
+        msg_Dbg(obj, "No dma_buf_import - fall back to X");
+        goto error;
+    }
+#endif
 
     const EGLint conf_attr[] = {
         EGL_RED_SIZE, 5,
