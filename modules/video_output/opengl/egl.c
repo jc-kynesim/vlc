@@ -476,7 +476,7 @@ vlc_module_begin ()
     add_shortcut ("egl")
 
     add_submodule ()
-    set_capability ("opengl es2", 50)
+    set_capability ("opengl es2", 51)
     set_callbacks (OpenGLES2, Close)
     add_shortcut ("egl")
 
