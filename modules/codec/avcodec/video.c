@@ -1980,6 +1980,33 @@ no_reuse:
         }
 #endif
 
+#if OPT_RPI
+        // This is a kludge to try to get RGB0 DRM_PRIME frames if we are
+        // running on Wayland + Pixman. Pixman can take dmabufs but cannot
+        // take YUV so what should be efficient WL output turns into a slow
+        // s/w convresion with YUV.
+        // Setting sw_pic_fmt here does the trick on Pi FFmpeg.
+        // There should be better ways, remove this code when there are
+        if (hwfmt == AV_PIX_FMT_DRM_PRIME)
+        {
+            const char * const wrend = getenv("WLR_RENDERER");
+            if (wrend && strcmp(wrend, "pixman") == 0)
+            {
+                // If BGR0 is supported it will be in the list with Pi FFmpeg
+                for (size_t j = 0; pi_fmt[j] != AV_PIX_FMT_NONE; j++)
+                {
+                    if (pi_fmt[j] == AV_PIX_FMT_BGR0)
+                    {
+                        swfmt = AV_PIX_FMT_BGR0;
+                        defsw = AV_PIX_FMT_BGR0;
+                        p_context->sw_pix_fmt = swfmt;
+                        break;
+                    }
+                }
+            }
+        }
+#endif
+
         if (ffmpeg_OpenVa(p_dec, p_context, hwfmt, defsw, src_desc, &p_sys->sem_mt) != VLC_SUCCESS)
             continue;
 
