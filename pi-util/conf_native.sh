@@ -4,7 +4,10 @@ OUT_BASE=$BASE/out
 
 DO_BOOTSTRAP=
 DO_MAKE=
+DO_INSTALL=
+SUDO_INSTALL=
 DO_CONFIGURE=1
+USR_PREFIX=
 
 while [ "$1" != "" ] ; do
     case $1 in
@@ -12,14 +15,26 @@ while [ "$1" != "" ] ; do
             DO_MAKE=1
             DO_CONFIGURE=
             ;;
+        --install)
+            DO_INSTALL=1
+            DO_MAKE=1
+            DO_CONFIGURE=
+            ;;
         --bootstrap)
             DO_BOOTSTRAP=1
             ;;
+	--usr)
+	    USR_PREFIX=/usr
+	    SUDO_INSTALL=sudo
+	    ;;
         *)
-            echo "Usage $0: [--bootstrap] [--make]"
-            echo "  bootstrap Do bootstrap before configure"
-            echo "            (will always bootstrap if clean)"
+            echo "Usage $0: [--bootstrap] [--make|--install] [--usr]"
+            echo "  bootstrap Clean <build dir> then bootstrap before configure"
+            echo "            Will happen automatically if already clean"
             echo "  make      Do make after configure"
+            echo "  install   Do make and install after configure"
+	    echo "  usr       Set install dir to /usr"
+	    echo "            Default is <build dir>/install for testing"
             exit 1
             ;;
     esac
@@ -67,7 +82,9 @@ if [ ! -f $OUT/Makefile ]; then
     DO_CONFIGURE=1
 fi
 
-USR_PREFIX=$OUT/install
+if [ "$USR_PREFIX" == "" ]; then
+    USR_PREFIX=$OUT/install
+fi
 LIB_PREFIX=$USR_PREFIX/lib/$A
 INC_PREFIX=$USR_PREFIX/include/$A
 
@@ -95,3 +112,10 @@ if [ $DO_MAKE ]; then
     make -j8
     echo "==== Made $OUT"
 fi
+
+if [ $DO_INSTALL ]; then
+    echo "==== Installing to $USR_PREFIX"
+    $SUDO_INSTALL make -j8 install
+    echo "==== Installed in $USR_PREFIX"
+fi
+
