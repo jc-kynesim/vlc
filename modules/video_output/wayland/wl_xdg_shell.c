@@ -42,9 +42,14 @@ struct vout_window_sys_t
 {
     struct wl_compositor *compositor;
     struct xdg_wm_base *shell;
-    struct xdg_surface *surface;
+    struct wl_surface *wl_surface;
+    struct xdg_surface *xdg_surface;
+    struct xdg_toplevel *toplevel;
     struct org_kde_kwin_server_decoration_manager *deco_manager;
     struct org_kde_kwin_server_decoration *deco;
+
+    int conf_width;
+    int conf_height;
 
     vlc_thread_t thread;
 };
@@ -113,7 +118,7 @@ static int Control(vout_window_t *wnd, int cmd, va_list ap)
              * code. In this case, it is arbitrated by the window core code.
              */
             vout_window_ReportSize(wnd, width, height);
-            xdg_surface_set_window_geometry(sys->surface, 0, 0, width, height);
+            xdg_surface_set_window_geometry(sys->xdg_surface, 0, 0, width, height);
             break;
         }
 
@@ -122,9 +127,9 @@ static int Control(vout_window_t *wnd, int cmd, va_list ap)
             bool fs = va_arg(ap, int);
 
             if (fs)
-                xdg_surface_set_fullscreen(sys->surface, NULL);
+                xdg_toplevel_set_fullscreen(sys->toplevel, NULL);
             else
-                xdg_surface_unset_fullscreen(sys->surface);
+                xdg_toplevel_unset_fullscreen(sys->toplevel);
             break;
         }
 
@@ -137,52 +142,104 @@ static int Control(vout_window_t *wnd, int cmd, va_list ap)
     return VLC_SUCCESS;
 }
 
-static void xdg_surface_configure_cb(void *data, struct xdg_surface *surface,
-                                     int32_t width, int32_t height,
-                                     struct wl_array *states,
-                                     uint32_t serial)
+// ---------------------------------------------------------------------------
+//
+// XDG Toplevel callbacks
+// Mostly ignored - except resize
+
+static void
+xdg_toplevel_configure_cb(void *data,
+                          struct xdg_toplevel *xdg_toplevel, int32_t w, int32_t h,
+                          struct wl_array *states)
+{
+    vout_window_t *const wnd = data;
+    vout_window_sys_t *const sys = wnd->sys;
+
+//    enum xdg_toplevel_state *p;
+//    LOG("%s: %dx%d\n", __func__, w, h);
+//    wl_array_for_each(p, states) {
+//        LOG("    State: %d\n", *p);
+//    }
+
+    (void)xdg_toplevel;
+    (void)states;
+
+    // no window geometry event, ignore
+    if (w == 0 && h == 0)
+        return;
+
+    sys->conf_width = w;
+    sys->conf_height = h;
+}
+
+static void
+xdg_toplevel_close_cb(void *data, struct xdg_toplevel *xdg_toplevel)
+{
+    (void)data;
+    (void)xdg_toplevel;
+}
+
+static void
+xdg_toplevel_configure_bounds_cb(void *data,
+                                 struct xdg_toplevel *xdg_toplevel,
+                                 int32_t width, int32_t height)
+{
+    (void)data;
+    (void)xdg_toplevel;
+    (void)width;
+    (void)height;
+//    LOG("%s: %dx%d\n", __func__, width, height);
+}
+
+static void
+xdg_toplevel_wm_capabilities_cb(void *data,
+                                struct xdg_toplevel *xdg_toplevel,
+                                struct wl_array *capabilities)
+{
+    (void)data;
+    (void)xdg_toplevel;
+    (void)capabilities;
+}
+
+static const struct xdg_toplevel_listener xdg_toplevel_listener = {
+    .configure = xdg_toplevel_configure_cb,
+    .close = xdg_toplevel_close_cb,
+    .configure_bounds = xdg_toplevel_configure_bounds_cb,
+    .wm_capabilities = xdg_toplevel_wm_capabilities_cb,
+};
+
+// ---------------------------------------------------------------------------
+
+static void
+xdg_surface_configure_cb(void *data, struct xdg_surface *xdg_surface, uint32_t serial)
 {
     vout_window_t *wnd = data;
-    const uint32_t *state;
+    vout_window_sys_t *const sys = wnd->sys;
 
-    msg_Dbg(wnd, "new configuration: %"PRId32"x%"PRId32" (serial: %"PRIu32")",
-            width, height, serial);
-    wl_array_for_each(state, states)
-    {
-        msg_Dbg(wnd, " - state 0x%04"PRIX32, *state);
-    }
+    msg_Dbg(wnd, "new configuration: (serial: %"PRIu32")", serial);
 
     /* Zero width or zero height means client (we) should choose.
      * DO NOT REPORT those values to video output... */
-    if (width != 0 && height != 0)
-        vout_window_ReportSize(wnd,  width, height);
+    if (sys->conf_width != 0 && sys->conf_height != 0)
+        vout_window_ReportSize(wnd, sys->conf_width, sys->conf_height);
 
     /* TODO: report fullscreen state, not implemented in VLC */
-    xdg_surface_ack_configure(surface, serial);
-}
-
-static void xdg_surface_close_cb(void *data, struct xdg_surface *surface)
-{
-    vout_window_t *wnd = data;
-
-    vout_window_ReportClose(wnd);
-    (void) surface;
+    xdg_surface_ack_configure(xdg_surface, serial);
 }
 
 static const struct xdg_surface_listener xdg_surface_cbs =
 {
     xdg_surface_configure_cb,
-    xdg_surface_close_cb,
 };
 
-static void xdg_shell_ping_cb(void *data, struct xdg_shell *shell,
+static void xdg_shell_ping_cb(void *data, struct xdg_wm_base *shell,
                               uint32_t serial)
 {
     (void) data;
-    xdg_shell_pong(shell, serial);
+    xdg_wm_base_pong(shell, serial);
 }
 
-static const struct xdg_shell_listener xdg_shell_cbs =
+static const struct xdg_wm_base_listener xdg_shell_cbs =
 {
     xdg_shell_ping_cb,
 };
@@ -200,8 +257,8 @@ static void registry_global_cb(void *data, struct wl_registry *registry,
                                            &wl_compositor_interface,
                                            (vers < 2) ? vers : 2);
     else
-    if (!strcmp(iface, "xdg_shell"))
-        sys->shell = wl_registry_bind(registry, name, &xdg_shell_interface, 1);
+    if (!strcmp(iface, xdg_wm_base_interface.name))
+        sys->shell = wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
     else
     if (!strcmp(iface, "org_kde_kwin_server_decoration_manager"))
         sys->deco_manager = wl_registry_bind(registry, name,
@@ -228,19 +285,15 @@ static const struct wl_registry_listener registry_cbs =
  */
 static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
 {
+    msg_Info(wnd, "<<< WL XDG, type=%d", cfg->type);
     if (cfg->type != VOUT_WINDOW_TYPE_INVALID
      && cfg->type != VOUT_WINDOW_TYPE_WAYLAND)
         return VLC_EGENERIC;
 
-    vout_window_sys_t *sys = malloc(sizeof (*sys));
+    vout_window_sys_t *sys = calloc(1, sizeof (*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
 
-    sys->compositor = NULL;
-    sys->shell = NULL;
-    sys->surface = NULL;
-    sys->deco_manager = NULL;
-    sys->deco = NULL;
     wnd->sys = sys;
 
     /* Connect to the display server */
@@ -251,6 +304,7 @@ static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
 
     if (display == NULL)
     {
+        msg_Info(wnd, ">>> WL XDG No display");
         free(sys);
         return VLC_EGENERIC;
     }
@@ -265,10 +319,12 @@ static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
     wl_registry_destroy(registry);
 
     if (sys->compositor == NULL || sys->shell == NULL)
+    {
+        msg_Info(wnd, ">>> WL XDG No compositor or shell");
         goto error;
+    }
 
-    xdg_shell_use_unstable_version(sys->shell, XDG_SHELL_VERSION_CURRENT);
-    xdg_shell_add_listener(sys->shell, &xdg_shell_cbs, NULL);
+    xdg_wm_base_add_listener(sys->shell, &xdg_shell_cbs, NULL);
 
     /* Create a surface */
     struct wl_surface *surface = wl_compositor_create_surface(sys->compositor);
@@ -276,23 +332,25 @@ static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
         goto error;
 
     struct xdg_surface *xdg_surface =
-        xdg_shell_get_xdg_surface(sys->shell, surface);
+        xdg_wm_base_get_xdg_surface(sys->shell, surface);
     if (xdg_surface == NULL)
         goto error;
 
-    sys->surface = xdg_surface;
-
+    sys->xdg_surface = xdg_surface;
     xdg_surface_add_listener(xdg_surface, &xdg_surface_cbs, wnd);
 
+    sys->toplevel = xdg_surface_get_toplevel(sys->xdg_surface);
+    xdg_toplevel_add_listener(sys->toplevel, &xdg_toplevel_listener, wnd);
+
     char *title = var_InheritString(wnd, "video-title");
-    xdg_surface_set_title(xdg_surface,
+    xdg_toplevel_set_title(sys->toplevel,
                           (title != NULL) ? title : _("VLC media player"));
     free(title);
 
     char *app_id = var_InheritString(wnd, "app-id");
     if (app_id != NULL)
     {
-        xdg_surface_set_app_id(xdg_surface, app_id);
+        xdg_toplevel_set_app_id(sys->toplevel, app_id);
         free(app_id);
     }
 
@@ -313,10 +371,12 @@ static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
     else if (deco_mode == ORG_KDE_KWIN_SERVER_DECORATION_MODE_SERVER)
         msg_Err(wnd, "server-side decoration not supported");
 
+    wl_surface_commit(surface);
+
     //if (var_InheritBool (wnd, "keyboard-events"))
     //    do_something();
 
-    wl_display_flush(display);
+    wl_display_roundtrip(display);
 
     wnd->type = VOUT_WINDOW_TYPE_WAYLAND;
     wnd->handle.wl = surface;
@@ -335,10 +395,12 @@ error:
         org_kde_kwin_server_decoration_destroy(sys->deco);
     if (sys->deco_manager != NULL)
         org_kde_kwin_server_decoration_manager_destroy(sys->deco_manager);
-    if (sys->surface != NULL)
-        xdg_surface_destroy(sys->surface);
+    if (sys->toplevel != NULL)
+        xdg_toplevel_destroy(sys->toplevel);
+    if (sys->xdg_surface != NULL)
+        xdg_surface_destroy(sys->xdg_surface);
     if (sys->shell != NULL)
-        xdg_shell_destroy(sys->shell);
+        xdg_wm_base_destroy(sys->shell);
     if (sys->compositor != NULL)
         wl_compositor_destroy(sys->compositor);
     wl_display_disconnect(display);
@@ -360,9 +422,10 @@ static void Close(vout_window_t *wnd)
         org_kde_kwin_server_decoration_destroy(sys->deco);
     if (sys->deco_manager != NULL)
         org_kde_kwin_server_decoration_manager_destroy(sys->deco_manager);
-    xdg_surface_destroy(sys->surface);
+    xdg_toplevel_destroy(sys->toplevel);
+    xdg_surface_destroy(sys->xdg_surface);
     wl_surface_destroy(wnd->handle.wl);
-    xdg_shell_destroy(sys->shell);
+    xdg_wm_base_destroy(sys->shell);
     wl_compositor_destroy(sys->compositor);
     wl_display_disconnect(wnd->display.wl);
     free(sys);
@@ -375,11 +438,11 @@ static void Close(vout_window_t *wnd)
     "If empty, the default display will be used.")
 
 vlc_module_begin()
-    set_shortname(N_("XDG shell"))
-    set_description(N_("XDG shell surface"))
+    set_shortname(N_("WL XDG shell"))
+    set_description(N_("Wayland XDG shell surface"))
     set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
-    set_capability("vout window", 20)
+    set_capability("vout window", 21)
     set_callbacks(Open, Close)
 
     add_string("wl-display", NULL, DISPLAY_TEXT, DISPLAY_LONGTEXT, true)
