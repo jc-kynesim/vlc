@@ -286,8 +286,8 @@ libwl_shell_plugin_la_LIBADD = $(WAYLAND_CLIENT_LIBS) $(LIBPTHREAD)
 
 libxdg_shell_plugin_la_SOURCES = video_output/wayland/xdg-shell.c
 nodist_libxdg_shell_plugin_la_SOURCES = \
-	video_output/wayland/xdg-shell-client-protocol.h \
-	video_output/wayland/xdg-shell-protocol.c \
+	video_output/wayland/xdg-shell-unstable-v5-client-protocol.h \
+	video_output/wayland/xdg-shell-unstable-v5-protocol.c \
 	video_output/wayland/server-decoration-client-protocol.h \
 	video_output/wayland/server-decoration-protocol.c
 libxdg_shell_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
@@ -295,13 +295,12 @@ libxdg_shell_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
 libxdg_shell_plugin_la_CFLAGS = $(WAYLAND_CLIENT_CFLAGS)
 libxdg_shell_plugin_la_LIBADD = $(WAYLAND_CLIENT_LIBS) $(LIBPTHREAD)
 
-video_output/wayland/xdg-shell-client-protocol.h: \
+video_output/wayland/xdg-shell-unstable-v5-client-protocol.h: \
 		$(WAYLAND_PROTOCOLS)/unstable/xdg-shell/xdg-shell-unstable-v5.xml
 	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
-
-video_output/wayland/xdg-shell-protocol.c: \
+video_output/wayland/xdg-shell-unstable-v5-protocol.c: \
 		$(WAYLAND_PROTOCOLS)/unstable/xdg-shell/xdg-shell-unstable-v5.xml
-	$(AM_V_GEN)$(WAYLAND_SCANNER) code $< $@
+	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
 
 video_output/wayland/server-decoration-client-protocol.h: \
 		video_output/wayland/server-decoration.xml
