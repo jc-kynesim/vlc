@@ -31,7 +31,7 @@
 #include <poll.h>
 
 #include <wayland-client.h>
-#include "xdg-shell-client-protocol.h"
+#include "xdg-shell-unstable-v5-client-protocol.h"
 #include "server-decoration-client-protocol.h"
 
 #include <vlc_common.h>
