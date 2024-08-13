@@ -48,8 +48,12 @@ struct vout_window_sys_t
     struct org_kde_kwin_server_decoration_manager *deco_manager;
     struct org_kde_kwin_server_decoration *deco;
 
-    int conf_width;
-    int conf_height;
+    bool req_fullscreen;
+    unsigned int req_width;
+    unsigned int req_height;
+
+    unsigned int conf_width;
+    unsigned int conf_height;
 
     vlc_thread_t thread;
 };
@@ -109,6 +113,14 @@ static int Control(vout_window_t *wnd, int cmd, va_list ap)
             unsigned width = va_arg(ap, unsigned);
             unsigned height = va_arg(ap, unsigned);
 
+            msg_Dbg(wnd, "Set size: %dx%d", width, height);
+            if (width == sys->req_width && height == sys->req_height)
+                break;
+            sys->req_width = width;
+            sys->req_height = height;
+            if (sys->req_fullscreen)
+                break;
+
             /* Unlike X11, the client basically gets to choose its size, which
              * is the size of the buffer attached to the surface.
              * Note that it is unspecified who "wins" in case of a race
@@ -117,19 +129,27 @@ static int Control(vout_window_t *wnd, int cmd, va_list ap)
              * server. With Wayland, it is arbitrated in the client windowing
              * code. In this case, it is arbitrated by the window core code.
              */
-            vout_window_ReportSize(wnd, width, height);
+//            vout_window_ReportSize(wnd, width, height);
             xdg_surface_set_window_geometry(sys->xdg_surface, 0, 0, width, height);
+            wl_surface_commit(wnd->handle.wl);
             break;
         }
 
         case VOUT_WINDOW_SET_FULLSCREEN:
         {
             bool fs = va_arg(ap, int);
+            msg_Dbg(wnd, "Set fullscreen: %d->%d", sys->req_fullscreen, fs);
+
+            if (sys->req_fullscreen == fs)
+                break;
 
             if (fs)
                 xdg_toplevel_set_fullscreen(sys->toplevel, NULL);
-            else
+            else {
                 xdg_toplevel_unset_fullscreen(sys->toplevel);
+                xdg_surface_set_window_geometry(sys->xdg_surface, 0, 0, sys->req_width, sys->req_height);
+            }
+            wl_surface_commit(wnd->handle.wl);
             break;
         }
 
@@ -165,9 +185,10 @@ xdg_toplevel_configure_cb(void *data,
     (void)states;
 
     // no window geometry event, ignore
-    if (w == 0 && h == 0)
+    if (w <= 0 || h <= 0)
         return;
 
+    msg_Dbg(wnd, "%s: Width=%"PRId32", Height=%"PRId32, __func__, w, h);
     sys->conf_width = w;
     sys->conf_height = h;
 }
@@ -216,7 +237,7 @@ xdg_surface_configure_cb(void *data, struct xdg_surface *xdg_surface, uint32_t s
     vout_window_t *wnd = data;
     vout_window_sys_t *const sys = wnd->sys;
 
-    msg_Dbg(wnd, "new configuration: (serial: %"PRIu32")", serial);
+    msg_Dbg(wnd, "new configuration: (serial: %"PRIu32", %dx%d)", serial, sys->conf_width, sys->conf_height);
 
     /* Zero width or zero height means client (we) should choose.
      * DO NOT REPORT those values to video output... */
