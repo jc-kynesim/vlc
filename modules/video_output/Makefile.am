@@ -246,6 +246,14 @@ video_output/wayland/single-pixel-buffer-v1-client-protocol.h: \
 		$(WAYLAND_PROTOCOLS)/staging/single-pixel-buffer/single-pixel-buffer-v1.xml
 	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
 
+video_output/wayland/cursor-shape-v1-client-protocol.h: \
+		$(WAYLAND_PROTOCOLS)/staging/cursor-shape/cursor-shape-v1.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
+
+video_output/wayland/tablet-unstable-v2-client-protocol.h: \
+		$(WAYLAND_PROTOCOLS)/unstable/tablet/tablet-unstable-v2.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
+
 libwl_dmabuf_plugin_la_SOURCES = video_output/wayland/wl_dmabuf.c\
 	video_output/wayland/picpool.c video_output/wayland/picpool.h\
 	video_output/wayland/dmabuf_alloc.c video_output/wayland/dmabuf_alloc.h\
@@ -301,6 +309,41 @@ video_output/wayland/xdg-shell-unstable-v5-protocol.c: \
 		$(WAYLAND_PROTOCOLS)/unstable/xdg-shell/xdg-shell-unstable-v5.xml
 	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
 
+libwl_xdg_shell_plugin_la_SOURCES = video_output/wayland/wl_xdg_shell.c
+nodist_libwl_xdg_shell_plugin_la_SOURCES = \
+	video_output/wayland/xdg-shell-client-protocol.h \
+	video_output/wayland/xdg-shell-protocol.c \
+	video_output/wayland/server-decoration-client-protocol.h \
+	video_output/wayland/server-decoration-protocol.c
+libwl_xdg_shell_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
+	-I$(builddir)/video_output/wayland
+libwl_xdg_shell_plugin_la_CFLAGS = $(WAYLAND_CLIENT_CFLAGS)
+libwl_xdg_shell_plugin_la_LIBADD = $(WAYLAND_CLIENT_LIBS) $(LIBPTHREAD)
+
+if HAVE_WAYLAND_CURSOR_SHAPE
+video_output/wayland/cursor-shape-v1-protocol.c: \
+		$(WAYLAND_PROTOCOLS)/staging/cursor-shape/cursor-shape-v1.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
+# Cursor shape needs this too - wayland dependency fail!
+video_output/wayland/tablet-unstable-v2-protocol.c: \
+		$(WAYLAND_PROTOCOLS)/unstable/tablet/tablet-unstable-v2.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
+
+nodist_libwl_xdg_shell_plugin_la_SOURCES +=\
+	video_output/wayland/tablet-unstable-v2-client-protocol.h \
+	video_output/wayland/tablet-unstable-v2-protocol.c \
+	video_output/wayland/cursor-shape-v1-client-protocol.h \
+	video_output/wayland/cursor-shape-v1-protocol.c
+libwl_xdg_shell_plugin_la_CFLAGS += -DHAVE_WAYLAND_CURSOR_SHAPE=1
+endif
+
+video_output/wayland/xdg-shell-client-protocol.h: \
+		$(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
+video_output/wayland/xdg-shell-protocol.c: \
+		$(WAYLAND_PROTOCOLS)/stable/xdg-shell/xdg-shell.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
+
 video_output/wayland/server-decoration-client-protocol.h: \
 		video_output/wayland/server-decoration.xml
 video_output/wayland/server-decoration-protocol.c: \
@@ -320,6 +363,10 @@ vout_LTLIBRARIES += libwl_dmabuf_plugin.la
 vout_LTLIBRARIES += libwl_shell_plugin.la
 BUILT_SOURCES += $(nodist_libxdg_shell_plugin_la_SOURCES)
 vout_LTLIBRARIES += libxdg_shell_plugin.la
+if HAVE_WAYLAND_XDG_SHELL
+BUILT_SOURCES += $(nodist_libwl_xdg_shell_plugin_la_SOURCES)
+vout_LTLIBRARIES += libwl_xdg_shell_plugin.la
+endif
 if HAVE_WAYLAND_EGL
 if HAVE_EGL
 vout_LTLIBRARIES += libegl_wl_plugin.la

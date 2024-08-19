@@ -3223,6 +3223,10 @@ AC_ARG_ENABLE(wayland,
 have_wayland="no"
 have_wayland_egl="no"
 have_wayland_single_pixel_buffer="no"
+have_wayland_cursor_shape="no"
+dnl This controls building wl_xdg_shell and isn't a simple xdg-shell exists
+dnl Pkg 1.20 is what exists in bullseye
+have_wayland_xdg_shell="no"
 
 AS_IF([test "${enable_wayland}" = "yes"], [
   PKG_CHECK_MODULES([WAYLAND_CLIENT], [wayland-client >= 1.5.91], [
@@ -3234,6 +3238,18 @@ AS_IF([test "${enable_wayland}" = "yes"], [
       PKG_CHECK_EXISTS([wayland-protocols >= 1.26], [
          AC_MSG_RESULT([yes])
          have_wayland_single_pixel_buffer="yes"
+      ], [
+         AC_MSG_RESULT([no])
+      ])
+      PKG_CHECK_EXISTS([wayland-protocols >= 1.20], [
+         AC_MSG_RESULT([yes])
+         have_wayland_xdg_shell="yes"
+      ], [
+         AC_MSG_RESULT([no])
+      ])
+      PKG_CHECK_EXISTS([wayland-protocols >= 1.32], [
+         AC_MSG_RESULT([yes])
+         have_wayland_cursor_shape="yes"
       ], [
          AC_MSG_RESULT([no])
       ])
@@ -3271,6 +3287,8 @@ AC_SUBST([WAYLAND_SCANNER])
 AM_CONDITIONAL([HAVE_WAYLAND], [test "${have_wayland}" = "yes"])
 AM_CONDITIONAL([HAVE_WAYLAND_EGL], [test "${have_wayland_egl}" = "yes"])
 AM_CONDITIONAL([HAVE_WAYLAND_SINGLE_PIXEL_BUFFER], [test "${have_wayland_single_pixel_buffer}" = "yes"])
+AM_CONDITIONAL([HAVE_WAYLAND_CURSOR_SHAPE], [test "${have_wayland_cursor_shape}" = "yes"])
+AM_CONDITIONAL([HAVE_WAYLAND_XDG_SHELL], [test "${have_wayland_xdg_shell}" = "yes"])
 
 
 dnl
