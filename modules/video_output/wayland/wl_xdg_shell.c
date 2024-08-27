@@ -644,36 +644,51 @@ static const struct wl_registry_listener registry_cbs =
     registry_global_remove_cb,
 };
 
+static struct wl_display *
+get_wl_display(vout_window_t * const wnd)
+{
+    char * const dpy_opt = var_InheritString(wnd, "wl-display");
+    char * dpy_name = dpy_opt;
+    struct wl_display * display;
+
+    if (dpy_name == NULL)
+        dpy_name = getenv("WAYLAND_DISPLAY");
+    if (dpy_name == NULL || strcmp(dpy_name, "none") == 0)
+        return NULL;
+
+    if ((display = wl_display_connect(strcmp(dpy_name, "auto") == 0 ? NULL : dpy_name)) == NULL)
+        msg_Warn(wnd, "WL XDG No display: '%s'", dpy_name);
+
+    free(dpy_opt);
+    return display;
+}
+
 /**
  * Creates a Wayland shell surface.
  */
 static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
 {
-    msg_Info(wnd, "<<< WL XDG, type=%d", cfg->type);
     if (cfg->type != VOUT_WINDOW_TYPE_INVALID
      && cfg->type != VOUT_WINDOW_TYPE_WAYLAND)
         return VLC_EGENERIC;
 
+    struct wl_display * const display = get_wl_display(wnd);
+    if (display == NULL)
+        return VLC_EGENERIC;
+
     vout_window_sys_t *sys = calloc(1, sizeof (*sys));
     if (unlikely(sys == NULL))
-        return VLC_ENOMEM;
-
-    wnd->sys = sys;
-
-    /* Connect to the display server */
-    char *dpy_name = var_InheritString(wnd, "wl-display");
-    struct wl_display *display = wl_display_connect(dpy_name);
-
-    free(dpy_name);
-
-    if (display == NULL)
     {
-        msg_Info(wnd, ">>> WL XDG No display");
-        free(sys);
-        return VLC_EGENERIC;
+        wl_display_disconnect(display);
+        return VLC_ENOMEM;
     }
 
+    wnd->sys = sys;
     vlc_mutex_init(&sys->lock);
+
+    /* Connect to the display server */
+
+    msg_Info(wnd, "<<< WL XDG");
 
     /* Find the interesting singleton(s) */
     struct wl_registry *registry = wl_display_get_registry(display);
@@ -810,7 +825,9 @@ static void Close(vout_window_t *wnd)
 #define DISPLAY_TEXT N_("Wayland display")
 #define DISPLAY_LONGTEXT N_( \
     "Video will be rendered with this Wayland display. " \
-    "If empty, the default display will be used.")
+    "If unset the WAYLAND_DISPLAY environment variable will be used; " \
+    "if both unset then wl-xdg-shell will be disabled. " \
+    "Special values are: \"auto\": use default; \"none\": disable.")
 
 vlc_module_begin()
     set_shortname(N_("WL XDG shell"))
