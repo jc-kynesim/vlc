@@ -37,6 +37,7 @@
 #include "cursor-shape-v1-client-protocol.h"
 #include "tablet-unstable-v2-client-protocol.h"
 #endif
+#include "wlr-layer-shell-unstable-v1-client-protocol.h"
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
@@ -46,13 +47,28 @@
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #endif
 
+#define DISPLAY_NAME "wl-display"
+#define DISPLAY_TEXT N_("Wayland display")
+#define DISPLAY_LONGTEXT N_( \
+    "Video will be rendered with this Wayland display. " \
+    "If unset the WAYLAND_DISPLAY environment variable will be used; " \
+    "if both unset then wl-xdg-shell will be disabled. " \
+    "Special values are: \"auto\": use default; \"none\": disable.")
+
+#define LAYER_NAME "wl-layer-pos"
+#define LAYER_TEXT "Position using layer-shell"
+#define LAYER_LONGTEXT "Try to position window at <x>,<y>"
+
+
 struct vout_window_sys_t
 {
     struct wl_compositor *compositor;
     struct xdg_wm_base *shell;
+    struct zwlr_layer_shell_v1 *layer_shell;
     struct wl_surface *wl_surface;
-    struct xdg_surface *xdg_surface;
+    struct xdg_surface *xdg_surface;  // Only one of xdg_surface & layer_surface should be in use
     struct xdg_toplevel *toplevel;
+    struct zwlr_layer_surface_v1 *layer_surface;
     struct org_kde_kwin_server_decoration_manager *deco_manager;
     struct org_kde_kwin_server_decoration *deco;
     struct wl_seat *wl_seat;
@@ -166,7 +182,8 @@ static int Control(vout_window_t *wnd, int cmd, va_list ap)
              * code. In this case, it is arbitrated by the window core code.
              */
 //            vout_window_ReportSize(wnd, width, height);
-            xdg_surface_set_window_geometry(sys->xdg_surface, 0, 0, width, height);
+            if (sys->xdg_surface)
+                xdg_surface_set_window_geometry(sys->xdg_surface, 0, 0, width, height);
             wl_surface_commit(wnd->handle.wl);
             break;
         }
@@ -183,7 +200,8 @@ static int Control(vout_window_t *wnd, int cmd, va_list ap)
                 xdg_toplevel_set_fullscreen(sys->toplevel, NULL);
             else {
                 xdg_toplevel_unset_fullscreen(sys->toplevel);
-                xdg_surface_set_window_geometry(sys->xdg_surface, 0, 0, sys->req_width, sys->req_height);
+                if (sys->xdg_surface)
+                    xdg_surface_set_window_geometry(sys->xdg_surface, 0, 0, sys->req_width, sys->req_height);
             }
             wl_surface_commit(wnd->handle.wl);
             break;
@@ -317,6 +335,30 @@ static void xdg_shell_ping_cb(void *data, struct xdg_wm_base *shell,
 static const struct xdg_wm_base_listener xdg_shell_cbs =
 {
     xdg_shell_ping_cb,
+};
+
+// ----------------------------------------------------------------------------
+
+static void layer_surface_configure(void * data, struct zwlr_layer_surface_v1 * layer_surface, uint32_t serial, uint32_t w, uint32_t h)
+{
+    vout_window_t *wnd = data;
+
+    msg_Info(wnd, "%s: ser: %d, %dx%d", __func__, serial, w, h);
+    zwlr_layer_surface_v1_ack_configure(layer_surface, serial);
+}
+
+static void layer_surface_closed(void * data, struct zwlr_layer_surface_v1 * layer_surface)
+{
+    vout_window_t *wnd = data;
+    VLC_UNUSED(layer_surface);
+
+    msg_Info(wnd, "%s", __func__);
+}
+
+static const struct zwlr_layer_surface_v1_listener layer_surface_cbs =
+{
+    .configure = layer_surface_configure,
+    .closed = layer_surface_closed,
 };
 
 // ----------------------------------------------------------------------------
@@ -610,11 +652,16 @@ static void registry_global_cb(void *data, struct wl_registry *registry,
     if (!strcmp(iface, xdg_wm_base_interface.name))
     {
         sys->shell = wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
+        xdg_wm_base_add_listener(sys->shell, &xdg_shell_cbs, wnd);
     } else
     if (!strcmp(iface, wl_seat_interface.name) && vers >= 5)
     {
         sys->wl_seat = wl_registry_bind(registry, name, &wl_seat_interface, MIN(9, vers));
         wl_seat_add_listener(sys->wl_seat, &seat_cbs, wnd);
+    } else
+    if (!strcmp(iface, zwlr_layer_shell_v1_interface.name))
+    {
+        sys->layer_shell = wl_registry_bind(registry, name, &zwlr_layer_shell_v1_interface, MIN(5, vers));
     } else
 #ifdef WP_CURSOR_SHAPE_DEVICE_V1_INTERFACE
     if (!strcmp(iface, wp_cursor_shape_manager_v1_interface.name))
@@ -644,10 +691,30 @@ static const struct wl_registry_listener registry_cbs =
     registry_global_remove_cb,
 };
 
+static void
+layer_shell_destroy(struct zwlr_layer_shell_v1 ** ppLayer_shell)
+{
+    struct zwlr_layer_shell_v1 * const layer_shell = *ppLayer_shell;
+    *ppLayer_shell = NULL;
+    if (layer_shell)
+        zwlr_layer_shell_v1_destroy(layer_shell);
+}
+
+static void
+layer_surface_destroy(struct zwlr_layer_surface_v1 ** ppLayer_surface)
+{
+    struct zwlr_layer_surface_v1 * const layer_surface = *ppLayer_surface;
+    *ppLayer_surface = NULL;
+    if (layer_surface)
+        zwlr_layer_surface_v1_destroy(layer_surface);
+}
+
+// Look for a wayland display name first in an explicit option then in the
+// environment
 static struct wl_display *
 get_wl_display(vout_window_t * const wnd)
 {
-    char * const dpy_opt = var_InheritString(wnd, "wl-display");
+    char *const dpy_opt = var_InheritString(wnd, DISPLAY_NAME);
     char * dpy_name = dpy_opt;
     struct wl_display * display;
 
@@ -661,6 +728,33 @@ get_wl_display(vout_window_t * const wnd)
 
     free(dpy_opt);
     return display;
+}
+
+static int
+get_layer_pos(vout_window_t * const wnd, int * pX, int * pY)
+{
+    char *const layer_pos = var_InheritString(wnd, LAYER_NAME);
+    char *p;
+    long x, y;
+    *pX = 0;
+    *pY = 0;
+    if (layer_pos == NULL)
+        return 0;
+
+    x = strtol(layer_pos, &p, 0);
+    if (*p != ',')
+        goto bad;
+    y = strtol(p + 1, &p, 0);
+    if (*p != '\0')
+        goto bad;
+
+    *pX = (int)x;
+    *pY = (int)y;
+    return 1;
+
+bad:
+    msg_Err(wnd, "Bad layer-pos: '%s'", layer_pos);
+    return -1;
 }
 
 /**
@@ -705,38 +799,49 @@ static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
         goto error;
     }
 
-    xdg_wm_base_add_listener(sys->shell, &xdg_shell_cbs, NULL);
-
     /* Create a surface */
     struct wl_surface *surface = wl_compositor_create_surface(sys->compositor);
     if (surface == NULL)
         goto error;
 
-    struct xdg_surface *xdg_surface =
-        xdg_wm_base_get_xdg_surface(sys->shell, surface);
-    if (xdg_surface == NULL)
-        goto error;
-
-    sys->xdg_surface = xdg_surface;
-    xdg_surface_add_listener(xdg_surface, &xdg_surface_cbs, wnd);
-
-    sys->toplevel = xdg_surface_get_toplevel(sys->xdg_surface);
-    xdg_toplevel_add_listener(sys->toplevel, &xdg_toplevel_listener, wnd);
-
-    char *title = var_InheritString(wnd, "video-title");
-    xdg_toplevel_set_title(sys->toplevel,
-                          (title != NULL) ? title : _("VLC media player"));
-    free(title);
-
-    char *app_id = var_InheritString(wnd, "app-id");
-    if (app_id != NULL)
+    int posX, posY;
+    if (sys->layer_shell != NULL && get_layer_pos(wnd, &posX, &posY) > 0)
     {
-        xdg_toplevel_set_app_id(sys->toplevel, app_id);
-        free(app_id);
+        sys->layer_surface = zwlr_layer_shell_v1_get_layer_surface(sys->layer_shell, surface, NULL, ZWLR_LAYER_SHELL_V1_LAYER_TOP, "vlc-video");
+        zwlr_layer_surface_v1_add_listener(sys->layer_surface, &layer_surface_cbs, wnd);
+        zwlr_layer_surface_v1_set_anchor(sys->layer_surface, ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT);
+        zwlr_layer_surface_v1_set_margin(sys->layer_surface, posY, 0, 0, posX);
+    }
+    else
+    {
+        struct xdg_surface *xdg_surface =
+            xdg_wm_base_get_xdg_surface(sys->shell, surface);
+        if (xdg_surface == NULL)
+            goto error;
+
+        sys->xdg_surface = xdg_surface;
+        xdg_surface_add_listener(xdg_surface, &xdg_surface_cbs, wnd);
+
+        sys->toplevel = xdg_surface_get_toplevel(sys->xdg_surface);
+        xdg_toplevel_add_listener(sys->toplevel, &xdg_toplevel_listener, wnd);
+
+        char *title = var_InheritString(wnd, "video-title");
+        xdg_toplevel_set_title(sys->toplevel,
+                              (title != NULL) ? title : _("VLC media player"));
+        free(title);
+
+        char *app_id = var_InheritString(wnd, "app-id");
+        if (app_id != NULL)
+        {
+            xdg_toplevel_set_app_id(sys->toplevel, app_id);
+            free(app_id);
+        }
+
+        xdg_surface_set_window_geometry(xdg_surface, 0, 0,
+                                        cfg->width, cfg->height);
     }
 
-    xdg_surface_set_window_geometry(xdg_surface, 0, 0,
-                                    cfg->width, cfg->height);
+
     vout_window_ReportSize(wnd, cfg->width, cfg->height);
 
     const uint_fast32_t deco_mode =
@@ -785,6 +890,7 @@ error:
         xdg_wm_base_destroy(sys->shell);
     if (sys->wl_seat)
         wl_seat_destroy(sys->wl_seat);
+    layer_shell_destroy(&sys->layer_shell);
     if (sys->compositor != NULL)
         wl_compositor_destroy(sys->compositor);
     wl_display_disconnect(display);
@@ -807,27 +913,23 @@ static void Close(vout_window_t *wnd)
         org_kde_kwin_server_decoration_destroy(sys->deco);
     if (sys->deco_manager != NULL)
         org_kde_kwin_server_decoration_manager_destroy(sys->deco_manager);
-    xdg_toplevel_destroy(sys->toplevel);
-    xdg_surface_destroy(sys->xdg_surface);
+    if (sys->toplevel)
+        xdg_toplevel_destroy(sys->toplevel);
+    if (sys->xdg_surface)
+        xdg_surface_destroy(sys->xdg_surface);
+    layer_surface_destroy(&sys->layer_surface);
     wl_surface_destroy(wnd->handle.wl);
     xdg_wm_base_destroy(sys->shell);
     cursor_shape_device_destroy(&sys->cursor_shape_device);
     pointer_destroy(&sys->wl_pointer);
     cursor_shape_manager_destroy(&sys->cursor_shape_manager);
+    layer_shell_destroy(&sys->layer_shell);
     wl_seat_destroy(sys->wl_seat);
     wl_compositor_destroy(sys->compositor);
     wl_display_disconnect(wnd->display.wl);
     vlc_mutex_destroy(&sys->lock);
     free(sys);
 }
-
-
-#define DISPLAY_TEXT N_("Wayland display")
-#define DISPLAY_LONGTEXT N_( \
-    "Video will be rendered with this Wayland display. " \
-    "If unset the WAYLAND_DISPLAY environment variable will be used; " \
-    "if both unset then wl-xdg-shell will be disabled. " \
-    "Special values are: \"auto\": use default; \"none\": disable.")
 
 vlc_module_begin()
     set_shortname(N_("WL XDG shell"))
@@ -837,5 +939,7 @@ vlc_module_begin()
     set_capability("vout window", 21)
     set_callbacks(Open, Close)
 
-    add_string("wl-display", NULL, DISPLAY_TEXT, DISPLAY_LONGTEXT, true)
+    add_string(DISPLAY_NAME, NULL, DISPLAY_TEXT, DISPLAY_LONGTEXT, true)
+    add_string(LAYER_NAME, NULL, LAYER_TEXT, LAYER_LONGTEXT, true)
+
 vlc_module_end()
