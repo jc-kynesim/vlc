@@ -56,8 +56,11 @@
     "Special values are: \"auto\": use default; \"none\": disable.")
 
 #define LAYER_NAME "wl-layer-pos"
-#define LAYER_TEXT "Position using layer-shell"
-#define LAYER_LONGTEXT "Try to position window at <x>,<y>"
+#define LAYER_TEXT "Create window using layer-shell"
+#define LAYER_LONGTEXT "Use wlr-layer-shell rather than xdg-shell. This " \
+    "(probably) allows positioning via --video-x,--video-y to work, but the " \
+    "window has a fixed Z which will either be on top of all normal windows " \
+    "or behind them and likely won't decorate."
 
 
 struct vout_window_sys_t
@@ -79,6 +82,10 @@ struct vout_window_sys_t
 #endif
 
     vlc_mutex_t lock;
+    vlc_cond_t cond;
+
+    bool use_layer;
+    bool config1_done;
 
     uint32_t pointer_enter_serial;
 
@@ -150,6 +157,18 @@ set_cursor(vout_window_t * const wnd, vout_window_sys_t * const sys)
     wl_display_flush(wnd->display.wl);
 }
 
+static void
+set_fullscreen(vout_window_sys_t *sys, bool fs)
+{
+    sys->req_fullscreen = fs;
+    if (fs)
+        xdg_toplevel_set_fullscreen(sys->toplevel, NULL);
+    else {
+        xdg_toplevel_unset_fullscreen(sys->toplevel);
+        xdg_surface_set_window_geometry(sys->xdg_surface, 0, 0, sys->req_width, sys->req_height);
+    }
+}
+
 static int Control(vout_window_t *wnd, int cmd, va_list ap)
 {
     vout_window_sys_t *sys = wnd->sys;
@@ -193,16 +212,10 @@ static int Control(vout_window_t *wnd, int cmd, va_list ap)
             bool fs = va_arg(ap, int);
             msg_Dbg(wnd, "Set fullscreen: %d->%d", sys->req_fullscreen, fs);
 
-            if (sys->req_fullscreen == fs)
+            if (sys->req_fullscreen == fs || sys->use_layer)
                 break;
 
-            if (fs)
-                xdg_toplevel_set_fullscreen(sys->toplevel, NULL);
-            else {
-                xdg_toplevel_unset_fullscreen(sys->toplevel);
-                if (sys->xdg_surface)
-                    xdg_surface_set_window_geometry(sys->xdg_surface, 0, 0, sys->req_width, sys->req_height);
-            }
+            set_fullscreen(sys, fs);
             wl_surface_commit(wnd->handle.wl);
             break;
         }
@@ -239,11 +252,11 @@ xdg_toplevel_configure_cb(void *data,
     vout_window_t *const wnd = data;
     vout_window_sys_t *const sys = wnd->sys;
 
-//    enum xdg_toplevel_state *p;
-//    LOG("%s: %dx%d\n", __func__, w, h);
-//    wl_array_for_each(p, states) {
-//        LOG("    State: %d\n", *p);
-//    }
+    enum xdg_toplevel_state *p;
+    msg_Dbg(wnd, "%s: %dx%d", __func__, w, h);
+    wl_array_for_each(p, states) {
+        msg_Dbg(wnd, "    State: %d", *p);
+    }
 
     (void)xdg_toplevel;
     (void)states;
@@ -260,8 +273,10 @@ xdg_toplevel_configure_cb(void *data,
 static void
 xdg_toplevel_close_cb(void *data, struct xdg_toplevel *xdg_toplevel)
 {
-    (void)data;
+    vout_window_t *const wnd = data;
     (void)xdg_toplevel;
+
+    vout_window_ReportClose(wnd);
 }
 
 #ifdef XDG_TOPLEVEL_CONFIGURE_BOUNDS_SINCE_VERSION
@@ -270,11 +285,12 @@ xdg_toplevel_configure_bounds_cb(void *data,
                                  struct xdg_toplevel *xdg_toplevel,
                                  int32_t width, int32_t height)
 {
+    vout_window_t *const wnd = data;
     (void)data;
     (void)xdg_toplevel;
     (void)width;
     (void)height;
-//    LOG("%s: %dx%d\n", __func__, width, height);
+    msg_Dbg(wnd, "%s: %dx%d", __func__, width, height);
 }
 #endif
 
@@ -306,7 +322,7 @@ static const struct xdg_toplevel_listener xdg_toplevel_listener = {
 static void
 xdg_surface_configure_cb(void *data, struct xdg_surface *xdg_surface, uint32_t serial)
 {
-    vout_window_t *wnd = data;
+    vout_window_t *const wnd = data;
     vout_window_sys_t *const sys = wnd->sys;
 
     msg_Dbg(wnd, "new configuration: (serial: %"PRIu32", %dx%d)", serial, sys->conf_width, sys->conf_height);
@@ -318,6 +334,12 @@ xdg_surface_configure_cb(void *data, struct xdg_surface *xdg_surface, uint32_t s
 
     /* TODO: report fullscreen state, not implemented in VLC */
     xdg_surface_ack_configure(xdg_surface, serial);
+
+    if (!sys->config1_done)
+    {
+        sys->config1_done = true;
+        vlc_cond_broadcast(&sys->cond);
+    }
 }
 
 static const struct xdg_surface_listener xdg_surface_cbs =
@@ -341,10 +363,21 @@ static const struct xdg_wm_base_listener xdg_shell_cbs =
 
 static void layer_surface_configure(void * data, struct zwlr_layer_surface_v1 * layer_surface, uint32_t serial, uint32_t w, uint32_t h)
 {
-    vout_window_t *wnd = data;
+    vout_window_t * const wnd = data;
+    vout_window_sys_t * const sys = wnd->sys;
 
     msg_Info(wnd, "%s: ser: %d, %dx%d", __func__, serial, w, h);
+
+    if (w != 0 && h != 0)
+        vout_window_ReportSize(wnd, w, h);
+
     zwlr_layer_surface_v1_ack_configure(layer_surface, serial);
+
+    if (!sys->config1_done)
+    {
+        sys->config1_done = true;
+        vlc_cond_broadcast(&sys->cond);
+    }
 }
 
 static void layer_surface_closed(void * data, struct zwlr_layer_surface_v1 * layer_surface)
@@ -353,6 +386,7 @@ static void layer_surface_closed(void * data, struct zwlr_layer_surface_v1 * lay
     VLC_UNUSED(layer_surface);
 
     msg_Info(wnd, "%s", __func__);
+    vout_window_ReportClose(wnd);
 }
 
 static const struct zwlr_layer_surface_v1_listener layer_surface_cbs =
@@ -731,30 +765,20 @@ get_wl_display(vout_window_t * const wnd)
 }
 
 static int
-get_layer_pos(vout_window_t * const wnd, int * pX, int * pY)
+wants_layer_shell(vout_window_t * const wnd, vout_window_sys_t * const sys)
 {
-    char *const layer_pos = var_InheritString(wnd, LAYER_NAME);
-    char *p;
-    long x, y;
-    *pX = 0;
-    *pY = 0;
-    if (layer_pos == NULL)
-        return 0;
+    const bool wants_layer = var_InheritBool(wnd, LAYER_NAME);
 
-    x = strtol(layer_pos, &p, 0);
-    if (*p != ',')
-        goto bad;
-    y = strtol(p + 1, &p, 0);
-    if (*p != '\0')
-        goto bad;
+    if (!wants_layer)
+        return false;
 
-    *pX = (int)x;
-    *pY = (int)y;
-    return 1;
+    if (sys->layer_shell == NULL)
+    {
+        msg_Err(wnd, "WLR Layer Shell not supported on this system");
+        return false;
+    }
 
-bad:
-    msg_Err(wnd, "Bad layer-pos: '%s'", layer_pos);
-    return -1;
+    return true;
 }
 
 /**
@@ -779,10 +803,11 @@ static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
 
     wnd->sys = sys;
     vlc_mutex_init(&sys->lock);
+    vlc_cond_init(&sys->cond);
 
     /* Connect to the display server */
 
-    msg_Info(wnd, "<<< WL XDG");
+    msg_Info(wnd, "<<< WL XDG: %dx%d", cfg->width, cfg->height);
 
     /* Find the interesting singleton(s) */
     struct wl_registry *registry = wl_display_get_registry(display);
@@ -804,9 +829,18 @@ static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
     if (surface == NULL)
         goto error;
 
-    int posX, posY;
-    if (sys->layer_shell != NULL && get_layer_pos(wnd, &posX, &posY) > 0)
+    sys->req_width = cfg->width;
+    sys->req_height = cfg->height;
+
+    if (wants_layer_shell(wnd, sys))
     {
+        int posX = var_InheritInteger(wnd, "video-x");
+        int posY = var_InheritInteger(wnd, "video-y");
+
+        msg_Info(wnd, "Create layer shell @ %d,%d", posX, posY);
+
+        sys->use_layer = true;
+
         sys->layer_surface = zwlr_layer_shell_v1_get_layer_surface(sys->layer_shell, surface, NULL, ZWLR_LAYER_SHELL_V1_LAYER_TOP, "vlc-video");
         zwlr_layer_surface_v1_add_listener(sys->layer_surface, &layer_surface_cbs, wnd);
         zwlr_layer_surface_v1_set_anchor(sys->layer_surface, ZWLR_LAYER_SURFACE_V1_ANCHOR_TOP | ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT);
@@ -837,12 +871,8 @@ static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
             free(app_id);
         }
 
-        xdg_surface_set_window_geometry(xdg_surface, 0, 0,
-                                        cfg->width, cfg->height);
+        set_fullscreen(sys, cfg->is_fullscreen);
     }
-
-
-    vout_window_ReportSize(wnd, cfg->width, cfg->height);
 
     const uint_fast32_t deco_mode =
         var_InheritBool(wnd, "video-deco")
@@ -863,6 +893,7 @@ static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
     //    do_something();
 
     wl_display_roundtrip(display);
+    wl_display_roundtrip(display);
 
     wnd->type = VOUT_WINDOW_TYPE_WAYLAND;
     wnd->handle.wl = surface;
@@ -870,11 +901,24 @@ static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
     wnd->control = Control;
     wnd->info.has_double_click = false;
 
-    vout_window_SetFullScreen(wnd, cfg->is_fullscreen);
-
     if (vlc_clone(&sys->thread, Thread, wnd, VLC_THREAD_PRIORITY_LOW))
         goto error;
 
+    vlc_mutex_lock(&sys->lock);
+    mutex_cleanup_push(&sys->lock); // release the mutex in case of cancellation
+
+    vlc_tick_t timeout = mdate() + 1000000;
+    while (!sys->config1_done)
+        if (vlc_cond_timedwait(&sys->cond, &sys->lock, timeout))
+        {
+            msg_Err(wnd, "Window configure timed out");
+            break;
+        }
+
+    vlc_cleanup_pop();
+    vlc_mutex_unlock(&sys->lock);
+
+    msg_Dbg(wnd, ">>> WL XDG: OK");
     return VLC_SUCCESS;
 
 error:
@@ -894,8 +938,12 @@ error:
     if (sys->compositor != NULL)
         wl_compositor_destroy(sys->compositor);
     wl_display_disconnect(display);
+
+    vlc_cond_destroy(&sys->cond);
     vlc_mutex_destroy(&sys->lock);
     free(sys);
+
+    msg_Dbg(wnd, ">>> WL XDG: Error");
     return VLC_EGENERIC;
 }
 
@@ -927,6 +975,8 @@ static void Close(vout_window_t *wnd)
     wl_seat_destroy(sys->wl_seat);
     wl_compositor_destroy(sys->compositor);
     wl_display_disconnect(wnd->display.wl);
+
+    vlc_cond_destroy(&sys->cond);
     vlc_mutex_destroy(&sys->lock);
     free(sys);
 }
@@ -940,6 +990,6 @@ vlc_module_begin()
     set_callbacks(Open, Close)
 
     add_string(DISPLAY_NAME, NULL, DISPLAY_TEXT, DISPLAY_LONGTEXT, true)
-    add_string(LAYER_NAME, NULL, LAYER_TEXT, LAYER_LONGTEXT, true)
+    add_bool(LAYER_NAME, false, LAYER_TEXT, LAYER_LONGTEXT, false)
 
 vlc_module_end()
