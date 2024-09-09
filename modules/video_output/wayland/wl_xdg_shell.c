@@ -66,6 +66,7 @@
 struct vout_window_sys_t
 {
     struct wl_compositor *compositor;
+    struct wl_output *output;
     struct xdg_wm_base *shell;
     struct zwlr_layer_shell_v1 *layer_shell;
     struct wl_surface *wl_surface;
@@ -90,6 +91,9 @@ struct vout_window_sys_t
     uint32_t pointer_enter_serial;
 
     bool req_fullscreen;
+    uint32_t output_width;
+    uint32_t output_height;
+
     // 0   Off
     // 1   On
     // -1  Off until 1st movement
@@ -146,6 +150,8 @@ static void *Thread(void *data)
 static void
 set_cursor(vout_window_t * const wnd, vout_window_sys_t * const sys)
 {
+    if (!sys->wl_pointer)
+        return;
 #ifdef WP_CURSOR_SHAPE_DEVICE_V1_INTERFACE
     if (sys->req_cursor > 0 && sys->cursor_shape_device != NULL)
         wp_cursor_shape_device_v1_set_shape(sys->cursor_shape_device,
@@ -331,6 +337,14 @@ xdg_surface_configure_cb(void *data, struct xdg_surface *xdg_surface, uint32_t s
      * DO NOT REPORT those values to video output... */
     if (sys->conf_width != 0 && sys->conf_height != 0)
         vout_window_ReportSize(wnd, sys->conf_width, sys->conf_height);
+    else if (sys->req_fullscreen)
+    {
+        msg_Dbg(wnd, "Use fullscreen size %dx%d", sys->output_width, sys->output_height);
+        vout_window_ReportSize(wnd, sys->output_width, sys->output_height);
+    }
+
+    sys->conf_width = 0;
+    sys->conf_height = 0;
 
     /* TODO: report fullscreen state, not implemented in VLC */
     xdg_surface_ack_configure(xdg_surface, serial);
@@ -642,11 +656,18 @@ seat_capabilities_cb(void *data, struct wl_seat *wl_seat, uint32_t capabilities)
 
     if ((capabilities & WL_SEAT_CAPABILITY_POINTER) != 0)
     {
-        sys->wl_pointer = wl_seat_get_pointer(wl_seat);
-        wl_pointer_add_listener(sys->wl_pointer, &pointer_cbs, wnd);
+        if (sys->wl_pointer != NULL)
+            /* Do nothing */;
+        else if ((sys->wl_pointer = wl_seat_get_pointer(wl_seat)) == NULL)
+            msg_Dbg(wnd, "%s: Ponter capability but no pointer", __func__);
+        else
+        {
+            wl_pointer_add_listener(sys->wl_pointer, &pointer_cbs, wnd);
 #ifdef WP_CURSOR_SHAPE_DEVICE_V1_INTERFACE
-        sys->cursor_shape_device = wp_cursor_shape_manager_v1_get_pointer(sys->cursor_shape_manager, sys->wl_pointer);
+            if (sys->cursor_shape_manager != NULL)
+                sys->cursor_shape_device = wp_cursor_shape_manager_v1_get_pointer(sys->cursor_shape_manager, sys->wl_pointer);
 #endif
+        }
     }
     else
     {
@@ -669,6 +690,116 @@ static const struct wl_seat_listener seat_cbs = {
 };
 
 // ----------------------------------------------------------------------------
+//
+// Get output info
+//
+// Maybe don't need/want this. It is an attempt to get the fullscreen size out
+// earlier due to XDG apparently requiring a buffer attached before the
+// fullscreen config occurs.
+//
+// If XDG did what I think it should (i.e. return the size before a buffer is
+// attached so you can size the buffer correctly) this would be completely
+// redundant
+
+static void
+output_destroy(struct wl_output ** const ppOutput)
+{
+    struct wl_output * const output = *ppOutput;
+
+    if (output == NULL)
+        return;
+    *ppOutput = NULL;
+    wl_output_destroy(output);
+}
+
+static void
+output_geometry_cb(void *data,
+                   struct wl_output *wl_output,
+                   int32_t x,
+                   int32_t y,
+                   int32_t physical_width,
+                   int32_t physical_height,
+                   int32_t subpixel,
+                   const char *make,
+                   const char *model,
+                   int32_t transform)
+{
+    vout_window_t *const wnd = data;
+    VLC_UNUSED(wl_output);
+    msg_Dbg(wnd, "%s: @%d,%d, %dx%dmm, subpixel %d, make='%s', model='%s', transform=%d", __func__,
+            x, y, physical_width, physical_height,
+            subpixel, make, model, transform);
+}
+
+static void
+output_mode_cb(void *data,
+               struct wl_output *wl_output,
+               uint32_t flags,
+               int32_t width,
+               int32_t height,
+               int32_t refresh)
+{
+    vout_window_t *const wnd = data;
+    vout_window_sys_t * const sys = wnd->sys;
+    VLC_UNUSED(wl_output);
+
+    sys->output_width = width;
+    sys->output_height = height;
+
+    msg_Dbg(wnd, "%s: flags=%#x %dx%dpels, refresh=%d", __func__,
+            flags, width, height, refresh);
+}
+
+static void
+output_done_cb(void *data,
+               struct wl_output *wl_output)
+{
+    vout_window_t *const wnd = data;
+    VLC_UNUSED(wl_output);
+    msg_Dbg(wnd, "%s", __func__);
+}
+
+static void
+output_scale_cb(void *data,
+                struct wl_output *wl_output,
+                int32_t factor)
+{
+    vout_window_t *const wnd = data;
+    VLC_UNUSED(wl_output);
+    msg_Dbg(wnd, "%s: %d", __func__, factor);
+}
+
+static void
+output_name_cb(void *data,
+               struct wl_output *wl_output,
+               const char *name)
+{
+    vout_window_t *const wnd = data;
+    VLC_UNUSED(wl_output);
+    msg_Dbg(wnd, "%s: %s", __func__, name);
+}
+
+static void
+output_description_cb(void *data,
+                      struct wl_output *wl_output,
+                      const char *description)
+{
+    vout_window_t *const wnd = data;
+    VLC_UNUSED(wl_output);
+    msg_Dbg(wnd, "%s: %s", __func__, description);
+}
+
+static const struct wl_output_listener output_cbs =
+{
+    .geometry = output_geometry_cb,
+    .mode = output_mode_cb,
+    .done = output_done_cb,
+    .scale = output_scale_cb,
+    .name = output_name_cb,
+    .description = output_description_cb,
+};
+
+// ----------------------------------------------------------------------------
 
 static void registry_global_cb(void *data, struct wl_registry *registry,
                                uint32_t name, const char *iface, uint32_t vers)
@@ -687,6 +818,11 @@ static void registry_global_cb(void *data, struct wl_registry *registry,
     {
         sys->shell = wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
         xdg_wm_base_add_listener(sys->shell, &xdg_shell_cbs, wnd);
+    } else
+    if (!strcmp(iface, wl_output_interface.name) && vers >= 3)
+    {
+        sys->output = wl_registry_bind(registry, name, &wl_output_interface, MIN(4, vers));
+        wl_output_add_listener(sys->output, &output_cbs, wnd);
     } else
     if (!strcmp(iface, wl_seat_interface.name) && vers >= 5)
     {
@@ -807,7 +943,7 @@ static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
 
     /* Connect to the display server */
 
-    msg_Info(wnd, "<<< WL XDG: %dx%d", cfg->width, cfg->height);
+    msg_Info(wnd, "<<< WL XDG: %dx%d fs %d standalone %d", cfg->width, cfg->height, cfg->is_fullscreen, cfg->is_standalone);
 
     /* Find the interesting singleton(s) */
     struct wl_registry *registry = wl_display_get_registry(display);
@@ -935,6 +1071,7 @@ error:
     if (sys->wl_seat)
         wl_seat_destroy(sys->wl_seat);
     layer_shell_destroy(&sys->layer_shell);
+    output_destroy(&sys->output);
     if (sys->compositor != NULL)
         wl_compositor_destroy(sys->compositor);
     wl_display_disconnect(display);
@@ -972,6 +1109,7 @@ static void Close(vout_window_t *wnd)
     pointer_destroy(&sys->wl_pointer);
     cursor_shape_manager_destroy(&sys->cursor_shape_manager);
     layer_shell_destroy(&sys->layer_shell);
+    output_destroy(&sys->output);
     wl_seat_destroy(sys->wl_seat);
     wl_compositor_destroy(sys->compositor);
     wl_display_disconnect(wnd->display.wl);
