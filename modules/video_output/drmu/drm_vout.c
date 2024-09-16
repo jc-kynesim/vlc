@@ -1153,7 +1153,15 @@ static int OpenDrmVout(vlc_object_t *object)
     char * display_name = NULL;
     int ret = VLC_EGENERIC;
     int rv;
-    msg_Info(vd, "<<< %s: Fmt=%4.4s", __func__, (const char *)&src_fmt->i_chroma);
+
+    msg_Info(vd, "<<< %s: %s %dx%d(%dx%d @ %d,%d %d/%d), cfg.display: %dx%d, source: %dx%d(%dx%d @ %d,%d %d/%d)", __func__,
+             drmu_log_fourcc(vd->fmt.i_chroma), vd->fmt.i_width, vd->fmt.i_height,
+             vd->fmt.i_visible_width, vd->fmt.i_visible_height, vd->fmt.i_x_offset, vd->fmt.i_y_offset,
+             vd->fmt.i_sar_num, vd->fmt.i_sar_den,
+             vd->cfg->display.width, vd->cfg->display.height,
+             vd->source.i_width, vd->source.i_height,
+             vd->source.i_visible_width, vd->source.i_visible_height, vd->source.i_x_offset, vd->source.i_y_offset,
+             vd->source.i_sar_num, vd->source.i_sar_den);
 
 //    if (!var_InheritBool(vd, "fullscreen")) {
 //        msg_Dbg(vd, ">>> %s: Not fullscreen", __func__);
