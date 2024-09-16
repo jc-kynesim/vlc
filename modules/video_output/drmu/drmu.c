@@ -623,11 +623,14 @@ drmu_atomic_add_prop_range(drmu_atomic_t * const da, const uint32_t obj_id, cons
         drmu_prop_range_immutable(pra) ? -EPERM :
         drmu_atomic_add_prop_generic(da, obj_id, drmu_prop_range_id(pra), x, NULL, NULL);
 
-    if (rv != 0)
+    if (rv != 0) {
+        if (rv == -EPERM && x == drmu_prop_range_min(pra) && x == drmu_prop_range_max(pra))
+            return 0;
         drmu_warn(drmu_atomic_env(da),
                   "%s: Failed to add range %s obj_id=%#x, prop_id=%#x, val=%"PRId64", range=%"PRId64"->%"PRId64": %s",
                   __func__, drmu_prop_range_name(pra),
                   obj_id, drmu_prop_range_id(pra), x, drmu_prop_range_min(pra), drmu_prop_range_max(pra), strerror(-rv));
+    }
 
     return rv;
 }
@@ -2272,7 +2275,7 @@ int
 drmu_crtc_claim_ref(drmu_crtc_t * const dc)
 {
     drmu_env_t * const du = dc->du;
-    static const int ref0 = 0;
+    int ref0 = 0;
     if (!atomic_compare_exchange_strong(&dc->ref_count, &ref0, 2))
         return -EBUSY;
 
@@ -2367,10 +2370,17 @@ drmu_atomic_conn_add_hdr_metadata(drmu_atomic_t * const da, drmu_conn_t * const 
     return rv;
 }
 
+bool
+drmu_conn_has_hi_bpc(const drmu_conn_t * const dn)
+{
+    return drmu_prop_range_max(dn->pid.max_bpc) > 8;
+}
+
 int
 drmu_atomic_conn_add_hi_bpc(drmu_atomic_t * const da, drmu_conn_t * const dn, bool hi_bpc)
 {
-    return drmu_atomic_add_prop_range(da, dn->conn.connector_id, dn->pid.max_bpc, !hi_bpc ? 8 :
+    return !hi_bpc && dn->pid.max_bpc == NULL ? 0 :
+        drmu_atomic_add_prop_range(da, dn->conn.connector_id, dn->pid.max_bpc, !hi_bpc ? 8 :
                                       drmu_prop_range_max(dn->pid.max_bpc));
 }
 
@@ -2635,7 +2645,7 @@ int
 drmu_conn_claim_ref(drmu_conn_t * const dn)
 {
     drmu_env_t * const du = dn->du;
-    static const int ref0 = 0;
+    int ref0 = 0;
     if (!atomic_compare_exchange_strong(&dn->ref_count, &ref0, 2))
         return -EBUSY;
 
@@ -2884,7 +2894,7 @@ drmu_plane_ref_crtc(drmu_plane_t * const dp, drmu_crtc_t * const dc)
 {
     drmu_env_t * const du = dp->du;
 
-    static const int ref0 = 0;
+    int ref0 = 0;
     if (!atomic_compare_exchange_strong(&dp->ref_count, &ref0, 2))
         return -EBUSY;
     dp->dc = dc;
@@ -2896,7 +2906,7 @@ drmu_plane_ref_crtc(drmu_plane_t * const dp, drmu_crtc_t * const dc)
 }
 
 drmu_plane_t *
-drmu_plane_new_find(drmu_crtc_t * const dc, const drmu_plane_new_find_ok_fn cb, void * const v)
+drmu_plane_new_find_ref(drmu_crtc_t * const dc, const drmu_plane_new_find_ok_fn cb, void * const v)
 {
     uint32_t i;
     drmu_env_t * const du = drmu_crtc_env(dc);
@@ -2911,7 +2921,7 @@ drmu_plane_new_find(drmu_crtc_t * const dc, const drmu_plane_new_find_ok_fn cb, 
             (dp_t->plane.possible_crtcs & crtc_mask) == 0)
             continue;
 
-        if (cb(dp_t, v)) {
+        if (cb(dp_t, v) && drmu_plane_ref_crtc(dp_t, dc) == 0) {
             dp = dp_t;
             break;
         }
@@ -2926,10 +2936,10 @@ static bool plane_find_type_cb(const drmu_plane_t * dp, void * v)
 }
 
 drmu_plane_t *
-drmu_plane_new_find_type(drmu_crtc_t * const dc, const unsigned int req_type)
+drmu_plane_new_find_ref_type(drmu_crtc_t * const dc, const unsigned int req_type)
 {
     drmu_env_t * const du = drmu_crtc_env(dc);
-    drmu_plane_t * const dp = drmu_plane_new_find(dc, plane_find_type_cb, (void*)&req_type);
+    drmu_plane_t * const dp = drmu_plane_new_find_ref(dc, plane_find_type_cb, (void*)&req_type);
     if (dp == NULL) {
         drmu_err(du, "%s: No plane found for types %#x", __func__, req_type);
         return NULL;
@@ -3068,6 +3078,8 @@ typedef struct drmu_env_s {
     struct drmu_poll_env_s * poll_env;
     drmu_poll_destroy_fn poll_destroy;
 
+    drmu_env_post_delete_fn post_delete_fn;
+    void * post_delete_v;
 } drmu_env_t;
 
 // Retrieve the the n-th conn
@@ -3278,8 +3290,13 @@ env_free(drmu_env_t * const du)
     drmu_bo_env_uninit(&du->boe);
     pthread_mutex_destroy(&du->lock);
 
-    close(du->fd);
-    free(du);
+    {
+        void * const post_delete_v = du->post_delete_v;
+        const drmu_env_post_delete_fn post_delete_fn = du->post_delete_fn;
+        const int fd = du->fd;
+        free(du);
+        post_delete_fn(post_delete_v, fd);
+    }
 }
 
 void
@@ -3461,7 +3478,8 @@ drmu_env_int_poll_get(drmu_env_t * const du)
 
 // Closes fd on failure
 drmu_env_t *
-drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log)
+drmu_env_new_fd2(const int fd, const struct drmu_log_env_s * const log,
+                 drmu_env_post_delete_fn post_delete_fn, void * post_delete_v)
 {
     drmu_env_t * const du = calloc(1, sizeof(*du));
     int rv;
@@ -3471,12 +3489,14 @@ drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log)
 
     if (!du) {
         drmu_err_log(log, "Failed to create du: No memory");
-        close(fd);
+        post_delete_fn(post_delete_v, fd);
         return NULL;
     }
 
     du->log = (log == NULL) ? drmu_log_env_none : *log;
     du->fd = fd;
+    du->post_delete_fn = post_delete_fn;
+    du->post_delete_v = post_delete_v;
 
     pthread_mutex_init(&du->lock, NULL);
     drmu_bo_env_init(&du->boe);
@@ -3567,6 +3587,21 @@ fail1:
     return NULL;
 }
 
+static void
+env_post_delete_close_cb(void * v, int fd)
+{
+    (void)v;
+    close(fd);
+}
+
+drmu_env_t *
+drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log)
+{
+    return drmu_env_new_fd2(fd, log, env_post_delete_close_cb, NULL);
+}
+
+// * As the only remaining libdrm code dependency this should maybe be evicted
+// * to its own file
 drmu_env_t *
 drmu_env_new_open(const char * name, const struct drmu_log_env_s * const log2)
 {

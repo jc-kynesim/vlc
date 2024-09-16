@@ -317,6 +317,8 @@ int drmu_crtc_claim_ref(drmu_crtc_t * const dc);
 // Set none if m=NULL
 int drmu_atomic_conn_add_hdr_metadata(struct drmu_atomic_s * const da, drmu_conn_t * const dn, const struct hdr_output_metadata * const m);
 
+// Does this connector have > 8 bit support?
+bool drmu_conn_has_hi_bpc(const drmu_conn_t * const dn);
 // False set max_bpc to 8, true max value
 int drmu_atomic_conn_add_hi_bpc(struct drmu_atomic_s * const da, drmu_conn_t * const dn, bool hi_bpc);
 
@@ -416,12 +418,13 @@ int drmu_plane_ref_crtc(drmu_plane_t * const dp, drmu_crtc_t * const dc);
 typedef bool (*drmu_plane_new_find_ok_fn)(const drmu_plane_t * dp, void * v);
 
 // Find a "free" plane that satisfies (returns true) the ok callback
-// Does not ref
-drmu_plane_t * drmu_plane_new_find(drmu_crtc_t * const dc, const drmu_plane_new_find_ok_fn cb, void * const v);
+// Binds to the crtc & takes a reference
+drmu_plane_t * drmu_plane_new_find_ref(drmu_crtc_t * const dc, const drmu_plane_new_find_ok_fn cb, void * const v);
 // Find a "free" plane of the given type. Types can be ORed
-// Does not ref
-drmu_plane_t * drmu_plane_new_find_type(drmu_crtc_t * const dc, const unsigned int req_type);
+// Binds to the crtc & takes a reference
+drmu_plane_t * drmu_plane_new_find_ref_type(drmu_crtc_t * const dc, const unsigned int req_type);
 
+// Find plane n. Does not ref.
 drmu_plane_t * drmu_env_plane_find_n(drmu_env_t * const du, const unsigned int n);
 
 
@@ -472,7 +475,14 @@ void drmu_env_int_restore(drmu_env_t * const du);
 // environment is copied so does not have to be valid for greater than the
 // duration of the call.
 // If log = NULL logging is disabled (set to drmu_log_env_none).
+// post_delete_fn is called after the env is deleted - this includes failures
+// in _new_fd2 itself
+typedef void (*drmu_env_post_delete_fn)(void * v, int fd);
+drmu_env_t * drmu_env_new_fd2(const int fd, const struct drmu_log_env_s * const log,
+                              drmu_env_post_delete_fn post_delete_fn, void * v);
+// Same as _new_fd2 but post_delete_fn is set to simply close the fd
 drmu_env_t * drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log);
+// open with device name
 drmu_env_t * drmu_env_new_open(const char * name, const struct drmu_log_env_s * const log);
 
 // Logging
@@ -484,6 +494,7 @@ extern const struct drmu_log_env_s drmu_log_env_none;   // pre-built do-nothing 
 struct drmu_atomic_s;
 typedef struct drmu_atomic_s drmu_atomic_t;
 
+void drmu_atomic_dump_lvl(const drmu_atomic_t * const da, const int lvl);
 void drmu_atomic_dump(const drmu_atomic_t * const da);
 drmu_env_t * drmu_atomic_env(const drmu_atomic_t * const da);
 void drmu_atomic_unref(drmu_atomic_t ** const ppda);
