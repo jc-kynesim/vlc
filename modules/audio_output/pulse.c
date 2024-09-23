@@ -75,6 +75,8 @@ struct aout_sys_t
     char *sink_force; /**< Forced sink name (stream must be NULL) */
 
     struct sink *sinks; /**< Locally-cached list of sinks */
+
+    bool flushed; /**< Flushed called, no Play since  */
 };
 
 static void VolumeReport(audio_output_t *aout)
@@ -496,6 +498,8 @@ static void Play(audio_output_t *aout, block_t *block)
 
     size_t len = block->i_buffer;
 
+    sys->flushed = false;
+
     /* Note: The core already holds the output FIFO lock at this point.
      * Therefore we must not under any circumstances (try to) acquire the
      * output FIFO lock while the PulseAudio threaded main loop lock is held
@@ -557,6 +561,9 @@ static void Flush(audio_output_t *aout, bool wait)
     pa_stream *s = sys->stream;
     pa_operation *op;
 
+    if (sys->flushed)
+        return;
+
     pa_threaded_mainloop_lock(sys->mainloop);
 
     if (unlikely(pa_stream_is_corked(s) > 0))
@@ -588,6 +595,7 @@ static void Flush(audio_output_t *aout, bool wait)
     if (op != NULL)
         pa_operation_unref(op);
     sys->first_pts = VLC_TICK_INVALID;
+    sys->flushed = true;
     stream_stop(s, aout);
 
     pa_threaded_mainloop_unlock(sys->mainloop);
@@ -960,6 +968,9 @@ static int Start(audio_output_t *aout, audio_sample_format_t *restrict fmt)
     sys->flags_force = PA_STREAM_NOFLAGS;
     free(sys->sink_force);
     sys->sink_force = NULL;
+    // Set to false on Start to allow for drain on very short streams as
+    // commented in Pause
+    sys->flushed = false;
 
     if (encoding == PA_ENCODING_PCM)
     {
