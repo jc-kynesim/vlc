@@ -47,6 +47,12 @@
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #endif
 
+#define WL_XDG_SHELL_NAME "wl-xdg-shell"
+#define WL_XDG_SHELL_TEXT N_("WL XDG Shell enable")
+#define WL_XDG_SHELL_LONGTEXT N_("WL XDG Shell enable/disable; enabled by default. "\
+    "Use --no-wl-xdg-shell to disable. This provides a simple wayland window " \
+    " if something like Qt isn't in use, and works with command-line VLCs.")
+
 #define DISPLAY_NAME "wl-display"
 #define DISPLAY_TEXT N_("Wayland display")
 #define DISPLAY_LONGTEXT N_( \
@@ -926,11 +932,14 @@ static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
      && cfg->type != VOUT_WINDOW_TYPE_WAYLAND)
         return VLC_EGENERIC;
 
-    struct wl_display * const display = get_wl_display(wnd);
+    if (!var_InheritBool(wnd, WL_XDG_SHELL_NAME))
+        return VLC_EGENERIC;
+
+    struct wl_display *const display = get_wl_display(wnd);
     if (display == NULL)
         return VLC_EGENERIC;
 
-    vout_window_sys_t *sys = calloc(1, sizeof (*sys));
+    vout_window_sys_t *const sys = calloc(1, sizeof (*sys));
     if (unlikely(sys == NULL))
     {
         wl_display_disconnect(display);
@@ -1129,5 +1138,6 @@ vlc_module_begin()
 
     add_string(DISPLAY_NAME, NULL, DISPLAY_TEXT, DISPLAY_LONGTEXT, true)
     add_bool(LAYER_NAME, false, LAYER_TEXT, LAYER_LONGTEXT, false)
+    add_bool(WL_XDG_SHELL_NAME, true, WL_XDG_SHELL_TEXT, WL_XDG_SHELL_LONGTEXT, false)
 
 vlc_module_end()
