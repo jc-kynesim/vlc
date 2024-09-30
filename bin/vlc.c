@@ -30,6 +30,7 @@
 #endif
 
 #include <vlc/vlc.h>
+#include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -117,6 +118,19 @@ static void exit_timeout (int signum)
  *****************************************************************************/
 int main( int i_argc, const char *ppsz_argv[] )
 {
+    /* We can end up with unfortunate memory fragmentation that ends up using
+     * a lot more memory than required when buffer allocations get partially
+     * used up. Put anything that looks like a video buffer directly into
+     * system memory. Local pooling fixes most of the downsides.
+     *
+     * 128k is documented as the system default but setting it here prevents
+     * dynamic resizing.
+     *
+     * Do not override a user threshold
+     */
+    if (!getenv("MALLOC_MMAP_THRESHOLD_"))
+        mallopt(M_MMAP_THRESHOLD, 128 * 1024);
+
     /* The so-called POSIX-compliant MacOS X reportedly processes SIGPIPE even
      * if it is blocked in all thread.
      * Note: this is NOT an excuse for not protecting against SIGPIPE. If
