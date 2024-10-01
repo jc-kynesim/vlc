@@ -651,8 +651,14 @@ eq_new(struct wl_display * const display, struct pollqueue * const pq)
     atomic_init(&eq->eq_count, 0);
     sem_init(&eq->sem, 0, 0);
 
+#if WAYLAND_VERSION_MAJOR > 1 ||\
+    (WAYLAND_VERSION_MAJOR == 1 && WAYLAND_VERSION_MINOR >= 23)
+    if ((eq->q = wl_display_create_queue_with_name(display, "vlc-wl-dmabuf")) == NULL)
+        goto err1;
+#else
     if ((eq->q = wl_display_create_queue(display)) == NULL)
         goto err1;
+#endif
     if ((eq->wrapped_display = wl_proxy_create_wrapper(display)) == NULL)
         goto err2;
     wl_proxy_set_queue((struct wl_proxy *)eq->wrapped_display, eq->q);
