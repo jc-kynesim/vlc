@@ -70,9 +70,9 @@
 #define MAX_PICTURES 4
 #define MAX_SUBPICS  6
 
-#define WL_DMABUF_DISABLE_NAME "wl-dmabuf-disable"
-#define WL_DMABUF_DISABLE_TEXT N_("Disable wl-dmabuf")
-#define WL_DMABUF_DISABLE_LONGTEXT N_("Disable wl-dmabuf - useful if auto selection is wanted but not wl-dmabuf")
+#define WL_DMABUF_ENABLE_NAME "wl-dmabuf"
+#define WL_DMABUF_ENABLE_TEXT N_("Enable/Disable wl-dmabuf (default:enabled)")
+#define WL_DMABUF_ENABLE_LONGTEXT N_("Enable/Disable wl-dmabuf. Disable with --no-wl-dmabuf. Useful if auto selection is wanted but not wl-dmabuf")
 
 #define WL_DMABUF_USE_SHM_NAME "wl-dmabuf-use-shm"
 #define WL_DMABUF_USE_SHM_TEXT N_("Attempt to map via shm")
@@ -2257,7 +2257,7 @@ static int Open(vlc_object_t *obj)
     fmt_list_t * flist = NULL;
     video_format_t req_fmt;
 
-    if (var_InheritBool(vd, WL_DMABUF_DISABLE_NAME))
+    if (!var_InheritBool(vd, WL_DMABUF_ENABLE_NAME))
         return VLC_EGENERIC;
 
     sys = calloc(1, sizeof(*sys));
@@ -2425,7 +2425,7 @@ vlc_module_begin()
     set_capability("vout display", 310)
     set_callbacks(Open, Close)
     add_shortcut("wl-dmabuf")
-    add_bool(WL_DMABUF_DISABLE_NAME, false, WL_DMABUF_DISABLE_TEXT, WL_DMABUF_DISABLE_LONGTEXT, false)
+    add_bool(WL_DMABUF_ENABLE_NAME, true, WL_DMABUF_ENABLE_TEXT, WL_DMABUF_ENABLE_LONGTEXT, false)
     add_bool(WL_DMABUF_USE_SHM_NAME, false, WL_DMABUF_USE_SHM_TEXT, WL_DMABUF_USE_SHM_LONGTEXT, false)
     add_bool(WL_DMABUF_CHEQUERBOARD_NAME, false, WL_DMABUF_CHEQUERBOARD_TEXT, WL_DMABUF_CHEQUERBOARD_LONGTEXT, false)
     add_bool(WL_DMABUF_STATS_NAME, false, WL_DMABUF_STATS_TEXT, WL_DMABUF_STATS_LONGTEXT, false)
