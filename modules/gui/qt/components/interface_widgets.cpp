@@ -280,6 +280,17 @@ void VideoWidget::reportSize()
 
     refreshHandle();
 
+    if (p_window && p_window->type == VOUT_WINDOW_TYPE_WAYLAND && p_window->handle.wl != NULL)
+    {
+#if HAS_QT56
+        qreal dpr = devicePixelRatioF();
+#else
+        qreal dpr = devicePixelRatio();
+#endif
+        p_window->scale_num = (int)(0x10000 * dpr + 0.5);
+        p_window->scale_den = 0x10000;
+    }
+
     QSize size = physicalSize();
     WindowResized(p_window, size);
 }
