@@ -313,6 +313,14 @@ viewport_destroy(struct wp_viewport ** const ppviewport)
     *ppviewport = NULL;
 }
 
+static inline int
+scale_dst(const vout_display_sys_t * const sys, int x)
+{
+    if (sys->embed->scale_den == sys->embed->scale_num)
+        return x;
+    return (x * sys->embed->scale_den) / sys->embed->scale_num;
+}
+
 static inline int_fast32_t
 place_rescale_1s(int_fast32_t x, uint_fast32_t mul, uint_fast32_t div)
 {
@@ -1296,7 +1304,8 @@ commit_do(vout_display_t * const vd, vout_display_sys_t * const sys)
         {
             if (sys->bkg_viewport)
             {
-                wp_viewport_set_destination(sys->bkg_viewport, sys->bkg_w, sys->bkg_h);
+                wp_viewport_set_destination(sys->bkg_viewport,
+                                            scale_dst(sys, sys->bkg_w), scale_dst(sys, sys->bkg_h));
                 wl_surface_commit(bkg_surface);
             }
             bkg_surface_unlock(vd, sys);
@@ -1521,12 +1530,17 @@ make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const 
     vdre_add_check(vdre, &sys->vdre_check_bkg);
 #endif
     vdre_eq_ref(vdre, sys->eq);
+    // Wayland will not commit a SPB to a scaled surface (not a multiple!)
+    // Qt sets buffer scale to output scale and we are told everything in 
+    // scaled units
+    wl_surface_set_buffer_scale(bkg_surface, 1);
     wl_buffer_add_listener(w_buffer, &vdre_buffer_listener, vdre);
     wl_surface_attach(bkg_surface, w_buffer, 0, 0);
     vdre = NULL;
     w_buffer = NULL;
 
-    wp_viewport_set_destination(sys->bkg_viewport, sys->bkg_w, sys->bkg_h);
+    wp_viewport_set_destination(sys->bkg_viewport,
+                                scale_dst(sys, sys->bkg_w), scale_dst(sys, sys->bkg_h));
     wl_surface_set_opaque_region(bkg_surface, sys->region_all);
 
     wl_surface_damage(bkg_surface, 0, 0, INT32_MAX, INT32_MAX);
@@ -1749,12 +1763,13 @@ plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const s
     }
     if (!place_xy_eq(dst_rect, plane->dst_rect))
     {
-        wl_subsurface_set_position(plane->subsurface, dst_rect.x, dst_rect.y);
+        wl_subsurface_set_position(plane->subsurface, scale_dst(sys, dst_rect.x), scale_dst(sys, dst_rect.y));
         plane->commit_req = true;
     }
     if (!place_wh_eq(dst_rect, plane->dst_rect))
     {
-        wp_viewport_set_destination(plane->viewport, dst_rect.width, dst_rect.height);
+        wp_viewport_set_destination(plane->viewport,
+                                    scale_dst(sys, dst_rect.width), scale_dst(sys, dst_rect.height));
         commit_req(sys, plane->commit_parent); // Subsurface pos needs parent commit (video)
     }
 
@@ -2286,14 +2301,15 @@ static int Open(vlc_object_t *obj)
     sys->last_embed_surface = sys->embed->handle.wl;
     sys->last_embed_seq = sys->embed->handle_seq;
 
-    msg_Info(vd, "<<< %s: %s %dx%d(%dx%d @ %d,%d %d/%d), cfg.display: %dx%d, source: %dx%d(%dx%d @ %d,%d %d/%d)", __func__,
+    msg_Info(vd, "<<< %s: %s %dx%d(%dx%d @ %d,%d %d/%d), cfg.display: %dx%d, source: %dx%d(%dx%d @ %d,%d %d/%d), scale=%d/%d", __func__,
              drmu_log_fourcc(vd->fmt.i_chroma), vd->fmt.i_width, vd->fmt.i_height,
              vd->fmt.i_visible_width, vd->fmt.i_visible_height, vd->fmt.i_x_offset, vd->fmt.i_y_offset,
              vd->fmt.i_sar_num, vd->fmt.i_sar_den,
              vd->cfg->display.width, vd->cfg->display.height,
              vd->source.i_width, vd->source.i_height,
              vd->source.i_visible_width, vd->source.i_visible_height, vd->source.i_x_offset, vd->source.i_y_offset,
-             vd->source.i_sar_num, vd->source.i_sar_den);
+             vd->source.i_sar_num, vd->source.i_sar_den,
+             sys->embed->scale_num, sys->embed->scale_den);
 
     if ((sys->pollq = pollqueue_new()) == NULL ||
         (sys->speq = pollqueue_new()) == NULL)
