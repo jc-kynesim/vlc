@@ -205,6 +205,9 @@ struct vout_window_t {
      */
      vlc_mutex_t handle_lock;
      unsigned int handle_seq;
+     /* Scale factor from reported size to physical, 0/0 if unknown */
+     int scale_num;
+     int scale_den;
 };
 
 /**
