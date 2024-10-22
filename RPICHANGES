@@ -1,0 +1,10 @@
+3.0.21/rpi_4
+------------
+Improve wl_xdg_shell so it is actually usable
+Change --wl-dmabuf-disable to --no-wl-dmabuf
+Set a malloc mmap threshold of 128k. This helps avoid bad memory fragmentation
+Add ability for video output to tell when output is scaled to enable correct
+use of native surfaces.
+Fix crash when playing video on a scaled Wayland output
+Fix output scaling on a scaled Wayland output
+
