@@ -235,6 +235,14 @@ video_output/wayland/viewporter-protocol.c: \
 		$(WAYLAND_PROTOCOLS)/stable/viewporter/viewporter.xml
 	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
 
+video_output/wayland/presentation-time-client-protocol.h: \
+		$(WAYLAND_PROTOCOLS)/stable/presentation-time/presentation-time.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
+
+video_output/wayland/presentation-time-protocol.c: \
+		$(WAYLAND_PROTOCOLS)/stable/presentation-time/presentation-time.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
+
 video_output/wayland/linux-dmabuf-unstable-v1-client-protocol.h: \
 		$(WAYLAND_PROTOCOLS)/unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml
 	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
@@ -264,6 +272,8 @@ libwl_dmabuf_plugin_la_SOURCES = video_output/wayland/wl_dmabuf.c\
 nodist_libwl_dmabuf_plugin_la_SOURCES = \
 	video_output/wayland/viewporter-client-protocol.h \
 	video_output/wayland/viewporter-protocol.c \
+	video_output/wayland/presentation-time-client-protocol.h \
+	video_output/wayland/presentation-time-protocol.c \
 	video_output/wayland/linux-dmabuf-unstable-v1-client-protocol.h \
 	video_output/wayland/linux-dmabuf-unstable-v1-protocol.c
 
