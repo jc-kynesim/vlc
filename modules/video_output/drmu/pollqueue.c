@@ -172,6 +172,11 @@ static void pollqueue_prod(const struct pollqueue *const pq)
     }
 }
 
+static bool am_in_thread(const struct pollqueue * const pq)
+{
+    return pthread_equal(pthread_self(), pq->worker);
+}
+
 void polltask_delete(struct polltask **const ppt)
 {
     struct polltask *const pt = *ppt;
@@ -184,7 +189,7 @@ void polltask_delete(struct polltask **const ppt)
         return;
 
     pq = pt->q;
-    inthread = pthread_equal(pthread_self(), pq->worker);
+    inthread = am_in_thread(pq);
 
     pthread_mutex_lock(&pq->lock);
     state = pt->state;
@@ -452,9 +457,7 @@ fail1:
 
 static void pollqueue_free(struct pollqueue *const pq)
 {
-    const pthread_t worker = pq->worker;
-
-    if (pthread_equal(worker, pthread_self())) {
+    if (am_in_thread(pq)) {
         pq->kill = true;
         if (!pq->no_prod)
             pollqueue_prod(pq);
@@ -516,15 +519,14 @@ void pollqueue_set_pre_post(struct pollqueue *const pq,
                             void (*fn_post)(void *v, short revents),
                             void *v)
 {
-    bool no_prod;
+    const bool in_thread = am_in_thread(pq);
 
     pthread_mutex_lock(&pq->lock);
     pq->prepost.pre = fn_pre;
     pq->prepost.post = fn_post;
     pq->prepost.v = v;
-    no_prod = pq->no_prod;
 
-    if (!no_prod) {
+    if (!pq->no_prod && !in_thread) {
         const uint32_t seq = pq->seq;
         int rv = 0;
 
