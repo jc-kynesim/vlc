@@ -267,6 +267,7 @@ libwl_dmabuf_plugin_la_SOURCES = video_output/wayland/wl_dmabuf.c\
 	video_output/wayland/picpool.c video_output/wayland/picpool.h\
 	video_output/wayland/dmabuf_alloc.c video_output/wayland/dmabuf_alloc.h\
 	video_output/wayland/rgba_premul.c video_output/wayland/rgba_premul.h\
+	video_output/wayland/weak_link.c video_output/wayland/weak_link.h\
 	video_output/drmu/pollqueue.c video_output/drmu/pollqueue.h\
 	video_output/drmu/drmu_vlc_fmts.c video_output/drmu/drmu_vlc_fmts.h
 nodist_libwl_dmabuf_plugin_la_SOURCES = \
