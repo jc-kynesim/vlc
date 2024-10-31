@@ -45,6 +45,7 @@
 #endif
 #include "viewporter-client-protocol.h"
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
+#include "presentation-time-client-protocol.h"
 
 #include <vlc_common.h>
 #include <vlc_plugin.h>
@@ -58,6 +59,7 @@
 #include "dmabuf_alloc.h"
 #include "picpool.h"
 #include "rgba_premul.h"
+#include "weak_link.h"
 #include "../drmu/drmu_log.h"
 #include "../drmu/drmu_vlc_fmts.h"
 #include "../drmu/pollqueue.h"
@@ -164,6 +166,7 @@ typedef struct w_bound_ss
     struct wl_compositor *compositor;
     struct wl_subcompositor *subcompositor;
     struct wl_shm *shm;
+    struct wp_presentation *presentation;
 #if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
     struct wp_single_pixel_buffer_manager_v1 *single_pixel_buffer_manager_v1;
 #endif
@@ -223,14 +226,19 @@ struct vout_display_sys_t
     fmt_list_t dmabuf_fmts;
     fmt_list_t shm_fmts;
 
+    unsigned int presentation_clock_id;
     struct display_stats_s {
         unsigned int frame_n;
         unsigned int frame_frame;
         unsigned int frame_display;
         unsigned int frame_discard;
+        unsigned int w_display;
+        unsigned int w_discard;
         vlc_tick_t time_frame0;
         vlc_tick_t time_frameN;
     } stats;
+
+    struct weak_link_master * weak_vd_master;
 };
 
 
@@ -243,8 +251,9 @@ msg_stats(vout_display_t * const vd, const struct display_stats_s * const s)
     unsigned int tframes = (s->frame_n + s->frame_discard);
     unsigned int frx1000 = tframes < 2 ? 0 :
             (unsigned int)((uint64_t)(tframes - 1) * 1000000000ULL / (s->time_frameN - s->time_frame0));
-    msg_Info(vd, "Frames: Total: %d, Discarded %d, Display %d FpS(total):%d.%03d",
+    msg_Info(vd, "Frames: Total: %d, Discarded %d, Display %d: Presented %d, Dropped %d, FpS(total):%d.%03d",
              tframes, s->frame_discard, s->frame_display,
+             s->w_display, s->w_discard,
              frx1000 / 1000, frx1000 % 1000);
 }
 
@@ -554,12 +563,13 @@ eq_wrapper(eq_env_t * const eq)
     return eq->wrapped_display;
 }
 
-static void
+static eq_env_t *
 eq_ref(eq_env_t * const eq)
 {
     const int n = atomic_fetch_add(&eq->eq_count, 1);
     (void)n;
 //    fprintf(stderr, "Ref: count=%d\n", n + 1);
+    return eq;
 }
 
 static void
@@ -571,7 +581,6 @@ eq_unref(eq_env_t ** const ppeq)
         int n;
         *ppeq = NULL;
         n = atomic_fetch_sub(&eq->eq_count, 1);
-//        fprintf(stderr, "Unref: Buffer count=%d\n", n);
         if (n == 0)
         {
             pollqueue_set_pre_post(eq->pq, 0, 0, NULL);
@@ -582,21 +591,8 @@ eq_unref(eq_env_t ** const ppeq)
 
             sem_destroy(&eq->sem);
             free(eq);
-//            fprintf(stderr, "Eq closed\n");
         }
     }
-}
-
-static int
-eq_finish(eq_env_t ** const ppeq)
-{
-    eq_env_t * const eq = *ppeq;
-
-    if (eq == NULL)
-        return 0;
-
-    eq_unref(ppeq);
-    return 0;
 }
 
 static void
@@ -831,8 +827,7 @@ vdre_eq_ref(video_dmabuf_release_env_t * const vdre, eq_env_t * const eq)
 {
     if (vdre == NULL)
         return;
-    vdre->eq = eq;
-    eq_ref(vdre->eq);
+    vdre->eq = eq_ref(eq);
 }
 
 #if CHECK_VDRE_COUNTS
@@ -1881,6 +1876,101 @@ do_resize(vout_display_t * const vd, vout_display_sys_t * const sys)
     sys->bkg_h = vd->cfg->display.height;
 }
 
+typedef struct pres_cb_env_ss {
+    struct weak_link_client *weak_vd;
+    eq_env_t * eq;
+} pres_cb_env_t;
+
+static pres_cb_env_t *
+pce_new(vout_display_t * const vd)
+{
+    vout_display_sys_t * const sys = vd->sys;
+    pres_cb_env_t * pce = malloc(sizeof(*pce));
+    pce->weak_vd = weak_link_ref(sys->weak_vd_master);
+    pce->eq = eq_ref(sys->eq);
+    return pce;
+}
+
+static void
+pce_free(pres_cb_env_t * const pce)
+{
+    weak_link_unref(&pce->weak_vd);
+    eq_unref(&pce->eq);
+    free(pce);
+}
+
+static void
+presentation_sync_output_cb(void *data,
+            struct wp_presentation_feedback *wp_presentation_feedback,
+            struct wl_output *output)
+{
+    (void)data;
+    (void)wp_presentation_feedback;
+    (void)output;
+}
+
+// Presented/Discarded can occur after close has finished so need to
+static void
+presentation_presented_cb(void *data,
+          struct wp_presentation_feedback *wp_presentation_feedback,
+          uint32_t tv_sec_hi,
+          uint32_t tv_sec_lo,
+          uint32_t tv_nsec,
+          uint32_t refresh,
+          uint32_t seq_hi,
+          uint32_t seq_lo,
+          uint32_t flags)
+{
+    pres_cb_env_t * const pce = data;
+    vout_display_t * const vd = weak_link_lock(&pce->weak_vd);
+    (void)tv_sec_hi;
+    (void)tv_sec_lo;
+    (void)tv_nsec;
+    (void)refresh;
+    (void)seq_hi;
+    (void)seq_lo;
+    (void)flags;
+
+    wp_presentation_feedback_destroy(wp_presentation_feedback);
+
+    if (vd)
+    {
+        vout_display_sys_t * const sys = vd->sys;
+        ++sys->stats.w_display;
+//        msg_Dbg(vd, "%s: %d", __func__, sys->stats.w_display);
+    }
+
+    weak_link_unlock(pce->weak_vd);
+    pce_free(pce);
+}
+
+static void
+presentation_discarded_cb(void *data,
+          struct wp_presentation_feedback *wp_presentation_feedback)
+{
+    // feedback object implicitly destroyed
+    pres_cb_env_t * const pce = data;
+    vout_display_t * const vd = weak_link_lock(&pce->weak_vd);
+
+    wp_presentation_feedback_destroy(wp_presentation_feedback);
+
+    if (vd)
+    {
+        vout_display_sys_t * const sys = vd->sys;
+        ++sys->stats.w_discard;
+//        msg_Dbg(vd, "%s: %d", __func__, sys->stats.w_discard);
+    }
+
+    weak_link_unlock(pce->weak_vd);
+    pce_free(pce);
+}
+
+static const struct wp_presentation_feedback_listener presentation_feedback_listener = {
+    .sync_output = presentation_sync_output_cb,
+    .presented = presentation_presented_cb,
+    .discarded = presentation_discarded_cb,
+};
+
 static void
 do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
 {
@@ -1915,6 +2005,14 @@ do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
             spe = plane->spe_cur = plane->spe_next;
             plane->spe_next = NULL;
             subpic_ent_attach(plane, spe, sys->eq);
+
+            if (i == PLANE_VID && sys->bound.presentation)
+            {
+                struct wp_presentation_feedback * feedback = wp_presentation_feedback(sys->bound.presentation, plane->surface);
+                wp_presentation_feedback_add_listener(feedback, &presentation_feedback_listener, pce_new(vd));
+                // * We unconditionally do a commit after this - if this is ever
+                // not the case we will need cleanup code for eq & feedback
+            }
         }
     }
 
@@ -2074,6 +2172,21 @@ static const struct wl_shm_listener shm_listener = {
     .format = shm_listener_format,
 };
 
+static void
+presentation_clock_id(void *data,
+                      struct wp_presentation * presentation,
+                      uint32_t clock_id)
+{
+    vout_display_t * const vd = data;
+    vout_display_sys_t * const sys = vd->sys;
+    (void)presentation;
+    sys->presentation_clock_id = clock_id;
+}
+
+static const struct wp_presentation_listener presentation_listener = {
+    .clock_id = presentation_clock_id,
+};
+
 
 static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
                         struct wl_registry * const registry,
@@ -2112,6 +2225,12 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
         else
             msg_Warn(vd, "Interface %s wanted v 3 got v %d", zwp_linux_dmabuf_v1_interface.name, vers);
     }
+    else
+    if (strcmp(iface, wp_presentation_interface.name) == 0)
+    {
+        b->presentation = wl_registry_bind(registry, name, &wp_presentation_interface, 1);
+        wp_presentation_add_listener(b->presentation, &presentation_listener, vd);
+    }
 #if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
     else
     if (strcmp(iface, wp_single_pixel_buffer_manager_v1_interface.name) == 0)
@@ -2131,6 +2250,8 @@ static void w_bound_destroy(w_bound_t * const b)
         wl_compositor_destroy(b->compositor);
     if (b->shm != NULL)
         wl_shm_destroy(b->shm);
+    if (b->presentation != NULL)
+        wp_presentation_destroy(b->presentation);
 #if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
     if (b->single_pixel_buffer_manager_v1)
         wp_single_pixel_buffer_manager_v1_destroy(b->single_pixel_buffer_manager_v1);
@@ -2214,6 +2335,8 @@ static void Close(vlc_object_t *obj)
     if (sys == NULL)
         return;
 
+    weak_link_break(&sys->weak_vd_master);
+
     if (sys->embed == NULL)
         goto no_window;
 
@@ -2235,8 +2358,7 @@ static void Close(vlc_object_t *obj)
 
     eventq_sync(sys->eq);
 
-    if (eq_finish(&sys->eq) != 0)
-        msg_Err(vd, "Failed to reclaim all buffers on close");
+    eq_unref(&sys->eq);
 
     // There is a risk of deadlock here if we wait for the pq to die as some
     // wl buffers may only be relased after close returns so just unref and the
@@ -2286,6 +2408,10 @@ static int Open(vlc_object_t *obj)
     }
     if (fmt_list_init(&sys->shm_fmts, 32)) {
         msg_Err(vd, "Failed to allocate shm format list!");
+        goto error;
+    }
+    if ((sys->weak_vd_master = weak_link_new(vd)) == NULL) {
+        msg_Err(vd, "Failed to create weak link to vd");
         goto error;
     }
 
