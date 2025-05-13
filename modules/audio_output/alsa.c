@@ -452,18 +452,16 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                     case VLC_CODEC_MLP:
                     case VLC_CODEC_TRUEHD:
                         sys->pause_bytes = 4 * 4;
-                        req_rate   = fmt->i_rate * 4;
+                        req_rate   = fmt->i_rate % 44100 == 0 ? 176400 : 192000;
                         channels   = 8;
                         break;
 
                     case VLC_CODEC_DTS:
-                    {
                         if (passthrough == PASSTHROUGH_SPDIF)
                             break;
                         req_rate   = 192000;
                         channels   = 8;
                         break;
-                    }
 
                     case VLC_CODEC_EAC3:
                         sys->pause_bytes = 4 * 4;
@@ -517,6 +515,8 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     {
         unsigned aes3;
 
+        // Use fmt->i_rate rather than req_rate as the number we want
+        // for aes3 is the decoded sample rate not the transmission rate
         switch (fmt->i_rate)
         {
 #define FS(freq) \
