@@ -371,10 +371,8 @@ static int lavc_UpdateVideoFormat(decoder_t *dec, AVCodecContext *ctx,
     int val;
 
     val = lavc_GetVideoFormat(dec, &fmt_out, ctx, fmt, swfmt);
-    if (val) {
-        msg_Warn(dec, "%s: lavc_GetVideoFormat(fmt=%d, swfmt=%d) fail", __func__, fmt, swfmt);
+    if (val)
         return val;
-    }
 
     decoder_sys_t *p_sys = dec->p_sys;
 
@@ -521,8 +519,6 @@ static int OpenVideoCodec( decoder_t *p_dec )
     ret = ffmpeg_OpenCodec( p_dec, ctx, codec );
     if( ret < 0 )
         return ret;
-
-    msg_Dbg(p_dec, "%s: Pix format=%d/%d", __func__, ctx->pix_fmt, ctx->sw_pix_fmt);
 
     switch( ctx->active_thread_type )
     {
@@ -1629,28 +1625,18 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
         {   /* When direct rendering is not used, get_format() and get_buffer()
              * might not be called. The output video format must be set here
              * then picture buffer can be allocated. */
-            if (frame->format == AV_PIX_FMT_DRM_PRIME || p_sys->p_va == NULL)
-            {
-                int rv1 = -1, rv2 = -1;
-                rv1 = lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
-                                       p_context->pix_fmt);
-                if (rv1 == 0)
-                    rv2 = decoder_UpdateVideoOutput(p_dec, NULL);
-
-                msg_Info(p_dec, "rv1=%d, rv2=%d", rv1, rv2);
-
-                if (rv1 == 0 && rv2 == 0)
-                    p_pic = decoder_NewPicture(p_dec);
-            }
-            else {
-                msg_Info(p_dec, "va=%p", p_sys->p_va);
-            }
-
-//            msg_Info(p_dec, "Pix fmt=%d, dec_fmt=%#x", p_context->pix_fmt, p_dec->fmt_out.video.i_chroma);
+            if (p_sys->p_va == NULL
+             && lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
+                                       p_context->pix_fmt) == 0
+             && decoder_UpdateVideoOutput(p_dec, NULL) == 0)
+                p_pic = decoder_NewPicture(p_dec);
+            else if (frame->format == AV_PIX_FMT_DRM_PRIME &&
+                     lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
+                                            p_context->pix_fmt) == 0)
+                p_pic = decoder_NewPicture(p_dec);
 
             if( !p_pic )
             {
-                msg_Info(p_dec, "No pic");
                 vlc_mutex_unlock(&p_sys->lock);
                 av_frame_free(&frame);
                 break;
@@ -1659,13 +1645,13 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
             /* Fill picture_t from AVFrame */
             if( lavc_CopyPicture( p_dec, p_pic, frame ) != VLC_SUCCESS )
             {
-                msg_Info(p_dec, "Copy fail");
                 vlc_mutex_unlock(&p_sys->lock);
                 av_frame_free(&frame);
                 picture_Release( p_pic );
                 break;
             }
-        } else
+        }
+        else
         {
             /* Some codecs can return the same frame multiple times. By the
              * time that the same frame is returned a second time, it will be
@@ -1710,10 +1696,7 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
         p_pic->b_still = p_frame_info && p_frame_info->b_eos;
 
         if (DecodeSidedata(p_dec, frame, p_pic))
-        {
-            msg_Info(p_dec, "%s: Bad side", __func__);
             i_pts = VLC_TICK_INVALID;
-        }
 
         av_frame_free(&frame);
 
@@ -1726,7 +1709,6 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
         }
         else
         {
-            msg_Dbg(p_dec, "%s: No PTS", __func__);
             vlc_mutex_unlock(&p_sys->lock);
             picture_Release( p_pic );
         }
