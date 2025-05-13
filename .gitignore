@@ -52,6 +52,7 @@ share/macosx/Info.plist
 Frameworks
 
 # Ignore build dirs
+out/*
 build*/
 target*/
 contrib-*

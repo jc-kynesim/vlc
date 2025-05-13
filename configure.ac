@@ -77,6 +77,30 @@ AX_CXX_COMPILE_STDCXX_17([noext], [mandatory])
 AX_CXX_TYPEOF
 AC_LANG_POP([C++])
 
+dnl Check the compiler supports atomics in C
+AC_MSG_CHECKING([C atomics])
+VLC_SAVE_FLAGS
+ATOMIC_LIB=""
+AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <stdatomic.h>],[
+ atomic_uint test;
+ atomic_init(&test, 0);
+ atomic_fetch_add_explicit(&test, 2u, memory_order_relaxed);
+])], [AC_MSG_RESULT([built-in])], [
+  LDFLAGS="$LDFLAGS -latomic"
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <stdatomic.h>],[
+atomic_uint test;
+atomic_init(&test, 0);
+atomic_fetch_add_explicit(&test, 2u, memory_order_relaxed);
+])],[
+    AC_MSG_RESULT([using -latomic])
+    ATOMIC_LIB="-latomic"
+  ],[
+  AC_MSG_ERROR([VLC requires atomics support])
+  ])
+])
+VLC_RESTORE_FLAGS
+AC_SUBST([ATOMIC_LIB])
+
 dnl Extend the --help string at the current spot.
 AC_DEFUN([EXTEND_HELP_STRING], [m4_divert_once([HELP_ENABLE], [$1])])
 
@@ -3746,6 +3770,33 @@ fi
 AC_SUBST([MMAL_CFLAGS])
 AC_SUBST([MMAL_LIBS])
 AM_CONDITIONAL([HAVE_MMAL], [test "${have_mmal}" = "yes"])
+
+dnl
+dnl DRM
+dnl
+AC_ARG_ENABLE(drm,
+  [  --enable-drm            DRM output support (default enabled)],, [
+    enable_drm="yes"
+])
+
+have_drm="no"
+AS_IF([test "${enable_drm}" != "no"], [
+  PKG_CHECK_MODULES(DRM, [libdrm])
+  have_drm="yes"
+])
+AM_CONDITIONAL([HAVE_DRM], [test "${have_drm}" = "yes"])
+
+dnl
+dnl DRM_PRIME plugin
+dnl
+AC_ARG_ENABLE([avcodec_drm_prime],
+  AS_HELP_STRING([--enable-avcodec-drm-prime],
+    [DRM-PRIME hardware plugin (default enable)]))
+if test "${enable_avcodec_drm_prime}" != "no"; then
+  have_avcodec_drm_prime="yes"
+  VLC_ADD_PLUGIN([avcodec_drm_prime])
+fi
+AM_CONDITIONAL([HAVE_AVCODEC_DRM_PRIME], [test "${have_avcodec_drm_prime}" = "yes"])
 
 dnl
 dnl  Audio plugins

@@ -44,6 +44,7 @@
 
 #include "avcodec.h"
 #include "va.h"
+#include "drm_pic.h"
 
 #if defined(_WIN32)
 # include <winapifamily.h>
@@ -429,6 +430,12 @@ static int lavc_CopyPicture(decoder_t *dec, picture_t *pic, AVFrame *frame)
 
     video_format_t test_chroma;
     video_format_Init(&test_chroma, 0);
+
+    if (test_chroma == AV_PIX_FMT_DRM_PRIME)
+    {
+        return drm_prime_attach_buf_to_pic(dec, pic, frame);
+    }
+
     if (GetVlcChroma(&test_chroma, frame->format) != VLC_SUCCESS)
     {
         const char *name = av_get_pix_fmt_name(frame->format);
@@ -511,6 +518,8 @@ static int OpenVideoCodec( decoder_t *p_dec )
     ret = ffmpeg_OpenCodec( p_dec, ctx, codec );
     if( ret < 0 )
         return ret;
+
+    msg_Dbg(p_dec, "%s: Pix format=%d/%d", __func__, ctx->pix_fmt, ctx->sw_pix_fmt);
 
     switch( ctx->active_thread_type )
     {
@@ -977,6 +986,8 @@ static void Flush( decoder_t *p_dec )
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
     AVCodecContext *p_context = p_sys->p_context;
+
+    msg_Info(p_dec, "<<< %s: (extra=%p[%d])", __func__, p_context->extradata, p_context->extradata_size);
 
     p_sys->i_late_frames = 0;
     p_sys->framedrop = FRAMEDROP_NONE;
@@ -1535,6 +1546,8 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
             if( i_used == 0 ) break;
             continue;
         }
+//        msg_Info(p_dec, "%s: Frame Rx: fmt=%d, ctx.fmt=%d PTS=%" PRId64 "/%" PRId64, __func__,
+//                 frame->format, p_context->pix_fmt, frame->pts, frame->pkt_pts);
 
         struct frame_info_s *p_frame_info = FrameInfoGet( p_sys, frame );
         if( p_frame_info && p_frame_info->b_eos )
@@ -1619,8 +1632,11 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
              && decoder_UpdateVideoOutput(p_dec, NULL) == 0)
                 p_pic = decoder_NewPicture(p_dec);
 
+//            msg_Info(p_dec, "Pix fmt=%d, dec_fmt=%#x", p_context->pix_fmt, p_dec->fmt_out.video.i_chroma);
+
             if( !p_pic )
             {
+                msg_Info(p_dec, "No pic");
                 vlc_mutex_unlock(&p_sys->lock);
                 av_frame_free(&frame);
                 break;
@@ -1629,13 +1645,13 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
             /* Fill picture_t from AVFrame */
             if( lavc_CopyPicture( p_dec, p_pic, frame ) != VLC_SUCCESS )
             {
+                msg_Info(p_dec, "Copy fail");
                 vlc_mutex_unlock(&p_sys->lock);
                 av_frame_free(&frame);
                 picture_Release( p_pic );
                 break;
             }
-        }
-        else
+        } else
         {
             /* Some codecs can return the same frame multiple times. By the
              * time that the same frame is returned a second time, it will be
@@ -1680,7 +1696,10 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
         p_pic->b_still = p_frame_info && p_frame_info->b_eos;
 
         if (DecodeSidedata(p_dec, frame, p_pic))
+        {
+            msg_Info(p_dec, "%s: Bad side", __func__);
             i_pts = VLC_TICK_INVALID;
+        }
 
         av_frame_free(&frame);
 
@@ -1693,6 +1712,7 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
         }
         else
         {
+            msg_Dbg(p_dec, "%s: No PTS", __func__);
             vlc_mutex_unlock(&p_sys->lock);
             picture_Release( p_pic );
         }
@@ -2120,7 +2140,22 @@ no_reuse:
     p_sys->level = p_context->level;
 
     if (!can_hwaccel)
+    {
+        msg_Dbg(p_dec, "No hwaccle use sw: %d", swfmt);
         return swfmt;
+    }
+
+    static const enum AVPixelFormat hwfmts[] =
+    {
+#ifdef _WIN32
+        AV_PIX_FMT_D3D11VA_VLD,
+        AV_PIX_FMT_DXVA2_VLD,
+#endif
+        AV_PIX_FMT_DRM_PRIME,
+        AV_PIX_FMT_VAAPI,
+        AV_PIX_FMT_VDPAU,
+        AV_PIX_FMT_NONE,
+    };
 
     const AVPixFmtDescriptor *src_desc = av_pix_fmt_desc_get(swfmt);
 
@@ -2135,6 +2170,8 @@ no_reuse:
             continue;
 
         vlc_decoder_device *dec_device;
+        msg_Dbg(p_dec, "Is hw %d, sw %d legit", hwfmt, swfmt);
+
         int ret = lavc_UpdateHWVideoFormat(p_dec, p_context, hwfmt, swfmt,
                                            &dec_device);
         if (ret != VLC_SUCCESS)

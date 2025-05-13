@@ -755,6 +755,7 @@ static int OpenGLES2(vlc_gl_t *gl, unsigned width, unsigned height,
         "OpenGL_ES", EGL_OPENGL_ES_API, 4, EGL_OPENGL_ES2_BIT,
         { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE },
     };
+    msg_Info(gl, "<<< %s", __func__);
     return Open(gl, &api, width, height, gl_cfg);
 }
 
@@ -765,6 +766,7 @@ static int OpenGL(vlc_gl_t *gl, unsigned width, unsigned height,
         "OpenGL", EGL_OPENGL_API, 4, EGL_OPENGL_BIT,
         { EGL_NONE },
     };
+    msg_Info(gl, "<<< %s", __func__);
     return Open(gl, &api, width, height, gl_cfg);
 }
 

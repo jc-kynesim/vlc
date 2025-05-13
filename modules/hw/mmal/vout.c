@@ -797,7 +797,7 @@ static void adjust_refresh_rate(vout_display_t *vd)
     int num_modes;
     double frame_rate = (double)vd->source->i_frame_rate / vd->source->i_frame_rate_base;
     int best_id = -1;
-    double best_score, score;
+    double best_score = 0.0, score;
     int i;
 
     vc_tv_get_display_state_id(vd->cfg->window->handle.display_id, &display_state);
@@ -998,6 +998,8 @@ static int OpenMmalVout(vout_display_t *vd,
     const bool needs_copy = !hw_mmal_chroma_is_mmal(vd->source->i_chroma);
     const MMAL_FOURCC_T enc_in = needs_copy ? MMAL_ENCODING_I420 :
         vout_vlc_to_mmal_pic_fourcc(vd->source->i_chroma);
+
+    msg_Info(vd, "<<< %s: Fmt=%4.4s, Cpy=%d", __func__, (const char *)&vd->fmt->i_chroma, needs_copy);
 
     sys = calloc(1, sizeof(struct vout_display_sys_t));
     if (!sys)
