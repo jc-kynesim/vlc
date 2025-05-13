@@ -75,6 +75,21 @@ uint32_t
 drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc)
 {
     switch (vf_vlc->i_chroma) {
+#ifdef VLC_CODEC_XRGB
+        case VLC_CODEC_XRGB:
+            return DRM_FORMAT_BGRX8888;
+        case VLC_CODEC_RGBX:
+            return DRM_FORMAT_XBGR8888;
+        case VLC_CODEC_BGRX:
+            return DRM_FORMAT_XRGB8888;
+        case VLC_CODEC_XBGR:
+            return DRM_FORMAT_RGBX8888;
+        case VLC_CODEC_RGB565:
+            return DRM_FORMAT_RGB565;
+        case VLC_CODEC_BGR565:
+            return DRM_FORMAT_BGR565;
+#endif
+#ifdef VLC_CODEC_RGB32
         case VLC_CODEC_RGB32:
         {
             // VLC RGB32 aka RV32 means we have to look at the mask values
@@ -103,6 +118,7 @@ drmu_format_vlc_to_drm(const video_frame_format_t * const vf_vlc)
                 return DRM_FORMAT_BGR565;
             break;
         }
+#endif
         case VLC_CODEC_RGBA:
             return DRM_FORMAT_ABGR8888;
         case VLC_CODEC_BGRA:
@@ -141,6 +157,21 @@ vlc_fourcc_t
 drmu_format_vlc_to_vlc(const uint32_t vf_drm)
 {
     switch (vf_drm) {
+#ifdef VLC_CODEC_XRGB
+        case DRM_FORMAT_XRGB8888:
+            return VLC_CODEC_BGRX;
+        case DRM_FORMAT_XBGR8888:
+            return VLC_CODEC_RGBX;
+        case DRM_FORMAT_RGBX8888:
+            return VLC_CODEC_XBGR;
+        case DRM_FORMAT_BGRX8888:
+            return VLC_CODEC_XRGB;
+        case DRM_FORMAT_BGR565:
+            return VLC_CODEC_BGR565;
+        case DRM_FORMAT_RGB565:
+            return VLC_CODEC_RGB565;
+#endif
+#ifdef VLC_CODEC_RGB32
         case DRM_FORMAT_XRGB8888:
         case DRM_FORMAT_XBGR8888:
         case DRM_FORMAT_RGBX8888:
@@ -149,6 +180,7 @@ drmu_format_vlc_to_vlc(const uint32_t vf_drm)
         case DRM_FORMAT_BGR565:
         case DRM_FORMAT_RGB565:
             return VLC_CODEC_RGB16;
+#endif
         case DRM_FORMAT_ABGR8888:
             return VLC_CODEC_RGBA;
         case DRM_FORMAT_ARGB8888:

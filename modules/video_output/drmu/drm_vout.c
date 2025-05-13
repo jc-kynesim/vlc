@@ -127,7 +127,7 @@ copy_pic_to_fb(vout_display_t *vd, drmu_pool_t * const pool, picture_t * const s
 }
 
 static void vd_drm_prepare(vout_display_t *vd, picture_t *pic,
-                           subpicture_t *subpicture, vlc_tick_t date)
+                           const struct vlc_render_subpicture *subpic, vlc_tick_t date)
 {
     vout_display_sys_t * const sys = vd->sys;
     unsigned int n = 0;
@@ -154,9 +154,12 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *pic,
     // * Mode (currently) doesn't change whilst running so no need to set here
 
     // Attempt to import the subpics
+    // ************************************ OLD
+    subpicture_t * subpicture = NULL;
     for (subpicture_t * spic = subpicture; spic != NULL; spic = spic->p_next)
     {
-        for (subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next) {
+        subpicture_region_t *sreg;
+        vlc_spu_regions_foreach(sreg, &spic->regions) {
             picture_t * const src = sreg->p_picture;
             subpic_ent_t * const dst = sys->subpics + n;
 
@@ -326,10 +329,9 @@ static int vd_drm_control(vout_display_t *vd, int query)
 
     switch (query) {
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
-        case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
-        case VOUT_DISPLAY_CHANGE_ZOOM:
+        case VOUT_DISPLAY_CHANGE_SOURCE_PLACE:
             msg_Warn(vd, "Unsupported control query %d", query);
             ret = VLC_SUCCESS;
             break;
@@ -616,12 +618,12 @@ static int OpenDrmVout(vout_display_t *vd,
         // no conversion - ask for something we know we can deal with
         vd->fmt->i_chroma = VLC_CODEC_I420;
     }
-#endif
 
     {
         const drmu_mode_simple_params_t * const mode = drmu_output_mode_simple_params(sys->dout);
         vout_display_SetSizeAndSar(vd, mode->width, mode->height, drmu_ufrac_vlc_to_rational(mode->sar));
     }
+#endif
 
     return VLC_SUCCESS;
 

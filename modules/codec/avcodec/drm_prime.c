@@ -95,12 +95,15 @@ static void DrmPrimeDelete(vlc_va_t *va, AVCodecContext* ctx)
 // *** Probably wrong but it doesn't matter
 #define VLC_TIME_BASE 1000000
 
-static int DrmPrimeCreate(vlc_va_t *va, AVCodecContext *ctx, enum AVPixelFormat hwfmt, const AVPixFmtDescriptor *desc,
-                  const es_format_t *fmt_in, vlc_decoder_device *dec_device,
-                  video_format_t *fmt_out, vlc_video_context **vtcx_out)
+//static int DrmPrimeCreate(vlc_va_t *va, AVCodecContext *ctx, enum AVPixelFormat hwfmt, const AVPixFmtDescriptor *desc,
+//                  const es_format_t *fmt_in, vlc_decoder_device *dec_device,
+//                  video_format_t *fmt_out, vlc_video_context **vtcx_out)
+static int DrmPrimeCreate(vlc_va_t *va, struct vlc_va_cfg *cfg)
 {
-    VLC_UNUSED(desc);
-    VLC_UNUSED(fmt_in);
+    AVCodecContext * const ctx = cfg->avctx;
+    enum AVPixelFormat hwfmt = cfg->hwfmt;
+    vlc_decoder_device * const dec_device = cfg->dec_device;
+    video_format_t * const fmt_out = cfg->video_fmt_out;
 
     msg_Dbg(va, "<<< %s: hwfmt=%d, dec_device=%p, type=%d, ctx fmt=%d/%d", __func__, hwfmt, dec_device, dec_device ? (int)dec_device->type : -1,
             ctx->pix_fmt, ctx->sw_pix_fmt);
@@ -182,8 +185,8 @@ static int DrmPrimeCreate(vlc_va_t *va, AVCodecContext *ctx, enum AVPixelFormat 
             break;
     }
 
-    *vtcx_out = sys->vctx;
-
+    cfg->vctx_out = sys->vctx;
+    cfg->use_hwframes = true;
     return VLC_SUCCESS;
 
 error:

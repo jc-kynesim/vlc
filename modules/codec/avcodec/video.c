@@ -205,6 +205,7 @@ static bool FrameCanStoreInfo( const AVFrame *frame )
 #if OPAQUE_REF_ONLY
     return !!frame->opaque_ref;
 #else
+    VLC_UNUSED(frame);
     return true;
 #endif
 }
@@ -370,8 +371,10 @@ static int lavc_UpdateVideoFormat(decoder_t *dec, AVCodecContext *ctx,
     int val;
 
     val = lavc_GetVideoFormat(dec, &fmt_out, ctx, fmt, swfmt);
-    if (val)
+    if (val) {
+        msg_Warn(dec, "%s: lavc_GetVideoFormat(fmt=%d, swfmt=%d) fail", __func__, fmt, swfmt);
         return val;
+    }
 
     decoder_sys_t *p_sys = dec->p_sys;
 
@@ -431,7 +434,7 @@ static int lavc_CopyPicture(decoder_t *dec, picture_t *pic, AVFrame *frame)
     video_format_t test_chroma;
     video_format_Init(&test_chroma, 0);
 
-    if (test_chroma == AV_PIX_FMT_DRM_PRIME)
+    if (frame->format == AV_PIX_FMT_DRM_PRIME)
     {
         return drm_prime_attach_buf_to_pic(dec, pic, frame);
     }
@@ -1626,11 +1629,22 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
         {   /* When direct rendering is not used, get_format() and get_buffer()
              * might not be called. The output video format must be set here
              * then picture buffer can be allocated. */
-            if (p_sys->p_va == NULL
-             && lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
-                                       p_context->pix_fmt) == 0
-             && decoder_UpdateVideoOutput(p_dec, NULL) == 0)
-                p_pic = decoder_NewPicture(p_dec);
+            if (frame->format == AV_PIX_FMT_DRM_PRIME || p_sys->p_va == NULL)
+            {
+                int rv1 = -1, rv2 = -1;
+                rv1 = lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
+                                       p_context->pix_fmt);
+                if (rv1 == 0)
+                    rv2 = decoder_UpdateVideoOutput(p_dec, NULL);
+
+                msg_Info(p_dec, "rv1=%d, rv2=%d", rv1, rv2);
+
+                if (rv1 == 0 && rv2 == 0)
+                    p_pic = decoder_NewPicture(p_dec);
+            }
+            else {
+                msg_Info(p_dec, "va=%p", p_sys->p_va);
+            }
 
 //            msg_Info(p_dec, "Pix fmt=%d, dec_fmt=%#x", p_context->pix_fmt, p_dec->fmt_out.video.i_chroma);
 

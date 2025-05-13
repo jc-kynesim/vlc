@@ -91,9 +91,11 @@ int decoder_UpdateVideoOutput( decoder_t *dec, vlc_video_context *vctx_out )
     /* */
     const vlc_chroma_description_t *dsc =
         vlc_fourcc_GetChromaDescription(dec->fmt_out.i_codec);
-    if (unlikely(dsc == NULL))
+    if (unlikely(dsc == NULL)) {
+        msg_Warn(dec, "No chroma desc");
         // the "codec" must be a valid picture chroma
         return -1;
+    }
     dec->fmt_out.video.i_chroma = dec->fmt_out.i_codec;
 
     if( dec->fmt_out.video.i_visible_height == 1088 &&
@@ -153,7 +155,9 @@ int decoder_UpdateVideoOutput( decoder_t *dec, vlc_video_context *vctx_out )
     if (dec->cbs->video.format_update == NULL)
         return 0;
 
-    return dec->cbs->video.format_update( dec, vctx_out );
+    int rv = dec->cbs->video.format_update( dec, vctx_out );
+    msg_Info(dec, "format_update rv=%d", rv);
+    return rv;
 }
 
 picture_t *decoder_NewPicture( decoder_t *dec )
