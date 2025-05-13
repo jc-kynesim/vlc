@@ -65,10 +65,13 @@ libxss-dev \
 libxt-dev \
 libxtst-dev \
 mesa-common-dev \
-qtbase5-dev \
-qtdeclarative5-dev \
-qtquickcontrols2-5-dev \
-"qml-module-*" \
+qt6-base-dev \
+qt6-base-private-dev \
+qt6-declarative-dev \
+qt6-declarative-dev-tools \
+qt6-shader-baker \
+libqt6quickcontrols2-6 \
+"qml6-module-*" \
 #libgnome-keyring-dev \
 
 # qml-module-qtsvg \
