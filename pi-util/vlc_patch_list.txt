@@ -1,0 +1,331 @@
+commit 591e87434c26aecff6d4d0b0ac9f055f667a06ce
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Thu Oct 31 15:03:40 2024 +0000
+
+    pollqueue: Fix set_pre_post such that it works from a pre_post callback
+
+commit 7e9cbfd0e5ddccdec2d8566591a2ec393ff30927
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Oct 22 15:59:50 2024 +0100
+
+    RPICHANGES: Add change log
+    
+    As codebase is now arranged to squash fixes into existing patches
+    add a changelog so we know what deltas have occured
+
+commit b94d2ac0ea996f914e1d01e0eb893e8a0b4d0708
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Mon Aug 19 17:34:18 2024 +0100
+
+    wl_xdg_shell: Create an updated version of xdg-shell
+    
+    xdg-shell has moved on since the previous version was written and
+    current exported interfaces from labwc do not include the unstable xdg
+    shell. This updates the calls and bindings to work again.
+
+commit 1a8a4464609a36aafe60733bac23a213ac43098a
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Thu Aug 8 18:42:59 2024 +0100
+
+    xdg-shell: Rename old xdg-shall include files
+    
+    Rename the xdg-shell header files to xdg-shell-unstable-v5 to match
+    the name of the XML file they are derived from. This frees up xdg-shell
+    for use with the stable version.
+
+commit fd50adc245bdb94ba71920c445d57dacd470df66
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Wed Jun 12 11:03:52 2024 +0100
+
+    wayland/shm: Set priority to 0 to use wl-dmabuf instead
+
+commit 75a8f3200eeb625767e7646ac0bb2be536375a9a
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Wed Jun 12 10:59:10 2024 +0100
+
+    video_output/wayland: Add dmabuf output
+    
+    Previously all output was via shm which can be inefficient.
+    Depends on some files from drmu for DRM format info.
+
+commit e709884402ffeec286c377e3a9dc0127723b6894
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Wed Jun 12 10:54:53 2024 +0100
+
+    video_output/drmu: Add DRM video output
+    
+    Heavily based on my somewhat independent drmu project
+    Can do HDR setup and mode matching
+
+commit 791f457bf47c760f0079296763665a1866767cab
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Wed Jun 12 10:51:42 2024 +0100
+
+    egl: Require dma_buf_import support if using egl out
+    
+    If egl doesn't support dmabufs then X is faster.
+
+commit 8f2b2adc4f6b4c5a9f143d116e077bffeab13630 - Replaced
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Wed Jun 12 10:48:19 2024 +0100
+
+    egl: Add avcodec DRM_PRIME decode path
+    
+    Also includes drm_prime based deinterlace and sand30 conversion
+    functions.
+
+commit 55013be8894a827a310c2c228f6fcac7525ebfa9 - Done
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Wed Jun 12 10:16:27 2024 +0100
+
+    video_output: Prioritise GLES over GL
+
+commit 4bbd7a15f80dc2004d64f536df131b6297931aa0
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Wed Jun 12 10:03:51 2024 +0100
+
+    video_chroma/chain: Fix chroma+resize then transform
+    
+    * Would be worth finding a test case for this
+
+commit 9a767f3601b8e4f0d759cd2c8b432c4ade872db0
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 18:49:22 2024 +0100
+
+    decoder: Add a vout_flush to decoder shutdown
+    
+    Our ffmpeg H265 decode can block waiting for buffers to be returned.
+    Trying to shut it down in that state without returning some buffers
+    causes deadlock. Probably the ffmpeg code needs a rewrite to use hwframe
+    allocation which might get round this.
+    
+    This fixes the reliable lockup of playing a H265 stream, pausing it and
+    attempting to move on to the next stream.
+
+commit ffacf3f81bcbe4785eddb5c8863cde30b02a6971
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 18:43:19 2024 +0100
+
+    qt: Disable HiDPIScaling if ratio is implausible
+
+commit 3a8e5d556dfd594df5ab274463e556de83b4897c
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Fri Jun 10 15:32:40 2022 +0000
+
+    caca: Set driver to ncurses avoiding segfault
+    
+    For some reason it unloads GL module on error without telling anything
+    else and this creates a later segfault. Forcing ncurses stops this.
+
+commit 2fbfbea9d148e45c318ccb5da989b7adcb2fba35 - Ignore
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 18:09:17 2024 +0100
+
+    mmal: Add all the mmal bits
+
+commit 4294bf26007f63286741e58b84759badfdb1a8e9 - Merged into EGL patch
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 18:00:33 2024 +0100
+
+    drm_pic: Add DRM_PRIME picture type code
+
+commit d5a7f9ac1939ffcea4668aeb87455d62d1dc03b5
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Apr 25 16:33:34 2023 +0000
+
+    audio_output: When padding with silence add zeros in multiple small buffers
+
+commit 179640ce3358c8cc6994f5c3c008a8411431f68b
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 17:53:42 2024 +0100
+
+    qt: Disable 1st run dialog
+    
+    Confuses Wayland so unset the default
+
+commit 34004d432016b3fab973974367acab948194e4f6
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 17:45:14 2024 +0100
+
+    qt/controller: Make fullscreen controller a popup under Wayland
+    
+    This fixes positioning both for it and context popups. Slow fade goes
+    away but that is a small price to pay.
+    
+    Qt creates Tool windows as xdg_toplevel windows which remove the ability
+    to position them and then gets confused when trying to create the
+    context popup as it needs to know the position of its transient window
+    to create further popups.
+    Making it a popup means it gets created as an xdg popup which can be
+    positioned.
+    
+    We need Qt 6.5 or later before this is fixed in Qt
+
+commit 5fb9fbdf103eabee34372f74caada3e0be395391
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 17:10:30 2024 +0100
+
+    avcommon: Add ffmpeg trace output for -vvvv
+
+commit 6e88fa500f759b47020bbaf1be0cb8d2df170a44
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Oct 22 15:48:45 2024 +0100
+
+    qt/interface: Set scale factor in vout_window
+
+commit 4fa65568ecc1acfb68801de9aa9979db133a35d1
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Oct 22 15:42:27 2024 +0100
+
+    vlc_vout_window: Add a scaling fraction from VLC to native
+    
+    Add members to vout_window_t to hold the scale factor between
+    reported sizes and coords and window system native coords.
+    This allows a module to create extra planes of the correct
+    size and position in wayland.
+
+commit c6dfc209f90679d6ad52d1ce418ceb3a4eb69cc3
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 17:05:36 2024 +0100
+
+    qt/interface_widgets: Use window locks when handle might change
+    
+    Qt/Wayland changes its surface when the window is hidden and then shown.
+    Hidden includes being resized to a zero dimension which seems to happen
+    shortly after window creation when playing video.
+    
+    Use the new window handle locks to signal this to the player to avoid it
+    trying to use stale handles which will crash VLC.
+
+commit 0bdf4459758d351d03235fbe093c2189f416cc45
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Wed Nov 1 10:42:57 2023 +0000
+
+    video_output/window: Add lock and seq for wayland surface handle sync
+    
+    Qt + Wayland can sometimes change the surface handle. Provide a lock
+    so that this can be guarded against whilst video display is actively
+    using it and a sequence number for reliable detection (the handle is the
+    address of a malloced block so might change without changing the
+    handle).
+    
+    It might well be better to have a proper message / callback mechanism
+    but this works and is fairly simple.
+
+commit 65eb6c56d076ceb139dcd7ec01b824ab2bf8358a - Ignore
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 17:01:48 2024 +0100
+
+    configure.ac: Add mmal_avcodec option
+
+commit 363c7eeda2ed95ddce9f15baa50538490a6b6138 - Ignore
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 17:01:17 2024 +0100
+
+    configure.ac: Fix lib ordering for MMAL libs
+
+commit af0eb2be1ffd6f5eaa10fbe638e09ecdb498e41e - Ignore
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 16:58:24 2024 +0100
+
+    configure.ac: Add Wayland single-pixel capability test
+
+commit ae7189c4ab22b7c33245cc334ddf07dcf00974f2 - Done
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 16:57:33 2024 +0100
+
+    configure.ac: Add DRM enable option & test
+
+commit 9ea13907093da7cc7cd898660d03ac40b9ff6821 - Ignore - already fixed
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jan 9 16:36:54 2024 +0000
+
+    adaptive/http: Fix port insertion into URL if on default port
+    
+    Fix the URL generation code to avoid adding an explicit port if the
+    port is the default for the scheme. This is fairly clearly what the
+    code was originally intended to do.
+    
+    This fixes the playback of some HLS streams where including the
+    port number in the Host: field causes the segment fetch to fail
+    with 404.
+    
+    Signed-off-by: John Cox <jc@kynesim.co.uk>
+
+commit 16d4dbffd385c024e43872b641c85e0642761dd4 - Ignore - This is in interop_drm_prime now
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Fri Nov 11 15:55:11 2022 +0000
+
+    egl: add queryDmaBufModifiersEXT to interface
+
+commit 09d6f0d8afd91b5f3c4bbb76816ff144fb438439 - Ignore - probably has a similiar fix already - retest
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Sun Jun 11 14:13:24 2023 +0000
+
+    avcodec: Fake an initial timestamp if none received
+    
+    This fixes playback of some .avi files that are missing PTSs
+
+commit 1352a91cf602b7b007157912075a4e334a917991 - Done (patched)
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 16:32:50 2024 +0100
+
+    avcodec/va: Add DRM_PRIME+swfmt->VLC format cases
+
+commit e59a64f0cb419ee80453b70a8281e216e4d5e3b4 - Done
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 16:29:03 2024 +0100
+
+    vlc_fourcc: Add DRM_PRIME picture types
+
+commit 18e041adde78d2e18203704fb32d8f6aec594791 - Ignore
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 16:28:46 2024 +0100
+
+    vlc_fourcc: Add MMAL picture types
+
+commit 3c95366d630c1b7f82506df502e825cfe996d02c - Done
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 16:25:24 2024 +0100
+
+    avcodec: Add AllocContextHw to try v4l2m2 decoders automatically
+
+commit 212019e25acc4e55eaf1c7aab65b030c32d015b9 - Done
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 16:13:54 2024 +0100
+
+    tospdif: Fix DTS rate calculation when we have 8*192000
+
+commit fee9e2bd312c61f1e0cb3cf8a2ee47f5aa6bbb3a - *** Postpone
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 16:09:44 2024 +0100
+
+    alsa: Add HDMI passthrough for TrueHD, DTS etc.
+
+commit 27eda661dc19b85f6a9004be1c971176240b1eaa - Done
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Mon Sep 30 17:30:09 2024 +0100
+
+    vlc: Set malloc mmap threshold to avoid fragmentation
+    
+    We can end up with unfortunate memory fragmentation that ends up using
+    a lot more memory than required when buffer allocations get partially
+    used up. Put anything that looks like a video buffer directly into
+    system memory. Local pooling fixes most of the downsides.
+    
+    128k is documented as the system default but setting it here prevents
+    dynamic resizing.
+    
+    Do not override a user threshold
+
+commit c778e148498f80026f82c5cb01228df626ffec77 - Done
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Tue Jun 11 16:01:01 2024 +0100
+
+    vlc: Upgrade exit timeout to exit() rather than signal
+
+commit 020b55f0f31d84a7c3aff4db07283dd037e2776c - Done
+Author: John Cox <jc@kynesim.co.uk>
+Date:   Mon Aug 19 17:42:02 2024 +0100
+
+    pi-util: Add useful scripts
