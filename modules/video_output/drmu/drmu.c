@@ -1,14 +1,18 @@
+// Needed to ensure we get a 64-bit offset to mmap when mapping BOs
+#undef _FILE_OFFSET_BITS
+#define _FILE_OFFSET_BITS 64
+
 #include "drmu.h"
+#include "drmu_fmts.h"
 #include "drmu_log.h"
 
 #include <pthread.h>
 
-#include "pollqueue.h"
-
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
-#include <limits.h>
+#include <poll.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
@@ -22,17 +26,20 @@
 #include <libdrm/drm_fourcc.h>
 #include <xf86drm.h>
 
+#include <linux/dma-buf.h>
+
 #define TRACE_PROP_NEW 0
+
+#ifndef OPT_IO_CALLOC
+#define OPT_IO_CALLOC 0
+#endif
 
 #ifndef DRM_FORMAT_P030
 #define DRM_FORMAT_P030 fourcc_code('P', '0', '3', '0')
 #endif
 
 struct drmu_bo_env_s;
-struct drmu_atomic_q_s;
 static struct drmu_bo_env_s * env_boe(drmu_env_t * const du);
-static struct pollqueue * env_pollqueue(const drmu_env_t * const du);
-static struct drmu_atomic_q_s * env_atomic_q(drmu_env_t * const du);
 static int env_object_state_save(drmu_env_t * const du, const uint32_t obj_id, const uint32_t obj_type);
 
 // Update return value with a new one for cases where we don't stop on error
@@ -40,6 +47,18 @@ static inline int rvup(int rv1, int rv2)
 {
     return rv2 ? rv2 : rv1;
 }
+
+// Use io_alloc when allocating arrays to pass into ioctls.
+//
+// When debugging with valgrind use calloc rather than malloc otherwise arrays
+// set by ioctls that valgrind doesn't know about (e.g. all drm ioctls) will
+// still be full of 'undefined'.
+// For normal use malloc should be fine
+#if OPT_IO_CALLOC
+#define io_alloc(p, n) (uintptr_t)((p) = calloc((n), sizeof(*(p))))
+#else
+#define io_alloc(p, n) (uintptr_t)((p) = malloc((n) * sizeof(*(p))))
+#endif
 
 // Alloc retry helper
 static inline int
@@ -49,114 +68,10 @@ retry_alloc_u32(uint32_t ** const pp, uint32_t * const palloc_count, uint32_t co
         return 0;
     free(*pp);
     *palloc_count = 0;
-    if ((*pp = malloc(sizeof(**pp) * new_count)) == NULL)
+    if (io_alloc(*pp, new_count) == 0)
         return -ENOMEM;
     *palloc_count = new_count;
     return 1;
-}
-
-drmu_ufrac_t
-drmu_ufrac_reduce(drmu_ufrac_t x)
-{
-    static const unsigned int primes[] = {2,3,5,7,11,13,17,19,23,29,31,UINT_MAX};
-    const unsigned int * p;
-
-    // Deal with specials
-    if (x.den == 0) {
-        x.num = 0;
-        return x;
-    }
-    if (x.num == 0) {
-        x.den = 1;
-        return x;
-    }
-
-    // Shortcut the 1:1 common case - also ensures the default loop terminates
-    if (x.num == x.den) {
-        x.num = 1;
-        x.den = 1;
-        return x;
-    }
-
-    // As num != den, (num/UINT_MAX == 0 || den/UINT_MAX == 0) must be true
-    // so loop will terminate
-    for (p = primes;; ++p) {
-        const unsigned int n = *p;
-        for (;;) {
-            const unsigned int xd = x.den / n;
-            const unsigned int xn = x.num / n;
-            if (xn == 0 || xd == 0)
-                return x;
-            if (xn * n != x.num || xd * n != x.den)
-                break;
-            x.num = xn;
-            x.den = xd;
-        }
-    }
-}
-
-//----------------------------------------------------------------------------
-//
-// Format properties
-
-typedef struct drmu_format_info_s {
-    uint32_t fourcc;
-    uint8_t  bpp;  // For dumb BO alloc
-    uint8_t  bit_depth;  // For display
-    uint8_t  plane_count;
-    struct {
-        uint8_t wdiv;
-        uint8_t hdiv;
-    } planes[4];
-    drmu_chroma_siting_t chroma_siting;  // Default for this format (YUV420 = (0.0, 0.5), otherwise (0, 0)
-} drmu_format_info_t;
-
-static const drmu_format_info_t format_info[] = {
-    { .fourcc = DRM_FORMAT_XRGB8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_XBGR8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_RGBX8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_BGRX8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_ARGB8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_ABGR8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_RGBA8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_BGRA8888, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_XRGB2101010, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_XBGR2101010, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_RGBX1010102, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_BGRX1010102, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_ARGB2101010, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_ABGR2101010, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_RGBA1010102, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_BGRA1010102, .bpp = 32, .bit_depth = 10, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_AYUV, .bpp = 32, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
-
-    { .fourcc = DRM_FORMAT_YUYV, .bpp = 16, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_YVYU, .bpp = 16, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_VYUY, .bpp = 16, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
-    { .fourcc = DRM_FORMAT_UYVY, .bpp = 16, .bit_depth = 8, .plane_count = 1, .planes = {{1, 1}}},
-
-    { .fourcc = DRM_FORMAT_NV12,   .bpp = 8, .bit_depth = 8, .plane_count = 2, .planes = {{.wdiv = 1, .hdiv = 1}, {.wdiv = 1, .hdiv = 2}},
-      .chroma_siting = DRMU_CHROMA_SITING_LEFT_I },
-    { .fourcc = DRM_FORMAT_NV21,   .bpp = 8, .bit_depth = 8, .plane_count = 2, .planes = {{.wdiv = 1, .hdiv = 1}, {.wdiv = 1, .hdiv = 2}},
-      .chroma_siting = DRMU_CHROMA_SITING_LEFT_I },
-    { .fourcc = DRM_FORMAT_YUV420, .bpp = 8, .bit_depth = 8, .plane_count = 3, .planes = {{.wdiv = 1, .hdiv = 1}, {.wdiv = 2, .hdiv = 2}, {.wdiv = 2, .hdiv = 2}},
-      .chroma_siting = DRMU_CHROMA_SITING_LEFT_I },
-
-    // 3 pel in 32 bits. So code as 32bpp with wdiv 3.
-    { .fourcc = DRM_FORMAT_P030,   .bpp = 32, .bit_depth = 10, .plane_count = 2, .planes = {{.wdiv = 3, .hdiv = 1}, {.wdiv = 3, .hdiv = 2}},
-      .chroma_siting = DRMU_CHROMA_SITING_LEFT_I },
-
-    { .fourcc = 0 }
-};
-
-static const drmu_format_info_t *
-format_info_find(const uint32_t fourcc)
-{
-    for (const drmu_format_info_t * p = format_info; p->fourcc; ++p) {
-        if (p->fourcc == fourcc)
-            return p;
-    }
-    return NULL;
 }
 
 //----------------------------------------------------------------------------
@@ -314,7 +229,7 @@ drmu_blob_update(drmu_env_t * const du, drmu_blob_t ** const ppblob, const void 
 static int
 blob_data_read(drmu_env_t * const du, uint32_t blob_id, void ** const ppdata, size_t * plen)
 {
-    void * data;
+    uint8_t * data;
     struct drm_mode_get_blob gblob = {.blob_id = blob_id};
     int rv;
 
@@ -330,10 +245,9 @@ blob_data_read(drmu_env_t * const du, uint32_t blob_id, void ** const ppdata, si
     if (gblob.length == 0)
         return 0;
 
-    if ((data = malloc(gblob.length)) == NULL)
+    if ((gblob.data = io_alloc(data, gblob.length)) == 0)
         return -ENOMEM;
 
-    gblob.data = (uintptr_t)data;
     if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_GETPROPBLOB, &gblob)) != 0) {
         free(data);
         return rv;
@@ -517,7 +431,7 @@ drmu_prop_enum_new(drmu_env_t * const du, const uint32_t id)
         free(enums);
 
         pen->n = prop.count_enum_blobs;
-        if ((enums = malloc(pen->n * sizeof(*enums))) == NULL)
+        if (io_alloc(enums, pen->n) == 0)
             goto fail;
     }
     if (retries >= 8) {
@@ -620,6 +534,12 @@ drmu_prop_range_validate(const drmu_prop_range_t * const pra, const uint64_t x)
     return pra->range[0] <= x && pra->range[1] >= x;
 }
 
+bool
+drmu_prop_range_immutable(const drmu_prop_range_t * const pra)
+{
+    return !pra || (pra->flags & DRM_MODE_PROP_IMMUTABLE) != 0;
+}
+
 uint64_t
 drmu_prop_range_max(const drmu_prop_range_t * const pra)
 {
@@ -636,6 +556,12 @@ uint32_t
 drmu_prop_range_id(const drmu_prop_range_t * const pra)
 {
     return pra == NULL ? 0 : pra->id;
+}
+
+const char *
+drmu_prop_range_name(const drmu_prop_range_t * const pra)
+{
+    return pra == NULL ? "{norange}" : pra->name;
 }
 
 drmu_prop_range_t *
@@ -694,11 +620,17 @@ drmu_atomic_add_prop_range(drmu_atomic_t * const da, const uint32_t obj_id, cons
 
     rv = !pra ? -ENOENT :
         !drmu_prop_range_validate(pra, x) ? -EINVAL :
+        drmu_prop_range_immutable(pra) ? -EPERM :
         drmu_atomic_add_prop_generic(da, obj_id, drmu_prop_range_id(pra), x, NULL, NULL);
 
-    if (rv != 0)
-        drmu_warn(drmu_atomic_env(da), "%s: Failed to add range obj_id=%#x, prop_id=%#x, val=%"PRId64": %s", __func__,
-                  obj_id, drmu_prop_range_id(pra), x, strerror(-rv));
+    if (rv != 0) {
+        if (rv == -EPERM && x == drmu_prop_range_min(pra) && x == drmu_prop_range_max(pra))
+            return 0;
+        drmu_warn(drmu_atomic_env(da),
+                  "%s: Failed to add range %s obj_id=%#x, prop_id=%#x, val=%"PRId64", range=%"PRId64"->%"PRId64": %s",
+                  __func__, drmu_prop_range_name(pra),
+                  obj_id, drmu_prop_range_id(pra), x, drmu_prop_range_min(pra), drmu_prop_range_max(pra), strerror(-rv));
+    }
 
     return rv;
 }
@@ -795,11 +727,16 @@ drmu_atomic_add_prop_object(drmu_atomic_t * const da, drmu_prop_object_t * obj, 
 //----------------------------------------------------------------------------
 //
 // BO fns
+//
+// Beware that when importing from FD we need to check that we don't already
+// have the BO as multiple FDs can map to the same BO and a single close will
+// close it irrespective of how many imports have occured.
 
 enum drmu_bo_type_e {
     BO_TYPE_NONE = 0,
-    BO_TYPE_FD,
-    BO_TYPE_DUMB
+    BO_TYPE_FD,         // Created from FD import
+    BO_TYPE_DUMB,       // Locally allocated
+    BO_TYPE_EXTERNAL,   // Externally allocated and closed
 };
 
 // BO handles come in 2 very distinct types: DUMB and FD
@@ -893,6 +830,11 @@ drmu_bo_unref(drmu_bo_t ** const ppbo)
             if (atomic_fetch_sub(&bo->ref_count, 1) == 0)
                 bo_free_dumb(bo);
             break;
+        case BO_TYPE_EXTERNAL:
+            // Simple imported BO - close dealt with elsewhere
+            if (atomic_fetch_sub(&bo->ref_count, 1) == 0)
+                free(bo);
+            break;
         case BO_TYPE_NONE:
         default:
             free(bo);
@@ -909,6 +851,21 @@ drmu_bo_ref(drmu_bo_t * const bo)
     return bo;
 }
 
+int
+drmu_bo_export_fd(drmu_bo_t * bo, uint32_t flags)
+{
+    struct drm_prime_handle prime_handle = {
+        .handle = bo->handle,
+        .flags = flags == 0 ? DRM_RDWR | DRM_CLOEXEC : flags,
+        .fd = 0
+    };
+
+   if (drmu_ioctl(bo->du, DRM_IOCTL_PRIME_HANDLE_TO_FD, &prime_handle) != 0)
+       return -1;
+
+   return prime_handle.fd;
+}
+
 static drmu_bo_t *
 bo_alloc(drmu_env_t *const du, enum drmu_bo_type_e bo_type)
 {
@@ -921,6 +878,20 @@ bo_alloc(drmu_env_t *const du, enum drmu_bo_type_e bo_type)
     bo->du = du;
     bo->bo_type = bo_type;
     atomic_init(&bo->ref_count, 0);
+    return bo;
+}
+
+drmu_bo_t *
+drmu_bo_new_external(drmu_env_t *const du, const uint32_t bo_handle)
+{
+    drmu_bo_t *const bo = bo_alloc(du, BO_TYPE_EXTERNAL);
+
+    if (bo == NULL) {
+        drmu_err(du, "%s: Failed to alloc BO", __func__);
+        return NULL;
+    }
+
+    bo->handle = bo_handle;
     return bo;
 }
 
@@ -1004,31 +975,21 @@ drmu_bo_env_init(drmu_bo_env_t * boe)
 
 //----------------------------------------------------------------------------
 //
-// Format info fns
-
-unsigned int
-drmu_format_info_bit_depth(const drmu_format_info_t * const fmt_info)
-{
-    return !fmt_info ? 0 : fmt_info->bit_depth;
-}
-
-//----------------------------------------------------------------------------
-//
 // FB fns
 
 typedef struct drmu_fb_s {
     atomic_int ref_count;  // 0 == 1 ref for ease of init
-    struct drmu_fb_s * prev;
-    struct drmu_fb_s * next;
 
     struct drmu_env_s * du;
 
-    const struct drmu_format_info_s * fmt_info;
+    const struct drmu_fmt_info_s * fmt_info;
 
     struct drm_mode_fb_cmd2 fb;
 
     drmu_rect_t active;     // Area that was asked for inside the buffer; pixels
     drmu_rect_t crop;       // Cropping inside that; fractional pels (16.16, 16.16)
+
+    int buf_fd;
 
     void * map_ptr;
     size_t map_size;
@@ -1036,10 +997,10 @@ typedef struct drmu_fb_s {
 
     drmu_bo_t * bo_list[4];
 
-    const char * color_encoding; // Assumed to be constant strings that don't need freeing
-    const char * color_range;
+    drmu_color_encoding_t color_encoding; // Assumed to be constant strings that don't need freeing
+    drmu_color_range_t    color_range;
+    drmu_colorspace_t     colorspace;
     const char * pixel_blend_mode;
-    const char * colorspace;
     drmu_chroma_siting_t chroma_siting;
     drmu_isset_t hdr_metadata_isset;
     struct hdr_output_metadata hdr_metadata;
@@ -1112,12 +1073,20 @@ drmu_fb_int_free(drmu_fb_t * const dfb)
     for (i = 0; i != 4; ++i)
         drmu_bo_unref(dfb->bo_list + i);
 
+    if (dfb->buf_fd != -1)
+        close(dfb->buf_fd);
+
     // Call on_delete last so we have stopped using anything that might be
     // freed by it
-    if (dfb->on_delete_fn)
-        dfb->on_delete_fn(dfb, dfb->on_delete_v);
+    {
+        void * const v = dfb->on_delete_v;
+        const drmu_fb_on_delete_fn fn = dfb->on_delete_fn;
 
-    free(dfb);
+        free(dfb);
+
+        if (fn)
+            fn(v);
+    }
 }
 
 void
@@ -1205,6 +1174,12 @@ drmu_fb_data(const drmu_fb_t *const dfb, const unsigned int layer)
     return (layer >= 4 || dfb->map_ptr == NULL) ? NULL : (uint8_t * )dfb->map_ptr + dfb->fb.offsets[layer];
 }
 
+drmu_bo_t *
+drmu_fb_bo(const drmu_fb_t * const dfb, const unsigned int layer)
+{
+    return (layer >= 4) ? NULL : dfb->bo_list[layer];
+}
+
 uint32_t
 drmu_fb_width(const drmu_fb_t *const dfb)
 {
@@ -1217,18 +1192,6 @@ drmu_fb_height(const drmu_fb_t *const dfb)
     return dfb->fb.height;
 }
 
-static inline drmu_rect_t
-rect_to_frac_rect(const drmu_rect_t a)
-{
-    drmu_rect_t b = {
-        .x = a.x << 16,
-        .y = a.y << 16,
-        .w = a.w << 16,
-        .h = a.h << 16
-    };
-    return b;
-}
-
 // Set cropping (fractional) - x, y, relative to active x, y (and must be +ve)
 int
 drmu_fb_crop_frac_set(drmu_fb_t *const dfb, drmu_rect_t crop_frac)
@@ -1239,8 +1202,8 @@ drmu_fb_crop_frac_set(drmu_fb_t *const dfb, drmu_rect_t crop_frac)
         return -EINVAL;
 
     dfb->crop = (drmu_rect_t){
-        .x = crop_frac.x + (dfb->active.x << 16),
-        .y = crop_frac.y + (dfb->active.y << 16),
+        .x = crop_frac.x,
+        .y = crop_frac.y,
         .w = crop_frac.w,
         .h = crop_frac.h
     };
@@ -1264,17 +1227,17 @@ drmu_fb_active(const drmu_fb_t *const dfb)
 void
 drmu_fb_int_fmt_size_set(drmu_fb_t *const dfb, uint32_t fmt, uint32_t w, uint32_t h, const drmu_rect_t active)
 {
-    dfb->fmt_info = format_info_find(fmt);
+    dfb->fmt_info        = drmu_fmt_info_find_fmt(fmt);
     dfb->fb.pixel_format = fmt;
     dfb->fb.width        = w;
     dfb->fb.height       = h;
     dfb->active          = active;
-    dfb->crop            = rect_to_frac_rect(active);
-    dfb->chroma_siting   = dfb->fmt_info ? dfb->fmt_info->chroma_siting : DRMU_CHROMA_SITING_TOP_LEFT;
+    dfb->crop            = drmu_rect_shl16(active);
+    dfb->chroma_siting   = drmu_fmt_info_chroma_siting(dfb->fmt_info);
 }
 
 void
-drmu_fb_int_color_set(drmu_fb_t *const dfb, const char * const enc, const char * const range, const char * const space)
+drmu_fb_color_set(drmu_fb_t *const dfb, const drmu_color_encoding_t enc, const drmu_color_range_t range, const drmu_colorspace_t space)
 {
     dfb->color_encoding = enc;
     dfb->color_range    = range;
@@ -1282,7 +1245,7 @@ drmu_fb_int_color_set(drmu_fb_t *const dfb, const char * const enc, const char *
 }
 
 void
-drmu_fb_int_chroma_siting_set(drmu_fb_t *const dfb, const drmu_chroma_siting_t siting)
+drmu_fb_chroma_siting_set(drmu_fb_t *const dfb, const drmu_chroma_siting_t siting)
 {
     dfb->chroma_siting   = siting;
 }
@@ -1298,6 +1261,20 @@ void
 drmu_fb_int_bo_set(drmu_fb_t *const dfb, unsigned int i, drmu_bo_t * const bo)
 {
     dfb->bo_list[i] = bo;
+}
+
+void
+drmu_fb_int_fd_set(drmu_fb_t *const dfb, const int fd)
+{
+    dfb->buf_fd = fd;
+}
+
+void
+drmu_fb_int_mmap_set(drmu_fb_t *const dfb, void * const buf, const size_t size, const size_t pitch)
+{
+    dfb->map_ptr = buf;
+    dfb->map_size = size;
+    dfb->map_pitch = pitch;
 }
 
 void
@@ -1323,7 +1300,8 @@ drmu_fb_int_make(drmu_fb_t *const dfb)
     drmu_env_t * du = dfb->du;
     int rv;
 
-    dfb->fb.flags = (dfb->fb.modifier[0] == DRM_FORMAT_MOD_INVALID || dfb->fb.modifier[0] == 0) ? 0 : DRM_MODE_FB_MODIFIERS;
+    dfb->fb.flags = (dfb->fb.modifier[0] == DRM_FORMAT_MOD_INVALID ||
+                     dfb->fb.modifier[0] == DRM_FORMAT_MOD_LINEAR) ? 0 : DRM_MODE_FB_MODIFIERS;
 
     if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_ADDFB2, &dfb->fb)) != 0)
         drmu_err(du, "AddFB2 failed: %s", strerror(-rv));
@@ -1354,31 +1332,31 @@ drmu_fb_hdr_metadata_get(const drmu_fb_t *const dfb)
     return dfb->hdr_metadata_isset == DRMU_ISSET_SET ? &dfb->hdr_metadata : NULL;
 }
 
-const char *
+drmu_colorspace_t
 drmu_fb_colorspace_get(const drmu_fb_t * const dfb)
 {
     return dfb->colorspace;
 }
 
 const char *
-drmu_color_range_to_broadcast_rgb(const char * const range)
+drmu_color_range_to_broadcast_rgb(const drmu_color_range_t range)
 {
-    if (range == NULL)
-        return NULL;
-    else if (strcmp(range, "YCbCr full range") == 0)
+    if (!drmu_color_range_is_set(range))
+        return DRMU_BROADCAST_RGB_UNSET;
+    else if (strcmp(range, DRMU_COLOR_RANGE_YCBCR_FULL_RANGE) == 0)
         return DRMU_BROADCAST_RGB_FULL;
-    else if (strcmp(range, "YCbCr limited range") == 0)
+    else if (strcmp(range, DRMU_COLOR_RANGE_YCBCR_LIMITED_RANGE) == 0)
         return DRMU_BROADCAST_RGB_LIMITED_16_235;
     return NULL;
 }
 
-const char *
+drmu_color_range_t
 drmu_fb_color_range_get(const drmu_fb_t * const dfb)
 {
     return dfb->color_range;
 }
 
-const struct drmu_format_info_s *
+const struct drmu_fmt_info_s *
 drmu_fb_format_info_get(const drmu_fb_t * const dfb)
 {
     return dfb->fmt_info;
@@ -1393,6 +1371,7 @@ drmu_fb_int_alloc(drmu_env_t * const du)
 
     dfb->du = du;
     dfb->chroma_siting = DRMU_CHROMA_SITING_UNSPECIFIED;
+    dfb->buf_fd = -1;
     dfb->fence_fd = -1;
     return dfb;
 }
@@ -1401,7 +1380,57 @@ drmu_fb_int_alloc(drmu_env_t * const du)
 unsigned int
 drmu_fb_pixel_bits(const drmu_fb_t * const dfb)
 {
-    return dfb->fmt_info->bpp;
+    return drmu_fmt_info_pixel_bits(dfb->fmt_info);
+}
+
+uint32_t
+drmu_fb_pixel_format(const drmu_fb_t * const dfb)
+{
+    return dfb->fb.pixel_format;
+}
+
+uint64_t
+drmu_fb_modifier(const drmu_fb_t * const dfb, const unsigned int plane)
+{
+    return plane >= 4 ? DRM_FORMAT_MOD_INVALID : dfb->fb.modifier[plane];
+}
+
+static int
+fb_sync(drmu_fb_t * const dfb, unsigned int flags)
+{
+    struct dma_buf_sync sync = {
+        .flags = flags
+    };
+    if (dfb->buf_fd == -1 || dfb->map_ptr == NULL)
+        return 0;
+    while (ioctl(dfb->buf_fd, DMA_BUF_IOCTL_SYNC, &sync) == -1) {
+        const int err = errno;
+        if (errno == EINTR)
+            continue;
+        drmu_debug(dfb->du, "%s: ioctl failed: flags=%#x\n", __func__, flags);
+        return -err;
+    }
+    return 0;
+}
+
+int drmu_fb_write_start(drmu_fb_t * const dfb)
+{
+    return fb_sync(dfb, DMA_BUF_SYNC_START | DMA_BUF_SYNC_WRITE);
+}
+
+int drmu_fb_write_end(drmu_fb_t * const dfb)
+{
+    return fb_sync(dfb, DMA_BUF_SYNC_END | DMA_BUF_SYNC_WRITE);
+}
+
+int drmu_fb_read_start(drmu_fb_t * const dfb)
+{
+    return fb_sync(dfb, DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ);
+}
+
+int drmu_fb_read_end(drmu_fb_t * const dfb)
+{
+    return fb_sync(dfb, DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ);
 }
 
 // Writeback fence
@@ -1431,12 +1460,13 @@ static unsigned int
 fb_total_height(const drmu_fb_t * const dfb, const unsigned int h)
 {
     unsigned int i;
-    const drmu_format_info_t *const f = dfb->fmt_info;
+    const drmu_fmt_info_t *const f = dfb->fmt_info;
     unsigned int t = 0;
-    unsigned int h0 = h * f->planes[0].wdiv;
+    unsigned int h0 = h * drmu_fmt_info_wdiv(f, 0);
+    const unsigned int c = drmu_fmt_info_plane_count(f);
 
-    for (i = 0; i != f->plane_count; ++i)
-        t += h0 / (f->planes[i].hdiv * f->planes[i].wdiv);
+    for (i = 0; i != c; ++i)
+        t += h0 / (drmu_fmt_info_hdiv(f, i) * drmu_fmt_info_wdiv(f, i));
 
     return t;
 }
@@ -1444,9 +1474,10 @@ fb_total_height(const drmu_fb_t * const dfb, const unsigned int h)
 static void
 fb_pitches_set_mod(drmu_fb_t * const dfb, uint64_t mod)
 {
-    const drmu_format_info_t *const f = dfb->fmt_info;
-    const uint32_t pitch0 = dfb->map_pitch * f->planes[0].wdiv;
+    const drmu_fmt_info_t *const f = dfb->fmt_info;
+    const uint32_t pitch0 = dfb->map_pitch * drmu_fmt_info_wdiv(f, 0);
     const uint32_t h = drmu_fb_height(dfb);
+    const unsigned int c = drmu_fmt_info_plane_count(f);
     uint32_t t = 0;
     unsigned int i;
 
@@ -1459,9 +1490,10 @@ fb_pitches_set_mod(drmu_fb_t * const dfb, uint64_t mod)
         return;
     }
 
-    for (i = 0; i != f->plane_count; ++i) {
-        drmu_fb_int_layer_mod_set(dfb, i, 0, pitch0 / f->planes[i].wdiv, t, mod);
-        t += (pitch0 * h) / (f->planes[i].hdiv * f->planes[i].wdiv);
+    for (i = 0; i != c; ++i) {
+        const unsigned int wdiv = drmu_fmt_info_wdiv(f, i);
+        drmu_fb_int_layer_mod_set(dfb, i, 0, pitch0 / wdiv, t, mod);
+        t += (pitch0 * h) / (drmu_fmt_info_hdiv(f, i) * wdiv);
     }
 }
 
@@ -1481,7 +1513,7 @@ drmu_fb_new_dumb_mod(drmu_env_t * const du, uint32_t w, uint32_t h,
     }
 
     if (mod != DRM_FORMAT_MOD_BROADCOM_SAND128_COL_HEIGHT(0))
-        w2 = (w + 15) & ~15;
+        w2 = w;
     else if (format == DRM_FORMAT_NV12)
         w2 = (w + 127) & ~127;
     else if (format == DRM_FORMAT_P030)
@@ -1492,7 +1524,7 @@ drmu_fb_new_dumb_mod(drmu_env_t * const du, uint32_t w, uint32_t h,
         goto fail;
     }
 
-    drmu_fb_int_fmt_size_set(dfb, format, w2, (h + 15) & ~15, drmu_rect_wh(w, h));
+    drmu_fb_int_fmt_size_set(dfb, format, w2, h, drmu_rect_wh(w, h));
 
     if ((bpp = drmu_fb_pixel_bits(dfb)) == 0) {
         drmu_err(du, "%s: Unexpected format %#x", __func__, format);
@@ -1501,8 +1533,8 @@ drmu_fb_new_dumb_mod(drmu_env_t * const du, uint32_t w, uint32_t h,
 
     {
         struct drm_mode_create_dumb dumb = {
-            .height = fb_total_height(dfb, dfb->fb.height),
-            .width = dfb->fb.width / dfb->fmt_info->planes[0].wdiv,
+            .height = fb_total_height(dfb, (h + 1) & ~1),
+            .width = ((w2 + 31) & ~31) / drmu_fmt_info_wdiv(dfb->fmt_info, 0),
             .bpp = bpp
         };
 
@@ -1519,19 +1551,24 @@ drmu_fb_new_dumb_mod(drmu_env_t * const du, uint32_t w, uint32_t h,
         struct drm_mode_map_dumb map_dumb = {
             .handle = dfb->bo_list[0]->handle
         };
+        void * map_ptr;
+
         if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_MAP_DUMB, &map_dumb)) != 0)
         {
             drmu_err(du, "%s: map dumb failed: %s", __func__, strerror(-rv));
             goto fail;
         }
 
-        if ((dfb->map_ptr = mmap(NULL, dfb->map_size,
-                                 PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE,
-                                 drmu_fd(du), (off_t)map_dumb.offset)) == MAP_FAILED) {
-            drmu_err(du, "%s: mmap failed (size=%zd, fd=%d, off=%zd): %s", __func__,
-                     dfb->map_size, drmu_fd(du), (size_t)map_dumb.offset, strerror(errno));
+        // Avoid having to test for MAP_FAILED when testing for mapped/unmapped
+        if ((map_ptr = mmap(NULL, dfb->map_size,
+                            PROT_READ | PROT_WRITE, MAP_SHARED | MAP_POPULATE,
+                            drmu_fd(du), map_dumb.offset)) == MAP_FAILED) {
+            drmu_err(du, "%s: mmap failed (size=%zd, fd=%d, off=%#"PRIx64"): %s", __func__,
+                     dfb->map_size, drmu_fd(du), map_dumb.offset, strerror(errno));
             goto fail;
         }
+
+        dfb->map_ptr = map_ptr;
     }
 
     fb_pitches_set_mod(dfb, mod);
@@ -1551,31 +1588,37 @@ fail:
 drmu_fb_t *
 drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format)
 {
-    return drmu_fb_new_dumb_mod(du, w, h, format, DRM_FORMAT_MOD_INVALID);
+    return drmu_fb_new_dumb_mod(du, w, h, format, DRM_FORMAT_MOD_LINEAR);
 }
 
-static int
-fb_try_reuse(drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format)
+bool
+drmu_fb_try_reuse(drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format, const uint64_t mod)
 {
-    if (w > dfb->fb.width || h > dfb->fb.height || format != dfb->fb.pixel_format)
-        return 0;
+    if (w > dfb->fb.width || h > dfb->fb.height || format != dfb->fb.pixel_format || mod != dfb->fb.modifier[0])
+        return false;
 
     dfb->active = drmu_rect_wh(w, h);
-    dfb->crop   = rect_to_frac_rect(dfb->active);
-    return 1;
+    dfb->crop   = drmu_rect_shl16(dfb->active);
+    return true;
+}
+
+drmu_fb_t *
+drmu_fb_realloc_dumb_mod(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format, const uint64_t mod)
+{
+    if (dfb == NULL)
+        return drmu_fb_new_dumb_mod(du, w, h, format, mod);
+
+    if (drmu_fb_try_reuse(dfb, w, h, format, mod))
+        return dfb;
+
+    drmu_fb_unref(&dfb);
+    return drmu_fb_new_dumb_mod(du, w, h, format, mod);
 }
 
 drmu_fb_t *
 drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format)
 {
-    if (dfb == NULL)
-        return drmu_fb_new_dumb(du, w, h, format);
-
-    if (fb_try_reuse(dfb, w, h, format))
-        return dfb;
-
-    drmu_fb_unref(&dfb);
-    return drmu_fb_new_dumb(du, w, h, format);
+    return drmu_fb_realloc_dumb_mod(du, dfb, w, h, format, DRM_FORMAT_MOD_LINEAR);
 }
 
 static void
@@ -1779,14 +1822,12 @@ props_get_properties(drmu_env_t * const du, const uint32_t objid, const uint32_t
         free(propids);
         propids = NULL;
         n = obj_props.count_props;
-        if ((values = malloc(n * sizeof(*values))) == NULL ||
-            (propids = malloc(n * sizeof(*propids))) == NULL) {
+        if ((obj_props.prop_values_ptr = io_alloc(values, n)) == 0 ||
+            (obj_props.props_ptr =       io_alloc(propids, n)) == 0) {
             drmu_err(du, "obj/value array alloc failed");
             rv = -ENOMEM;
             goto fail;
         }
-        obj_props.prop_values_ptr = (uintptr_t)values;
-        obj_props.props_ptr = (uintptr_t)propids;
     }
 
     *ppValues = values;
@@ -1958,16 +1999,17 @@ typedef struct drmu_crtc_s {
 } drmu_crtc_t;
 
 static void
-free_crtc(drmu_crtc_t * const dc)
+crtc_uninit(drmu_crtc_t * const dc)
 {
+    drmu_prop_range_delete(&dc->pid.active);
     drmu_blob_unref(&dc->mode_id_blob);
-    free(dc);
 }
 
 static void
-crtc_uninit(drmu_crtc_t * const dc)
+crtc_free(drmu_crtc_t * const dc)
 {
-    (void)dc;
+    crtc_uninit(dc);
+    free(dc);
 }
 
 
@@ -2040,7 +2082,7 @@ drmu_crtc_delete(drmu_crtc_t ** ppdc)
         return;
     *ppdc = NULL;
 
-    free_crtc(dc);
+    crtc_free(dc);
 }
 
 drmu_env_t *
@@ -2217,18 +2259,28 @@ drmu_crtc_ref(drmu_crtc_t * const dc)
     return dc;
 }
 
+static int
+crtc_state_save(drmu_env_t * const du, drmu_crtc_t * const dc)
+{
+    int rv = 0;
+    // 1st time through save state
+    if (!dc->saved &&
+        (rv = env_object_state_save(du, dc->crtc.crtc_id, DRM_MODE_OBJECT_CRTC)) == 0)
+        dc->saved = true;
+    return rv;
+}
+
 // A Conn should be claimed before any op that might change its state
 int
 drmu_crtc_claim_ref(drmu_crtc_t * const dc)
 {
     drmu_env_t * const du = dc->du;
-    static const int ref0 = 0;
+    int ref0 = 0;
     if (!atomic_compare_exchange_strong(&dc->ref_count, &ref0, 2))
         return -EBUSY;
 
     // 1st time through save state
-    if (!dc->saved && env_object_state_save(du, dc->crtc.crtc_id, DRM_MODE_OBJECT_CRTC) == 0)
-        dc->saved = true;
+    crtc_state_save(du, dc);
 
     return 0;
 }
@@ -2297,7 +2349,7 @@ struct drmu_conn_s {
 
 
 int
-drmu_atomic_conn_hdr_metadata_set(drmu_atomic_t * const da, drmu_conn_t * const dn, const struct hdr_output_metadata * const m)
+drmu_atomic_conn_add_hdr_metadata(drmu_atomic_t * const da, drmu_conn_t * const dn, const struct hdr_output_metadata * const m)
 {
     drmu_env_t * const du = drmu_atomic_env(da);
     int rv;
@@ -2318,15 +2370,22 @@ drmu_atomic_conn_hdr_metadata_set(drmu_atomic_t * const da, drmu_conn_t * const 
     return rv;
 }
 
-int
-drmu_atomic_conn_hi_bpc_set(drmu_atomic_t * const da, drmu_conn_t * const dn, bool hi_bpc)
+bool
+drmu_conn_has_hi_bpc(const drmu_conn_t * const dn)
 {
-    return drmu_atomic_add_prop_range(da, dn->conn.connector_id, dn->pid.max_bpc, !hi_bpc ? 8 :
+    return drmu_prop_range_max(dn->pid.max_bpc) > 8;
+}
+
+int
+drmu_atomic_conn_add_hi_bpc(drmu_atomic_t * const da, drmu_conn_t * const dn, bool hi_bpc)
+{
+    return !hi_bpc && dn->pid.max_bpc == NULL ? 0 :
+        drmu_atomic_add_prop_range(da, dn->conn.connector_id, dn->pid.max_bpc, !hi_bpc ? 8 :
                                       drmu_prop_range_max(dn->pid.max_bpc));
 }
 
 int
-drmu_atomic_conn_colorspace_set(drmu_atomic_t * const da, drmu_conn_t * const dn, const char * colorspace)
+drmu_atomic_conn_add_colorspace(drmu_atomic_t * const da, drmu_conn_t * const dn, const drmu_colorspace_t colorspace)
 {
     if (!dn->pid.colorspace)
         return 0;
@@ -2335,7 +2394,7 @@ drmu_atomic_conn_colorspace_set(drmu_atomic_t * const da, drmu_conn_t * const dn
 }
 
 int
-drmu_atomic_conn_broadcast_rgb_set(drmu_atomic_t * const da, drmu_conn_t * const dn, const char * bcrgb)
+drmu_atomic_conn_add_broadcast_rgb(drmu_atomic_t * const da, drmu_conn_t * const dn, const drmu_broadcast_rgb_t bcrgb)
 {
     if (!dn->pid.broadcast_rgb)
         return 0;
@@ -2459,7 +2518,7 @@ conn_init(drmu_env_t * const du, drmu_conn_t * const dn, unsigned int conn_idx, 
 
         if (modes_req > dn->modes_size) {
             free(dn->modes);
-            if ((dn->modes = malloc(modes_req * sizeof(*dn->modes))) == NULL) {
+            if (io_alloc(dn->modes, modes_req) == 0) {
                 drmu_err(du, "Failed to alloc modes array");
                 goto fail;
             }
@@ -2470,7 +2529,7 @@ conn_init(drmu_env_t * const du, drmu_conn_t * const dn, unsigned int conn_idx, 
 
         if (encs_req > dn->enc_ids_size) {
             free(dn->enc_ids);
-            if ((dn->enc_ids = malloc(encs_req * sizeof(*dn->enc_ids))) == NULL) {
+            if (io_alloc(dn->enc_ids, encs_req) == 0) {
                 drmu_err(du, "Failed to alloc encs array");
                 goto fail;
             }
@@ -2570,457 +2629,30 @@ drmu_conn_ref(drmu_conn_t * const dn)
     return dn;
 }
 
+static int
+conn_state_save(drmu_env_t * const du, drmu_conn_t * const dn)
+{
+    int rv = 0;
+    // 1st time through save state
+    if (!dn->saved &&
+        (rv = env_object_state_save(du, dn->conn.connector_id, DRM_MODE_OBJECT_CONNECTOR)) == 0)
+        dn->saved = true;
+    return rv;
+}
+
 // A Conn should be claimed before any op that might change its state
 int
 drmu_conn_claim_ref(drmu_conn_t * const dn)
 {
     drmu_env_t * const du = dn->du;
-    static const int ref0 = 0;
+    int ref0 = 0;
     if (!atomic_compare_exchange_strong(&dn->ref_count, &ref0, 2))
         return -EBUSY;
 
     // 1st time through save state
-    if (!dn->saved && env_object_state_save(du, dn->conn.connector_id, DRM_MODE_OBJECT_CONNECTOR) == 0)
-        dn->saved = true;
+    conn_state_save(du, dn);
 
     return 0;
-}
-
-//----------------------------------------------------------------------------
-//
-// Atomic Q fns (internal)
-
-typedef struct drmu_atomic_q_s {
-    pthread_mutex_t lock;
-    pthread_cond_t cond;
-    drmu_atomic_t * next_flip;
-    drmu_atomic_t * cur_flip;
-    drmu_atomic_t * last_flip;
-    unsigned int retry_count;
-    struct polltask * retry_task;
-} drmu_atomic_q_t;
-
-static void atomic_q_retry(drmu_atomic_q_t * const aq, drmu_env_t * const du);
-
-// Needs locked
-static int
-atomic_q_attempt_commit_next(drmu_atomic_q_t * const aq)
-{
-    drmu_env_t * const du = drmu_atomic_env(aq->next_flip);
-    uint32_t flags = DRM_MODE_ATOMIC_NONBLOCK | DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_ALLOW_MODESET;
-    int rv;
-
-    if ((rv = drmu_atomic_commit(aq->next_flip, flags)) == 0) {
-        if (aq->retry_count != 0)
-            drmu_warn(du, "%s: Atomic commit OK", __func__);
-        aq->cur_flip = aq->next_flip;
-        aq->next_flip = NULL;
-        aq->retry_count = 0;
-    }
-    else if (rv == -EBUSY && ++aq->retry_count < 16) {
-        // This really shouldn't happen but we observe that the 1st commit after
-        // a modeset often fails with BUSY.  It seems to be fine on a 10ms retry
-        // but allow some more in case ww need a bit longer in some cases
-        drmu_warn(du, "%s: Atomic commit BUSY", __func__);
-        atomic_q_retry(aq, du);
-        rv = 0;
-    }
-    else {
-        drmu_err(du, "%s: Atomic commit failed: %s", __func__, strerror(-rv));
-        drmu_atomic_dump(aq->next_flip);
-        drmu_atomic_unref(&aq->next_flip);
-        aq->retry_count = 0;
-    }
-
-    return rv;
-}
-
-static void
-atomic_q_retry_cb(void * v, short revents)
-{
-    drmu_atomic_q_t * const aq = v;
-    (void)revents;
-
-    pthread_mutex_lock(&aq->lock);
-
-    // If we need a retry then next != NULL && cur == NULL
-    // if not that then we've fixed ourselves elsewhere
-
-    if (aq->next_flip != NULL && aq->cur_flip == NULL)
-        atomic_q_attempt_commit_next(aq);
-
-    pthread_mutex_unlock(&aq->lock);
-}
-
-static void
-atomic_q_retry(drmu_atomic_q_t * const aq, drmu_env_t * const du)
-{
-    if (aq->retry_task == NULL)
-        aq->retry_task = polltask_new_timer(env_pollqueue(du), atomic_q_retry_cb, aq);
-    pollqueue_add_task(aq->retry_task, 20);
-}
-
-// Called after an atomic commit has completed
-// not called on every vsync, so if we haven't committed anything this won't be called
-static void
-drmu_atomic_page_flip_cb(int fd, unsigned int sequence, unsigned int tv_sec, unsigned int tv_usec, unsigned int crtc_id, void *user_data)
-{
-    drmu_atomic_t * const da = user_data;
-    drmu_env_t * const du = drmu_atomic_env(da);
-    drmu_atomic_q_t * const aq = env_atomic_q(du);
-
-    (void)fd;
-    (void)sequence;
-    (void)tv_sec;
-    (void)tv_usec;
-    (void)crtc_id;
-
-    // At this point:
-    //  next   The atomic we are about to commit
-    //  cur    The last atomic we committed, now in use (must be != NULL)
-    //  last   The atomic that has just become obsolete
-
-    pthread_mutex_lock(&aq->lock);
-
-    if (da != aq->cur_flip) {
-        drmu_err(du, "%s: User data el (%p) != cur (%p)", __func__, da, aq->cur_flip);
-    }
-
-    drmu_atomic_unref(&aq->last_flip);
-    aq->last_flip = aq->cur_flip;
-    aq->cur_flip = NULL;
-
-    if (aq->next_flip != NULL)
-        atomic_q_attempt_commit_next(aq);
-
-    pthread_cond_broadcast(&aq->cond);
-    pthread_mutex_unlock(&aq->lock);
-}
-
-static int
-atomic_q_flush(drmu_atomic_q_t * const aq)
-{
-    struct timespec ts;
-    int rv = 0;
-
-    pthread_mutex_lock(&aq->lock);
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    ts.tv_sec += 1;  // We should never timeout if all is well - 1 sec is plenty
-
-    // Can flush next safely
-    drmu_atomic_unref(&aq->next_flip);
-
-    // Wait for cur to finish - seems to confuse the world otherwise
-    while (aq->cur_flip != NULL) {
-        if ((rv = pthread_cond_timedwait(&aq->cond, &aq->lock, &ts)) != 0)
-            break;
-    }
-
-    pthread_mutex_unlock(&aq->lock);
-    return rv;
-}
-
-// 'consumes' da
-static int
-atomic_q_queue(drmu_atomic_q_t * const aq, drmu_atomic_t * da)
-{
-    int rv = 0;
-
-    pthread_mutex_lock(&aq->lock);
-
-    if (aq->next_flip != NULL) {
-        // We already have something pending or retrying - merge the new with it
-        rv = drmu_atomic_merge(aq->next_flip, &da);
-    }
-    else {
-        aq->next_flip = da;
-
-        // No pending commit?
-        if (aq->cur_flip == NULL)
-            rv = atomic_q_attempt_commit_next(aq);
-    }
-
-    pthread_mutex_unlock(&aq->lock);
-    return rv;
-}
-
-// Consumes the passed atomic structure as it isn't copied
-// * arguably should copy & unref if ref count != 0
-int
-drmu_atomic_queue(drmu_atomic_t ** ppda)
-{
-    drmu_atomic_t * da = *ppda;
-
-    if (da == NULL)
-        return 0;
-    *ppda = NULL;
-
-    return atomic_q_queue(env_atomic_q(drmu_atomic_env(da)), da);
-}
-
-int
-drmu_env_queue_wait(drmu_env_t * const du)
-{
-
-    drmu_atomic_q_t *const aq = env_atomic_q(du);
-    struct timespec ts;
-    int rv = 0;
-
-    pthread_mutex_lock(&aq->lock);
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    ts.tv_sec += 1;  // We should never timeout if all is well - 1 sec is plenty
-
-    // Next should clear quickly
-    while (aq->next_flip != NULL) {
-        if ((rv = pthread_cond_timedwait(&aq->cond, &aq->lock, &ts)) != 0)
-            break;
-    }
-
-    pthread_mutex_unlock(&aq->lock);
-    return rv;
-}
-
-static void
-atomic_q_uninit(drmu_atomic_q_t * const aq)
-{
-    polltask_delete(&aq->retry_task);
-    drmu_atomic_unref(&aq->next_flip);
-    drmu_atomic_unref(&aq->cur_flip);
-    drmu_atomic_unref(&aq->last_flip);
-    pthread_cond_destroy(&aq->cond);
-    pthread_mutex_destroy(&aq->lock);
-}
-
-static void
-atomic_q_init(drmu_atomic_q_t * const aq)
-{
-    pthread_condattr_t condattr;
-
-    aq->next_flip = NULL;
-    pthread_mutex_init(&aq->lock, NULL);
-
-    pthread_condattr_init(&condattr);
-    pthread_condattr_setclock(&condattr, CLOCK_MONOTONIC);
-    pthread_cond_init(&aq->cond, &condattr);
-    pthread_condattr_destroy(&condattr);
-}
-
-//----------------------------------------------------------------------------
-//
-// Pool fns
-
-typedef struct drmu_fb_list_s {
-    drmu_fb_t * head;
-    drmu_fb_t * tail;
-} drmu_fb_list_t;
-
-typedef struct drmu_pool_s {
-    atomic_int ref_count;  // 0 == 1 ref for ease of init
-
-    struct drmu_env_s * du;
-
-    pthread_mutex_t lock;
-    int dead;
-
-    unsigned int seq;  // debug
-
-    unsigned int fb_count;
-    unsigned int fb_max;
-
-    drmu_fb_list_t free_fbs;
-} drmu_pool_t;
-
-static void
-fb_list_add_tail(drmu_fb_list_t * const fbl, drmu_fb_t * const dfb)
-{
-    assert(dfb->prev == NULL && dfb->next == NULL);
-
-    if (fbl->tail == NULL)
-        fbl->head = dfb;
-    else
-        fbl->tail->next = dfb;
-    dfb->prev = fbl->tail;
-    fbl->tail = dfb;
-}
-
-static drmu_fb_t *
-fb_list_extract(drmu_fb_list_t * const fbl, drmu_fb_t * const dfb)
-{
-    if (dfb == NULL)
-        return NULL;
-
-    if (dfb->prev == NULL)
-        fbl->head = dfb->next;
-    else
-        dfb->prev->next = dfb->next;
-
-    if (dfb->next == NULL)
-        fbl->tail = dfb->prev;
-    else
-        dfb->next->prev = dfb->prev;
-
-    dfb->next = NULL;
-    dfb->prev = NULL;
-    return dfb;
-}
-
-static drmu_fb_t *
-fb_list_extract_head(drmu_fb_list_t * const fbl)
-{
-    return fb_list_extract(fbl, fbl->head);
-}
-
-static drmu_fb_t *
-fb_list_peek_head(drmu_fb_list_t * const fbl)
-{
-    return fbl->head;
-}
-
-static bool
-fb_list_is_empty(drmu_fb_list_t * const fbl)
-{
-    return fbl->head == NULL;
-}
-
-static void
-pool_free_pool(drmu_pool_t * const pool)
-{
-    drmu_fb_t * dfb;
-    while ((dfb = fb_list_extract_head(&pool->free_fbs)) != NULL)
-        drmu_fb_unref(&dfb);
-}
-
-static void
-pool_free(drmu_pool_t * const pool)
-{
-    pool_free_pool(pool);
-    pthread_mutex_destroy(&pool->lock);
-    free(pool);
-}
-
-void
-drmu_pool_unref(drmu_pool_t ** const pppool)
-{
-    drmu_pool_t * const pool = *pppool;
-
-    if (pool == NULL)
-        return;
-    *pppool = NULL;
-
-    if (atomic_fetch_sub(&pool->ref_count, 1) != 0)
-        return;
-
-    pool_free(pool);
-}
-
-drmu_pool_t *
-drmu_pool_ref(drmu_pool_t * const pool)
-{
-    atomic_fetch_add(&pool->ref_count, 1);
-    return pool;
-}
-
-drmu_pool_t *
-drmu_pool_new(drmu_env_t * const du, unsigned int total_fbs_max)
-{
-    drmu_pool_t * const pool = calloc(1, sizeof(*pool));
-
-    if (pool == NULL) {
-        drmu_err(du, "Failed pool env alloc");
-        return NULL;
-    }
-
-    pool->du = du;
-    pool->fb_max = total_fbs_max;
-    pthread_mutex_init(&pool->lock, NULL);
-
-    return pool;
-}
-
-static int
-pool_fb_pre_delete_cb(drmu_fb_t * dfb, void * v)
-{
-    drmu_pool_t * pool = v;
-
-    // Ensure we cannot end up in a delete loop
-    drmu_fb_pre_delete_unset(dfb);
-
-    // If dead set then might as well delete now
-    // It should all work without this shortcut but this reclaims
-    // storage quicker
-    if (pool->dead) {
-        drmu_pool_unref(&pool);
-        return 0;
-    }
-
-    drmu_fb_ref(dfb);  // Restore ref
-
-    pthread_mutex_lock(&pool->lock);
-    fb_list_add_tail(&pool->free_fbs, dfb);
-    pthread_mutex_unlock(&pool->lock);
-
-    // May cause suicide & recursion on fb delete, but that should be OK as
-    // the 1 we return here should cause simple exit of fb delete
-    drmu_pool_unref(&pool);
-    return 1;  // Stop delete
-}
-
-drmu_fb_t *
-drmu_pool_fb_new_dumb(drmu_pool_t * const pool, uint32_t w, uint32_t h, const uint32_t format)
-{
-    drmu_env_t * const du = pool->du;
-    drmu_fb_t * dfb;
-
-    pthread_mutex_lock(&pool->lock);
-
-    dfb = fb_list_peek_head(&pool->free_fbs);
-    while (dfb != NULL) {
-        if (fb_try_reuse(dfb, w, h, format)) {
-            fb_list_extract(&pool->free_fbs, dfb);
-            break;
-        }
-        dfb = dfb->next;
-    }
-
-    if (dfb == NULL) {
-        if (pool->fb_count >= pool->fb_max && !fb_list_is_empty(&pool->free_fbs)) {
-            --pool->fb_count;
-            dfb = fb_list_extract_head(&pool->free_fbs);
-        }
-        ++pool->fb_count;
-        pthread_mutex_unlock(&pool->lock);
-
-        drmu_fb_unref(&dfb);  // Will free the dfb as pre-delete CB will be unset
-        if ((dfb = drmu_fb_realloc_dumb(du, NULL, w, h, format)) == NULL) {
-            --pool->fb_count;  // ??? lock
-            return NULL;
-        }
-    }
-    else {
-        pthread_mutex_unlock(&pool->lock);
-    }
-
-    drmu_fb_pre_delete_set(dfb, pool_fb_pre_delete_cb, pool);
-    drmu_pool_ref(pool);
-    return dfb;
-}
-
-// Mark pool as dead (i.e. no new allocs) and unref it
-// Simple unref will also work but this reclaims storage faster
-// Actual pool structure will persist until all referencing fbs are deleted too
-void
-drmu_pool_delete(drmu_pool_t ** const pppool)
-{
-    drmu_pool_t * pool = *pppool;
-
-    if (pool == NULL)
-        return;
-    *pppool = NULL;
-
-    pool->dead = 1;
-    pool_free_pool(pool);
-
-    drmu_pool_unref(&pool);
 }
 
 //----------------------------------------------------------------------------
@@ -3046,12 +2678,12 @@ typedef struct drmu_plane_s {
     struct {
         uint32_t crtc_id;
         uint32_t fb_id;
-        uint32_t crtc_h;
-        uint32_t crtc_w;
+        drmu_prop_range_t * crtc_h;
+        drmu_prop_range_t * crtc_w;
         uint32_t crtc_x;
         uint32_t crtc_y;
-        uint32_t src_h;
-        uint32_t src_w;
+        drmu_prop_range_t * src_h;
+        drmu_prop_range_t * src_w;
         uint32_t src_x;
         uint32_t src_y;
         drmu_prop_range_t * alpha;
@@ -3061,6 +2693,7 @@ typedef struct drmu_plane_s {
         drmu_prop_bitmask_t * rotation;
         drmu_prop_range_t * chroma_siting_h;
         drmu_prop_range_t * chroma_siting_v;
+        drmu_prop_range_t * zpos;
     } pid;
     uint64_t rot_vals[8];
 
@@ -3080,17 +2713,17 @@ plane_set_atomic(drmu_atomic_t * const da,
     drmu_atomic_add_prop_fb(da, plid, dp->pid.fb_id, dfb);
     drmu_atomic_add_prop_value(da, plid, dp->pid.crtc_x, crtc_x);
     drmu_atomic_add_prop_value(da, plid, dp->pid.crtc_y, crtc_y);
-    drmu_atomic_add_prop_value(da, plid, dp->pid.crtc_w, crtc_w);
-    drmu_atomic_add_prop_value(da, plid, dp->pid.crtc_h, crtc_h);
+    drmu_atomic_add_prop_range(da, plid, dp->pid.crtc_w, crtc_w);
+    drmu_atomic_add_prop_range(da, plid, dp->pid.crtc_h, crtc_h);
     drmu_atomic_add_prop_value(da, plid, dp->pid.src_x,  src_x);
     drmu_atomic_add_prop_value(da, plid, dp->pid.src_y,  src_y);
-    drmu_atomic_add_prop_value(da, plid, dp->pid.src_w,  src_w);
-    drmu_atomic_add_prop_value(da, plid, dp->pid.src_h,  src_h);
+    drmu_atomic_add_prop_range(da, plid, dp->pid.src_w,  src_w);
+    drmu_atomic_add_prop_range(da, plid, dp->pid.src_h,  src_h);
     return 0;
 }
 
 int
-drmu_atomic_add_plane_alpha(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int alpha)
+drmu_atomic_plane_add_alpha(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int alpha)
 {
     if (alpha == DRMU_PLANE_ALPHA_UNSET)
         return 0;
@@ -3098,7 +2731,13 @@ drmu_atomic_add_plane_alpha(struct drmu_atomic_s * const da, const drmu_plane_t 
 }
 
 int
-drmu_atomic_add_plane_rotation(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int rot)
+drmu_atomic_plane_add_zpos(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int zpos)
+{
+    return drmu_atomic_add_prop_range(da, dp->plane.plane_id, dp->pid.zpos, zpos);
+}
+
+int
+drmu_atomic_plane_add_rotation(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int rot)
 {
     if (!dp->pid.rotation)
         return rot == DRMU_PLANE_ROTATION_0 ? 0 : -EINVAL;
@@ -3124,38 +2763,47 @@ drmu_atomic_plane_add_chroma_siting(struct drmu_atomic_s * const da, const drmu_
 }
 
 int
-drmu_atomic_plane_fb_set(drmu_atomic_t * const da, drmu_plane_t * const dp,
+drmu_atomic_plane_clear_add(drmu_atomic_t * const da, drmu_plane_t * const dp)
+{
+    return plane_set_atomic(da, dp, NULL,
+                            0, 0, 0, 0,
+                            0, 0, 0, 0);
+}
+
+int
+drmu_atomic_plane_add_fb(drmu_atomic_t * const da, drmu_plane_t * const dp,
     drmu_fb_t * const dfb, const drmu_rect_t pos)
 {
     int rv;
     const uint32_t plid = dp->plane.plane_id;
 
-    if (dfb == NULL) {
-        rv = plane_set_atomic(da, dp, NULL,
-                              0, 0, 0, 0,
-                              0, 0, 0, 0);
-    }
-    else {
-        rv = plane_set_atomic(da, dp, dfb,
+    if (dfb == NULL)
+        return drmu_atomic_plane_clear_add(da, dp);
+
+    if ((rv = plane_set_atomic(da, dp, dfb,
                               pos.x, pos.y,
                               pos.w, pos.h,
                               dfb->crop.x + (dfb->active.x << 16), dfb->crop.y + (dfb->active.y << 16),
-                              dfb->crop.w, dfb->crop.h);
-    }
-    if (rv != 0 || dfb == NULL)
+                              dfb->crop.w, dfb->crop.h)) != 0)
         return rv;
 
     drmu_atomic_add_prop_enum(da, plid, dp->pid.pixel_blend_mode, dfb->pixel_blend_mode);
     drmu_atomic_add_prop_enum(da, plid, dp->pid.color_encoding,   dfb->color_encoding);
     drmu_atomic_add_prop_enum(da, plid, dp->pid.color_range,      dfb->color_range);
     drmu_atomic_plane_add_chroma_siting(da, dp, dfb->chroma_siting);
-    return rv != 0 ? -errno : 0;
+    return 0;
 }
 
 uint32_t
 drmu_plane_id(const drmu_plane_t * const dp)
 {
     return dp->plane.plane_id;
+}
+
+unsigned int
+drmu_plane_type(const drmu_plane_t * const dp)
+{
+    return dp->plane_type;
 }
 
 const uint32_t *
@@ -3170,7 +2818,15 @@ drmu_plane_format_check(const drmu_plane_t * const dp, const uint32_t format, co
 {
     const struct drm_format_modifier * const mods = (const struct drm_format_modifier *)((const uint8_t *)dp->formats_in + dp->fmts_hdr->modifiers_offset);
     const uint32_t * const fmts = (const uint32_t *)((const uint8_t *)dp->formats_in + dp->fmts_hdr->formats_offset);
+    uint64_t modbase = modifier;
     unsigned int i;
+
+    if (!format)
+        return false;
+
+    // If broadcom then remove parameters before checking
+    if ((modbase >> 56) == DRM_FORMAT_MOD_VENDOR_BROADCOM)
+        modbase = fourcc_mod_broadcom_mod(modbase);
 
     // * Simplistic lookup; Could be made much faster
 
@@ -3179,7 +2835,7 @@ drmu_plane_format_check(const drmu_plane_t * const dp, const uint32_t format, co
         uint64_t fbits;
         unsigned int j;
 
-        if (mod->modifier != modifier)
+        if (mod->modifier != modbase)
             continue;
 
         for (fbits = mod->formats, j = mod->offset; fbits; fbits >>= 1, ++j) {
@@ -3188,6 +2844,12 @@ drmu_plane_format_check(const drmu_plane_t * const dp, const uint32_t format, co
         }
     }
     return false;
+}
+
+bool
+drmu_plane_is_claimed(drmu_plane_t * const dp)
+{
+    return atomic_load(&dp->ref_count) != 0;
 }
 
 void
@@ -3213,6 +2875,18 @@ drmu_plane_ref(drmu_plane_t * const dp)
     return dp;
 }
 
+static int
+plane_state_save(drmu_env_t * const du, drmu_plane_t * const dp)
+{
+    int rv = 0;
+
+    // 1st time through save state
+    if (!dp->saved &&
+        (rv = env_object_state_save(du, drmu_plane_id(dp), DRM_MODE_OBJECT_PLANE)) == 0)
+        dp->saved = true;
+    return rv;
+}
+
 // Associate a plane with a crtc and ref it
 // Returns -EBUSY if plane already associated
 int
@@ -3220,20 +2894,19 @@ drmu_plane_ref_crtc(drmu_plane_t * const dp, drmu_crtc_t * const dc)
 {
     drmu_env_t * const du = dp->du;
 
-    static const int ref0 = 0;
+    int ref0 = 0;
     if (!atomic_compare_exchange_strong(&dp->ref_count, &ref0, 2))
         return -EBUSY;
     dp->dc = dc;
 
-    // 1st time through save state
-    if (!dp->saved && env_object_state_save(du, drmu_plane_id(dp), DRM_MODE_OBJECT_PLANE) == 0)
-        dp->saved = true;
+    // 1st time through save state if required - ignore fail
+    plane_state_save(du, dp);
 
     return 0;
 }
 
 drmu_plane_t *
-drmu_plane_new_find_type(drmu_crtc_t * const dc, const unsigned int req_type)
+drmu_plane_new_find_ref(drmu_crtc_t * const dc, const drmu_plane_new_find_ok_fn cb, void * const v)
 {
     uint32_t i;
     drmu_env_t * const du = drmu_crtc_env(dc);
@@ -3242,23 +2915,33 @@ drmu_plane_new_find_type(drmu_crtc_t * const dc, const unsigned int req_type)
     const uint32_t crtc_mask = (uint32_t)1 << drmu_crtc_idx(dc);
 
     for (i = 0; (dp_t = drmu_env_plane_find_n(du, i)) != NULL; ++i) {
-        // Is wanted type?
-        if ((dp_t->plane_type & req_type) == 0)
-            continue;
-
-        // In use?
-        if (dp_t->dc != NULL)
-            continue;
-
+        // Is unused?
         // Availible for this crtc?
-        if ((dp_t->plane.possible_crtcs & crtc_mask) == 0)
+        if (dp_t->dc != NULL ||
+            (dp_t->plane.possible_crtcs & crtc_mask) == 0)
             continue;
 
-        dp = dp_t;
-        break;
+        if (cb(dp_t, v) && drmu_plane_ref_crtc(dp_t, dc) == 0) {
+            dp = dp_t;
+            break;
+        }
     }
+    return dp;
+}
+
+static bool plane_find_type_cb(const drmu_plane_t * dp, void * v)
+{
+    const unsigned int * const pReq = v;
+    return (*pReq & drmu_plane_type(dp)) != 0;
+}
+
+drmu_plane_t *
+drmu_plane_new_find_ref_type(drmu_crtc_t * const dc, const unsigned int req_type)
+{
+    drmu_env_t * const du = drmu_crtc_env(dc);
+    drmu_plane_t * const dp = drmu_plane_new_find_ref(dc, plane_find_type_cb, (void*)&req_type);
     if (dp == NULL) {
-        drmu_err(du, "%s: No plane (count=%d) found for types %#x", __func__, i, req_type);
+        drmu_err(du, "%s: No plane found for types %#x", __func__, req_type);
         return NULL;
     }
     return dp;
@@ -3267,6 +2950,10 @@ drmu_plane_new_find_type(drmu_crtc_t * const dc, const unsigned int req_type)
 static void
 plane_uninit(drmu_plane_t * const dp)
 {
+    drmu_prop_range_delete(&dp->pid.crtc_h);
+    drmu_prop_range_delete(&dp->pid.crtc_w);
+    drmu_prop_range_delete(&dp->pid.src_h);
+    drmu_prop_range_delete(&dp->pid.src_w);
     drmu_prop_range_delete(&dp->pid.alpha);
     drmu_prop_range_delete(&dp->pid.chroma_siting_h);
     drmu_prop_range_delete(&dp->pid.chroma_siting_v);
@@ -3274,6 +2961,7 @@ plane_uninit(drmu_plane_t * const dp)
     drmu_prop_enum_delete(&dp->pid.color_range);
     drmu_prop_enum_delete(&dp->pid.pixel_blend_mode);
     drmu_prop_enum_delete(&dp->pid.rotation);
+    drmu_prop_range_delete(&dp->pid.zpos);
     free(dp->formats_in);
     dp->formats_in = NULL;
 }
@@ -3298,18 +2986,18 @@ plane_init(drmu_env_t * const du, drmu_plane_t * const dp, const uint32_t plane_
         return -EINVAL;
 
 #if TRACE_PROP_NEW
-    drmu_info(du, "Plane %d:", i);
+    drmu_info(du, "Plane id %d:", plane_id);
     props_dump(props);
 #endif
 
     if ((dp->pid.crtc_id = props_name_to_id(props, "CRTC_ID")) == 0 ||
         (dp->pid.fb_id  = props_name_to_id(props, "FB_ID")) == 0 ||
-        (dp->pid.crtc_h = props_name_to_id(props, "CRTC_H")) == 0 ||
-        (dp->pid.crtc_w = props_name_to_id(props, "CRTC_W")) == 0 ||
+        (dp->pid.crtc_h = drmu_prop_range_new(du, props_name_to_id(props, "CRTC_H"))) == NULL ||
+        (dp->pid.crtc_w = drmu_prop_range_new(du, props_name_to_id(props, "CRTC_W"))) == NULL ||
         (dp->pid.crtc_x = props_name_to_id(props, "CRTC_X")) == 0 ||
         (dp->pid.crtc_y = props_name_to_id(props, "CRTC_Y")) == 0 ||
-        (dp->pid.src_h  = props_name_to_id(props, "SRC_H")) == 0 ||
-        (dp->pid.src_w  = props_name_to_id(props, "SRC_W")) == 0 ||
+        (dp->pid.src_h  = drmu_prop_range_new(du, props_name_to_id(props, "SRC_H"))) == NULL ||
+        (dp->pid.src_w  = drmu_prop_range_new(du, props_name_to_id(props, "SRC_W"))) == NULL ||
         (dp->pid.src_x  = props_name_to_id(props, "SRC_X")) == 0 ||
         (dp->pid.src_y  = props_name_to_id(props, "SRC_Y")) == 0 ||
         props_name_get_blob(props, "IN_FORMATS", &dp->formats_in, &dp->formats_in_len) != 0)
@@ -3327,6 +3015,7 @@ plane_init(drmu_env_t * const du, drmu_plane_t * const dp, const uint32_t plane_
     dp->pid.rotation         = drmu_prop_enum_new(du, props_name_to_id(props, "rotation"));
     dp->pid.chroma_siting_h  = drmu_prop_range_new(du, props_name_to_id(props, "CHROMA_SITING_H"));
     dp->pid.chroma_siting_v  = drmu_prop_range_new(du, props_name_to_id(props, "CHROMA_SITING_V"));
+    dp->pid.zpos             = drmu_prop_range_new(du, props_name_to_id(props, "zpos"));
 
     dp->rot_vals[DRMU_PLANE_ROTATION_0] = drmu_prop_bitmask_value(dp->pid.rotation, "rotate-0");
     if (dp->rot_vals[DRMU_PLANE_ROTATION_0]) {
@@ -3367,6 +3056,8 @@ plane_init(drmu_env_t * const du, drmu_plane_t * const dp, const uint32_t plane_
 // Env fns
 
 typedef struct drmu_env_s {
+    atomic_int ref_count;  // 0 == 1 ref for ease of init
+    bool kill;
     int fd;
     uint32_t plane_count;
     uint32_t conn_count;
@@ -3377,15 +3068,18 @@ typedef struct drmu_env_s {
 
     drmu_log_env_t log;
 
-    // global env for atomic flip
-    drmu_atomic_q_t aq;
+    pthread_mutex_t lock;
+
     // global env for bo tracking
     drmu_bo_env_t boe;
     // global atomic for restore op
     drmu_atomic_t * da_restore;
 
-    struct pollqueue * pq;
-    struct polltask * pt;
+    struct drmu_poll_env_s * poll_env;
+    drmu_poll_destroy_fn poll_destroy;
+
+    drmu_env_post_delete_fn post_delete_fn;
+    void * post_delete_v;
 } drmu_env_t;
 
 // Retrieve the the n-th conn
@@ -3554,60 +3248,102 @@ env_boe(drmu_env_t * const du)
     return &du->boe;
 }
 
-static struct pollqueue *
-env_pollqueue(const drmu_env_t * const du)
+static void
+env_restore(drmu_env_t * const du)
 {
-    return du->pq;
-}
+    int rv;
+    drmu_atomic_t * bad = drmu_atomic_new(du);
+    if ((rv = drmu_atomic_commit_test(du->da_restore, DRM_MODE_ATOMIC_ALLOW_MODESET, bad)) != 0) {
+        drmu_atomic_sub(du->da_restore, bad);
+        if ((rv = drmu_atomic_commit(du->da_restore, DRM_MODE_ATOMIC_ALLOW_MODESET)) != 0)
+            drmu_err(du, "Failed to restore old mode on exit: %s", strerror(-rv));
+        else
+            drmu_err(du, "Failed to completely restore old mode on exit");
 
-static struct drmu_atomic_q_s *
-env_atomic_q(drmu_env_t * const du)
-{
-    return &du->aq;
+        if (drmu_env_log(du)->max_level >= DRMU_LOG_LEVEL_DEBUG)
+            drmu_atomic_dump(bad);
+    }
+    drmu_atomic_unref(&bad);
+    drmu_atomic_unref(&du->da_restore);
 }
-
 
 void
-drmu_env_delete(drmu_env_t ** const ppdu)
+drmu_env_int_restore(drmu_env_t * const du)
 {
-    drmu_env_t * const du = *ppdu;
+    if (du->da_restore != NULL)
+        env_restore(du);
+}
 
+static void
+env_free(drmu_env_t * const du)
+{
     if (!du)
         return;
-    *ppdu = NULL;
 
-    atomic_q_flush(&du->aq);
-
-    pollqueue_unref(&du->pq);
-    polltask_delete(&du->pt);
-
-    atomic_q_uninit(&du->aq);
-
-    if (du->da_restore) {
-        int rv;
-        if ((rv = drmu_atomic_commit(du->da_restore, DRM_MODE_ATOMIC_ALLOW_MODESET)) != 0) {
-            drmu_atomic_t * bad = drmu_atomic_new(du);
-            drmu_atomic_commit_test(du->da_restore, DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_ATOMIC_ALLOW_MODESET, bad);
-            drmu_atomic_sub(du->da_restore, bad);
-            if ((rv = drmu_atomic_commit(du->da_restore, DRM_MODE_ATOMIC_ALLOW_MODESET)) != 0)
-                drmu_err(du, "Failed to restore old mode on exit: %s", strerror(-rv));
-            else
-                drmu_err(du, "Failed to completely restore old mode on exit");
-
-            if (drmu_env_log(du)->max_level >= DRMU_LOG_LEVEL_DEBUG)
-                drmu_atomic_dump(bad);
-            drmu_atomic_unref(&bad);
-        }
-        drmu_atomic_unref(&du->da_restore);
-    }
+    if (du->poll_env)
+        du->poll_destroy(&du->poll_env, du);
+    drmu_env_int_restore(du);
 
     env_free_planes(du);
     env_free_conns(du);
     env_free_crtcs(du);
     drmu_bo_env_uninit(&du->boe);
+    pthread_mutex_destroy(&du->lock);
 
-    close(du->fd);
-    free(du);
+    {
+        void * const post_delete_v = du->post_delete_v;
+        const drmu_env_post_delete_fn post_delete_fn = du->post_delete_fn;
+        const int fd = du->fd;
+        free(du);
+        post_delete_fn(post_delete_v, fd);
+    }
+}
+
+void
+drmu_env_unref(drmu_env_t ** const ppdu)
+{
+    drmu_env_t * const du = *ppdu;
+    int n;
+
+    if (!du)
+        return;
+    *ppdu = NULL;
+
+    n = atomic_fetch_sub(&du->ref_count, 1);
+    assert(n >= 0);
+    if (n == 0)
+        env_free(du);
+}
+
+// Kill the Q
+void
+drmu_env_kill(drmu_env_t ** const ppdu)
+{
+    drmu_env_t * du = *ppdu;
+
+    if (!du)
+        return;
+    *ppdu = NULL;
+
+    pthread_mutex_lock(&du->lock);
+    du->kill = true;
+    if (du->poll_env)
+        du->poll_destroy(&du->poll_env, du);
+    pthread_mutex_unlock(&du->lock);
+
+    // If we had a poll env this should have already been done, if it has
+    // already been done this is a noop
+    drmu_env_int_restore(du);
+
+    drmu_env_unref(&du);
+}
+
+drmu_env_t *
+drmu_env_ref(drmu_env_t * const du)
+{
+    if (du)
+        atomic_fetch_add(&du->ref_count, 1);
+    return du;
 }
 
 static int
@@ -3643,10 +3379,26 @@ fail:
 int
 drmu_env_restore_enable(drmu_env_t * const du)
 {
+    uint32_t i;
+
     if (du->da_restore)
         return 0;
     if ((du->da_restore = drmu_atomic_new(du)) == NULL)
         return -ENOMEM;
+
+    // Save state of anything already claimed
+    // Cannot rewind time but this allows us to be a bit lax with the
+    // precise ordering of calls on setup (which is handy for scan)
+    for (i = 0; i != du->conn_count; ++i)
+        if (drmu_conn_is_claimed(du->conns + i))
+            conn_state_save(du, du->conns + i);
+    for (i = 0; i != du->crtc_count; ++i)
+        if (drmu_crtc_is_claimed(du->crtcs + i))
+            crtc_state_save(du, du->crtcs + i);
+    for (i = 0; i != du->plane_count; ++i)
+        if (drmu_plane_is_claimed(du->planes + i))
+            plane_state_save(du, du->planes + i);
+
     return 0;
 }
 
@@ -3679,25 +3431,6 @@ drmu_atomic_env_restore_add_snapshot(drmu_atomic_t ** const ppda)
     return drmu_atomic_merge(du->da_restore, &da);
 }
 
-static void
-drmu_env_polltask_cb(void * v, short revents)
-{
-    drmu_env_t * const du = v;
-    drmEventContext ctx = {
-        .version = DRM_EVENT_CONTEXT_VERSION,
-        .page_flip_handler2 = drmu_atomic_page_flip_cb,
-    };
-
-    if (revents == 0) {
-        drmu_debug(du, "%s: Timeout", __func__);
-    }
-    else {
-        drmHandleEvent(du->fd, &ctx);
-    }
-
-    pollqueue_add_task(du->pt, 1000);
-}
-
 static int
 env_set_client_cap(drmu_env_t * const du, uint64_t cap_id, uint64_t cap_val)
 {
@@ -3708,11 +3441,47 @@ env_set_client_cap(drmu_env_t * const du, uint64_t cap_id, uint64_t cap_val)
     return drmu_ioctl(du, DRM_IOCTL_SET_CLIENT_CAP, &cap);
 }
 
+int
+drmu_env_int_poll_set(drmu_env_t * const du,
+                  const drmu_poll_new_fn new_fn, const drmu_poll_destroy_fn destroy_fn,
+                  struct drmu_poll_env_s ** const ppPe)
+{
+    int rv = 0;
+
+    pthread_mutex_lock(&du->lock);
+    if (du->kill) {
+        rv = -EBUSY;
+    }
+    else if (du->poll_env == NULL) {
+        du->poll_destroy = destroy_fn;
+        if ((du->poll_env = new_fn(du)) == NULL)
+            rv = -ENOMEM;
+    }
+    *ppPe = du->poll_env;
+    pthread_mutex_unlock(&du->lock);
+
+    if (rv == -ENOMEM)
+        drmu_err(du, "Failed to create poll env");
+
+    return rv;
+}
+
+struct drmu_poll_env_s *
+drmu_env_int_poll_get(drmu_env_t * const du)
+{
+    struct drmu_poll_env_s * pe;
+    pthread_mutex_lock(&du->lock);
+    pe = du->poll_env;
+    pthread_mutex_unlock(&du->lock);
+    return pe;
+}
+
 // Closes fd on failure
 drmu_env_t *
-drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log)
+drmu_env_new_fd2(const int fd, const struct drmu_log_env_s * const log,
+                 drmu_env_post_delete_fn post_delete_fn, void * post_delete_v)
 {
-    drmu_env_t * du = calloc(1, sizeof(*du));
+    drmu_env_t * const du = calloc(1, sizeof(*du));
     int rv;
     uint32_t * conn_ids = NULL;
     uint32_t * crtc_ids = NULL;
@@ -3720,33 +3489,26 @@ drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log)
 
     if (!du) {
         drmu_err_log(log, "Failed to create du: No memory");
-        close(fd);
+        post_delete_fn(post_delete_v, fd);
         return NULL;
     }
 
     du->log = (log == NULL) ? drmu_log_env_none : *log;
     du->fd = fd;
+    du->post_delete_fn = post_delete_fn;
+    du->post_delete_v = post_delete_v;
 
+    pthread_mutex_init(&du->lock, NULL);
     drmu_bo_env_init(&du->boe);
-    atomic_q_init(&du->aq);
 
-    if ((du->pq = pollqueue_new()) == NULL) {
-        drmu_err(du, "Failed to create pollqueue");
-        goto fail1;
-    }
-    if ((du->pt = polltask_new(du->pq, du->fd, POLLIN | POLLPRI, drmu_env_polltask_cb, du)) == NULL) {
-        drmu_err(du, "Failed to create polltask");
-        goto fail1;
-    }
-
-    // We want the primary plane for video
-    if ((rv = env_set_client_cap(du, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1)) != 0)
-        drmu_debug(du, "Failed to set universal planes cap");
     // We need atomic for almost everything we do
     if ((rv = env_set_client_cap(du, DRM_CLIENT_CAP_ATOMIC, 1)) != 0) {
         drmu_err(du, "Failed to set atomic cap");
         goto fail1;
     }
+    // We want the primary plane for video
+    if ((rv = env_set_client_cap(du, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1)) != 0)
+        drmu_debug(du, "Failed to set universal planes cap");
     // We can understand AR info
     if ((rv = env_set_client_cap(du, DRM_CLIENT_CAP_ASPECT_RATIO, 1)) != 0)
         drmu_debug(du, "Failed to set AR cap");
@@ -3814,19 +3576,32 @@ drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log)
         crtc_ids = NULL;
     }
 
-    pollqueue_add_task(du->pt, 1000);
-
     free(plane_ids);
     return du;
 
 fail1:
-    drmu_env_delete(&du);
+    env_free(du);
     free(conn_ids);
     free(crtc_ids);
     free(plane_ids);
     return NULL;
 }
 
+static void
+env_post_delete_close_cb(void * v, int fd)
+{
+    (void)v;
+    close(fd);
+}
+
+drmu_env_t *
+drmu_env_new_fd(const int fd, const struct drmu_log_env_s * const log)
+{
+    return drmu_env_new_fd2(fd, log, env_post_delete_close_cb, NULL);
+}
+
+// * As the only remaining libdrm code dependency this should maybe be evicted
+// * to its own file
 drmu_env_t *
 drmu_env_new_open(const char * name, const struct drmu_log_env_s * const log2)
 {

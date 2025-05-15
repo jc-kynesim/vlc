@@ -1,3 +1,6 @@
+#include "pollqueue.h"
+
+#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <poll.h>
@@ -12,8 +15,6 @@
 #include <unistd.h>
 #include <sys/eventfd.h>
 
-#include "pollqueue.h"
-
 #define request_log(...) fprintf(stderr, __VA_ARGS__)
 
 struct pollqueue;
@@ -23,8 +24,11 @@ enum polltask_state {
     POLLTASK_QUEUED,
     POLLTASK_RUNNING,
     POLLTASK_Q_KILL,
+    POLLTASK_Q_DEAD,
     POLLTASK_RUN_KILL,
 };
+
+#define POLLTASK_FLAG_ONCE 1
 
 struct polltask {
     struct polltask *next;
@@ -34,32 +38,49 @@ struct polltask {
 
     int fd;
     short events;
+    unsigned short flags;
 
     void (*fn)(void *v, short revents);
     void * v;
 
     uint64_t timeout; /* CLOCK_MONOTONIC time, 0 => never */
-    sem_t kill_sem;
 };
 
 struct pollqueue {
     atomic_int ref_count;
     pthread_mutex_t lock;
+    pthread_cond_t cond;
 
     struct polltask *head;
     struct polltask *tail;
 
+    struct prepost_ss {
+        void (*pre)(void *v, struct pollfd *pfd);
+        void (*post)(void *v, short revents);
+        void *v;
+    } prepost;
+
+    void (* exit_fn)(void * v);
+    void * exit_v;
+
     bool kill;
+    bool join_req;  // On thread exit do not detach
     bool no_prod;
+
+    bool sig_seq; // Signal cond when seq incremented
+    uint32_t seq;
+
     int prod_fd;
     struct polltask *prod_pt;
     pthread_t worker;
 };
 
-struct polltask *polltask_new(struct pollqueue *const pq,
-                              const int fd, const short events,
-                  void (*const fn)(void *v, short revents),
-                  void *const v)
+static struct polltask *
+polltask_new2(struct pollqueue *const pq,
+              const int fd, const short events,
+              void (*const fn)(void *v, short revents),
+              void *const v,
+              const unsigned short flags)
 {
     struct polltask *pt;
 
@@ -76,13 +97,21 @@ struct polltask *polltask_new(struct pollqueue *const pq,
         .q = pollqueue_ref(pq),
         .fd = fd,
         .events = events,
+        .flags = flags,
         .fn = fn,
         .v = v
     };
 
-    sem_init(&pt->kill_sem, 0, 0);
-
     return pt;
+}
+
+struct polltask *
+polltask_new(struct pollqueue *const pq,
+             const int fd, const short events,
+             void (*const fn)(void *v, short revents),
+             void *const v)
+{
+    return polltask_new2(pq, fd, events, fn, v, 0);
 }
 
 struct polltask *polltask_new_timer(struct pollqueue *const pq,
@@ -90,6 +119,18 @@ struct polltask *polltask_new_timer(struct pollqueue *const pq,
                   void *const v)
 {
     return polltask_new(pq, -1, 0, fn, v);
+}
+
+int
+pollqueue_callback_once(struct pollqueue *const pq,
+                        void (*const fn)(void *v, short revents),
+                        void *const v)
+{
+    struct polltask * const pt = polltask_new2(pq, -1, 0, fn, v, POLLTASK_FLAG_ONCE);
+    if (pt == NULL)
+        return -EINVAL;
+    pollqueue_add_task(pt, 0);
+    return 0;
 }
 
 static void pollqueue_rem_task(struct pollqueue *const pq, struct polltask *const pt)
@@ -108,14 +149,35 @@ static void pollqueue_rem_task(struct pollqueue *const pq, struct polltask *cons
 
 static void polltask_free(struct polltask * const pt)
 {
-    sem_destroy(&pt->kill_sem);
     free(pt);
 }
 
-static int pollqueue_prod(const struct pollqueue *const pq)
+static void polltask_kill(struct polltask * const pt)
+{
+    struct pollqueue * pq = pt->q;
+    polltask_free(pt);
+    pollqueue_unref(&pq);
+}
+
+static void polltask_dead(struct polltask * const pt)
+{
+    pt->state = POLLTASK_Q_DEAD;
+    pthread_cond_broadcast(&pt->q->cond);
+}
+
+static void pollqueue_prod(const struct pollqueue *const pq)
 {
     static const uint64_t one = 1;
-    return write(pq->prod_fd, &one, sizeof(one));
+    int rv;
+    while ((rv = write(pq->prod_fd, &one, sizeof(one))) != sizeof(one)) {
+        if (!(rv == -1 && errno == EINTR))
+            break;
+    }
+}
+
+static bool am_in_thread(const struct pollqueue * const pq)
+{
+    return pthread_equal(pthread_self(), pq->worker);
 }
 
 void polltask_delete(struct polltask **const ppt)
@@ -124,29 +186,56 @@ void polltask_delete(struct polltask **const ppt)
     struct pollqueue * pq;
     enum polltask_state state;
     bool prodme;
+    bool inthread;
 
     if (!pt)
         return;
 
     pq = pt->q;
+    inthread = am_in_thread(pq);
+
     pthread_mutex_lock(&pq->lock);
     state = pt->state;
-    pt->state = (state == POLLTASK_RUNNING) ? POLLTASK_RUN_KILL : POLLTASK_Q_KILL;
+    pt->state = inthread ? POLLTASK_RUN_KILL : POLLTASK_Q_KILL;
     prodme = !pq->no_prod;
     pthread_mutex_unlock(&pq->lock);
 
-    if (state != POLLTASK_UNQUEUED) {
-        if (prodme)
-            pollqueue_prod(pq);
-        while (sem_wait(&pt->kill_sem) && errno == EINTR)
-            /* loop */;
-    }
+    switch (state) {
+        case POLLTASK_UNQUEUED:
+            *ppt = NULL;
+            polltask_kill(pt);
+            break;
 
-    // Leave zapping the ref until we have DQed the PT as might well be
-    // legitimately used in it
-    *ppt = NULL;
-    polltask_free(pt);
-    pollqueue_unref(&pq);
+        case POLLTASK_QUEUED:
+        case POLLTASK_RUNNING:
+        {
+            int rv = 0;
+
+            if (inthread) {
+                // We are in worker thread - kill in main loop to avoid confusion or deadlock
+                *ppt = NULL;
+                break;
+            }
+
+            if (prodme)
+                pollqueue_prod(pq);
+
+            pthread_mutex_lock(&pq->lock);
+            while (rv == 0 && pt->state != POLLTASK_Q_DEAD)
+                rv = pthread_cond_wait(&pq->cond, &pq->lock);
+            pthread_mutex_unlock(&pq->lock);
+
+            // Leave zapping the ref until we have DQed the PT as might well be
+            // legitimately used in it
+            *ppt = NULL;
+            polltask_kill(pt);
+            break;
+        }
+        default:
+            request_log("%s: Unexpected task state: %d\n", __func__, state);
+            *ppt = NULL;
+            break;
+    }
 }
 
 static uint64_t pollqueue_now(int timeout)
@@ -164,9 +253,10 @@ void pollqueue_add_task(struct polltask *const pt, const int timeout)
 {
     bool prodme = false;
     struct pollqueue * const pq = pt->q;
+    const uint64_t timeout_time = timeout < 0 ? 0 : pollqueue_now(timeout);
 
     pthread_mutex_lock(&pq->lock);
-    if (pt->state != POLLTASK_Q_KILL && pt->state != POLLTASK_RUN_KILL) {
+    if (pt->state == POLLTASK_UNQUEUED || pt->state == POLLTASK_RUNNING) {
         if (pq->tail)
             pq->tail->next = pt;
         else
@@ -174,7 +264,7 @@ void pollqueue_add_task(struct polltask *const pt, const int timeout)
         pt->prev = pq->tail;
         pt->next = NULL;
         pt->state = POLLTASK_QUEUED;
-        pt->timeout = timeout < 0 ? 0 : pollqueue_now(timeout);
+        pt->timeout = timeout_time;
         pq->tail = pt;
         prodme = !pq->no_prod;
     }
@@ -186,80 +276,104 @@ void pollqueue_add_task(struct polltask *const pt, const int timeout)
 static void *poll_thread(void *v)
 {
     struct pollqueue *const pq = v;
-    struct pollfd *a = NULL;
-    size_t asize = 0;
 
     pthread_mutex_lock(&pq->lock);
     do {
+        struct pollfd a[POLLQUEUE_MAX_QUEUE];
         unsigned int i, j;
         unsigned int nall = 0;
         unsigned int npoll = 0;
         struct polltask *pt;
         struct polltask *pt_next;
-        uint64_t now = pollqueue_now(0);
-        int timeout = -1;
+        struct prepost_ss prepost;
+        uint64_t timeout0 = 0;
         int rv;
 
         for (pt = pq->head; pt; pt = pt_next) {
-            int64_t t;
-
             pt_next = pt->next;
 
             if (pt->state == POLLTASK_Q_KILL) {
                 pollqueue_rem_task(pq, pt);
-                sem_post(&pt->kill_sem);
+                polltask_dead(pt);
+                continue;
+            }
+            if (pt->state == POLLTASK_RUN_KILL) {
+                pollqueue_rem_task(pq, pt);
+                polltask_kill(pt);
                 continue;
             }
 
             if (pt->fd != -1) {
-                if (npoll >= asize) {
-                    asize = asize ? asize * 2 : 4;
-                    a = realloc(a, asize * sizeof(*a));
-                    if (!a) {
-                        request_log("Failed to realloc poll array to %zd\n", asize);
-                        goto fail_locked;
-                    }
-                }
-
+                assert(npoll < POLLQUEUE_MAX_QUEUE - 1); // Allow for pre/post
                 a[npoll++] = (struct pollfd){
                     .fd = pt->fd,
                     .events = pt->events
                 };
             }
 
-            t = (int64_t)(pt->timeout - now);
-            if (pt->timeout && t < INT_MAX &&
-                (timeout < 0 || (int)t < timeout))
-                timeout = (t < 0) ? 0 : (int)t;
+            // Get earliest timeout
+            if (pt->timeout != 0 &&
+                (timeout0 == 0 || (int64_t)(pt->timeout - timeout0) < 0))
+                timeout0 = pt->timeout;
+
             ++nall;
         }
+        prepost = pq->prepost;
         pthread_mutex_unlock(&pq->lock);
 
-        if ((rv = poll(a, npoll, timeout)) == -1) {
-            if (errno != EINTR) {
-                request_log("Poll error: %s\n", strerror(errno));
-                goto fail_unlocked;
-            }
+        a[npoll] = (struct pollfd){.fd=-1, .events=0, .revents=0};
+        if (prepost.pre)
+            prepost.pre(prepost.v, a + npoll);
+
+        do {
+            const int64_t diff = (int64_t)(timeout0 - pollqueue_now(0));
+            const int timeout = timeout0 == 0 ? -1 :
+                                diff <= 0 ? 0 :
+                                diff >= INT_MAX ? INT_MAX : (int)diff;
+
+            rv = poll(a, npoll + (a[npoll].fd != -1), timeout);
+        } while (rv == -1 && errno == EINTR);
+
+        // Only do timeouts if nothing polled
+        if (rv > 0)
+            timeout0 = 0;
+
+        if (prepost.post)
+            prepost.post(prepost.v, a[npoll].revents);
+
+        if (rv == -1) {
+            request_log("Poll error: %s\n", strerror(errno));
+            goto fail_unlocked;
         }
 
         pthread_mutex_lock(&pq->lock);
-        now = pollqueue_now(0);
-
         /* Prodding in this loop is pointless and might lead to
          * infinite looping
         */
         pq->no_prod = true;
+
+        // Sync for prepost changes
+        ++pq->seq;
+        if (pq->sig_seq) {
+            pq->sig_seq = false;
+            pthread_cond_broadcast(&pq->cond);
+        }
+
         for (i = 0, j = 0, pt = pq->head; i < nall; ++i, pt = pt_next) {
             const short r = pt->fd == -1 ? 0 : a[j++].revents;
             pt_next = pt->next;
 
-            /* Pending? */
-            if (r || (pt->timeout && (int64_t)(now - pt->timeout) >= 0)) {
+            if (pt->state != POLLTASK_QUEUED)
+                continue;
+
+            /* Pending?
+             * Take time as intended time rather than actual time.
+             * probably makes no actual difference and saves us a call
+             */
+            if (r || (pt->timeout != 0 && timeout0 != 0 &&
+                      (int64_t)(timeout0 - pt->timeout) >= 0)) {
                 pollqueue_rem_task(pq, pt);
-                if (pt->state == POLLTASK_QUEUED)
-                    pt->state = POLLTASK_RUNNING;
-                if (pt->state == POLLTASK_Q_KILL)
-                    pt->state = POLLTASK_RUN_KILL;
+                pt->state = POLLTASK_RUNNING;
                 pthread_mutex_unlock(&pq->lock);
 
                 /* This can add new entries to the Q but as
@@ -269,20 +383,38 @@ static void *poll_thread(void *v)
                 pt->fn(pt->v, r);
 
                 pthread_mutex_lock(&pq->lock);
-                if (pt->state == POLLTASK_RUNNING)
+                if (pt->state == POLLTASK_Q_KILL)
+                    polltask_dead(pt);
+                else if (pt->state == POLLTASK_RUN_KILL ||
+                    (pt->flags & POLLTASK_FLAG_ONCE) != 0)
+                    polltask_kill(pt);
+                else if (pt->state == POLLTASK_RUNNING)
                     pt->state = POLLTASK_UNQUEUED;
-                if (pt->state == POLLTASK_RUN_KILL)
-                    sem_post(&pt->kill_sem);
             }
         }
         pq->no_prod = false;
 
     } while (!pq->kill);
 
-fail_locked:
     pthread_mutex_unlock(&pq->lock);
 fail_unlocked:
-    free(a);
+
+    {
+        void (*const exit_fn)(void *v) = pq->exit_fn;
+        void * const exit_v = pq->exit_v;
+
+        polltask_free(pq->prod_pt);
+        pthread_cond_destroy(&pq->cond);
+        pthread_mutex_destroy(&pq->lock);
+        close(pq->prod_fd);
+        if (!pq->join_req)
+            pthread_detach(pthread_self());
+        free(pq);
+
+        if (exit_fn)
+            exit_fn(exit_v);
+    }
+
     return NULL;
 }
 
@@ -290,8 +422,13 @@ static void prod_fn(void *v, short revents)
 {
     struct pollqueue *const pq = v;
     char buf[8];
-    if (revents)
-        read(pq->prod_fd, buf, 8);
+    if (revents) {
+        int rv;
+        while ((rv = read(pq->prod_fd, buf, 8)) != 8) {
+            if (!(rv == -1 && errno == EINTR))
+                break;
+        }
+    }
     if (!pq->kill)
         pollqueue_add_task(pq->prod_pt, -1);
 }
@@ -304,6 +441,7 @@ struct pollqueue * pollqueue_new(void)
     *pq = (struct pollqueue){
         .ref_count = ATOMIC_VAR_INIT(0),
         .lock = PTHREAD_MUTEX_INITIALIZER,
+        .cond = PTHREAD_COND_INITIALIZER,
         .head = NULL,
         .tail = NULL,
         .kill = false,
@@ -311,7 +449,7 @@ struct pollqueue * pollqueue_new(void)
     };
 
     pq->prod_fd = eventfd(0, EFD_NONBLOCK);
-    if (pq->prod_fd == 1)
+    if (pq->prod_fd == -1)
         goto fail1;
     pq->prod_pt = polltask_new(pq, pq->prod_fd, POLLIN, prod_fn, pq);
     if (!pq->prod_pt)
@@ -334,18 +472,21 @@ fail1:
 
 static void pollqueue_free(struct pollqueue *const pq)
 {
-    void *rv;
-
-    pthread_mutex_lock(&pq->lock);
-    pq->kill = true;
-    pollqueue_prod(pq);
-    pthread_mutex_unlock(&pq->lock);
-
-    pthread_join(pq->worker, &rv);
-    polltask_free(pq->prod_pt);
-    pthread_mutex_destroy(&pq->lock);
-    close(pq->prod_fd);
-    free(pq);
+    if (am_in_thread(pq)) {
+        pq->kill = true;
+        if (!pq->no_prod)
+            pollqueue_prod(pq);
+    }
+    else
+    {
+        pthread_mutex_lock(&pq->lock);
+        pq->kill = true;
+        // Must prod inside lock here as otherwise there is a potential race
+        // where the worker terminates and pq is freed before the prod
+        if (!pq->no_prod)
+            pollqueue_prod(pq);
+        pthread_mutex_unlock(&pq->lock);
+    }
 }
 
 struct pollqueue * pollqueue_ref(struct pollqueue *const pq)
@@ -368,5 +509,54 @@ void pollqueue_unref(struct pollqueue **const ppq)
     pollqueue_free(pq);
 }
 
+void pollqueue_finish(struct pollqueue **const ppq)
+{
+    struct pollqueue * pq = *ppq;
+    pthread_t worker;
 
+    if (!pq)
+        return;
 
+    pq->join_req = true;
+    worker = pq->worker;
+
+    pollqueue_unref(&pq);
+
+    pthread_join(worker, NULL);
+
+    // Delay zapping the ref until after the join as it is legit for the
+    // remaining active polltasks to use it.
+    *ppq = NULL;
+}
+
+void pollqueue_set_pre_post(struct pollqueue *const pq,
+                            void (*fn_pre)(void *v, struct pollfd *pfd),
+                            void (*fn_post)(void *v, short revents),
+                            void *v)
+{
+    const bool in_thread = am_in_thread(pq);
+
+    pthread_mutex_lock(&pq->lock);
+    pq->prepost.pre = fn_pre;
+    pq->prepost.post = fn_post;
+    pq->prepost.v = v;
+
+    if (!pq->no_prod && !in_thread) {
+        const uint32_t seq = pq->seq;
+        int rv = 0;
+
+        pollqueue_prod(pq);
+
+        pq->sig_seq = true;
+        while (rv == 0 && pq->seq == seq)
+            rv = pthread_cond_wait(&pq->cond, &pq->lock);
+    }
+    pthread_mutex_unlock(&pq->lock);
+}
+
+void pollqueue_set_exit(struct pollqueue *const pq,
+                        void (* const exit_fn)(void * v), void * v)
+{
+    pq->exit_fn = exit_fn;
+    pq->exit_v = v;
+}

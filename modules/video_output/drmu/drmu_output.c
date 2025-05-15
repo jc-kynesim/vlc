@@ -1,7 +1,10 @@
 #include "drmu_output.h"
+
+#include "drmu_fmts.h"
 #include "drmu_log.h"
 
 #include <errno.h>
+#include <stdatomic.h>
 #include <string.h>
 
 #include <libdrm/drm.h>
@@ -14,20 +17,23 @@ static inline int rvup(int rv1, int rv2)
 }
 
 struct drmu_output_s {
+    atomic_int ref_count;
+
     drmu_env_t * du;
     drmu_crtc_t * dc;
     unsigned int conn_n;
     unsigned int conn_size;
     drmu_conn_t ** dns;
+    bool has_max_bpc;
     bool max_bpc_allow;
     bool modeset_allow;
     int mode_id;
     drmu_mode_simple_params_t mode_params;
 
     // These are expected to be static consts so no copy / no free
-    const drmu_format_info_t * fmt_info;
-    const char * colorspace;
-    const char * broadcast_rgb;
+    const drmu_fmt_info_t * fmt_info;
+    drmu_colorspace_t colorspace;
+    drmu_broadcast_rgb_t broadcast_rgb;
 
     // HDR metadata
     drmu_isset_t hdr_metadata_isset;
@@ -37,27 +43,59 @@ struct drmu_output_s {
 drmu_plane_t *
 drmu_output_plane_ref_primary(drmu_output_t * const dout)
 {
-    drmu_plane_t * const dp = drmu_plane_new_find_type(dout->dc, DRMU_PLANE_TYPE_PRIMARY);
-
-    if (dp == NULL || drmu_plane_ref_crtc(dp, dout->dc) != 0)
-        return NULL;
-
-    return dp;
+    return drmu_plane_new_find_ref_type(dout->dc, DRMU_PLANE_TYPE_PRIMARY);
 }
 
 drmu_plane_t *
 drmu_output_plane_ref_other(drmu_output_t * const dout)
 {
-    drmu_plane_t *const dp = drmu_plane_new_find_type(dout->dc, DRMU_PLANE_TYPE_CURSOR | DRMU_PLANE_TYPE_OVERLAY);
+    return drmu_plane_new_find_ref_type(dout->dc, DRMU_PLANE_TYPE_CURSOR | DRMU_PLANE_TYPE_OVERLAY);
+}
 
-    if (dp == NULL || drmu_plane_ref_crtc(dp, dout->dc) != 0)
-        return NULL;
+struct plane_format_s {
+    unsigned int types;
+    uint32_t fmt;
+    uint64_t mod;
+};
 
-    return dp;
+static bool plane_find_format_cb(const drmu_plane_t * dp, void * v)
+{
+    const struct plane_format_s * const f = v;
+    return (f->types & drmu_plane_type(dp)) != 0 &&
+        drmu_plane_format_check(dp, f->fmt, f->mod);
+}
+
+drmu_plane_t *
+drmu_output_plane_ref_format(drmu_output_t * const dout, const unsigned int types, const uint32_t format, const uint64_t mod)
+{
+    struct plane_format_s fm = {
+        .types = (types != 0) ? types : (DRMU_PLANE_TYPE_PRIMARY |  DRMU_PLANE_TYPE_CURSOR | DRMU_PLANE_TYPE_OVERLAY),
+        .fmt = format,
+        .mod = mod
+    };
+
+    return drmu_plane_new_find_ref(dout->dc, plane_find_format_cb, &fm);
+}
+
+
+int
+drmu_atomic_output_add_connect(drmu_atomic_t * const da, drmu_output_t * const dout)
+{
+    int rv;
+
+    if ((rv = drmu_atomic_crtc_add_active(da, dout->dc, 1)) != 0)
+        return rv;
+
+    for (unsigned int i = 0; i != dout->conn_n; ++i) {
+        if ((rv = drmu_atomic_conn_add_crtc(da, dout->dns[i], dout->dc)) != 0)
+            return rv;
+    }
+
+    return 0;
 }
 
 int
-drmu_atomic_add_output_props(drmu_atomic_t * const da, drmu_output_t * const dout)
+drmu_atomic_output_add_props(drmu_atomic_t * const da, drmu_output_t * const dout)
 {
     int rv = 0;
     unsigned int i;
@@ -71,13 +109,13 @@ drmu_atomic_add_output_props(drmu_atomic_t * const da, drmu_output_t * const dou
         drmu_conn_t * const dn = dout->dns[i];
 
         if (dout->fmt_info && dout->max_bpc_allow)
-            rv = rvup(rv, drmu_atomic_conn_hi_bpc_set(da, dn, (drmu_format_info_bit_depth(dout->fmt_info) > 8)));
-        if (dout->colorspace)
-            rv = rvup(rv, drmu_atomic_conn_colorspace_set(da, dn, dout->colorspace));
-        if (dout->broadcast_rgb)
-            rv = rvup(rv, drmu_atomic_conn_broadcast_rgb_set(da, dn, dout->broadcast_rgb));
+            rv = rvup(rv, drmu_atomic_conn_add_hi_bpc(da, dn, (drmu_fmt_info_bit_depth(dout->fmt_info) > 8)));
+        if (drmu_colorspace_is_set(dout->colorspace))
+            rv = rvup(rv, drmu_atomic_conn_add_colorspace(da, dn, dout->colorspace));
+        if (drmu_broadcast_rgb_is_set(dout->broadcast_rgb))
+            rv = rvup(rv, drmu_atomic_conn_add_broadcast_rgb(da, dn, dout->broadcast_rgb));
         if (dout->hdr_metadata_isset != DRMU_ISSET_UNSET)
-            rv = rvup(rv, drmu_atomic_conn_hdr_metadata_set(da, dn,
+            rv = rvup(rv, drmu_atomic_conn_add_hdr_metadata(da, dn,
                 dout->hdr_metadata_isset == DRMU_ISSET_NULL ? NULL : &dout->hdr_metadata));
     }
 
@@ -87,19 +125,22 @@ drmu_atomic_add_output_props(drmu_atomic_t * const da, drmu_output_t * const dou
 // Set all the fb info props that might apply to a crtc on the crtc
 // (e.g. hdr_metadata, colorspace) but do not set the mode (resolution
 // and refresh)
+//
+// N.B. Only changes those props that are set in the fb. If unset in the fb
+// then their value is unchanged.
 int
 drmu_output_fb_info_set(drmu_output_t * const dout, const drmu_fb_t * const fb)
 {
-    drmu_isset_t hdr_isset = drmu_fb_hdr_metadata_isset(fb);
-    const drmu_format_info_t * fmt_info = drmu_fb_format_info_get(fb);
-    const char * colorspace             = drmu_fb_colorspace_get(fb);
-    const char * broadcast_rgb          = drmu_color_range_to_broadcast_rgb(drmu_fb_color_range_get(fb));
+    const drmu_isset_t hdr_isset = drmu_fb_hdr_metadata_isset(fb);
+    const drmu_fmt_info_t * fmt_info = drmu_fb_format_info_get(fb);
+    const drmu_colorspace_t colorspace  = drmu_fb_colorspace_get(fb);
+    const drmu_broadcast_rgb_t broadcast_rgb = drmu_color_range_to_broadcast_rgb(drmu_fb_color_range_get(fb));
 
     if (fmt_info)
         dout->fmt_info = fmt_info;
-    if (colorspace)
+    if (drmu_colorspace_is_set(colorspace))
         dout->colorspace = colorspace;
-    if (broadcast_rgb)
+    if (drmu_broadcast_rgb_is_set(broadcast_rgb))
         dout->broadcast_rgb = broadcast_rgb;
 
     if (hdr_isset != DRMU_ISSET_UNSET) {
@@ -109,6 +150,15 @@ drmu_output_fb_info_set(drmu_output_t * const dout, const drmu_fb_t * const fb)
     }
 
     return 0;
+}
+
+void
+drmu_output_fb_info_unset(drmu_output_t * const dout)
+{
+    dout->fmt_info = NULL;
+    dout->colorspace = DRMU_COLORSPACE_UNSET;
+    dout->broadcast_rgb = DRMU_BROADCAST_RGB_UNSET;
+    dout->hdr_metadata_isset = DRMU_ISSET_UNSET;
 }
 
 
@@ -134,37 +184,44 @@ drmu_output_mode_simple_params(const drmu_output_t * const dout)
     return &dout->mode_params;
 }
 
+static int
+score_freq(const drmu_mode_simple_params_t * const mode, const drmu_mode_simple_params_t * const p)
+{
+    const int pref = (mode->type & DRM_MODE_TYPE_PREFERRED) != 0;
+    const unsigned int r_m = (mode->flags & DRM_MODE_FLAG_INTERLACE) != 0 ?
+        mode->hz_x_1000 * 2: mode->hz_x_1000;
+    const unsigned int r_f = (p->flags & DRM_MODE_FLAG_INTERLACE) != 0 ?
+        p->hz_x_1000 * 2 : p->hz_x_1000;
+
+    // If we haven't been given any hz then pick pref or fastest
+    // Max out at 300Hz (=300,0000)
+    if (r_f == 0)
+        return pref ? 83000000 : 80000000 + (r_m >= 2999999 ? 2999999 : r_m);
+    // Prefer a good match to 29.97 / 30 but allow the other
+    else if ((r_m + 10 >= r_f && r_m <= r_f + 10))
+        return 100000000;
+    else if ((r_m + 100 >= r_f && r_m <= r_f + 100))
+        return 95000000;
+    // Double isn't bad
+    else if ((r_m + 10 >= r_f * 2 && r_m <= r_f * 2 + 10))
+        return 90000000;
+    else if ((r_m + 100 >= r_f * 2 && r_m <= r_f * 2 + 100))
+        return 85000000;
+    return -1;
+}
+
+// Avoid interlace no matter what our source
 int
 drmu_mode_pick_simple_cb(void * v, const drmu_mode_simple_params_t * mode)
 {
     const drmu_mode_simple_params_t * const p = v;
-
     const int pref = (mode->type & DRM_MODE_TYPE_PREFERRED) != 0;
-    const unsigned int r_m = mode->hz_x_1000;
-    const unsigned int r_f = p->hz_x_1000;
     int score = -1;
 
-    // We don't understand interlace
-    if ((mode->flags & DRM_MODE_FLAG_INTERLACE) != 0)
-        return -1;
+    if (p->width == mode->width && p->height == mode->height &&
+        (mode->flags & DRM_MODE_FLAG_INTERLACE) == 0)
+        score = score_freq(mode, p);
 
-    if (p->width == mode->width && p->height == mode->height)
-    {
-        // If we haven't been given any hz then pick pref or fastest
-        // Max out at 300Hz (=300,0000)
-        if (r_f == 0)
-            score = pref ? 83000000 : 80000000 + (r_m >= 2999999 ? 2999999 : r_m);
-        // Prefer a good match to 29.97 / 30 but allow the other
-        else if ((r_m + 10 >= r_f && r_m <= r_f + 10))
-            score = 100000000;
-        else if ((r_m + 100 >= r_f && r_m <= r_f + 100))
-            score = 95000000;
-        // Double isn't bad
-        else if ((r_m + 10 >= r_f * 2 && r_m <= r_f * 2 + 10))
-            score = 90000000;
-        else if ((r_m + 100 >= r_f * 2 && r_m <= r_f * 2 + 100))
-            score = 85000000;
-    }
     if (score > 0 && (p->width != mode->width || p->height != mode->height))
         score -= 30000000;
 
@@ -173,6 +230,38 @@ drmu_mode_pick_simple_cb(void * v, const drmu_mode_simple_params_t * mode)
 
     return score;
 }
+
+// Pick the preferred mode or the 1st one if nothing preferred
+int
+drmu_mode_pick_simple_preferred_cb(void * v, const drmu_mode_simple_params_t * mode)
+{
+    (void)v;
+    return (mode->type & DRM_MODE_TYPE_PREFERRED) != 0 ? 1 : 0;
+}
+
+// Try to match interlace as well as everything else
+int
+drmu_mode_pick_simple_interlace_cb(void * v, const drmu_mode_simple_params_t * mode)
+{
+    const drmu_mode_simple_params_t * const p = v;
+
+    const int pref = (mode->type & DRM_MODE_TYPE_PREFERRED) != 0;
+    int score = -1;
+
+    if (p->width == mode->width && p->height == mode->height)
+        score = score_freq(mode, p);
+
+    if (score > 0 && (p->width != mode->width || p->height != mode->height))
+        score -= 30000000;
+    if (((mode->flags ^ p->flags) & DRM_MODE_FLAG_INTERLACE) != 0)
+        score -= 20000000;
+
+    if (score <= 0 && pref)
+        score = 10000000;
+
+    return score;
+}
+
 
 int
 drmu_output_mode_pick_simple(drmu_output_t * const dout, drmu_mode_score_fn * const score_fn, void * const score_v)
@@ -201,8 +290,8 @@ drmu_output_mode_pick_simple(drmu_output_t * const dout, drmu_mode_score_fn * co
 int
 drmu_output_max_bpc_allow(drmu_output_t * const dout, const bool allow)
 {
-    dout->max_bpc_allow = allow;
-    return 0;
+    dout->max_bpc_allow = allow && dout->has_max_bpc;
+    return allow && !dout->has_max_bpc ? -ENOENT : 0;
 }
 
 int
@@ -228,11 +317,11 @@ check_conns_size(drmu_output_t * const dout)
     return 0;
 }
 
+// Experimental, more flexible version of _add_output
 int
-drmu_output_add_output(drmu_output_t * const dout, const char * const conn_name)
+drmu_output_add_output2(drmu_output_t * const dout, const char * const conn_name, const unsigned int flags)
 {
     const size_t nlen = !conn_name ? 0 : strlen(conn_name);
-    unsigned int i;
     unsigned int retries = 0;
     drmu_env_t * const du = dout->du;
     drmu_conn_t * dn;
@@ -253,7 +342,7 @@ retry:
     dn = NULL;
     dc_t = NULL;
 
-    for (i = 0; (dn_t = drmu_env_conn_find_n(du, i)) != NULL; ++i) {
+    for (unsigned int i = 0; (dn_t = drmu_env_conn_find_n(du, i)) != NULL; ++i) {
         if (!drmu_conn_is_output(dn_t) || drmu_conn_is_claimed(dn_t))
             continue;
         if (nlen && strncmp(conn_name, drmu_conn_name(dn_t), nlen) != 0)
@@ -275,9 +364,32 @@ retry:
     if (!dn)
         return -ENOENT;
 
-    if (!dc_t) {
+    if (!dc_t && (flags & DRMU_OUTPUT_FLAG_ADD_DISCONNECTED) == 0) {
         drmu_warn(du, "Adding unattached conns NIF");
         return -EINVAL;
+    }
+
+    if (!dc_t) {
+        uint32_t possible_crtcs = drmu_conn_possible_crtcs(dn);
+        drmu_warn(du, "Adding unattached conn: CRTCs=%#x", possible_crtcs);
+
+        for (unsigned int i = 0; possible_crtcs != 0; ++i, possible_crtcs >>= 1) {
+            if ((possible_crtcs & 1) == 0)
+                continue;
+
+            drmu_info(du, "try Crtc %d", i);
+
+            if ((dc_t = drmu_env_crtc_find_n(du, i)) == NULL) {
+                break; // Can only happen if i is too big
+            }
+
+            // ** Maybe some more tests for viability here
+        }
+    }
+
+    if (!dc_t) {
+        drmu_warn(du, "No CRTC found for Conn");
+        return -ENOENT;
     }
 
     if ((rv = check_conns_size(dout)) != 0)
@@ -293,12 +405,21 @@ retry:
         goto retry;
     }
 
+    // Test features
+    dout->has_max_bpc = drmu_conn_has_hi_bpc(dn);
+
     dout->dns[dout->conn_n++] = dn;
     dout->dc = dc_t;
 
     dout->mode_params = drmu_crtc_mode_simple_params(dout->dc);
 
     return 0;
+}
+
+int
+drmu_output_add_output(drmu_output_t * const dout, const char * const conn_name)
+{
+    return drmu_output_add_output2(dout, conn_name, 0);
 }
 
 static struct drm_mode_modeinfo
@@ -491,13 +612,21 @@ drmu_output_conn(const drmu_output_t * const dout, const unsigned int n)
     return !dout || n >= dout->conn_n ? NULL : dout->dns[n];
 }
 
+drmu_env_t *
+drmu_output_env(const drmu_output_t * const dout)
+{
+    return dout->du;
+}
+
 static void
 output_free(drmu_output_t * const dout)
 {
     unsigned int i;
     for (i = 0; i != dout->conn_n; ++i)
         drmu_conn_unref(dout->dns + i);
+    free(dout->dns);
     drmu_crtc_unref(&dout->dc);
+    drmu_env_unref(&dout->du);
     free(dout);
 }
 
@@ -509,7 +638,16 @@ drmu_output_unref(drmu_output_t ** const ppdout)
         return;
     *ppdout = NULL;
 
-    output_free(dout);
+    if (atomic_fetch_sub(&dout->ref_count, 1) == 0)
+        output_free(dout);
+}
+
+drmu_output_t *
+drmu_output_ref(drmu_output_t * const dout)
+{
+    if (dout != NULL)
+        atomic_fetch_add(&dout->ref_count, 1);
+    return dout;
 }
 
 drmu_output_t *
@@ -522,7 +660,7 @@ drmu_output_new(drmu_env_t * const du)
         return NULL;
     }
 
-    dout->du = du;
+    dout->du = drmu_env_ref(du);
     dout->mode_id = -1;
     return dout;
 }
