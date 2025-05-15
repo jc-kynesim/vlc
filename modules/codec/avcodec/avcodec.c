@@ -285,6 +285,7 @@ AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
     vlc_init_avcodec(VLC_OBJECT(p_dec));
 
     /* *** ask ffmpeg for a decoder *** */
+    char *psz_decoder = var_InheritString( p_dec, "avcodec-codec" );
     if( psz_decoder != NULL )
     {
         p_codec = avcodec_find_decoder_by_name( psz_decoder );
@@ -296,7 +297,7 @@ AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
                     psz_decoder, (char*)&p_dec->fmt_in->i_codec );
             p_codec = NULL;
         }
-        free( (char*)psz_decoder );
+        free( psz_decoder );
     }
 
 //    if( hw_dec_name != NULL )
@@ -321,11 +322,8 @@ AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
 
     avctx->debug = var_InheritInteger( p_dec, "avcodec-debug" );
     avctx->opaque = p_dec;
-    return avctx;
 
-fail_free_psz_decoder:
-    free((char*)psz_decoder);
-    return NULL;
+    return avctx;
 }
 
 //AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
