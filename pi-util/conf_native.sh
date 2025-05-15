@@ -98,7 +98,7 @@ echo "**" > $OUT_BASE/.gitignore
 
 cd $OUT
 if [ $DO_CONFIGURE ]; then
-    $BASE/configure \
+    ../../configure \
      --build=$A \
      --prefix=$USR_PREFIX\
      --libdir=$LIB_PREFIX\
