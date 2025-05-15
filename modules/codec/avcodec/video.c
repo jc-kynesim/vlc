@@ -44,6 +44,7 @@
 
 #include "avcodec.h"
 #include "va.h"
+#include "drm_pic.h"
 
 #if defined(_WIN32)
 # include <winapifamily.h>
@@ -204,6 +205,7 @@ static bool FrameCanStoreInfo( const AVFrame *frame )
 #if OPAQUE_REF_ONLY
     return !!frame->opaque_ref;
 #else
+    VLC_UNUSED(frame);
     return true;
 #endif
 }
@@ -429,6 +431,12 @@ static int lavc_CopyPicture(decoder_t *dec, picture_t *pic, AVFrame *frame)
 
     video_format_t test_chroma;
     video_format_Init(&test_chroma, 0);
+
+    if (frame->format == AV_PIX_FMT_DRM_PRIME)
+    {
+        return drm_prime_attach_buf_to_pic(dec, pic, frame);
+    }
+
     if (GetVlcChroma(&test_chroma, frame->format) != VLC_SUCCESS)
     {
         const char *name = av_get_pix_fmt_name(frame->format);
@@ -768,8 +776,10 @@ static int ffmpeg_OpenVa(decoder_t *p_dec, AVCodecContext *p_context,
     };
     vlc_va_t *va = vlc_va_New(VLC_OBJECT(p_dec), &cfg);
 
-    if (va == NULL)
+    if (va == NULL) {
+        msg_Dbg(p_dec, "%s: vlc_va_New failed (Unsupported codec profile or such)", __func__);
         return VLC_EGENERIC; /* Unsupported codec profile or such */
+    }
     assert(p_dec->fmt_out.video.i_chroma != 0);
     assert(cfg.vctx_out != NULL);
     p_dec->fmt_out.i_codec = p_dec->fmt_out.video.i_chroma;
@@ -777,6 +787,7 @@ static int ffmpeg_OpenVa(decoder_t *p_dec, AVCodecContext *p_context,
 
     if (decoder_UpdateVideoOutput(p_dec, cfg.vctx_out))
     {
+        msg_Dbg(p_dec, "%s: decoder_UpdateVideoOutput failed", __func__);
         vlc_va_Delete(va, p_context);
         return VLC_EGENERIC; /* Unsupported codec profile or such */
     }
@@ -977,6 +988,8 @@ static void Flush( decoder_t *p_dec )
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
     AVCodecContext *p_context = p_sys->p_context;
+
+    msg_Info(p_dec, "<<< %s: (extra=%p[%d])", __func__, p_context->extradata, p_context->extradata_size);
 
     p_sys->i_late_frames = 0;
     p_sys->framedrop = FRAMEDROP_NONE;
@@ -1535,6 +1548,8 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
             if( i_used == 0 ) break;
             continue;
         }
+//        msg_Info(p_dec, "%s: Frame Rx: fmt=%d, ctx.fmt=%d PTS=%" PRId64 "/%" PRId64, __func__,
+//                 frame->format, p_context->pix_fmt, frame->pts, frame->pkt_pts);
 
         struct frame_info_s *p_frame_info = FrameInfoGet( p_sys, frame );
         if( p_frame_info && p_frame_info->b_eos )
@@ -1617,6 +1632,10 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
              && lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
                                        p_context->pix_fmt) == 0
              && decoder_UpdateVideoOutput(p_dec, NULL) == 0)
+                p_pic = decoder_NewPicture(p_dec);
+            else if (frame->format == AV_PIX_FMT_DRM_PRIME &&
+                     lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
+                                            p_context->pix_fmt) == 0)
                 p_pic = decoder_NewPicture(p_dec);
 
             if( !p_pic )
@@ -2120,7 +2139,22 @@ no_reuse:
     p_sys->level = p_context->level;
 
     if (!can_hwaccel)
+    {
+        msg_Dbg(p_dec, "No hwaccle use sw: %d", swfmt);
         return swfmt;
+    }
+
+    static const enum AVPixelFormat hwfmts[] =
+    {
+#ifdef _WIN32
+        AV_PIX_FMT_D3D11VA_VLD,
+        AV_PIX_FMT_DXVA2_VLD,
+#endif
+        AV_PIX_FMT_DRM_PRIME,
+        AV_PIX_FMT_VAAPI,
+        AV_PIX_FMT_VDPAU,
+        AV_PIX_FMT_NONE,
+    };
 
     const AVPixFmtDescriptor *src_desc = av_pix_fmt_desc_get(swfmt);
 
@@ -2135,17 +2169,23 @@ no_reuse:
             continue;
 
         vlc_decoder_device *dec_device;
+        msg_Dbg(p_dec, "Is hw %d, sw %d legit", hwfmt, swfmt);
+
         int ret = lavc_UpdateHWVideoFormat(p_dec, p_context, hwfmt, swfmt,
                                            &dec_device);
-        if (ret != VLC_SUCCESS)
+        if (ret != VLC_SUCCESS) {
+            msg_Dbg(p_dec, "%s: lavc_UpdateHWVideoFormat failed", __func__);
             continue;
+        }
 
         ret = ffmpeg_OpenVa(p_dec, p_context, hwfmt, src_desc, dec_device);
         if (dec_device != NULL)
             vlc_decoder_device_Release(dec_device);
 
-        if (ret != VLC_SUCCESS)
+        if (ret != VLC_SUCCESS) {
+            msg_Dbg(p_dec, "%s: ffmpeg_OpenVa failed", __func__);
             continue;
+        }
 
         return hwfmt;
     }
