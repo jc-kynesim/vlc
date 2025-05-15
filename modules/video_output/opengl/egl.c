@@ -245,14 +245,14 @@ static EGLDisplay OpenDisplay(vlc_gl_t *gl)
 
     if (surface->type != VLC_WINDOW_TYPE_WAYLAND)
         return EGL_NO_DISPLAY;
-    if (!CheckClientExt("EGL_KHR_display_reference")) {
-        msg_Warn(gl, "EGL display reference counting not supported");
-        return EGL_NO_DISPLAY;
-    }
+//    if (!CheckClientExt("EGL_KHR_display_reference")) {
+//        msg_Warn(gl, "EGL display reference counting not supported");
+//        return EGL_NO_DISPLAY;
+//    }
 
 # ifdef EGL_KHR_display_reference
     static const EGLAttrib attrs[] = {
-        EGL_TRACK_REFERENCES_KHR, EGL_TRUE,
+//        EGL_TRACK_REFERENCES_KHR, EGL_TRUE,
         EGL_NONE
     };
 
