@@ -16,6 +16,8 @@
 
 #include <libdrm/drm_fourcc.h>
 
+#include <vlc/libvlc_version.h>
+
 typedef struct fb_aux_pic_s {
     picture_context_t * pic_ctx;
 } fb_aux_pic_t;
@@ -24,8 +26,18 @@ static void
 pic_fb_delete_cb(void * v)
 {
     fb_aux_pic_t * const aux = v;
+    picture_context_t * const ctx = aux->pic_ctx;
 
-    aux->pic_ctx->destroy(aux->pic_ctx);
+    printf("%s\n", __func__);
+#if LIBVLC_VERSION_MAJOR >= 4
+    vlc_video_context *vctx = ctx->vctx;
+    ctx->destroy(ctx);
+    if (vctx)
+        vlc_video_context_Release(vctx);
+#else
+    ctx->destroy(aux->pic_ctx);
+#endif
+
     free(aux);
 }
 

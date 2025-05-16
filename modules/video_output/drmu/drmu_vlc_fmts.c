@@ -24,7 +24,7 @@
 #define DRMU_VLC_FMTS_FLAG_FULL_RANGE   4
 
 // VLC4 after some point removes RGB32 and associated masks
-#ifdef VLC_CODEC_XRGB
+#ifdef VLC_CODEC_RGB32
 #define HAS_RGB_MASK 1
 #else
 #define HAS_RGB_MASK 0
@@ -33,11 +33,9 @@
 struct drmu_vlc_fmt_info_ss {
     vlc_fourcc_t vlc_chroma;
     uint32_t drm_pixelformat;
-#if HAS_RGB_MASK
     uint32_t rmask;
     uint32_t gmask;
     uint32_t bmask;
-#endif
     uint64_t drm_modifier;
     unsigned int flags;
 };
@@ -45,11 +43,10 @@ struct drmu_vlc_fmt_info_ss {
 // N.B. DRM seems to order its format descriptor names the opposite way round to VLC
 // DRM is hi->lo within a little-endian word, VLC is byte order
 
+#warning Fix macros to deal with masks els not existing
 #define I2(vlc, drm) {(vlc), (drm), 0, 0, 0, DRM_FORMAT_MOD_LINEAR, 0 }
 #define R2(vlc, drm) RM((vlc), (drm), 0, 0, 0)
-#if HAS_RGB_MASK
 #define RM(vlc, drm, r, g, b) {(vlc), (drm), (r), (g), (b), DRM_FORMAT_MOD_LINEAR, 0 }
-#endif
 
 static const drmu_vlc_fmt_info_t fmt_table[] = {
     R2(VLC_CODEC_RGBA, DRM_FORMAT_ABGR8888),
@@ -70,12 +67,18 @@ static const drmu_vlc_fmt_info_t fmt_table[] = {
     I2(VLC_CODEC_NV42, DRM_FORMAT_NV42),
     I2(VLC_CODEC_P010, DRM_FORMAT_P010),
     I2(VLC_CODEC_I420, DRM_FORMAT_YUV420),
+#ifdef VLC_CODEC_J420
     { VLC_CODEC_J420, DRM_FORMAT_YUV420, 0, 0, 0, DRM_FORMAT_MOD_LINEAR, DRMU_VLC_FMTS_FLAG_FULL_RANGE },
+#endif
     I2(VLC_CODEC_YV12, DRM_FORMAT_YVU420),
     I2(VLC_CODEC_I422, DRM_FORMAT_YUV422),
+#ifdef VLC_CODEC_J422
     { VLC_CODEC_J422, DRM_FORMAT_YUV422, 0, 0, 0, DRM_FORMAT_MOD_LINEAR, DRMU_VLC_FMTS_FLAG_FULL_RANGE },
+#endif
     I2(VLC_CODEC_I444, DRM_FORMAT_YUV444),
+#ifdef VLC_CODEC_J444
     { VLC_CODEC_J444, DRM_FORMAT_YUV444, 0, 0, 0, DRM_FORMAT_MOD_LINEAR, DRMU_VLC_FMTS_FLAG_FULL_RANGE },
+#endif
 #if HAS_DRMPRIME
     { VLC_CODEC_DRM_PRIME_I420,   DRM_FORMAT_YUV420,   0, 0, 0, DRM_FORMAT_MOD_LINEAR,           DRMU_VLC_FMTS_FLAG_DRMP },
     { VLC_CODEC_DRM_PRIME_NV12,   DRM_FORMAT_NV12,     0, 0, 0, DRM_FORMAT_MOD_LINEAR,           DRMU_VLC_FMTS_FLAG_DRMP },
@@ -190,6 +193,8 @@ drmu_vlc_fmt_info_vlc_rgb_masks(const drmu_vlc_fmt_info_t * const f, uint32_t * 
         *g = f->gmask;
         *b = f->bmask;
     }
+#else
+    VLC_UNUSED(f);
 #endif
     *r = 0;
     *g = 0;
