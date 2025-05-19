@@ -542,6 +542,26 @@ static int OpenVideoCodec( decoder_t *p_dec )
     return 0;
 }
 
+static es_format_t hw_fail;
+
+static bool
+hw_check_bad(const es_format_t * const fmt)
+{
+    if (hw_fail.i_codec == fmt->i_codec &&
+        hw_fail.video.i_width  == fmt->video.i_width &&
+        hw_fail.video.i_height == fmt->video.i_height)
+        return true;
+
+    return false;
+}
+
+static void
+hw_set_bad(const es_format_t * const fmt)
+{
+    if (fmt->video.i_width != 0 && fmt->video.i_height != 0)
+        hw_fail = *fmt;
+}
+
 static int InitVideoDecCommon( decoder_t *p_dec )
 {
     decoder_sys_t *p_sys = p_dec->p_sys;
@@ -955,11 +975,12 @@ failed:
  * the ffmpeg codec will be opened, some memory allocated. The vout is not yet
  * opened (done after the first decoded frame).
  *****************************************************************************/
-int InitVideoDec( vlc_object_t *obj )
+
+static int InitVideoDec2( vlc_object_t *obj, const int hw )
 {
     decoder_t *p_dec = (decoder_t *)obj;
     const AVCodec *p_codec;
-    AVCodecContext *p_context = ffmpeg_AllocContext( p_dec, &p_codec );
+    AVCodecContext *p_context = ffmpeg_AllocContextHw( p_dec, &p_codec, hw );
     if( p_context == NULL )
         return VLC_EGENERIC;
 
@@ -979,6 +1000,27 @@ int InitVideoDec( vlc_object_t *obj )
     p_sys->b_hardware_only = false;
 
     return InitVideoDecCommon( p_dec );
+}
+
+int InitVideoDec( vlc_object_t *obj )
+{
+    decoder_t * const p_dec = (decoder_t *)obj;
+
+    // Don't retry something we know failed
+    if (!hw_check_bad(p_dec->fmt_in))
+    {
+        if (InitVideoDec2(obj, 1) == 0)
+            return 0;
+
+        hw_set_bad(p_dec->fmt_in);
+        msg_Dbg(p_dec, "Set hw fail for %4.4s %dx%d", (char *)&p_dec->fmt_in->i_codec, p_dec->fmt_in->video.i_width, p_dec->fmt_in->video.i_height);
+    }
+    else
+    {
+        msg_Dbg(p_dec, "Avoid trying hw decoder for %4.4s %dx%d", (char *)&p_dec->fmt_in->i_codec, p_dec->fmt_in->video.i_width, p_dec->fmt_in->video.i_height);
+    }
+
+    return InitVideoDec2(obj, 0);
 }
 
 /*****************************************************************************

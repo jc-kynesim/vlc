@@ -222,8 +222,9 @@ vlc_module_begin ()
 #endif
 vlc_module_end ()
 
-AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
-                                     const AVCodec **restrict codecp )
+AVCodecContext *ffmpeg_AllocContextHw( decoder_t *p_dec,
+                                       const AVCodec **restrict codecp,
+                                       int hw )
 {
     enum AVCodecID i_codec_id;
     const char *psz_namecodec;
@@ -254,7 +255,7 @@ AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
         }
         free( psz_decoder );
     }
-    if( i_codec_id == AV_CODEC_ID_H264 )
+    if( hw && i_codec_id == AV_CODEC_ID_H264 )
         p_codec = avcodec_find_decoder_by_name("h264_v4l2m2m");
     if( !p_codec )
         p_codec = avcodec_find_decoder( i_codec_id );
@@ -275,6 +276,12 @@ AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
     avctx->opaque = p_dec;
 
     return avctx;
+}
+
+AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
+                                     const AVCodec **restrict codecp )
+{
+    return ffmpeg_AllocContextHw(p_dec, codecp, 0);
 }
 
 /*****************************************************************************
