@@ -50,7 +50,7 @@
 #include <libdrm/drm_mode.h>
 #include <libdrm/drm_fourcc.h>
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
 
 #define SUBPICS_MAX 4
 
@@ -121,7 +121,7 @@ typedef struct vout_display_sys_t {
     drmu_atomic_t * display_set;
 
     vout_display_place_t req_win;
-    vout_display_place_t spu_rect;
+//    vout_display_place_t spu_rect;
     vout_display_place_t dest_rect;
     vout_display_place_t win_rect;
     vout_display_place_t display_rect;
@@ -130,8 +130,6 @@ typedef struct vout_display_sys_t {
     video_transform_t video_transform;
     video_transform_t dest_transform;
 
-    bool pool_try_fb;
-    bool pool_is_fb;
     bool output_simple;
     uint32_t con_id;
     int mode_id;
@@ -434,6 +432,7 @@ place_dest_rect(vout_display_sys_t * const sys,
                                     sys->display_rect, sys->dest_transform);
 }
 
+#if 0
 static void
 place_spu_rect(vout_display_sys_t * const sys,
                const vout_display_cfg_t * const cfg,
@@ -456,6 +455,7 @@ place_spu_rect(vout_display_sys_t * const sys,
     if (ORIENT_IS_SWAP(fmt->orientation))
         sys->spu_rect = vplace_transpose(sys->spu_rect);
 }
+#endif
 
 static void
 place_rects(vout_display_sys_t * const sys,
@@ -463,7 +463,7 @@ place_rects(vout_display_sys_t * const sys,
             const video_format_t * fmt)
 {
     place_dest_rect(sys, cfg, fmt);
-    place_spu_rect(sys, cfg, fmt);
+//    place_spu_rect(sys, cfg, fmt);
 }
 
 static int configure_display(vout_display_t *vd, vout_display_sys_t *const sys,
@@ -525,6 +525,10 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *pic,
     if (subpic)
     {
         const struct subpicture_region_rendered *sreg;
+        // You might hope that subpic->i_order could be used to find when subpics
+        // change but it only indicates pic positioning, not if they are different
+        // I think it is meant to do the former (the android vout assumes it means
+        // that).
         vlc_vector_foreach(sreg, &subpic->regions) {
             picture_t * const src = sreg->p_picture;
             subpic_ent_t * const dst = sys->subpics + n;
@@ -561,7 +565,7 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *pic,
             };
             dst->alpha = sreg->i_alpha;
 #if 0
-            msg_Info(vd, "Place: %dx%d @ %d,%d, Crop: %dx%d %d,%d, Display: %dx%d",
+            msg_Info(vd, "Place[%d]: %dx%d @ %d,%d, Crop: %dx%d %d,%d, Display: %dx%d", n,
                      sreg->place.width, sreg->place.height, sreg->place.x, sreg->place.y,
                      src->format.i_visible_width, src->format.i_visible_height, src->format.i_x_offset, src->format.i_y_offset,
                      vd->cfg->display.width, vd->cfg->display.height);
@@ -600,10 +604,10 @@ subpics_done:
                      vd->fmt->i_width, vd->fmt->i_height,
                      vd->fmt->i_visible_width, vd->fmt->i_visible_height,
                      vd->fmt->i_sar_num, vd->fmt->i_sar_den,
-                     vd->source.i_x_offset, vd->source.i_y_offset,
-                     vd->source.i_width, vd->source.i_height,
-                     vd->source.i_visible_width, vd->source.i_visible_height,
-                     vd->source.i_sar_num, vd->source.i_sar_den,
+                     vd->source->i_x_offset, vd->source->i_y_offset,
+                     vd->source->i_width, vd->source->i_height,
+                     vd->source->i_visible_width, vd->source->i_visible_height,
+                     vd->source->i_sar_num, vd->source->i_sar_den,
                      vd->cfg->display.width,   vd->cfg->display.height,
                      vd->cfg->display.sar.num, vd->cfg->display.sar.den,
                      r.x, r.y, r.w, r.h);
@@ -662,20 +666,20 @@ subpics_done:
 
     for (i = 0; i != SUBPICS_MAX; ++i) {
         subpic_ent_t * const spe = sys->subpics + i;
-
-//        msg_Info(vd, "pic=%dx%d @ %d,%d, r=%dx%d @ %d,%d, space=%dx%d @ %d,%d",
-//                 spe->pos.w, spe->pos.h, spe->pos.x, spe->pos.y,
-//                 r.w, r.h, r.x, r.y,
-//                 spe->space.w, spe->space.h, spe->space.x, spe->space.y);
-
+#if 0
+        msg_Info(vd, "pic[%d]=%dx%d @ %d,%d, r=%dx%d @ %d,%d, space=%dx%d @ %d,%d", i,
+                 spe->pos.w, spe->pos.h, spe->pos.x, spe->pos.y,
+                 r.w, r.h, r.x, r.y,
+                 spe->space.w, spe->space.h, spe->space.x, spe->space.y);
+#endif
         // Rescale from sub-space
         if (sys->subplanes[i])
         {
-            if ((ret = drmu_atomic_plane_add_fb(da, sys->subplanes[i], spe->fb,
-                                  drmu_rect_rescale(spe->pos, r, spe->space))) != 0) {
+            drmu_rect_t rs = drmu_rect_rescale(spe->pos, r, spe->space);
+            if ((ret = drmu_atomic_plane_add_fb(da, sys->subplanes[i], spe->fb, rs)) != 0) {
                  msg_Err(vd, "drmModeSetPlane for subplane %d failed: %s", i, strerror(-ret));
             }
-            drmu_atomic_plane_add_alpha(da, sys->subplanes[i], (spe->alpha * DRMU_PLANE_ALPHA_OPAQUE) / (0xff * 0xff));
+            drmu_atomic_plane_add_alpha(da, sys->subplanes[i], (spe->alpha * DRMU_PLANE_ALPHA_OPAQUE) / 0xff);
         }
     }
 
@@ -834,63 +838,45 @@ static int vd_drm_control(vout_display_t *vd, int query)
 {
     vout_display_sys_t * const sys = vd->sys;
     video_format_t fmt;
-    int ret = VLC_EGENERIC;
+    int ret;
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s: query=%d", __func__, query);
 #endif
 
     switch (query) {
-#if 0
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
         case VOUT_DISPLAY_CHANGE_SOURCE_PLACE:
-            if ((ret = reconfigure_display(vd, sys, NULL, &fmt)) != 0)
-                break;
-            if (!video_format_IsSimilar(vd->fmt, &fmt)) {
-                if (vd->info.has_pictures_invalid)
-                    vout_display_SendEventPicturesInvalid(vd);
-                else
-                    msg_Err(vd, "Wanted Pic Invalid but not allowed");
-            }
-            break;
-
         case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
-            if ((ret = reconfigure_display(vd, sys, va_arg(args, const vout_display_cfg_t *), &fmt)) != 0)
+            if ((ret = reconfigure_display(vd, sys, vd->cfg, &fmt)) != 0)
                 break;
-            if (!video_format_IsSimilar(vd->fmt, &fmt)) {
-                if (vd->info.has_pictures_invalid)
-                    vout_display_SendEventPicturesInvalid(vd);
-                else
-                    msg_Err(vd, "Wanted Pic Invalid but not allowed");
-            }
-            break;
-#endif
-        case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
-        case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
-        case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
-        case VOUT_DISPLAY_CHANGE_SOURCE_PLACE:
-            msg_Warn(vd, "Unsupported control query %d", query);
-            ret = VLC_SUCCESS;
+            // If simple then we only have one size we can be
+            if (sys->output_simple && !video_format_IsSimilar(vd->fmt, &fmt))
+                ret = VLC_EGENERIC;
             break;
 
         default:
             msg_Warn(vd, "Unknown control query %d", query);
+            ret = VLC_EGENERIC;
             break;
     }
 
     return ret;
 }
 
+
+// Reset the picture format handled by the module
+// Happens after Control returns error
+// Returns the wanted new format in fmt
 static int vd_drm_reset_pictures(vout_display_t *vd, video_format_t *fmt)
 {
-    VLC_UNUSED(vd);
-    VLC_UNUSED(fmt);
+    vout_display_sys_t * const sys = vd->sys;
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
-#warning Contents for reset pictures?
-    return VLC_SUCCESS;
+
+    return reconfigure_display(vd, sys, vd->cfg, fmt);
 }
 
 static void CloseDrmVout(vout_display_t *vd)
@@ -1268,9 +1254,6 @@ OpenDrmVout(vout_display_t *vd, video_format_t *fmtp, vlc_video_context *vctx)
 
     if (sys->output_simple)
         set_simple_format_size(&out_fmt, src_fmt, drmu_rect_vlc_place(&sys->dest_rect));
-
-    // Simple does not work usefully with dmabuf input
-    sys->pool_try_fb = !sys->output_simple && var_InheritBool(vd, DRM_VOUT_POOL_DMABUF_NAME);
 
     // All setup done - no possibility of error from here on
     // Do final config setup & cleanup

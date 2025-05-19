@@ -22,7 +22,6 @@ static void drm_prime_video_sys_destroy(void * v)
 {
     // Just free contents - container is freed by caller
     drm_prime_video_sys_t * const vsys = v;
-    printf("%s(%p)\n", __func__, vsys->buf);
     vsys->desc = NULL;
     av_buffer_unref(&vsys->buf);
 }
@@ -30,7 +29,6 @@ static void drm_prime_video_sys_destroy(void * v)
 static void drm_prime_pic_ctx_destroy(struct picture_context_t * ctx)
 {
     // vctx is released by caller
-    printf("%s\n", __func__);
     free(ctx);
 }
 
@@ -51,7 +49,6 @@ static struct picture_context_t * drm_prime_pic_ctx_copy(struct picture_context_
 static vlc_video_context *
 drm_prime_video_context_new(AVBufferRef * buf, const void * data)
 {
-    printf("%s(%p)\n", __func__, buf);
     static const struct vlc_video_context_operations ops = {
         .destroy = drm_prime_video_sys_destroy
     };

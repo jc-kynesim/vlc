@@ -28,7 +28,6 @@ pic_fb_delete_cb(void * v)
     fb_aux_pic_t * const aux = v;
     picture_context_t * const ctx = aux->pic_ctx;
 
-    printf("%s\n", __func__);
 #if LIBVLC_VERSION_MAJOR >= 4
     vlc_video_context *vctx = ctx->vctx;
     ctx->destroy(ctx);
