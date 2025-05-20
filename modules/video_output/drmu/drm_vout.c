@@ -624,7 +624,6 @@ subpics_done:
 #if HAS_DRMPRIME
     if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) != 0) {
         dfb = drmu_fb_vlc_new_pic_attach(sys->du, pic);
-        msg_Dbg(vd, "DRM Prime pic attached");
     }
     else
 #endif
@@ -839,9 +838,7 @@ static int vd_drm_control(vout_display_t *vd, int query)
     vout_display_sys_t * const sys = vd->sys;
     video_format_t fmt;
     int ret;
-#if TRACE_ALL
     msg_Dbg(vd, "<<< %s: query=%d", __func__, query);
-#endif
 
     switch (query) {
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
@@ -861,6 +858,8 @@ static int vd_drm_control(vout_display_t *vd, int query)
             break;
     }
 
+    msg_Dbg(vd, ">>> %s: query=%d: rv=%d", __func__, query, ret);
+
     return ret;
 }
 
@@ -872,9 +871,7 @@ static int vd_drm_reset_pictures(vout_display_t *vd, video_format_t *fmt)
 {
     vout_display_sys_t * const sys = vd->sys;
 
-#if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
-#endif
 
     return reconfigure_display(vd, sys, vd->cfg, fmt);
 }

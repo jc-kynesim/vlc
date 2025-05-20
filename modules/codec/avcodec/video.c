@@ -296,6 +296,27 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
 
         avcodec_align_dimensions2(ctx, &width, &height, aligns);
     }
+    else if (pix_fmt == AV_PIX_FMT_DRM_PRIME)
+    {
+#warning This must be the wrong way to do this
+        switch (sw_pix_fmt)
+        {
+            case AV_PIX_FMT_YUV420P:
+                fmt->i_chroma = VLC_CODEC_DRM_PRIME_I420;
+                break;
+            case AV_PIX_FMT_NV12:
+                fmt->i_chroma = VLC_CODEC_DRM_PRIME_NV12;
+                break;
+            case AV_PIX_FMT_RPI4_8:
+                fmt->i_chroma = VLC_CODEC_DRM_PRIME_SAND8;
+                break;
+            case AV_PIX_FMT_RPI4_10:
+                fmt->i_chroma = VLC_CODEC_DRM_PRIME_SAND30;
+                break;
+            default:
+                break;
+        }
+    }
 
     if( width == 0 || height == 0 || width > 8192 || height > 8192 ||
         width < ctx->width || height < ctx->height )
@@ -388,10 +409,10 @@ static int lavc_UpdateVideoFormat(decoder_t *dec, AVCodecContext *ctx,
     dec->fmt_out.video.p_palette = NULL;
 
     vlc_fourcc_t i_chroma;
-    if (fmt == swfmt)
+//    if (fmt == swfmt)
         i_chroma = fmt_out.i_chroma;
-    else
-        i_chroma = 0;
+//    else
+//        i_chroma = 0;
     es_format_Change(&dec->fmt_out, VIDEO_ES, i_chroma);
     dec->fmt_out.video = fmt_out;
     dec->fmt_out.video.i_chroma = i_chroma;
@@ -715,6 +736,8 @@ static int InitVideoDecCommon( decoder_t *p_dec )
             *p_dec->fmt_out.video.p_palette = *p_dec->fmt_in->video.p_palette;
     } else
         p_sys->palette_sent = true;
+
+#warning VLC3 inits hw context here
 
     /* ***** init this codec with special data ***** */
     ffmpeg_InitCodec( p_dec );
@@ -1331,8 +1354,10 @@ static int DecodeSidedata( decoder_t *p_dec, const AVFrame *frame, picture_t *p_
     else
         p_pic->format.multiview_mode = p_dec->fmt_out.video.multiview_mode;
 
-    if (format_changed && decoder_UpdateVideoOutput( p_dec, p_sys->vctx_out ))
+    if (format_changed && decoder_UpdateVideoOutput( p_dec, p_sys->vctx_out )) {
+        msg_Warn(p_dec, "Cannot update output with new metadata");
         return -1;
+    }
 
     const AVFrameSideData *p_avcc = av_frame_get_side_data( frame, AV_FRAME_DATA_A53_CC );
     if( p_avcc )
@@ -1590,9 +1615,10 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
             if( i_used == 0 ) break;
             continue;
         }
-//        msg_Info(p_dec, "%s: Frame Rx: fmt=%d, ctx.fmt=%d PTS=%" PRId64 "/%" PRId64, __func__,
-//                 frame->format, p_context->pix_fmt, frame->pts, frame->pkt_pts);
-
+#if 0
+        msg_Info(p_dec, "%s: Frame Rx: fmt=%d, ctx.fmt=%d PTS=%" PRId64"/%"PRId64, __func__,
+                 frame->format, p_context->pix_fmt, frame->pts, frame->best_effort_timestamp);
+#endif
         struct frame_info_s *p_frame_info = FrameInfoGet( p_sys, frame );
         if( p_frame_info && p_frame_info->b_eos )
             p_sys->b_first_frame = true;
@@ -1677,11 +1703,12 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
                 p_pic = decoder_NewPicture(p_dec);
             else if (frame->format == AV_PIX_FMT_DRM_PRIME &&
                      lavc_UpdateVideoFormat(p_dec, p_context, p_context->pix_fmt,
-                                            p_context->pix_fmt) == 0)
+                                            p_context->sw_pix_fmt) == 0)
                 p_pic = decoder_NewPicture(p_dec);
 
             if( !p_pic )
             {
+                msg_Dbg(p_dec, "%s: No Pic", __func__);
                 vlc_mutex_unlock(&p_sys->lock);
                 av_frame_free(&frame);
                 break;
@@ -1740,8 +1767,10 @@ static int DecodeBlock( decoder_t *p_dec, block_t **pp_block )
 #endif
         p_pic->b_still = p_frame_info && p_frame_info->b_eos;
 
-        if (DecodeSidedata(p_dec, frame, p_pic))
+        if (DecodeSidedata(p_dec, frame, p_pic)) {
+            msg_Warn(p_dec, "%s: Side Data broken", __func__);
             i_pts = VLC_TICK_INVALID;
+        }
 
         av_frame_free(&frame);
 

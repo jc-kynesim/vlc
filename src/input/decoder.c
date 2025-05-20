@@ -744,7 +744,7 @@ static int CreateVoutIfNeeded(vlc_input_decoder_t *p_owner)
     }
     if( p_dec->fmt_out.i_codec != p_owner->fmt.video.i_chroma )
     {
-        msg_Dbg(p_dec, "vout change: chroma");
+        msg_Dbg(p_dec, "vout change: chroma %.4s -> %.4s", (char*)&p_owner->fmt.video.i_chroma, (char*)&p_dec->fmt_out.i_codec);
         need_vout = true;
     }
     if( (int64_t)p_dec->fmt_out.video.i_sar_num * p_owner->fmt.video.i_sar_den !=
