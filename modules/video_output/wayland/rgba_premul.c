@@ -1,7 +1,7 @@
 #include <stdint.h>
 
 #ifdef MAKE_TEST
-#define vlc_CPU_ARM64_NEON() (1)
+#define vlc_CPU_ARM_NEON() (1)
 #define HAVE_AARCH64_ASM 1
 #else
 #include <vlc_common.h>
@@ -51,7 +51,7 @@ copy_xxxa_with_premul(void * dst_data, int dst_stride,
                       const unsigned int global_alpha)
 {
 #ifdef HAVE_AARCH64_ASM
-    if (vlc_CPU_ARM64_NEON())
+    if (vlc_CPU_ARM_NEON())
         copy_xxxa_with_premul_aarch64(dst_data, dst_stride, src_data, src_stride, w, h, global_alpha);
     else
 #endif

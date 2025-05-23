@@ -295,7 +295,7 @@ static void picpool_delete(picpool_ctl_t * const pc)
 
     dmabufs_ctl_unref(&pc->dbsc);
 
-    vlc_mutex_destroy(&pc->lock);
+//    vlc_mutex_destroy(&pc->lock);
 
 //    memset(pc, 0xba, sizeof(*pc)); // Zap for (hopefully) faster crash
     free (pc);

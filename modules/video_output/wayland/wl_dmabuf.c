@@ -23,9 +23,6 @@
 #ifdef HAVE_CONFIG_H
 # include <config.h>
 #endif
-#ifndef HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
-#define HAVE_WAYLAND_SINGLE_PIXEL_BUFFER 0
-#endif
 
 #include <assert.h>
 #include <stdatomic.h>
@@ -40,9 +37,7 @@
 #include <unistd.h>
 
 #include <wayland-client.h>
-#if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
 #include "single-pixel-buffer-v1-client-protocol.h"
-#endif
 #include "viewporter-client-protocol.h"
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 
@@ -51,6 +46,8 @@
 #include <vlc_vout_display.h>
 #include <vlc_picture_pool.h>
 #include <vlc_fs.h>
+#include <vlc_subpicture.h>
+#include <vlc_threads.h>
 
 // *** Avoid this include if possible
 #include <libdrm/drm_fourcc.h>
@@ -64,7 +61,7 @@
 #include "../../codec/avcodec/drm_pic.h"
 #include <libavutil/hwcontext_drm.h>
 
-#define TRACE_ALL 0
+#define TRACE_ALL 1
 #define CHECK_VDRE_COUNTS 0
 
 #define MAX_PICTURES 4
@@ -86,6 +83,9 @@
 #define WL_DMABUF_STATS_TEXT N_("Display some display stats")
 #define WL_DMABUF_STATS_LONGTEXT N_("When display is closed report frames displayed/discarded and avg fps. "\
     "N.B. Unfortunately current implementation cannot track frames discarded by Wayland before display")
+
+struct vout_display_sys_s;
+typedef struct vout_display_sys_s vout_display_sys_t;
 
 typedef struct fmt_ent_s {
     uint32_t fmt;
@@ -164,18 +164,16 @@ typedef struct w_bound_ss
     struct wl_compositor *compositor;
     struct wl_subcompositor *subcompositor;
     struct wl_shm *shm;
-#if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
     struct wp_single_pixel_buffer_manager_v1 *single_pixel_buffer_manager_v1;
-#endif
 } w_bound_t;
 
 #define PLANE_BKG 0
 #define PLANE_VID 1
 #define PLANE_SUB 2
 
-struct vout_display_sys_t
+struct vout_display_sys_s
 {
-    vout_window_t *embed; /* VLC window */
+    vlc_window_t *embed; /* VLC window */
 
     w_bound_t bound;
 
@@ -316,9 +314,14 @@ viewport_destroy(struct wp_viewport ** const ppviewport)
 static inline int
 scale_dst(const vout_display_sys_t * const sys, int x)
 {
+#if 1
+    VLC_UNUSED(sys);
+    return x;
+#else
     if (sys->embed->scale_den == sys->embed->scale_num)
         return x;
     return (x * sys->embed->scale_den) / sys->embed->scale_num;
+#endif
 }
 
 static inline int_fast32_t
@@ -787,8 +790,8 @@ vdre_new_null(void)
 static void
 vdre_dma_rel_cb(void * v)
 {
-    struct picture_context_t * ctx = v;
-    ctx->destroy(ctx);
+    vlc_video_context * vctx = v;
+    vlc_video_context_Release(vctx);
 }
 
 static video_dmabuf_release_env_t *
@@ -797,7 +800,7 @@ vdre_new_ctx(struct picture_context_t * ctx)
     video_dmabuf_release_env_t * const vdre = vdre_new_null();
     if (vdre == NULL)
         return NULL;
-    if ((vdre->dma_rel_v = ctx->copy(ctx)) == NULL)
+    if ((vdre->dma_rel_v = vlc_video_context_Hold(ctx->vctx)) == NULL)
     {
         free(vdre);
         return NULL;
@@ -1064,20 +1067,6 @@ static void kill_pool(vout_display_sys_t * const sys)
     }
 }
 
-// Actual picture pool for dmabufs is just a set of trivial containers
-static picture_pool_t *vd_dmabuf_pool(vout_display_t * const vd, unsigned count)
-{
-    vout_display_sys_t * const sys = vd->sys;
-
-    msg_Dbg(vd, "%s: fmt:%dx%d,sar:%d/%d; source:%dx%d, count=%u", __func__,
-            vd->fmt.i_width, vd->fmt.i_height, vd->fmt.i_sar_num, vd->fmt.i_sar_den,
-            vd->source.i_width, vd->source.i_height, count);
-
-    if (sys->vlc_pic_pool == NULL)
-        sys->vlc_pic_pool = picture_pool_NewFromFormat(&vd->fmt, count);
-    return sys->vlc_pic_pool;
-}
-
 static int
 do_display_dmabuf(vout_display_t * const vd, vout_display_sys_t * const sys, picture_t * const pic,
                   video_dmabuf_release_env_t ** const pVdre, struct wl_buffer ** const pWbuffer)
@@ -1176,7 +1165,7 @@ spe_no_pic(const subpic_ent_t * const spe)
 }
 
 static bool
-spe_changed(const subpic_ent_t * const spe, const subpicture_region_t * const sreg)
+spe_changed(const subpic_ent_t * const spe, const struct subpicture_region_rendered * const sreg)
 {
     const bool no_pic = (sreg == NULL || sreg->i_alpha == 0);
     if (no_pic && spe_no_pic(spe))
@@ -1186,26 +1175,22 @@ spe_changed(const subpic_ent_t * const spe, const subpicture_region_t * const sr
 
 static void
 spe_update_rect(subpic_ent_t * const spe,
-                const subpicture_t * const spic,
-                const subpicture_region_t * const sreg)
+                const vout_display_cfg_t * const cfg,
+                const picture_t * const pic,
+                const struct subpicture_region_rendered * const sreg)
 {
     spe->src_rect = (vout_display_place_t) {
-        .x = sreg->fmt.i_x_offset,
-        .y = sreg->fmt.i_y_offset,
-        .width = sreg->fmt.i_visible_width,
-        .height = sreg->fmt.i_visible_height,
+        .x = pic->format.i_x_offset,
+        .y = pic->format.i_y_offset,
+        .width = pic->format.i_visible_width,
+        .height = pic->format.i_visible_height,
     };
-    spe->dst_rect = (vout_display_place_t) {
-        .x = sreg->i_x,
-        .y = sreg->i_y,
-        .width = sreg->fmt.i_visible_width,
-        .height = sreg->fmt.i_visible_height,
-    };
+    spe->dst_rect = sreg->place;
     spe->orig_rect = (vout_display_place_t) {
         .x = 0,
         .y = 0,
-        .width  = spic->i_original_picture_width,
-        .height = spic->i_original_picture_height,
+        .width  = cfg->display.width,
+        .height = cfg->display.height
     };
 }
 
@@ -1236,8 +1221,8 @@ spe_new_pic(vout_display_t * const vd, vout_display_sys_t * const sys,
 
 static subpic_ent_t *
 spe_new(vout_display_t * const vd, vout_display_sys_t * const sys,
-        const subpicture_t * const spic,
-        const subpicture_region_t * const sreg)
+        const picture_t * const spic,
+        const struct subpicture_region_rendered * const sreg)
 {
     subpic_ent_t * const spe = spe_new_pic(vd, sys,
         (sreg == NULL || sreg->i_alpha == 0) ? NULL : sreg->p_picture);
@@ -1247,7 +1232,7 @@ spe_new(vout_display_t * const vd, vout_display_sys_t * const sys,
 
     spe->alpha = sreg->i_alpha;
 
-    spe_update_rect(spe, spic, sreg);
+    spe_update_rect(spe, vd->cfg, spic, sreg);
 
     spe->pt = polltask_new_timer(sys->speq, spe_convert_cb, spe);
 
@@ -1400,21 +1385,22 @@ bkg_surface_get_lock(vout_display_t * const vd, vout_display_sys_t * const sys)
         return NULL;
     }
 
-    vlc_mutex_lock(&sys->embed->handle_lock);
+//    vlc_mutex_lock(&sys->embed->handle_lock);
 
-    if (sys->embed->handle.wl != sys->last_embed_surface || sys->embed->handle_seq != sys->last_embed_seq)
+//    if (sys->embed->handle.wl != sys->last_embed_surface || sys->embed->handle_seq != sys->last_embed_seq)
+    if (sys->embed->handle.wl != sys->last_embed_surface)
     {
         msg_Warn(vd, "%s: Embed surface changed %p (%u)->%p (%u)", __func__,
                  sys->last_embed_surface, sys->last_embed_seq,
-                 sys->embed->handle.wl, sys->embed->handle_seq);
+                 sys->embed->handle.wl, 0);
 
         sys->last_embed_surface = sys->embed->handle.wl;
-        sys->last_embed_seq = sys->embed->handle_seq;
+//        sys->last_embed_seq = sys->embed->handle_seq;
         unmap_all(sys, false);
     }
 
-    if (sys->last_embed_surface == NULL)
-        vlc_mutex_unlock(&sys->embed->handle_lock);
+//    if (sys->last_embed_surface == NULL)
+//        vlc_mutex_unlock(&sys->embed->handle_lock);
 
     return sys->last_embed_surface;
 }
@@ -1423,7 +1409,8 @@ static void
 bkg_surface_unlock(vout_display_t * const vd, vout_display_sys_t * const sys)
 {
     VLC_UNUSED(vd);
-    vlc_mutex_unlock(&sys->embed->handle_lock);
+    VLC_UNUSED(sys);
+//    vlc_mutex_unlock(&sys->embed->handle_lock);
 }
 
 static int
@@ -1464,7 +1451,6 @@ make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const 
     if (sys->bkg_viewport)
         return VLC_SUCCESS;
 
-#if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
     if (sys->bound.single_pixel_buffer_manager_v1 && !sys->chequerboard)
     {
         w_buffer = wp_single_pixel_buffer_manager_v1_create_u32_rgba_buffer(
@@ -1473,7 +1459,6 @@ make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const 
         vdre = vdre_new_null();
     }
     else
-#endif
     {
         // Buffer width & height - not display
         const unsigned int width = sys->chequerboard ? 640 : 32;
@@ -1649,8 +1634,8 @@ place_rects(vout_display_t * const vd,
 {
     vout_display_sys_t * const sys = vd->sys;
 
-    vout_display_PlacePicture(&sys->video_dst_rect, &vd->source, cfg, true);
-    sys->video_trans = transform_from_fmt(&vd->source, &sys->video_src_rect);
+    vout_display_PlacePicture(&sys->video_dst_rect, vd->source, &cfg->display);
+    sys->video_trans = transform_from_fmt(vd->source, &sys->video_src_rect);
 }
 
 static const drmu_vlc_fmt_info_t *
@@ -1702,7 +1687,7 @@ get_usable_format(vout_display_t * const vd,
     {
         static const vlc_fourcc_t fallback2[] = {
             VLC_CODEC_I420,
-            VLC_CODEC_RGB32,
+            VLC_CODEC_XRGB,
             0
         };
 
@@ -1725,7 +1710,7 @@ get_usable_format(vout_display_t * const vd,
 static int
 set_req_format(vout_display_t * const vd, const vout_display_sys_t * const sys, video_format_t * const fmt)
 {
-    const video_format_t * const src_fmt = &vd->source;
+    const video_format_t * const src_fmt = vd->source;
     const drmu_vlc_fmt_info_t * const fmti = get_usable_format(vd, sys->use_shm ? &sys->shm_fmts : &sys->dmabuf_fmts, src_fmt);
 
     if (fmti == NULL)
@@ -1733,7 +1718,6 @@ set_req_format(vout_display_t * const vd, const vout_display_sys_t * const sys, 
 
     *fmt = *src_fmt;
     fmt->i_chroma = drmu_vlc_fmt_info_vlc_chroma(fmti);
-    drmu_vlc_fmt_info_vlc_rgb_masks(fmti, &fmt->i_rmask, &fmt->i_gmask, &fmt->i_bmask);
 
     return VLC_SUCCESS;
 }
@@ -1778,10 +1762,13 @@ plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const s
     plane->dst_rect = dst_rect;
 }
 
-static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
+static void
+wl_dmabuf_prepare(vout_display_t *vd, picture_t *pic,
+                  const struct vlc_render_subpicture *subpic, vlc_tick_t date)
 {
     vout_display_sys_t * const sys = vd->sys;
     unsigned int n = 0;
+    VLC_UNUSED(date);
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
@@ -1816,6 +1803,50 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
         wl_display_flush(video_display(sys)); // Kick off any work required by Wayland
     }
 
+#if 1
+
+    if (subpic)
+    {
+        const struct subpicture_region_rendered *sreg;
+        // You might hope that subpic->i_order could be used to find when subpics
+        // change but it only indicates pic positioning, not if they are different
+        // I think it is meant to do the former (the android vout assumes it means
+        // that).
+        vlc_vector_foreach(sreg, &subpic->regions) {
+            picture_t * const src = sreg->p_picture;
+            subplane_t * const plane = sys->planes + n + PLANE_SUB;
+
+            if (plane->spe_next != NULL)
+            {
+                if (!spe_changed(plane->spe_next, sreg))
+                    spe_update_rect(plane->spe_next, vd->cfg, src, sreg);
+                // else if changed ignore as we are already doing stuff
+            }
+            else
+            {
+                if (!spe_changed(plane->spe_cur, sreg))
+                    spe_update_rect(plane->spe_cur, vd->cfg, src, sreg);
+                else
+                {
+                    plane->spe_next = spe_new(vd, sys, src, sreg);
+                    spe_convert(plane->spe_next);
+                }
+            }
+
+#if 0
+            msg_Info(vd, "Place[%d]: %dx%d @ %d,%d, Crop: %dx%d %d,%d, Display: %dx%d", n,
+                     sreg->place.width, sreg->place.height, sreg->place.x, sreg->place.y,
+                     src->format.i_visible_width, src->format.i_visible_height, src->format.i_x_offset, src->format.i_y_offset,
+                     vd->cfg->display.width, vd->cfg->display.height);
+#endif
+
+            // If we've run out of subplanes we could allocate - give up now
+            if (++n == MAX_SUBPICS)
+                goto subpics_done;
+        }
+    }
+#else
+
     // Attempt to import the subpics
     for (const subpicture_t * spic = subpic; spic != NULL; spic = spic->p_next)
     {
@@ -1844,6 +1875,7 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
                 goto subpics_done;
         }
     }
+#endif
 subpics_done:
 
     // Clear any other entries
@@ -1886,7 +1918,7 @@ do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
 {
 //    msg_Info(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
 
-    sys->stats.time_frameN = mdate();
+    sys->stats.time_frameN = vlc_tick_now();
     if (!sys->stats.time_frame0)
         sys->stats.time_frame0 = sys->stats.time_frameN;
     ++sys->stats.frame_n;
@@ -1924,9 +1956,10 @@ do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
     return;
 }
 
-static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
+static void Display(vout_display_t *vd, picture_t *pic)
 {
     vout_display_sys_t * const sys = vd->sys;
+    VLC_UNUSED(pic);
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
@@ -1963,16 +1996,12 @@ static void Display(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
     do_display(vd, sys);
 
 done:
-    if (subpic)
-        subpicture_Delete(subpic);
-    picture_Release(pic);
-
 #if TRACE_ALL
     msg_Dbg(vd, ">>> %s: Surface: %p", __func__, sys->embed->handle.wl);
 #endif
 }
 
-static int Control(vout_display_t *vd, int query, va_list ap)
+static int Control(vout_display_t *vd, int query)
 {
     vout_display_sys_t * const sys = vd->sys;
 
@@ -1984,26 +2013,12 @@ static int Control(vout_display_t *vd, int query, va_list ap)
     {
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
+        case VOUT_DISPLAY_CHANGE_SOURCE_PLACE:
+        case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
             place_rects(vd, vd->cfg);
             do_resize(vd, sys);
             commit_do(vd, sys);
             break;
-
-        case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
-        case VOUT_DISPLAY_CHANGE_DISPLAY_FILLED:
-        case VOUT_DISPLAY_CHANGE_ZOOM:
-        {
-            const vout_display_cfg_t * const cfg = va_arg(ap, const vout_display_cfg_t *);
-
-            place_rects(vd, cfg);
-            do_resize(vd, sys);
-            commit_do(vd, sys);
-            break;
-        }
-
-        case VOUT_DISPLAY_RESET_PICTURES:
-            msg_Err(vd, "Unexpected reset pictures");
-            return VLC_EGENERIC;
 
         default:
             msg_Err(vd, "unknown request %d", query);
@@ -2079,6 +2094,8 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
                         struct wl_registry * const registry,
                         const uint32_t name, const char *const iface, const uint32_t vers)
 {
+    vout_display_sys_t * const sys = vd->sys;
+
 #if TRACE_ALL
     msg_Dbg(vd, "global %3"PRIu32": %s version %"PRIu32, name, iface, vers);
 #endif
@@ -2102,7 +2119,7 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
             msg_Warn(vd, "Interface %s wanted v 4 got v %d", wl_compositor_interface.name, vers);
     }
     else
-    if (!vd->sys->use_shm && strcmp(iface, zwp_linux_dmabuf_v1_interface.name) == 0)
+    if (!sys->use_shm && strcmp(iface, zwp_linux_dmabuf_v1_interface.name) == 0)
     {
         if (vers >= 3)
         {
@@ -2112,11 +2129,9 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
         else
             msg_Warn(vd, "Interface %s wanted v 3 got v %d", zwp_linux_dmabuf_v1_interface.name, vers);
     }
-#if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
     else
     if (strcmp(iface, wp_single_pixel_buffer_manager_v1_interface.name) == 0)
         b->single_pixel_buffer_manager_v1 = wl_registry_bind(registry, name, &wp_single_pixel_buffer_manager_v1_interface, 1);
-#endif
 }
 
 static void w_bound_destroy(w_bound_t * const b)
@@ -2131,10 +2146,8 @@ static void w_bound_destroy(w_bound_t * const b)
         wl_compositor_destroy(b->compositor);
     if (b->shm != NULL)
         wl_shm_destroy(b->shm);
-#if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
     if (b->single_pixel_buffer_manager_v1)
         wp_single_pixel_buffer_manager_v1_destroy(b->single_pixel_buffer_manager_v1);
-#endif
     memset(b, 0, sizeof(*b));
 }
 
@@ -2204,9 +2217,22 @@ registry_scan(vout_display_t * const vd, vout_display_sys_t * const sys)
     return 0;
 }
 
-static void Close(vlc_object_t *obj)
+// Reset the picture format handled by the module
+// Happens after Control returns error
+// Returns the wanted new format in fmt
+static int ResetPictures(vout_display_t *vd, video_format_t *fmt)
 {
-    vout_display_t * const vd = (vout_display_t *)obj;
+//    vout_display_sys_t * const sys = vd->sys;
+    VLC_UNUSED(fmt);
+
+    msg_Dbg(vd, "<<< %s", __func__);
+
+    return 0;
+//    return reconfigure_display(vd, sys, vd->cfg, fmt);
+}
+
+static void Close(vout_display_t *vd)
+{
     vout_display_sys_t * const sys = vd->sys;
 
     msg_Dbg(vd, "<<< %s", __func__);
@@ -2243,7 +2269,6 @@ static void Close(vlc_object_t *obj)
     // pq will clean up after itself once the last buffer has been released.
     pollqueue_unref(&sys->pollq);
 
-    vout_display_DeleteWindow(vd, sys->embed);
     sys->embed = NULL;
 
     kill_pool(sys);
@@ -2265,12 +2290,13 @@ no_window:
     msg_Dbg(vd, ">>> %s", __func__);
 }
 
-static int Open(vlc_object_t *obj)
+static int Open(vout_display_t *vd,
+                video_format_t *fmtp, vlc_video_context *context)
 {
-    vout_display_t * const vd = (vout_display_t *)obj;
     vout_display_sys_t *sys;
     fmt_list_t * flist = NULL;
     video_format_t req_fmt;
+    VLC_UNUSED(context);
 
     if (!var_InheritBool(vd, WL_DMABUF_ENABLE_NAME))
         return VLC_EGENERIC;
@@ -2293,23 +2319,22 @@ static int Open(vlc_object_t *obj)
     sys->chequerboard = var_InheritBool(vd, WL_DMABUF_CHEQUERBOARD_NAME);
 
         /* Get window */
-    sys->embed = vout_display_NewWindow(vd, VOUT_WINDOW_TYPE_WAYLAND);
+    sys->embed = vd->cfg->window;
     if (sys->embed == NULL) {
         msg_Dbg(vd, "Cannot create window - probably not using Wayland");
         goto error;
     }
     sys->last_embed_surface = sys->embed->handle.wl;
-    sys->last_embed_seq = sys->embed->handle_seq;
+//    sys->last_embed_seq = sys->embed->handle_seq;
 
-    msg_Info(vd, "<<< %s: %s %dx%d(%dx%d @ %d,%d %d/%d), cfg.display: %dx%d, source: %dx%d(%dx%d @ %d,%d %d/%d), scale=%d/%d", __func__,
-             drmu_log_fourcc(vd->fmt.i_chroma), vd->fmt.i_width, vd->fmt.i_height,
-             vd->fmt.i_visible_width, vd->fmt.i_visible_height, vd->fmt.i_x_offset, vd->fmt.i_y_offset,
-             vd->fmt.i_sar_num, vd->fmt.i_sar_den,
+    msg_Info(vd, "<<< %s: %s %dx%d(%dx%d @ %d,%d %d/%d), cfg.display: %dx%d, source: %dx%d(%dx%d @ %d,%d %d/%d)", __func__,
+             drmu_log_fourcc(vd->fmt->i_chroma), vd->fmt->i_width, vd->fmt->i_height,
+             vd->fmt->i_visible_width, vd->fmt->i_visible_height, vd->fmt->i_x_offset, vd->fmt->i_y_offset,
+             vd->fmt->i_sar_num, vd->fmt->i_sar_den,
              vd->cfg->display.width, vd->cfg->display.height,
-             vd->source.i_width, vd->source.i_height,
-             vd->source.i_visible_width, vd->source.i_visible_height, vd->source.i_x_offset, vd->source.i_y_offset,
-             vd->source.i_sar_num, vd->source.i_sar_den,
-             sys->embed->scale_num, sys->embed->scale_den);
+             vd->source->i_width, vd->source->i_height,
+             vd->source->i_visible_width, vd->source->i_visible_height, vd->source->i_x_offset, vd->source->i_y_offset,
+             vd->source->i_sar_num, vd->source->i_sar_den);
 
     if ((sys->pollq = pollqueue_new()) == NULL ||
         (sys->speq = pollqueue_new()) == NULL)
@@ -2402,7 +2427,7 @@ static int Open(vlc_object_t *obj)
     sys->region_none = wl_compositor_create_region(video_compositor(sys));
     wl_region_add(sys->region_all, 0, 0, 0, 0);
 
-    vd->fmt = req_fmt;
+    *fmtp = req_fmt;
 
     place_rects(vd, vd->cfg);
 
@@ -2410,25 +2435,26 @@ static int Open(vlc_object_t *obj)
 
     // If we can invalidate the pic pool then DRI is disabled - we want DRI
     vd->info = (vout_display_info_t){
-        .is_slow = false,
-        .has_double_click = false,
-        .needs_hide_mouse = false,
-        .has_pictures_invalid = false,
         .subpicture_chromas = sys->subpic_chromas,
     };
 
-    vd->pool = vd_dmabuf_pool;
-    vd->prepare = Prepare;
-    vd->display = Display;
-    vd->control = Control;
+    {
+        static const struct vlc_display_operations ops = {
+            .close = Close,
+            .prepare = wl_dmabuf_prepare,
+            .display = Display,
+            .control = Control,
+            .reset_pictures = ResetPictures,
+        };
+        vd->ops = &ops;
+    }
 
-    msg_Dbg(vd, ">>> %s: OK: %.4s (%#x/%#x/%#x)", __func__,
-            (char*)&vd->fmt.i_chroma,
-            vd->fmt.i_rmask, vd->fmt.i_gmask, vd->fmt.i_bmask);
+    msg_Dbg(vd, ">>> %s: OK: %.4s", __func__,
+            (char*)&vd->fmt->i_chroma);
     return VLC_SUCCESS;
 
 error:
-    Close(obj);
+    Close(vd);
     msg_Dbg(vd, ">>> %s: ERROR", __func__);
     return VLC_EGENERIC;
 }
@@ -2436,13 +2462,12 @@ error:
 vlc_module_begin()
     set_shortname(N_("WL DMABUF"))
     set_description(N_("Wayland dmabuf video output"))
-    set_category(CAT_VIDEO)
     set_subcategory(SUBCAT_VIDEO_VOUT)
-    set_capability("vout display", 310)
-    set_callbacks(Open, Close)
+    set_callback_display(Open, 310)
     add_shortcut("wl-dmabuf")
-    add_bool(WL_DMABUF_ENABLE_NAME, true, WL_DMABUF_ENABLE_TEXT, WL_DMABUF_ENABLE_LONGTEXT, false)
-    add_bool(WL_DMABUF_USE_SHM_NAME, false, WL_DMABUF_USE_SHM_TEXT, WL_DMABUF_USE_SHM_LONGTEXT, false)
-    add_bool(WL_DMABUF_CHEQUERBOARD_NAME, false, WL_DMABUF_CHEQUERBOARD_TEXT, WL_DMABUF_CHEQUERBOARD_LONGTEXT, false)
-    add_bool(WL_DMABUF_STATS_NAME, false, WL_DMABUF_STATS_TEXT, WL_DMABUF_STATS_LONGTEXT, false)
+
+    add_bool(WL_DMABUF_ENABLE_NAME, true, WL_DMABUF_ENABLE_TEXT, WL_DMABUF_ENABLE_LONGTEXT)
+    add_bool(WL_DMABUF_USE_SHM_NAME, false, WL_DMABUF_USE_SHM_TEXT, WL_DMABUF_USE_SHM_LONGTEXT)
+    add_bool(WL_DMABUF_CHEQUERBOARD_NAME, false, WL_DMABUF_CHEQUERBOARD_TEXT, WL_DMABUF_CHEQUERBOARD_LONGTEXT)
+    add_bool(WL_DMABUF_STATS_NAME, false, WL_DMABUF_STATS_TEXT, WL_DMABUF_STATS_LONGTEXT)
 vlc_module_end()

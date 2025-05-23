@@ -1,4 +1,4 @@
-#include "../../arm_neon/asm.S"
+#include "../../isa/arm/asm.S"
 
 // copy_xxxa_with_premul(
 //   void * dst_data,           // x0

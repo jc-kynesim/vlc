@@ -143,7 +143,6 @@ libwl_dmabuf_plugin_la_SOURCES += video_output/wayland/rgba_premul_aarch64.S\
 	video_output/wayland/rgba_premul_aarch64.h
 libwl_dmabuf_plugin_la_CFLAGS += -DHAVE_AARCH64_ASM=1
 endif
-if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
 video_output/wayland/single-pixel-buffer-v1-protocol.c: \
 		$(WAYLAND_PROTOCOLS)/staging/single-pixel-buffer/single-pixel-buffer-v1.xml
 	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
@@ -151,12 +150,7 @@ nodist_libwl_dmabuf_plugin_la_SOURCES +=\
 	video_output/wayland/single-pixel-buffer-v1-client-protocol.h \
 	video_output/wayland/single-pixel-buffer-v1-protocol.c
 libwl_dmabuf_plugin_la_CFLAGS += -DHAVE_WAYLAND_SINGLE_PIXEL_BUFFER=1
-endif
 CLEANFILES += $(nodist_libwl_dmabuf_plugin_la_SOURCES)
-
-libwl_shell_plugin_la_SOURCES = video_output/wayland/shell.c
-libwl_shell_plugin_la_CFLAGS = $(WAYLAND_CLIENT_CFLAGS)
-libwl_shell_plugin_la_LIBADD = $(WAYLAND_CLIENT_LIBS) $(LIBPTHREAD)
 
 if HAVE_WAYLAND
 BUILT_SOURCES += $(nodist_libwl_shm_plugin_la_SOURCES)
