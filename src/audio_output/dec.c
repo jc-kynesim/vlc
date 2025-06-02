@@ -563,32 +563,49 @@ static void stream_StopResampling(vlc_aout_stream *stream)
     aout_FiltersAdjustResampling (stream->filters, 0);
 }
 
-static void stream_Silence (vlc_aout_stream *stream, vlc_tick_t length, vlc_tick_t pts)
+// Block into something that has a multiple of 3 in case this is spdif
+// and we are going to substitute with pause blocks with a rep count of 3
+#define SILENCE_SAMPLES 3072
+
+static void stream_Silence (vlc_aout_stream *stream, vlc_tick_t frame_length, vlc_tick_t pts)
 {
     audio_output_t *aout = aout_stream_aout(stream);
     const audio_sample_format_t *fmt = &stream->mixer_format;
-    size_t frames = samples_from_vlc_tick(length, fmt->i_rate);
+    size_t frame_count = samples_from_vlc_tick(frame_length, fmt->i_rate);
 
-    block_t *block = block_Alloc (frames * fmt->i_bytes_per_frame
-                                  / fmt->i_frame_length);
-    if (unlikely(block == NULL))
-        return; /* uho! */
+    msg_Dbg (aout, "inserting %zu zeroes / %"PRId64"ms", frame_count, MS_FROM_VLC_TICK(frame_length));
 
-    msg_Dbg (aout, "inserting %zu zeroes / %"PRId64"ms", frames, MS_FROM_VLC_TICK(length));
-    memset (block->p_buffer, 0, block->i_buffer);
-    block->i_nb_samples = frames;
-    block->i_pts = pts;
-    block->i_dts = pts;
-    block->i_length = length;
+    while (frame_count != 0)
+    {
+        const size_t frames = frame_count >= SILENCE_SAMPLES * 2 ? SILENCE_SAMPLES :
+            frame_count > SILENCE_SAMPLES ? ((frame_count / 2 + 11) / 12) * 12 :
+            frame_count;
+        const vlc_tick_t length = vlc_tick_from_samples(frames, fmt->i_rate);
+        block_t *block = block_Alloc((size_t)((uint_fast64_t)frames * fmt->i_bytes_per_frame
+                                      / fmt->i_frame_length));
+        if (unlikely(block == NULL))
+            return; /* uho! */
 
-    const vlc_tick_t system_now = vlc_tick_now();
-    vlc_clock_Lock(stream->sync.clock);
-    const vlc_tick_t system_pts =
-       vlc_clock_ConvertToSystem(stream->sync.clock, system_now, pts,
-                                 stream->sync.rate, NULL);
-    vlc_clock_Unlock(stream->sync.clock);
-    stream->timing.played_samples += block->i_nb_samples;
-    aout->play(aout, block, system_pts);
+        memset (block->p_buffer, 0, block->i_buffer);
+        block->i_nb_samples = frames;
+        block->i_pts = pts;
+        block->i_dts = pts;
+        block->i_length = length;
+
+        const vlc_tick_t system_now = vlc_tick_now();
+        vlc_clock_Lock(stream->sync.clock);
+        const vlc_tick_t system_pts =
+           vlc_clock_ConvertToSystem(stream->sync.clock, system_now, pts,
+                                     stream->sync.rate, NULL);
+        vlc_clock_Unlock(stream->sync.clock);
+        stream->timing.played_samples += block->i_nb_samples;
+        aout->play(aout, block, system_pts);
+
+        frame_count -= frames;
+        pts += length;
+    }
+
+    msg_Dbg (aout, "%s: Done", __func__);
 }
 
 static void stream_HandleDrift(vlc_aout_stream *stream, vlc_tick_t drift,
