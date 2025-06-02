@@ -812,7 +812,6 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                     case VLC_CODEC_TRUEHD:
                         if (passthrough == PASSTHROUGH_SPDIF)
                             break;
-                        fmt->i_format = VLC_CODEC_SPDIFL;
                         sys->pause_bytes = 4 * 4;
                         arate    = fmt->i_rate % 44100 == 0 ? 176400 : 192000;
                         channels = 8;
@@ -821,13 +820,11 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                     case VLC_CODEC_DTS:
                         if (passthrough == PASSTHROUGH_SPDIF)
                             break;
-                        fmt->i_format = VLC_CODEC_SPDIFL;
                         arate    = 192000;
                         channels = 8;
                         break;
 
                     case VLC_CODEC_EAC3:
-                        fmt->i_format = VLC_CODEC_SPDIFL;
                         sys->pause_bytes = 4 * 4;
                         arate   = fmt->i_rate * 4;
                         break;
@@ -835,6 +832,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                     default:
                         break;
                 }
+                fmt->i_format = VLC_CODEC_SPDIFL;
             }
             else
             if (HAVE_FPU)
