@@ -580,55 +580,56 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>VLCメディアプレイヤーのヘルプへようこそ</"
-"h2><h3>ドキュメンテーション</h3><p>VideoLANの<a href=\"http://wiki.videolan."
-"org\">wiki</a> ウェブサイトでVLCのドキュメントを見つけることができます。</"
-"p><p>もし、はじめてVLCメディアプレイヤーをご利用になるなら、ぜひ、<a href="
-"\"http://wiki.videolan.org/Documentation:VLC_for_dummies\"><em>はじめてのVLC"
-"メディアプレイヤー</em></a>をご覧ください。</p><p>どのようにプレイヤーを使用"
-"するかについては、\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>VLCメディアプレイヤーでファイルを再生する方法</em></a>\"が役"
-"立つでしょう。</p><p>保存、変換、トランスコーディング、エンコーディング、ミキ"
-"シング、それからストリーミングのすべてについては、<a href=\"http://wiki."
-"videolan.org/Documentation:Streaming_HowTo\">ストリーミングのドキュメント</a>"
-"から様々な役立つ情報を見つけることができるでしょう。</p><p>もし、用語について"
-"不安がある場合、<a href=\"http://wiki.videolan.org/Knowledge_Base\">ナレッジ"
-"ベース</a>を確認してみてください。</p><p>メインのキーボードによるショートカッ"
-"トについて理解するためには、<a href=\"http://wiki.videolan.org/Hotkeys\">"
-"ショートカット</a>のページを参照ください。</p><h3>ヘルプ</h3><p>質問をする前"
-"に<a href=\"http://www.videolan.org/support/faq.html\">FAQ</a>をご一読くださ"
-"い。</p><p><a href=\"http://forum.videolan.org\">フォーラム</a>や<a href="
-"\"http://www.videolan.org/vlc/lists.html\">メーリングリスト</a>、irc."
-"freenode.netのIRCチャンネル(<em>#videolan</em> on irc.freenode.net)</p>では、"
-"あなたがヘルプを受けたり（または、提供したり）できるかも知れません。</p><h3>"
-"プロジェクトへの貢献</h3><p>VideoLANプロジェクトに参加し、コミュニティを援助"
-"することができます。スキンをデザインしたり、ドキュメントを翻訳したり、コード"
-"をテストすることができます。また、資金や物資を私達に提供していただくことも可"
-"能です。もちろん、あなたが他の人に VLCメディアプレイヤーを<b>推奨</b>すること"
-"もできます。</p></body></html>"
+"h2><h3>ドキュメンテーション</h3><p>VideoLANの<a href=\"http://"
+"wiki.videolan.org\">wiki</a> ウェブサイトでVLCのドキュメントを見つけることが"
+"できます。</p><p>もし、はじめてVLCメディアプレイヤーをご利用になるなら、ぜ"
+"ひ、<a href=\"http://wiki.videolan.org/Documentation:VLC_for_dummies\"><em>は"
+"じめてのVLCメディアプレイヤー</em></a>をご覧ください。</p><p>どのようにプレイ"
+"ヤーを使用するかについては、\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>VLCメディアプレイヤーでファイルを再生する方法"
+"</em></a>\"が役立つでしょう。</p><p>保存、変換、トランスコーディング、エン"
+"コーディング、ミキシング、それからストリーミングのすべてについては、<a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">ストリーミン"
+"グのドキュメント</a>から様々な役立つ情報を見つけることができるでしょう。</"
+"p><p>もし、用語について不安がある場合、<a href=\"http://wiki.videolan.org/"
+"Knowledge_Base\">ナレッジベース</a>を確認してみてください。</p><p>メインの"
+"キーボードによるショートカットについて理解するためには、<a href=\"http://"
+"wiki.videolan.org/Hotkeys\">ショートカット</a>のページを参照ください。</"
+"p><h3>ヘルプ</h3><p>質問をする前に<a href=\"http://www.videolan.org/support/"
+"faq.html\">FAQ</a>をご一読ください。</p><p><a href=\"http://"
+"forum.videolan.org\">フォーラム</a>や<a href=\"http://www.videolan.org/vlc/"
+"lists.html\">メーリングリスト</a>、irc.freenode.netのIRCチャンネル"
+"(<em>#videolan</em> on irc.freenode.net)</p>では、あなたがヘルプを受けたり"
+"（または、提供したり）できるかも知れません。</p><h3>プロジェクトへの貢献</"
+"h3><p>VideoLANプロジェクトに参加し、コミュニティを援助することができます。ス"
+"キンをデザインしたり、ドキュメントを翻訳したり、コードをテストすることができ"
+"ます。また、資金や物資を私達に提供していただくことも可能です。もちろん、あな"
+"たが他の人に VLCメディアプレイヤーを<b>推奨</b>することもできます。</p></"
+"body></html>"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -1569,8 +1570,8 @@ msgstr "拡張インターフェースモジュール"
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "VLCの\"追加インターフェース\"を選択可能です。デフォルトのインターフェースに加"
 "えてバックグラウンドで起動されます。使用するインターフェースモジュールをコロ"
@@ -2350,8 +2351,8 @@ msgstr "ソースのアスペクト比"
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "ソースのアスペクト比を固定化します。例えば、いくつかのDVDはアスペクト比が4:3"
@@ -2916,15 +2917,15 @@ msgstr "再生中メディアのタイトル変更"
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
-"このオプションは再生されるコンテンツのタイトルを変更することが可能です。<br>"
-"$a: アーティスト<br>$b: アルバム<br>$c: 著作権<br>$t: タイトル<br>$g: ジャン"
-"ル<br>$n: トラック番号<br>$p: 再生中<br>$A: 日付<br>$D: 長さ<br>$Z: \"再生中"
-"\" (代替表記: タイトル - アーティスト)"
+"このオプションは再生されるコンテンツのタイトルを変更することが可能です。"
+"<br>$a: アーティスト<br>$b: アルバム<br>$c: 著作権<br>$t: タイトル<br>$g: "
+"ジャンル<br>$n: トラック番号<br>$p: 再生中<br>$A: 日付<br>$D: 長さ<br>$Z: "
+"\"再生中\" (代替表記: タイトル - アーティスト)"
 
 #: src/libvlc-module.c:699
 msgid "Disable all lua plugins"
@@ -7530,8 +7531,9 @@ msgstr "HTTPプロキシー"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
 "使用されるHTTPプロキシーをhttp://[user@]myproxy.mydomain:myport/の形式で指定"
 "します。何も指定されない場合、http_proxy環境変数が使用されます。"
@@ -8119,8 +8121,8 @@ msgstr "オーディオ入力デバイスが見つかりません"
 
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "あなたのMacはオーディオ入力デバイスが見つかりません。コネクターおよびドライ"
 "バーを確認してください。"
@@ -8558,8 +8560,8 @@ msgstr "RTSP認証"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -9017,9 +9019,9 @@ msgstr "v4l2ドライバ制御"
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "カンマ区切りでv4l2ドライバ制御の値リストを括弧{}で括って指定します。(例: "
 "{video_bitrate=6000000,audio_crc=0,stream_type=3} ) 使用可能な制御を表示する"
@@ -9419,9 +9421,9 @@ msgstr "VLCがキーURIを読み込むファイルまたは、キーファイル
 #: modules/access_output/livehttp.c:98
 #, fuzzy
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
 "セグメントが開始された時および、セグメントがフォーマットに想定される時に読み"
 "込まれるファイル: キーURI\n"
@@ -10600,8 +10602,8 @@ msgid ""
 "Select speaker configuration you want to use. This option doesn't upmix! So "
 "NO e.g. Stereo -> 5.1 conversion."
 msgstr ""
-"使用するスピーカー設定を選択します。このオプションでは、たとえば、ステレオ -"
-"> 5.1への変換などのアップミックスは行いません！"
+"使用するスピーカー設定を選択します。このオプションでは、たとえば、ステレオ "
+"-> 5.1への変換などのアップミックスは行いません！"
 
 #: modules/audio_output/directsound.c:70
 msgid "Audio volume in hundredths of decibels (dB)."
@@ -10924,7 +10926,6 @@ msgstr "デコード中"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "エンコード中"
 
@@ -11473,11 +11474,11 @@ msgstr "Theoraビデオのパケッタイザー"
 msgid "Daala video encoder"
 msgstr "PNGビデオエンコーダー"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "クロマフォーマット"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr "ビデオの変換で使用されるクロマフォーマットを指定します。"
@@ -11541,8 +11542,8 @@ msgstr "サブピクチャーの位置"
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 "ビデオ上のサブピクチャーの位置を指定します。(0:中央, 1:左, 2:右, 4:上, 8:下, "
 "これらを組み合わせることも可能です。例えば、6=右上)"
@@ -12313,10 +12314,10 @@ msgstr "レート制御の正確性"
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
 "'avbr' (平均可変ビットレート)方法の許容範囲をパーセンテージで指定します。(例"
 "えば、800 kbpsの10%の場合、エンコーダーは730kbpsから880kbpsの範囲で処理するよ"
@@ -12384,386 +12385,6 @@ msgstr "Pseudo Rawビデオのパケッタイザー"
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "PNGビデオエンコーダー"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "レート制御方法"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr "ビデオシーケンスのエンコードに使用される方法"
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "固定ノイズ閾値モード"
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "固定ビットレートモード(CBR)"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "低遅延モード"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "ロスレスモード"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "固定ラムダモード"
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "固定エラーモード"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "固定品質モード"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "GOP構造"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr "ビデオシーケンスのエンコードに使用されるGOP構造"
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-"固定化したGOP構造なし。画像間、または画像内で前、または先の画像を参照すること"
-"が可能"
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr "Iフレームのみのシーケンス"
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr "画像間は前の画像のみを参照可能"
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr "画像間は前、または先の画像を参照可能"
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "品質固定化係数"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr "固定品質モードで使用される品質係数"
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "ノイズ閾値"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr "固定ノイズ閾値モードで使用されるノイズの閾値を指定します。"
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "CBR ビットレート(kbps)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"エンコードが固定ビットレートモードの時のターゲットビットレートをkbpsで指定し"
-"ます。"
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "最大ビットレート(kbps)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"エンコードが固定ビットレートモードの時の最大ビットレートをkbpsで指定します。"
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "最小ビットレート(kbps)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"エンコードが固定ビットレートモードの時の最小ビットレートをkbpsで指定します。"
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "GOP長"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr "連続的なシーケンスヘッダー間の画像数。つまり、画像のグループ数"
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "プレフィルター"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "プレフィルタリングを有効にします。"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "プレフィルタリングなし"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr "中心を重点化したメディア"
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "ガウスローパスフィルター"
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "ノイズ追加"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "ガウス適応ローパスフィルター"
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "ローパスフィルター"
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "プレフィルタリングの量"
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "高い値はよりプレフィルタリングを行うことを意味します。"
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "画像コーディングモード"
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-"疑似進行フレームに対抗して別にコード化されるインターレス化フィールドのフィー"
-"ルドコーディングを指定します。"
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr "自動:入力を基準としてエンコーダーが決定(最適)"
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr "単一画像としてコーディングフレームを強制"
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr "別のインターレース化フィールドとしてコーディングフレームを強制"
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr "モーション補正ブロックサイズ"
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr "自動:入力を基準としてエンコーダーが決定(最適)"
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr "小:小さなモーション補正ブロックを使用"
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr "中:中間のモーション補正ブロックを使用"
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr "大:大きなモーション補正ブロックを使用"
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr "モーション補正ブロックの重なり"
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr "なし:モーション補正ブロックを重ねません"
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr "部分的:モーション補正ブロックを部分的に重ねます"
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr "フル:モーション補正ブロック全体を重ねます"
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "モーションベクトル精度"
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "モーションベクトルの精度をピクセルで指定します。"
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "3コンポーネントモーション予測"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "クロマをモーション予測処理の一部として使用します。"
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr "画像内DWTフィルター"
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr "画像間DWTフィルター"
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr "DWT相互作用の数"
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr "DWTレベルとしても知られています。"
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr "複数の量子化を有効化"
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr "サブバンドごとに複数の量子化を有効化します。(コードブロックごとに一つ)"
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr "算術コーディングの無効化"
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr ""
-"便利な非常に高いビットレートを使用するのではなく、可変長コードを使用します。"
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "知覚的重み付け方式"
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "知覚的距離"
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr "知覚的重みを計算するための知覚的距離"
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "フレームごとの水平スライス"
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr "低遅延モードでのフレームごとの水平スライス数"
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "フレームごとの垂直スライス"
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr "低遅延モードでのフレームごとの垂直スライス数"
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr "個々のサブバンドのコードブロックサイズ"
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr "小 - 小さなコードブロックの使用"
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr "中 - 中間サイズのコードブロックの使用"
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr "大 - 大きなコードブロックの使用"
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr "フル - サブバンドごとに1つのコードブロック"
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr "階層的モーション予測の有効化"
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr "ダウンサンプリングのレベル数"
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr "階層的モーション予測モードのダウンサンプリングのレベル数"
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr "グローバルモーション予測の有効化"
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr "フェーズ相関予測の有効化"
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr "シーン変更検出を有効化"
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "プロファイルを強制"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr "VC2低遅延プロファイル"
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr "VC2シンプルプロファイル"
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr "VC2メインプロファイル"
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "メインプロファイル"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr "libschroedinger使用のDiracビデオデコーダー"
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr "libschroedinger使用のDiracビデオエンコーダー"
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -15468,14 +15089,6 @@ msgstr "既にファイルが存在する場合、上書きしないようにし
 msgid "File dumper"
 msgstr "ファイルダンパー"
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "DTSを調整する間隔"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "Diracビデオ デマルチプレクサー"
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -16543,17 +16156,17 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
-"<p>VLCメディアプレイヤーは<a href=\"http://www.videolan.org/\"><span style="
-"\" text-decoration: underline; color:#0057ae;\">VideoLAN</span></a> コミュニ"
-"ティによって開発されたフリーのオープンソースのエンコーダー、ストリーミング機"
-"能を持つメディアプレイヤーです。</p><p>VLCは様々なプラットフォームで実行可能"
-"な自身の内部コーデックを使用し、ほとんどすべてのファイル、CD、DVD、ネットワー"
-"クストリーム、キャプチャーカードおよび、その他のメディアフォーマットを読み込"
-"むことができます！</p><p><a href=\"http://www.videolan.org/contribute/"
+"<p>VLCメディアプレイヤーは<a href=\"http://www.videolan.org/\"><span "
+"style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</span></a> コ"
+"ミュニティによって開発されたフリーのオープンソースのエンコーダー、ストリーミ"
+"ング機能を持つメディアプレイヤーです。</p><p>VLCは様々なプラットフォームで実"
+"行可能な自身の内部コーデックを使用し、ほとんどすべてのファイル、CD、DVD、ネッ"
+"トワークストリーム、キャプチャーカードおよび、その他のメディアフォーマットを"
+"読み込むことができます！</p><p><a href=\"http://www.videolan.org/contribute/"
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">一緒に参加しま"
 "しょう！</span></a></p>"
 
@@ -16848,8 +16461,8 @@ msgstr "入力は変更されました"
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "入力が変更されました。ブックマークを保存することができません。ブックマークの"
 "編集中は同じ入力を保持するために、\"一時停止\"で再生を中断してください。"
@@ -22598,8 +22211,8 @@ msgstr "Luaインターフェース設定"
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 "Luaインターフェース設定の文字列を指定します。フォーマットは: '[\"<インター"
 "フェースモジュール名>\"] = { <オプション> = <値>, ...}, ...'です。"
@@ -24049,10 +23662,6 @@ msgstr "AVパーサーパケッタイザー"
 msgid "Copy packetizer"
 msgstr "コピーのパケッタイザー"
 
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "Diracパケッタイザー"
-
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
 msgstr "DTSオーディオのパケッタイザー"
@@ -24248,9 +23857,9 @@ msgid ""
 "This enables actual parsing of the announces by the SAP module. Otherwise, "
 "all announcements are parsed by the \"live555\" (RTP/RTSP) module."
 msgstr ""
-"SAMPモジュールによるアナウンスの解析を有効にします。それ以外の場"
-"合、\"live555\"（RTP/RTSP)モジュールによってすべてのアナウンスメントが解析さ"
-"れます。"
+"SAMPモジュールによるアナウンスの解析を有効にします。それ以外の場合、"
+"\"live555\"（RTP/RTSP)モジュールによってすべてのアナウンスメントが解析されま"
+"す。"
 
 #: modules/services_discovery/sap.c:95
 msgid "SAP Strict mode"
@@ -30045,6 +29654,308 @@ msgstr "AAAA; "
 msgid "Media Manager List"
 msgstr "メディアマネージャーリスト"
 
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4"
+
+#~ msgid "Rate control method"
+#~ msgstr "レート制御方法"
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr "ビデオシーケンスのエンコードに使用される方法"
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "固定ノイズ閾値モード"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "固定ビットレートモード(CBR)"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "低遅延モード"
+
+#~ msgid "Lossless mode"
+#~ msgstr "ロスレスモード"
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "固定ラムダモード"
+
+#~ msgid "Constant error mode"
+#~ msgstr "固定エラーモード"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "固定品質モード"
+
+#~ msgid "GOP structure"
+#~ msgstr "GOP構造"
+
+#~ msgid "GOP structure used to encode the video sequence"
+#~ msgstr "ビデオシーケンスのエンコードに使用されるGOP構造"
+
+#~ msgid ""
+#~ "No fixed gop structure. A picture can be intra or inter and refer to "
+#~ "previous or future pictures."
+#~ msgstr ""
+#~ "固定化したGOP構造なし。画像間、または画像内で前、または先の画像を参照する"
+#~ "ことが可能"
+
+#~ msgid "I-frame only sequence"
+#~ msgstr "Iフレームのみのシーケンス"
+
+#~ msgid "Inter pictures refere to previous pictures only"
+#~ msgstr "画像間は前の画像のみを参照可能"
+
+#~ msgid "Inter pictures can refer to previous or future pictures"
+#~ msgstr "画像間は前、または先の画像を参照可能"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "品質固定化係数"
+
+#~ msgid "Quality factor to use in constant quality mode"
+#~ msgstr "固定品質モードで使用される品質係数"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "ノイズ閾値"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr "固定ノイズ閾値モードで使用されるノイズの閾値を指定します。"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "CBR ビットレート(kbps)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "エンコードが固定ビットレートモードの時のターゲットビットレートをkbpsで指定"
+#~ "します。"
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "最大ビットレート(kbps)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "エンコードが固定ビットレートモードの時の最大ビットレートをkbpsで指定しま"
+#~ "す。"
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "最小ビットレート(kbps)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "エンコードが固定ビットレートモードの時の最小ビットレートをkbpsで指定しま"
+#~ "す。"
+
+#~ msgid "GOP length"
+#~ msgstr "GOP長"
+
+#~ msgid ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+#~ msgstr "連続的なシーケンスヘッダー間の画像数。つまり、画像のグループ数"
+
+#~ msgid "Prefilter"
+#~ msgstr "プレフィルター"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "プレフィルタリングを有効にします。"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "プレフィルタリングなし"
+
+#~ msgid "Centre Weighted Median"
+#~ msgstr "中心を重点化したメディア"
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "ガウスローパスフィルター"
+
+#~ msgid "Add Noise"
+#~ msgstr "ノイズ追加"
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "ガウス適応ローパスフィルター"
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "ローパスフィルター"
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "プレフィルタリングの量"
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "高い値はよりプレフィルタリングを行うことを意味します。"
+
+#~ msgid "Picture coding mode"
+#~ msgstr "画像コーディングモード"
+
+#~ msgid ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+#~ msgstr ""
+#~ "疑似進行フレームに対抗して別にコード化されるインターレス化フィールドの"
+#~ "フィールドコーディングを指定します。"
+
+#~ msgid "auto - let encoder decide based upon input (Best)"
+#~ msgstr "自動:入力を基準としてエンコーダーが決定(最適)"
+
+#~ msgid "force coding frame as single picture"
+#~ msgstr "単一画像としてコーディングフレームを強制"
+
+#~ msgid "force coding frame as separate interlaced fields"
+#~ msgstr "別のインターレース化フィールドとしてコーディングフレームを強制"
+
+#~ msgid "Size of motion compensation blocks"
+#~ msgstr "モーション補正ブロックサイズ"
+
+#~ msgid "automatic - let encoder decide based upon input (Best)"
+#~ msgstr "自動:入力を基準としてエンコーダーが決定(最適)"
+
+#~ msgid "small - use small motion compensation blocks"
+#~ msgstr "小:小さなモーション補正ブロックを使用"
+
+#~ msgid "medium - use medium motion compensation blocks"
+#~ msgstr "中:中間のモーション補正ブロックを使用"
+
+#~ msgid "large - use large motion compensation blocks"
+#~ msgstr "大:大きなモーション補正ブロックを使用"
+
+#~ msgid "Overlap of motion compensation blocks"
+#~ msgstr "モーション補正ブロックの重なり"
+
+#~ msgid "none - Motion compensation blocks do not overlap"
+#~ msgstr "なし:モーション補正ブロックを重ねません"
+
+#~ msgid "partial - Motion compensation blocks only partially overlap"
+#~ msgstr "部分的:モーション補正ブロックを部分的に重ねます"
+
+#~ msgid "full - Motion compensation blocks fully overlap"
+#~ msgstr "フル:モーション補正ブロック全体を重ねます"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "モーションベクトル精度"
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "モーションベクトルの精度をピクセルで指定します。"
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "3コンポーネントモーション予測"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "クロマをモーション予測処理の一部として使用します。"
+
+#~ msgid "Intra picture DWT filter"
+#~ msgstr "画像内DWTフィルター"
+
+#~ msgid "Inter picture DWT filter"
+#~ msgstr "画像間DWTフィルター"
+
+#~ msgid "Number of DWT iterations"
+#~ msgstr "DWT相互作用の数"
+
+#~ msgid "Also known as DWT levels"
+#~ msgstr "DWTレベルとしても知られています。"
+
+#~ msgid "Enable multiple quantizers"
+#~ msgstr "複数の量子化を有効化"
+
+#~ msgid "Enable multiple quantizers per subband (one per codeblock)"
+#~ msgstr ""
+#~ "サブバンドごとに複数の量子化を有効化します。(コードブロックごとに一つ)"
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr "算術コーディングの無効化"
+
+#~ msgid "Use variable length codes instead, useful for very high bitrates"
+#~ msgstr ""
+#~ "便利な非常に高いビットレートを使用するのではなく、可変長コードを使用しま"
+#~ "す。"
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "知覚的重み付け方式"
+
+#~ msgid "perceptual distance"
+#~ msgstr "知覚的距離"
+
+#~ msgid "perceptual distance to calculate perceptual weight"
+#~ msgstr "知覚的重みを計算するための知覚的距離"
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "フレームごとの水平スライス"
+
+#~ msgid "Number of horizontal slices per frame in low delay mode"
+#~ msgstr "低遅延モードでのフレームごとの水平スライス数"
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "フレームごとの垂直スライス"
+
+#~ msgid "Number of vertical slices per frame in low delay mode"
+#~ msgstr "低遅延モードでのフレームごとの垂直スライス数"
+
+#~ msgid "Size of code blocks in each subband"
+#~ msgstr "個々のサブバンドのコードブロックサイズ"
+
+#~ msgid "small - use small code blocks"
+#~ msgstr "小 - 小さなコードブロックの使用"
+
+#~ msgid "medium - use medium sized code blocks"
+#~ msgstr "中 - 中間サイズのコードブロックの使用"
+
+#~ msgid "large - use large code blocks"
+#~ msgstr "大 - 大きなコードブロックの使用"
+
+#~ msgid "full - One code block per subband"
+#~ msgstr "フル - サブバンドごとに1つのコードブロック"
+
+#~ msgid "Enable hierarchical Motion Estimation"
+#~ msgstr "階層的モーション予測の有効化"
+
+#~ msgid "Number of levels of downsampling"
+#~ msgstr "ダウンサンプリングのレベル数"
+
+#~ msgid ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+#~ msgstr "階層的モーション予測モードのダウンサンプリングのレベル数"
+
+#~ msgid "Enable Global Motion Estimation"
+#~ msgstr "グローバルモーション予測の有効化"
+
+#~ msgid "Enable Phase Correlation Estimation"
+#~ msgstr "フェーズ相関予測の有効化"
+
+#~ msgid "Enable Scene Change Detection"
+#~ msgstr "シーン変更検出を有効化"
+
+#~ msgid "Force Profile"
+#~ msgstr "プロファイルを強制"
+
+#~ msgid "VC2 Low Delay Profile"
+#~ msgstr "VC2低遅延プロファイル"
+
+#~ msgid "VC2 Simple Profile"
+#~ msgstr "VC2シンプルプロファイル"
+
+#~ msgid "VC2 Main Profile"
+#~ msgstr "VC2メインプロファイル"
+
+#~ msgid "Main Profile"
+#~ msgstr "メインプロファイル"
+
+#~ msgid "Dirac video decoder using libschroedinger"
+#~ msgstr "libschroedinger使用のDiracビデオデコーダー"
+
+#~ msgid "Dirac video encoder using libschroedinger"
+#~ msgstr "libschroedinger使用のDiracビデオエンコーダー"
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "DTSを調整する間隔"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "Diracビデオ デマルチプレクサー"
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "Diracパケッタイザー"
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr ""
@@ -30253,9 +30164,9 @@ msgstr "メディアマネージャーリスト"
 #~ msgstr "RTSPパスワード"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
 #~ "使用されるHTTPプロキシーをhttp://[user[:pass]@]myproxy.mydomain:myport/の"
 #~ "形式で指定します。何も指定されない場合、http_proxy環境変数が使用されます。"
@@ -32402,15 +32313,15 @@ msgstr "メディアマネージャーリスト"
 #~ msgid ""
 #~ "Force the subtiles format. Valid values are : \"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
 #~ "autodetection, this should always work)."
 #~ msgstr ""
 #~ "字幕のフォーマットを指定します。有効な値は、\"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\",  および \"auto\" (自動検出を意"
-#~ "味します。この指定は常に動作します。)."
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\",  および \"auto\" (自動検出"
+#~ "を意味します。この指定は常に動作します。)."
 
 #~ msgid "Do not complain on encrypted PES."
 #~ msgstr "暗号化されたPESに対応しません。"
@@ -32560,9 +32471,9 @@ msgstr "メディアマネージャーリスト"
 #~ "ます。"
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", \"syslog\" (special mode to send to syslog instead of file), and "
-#~ "\"android\" (special mode to send to android logging facility)."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", \"syslog\" (special mode to send to syslog instead of file), "
+#~ "and \"android\" (special mode to send to android logging facility)."
 #~ msgstr ""
 #~ "ログのフォーマットを\"テキスト\"(デフォルト), \"HTML\", \"syslog\"(ファイ"
 #~ "ルを使用せずにsyslogに送信する特殊なモード), \"android\"(androidのロギング"
@@ -32807,8 +32718,8 @@ msgstr "メディアマネージャーリスト"
 #~ "ジを表示させたい場合は、-vvvを指定する必要があります。"
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", and \"syslog\" (special mode to send to syslog instead of file."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", and \"syslog\" (special mode to send to syslog instead of file."
 #~ msgstr ""
 #~ "ログのフォーマットを\"テキスト\"(デフォルト), \"HTML\", \"syslog\"(ファイ"
 #~ "ルを使用せずにsyslogに送信する特殊なモード)のいずれかから選択します。"
@@ -32818,8 +32729,8 @@ msgstr "メディアマネージャーリスト"
 
 #~ msgid ""
 #~ "Use a unique dbus service id to identify this VLC instance on the DBUS "
-#~ "bus. The process identifier (PID) is added to the service name: org.mpris."
-#~ "vlc-<pid>"
+#~ "bus. The process identifier (PID) is added to the service name: "
+#~ "org.mpris.vlc-<pid>"
 #~ msgstr ""
 #~ "DBUS上でVLCインスタンスを識別するための一意なDBUSサービスID。プロセス識別"
 #~ "子(PID)がサービス名に付加されます。: org.mpris.vlc-<pid>"
@@ -32871,8 +32782,8 @@ msgstr "メディアマネージャーリスト"
 #~ msgstr "ボールの色を\"赤\"、\"青\"、または\"緑\"のいずれかで指定します。"
 
 #~ msgid ""
-#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be"
-#~ "\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
+#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
+#~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
 #~ msgstr ""
 #~ "\"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be\", "
 #~ "\"s16_be\", \"fixed32\", \"float32\", \"spdif\"のいずれかを指定します。"
@@ -33695,20 +33606,21 @@ msgstr "メディアマネージャーリスト"
 #~ "</style></head><body style=\" font-family:'DejaVu Sans'; font-size:8pt; "
 #~ "font-weight:400; font-style:normal;\">\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.example.com/stream.avi</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.example.com/stream.avi</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtp://@:1234</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtp://@:1234</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></html>"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></"
+#~ "html>"
 #~ msgstr ""
 #~ "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/"
 #~ "REC-html40/strict.dtd\">\n"
@@ -33718,20 +33630,21 @@ msgstr "メディアマネージャーリスト"
 #~ "</style></head><body style=\" font-family:'DejaVu Sans'; font-size:8pt; "
 #~ "font-weight:400; font-style:normal;\">\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.example.com/stream.avi</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.example.com/stream.avi</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtp://@:1234</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtp://@:1234</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></html>"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></"
+#~ "html>"
 
 #~ msgid "Minimal view mode (no toolbars)"
 #~ msgstr "最小ビューモード(ツールバー無し)"
@@ -34014,10 +33927,10 @@ msgstr "メディアマネージャーリスト"
 
 #, fuzzy
 #~ msgid ""
-#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title"
-#~ "\" ($a - $t). You can use the following substitutions: $a Artist, $b "
-#~ "Album, $c Copyright, $d Description, $e Encoder, $g Genre, $l Language, "
-#~ "$n number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
+#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title\" "
+#~ "($a - $t). You can use the following substitutions: $a Artist, $b Album, "
+#~ "$c Copyright, $d Description, $e Encoder, $g Genre, $l Language, $n "
+#~ "number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
 #~ "URL, $A Date, $B Bitrate, $C Chapter, $D Duration, $F URI, $I Video "
 #~ "Title, $L Time Remaining, $N Name, $O Audio language, $P Position, $R "
 #~ "Rate, $S Sample rate, $T Time elapsed, $U Publisher, $V Volume"
@@ -34118,8 +34031,8 @@ msgstr "メディアマネージャーリスト"
 #, fuzzy
 #~ msgid ""
 #~ "Your video output acceleration driver does not support the required "
-#~ "resolution: %ux%u pixels. The maximum supported resolution is %<PRIu32>x"
-#~ "%<PRIu32>.\n"
+#~ "resolution: %ux%u pixels. The maximum supported resolution is "
+#~ "%<PRIu32>x%<PRIu32>.\n"
 #~ "Video output acceleration will be disabled. However, rendering videos "
 #~ "with overly large resolution may cause severe performance degration."
 #~ msgstr ""

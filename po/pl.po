@@ -21,9 +21,9 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=4; plural=(n==1 ? 0 : (n%10>=2 && n%10<=4) && (n"
-"%100<12 || n%100>14) ? 1 : n!=1 && (n%10>=0 && n%10<=1) || (n%10>=5 && n"
-"%10<=9) || (n%100>=12 && n%100<=14) ? 2 : 3);\n"
+"Plural-Forms: nplurals=4; plural=(n==1 ? 0 : (n%10>=2 && n%10<=4) && "
+"(n%100<12 || n%100>14) ? 1 : n!=1 && (n%10>=0 && n%10<=1) || (n%10>=5 && "
+"n%10<=9) || (n%100>=12 && n%100<=14) ? 2 : 3);\n"
 
 #: include/vlc_common.h:1040
 msgid ""
@@ -582,55 +582,56 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>Zapraszamy do pomocy przy VLC media "
 "playerze</h2><h3>Dokumentacja</h3><p>Możesz znaleźć dokumentację dotyczącą "
 "VLC na witrynie <a href=\"http://wiki.videolan.org\">wiki</a> strony "
 "internetowej VideoLAN.</p><p>Jeśli jesteś nowicjuszem VLC media playera, "
-"proszę przeczytaj<br><a href=\"http://wiki.videolan.org/Documentation:"
-"VLC_for_dummies\"><em>Wprowadzenie do VLC media playera</em></a>.</"
-"p><p>Informacje o tym, jak używać odtwarzacza znajdziesz w dokumencie<br>"
-"\"<a href=\"http://wiki.videolan.org/Documentation:Play_HowTo\"><em>Jak "
-"odtwarzać pliki z VLC media playerem</em></a>\".</p><p>Dla wszystkich zadań "
-"zapisywania, konwertowania, transkodowania, kodowania, miksowania i "
-"strumieniowania, znajdziesz przydatne informacje w <a href=\"http://wiki."
-"videolan.org/Documentation:Streaming_HowTo\">dokumentacji strumieniowania</"
-"a>.</p><p>Jeśli nie jesteś pewny terminologii, odwiedź <a href = \"http://"
+"proszę przeczytaj<br><a href=\"http://wiki.videolan.org/"
+"Documentation:VLC_for_dummies\"><em>Wprowadzenie do VLC media playera</em></"
+"a>.</p><p>Informacje o tym, jak używać odtwarzacza znajdziesz w "
+"dokumencie<br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>Jak odtwarzać pliki z VLC media playerem</"
+"em></a>\".</p><p>Dla wszystkich zadań zapisywania, konwertowania, "
+"transkodowania, kodowania, miksowania i strumieniowania, znajdziesz "
+"przydatne informacje w <a href=\"http://wiki.videolan.org/"
+"Documentation:Streaming_HowTo\">dokumentacji strumieniowania</a>.</"
+"p><p>Jeśli nie jesteś pewny terminologii, odwiedź <a href = \"http://"
 "wiki.videolan.org/Knowledge_Base \">bazę wiedzy</a>.</p><p>Aby zrozumieć "
-"podstawowe skróty klawiszowe, przeczytaj stronę <a href=\"http://wiki."
-"videolan.org/Hotkeys\">skrótów</a>.</p><h3>Pomoc</h3><p>Przed zadawaniem "
-"wszelkich pytań, należy zapoznać się z <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>Można wówczas uzyskać (i dać) pomoc na <a "
-"href=\"http://forum.videolan.org\">forach</a>, <a href=\"http://www.videolan."
-"org/vlc/lists.html\">listach mailingowych</a> lub naszym kanale IRC "
-"(<em>#videolan</em></a> na irc.freenode.net).</p><h3>Przyczyń się do "
-"projektu</h3><p>Możesz pomóc przy projekcie VideoLAN, oferując trochę "
-"swojego czasu, aby pomóc społeczności, zaprojektować skóry, przetłumaczyć "
-"dokumentację albo przetestować i kodować program. Możesz również ofiarować "
-"fundusz i materiały, które nam pomogą. I oczywiście możesz <b>promować</b> "
-"VLC media playera.</p></body></html>"
+"podstawowe skróty klawiszowe, przeczytaj stronę <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">skrótów</a>.</p><h3>Pomoc</h3><p>Przed "
+"zadawaniem wszelkich pytań, należy zapoznać się z <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>Można wówczas uzyskać (i "
+"dać) pomoc na <a href=\"http://forum.videolan.org\">forach</a>, <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">listach mailingowych</a> lub "
+"naszym kanale IRC (<em>#videolan</em></a> na irc.freenode.net).</"
+"p><h3>Przyczyń się do projektu</h3><p>Możesz pomóc przy projekcie VideoLAN, "
+"oferując trochę swojego czasu, aby pomóc społeczności, zaprojektować skóry, "
+"przetłumaczyć dokumentację albo przetestować i kodować program. Możesz "
+"również ofiarować fundusz i materiały, które nam pomogą. I oczywiście możesz "
+"<b>promować</b> VLC media playera.</p></body></html>"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -814,8 +815,8 @@ msgstr ""
 "  [[dostęp] [/demuks]://]URL[#[tytuł][:rozdział][-[tytuł][:rozdział]]]\n"
 "  [:opcja=wartość ...]\n"
 "\n"
-"  Wiele globalnych opcji-- mogą również być wykorzystane jako szczególne :"
-"opcje MRL.\n"
+"  Wiele globalnych opcji-- mogą również być wykorzystane jako "
+"szczególne :opcje MRL.\n"
 "  Określone mogą być wielokrotne wartości :opcja=para.\n"
 "\n"
 "Składnia adresu URL:\n"
@@ -1584,8 +1585,8 @@ msgstr "Dodatkowe moduły interfejsu"
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "W VLC można wybrać \"dodatkowe interfejsy\". Są one uruchamiane w tle jako "
 "dodatek do domyślnego interfejsu. Należy je wpisywać w postaci listy modułów "
@@ -2372,8 +2373,8 @@ msgstr "Współczynnik proporcji obrazu źródłowego"
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "To wymusza stosunek rozmiaru źródła. Na przykład niektóre płyty DVD żądają "
@@ -2888,8 +2889,9 @@ msgid ""
 "\"{name=bookmark-name,time=optional-time-offset,bytes=optional-byte-offset},"
 "{...}\""
 msgstr ""
-"Możesz ręcznie podać listę zakładek dla strumienia \"{name=nazwa-zakładki,"
-"time=dowolne-wyrównanie-czasu,bytes=dowolne-przesunięcie-bajtu},{...}\""
+"Możesz ręcznie podać listę zakładek dla strumienia \"{name=nazwa-"
+"zakładki,time=dowolne-wyrównanie-czasu,bytes=dowolne-przesunięcie-bajtu},"
+"{...}\""
 
 #: src/libvlc-module.c:675
 #, fuzzy
@@ -2939,15 +2941,15 @@ msgstr "Zmień tytuł według bieżącego pliku multimedialnego"
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
 "Ta opcja pozwala ustawić tytuł w zależności od aktualnego odtwarzania<br>$a: "
-"Wykonawca<br>$b: Album<br>$c: Prawa autorskie<br>$t: Tytuł<br>$g: Gatunek<br>"
-"$n: Nr. ścieżki<br>$p: Odtwarzane<br>$A: Data<br>$D: Czas trwania<br>$Z: "
-"\"Teraz odtwarzane\" (powrót na Tytuł - Wykonawca)"
+"Wykonawca<br>$b: Album<br>$c: Prawa autorskie<br>$t: Tytuł<br>$g: "
+"Gatunek<br>$n: Nr. ścieżki<br>$p: Odtwarzane<br>$A: Data<br>$D: Czas "
+"trwania<br>$Z: \"Teraz odtwarzane\" (powrót na Tytuł - Wykonawca)"
 
 #: src/libvlc-module.c:699
 msgid "Disable all lua plugins"
@@ -7591,8 +7593,9 @@ msgstr "Serwer proxy HTTP"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
 "Proxy HTTP, który ma być używany musi być w następującym formacie: http://"
 "[użytkownik@]mójproxy.mójdomain:mójport/ ; jeśli jest pusty, będzie "
@@ -8177,8 +8180,8 @@ msgstr "Nie znaleziono wejściowych urządzeń Audio"
 
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "Twój Mac nie wydaje się być wyposażony w odpowiednie urządzenie z wejściem "
 "audio. Proszę sprawdzić swoje połączenia i sterowniki."
@@ -8614,8 +8617,8 @@ msgstr "Uwierzytelnienie RTSP"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -9078,9 +9081,9 @@ msgstr "kontrole sterownika v4l2 driver"
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "Ustaw kontrole sterownika v4l2 do wartości określonych za pomocą listy, "
 "dzielonej przecinkami, opcjonalnie dzielonej nawiasami klamrowymi (np.: "
@@ -9481,12 +9484,12 @@ msgstr "Plik, z którego vlc odczyta adres-klucza i plik-klucza"
 #: modules/access_output/livehttp.c:98
 #, fuzzy
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
-"Plik jest odczytywany od początku segmentu i musi mieć format: adres-klucza"
-"\\nplik-klucza. Plik jest odczytywany na początku segmentu i wartości "
+"Plik jest odczytywany od początku segmentu i musi mieć format: adres-"
+"klucza\\nplik-klucza. Plik jest odczytywany na początku segmentu i wartości "
 "zostają użyte w tym segmencie."
 
 #: modules/access_output/livehttp.c:102
@@ -10982,7 +10985,6 @@ msgstr "Dekodowanie"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "Kodowanie"
 
@@ -11536,11 +11538,11 @@ msgstr "Pakietowiec obrazu Theora"
 msgid "Daala video encoder"
 msgstr "Koder obrazu Theora"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "Format chromy"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr "Zbieranie formatu chromy wymusza konwersję obrazu do tego formatu"
@@ -11604,8 +11606,8 @@ msgstr "Pozycja podobrazów"
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 "Możesz wymusić pozycję podobrazów na obrazie (0=środek, 1=lewa, 2=prawa, "
 "4=góra, 8=dół, możesz użyć też kombinacje z tych parametrów, np. 6 = prawa-"
@@ -12380,10 +12382,10 @@ msgstr "Dokładność funkcji RateControl"
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
 "Tolerancja metody 'avbr' (średnia zmiennego bitrate) w procentach. (Np. 10 w "
 "bitrate 800 kpbs oznacza, że koder nie próbuje przejść powyżej 880 kpbs i "
@@ -12453,384 +12455,6 @@ msgstr "Fałszywy pakietowiec surowego obrazu"
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "Koder obrazu Theora"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "Metoda kontroli stosunku"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr "Metoda stosowana do kodowania sekwencji obrazu"
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "Tryb stałego progu szumów"
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "Stały bitrate kodowania (CBR)"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "Tryb niskiego opóźnienia"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "Tryb bezstratny"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "Stały tryb lambda"
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "Tryb stałych błędów"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "Tryb stałej jakości"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "Struktura GOP"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr "Struktura GOP używana do kodowania sekwencji wideo"
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-"Brak stałej struktury GOP. Obraz może być intra lub inter i odnosi się do "
-"poprzednich lub przyszłych obrazów."
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr "Tylko sekwencja klatek I"
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr "Obrazy międzyramkowe odnoszą się tylko do ostatnich obrazów"
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr "Obrazy międzyramkowe odnoszą się do ostatnich lub przyszłych obrazów"
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "Stały współczynnik jakości"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr "Współczynnik jakości używany w trybie stałej jakości"
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "Próg szumu"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr "Próg szumu używany w trybie stałego progu szumów"
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "Stały bitrate (kbps)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr "Docelowy bitrate w kbps jeśli kodujesz w trybie stałego bitrate"
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "Maksymalny bitrate (kbps)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "Maksymalny bitrate w kbps podczas kodowania w trybie stałego bitrate"
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "Minimalny bitrate (kbps)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "Minimalny bitrate w kbps podczas kodowania trybie w stałego bitrate"
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "Długość GOP"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr ""
-"Liczba obrazów pomiędzy kolejnymi nagłówkami sekwencji tzn. długość grupy "
-"obrazów (GOP)"
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "Filtr wstępny"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "Włącz adaptacyjne przefiltrowanie"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "Bez przed-filtrowania"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr "Zależny element centralny"
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "Filtr dolnoprzepustowy Gaussa"
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "Dodaj szum"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "Adaptacyjny filtr dolnoprzepustowy Gaussa"
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "Filtr dolnoprzepustowy"
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "Kwota przefiltrowania"
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "Wyższa wartość oznacza więcej przefiltrowania"
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "Tryb kodowania obrazu"
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-"Pole kodowania jest tam gdzie odbywa się oddzielnie kodowane z przeplotem, w "
-"przeciwieństwie do pseudo-progresywnej klatki"
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr "automatycznie - niech zdecyduje koder na podstawie wejścia (najlepsze)"
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr "wymuś kodowanie klatki jako pojedynczy obraz"
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr "wymuś kodowanie klatki jako oddzielne pola z przeplotem"
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr "Rozmiar bloków kompensacji ruchu"
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr "automatyczny - koder zdecyduje na podstawie wejścia (najlepsze)"
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr "mały - użyj małych bloków kompensacji ruchu"
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr "średni - użyj średnich bloków kompensacji ruchu"
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr "duży - użyj dużych bloków kompensacji ruchu"
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr "Nakładanie bloków kompensacji ruchu"
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr "brak - bloki kompensacji ruchu nie nakładają się"
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr "częściowe - bloki kompensacji ruchu tylko częściowo nakładają się"
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr "pełne - bloki kompensacji ruchu w pełni nakładają się"
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "Dokładność wektora ruchu"
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "Dokładność wektora ruchu w pikselach"
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "Trzy komponenty przewidywania ruchu"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "Użyj barw jako część procesu przewidywania ruchu"
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr "Filtr Intra obrazu DWT"
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr "Filtr DWT obrazu międzyramkowego"
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr "Liczba iteracji DWT"
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr "Znane również jako poziomy DWT"
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr "Włącz wielokrotne kwantyzatory"
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr "Włącz wielokrotne kwantyzatory na podpasma (jeden na blok kodu)"
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr "Wyłącz kodowanie arytmetyczne"
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr "Użyj kodów o zmiennej długości, przydatne dla bardzo wysokich bitrate"
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "metoda percepcyjnego ważenia"
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "percepcyjna odległość"
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr "percepcyjna odległość do obliczenia masy percepcyjnej"
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "Poziome kawałki na klatkę"
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr "Ilość poziomych kawałków na klatkę w trybie niskiego opóźnienia"
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "Pionowe kawałki na klatkę"
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr "Ilość pionowych kawałków na klatkę w trybie niskiego opóźnienia"
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr "Rozmiar bloków kodu w każdym podpasmie"
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr "mały - użyj małych bloków kodu"
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr "średni - użyj średnich bloków kodu"
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr "duży - użyju dużych bloków kodu"
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr "pełny - jeden blok kodu na każde podpasmo"
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr "Włącz hierarchiczne przewidywania ruchu"
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr "Liczba poziomów zmniejszania próbkowania"
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr ""
-"Liczba poziomów próbkowania w dół w hierarchicznym trybie przewidywania ruchu"
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr "Włącz globalne przewidywania ruchu"
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr "Włącz fazowe przewidywania korelacji"
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr "Włącz wykrywanie zmiany sceny"
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "Wymuś profil"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr "Profil niskiego opóźnienia VC2"
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr "Prosty profil VC2"
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr "Główny profil VC2"
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "Główny profil"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr "Dekoder obrazu Dirac używający libschroedinger"
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr "Koder obrazu Dirac używający libschroedinger"
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -15561,14 +15185,6 @@ msgstr "Jeśli plik już istnieje, nie zostanie nadpisany."
 msgid "File dumper"
 msgstr "Zrzutnia pliku"
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "Wartość dostosowania dts przez"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "Demuxer obrazu Dirac"
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -16051,8 +15667,8 @@ msgstr "Dodatkowy PMT"
 #: modules/demux/mpeg/ts.c:82
 msgid "Allows a user to specify an extra pmt (pmt_pid=pid:stream_type[,...])."
 msgstr ""
-"Pozwala użytkownikowi na określenie dodatkowego pmt (pmt_pid=pid:"
-"strumień_typ[,...])."
+"Pozwala użytkownikowi na określenie dodatkowego pmt "
+"(pmt_pid=pid:strumień_typ[,...])."
 
 #: modules/demux/mpeg/ts.c:84
 msgid "Set id of ES to PID"
@@ -16644,13 +16260,13 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 "<p>VLC media player to darmowy i otwarty odtwarzacz multimedialny, koder i "
-"streamer stworzony przez wolontariuszy społeczności <a href=\"http://www."
-"videolan.org/\"><span style=\" text-decoration: underline; color:#0057ae;"
+"streamer stworzony przez wolontariuszy społeczności <a href=\"http://"
+"www.videolan.org/\"><span style=\" text-decoration: underline; color:#0057ae;"
 "\">VideoLAN</span></a>.</p><p>VLC korzysta ze swoich wewnętrznych kodeków, "
 "działa na każdej popularnej platformie i jest w stanie odczytać niemal "
 "wszystkie pliki, CD, DVD, strumienie sieciowe, karty przechwytywania i inne "
@@ -16949,8 +16565,8 @@ msgstr "Wejście zostało zmienione"
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "Wejście zostało zmienione, nie można zapisać zakładki. Przerwij odtwarzanie "
 "przyciskiem \"Wstrzymaj\" podczas edytowania zakładek, aby zapewnić "
@@ -22704,11 +22320,11 @@ msgstr "Konfiguracja interfejsu Lua"
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
-"Ciąg konfiguracyjny interfejsu Lua. W formacie: '[\"<nazwa modułu interfejsu>"
-"\"] = { <opcja> = <wartość>, ...}, ...'."
+"Ciąg konfiguracyjny interfejsu Lua. W formacie: '[\"<nazwa modułu "
+"interfejsu>\"] = { <opcja> = <wartość>, ...}, ...'."
 
 #: modules/lua/vlc.c:55 modules/lua/vlc.c:71
 msgid "A single password restricts access to this interface."
@@ -24162,10 +23778,6 @@ msgstr "Pakietowiec avparser"
 #: modules/packetizer/copy.c:48
 msgid "Copy packetizer"
 msgstr "Pakietowiec kopiowania"
-
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "Pakietowiec Dirac"
 
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
@@ -26131,8 +25743,8 @@ msgid ""
 "Filename for stream. Helper setting for dst, dst=bind+'/'+path. dst-"
 "parameter overrides this."
 msgstr ""
-"Nazwa pliku dla strumienia. Kreator instalacji dla dst, dst=połącz"
-"+'/'+ścieżka. Parametr dst nadpisuje tą opcję"
+"Nazwa pliku dla strumienia. Kreator instalacji dla dst, "
+"dst=połącz+'/'+ścieżka. Parametr dst nadpisuje tą opcję"
 
 #: modules/stream_out/standard.c:93
 msgid "Standard stream output"
@@ -30208,6 +29820,307 @@ msgstr "AAAA; "
 msgid "Media Manager List"
 msgstr "Lista menedżera mediów"
 
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4"
+
+#~ msgid "Rate control method"
+#~ msgstr "Metoda kontroli stosunku"
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr "Metoda stosowana do kodowania sekwencji obrazu"
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "Tryb stałego progu szumów"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "Stały bitrate kodowania (CBR)"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "Tryb niskiego opóźnienia"
+
+#~ msgid "Lossless mode"
+#~ msgstr "Tryb bezstratny"
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "Stały tryb lambda"
+
+#~ msgid "Constant error mode"
+#~ msgstr "Tryb stałych błędów"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "Tryb stałej jakości"
+
+#~ msgid "GOP structure"
+#~ msgstr "Struktura GOP"
+
+#~ msgid "GOP structure used to encode the video sequence"
+#~ msgstr "Struktura GOP używana do kodowania sekwencji wideo"
+
+#~ msgid ""
+#~ "No fixed gop structure. A picture can be intra or inter and refer to "
+#~ "previous or future pictures."
+#~ msgstr ""
+#~ "Brak stałej struktury GOP. Obraz może być intra lub inter i odnosi się do "
+#~ "poprzednich lub przyszłych obrazów."
+
+#~ msgid "I-frame only sequence"
+#~ msgstr "Tylko sekwencja klatek I"
+
+#~ msgid "Inter pictures refere to previous pictures only"
+#~ msgstr "Obrazy międzyramkowe odnoszą się tylko do ostatnich obrazów"
+
+#~ msgid "Inter pictures can refer to previous or future pictures"
+#~ msgstr ""
+#~ "Obrazy międzyramkowe odnoszą się do ostatnich lub przyszłych obrazów"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "Stały współczynnik jakości"
+
+#~ msgid "Quality factor to use in constant quality mode"
+#~ msgstr "Współczynnik jakości używany w trybie stałej jakości"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "Próg szumu"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr "Próg szumu używany w trybie stałego progu szumów"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "Stały bitrate (kbps)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "Docelowy bitrate w kbps jeśli kodujesz w trybie stałego bitrate"
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "Maksymalny bitrate (kbps)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Maksymalny bitrate w kbps podczas kodowania w trybie stałego bitrate"
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "Minimalny bitrate (kbps)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "Minimalny bitrate w kbps podczas kodowania trybie w stałego bitrate"
+
+#~ msgid "GOP length"
+#~ msgstr "Długość GOP"
+
+#~ msgid ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+#~ msgstr ""
+#~ "Liczba obrazów pomiędzy kolejnymi nagłówkami sekwencji tzn. długość grupy "
+#~ "obrazów (GOP)"
+
+#~ msgid "Prefilter"
+#~ msgstr "Filtr wstępny"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "Włącz adaptacyjne przefiltrowanie"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "Bez przed-filtrowania"
+
+#~ msgid "Centre Weighted Median"
+#~ msgstr "Zależny element centralny"
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "Filtr dolnoprzepustowy Gaussa"
+
+#~ msgid "Add Noise"
+#~ msgstr "Dodaj szum"
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "Adaptacyjny filtr dolnoprzepustowy Gaussa"
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "Filtr dolnoprzepustowy"
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "Kwota przefiltrowania"
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "Wyższa wartość oznacza więcej przefiltrowania"
+
+#~ msgid "Picture coding mode"
+#~ msgstr "Tryb kodowania obrazu"
+
+#~ msgid ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+#~ msgstr ""
+#~ "Pole kodowania jest tam gdzie odbywa się oddzielnie kodowane z "
+#~ "przeplotem, w przeciwieństwie do pseudo-progresywnej klatki"
+
+#~ msgid "auto - let encoder decide based upon input (Best)"
+#~ msgstr ""
+#~ "automatycznie - niech zdecyduje koder na podstawie wejścia (najlepsze)"
+
+#~ msgid "force coding frame as single picture"
+#~ msgstr "wymuś kodowanie klatki jako pojedynczy obraz"
+
+#~ msgid "force coding frame as separate interlaced fields"
+#~ msgstr "wymuś kodowanie klatki jako oddzielne pola z przeplotem"
+
+#~ msgid "Size of motion compensation blocks"
+#~ msgstr "Rozmiar bloków kompensacji ruchu"
+
+#~ msgid "automatic - let encoder decide based upon input (Best)"
+#~ msgstr "automatyczny - koder zdecyduje na podstawie wejścia (najlepsze)"
+
+#~ msgid "small - use small motion compensation blocks"
+#~ msgstr "mały - użyj małych bloków kompensacji ruchu"
+
+#~ msgid "medium - use medium motion compensation blocks"
+#~ msgstr "średni - użyj średnich bloków kompensacji ruchu"
+
+#~ msgid "large - use large motion compensation blocks"
+#~ msgstr "duży - użyj dużych bloków kompensacji ruchu"
+
+#~ msgid "Overlap of motion compensation blocks"
+#~ msgstr "Nakładanie bloków kompensacji ruchu"
+
+#~ msgid "none - Motion compensation blocks do not overlap"
+#~ msgstr "brak - bloki kompensacji ruchu nie nakładają się"
+
+#~ msgid "partial - Motion compensation blocks only partially overlap"
+#~ msgstr "częściowe - bloki kompensacji ruchu tylko częściowo nakładają się"
+
+#~ msgid "full - Motion compensation blocks fully overlap"
+#~ msgstr "pełne - bloki kompensacji ruchu w pełni nakładają się"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "Dokładność wektora ruchu"
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "Dokładność wektora ruchu w pikselach"
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "Trzy komponenty przewidywania ruchu"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "Użyj barw jako część procesu przewidywania ruchu"
+
+#~ msgid "Intra picture DWT filter"
+#~ msgstr "Filtr Intra obrazu DWT"
+
+#~ msgid "Inter picture DWT filter"
+#~ msgstr "Filtr DWT obrazu międzyramkowego"
+
+#~ msgid "Number of DWT iterations"
+#~ msgstr "Liczba iteracji DWT"
+
+#~ msgid "Also known as DWT levels"
+#~ msgstr "Znane również jako poziomy DWT"
+
+#~ msgid "Enable multiple quantizers"
+#~ msgstr "Włącz wielokrotne kwantyzatory"
+
+#~ msgid "Enable multiple quantizers per subband (one per codeblock)"
+#~ msgstr "Włącz wielokrotne kwantyzatory na podpasma (jeden na blok kodu)"
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr "Wyłącz kodowanie arytmetyczne"
+
+#~ msgid "Use variable length codes instead, useful for very high bitrates"
+#~ msgstr ""
+#~ "Użyj kodów o zmiennej długości, przydatne dla bardzo wysokich bitrate"
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "metoda percepcyjnego ważenia"
+
+#~ msgid "perceptual distance"
+#~ msgstr "percepcyjna odległość"
+
+#~ msgid "perceptual distance to calculate perceptual weight"
+#~ msgstr "percepcyjna odległość do obliczenia masy percepcyjnej"
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "Poziome kawałki na klatkę"
+
+#~ msgid "Number of horizontal slices per frame in low delay mode"
+#~ msgstr "Ilość poziomych kawałków na klatkę w trybie niskiego opóźnienia"
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "Pionowe kawałki na klatkę"
+
+#~ msgid "Number of vertical slices per frame in low delay mode"
+#~ msgstr "Ilość pionowych kawałków na klatkę w trybie niskiego opóźnienia"
+
+#~ msgid "Size of code blocks in each subband"
+#~ msgstr "Rozmiar bloków kodu w każdym podpasmie"
+
+#~ msgid "small - use small code blocks"
+#~ msgstr "mały - użyj małych bloków kodu"
+
+#~ msgid "medium - use medium sized code blocks"
+#~ msgstr "średni - użyj średnich bloków kodu"
+
+#~ msgid "large - use large code blocks"
+#~ msgstr "duży - użyju dużych bloków kodu"
+
+#~ msgid "full - One code block per subband"
+#~ msgstr "pełny - jeden blok kodu na każde podpasmo"
+
+#~ msgid "Enable hierarchical Motion Estimation"
+#~ msgstr "Włącz hierarchiczne przewidywania ruchu"
+
+#~ msgid "Number of levels of downsampling"
+#~ msgstr "Liczba poziomów zmniejszania próbkowania"
+
+#~ msgid ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+#~ msgstr ""
+#~ "Liczba poziomów próbkowania w dół w hierarchicznym trybie przewidywania "
+#~ "ruchu"
+
+#~ msgid "Enable Global Motion Estimation"
+#~ msgstr "Włącz globalne przewidywania ruchu"
+
+#~ msgid "Enable Phase Correlation Estimation"
+#~ msgstr "Włącz fazowe przewidywania korelacji"
+
+#~ msgid "Enable Scene Change Detection"
+#~ msgstr "Włącz wykrywanie zmiany sceny"
+
+#~ msgid "Force Profile"
+#~ msgstr "Wymuś profil"
+
+#~ msgid "VC2 Low Delay Profile"
+#~ msgstr "Profil niskiego opóźnienia VC2"
+
+#~ msgid "VC2 Simple Profile"
+#~ msgstr "Prosty profil VC2"
+
+#~ msgid "VC2 Main Profile"
+#~ msgstr "Główny profil VC2"
+
+#~ msgid "Main Profile"
+#~ msgstr "Główny profil"
+
+#~ msgid "Dirac video decoder using libschroedinger"
+#~ msgstr "Dekoder obrazu Dirac używający libschroedinger"
+
+#~ msgid "Dirac video encoder using libschroedinger"
+#~ msgstr "Koder obrazu Dirac używający libschroedinger"
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "Wartość dostosowania dts przez"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "Demuxer obrazu Dirac"
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "Pakietowiec Dirac"
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr "Syntezator programowy wymaga plik Sound fonts."
@@ -30415,13 +30328,13 @@ msgstr "Lista menedżera mediów"
 #~ msgstr "Hasło RTSP"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
-#~ "Używany proxy HTTP musi być w następującym formacie: http://[użytkownik[:"
-#~ "hasło]@]mojeproxy.mojadomena:mójport/ ; jeśli jest pusty, będzie "
-#~ "próbowana zmienna środowiskowa http_proxy."
+#~ "Używany proxy HTTP musi być w następującym formacie: http://"
+#~ "[użytkownik[:hasło]@]mojeproxy.mojadomena:mójport/ ; jeśli jest pusty, "
+#~ "będzie próbowana zmienna środowiskowa http_proxy."
 
 #~ msgid "VLC could not open the file \"%s\": %s"
 #~ msgstr "VLC nie może otworzyć pliku \"%s\": %s"
@@ -32131,8 +32044,8 @@ msgstr "Lista menedżera mediów"
 #~ "Some options are available but hidden. Check \"Advanced options\" to see "
 #~ "them."
 #~ msgstr ""
-#~ "Niektóre opcje są dostępne lecz ukryte. Zaznacz pole \"Zaawansowane opcje"
-#~ "\" aby je wyświetlić."
+#~ "Niektóre opcje są dostępne lecz ukryte. Zaznacz pole \"Zaawansowane "
+#~ "opcje\" aby je wyświetlić."
 
 #~ msgid ""
 #~ "Magnify a part of the video. You can select which part of the image "
@@ -32605,14 +32518,14 @@ msgstr "Lista menedżera mediów"
 #~ msgid ""
 #~ "Force the subtiles format. Valid values are : \"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
 #~ "autodetection, this should always work)."
 #~ msgstr ""
 #~ "Wymuś format napisów. Prawidłowe wartości to: \"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\",  i \"auto\" (co oznacza "
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\",  i \"auto\" (co oznacza "
 #~ "autodetekcję, powinno to zawsze działać)."
 
 #~ msgid "Do not complain on encrypted PES."
@@ -32763,9 +32676,9 @@ msgstr "Lista menedżera mediów"
 #~ "Określ format protokołu. Dostępne opcje to \"text\" (domyślnie) i \"html\""
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", \"syslog\" (special mode to send to syslog instead of file), and "
-#~ "\"android\" (special mode to send to android logging facility)."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", \"syslog\" (special mode to send to syslog instead of file), "
+#~ "and \"android\" (special mode to send to android logging facility)."
 #~ msgstr ""
 #~ "Określ format dziennika. Dostępne opcje to \"text\" (domyślnie), \"html\" "
 #~ "i \"syslog\" (specjalny tryb, wysyłany do dziennika systemowego zamiast "
@@ -33013,8 +32926,8 @@ msgstr "Lista menedżera mediów"
 #~ "wyświetlić wiadomość debugowania."
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", and \"syslog\" (special mode to send to syslog instead of file."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", and \"syslog\" (special mode to send to syslog instead of file."
 #~ msgstr ""
 #~ "Określ format protokołu. Dostępne opcje to \"text\" (domyślnie), \"html\" "
 #~ "i \"syslog\" (specjalny tryb, wysyła do protokołu systemowego zamiast do "
@@ -33025,8 +32938,8 @@ msgstr "Lista menedżera mediów"
 
 #~ msgid ""
 #~ "Use a unique dbus service id to identify this VLC instance on the DBUS "
-#~ "bus. The process identifier (PID) is added to the service name: org.mpris."
-#~ "vlc-<pid>"
+#~ "bus. The process identifier (PID) is added to the service name: "
+#~ "org.mpris.vlc-<pid>"
 #~ msgstr ""
 #~ "Użyj unikalnego identyfikatora usługi dbus do zidentyfikowania tej "
 #~ "instancji VLC na busie DBUS. Identyfikator procesu (PID) dodany został do "
@@ -33064,11 +32977,11 @@ msgstr "Lista menedżera mediów"
 #~ msgstr "Kolor piłki, wybierz \"czerwony\", \"niebieski\" lub \"zielony\"."
 
 #~ msgid ""
-#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be"
-#~ "\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
+#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
+#~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
 #~ msgstr ""
-#~ "Jeden z \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be"
-#~ "\", \"s16_be\", \"fixed32\", \"float32\" lub \"spdif\""
+#~ "Jeden z \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
+#~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" lub \"spdif\""
 
 #~ msgid ""
 #~ "This defines the address, port and path the RTSP VOD server will listen "
@@ -33081,8 +32994,8 @@ msgstr "Lista menedżera mediów"
 #~ "będzie nasłuchiwał połączeń.\n"
 #~ "Składnia to adres:port/ścieżka. Domyślnie nasłuchiwane są wszystkie "
 #~ "interfejsy (adres 0.0.0.0), na porcie 554, bez ścieżki.\n"
-#~ "Jeżeli chcesz korzystać tylko z lokalnego interfejsu, podaj \"localhost"
-#~ "\", jako adres."
+#~ "Jeżeli chcesz korzystać tylko z lokalnego interfejsu, podaj "
+#~ "\"localhost\", jako adres."
 
 #~ msgid "Disable DVD Menus (for compatibility)"
 #~ msgstr "Wyłącz menu DVD (dla kompatybilności)"
@@ -33895,20 +33808,21 @@ msgstr "Lista menedżera mediów"
 #~ "</style></head><body style=\" font-family:'DejaVu Sans'; font-size:8pt; "
 #~ "font-weight:400; font-style:normal;\">\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.example.com/stream.avi</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.example.com/stream.avi</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtp://@:1234</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtp://@:1234</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></html>"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></"
+#~ "html>"
 #~ msgstr ""
 #~ "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/"
 #~ "REC-html40/strict.dtd\">\n"
@@ -33918,20 +33832,21 @@ msgstr "Lista menedżera mediów"
 #~ "</style></head><body style=\" font-family:'DejaVu Sans'; font-size:8pt; "
 #~ "font-weight:400; font-style:normal;\">\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.przykład.com/strumień.avi</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.przykład.com/strumień.avi</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtp://@:1234</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtp://@:1234</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">mms://mms.przykłady.com/strumień.asx</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">mms://mms.przykłady.com/strumień.asx</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtsp://serwer.przykład.org:8080/test.sdp</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtsp://serwer.przykład.org:8080/test.sdp</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></html>"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></"
+#~ "html>"
 
 #~ msgid "Use system codecs if available (better quality, but dangerous)"
 #~ msgstr ""
@@ -34958,10 +34873,10 @@ msgstr "Lista menedżera mediów"
 
 #, fuzzy
 #~ msgid ""
-#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title"
-#~ "\" ($a - $t). You can use the following substitutions: $a Artist, $b "
-#~ "Album, $c Copyright, $d Description, $e Encoder, $g Genre, $l Language, "
-#~ "$n number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
+#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title\" "
+#~ "($a - $t). You can use the following substitutions: $a Artist, $b Album, "
+#~ "$c Copyright, $d Description, $e Encoder, $g Genre, $l Language, $n "
+#~ "number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
 #~ "URL, $A Date, $B Bitrate, $C Chapter, $D Duration, $F URI, $I Video "
 #~ "Title, $L Time Remaining, $N Name, $O Audio language, $P Position, $R "
 #~ "Rate, $S Sample rate, $T Time elapsed, $U Publisher, $V Volume"
@@ -35063,8 +34978,8 @@ msgstr "Lista menedżera mediów"
 #, fuzzy
 #~ msgid ""
 #~ "Your video output acceleration driver does not support the required "
-#~ "resolution: %ux%u pixels. The maximum supported resolution is %<PRIu32>x"
-#~ "%<PRIu32>.\n"
+#~ "resolution: %ux%u pixels. The maximum supported resolution is "
+#~ "%<PRIu32>x%<PRIu32>.\n"
 #~ "Video output acceleration will be disabled. However, rendering videos "
 #~ "with overly large resolution may cause severe performance degration."
 #~ msgstr ""
@@ -38660,8 +38575,8 @@ msgstr "Lista menedżera mediów"
 #~ msgid ""
 #~ "Containers (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv)"
 #~ msgstr ""
-#~ "Kontenery (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv *."
-#~ "webm)"
+#~ "Kontenery (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv "
+#~ "*.webm)"
 
 #, fuzzy
 #~ msgid "SessionManager"
@@ -39482,16 +39397,16 @@ msgstr "Lista menedżera mediów"
 
 #, fuzzy
 #~ msgid ""
-#~ "Name of the audio device to use. If you don't specify anything, \"/dev/dsp"
-#~ "\" will be used for OSS."
+#~ "Name of the audio device to use. If you don't specify anything, \"/dev/"
+#~ "dsp\" will be used for OSS."
 #~ msgstr ""
 #~ "Nazwa urządzenia dźwięku, które ma być używane przez wtyczkę DirectShow. "
 #~ "Jeśli nic nie podałeś, to będzie używane urządzenie domyślne."
 
 #, fuzzy
 #~ msgid ""
-#~ "Name of the audio device to use. If you don't specify anything, \"/dev/dsp"
-#~ "\" will be used for OSS, \"hw\" for Alsa."
+#~ "Name of the audio device to use. If you don't specify anything, \"/dev/"
+#~ "dsp\" will be used for OSS, \"hw\" for Alsa."
 #~ msgstr ""
 #~ "Nazwa urządzenia dźwięku, które ma być używane przez wtyczkę DirectShow. "
 #~ "Jeśli nic nie podałeś, to będzie używane urządzenie domyślne."
@@ -39637,8 +39552,8 @@ msgstr "Lista menedżera mediów"
 #~ "All playlists|*.pls;*.m3u;*.asx;*.b4s;*.xspf|M3U files|*.m3u|XSPF "
 #~ "playlist|*.xspf"
 #~ msgstr ""
-#~ "Lista odtwarzania XSPF |*.xspf|plik M3U|*.m3u|Lista odtwarzania HTML|*."
-#~ "html"
+#~ "Lista odtwarzania XSPF |*.xspf|plik M3U|*.m3u|Lista odtwarzania HTML|"
+#~ "*.html"
 
 #, fuzzy
 #~ msgid "WinCE interface module"

@@ -574,54 +574,54 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>VLC 미디어 재생기 도움말에 오신 것을 환영"
 "합니다!</h2><h3>문서</h3><p>VideoLAN <a href=\"http://wiki.videolan.org\">위"
 "키</a> 웹사이트에서 VLC 문서를 찾을 수 있습니다.</p><p>만약 VLC를 처음 사용"
-"해 보신다면, <br><a href=\"http://wiki.videolan.org/Documentation:"
-"VLC_for_dummies\"><em>VLC 미디어 재생기 소개</em></a> 문서를 읽어보시기 바랍"
-"니다.</p><p>VLC를 사용하는 방법은 <br>\"<a href=\"http://wiki.videolan.org/"
-"Documentation:Play_HowTo\"><em>VLC 미디어 재생기로 파일 재생하기</em></a>\" "
-"문서에서 설명하고 있습니다.</p><p>저장, 변환, 트랜스코딩, 인코딩, 먹싱, 스트"
-"리밍 작업에 대한 모든 정보는 <a href=\"http://wiki.videolan.org/"
-"Documentation:Streaming_HowTo\">스트리밍 문서</a>에서 찾아볼 수 있습니다.</"
-"p><p>만약 여기서 사용하는 용어들이 궁금하다면, <a href=\"http://wiki."
-"videolan.org/Knowledge_Base\">지식 베이스</a>를 참조하십시오.</p><p>주요 키보"
-"드 단축키들을 알아보고 싶다면, <a href=\"http://wiki.videolan.org/Hotkeys\">"
-"단축키</a> 페이지가 도움이 될 것입니다.</p><h3>도움말</h3><p>모르는 내용을 질"
-"문하기 전에, 먼저 <a href=\"http://wiki.videolan.org/"
-"Frequently_Asked_Questions\">FAQ</a>를 참조해 주시기 바랍니다.</p><p>다른 VLC"
-"에 대한 도움말은 <a href=\"http://forum.videolan.org\">포럼</a>, <a href="
-"\"http://www.videolan.org/vlc/lists.html\">메일링 리스트</a> 혹은 IRC 채널 "
-"( <a href=\"http://www.videolan.org/webirc/\"><em>#videolan</em></a> on irc."
-"freenode.net ) 에서 얻을 수 있을 것입니다.</p><h3>프로젝트에 공헌하기</h3><p>"
-"여러분의 시간을 약간 투자하여 스킨을 제작하거나, 문서를 번역하거나, 프로그램"
-"을 테스트하거나, 작성하는 방식으로 커뮤니티를 도와서 VideoLan 프로젝트에 공헌"
-"할 수 있습니다.혹은 기부금 혹은 장비를 제공하여 도울 수도 있습니다. 아니면 "
-"VLC 미디어 재생기를 <b>사람들에게 알리는 일</b>도 큰 도움이 됩니다.</body></"
-"html>"
+"해 보신다면, <br><a href=\"http://wiki.videolan.org/"
+"Documentation:VLC_for_dummies\"><em>VLC 미디어 재생기 소개</em></a> 문서를 읽"
+"어보시기 바랍니다.</p><p>VLC를 사용하는 방법은 <br>\"<a href=\"http://"
+"wiki.videolan.org/Documentation:Play_HowTo\"><em>VLC 미디어 재생기로 파일 재"
+"생하기</em></a>\" 문서에서 설명하고 있습니다.</p><p>저장, 변환, 트랜스코딩, "
+"인코딩, 먹싱, 스트리밍 작업에 대한 모든 정보는 <a href=\"http://"
+"wiki.videolan.org/Documentation:Streaming_HowTo\">스트리밍 문서</a>에서 찾아"
+"볼 수 있습니다.</p><p>만약 여기서 사용하는 용어들이 궁금하다면, <a "
+"href=\"http://wiki.videolan.org/Knowledge_Base\">지식 베이스</a>를 참조하십시"
+"오.</p><p>주요 키보드 단축키들을 알아보고 싶다면, <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">단축키</a> 페이지가 도움이 될 것입니다.</p><h3>도"
+"움말</h3><p>모르는 내용을 질문하기 전에, 먼저 <a href=\"http://"
+"wiki.videolan.org/Frequently_Asked_Questions\">FAQ</a>를 참조해 주시기 바랍니"
+"다.</p><p>다른 VLC에 대한 도움말은 <a href=\"http://forum.videolan.org\">포럼"
+"</a>, <a href=\"http://www.videolan.org/vlc/lists.html\">메일링 리스트</a> 혹"
+"은 IRC 채널 ( <a href=\"http://www.videolan.org/webirc/\"><em>#videolan</"
+"em></a> on irc.freenode.net ) 에서 얻을 수 있을 것입니다.</p><h3>프로젝트에 "
+"공헌하기</h3><p>여러분의 시간을 약간 투자하여 스킨을 제작하거나, 문서를 번역"
+"하거나, 프로그램을 테스트하거나, 작성하는 방식으로 커뮤니티를 도와서 "
+"VideoLan 프로젝트에 공헌할 수 있습니다.혹은 기부금 혹은 장비를 제공하여 도울 "
+"수도 있습니다. 아니면 VLC 미디어 재생기를 <b>사람들에게 알리는 일</b>도 큰 도"
+"움이 됩니다.</body></html>"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -1560,8 +1560,8 @@ msgstr "추가 인터페이스 모듈"
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "VLC의 \"추가 인터페이스\"를 선택할 수 있습니다. 기본 인터페이스에 더하여 백그"
 "라운드로 실행이 될 것입니다. 인터페이스 모듈의 목록을 콜론(:)으로 구분하여 사"
@@ -2331,8 +2331,8 @@ msgstr "소스 화면 비율"
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "원본 화면 비율을 강제로 적용합니다. 예를 들어 어떤 DVD는 실제로는 4:3인데 "
@@ -2882,15 +2882,15 @@ msgstr "현재 미디어에 따라 제목을 변경합니다"
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
-"현재 재생하는 것에 따라서 제목을 정할 수 있게 해 줍니다.<br>$a: 아티스트<br>"
-"$b: 앨범<br>$c: 저작권<br>$t: 제목<br>$g: 장르<br>$n: 트랙번호<br>$p: 지금 재"
-"생 중<br>$A: 날짜<br>$D: 시간<br>$Z: \"지금 재생 중\" (제목 - 아티스트로 돌아"
-"가기)"
+"현재 재생하는 것에 따라서 제목을 정할 수 있게 해 줍니다.<br>$a: 아티스트"
+"<br>$b: 앨범<br>$c: 저작권<br>$t: 제목<br>$g: 장르<br>$n: 트랙번호<br>$p: 지"
+"금 재생 중<br>$A: 날짜<br>$D: 시간<br>$Z: \"지금 재생 중\" (제목 - 아티스트"
+"로 돌아가기)"
 
 #: src/libvlc-module.c:699
 #, fuzzy
@@ -7464,8 +7464,9 @@ msgstr "HTTP 프록시"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
 "사용할 HTTP 프록시는 반드시 http://[user@]myproxy.mydomain:myport/ 의 형식이"
 "어야 합니다; 이 값이 없으면, http_proxy 환경 변수값 사용을 시도합니다."
@@ -8047,8 +8048,8 @@ msgstr "오디오 입력 장치를 찾을 수 없습니다"
 
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "귀하의 맥은 적당한 오디오 입력 장치를 갖추지 못한 것 같습니다. 컨넥터와 드라"
 "이버를 확인하세요."
@@ -8478,8 +8479,8 @@ msgstr "RTSP 인증"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -8937,14 +8938,14 @@ msgstr "v4l2 드라이버 제어"
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "콤마로 분리한, 브레이스 괄호로 선택적으로 둘러싸인, 목록을 이용하여 지정한 값"
-"으로 v4l2 드라이버 컨트롤을 설정합니다. (예: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). 사용할 수 있는 컨트롤의 목록을 보려면, 상세출"
-"력 (-vw) 을 증가시키거나 v4l2-ctl 프로그램을 사용하세요."
+"으로 v4l2 드라이버 컨트롤을 설정합니다. (예: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). 사용할 수 있는 컨트롤의 "
+"목록을 보려면, 상세출력 (-vw) 을 증가시키거나 v4l2-ctl 프로그램을 사용하세요."
 
 #: modules/access/v4l2/v4l2.c:242 modules/codec/avcodec/avcodec.c:50
 #: modules/codec/avcodec/avcodec.c:54 modules/codec/x264.c:435
@@ -9333,9 +9334,9 @@ msgstr "VLC가 키-uri와 키파일-위치를 읽는 파일"
 #: modules/access_output/livehttp.c:98
 #, fuzzy
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
 "세그먼트가 시작할 때 다음 파일의 형식을 읽습니다: key-uri\\nkey-file. 세그먼"
 "트를 열 때 파일을 읽고, 그 세그먼트에서 해당 값을 사용합니다."
@@ -10846,7 +10847,6 @@ msgstr "디코딩"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "인코딩"
 
@@ -11378,11 +11378,11 @@ msgstr "Theora 비디오 패킷타이저"
 msgid "Daala video encoder"
 msgstr "Theora 비디오 인코더"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "크로마 형식"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr "크로마 형식을 선택하면 해당 형식으로 비디오를 변환하게 할 것입니다."
@@ -11445,8 +11445,8 @@ msgstr "자막 위치"
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 "비디오에 출력할 자막 위치를 설정할 수 있습니다 (0=가운데, 1=왼쪽, 2=오른쪽, "
 "4=상단, 8=하단, 또한 이 값들을 조합해서 사용할수 있습니다, 예 6=오른쪽 상단)."
@@ -12205,10 +12205,10 @@ msgstr "속도제어의 정밀도"
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
 "오차, 'avbr' (평균 가변 비트레이트) 방법의 백분율 단위. (예를 들어 800 kpbs"
 "의 10은 인코더가 880 kpbs 이상이나 730 kpbs 이하로 가지 않도록 하려 한다는 것"
@@ -12277,381 +12277,6 @@ msgstr "유사 원시 비디오 패킷타이저"
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "Theora 비디오 인코더"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "레이트 컨트롤 방법"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr "비디오 시퀀스를 인코딩하는데 사용되는 방법"
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "일정한 잡음 임계 모드"
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "일정한 비트레이트 모드 (CBR)"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "낮은 지연 모드"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "무손실 모드"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "일정한 람다 모드"
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "일정한 오류 모드"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "일정한 품질 모드"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "GOP 구조"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr "비디오 시퀀스를 인코딩하기 위해 사용되는 GOP 구조"
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-"고정된 GOP 구조 없음. 한 장의 그림은 intra나 inter가 될 수 있고, 이전이나 다"
-"음 그림을 참고합니다."
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr "I-프레임만 시퀀스"
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr "중간 영상은 이전 영상만 참고합니다."
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr "중간 영상은 이전이나 다음 영상을 참고할 수 있습니다"
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "일정한 품질 비율"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr "일정한 품질 모드에서 사용할 품질 계수"
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "노이즈 임계값"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr "일정한 노이즈 임계 모드에서 사용할 노이즈 임계값"
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "CBR 비트레이트 (kbps)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr "일정한 비트레이드 모드로 인코딩시 대상 비트레이트, kbps 단위"
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "최대 비트레이트 (kbps)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "일정한 비트레이트 모드로 인코딩시 최대 비트레이트, kbps 단위"
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "최소 비트레이트 (kbps)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "일정한 비트레이트 모드로 인코딩시 최소 비트레이트, kbps 단위"
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "GOP 길이"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr "연속하는 시퀀스 헤더 사이의 영상 개수, 예. 영상 그룹의 길이"
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "전처리필터"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "가변 전처리 필터 사용하기"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "전처리 필터 없음"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr "가운데 가중 중앙값"
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "가우시안 로우 패스 필터"
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "노이즈 추가"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "가우시안 가변 로우 패스 필터"
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "로우 패스 필터"
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "전필터링 량"
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "더 높은 값은 더 많은 전필터링을 의미합니다"
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "사진 인코딩 모드"
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-"인터레이스 필드가 있는 필드 코딩은 유사-프로그래시브 프레임과는 대조적으로, "
-"즉 개별적으로 이루어집니다."
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr "자동 - 입력에 기반하여 인코더가 결정 허용 (최상)"
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr "코딩 프레임을 단일 화면으로 강제하기"
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr "코딩 프레임을 독립된 인터레이스 필드로 강제하기"
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr "모션 보정 블록 크기"
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr "자동 - 입력에 따라서 인코더가 결정하도록 함 (최고)"
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr "작은 - 작은 모션 보정 블록을 사용합니다"
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr "중간 - 중간 모션 보정 블록을 사용합니다"
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr "큰 - 큰 모션 보정 블록을 사용합니다"
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr "모션 보정 블록의 겹침"
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr "없음 - 모션 보정 블록이 겹치지 않습니다"
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr "일부 - 모션 보정 블록이 일부만 겹칩니다"
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr "전체 - 모션 보정 블록이 완전히 겹칩니다"
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "모션 벡터 정밀도"
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "모션 벡터 정밀도, 화소 단위"
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "세가지 모션 추정 구성요소"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "모션 추정 처리의 일부로 크로마 사용하기"
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr "인트라픽쳐 DWT 필터"
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr "Inter picture DWT 필터"
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr "DWT 반복수"
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr "DWT 레벨로도 알려짐"
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr "다중 양자화기 사용"
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr "하위밴드 당 (코드블록 당 하나) 다중의 양자화기를 사용합니다"
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr "이진 산술 코딩 사용 안함"
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr "대신 가변 길이 코드 사용, 매우 높은 비트레이트에 유용합니다"
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "지각적인 가중치 방법"
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "지각적인 거리"
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr "지각적인 하중을 계산하기 위한 지각적인 거리"
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "프레임 당 수평 조각"
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr "낮은 지연 모드에서 프레임 당 수평 조각의 개수"
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "프레임 당 수직 조각"
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr "낮은 지연 모드에서 프레임 당 수직 조각의 개수"
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr "각 하위밴드에서 코드 블록의 크기"
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr "작은 - 작은 코드 블록을 사용합니다"
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr "중간 - 중간 크기의 코드 블록"
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr "큰 - 큰 코드 블록 사용하기"
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr "전부 - 하위밴드당 한 개의 코드 블록"
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr "계층적인 모션 추정 사용하기"
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr "다운샘플링의 단계 수"
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr "계층적인 모션 추정 모드에서 다운샘플링의 단계 수"
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr "전역 모션 추정 사용하기"
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr "위상 상관성 추정 사용하기"
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr "장면 변화 감지 사용하기"
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "프로파일 강제사용 "
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr "VC2 낮은 지연 프로파일"
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr "VC2 간단한 프로파일"
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr "VC2 메인 프로파일"
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "메인 프로파일"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr "libschroedinger를 이용한 Dirac 비디오 디코더"
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr "libschroedinger를 이용한 Dirac 비디오 인코더"
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -15321,14 +14946,6 @@ msgstr "파일이 이미 존재하면, 그것을 덮어 쓰지 않을 것입니�
 msgid "File dumper"
 msgstr "파일 덤프"
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "DTS를 조절할 값"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "Dirac 비디오 디먹서"
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -16388,8 +16005,8 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 "<p>VLC 미디어 재생기는 <a href=\"http://www.videolan.org/\"><span style=\" "
@@ -16397,9 +16014,9 @@ msgstr ""
 "의 자발적인 참여자들이 만든 무료 오픈 소스 미디어 재생기, 인코더, 그리고 스트"
 "리머입니다. <p>VLC는 자체적인 내장 코덱을 사용하고, 당연히 여러 유명한 플랫"
 "폼 상에서 동작합니다. 그리고 거의 모든 파일, CD, DVD, 네트웍 스트림, 캡처 카"
-"드와 다른 미디어 형식을 읽을 수 있습니다!</p><p><a href=\"http://www."
-"videolan.org/contribute/\"><span style=\" text-decoration: underline; color:"
-"#0057ae;\">참여하세요!</span></a>"
+"드와 다른 미디어 형식을 읽을 수 있습니다!</p><p><a href=\"http://"
+"www.videolan.org/contribute/\"><span style=\" text-decoration: underline; "
+"color:#0057ae;\">참여하세요!</span></a>"
 
 #: modules/gui/macosx/VLCAddonsWindowController.m:104
 #: modules/gui/macosx/VLCAddonsWindowController.m:355
@@ -16694,8 +16311,8 @@ msgstr "입력이 변경됨"
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "입력이 변경되서, 책갈피를 저장할 수 없습니다. 동일한 입력을 확실히 유지하기 "
 "위해 책갈피를 편집하는 동안에 \"일시중지\" 상태를 유지하세요."
@@ -22410,8 +22027,8 @@ msgstr "Lua 인터페이스 설정"
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 "Lua 인터페이스 설정 문자열. 형식: '[\"<인터페이스 모듈 이름>\"] = { <옵션> = "
 "<값>, ...}, ...'."
@@ -23846,10 +23463,6 @@ msgstr "Copy 패킷타이저"
 #: modules/packetizer/copy.c:48
 msgid "Copy packetizer"
 msgstr "Copy 패킷타이저"
-
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "Dirac 패킷타이저"
 
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
@@ -29785,6 +29398,299 @@ msgstr "AAAA; "
 msgid "Media Manager List"
 msgstr "미디어 관리자 목록"
 
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4"
+
+#~ msgid "Rate control method"
+#~ msgstr "레이트 컨트롤 방법"
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr "비디오 시퀀스를 인코딩하는데 사용되는 방법"
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "일정한 잡음 임계 모드"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "일정한 비트레이트 모드 (CBR)"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "낮은 지연 모드"
+
+#~ msgid "Lossless mode"
+#~ msgstr "무손실 모드"
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "일정한 람다 모드"
+
+#~ msgid "Constant error mode"
+#~ msgstr "일정한 오류 모드"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "일정한 품질 모드"
+
+#~ msgid "GOP structure"
+#~ msgstr "GOP 구조"
+
+#~ msgid "GOP structure used to encode the video sequence"
+#~ msgstr "비디오 시퀀스를 인코딩하기 위해 사용되는 GOP 구조"
+
+#~ msgid ""
+#~ "No fixed gop structure. A picture can be intra or inter and refer to "
+#~ "previous or future pictures."
+#~ msgstr ""
+#~ "고정된 GOP 구조 없음. 한 장의 그림은 intra나 inter가 될 수 있고, 이전이나 "
+#~ "다음 그림을 참고합니다."
+
+#~ msgid "I-frame only sequence"
+#~ msgstr "I-프레임만 시퀀스"
+
+#~ msgid "Inter pictures refere to previous pictures only"
+#~ msgstr "중간 영상은 이전 영상만 참고합니다."
+
+#~ msgid "Inter pictures can refer to previous or future pictures"
+#~ msgstr "중간 영상은 이전이나 다음 영상을 참고할 수 있습니다"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "일정한 품질 비율"
+
+#~ msgid "Quality factor to use in constant quality mode"
+#~ msgstr "일정한 품질 모드에서 사용할 품질 계수"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "노이즈 임계값"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr "일정한 노이즈 임계 모드에서 사용할 노이즈 임계값"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "CBR 비트레이트 (kbps)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "일정한 비트레이드 모드로 인코딩시 대상 비트레이트, kbps 단위"
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "최대 비트레이트 (kbps)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "일정한 비트레이트 모드로 인코딩시 최대 비트레이트, kbps 단위"
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "최소 비트레이트 (kbps)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "일정한 비트레이트 모드로 인코딩시 최소 비트레이트, kbps 단위"
+
+#~ msgid "GOP length"
+#~ msgstr "GOP 길이"
+
+#~ msgid ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+#~ msgstr "연속하는 시퀀스 헤더 사이의 영상 개수, 예. 영상 그룹의 길이"
+
+#~ msgid "Prefilter"
+#~ msgstr "전처리필터"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "가변 전처리 필터 사용하기"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "전처리 필터 없음"
+
+#~ msgid "Centre Weighted Median"
+#~ msgstr "가운데 가중 중앙값"
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "가우시안 로우 패스 필터"
+
+#~ msgid "Add Noise"
+#~ msgstr "노이즈 추가"
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "가우시안 가변 로우 패스 필터"
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "로우 패스 필터"
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "전필터링 량"
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "더 높은 값은 더 많은 전필터링을 의미합니다"
+
+#~ msgid "Picture coding mode"
+#~ msgstr "사진 인코딩 모드"
+
+#~ msgid ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+#~ msgstr ""
+#~ "인터레이스 필드가 있는 필드 코딩은 유사-프로그래시브 프레임과는 대조적으"
+#~ "로, 즉 개별적으로 이루어집니다."
+
+#~ msgid "auto - let encoder decide based upon input (Best)"
+#~ msgstr "자동 - 입력에 기반하여 인코더가 결정 허용 (최상)"
+
+#~ msgid "force coding frame as single picture"
+#~ msgstr "코딩 프레임을 단일 화면으로 강제하기"
+
+#~ msgid "force coding frame as separate interlaced fields"
+#~ msgstr "코딩 프레임을 독립된 인터레이스 필드로 강제하기"
+
+#~ msgid "Size of motion compensation blocks"
+#~ msgstr "모션 보정 블록 크기"
+
+#~ msgid "automatic - let encoder decide based upon input (Best)"
+#~ msgstr "자동 - 입력에 따라서 인코더가 결정하도록 함 (최고)"
+
+#~ msgid "small - use small motion compensation blocks"
+#~ msgstr "작은 - 작은 모션 보정 블록을 사용합니다"
+
+#~ msgid "medium - use medium motion compensation blocks"
+#~ msgstr "중간 - 중간 모션 보정 블록을 사용합니다"
+
+#~ msgid "large - use large motion compensation blocks"
+#~ msgstr "큰 - 큰 모션 보정 블록을 사용합니다"
+
+#~ msgid "Overlap of motion compensation blocks"
+#~ msgstr "모션 보정 블록의 겹침"
+
+#~ msgid "none - Motion compensation blocks do not overlap"
+#~ msgstr "없음 - 모션 보정 블록이 겹치지 않습니다"
+
+#~ msgid "partial - Motion compensation blocks only partially overlap"
+#~ msgstr "일부 - 모션 보정 블록이 일부만 겹칩니다"
+
+#~ msgid "full - Motion compensation blocks fully overlap"
+#~ msgstr "전체 - 모션 보정 블록이 완전히 겹칩니다"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "모션 벡터 정밀도"
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "모션 벡터 정밀도, 화소 단위"
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "세가지 모션 추정 구성요소"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "모션 추정 처리의 일부로 크로마 사용하기"
+
+#~ msgid "Intra picture DWT filter"
+#~ msgstr "인트라픽쳐 DWT 필터"
+
+#~ msgid "Inter picture DWT filter"
+#~ msgstr "Inter picture DWT 필터"
+
+#~ msgid "Number of DWT iterations"
+#~ msgstr "DWT 반복수"
+
+#~ msgid "Also known as DWT levels"
+#~ msgstr "DWT 레벨로도 알려짐"
+
+#~ msgid "Enable multiple quantizers"
+#~ msgstr "다중 양자화기 사용"
+
+#~ msgid "Enable multiple quantizers per subband (one per codeblock)"
+#~ msgstr "하위밴드 당 (코드블록 당 하나) 다중의 양자화기를 사용합니다"
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr "이진 산술 코딩 사용 안함"
+
+#~ msgid "Use variable length codes instead, useful for very high bitrates"
+#~ msgstr "대신 가변 길이 코드 사용, 매우 높은 비트레이트에 유용합니다"
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "지각적인 가중치 방법"
+
+#~ msgid "perceptual distance"
+#~ msgstr "지각적인 거리"
+
+#~ msgid "perceptual distance to calculate perceptual weight"
+#~ msgstr "지각적인 하중을 계산하기 위한 지각적인 거리"
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "프레임 당 수평 조각"
+
+#~ msgid "Number of horizontal slices per frame in low delay mode"
+#~ msgstr "낮은 지연 모드에서 프레임 당 수평 조각의 개수"
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "프레임 당 수직 조각"
+
+#~ msgid "Number of vertical slices per frame in low delay mode"
+#~ msgstr "낮은 지연 모드에서 프레임 당 수직 조각의 개수"
+
+#~ msgid "Size of code blocks in each subband"
+#~ msgstr "각 하위밴드에서 코드 블록의 크기"
+
+#~ msgid "small - use small code blocks"
+#~ msgstr "작은 - 작은 코드 블록을 사용합니다"
+
+#~ msgid "medium - use medium sized code blocks"
+#~ msgstr "중간 - 중간 크기의 코드 블록"
+
+#~ msgid "large - use large code blocks"
+#~ msgstr "큰 - 큰 코드 블록 사용하기"
+
+#~ msgid "full - One code block per subband"
+#~ msgstr "전부 - 하위밴드당 한 개의 코드 블록"
+
+#~ msgid "Enable hierarchical Motion Estimation"
+#~ msgstr "계층적인 모션 추정 사용하기"
+
+#~ msgid "Number of levels of downsampling"
+#~ msgstr "다운샘플링의 단계 수"
+
+#~ msgid ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+#~ msgstr "계층적인 모션 추정 모드에서 다운샘플링의 단계 수"
+
+#~ msgid "Enable Global Motion Estimation"
+#~ msgstr "전역 모션 추정 사용하기"
+
+#~ msgid "Enable Phase Correlation Estimation"
+#~ msgstr "위상 상관성 추정 사용하기"
+
+#~ msgid "Enable Scene Change Detection"
+#~ msgstr "장면 변화 감지 사용하기"
+
+#~ msgid "Force Profile"
+#~ msgstr "프로파일 강제사용 "
+
+#~ msgid "VC2 Low Delay Profile"
+#~ msgstr "VC2 낮은 지연 프로파일"
+
+#~ msgid "VC2 Simple Profile"
+#~ msgstr "VC2 간단한 프로파일"
+
+#~ msgid "VC2 Main Profile"
+#~ msgstr "VC2 메인 프로파일"
+
+#~ msgid "Main Profile"
+#~ msgstr "메인 프로파일"
+
+#~ msgid "Dirac video decoder using libschroedinger"
+#~ msgstr "libschroedinger를 이용한 Dirac 비디오 디코더"
+
+#~ msgid "Dirac video encoder using libschroedinger"
+#~ msgstr "libschroedinger를 이용한 Dirac 비디오 인코더"
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "DTS를 조절할 값"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "Dirac 비디오 디먹서"
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "Dirac 패킷타이저"
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr "소프트웨어 합성에 필요한 사운드 글꼴 파일."
@@ -29988,9 +29894,9 @@ msgstr "미디어 관리자 목록"
 #~ msgstr "RTSP 비밀번호"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
 #~ "사용할 HTTP 프록시는 반드시 http://[user[:pass]@]myproxy.mydomain:myport/ "
 #~ "의 형식이어야 합니다; 이 값이 없으면, http_proxy 환경 변수값 사용을 시도합"
@@ -32010,15 +31916,15 @@ msgstr "미디어 관리자 목록"
 #~ msgid ""
 #~ "Force the subtiles format. Valid values are : \"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
 #~ "autodetection, this should always work)."
 #~ msgstr ""
 #~ "자막 형식 강제. 유효한 값은 : \"microdvd\", \"subrip\", \"subviewer\", "
 #~ "\"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", \"dvdsubtitle\", "
-#~ "\"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb\", \"realtext"
-#~ "\", \"dks\", \"subviewer1\",  및 \"auto\" (자동감지를 의미, 항상 제대로 동"
-#~ "작합니다)."
+#~ "\"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb\", "
+#~ "\"realtext\", \"dks\", \"subviewer1\",  및 \"auto\" (자동감지를 의미, 항"
+#~ "상 제대로 동작합니다)."
 
 #~ msgid "Filename of image file to use on the overlay framebuffer."
 #~ msgstr "중첩 프레임버퍼에 사용할 이미지 파일명."
@@ -32170,8 +32076,8 @@ msgstr "미디어 관리자 목록"
 #~ "시지를 표시하려면 여전히 -vvv 를 필요한것에 주의하세요."
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", and \"syslog\" (special mode to send to syslog instead of file."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", and \"syslog\" (special mode to send to syslog instead of file."
 #~ msgstr ""
 #~ "로그 형식을 지정합니다. \"text\" (기본값) 와 \"html\", \"syslog\" (파일 대"
 #~ "신syslog로 전송하는 특별 모드) 중에서 선택할 수 있습니다."
@@ -32190,8 +32096,8 @@ msgstr "미디어 관리자 목록"
 #~ msgstr "dbus"
 
 #~ msgid ""
-#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be"
-#~ "\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
+#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
+#~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
 #~ msgstr ""
 #~ "\"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be\", "
 #~ "\"s16_be\", \"fixed32\", \"float32\" 또는 \"spdif\" 중 하나"
@@ -36322,8 +36228,8 @@ msgstr "미디어 관리자 목록"
 #~ msgid ""
 #~ "Containers (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv)"
 #~ msgstr ""
-#~ "컨테이너 (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv *."
-#~ "webm)"
+#~ "컨테이너 (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv "
+#~ "*.webm)"
 
 #, fuzzy
 #~ msgid "Should act as the master client for the network synchronisation?"
@@ -39466,8 +39372,8 @@ msgstr "미디어 관리자 목록"
 
 #, fuzzy
 #~ msgid ""
-#~ "Distort mode, one of \"wave\", \"ripple\", \"gradient\", \"edge\", \"hough"
-#~ "\" and \"psychedelic\"."
+#~ "Distort mode, one of \"wave\", \"ripple\", \"gradient\", \"edge\", "
+#~ "\"hough\" and \"psychedelic\"."
 #~ msgstr "왜곡 모드, \"기울기\", \"가장자리\" 및 \"허프\" 중 하나."
 
 #, fuzzy

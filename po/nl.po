@@ -186,8 +186,8 @@ msgstr "Ondertitels / OSD"
 msgid ""
 "Settings related to On-Screen-Display, subtitles and \"overlay subpictures\""
 msgstr ""
-"Instellingen van On-Screen-Display, ondertitels en \"overlay subafbeeldingen"
-"\""
+"Instellingen van On-Screen-Display, ondertitels en \"overlay "
+"subafbeeldingen\""
 
 #: include/vlc_config_cat.h:88
 #, fuzzy
@@ -584,54 +584,54 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>Welkom bij VLC Media Player Help</"
 "h2><h3>Documentatie</h3><p>U kunt informatie over VLC terugvinden op de "
 "VideoLAN <a href=\"http://wiki.videolan.org\">wiki</a>-website.</p><p>Begint "
-"u nog maar net met VLC Media Player, lees dan de <br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introductie van VLC Media "
-"Player</em></a>.</p><p>U vindt informatie over hoe u de speler moet "
-"gebruiken in het <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>Hoe speel ik bestanden af met VLC Media Player</em></a>\"-"
-"document.</p><p>Voor alle functies zoals opslaan, converteren, transcoderen, "
-"encoderen, muxen en streamen zult u bruikbare informatie vinden in de <a "
-"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo"
-"\">streamingdocumentatie</a>.</p><p>Als u onzeker bent over terminologie, "
-"raadpleeg dan de <a href=\"http://wiki.videolan.org/Knowledge_Base"
-"\">kennisbank</a>.</p><p>Om de belangrijkste sneltoetsen te begrijpen, leest "
-"u de <a href=\"http://wiki.videolan.org/Hotkeys\">sneltoetsen</a>-pagina.</"
-"p><h3>Help</h3><p>Raadpleeg de <a href=\"http://www.videolan.org/support/faq."
-"html\">FAQ</a> voordat u een vraag stelt.</p><p>U kunt hulp krijgen (en "
-"bieden) op de <a href=\"http://forum.videolan.org\">forums</a>, de <a href="
-"\"http://www.videolan.org/vlc/lists.html\">maillijsten</a> of ons IRC-kanaal "
-"(<em>#videolan</em> op irc.freenode.net).</p><h3>Bijdragen aan het project</"
-"h3><p>U kunt het VideoLAN-project helpen door tijd te geven om de "
-"gemeenschap te helpen, om thema's te ontwerpen, documentatie te vertalen, de "
-"software te testen en te programmeren. U kunt ons ook financieel of met "
-"materieel helpen. En natuurlijk kunt u VLC Media Player <b>promoten</b>.</"
-"p></body></html>"
+"u nog maar net met VLC Media Player, lees dan de <br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introductie van VLC "
+"Media Player</em></a>.</p><p>U vindt informatie over hoe u de speler moet "
+"gebruiken in het <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>Hoe speel ik bestanden af met VLC Media "
+"Player</em></a>\"-document.</p><p>Voor alle functies zoals opslaan, "
+"converteren, transcoderen, encoderen, muxen en streamen zult u bruikbare "
+"informatie vinden in de <a href=\"http://wiki.videolan.org/"
+"Documentation:Streaming_HowTo\">streamingdocumentatie</a>.</p><p>Als u "
+"onzeker bent over terminologie, raadpleeg dan de <a href=\"http://"
+"wiki.videolan.org/Knowledge_Base\">kennisbank</a>.</p><p>Om de belangrijkste "
+"sneltoetsen te begrijpen, leest u de <a href=\"http://wiki.videolan.org/"
+"Hotkeys\">sneltoetsen</a>-pagina.</p><h3>Help</h3><p>Raadpleeg de <a "
+"href=\"http://www.videolan.org/support/faq.html\">FAQ</a> voordat u een "
+"vraag stelt.</p><p>U kunt hulp krijgen (en bieden) op de <a href=\"http://"
+"forum.videolan.org\">forums</a>, de <a href=\"http://www.videolan.org/vlc/"
+"lists.html\">maillijsten</a> of ons IRC-kanaal (<em>#videolan</em> op "
+"irc.freenode.net).</p><h3>Bijdragen aan het project</h3><p>U kunt het "
+"VideoLAN-project helpen door tijd te geven om de gemeenschap te helpen, om "
+"thema's te ontwerpen, documentatie te vertalen, de software te testen en te "
+"programmeren. U kunt ons ook financieel of met materieel helpen. En "
+"natuurlijk kunt u VLC Media Player <b>promoten</b>.</p></body></html>"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -1578,13 +1578,13 @@ msgstr "Extra interfacemodules"
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "U kunt \"extra interfaces\" selecteren voor VLC. Ze worden in de achtergrond "
 "geopend als aanvulling op de standaardinterface. Gebruik een lijst van door "
-"dubbele punten gescheiden interfacemodules. (veelgebruikte waarden zijn: \"rc"
-"\" (afstandbediening), \"http\", \"gestures\" ...)"
+"dubbele punten gescheiden interfacemodules. (veelgebruikte waarden zijn: "
+"\"rc\" (afstandbediening), \"http\", \"gestures\" ...)"
 
 #: src/libvlc-module.c:83
 msgid "You can select control interfaces for VLC."
@@ -1656,8 +1656,8 @@ msgid ""
 msgstr ""
 "Deze instellingen beïnvloeden het gedrag van geluid en u kunt hier "
 "audiofilters voor nabewerking en visuele effecten (spectrum-analyse, etc.) "
-"activeren. Schakel deze filters hier in en configureer ze in de modulesectie"
-"\"'audiofilters\"."
+"activeren. Schakel deze filters hier in en configureer ze in de "
+"modulesectie\"'audiofilters\"."
 
 #: src/libvlc-module.c:123
 msgid "Audio output module"
@@ -2380,8 +2380,8 @@ msgstr "Beeldverhouding bron"
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "Dit legt de beeldverhouding vast. Bijvoorbeeld: sommige dvd's zeggen 16:9 "
@@ -2902,8 +2902,8 @@ msgid ""
 "{...}\""
 msgstr ""
 "U kunt handmatig een lijst van bladwijzers maken voor een stream van de "
-"volgende vorm  \"{name=bladwijzer-naam,time=optionele-tijd-offset,"
-"bytes=optionele-byte-offset},{...}\""
+"volgende vorm  \"{name=bladwijzer-naam,time=optionele-tijd-"
+"offset,bytes=optionele-byte-offset},{...}\""
 
 #: src/libvlc-module.c:675
 #, fuzzy
@@ -2953,15 +2953,15 @@ msgstr "Titel wijzigen naargelang de huidige media"
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
 "Deze optie laat u de titel instellen naargelang wat afgespeeld wordt<br>$a: "
 "Artiest<br>$b: Album<br>$c: Copyright<br>$t: Titel<br>$g: Genre<br>$n: Track "
-"num<br>$p: Nu afspelend<br>$A: Datum<br>$D: Duur<br>$Z: \"Nu afspelend"
-"\" (Val terug op Titel - Artiest)"
+"num<br>$p: Nu afspelend<br>$A: Datum<br>$D: Duur<br>$Z: \"Nu afspelend\" "
+"(Val terug op Titel - Artiest)"
 
 #: src/libvlc-module.c:699
 msgid "Disable all lua plugins"
@@ -3385,10 +3385,10 @@ msgid ""
 "try the dummy and a52 codecs before trying the other ones. Only advanced "
 "users should alter this option as it can break playback of all your streams."
 msgstr ""
-"Lijst van codecs die VLC in volgorde zal gebruiken. Bijvoorbeeld, 'dummy,"
-"a52' zal de dummy en a52 codecs eerst proberen voordat anderen geprobeerd "
-"worden.  Alleen geavanceerde gebruikers mogen deze optie aanpassen, "
-"aangezien dit het afspelen van alle streams onmogelijk kan maken."
+"Lijst van codecs die VLC in volgorde zal gebruiken. Bijvoorbeeld, "
+"'dummy,a52' zal de dummy en a52 codecs eerst proberen voordat anderen "
+"geprobeerd worden.  Alleen geavanceerde gebruikers mogen deze optie "
+"aanpassen, aangezien dit het afspelen van alle streams onmogelijk kan maken."
 
 #: src/libvlc-module.c:909
 msgid "Preferred encoders list"
@@ -7627,12 +7627,13 @@ msgstr "HTTP-proxy"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
-"HTTP-proxy om te gebruiken. Moet in het formaat http://[gebruiker@]mijnproxy."
-"mijndomein:mijnpoort/ zijn; indien leeg zal de http_proxy omgevingsvariabele "
-"geprobeerd worden."
+"HTTP-proxy om te gebruiken. Moet in het formaat http://"
+"[gebruiker@]mijnproxy.mijndomein:mijnpoort/ zijn; indien leeg zal de "
+"http_proxy omgevingsvariabele geprobeerd worden."
 
 #: modules/access/http.c:65
 msgid "HTTP proxy password"
@@ -7946,8 +7947,8 @@ msgstr "Audioconfiguratie"
 #: modules/access/linsys/linsys_sdi.c:79
 msgid "Allows you to set audio configuration (id=group,pair:id=group,pair...)."
 msgstr ""
-"Staat u toe om de audioconfiguratie in te stellen (id=group,pair:id=group,"
-"pair...)."
+"Staat u toe om de audioconfiguratie in te stellen "
+"(id=group,pair:id=group,pair...)."
 
 #: modules/access/linsys/linsys_hdsdi.c:89
 msgid "HD-SDI Input"
@@ -8225,8 +8226,8 @@ msgstr "Geen audio-invoerapparaat gevonden"
 
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "Uw Mac lijkt niet met een geschikt audio-invoerapparaat uitgerust te zijn. "
 "Controleer uw aansluitingen en stuurprogramma's."
@@ -8666,8 +8667,8 @@ msgstr "RTSP authentificatie"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -9131,9 +9132,9 @@ msgstr "v4l2-driver bediening"
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "Stel de v4l2-modulebediening in op de waarden opgegeven in een door komma's "
 "gescheiden lijst optioneel aangehaald in accolades (bijv.: "
@@ -9539,9 +9540,9 @@ msgstr "Bestand waar vlc sleutel-uri en sleutelbestand-locatie leest"
 #: modules/access_output/livehttp.c:98
 #, fuzzy
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
 "Bestand is gelezen wanneer segment start, en wordt verondersteld in formaat "
 "te zijn: sleutel-uri\\nsleutelbestand. Bestand wordt gelezen bij het openen "
@@ -11052,7 +11053,6 @@ msgstr "Decoderen"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "Coderen"
 
@@ -11610,11 +11610,11 @@ msgstr "Theora video-packetizer"
 msgid "Daala video encoder"
 msgstr "Theora video-encoder"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "Chromaformaat"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr ""
@@ -11679,8 +11679,8 @@ msgstr "Positie subafbeelding:"
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 "U kunt hier de subafbeelingpositie op de video forceren (0=centreren, 1= "
 "links, 2=rechts, 4=boven, 8=onder, u kunt ook combinaties van deze waarden "
@@ -12460,10 +12460,10 @@ msgstr "Nauwkeurigheid van RateControl"
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
 "Tolerantie in percentage van de 'avbr'-methode (Average Variable Bitrate). "
 "Bijvoorbeeld 10 bij een bitrate van 800 kbps betekent dat de encoder "
@@ -12536,388 +12536,6 @@ msgstr "Pseudo ruwe videopacketizer"
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "Theora video-encoder"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4:"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "Methode rate-bediening"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr "Gebruikte methode om de videosequentie te coderen"
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "Constante ruisdrempelmodus"
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "Constante bitrate-modus (CBR)"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "Lage delay-modus"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "Lossless-modus"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "Constante lambda-modus"
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "Constante-foutmodus"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "Constante-kwaliteitmodus"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "GOP-structuur"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr "GOP-structuur gebruikt om de videosequentie te coderen"
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-"Geen vaste gop-structuur. Een afbeelding kan intra of inter zijn en "
-"verwijzen naar vroegere of toekomstige afbeeldingen."
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr "I-frame louter opeenvolging"
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr "Inter-afbeeldingen verwijzen alleen naar vroegere afbeeldingen"
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr ""
-"Inter-afbeeldingen kunne verwijzen naar vroegere of toekomstige afbeeldingen"
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "Constante kwaliteitsfactor"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr "Kwaliteitsfactor om te gebruiken in constante-kwaliteitsmodus"
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "Ruisdrempel"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr "Ruisdrempel te gebruiken bij constante-ruisdrempelmodus"
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "CBR bitrate (kbps)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr "Bitrate-doel in kbps bij coderen in constante-bitratemodus"
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "Maximum bitrate (kbps)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "Maximum bitrate in kbps bij coderen in constante-bitratemodus"
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "Minimum bitrate (kbps)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "Minimum bitrate in kbps bij coderen in constante-bitratemodus"
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "GOP lengte"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr ""
-"Aantal afbeeldingen tussen opeenvolgende sequentie-headers, dus de lengte "
-"van de groep afbeeldingen"
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "Prefilter"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "Adaptieve prefiltering inschakelen"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "Geen voorfiltering"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr "Middengewogen mediaan"
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "Gaussiaanse lowpass-filter"
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "Ruis toevoegen"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "Gaussiaanse adaptive lowpassfilter"
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "Lowpass-filter"
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "Hoeveelheid prefiltering"
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "Hogere waarde is meer prefilteren"
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "Afbeeldingcoderingsmodus"
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-"Veldcodering is waar geïnterlacete velden in tegenstelling tot een pseudo-"
-"progressief beeld apart gecodeerd worden"
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr "auto - laat encoder bepalen gebaseerd op de invoer (beste)"
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr "forceer beeldcodering als een enkele afbeelding"
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr "forceer beeldcodering in afzonderlijke geïnterlacete velden"
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr "Grootte van bewegingscompensatieblokken"
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr "auto - laat encoder bepalen gebaseerd op de invoer (beste)"
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr "klein - gebruik kleine bewegingscompensatieblokken"
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr "medium - gebruik medium bewegingscompensatieblokken"
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr "groot - gebruik grote bewegingscompensatieblokken"
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr "Overlap van bewegingscompensatieblokken"
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr "geen - bewegingscompensatieblokken overlappen niet"
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr ""
-"gedeeltelijk - bewegingscompensatie blokkeert alleen gedeeltelijke overlap"
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr "volledig - bewegingscompensatieblokken overlappen volledig"
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "Bewegingsvectorprecisie"
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "Bewegingsvectorprecisie in pels."
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "Drie componenten bewegingsschatting"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "Gebruik chroma als onderdeel in het bewegingsschattingsproces"
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr "Intra afbeelding DWT filter"
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr "Inter afbeelding DWT filter"
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr "Aantal DWT iteraties"
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr "Ook DWT-niveaus genoemd"
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr "Meerdere quantizers inschakelen"
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr "Activeer meerdere quantisaties per subband (een per codeblok)"
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr "Rekenkundige codering uitschakelen"
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr ""
-"Gebruik in plaats daarvan codes met variabele lengte, handig voor hoge "
-"bitrates"
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "perceptuele weegmethode"
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "perceptuele afstand"
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr "perceptuele afstand om perceptueel gewicht te berekenen"
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "Horizontale stukken per frame"
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr "Aantal horizontale stukken per frame in lage delaymodus"
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "Verticale stukken per frame"
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr "Aantal verticale stukken per frame in lage delaymodus"
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr "Grootte van codeblokken in elke subband"
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr "klein - gebruik kleine codeblokken"
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr "medium - gebruik middelgrote codeblokken"
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr "groot - gebruik grote codeblokken"
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr "volledig - één codeblok per subband"
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr "Hiërarchische bewegingsschatting inschakelen"
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr "Aantal niveaus downsampling"
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr ""
-"Aantal downsampling-niveaus in hiërarchische bewegingsvoorspellingsmodus"
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr "Globale bewegingsschatting inschakelen"
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr "Schatting fase-verband inschakelen"
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr "Scènewijziging-detectie inschakelen"
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "Profiel forceren"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr "VC2 Lage Delay Profiel"
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr "VC2 Simpel profiel"
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr "VC2 Hoofdprofiel"
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "Hoofdprofiel"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr "Dirac video-decoder, gebruikmakend van libschroedinger"
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr "Dirac video-encoder, gebruikmakend van libschroedinger"
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -13460,8 +13078,8 @@ msgid ""
 "Force a specific encoding quality between 0.0 (high) and 50.0 (low), instead "
 "of specifying a particular bitrate. This will produce a VBR stream."
 msgstr ""
-"Forceer een specifieke codeerkwaliteit tussen 0.0 (hoog) en 50.0 (laag), i.p."
-"v. een specifieke bitrate. Dit zal een VBR-stream produceren."
+"Forceer een specifieke codeerkwaliteit tussen 0.0 (hoog) en 50.0 (laag), "
+"i.p.v. een specifieke bitrate. Dit zal een VBR-stream produceren."
 
 #: modules/codec/twolame.c:59
 msgid "Stereo mode"
@@ -15654,14 +15272,6 @@ msgstr "Als het bestand reeds bestaat zal het niet overschreven worden."
 msgid "File dumper"
 msgstr "Bestandsdumper"
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "Waarde om dts mee bij te stellen"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "Dirac-videodemuxer"
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -16739,18 +16349,18 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 "<p>VLC media player is een gratis en opensource mediaspeler, encoder en "
-"streamer, gemaakt door de vrijwilligers van de <a href=\"http://www.videolan."
-"org/\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
-"span></a>-gemeenschap.</p><p>VLC gebruikt zijn eigen interne codecs, werkt "
-"op vrijwel elk populair platform en kan bijna alle bestanden, cd's, dvd's, "
-"netwerkstreams, opnamekaarten en andere mediaformaten lezen!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
-"underline; color:#0057ae;\">Help ons en doe mee!</span></a>"
+"streamer, gemaakt door de vrijwilligers van de <a href=\"http://"
+"www.videolan.org/\"><span style=\" text-decoration: underline; color:#0057ae;"
+"\">VideoLAN</span></a>-gemeenschap.</p><p>VLC gebruikt zijn eigen interne "
+"codecs, werkt op vrijwel elk populair platform en kan bijna alle bestanden, "
+"cd's, dvd's, netwerkstreams, opnamekaarten en andere mediaformaten lezen!</"
+"p><p><a href=\"http://www.videolan.org/contribute/\"><span style=\" text-"
+"decoration: underline; color:#0057ae;\">Help ons en doe mee!</span></a>"
 
 #: modules/gui/macosx/VLCAddonsWindowController.m:104
 #: modules/gui/macosx/VLCAddonsWindowController.m:355
@@ -17043,8 +16653,8 @@ msgstr "Invoer is veranderd"
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "Invoer is veranderd, niet in staat om bladwijzer op te slaan. Pauzeer het "
 "afspelen terwijl u bladwijzers bewerkt om er zeker van te zijn dat dezelfde "
@@ -20710,8 +20320,8 @@ msgstr "Bestand opslaan..."
 msgid ""
 "Containers (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv *.webm)"
 msgstr ""
-"Containerbestanden (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *."
-"flv *.webm)"
+"Containerbestanden (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw "
+"*.flv *.webm)"
 
 #: modules/gui/qt/components/sout/sout_widgets.cpp:179
 msgid "This module outputs the transcoded stream to a network via HTTP."
@@ -22801,8 +22411,8 @@ msgstr "Lua-interfaceconfiguratie"
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 "Lua-interfaceconfiguratieregel. Formaat is: '[\"<interface module naam>\"] = "
 "{ <optie> = <waarde>, ...}, ...'."
@@ -22850,9 +22460,10 @@ msgid ""
 "but can also bind to a plain TCP socket (\"localhost:4212\") or use the "
 "telnet protocol (\"telnet://0.0.0.0:4212\")"
 msgstr ""
-"Commando's van deze bron accepteren. De CLI-standaard is stdin (\"*console"
-"\"), maar kan ook verbinden met een plain TCP socket (\"localhost:4212\") of "
-"het telnet-protocol gebruiken (\"telnet://0.0.0.0:4212\")"
+"Commando's van deze bron accepteren. De CLI-standaard is stdin "
+"(\"*console\"), maar kan ook verbinden met een plain TCP socket "
+"(\"localhost:4212\") of het telnet-protocol gebruiken (\"telnet://"
+"0.0.0.0:4212\")"
 
 #: modules/lua/vlc.c:85
 msgid "Lua"
@@ -24256,10 +23867,6 @@ msgstr "avparser packetizer"
 msgid "Copy packetizer"
 msgstr "Copy packetizer"
 
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "Ddirac packetizer"
-
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
 msgstr "DTS audiopacketizer"
@@ -24409,8 +24016,8 @@ msgstr "Podcast webadressenlijst"
 #: modules/services_discovery/podcast.c:57
 msgid "Enter the list of podcasts to retrieve, separated by '|' (pipe)."
 msgstr ""
-"Geeft een lijst van podcasts om op te halen, gescheiden door een \"|"
-"\" (pijp)."
+"Geeft een lijst van podcasts om op te halen, gescheiden door een \"|\" "
+"(pijp)."
 
 #: modules/services_discovery/pulse.c:39 modules/services_discovery/pulse.c:42
 #: modules/services_discovery/pulse.c:82 modules/services_discovery/udev.c:65
@@ -27397,8 +27004,8 @@ msgstr "Tekenfilmeffect toepassen"
 #: modules/video_filter/gradient.c:70
 msgid "Apply cartoon effect. It is only used by \"gradient\" and \"edge\"."
 msgstr ""
-"Pas tekenfilmeffect toe. Het wordt alleen gebruikt bij \"gradient\" en \"edge"
-"\"."
+"Pas tekenfilmeffect toe. Het wordt alleen gebruikt bij \"gradient\" en "
+"\"edge\"."
 
 #: modules/video_filter/gradient.c:73
 msgid "Apply color gradient or edge detection effects"
@@ -30336,6 +29943,307 @@ msgstr "AAAA;"
 msgid "Media Manager List"
 msgstr "Mediabeheerlijst"
 
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4:"
+
+#~ msgid "Rate control method"
+#~ msgstr "Methode rate-bediening"
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr "Gebruikte methode om de videosequentie te coderen"
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "Constante ruisdrempelmodus"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "Constante bitrate-modus (CBR)"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "Lage delay-modus"
+
+#~ msgid "Lossless mode"
+#~ msgstr "Lossless-modus"
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "Constante lambda-modus"
+
+#~ msgid "Constant error mode"
+#~ msgstr "Constante-foutmodus"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "Constante-kwaliteitmodus"
+
+#~ msgid "GOP structure"
+#~ msgstr "GOP-structuur"
+
+#~ msgid "GOP structure used to encode the video sequence"
+#~ msgstr "GOP-structuur gebruikt om de videosequentie te coderen"
+
+#~ msgid ""
+#~ "No fixed gop structure. A picture can be intra or inter and refer to "
+#~ "previous or future pictures."
+#~ msgstr ""
+#~ "Geen vaste gop-structuur. Een afbeelding kan intra of inter zijn en "
+#~ "verwijzen naar vroegere of toekomstige afbeeldingen."
+
+#~ msgid "I-frame only sequence"
+#~ msgstr "I-frame louter opeenvolging"
+
+#~ msgid "Inter pictures refere to previous pictures only"
+#~ msgstr "Inter-afbeeldingen verwijzen alleen naar vroegere afbeeldingen"
+
+#~ msgid "Inter pictures can refer to previous or future pictures"
+#~ msgstr ""
+#~ "Inter-afbeeldingen kunne verwijzen naar vroegere of toekomstige "
+#~ "afbeeldingen"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "Constante kwaliteitsfactor"
+
+#~ msgid "Quality factor to use in constant quality mode"
+#~ msgstr "Kwaliteitsfactor om te gebruiken in constante-kwaliteitsmodus"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "Ruisdrempel"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr "Ruisdrempel te gebruiken bij constante-ruisdrempelmodus"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "CBR bitrate (kbps)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "Bitrate-doel in kbps bij coderen in constante-bitratemodus"
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "Maximum bitrate (kbps)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "Maximum bitrate in kbps bij coderen in constante-bitratemodus"
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "Minimum bitrate (kbps)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "Minimum bitrate in kbps bij coderen in constante-bitratemodus"
+
+#~ msgid "GOP length"
+#~ msgstr "GOP lengte"
+
+#~ msgid ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+#~ msgstr ""
+#~ "Aantal afbeeldingen tussen opeenvolgende sequentie-headers, dus de lengte "
+#~ "van de groep afbeeldingen"
+
+#~ msgid "Prefilter"
+#~ msgstr "Prefilter"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "Adaptieve prefiltering inschakelen"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "Geen voorfiltering"
+
+#~ msgid "Centre Weighted Median"
+#~ msgstr "Middengewogen mediaan"
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "Gaussiaanse lowpass-filter"
+
+#~ msgid "Add Noise"
+#~ msgstr "Ruis toevoegen"
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "Gaussiaanse adaptive lowpassfilter"
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "Lowpass-filter"
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "Hoeveelheid prefiltering"
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "Hogere waarde is meer prefilteren"
+
+#~ msgid "Picture coding mode"
+#~ msgstr "Afbeeldingcoderingsmodus"
+
+#~ msgid ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+#~ msgstr ""
+#~ "Veldcodering is waar geïnterlacete velden in tegenstelling tot een pseudo-"
+#~ "progressief beeld apart gecodeerd worden"
+
+#~ msgid "auto - let encoder decide based upon input (Best)"
+#~ msgstr "auto - laat encoder bepalen gebaseerd op de invoer (beste)"
+
+#~ msgid "force coding frame as single picture"
+#~ msgstr "forceer beeldcodering als een enkele afbeelding"
+
+#~ msgid "force coding frame as separate interlaced fields"
+#~ msgstr "forceer beeldcodering in afzonderlijke geïnterlacete velden"
+
+#~ msgid "Size of motion compensation blocks"
+#~ msgstr "Grootte van bewegingscompensatieblokken"
+
+#~ msgid "automatic - let encoder decide based upon input (Best)"
+#~ msgstr "auto - laat encoder bepalen gebaseerd op de invoer (beste)"
+
+#~ msgid "small - use small motion compensation blocks"
+#~ msgstr "klein - gebruik kleine bewegingscompensatieblokken"
+
+#~ msgid "medium - use medium motion compensation blocks"
+#~ msgstr "medium - gebruik medium bewegingscompensatieblokken"
+
+#~ msgid "large - use large motion compensation blocks"
+#~ msgstr "groot - gebruik grote bewegingscompensatieblokken"
+
+#~ msgid "Overlap of motion compensation blocks"
+#~ msgstr "Overlap van bewegingscompensatieblokken"
+
+#~ msgid "none - Motion compensation blocks do not overlap"
+#~ msgstr "geen - bewegingscompensatieblokken overlappen niet"
+
+#~ msgid "partial - Motion compensation blocks only partially overlap"
+#~ msgstr ""
+#~ "gedeeltelijk - bewegingscompensatie blokkeert alleen gedeeltelijke overlap"
+
+#~ msgid "full - Motion compensation blocks fully overlap"
+#~ msgstr "volledig - bewegingscompensatieblokken overlappen volledig"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "Bewegingsvectorprecisie"
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "Bewegingsvectorprecisie in pels."
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "Drie componenten bewegingsschatting"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "Gebruik chroma als onderdeel in het bewegingsschattingsproces"
+
+#~ msgid "Intra picture DWT filter"
+#~ msgstr "Intra afbeelding DWT filter"
+
+#~ msgid "Inter picture DWT filter"
+#~ msgstr "Inter afbeelding DWT filter"
+
+#~ msgid "Number of DWT iterations"
+#~ msgstr "Aantal DWT iteraties"
+
+#~ msgid "Also known as DWT levels"
+#~ msgstr "Ook DWT-niveaus genoemd"
+
+#~ msgid "Enable multiple quantizers"
+#~ msgstr "Meerdere quantizers inschakelen"
+
+#~ msgid "Enable multiple quantizers per subband (one per codeblock)"
+#~ msgstr "Activeer meerdere quantisaties per subband (een per codeblok)"
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr "Rekenkundige codering uitschakelen"
+
+#~ msgid "Use variable length codes instead, useful for very high bitrates"
+#~ msgstr ""
+#~ "Gebruik in plaats daarvan codes met variabele lengte, handig voor hoge "
+#~ "bitrates"
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "perceptuele weegmethode"
+
+#~ msgid "perceptual distance"
+#~ msgstr "perceptuele afstand"
+
+#~ msgid "perceptual distance to calculate perceptual weight"
+#~ msgstr "perceptuele afstand om perceptueel gewicht te berekenen"
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "Horizontale stukken per frame"
+
+#~ msgid "Number of horizontal slices per frame in low delay mode"
+#~ msgstr "Aantal horizontale stukken per frame in lage delaymodus"
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "Verticale stukken per frame"
+
+#~ msgid "Number of vertical slices per frame in low delay mode"
+#~ msgstr "Aantal verticale stukken per frame in lage delaymodus"
+
+#~ msgid "Size of code blocks in each subband"
+#~ msgstr "Grootte van codeblokken in elke subband"
+
+#~ msgid "small - use small code blocks"
+#~ msgstr "klein - gebruik kleine codeblokken"
+
+#~ msgid "medium - use medium sized code blocks"
+#~ msgstr "medium - gebruik middelgrote codeblokken"
+
+#~ msgid "large - use large code blocks"
+#~ msgstr "groot - gebruik grote codeblokken"
+
+#~ msgid "full - One code block per subband"
+#~ msgstr "volledig - één codeblok per subband"
+
+#~ msgid "Enable hierarchical Motion Estimation"
+#~ msgstr "Hiërarchische bewegingsschatting inschakelen"
+
+#~ msgid "Number of levels of downsampling"
+#~ msgstr "Aantal niveaus downsampling"
+
+#~ msgid ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+#~ msgstr ""
+#~ "Aantal downsampling-niveaus in hiërarchische bewegingsvoorspellingsmodus"
+
+#~ msgid "Enable Global Motion Estimation"
+#~ msgstr "Globale bewegingsschatting inschakelen"
+
+#~ msgid "Enable Phase Correlation Estimation"
+#~ msgstr "Schatting fase-verband inschakelen"
+
+#~ msgid "Enable Scene Change Detection"
+#~ msgstr "Scènewijziging-detectie inschakelen"
+
+#~ msgid "Force Profile"
+#~ msgstr "Profiel forceren"
+
+#~ msgid "VC2 Low Delay Profile"
+#~ msgstr "VC2 Lage Delay Profiel"
+
+#~ msgid "VC2 Simple Profile"
+#~ msgstr "VC2 Simpel profiel"
+
+#~ msgid "VC2 Main Profile"
+#~ msgstr "VC2 Hoofdprofiel"
+
+#~ msgid "Main Profile"
+#~ msgstr "Hoofdprofiel"
+
+#~ msgid "Dirac video decoder using libschroedinger"
+#~ msgstr "Dirac video-decoder, gebruikmakend van libschroedinger"
+
+#~ msgid "Dirac video encoder using libschroedinger"
+#~ msgstr "Dirac video-encoder, gebruikmakend van libschroedinger"
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "Waarde om dts mee bij te stellen"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "Dirac-videodemuxer"
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "Ddirac packetizer"
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr "Een soundfontsbestand is nodig voor software-synthese."
@@ -30486,8 +30394,8 @@ msgstr "Mediabeheerlijst"
 #~ "Sort items in a natural order (for example: 1.ogg 2.ogg 10.ogg). This "
 #~ "method does not take the current language's collation rules into account."
 #~ msgstr ""
-#~ "Items sorteren in een natuurlijke volgorde (bijvoorbeeld: 1.ogg 2.ogg 10."
-#~ "ogg). Deze methode houdt geen rekening met de collatieregels van de "
+#~ "Items sorteren in een natuurlijke volgorde (bijvoorbeeld: 1.ogg 2.ogg "
+#~ "10.ogg). Deze methode houdt geen rekening met de collatieregels van de "
 #~ "huidige taal."
 
 #~ msgid "Do not sort the items."
@@ -30544,13 +30452,13 @@ msgstr "Mediabeheerlijst"
 #~ msgstr "RTSP wachtwoord"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
-#~ "HTTP-proxy om te gebruiken moet in het formaat http://[gebruiker[:"
-#~ "wachtwoord]@]mijnproxy.mijndomein:mijnpoort/ zijn; indien leeg zal de "
-#~ "http_proxy omgevingsvariabele geprobeerd worden."
+#~ "HTTP-proxy om te gebruiken moet in het formaat http://"
+#~ "[gebruiker[:wachtwoord]@]mijnproxy.mijndomein:mijnpoort/ zijn; indien "
+#~ "leeg zal de http_proxy omgevingsvariabele geprobeerd worden."
 
 #~ msgid "VLC could not open the file \"%s\": %s"
 #~ msgstr "VLC kon het bestand \"%s\" niet openen: %s"
@@ -32328,8 +32236,8 @@ msgstr "Mediabeheerlijst"
 #~ "voorafgegaan door een '+' of een '-' om het respectievelijk in of uit te "
 #~ "schakelen. Het sleutelwoord 'all' verwijst naar alle objecten. U kunt "
 #~ "verwijzen naar objecten met hun type of modulenaam. Regels voor benoemde "
-#~ "objecten gaan boven regels voor objecttypen. Merk op dat u nog steeds -"
-#~ "vvv moet gebruiken voor de eigenlijke weergave van debugmeldingen."
+#~ "objecten gaan boven regels voor objecttypen. Merk op dat u nog steeds "
+#~ "-vvv moet gebruiken voor de eigenlijke weergave van debugmeldingen."
 
 #~ msgid ""
 #~ "You can manually select a language for the interface. The system language "
@@ -32732,15 +32640,15 @@ msgstr "Mediabeheerlijst"
 #~ msgid ""
 #~ "Force the subtiles format. Valid values are : \"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
 #~ "autodetection, this should always work)."
 #~ msgstr ""
 #~ "Forceer het ondertitelsformaat. Geldige waardes zijn: \"microdvd\", "
 #~ "\"subrip\", \"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", "
 #~ "\"sami\", \"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", "
-#~ "\"jacosub\", \"psb\", \"realtext\", \"dks\", \"subviewer1\",  en \"auto"
-#~ "\" (betekent autodetectie, dit zou altijd moeten werken)."
+#~ "\"jacosub\", \"psb\", \"realtext\", \"dks\", \"subviewer1\",  en \"auto\" "
+#~ "(betekent autodetectie, dit zou altijd moeten werken)."
 
 #~ msgid "Do not complain on encrypted PES."
 #~ msgstr "Geef geen meldingen over versleutelde PES."
@@ -32889,16 +32797,16 @@ msgstr "Mediabeheerlijst"
 #~ "Specify the log format. Available choices are \"text\" (default) and "
 #~ "\"html\"."
 #~ msgstr ""
-#~ "Specificeer het logboekformaat. De beschikbare keuzes zijn \"text"
-#~ "\" (standaard) en \"html\"."
+#~ "Specificeer het logboekformaat. De beschikbare keuzes zijn \"text\" "
+#~ "(standaard) en \"html\"."
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", \"syslog\" (special mode to send to syslog instead of file), and "
-#~ "\"android\" (special mode to send to android logging facility)."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", \"syslog\" (special mode to send to syslog instead of file), "
+#~ "and \"android\" (special mode to send to android logging facility)."
 #~ msgstr ""
-#~ "Specificeer het logboekformaat. Beschikbare opties zijn \"tekst"
-#~ "\" (standaard), \"html\", \"syslog\" (speciale modus om naar syslog te "
+#~ "Specificeer het logboekformaat. Beschikbare opties zijn \"tekst\" "
+#~ "(standaard), \"html\", \"syslog\" (speciale modus om naar syslog te "
 #~ "sturen i.p.v. naar bestand), en \"android\" (speciale modus om naar "
 #~ "android logging-faciliteit te zenden))."
 
@@ -33143,15 +33051,15 @@ msgstr "Mediabeheerlijst"
 #~ "voorafgegaan door een '+' of een '-' om het respectievelijk in of uit te "
 #~ "schakelen. Het sleutelwoord 'all' verwijst naar alle objecten. U kunt "
 #~ "verwijzen naar objecten met hun type of modulenaam. Regels voor benoemde "
-#~ "objecten gaan boven regels voor objecttypen. Merk op dat u nog steeds -"
-#~ "vvv moet gebruiken voor de eigenlijke weergave van debugmeldingen."
+#~ "objecten gaan boven regels voor objecttypen. Merk op dat u nog steeds "
+#~ "-vvv moet gebruiken voor de eigenlijke weergave van debugmeldingen."
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", and \"syslog\" (special mode to send to syslog instead of file."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", and \"syslog\" (special mode to send to syslog instead of file."
 #~ msgstr ""
-#~ "Specificeer het logboekformaat. Beschikbare opties zijn \"tekst"
-#~ "\" (standaard), \"html\" en \"syslog\" (speciale modus om naar syslog te "
+#~ "Specificeer het logboekformaat. Beschikbare opties zijn \"tekst\" "
+#~ "(standaard), \"html\" en \"syslog\" (speciale modus om naar syslog te "
 #~ "sturen i.p.v. naar bestand)."
 
 #~ msgid "Unique DBUS service id (org.mpris.vlc-<pid>)"
@@ -33159,8 +33067,8 @@ msgstr "Mediabeheerlijst"
 
 #~ msgid ""
 #~ "Use a unique dbus service id to identify this VLC instance on the DBUS "
-#~ "bus. The process identifier (PID) is added to the service name: org.mpris."
-#~ "vlc-<pid>"
+#~ "bus. The process identifier (PID) is added to the service name: "
+#~ "org.mpris.vlc-<pid>"
 #~ msgstr ""
 #~ "Gebruik een unieke dbus dienst-id om deze VLC-instantie te identificeren "
 #~ "op de DBUS-bus. De process-identificator (PID) wordt aan de service-naam "
@@ -33215,11 +33123,11 @@ msgstr "Mediabeheerlijst"
 #~ "Balkleur, een van \"red\" (rood), \"blue\" (blauw) en \"green\" (groen)."
 
 #~ msgid ""
-#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be"
-#~ "\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
+#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
+#~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
 #~ msgstr ""
-#~ "Selecteer een van \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le"
-#~ "\", \"u16_be\", \"s16_be\", \"fixed32\", \"float32\" of \"spdif\""
+#~ "Selecteer een van \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", "
+#~ "\"s16_le\", \"u16_be\", \"s16_be\", \"fixed32\", \"float32\" of \"spdif\""
 
 #~ msgid ""
 #~ "This defines the address, port and path the RTSP VOD server will listen "
@@ -34048,20 +33956,21 @@ msgstr "Mediabeheerlijst"
 #~ "</style></head><body style=\" font-family:'DejaVu Sans'; font-size:8pt; "
 #~ "font-weight:400; font-style:normal;\">\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.example.com/stream.avi</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.example.com/stream.avi</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtp://@:1234</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtp://@:1234</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></html>"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></"
+#~ "html>"
 #~ msgstr ""
 #~ "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/"
 #~ "REC-html40/strict.dtd\">\n"
@@ -34071,20 +33980,21 @@ msgstr "Mediabeheerlijst"
 #~ "</style></head><body style=\" font-family:'DejaVu Sans'; font-size:8pt; "
 #~ "font-weight:400; font-style:normal;\">\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.example.com/stream.avi</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.example.com/stream.avi</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtp://@:1234</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtp://@:1234</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></html>"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></"
+#~ "html>"
 
 #~ msgid "Use system codecs if available (better quality, but dangerous)"
 #~ msgstr ""
@@ -35302,10 +35212,10 @@ msgstr "Mediabeheerlijst"
 
 #, fuzzy
 #~ msgid ""
-#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title"
-#~ "\" ($a - $t). You can use the following substitutions: $a Artist, $b "
-#~ "Album, $c Copyright, $d Description, $e Encoder, $g Genre, $l Language, "
-#~ "$n number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
+#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title\" "
+#~ "($a - $t). You can use the following substitutions: $a Artist, $b Album, "
+#~ "$c Copyright, $d Description, $e Encoder, $g Genre, $l Language, $n "
+#~ "number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
 #~ "URL, $A Date, $B Bitrate, $C Chapter, $D Duration, $F URI, $I Video "
 #~ "Title, $L Time Remaining, $N Name, $O Audio language, $P Position, $R "
 #~ "Rate, $S Sample rate, $T Time elapsed, $U Publisher, $V Volume"
@@ -35408,8 +35318,8 @@ msgstr "Mediabeheerlijst"
 #, fuzzy
 #~ msgid ""
 #~ "Your video output acceleration driver does not support the required "
-#~ "resolution: %ux%u pixels. The maximum supported resolution is %<PRIu32>x"
-#~ "%<PRIu32>.\n"
+#~ "resolution: %ux%u pixels. The maximum supported resolution is "
+#~ "%<PRIu32>x%<PRIu32>.\n"
 #~ "Video output acceleration will be disabled. However, rendering videos "
 #~ "with overly large resolution may cause severe performance degration."
 #~ msgstr ""
@@ -39078,8 +38988,8 @@ msgstr "Mediabeheerlijst"
 #~ msgid ""
 #~ "Containers (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv)"
 #~ msgstr ""
-#~ "Containerbestanden (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *."
-#~ "flv *.webm)"
+#~ "Containerbestanden (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw "
+#~ "*.flv *.webm)"
 
 #, fuzzy
 #~ msgid "SessionManager"
@@ -40021,16 +39931,16 @@ msgstr "Mediabeheerlijst"
 
 #, fuzzy
 #~ msgid ""
-#~ "Name of the audio device to use. If you don't specify anything, \"/dev/dsp"
-#~ "\" will be used for OSS."
+#~ "Name of the audio device to use. If you don't specify anything, \"/dev/"
+#~ "dsp\" will be used for OSS."
 #~ msgstr ""
 #~ "Naam van het audio-apparaat dat door de DirectShow plugin gebruikt moet "
 #~ "worden. Als u niets opgeeft, zal het standaardapparaat gebruikt worden."
 
 #, fuzzy
 #~ msgid ""
-#~ "Name of the audio device to use. If you don't specify anything, \"/dev/dsp"
-#~ "\" will be used for OSS, \"hw\" for Alsa."
+#~ "Name of the audio device to use. If you don't specify anything, \"/dev/"
+#~ "dsp\" will be used for OSS, \"hw\" for Alsa."
 #~ msgstr ""
 #~ "Naam van het audio-apparaat dat door de DirectShow plugin gebruikt moet "
 #~ "worden. Als u niets opgeeft, zal het standaardapparaat gebruikt worden."

@@ -184,8 +184,8 @@ msgstr "Sarikata / OSD"
 msgid ""
 "Settings related to On-Screen-Display, subtitles and \"overlay subpictures\""
 msgstr ""
-"Tetapan berkaitan dengan Paparan-Atas-Skrin, sarikata dan \"lapisan subgambar"
-"\"."
+"Tetapan berkaitan dengan Paparan-Atas-Skrin, sarikata dan \"lapisan "
+"subgambar\"."
 
 #: include/vlc_config_cat.h:88
 #, fuzzy
@@ -579,27 +579,27 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>Selamat datang ke Bantuan pemain media "
@@ -608,27 +608,27 @@ msgstr ""
 "anda pengguna baharu pemain media VLC, sila baca dahulu<br><a href=\"http://"
 "wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Pengenalan pemain "
 "media VLC</em></a>.</p><p>Anda akan ketahui beberapa maklumat bagaimana "
-"hendak gunakan pemain di dalam dokumen <br>\"<a href=\"http://wiki.videolan."
-"org/Documentation:Play_HowTo\"><em>Bagaimana hendak memainkan fail dengan "
-"pemain media VLC media</em></a>\".</p><p>Untuk kerja-kerja penyimpanan, "
-"penukaran, pentranskodan, pengekodan, muxing, dan penstriman, anda boleh "
-"dapatkan maklumat yang berguna di dalam <a href=\"http://wiki.videolan.org/"
-"Documentation:Streaming_HowTo\">Dokumentasi Penstriman</a>.</p><p>JIka anda "
-"tidak pasti mengenai terminologi, sila rujuk <a href=\"http://wiki.videolan."
-"org/Knowledge_Base\">Asas pengetahuan</a>.</p><p>Untuk mengetahui pintasan "
-"papan kekunci utama, sila rujuk halaman <a href=\"http://wiki.videolan.org/"
-"Hotkeys\">pintasan</a>.</p><h3>Bantuan</h3><p>Sebelum menanya apa-jua "
-"persoalan, pastikan anda merujuk ke <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a> terlebih dahulu.</p><p>Anda juga boleh memberi "
-"bantuan (dan mendapatkan) bantuan menerusi <a href=\"http://forum.videolan."
-"org\">Forum</a>, the <a href=\"http://www.videolan.org/vlc/lists.html"
-"\">senarai-mel</a> atau saluran IRC kami (<em>#videolan</em> on irc.freenode."
-"net).</p><h3>Sumbangan kepada projek</h3><p>Anda boleh membantu projek "
-"VideoLAN dengan memberikan sedikit masa anda untuk membantu komuniti, mereka "
-"kulit, menterjemah dokumentasi, menguji dan membina kod. Anda juga dialu-"
-"alukan memberi sumbangan dalam bentuk wang dan bahan untuk membantu kami. "
-"Akhir sekali, semestinya anda boleh membuat <b>promosi</b> mengenai pemain "
-"media VLC ini.</p></body></html>"
+"hendak gunakan pemain di dalam dokumen <br>\"<a href=\"http://"
+"wiki.videolan.org/Documentation:Play_HowTo\"><em>Bagaimana hendak memainkan "
+"fail dengan pemain media VLC media</em></a>\".</p><p>Untuk kerja-kerja "
+"penyimpanan, penukaran, pentranskodan, pengekodan, muxing, dan penstriman, "
+"anda boleh dapatkan maklumat yang berguna di dalam <a href=\"http://"
+"wiki.videolan.org/Documentation:Streaming_HowTo\">Dokumentasi Penstriman</a>."
+"</p><p>JIka anda tidak pasti mengenai terminologi, sila rujuk <a "
+"href=\"http://wiki.videolan.org/Knowledge_Base\">Asas pengetahuan</a>.</"
+"p><p>Untuk mengetahui pintasan papan kekunci utama, sila rujuk halaman <a "
+"href=\"http://wiki.videolan.org/Hotkeys\">pintasan</a>.</p><h3>Bantuan</"
+"h3><p>Sebelum menanya apa-jua persoalan, pastikan anda merujuk ke <a "
+"href=\"http://www.videolan.org/support/faq.html\">FAQ</a> terlebih dahulu.</"
+"p><p>Anda juga boleh memberi bantuan (dan mendapatkan) bantuan menerusi <a "
+"href=\"http://forum.videolan.org\">Forum</a>, the <a href=\"http://"
+"www.videolan.org/vlc/lists.html\">senarai-mel</a> atau saluran IRC kami "
+"(<em>#videolan</em> on irc.freenode.net).</p><h3>Sumbangan kepada projek</"
+"h3><p>Anda boleh membantu projek VideoLAN dengan memberikan sedikit masa "
+"anda untuk membantu komuniti, mereka kulit, menterjemah dokumentasi, menguji "
+"dan membina kod. Anda juga dialu-alukan memberi sumbangan dalam bentuk wang "
+"dan bahan untuk membantu kami. Akhir sekali, semestinya anda boleh membuat "
+"<b>promosi</b> mengenai pemain media VLC ini.</p></body></html>"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -1570,8 +1570,8 @@ msgstr "Modul antaramuka tambahan"
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "Anda boleh pilih \"antaramuka tambahan\" VLC. Ianya akan dilancarkan pada "
 "latar sebagai tambahan kepada antaramuka lalai. Gunakan senarai diasingkan "
@@ -2356,8 +2356,8 @@ msgstr "Nisbah bidang sumber"
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "Ini akan memaksa nisbah bidang sumber. Sebagai contoh, terdapat DVD yang "
@@ -2926,10 +2926,10 @@ msgstr "Ubah tajuk berdasarkan media semasa"
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
 "Pilihan ini membolehkan anda tetapkan tajuk berdasarkan apa yang sedang "
 "dimanikan<br>$a: Artis<br>$b: Album<br>$c: hakcipta<br>$t: Tajuk<br>$g: "
@@ -2949,8 +2949,8 @@ msgid ""
 msgstr ""
 "Pilihan ini membenarkan anda mengubahsuai kelakuan subgambar subsistem. Anda "
 "boleh sebagai contoh bolehkan penapis subgambar (logo, dll.). Bolehkan "
-"tetapan ini di sini dan konfigurnya dalam seksyen modul \"penapis subgambar"
-"\". Anda boleh juga tetapkan perlbagai pilihan subgambar."
+"tetapan ini di sini dan konfigurnya dalam seksyen modul \"penapis "
+"subgambar\". Anda boleh juga tetapkan perlbagai pilihan subgambar."
 
 #: src/libvlc-module.c:709 modules/gui/qt/ui/sprefs_subtitles.h:305
 msgid "Force subtitle position"
@@ -7565,12 +7565,13 @@ msgstr "Proksi HTTP"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
-"Proksi HTTP untuk digunakan. Mestilah dalam bentuk http://[user@]myproxy."
-"mydomain:myport/ ; jika kosong, pembolehubah persekitaran http_proxy akan "
-"dicuba."
+"Proksi HTTP untuk digunakan. Mestilah dalam bentuk http://"
+"[user@]myproxy.mydomain:myport/ ; jika kosong, pembolehubah persekitaran "
+"http_proxy akan dicuba."
 
 #: modules/access/http.c:65
 msgid "HTTP proxy password"
@@ -8161,8 +8162,8 @@ msgstr "Tiada peranti Input Audio ditemui"
 
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "Mac anda tidak kelihatan dilengkapi dengan peranti input yang sesuai. Sila "
 "periksa penyambung dan pemacu anda."
@@ -8596,8 +8597,8 @@ msgstr "Pengesahan RTSP"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -9060,9 +9061,9 @@ msgstr "Kawalan pemacu v4lc"
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "Tetapkan kawalan pemacu v4l2kepada nilai spesifik menggunakan senarai "
 "dipisahkan koma opsyen yang dirangkumkan dengan penyangkut ikal (cth.: "
@@ -9460,13 +9461,13 @@ msgstr "Fail di mana vlc membaca key-uri dan keyfile-location"
 #: modules/access_output/livehttp.c:98
 #, fuzzy
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
-"fail dibaca ketika segmen dimulakan dan menganggap dalam format: key-uri"
-"\\nkey-file. Fail dibaca pada pembukaan segmen dan nilainya digunakan dalam "
-"segmen berkenaan."
+"fail dibaca ketika segmen dimulakan dan menganggap dalam format: key-"
+"uri\\nkey-file. Fail dibaca pada pembukaan segmen dan nilainya digunakan "
+"dalam segmen berkenaan."
 
 #: modules/access_output/livehttp.c:102
 msgid "Use randomized IV for encryption"
@@ -10963,7 +10964,6 @@ msgstr "Menyahkod"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "Pengenkodan"
 
@@ -10996,8 +10996,8 @@ msgid ""
 "Valid values range from 0 to 4 (0 disables all errors resilience)."
 msgstr ""
 "libavcodec boleh menyebabkan kebingkasan ralat.\n"
-"Disebabkan dengan pengekod berpepijat (seperti pengekod ISO MPEG-4 daripada M"
-"$) ia menghasilkan banyak ralat.\n"
+"Disebabkan dengan pengekod berpepijat (seperti pengekod ISO MPEG-4 daripada "
+"M$) ia menghasilkan banyak ralat.\n"
 "Julat nilai yang sah bermula dari 0 hingga 4 (0 lumpuhkan semua kebingkasan "
 "ralat)."
 
@@ -11513,11 +11513,11 @@ msgstr "Packetizer video Theora"
 msgid "Daala video encoder"
 msgstr "Pengekod video PNG"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "Format kroma"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr "Mengambil format kroma akan paksa penukaran video ke format tersebut"
@@ -11581,8 +11581,8 @@ msgstr "Posisi subgambar"
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 "Anda boleh paksa posisi subgambar pada video (0=tengah, 1=kiri, 2=kanan, "
 "4=atas, 8=bawah, anda juga boleh gunakan kombinasi nilai, cth. 6=atas-kanan)."
@@ -12357,10 +12357,10 @@ msgstr "Kawalan Kadar Ketepatan"
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
 "Toleransi dalam peratus kaedah 'avbr' (Average Variable BitRate atau Kadar "
 "Bit Pembolehubah Purata). (contohnya 10 dengan kadar bit 800 kpbs bermaksud "
@@ -12431,385 +12431,6 @@ msgstr "Packetizer video raw pseudo"
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "Pengekod video PNG"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "Kaedah kawalan kadar"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr "Kaedah yang digunakan untuk mengekod jujukan video"
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "Mod ambang hingar malar"
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "Mod kadar bit malar (CBR)"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "Mod Lengah Rendah"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "Mod Tak Hilang"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "Mod lambda malar"
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "Mod ralat malar"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "Mod jkualiti malar"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "Struktur GOP"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr "Struktur GOP yang digunakan untuk mengekod jujukan video"
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-"Tiada struktur gop tetap. Gambar boleh jadi intra atau inter dan rujuk ke "
-"gambar terdahulu atau akan datang."
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr "Jujukan I-frame sahaja"
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr "Gambar inter dirujuk ke gambar terdahulu sahaja"
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr "Gambar inter boleh dirujuk ke gambar terdahulu atau akan datang"
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "Faktor kualiti malar"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr "Faktor kualiti yang digunakan dalam mod kualiti malar"
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "Ambang Hingar"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr "Ambang hingar yang digunakan dalam mod ambang hingar malar"
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "Kadar bit CBR (kbps)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr "Kadar bit sasaran dalam kbps bila mengekod dalam mod kadar bit malar"
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "Kad bit maksimum (kbps)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "Kadar bit maksimum dalam kbps bila mengekod dalam mod kadar bit malar"
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "Kadar bit minimum (kbps)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "Kadar bit minimum dalam kbps bila mengekod dalam mod kadar bit malar"
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "Panjang GOP"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr ""
-"Bilangan gambar diantar pengepala jujukan yang berjaya iaitu panjang "
-"kumpulan gambar"
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "Pra tapisan"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "Bolehkan pra-penapisan adaptif"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "Tiada pra-penapisan"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr "Median Berat Tengah"
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "Penapis Laluan Rendah Gaussian"
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "Tambah Hingar"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "Penapis Laluan Rendah Mudah Suai Gaussian"
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "Penapis Laluan Rendah"
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "Amaun pra-penapisan"
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "Nilai lebih tinggi melaksanakan lebih pra-penapisan"
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "Mod pengkodan gambar"
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-"Pengkodan medan yang mana medan terjalin dikod secara berasingan sebagai "
-"berlawanan dengan bingkai pseudo-progresif"
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr "auto - biarkan pengekod tentukan berasaskan input (Terbaik)"
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr "paksa bingkai penkodan sebagai satu gambar"
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr "paksa bingkai pengkodan sebagai medan terjalin yang berasingan"
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr "Saiz blok pemampasan gerakan"
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr "automatik - biarkan pengekod tentukan berdasarkan input (Terbaik)"
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr "kecil - guna blok pemampasan gerakan kecil"
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr "sederhana - guna blok pemampasan gerakan sederhana"
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr "besar - guna blok pemampasan gerakan besar"
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr "Tindih blok pemampasan gerakan"
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr "tiada - Blok pemampasan gerakan tidak bertindan"
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr "separa - Blok pemampasan gerakan hanya separa bertindan"
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr "penuh - Blok pemampasan gerakan sepenuhnya bertindan"
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "Kepersisian Vektor Gerakan"
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "Kepersisan Vektor Gerakan dalam pel"
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "Tiga anggaran gerakan komponen"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "Guna kroma sebagai sebahagian dari proses anggaran gerakan"
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr "Penapis DWT gambar intra"
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr "Penapis DWT gambar inter"
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr "Bilangan iterasi DWT"
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr "Juga dikenali sebagai aras DWT"
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr "Benarkan pengkuantiti berbilang"
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr "Benarkan pengkuantiti berbilang per sub-jalur (satu per blok-kod)"
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr "Lumpuhkan pengkodan aritmatik"
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr ""
-"Guna kod panjang pembolehubah sebagai ganti, berguna untuk kadar bit sangat "
-"tinggi"
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "kaedah pemberatan perseptual"
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "jarak perseptual"
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr "jarak perseptual untu mengira berat perseptual"
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "Hirisan mengufuk per bingkai"
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr "Bilangan hirisan mengufuk per bingkai dalam mod lengah rendah"
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "Hirisan mengufuk per bingkai"
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr "Bilangan hirisan mengufuk per bingkai dalam mod lengah rendah"
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr "Saiz blok kod dalam setiap sub-jalur"
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr "kecil - guna blok kod kecil"
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr "sederhana - guna blok kod bersaiz sederhana"
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr "besar - guna blok kod besar"
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr "penuh - Satu blok kod per sub-jalur"
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr "Benarkan Anggaran Gerakan berhieraki"
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr "Bilangan aras persampelan-turun"
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr "Bilangan aras persampelan-turun dalam mod anggaran gerakan berhieraki"
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr "Benarkan Anggaran Gerakan Sejagat"
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr "Benarkan Anggaran Korelasi Fasa"
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr "Benarkan Pengesanan Ubah Adegan"
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "Paksa Profil"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr "Profil Lengah Rendah VC2"
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr "Profil Ringkas VC2"
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr "Profil Utama VC2"
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "Profil Utama"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr "Pengekod video Dirac menggunakan libschroedinger"
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr "Pengekod video Dirac menggunakan libschroedinger"
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -15520,14 +15141,6 @@ msgstr "Jika fail sedia wujud, ia tidak akan ditindih."
 msgid "File dumper"
 msgstr "Penghumban fail"
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "Nilai untuk laras dts"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "Demuxer video Dirac"
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -16596,18 +16209,18 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 "<p>Pemain media VLC adalah pemain media sumber terbuka, pengekod, dan "
-"penstrim yang dibina oleh sukarelawan komuniti <a href=\"http://www.videolan."
-"org/\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
-"span></a>.</p><p>VLC menggunakan kodeks dalamannya, berfungsi dalam setiap "
-"platform popular, dan dapat baca hampir kesemua fail, CD, DVD, strim "
-"rangkaian, kad tangkap dan lain-lain format media!</p><p><a href=\"http://"
-"www.videolan.org/contribute/\"><span style=\" text-decoration: underline; "
-"color:#0057ae;\">Beri bantuan dan sertai kami!</span></a>"
+"penstrim yang dibina oleh sukarelawan komuniti <a href=\"http://"
+"www.videolan.org/\"><span style=\" text-decoration: underline; color:#0057ae;"
+"\">VideoLAN</span></a>.</p><p>VLC menggunakan kodeks dalamannya, berfungsi "
+"dalam setiap platform popular, dan dapat baca hampir kesemua fail, CD, DVD, "
+"strim rangkaian, kad tangkap dan lain-lain format media!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"underline; color:#0057ae;\">Beri bantuan dan sertai kami!</span></a>"
 
 #: modules/gui/macosx/VLCAddonsWindowController.m:104
 #: modules/gui/macosx/VLCAddonsWindowController.m:355
@@ -16902,8 +16515,8 @@ msgstr "Input telah berubah"
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "Input telah berubah, tidak dapat menyimpan tanda buku. Gantung mainbalik "
 "dengan \"Henti seketika\" ketika mengedit tanda buku untuk pengekalkan input "
@@ -22661,8 +22274,8 @@ msgstr "Konfigurasi antaramuka Lua"
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 "Rentetan konfigurasi antaramuka Lua. Formatnya ialah: '[\"<interface module "
 "name>\"] = { <option> = <value>, ...}, ...'."
@@ -24113,10 +23726,6 @@ msgstr "Salin packetizer"
 #: modules/packetizer/copy.c:48
 msgid "Copy packetizer"
 msgstr "Salin packetizer"
-
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "Pempaket Dirac"
 
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
@@ -30130,6 +29739,307 @@ msgstr "AAAA; "
 msgid "Media Manager List"
 msgstr "Senarai Pengurus Media"
 
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4"
+
+#~ msgid "Rate control method"
+#~ msgstr "Kaedah kawalan kadar"
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr "Kaedah yang digunakan untuk mengekod jujukan video"
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "Mod ambang hingar malar"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "Mod kadar bit malar (CBR)"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "Mod Lengah Rendah"
+
+#~ msgid "Lossless mode"
+#~ msgstr "Mod Tak Hilang"
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "Mod lambda malar"
+
+#~ msgid "Constant error mode"
+#~ msgstr "Mod ralat malar"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "Mod jkualiti malar"
+
+#~ msgid "GOP structure"
+#~ msgstr "Struktur GOP"
+
+#~ msgid "GOP structure used to encode the video sequence"
+#~ msgstr "Struktur GOP yang digunakan untuk mengekod jujukan video"
+
+#~ msgid ""
+#~ "No fixed gop structure. A picture can be intra or inter and refer to "
+#~ "previous or future pictures."
+#~ msgstr ""
+#~ "Tiada struktur gop tetap. Gambar boleh jadi intra atau inter dan rujuk ke "
+#~ "gambar terdahulu atau akan datang."
+
+#~ msgid "I-frame only sequence"
+#~ msgstr "Jujukan I-frame sahaja"
+
+#~ msgid "Inter pictures refere to previous pictures only"
+#~ msgstr "Gambar inter dirujuk ke gambar terdahulu sahaja"
+
+#~ msgid "Inter pictures can refer to previous or future pictures"
+#~ msgstr "Gambar inter boleh dirujuk ke gambar terdahulu atau akan datang"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "Faktor kualiti malar"
+
+#~ msgid "Quality factor to use in constant quality mode"
+#~ msgstr "Faktor kualiti yang digunakan dalam mod kualiti malar"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "Ambang Hingar"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr "Ambang hingar yang digunakan dalam mod ambang hingar malar"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "Kadar bit CBR (kbps)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Kadar bit sasaran dalam kbps bila mengekod dalam mod kadar bit malar"
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "Kad bit maksimum (kbps)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Kadar bit maksimum dalam kbps bila mengekod dalam mod kadar bit malar"
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "Kadar bit minimum (kbps)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Kadar bit minimum dalam kbps bila mengekod dalam mod kadar bit malar"
+
+#~ msgid "GOP length"
+#~ msgstr "Panjang GOP"
+
+#~ msgid ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+#~ msgstr ""
+#~ "Bilangan gambar diantar pengepala jujukan yang berjaya iaitu panjang "
+#~ "kumpulan gambar"
+
+#~ msgid "Prefilter"
+#~ msgstr "Pra tapisan"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "Bolehkan pra-penapisan adaptif"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "Tiada pra-penapisan"
+
+#~ msgid "Centre Weighted Median"
+#~ msgstr "Median Berat Tengah"
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "Penapis Laluan Rendah Gaussian"
+
+#~ msgid "Add Noise"
+#~ msgstr "Tambah Hingar"
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "Penapis Laluan Rendah Mudah Suai Gaussian"
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "Penapis Laluan Rendah"
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "Amaun pra-penapisan"
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "Nilai lebih tinggi melaksanakan lebih pra-penapisan"
+
+#~ msgid "Picture coding mode"
+#~ msgstr "Mod pengkodan gambar"
+
+#~ msgid ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+#~ msgstr ""
+#~ "Pengkodan medan yang mana medan terjalin dikod secara berasingan sebagai "
+#~ "berlawanan dengan bingkai pseudo-progresif"
+
+#~ msgid "auto - let encoder decide based upon input (Best)"
+#~ msgstr "auto - biarkan pengekod tentukan berasaskan input (Terbaik)"
+
+#~ msgid "force coding frame as single picture"
+#~ msgstr "paksa bingkai penkodan sebagai satu gambar"
+
+#~ msgid "force coding frame as separate interlaced fields"
+#~ msgstr "paksa bingkai pengkodan sebagai medan terjalin yang berasingan"
+
+#~ msgid "Size of motion compensation blocks"
+#~ msgstr "Saiz blok pemampasan gerakan"
+
+#~ msgid "automatic - let encoder decide based upon input (Best)"
+#~ msgstr "automatik - biarkan pengekod tentukan berdasarkan input (Terbaik)"
+
+#~ msgid "small - use small motion compensation blocks"
+#~ msgstr "kecil - guna blok pemampasan gerakan kecil"
+
+#~ msgid "medium - use medium motion compensation blocks"
+#~ msgstr "sederhana - guna blok pemampasan gerakan sederhana"
+
+#~ msgid "large - use large motion compensation blocks"
+#~ msgstr "besar - guna blok pemampasan gerakan besar"
+
+#~ msgid "Overlap of motion compensation blocks"
+#~ msgstr "Tindih blok pemampasan gerakan"
+
+#~ msgid "none - Motion compensation blocks do not overlap"
+#~ msgstr "tiada - Blok pemampasan gerakan tidak bertindan"
+
+#~ msgid "partial - Motion compensation blocks only partially overlap"
+#~ msgstr "separa - Blok pemampasan gerakan hanya separa bertindan"
+
+#~ msgid "full - Motion compensation blocks fully overlap"
+#~ msgstr "penuh - Blok pemampasan gerakan sepenuhnya bertindan"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "Kepersisian Vektor Gerakan"
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "Kepersisan Vektor Gerakan dalam pel"
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "Tiga anggaran gerakan komponen"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "Guna kroma sebagai sebahagian dari proses anggaran gerakan"
+
+#~ msgid "Intra picture DWT filter"
+#~ msgstr "Penapis DWT gambar intra"
+
+#~ msgid "Inter picture DWT filter"
+#~ msgstr "Penapis DWT gambar inter"
+
+#~ msgid "Number of DWT iterations"
+#~ msgstr "Bilangan iterasi DWT"
+
+#~ msgid "Also known as DWT levels"
+#~ msgstr "Juga dikenali sebagai aras DWT"
+
+#~ msgid "Enable multiple quantizers"
+#~ msgstr "Benarkan pengkuantiti berbilang"
+
+#~ msgid "Enable multiple quantizers per subband (one per codeblock)"
+#~ msgstr "Benarkan pengkuantiti berbilang per sub-jalur (satu per blok-kod)"
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr "Lumpuhkan pengkodan aritmatik"
+
+#~ msgid "Use variable length codes instead, useful for very high bitrates"
+#~ msgstr ""
+#~ "Guna kod panjang pembolehubah sebagai ganti, berguna untuk kadar bit "
+#~ "sangat tinggi"
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "kaedah pemberatan perseptual"
+
+#~ msgid "perceptual distance"
+#~ msgstr "jarak perseptual"
+
+#~ msgid "perceptual distance to calculate perceptual weight"
+#~ msgstr "jarak perseptual untu mengira berat perseptual"
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "Hirisan mengufuk per bingkai"
+
+#~ msgid "Number of horizontal slices per frame in low delay mode"
+#~ msgstr "Bilangan hirisan mengufuk per bingkai dalam mod lengah rendah"
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "Hirisan mengufuk per bingkai"
+
+#~ msgid "Number of vertical slices per frame in low delay mode"
+#~ msgstr "Bilangan hirisan mengufuk per bingkai dalam mod lengah rendah"
+
+#~ msgid "Size of code blocks in each subband"
+#~ msgstr "Saiz blok kod dalam setiap sub-jalur"
+
+#~ msgid "small - use small code blocks"
+#~ msgstr "kecil - guna blok kod kecil"
+
+#~ msgid "medium - use medium sized code blocks"
+#~ msgstr "sederhana - guna blok kod bersaiz sederhana"
+
+#~ msgid "large - use large code blocks"
+#~ msgstr "besar - guna blok kod besar"
+
+#~ msgid "full - One code block per subband"
+#~ msgstr "penuh - Satu blok kod per sub-jalur"
+
+#~ msgid "Enable hierarchical Motion Estimation"
+#~ msgstr "Benarkan Anggaran Gerakan berhieraki"
+
+#~ msgid "Number of levels of downsampling"
+#~ msgstr "Bilangan aras persampelan-turun"
+
+#~ msgid ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+#~ msgstr ""
+#~ "Bilangan aras persampelan-turun dalam mod anggaran gerakan berhieraki"
+
+#~ msgid "Enable Global Motion Estimation"
+#~ msgstr "Benarkan Anggaran Gerakan Sejagat"
+
+#~ msgid "Enable Phase Correlation Estimation"
+#~ msgstr "Benarkan Anggaran Korelasi Fasa"
+
+#~ msgid "Enable Scene Change Detection"
+#~ msgstr "Benarkan Pengesanan Ubah Adegan"
+
+#~ msgid "Force Profile"
+#~ msgstr "Paksa Profil"
+
+#~ msgid "VC2 Low Delay Profile"
+#~ msgstr "Profil Lengah Rendah VC2"
+
+#~ msgid "VC2 Simple Profile"
+#~ msgstr "Profil Ringkas VC2"
+
+#~ msgid "VC2 Main Profile"
+#~ msgstr "Profil Utama VC2"
+
+#~ msgid "Main Profile"
+#~ msgstr "Profil Utama"
+
+#~ msgid "Dirac video decoder using libschroedinger"
+#~ msgstr "Pengekod video Dirac menggunakan libschroedinger"
+
+#~ msgid "Dirac video encoder using libschroedinger"
+#~ msgstr "Pengekod video Dirac menggunakan libschroedinger"
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "Nilai untuk laras dts"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "Demuxer video Dirac"
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "Pempaket Dirac"
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr "Fail fon bunyi yang diperlukan untuk sintesis perisian."
@@ -30339,13 +30249,13 @@ msgstr "Senarai Pengurus Media"
 #~ msgstr "Kata laluan RTSP"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
-#~ "Proksi HTTP digunakan mestilah dalam bentuk http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; jika cuti, pembolehubah persekitaran http_proxy akan "
-#~ "dicuba."
+#~ "Proksi HTTP digunakan mestilah dalam bentuk http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; jika cuti, pembolehubah "
+#~ "persekitaran http_proxy akan dicuba."
 
 #~ msgid "VLC could not open the file \"%s\": %s"
 #~ msgstr "VLC tidak dapat buka fail \"%s\": %s"
@@ -32310,8 +32220,8 @@ msgstr "Senarai Pengurus Media"
 #~ msgid ""
 #~ "Force the subtiles format. Valid values are : \"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
 #~ "autodetection, this should always work)."
 #~ msgstr ""
 #~ "Paksa format sarikata. Nilai sah adalah : \"microdvd\", \"subrip\",  "
@@ -32374,14 +32284,14 @@ msgstr "Senarai Pengurus Media"
 #~ "Specify the log format. Available choices are \"text\" (default) and "
 #~ "\"html\"."
 #~ msgstr ""
-#~ "Tentukan format log. Pilihan yang ada adalah \"teks\" (lalai) dan \"html"
-#~ "\"."
+#~ "Tentukan format log. Pilihan yang ada adalah \"teks\" (lalai) dan "
+#~ "\"html\"."
 
 #, fuzzy
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", \"syslog\" (special mode to send to syslog instead of file), and "
-#~ "\"android\" (special mode to send to android logging facility)."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", \"syslog\" (special mode to send to syslog instead of file), "
+#~ "and \"android\" (special mode to send to android logging facility)."
 #~ msgstr ""
 #~ "Tentukan format log. Pilihan yang ada adalah \"teks\" (lalai), \"html\", "
 #~ "dan \"syslog\" (mod khas untuk menghantar ke syslog selain fail."
@@ -32392,8 +32302,8 @@ msgstr "Senarai Pengurus Media"
 #~ "choices are \"user\" (default), \"daemon\", and \"local0\" through "
 #~ "\"local7\"."
 #~ msgstr ""
-#~ "Tentukan format log. Pilihan yang ada adalah \"teks\" (lalai) dan \"html"
-#~ "\"."
+#~ "Tentukan format log. Pilihan yang ada adalah \"teks\" (lalai) dan "
+#~ "\"html\"."
 
 #~ msgid "libc memcpy"
 #~ msgstr "libc memcpy"
@@ -32506,8 +32416,8 @@ msgstr "Senarai Pengurus Media"
 #~ msgstr "00000; "
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", and \"syslog\" (special mode to send to syslog instead of file."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", and \"syslog\" (special mode to send to syslog instead of file."
 #~ msgstr ""
 #~ "Tentukan format log. Pilihan yang ada adalah \"teks\" (lalai), \"html\", "
 #~ "dan \"syslog\" (mod khas untuk menghantar ke syslog selain fail."
@@ -32528,8 +32438,8 @@ msgstr "Senarai Pengurus Media"
 #~ msgstr "Adjust"
 
 #~ msgid ""
-#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be"
-#~ "\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
+#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
+#~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
 #~ msgstr ""
 #~ "Salah satu dari \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
 #~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" atau \"spdif\""
@@ -35089,10 +34999,10 @@ msgstr "Senarai Pengurus Media"
 
 #, fuzzy
 #~ msgid ""
-#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title"
-#~ "\" ($a - $t). You can use the following substitutions: $a Artist, $b "
-#~ "Album, $c Copyright, $d Description, $e Encoder, $g Genre, $l Language, "
-#~ "$n number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
+#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title\" "
+#~ "($a - $t). You can use the following substitutions: $a Artist, $b Album, "
+#~ "$c Copyright, $d Description, $e Encoder, $g Genre, $l Language, $n "
+#~ "number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
 #~ "URL, $A Date, $B Bitrate, $C Chapter, $D Duration, $F URI, $I Video "
 #~ "Title, $L Time Remaining, $N Name, $O Audio language, $P Position, $R "
 #~ "Rate, $S Sample rate, $T Time elapsed, $U Publisher, $V Volume"
@@ -39263,16 +39173,16 @@ msgstr "Senarai Pengurus Media"
 
 #, fuzzy
 #~ msgid ""
-#~ "Name of the audio device to use. If you don't specify anything, \"/dev/dsp"
-#~ "\" will be used for OSS."
+#~ "Name of the audio device to use. If you don't specify anything, \"/dev/"
+#~ "dsp\" will be used for OSS."
 #~ msgstr ""
 #~ "Nama peranti video yang akan digunakan oleh pemalam DirectShow. Jika anda "
 #~ "tidak menentukan apa-apa, peranti lalai akan digunakan. "
 
 #, fuzzy
 #~ msgid ""
-#~ "Name of the audio device to use. If you don't specify anything, \"/dev/dsp"
-#~ "\" will be used for OSS, \"hw\" for Alsa."
+#~ "Name of the audio device to use. If you don't specify anything, \"/dev/"
+#~ "dsp\" will be used for OSS, \"hw\" for Alsa."
 #~ msgstr ""
 #~ "Nama peranti video yang akan digunakan oleh pemalam DirectShow. Jika anda "
 #~ "tidak menentukan apa-apa, peranti lalai akan digunakan. "
@@ -41012,8 +40922,8 @@ msgstr "Senarai Pengurus Media"
 
 #, fuzzy
 #~ msgid ""
-#~ "Distort mode, one of \"wave\", \"ripple\", \"gradient\", \"edge\", \"hough"
-#~ "\" and \"psychedelic\"."
+#~ "Distort mode, one of \"wave\", \"ripple\", \"gradient\", \"edge\", "
+#~ "\"hough\" and \"psychedelic\"."
 #~ msgstr "Mod herotan, salah satu dari \"curam\", \"bucu\"dan \"hough\"."
 
 #, fuzzy

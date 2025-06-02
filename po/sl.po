@@ -23,8 +23,8 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=4; plural=(n%100==1 ? 0 : n%100==2 ? 1 : n%100==3 || n"
-"%100==4 ? 2 : 3);\n"
+"Plural-Forms: nplurals=4; plural=(n%100==1 ? 0 : n%100==2 ? 1 : n%100==3 || "
+"n%100==4 ? 2 : 3);\n"
 
 #: include/vlc_common.h:1040
 msgid ""
@@ -585,54 +585,55 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>Strani pomoči za predvajalnik VLC</"
 "h2><h3>Dokumentacija</h3><p>Dokumentacija predvajalnika VLC je na voljo na "
 "spletišču <a href=\"http://wiki.videolan.org\">VideoLAN Wiki</a>.</"
 "p><p>Začetnikom priporočamo, da pred uporabo predvajalnika preberejo "
-"poglavje <br><a href=\"http://wiki.videolan.org/Documentation:VLC_for_dummies"
-"\"><em>Uvod v predvajalnik VLC</em></a>.</p><p>Podrobnosti o načinu uporabe "
-"predvajalnika so zavedene v poglavju <br>\"<a href=\"http://wiki.videolan."
-"org/Documentation:Play_HowTo\"><em>Kako predvajati datoteke v predvajalniku "
-"VLC?</em></a>\".</p><p>Za shranjevanje, pretvarjanje, kodiranje, "
-"preoblikovanje, zvijanje in pretakanje si je dobro prebrati <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Dokumentacijo pretakanja</"
-"a>.</p><p>Terminološki opisi in tehnično izrazoslovje je zbrano v <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">zbirki znanja</a>.</"
-"p><p>Tipkovne bližnjice so zbrane na strani <a href=\"http://wiki.videolan."
-"org/Hotkeys\">tipkovnih povezav</a>.</p><h3>Pomoč</h3><p>Pred zastavljanjem "
-"vprašanj si najprej preberite <a href=\"http://www.videolan.org/support/faq."
-"html\">z najpogosteje zastavljena vprašanja (FAQ)</a>.</p><p>Pomoč lahko "
-"poiščete tudi na <a href=\"http://forum.videolan.org\">forumih</a>, na <a "
-"href=\"http://www.videolan.org/vlc/lists.html\">poštnem seznamu</a> ali "
-"preko kanala IRC (<em>#videolan</em> na irc.freenode.net).</p><h3>Podpora "
-"projektu</h3><p>Projektu lahko pomagate na različne načine; s "
-"programiranjem, oblikovanjem, prevajanjem, pisanjem dokumentacije, "
-"preverjanjem delovanja in drugo. Pomagate lahko tudi finančno in materialno. "
-"Vsekakor pa vedno lahko <b>širite</b> dobro besedo o predvajalniku VLC.</p></"
-"body></html>"
+"poglavje <br><a href=\"http://wiki.videolan.org/"
+"Documentation:VLC_for_dummies\"><em>Uvod v predvajalnik VLC</em></a>.</"
+"p><p>Podrobnosti o načinu uporabe predvajalnika so zavedene v poglavju "
+"<br>\"<a href=\"http://wiki.videolan.org/Documentation:Play_HowTo\"><em>Kako "
+"predvajati datoteke v predvajalniku VLC?</em></a>\".</p><p>Za shranjevanje, "
+"pretvarjanje, kodiranje, preoblikovanje, zvijanje in pretakanje si je dobro "
+"prebrati <a href=\"http://wiki.videolan.org/"
+"Documentation:Streaming_HowTo\">Dokumentacijo pretakanja</a>.</"
+"p><p>Terminološki opisi in tehnično izrazoslovje je zbrano v <a "
+"href=\"http://wiki.videolan.org/Knowledge_Base\">zbirki znanja</a>.</"
+"p><p>Tipkovne bližnjice so zbrane na strani <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">tipkovnih povezav</a>.</p><h3>Pomoč</h3><p>Pred "
+"zastavljanjem vprašanj si najprej preberite <a href=\"http://"
+"www.videolan.org/support/faq.html\">z najpogosteje zastavljena vprašanja "
+"(FAQ)</a>.</p><p>Pomoč lahko poiščete tudi na <a href=\"http://"
+"forum.videolan.org\">forumih</a>, na <a href=\"http://www.videolan.org/vlc/"
+"lists.html\">poštnem seznamu</a> ali preko kanala IRC (<em>#videolan</em> na "
+"irc.freenode.net).</p><h3>Podpora projektu</h3><p>Projektu lahko pomagate na "
+"različne načine; s programiranjem, oblikovanjem, prevajanjem, pisanjem "
+"dokumentacije, preverjanjem delovanja in drugo. Pomagate lahko tudi finančno "
+"in materialno. Vsekakor pa vedno lahko <b>širite</b> dobro besedo o "
+"predvajalniku VLC.</p></body></html>"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -1579,8 +1580,8 @@ msgstr "Dodatni moduli vmesnika"
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "Predvajalnik VLC omogoča razširitev vmesnika z »dodatnimi vstavki«, ki se "
 "zaženejo v ozadju, pokažejo pa se v glavnem vmesniku. Vstavke je mogoče "
@@ -2368,8 +2369,8 @@ msgstr "Izvorno razmerje velikosti"
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "Izbira določa vsiljeno razmerje velikosti slike. Nekateri pogoni DVD "
@@ -2940,10 +2941,10 @@ msgstr "Spremeni naslov glede na trenutno predstavno vsebino"
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
 "Možnost omogoča nastavitev naslova okna glede na predvajano vsebino. Možne "
 "kode so:<br>$a: Izvajalec<br>$b: Album<br>$c: Avtorske pravice<br>$t: "
@@ -7603,12 +7604,13 @@ msgstr "Posredniški strežnik HTTP"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
-"Določitev posredniškega strežnika HTTP v obliki http://[uporabnik]@]mojproxy."
-"mojadomena:moja vrata/ . V primeru, da vrednost ni navedena bo uporabljena "
-"sistemska nastavitev."
+"Določitev posredniškega strežnika HTTP v obliki http://"
+"[uporabnik]@]mojproxy.mojadomena:moja vrata/ . V primeru, da vrednost ni "
+"navedena bo uporabljena sistemska nastavitev."
 
 #: modules/access/http.c:65
 msgid "HTTP proxy password"
@@ -8192,8 +8194,8 @@ msgstr "Ni mogoče najti dovodne naprave"
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 #, fuzzy
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "Računalnik Mac najbrž ni opremljen z ustrezno dovodno napravo. Preverite "
 "povezave in gonilnike."
@@ -8628,8 +8630,8 @@ msgstr "RTSP overitev"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -9092,14 +9094,14 @@ msgstr "v4l2 tipkovne bližnjice gonilnika"
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "Določilo v4l2 možnosti gonilnika z vrednostmi ločenih z vejico zapisanih v "
-"seznamu z zavitimi oklepaji (primer: {video_bitrate=6000000,audio_crc=0,"
-"stream_type=3} ). Za izpis možnosti, ki so na voljo, uporabite (-vvv) ali pa "
-"v4l2-ctl program."
+"seznamu z zavitimi oklepaji (primer: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). Za izpis možnosti, ki "
+"so na voljo, uporabite (-vvv) ali pa v4l2-ctl program."
 
 #: modules/access/v4l2/v4l2.c:242 modules/codec/avcodec/avcodec.c:50
 #: modules/codec/avcodec/avcodec.c:54 modules/codec/x264.c:435
@@ -9494,9 +9496,9 @@ msgstr "Datoteka, iz katere program prebere naslov URI ključa"
 #: modules/access_output/livehttp.c:98
 #, fuzzy
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
 "Datoteka se prebere ob začetku odseka in se domneva, daje v obliki "
 "uri_ključa/datoteka_nkey. Datoteka se prebere od odpiranju odseka in "
@@ -10991,7 +10993,6 @@ msgstr "Odkodiranje"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "Kodiranje"
 
@@ -11534,11 +11535,11 @@ msgstr "Paketnik slike Theora"
 msgid "Daala video encoder"
 msgstr "Kodirnik slike Theora"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "Oblika barv"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr "Z izborom zapisa barv se vsili tudi zapis slikovnega posnetka."
@@ -11602,8 +11603,8 @@ msgstr "Položaj nalepke na zaslonu"
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 "Določiti je mogoče lego nalepk na sliki. (0=sredina, 1=levo, 2=desno, "
 "4=zgoraj, 8=spodaj, vrednosti je mogoče seštevati, npr: 6=zgoraj desno)."
@@ -12376,10 +12377,10 @@ msgstr "Natančnost nadzora hitrosti"
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
 "Odstopanje v odstotkih metode 'avbr' (Average Variable BitRate) (npr. 10 z "
 "bitno hitrostjo 800 kb/s pomeni, da kodirnik poskuša ohraniti hitrost med "
@@ -12450,389 +12451,6 @@ msgstr "Pseudo raw slikovni paketnik"
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "Kodirnik slike Theora"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "Metoda nadzora hitrosti"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr "Metoda, ki se uporablja za kodiranje zaporedja sličic"
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "Način praga stalnega šuma"
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "Način stalne bitne hitrosti (CBR)"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "Način z majhnim zamikom"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "Način brez izgub"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "Stalni način lambda"
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "Način stalnih napak"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "Način stalne kakovosti"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "GOP struktura"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr "Zgradba GOP, ki se uporablja za kodiranja zaporedja sličic"
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-"Brez stalne zgradbe skupine sličic. Slika je lahko intra ali inter in se "
-"sklicuje na prejšnje ali prihodnje slike."
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr "Zaporedje samo sličic I"
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr "Slike inter se sklicujejo samo na prejšnje slike"
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr "Slike inter se sklicujejo na prejšnje in prihodnje slike"
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "Vrednost stalne kakovosti"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr "Faktor kakovosti, ki se uporablja v načinu stalne kakovosti"
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "Prag šuma"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr "Prag šuma uporabljen za način neprekinjenega praga šuma"
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "Bitna hitrost CBR (kbps)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"Ciljna bitna hitrost v kb/s med kodiranjem v načinu konstantne bitne hitrosti"
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "Maksimalna bitna hitrost (kb/s)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"Maksimalna bitna hitrost v kb/s med kodiranjem v načinu konstantne bitne "
-"hitrosti"
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "Najmanjša bitna hitrost (kb/s)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"Najmanjša sprejemljiva bitna hitrost v kb/s med kodiranjem v načinu "
-"konstantne bitne hitrosti"
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "GOP dolžina"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr ""
-"Število sličic med zaporednimi glavami zaporedja - dolžina skupine sličic"
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "Predfilter"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "Omogoči prilagodljivo predfiltriranje"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "Brez predfiltriranja"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr "Mediano sredinjenje"
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "Gaussov nizkopropustni filter"
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "Dodaj šum"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "Gaussov prilagodljivi nizkopropustni filter"
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "Nizkopropustni filter"
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "Količina predfiltriranja"
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "Večja vrednost določa več predfiltriranja"
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "Način kodiranja slike"
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-"Pri kodiranju polja se prepletena polja kodirajo posebej v nasprotju s "
-"psevdo progresivnimi sličicami"
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr "samodejno - kodirnik določa glede na najbolji dovod (priporočeno)"
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr "vsili kodiranje sličice kot samostojne slike"
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr "vsili sličico za kodiranje kot ločena prepletena polja"
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr "Velikost blokov poravnave gibanja"
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr "samodejno - kodirnik določi glede na vhod (najboljše)"
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr "majhna - uporaba majhnih blokov poravnave gibanja"
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr "srednja - uporaba srednjih blokov poravnave gibanja"
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr "velika - uporaba velikih blokov poravnave gibanja"
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr "Prekrivanje blokov poravnave gibanja"
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr "brez - bloki poravnave gibanja se ne prekrivajo"
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr "delno - bloki poravnave gibanja se delno prekrivajo"
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr "popolno - bloki poravnave gibanja se popolnoma prekrivajo"
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "Natančnost vektorja gibanja"
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "Natančnost vektorja gibanja v sl. točkah"
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "Tridelno predvidevanje gibanja"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "Uporabi barve v postopku predvidevanja gibanja"
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr "Filtri Intra picture DWT"
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr "Filtri Inter picture DWT"
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr "Število DWT ponovitev"
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr "Znane kot DWT ravni"
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr "Omogoči več delilnikov"
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr "Omogoči več delilnikov na pasovno širino (en delilnik na kodni blok)"
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr "Onemogoči aritmetično kodiranje"
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr ""
-"Uporaba spremenljive dolžine kode, uporabna pri visokih bitnih hitrostih"
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "način zaznanega tehtanja"
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "zaznana oddaljenost"
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr "zaznana oddaljenost za računanje zaznane teže"
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "vodoravnih rezin na sličico"
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr "Število vodoravnih rezin na sličico v načinu nizke zakasnitve"
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "navpičnih rezin na sličico"
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr "Število navpičnih rezin na sličico v načinu nizke zakasnitve"
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr "Velikost blokov kode v vsakem podpasu"
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr "majhna - uporaba majhnih blokov kode"
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr "srednja - uporaba srednjih blokov kode"
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr "velika - uporaba velikih blokov kode"
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr "popolna - en blok kode na podpas"
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr "Omogoči predvidevanje hierarhičnega gibanja"
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr "Število ravni podvzorčenja"
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr ""
-"Število ravni vzorčenja navzdol v načinu ocenjevanja hierarhičnega gibanja"
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr "Omogoči oceno splošnega gibanja"
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr "Omogoči oceno soodnosa faze"
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr "Omogoči zaznavanje spremembe prizora"
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "Vsili profil"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr "Prifil nizke nazaksnitve VC2"
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr "Preprost profil VC2"
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr "Glavni profil VC2"
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "Glavni profil"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr "Odkodirnik slike Dirac (libschroedinger)"
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr "Kodirnik slike Dirac (libschroedinger)"
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -15554,14 +15172,6 @@ msgstr "Če datoteka že obstaja, ne bo prepisana."
 msgid "File dumper"
 msgstr "Odlaganje datotek"
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "Vrednost za prilagajanje DTS"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "Odvijalnik slike Dirac"
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -16633,13 +16243,13 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 "<p>Predvajalnik VLC je brezplačen odprtokodni predvajalnik, kodirnik in "
-"orodje za pretakanje, ki so ga ustvarili prostovoljci skupnosti <a href="
-"\"http://www.videolan.org/\"><span style=\" text-decoration: underline; "
+"orodje za pretakanje, ki so ga ustvarili prostovoljci skupnosti <a "
+"href=\"http://www.videolan.org/\"><span style=\" text-decoration: underline; "
 "color:#0057ae;\">VideoLAN</span></a>.</p><p>Predvajalnik uporablja lastne "
 "kodeke, deluje pravzaprav v vsakem sistemskem okolju in predvaja skoraj vse "
 "zapise predstavnih datotek, vsebino nosilcev CD in DVD, omrežne pretoke, "
@@ -16941,8 +16551,8 @@ msgstr "Dovod je spremenjen"
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "Vnos je spremenjen, zato ni mogoče shraniti zaznamkov. Začasno ustavite "
 "predvajanje s »Premorom« med urejanjem zaznamkov, da se ohrani vnos."
@@ -22114,8 +21724,8 @@ msgstr "Shrani seznam predvajanja"
 #, fuzzy
 msgid "XSPF playlist |*.xspf|M3U file |*.m3u|HTML playlist |*.html"
 msgstr ""
-"Seznam predvajanja XSPF|*.xspf|datoteka M3U|*.m3u|seznam predvajanja HTML|*."
-"html"
+"Seznam predvajanja XSPF|*.xspf|datoteka M3U|*.m3u|seznam predvajanja HTML|"
+"*.html"
 
 #: modules/gui/skins2/src/skin_main.cpp:484
 msgid "Skin to use"
@@ -22715,8 +22325,8 @@ msgstr "Nastavitev vmesnika Lua"
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 "Niz nastavitve vmesnika Lua. Oblika je: '[\"<ime enote vmesnika>\"] = "
 "{ <možnost> = <vrednost>, ...}, ...'."
@@ -22765,8 +22375,8 @@ msgid ""
 msgstr ""
 "Nastavitev omogoči prejem ukazov prek ukazne vrstice. Privzeto je to "
 "standardni vhod konzole (\"*console\"), vendar pa je to lahko tudi običajni "
-"vtič TCP (\"localhost:4212\") oziroma uporaba protokola telnet "
-"(\"telnet://0.0.0.0:4212\")"
+"vtič TCP (\"localhost:4212\") oziroma uporaba protokola telnet (\"telnet://"
+"0.0.0.0:4212\")"
 
 #: modules/lua/vlc.c:85
 msgid "Lua"
@@ -24163,10 +23773,6 @@ msgstr "Paketnik kopiranja"
 #: modules/packetizer/copy.c:48
 msgid "Copy packetizer"
 msgstr "Paketnik kopiranja"
-
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "Paketnik Dirac"
 
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
@@ -27773,8 +27379,8 @@ msgid ""
 "Prefix of the output images filenames. Output filenames will have the "
 "\"prefixNUMBER.format\" form if replace is not true."
 msgstr ""
-"Predpona imena datoteke slik. Ime slike bo imelo obliko »predponaŠTEVILKA."
-"zapis«, če ni omogočena možnost prepisovanja."
+"Predpona imena datoteke slik. Ime slike bo imelo obliko "
+"»predponaŠTEVILKA.zapis«, če ni omogočena možnost prepisovanja."
 
 #: modules/video_filter/scene.c:81
 msgid "Directory path prefix"
@@ -30200,6 +29806,309 @@ msgstr "AAAA; "
 msgid "Media Manager List"
 msgstr "Seznam upravljalnika predstavnih datotek"
 
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4"
+
+#~ msgid "Rate control method"
+#~ msgstr "Metoda nadzora hitrosti"
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr "Metoda, ki se uporablja za kodiranje zaporedja sličic"
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "Način praga stalnega šuma"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "Način stalne bitne hitrosti (CBR)"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "Način z majhnim zamikom"
+
+#~ msgid "Lossless mode"
+#~ msgstr "Način brez izgub"
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "Stalni način lambda"
+
+#~ msgid "Constant error mode"
+#~ msgstr "Način stalnih napak"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "Način stalne kakovosti"
+
+#~ msgid "GOP structure"
+#~ msgstr "GOP struktura"
+
+#~ msgid "GOP structure used to encode the video sequence"
+#~ msgstr "Zgradba GOP, ki se uporablja za kodiranja zaporedja sličic"
+
+#~ msgid ""
+#~ "No fixed gop structure. A picture can be intra or inter and refer to "
+#~ "previous or future pictures."
+#~ msgstr ""
+#~ "Brez stalne zgradbe skupine sličic. Slika je lahko intra ali inter in se "
+#~ "sklicuje na prejšnje ali prihodnje slike."
+
+#~ msgid "I-frame only sequence"
+#~ msgstr "Zaporedje samo sličic I"
+
+#~ msgid "Inter pictures refere to previous pictures only"
+#~ msgstr "Slike inter se sklicujejo samo na prejšnje slike"
+
+#~ msgid "Inter pictures can refer to previous or future pictures"
+#~ msgstr "Slike inter se sklicujejo na prejšnje in prihodnje slike"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "Vrednost stalne kakovosti"
+
+#~ msgid "Quality factor to use in constant quality mode"
+#~ msgstr "Faktor kakovosti, ki se uporablja v načinu stalne kakovosti"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "Prag šuma"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr "Prag šuma uporabljen za način neprekinjenega praga šuma"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "Bitna hitrost CBR (kbps)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Ciljna bitna hitrost v kb/s med kodiranjem v načinu konstantne bitne "
+#~ "hitrosti"
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "Maksimalna bitna hitrost (kb/s)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Maksimalna bitna hitrost v kb/s med kodiranjem v načinu konstantne bitne "
+#~ "hitrosti"
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "Najmanjša bitna hitrost (kb/s)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Najmanjša sprejemljiva bitna hitrost v kb/s med kodiranjem v načinu "
+#~ "konstantne bitne hitrosti"
+
+#~ msgid "GOP length"
+#~ msgstr "GOP dolžina"
+
+#~ msgid ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+#~ msgstr ""
+#~ "Število sličic med zaporednimi glavami zaporedja - dolžina skupine sličic"
+
+#~ msgid "Prefilter"
+#~ msgstr "Predfilter"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "Omogoči prilagodljivo predfiltriranje"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "Brez predfiltriranja"
+
+#~ msgid "Centre Weighted Median"
+#~ msgstr "Mediano sredinjenje"
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "Gaussov nizkopropustni filter"
+
+#~ msgid "Add Noise"
+#~ msgstr "Dodaj šum"
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "Gaussov prilagodljivi nizkopropustni filter"
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "Nizkopropustni filter"
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "Količina predfiltriranja"
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "Večja vrednost določa več predfiltriranja"
+
+#~ msgid "Picture coding mode"
+#~ msgstr "Način kodiranja slike"
+
+#~ msgid ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+#~ msgstr ""
+#~ "Pri kodiranju polja se prepletena polja kodirajo posebej v nasprotju s "
+#~ "psevdo progresivnimi sličicami"
+
+#~ msgid "auto - let encoder decide based upon input (Best)"
+#~ msgstr "samodejno - kodirnik določa glede na najbolji dovod (priporočeno)"
+
+#~ msgid "force coding frame as single picture"
+#~ msgstr "vsili kodiranje sličice kot samostojne slike"
+
+#~ msgid "force coding frame as separate interlaced fields"
+#~ msgstr "vsili sličico za kodiranje kot ločena prepletena polja"
+
+#~ msgid "Size of motion compensation blocks"
+#~ msgstr "Velikost blokov poravnave gibanja"
+
+#~ msgid "automatic - let encoder decide based upon input (Best)"
+#~ msgstr "samodejno - kodirnik določi glede na vhod (najboljše)"
+
+#~ msgid "small - use small motion compensation blocks"
+#~ msgstr "majhna - uporaba majhnih blokov poravnave gibanja"
+
+#~ msgid "medium - use medium motion compensation blocks"
+#~ msgstr "srednja - uporaba srednjih blokov poravnave gibanja"
+
+#~ msgid "large - use large motion compensation blocks"
+#~ msgstr "velika - uporaba velikih blokov poravnave gibanja"
+
+#~ msgid "Overlap of motion compensation blocks"
+#~ msgstr "Prekrivanje blokov poravnave gibanja"
+
+#~ msgid "none - Motion compensation blocks do not overlap"
+#~ msgstr "brez - bloki poravnave gibanja se ne prekrivajo"
+
+#~ msgid "partial - Motion compensation blocks only partially overlap"
+#~ msgstr "delno - bloki poravnave gibanja se delno prekrivajo"
+
+#~ msgid "full - Motion compensation blocks fully overlap"
+#~ msgstr "popolno - bloki poravnave gibanja se popolnoma prekrivajo"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "Natančnost vektorja gibanja"
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "Natančnost vektorja gibanja v sl. točkah"
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "Tridelno predvidevanje gibanja"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "Uporabi barve v postopku predvidevanja gibanja"
+
+#~ msgid "Intra picture DWT filter"
+#~ msgstr "Filtri Intra picture DWT"
+
+#~ msgid "Inter picture DWT filter"
+#~ msgstr "Filtri Inter picture DWT"
+
+#~ msgid "Number of DWT iterations"
+#~ msgstr "Število DWT ponovitev"
+
+#~ msgid "Also known as DWT levels"
+#~ msgstr "Znane kot DWT ravni"
+
+#~ msgid "Enable multiple quantizers"
+#~ msgstr "Omogoči več delilnikov"
+
+#~ msgid "Enable multiple quantizers per subband (one per codeblock)"
+#~ msgstr ""
+#~ "Omogoči več delilnikov na pasovno širino (en delilnik na kodni blok)"
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr "Onemogoči aritmetično kodiranje"
+
+#~ msgid "Use variable length codes instead, useful for very high bitrates"
+#~ msgstr ""
+#~ "Uporaba spremenljive dolžine kode, uporabna pri visokih bitnih hitrostih"
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "način zaznanega tehtanja"
+
+#~ msgid "perceptual distance"
+#~ msgstr "zaznana oddaljenost"
+
+#~ msgid "perceptual distance to calculate perceptual weight"
+#~ msgstr "zaznana oddaljenost za računanje zaznane teže"
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "vodoravnih rezin na sličico"
+
+#~ msgid "Number of horizontal slices per frame in low delay mode"
+#~ msgstr "Število vodoravnih rezin na sličico v načinu nizke zakasnitve"
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "navpičnih rezin na sličico"
+
+#~ msgid "Number of vertical slices per frame in low delay mode"
+#~ msgstr "Število navpičnih rezin na sličico v načinu nizke zakasnitve"
+
+#~ msgid "Size of code blocks in each subband"
+#~ msgstr "Velikost blokov kode v vsakem podpasu"
+
+#~ msgid "small - use small code blocks"
+#~ msgstr "majhna - uporaba majhnih blokov kode"
+
+#~ msgid "medium - use medium sized code blocks"
+#~ msgstr "srednja - uporaba srednjih blokov kode"
+
+#~ msgid "large - use large code blocks"
+#~ msgstr "velika - uporaba velikih blokov kode"
+
+#~ msgid "full - One code block per subband"
+#~ msgstr "popolna - en blok kode na podpas"
+
+#~ msgid "Enable hierarchical Motion Estimation"
+#~ msgstr "Omogoči predvidevanje hierarhičnega gibanja"
+
+#~ msgid "Number of levels of downsampling"
+#~ msgstr "Število ravni podvzorčenja"
+
+#~ msgid ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+#~ msgstr ""
+#~ "Število ravni vzorčenja navzdol v načinu ocenjevanja hierarhičnega gibanja"
+
+#~ msgid "Enable Global Motion Estimation"
+#~ msgstr "Omogoči oceno splošnega gibanja"
+
+#~ msgid "Enable Phase Correlation Estimation"
+#~ msgstr "Omogoči oceno soodnosa faze"
+
+#~ msgid "Enable Scene Change Detection"
+#~ msgstr "Omogoči zaznavanje spremembe prizora"
+
+#~ msgid "Force Profile"
+#~ msgstr "Vsili profil"
+
+#~ msgid "VC2 Low Delay Profile"
+#~ msgstr "Prifil nizke nazaksnitve VC2"
+
+#~ msgid "VC2 Simple Profile"
+#~ msgstr "Preprost profil VC2"
+
+#~ msgid "VC2 Main Profile"
+#~ msgstr "Glavni profil VC2"
+
+#~ msgid "Main Profile"
+#~ msgstr "Glavni profil"
+
+#~ msgid "Dirac video decoder using libschroedinger"
+#~ msgstr "Odkodirnik slike Dirac (libschroedinger)"
+
+#~ msgid "Dirac video encoder using libschroedinger"
+#~ msgstr "Kodirnik slike Dirac (libschroedinger)"
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "Vrednost za prilagajanje DTS"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "Odvijalnik slike Dirac"
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "Paketnik Dirac"
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr "Zvoča pisava je obvezna zaradi sinteze programske opreme."
@@ -30412,13 +30321,13 @@ msgstr "Seznam upravljalnika predstavnih datotek"
 #~ msgstr "Geslo za RTSP"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
-#~ "Določitev HTTP namestniškega strežnika v obliki http://[uporabnik[:"
-#~ "geslo]@]mojproxy.mojadomena:moja vrata/ . Če je vrednost prazna bo "
-#~ "uporabljena sistemska nastavitev."
+#~ "Določitev HTTP namestniškega strežnika v obliki http://"
+#~ "[uporabnik[:geslo]@]mojproxy.mojadomena:moja vrata/ . Če je vrednost "
+#~ "prazna bo uporabljena sistemska nastavitev."
 
 #~ msgid "VLC could not open the file \"%s\": %s"
 #~ msgstr "Ni mogoče odpreti datoteke »%s«: %s"
@@ -32478,14 +32387,14 @@ msgstr "Seznam upravljalnika predstavnih datotek"
 #~ msgid ""
 #~ "Force the subtiles format. Valid values are : \"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
 #~ "autodetection, this should always work)."
 #~ msgstr ""
 #~ "Vsili zapis podnapisov. Veljavne vrednosti so: \"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\" in \"auto\" (slednji "
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\" in \"auto\" (slednji "
 #~ "predstavlja samodejno zaznavanje)."
 
 #~ msgid "Do not complain on encrypted PES."
@@ -32560,8 +32469,8 @@ msgstr "Seznam upravljalnika predstavnih datotek"
 #~ "A single administration password is used to protect this interface. The "
 #~ "default value is \"admin\"."
 #~ msgstr ""
-#~ "Enotno skrbniško geslo za zaščito vmesnika. Privzeta vrednost je \"admin"
-#~ "\"."
+#~ "Enotno skrbniško geslo za zaščito vmesnika. Privzeta vrednost je "
+#~ "\"admin\"."
 
 #~ msgid "Freebox TV"
 #~ msgstr "Freebox TV"
@@ -32750,8 +32659,8 @@ msgstr "Seznam upravljalnika predstavnih datotek"
 #~ "dejanski prikaz sporočil razhroščevanja morate uporabiti -vvv določilo."
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", and \"syslog\" (special mode to send to syslog instead of file."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", and \"syslog\" (special mode to send to syslog instead of file."
 #~ msgstr ""
 #~ "Določitev zapisa dnevnika. Možnosti so \"besedilo\" (privzeto), \"html\", "
 #~ "in \"syslog\"."
@@ -32773,8 +32682,8 @@ msgstr "Seznam upravljalnika predstavnih datotek"
 #~ msgstr "dbus"
 
 #~ msgid ""
-#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be"
-#~ "\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
+#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
+#~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
 #~ msgstr ""
 #~ "Eden izmed \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
 #~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
@@ -33168,8 +33077,8 @@ msgstr "Seznam upravljalnika predstavnih datotek"
 #~ "Alsa or OSS audio capture in the v4l access is deprecated. please use "
 #~ "'v4l:// :input-slave=alsa://' or 'v4l:// :input-slave=oss://' instead."
 #~ msgstr ""
-#~ "Alsa ali OSS zajem zvoka, kadar je v4l dostop odvečen. Uporabite 'v4l:// :"
-#~ "input-slave=alsa://' ali 'v4l2:// :input-slave=oss://'."
+#~ "Alsa ali OSS zajem zvoka, kadar je v4l dostop odvečen. Uporabite "
+#~ "'v4l:// :input-slave=alsa://' ali 'v4l2:// :input-slave=oss://'."
 
 #~ msgid "IO Method"
 #~ msgstr "IO način"
@@ -34748,8 +34657,8 @@ msgstr "Seznam upravljalnika predstavnih datotek"
 #~ "Select the desired modules. For more advanced control, the resulting "
 #~ "\"chain\" can be modified."
 #~ msgstr ""
-#~ "Izberite želene enote. Za naprednejše izbire spremenite obstoječe \"verige"
-#~ "\"."
+#~ "Izberite želene enote. Za naprednejše izbire spremenite obstoječe "
+#~ "\"verige\"."
 
 #~ msgid ""
 #~ "Specifies the MRL. This can be specified directly or filled in "
@@ -35188,10 +35097,10 @@ msgstr "Seznam upravljalnika predstavnih datotek"
 
 #, fuzzy
 #~ msgid ""
-#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title"
-#~ "\" ($a - $t). You can use the following substitutions: $a Artist, $b "
-#~ "Album, $c Copyright, $d Description, $e Encoder, $g Genre, $l Language, "
-#~ "$n number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
+#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title\" "
+#~ "($a - $t). You can use the following substitutions: $a Artist, $b Album, "
+#~ "$c Copyright, $d Description, $e Encoder, $g Genre, $l Language, $n "
+#~ "number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
 #~ "URL, $A Date, $B Bitrate, $C Chapter, $D Duration, $F URI, $I Video "
 #~ "Title, $L Time Remaining, $N Name, $O Audio language, $P Position, $R "
 #~ "Rate, $S Sample rate, $T Time elapsed, $U Publisher, $V Volume"
@@ -35581,8 +35490,8 @@ msgstr "Seznam upravljalnika predstavnih datotek"
 #~ msgid ""
 #~ "Containers (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv)"
 #~ msgstr ""
-#~ "Vsebniki (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv *."
-#~ "webm)"
+#~ "Vsebniki (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv "
+#~ "*.webm)"
 
 #, fuzzy
 #~ msgid "Should act as the master client for the network synchronisation?"
@@ -39202,8 +39111,8 @@ msgstr "Seznam upravljalnika predstavnih datotek"
 
 #, fuzzy
 #~ msgid ""
-#~ "Name of the audio device to use. If you don't specify anything, \"/dev/dsp"
-#~ "\" will be used for OSS."
+#~ "Name of the audio device to use. If you don't specify anything, \"/dev/"
+#~ "dsp\" will be used for OSS."
 #~ msgstr ""
 #~ "Ime slikovne naprave, ki bo uporabljena za prikaz predstavne vsebine "
 #~ "DirectShow. V primeru, da ni nastavljena nobena naprava, bo program "
@@ -39211,8 +39120,8 @@ msgstr "Seznam upravljalnika predstavnih datotek"
 
 #, fuzzy
 #~ msgid ""
-#~ "Name of the audio device to use. If you don't specify anything, \"/dev/dsp"
-#~ "\" will be used for OSS, \"hw\" for Alsa."
+#~ "Name of the audio device to use. If you don't specify anything, \"/dev/"
+#~ "dsp\" will be used for OSS, \"hw\" for Alsa."
 #~ msgstr ""
 #~ "Ime slikovne naprave, ki bo uporabljena za prikaz predstavne vsebine "
 #~ "DirectShow. V primeru, da ni nastavljena nobena naprava, bo program "

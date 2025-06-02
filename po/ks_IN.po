@@ -181,8 +181,8 @@ msgstr "سب ٹایٹل یا او ایس ڈی"
 msgid ""
 "Settings related to On-Screen-Display, subtitles and \"overlay subpictures\""
 msgstr ""
-"سیٹینگ یم وابستْہ چھ آنأسکرین ڈیسپْلے سْیت، سب ٹایٹلن تْہ    \"اوور لے سب پیکچرن"
-"\" باپت "
+"سیٹینگ یم وابستْہ چھ آنأسکرین ڈیسپْلے سْیت، سب ٹایٹلن تْہ    \"اوور لے سب "
+"پیکچرن\" باپت "
 
 #: include/vlc_config_cat.h:88
 #, fuzzy
@@ -572,27 +572,27 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>خوش آمدید وی ایل سی میڈیا پْلییر مددس کُن</"
@@ -601,24 +601,24 @@ msgstr ""
 "توہیہ اکھ نیو کمر چھیو وی ایل سی میڈیا پْلییرس کُن، مہربأنی کْرتھ پْریو<br><a "
 "href=\"http://wiki.videolan.org/Documentation:VLC_for_dummies\"><em>تعارف وی "
 "ایل سی میڈیا پْلییرس کُن</em></a>.</p><p>توہیہ لْبیو انفارمیشن ذِ کِتھ کْنئ چُھ "
-"استعمال کرُن پْلیر <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>وی ایل سی میڈیا پْلییر سْیت کِتھ کْنئ چھ فایلْہ پْلے کرنِہ</em></a>"
-"\" دستاویزس منز۔</p><p>تمام محفوظ کرُن، تبدیل کرُن، ٹرانسکوڈ کرُن، اینکوڈ کرُن، "
-"مکسینگ تْہ سِٹریمینگ ٹاسکْہ باپت لْبیو توہیہ جانکأری <a href=\"http://wiki."
-"videolan.org/Documentation:Streaming_HowTo\">سٹریمینگ ڈاکیمینٹیشنس منز۔</a>."
-"</p><p>اگر نْہ توہیہ ٹْرمینالجی پورْ پتاہ چھ، مہربأنی کْرتھ کْریو کنسلٹْہ <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">نالیج بیس/a>.</p><p>مین کی بورڈ "
-"شاٹ کٹ سمجھنْہ باپت، پْریو <a href=\"http://wiki.videolan.org/Hotkeys\">شاٹ "
-"کٹ</a> پیج۔.</p><h3>مدد</h3><p>کانہہ تِہ سوال کرنْہ برونہہ کْریو پنُن پان ریفر "
-"مہربأنی کْرتھ <a href=\"http://www.videolan.org/support/faq.html\"> کُنFAQ</a>."
-"</p><p>توہیہ ہیکیو پتْہ حأصل کْرتھ  (یا دِتھ) مدد <a href=\"http://forum."
-"videolan.org\">فورمن پیٹھ</a>,یہ <a href=\"http://www.videolan.org/vlc/lists."
-"html\">mailing-lists</a>یا سأنئ  آی آر سی چنل  (<em>#videolan</em> on irc."
-"freenode.net).</p><h3>چھ شمولیت کران یتھ پروجکٹس منز</h3><p>توہیہ ہیکیو مدد "
-"دِتھ ویڈیو لین پروجکٹس پنُن کینہ ٹایم دِتھ کومنیٹی مدد کرنْہ باپت، سیکِن ڈیزایِن "
-"کرنْہ باپت، ڈاکیمینٹیشن ترجُم کرنْہ باپت، ٹیسٹْہ تْہ کوڈ کرنْہ باپت۔ توہیہ ہیکیو "
-"بْیہ فنڈ تْہ میٹیریل دِتھ اسِہ مدد کرنْہ باپت۔ تْہ بے شک ، توہیہ ہیکیو <b>شُہرت "
-"کْرتھ</b> میڈیا پْلییرْچ۔VLC </p></body></html>"
+"استعمال کرُن پْلیر <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>وی ایل سی میڈیا پْلییر سْیت کِتھ کْنئ چھ فایلْہ "
+"پْلے کرنِہ</em></a>\" دستاویزس منز۔</p><p>تمام محفوظ کرُن، تبدیل کرُن، ٹرانسکوڈ "
+"کرُن، اینکوڈ کرُن، مکسینگ تْہ سِٹریمینگ ٹاسکْہ باپت لْبیو توہیہ جانکأری <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">سٹریمینگ "
+"ڈاکیمینٹیشنس منز۔</a>.</p><p>اگر نْہ توہیہ ٹْرمینالجی پورْ پتاہ چھ، مہربأنی "
+"کْرتھ کْریو کنسلٹْہ <a href=\"http://wiki.videolan.org/Knowledge_Base\">نالیج "
+"بیس/a>.</p><p>مین کی بورڈ شاٹ کٹ سمجھنْہ باپت، پْریو <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">شاٹ کٹ</a> پیج۔.</p><h3>مدد</h3><p>کانہہ تِہ سوال "
+"کرنْہ برونہہ کْریو پنُن پان ریفر مہربأنی کْرتھ <a href=\"http://www.videolan.org/"
+"support/faq.html\"> کُنFAQ</a>.</p><p>توہیہ ہیکیو پتْہ حأصل کْرتھ  (یا دِتھ) مدد "
+"<a href=\"http://forum.videolan.org\">فورمن پیٹھ</a>,یہ <a href=\"http://"
+"www.videolan.org/vlc/lists.html\">mailing-lists</a>یا سأنئ  آی آر سی چنل  "
+"(<em>#videolan</em> on irc.freenode.net).</p><h3>چھ شمولیت کران یتھ پروجکٹس "
+"منز</h3><p>توہیہ ہیکیو مدد دِتھ ویڈیو لین پروجکٹس پنُن کینہ ٹایم دِتھ کومنیٹی "
+"مدد کرنْہ باپت، سیکِن ڈیزایِن کرنْہ باپت، ڈاکیمینٹیشن ترجُم کرنْہ باپت، ٹیسٹْہ تْہ "
+"کوڈ کرنْہ باپت۔ توہیہ ہیکیو بْیہ فنڈ تْہ میٹیریل دِتھ اسِہ مدد کرنْہ باپت۔ تْہ بے "
+"شک ، توہیہ ہیکیو <b>شُہرت کْرتھ</b> میڈیا پْلییرْچ۔VLC </p></body></html>"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -1555,8 +1555,8 @@ msgstr "اضأفی اِنٹرفیس ماڈیول"
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "توہیہ ہیکیو ژأرِتھ  \"اضأفی اِنٹرفی\" وی ایل سی باپت۔ تِم یِین لانچ کرنْہ بیک "
 "گراونڈس منز ڈیفالٹْہ اِنٹرفیسس علاو۔ استعمال کْریو اکھ کولن سْیت علیحدہ لِسٹْہ "
@@ -1899,8 +1899,9 @@ msgid ""
 msgstr ""
 "یم اوپشن چھ توہیہ اجازت دِوان توہیہ تبدیل کرنس منز طریق کار ویڈیو آوت پُٹت سب "
 "سسٹمُک۔ توہیہ ہیکیو مثلن اینیبْل کْرتھ ویڈیو فلٹر ( ڈی اِنٹرلیسینگ، امیج "
-"ایڈجسٹینگ، وغیر)۔ اینیبْل کْریو یم فلٹر ییتنس تْہ کنفیگر کْریو تِم   \"ویڈیو فلٹر"
-"\" ماڈیول سیکشنس منز۔ توہیہ ہیکیو بْیہ سیٹ کْرتھ واریاہ رلْہ مِلْہ ویڈیو اوپشن۔"
+"ایڈجسٹینگ، وغیر)۔ اینیبْل کْریو یم فلٹر ییتنس تْہ کنفیگر کْریو تِم   \"ویڈیو "
+"فلٹر\" ماڈیول سیکشنس منز۔ توہیہ ہیکیو بْیہ سیٹ کْرتھ واریاہ رلْہ مِلْہ ویڈیو "
+"اوپشن۔"
 
 #: src/libvlc-module.c:253
 msgid "Video output module"
@@ -2336,8 +2337,8 @@ msgstr "سورس آسپیکٹْہ ریشیو "
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "یہ چُھ لاگو کران سورس آسپیکٹْہ ریشیو۔ مثلن، کینہہ ڈی وی ڈی چھ دعوا کران ۱۶:۹ "
@@ -2904,15 +2905,15 @@ msgstr "عنوان کْریو تبدیل موجود میڈیا مُطأبق"
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
 "یہ اوپشن چُھ توہیہ اجازت دِوان سیٹ کرنس منز عنوان تمِہ مُطأبق یوس پْلے گژھان چُھ "
-"آسن <br>$a: فنکار<br>$b: ایلبم<br>$c: کاپی رایِٹ<br>$t: Title<br>$g: Genre<br>"
-"$n: ٹریک نمبر<br>$p: وْنئ چُھ پْلے کران<br>$A:تأریخ<br>$D: مُدت<br>$Z: \"وْنئ چُھ "
-"پْلے کران\" (فال بیک کْریو عنوانس پیٹھ۔فنکار) "
+"آسن <br>$a: فنکار<br>$b: ایلبم<br>$c: کاپی رایِٹ<br>$t: Title<br>$g: "
+"Genre<br>$n: ٹریک نمبر<br>$p: وْنئ چُھ پْلے کران<br>$A:تأریخ<br>$D: مُدت<br>$Z: "
+"\"وْنئ چُھ پْلے کران\" (فال بیک کْریو عنوانس پیٹھ۔فنکار) "
 
 #: src/libvlc-module.c:699
 msgid "Disable all lua plugins"
@@ -3134,8 +3135,8 @@ msgid ""
 "address (e.g. ::1 or 127.0.0.1) or a host name (e.g. localhost) to restrict "
 "them to a specific network interface."
 msgstr ""
-"ڈیفالٹْہ ذریعہ، سْرور بوزِ کونِہ تِہ لوکل آی پی ایڈرسس پیٹھ۔ اکھ آی پی ایڈرس (e."
-"g. ::1 or 127.0.0.1) کْریو مخصوص یا اکھ ہوسٹْہ ناو ( مثلن۔ لوکل ہوسٹْہ) تِم "
+"ڈیفالٹْہ ذریعہ، سْرور بوزِ کونِہ تِہ لوکل آی پی ایڈرسس پیٹھ۔ اکھ آی پی ایڈرس "
+"(e.g. ::1 or 127.0.0.1) کْریو مخصوص یا اکھ ہوسٹْہ ناو ( مثلن۔ لوکل ہوسٹْہ) تِم "
 "محدود تھاونْہ باپت أکس خاص نیٹوْرک اِنٹرفیسس کُن۔"
 
 #: src/libvlc-module.c:813
@@ -6740,8 +6741,8 @@ msgid ""
 "AM Tuner mode. Can be one of Default (0), TV (1), AM Radio (2), FM Radio (3) "
 "or DSS (4)."
 msgstr ""
-"ا ے ایم ٹیونر موڈ۔ ہیکِہ ڈیفالٹو منز اکھ أسِتھ (0), TV (1),اے ایم ریڈیو (2),"
-"ایف ایم ریڈیو (3) یا DSS (4)۔ "
+"ا ے ایم ٹیونر موڈ۔ ہیکِہ ڈیفالٹو منز اکھ أسِتھ (0), TV (1),اے ایم ریڈیو "
+"(2),ایف ایم ریڈیو (3) یا DSS (4)۔ "
 
 #: modules/access/dshow/dshow.cpp:199
 msgid ""
@@ -7540,8 +7541,9 @@ msgstr "پراکزی   HTTP"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
 "ایچ ٹی ٹی پی پراکزی یوس استعمال کرْنئ چھ اتھ گژھ ضرور فارم آسْنئ http://"
 "[user@]myproxy.mydomain:myport/   ؛ اگر ایمپٹی آسِہ، یہ ایچ ٹی ٹی پی۔پراکزی "
@@ -7857,8 +7859,8 @@ msgstr "آڈیو کنفیگریشن"
 #: modules/access/linsys/linsys_sdi.c:79
 msgid "Allows you to set audio configuration (id=group,pair:id=group,pair...)."
 msgstr ""
-"چُھ توہیہ اجازت دوان سیٹ کرنس منز آڈیو کنفیگریشن  (id=group,pair:id=group,"
-"pair...)۔ "
+"چُھ توہیہ اجازت دوان سیٹ کرنس منز آڈیو کنفیگریشن  "
+"(id=group,pair:id=group,pair...)۔ "
 
 #: modules/access/linsys/linsys_hdsdi.c:89
 msgid "HD-SDI Input"
@@ -8014,8 +8016,8 @@ msgid ""
 "MMS streams can contain several elementary streams, with different bitrates. "
 "You can choose to select all of them."
 msgstr ""
-"ایم ایم ایس سِٹریمن منز ہیکن أسِتھ واریاہ ایلمینٹری سِٹریم، یمن مُختلف بایٹریٹ ّ"
-"سن۔۔ توہیہ ہیکو ژأر کْرتھ  تِم تمام ژأرِتھ۔"
+"ایم ایم ایس سِٹریمن منز ہیکن أسِتھ واریاہ ایلمینٹری سِٹریم، یمن مُختلف بایٹریٹ "
+"ّسن۔۔ توہیہ ہیکو ژأر کْرتھ  تِم تمام ژأرِتھ۔"
 
 #: modules/access/mms/mms.c:54
 msgid "Maximum bitrate"
@@ -8143,8 +8145,8 @@ msgstr "کانہہ اِنپُٹ ڈیوایِس آو نْہ لبنْہ"
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 #, fuzzy
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "تُہند میک چُھ نْہ باسان صلأحیت تھاوان اکِہ موأفق اِنپُٹ ڈیواسْچ۔ مہربأنی کْرتھ کْریو "
 "چک پنْینی کنیکٹر تْہ ڈرایور۔"
@@ -8582,8 +8584,8 @@ msgstr "آر ٹی ایس پی تصدیو"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -8676,8 +8678,8 @@ msgid ""
 "I420, I411, I410, MJPG)"
 msgstr ""
 "لاگو کْریو  ویڈیو ۴ لینْکْس ۲ ویڈیو ڈیوایسس استعمال کرُن اکھ مخصوص کروما فارمیٹ "
-"( مثلن ۱۴۲۰ یا ۱۴۲۲ را امیجن باپت، ایم۔ جے پی ای جی کمپریسْڈ اِنپُٹ) (مُکمل لِسٹْہ:"
-"GREY, I240, RV16, RV15, RV24, RV32, YUY2, YUYV, UYVY, I41N, I422, I420, "
+"( مثلن ۱۴۲۰ یا ۱۴۲۲ را امیجن باپت، ایم۔ جے پی ای جی کمپریسْڈ اِنپُٹ) (مُکمل "
+"لِسٹْہ:GREY, I240, RV16, RV15, RV24, RV32, YUY2, YUYV, UYVY, I41N, I422, I420, "
 "I411, I410, MJPG) "
 
 #: modules/access/v4l2/v4l2.c:61
@@ -9046,9 +9048,9 @@ msgstr "v4l2 ڈرایور کنٹرول "
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "سیٹ کْریو وی۴ایل۲ ڈرایور کنٹرول ویلیوہن کُن یم مخصوص کرنْہ آیہ استعمال کْرتھ اکھ "
 "کاما سپریٹِڈ لِسٹْہ اوپشنلی یوس اینکیپشولیٹ کْرتھ چُھ کْرلی بریسو ذریعہ  (e.g.: "
@@ -9446,9 +9448,9 @@ msgstr "فایل ییتنس وی ایل سی ریڈ کران چُھ کی۔یو �
 #: modules/access_output/livehttp.c:98
 #, fuzzy
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
 "فایل چھ ریڈ کرنْہ یوان ییلہ سیگمینٹ شروع گژھان چُھ تْہ چُھ ماننْہ یوان فارمیٹس "
 "منز: کی۔یو آر آیi\\nکی۔فایل۔ فایل چھ ریڈ کرنْہ یوان سیگمینٹ اوپینینگ پیٹھ تْہ "
@@ -10950,7 +10952,6 @@ msgstr "ڈیکوڈینگ "
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "اینکوڈینگ"
 
@@ -11498,11 +11499,11 @@ msgstr "تھییورا ویڈیو پیکیٹایزر   "
 msgid "Daala video encoder"
 msgstr "پی این جی ویڈیو اینکوڈر "
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "کروما فارمیٹ "
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr "کروما فارمیٹ کرِ لاگو اکھ تبدیلی ویڈیوہْچ تتھ فارمیٹس منز"
@@ -11566,8 +11567,8 @@ msgstr "سب  پیکچر جاے "
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 "توہیہ ہیکیو لاگو کْرتھ  سب پیکچر جاے ویڈیوہس پیٹھ    (0=مرکز, 1=کھوفُر , "
 "2=دوچُھن, 4=ٹاپ, 8=باٹم, توہیہ ہیکیو بْیِہ استعمال کْرتھ یمن ویلیوہن ہْنز "
@@ -12343,10 +12344,10 @@ msgstr "ریٹ کنٹرولْچ ایکوریسی "
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
 "ٹالیرینْس چھ اے وی بی آر چِہ فیصد منز ( اوسط ویریبْل بِٹ ریٹ) میتھڈ۔ ( مثلن ۱۰ "
 "یتھ ذن آسِہ بِٹ ریٹ ۸۰۰ کے پی مطلب گو اینکوڈر چُھ کوشش کران ذِ یہ گژھِ نْہ ہیور "
@@ -12415,390 +12416,6 @@ msgstr "سیڈو را ویڈیو پیکیٹایزر "
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "پی این جی ویڈیو اینکوڈر "
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "ریٹ کنٹرول میتھڈ "
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr "میتھڈ یوس استعمال گژھان چُھ اینکوڈ کرنس منز ویڈیو ترتیب "
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "لگاتار شور تھرش ہولڈ موڈ "
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "کنسٹینٹ بِٹ ریٹ موڈ (سی بی آر)"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "لو ڈیلے موڈ "
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "لاس لیس موڈ "
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "لگاتار لمبڈا موڈ "
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "کنسٹینٹ ایرر موڈ "
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "کنسٹینٹ کالٹی موڈ "
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "جی او پی سِٹرکچر "
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr "جی او پی سِٹرکچر یوس استعمال گژھان چُھ اینکوڈ کرنْہ باپت ویڈیو ترتیب   "
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-"کانہہ فیکسْڈ گروپ سِٹرکچر چُھ نْہ۔ اکھ پیکچر ہیکہ اِنٹرا یا اِنٹر أسِتھ تْہ ہیکہ "
-"ریفر کْرتھ پْتمین یا یِنْہ واجنین پیکچرن۔"
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr "آی۔فریم آنلی ترتیب "
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr "اِنٹر پیکچر چِھ ریفر کران صرف پْتمین پیکچرن کُن"
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr "انٹر پیکچر ہیکن ریفر کْرتھ پْتمین یا یِنْہ واجنین پیکچرن"
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "لگاتار کالٹی فیکٹر "
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr "کالٹی فیکٹر یوس استعمال کرُن چُھ لگاتار کالٹی موڈس منز"
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "شور تھرش ہولڈ"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr "شور تھرش ہولڈْ یوس استعمال کرُن چُھ لگاتار شور تھرش ہولڈْ موڈس منز "
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "سی بی آر بِٹ ریٹ (کے بی پی یز)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"ٹارگیٹ بِٹ ریٹ کے بی پی ین منز ییلہ اینکوڈ کران آسو لگاتار بِٹ ریٹ موڈس منز "
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "میکسیمم بِٹ ریٹ (کے بی پی یِز)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"میکسیمم بِٹ ریٹ کےبی پی ین منز ییلہ اینکوڈ کران آسِہ لگاتار بِٹ ریٹ موڈس منز "
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "مینیمم بِٹ ریٹ (کے بی پی یِز)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"مینیمم بِٹ ریٹ کےبی پی ین منز ییلہ اینکوڈ کران آسِہ لگاتار بِٹ ریٹ موڈس منز "
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "جی او پی زیچھر "
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr ""
-"نمبر پیکچرن ہُند ترتیبس منز  ترتیب وار ہیڈرن درمیان یعنے زیچھر پیکچرن ہْندِ "
-"گروپُک"
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "پری فلٹر "
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "اینیبْل کْریو ایڈاپٹیو پری فلٹرینگ "
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "کانہہ پری۔فلٹرینگ چھ نْہ"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr "مرکز ویٹیڈ میڈین "
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "گاسین لو پاس فلٹر "
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "شور کْریو جمع "
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "گاسین ایڈاپٹیو لو پاس فلٹر "
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "لو پاس فلٹر "
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "ایماونٹ پری فلٹرینگ "
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "تھود ویلیو چُھ لاگو کران ذیاد پری فلٹرینگ "
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "پیکچر کوڈینگ موڈ "
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-"فیلڈْ کوڈینگ چھ ییتنس اِنٹرلیسْڈ فیلڈْ کوڈ چھ یوان کرنْہ الگ پأٹھ أکس سیڈو۔"
-"پراگریسیو فریمس باالکُل خلاف"
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr ""
-"آٹو۔لیٹ اینکوڈر ڈیسایِڈ یمیوک دارمدار اِنپُٹس پیٹھ آسان چُھ ( ساروْی کھوتْہ بہتر)"
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr "لاگو کْریو فریم کوڈ کرُن بطور اکھ سِنگل پیکچر "
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr "لاگو کْریو کوڈ کرُن فریم بطور اکھ الگ اِنٹرلیسْڈ فیلڈْ "
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr "سایز موشن کمپنسیشن بُلاکن ہُند "
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr ""
-"آٹومیٹِک۔لیٹ اینکوڈر ڈیسایِڈ یمیوک دارمدار اِنپُٹس پیٹھ آسان چُھ ( ساروْی کھوتْہ "
-"بہتر)"
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr "لوکُٹ۔ استعمال کْریو لوکْٹ موشن کمپنسیشن بُلاک"
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr "میڈیم۔ استعمال کْریو میڈیم موشن کمپنسیشن بُلاک"
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr "بوڈ۔ استعمال کْریو  بْڈ موشن کمپنسیشن بُلاک"
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr "اوورلیپ موشن کمپنسیشن بُلاکن ہُند "
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr "کانہہ نْہ۔ موشن کمپنسیشن بُلاک چھ نْہ اوورلیپ گژھان"
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr "پارشل۔ موشن کمپنسیشن بُلاک چھ صرف پارشلی اوورلیپ گژھان"
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr "پور پور ۔ موشن کمپنسیشن بُلاک چھ پورْ پأٹھ  اوورلیپ گژھان"
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "موشن ویکٹر پریسیجن "
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "موشن ویکٹر پریسیجن پیلن منز   "
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "ترے کمپونینٹ موشن ایسٹیمیشن"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "استعمال کْریو کروما بطور اکھ پارٹ موشن ایسٹیمیشن پراسیس ہُند "
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr "اِنٹرا پیکچر  ڈی ڈبلیو ٹی فلٹر "
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr "اِنٹر پیکچر  ڈی ڈبلیو ٹی فلٹر "
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr "نمبر ڈی ڈبلیو ٹی آیٹریشنن ہُند "
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr "یمن چھ بْیہ ونان ڈی ڈبلیو ٹی لیولْہ "
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr "اینیبْل کْریو ملٹیپُل کانٹیزر "
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr "اینیبْل کْریو ملٹیپُل کانٹیزر پریتھ سب بینڈس منز ( اکھ پریتھ کوڈ بُلاکس) "
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr "ڈیسیبْل کْریو آرتھیمیٹیک کوڈینگ "
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr ""
-"استعمال کْریو ویریبْل زیچھر کوڈ امہ بجاے، فأیدْ مند چھ واریاہ ذیادْ بِٹ ریٹن باپت "
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "پْرسیپچوول ویٹینگ میتھڈ "
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "پْرسیپچوول جاے "
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr "پْرسیپچوول جاے شُمار کرنْہ باپت پْرسیپچوول وزن  "
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "ہاریزینٹل سِلایِس پریتھ فریمس منز "
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr "نمبر ہاریزینٹل سِلایسن ہُند پریتھ فریمس منز لو ڈیلے موڈس منز "
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "وْرٹیکل سِلایس پریتھ فریمس منز "
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr "نمبر  وْرٹیکل سِلایسن ہُند پریتھ فریمس منز لو ڈیلے موڈس منز "
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr "سایز کوڈ بُلاکن ہُند پریتھ سب بینڈس منز "
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr "لوکُٹ۔ استعمال کْریو لوکْٹ کوڈ بُلاک "
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr "میڈیم۔ استعمال کْریو میڈیم  سایزْڈ  کوڈ بُلاک "
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr "بوڈ۔ استعمال کْریو  بْڈ کوڈ بُلاک "
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr "فُل۔ اکھ کوڈ بُلاک پریتھ سب بینڈس "
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr "اینیبْل کْریو ہایر آرکیکل موشن ایسٹیمیشن "
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr "ڈاون سیمپلینگ لیولن ہُند نمبر "
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr "ڈاون سیمپلینگ لیولن ہُند نمبر ہایرآرکیکل موشن ایسٹیمیشن موڈس منز  "
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr "اینیبْل کْریو گلوبل موشن ایسٹیمیشن "
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr "اینیبْل کْریو فیز کوریلیشن ایسٹیمیشن "
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr "اینیبْل کْریو سین تبدیلی ڈیٹیکشن "
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "لاگو کْریو پروفایل"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr "وی سی ۲ لو ڈیلے پروفایل "
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr "وی سی ۲ سادْ پروفایل"
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr "وی سی ۲ مینْ پروفایل"
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "مین پروفایل"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr "ڈیراک ویڈیو ڈیکوڈر استعمال کْرتھ لِب سیکروڈینگر "
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr "ڈیراک ویڈیو اینکوڈر استعمال کْرتھ لِب سیکروڈینگر "
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -15516,14 +15133,6 @@ msgstr "اگر فایل گوڈے موجود آسِہ، یہ یِیہ نْہ او
 msgid "File dumper"
 msgstr "فایل ڈمپر "
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "ویلیو یمو ذریعہ ڈی ٹی ایس برابر کرُن چُھ"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "ڈیریک ویڈیو ڈیمکسر "
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -16005,8 +15614,8 @@ msgstr "ایکْسٹرا پی ایم ٹی "
 #: modules/demux/mpeg/ts.c:82
 msgid "Allows a user to specify an extra pmt (pmt_pid=pid:stream_type[,...])."
 msgstr ""
-"چُھ اجازت دِوان أکس یوزرس مخصوص کرنْہ باپت اکھ اضأفی پی ایم ٹی    (pmt_pid=pid:"
-"stream_type[,...]) ۔ "
+"چُھ اجازت دِوان أکس یوزرس مخصوص کرنْہ باپت اکھ اضأفی پی ایم ٹی    "
+"(pmt_pid=pid:stream_type[,...]) ۔ "
 
 #: modules/demux/mpeg/ts.c:84
 msgid "Set id of ES to PID"
@@ -16592,13 +16201,13 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 "<p>وی ایل سی میڈیا پْلییر چُھ اکھ فری تْہ اوپْْن سورس میڈیا پْلییر، اینکوڈر تْہ "
-"سٹریمر یوس ذن بنومُت چُھ والینٹیرو یم ذن تعلق تھاوان چھ <a href=\"http://www."
-"videolan.org/\"><span style=\" text-decoration: underline; color:#0057ae;"
+"سٹریمر یوس ذن بنومُت چُھ والینٹیرو یم ذن تعلق تھاوان چھ <a href=\"http://"
+"www.videolan.org/\"><span style=\" text-decoration: underline; color:#0057ae;"
 "\">ویڈیو لین</span></a> کومنیٹی سْیت۔</p><p>وی ایل سی چُھ استعمال کران پنْنئ "
 "اِنٹرنل کوڈیک، چُھ کأم کران تقریبن تمام مشہور پلیٹ فارمن پیتھ، تْہ چُھ ہیکان "
 "پْرَتھ تمام فایلْہ، سی ڈی، ڈی وی ڈی، نیٹوْرک سٹریم، کیپچر کارڈ تْہ باقی میڈیا "
@@ -16897,8 +16506,8 @@ msgstr "اِنپُٹ چُھ تبدیل گومُت "
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "اِنپُٹ گو تبدیل، ہیوک نْہ محفوظ کْرتھ بوک مارْک۔ سسپینڈ کران پْلے بیک    \"پاز\"  "
 "سْیتئ ییلہ ذن بوک مارْک ایڈیٹ کران چُھ یقینی بناونْہ باپت  ذِ اِنپُٹ روزِ کونوی۔"
@@ -22633,8 +22242,8 @@ msgstr "لووا اِنٹرفیس کنفیگریشن  "
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 "لووا اِنٹرفیس کنفیگریشن سیٹرینگ ۔ فارمیٹ چھ:'[\"<interface module name>\"] = "
 "{ <option> = <value>, ...}, ...'.   "
@@ -22684,8 +22293,8 @@ msgid ""
 msgstr ""
 "ییمہ سورسْہ پیٹھ کْریو کمانڈ قبول۔ سی ایل آی چُھ ڈیفالٹْہ گژھان  (\"*console\") "
 "کُن، مگر ہیکہ بایِنڈ گْژھیتھ أکس سادْ ٹی سی پی ساکیٹس کُن    "
-"(\"localhost:4212\")  یا ہیکہ استعمال کْرتھ ٹیل نیٹ "
-"پروٹوکال(\"telnet://0.0.0.0:4212\")"
+"(\"localhost:4212\")  یا ہیکہ استعمال کْرتھ ٹیل نیٹ پروٹوکال(\"telnet://"
+"0.0.0.0:4212\")"
 
 #: modules/lua/vlc.c:85
 msgid "Lua"
@@ -24089,10 +23698,6 @@ msgstr "اے وی پارسر پیکیٹایزر "
 #: modules/packetizer/copy.c:48
 msgid "Copy packetizer"
 msgstr "کاپی پیکیٹایزر"
-
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "ڈیریک پیکیٹایزر"
 
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
@@ -26219,10 +25824,10 @@ msgid ""
 "overlayed directly onto the video. You can specify a colon-separated list of "
 "subpicture modules."
 msgstr ""
-"یہ چُھ توہیہ اجازت دوان جمع کرنس منز اوورلے یمن ذن بْیہ ونان چھ    \"سب پیکچر"
-"\"  ٹرانسکوڈیڈ ویڈیو سٹریمس پیٹھ۔ سب پیکچر یوس بنأومژ آس،ہ فلٹرو یِیہ اوورلے "
-"کرنْہ ڈاریکٹلی ویڈیوہس پیٹھ۔ توہیہ ہیکیو مخصوص کْرتھ اکھ کولن۔سپریٹِڈ لِسٹْہ سب "
-"پیکچر ماڈیولن ہُند"
+"یہ چُھ توہیہ اجازت دوان جمع کرنس منز اوورلے یمن ذن بْیہ ونان چھ    \"سب "
+"پیکچر\"  ٹرانسکوڈیڈ ویڈیو سٹریمس پیٹھ۔ سب پیکچر یوس بنأومژ آس،ہ فلٹرو یِیہ "
+"اوورلے کرنْہ ڈاریکٹلی ویڈیوہس پیٹھ۔ توہیہ ہیکیو مخصوص کْرتھ اکھ کولن۔سپریٹِڈ "
+"لِسٹْہ سب پیکچر ماڈیولن ہُند"
 
 #: modules/stream_out/transcode/transcode.c:123
 msgid "Number of threads"
@@ -27696,8 +27301,8 @@ msgid ""
 "Prefix of the output images filenames. Output filenames will have the "
 "\"prefixNUMBER.format\" form if replace is not true."
 msgstr ""
-"پریفیکْس آوٹ پُٹ امیج فایل ناون ہُند۔ آوٹ پُٹ فایل ناون آسہ   \"prefixNUMBER."
-"format\"  فارم اگر ذن نْہ بدلاو ٹرو آسِہ۔"
+"پریفیکْس آوٹ پُٹ امیج فایل ناون ہُند۔ آوٹ پُٹ فایل ناون آسہ   "
+"\"prefixNUMBER.format\"  فارم اگر ذن نْہ بدلاو ٹرو آسِہ۔"
 
 #: modules/video_filter/scene.c:81
 msgid "Directory path prefix"
@@ -30115,6 +29720,312 @@ msgstr "AAAA; "
 msgid "Media Manager List"
 msgstr "میڈیا منیجر لِسٹْہ"
 
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4"
+
+#~ msgid "Rate control method"
+#~ msgstr "ریٹ کنٹرول میتھڈ "
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr "میتھڈ یوس استعمال گژھان چُھ اینکوڈ کرنس منز ویڈیو ترتیب "
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "لگاتار شور تھرش ہولڈ موڈ "
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "کنسٹینٹ بِٹ ریٹ موڈ (سی بی آر)"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "لو ڈیلے موڈ "
+
+#~ msgid "Lossless mode"
+#~ msgstr "لاس لیس موڈ "
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "لگاتار لمبڈا موڈ "
+
+#~ msgid "Constant error mode"
+#~ msgstr "کنسٹینٹ ایرر موڈ "
+
+#~ msgid "Constant quality mode"
+#~ msgstr "کنسٹینٹ کالٹی موڈ "
+
+#~ msgid "GOP structure"
+#~ msgstr "جی او پی سِٹرکچر "
+
+#~ msgid "GOP structure used to encode the video sequence"
+#~ msgstr ""
+#~ "جی او پی سِٹرکچر یوس استعمال گژھان چُھ اینکوڈ کرنْہ باپت ویڈیو ترتیب   "
+
+#~ msgid ""
+#~ "No fixed gop structure. A picture can be intra or inter and refer to "
+#~ "previous or future pictures."
+#~ msgstr ""
+#~ "کانہہ فیکسْڈ گروپ سِٹرکچر چُھ نْہ۔ اکھ پیکچر ہیکہ اِنٹرا یا اِنٹر أسِتھ تْہ ہیکہ "
+#~ "ریفر کْرتھ پْتمین یا یِنْہ واجنین پیکچرن۔"
+
+#~ msgid "I-frame only sequence"
+#~ msgstr "آی۔فریم آنلی ترتیب "
+
+#~ msgid "Inter pictures refere to previous pictures only"
+#~ msgstr "اِنٹر پیکچر چِھ ریفر کران صرف پْتمین پیکچرن کُن"
+
+#~ msgid "Inter pictures can refer to previous or future pictures"
+#~ msgstr "انٹر پیکچر ہیکن ریفر کْرتھ پْتمین یا یِنْہ واجنین پیکچرن"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "لگاتار کالٹی فیکٹر "
+
+#~ msgid "Quality factor to use in constant quality mode"
+#~ msgstr "کالٹی فیکٹر یوس استعمال کرُن چُھ لگاتار کالٹی موڈس منز"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "شور تھرش ہولڈ"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr "شور تھرش ہولڈْ یوس استعمال کرُن چُھ لگاتار شور تھرش ہولڈْ موڈس منز "
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "سی بی آر بِٹ ریٹ (کے بی پی یز)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "ٹارگیٹ بِٹ ریٹ کے بی پی ین منز ییلہ اینکوڈ کران آسو لگاتار بِٹ ریٹ موڈس منز "
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "میکسیمم بِٹ ریٹ (کے بی پی یِز)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "میکسیمم بِٹ ریٹ کےبی پی ین منز ییلہ اینکوڈ کران آسِہ لگاتار بِٹ ریٹ موڈس منز "
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "مینیمم بِٹ ریٹ (کے بی پی یِز)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "مینیمم بِٹ ریٹ کےبی پی ین منز ییلہ اینکوڈ کران آسِہ لگاتار بِٹ ریٹ موڈس منز "
+
+#~ msgid "GOP length"
+#~ msgstr "جی او پی زیچھر "
+
+#~ msgid ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+#~ msgstr ""
+#~ "نمبر پیکچرن ہُند ترتیبس منز  ترتیب وار ہیڈرن درمیان یعنے زیچھر پیکچرن ہْندِ "
+#~ "گروپُک"
+
+#~ msgid "Prefilter"
+#~ msgstr "پری فلٹر "
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "اینیبْل کْریو ایڈاپٹیو پری فلٹرینگ "
+
+#~ msgid "No pre-filtering"
+#~ msgstr "کانہہ پری۔فلٹرینگ چھ نْہ"
+
+#~ msgid "Centre Weighted Median"
+#~ msgstr "مرکز ویٹیڈ میڈین "
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "گاسین لو پاس فلٹر "
+
+#~ msgid "Add Noise"
+#~ msgstr "شور کْریو جمع "
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "گاسین ایڈاپٹیو لو پاس فلٹر "
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "لو پاس فلٹر "
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "ایماونٹ پری فلٹرینگ "
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "تھود ویلیو چُھ لاگو کران ذیاد پری فلٹرینگ "
+
+#~ msgid "Picture coding mode"
+#~ msgstr "پیکچر کوڈینگ موڈ "
+
+#~ msgid ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+#~ msgstr ""
+#~ "فیلڈْ کوڈینگ چھ ییتنس اِنٹرلیسْڈ فیلڈْ کوڈ چھ یوان کرنْہ الگ پأٹھ أکس سیڈو۔"
+#~ "پراگریسیو فریمس باالکُل خلاف"
+
+#~ msgid "auto - let encoder decide based upon input (Best)"
+#~ msgstr ""
+#~ "آٹو۔لیٹ اینکوڈر ڈیسایِڈ یمیوک دارمدار اِنپُٹس پیٹھ آسان چُھ ( ساروْی کھوتْہ "
+#~ "بہتر)"
+
+#~ msgid "force coding frame as single picture"
+#~ msgstr "لاگو کْریو فریم کوڈ کرُن بطور اکھ سِنگل پیکچر "
+
+#~ msgid "force coding frame as separate interlaced fields"
+#~ msgstr "لاگو کْریو کوڈ کرُن فریم بطور اکھ الگ اِنٹرلیسْڈ فیلڈْ "
+
+#~ msgid "Size of motion compensation blocks"
+#~ msgstr "سایز موشن کمپنسیشن بُلاکن ہُند "
+
+#~ msgid "automatic - let encoder decide based upon input (Best)"
+#~ msgstr ""
+#~ "آٹومیٹِک۔لیٹ اینکوڈر ڈیسایِڈ یمیوک دارمدار اِنپُٹس پیٹھ آسان چُھ ( ساروْی کھوتْہ "
+#~ "بہتر)"
+
+#~ msgid "small - use small motion compensation blocks"
+#~ msgstr "لوکُٹ۔ استعمال کْریو لوکْٹ موشن کمپنسیشن بُلاک"
+
+#~ msgid "medium - use medium motion compensation blocks"
+#~ msgstr "میڈیم۔ استعمال کْریو میڈیم موشن کمپنسیشن بُلاک"
+
+#~ msgid "large - use large motion compensation blocks"
+#~ msgstr "بوڈ۔ استعمال کْریو  بْڈ موشن کمپنسیشن بُلاک"
+
+#~ msgid "Overlap of motion compensation blocks"
+#~ msgstr "اوورلیپ موشن کمپنسیشن بُلاکن ہُند "
+
+#~ msgid "none - Motion compensation blocks do not overlap"
+#~ msgstr "کانہہ نْہ۔ موشن کمپنسیشن بُلاک چھ نْہ اوورلیپ گژھان"
+
+#~ msgid "partial - Motion compensation blocks only partially overlap"
+#~ msgstr "پارشل۔ موشن کمپنسیشن بُلاک چھ صرف پارشلی اوورلیپ گژھان"
+
+#~ msgid "full - Motion compensation blocks fully overlap"
+#~ msgstr "پور پور ۔ موشن کمپنسیشن بُلاک چھ پورْ پأٹھ  اوورلیپ گژھان"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "موشن ویکٹر پریسیجن "
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "موشن ویکٹر پریسیجن پیلن منز   "
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "ترے کمپونینٹ موشن ایسٹیمیشن"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "استعمال کْریو کروما بطور اکھ پارٹ موشن ایسٹیمیشن پراسیس ہُند "
+
+#~ msgid "Intra picture DWT filter"
+#~ msgstr "اِنٹرا پیکچر  ڈی ڈبلیو ٹی فلٹر "
+
+#~ msgid "Inter picture DWT filter"
+#~ msgstr "اِنٹر پیکچر  ڈی ڈبلیو ٹی فلٹر "
+
+#~ msgid "Number of DWT iterations"
+#~ msgstr "نمبر ڈی ڈبلیو ٹی آیٹریشنن ہُند "
+
+#~ msgid "Also known as DWT levels"
+#~ msgstr "یمن چھ بْیہ ونان ڈی ڈبلیو ٹی لیولْہ "
+
+#~ msgid "Enable multiple quantizers"
+#~ msgstr "اینیبْل کْریو ملٹیپُل کانٹیزر "
+
+#~ msgid "Enable multiple quantizers per subband (one per codeblock)"
+#~ msgstr ""
+#~ "اینیبْل کْریو ملٹیپُل کانٹیزر پریتھ سب بینڈس منز ( اکھ پریتھ کوڈ بُلاکس) "
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr "ڈیسیبْل کْریو آرتھیمیٹیک کوڈینگ "
+
+#~ msgid "Use variable length codes instead, useful for very high bitrates"
+#~ msgstr ""
+#~ "استعمال کْریو ویریبْل زیچھر کوڈ امہ بجاے، فأیدْ مند چھ واریاہ ذیادْ بِٹ ریٹن "
+#~ "باپت "
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "پْرسیپچوول ویٹینگ میتھڈ "
+
+#~ msgid "perceptual distance"
+#~ msgstr "پْرسیپچوول جاے "
+
+#~ msgid "perceptual distance to calculate perceptual weight"
+#~ msgstr "پْرسیپچوول جاے شُمار کرنْہ باپت پْرسیپچوول وزن  "
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "ہاریزینٹل سِلایِس پریتھ فریمس منز "
+
+#~ msgid "Number of horizontal slices per frame in low delay mode"
+#~ msgstr "نمبر ہاریزینٹل سِلایسن ہُند پریتھ فریمس منز لو ڈیلے موڈس منز "
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "وْرٹیکل سِلایس پریتھ فریمس منز "
+
+#~ msgid "Number of vertical slices per frame in low delay mode"
+#~ msgstr "نمبر  وْرٹیکل سِلایسن ہُند پریتھ فریمس منز لو ڈیلے موڈس منز "
+
+#~ msgid "Size of code blocks in each subband"
+#~ msgstr "سایز کوڈ بُلاکن ہُند پریتھ سب بینڈس منز "
+
+#~ msgid "small - use small code blocks"
+#~ msgstr "لوکُٹ۔ استعمال کْریو لوکْٹ کوڈ بُلاک "
+
+#~ msgid "medium - use medium sized code blocks"
+#~ msgstr "میڈیم۔ استعمال کْریو میڈیم  سایزْڈ  کوڈ بُلاک "
+
+#~ msgid "large - use large code blocks"
+#~ msgstr "بوڈ۔ استعمال کْریو  بْڈ کوڈ بُلاک "
+
+#~ msgid "full - One code block per subband"
+#~ msgstr "فُل۔ اکھ کوڈ بُلاک پریتھ سب بینڈس "
+
+#~ msgid "Enable hierarchical Motion Estimation"
+#~ msgstr "اینیبْل کْریو ہایر آرکیکل موشن ایسٹیمیشن "
+
+#~ msgid "Number of levels of downsampling"
+#~ msgstr "ڈاون سیمپلینگ لیولن ہُند نمبر "
+
+#~ msgid ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+#~ msgstr "ڈاون سیمپلینگ لیولن ہُند نمبر ہایرآرکیکل موشن ایسٹیمیشن موڈس منز  "
+
+#~ msgid "Enable Global Motion Estimation"
+#~ msgstr "اینیبْل کْریو گلوبل موشن ایسٹیمیشن "
+
+#~ msgid "Enable Phase Correlation Estimation"
+#~ msgstr "اینیبْل کْریو فیز کوریلیشن ایسٹیمیشن "
+
+#~ msgid "Enable Scene Change Detection"
+#~ msgstr "اینیبْل کْریو سین تبدیلی ڈیٹیکشن "
+
+#~ msgid "Force Profile"
+#~ msgstr "لاگو کْریو پروفایل"
+
+#~ msgid "VC2 Low Delay Profile"
+#~ msgstr "وی سی ۲ لو ڈیلے پروفایل "
+
+#~ msgid "VC2 Simple Profile"
+#~ msgstr "وی سی ۲ سادْ پروفایل"
+
+#~ msgid "VC2 Main Profile"
+#~ msgstr "وی سی ۲ مینْ پروفایل"
+
+#~ msgid "Main Profile"
+#~ msgstr "مین پروفایل"
+
+#~ msgid "Dirac video decoder using libschroedinger"
+#~ msgstr "ڈیراک ویڈیو ڈیکوڈر استعمال کْرتھ لِب سیکروڈینگر "
+
+#~ msgid "Dirac video encoder using libschroedinger"
+#~ msgstr "ڈیراک ویڈیو اینکوڈر استعمال کْرتھ لِب سیکروڈینگر "
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "ویلیو یمو ذریعہ ڈی ٹی ایس برابر کرُن چُھ"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "ڈیریک ویڈیو ڈیمکسر "
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "ڈیریک پیکیٹایزر"
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr "اکھ ساوُنڈ فانٹ فایل چھ ضرورت سافٹْہ وِیر سینتھیسیز باپت۔"
@@ -30315,9 +30226,9 @@ msgstr "میڈیا منیجر لِسٹْہ"
 #~ msgstr "پاس وأرڈ RTSP"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
 #~ "ایچ ٹی ٹی پی پراکزی یوس استعمال کرْنئ چھ تتھ گژھ ضرور فارم آسْنئ      "
 #~ "http://[user[:pass]@]myproxy.mydomain:myport/  ؛ اگر ایمپٹی آسِہ، یہ ایچ "
@@ -31830,11 +31741,11 @@ msgstr "میڈیا منیجر لِسٹْہ"
 #~ "mapping for classic AtmoLight would be -1,3,2,1,0"
 #~ msgstr ""
 #~ "تمن ڈیوایسن باپت یمن ذن پانژو چنلو کھوتْہ ذیادہ آسن یا  زون چھ ییتنس "
-#~ "لیکھان پریتھ چنل،ہ باپت زون نمبر ہاونْہ باپت تْہ الگ کرنْہ باپت ویلیو یم آسن،"
-#~ "اورس؛ سْیتئ تْہ کْریو استعمال منفی ۱ استعمال نہ کرنْہ باپت کینہہ چنلْہ۔ کلاسک "
-#~ "ایٹمولایِٹ باپت ترتیب ۴،۳،۱،۰،۲ کرِ سیٹ ڈیفالٹْہ چنل یا زون میپینگ۔ اگر صرف "
-#~ "۲ زون آسن ٹاپس پیٹھ، اکھ زون آسِہ کھوفرِ تْہ دوچھنِہ طرفْہ تْہ کانہہ سمری زون "
-#~ "آس،ہ نْہ، میپینگ آس،ہ کلاسِک ایٹمو لایٹِہ باپت منفی ۱، ۳،۲،۱،۰"
+#~ "لیکھان پریتھ چنل،ہ باپت زون نمبر ہاونْہ باپت تْہ الگ کرنْہ باپت ویلیو یم "
+#~ "آسن،اورس؛ سْیتئ تْہ کْریو استعمال منفی ۱ استعمال نہ کرنْہ باپت کینہہ چنلْہ۔ "
+#~ "کلاسک ایٹمولایِٹ باپت ترتیب ۴،۳،۱،۰،۲ کرِ سیٹ ڈیفالٹْہ چنل یا زون میپینگ۔ "
+#~ "اگر صرف ۲ زون آسن ٹاپس پیٹھ، اکھ زون آسِہ کھوفرِ تْہ دوچھنِہ طرفْہ تْہ کانہہ "
+#~ "سمری زون آس،ہ نْہ، میپینگ آس،ہ کلاسِک ایٹمو لایٹِہ باپت منفی ۱، ۳،۲،۱،۰"
 
 #~ msgid "Zone 0: Top gradient"
 #~ msgstr "زون ۰: ٹاپ گریڈینٹ "
@@ -31864,8 +31775,8 @@ msgstr "میڈیا منیجر لِسٹْہ"
 #~ "Now preferred option to assign gradient bitmaps, put them as zone_0.bmp, "
 #~ "zone_1.bmp etc. into one folder and set the foldername here"
 #~ msgstr ""
-#~ "وْنئ بہتر اوپشن ایساین کرنْہ باپت گریڈینٹ بِٹ میپ، تِم تھأیو بطور    zone_0."
-#~ "bmp, zone_1.bmp وغیر أکس فولڈرس منز تْہ ییتنس کْریو سیٹ فولڈر ناو"
+#~ "وْنئ بہتر اوپشن ایساین کرنْہ باپت گریڈینٹ بِٹ میپ، تِم تھأیو بطور    "
+#~ "zone_0.bmp, zone_1.bmp وغیر أکس فولڈرس منز تْہ ییتنس کْریو سیٹ فولڈر ناو"
 
 #~ msgid "Filename of AtmoWin*.exe"
 #~ msgstr "اُک فایل ناو AtmoWin*.exe"

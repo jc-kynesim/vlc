@@ -568,53 +568,53 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>VLC मेडिया प्लेयार मददआव बरायबाय</"
-"h2><h3>डकुमेन्टेसन</h3><p>नोंथाङा VLC डकुमेन्टेसनखौ VideoLANनि<a href=\"http://wiki."
-"videolan.org\">उइकि</a> वेबसाइटआव नागिरना दिहुननो हायो।</p><p>नोंथाङा VLC मेडिया "
-"प्लेयारआव गोदायै फैनायब्ला, अननानै <br><a href=\"http://wiki.videolan.org/"
+"h2><h3>डकुमेन्टेसन</h3><p>नोंथाङा VLC डकुमेन्टेसनखौ VideoLANनि<a href=\"http://"
+"wiki.videolan.org\">उइकि</a> वेबसाइटआव नागिरना दिहुननो हायो।</p><p>नोंथाङा VLC "
+"मेडिया प्लेयारआव गोदायै फैनायब्ला, अननानै <br><a href=\"http://wiki.videolan.org/"
 "Documentation:VLC_for_dummies\"><em> VLC मेडिया प्लेयारआव खुगाफोरनाय</em></a>खौ "
-"मोजाङै फराय।</p><p>नोंथाङा प्लेयारखौ माबोरै बाहायनांगौ बेनि सोमोन्दै <br>\"<a href="
-"\"http://wiki.videolan.org/Documentation:Play_HowTo\"><em>VLC मेडिया प्लेयारजों "
-"फाइलखौ माबोरै दामनांगौ</em></a>\" फोरमान बिलाइआव माखासे फोरोंथाय मोनगोन।</"
-"p><p>टास्कखौ थिना दोननाय, सोलाय होनाय, ट्रेन्सक'ड खालामनाय, एनक'ड खालामनाय, माक्स "
-"खालामनाय आरो स्ट्रिम खालामनाय गासैबोनि थाखाय, नोंथाङा खामानिआव नांथाव "
-"फोरमायथिहोग्राखौ <a href=\"http://wiki.videolan.org/Documentation:"
-"Streaming_HowTo\">स्ट्रिमिं डकुमेन्टेसनआव</a>मोननांगोन।</p><p>नोंथाङा बे सोदोबजों रोखा "
-"नङाब्ला, अननानै <a href=\"http://wiki.videolan.org/Knowledge_Base\">गियान "
-"बिथा</a> निफ्राय बोसोन ला।</p><p>गाहाय किबर्ड शर्टकाटखौ बुजिनो, <a href=\"http://"
-"wiki.videolan.org/Hotkeys\">शर्टकाट</a> बिलाइखौ फराय।</p><h3>Help</h3><p>जेबो "
-"सोंथि सोंनायनि सिगां, अननानै <a href=\"http://www.videolan.org/support/faq.html"
-"\">FAQ</a> खौ नायदेर।</p><p>अब्ला नोंथाङा <a href=\"http://forum.videolan.org"
-"\">फराम</a>, <a href=\"http://www.videolan.org/vlc/lists.html\">मेइलिं-लिस्ट</"
-"a> एबा जोंनि IRC सेनेल (<em>#videolan</em> on irc.freenode.net) आव मदद मोनगोन।</"
-"p><h3>प्रजेक्टआव बिहोमा हो</h3><p>नोंथाङा माहारिखौ मदद खालामनो नोंथांनि माखासे सम "
-"होनानै, डकुमेन्टेसनखौ रावसोलायनानै, आनजाद खालामनानै आरो क'ड खालामनानै VideoLAN "
-"प्रजेक्टखौ मदद खालामनो हायो। नोंथाङा रां आरो बेसादफोर हरनानै जोंखौ मदद खालामनोबो "
-"हायो। आरो थारैनो, नोंथाङा VLC मेडिया प्लेयारखौ <b>दावगाहोनो</b>हायो।</p></body></"
-"html>"
+"मोजाङै फराय।</p><p>नोंथाङा प्लेयारखौ माबोरै बाहायनांगौ बेनि सोमोन्दै <br>\"<a "
+"href=\"http://wiki.videolan.org/Documentation:Play_HowTo\"><em>VLC मेडिया "
+"प्लेयारजों फाइलखौ माबोरै दामनांगौ</em></a>\" फोरमान बिलाइआव माखासे फोरोंथाय मोनगोन।"
+"</p><p>टास्कखौ थिना दोननाय, सोलाय होनाय, ट्रेन्सक'ड खालामनाय, एनक'ड खालामनाय, "
+"माक्स खालामनाय आरो स्ट्रिम खालामनाय गासैबोनि थाखाय, नोंथाङा खामानिआव नांथाव "
+"फोरमायथिहोग्राखौ <a href=\"http://wiki.videolan.org/"
+"Documentation:Streaming_HowTo\">स्ट्रिमिं डकुमेन्टेसनआव</a>मोननांगोन।</p><p>नोंथाङा बे "
+"सोदोबजों रोखा नङाब्ला, अननानै <a href=\"http://wiki.videolan.org/"
+"Knowledge_Base\">गियान बिथा</a> निफ्राय बोसोन ला।</p><p>गाहाय किबर्ड शर्टकाटखौ "
+"बुजिनो, <a href=\"http://wiki.videolan.org/Hotkeys\">शर्टकाट</a> बिलाइखौ फराय।"
+"</p><h3>Help</h3><p>जेबो सोंथि सोंनायनि सिगां, अननानै <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a> खौ नायदेर।</p><p>अब्ला नोंथाङा <a "
+"href=\"http://forum.videolan.org\">फराम</a>, <a href=\"http://"
+"www.videolan.org/vlc/lists.html\">मेइलिं-लिस्ट</a> एबा जोंनि IRC सेनेल "
+"(<em>#videolan</em> on irc.freenode.net) आव मदद मोनगोन।</p><h3>प्रजेक्टआव "
+"बिहोमा हो</h3><p>नोंथाङा माहारिखौ मदद खालामनो नोंथांनि माखासे सम होनानै, "
+"डकुमेन्टेसनखौ रावसोलायनानै, आनजाद खालामनानै आरो क'ड खालामनानै VideoLAN प्रजेक्टखौ मदद "
+"खालामनो हायो। नोंथाङा रां आरो बेसादफोर हरनानै जोंखौ मदद खालामनोबो हायो। आरो "
+"थारैनो, नोंथाङा VLC मेडिया प्लेयारखौ <b>दावगाहोनो</b>हायो।</p></body></html>"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -1550,8 +1550,8 @@ msgstr "बांद्राय इन्टारफेस मडुल"
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "नोंथाङा VLC नि थाखाय \"उफेरा इन्टारफेस\" खौ सायखनो हायो। बेफोरखौ डिफल्ट इन्टारफेसनि "
 "बादैबो सावगारिनि उनथिं थानायाव जागायगोन। इन्टारफेस मडुलनि कलन आलादा खालामनाय "
@@ -2328,8 +2328,8 @@ msgstr "फुंखा नुथाय रुजुथाय"
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "बेयो फुंखा नुथाय रुजुथायखौ जर खालामो। बिदिन्थि महरै, माखासे DVD क्लेइमआ 16:9 जानांगोन, "
@@ -2884,10 +2884,10 @@ msgstr "बिमुंखौ दानि मेडिया मथे सो�
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
 "बे उफ्राया जायखौ दामनाय जागासिनो दं बेनि मथे बिमुंखौ फजनो गनायथि होयो<br>$a: "
 "महरगिरि<br>$b: एलबाम<br>$c: कपिराइट<br>$t: बिमुं<br>$g: आरिमु<br>$n: ट्रेक "
@@ -3314,8 +3314,8 @@ msgid ""
 "try the dummy and a52 codecs before trying the other ones. Only advanced "
 "users should alter this option as it can break playback of all your streams."
 msgstr ""
-"codecs नि लिस्ट जायखौ VLC आ गिबि गोनांथि महरै बाहायगोन। बिदिन्थि महरै, 'dummy,"
-"a52' आ गुबुननि सोलायै डामि आरो a52 codecs खौ नाजागोन। खालि जौगानाय "
+"codecs नि लिस्ट जायखौ VLC आ गिबि गोनांथि महरै बाहायगोन। बिदिन्थि महरै, "
+"'dummy,a52' आ गुबुननि सोलायै डामि आरो a52 codecs खौ नाजागोन। खालि जौगानाय "
 "बाहायग्राफोराल' बे उफ्राखौ सोलायनांगौ मानोना बेयो नोंथांनि गासै स्ट्रिमनि प्लेबेकखौ "
 "सिफायनो हायो।"
 
@@ -7488,8 +7488,9 @@ msgstr "HTTP प्रक्सि"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
 "बाहायनो गोनां HTTP प्रक्सि, बेयो फर्म http://[user@]myproxy.mydomain:myport/ नि "
 "मोनसे जाथारनांगोन; लांदांब्ला, http_proxy आबहावा सोलायस्लुखौ नाजागोन।"
@@ -8074,8 +8075,8 @@ msgstr "जेबो इनपुट डिभाइस मोनाखै"
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 #, fuzzy
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "नोंथांनि मेकआव गोरोबथाव इनपुट डिभाइस गैयाबादि नुयो। नोंथांनि फोनांजाब आरो ड्राइभारखौ "
 "आनजाद खालाम।"
@@ -8506,8 +8507,8 @@ msgstr "RTSP थारफोरमान"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -8968,14 +8969,14 @@ msgstr "v4l2 ड्राइभार दबथायनाय"
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "लाव बेन्दोंजों गोसोबादियै फुसुंखानाय कमा आलादा खालामनाय लिस्टखौ बाहायनानै v4l2 ड्राइभार "
-"दबथायनायखौ थि बेसेनाव फज (जेरै: {video_bitrate=6000000,audio_crc=0,"
-"stream_type=3} )। मोननो हाथाव दबथायनायखौ लिस्ट खालामनो, भार्ब'सिटि (-vvv) खौ "
-"बांहो v4l2-ctl एप्लिकेसनखौ बाहाय।"
+"दबथायनायखौ थि बेसेनाव फज (जेरै: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} )। मोननो हाथाव दबथायनायखौ "
+"लिस्ट खालामनो, भार्ब'सिटि (-vvv) खौ बांहो v4l2-ctl एप्लिकेसनखौ बाहाय।"
 
 #: modules/access/v4l2/v4l2.c:242 modules/codec/avcodec/avcodec.c:50
 #: modules/codec/avcodec/avcodec.c:54 modules/codec/x264.c:435
@@ -9362,9 +9363,9 @@ msgstr "फाइल जेराव vlc आ साबि-uri आरो keyfile-
 #: modules/access_output/livehttp.c:98
 #, fuzzy
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
 "खोन्दोखौ जागायनाय समाव फाइलखौ फरायनाय जायो आरो बेखौ फरमेट बादि हमनानै लानाय "
 "जायो: साबि-uri\\nसाबि-फाइल। फाइलखौ खोन्दो खेवनायाव फरायनाय जायो आरो बेसेनखौ बै "
@@ -10854,7 +10855,6 @@ msgstr "डिक'डिं"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "एनक'डिं"
 
@@ -11397,11 +11397,11 @@ msgstr "थेअ'रा भिडिअ' पेकेटाइजार"
 msgid "Daala video encoder"
 msgstr "PNG भिडिअ' डिक'डार"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "क्र'मा फरमेट"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr "पिकिं क्र'मा फरमेटआ भिडिअ'खौ बै फरमेटआव सोलायहोनायखौ जर खालामगोन"
@@ -11465,8 +11465,8 @@ msgstr "दालाय-सावगारि जायगा"
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 "नोंथाङा दालाय-सावगारि जायगाखौ भिडिअ'आव जर खालामनो हायो। (0=मिरु, 1=आगसि, "
 "2=आगदा, 4=बिजौ, 8=थालो, नोंथाङा बेफोर बेसेननि जरायनायखौबो बाहायनो हायो, जेरै- "
@@ -12230,10 +12230,10 @@ msgstr "रेट-दबथायनायनि गेबें"
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
 "'avbr' (गड़ सोलायस्लु बिटरेट) खान्थिनि जौखोन्दोआव ट'लारेन्स। (जेरै- 800 kpbs नि मोनसे "
 "बिट्रेटजों 10 नि ओंथिया जाबाय एनक'डारआ 880 kpbs नि गोजौ आरो 730 kpbs नि गाहायाव "
@@ -12302,386 +12302,6 @@ msgstr "नंखाय गोथां भिडिअ' पेकेटाइ�
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "PNG भिडिअ' डिक'डार"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "रेट दबथायना खान्थि"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr "भिडिअ' फारिखौ एनक'ड खालामनो बाहायनाय खान्थि"
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "दिदोम दावराव सिमा म'ड"
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "दिदोम बिट्रेट म'ड (CBR)"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "खम गोबाव म'ड"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "खहागैयै म'ड"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "दिदोम लाम्बडा म'ड"
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "दिदोम गोरोन्थि म'ड"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "दिदोम गुन म'ड"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "GOP दाथाय"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr "GOP दाथायखौ भिडिअ' फारि एनक'ड खालामनो बाहायनाय जायो"
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-"जेबो थि gop दाथाय गैया। मोनसे सावगारिआ बाइजोनि एबा इसिंनि जानो हायो आरो आगोलनि "
-"एबा इयुननि सावगारिखौ नायदेरनो हायो।"
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr "I-फ्रेम फारि"
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr "इसिं सावगारिखौ आगोलनि सावगारिआवल' रायखांनो हायो"
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr "इसिं सावगारिखौ आगोलनि एबा इयुननि सावगारिआव रायखांनो हायो"
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "दिदोम गुन फेक्टर"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr "दिदोम गुन फेक्टरआव बाहायनो गुन फेक्टर"
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "दावराव सिमा"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr "दिदोम दावराव सिमा म'डआव बाहायनो थाखाय दावराव सिमा"
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "CBR बिट्रेट (kbps)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr "दिदोम बिट्रेट म'डआव एनक'ड खालामनाय समाव kbps आव थांखि बिट्रेट"
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "बांसिन बिट्रेट (kbps)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "दिदोम बिट्रेट म'डआव एनक'ड खालामनाय समाव kbps आव बांसिन बिट्रेट"
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "खमसिन बिट्रेट (kbps)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "दिदोम बिट्रेट म'डखौ एनक'ड खालामनाय समाव kbps आव बांसिन बिट्रेट"
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "GOP गोलाव"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr ""
-"मोनसेनि उनाव मोनसे फारि हेडारफोरनि गेजेराव सावगारिनि अनजिमा, जेरै- सावगारिनि "
-"हानजानि गोलाव"
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "प्रिफिल्टार"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "गोरोबथाव प्रिफिल्टारिंखौ हाहोनाय खालाम"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "जेबो प्रि-फिल्टारिं गैया"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr "मिरु अजन खालामखानाय मेडियान"
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "Gaussian Low Pass Filter"
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "दावराव दाजाबदेर"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "गौसियान गोरोबथाव खम पास फिल्टार"
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "खम पास फिल्टार"
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "प्रिफिल्टारिंनि बिबां"
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "गोजौ बेसेनआ गोबां प्रिफिल्टारिंखौ दिन्थियो"
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "सावगारि क'डिं म'ड"
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-"फोथार क'डिं जेराव ज' खालामनाय फोथारखौ नंखाय-दावगानाय फ्रेमनि बेरेखा महरै आलादायै क'ड "
-"खालामनाय जायो"
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr "हार्सिं - एनक'डारआ इनपुटआव सोनारनो गनायथि हो (साबसिन)"
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr "क'डिं फ्रेमखौ मोनसेल' सावगारि महरै जर खालाम"
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr "आलादा ज' खालामखानाय फोथार महरै क'डिं फ्रेमखौ जर हो"
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr "खारथाय खहा सुफुंनाय ब्लकनि महर"
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr "गावनोगाव - एनक'डारआ इनपुटआव सोनारनो गनायथि हो (साबसिन)"
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr "फिसा - फिसा खारथाय खहा सुफुंनाय ब्लकखौ बाहाय"
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr "गेजेरनि - गेजेरनि खारथाय खहा सुफुंनाय ब्लकखौ बाहाय"
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr "गेदेर - गेदेर खारथाय खहा सुफुंनाय ब्लकखौ बाहाय"
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr "खारथाय खहा सुफुंनाय ब्लकनि अभारलेप"
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr "मोनसेबो नङा - खारथाय खहा सुफुंनाय ब्लकआ अभारलेप खालामा"
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr "खावसे - खारथाय खहा सुफुंनाया अभारलेपखौ खावसे महरैल' ब्लक खालामो"
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr "आबुं - खारथाय खहा सुफुंनाया अभारलेपखौ आबुङै ब्लक खालामो"
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "खारथाय भेक्टर गोरोबनाय"
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "pels आव खारथाय भेक्टर गोरोबनाय"
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "मोनथाम थाफानाय-मुवा खारथाय आन्दाज"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "खारथाय आन्दाज प्रसेसनि बाहागो महरै क्र'माखौ बाहाय"
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr "बाइजो सावगारि DWT फिल्टार"
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr "इसिं सावगारि DWT फिल्टार"
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr "Number of DWT iteration"
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr "DWT लेभेल मुङैबो मोनथिजायो"
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr "गोबां बिबां खालामग्राखौ हाहोनाय खालाम"
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr ""
-"मोनफ्रोम दालाय-बेन्डआव गोबां बिबां खालामग्राखौ हाहोनाय खालाम (मोनफ्रोम क'डब्लकआव "
-"मोनसे)"
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr "सानखान्थि क'डिंखौ लोरबां"
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr ""
-"बेनि सोलायै सोलायथाव गोलाव क'डखौ बाहाय, जोबोद गोजौ बिट्रेटनि थाखाय खामानिआव नांथाव"
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "बुजिनो हाथाव अजन खान्थि"
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "बुजिनो हाथाव जानथाय"
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr "बुजिनो हाथाव अजनखौ हिसाब खालामनो थाखाय बुजिनो हाथाव जानथाय"
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "मोनफा फ्रेमआव समानथि स्लाइस"
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr "खम गोबाव म'डआव मोनफा फ्रेमआव समानथि स्लाइसनि अनजिमा"
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "मोनफा फ्रेमआव थोंगोर स्लाइस"
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr "खम गोबाव म'डआव मोनफा फ्रेमआव थोंगोर स्लाइसनि अनजिमा"
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr "मोनफ्रोम दालाय-बेन्डआव क'ड ब्लकनि महर"
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr "फिसा - फिसा क'ड ब्लकखौ बाहाय"
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr "गेजेरनि - गेजेरनि क'ड ब्लकखौ बाहाय"
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr "गेदेर - गेदेर क'ड ब्लकखौ बाहाय"
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr "आबुं - मोनफा दालाय-बेन्डआव मोनसे क'ड ब्लक"
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr "फारि जौगा खारथाय आन्दाजखौ हाहोनाय खालाम"
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr "डाउनसेम्पलिंनि लेभेलनि अनजिमा"
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr "फारियै बारायलांनाय खारथाय आन्दाज म'डआव सेम्पलिंनि लेभेलनि अनजिमा"
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr "मुलुगनां खारथाय आन्दाजखौ हाहोनाय खालाम"
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr "थोरफो लोगो-सोमोन्दो आन्दाजखौ हाहोनाय खालाम"
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr "नुथाय सोलायनाय संना दिहुननायखौ हाहोनाय खालाम"
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "प्रफाइलखौ जर हो"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr "VC2 खम गोबाव प्रफाइल"
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr "VC2 गोरलै प्रफाइल"
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr "VC2 गाहाय प्रफाइल"
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "गाहाय प्रफाइल"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr "libschroedinger नि हेफाजाबजों डिराक भिडिअ' डिक'डार"
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr "libschroedinger नि हेफाजाबजों डिराक अडिअ' डिक'डार"
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -15366,14 +14986,6 @@ msgstr "फाइलआ सिगाङावनो दङब्ला बेख
 msgid "File dumper"
 msgstr "फाइल डाम्पार"
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "dts खौ गोरोबहोनो भिडिअ'"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "डिराक भिडिअ' डिमाक्सार"
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -16435,8 +16047,8 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 "<p>VLC मेडिया प्लेयारआ <a href=\"http://www.videolan.org/\"><span style=\" text-"
@@ -16739,8 +16351,8 @@ msgstr "इनपुटआ सोलायबाय"
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "इनपुटआ सोलाबाय, बुकमार्कखौ थिना दोननो हायाखै। एखे इनपुटखौ दोननो बुकमार्कखौ सुजुनाय "
 "समाव \"दोनथ'नाय\" जों प्लेबेकखौ बन्द' खालामथ'गासिनो दं।"
@@ -22445,8 +22057,8 @@ msgstr "लुआ इन्टारफेस बाइजोमहर"
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 "लुआ इन्टारफेस बाइजोमहर स्ट्रिं। फरमेटआ: '[\"<interface module name>\"] = { <option> "
 "= <value>, ...}, ...'."
@@ -22494,8 +22106,8 @@ msgid ""
 "telnet protocol (\"telnet://0.0.0.0:4212\")"
 msgstr ""
 "बे फुंखा निफ्राय बिथोनखौ आजाव। stdin (\"*कनस'ल\") आव CLI डिफल्ट, नाथाय बेयो समान "
-"TCP सकेट (\"localhost:4212\") सिङाव थायो एबा टेलनेट प्र'ट'कल "
-"(\"telnet://0.0.0.0:4212\") खौ बाहायनो हायो।"
+"TCP सकेट (\"localhost:4212\") सिङाव थायो एबा टेलनेट प्र'ट'कल (\"telnet://"
+"0.0.0.0:4212\") खौ बाहायनो हायो।"
 
 #: modules/lua/vlc.c:85
 msgid "Lua"
@@ -23651,8 +23263,8 @@ msgid ""
 "Assign a program number to each PMT. This requires \"Set PID to ID of ES\" "
 "to be enabled."
 msgstr ""
-"प्रग्राम नाम्बारखौ मोनफ्रोम PMT आव बाहागो खालामना हो। बेयो \"PID खौ ES नि ID आव फज"
-"\" खौ हाहोनाय खालामनांगौ।"
+"प्रग्राम नाम्बारखौ मोनफ्रोम PMT आव बाहागो खालामना हो। बेयो \"PID खौ ES नि ID आव "
+"फज\" खौ हाहोनाय खालामनांगौ।"
 
 #: modules/mux/mpeg/ts.c:120
 msgid "Mux PMT (requires --sout-ts-es-id-pid)"
@@ -23663,8 +23275,8 @@ msgid ""
 "Define the pids to add to each pmt. This requires \"Set PID to ID of ES\" to "
 "be enabled."
 msgstr ""
-"मोनफ्रोम pmt जों दाजाबदेरनो pids खौ थि खालाम। बेनि थाखाय \"PID खौ ES नि ID आव फज"
-"\" खौ हाहोनाय खालामनांगोन।"
+"मोनफ्रोम pmt जों दाजाबदेरनो pids खौ थि खालाम। बेनि थाखाय \"PID खौ ES नि ID आव "
+"फज\" खौ हाहोनाय खालामनांगोन।"
 
 #: modules/mux/mpeg/ts.c:124
 msgid "SDT Descriptors (requires --sout-ts-es-id-pid)"
@@ -23890,10 +23502,6 @@ msgstr "avparser पेकेटाइजार"
 #: modules/packetizer/copy.c:48
 msgid "Copy packetizer"
 msgstr "पेकेटाइजारखौ कपि खालाम"
-
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "डिराक पेकेटाइजार"
 
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
@@ -24631,9 +24239,9 @@ msgid ""
 "if positioning method is set to \"offsets\"). You must give a comma-"
 "separated list of coordinates (eg: 10,10,150,10)."
 msgstr ""
-"नोंथाङा मजेइकआव गुदिमुवानि (x,y) अफसेटखौ जर खालामनो हायो (प'जिसनिं खान्थिखौ \"अफसेट"
-"\"आव फजयोब्लाल'नो बाहाय)। नोंथाङा क'अर्डिनेटनि मोनसे कमा-आलादा खालामनाय लिस्टखौ "
-"होनांगोन (जेरै: 10,10,150,10)।"
+"नोंथाङा मजेइकआव गुदिमुवानि (x,y) अफसेटखौ जर खालामनो हायो (प'जिसनिं खान्थिखौ "
+"\"अफसेट\"आव फजयोब्लाल'नो बाहाय)। नोंथाङा क'अर्डिनेटनि मोनसे कमा-आलादा खालामनाय "
+"लिस्टखौ होनांगोन (जेरै: 10,10,150,10)।"
 
 #: modules/spu/mosaic.c:156
 msgid ""
@@ -26497,9 +26105,9 @@ msgid ""
 "default)."
 msgstr ""
 "बेयो गोहोम गोग्लैयो, ओरैबादिबो मोनथिजायो- \"सोमखोर-स्क्रिन\" एबा \"क्र'मा साबि\"आ "
-"सावगारिनि उनथिं थानायनि मजेइकनि सावगारिनि सिगांथिं थानाय मुसुखानि \"निला बाहागो"
-"\"खौ गलाय मोन्देर खालामो (जेरै- बोथोरनि *अनुमान)। नोंथाङा गलाय-मोन्देरनि थाखाय \"साबि"
-"\" गाबखौ बासिखनो हायो (डिफल्ट मथे निला)।"
+"सावगारिनि उनथिं थानायनि मजेइकनि सावगारिनि सिगांथिं थानाय मुसुखानि \"निला "
+"बाहागो\"खौ गलाय मोन्देर खालामो (जेरै- बोथोरनि *अनुमान)। नोंथाङा गलाय-मोन्देरनि थाखाय "
+"\"साबि\" गाबखौ बासिखनो हायो (डिफल्ट मथे निला)।"
 
 #: modules/video_filter/bluescreen.c:43
 msgid "Bluescreen U value"
@@ -29843,6 +29451,305 @@ msgstr "AAAA; "
 msgid "Media Manager List"
 msgstr "मेडिया मेनेजार लिस्ट"
 
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4"
+
+#~ msgid "Rate control method"
+#~ msgstr "रेट दबथायना खान्थि"
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr "भिडिअ' फारिखौ एनक'ड खालामनो बाहायनाय खान्थि"
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "दिदोम दावराव सिमा म'ड"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "दिदोम बिट्रेट म'ड (CBR)"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "खम गोबाव म'ड"
+
+#~ msgid "Lossless mode"
+#~ msgstr "खहागैयै म'ड"
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "दिदोम लाम्बडा म'ड"
+
+#~ msgid "Constant error mode"
+#~ msgstr "दिदोम गोरोन्थि म'ड"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "दिदोम गुन म'ड"
+
+#~ msgid "GOP structure"
+#~ msgstr "GOP दाथाय"
+
+#~ msgid "GOP structure used to encode the video sequence"
+#~ msgstr "GOP दाथायखौ भिडिअ' फारि एनक'ड खालामनो बाहायनाय जायो"
+
+#~ msgid ""
+#~ "No fixed gop structure. A picture can be intra or inter and refer to "
+#~ "previous or future pictures."
+#~ msgstr ""
+#~ "जेबो थि gop दाथाय गैया। मोनसे सावगारिआ बाइजोनि एबा इसिंनि जानो हायो आरो "
+#~ "आगोलनि एबा इयुननि सावगारिखौ नायदेरनो हायो।"
+
+#~ msgid "I-frame only sequence"
+#~ msgstr "I-फ्रेम फारि"
+
+#~ msgid "Inter pictures refere to previous pictures only"
+#~ msgstr "इसिं सावगारिखौ आगोलनि सावगारिआवल' रायखांनो हायो"
+
+#~ msgid "Inter pictures can refer to previous or future pictures"
+#~ msgstr "इसिं सावगारिखौ आगोलनि एबा इयुननि सावगारिआव रायखांनो हायो"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "दिदोम गुन फेक्टर"
+
+#~ msgid "Quality factor to use in constant quality mode"
+#~ msgstr "दिदोम गुन फेक्टरआव बाहायनो गुन फेक्टर"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "दावराव सिमा"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr "दिदोम दावराव सिमा म'डआव बाहायनो थाखाय दावराव सिमा"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "CBR बिट्रेट (kbps)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "दिदोम बिट्रेट म'डआव एनक'ड खालामनाय समाव kbps आव थांखि बिट्रेट"
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "बांसिन बिट्रेट (kbps)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "दिदोम बिट्रेट म'डआव एनक'ड खालामनाय समाव kbps आव बांसिन बिट्रेट"
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "खमसिन बिट्रेट (kbps)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "दिदोम बिट्रेट म'डखौ एनक'ड खालामनाय समाव kbps आव बांसिन बिट्रेट"
+
+#~ msgid "GOP length"
+#~ msgstr "GOP गोलाव"
+
+#~ msgid ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+#~ msgstr ""
+#~ "मोनसेनि उनाव मोनसे फारि हेडारफोरनि गेजेराव सावगारिनि अनजिमा, जेरै- सावगारिनि "
+#~ "हानजानि गोलाव"
+
+#~ msgid "Prefilter"
+#~ msgstr "प्रिफिल्टार"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "गोरोबथाव प्रिफिल्टारिंखौ हाहोनाय खालाम"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "जेबो प्रि-फिल्टारिं गैया"
+
+#~ msgid "Centre Weighted Median"
+#~ msgstr "मिरु अजन खालामखानाय मेडियान"
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "Gaussian Low Pass Filter"
+
+#~ msgid "Add Noise"
+#~ msgstr "दावराव दाजाबदेर"
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "गौसियान गोरोबथाव खम पास फिल्टार"
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "खम पास फिल्टार"
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "प्रिफिल्टारिंनि बिबां"
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "गोजौ बेसेनआ गोबां प्रिफिल्टारिंखौ दिन्थियो"
+
+#~ msgid "Picture coding mode"
+#~ msgstr "सावगारि क'डिं म'ड"
+
+#~ msgid ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+#~ msgstr ""
+#~ "फोथार क'डिं जेराव ज' खालामनाय फोथारखौ नंखाय-दावगानाय फ्रेमनि बेरेखा महरै आलादायै "
+#~ "क'ड खालामनाय जायो"
+
+#~ msgid "auto - let encoder decide based upon input (Best)"
+#~ msgstr "हार्सिं - एनक'डारआ इनपुटआव सोनारनो गनायथि हो (साबसिन)"
+
+#~ msgid "force coding frame as single picture"
+#~ msgstr "क'डिं फ्रेमखौ मोनसेल' सावगारि महरै जर खालाम"
+
+#~ msgid "force coding frame as separate interlaced fields"
+#~ msgstr "आलादा ज' खालामखानाय फोथार महरै क'डिं फ्रेमखौ जर हो"
+
+#~ msgid "Size of motion compensation blocks"
+#~ msgstr "खारथाय खहा सुफुंनाय ब्लकनि महर"
+
+#~ msgid "automatic - let encoder decide based upon input (Best)"
+#~ msgstr "गावनोगाव - एनक'डारआ इनपुटआव सोनारनो गनायथि हो (साबसिन)"
+
+#~ msgid "small - use small motion compensation blocks"
+#~ msgstr "फिसा - फिसा खारथाय खहा सुफुंनाय ब्लकखौ बाहाय"
+
+#~ msgid "medium - use medium motion compensation blocks"
+#~ msgstr "गेजेरनि - गेजेरनि खारथाय खहा सुफुंनाय ब्लकखौ बाहाय"
+
+#~ msgid "large - use large motion compensation blocks"
+#~ msgstr "गेदेर - गेदेर खारथाय खहा सुफुंनाय ब्लकखौ बाहाय"
+
+#~ msgid "Overlap of motion compensation blocks"
+#~ msgstr "खारथाय खहा सुफुंनाय ब्लकनि अभारलेप"
+
+#~ msgid "none - Motion compensation blocks do not overlap"
+#~ msgstr "मोनसेबो नङा - खारथाय खहा सुफुंनाय ब्लकआ अभारलेप खालामा"
+
+#~ msgid "partial - Motion compensation blocks only partially overlap"
+#~ msgstr "खावसे - खारथाय खहा सुफुंनाया अभारलेपखौ खावसे महरैल' ब्लक खालामो"
+
+#~ msgid "full - Motion compensation blocks fully overlap"
+#~ msgstr "आबुं - खारथाय खहा सुफुंनाया अभारलेपखौ आबुङै ब्लक खालामो"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "खारथाय भेक्टर गोरोबनाय"
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "pels आव खारथाय भेक्टर गोरोबनाय"
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "मोनथाम थाफानाय-मुवा खारथाय आन्दाज"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "खारथाय आन्दाज प्रसेसनि बाहागो महरै क्र'माखौ बाहाय"
+
+#~ msgid "Intra picture DWT filter"
+#~ msgstr "बाइजो सावगारि DWT फिल्टार"
+
+#~ msgid "Inter picture DWT filter"
+#~ msgstr "इसिं सावगारि DWT फिल्टार"
+
+#~ msgid "Number of DWT iterations"
+#~ msgstr "Number of DWT iteration"
+
+#~ msgid "Also known as DWT levels"
+#~ msgstr "DWT लेभेल मुङैबो मोनथिजायो"
+
+#~ msgid "Enable multiple quantizers"
+#~ msgstr "गोबां बिबां खालामग्राखौ हाहोनाय खालाम"
+
+#~ msgid "Enable multiple quantizers per subband (one per codeblock)"
+#~ msgstr ""
+#~ "मोनफ्रोम दालाय-बेन्डआव गोबां बिबां खालामग्राखौ हाहोनाय खालाम (मोनफ्रोम क'डब्लकआव "
+#~ "मोनसे)"
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr "सानखान्थि क'डिंखौ लोरबां"
+
+#~ msgid "Use variable length codes instead, useful for very high bitrates"
+#~ msgstr ""
+#~ "बेनि सोलायै सोलायथाव गोलाव क'डखौ बाहाय, जोबोद गोजौ बिट्रेटनि थाखाय खामानिआव "
+#~ "नांथाव"
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "बुजिनो हाथाव अजन खान्थि"
+
+#~ msgid "perceptual distance"
+#~ msgstr "बुजिनो हाथाव जानथाय"
+
+#~ msgid "perceptual distance to calculate perceptual weight"
+#~ msgstr "बुजिनो हाथाव अजनखौ हिसाब खालामनो थाखाय बुजिनो हाथाव जानथाय"
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "मोनफा फ्रेमआव समानथि स्लाइस"
+
+#~ msgid "Number of horizontal slices per frame in low delay mode"
+#~ msgstr "खम गोबाव म'डआव मोनफा फ्रेमआव समानथि स्लाइसनि अनजिमा"
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "मोनफा फ्रेमआव थोंगोर स्लाइस"
+
+#~ msgid "Number of vertical slices per frame in low delay mode"
+#~ msgstr "खम गोबाव म'डआव मोनफा फ्रेमआव थोंगोर स्लाइसनि अनजिमा"
+
+#~ msgid "Size of code blocks in each subband"
+#~ msgstr "मोनफ्रोम दालाय-बेन्डआव क'ड ब्लकनि महर"
+
+#~ msgid "small - use small code blocks"
+#~ msgstr "फिसा - फिसा क'ड ब्लकखौ बाहाय"
+
+#~ msgid "medium - use medium sized code blocks"
+#~ msgstr "गेजेरनि - गेजेरनि क'ड ब्लकखौ बाहाय"
+
+#~ msgid "large - use large code blocks"
+#~ msgstr "गेदेर - गेदेर क'ड ब्लकखौ बाहाय"
+
+#~ msgid "full - One code block per subband"
+#~ msgstr "आबुं - मोनफा दालाय-बेन्डआव मोनसे क'ड ब्लक"
+
+#~ msgid "Enable hierarchical Motion Estimation"
+#~ msgstr "फारि जौगा खारथाय आन्दाजखौ हाहोनाय खालाम"
+
+#~ msgid "Number of levels of downsampling"
+#~ msgstr "डाउनसेम्पलिंनि लेभेलनि अनजिमा"
+
+#~ msgid ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+#~ msgstr "फारियै बारायलांनाय खारथाय आन्दाज म'डआव सेम्पलिंनि लेभेलनि अनजिमा"
+
+#~ msgid "Enable Global Motion Estimation"
+#~ msgstr "मुलुगनां खारथाय आन्दाजखौ हाहोनाय खालाम"
+
+#~ msgid "Enable Phase Correlation Estimation"
+#~ msgstr "थोरफो लोगो-सोमोन्दो आन्दाजखौ हाहोनाय खालाम"
+
+#~ msgid "Enable Scene Change Detection"
+#~ msgstr "नुथाय सोलायनाय संना दिहुननायखौ हाहोनाय खालाम"
+
+#~ msgid "Force Profile"
+#~ msgstr "प्रफाइलखौ जर हो"
+
+#~ msgid "VC2 Low Delay Profile"
+#~ msgstr "VC2 खम गोबाव प्रफाइल"
+
+#~ msgid "VC2 Simple Profile"
+#~ msgstr "VC2 गोरलै प्रफाइल"
+
+#~ msgid "VC2 Main Profile"
+#~ msgstr "VC2 गाहाय प्रफाइल"
+
+#~ msgid "Main Profile"
+#~ msgstr "गाहाय प्रफाइल"
+
+#~ msgid "Dirac video decoder using libschroedinger"
+#~ msgstr "libschroedinger नि हेफाजाबजों डिराक भिडिअ' डिक'डार"
+
+#~ msgid "Dirac video encoder using libschroedinger"
+#~ msgstr "libschroedinger नि हेफाजाबजों डिराक अडिअ' डिक'डार"
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "dts खौ गोरोबहोनो भिडिअ'"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "डिराक भिडिअ' डिमाक्सार"
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "डिराक पेकेटाइजार"
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr "सफ्टवेयार सिन्थेसिसनि थाखाय मोनसे सोदोब फन्ट फाइलखौ नांगौ"
@@ -30042,12 +29949,13 @@ msgstr "मेडिया मेनेजार लिस्ट"
 #~ msgstr "RTSP पासवार्ड"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
-#~ "बाहायनो गोनां HTTP प्रक्सि, बेयो फर्म http://[user[:pass]@]myproxy.mydomain:"
-#~ "myport/ जाथारनांगोन; लांदांब्ला http_proxy आबहावा सोलायस्लुखौ नाजागोन।"
+#~ "बाहायनो गोनां HTTP प्रक्सि, बेयो फर्म http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ जाथारनांगोन; लांदांब्ला http_proxy "
+#~ "आबहावा सोलायस्लुखौ नाजागोन।"
 
 #~ msgid "VLC could not open the file \"%s\": %s"
 #~ msgstr "VLC आ फाइल \"%s\": %s खौ खेवनो हायाखै"

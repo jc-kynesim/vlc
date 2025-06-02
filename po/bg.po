@@ -590,27 +590,27 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>Добре дошли във VLC Media Player Помощ</"
@@ -618,23 +618,23 @@ msgstr ""
 "href=\"http://wiki.videolan.org\">Wiki</a> уебсайта.</p><p>Ако сте нов към "
 "VLC Media Player моля прочетете<br><a href=\"http://wiki.videolan.org/"
 "Documentation:VLC_for_dummies\"><em>Въведение към VLC Media Player</em></a>."
-"</p><p>Ще намерите информация за това как да използвате плеъра<br>\"<a href="
-"\"http://wiki.videolan.org/Documentation:Play_HowTo\"><em>Как да гледаме "
-"файлове чрез VLC Media Player</em></a>\" документа.</p><p>За останалите неща "
-"като запазване,кодиране,транскодиране,конвертиране,муксиране и стриймване ще "
-"намерите полезна информация на <a href=\"http://wiki.videolan.org/"
-"Documentation:Streaming_HowTo\">Streaming Documentation</a>.</p><p>Ако не "
-"сте сигурен/на в терминологията,моля консултирайте се с <a href=\"http://"
-"wiki.videolan.org/Knowledge_Base\">базата знания</a>.</p><p>За да разберете "
-"главните преки пътища с клавиатурата,моля прочетете<a href=\"http://wiki."
-"videolan.org/Hotkeys\">за преките пътища</a> на тази страница.</p><h3>Помощ</"
-"h3><p>Преди да питате,каквито и да въпроси,моля отнесете се към  <a href="
-"\"http://www.videolan.org/support/faq.html\">ЧЗВ</a>.</p><p>Можете да "
-"получите (и окажете) помощ на <a href=\"http://forum.videolan.org"
-"\">форумите</a>,  <a href=\"http://www.videolan.org/vlc/lists.html"
-"\">пощенският списък</a> или нашият IRC канал(<em>#videolan</em> on irc."
-"freenode.net).</p><h3>Помогнете на проекта</h3><p>Можете да помогнете на "
-"VideoLAN проекта,като отделите малко от времето си,за да помогнете на "
+"</p><p>Ще намерите информация за това как да използвате плеъра<br>\"<a "
+"href=\"http://wiki.videolan.org/Documentation:Play_HowTo\"><em>Как да "
+"гледаме файлове чрез VLC Media Player</em></a>\" документа.</p><p>За "
+"останалите неща като запазване,кодиране,транскодиране,конвертиране,муксиране "
+"и стриймване ще намерите полезна информация на <a href=\"http://"
+"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
+"a>.</p><p>Ако не сте сигурен/на в терминологията,моля консултирайте се с <a "
+"href=\"http://wiki.videolan.org/Knowledge_Base\">базата знания</a>.</p><p>За "
+"да разберете главните преки пътища с клавиатурата,моля прочетете<a "
+"href=\"http://wiki.videolan.org/Hotkeys\">за преките пътища</a> на тази "
+"страница.</p><h3>Помощ</h3><p>Преди да питате,каквито и да въпроси,моля "
+"отнесете се към  <a href=\"http://www.videolan.org/support/faq.html\">ЧЗВ</"
+"a>.</p><p>Можете да получите (и окажете) помощ на <a href=\"http://"
+"forum.videolan.org\">форумите</a>,  <a href=\"http://www.videolan.org/vlc/"
+"lists.html\">пощенският списък</a> или нашият IRC канал(<em>#videolan</em> "
+"on irc.freenode.net).</p><h3>Помогнете на проекта</h3><p>Можете да помогнете "
+"на VideoLAN проекта,като отделите малко от времето си,за да помогнете на "
 "обществото,да моделирате скинове,да превеждате документи,да изпробвате и "
 "програмирате.Също така можете да ни спонсорирате с пари и материали.И "
 "естествено можете да  <b>рекламирате</b> VLC Media Player.</p></body></html>"
@@ -1536,8 +1536,8 @@ msgstr "Допълнителни модули за интерфейса"
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "Можете да изберете \"допълнителни интерфейси\" за VLC. Те ще бъдат "
 "стартирани във фонов режим в допълнение към стандартния интерфейс. Задайте "
@@ -1617,8 +1617,8 @@ msgstr ""
 "Тези настройки ви позволяват да изменяте работата на звуковата подсистема и "
 "да добавите аудио филтри, които могат да се използват за обработка или "
 "визуални ефекти (анализатор на спектъра и др.).\n"
-"Включете филтрите тук и ги конфигурирайте в раздела за модули \"аудио филтри"
-"\"."
+"Включете филтрите тук и ги конфигурирайте в раздела за модули \"аудио "
+"филтри\"."
 
 #: src/libvlc-module.c:123
 msgid "Audio output module"
@@ -2340,8 +2340,8 @@ msgstr "Съотношение на страните на източника"
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "Задаване съотношението на страните на източника. Например някои DVD-та "
@@ -2918,16 +2918,16 @@ msgstr "Промяна на заглавието, според текущата 
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
 "Тази опция позволява да зададете заглавие, което да е съобразено с това, "
 "което се възпроизвежда<br>$a: Изпълнител<br>$b: Албум<br>$c: Авторски "
 "права<br>$t: Заглавие<br>$g: Жанр<br>$n: Номер на пътечка<br>$p: Сега се "
-"възпроизвежда<br>$A: Дата<br>$D: Времетраене<br>$Z: \"Сега се възпроизвежда"
-"\" (Едновременно Заглавие - Изпълнител)"
+"възпроизвежда<br>$A: Дата<br>$D: Времетраене<br>$Z: \"Сега се "
+"възпроизвежда\" (Едновременно Заглавие - Изпълнител)"
 
 #: src/libvlc-module.c:699
 msgid "Disable all lua plugins"
@@ -7513,8 +7513,9 @@ msgstr "HTTP прокси"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
 "HTTP прокси, което да се използва, трябва да е във формата: http://"
 "[потребител[:парола]@]myproxy.mydomain:myport/ ; ако е празно,  ще бъде "
@@ -8092,8 +8093,8 @@ msgstr "Не е намерено входящо устройство"
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 #, fuzzy
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "Вашия Mac изглежда няма необходимото устройство. Моля проверете връзките и "
 "драйверите."
@@ -8514,8 +8515,8 @@ msgstr "RTSP достоверност"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -8969,9 +8970,9 @@ msgstr "Регулатори за драйвера v4l2"
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "Настройка на регулаторите за драйвера v4l2 към зададените стойности, като "
 "зададете списък на стойности разделени със запетая и заградени с фигурни "
@@ -9368,9 +9369,9 @@ msgstr ""
 
 #: modules/access_output/livehttp.c:98
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
 
 #: modules/access_output/livehttp.c:102
@@ -9489,10 +9490,10 @@ msgid ""
 "of streams) on the icecast/shoutcast website. Requires the bitrate "
 "information specified for shoutcast. Requires Ogg streaming for icecast."
 msgstr ""
-"Прави сървъра публичен, който да е наличен в 'Жълтите "
-"страници' (директорията описана в потоците) за icecast/shoutcast уебсайтове. "
-"Изисква се информация за битрейта зададена за shoutcast. Изисква Ogg поток "
-"за icecast."
+"Прави сървъра публичен, който да е наличен в 'Жълтите страници' "
+"(директорията описана в потоците) за icecast/shoutcast уебсайтове. Изисква "
+"се информация за битрейта зададена за shoutcast. Изисква Ogg поток за "
+"icecast."
 
 #: modules/access_output/shout.c:111
 msgid "IceCAST output"
@@ -10857,7 +10858,6 @@ msgstr "Декодиране"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "Кодиране"
 
@@ -10914,8 +10914,8 @@ msgstr ""
 "  16 Без вместване.\n"
 "  32 Аc vlc.\n"
 "  64 Цветност Qpel .\n"
-" Това трябва да е сумата от стойностите. Например, за да се поправи \"Ac vlc"
-"\" и \"Ump4\", въведете 40."
+" Това трябва да е сумата от стойностите. Например, за да се поправи \"Ac "
+"vlc\" и \"Ump4\", въведете 40."
 
 #: modules/codec/avcodec/avcodec.h:82 modules/codec/avcodec/avcodec.h:177
 #: modules/demux/rawdv.c:42
@@ -11393,11 +11393,11 @@ msgstr "Видео опаковчик Theora"
 msgid "Daala video encoder"
 msgstr "Видео декодер CDG"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "Формат на цветността"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr "Избирането на формат на цвета ще конвертира видеото към този формат"
@@ -11461,8 +11461,8 @@ msgstr "Позиция на слоя със субтитри"
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr "Задаване позицията на слоя със субтитри върху видеото."
 
 #: modules/codec/dvbsub.c:95
@@ -12173,10 +12173,10 @@ msgstr ""
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
 
 #: modules/codec/qsv.c:134
@@ -12231,379 +12231,6 @@ msgstr "Видео опаковчик Pseudo raw"
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "Видео кодер Theora"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr ""
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr ""
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr ""
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "Метод за контрол на честотата"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr ""
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "Режим за ограничаване на постоянния шум"
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "Режим на постоянен битрейт (CBR)."
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "Режим на малко задържане"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "Режим без загуби"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "Режим на постоянна грешка"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "Режим на постоянно качество"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "GOP структура"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr ""
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr ""
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr ""
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr ""
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "Постоянен коефицент на качеството"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "Ограничаване на шума"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr "Граница на шума, която да се използва в режима ограничаване на шум"
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "CBR битрейт (kbps)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr "Целев битрейт в kbps, когато кодирането е в режим на постоянен битрейт"
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "Максимален битрейт (kbps)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"Максимален битрейт в кбит/с, когато кодирането е в режим на постоянен битрейт"
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "Минимален битрейт (kbps)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"Минимален битрейт в кбит/с, когато кодирането е в режим на постоянен битрейт"
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "Максимална дължина"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr ""
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "Предфилтър"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "Включване на адаптивно предфилтриране"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "Без филтър"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr ""
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "Гаусово замъгляване"
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "Шум"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "Гаусово замъгляване"
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr ""
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "Размер на предфилтриране"
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "По-висока стойност означава повече предфилтриране"
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "Вид на кодирането на изображението"
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr ""
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr ""
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr ""
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr ""
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr ""
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr ""
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr ""
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "Точност на векторното движение"
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "Точност на векторното движение"
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "Три компонента  в оценката на движенията"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "Използване на цветността, като част от оценката на движенията"
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr ""
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr ""
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr ""
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr ""
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr ""
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr ""
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr ""
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr ""
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "Метод за изпращане на потока"
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr ""
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr ""
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "Хоризонтални части на кадър"
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "Вертикални части на кадър"
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr ""
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr ""
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr ""
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr ""
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr ""
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr ""
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr ""
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "Профил"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr ""
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr ""
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr ""
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "Главен профил"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr ""
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr ""
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -15305,14 +14932,6 @@ msgstr "Ако файла вече съществува, той ще бъде п
 msgid "File dumper"
 msgstr "Файл за временно съхранение"
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "Задаване на стойност на dts с"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "Видео демултиплексор Dirac"
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -15807,8 +15426,8 @@ msgid ""
 "'#duplicate{..., select=\"es=<pid>\"}'."
 msgstr ""
 "Определяне на вътрешен идентификатор за всеки елементарен поток равен на PID "
-"в TS поток, вместо 1, 2, 3, и др. Полезно за '#duplicate{..., select="
-"\"es=<pid>\"}'."
+"в TS поток, вместо 1, 2, 3, и др. Полезно за '#duplicate{..., "
+"select=\"es=<pid>\"}'."
 
 #: modules/demux/mpeg/ts.c:90 modules/mux/mpeg/ts.c:173
 msgid "CSA Key"
@@ -16374,8 +15993,8 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 
@@ -16670,8 +16289,8 @@ msgstr "Входящия поток е променен"
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "Входящия поток е променен, невъзможно е да се запази отметката. Спрете "
 "възпроизвеждането с \"Пауза\" когато редактирате отметки за да осигурите "
@@ -22328,8 +21947,8 @@ msgstr "Настройка на интерфейса Lua"
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 "Задаване на низа за настройка на интерфейса Lua. Формата е: '[\"име на "
 "модула за интерфейса\"] = { опция> = <стойност, ...}, ...'."
@@ -23751,10 +23370,6 @@ msgstr ""
 #: modules/packetizer/copy.c:48
 msgid "Copy packetizer"
 msgstr "Опаковчик Copy"
-
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "Опаковчик Dirac "
 
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
@@ -29760,6 +29375,128 @@ msgstr ""
 msgid "Media Manager List"
 msgstr "Управление на списъка с медии"
 
+#~ msgid "Rate control method"
+#~ msgstr "Метод за контрол на честотата"
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "Режим за ограничаване на постоянния шум"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "Режим на постоянен битрейт (CBR)."
+
+#~ msgid "Low Delay mode"
+#~ msgstr "Режим на малко задържане"
+
+#~ msgid "Lossless mode"
+#~ msgstr "Режим без загуби"
+
+#~ msgid "Constant error mode"
+#~ msgstr "Режим на постоянна грешка"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "Режим на постоянно качество"
+
+#~ msgid "GOP structure"
+#~ msgstr "GOP структура"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "Постоянен коефицент на качеството"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "Ограничаване на шума"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr "Граница на шума, която да се използва в режима ограничаване на шум"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "CBR битрейт (kbps)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Целев битрейт в kbps, когато кодирането е в режим на постоянен битрейт"
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "Максимален битрейт (kbps)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Максимален битрейт в кбит/с, когато кодирането е в режим на постоянен "
+#~ "битрейт"
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "Минимален битрейт (kbps)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Минимален битрейт в кбит/с, когато кодирането е в режим на постоянен "
+#~ "битрейт"
+
+#~ msgid "GOP length"
+#~ msgstr "Максимална дължина"
+
+#~ msgid "Prefilter"
+#~ msgstr "Предфилтър"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "Включване на адаптивно предфилтриране"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "Без филтър"
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "Гаусово замъгляване"
+
+#~ msgid "Add Noise"
+#~ msgstr "Шум"
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "Гаусово замъгляване"
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "Размер на предфилтриране"
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "По-висока стойност означава повече предфилтриране"
+
+#~ msgid "Picture coding mode"
+#~ msgstr "Вид на кодирането на изображението"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "Точност на векторното движение"
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "Точност на векторното движение"
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "Три компонента  в оценката на движенията"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "Използване на цветността, като част от оценката на движенията"
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "Метод за изпращане на потока"
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "Хоризонтални части на кадър"
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "Вертикални части на кадър"
+
+#~ msgid "Force Profile"
+#~ msgstr "Профил"
+
+#~ msgid "Main Profile"
+#~ msgstr "Главен профил"
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "Задаване на стойност на dts с"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "Видео демултиплексор Dirac"
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "Опаковчик Dirac "
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr "Файл с шрифтовете за звука се изискват за софтуерен синтез."
@@ -29952,9 +29689,9 @@ msgstr "Управление на списъка с медии"
 #~ msgstr "Парола за RTSP"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
 #~ "HTTP прокси, което да се използва. Трябва да бъде във формата: http://"
 #~ "[потребител[:парола]@]myproxy.mydomain:myport/ ; ако е празно,  ще бъде "
@@ -31105,8 +30842,8 @@ msgstr "Управление на списъка с медии"
 #~ "On Windows usually something like COM1 or COM2. On Linux /dev/ttyS01 f.e."
 #~ msgstr ""
 #~ "Име на серийния порт, където е свързано управлението на AtmoLight.\n"
-#~ "При Windows обикновенно е нещо като COM1 или COM2. На Linux /dev/ttyS01 f."
-#~ "e."
+#~ "При Windows обикновенно е нещо като COM1 или COM2. На Linux /dev/ttyS01 "
+#~ "f.e."
 
 #~ msgid "Edge weightning"
 #~ msgstr "Удебеляване на контурите"
@@ -31715,8 +31452,8 @@ msgstr "Управление на списъка с медии"
 #~ msgid ""
 #~ "Force the subtiles format. Valid values are : \"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
 #~ "autodetection, this should always work)."
 #~ msgstr ""
 #~ "Задаване формата на субтитрите, ако не се открие автоматично. Възможните "
@@ -31870,14 +31607,14 @@ msgstr "Управление на списъка с медии"
 #~ "Specify the log format. Available choices are \"text\" (default) and "
 #~ "\"html\"."
 #~ msgstr ""
-#~ "Определяне формата на файла за дневника. Възможните избори са \"текст"
-#~ "\" (по подразбиране) и \"html\"."
+#~ "Определяне формата на файла за дневника. Възможните избори са \"текст\" "
+#~ "(по подразбиране) и \"html\"."
 
 #, fuzzy
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", \"syslog\" (special mode to send to syslog instead of file), and "
-#~ "\"android\" (special mode to send to android logging facility)."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", \"syslog\" (special mode to send to syslog instead of file), "
+#~ "and \"android\" (special mode to send to android logging facility)."
 #~ msgstr ""
 #~ "Определяне формата на дневника. Наличните възможности са \"text\" (по "
 #~ "подразбиране), \"html\", и \"syslog\" (специален режим за изпращане в "
@@ -32137,8 +31874,8 @@ msgstr "Управление на списъка с медии"
 #~ "възпроизвеждане. Може да се изключи, за да се предпази екрана от изгаряне."
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", and \"syslog\" (special mode to send to syslog instead of file."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", and \"syslog\" (special mode to send to syslog instead of file."
 #~ msgstr ""
 #~ "Определяне формата на дневника. Наличните възможности са \"text\" (по "
 #~ "подразбиране), \"html\", и \"syslog\" (специален режим за изпращане в "
@@ -32186,11 +31923,11 @@ msgstr "Управление на списъка с медии"
 #~ msgstr "Цвят на топката, един от \"червен\", \"син\" и \"зелен\"."
 
 #~ msgid ""
-#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be"
-#~ "\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
+#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
+#~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
 #~ msgstr ""
-#~ "Един от \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be"
-#~ "\", \"s16_be\", \"fixed32\", \"float32\" или \"spdif\""
+#~ "Един от \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
+#~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" или \"spdif\""
 
 #~ msgid ""
 #~ "This defines the address, port and path the RTSP VOD server will listen "
@@ -32425,8 +32162,8 @@ msgstr "Управление на списъка с медии"
 #~ "Access control list (equivalent to .hosts) file path, which will limit "
 #~ "the range of IPs entitled to log into the internal HTTP server."
 #~ msgstr ""
-#~ "Път към файла със списък на управлението на достъпа (еквивалент на ."
-#~ "hosts), който позволява на определен обхват от IP да се включват към "
+#~ "Път към файла със списък на управлението на достъпа (еквивалент "
+#~ "на .hosts), който позволява на определен обхват от IP да се включват към "
 #~ "вътрешния HTTP-сървър."
 
 #~ msgid "HTTP interface x509 PEM certificate file (enables SSL)"
@@ -32597,8 +32334,8 @@ msgstr "Управление на списъка с медии"
 #~ "List of handler extensions and executable paths (for instance: php=/usr/"
 #~ "bin/php,pl=/usr/bin/perl)."
 #~ msgstr ""
-#~ "Списък на разширения и техните обработчици (например: php=/usr/bin/php,"
-#~ "pl=/usr/bin/perl)."
+#~ "Списък на разширения и техните обработчици (например: php=/usr/bin/"
+#~ "php,pl=/usr/bin/perl)."
 
 #~ msgid "Export album art as /art"
 #~ msgstr "Изнасяне на обложка на албум като /art"
@@ -33064,10 +32801,10 @@ msgstr "Управление на списъка с медии"
 
 #, fuzzy
 #~ msgid ""
-#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title"
-#~ "\" ($a - $t). You can use the following substitutions: $a Artist, $b "
-#~ "Album, $c Copyright, $d Description, $e Encoder, $g Genre, $l Language, "
-#~ "$n number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
+#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title\" "
+#~ "($a - $t). You can use the following substitutions: $a Artist, $b Album, "
+#~ "$c Copyright, $d Description, $e Encoder, $g Genre, $l Language, $n "
+#~ "number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
 #~ "URL, $A Date, $B Bitrate, $C Chapter, $D Duration, $F URI, $I Video "
 #~ "Title, $L Time Remaining, $N Name, $O Audio language, $P Position, $R "
 #~ "Rate, $S Sample rate, $T Time elapsed, $U Publisher, $V Volume"
@@ -35446,8 +35183,8 @@ msgstr "Управление на списъка с медии"
 #~ msgid ""
 #~ "Containers (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv)"
 #~ msgstr ""
-#~ "Контейнери (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv *."
-#~ "webm)"
+#~ "Контейнери (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv "
+#~ "*.webm)"
 
 #, fuzzy
 #~ msgid "SessionManager"

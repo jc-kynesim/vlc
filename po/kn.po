@@ -586,58 +586,59 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "&lt;html&gt;&lt;head&gt;&lt;meta http-equiv=\"Content-Type\" content=\"text/"
 "html; charset=utf-8\" /&gt;&lt;/head&gt;&lt;body&gt;&lt;h2&gt;Welcome to VLC "
 "media player Help&lt;/h2&gt;&lt;h3&gt;Documentation&lt;/h3&gt;&lt;p&gt;You "
-"can find VLC documentation on VideoLAN's &lt;a href=\"http://wiki.videolan."
-"org\"&gt;wiki&lt;/a&gt; website.&lt;/p&gt;&lt;p&gt;If you are a newcomer to "
-"VLC media player, please read the&lt;br&gt;&lt;a href=\"http://wiki.videolan."
-"org/Documentation:VLC_for_dummies\"&gt;&lt;em&gt;Introduction to VLC media "
-"player&lt;/em&gt;&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;You will find some "
-"information on how to use the player in the &lt;br&gt;\"&lt;a href=\"http://"
-"wiki.videolan.org/Documentation:Play_HowTo\"&gt;&lt;em&gt;How to play files "
-"with VLC media player&lt;/em&gt;&lt;/a&gt;\" document.&lt;/p&gt;&lt;p&gt;For "
-"all the saving, converting, transcoding, encoding, muxing and streaming "
-"tasks, you should find useful information in the &lt;a href=\"http://wiki."
-"videolan.org/Documentation:Streaming_HowTo\"&gt;Streaming Documentation&lt;/"
-"a&gt;.&lt;/p&gt;&lt;p&gt;If you are unsure about terminology, please consult "
-"the &lt;a href=\"http://wiki.videolan.org/Knowledge_Base\"&gt;knowledge "
-"base&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;To understand the main keyboard shortcuts, "
-"read the &lt;a href=\"http://wiki.videolan.org/Hotkeys\"&gt;shortcuts&lt;/"
-"a&gt; page.&lt;/p&gt;&lt;h3&gt;Help&lt;/h3&gt;&lt;p&gt;Before asking any "
-"question, please refer yourself to the &lt;a href=\"http://www.videolan.org/"
-"support/faq.html\"&gt;FAQ&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;You might then get "
-"(and give) help on the &lt;a href=\"http://forum.videolan.org\"&gt;"
-"Forums&lt;/a&gt;, the &lt;a href=\"http://www.videolan.org/vlc/lists.html"
-"\"&gt;mailing-lists&lt;/a&gt; or our IRC channel (&lt;em&gt;#videolan&lt;/"
-"em&gt; on irc.freenode.net).&lt;/p&gt;&lt;h3&gt;Contribute to the "
-"project&lt;/h3&gt;&lt;p&gt;You can help the VideoLAN project giving some of "
-"your time to help the community, to design skins, to translate the "
-"documentation, to test and to code. You can also give funds and material to "
-"help us. And of course, you can &lt;b&gt;promote&lt;/b&gt; VLC media player."
-"&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;"
+"can find VLC documentation on VideoLAN's &lt;a href=\"http://"
+"wiki.videolan.org\"&gt;wiki&lt;/a&gt; website.&lt;/p&gt;&lt;p&gt;If you are "
+"a newcomer to VLC media player, please read the&lt;br&gt;&lt;a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"&gt;&lt;em&gt;Introduction "
+"to VLC media player&lt;/em&gt;&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;You will find "
+"some information on how to use the player in the &lt;br&gt;\"&lt;a "
+"href=\"http://wiki.videolan.org/Documentation:Play_HowTo\"&gt;&lt;em&gt;How "
+"to play files with VLC media player&lt;/em&gt;&lt;/a&gt;\" document.&lt;/"
+"p&gt;&lt;p&gt;For all the saving, converting, transcoding, encoding, muxing "
+"and streaming tasks, you should find useful information in the &lt;a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\"&gt;Streaming "
+"Documentation&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;If you are unsure about "
+"terminology, please consult the &lt;a href=\"http://wiki.videolan.org/"
+"Knowledge_Base\"&gt;knowledge base&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;To "
+"understand the main keyboard shortcuts, read the &lt;a href=\"http://"
+"wiki.videolan.org/Hotkeys\"&gt;shortcuts&lt;/a&gt; page.&lt;/"
+"p&gt;&lt;h3&gt;Help&lt;/h3&gt;&lt;p&gt;Before asking any question, please "
+"refer yourself to the &lt;a href=\"http://www.videolan.org/support/"
+"faq.html\"&gt;FAQ&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;You might then get (and give) "
+"help on the &lt;a href=\"http://forum.videolan.org\"&gt;Forums&lt;/a&gt;, "
+"the &lt;a href=\"http://www.videolan.org/vlc/lists.html\"&gt;mailing-"
+"lists&lt;/a&gt; or our IRC channel (&lt;em&gt;#videolan&lt;/em&gt; on "
+"irc.freenode.net).&lt;/p&gt;&lt;h3&gt;Contribute to the project&lt;/"
+"h3&gt;&lt;p&gt;You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can &lt;b&gt;promote&lt;/b&gt; VLC media player.&lt;/p&gt;&lt;/"
+"body&gt;&lt;/html&gt;"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -1555,9 +1556,9 @@ msgid ""
 "select the main interface, additional interface modules, and define various "
 "related options."
 msgstr ""
-"ಈ ಆಯ್ಕೆಗಳು ನೀವು VLC ಯಲ್ಲಿ ಬಳಸುವ ಸಂಪರ್ಕಸಾಧನಗಳನ್ನು ಸಂರಚಿಸಲು ಅನುವುಮಾಡಿಕೊಡುತ್ತವೆ."
-"ನೀವು ಮುಖ್ಯ ಮೇಲ್ಮೈ, ,ಹೆಚ್ಚುವರಿ ಮೇಲ್ಮೈಘಟಕಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ ಸಂಬಂಧಿತ ಆಯ್ಕೆಗಳನ್ನು "
-"ರೂಪಿಸಬಹುದು."
+"ಈ ಆಯ್ಕೆಗಳು ನೀವು VLC ಯಲ್ಲಿ ಬಳಸುವ ಸಂಪರ್ಕಸಾಧನಗಳನ್ನು ಸಂರಚಿಸಲು "
+"ಅನುವುಮಾಡಿಕೊಡುತ್ತವೆ.ನೀವು ಮುಖ್ಯ ಮೇಲ್ಮೈ, ,ಹೆಚ್ಚುವರಿ ಮೇಲ್ಮೈಘಟಕಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ "
+"ಸಂಬಂಧಿತ ಆಯ್ಕೆಗಳನ್ನು ರೂಪಿಸಬಹುದು."
 
 #: src/libvlc-module.c:68
 msgid "Interface module"
@@ -1579,8 +1580,8 @@ msgstr "ಹೆಚ್ಚುವರಿ ಮೇಲ್ಮೈ ಘಟಕಗಳು"
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "ನೀವು \"ಹೆಚ್ಚುವರಿ ಸಂಪರ್ಕಸಾಧನಗಳು \" VLC ಗೆ ಆಯ್ಕೆ ಮಾಡಬಹುದು.ಅವುಗಳನ್ನು ಪೂರ್ವನಿಯೋಜಿತ "
 "ಮೇಲ್ಮೈಜೊತೆಗೆ ಹಿನ್ನೆಲೆಯಲ್ಲಿ ಕಾರ್ಯಗತಗೊಳಿಸಲಾಗುತ್ತದೆ.ಮೇಲ್ಮೈ ಘಟಕವನ್ನು ಒಂದು ಅಪೂರ್ಣವಿರಾಮ "
@@ -1767,8 +1768,9 @@ msgid ""
 "This delays the audio output. The delay must be given in milliseconds. This "
 "can be handy if you notice a lag between the video and the audio."
 msgstr ""
-"ಇದು ಧ್ವನಿ ಉತ್ಪಾದನೆಯನ್ನು ವಿಳಂಬಗೊಳಿಸುತ್ತದೆ.ವಿಳಂಬವನ್ನು ಮಿಲಿಸೆಕೆಂಡುಗಳಲ್ಲಿ ನೀಡಬೇಕು."
-"ನೀವು ವೀಡಿಯೊ ಮತ್ತು ಧ್ವನಿ ನಡುವೆ ಮಂದಗತಿ ಗಮನಕ್ಕೆ ಬಂದರೆ ಇದು ಉಪಯುಕ್ತ ಆಗುತ್ತದೆ."
+"ಇದು ಧ್ವನಿ ಉತ್ಪಾದನೆಯನ್ನು ವಿಳಂಬಗೊಳಿಸುತ್ತದೆ.ವಿಳಂಬವನ್ನು ಮಿಲಿಸೆಕೆಂಡುಗಳಲ್ಲಿ "
+"ನೀಡಬೇಕು.ನೀವು ವೀಡಿಯೊ ಮತ್ತು ಧ್ವನಿ ನಡುವೆ ಮಂದಗತಿ ಗಮನಕ್ಕೆ ಬಂದರೆ ಇದು ಉಪಯುಕ್ತ "
+"ಆಗುತ್ತದೆ."
 
 #: src/libvlc-module.c:168
 msgid "This selects which plugin to use for audio resampling."
@@ -2370,14 +2372,14 @@ msgstr "ಮೂಲ ಆಕಾರ ಅನುಪಾತ"
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 
 #: src/libvlc-module.c:440
@@ -2512,8 +2514,8 @@ msgid ""
 "channel."
 msgstr ""
 "ಈ ಆಯ್ಕೆಗಳು ನಿಮಗೆ ಇನ್ಪುಟ್ ಉಪವ್ಯವಸ್ಥೆಯು ಸ್ವಭಾವವನ್ನು ಬದಲಾಯಿಸಲು ಅವಕಾಶ ಈ ಆಯ್ಕೆಗಳು ನಿಮಗೆ "
-"ಇನ್ಪುಟ್ ಉಪವ್ಯವಸ್ಥೆಯು ಸ್ವಭಾವವನ್ನು ಬದಲಾಯಿಸಲು ಅವಕಾಶ,ಉದಾಹರಣೆಗೆ, DVD ಅಥವಾ VCD ಸಾಧನ,"
-"ಜಾಲಬಂಧ ಸಂಪರ್ಕಸಾಧನಗಳ ಸಿದ್ಧತೆಗಳು ಅಥವಾ ಉಪಶೀರ್ಷಿಕೆ ಚಾನಲ್."
+"ಇನ್ಪುಟ್ ಉಪವ್ಯವಸ್ಥೆಯು ಸ್ವಭಾವವನ್ನು ಬದಲಾಯಿಸಲು ಅವಕಾಶ,ಉದಾಹರಣೆಗೆ, DVD ಅಥವಾ VCD "
+"ಸಾಧನ,ಜಾಲಬಂಧ ಸಂಪರ್ಕಸಾಧನಗಳ ಸಿದ್ಧತೆಗಳು ಅಥವಾ ಉಪಶೀರ್ಷಿಕೆ ಚಾನಲ್."
 
 #: src/libvlc-module.c:505
 msgid "File caching (ms)"
@@ -2567,8 +2569,9 @@ msgid ""
 "It is possible to disable the input clock synchronisation for real-time "
 "sources. Use this if you experience jerky playback of network streams."
 msgstr ""
-"ನೈಜ ಸಮಯದ ಮೂಲಗಳಿಗೆ input ಗಡಿಯಾರದ ಹೊಂದಾಣಿಕೆಯನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲು ಸಾಧ್ಯವಿದೆ."
-"ಜಾಲಬಂಧದ ಸ್ಟ್ರೀಮ್ಗಳ ಸಕ್ರಿಯವಾಗಿರುವ ಸಮಯದಲ್ಲಿ ನುಲಿಯುವಿಕೆ ಅನುಭವಿಸಿದರೆ ಇದನ್ನು ಬಳಸಿ."
+"ನೈಜ ಸಮಯದ ಮೂಲಗಳಿಗೆ input ಗಡಿಯಾರದ ಹೊಂದಾಣಿಕೆಯನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲು "
+"ಸಾಧ್ಯವಿದೆ.ಜಾಲಬಂಧದ ಸ್ಟ್ರೀಮ್ಗಳ ಸಕ್ರಿಯವಾಗಿರುವ ಸಮಯದಲ್ಲಿ ನುಲಿಯುವಿಕೆ ಅನುಭವಿಸಿದರೆ ಇದನ್ನು "
+"ಬಳಸಿ."
 
 #: src/libvlc-module.c:532
 msgid "Clock jitter"
@@ -2591,8 +2594,8 @@ msgid ""
 "This allows you to remotely synchronise clocks for server and client. The "
 "detailed settings are available in Advanced / Network Sync."
 msgstr ""
-"ಇದು ನಿಮಗೆ ರಿಮೋಟ್ ಸರ್ವರ್ ಮತ್ತು ಗ್ರಾಹಕರ ಗಡಿಯಾರಗಳ ಹೊಂದಾಣಿಕೆಗೆ ಅನುವು ಮಾಡಿಕೊಡುತ್ತದೆ."
-"ವಿವರವಾದ ಸಿದ್ಧತೆಗಳು ಸುಧಾರಿತ / ಜಾಲಬಂಧ ಹೊಂದಾಣಿಕೆ ಇಲ್ಲಿ ಲಭ್ಯವಿದೆ."
+"ಇದು ನಿಮಗೆ ರಿಮೋಟ್ ಸರ್ವರ್ ಮತ್ತು ಗ್ರಾಹಕರ ಗಡಿಯಾರಗಳ ಹೊಂದಾಣಿಕೆಗೆ ಅನುವು "
+"ಮಾಡಿಕೊಡುತ್ತದೆ.ವಿವರವಾದ ಸಿದ್ಧತೆಗಳು ಸುಧಾರಿತ / ಜಾಲಬಂಧ ಹೊಂದಾಣಿಕೆ ಇಲ್ಲಿ ಲಭ್ಯವಿದೆ."
 
 #: src/libvlc-module.c:544 src/video_output/vout_intf.c:98
 #: src/video_output/vout_intf.c:116 modules/access/dshow/dshow.cpp:92
@@ -2642,8 +2645,8 @@ msgid ""
 "multicast packets sent by the stream output (-1 = use operating system built-"
 "in default)."
 msgstr ""
-"ಇದು ಸ್ಟ್ರೀಮ್ output ಕಳುಹಿಸಿದ ಬಹು ಪಾತ್ರವರ್ಗದ ಪ್ಯಾಕೆಟ್ಗಳ ಕುಪ್ಪಳಿಕೆಯ ಮಿತಿ (\"ಬದುಕುವ ಸಮಯ"
-"\" ಅಥವಾ TTL ಎಂದು ಕರೆಯಲಾಗುತ್ತದೆ) (-1 = ಕಾರ್ಯವ್ಯವಸ್ಥೆಯ ಪೂರ್ವನಿಯೋಜಿತ ಅಂತರ್ನಿರ್ಮಿತ "
+"ಇದು ಸ್ಟ್ರೀಮ್ output ಕಳುಹಿಸಿದ ಬಹು ಪಾತ್ರವರ್ಗದ ಪ್ಯಾಕೆಟ್ಗಳ ಕುಪ್ಪಳಿಕೆಯ ಮಿತಿ (\"ಬದುಕುವ "
+"ಸಮಯ\" ಅಥವಾ TTL ಎಂದು ಕರೆಯಲಾಗುತ್ತದೆ) (-1 = ಕಾರ್ಯವ್ಯವಸ್ಥೆಯ ಪೂರ್ವನಿಯೋಜಿತ ಅಂತರ್ನಿರ್ಮಿತ "
 "ಬಳಕೆಮಾಡಿ)."
 
 #: src/libvlc-module.c:559
@@ -2936,16 +2939,16 @@ msgstr "ಪ್ರಸ್ತುತ ಮಾಧ್ಯಮದ ಪ್ರಕಾರ ಶಿ
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
-"This option allows you to set the title according to what's being played&lt;"
-"br&gt;$a: Artist&lt;br&gt;$b: Album&lt;br&gt;$c: Copyright&lt;br&gt;$t: "
-"Title&lt;br&gt;$g: Genre&lt;br&gt;$n: Track num&lt;br&gt;$p: Now playing&lt;"
-"br&gt;$A: Date&lt;br&gt;$D: Duration&lt;br&gt;$Z: \"Now playing\" (Fall back "
-"on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played&lt;br&gt;$a: Artist&lt;br&gt;$b: Album&lt;br&gt;$c: "
+"Copyright&lt;br&gt;$t: Title&lt;br&gt;$g: Genre&lt;br&gt;$n: Track "
+"num&lt;br&gt;$p: Now playing&lt;br&gt;$A: Date&lt;br&gt;$D: "
+"Duration&lt;br&gt;$Z: \"Now playing\" (Fall back on Title - Artist)"
 
 #: src/libvlc-module.c:699
 msgid "Disable all lua plugins"
@@ -6869,8 +6872,8 @@ msgid ""
 "If there is more than one digital broadcasting adapter, the adapter number "
 "must be selected. Numbering starts from zero."
 msgstr ""
-"ಒಂದಕ್ಕಿಂತ ಹೆಚ್ಚು ಡಿಜಿಟಲ್ ಪ್ರಸಾರ ಸಂಯೋಜಕ ಇದ್ದರೆ,ಸಂಯೋಜಕದ ಸಂಖ್ಯೆಯನ್ನು ಆಯ್ಕೆ ಮಾಡಬೇಕು."
-"ಸಂಖ್ಯೆಯನ್ನು ಸೊನ್ನೆಯಿಂದ ಪ್ರಾರಂಭಿಸಲಾಗಗುತ್ತದೆ."
+"ಒಂದಕ್ಕಿಂತ ಹೆಚ್ಚು ಡಿಜಿಟಲ್ ಪ್ರಸಾರ ಸಂಯೋಜಕ ಇದ್ದರೆ,ಸಂಯೋಜಕದ ಸಂಖ್ಯೆಯನ್ನು ಆಯ್ಕೆ "
+"ಮಾಡಬೇಕು.ಸಂಖ್ಯೆಯನ್ನು ಸೊನ್ನೆಯಿಂದ ಪ್ರಾರಂಭಿಸಲಾಗಗುತ್ತದೆ."
 
 #: modules/access/dtv/access.c:41
 msgid "DVB device"
@@ -7585,11 +7588,13 @@ msgstr "HTTP ಪ್ರಾಕ್ಸಿ"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
-"ಬಳಸಬೇಕಾದ HTTP ಪ್ರಾಕ್ಸಿ ಈ ರೂಪದಲ್ಲಿ ಇರಬೇಕು http://[user@]myproxy.mydomain:"
-"myport/ ; ಒಂದು ವೇಳೆ ಖಾಲಿಯಾಗಿದ್ದರೆ http_proxy environment ಪ್ರಯತ್ನ ನಡೆಯಲಿದೆ."
+"ಬಳಸಬೇಕಾದ HTTP ಪ್ರಾಕ್ಸಿ ಈ ರೂಪದಲ್ಲಿ ಇರಬೇಕು http://"
+"[user@]myproxy.mydomain:myport/ ; ಒಂದು ವೇಳೆ ಖಾಲಿಯಾಗಿದ್ದರೆ http_proxy "
+"environment ಪ್ರಯತ್ನ ನಡೆಯಲಿದೆ."
 
 #: modules/access/http.c:65
 msgid "HTTP proxy password"
@@ -7900,8 +7905,8 @@ msgstr "ಧ್ವನಿಯ ಸಂರಚನೆ"
 #: modules/access/linsys/linsys_sdi.c:79
 msgid "Allows you to set audio configuration (id=group,pair:id=group,pair...)."
 msgstr ""
-"ಇದು ಧ್ವನಿಯ ಸಂರಚನೆಯನ್ನು ಹೊಂದಿಸಲು ಅನುಮತಿಸುತ್ತದೆ (ಗುರುತು=ಗುಂಪು,ಜೋಡಿ:"
-"ಗುರುತು=ಗುಂಪು,ಜೋಡಿ...)."
+"ಇದು ಧ್ವನಿಯ ಸಂರಚನೆಯನ್ನು ಹೊಂದಿಸಲು ಅನುಮತಿಸುತ್ತದೆ "
+"(ಗುರುತು=ಗುಂಪು,ಜೋಡಿ:ಗುರುತು=ಗುಂಪು,ಜೋಡಿ...)."
 
 #: modules/access/linsys/linsys_hdsdi.c:89
 msgid "HD-SDI Input"
@@ -8182,8 +8187,8 @@ msgstr "ಯಾವುದೇ Input ಸಾಧನ"
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 #, fuzzy
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "ನಿಮ್ಮ ಮ್ಯಾಕ್ ಸೂಕ್ತ ಇನ್ಪುಟ್ ಸಾಧನದಿಂದ ಸಜ್ಜುಗೊಂಡಿಯೆಂದು ತೋರುವುದಿಲ್ಲ. ನಿಮ್ಮ ಕನೆಕ್ಟರ್ಗಳು "
 "ಮತ್ತು ಡ್ರೈವರ್ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ."
@@ -8616,8 +8621,8 @@ msgstr "RTSP ದೃಢೀಕರಣ"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -9081,14 +9086,14 @@ msgstr "v4l2 ಡ್ರೈವರ್ ನಿಯಂತ್ರಣಗಳು"
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vvv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vvv) or use the v4l2-ctl application."
 
 #: modules/access/v4l2/v4l2.c:242 modules/codec/avcodec/avcodec.c:50
 #: modules/codec/avcodec/avcodec.c:54 modules/codec/x264.c:435
@@ -9474,13 +9479,13 @@ msgstr "VLC ಕೀಲಿ URI ಮತ್ತು keyfile ಓದುವ ಕಡತ�
 #: modules/access_output/livehttp.c:98
 #, fuzzy
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
-"File is read when segment starts and is assumet to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumet to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 
 #: modules/access_output/livehttp.c:102
 msgid "Use randomized IV for encryption"
@@ -10973,7 +10978,6 @@ msgstr "ವಿಸಂಕೇತಿಸು"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "ಸಂಕೇತಿಸು"
 
@@ -11516,11 +11520,11 @@ msgstr "ಥಿಯೊರ ವಿಡಿಯೋ ವಿಭಜಕ"
 msgid "Daala video encoder"
 msgstr "PNG ವೀಡಿಯೊ ಎನ್ಕೋಡರ್"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "ವರ್ಣಶುದ್ಧತೆ ಸ್ವರೂಪ"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr ""
@@ -11585,12 +11589,12 @@ msgstr "ಉಪ ಚಿತ್ರದ ಸ್ಥಾನ"
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 
 #: modules/codec/dvbsub.c:95
 msgid "Encoding X coordinate"
@@ -12352,15 +12356,15 @@ msgstr "ದರ ನಿಯಂತ್ರಣದ ನಿಖರತೆ"
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 
 #: modules/codec/qsv.c:134
 msgid "Convergence time of 'avbr' RateControl"
@@ -12423,384 +12427,6 @@ msgstr "ಕೃತಕ ಕಚ್ಚಾ ವಿಡಿಯೋ ವಿಭಜಕ"
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "PNG ವೀಡಿಯೊ ಎನ್ಕೋಡರ್"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "ದರ ನಿಯಂತ್ರಣ ವಿಧಾನ"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr "ವೀಡಿಯೊ ಅನುಕ್ರಮ ಸಂಕೇತಿಕರಣಕ್ಕೆ ಉಪಯೋಗಿಸಿದ ವಿಧಾನ"
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "ನಿರಂತರ ಶಬ್ದ ಮಿತಿ ಕ್ರಮ"
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "ಸ್ಥಿರ ಬಿಟ್ ದರ (CBR)"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "ಕಡಿಮೆ ವಿಳಂಬ ಕ್ರಮ"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "ನಷ್ಟವಿಲ್ಲದ ಕ್ರಮ"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "ಸ್ಥಿರ ಲ್ಯಾಂಬ್ಡಾ ಕ್ರಮ"
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "ಸ್ಥಿರ ದೋಷ ಕ್ರಮ"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "ಸ್ಥಿರ ಗುಣಮಟ್ಟದ ಕ್ರಮ"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "GOP ರಚನೆ"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr "GOP ರಚನೆ ವೀಡಿಯೊ ಅನುಕ್ರಮದ ಸಂಕೇತಿಕರಣಕ್ಕೆ ಬಳಸಲಾಗುತ್ತದೆ"
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-"ಯಾವುದೇ ನಿಶ್ಚಿತ GOP ರಚನೆಯಿಲ್ಲ.ಒಂದು ಚಿತ್ರ ಆಂತರಿಕ ಅಥವಾ ಅಂತರ ಮತ್ತು ಹಿಂದಿನ ಅಥವಾ "
-"ಮುಂದಿನ ಚಿತ್ರಗಳನ್ನು ಉಲ್ಲೇಖಿಸಬಹುದು."
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr "I-frame ಮಾತ್ರ ಅನುಕ್ರಮ"
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr "ಅಂತರ ಚಿತ್ರಗಳು ಹಿಂದಿನ ಚಿತ್ರಗಳನ್ನು ಮಾತ್ರ ಉಲ್ಲೇಖಿಸುತ್ತದೆ "
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr "ಅಂತರ ಚಿತ್ರಗಳು ಹಿಂದಿನ ಅಥವಾ ಮುಂದಿನ ಚಿತ್ರಗಳನ್ನು ಉಲ್ಲೇಖಿಸಬಹುದು "
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "ಸ್ಥಿರ ಗುಣಮಟ್ಟ ಅಂಶ"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr "ನಿರಂತರ ಗುಣಮಟ್ಟದ ಕ್ರಮದಲ್ಲಿ ಬಳಸುವ ಗುಣಮಟ್ಟದ ಅಂಶ"
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "ಶಬ್ದದ ಮಿತಿ"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr "Noise threshold to use in constant noise threshold mode"
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "CBR ಬಿಟ್ ದರ (kbps)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr "Target bitrate in kbps when encoding in constant bitrate mode"
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "ಗರಿಷ್ಠ ಬಿಟ್ ದರ(Kbps)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "ಸ್ಥಿರ ಬಿಟ್ ಕ್ರಮದಲ್ಲಿ ಸಂಕೇತಿಕರಣ ಮಾಡುವಾಗ ಗರಿಷ್ಠ ಬಿಟ್ ದರ್ Kbps ನಲ್ಲಿ "
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "ಕನಿಷ್ಠ ಬಿಟ್ ದರ(Kbps)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "ಸ್ಥಿರ ಬಿಟ್ ಕ್ರಮದಲ್ಲಿ ಸಂಕೇತಿಕರಣ ಮಾಡುವಾಗ ಕನಿಷ್ಠ ಬಿಟ್ ದರ್ Kbps ನಲ್ಲಿ "
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "GOP ಉದ್ದ"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "ಪೂರ್ವ ಶೋಧಕ"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "ಹೊಂದಿಕೊಳ್ಳಬಲ್ಲ ಪೂರ್ವ ಶೋಧಕವನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "ಪೂರ್ವ ಶೋಧಿಸುವಿಕೆ ಇಲ್ಲ"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr "ಕೇಂದ್ರ ಸಮತೋಲನದ ಸರಾಸರಿ"
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "ಗಾಸಿಯನ್ ಲೋ ಪಾಸ್ ಶೋಧಕ"
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "ಶಬ್ದವನ್ನು ಸೇರಿಸಿ"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "ಗಾಸಿಯನ್ ಹೊಂದಿಕೊಳ್ಳಬಲ್ಲ ಲೋ ಪಾಸ್ ಶೋಧಕ"
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "ಲೋ ಪಾಸ್ ಶೋಧಕ"
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "ಪೂರ್ವ ಶೋದಕದ ಪ್ರಮಾಣ"
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "ಹೆಚ್ಚಿನ ಮೌಲ್ಯ ಹೆಚ್ಚಿನ ಪೂರ್ವ ಶೋಧಿಸುವಿಕೆಯನ್ನು ಸೂಚಿಸುತ್ತದೆ"
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "ಚಿತ್ರ ಸಂಕೇತಿಸುವ ಕ್ರಮ"
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr "auto - let encoder decide based upon input (Best)"
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr "force coding frame as single picture"
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr "force coding frame as separate interlaced fields"
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr "ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳ ಗಾತ್ರ"
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr "automatic - let encoder decide based upon input (Best)"
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr "ಸಣ್ಣ - ಸಣ್ಣ ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್‍ಗಳನ್ನು ಬಳಸಿ"
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr "ಮಧ್ಯಮ - ಮಧ್ಯಮ ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳನ್ನು ಬಳಸಿ"
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr "ದೊಡ್ಡ - ದೊಡ್ಡ ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳನ್ನು ಬಳಸಿ"
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr "ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳನ್ನು ಅತಿಕ್ರಮಣ ಮಾಡಿ"
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr "ಯಾವುದೂ ಇಲ್ಲ - ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳು ಅತಿಕ್ರಮಿಸುವುದಿಲ್ಲ"
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr "ಭಾಗಶಃ - ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳನ್ನು ಭಾಗಶಃ ಹರಡುತ್ತವೆ"
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr "ಪೂರ್ಣ - ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳನ್ನು ಸಂಪೂರ್ಣವಾಗಿ ಹರಡುತ್ತವೆ"
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "ಚಲನೆಯ ಸದಿಶ ನಿಖರತೆ"
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "ಚಲನೆಯ ಸದಿಶ ನಿಖರತೆ pels ಗಳಲ್ಲಿ"
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "ಮೂರು ಘಟಕದ ಚಲನೆಯ ಅಂದಾಜು"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "ಚಲನೆಯ ಅಂದಾಜು ಪ್ರಕ್ರಿಯೆಯ ಭಾಗವಾಗಿ ವರ್ಣಶುದ್ಧತೆಯನ್ನು ಬಳಸಿ"
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr "ಅಂತರ್ ಚಿತ್ರ DWT ಶೋಧಕ"
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr "ಅಂತರ ಚಿತ್ರ DWT ಶೋಧಕ"
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr "DWT ಪುನರಾವರ್ತನೆಗಳ ಸಂಖ್ಯೆ"
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr "DWT ಮಟ್ಟ ಎಂದು ಕರೆಯಲಾಗುತ್ತದೆ"
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr "ಅನೇಕ ಪರಿಮಾಣೀಕರಣಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ"
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr "Enable multiple quantizers per subband (one per codeblock)"
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr " ಅಂಕಗಣಿತ ಸಂಕೇತಿಕರಣವನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಿ"
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr "Use variable length codes instead, useful for very high bitrates"
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "ಐಂದ್ರಿಯಕವಾದ ಸಮತೋಲನದ ವಿಧಾನ"
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "ಐಂದ್ರಿಯಕವಾದ ದೂರ"
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr "ಐಂದ್ರಿಯಕವಾದ ಭಾರ ಲೆಕ್ಕಹಾಕಲು ಐಂದ್ರಿಯಕವಾದ ದೂರ"
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "ಪ್ರತಿ ಚೌಕಟ್ಟಿಗೆ ಸಮತಲ ಹೋಳುಗಳು"
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr "ಕಡಿಮೆ ವಿಳಂಬ ಕ್ರಮದಲ್ಲಿ  ಪ್ರತಿ ಸಮತಲ ಬಿಲ್ಲೆಗಳಿಗೆ ಚೌಕಟ್ಟುಗಳ ಸಂಖ್ಯೆ "
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "ಪ್ರತಿ ಚೌಕಟ್ಟಿಗೆ ಲಂಬ ಬಿಲ್ಲೆಗಳ ಸಂಖ್ಯೆ"
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr "ಕಡಿಮೆ ವಿಳಂಬ ಕ್ರಮದಲ್ಲಿ  ಪ್ರತಿ ಲಂಬವಾದ ಬಿಲ್ಲೆಗಳಿಗೆ ಚೌಕಟ್ಟುಗಳ ಸಂಖ್ಯೆ "
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr "Size of code blocks in each subband"
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr "ಸಣ್ಣ - ಸಣ್ಣ ಸಂಕೇತದ ಬ್ಲಾಕ್ಗಳನ್ನು ಬಳಸಿ"
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr "ಮಧ್ಯಮ - ಮಧ್ಯಮ ಗಾತ್ರದ ಸಂಕೇತದ ಬ್ಲಾಕ್ಗಳನ್ನು ಬಳಸಿ"
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr "ದೊಡ್ಡ - ದೊಡ್ಡ ಸಂಕೇತದ ಬ್ಲಾಕ್ಗಳನ್ನು ಬಳಸಿ"
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr "ಪೂರ್ಣ -ಪ್ರತಿ subband ಗೆ ಒಂದು ಸಂಕೇತದ ಬ್ಲಾಕ್"
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr "ಶ್ರೇಣಿ ಚಲನೆಯ ಅಂದಾಜನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ"
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr "Downsampling ಪ್ರಮಾಣದ ಸಂಖ್ಯೆ"
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr ""
-"Number of levels of downsampling in hierarchical motion estimation mode"
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr "ಜಾಗತಿಕ ಚಲನೆಯ ಅಂದಾಜನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ"
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr "Phase Correlation Estimation ಅನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ"
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr "ದೃಶ್ಯ ಬದಲಾವಣೆ ಪತ್ತೆಯನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ"
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "ವಿವರ ಒತ್ತಾಯಪಡಿಸಿ"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr "VC2 ಕಡಿಮೆ ವಿಳಂಬ ವಿವರ"
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr "VC2 ಸರಳ ವಿವರ"
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr "VC2 ಪ್ರಮುಖ ವಿವರ"
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "ಪ್ರಮುಖ ವಿವರ"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr "Libschroedinger ಬಳಸಿಕೊಂಡು ಡಿರಾಕ್ ವೀಡಿಯೊ ವಿಸಂಕೇತಕ"
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr "Libschroedinger ಬಳಸಿಕೊಂಡು ಡಿರಾಕ್ ವೀಡಿಯೊ ಸಂಕೇತಕ"
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -15503,14 +15129,6 @@ msgstr "ಕಡತವು ಇದ್ದರೆ, ಇದು ತಿದ್ದಿ ಬರ�
 msgid "File dumper"
 msgstr "ಕಡತ ಸರಂಜಾಮು"
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "DTS ನಿಂದ ಸರಿಹೊಂದಿಸಲು ಮೌಲ್ಯ"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "Dirac ವೀಡಿಯೊ demuxer"
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -16575,19 +16193,19 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 "&lt;p&gt;VLC media player is a free and open source media player, encoder, "
-"and streamer made by the volunteers of the &lt;a href=\"http://www.videolan."
-"org/\"&gt;&lt;span style=\" text-decoration: underline; color:#0057ae;\"&gt;"
-"VideoLAN&lt;/span&gt;&lt;/a&gt; community.&lt;/p&gt;&lt;p&gt;VLC uses its "
-"internal codecs, works on essentially every popular platform, and can read "
-"almost all files, CDs, DVDs, network streams, capture cards and other media "
-"formats!&lt;/p&gt;&lt;p&gt;&lt;a href=\"http://www.videolan.org/contribute/"
-"\"&gt;&lt;span style=\" text-decoration: underline; color:#0057ae;\"&gt;Help "
-"and join us!&lt;/span&gt;&lt;/a&gt;"
+"and streamer made by the volunteers of the &lt;a href=\"http://"
+"www.videolan.org/\"&gt;&lt;span style=\" text-decoration: underline; "
+"color:#0057ae;\"&gt;VideoLAN&lt;/span&gt;&lt;/a&gt; community.&lt;/"
+"p&gt;&lt;p&gt;VLC uses its internal codecs, works on essentially every "
+"popular platform, and can read almost all files, CDs, DVDs, network streams, "
+"capture cards and other media formats!&lt;/p&gt;&lt;p&gt;&lt;a href=\"http://"
+"www.videolan.org/contribute/\"&gt;&lt;span style=\" text-decoration: "
+"underline; color:#0057ae;\"&gt;Help and join us!&lt;/span&gt;&lt;/a&gt;"
 
 #: modules/gui/macosx/VLCAddonsWindowController.m:104
 #: modules/gui/macosx/VLCAddonsWindowController.m:355
@@ -16882,11 +16500,11 @@ msgstr "ಇನ್ಪುಟ್ ಬದಲಾಗಿದೆ"
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 
 #: modules/gui/macosx/VLCControlsBarCommon.m:67
 #: modules/gui/macosx/VLCControlsBarCommon.m:149
@@ -22567,10 +22185,10 @@ msgid ""
 "password, or set a password in </p><p>Preferences &gt; All &gt; Main "
 "interfaces &gt; Lua &gt; Lua HTTP &gt; Password.</p>"
 msgstr ""
-"&lt;p&gt;Password for Web interface has not been set.&lt;/p&gt;&lt;p&gt;"
-"Please use --http-password, or set a password in &lt;/p&gt;&lt;p&gt;"
-"Preferences &amp;gt; All &amp;gt; Main interfaces &amp;gt; Lua &amp;gt; Lua "
-"HTTP &amp;gt; Password.&lt;/p&gt;"
+"&lt;p&gt;Password for Web interface has not been set.&lt;/"
+"p&gt;&lt;p&gt;Please use --http-password, or set a password in &lt;/"
+"p&gt;&lt;p&gt;Preferences &amp;gt; All &amp;gt; Main interfaces &amp;gt; Lua "
+"&amp;gt; Lua HTTP &amp;gt; Password.&lt;/p&gt;"
 
 #: modules/lua/vlc.c:49
 msgid "Lua interface"
@@ -22586,8 +22204,8 @@ msgstr "Lua ಅಂತರ್ವರ್ತನದ ಸಂಯೋಜನೆ"
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 "Lua interface configuration string. Format is: '[\"&lt;interface module "
 "name&gt;\"] = { &lt;option&gt; = &lt;value&gt;, ...}, ...'."
@@ -24035,10 +23653,6 @@ msgstr "ವಿಭಜಕಗಳನ್ನು ನಕಲಿಸಿ"
 msgid "Copy packetizer"
 msgstr "ವಿಭಜಕಗಳನ್ನು ನಕಲಿಸಿ"
 
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "Dirac ವಿಭಜಕ"
-
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
 msgstr "DTS ಶ್ರಾವ್ಯ ವಿಭಜಕ"
@@ -24460,8 +24074,8 @@ msgid ""
 "<alpha>]][;<image>[,<delay>[,<alpha>]]][;...]. If you only have one file, "
 "simply enter its filename."
 msgstr ""
-"ಬಳಸುವ ಚಿತ್ರ ಕಡತಗಳ ಸಂಪೂರ್ಣ ಮಾರ್ಗ.&lt;image&gt;[,&lt;delay in ms&gt;[,&lt;"
-"alpha&gt;]][;&lt;image&gt;[,&lt;delay&gt;[,&lt;alpha&gt;]]][;...].  "
+"ಬಳಸುವ ಚಿತ್ರ ಕಡತಗಳ ಸಂಪೂರ್ಣ ಮಾರ್ಗ.&lt;image&gt;[,&lt;delay in ms&gt;"
+"[,&lt;alpha&gt;]][;&lt;image&gt;[,&lt;delay&gt;[,&lt;alpha&gt;]]][;...].  "
 "ಸ್ವರೂಪವಾಗಿದೆ.ನೀವು ಕೇವಲ ಒಂದು ಕಡತವನ್ನು ಹೊಂದಿದ್ದರೆ, ಕೇವಲ ಅದರ ಹೆಸರನ್ನು ನಮೂದಿಸಿ."
 
 #: modules/spu/logo.c:53
@@ -30046,6 +29660,302 @@ msgstr "AAAA;"
 msgid "Media Manager List"
 msgstr "ಮಾಧ್ಯಮ ಮ್ಯಾನೇಜರ್ ಪಟ್ಟಿ"
 
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4"
+
+#~ msgid "Rate control method"
+#~ msgstr "ದರ ನಿಯಂತ್ರಣ ವಿಧಾನ"
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr "ವೀಡಿಯೊ ಅನುಕ್ರಮ ಸಂಕೇತಿಕರಣಕ್ಕೆ ಉಪಯೋಗಿಸಿದ ವಿಧಾನ"
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "ನಿರಂತರ ಶಬ್ದ ಮಿತಿ ಕ್ರಮ"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "ಸ್ಥಿರ ಬಿಟ್ ದರ (CBR)"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "ಕಡಿಮೆ ವಿಳಂಬ ಕ್ರಮ"
+
+#~ msgid "Lossless mode"
+#~ msgstr "ನಷ್ಟವಿಲ್ಲದ ಕ್ರಮ"
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "ಸ್ಥಿರ ಲ್ಯಾಂಬ್ಡಾ ಕ್ರಮ"
+
+#~ msgid "Constant error mode"
+#~ msgstr "ಸ್ಥಿರ ದೋಷ ಕ್ರಮ"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "ಸ್ಥಿರ ಗುಣಮಟ್ಟದ ಕ್ರಮ"
+
+#~ msgid "GOP structure"
+#~ msgstr "GOP ರಚನೆ"
+
+#~ msgid "GOP structure used to encode the video sequence"
+#~ msgstr "GOP ರಚನೆ ವೀಡಿಯೊ ಅನುಕ್ರಮದ ಸಂಕೇತಿಕರಣಕ್ಕೆ ಬಳಸಲಾಗುತ್ತದೆ"
+
+#~ msgid ""
+#~ "No fixed gop structure. A picture can be intra or inter and refer to "
+#~ "previous or future pictures."
+#~ msgstr ""
+#~ "ಯಾವುದೇ ನಿಶ್ಚಿತ GOP ರಚನೆಯಿಲ್ಲ.ಒಂದು ಚಿತ್ರ ಆಂತರಿಕ ಅಥವಾ ಅಂತರ ಮತ್ತು ಹಿಂದಿನ ಅಥವಾ "
+#~ "ಮುಂದಿನ ಚಿತ್ರಗಳನ್ನು ಉಲ್ಲೇಖಿಸಬಹುದು."
+
+#~ msgid "I-frame only sequence"
+#~ msgstr "I-frame ಮಾತ್ರ ಅನುಕ್ರಮ"
+
+#~ msgid "Inter pictures refere to previous pictures only"
+#~ msgstr "ಅಂತರ ಚಿತ್ರಗಳು ಹಿಂದಿನ ಚಿತ್ರಗಳನ್ನು ಮಾತ್ರ ಉಲ್ಲೇಖಿಸುತ್ತದೆ "
+
+#~ msgid "Inter pictures can refer to previous or future pictures"
+#~ msgstr "ಅಂತರ ಚಿತ್ರಗಳು ಹಿಂದಿನ ಅಥವಾ ಮುಂದಿನ ಚಿತ್ರಗಳನ್ನು ಉಲ್ಲೇಖಿಸಬಹುದು "
+
+#~ msgid "Constant quality factor"
+#~ msgstr "ಸ್ಥಿರ ಗುಣಮಟ್ಟ ಅಂಶ"
+
+#~ msgid "Quality factor to use in constant quality mode"
+#~ msgstr "ನಿರಂತರ ಗುಣಮಟ್ಟದ ಕ್ರಮದಲ್ಲಿ ಬಳಸುವ ಗುಣಮಟ್ಟದ ಅಂಶ"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "ಶಬ್ದದ ಮಿತಿ"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr "Noise threshold to use in constant noise threshold mode"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "CBR ಬಿಟ್ ದರ (kbps)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "Target bitrate in kbps when encoding in constant bitrate mode"
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "ಗರಿಷ್ಠ ಬಿಟ್ ದರ(Kbps)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "ಸ್ಥಿರ ಬಿಟ್ ಕ್ರಮದಲ್ಲಿ ಸಂಕೇತಿಕರಣ ಮಾಡುವಾಗ ಗರಿಷ್ಠ ಬಿಟ್ ದರ್ Kbps ನಲ್ಲಿ "
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "ಕನಿಷ್ಠ ಬಿಟ್ ದರ(Kbps)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "ಸ್ಥಿರ ಬಿಟ್ ಕ್ರಮದಲ್ಲಿ ಸಂಕೇತಿಕರಣ ಮಾಡುವಾಗ ಕನಿಷ್ಠ ಬಿಟ್ ದರ್ Kbps ನಲ್ಲಿ "
+
+#~ msgid "GOP length"
+#~ msgstr "GOP ಉದ್ದ"
+
+#~ msgid ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+#~ msgstr ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+
+#~ msgid "Prefilter"
+#~ msgstr "ಪೂರ್ವ ಶೋಧಕ"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "ಹೊಂದಿಕೊಳ್ಳಬಲ್ಲ ಪೂರ್ವ ಶೋಧಕವನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "ಪೂರ್ವ ಶೋಧಿಸುವಿಕೆ ಇಲ್ಲ"
+
+#~ msgid "Centre Weighted Median"
+#~ msgstr "ಕೇಂದ್ರ ಸಮತೋಲನದ ಸರಾಸರಿ"
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "ಗಾಸಿಯನ್ ಲೋ ಪಾಸ್ ಶೋಧಕ"
+
+#~ msgid "Add Noise"
+#~ msgstr "ಶಬ್ದವನ್ನು ಸೇರಿಸಿ"
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "ಗಾಸಿಯನ್ ಹೊಂದಿಕೊಳ್ಳಬಲ್ಲ ಲೋ ಪಾಸ್ ಶೋಧಕ"
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "ಲೋ ಪಾಸ್ ಶೋಧಕ"
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "ಪೂರ್ವ ಶೋದಕದ ಪ್ರಮಾಣ"
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "ಹೆಚ್ಚಿನ ಮೌಲ್ಯ ಹೆಚ್ಚಿನ ಪೂರ್ವ ಶೋಧಿಸುವಿಕೆಯನ್ನು ಸೂಚಿಸುತ್ತದೆ"
+
+#~ msgid "Picture coding mode"
+#~ msgstr "ಚಿತ್ರ ಸಂಕೇತಿಸುವ ಕ್ರಮ"
+
+#~ msgid ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+#~ msgstr ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+
+#~ msgid "auto - let encoder decide based upon input (Best)"
+#~ msgstr "auto - let encoder decide based upon input (Best)"
+
+#~ msgid "force coding frame as single picture"
+#~ msgstr "force coding frame as single picture"
+
+#~ msgid "force coding frame as separate interlaced fields"
+#~ msgstr "force coding frame as separate interlaced fields"
+
+#~ msgid "Size of motion compensation blocks"
+#~ msgstr "ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳ ಗಾತ್ರ"
+
+#~ msgid "automatic - let encoder decide based upon input (Best)"
+#~ msgstr "automatic - let encoder decide based upon input (Best)"
+
+#~ msgid "small - use small motion compensation blocks"
+#~ msgstr "ಸಣ್ಣ - ಸಣ್ಣ ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್‍ಗಳನ್ನು ಬಳಸಿ"
+
+#~ msgid "medium - use medium motion compensation blocks"
+#~ msgstr "ಮಧ್ಯಮ - ಮಧ್ಯಮ ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳನ್ನು ಬಳಸಿ"
+
+#~ msgid "large - use large motion compensation blocks"
+#~ msgstr "ದೊಡ್ಡ - ದೊಡ್ಡ ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳನ್ನು ಬಳಸಿ"
+
+#~ msgid "Overlap of motion compensation blocks"
+#~ msgstr "ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳನ್ನು ಅತಿಕ್ರಮಣ ಮಾಡಿ"
+
+#~ msgid "none - Motion compensation blocks do not overlap"
+#~ msgstr "ಯಾವುದೂ ಇಲ್ಲ - ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳು ಅತಿಕ್ರಮಿಸುವುದಿಲ್ಲ"
+
+#~ msgid "partial - Motion compensation blocks only partially overlap"
+#~ msgstr "ಭಾಗಶಃ - ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳನ್ನು ಭಾಗಶಃ ಹರಡುತ್ತವೆ"
+
+#~ msgid "full - Motion compensation blocks fully overlap"
+#~ msgstr "ಪೂರ್ಣ - ಚಲನೆಯ ಪರಿಹಾರ ಬ್ಲಾಕ್ಗಳನ್ನು ಸಂಪೂರ್ಣವಾಗಿ ಹರಡುತ್ತವೆ"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "ಚಲನೆಯ ಸದಿಶ ನಿಖರತೆ"
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "ಚಲನೆಯ ಸದಿಶ ನಿಖರತೆ pels ಗಳಲ್ಲಿ"
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "ಮೂರು ಘಟಕದ ಚಲನೆಯ ಅಂದಾಜು"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "ಚಲನೆಯ ಅಂದಾಜು ಪ್ರಕ್ರಿಯೆಯ ಭಾಗವಾಗಿ ವರ್ಣಶುದ್ಧತೆಯನ್ನು ಬಳಸಿ"
+
+#~ msgid "Intra picture DWT filter"
+#~ msgstr "ಅಂತರ್ ಚಿತ್ರ DWT ಶೋಧಕ"
+
+#~ msgid "Inter picture DWT filter"
+#~ msgstr "ಅಂತರ ಚಿತ್ರ DWT ಶೋಧಕ"
+
+#~ msgid "Number of DWT iterations"
+#~ msgstr "DWT ಪುನರಾವರ್ತನೆಗಳ ಸಂಖ್ಯೆ"
+
+#~ msgid "Also known as DWT levels"
+#~ msgstr "DWT ಮಟ್ಟ ಎಂದು ಕರೆಯಲಾಗುತ್ತದೆ"
+
+#~ msgid "Enable multiple quantizers"
+#~ msgstr "ಅನೇಕ ಪರಿಮಾಣೀಕರಣಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ"
+
+#~ msgid "Enable multiple quantizers per subband (one per codeblock)"
+#~ msgstr "Enable multiple quantizers per subband (one per codeblock)"
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr " ಅಂಕಗಣಿತ ಸಂಕೇತಿಕರಣವನ್ನು ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಿ"
+
+#~ msgid "Use variable length codes instead, useful for very high bitrates"
+#~ msgstr "Use variable length codes instead, useful for very high bitrates"
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "ಐಂದ್ರಿಯಕವಾದ ಸಮತೋಲನದ ವಿಧಾನ"
+
+#~ msgid "perceptual distance"
+#~ msgstr "ಐಂದ್ರಿಯಕವಾದ ದೂರ"
+
+#~ msgid "perceptual distance to calculate perceptual weight"
+#~ msgstr "ಐಂದ್ರಿಯಕವಾದ ಭಾರ ಲೆಕ್ಕಹಾಕಲು ಐಂದ್ರಿಯಕವಾದ ದೂರ"
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "ಪ್ರತಿ ಚೌಕಟ್ಟಿಗೆ ಸಮತಲ ಹೋಳುಗಳು"
+
+#~ msgid "Number of horizontal slices per frame in low delay mode"
+#~ msgstr "ಕಡಿಮೆ ವಿಳಂಬ ಕ್ರಮದಲ್ಲಿ  ಪ್ರತಿ ಸಮತಲ ಬಿಲ್ಲೆಗಳಿಗೆ ಚೌಕಟ್ಟುಗಳ ಸಂಖ್ಯೆ "
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "ಪ್ರತಿ ಚೌಕಟ್ಟಿಗೆ ಲಂಬ ಬಿಲ್ಲೆಗಳ ಸಂಖ್ಯೆ"
+
+#~ msgid "Number of vertical slices per frame in low delay mode"
+#~ msgstr "ಕಡಿಮೆ ವಿಳಂಬ ಕ್ರಮದಲ್ಲಿ  ಪ್ರತಿ ಲಂಬವಾದ ಬಿಲ್ಲೆಗಳಿಗೆ ಚೌಕಟ್ಟುಗಳ ಸಂಖ್ಯೆ "
+
+#~ msgid "Size of code blocks in each subband"
+#~ msgstr "Size of code blocks in each subband"
+
+#~ msgid "small - use small code blocks"
+#~ msgstr "ಸಣ್ಣ - ಸಣ್ಣ ಸಂಕೇತದ ಬ್ಲಾಕ್ಗಳನ್ನು ಬಳಸಿ"
+
+#~ msgid "medium - use medium sized code blocks"
+#~ msgstr "ಮಧ್ಯಮ - ಮಧ್ಯಮ ಗಾತ್ರದ ಸಂಕೇತದ ಬ್ಲಾಕ್ಗಳನ್ನು ಬಳಸಿ"
+
+#~ msgid "large - use large code blocks"
+#~ msgstr "ದೊಡ್ಡ - ದೊಡ್ಡ ಸಂಕೇತದ ಬ್ಲಾಕ್ಗಳನ್ನು ಬಳಸಿ"
+
+#~ msgid "full - One code block per subband"
+#~ msgstr "ಪೂರ್ಣ -ಪ್ರತಿ subband ಗೆ ಒಂದು ಸಂಕೇತದ ಬ್ಲಾಕ್"
+
+#~ msgid "Enable hierarchical Motion Estimation"
+#~ msgstr "ಶ್ರೇಣಿ ಚಲನೆಯ ಅಂದಾಜನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ"
+
+#~ msgid "Number of levels of downsampling"
+#~ msgstr "Downsampling ಪ್ರಮಾಣದ ಸಂಖ್ಯೆ"
+
+#~ msgid ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+#~ msgstr ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+
+#~ msgid "Enable Global Motion Estimation"
+#~ msgstr "ಜಾಗತಿಕ ಚಲನೆಯ ಅಂದಾಜನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ"
+
+#~ msgid "Enable Phase Correlation Estimation"
+#~ msgstr "Phase Correlation Estimation ಅನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ"
+
+#~ msgid "Enable Scene Change Detection"
+#~ msgstr "ದೃಶ್ಯ ಬದಲಾವಣೆ ಪತ್ತೆಯನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ"
+
+#~ msgid "Force Profile"
+#~ msgstr "ವಿವರ ಒತ್ತಾಯಪಡಿಸಿ"
+
+#~ msgid "VC2 Low Delay Profile"
+#~ msgstr "VC2 ಕಡಿಮೆ ವಿಳಂಬ ವಿವರ"
+
+#~ msgid "VC2 Simple Profile"
+#~ msgstr "VC2 ಸರಳ ವಿವರ"
+
+#~ msgid "VC2 Main Profile"
+#~ msgstr "VC2 ಪ್ರಮುಖ ವಿವರ"
+
+#~ msgid "Main Profile"
+#~ msgstr "ಪ್ರಮುಖ ವಿವರ"
+
+#~ msgid "Dirac video decoder using libschroedinger"
+#~ msgstr "Libschroedinger ಬಳಸಿಕೊಂಡು ಡಿರಾಕ್ ವೀಡಿಯೊ ವಿಸಂಕೇತಕ"
+
+#~ msgid "Dirac video encoder using libschroedinger"
+#~ msgstr "Libschroedinger ಬಳಸಿಕೊಂಡು ಡಿರಾಕ್ ವೀಡಿಯೊ ಸಂಕೇತಕ"
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "DTS ನಿಂದ ಸರಿಹೊಂದಿಸಲು ಮೌಲ್ಯ"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "Dirac ವೀಡಿಯೊ demuxer"
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "Dirac ವಿಭಜಕ"
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr "A sound fonts file is required for software synthesis."
@@ -30246,13 +30156,13 @@ msgstr "ಮಾಧ್ಯಮ ಮ್ಯಾನೇಜರ್ ಪಟ್ಟಿ"
 #~ msgstr "RTSP ಗುಪ್ತಪದ"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 
 #~ msgid "VLC could not open the file \"%s\": %s"
 #~ msgstr "VLC ಕಡತ \"%s\": %s ಎಂಬುದು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ"

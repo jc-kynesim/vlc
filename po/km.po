@@ -566,51 +566,51 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>សូម​ស្វាគមន៍​មកកាន់​ជំនួយ​កម្មវិធី​ចាក់​មេឌៀ VLC​</"
-"h2><h3>ឯកសារ</h3><p>អ្នក​អាច​​រកមើល​ឯកសារ VLC នៅ​លើ​តំបន់បណ្ដាញ <a href=\"http://wiki."
-"videolan.org\">វិគី</a> របស់ VideoLAN បាន ។</p><p>បើ​អ្នក​ទើប​ចាប់ផ្ដើម​ប្រើ​កម្មវិធី​ចាក់​"
-"មេឌៀ VLC សូម​អាន <br><a href=\"http://wiki.videolan.org/Documentation:"
-"VLC_for_dummies\"><em>សេចក្ដី​ណែនាំ​អំពី​កម្មវិធី​ចាក់​មេឌៀ VLC</em></a> ។</p><p>អ្នក​នឹង​ឃើញ​"
-"ព័ត៌មាន​មួយ​ចំនួន​ស្ដី​អំពី​របៀប​ប្រើប្រាស់​កម្មវិធី​ចាក់​មេឌៀ​នេះ នៅ​ក្នុង​ឯកសារ​ <br>\"<a href=\"http://"
-"wiki.videolan.org/Documentation:Play_HowTo\"><em>របៀប​ចាក់​ឯកសារ​ជាមួយ​នឹង​កម្មវិធី​ចាក់​"
-"មេឌៀ VLC</em></a>\" ។</p><p>ចំពោះ​ការ​រក្សាទុក ការ​បម្លែង ការ​បម្លែង​ត្រឡប់ ការ​អ៊ិនកូដ ការ​"
-"ទ្វេ​ទិស និង​ការ​ស្ទ្រីម អ្នក​គួរតែ​រក​វា​នៅ​ក្នុង <a href=\"http://wiki.videolan.org/"
-"Documentation:Streaming_HowTo\">ឯកសារ​ការ​ស្ទ្រីម</a> ។</p><p>បើ​អ្នក​មិន​ច្បាស់​ជាមួយ​ប្រជុំ​"
-"សព្ទ​បច្ចេកទេស​សូម​ចូល​មើល <a href=\"http://wiki.videolan.org/Knowledge_Base\">មូលដ្ឋាន​"
-"ចំណេះដឹង</a> ។</p><p>ដើម្បី​ស្វែងយល់​អំពី​ផ្លូវកាត់​គ្រាប់ចុច​មេ សូម​អាន​ទំព័រ <a href=\"http://wiki."
-"videolan.org/Hotkeys\">ផ្លូវកាត់</a> ។</p><h3>ជំនួយ</h3><p> សូម​មើល <a href="
-"\"http://wiki.videolan.org/Frequently_Asked_Questions\">FAQ (សំណួរ​ដែល​សួរ​រឿយៗ)</"
-"a> មុន​នឹង​សួរ​សំណួរ​ណាមួយ។</p><p>អ្នក​អាច​ទទួល​បាន (និង​ផ្ដល់) ជំនួយ​តាម​រយៈ <a href=\"http://"
-"forum.videolan.org\">វេទិកា</a> <a href=\"http://www.videolan.org/vlc/lists."
-"html\">បញ្ជី​សំបុត្រ​រួម</a> ឬ​ឆានែល IRC ( <a href=\"http://www.videolan.org/webirc/"
-"\"><em>#videolan</em></a> irc.freenode.net ) ។</p><h3>ការ​ចូលរួម​​គម្រោង គឺ</"
-"h3><p>អ្នក​អាច​ជួយ​គម្រោង VideoLAN បាន ដោយ​ចំណាយ​ពេលវេលា​ដើម្បី​ជួយ​សហគមន៍ ក្នុង​ការរចនា​រូបរាង "
-"ការ​បកប្រែ​ឯកសារ ការ​ធ្វើ​តេស្ដ និង​ការ​សរសេរ​កូដ​ជា​ដើម។ ឬ​អ្នក​អាច​ផ្ដល់​ជា​ថវិកា និង​សម្ភារៈ​ដើម្បី​ជួយ​ដល់​"
-"ពួក​យើង​ក៏បាន។ ហើយ​ជា​ការ​ពិត​អ្នក​ក៏​អាច​<b>ផ្សព្វផ្សាយ</b>​កម្មវិធី​ចាក់ VLC បាន​ផង​ដែរ។</p></"
-"body></html>"
+"h2><h3>ឯកសារ</h3><p>អ្នក​អាច​​រកមើល​ឯកសារ VLC នៅ​លើ​តំបន់បណ្ដាញ <a href=\"http://"
+"wiki.videolan.org\">វិគី</a> របស់ VideoLAN បាន ។</p><p>បើ​អ្នក​ទើប​ចាប់ផ្ដើម​ប្រើ​កម្មវិធី​"
+"ចាក់​មេឌៀ VLC សូម​អាន <br><a href=\"http://wiki.videolan.org/"
+"Documentation:VLC_for_dummies\"><em>សេចក្ដី​ណែនាំ​អំពី​កម្មវិធី​ចាក់​មេឌៀ VLC</em></a> ។</"
+"p><p>អ្នក​នឹង​ឃើញ​ព័ត៌មាន​មួយ​ចំនួន​ស្ដី​អំពី​របៀប​ប្រើប្រាស់​កម្មវិធី​ចាក់​មេឌៀ​នេះ នៅ​ក្នុង​ឯកសារ​ <br>\"<a "
+"href=\"http://wiki.videolan.org/Documentation:Play_HowTo\"><em>របៀប​ចាក់​ឯកសារ​"
+"ជាមួយ​នឹង​កម្មវិធី​ចាក់​មេឌៀ VLC</em></a>\" ។</p><p>ចំពោះ​ការ​រក្សាទុក ការ​បម្លែង ការ​បម្លែង​"
+"ត្រឡប់ ការ​អ៊ិនកូដ ការ​ទ្វេ​ទិស និង​ការ​ស្ទ្រីម អ្នក​គួរតែ​រក​វា​នៅ​ក្នុង <a href=\"http://"
+"wiki.videolan.org/Documentation:Streaming_HowTo\">ឯកសារ​ការ​ស្ទ្រីម</a> ។</p><p>បើ​"
+"អ្នក​មិន​ច្បាស់​ជាមួយ​ប្រជុំ​សព្ទ​បច្ចេកទេស​សូម​ចូល​មើល <a href=\"http://wiki.videolan.org/"
+"Knowledge_Base\">មូលដ្ឋាន​ចំណេះដឹង</a> ។</p><p>ដើម្បី​ស្វែងយល់​អំពី​ផ្លូវកាត់​គ្រាប់ចុច​មេ សូម​អាន​"
+"ទំព័រ <a href=\"http://wiki.videolan.org/Hotkeys\">ផ្លូវកាត់</a> ។</p><h3>ជំនួយ</"
+"h3><p> សូម​មើល <a href=\"http://wiki.videolan.org/"
+"Frequently_Asked_Questions\">FAQ (សំណួរ​ដែល​សួរ​រឿយៗ)</a> មុន​នឹង​សួរ​សំណួរ​ណាមួយ។</p><p>អ្នក​"
+"អាច​ទទួល​បាន (និង​ផ្ដល់) ជំនួយ​តាម​រយៈ <a href=\"http://forum.videolan.org\">វេទិកា</a> "
+"<a href=\"http://www.videolan.org/vlc/lists.html\">បញ្ជី​សំបុត្រ​រួម</a> ឬ​ឆានែល IRC "
+"( <a href=\"http://www.videolan.org/webirc/\"><em>#videolan</em></a> "
+"irc.freenode.net ) ។</p><h3>ការ​ចូលរួម​​គម្រោង គឺ</h3><p>អ្នក​អាច​ជួយ​គម្រោង VideoLAN បាន "
+"ដោយ​ចំណាយ​ពេលវេលា​ដើម្បី​ជួយ​សហគមន៍ ក្នុង​ការរចនា​រូបរាង ការ​បកប្រែ​ឯកសារ ការ​ធ្វើ​តេស្ដ និង​ការ​សរសេរ​"
+"កូដ​ជា​ដើម។ ឬ​អ្នក​អាច​ផ្ដល់​ជា​ថវិកា និង​សម្ភារៈ​ដើម្បី​ជួយ​ដល់​ពួក​យើង​ក៏បាន។ ហើយ​ជា​ការ​ពិត​អ្នក​ក៏​អាច​"
+"<b>ផ្សព្វផ្សាយ</b>​កម្មវិធី​ចាក់ VLC បាន​ផង​ដែរ។</p></body></html>"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -1545,8 +1545,8 @@ msgstr "ម៉ូឌុល​ចំណុច​ប្រទាក់​បន្
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "អ្នក​អាច​ជ្រើស​ \"ចំណុច​ប្រទាក់​បន្ថែម\" សម្រាប់ VLC បាន ។ ពួក​វា​នឹង​ត្រូវ​បាន​ចាប់ផ្ដើម​នៅ​ក្នុង​"
 "ផ្ទៃខាងក្រោយ ដើម្បី​បន្ថែម​ទៅកាន់​ចំណុច​ប្រទាក់​លំនាំដើម ។ ប្រើ​បញ្ជី​​ម៉ូឌុល​ចំណុច​ប្រទាក់​ដែល​បំបែក​ដោយ​សញ្ញា​ចុច​"
@@ -2301,8 +2301,8 @@ msgstr "សមាមាត្រ​ប្រភព"
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "វា​នឹង​បង្ខំ​សមាមាត្រ​ប្រភព។ ឧទាហរណ៍ ឌីវីឌី​មួយ​ចំនួន​អះអាង​ថា 16:9 ខណៈ​ដែល​តាមពិត​វា​គឺ 4:3 ។ វា​ក៏​អាច​"
@@ -2842,10 +2842,10 @@ msgstr "ផ្លាស់ប្ដូរ​ចំណងជើង​ផ្អែ
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
 "ជម្រើស​នេះ​អនុញ្ញាត​ឲ្យ​អ្នក​កំណត់​ចំណងជើង​ដោយ​ផ្អែកលើ​អ្វី​ដែល​វា​កំពុង​ចាក់<br>$a ៖ សិល្បករ<br>$b ៖ "
 "អាល់ប៊ុម<br>$c ៖ រក្សាសិទ្ធិ<br>$t ៖ ចំណងជើង<br>$g ៖ ចង្វាក់<br>$n ៖ លេខ​បទ<br>$p ៖ កំពុង​"
@@ -2864,8 +2864,8 @@ msgid ""
 "section. You can also set many miscellaneous subpictures options."
 msgstr ""
 "ជម្រើស​នេះ​អនុញ្ញាត​ឲ្យ​អ្នក​ ត្រូវ​កែប្រែ​ឥរិយាបថ​ប្រព័ន្ធ​រង​របស់​រូបភាព​រង។ ឧទាហរណ៍ អ្នក​អាច​បើក​ប្រភព​"
-"រូបភាព​រង (រូប​សញ្ញា។ល។) ។ បើក​តម្រង​ទាំងនេះ​នៅ​ទី​នេះ ហើយ​កំណត់​រចនាសម្ព័ន្ធ​វា​នៅ​ក្នុង \"តម្រង​ប្រភព​រង"
-"\" ជម្រើស​ម៉ូឌុល។ អ្នក​អាច​កំណត់​ជម្រើស​​រូបភាព​រង​ផ្សេងៗទៀត​ជា​ច្រើន។"
+"រូបភាព​រង (រូប​សញ្ញា។ល។) ។ បើក​តម្រង​ទាំងនេះ​នៅ​ទី​នេះ ហើយ​កំណត់​រចនាសម្ព័ន្ធ​វា​នៅ​ក្នុង \"តម្រង​ប្រភព​"
+"រង\" ជម្រើស​ម៉ូឌុល។ អ្នក​អាច​កំណត់​ជម្រើស​​រូបភាព​រង​ផ្សេងៗទៀត​ជា​ច្រើន។"
 
 #: src/libvlc-module.c:709 modules/gui/qt/ui/sprefs_subtitles.h:305
 msgid "Force subtitle position"
@@ -7380,8 +7380,9 @@ msgstr "ប្រូកស៊ី HTTP"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
 "ប្រូកស៊ី HTTP ដែល​បាន​ប្រើ គឺ​ត្រូវតែ​ជា​ទម្រង់ http://[user@]myproxy.mydomain:myport/ ; "
 "ប្រសិនបើ​ទ​ទេ អថេរ http_proxy នឹង​ត្រូវ​បាន​សាកល្បង។"
@@ -7964,8 +7965,8 @@ msgstr "រក​មិន​ឃើញ​ឧបករណ៍​បញ្ចូល
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 #, fuzzy
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "Mac របស់​អ្នក​ហាក់​ដូចជា​មិន​ត្រូវ​បាន​ភ្ជាប់​ជាមួយ​ឧបករណ៍​បញ្ចូល​ដែល​សមរម្យ។ សូម​ពិនិត្យមើល​ឧបករណ៍​ភ្ជាប់ និង​"
 "កម្មវិធី​បញ្ជា​របស់​អ្នក។"
@@ -8396,8 +8397,8 @@ msgstr "ការ​ផ្ទៀង​ផ្ទាត់ RTSP"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -8851,9 +8852,9 @@ msgstr "វត្ថុ​បញ្ជា​កម្មវិធី​បញ្
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "កំណត់​វត្ថុបញ្ជា​កម្មវិធី​បញ្ជា v4l2 ទៅ​តម្លៃ​ជាក់លាក់ ដោយ​ប្រើ​បញ្ជី​​បំបែក​ដោយ​សញ្ញា​ក្បៀស ជាទូទៅ​ត្រូវ​បាន​ខ្ចប់​"
 "ដោយ​សញ្ញា​រ៉ាត់ (ឧ ៖ {video_bitrate=6000000,audio_crc=0,stream_type=3} ) ។ ដើម្បី​រាយ​"
@@ -9243,9 +9244,9 @@ msgstr "ឯកសារ​ដែល vlc អាន key-uri និង keyfile-loca
 #: modules/access_output/livehttp.c:98
 #, fuzzy
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
 "បាន​អាន​ឯកសារ​ពេល​ចម្រៀក​ចាប់ផ្ដើម និង​បាន​សន្មត​ថា​នៅ​ក្នុង​ទ្រង់ទ្រាយ៖ key-uri\\nkey-file ។ "
 "ឯកសារ​ត្រូវ​បាន​អាន​នៅ​ពេល​បើក​ចម្រៀក ហើយ​តម្លៃ​ត្រូវ​បាន​ប្រើ​នៅ​លើ​ចម្រៀក​នោះ។"
@@ -10723,7 +10724,6 @@ msgstr "ការ​ឌិកូដ"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "ការ​អ៊ិនកូដ"
 
@@ -11254,11 +11254,11 @@ msgstr "ឧបករណ៍​ចងក្រង​វីដេអូ Theora"
 msgid "Daala video encoder"
 msgstr "ឌិកូឌ័រ​វីដេអូ CDG"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "ទ្រង់ទ្រាយ​ក្រូម៉ា"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr "យក​ទ្រង់ទ្រាយ​ក្រូម៉ា​នឹង​បង្ខំ​ឲ្យ​ការ​បម្លែង​វីដេអូ​ទៅ​ជា​ទ្រង់ទ្រាយ​នោះ"
@@ -11320,8 +11320,8 @@ msgstr "ទីតាំង​រូបភាព​រង"
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 "អ្នក​អាច​បង្ខំ​ទីតាំង​រូបភាព​រង​នៅ​លើ​វីដេអូ​បាន (0=កណ្ដាល 1=ឆ្វេង 2=ស្ដាំ 4=កំពូល 8=បាត អ្នក​ក៏​អាច​ប្រើ​"
 "ការ​បន្សំ​គ្នា​រវាង​តម្លៃ​ទាំង​នេះ​បាន​ផង​ដែរ ឧ. 6=កំពូល​ខាងស្ដាំ) ។"
@@ -12066,10 +12066,10 @@ msgstr "សុក្រឹតភាព​នៃ​ការ​គ្រប់គ
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
 "ប្រលោះ​គិតជា​ភាគរយ​នៃ​វិធី​សាស្ត្រ 'avbr'  (Average Variable BitRate) ។ (ឧ. 10 ជាមួយ​អត្រា​"
 "ប៊ីត 800  kpbs មានន័យថា​កម្មវិធី​ដាក់​លេខ​កូដ​នឹង​មិន​ព្យាយាម​លើស​ពី 880 kpbs ហើយ​ក៏​មិន​ក្រោម  730 "
@@ -12135,380 +12135,6 @@ msgstr "កម្មវិធី​វេច​ខ្ចប់​វីដេអ
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "អ៊ិនកូឌ័រ​វីដេអូ Theora"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "វិធីសាស្ត្រ​គ្រប់គ្រង​អត្រា"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr "វិធីសាស្ត្រ​ដែល​បាន​ប្រើ​ ដើម្បី​អ៊ិនកូដ​លំដាប់​វីដេអូ"
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "របៀប​កម្រិត​ពន្លឺ​ថេរ"
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "Constant bitrate mode (CBR)"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "របៀប​ពន្យារ​ពេល​ទាប"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "របៀប​បាត់បង់​តិច​បំផុត"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "របៀប​ឡាមដា​ថេរ"
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "របៀប​កំហុស​ថេរ"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "របៀប​គុណភាព​ថេរ"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "រចនាសម្ព័ន្ធ GOP"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr "រចនាសម្ព័ន្ធ GOP ដែល​បាន​ប្រើ​ ដើម្បី​អ៊ិនកូដ​​លំដាប់​វីដេអូ"
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-"គ្មាន​រចនាសម្ព័ន្ធ​ថេរ​ទេ ។ រូបភាព​អាច​ត្រូវ​បាន​ចេញ ឬ​ចូល និង​សំដៅ​ទៅលើ​រូបភាព​មុន ឬ​រូបភាព​អនាគត ។"
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr "តែ​លំដាប់​ស៊ុម I ប៉ុណ្ណោះ"
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr "រូបភាព​ដែល​ទាក់ទង​សំដៅ​លើ​​តែ​រូបភាព​មុន​តែ​ប៉ុណ្ណោះ"
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr "រូបភាព​ដែល​ទាក់ទង​សំដៅ​លើ​តែ​រូបភាព​មុន ឬ​រូប​ភាព​​​នៅ​​ក្រោយ​"
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "កត្តា​គុណភាព​ថេរ"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr "កត្តា​គុណភាព​​ដែល​ត្រូវ​ប្រើ​នៅ​ក្នុង​របៀប​គុណភាព​ថេរ"
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "មើល​មិន​ច្បាស់"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr "មើល​មិន​ច្បាស់​នៅ​ក្នុង​របៀប​កម្រិត​ពន្លឺ​ថេរ"
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "អត្រាប៊ីត CBR (kbps)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr "អត្រា​​ប៊ីត​គោលដៅ​នៅ​ក្នុង kbps នៅ​ពេល​​អ៊ិនកូដ​​នៅ​ក្នុង​អត្រា​ប៊ីត​ថេរ"
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "អត្រា​ប៊ីត​អតិបរមា (kbps)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "អត្រា​ប៊ីត​អតិបរមា​នៅ​ក្នុង kbps នៅ​ពេល​អ៊ិនកូដ​នៅ​ក្នុង​របៀប​អត្រា​ប៊ីត​ថេរ"
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "អត្រា​ប៊ីត​អតិបរមា (kbps)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "អត្រា​ប៊ីត​អប្បបរមា​នៅ​ក្នុង kbps នៅ​ពេល​អ៊ិនកូដ​នៅ​ក្នុង​របៀប​អត្រា​​ប៊ីត​ថេរ"
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "ប្រវែង GOP"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr "ចំនួន​រូបភាព​​នៅ​ចន្លោះ​បឋមកថា​លំដាប់​បន្ត​គ្នា ឧ. ប្រវែង​ក្រុម​រូបភាព"
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "តម្រង​ជាមុន"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "បើក​ការ​ត្រង​ជាមុន​ដែល​អាច​ប្រែប្រួល"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "មិន​ត្រង​ជា​មុន​ឡើយ"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr "មេដ្យាន​ដែលមានកម្ពស់​កណ្ដាល"
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "ហ្គូសៀន​តម្រង​បញ្ជូន​ទាប"
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "បន្ថែម មើល​មិន​ច្បាស់"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "ហ្គូសៀន​តម្រង​បញ្ជូន​ទាប​ដែល​អាច​ប្រែប្រួល"
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "Low Pass Filter"
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "ចំនួន​​តម្រង​​ជា​មុន"
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "តម្លៃ​កាន់តែ​ខ្ពស់​អនុវត្ត​ការ​ត្រង​ជា​មុន​កាន់តែ​ច្រើន"
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "របៀប​ដាក់​កូដ​រូបភាព"
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-"វាល​សរសេរ​កូដ​ជា​កន្លែង​ដែល​វាល​ត្របាញ់​ត្រូវ​បាន​សរសេរ​កូដ​ដោយ​ឡែក​ពី​គ្នា ដូច​បាន​ដាក់​ផ្ទុយគ្នា​ទៅកាន់​ស៊ុម​ "
-"pseudo-progressive"
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr "ស្វ័យ​ប្រវត្តិ - អនុញ្ញាត​ឲ្យ​អ៊ិនកូដឌ័រ​សម្រេច​លើ​ព័ត៌មាន​បញ្ចូល (ល្អ​បំផុត)"
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr "តម្រូវ​ស៊ុម​កូដ​ជា​រូបភាព​តែ​មួយ"
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr "តម្រូវ​ស៊ុម​កូដ​ជា​វាល​ត្របាញ់​បំបែក"
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr "ទំហំ ចលនា ទប់ស្កាត់"
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr "អ៊ិនកូឌ័រ​​ផ្អែក​លើ​ព័ត៌មាន​បញ្ចូល​ខាង​លើ​ស្វ័យ​ប្រវត្តិ (ល្អ​បំផុត)"
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr "យឺត  ប្រើ​​​ការ​ទប់​ស្កាត់​​ចលនា​យឺត"
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr "មធ្យម ប្រើ​ការ​ទប់​ស្កាត់​ចលនា​មធ្យម"
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr "លឿន ប្រើ​ការ​ទប់ស្កាត់​ចលនា​លឿន"
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr "ជាន់​លើ​ការ​​ទប់ស្កាត់​ចលនា"
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr "គ្មាន​ការ​ទប់​ស្កាត់​ចលនា​កុំ​ជាន់​លើ"
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr "ផាតស្យល ការ​ទប់ស្កាត់​ចលនា​ជាន់​លើ​តែ​ផាតស្យល​ប៉ុណ្ណោះ"
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr "ពេញ​លេញ ការ​ទប់ស្កាត់​ចលនា​ជាន់​លើ​ពេញ​លេញ"
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "ចំនួន​ខ្ទង់​វ៉ិចទ័រ​ចលនា"
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "ចំនួន​ខ្ទង់​វ៉ិចទ័រ​​ចលនា​គិត​​ជាភីសែល"
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "ការ​វាយតម្លៃ​ចលនា​សមាសភាគ​បី"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "ប្រើ​ក្រូម៉ា​ជា​ផ្នែក​នៃ​ដំណើរការ​វាយតម្លៃ​ចលនា"
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr "តម្រង DWT រូបភាព​ខាងក្នុង"
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr "បង្កប់​រូបភាព​តម្រង DWT"
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr "ចំនួន​នៃ​ការ​ធ្វើ​ឡើងវិញ​របស់ DWT"
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr "បាន​ស្គាល់​ជា​​កម្រិត DWT ផង​ដែរ"
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr "​បើក​កម្មវិធី​កំណត់​បរិមាណ​ច្រើន"
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr "បើក​​កម្មវិធី​កំណត់​ច្រើន​ក្នុង​មួយ​ក្រុមរង (មួយ​ក្នុង​មួយ​ប្លុក​កូដ)"
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr "បិទ​កូដ​គណិតវិទ្យា"
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr "ប្រើ​ប្រវែង​អថេរ​កូដ​ជំនួស​វិញ មាន​ប្រយោជន៍​សម្រាប់​អត្រា​ប៊ីត​ខ្ពស់"
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "វិធីសាស្ត្រ​សំខាន់​ដែល​ឆាប់​ដឹង"
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "ចម្ងាយ​ដែល​ឆាប់​ដឹង"
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr "ចម្ងាយ​ដែល​ឆាប់​ដឹង​ដើម្បី​គណនា​ភាព​សំខាន់​ដែល​ឆាប់​ដឹង"
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "បន្ទះ​ផ្ដេក​ក្នុង​មួយ​ស៊ុម"
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr "ចំនួន​បន្ទះ​ផ្ដេក​របស់​ស៊ុម​នៅ​ក្នុង​របៀប​​ពន្យារ​ពេល​​​ទាប"
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "បន្ទះ​បញ្ឈរ​ក្នុង​មួយ​ស៊ុម"
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr "ចំនួន​បន្ទះ​បញ្ឈរ​របស់​ស៊ុម​នៅ​ក្នុង​របៀប​ពន្យារពេល​ទាប"
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr "ទំហំ​របស់​ប្លុក​កូដ​នៅ​ក្នុង​ក្រុម​រង​នីមួយៗ"
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr "តូច - ប្រើ​ប្លុក​កូដ​តូច"
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr "មធ្យម - ប្រើ​ប្លុក​កូដ​ដែល​មាន​ទំហំ​មធ្យម"
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr "ធំ - ប្រើ​ប្លុក​កូដ​​ធំ"
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr "ពេញលេញ - ប្លុក​កូដ​មួយ​ក្នុង​ក្រុម​រង"
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr "បើក​ការ​វាយ​តម្លៃ​ចលនា​នៃ​ឋានានុក្រម"
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr "ចំនួន​កម្រិត​​នៃ​​ការ​បន្ថយ​គុណភាព"
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr "ចំនួន​កម្រិត​នៃ​ការ​បន្ថយ​គុណភាព​នៅ​ក្នុង​របៀប​ការ​វាយ​តម្លៃ​ចលនា​​នៃ​ឋានានុក្រម"
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr "បើក​ការ​វាយ​តម្លៃ​ចលនា​សកល"
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr "បើក​ការ​វាយ​តម្លៃ​​ទាក់ទង​បន្តបន្ទាប់"
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr "បើក​ការ​រក​ឃើញ​ការ​ផ្លាស់​​ប្ដូរ​​រូបភាព"
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "បង្ខំ​ទម្រង់"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr "ពន្យារពេល​ទម្រង់ VC2 ទាប"
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr "ទម្រង់ VC2 សាមញ្ញ"
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr "ទម្រង់ VC2 ចម្បង"
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "ទម្រង់​សំខាន់"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr "ឌិកូឌ័រ​វីដេអូ Dirac ប្រើ libschroedinger"
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr "អ៊ិនកូឌ័រ Dirac ប្រើ libschroedinger"
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -15170,14 +14796,6 @@ msgstr "ប្រសិន​បើ​មាន​ឯកសារ​នោះ​
 msgid "File dumper"
 msgstr "កម្មវិធី​បោះបង់​ឯកសារ​"
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "តម្លៃ​ដើម្បី​លៃ​តម្រូវ dts ដោយ​"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "ឧបករណ៍​មិន​ទ្វេ​ទិស​វីដេអូ Dirac"
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -15661,8 +15279,8 @@ msgid ""
 "'#duplicate{..., select=\"es=<pid>\"}'."
 msgstr ""
 "កំណត់​លេខ​សម្គាល់​ខាង​ក្នុង​របស់​ស្ទ្រីម​ចម្បង​នីមួយៗ ដែល​បាន​គ្រប់គ្រង​ដោយ VLC ទៅកាន់​តម្លៃ​ដូចគ្នា​នឹង PID នៅ​"
-"ក្នុង​ស្ទ្រីម TS ជំនួស​ឲ្យ ១ ២ ៣ ។ល។ ទង្វើ​មាន​ប្រយោជន៍ '#duplicate{..., select=\"es=<pid>"
-"\"}' ។"
+"ក្នុង​ស្ទ្រីម TS ជំនួស​ឲ្យ ១ ២ ៣ ។ល។ ទង្វើ​មាន​ប្រយោជន៍ '#duplicate{..., "
+"select=\"es=<pid>\"}' ។"
 
 #: modules/demux/mpeg/ts.c:90 modules/mux/mpeg/ts.c:173
 msgid "CSA Key"
@@ -16220,8 +15838,8 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 "<p>កម្មវិធី​ចាក់​មេឌៀ VLC គឺជា​កម្មវិធី​ស្ទ្រីម កម្មវិធី​ដាក់​លេខ​កូដ និង​ជា​កម្មវិធី​ចាក់​មេឌៀ​កូដ​ចំហ​ឥត​បង់​ថ្លៃ "
@@ -16523,8 +16141,8 @@ msgstr "បាន​ផ្លាស់ប្ដូរ​ព័ត៌មាន​
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "ព័ត៌មាន​បញ្ចូល​បាន​ផ្លាស់ប្ដូរ មិន​អាច​រក្សាទុក​ចំណាំបានទេ ។ ផ្អាក​ការ​ចាក់​ឡើងវិញ​ជាមួយ \"ផ្អាក\" នៅ​ពេល​"
 "កំពុង​កែសម្រួល​ចំណាំ ដើម្បី​ប្រាកដ​ថា​បាន​រក្សាទុក​ព័ត៌មាន​បញ្ចូល​ដូចគ្នា ។"
@@ -20710,8 +20328,8 @@ msgid ""
 msgstr ""
 "អ្នកជំនួយការ​នេះ​នឹង​អនុញ្ញាត​ឲ្យ​អ្នក​ស្ទ្រីម ឬ​បម្លែង​មេឌៀ​របស់​អ្នក​សម្រាប់​ប្រើ​ក្នុង​មូលដ្ឋាន លើ​បណ្ដាញ​ឯកជន​"
 "របស់​អ្នក ឬ​នៅ​លើ​អ៊ីនធឺណិត។\n"
-"អ្នក​គួរតែ​ចាប់ផ្ដើម​ដោយ​ពិនិត្យមើល​ថា​ប្រភព​នោះ​ផ្គូផ្គង​ជាមួយ​អ្វី​ដែល​អ្នក​បញ្ចូល​ដែរ​ឬទេ រួច​ចុច​ប៊ូតុង \"បន្ទាប់"
-"\" ដើម្បី​បន្ត។\n"
+"អ្នក​គួរតែ​ចាប់ផ្ដើម​ដោយ​ពិនិត្យមើល​ថា​ប្រភព​នោះ​ផ្គូផ្គង​ជាមួយ​អ្វី​ដែល​អ្នក​បញ្ចូល​ដែរ​ឬទេ រួច​ចុច​ប៊ូតុង "
+"\"បន្ទាប់\" ដើម្បី​បន្ត។\n"
 
 #: modules/gui/qt/dialogs/sout.cpp:58
 msgid ""
@@ -22191,8 +21809,8 @@ msgstr "ការ​កំណត់​រចនា​សម្ព័ន្ធ​
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 "តួអក្សរ​​ការ​កំណត់​រចនា​សម្ព័ន្ធ​ចំណុចប្រទាក់ Lua ។ ទ្រង់ទ្រាយ ៖ '[\"<ឈ្មោះ​ម៉ូឌុល​ចំណុច​ប្រទាក់>\"] = "
 "{ <option> = <value>, ...}, ...' ។"
@@ -22239,8 +21857,8 @@ msgid ""
 "telnet protocol (\"telnet://0.0.0.0:4212\")"
 msgstr ""
 "ព្រម​ទទួល​ពាក្យ​បញ្ជា​ពី​ប្រភព​នេះ ។ CLI កំណត់​លំនាំដើម​ទៅ stdin (\"*console\") ប៉ុន្តែ​វា​អាច​ភ្ជាប់​ទៅ​"
-"រន្ធ TCP ធម្មតា (\"localhost:4212\") ឬ​ប្រើ​ពិធីការ telnet "
-"(\"telnet://0.0.0.0:4212\")"
+"រន្ធ TCP ធម្មតា (\"localhost:4212\") ឬ​ប្រើ​ពិធីការ telnet (\"telnet://"
+"0.0.0.0:4212\")"
 
 #: modules/lua/vlc.c:85
 msgid "Lua"
@@ -23617,10 +23235,6 @@ msgstr "ចម្លង​កម្មវិធី​វេច​ខ្ចប់
 #: modules/packetizer/copy.c:48
 msgid "Copy packetizer"
 msgstr "ចម្លង​កម្មវិធី​វេច​ខ្ចប់"
-
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "កម្មវិធី​វេច​ខ្ចប់ Dirac"
 
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
@@ -25499,8 +25113,8 @@ msgid ""
 "address:port to bind vlc to listening incoming streams. Helper setting for "
 "dst, dst=bind+'/'+path. dst-parameter overrides this."
 msgstr ""
-"address:port ដែល​ត្រូវ​ចង vlc ទៅកាន់​ការ​ស្ដាប់​ការ​កំណត់​កម្មវិធី​ជំនួយ​ស្ទ្រីម​បញ្ចូល​សម្រាប់ dst,"
-"dst=bind+'/'+path. dst-parameter ដែល​បដិសេធ"
+"address:port ដែល​ត្រូវ​ចង vlc ទៅកាន់​ការ​ស្ដាប់​ការ​កំណត់​កម្មវិធី​ជំនួយ​ស្ទ្រីម​បញ្ចូល​សម្រាប់ "
+"dst,dst=bind+'/'+path. dst-parameter ដែល​បដិសេធ"
 
 #: modules/stream_out/standard.c:55
 #, fuzzy
@@ -29523,6 +29137,298 @@ msgstr "AAAA;"
 msgid "Media Manager List"
 msgstr "បញ្ជី​គ្រប់គ្រង​មេឌៀ"
 
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4"
+
+#~ msgid "Rate control method"
+#~ msgstr "វិធីសាស្ត្រ​គ្រប់គ្រង​អត្រា"
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr "វិធីសាស្ត្រ​ដែល​បាន​ប្រើ​ ដើម្បី​អ៊ិនកូដ​លំដាប់​វីដេអូ"
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "របៀប​កម្រិត​ពន្លឺ​ថេរ"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "Constant bitrate mode (CBR)"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "របៀប​ពន្យារ​ពេល​ទាប"
+
+#~ msgid "Lossless mode"
+#~ msgstr "របៀប​បាត់បង់​តិច​បំផុត"
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "របៀប​ឡាមដា​ថេរ"
+
+#~ msgid "Constant error mode"
+#~ msgstr "របៀប​កំហុស​ថេរ"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "របៀប​គុណភាព​ថេរ"
+
+#~ msgid "GOP structure"
+#~ msgstr "រចនាសម្ព័ន្ធ GOP"
+
+#~ msgid "GOP structure used to encode the video sequence"
+#~ msgstr "រចនាសម្ព័ន្ធ GOP ដែល​បាន​ប្រើ​ ដើម្បី​អ៊ិនកូដ​​លំដាប់​វីដេអូ"
+
+#~ msgid ""
+#~ "No fixed gop structure. A picture can be intra or inter and refer to "
+#~ "previous or future pictures."
+#~ msgstr ""
+#~ "គ្មាន​រចនាសម្ព័ន្ធ​ថេរ​ទេ ។ រូបភាព​អាច​ត្រូវ​បាន​ចេញ ឬ​ចូល និង​សំដៅ​ទៅលើ​រូបភាព​មុន ឬ​រូបភាព​អនាគត ។"
+
+#~ msgid "I-frame only sequence"
+#~ msgstr "តែ​លំដាប់​ស៊ុម I ប៉ុណ្ណោះ"
+
+#~ msgid "Inter pictures refere to previous pictures only"
+#~ msgstr "រូបភាព​ដែល​ទាក់ទង​សំដៅ​លើ​​តែ​រូបភាព​មុន​តែ​ប៉ុណ្ណោះ"
+
+#~ msgid "Inter pictures can refer to previous or future pictures"
+#~ msgstr "រូបភាព​ដែល​ទាក់ទង​សំដៅ​លើ​តែ​រូបភាព​មុន ឬ​រូប​ភាព​​​នៅ​​ក្រោយ​"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "កត្តា​គុណភាព​ថេរ"
+
+#~ msgid "Quality factor to use in constant quality mode"
+#~ msgstr "កត្តា​គុណភាព​​ដែល​ត្រូវ​ប្រើ​នៅ​ក្នុង​របៀប​គុណភាព​ថេរ"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "មើល​មិន​ច្បាស់"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr "មើល​មិន​ច្បាស់​នៅ​ក្នុង​របៀប​កម្រិត​ពន្លឺ​ថេរ"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "អត្រាប៊ីត CBR (kbps)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "អត្រា​​ប៊ីត​គោលដៅ​នៅ​ក្នុង kbps នៅ​ពេល​​អ៊ិនកូដ​​នៅ​ក្នុង​អត្រា​ប៊ីត​ថេរ"
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "អត្រា​ប៊ីត​អតិបរមា (kbps)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "អត្រា​ប៊ីត​អតិបរមា​នៅ​ក្នុង kbps នៅ​ពេល​អ៊ិនកូដ​នៅ​ក្នុង​របៀប​អត្រា​ប៊ីត​ថេរ"
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "អត្រា​ប៊ីត​អតិបរមា (kbps)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr "អត្រា​ប៊ីត​អប្បបរមា​នៅ​ក្នុង kbps នៅ​ពេល​អ៊ិនកូដ​នៅ​ក្នុង​របៀប​អត្រា​​ប៊ីត​ថេរ"
+
+#~ msgid "GOP length"
+#~ msgstr "ប្រវែង GOP"
+
+#~ msgid ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+#~ msgstr "ចំនួន​រូបភាព​​នៅ​ចន្លោះ​បឋមកថា​លំដាប់​បន្ត​គ្នា ឧ. ប្រវែង​ក្រុម​រូបភាព"
+
+#~ msgid "Prefilter"
+#~ msgstr "តម្រង​ជាមុន"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "បើក​ការ​ត្រង​ជាមុន​ដែល​អាច​ប្រែប្រួល"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "មិន​ត្រង​ជា​មុន​ឡើយ"
+
+#~ msgid "Centre Weighted Median"
+#~ msgstr "មេដ្យាន​ដែលមានកម្ពស់​កណ្ដាល"
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "ហ្គូសៀន​តម្រង​បញ្ជូន​ទាប"
+
+#~ msgid "Add Noise"
+#~ msgstr "បន្ថែម មើល​មិន​ច្បាស់"
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "ហ្គូសៀន​តម្រង​បញ្ជូន​ទាប​ដែល​អាច​ប្រែប្រួល"
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "Low Pass Filter"
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "ចំនួន​​តម្រង​​ជា​មុន"
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "តម្លៃ​កាន់តែ​ខ្ពស់​អនុវត្ត​ការ​ត្រង​ជា​មុន​កាន់តែ​ច្រើន"
+
+#~ msgid "Picture coding mode"
+#~ msgstr "របៀប​ដាក់​កូដ​រូបភាព"
+
+#~ msgid ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+#~ msgstr ""
+#~ "វាល​សរសេរ​កូដ​ជា​កន្លែង​ដែល​វាល​ត្របាញ់​ត្រូវ​បាន​សរសេរ​កូដ​ដោយ​ឡែក​ពី​គ្នា ដូច​បាន​ដាក់​ផ្ទុយគ្នា​ទៅកាន់​ស៊ុម​ "
+#~ "pseudo-progressive"
+
+#~ msgid "auto - let encoder decide based upon input (Best)"
+#~ msgstr "ស្វ័យ​ប្រវត្តិ - អនុញ្ញាត​ឲ្យ​អ៊ិនកូដឌ័រ​សម្រេច​លើ​ព័ត៌មាន​បញ្ចូល (ល្អ​បំផុត)"
+
+#~ msgid "force coding frame as single picture"
+#~ msgstr "តម្រូវ​ស៊ុម​កូដ​ជា​រូបភាព​តែ​មួយ"
+
+#~ msgid "force coding frame as separate interlaced fields"
+#~ msgstr "តម្រូវ​ស៊ុម​កូដ​ជា​វាល​ត្របាញ់​បំបែក"
+
+#~ msgid "Size of motion compensation blocks"
+#~ msgstr "ទំហំ ចលនា ទប់ស្កាត់"
+
+#~ msgid "automatic - let encoder decide based upon input (Best)"
+#~ msgstr "អ៊ិនកូឌ័រ​​ផ្អែក​លើ​ព័ត៌មាន​បញ្ចូល​ខាង​លើ​ស្វ័យ​ប្រវត្តិ (ល្អ​បំផុត)"
+
+#~ msgid "small - use small motion compensation blocks"
+#~ msgstr "យឺត  ប្រើ​​​ការ​ទប់​ស្កាត់​​ចលនា​យឺត"
+
+#~ msgid "medium - use medium motion compensation blocks"
+#~ msgstr "មធ្យម ប្រើ​ការ​ទប់​ស្កាត់​ចលនា​មធ្យម"
+
+#~ msgid "large - use large motion compensation blocks"
+#~ msgstr "លឿន ប្រើ​ការ​ទប់ស្កាត់​ចលនា​លឿន"
+
+#~ msgid "Overlap of motion compensation blocks"
+#~ msgstr "ជាន់​លើ​ការ​​ទប់ស្កាត់​ចលនា"
+
+#~ msgid "none - Motion compensation blocks do not overlap"
+#~ msgstr "គ្មាន​ការ​ទប់​ស្កាត់​ចលនា​កុំ​ជាន់​លើ"
+
+#~ msgid "partial - Motion compensation blocks only partially overlap"
+#~ msgstr "ផាតស្យល ការ​ទប់ស្កាត់​ចលនា​ជាន់​លើ​តែ​ផាតស្យល​ប៉ុណ្ណោះ"
+
+#~ msgid "full - Motion compensation blocks fully overlap"
+#~ msgstr "ពេញ​លេញ ការ​ទប់ស្កាត់​ចលនា​ជាន់​លើ​ពេញ​លេញ"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "ចំនួន​ខ្ទង់​វ៉ិចទ័រ​ចលនា"
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "ចំនួន​ខ្ទង់​វ៉ិចទ័រ​​ចលនា​គិត​​ជាភីសែល"
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "ការ​វាយតម្លៃ​ចលនា​សមាសភាគ​បី"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "ប្រើ​ក្រូម៉ា​ជា​ផ្នែក​នៃ​ដំណើរការ​វាយតម្លៃ​ចលនា"
+
+#~ msgid "Intra picture DWT filter"
+#~ msgstr "តម្រង DWT រូបភាព​ខាងក្នុង"
+
+#~ msgid "Inter picture DWT filter"
+#~ msgstr "បង្កប់​រូបភាព​តម្រង DWT"
+
+#~ msgid "Number of DWT iterations"
+#~ msgstr "ចំនួន​នៃ​ការ​ធ្វើ​ឡើងវិញ​របស់ DWT"
+
+#~ msgid "Also known as DWT levels"
+#~ msgstr "បាន​ស្គាល់​ជា​​កម្រិត DWT ផង​ដែរ"
+
+#~ msgid "Enable multiple quantizers"
+#~ msgstr "​បើក​កម្មវិធី​កំណត់​បរិមាណ​ច្រើន"
+
+#~ msgid "Enable multiple quantizers per subband (one per codeblock)"
+#~ msgstr "បើក​​កម្មវិធី​កំណត់​ច្រើន​ក្នុង​មួយ​ក្រុមរង (មួយ​ក្នុង​មួយ​ប្លុក​កូដ)"
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr "បិទ​កូដ​គណិតវិទ្យា"
+
+#~ msgid "Use variable length codes instead, useful for very high bitrates"
+#~ msgstr "ប្រើ​ប្រវែង​អថេរ​កូដ​ជំនួស​វិញ មាន​ប្រយោជន៍​សម្រាប់​អត្រា​ប៊ីត​ខ្ពស់"
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "វិធីសាស្ត្រ​សំខាន់​ដែល​ឆាប់​ដឹង"
+
+#~ msgid "perceptual distance"
+#~ msgstr "ចម្ងាយ​ដែល​ឆាប់​ដឹង"
+
+#~ msgid "perceptual distance to calculate perceptual weight"
+#~ msgstr "ចម្ងាយ​ដែល​ឆាប់​ដឹង​ដើម្បី​គណនា​ភាព​សំខាន់​ដែល​ឆាប់​ដឹង"
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "បន្ទះ​ផ្ដេក​ក្នុង​មួយ​ស៊ុម"
+
+#~ msgid "Number of horizontal slices per frame in low delay mode"
+#~ msgstr "ចំនួន​បន្ទះ​ផ្ដេក​របស់​ស៊ុម​នៅ​ក្នុង​របៀប​​ពន្យារ​ពេល​​​ទាប"
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "បន្ទះ​បញ្ឈរ​ក្នុង​មួយ​ស៊ុម"
+
+#~ msgid "Number of vertical slices per frame in low delay mode"
+#~ msgstr "ចំនួន​បន្ទះ​បញ្ឈរ​របស់​ស៊ុម​នៅ​ក្នុង​របៀប​ពន្យារពេល​ទាប"
+
+#~ msgid "Size of code blocks in each subband"
+#~ msgstr "ទំហំ​របស់​ប្លុក​កូដ​នៅ​ក្នុង​ក្រុម​រង​នីមួយៗ"
+
+#~ msgid "small - use small code blocks"
+#~ msgstr "តូច - ប្រើ​ប្លុក​កូដ​តូច"
+
+#~ msgid "medium - use medium sized code blocks"
+#~ msgstr "មធ្យម - ប្រើ​ប្លុក​កូដ​ដែល​មាន​ទំហំ​មធ្យម"
+
+#~ msgid "large - use large code blocks"
+#~ msgstr "ធំ - ប្រើ​ប្លុក​កូដ​​ធំ"
+
+#~ msgid "full - One code block per subband"
+#~ msgstr "ពេញលេញ - ប្លុក​កូដ​មួយ​ក្នុង​ក្រុម​រង"
+
+#~ msgid "Enable hierarchical Motion Estimation"
+#~ msgstr "បើក​ការ​វាយ​តម្លៃ​ចលនា​នៃ​ឋានានុក្រម"
+
+#~ msgid "Number of levels of downsampling"
+#~ msgstr "ចំនួន​កម្រិត​​នៃ​​ការ​បន្ថយ​គុណភាព"
+
+#~ msgid ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+#~ msgstr "ចំនួន​កម្រិត​នៃ​ការ​បន្ថយ​គុណភាព​នៅ​ក្នុង​របៀប​ការ​វាយ​តម្លៃ​ចលនា​​នៃ​ឋានានុក្រម"
+
+#~ msgid "Enable Global Motion Estimation"
+#~ msgstr "បើក​ការ​វាយ​តម្លៃ​ចលនា​សកល"
+
+#~ msgid "Enable Phase Correlation Estimation"
+#~ msgstr "បើក​ការ​វាយ​តម្លៃ​​ទាក់ទង​បន្តបន្ទាប់"
+
+#~ msgid "Enable Scene Change Detection"
+#~ msgstr "បើក​ការ​រក​ឃើញ​ការ​ផ្លាស់​​ប្ដូរ​​រូបភាព"
+
+#~ msgid "Force Profile"
+#~ msgstr "បង្ខំ​ទម្រង់"
+
+#~ msgid "VC2 Low Delay Profile"
+#~ msgstr "ពន្យារពេល​ទម្រង់ VC2 ទាប"
+
+#~ msgid "VC2 Simple Profile"
+#~ msgstr "ទម្រង់ VC2 សាមញ្ញ"
+
+#~ msgid "VC2 Main Profile"
+#~ msgstr "ទម្រង់ VC2 ចម្បង"
+
+#~ msgid "Main Profile"
+#~ msgstr "ទម្រង់​សំខាន់"
+
+#~ msgid "Dirac video decoder using libschroedinger"
+#~ msgstr "ឌិកូឌ័រ​វីដេអូ Dirac ប្រើ libschroedinger"
+
+#~ msgid "Dirac video encoder using libschroedinger"
+#~ msgstr "អ៊ិនកូឌ័រ Dirac ប្រើ libschroedinger"
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "តម្លៃ​ដើម្បី​លៃ​តម្រូវ dts ដោយ​"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "ឧបករណ៍​មិន​ទ្វេ​ទិស​វីដេអូ Dirac"
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "កម្មវិធី​វេច​ខ្ចប់ Dirac"
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr "បាន​ទាមទារ​ឯកសារ​ពុម្ពអក្សរ​សំឡេង​សម្រាប់​ការ​សំយោគ​កម្មវិធី ។"
@@ -29712,12 +29618,13 @@ msgstr "បញ្ជី​គ្រប់គ្រង​មេឌៀ"
 #~ msgstr "ពាក្យសម្ងាត់ RTSP"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
-#~ "ប្រូកស៊ី HTTP ដែល​ត្រូវ​ប្រើ។ វា​ត្រូវតែ​មាន​ទម្រង់​ជា http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; ប្រសិន​បើ​ទទេ អថេរ http_proxy នឹង​ត្រូវ​បាន​សាកល្បង។"
+#~ "ប្រូកស៊ី HTTP ដែល​ត្រូវ​ប្រើ។ វា​ត្រូវតែ​មាន​ទម្រង់​ជា http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; ប្រសិន​បើ​ទទេ អថេរ http_proxy នឹង​ត្រូវ​"
+#~ "បាន​សាកល្បង។"
 
 #~ msgid "Video Capture width"
 #~ msgstr "ការ​ចាប់​យក​ទទឹង​វីដេអូ"
@@ -31914,14 +31821,14 @@ msgstr "បញ្ជី​គ្រប់គ្រង​មេឌៀ"
 #~ msgid ""
 #~ "Force the subtiles format. Valid values are : \"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
 #~ "autodetection, this should always work)."
 #~ msgstr ""
 #~ "បង្ខំ​ទ្រង់ទ្រាយ​ចំណងជើង​រង ។ តម្លៃ​ដែល​ត្រឹមត្រូវ​គឺ ៖ \"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\",  និង \"auto\" (មានន័យថា​រក​ឃើញ​"
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\",  និង \"auto\" (មានន័យថា​រក​ឃើញ​"
 #~ "ស្វ័យប្រវត្តិ វា​គួរតែ​ដំណើរជានិច្ច) ។"
 
 #~ msgid "Do not complain on encrypted PES."
@@ -32063,21 +31970,21 @@ msgstr "បញ្ជី​គ្រប់គ្រង​មេឌៀ"
 #~ msgstr "បញ្ជាក់​ទ្រង់ទ្រាយ​កំណត់ហេតុ ។ ជម្រើស​ដែល​មាន​គឺ \"text\" (លំនាំដើម) និង \"html\" ។"
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", \"syslog\" (special mode to send to syslog instead of file), and "
-#~ "\"android\" (special mode to send to android logging facility)."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", \"syslog\" (special mode to send to syslog instead of file), "
+#~ "and \"android\" (special mode to send to android logging facility)."
 #~ msgstr ""
-#~ "បញ្ជាក់​ទ្រង់ទ្រាយ​កំណត់ហេតុ ។ ជម្រើស​ដែល​មាន​គឺ \"text\" (លំនាំដើម) \"html\", \"syslog"
-#~ "\" (របៀប​ពិសេស​ដើម្បី​ផ្ញើ​ទៅកាន់​កំណត់ហេតុ​ប្រព័ន្ធ​ជំនួស​ឲ្យ​ឯកសារ) និង \"android\" (របៀប​ពិសេស​"
-#~ "ដើម្បី​ផ្ញើ​ទៅកាន់​សេវា​ចូល​របស់ Android) ។"
+#~ "បញ្ជាក់​ទ្រង់ទ្រាយ​កំណត់ហេតុ ។ ជម្រើស​ដែល​មាន​គឺ \"text\" (លំនាំដើម) \"html\", \"syslog\" "
+#~ "(របៀប​ពិសេស​ដើម្បី​ផ្ញើ​ទៅកាន់​កំណត់ហេតុ​ប្រព័ន្ធ​ជំនួស​ឲ្យ​ឯកសារ) និង \"android\" (របៀប​ពិសេស​ដើម្បី​"
+#~ "ផ្ញើ​ទៅកាន់​សេវា​ចូល​របស់ Android) ។"
 
 #~ msgid ""
 #~ "Select the syslog facility where logs will be forwarded. Available "
 #~ "choices are \"user\" (default), \"daemon\", and \"local0\" through "
 #~ "\"local7\"."
 #~ msgstr ""
-#~ "ជ្រើស​សេវា​កំណត់​ហេតុ​ប្រព័ន្ធ ដែល​កំណត់​ហេតុ​នឹង​ត្រូវ​បាន​បញ្ជូន​បន្ត ។ ជម្រើស​ដែល​មាន​គឺ \"user"
-#~ "\" (លំនាំដើម) \"daemon\" និង \"local0\" តាមរយៈ \"local7\" ។"
+#~ "ជ្រើស​សេវា​កំណត់​ហេតុ​ប្រព័ន្ធ ដែល​កំណត់​ហេតុ​នឹង​ត្រូវ​បាន​បញ្ជូន​បន្ត ។ ជម្រើស​ដែល​មាន​គឺ \"user\" "
+#~ "(លំនាំដើម) \"daemon\" និង \"local0\" តាមរយៈ \"local7\" ។"
 
 #~ msgid "libc memcpy"
 #~ msgstr "libc memcpy"
@@ -32293,16 +32200,16 @@ msgstr "បញ្ជី​គ្រប់គ្រង​មេឌៀ"
 #~ "ថា អ្នកនៅតែ​ត្រូវ​ប្រើ -vvv ដើម្បី​បង្ហាញ​សារ​បំបាត់​កំហុស​ពិតប្រាកដ ។"
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", and \"syslog\" (special mode to send to syslog instead of file."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", and \"syslog\" (special mode to send to syslog instead of file."
 #~ msgstr ""
-#~ "បញ្ជាក់​ទ្រង់ទ្រាយ​កំណត់ហេតុ ។ ជម្រើស​ដែល​មាន​គឺ \"text\" (លំនាំដើម), \"html\", និង \"syslog"
-#~ "\" (របៀប​ពិសេស​ដែល​ត្រូវ​ផ្ញើ​ទៅកាន់កំណត់ហេតុ​ប្រព័ន្ធ​ជំនួស​ឲ្យ​ឯកសារ ។"
+#~ "បញ្ជាក់​ទ្រង់ទ្រាយ​កំណត់ហេតុ ។ ជម្រើស​ដែល​មាន​គឺ \"text\" (លំនាំដើម), \"html\", និង "
+#~ "\"syslog\" (របៀប​ពិសេស​ដែល​ត្រូវ​ផ្ញើ​ទៅកាន់កំណត់ហេតុ​ប្រព័ន្ធ​ជំនួស​ឲ្យ​ឯកសារ ។"
 
 #~ msgid ""
 #~ "Use a unique dbus service id to identify this VLC instance on the DBUS "
-#~ "bus. The process identifier (PID) is added to the service name: org.mpris."
-#~ "vlc-<pid>"
+#~ "bus. The process identifier (PID) is added to the service name: "
+#~ "org.mpris.vlc-<pid>"
 #~ msgstr "dbus VLC<pid>"
 
 #~ msgid "Error when sending the Crash Report"
@@ -32369,8 +32276,8 @@ msgstr "បញ្ជី​គ្រប់គ្រង​មេឌៀ"
 #~ msgstr "dbus"
 
 #~ msgid ""
-#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be"
-#~ "\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
+#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
+#~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
 #~ msgstr ""
 #~ "មួយ​ក្នុង​ចំណោម \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
 #~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
@@ -32825,8 +32732,8 @@ msgstr "បញ្ជី​គ្រប់គ្រង​មេឌៀ"
 #~ "List of handler extensions and executable paths (for instance: php=/usr/"
 #~ "bin/php,pl=/usr/bin/perl)."
 #~ msgstr ""
-#~ "បញ្ជី​ផ្នែក​បន្ថែម​របស់​កម្មវិធី​ដោះស្រាយ និង​ផ្លូវ​ឯកសារ​ប្រតិបត្តិ (សម្រាប់​វត្ថុ ៖ php=/usr/bin/php,"
-#~ "pl=/usr/bin/perl) ។"
+#~ "បញ្ជី​ផ្នែក​បន្ថែម​របស់​កម្មវិធី​ដោះស្រាយ និង​ផ្លូវ​ឯកសារ​ប្រតិបត្តិ (សម្រាប់​វត្ថុ ៖ php=/usr/bin/"
+#~ "php,pl=/usr/bin/perl) ។"
 
 #~ msgid "Export album art as /art"
 #~ msgstr "នាំចេញ​សិល្បៈ​អាល់ប៊ុម​ជា /art"
@@ -33111,20 +33018,21 @@ msgstr "បញ្ជី​គ្រប់គ្រង​មេឌៀ"
 #~ "</style></head><body style=\" font-family:'DejaVu Sans'; font-size:8pt; "
 #~ "font-weight:400; font-style:normal;\">\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.example.com/stream.avi</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.example.com/stream.avi</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtp://@:1234</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtp://@:1234</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></html>"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></"
+#~ "html>"
 #~ msgstr ""
 #~ "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/"
 #~ "REC-html40/strict.dtd\">\n"
@@ -33134,20 +33042,21 @@ msgstr "បញ្ជី​គ្រប់គ្រង​មេឌៀ"
 #~ "</style></head><body style=\" font-family:'DejaVu Sans'; font-size:8pt; "
 #~ "font-weight:400; font-style:normal;\">\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.example.com/stream.avi</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.example.com/stream.avi</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtp://@:1234</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtp://@:1234</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></html>"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></"
+#~ "html>"
 
 #~ msgid "Minimal view mode (no toolbars)"
 #~ msgstr "ទេ"
@@ -33218,10 +33127,10 @@ msgstr "បញ្ជី​គ្រប់គ្រង​មេឌៀ"
 
 #, fuzzy
 #~ msgid ""
-#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title"
-#~ "\" ($a - $t). You can use the following substitutions: $a Artist, $b "
-#~ "Album, $c Copyright, $d Description, $e Encoder, $g Genre, $l Language, "
-#~ "$n number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
+#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title\" "
+#~ "($a - $t). You can use the following substitutions: $a Artist, $b Album, "
+#~ "$c Copyright, $d Description, $e Encoder, $g Genre, $l Language, $n "
+#~ "number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
 #~ "URL, $A Date, $B Bitrate, $C Chapter, $D Duration, $F URI, $I Video "
 #~ "Title, $L Time Remaining, $N Name, $O Audio language, $P Position, $R "
 #~ "Rate, $S Sample rate, $T Time elapsed, $U Publisher, $V Volume"
@@ -33778,8 +33687,8 @@ msgstr "បញ្ជី​គ្រប់គ្រង​មេឌៀ"
 #, fuzzy
 #~ msgid ""
 #~ "Your video output acceleration driver does not support the required "
-#~ "resolution: %ux%u pixels. The maximum supported resolution is %<PRIu32>x"
-#~ "%<PRIu32>.\n"
+#~ "resolution: %ux%u pixels. The maximum supported resolution is "
+#~ "%<PRIu32>x%<PRIu32>.\n"
 #~ "Video output acceleration will be disabled. However, rendering videos "
 #~ "with overly large resolution may cause severe performance degration."
 #~ msgstr ""
@@ -36706,8 +36615,8 @@ msgstr "បញ្ជី​គ្រប់គ្រង​មេឌៀ"
 #~ msgid ""
 #~ "Containers (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv)"
 #~ msgstr ""
-#~ "ឧបករណ៍​ផ្ទុក (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv *."
-#~ "webm)"
+#~ "ឧបករណ៍​ផ្ទុក (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv "
+#~ "*.webm)"
 
 #, fuzzy
 #~ msgid "title"

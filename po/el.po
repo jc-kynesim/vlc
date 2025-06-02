@@ -604,58 +604,59 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>Καλώς ήλθατε στη Βοήθεια του αναπαραγωγού "
 "πολυμέσων VLC</h2><h3>Τεκμηρίωση</h3><p>Μπορείτε να βρείτε την τεκμηρίωση "
 "για τον VLC στην ιστοσελίδα <a href=\"http://wiki.videolan.org\">wiki</a> "
 "της VideoLAN.</p><p>Εάν είστε νέος στον αναπαραγωγό πολυμέσων VLC, παρακαλώ "
-"διαβάστε την<br><a href=\"http://wiki.videolan.org/Documentation:"
-"VLC_for_dummies\"><em>Εισαγωγή στον αναπαραγωγό πολυμέσων VLC</em></a>.</"
-"p><p>Θα βρείτε ορισμένες πληροφορίες για το πώς να χρησιμοποιήσετε τον "
-"αναπαραγωγό στο έγγραφο <br>\"<a href=\"http://wiki.videolan.org/"
+"διαβάστε την<br><a href=\"http://wiki.videolan.org/"
+"Documentation:VLC_for_dummies\"><em>Εισαγωγή στον αναπαραγωγό πολυμέσων VLC</"
+"em></a>.</p><p>Θα βρείτε ορισμένες πληροφορίες για το πώς να χρησιμοποιήσετε "
+"τον αναπαραγωγό στο έγγραφο <br>\"<a href=\"http://wiki.videolan.org/"
 "Documentation:Play_HowTo\"><em>Πώς να αναπαραγάγετε αρχεία με τον "
 "αναπαραγωγό πολυμέσων VLC</em></a>\".</p><p>Για όλες τις ενέργειες "
 "αποθήκευσης, μετατροπής, επανακωδικοποίησης, κωδικοποίησης, πολυπλεξίας και "
-"συνεχούς ροής δεδομένων, μπορείτε να βρείτε χρήσιμες πληροφορίες στο <a href="
-"\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Τεκμηρίωση για τη "
-"συνεχή ροή δεδομένων</a>.</p><p>Εάν δεν είστε σίγουροι για την ορολογία, "
-"παρακαλώ συμβουλευτείτε τη <a href=\"http://wiki.videolan.org/Knowledge_Base"
-"\">βάση γνώσεων</a>.</p><p>Για να κατανοήσετε τις κύριες συντομεύσεις "
-"πληκτρολογίου, διαβάστε τη σελίδα <a href=\"http://wiki.videolan.org/Hotkeys"
-"\"> των συντομεύσεων</a>.</p><h3>Βοήθεια</h3><p>Προτού θέσετε οποιαδήποτε "
-"ερώτηση, παρακαλώ ανατρέξτε στις <a href=\"http://www.videolan.org/support/"
-"faq.html\">Συχνές ερωτήσεις</a>.</p><p>Έπειτα θα μπορείτε να λάβετε (και να "
-"δώσετε) βοήθεια στα <a href=\"http://forum.videolan.org\">Φόρουμ</a>, τις <a "
-"href=\"http://www.videolan.org/vlc/lists.html\">λίστες e-mail</a> ή το "
-"κανάλι σας στο IRC (<em>#videolan</em> στο irc.freenode.net).</"
-"p><h3>Συνεισφέρετε στο πρόγραμμα</h3><p>Μπορείτε να βοηθήσετε το πρόγραμμα "
-"δίνοντας μερικό από το χρόνο σας για να βοηθήσετε την κοινότητα, να "
-"σχεδιάσετε προσόψεις, να μεταφράσετε τη βοήθεια, για να δοκιμάσετε και να "
-"γράψετε κώδικα. Μπορείτε επίσης να μας δώσετε πόρους και υλικό για να μας "
-"βοηθήσετε. Και φυσικά, μπορείτε να <b>προωθήσετε</b> τον αναπαραγωγό "
-"πολυμέσων VLC.</p></body></html>"
+"συνεχούς ροής δεδομένων, μπορείτε να βρείτε χρήσιμες πληροφορίες στο <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Τεκμηρίωση "
+"για τη συνεχή ροή δεδομένων</a>.</p><p>Εάν δεν είστε σίγουροι για την "
+"ορολογία, παρακαλώ συμβουλευτείτε τη <a href=\"http://wiki.videolan.org/"
+"Knowledge_Base\">βάση γνώσεων</a>.</p><p>Για να κατανοήσετε τις κύριες "
+"συντομεύσεις πληκτρολογίου, διαβάστε τη σελίδα <a href=\"http://"
+"wiki.videolan.org/Hotkeys\"> των συντομεύσεων</a>.</p><h3>Βοήθεια</"
+"h3><p>Προτού θέσετε οποιαδήποτε ερώτηση, παρακαλώ ανατρέξτε στις <a "
+"href=\"http://www.videolan.org/support/faq.html\">Συχνές ερωτήσεις</a>.</"
+"p><p>Έπειτα θα μπορείτε να λάβετε (και να δώσετε) βοήθεια στα <a "
+"href=\"http://forum.videolan.org\">Φόρουμ</a>, τις <a href=\"http://"
+"www.videolan.org/vlc/lists.html\">λίστες e-mail</a> ή το κανάλι σας στο IRC "
+"(<em>#videolan</em> στο irc.freenode.net).</p><h3>Συνεισφέρετε στο "
+"πρόγραμμα</h3><p>Μπορείτε να βοηθήσετε το πρόγραμμα δίνοντας μερικό από το "
+"χρόνο σας για να βοηθήσετε την κοινότητα, να σχεδιάσετε προσόψεις, να "
+"μεταφράσετε τη βοήθεια, για να δοκιμάσετε και να γράψετε κώδικα. Μπορείτε "
+"επίσης να μας δώσετε πόρους και υλικό για να μας βοηθήσετε. Και φυσικά, "
+"μπορείτε να <b>προωθήσετε</b> τον αναπαραγωγό πολυμέσων VLC.</p></body></"
+"html>"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -837,8 +838,8 @@ msgstr ""
 "            και η οποία παρακάμπτει τις προηγούμενες ρυθμίσεις.\n"
 "\n"
 "Σύνταξη του MRL της ροής δεδομένων:\n"
-"  [[πρόσβαση][/αποπολυπλεξία]://]URL[#[τίτλος][:κεφάλαιο][-[τίτλος][:"
-"κεφάλαιο]]]\n"
+"  [[πρόσβαση][/αποπολυπλεξία]://]URL[#[τίτλος][:κεφάλαιο][-[τίτλος]"
+"[:κεφάλαιο]]]\n"
 "  [:επιλογή=τιμή ...]\n"
 "\n"
 "  Πολλές από τις συνολικές --επιλογές μπορούν επίσης να χρησιμοποιηθούν και "
@@ -1607,14 +1608,14 @@ msgstr "Επιπρόσθετες ενότητες διεπαφών"
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "Μπορείτε να επιλέξετε \"πρόσθετες διεπαφές\" για τον VLC. Αυτές θα "
 "εκκινηθούν στο παρασκήνιο επιπροσθέτως της προεπιλεγμένης διεπαφής. "
 "Χρησιμοποιήστε μία λίστα ενοτήτων διεπαφών χωρισμένη με άνω-κάτω τελείες "
-"(συνήθεις τιμές είναι \"rc\" (απομακρυσμένος έλεγχος), \"http\", \"κινήσεις"
-"\" ...)"
+"(συνήθεις τιμές είναι \"rc\" (απομακρυσμένος έλεγχος), \"http\", "
+"\"κινήσεις\" ...)"
 
 #: src/libvlc-module.c:83
 msgid "You can select control interfaces for VLC."
@@ -2421,8 +2422,8 @@ msgstr "Αναλογία διαστάσεων της πηγής"
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "Αυτό επιβάλλει την αναλογία διαστάσεων της πηγής. Για παράδειγμα, ορισμένα "
@@ -3012,10 +3013,10 @@ msgstr "Αλλαγή τίτλου σύμφωνα με το τρέχον πολυ
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
 "Αυτή η επιλογή σας επιτρέπει να ρυθμίσετε τον τίτλο σύμφωνα με το τι "
 "αναπαράγεται<br>$a: Καλλιτέχνης<br>$b: Άλμπουμ<br>$c: Πνευματικά "
@@ -7780,8 +7781,9 @@ msgstr "Διαμεσολαβητής HTTP"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
 "Ο διαμεσολαβητής HTTP που θα χρησιμοποιηθεί. Πρέπει να είναι της μορφής "
 "http://[όνομα χρήστη@]myproxy.mydomain:myport/ Εάν παραμείνει άδειο, θα "
@@ -8098,8 +8100,8 @@ msgstr "Ρυθμίσεις ήχου"
 #: modules/access/linsys/linsys_sdi.c:79
 msgid "Allows you to set audio configuration (id=group,pair:id=group,pair...)."
 msgstr ""
-"Σας επιτρέπει να ορίσετε τις ρυθμίσεις ήχου (ταυτότητα=ομάδα,ζεύγος:"
-"ταυτότητα=ομάδα,ζεύγος...)."
+"Σας επιτρέπει να ορίσετε τις ρυθμίσεις ήχου "
+"(ταυτότητα=ομάδα,ζεύγος:ταυτότητα=ομάδα,ζεύγος...)."
 
 #: modules/access/linsys/linsys_hdsdi.c:89
 msgid "HD-SDI Input"
@@ -8388,8 +8390,8 @@ msgstr "Δεν βρέθηκε συσκευή εισόδου"
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 #, fuzzy
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "Ο Mac σας δεν φαίνεται να είναι εξοπλισμένος με κατάλληλη συσκευή εισόδου. "
 "Παρακαλώ ελέγξτε τους συνδέσμους και τους οδηγούς υλικού σας."
@@ -8837,8 +8839,8 @@ msgstr "Πιστοποίηση RTSP"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -9304,16 +9306,16 @@ msgstr "Στοιχεία ελέγχου οδηγού υλικού v4l2"
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "Ορισμός των στοιχείων ελέγχου οδηγού v4l2 στις καθορισμένες τιμές "
 "χρησιμοποιώντας μία λίστα χωρισμένη με κόμματα, προαιρετικά ενθυλακωμένη με "
-"άγκιστρα (π.χ.: {ρυθμός_μεταφοράς_δεδομένων_βίντεο=6000000,crc_ήχου=0,"
-"τύπος_ροής_δεδομένων=3} ). για να δημιουργήσετε μία λίστα με τα διαθέσιμα "
-"στοιχεία ελέγχου, αυξήστε την αναλυτικότητα (-vvv) ή χρησιμοποιήστε την "
-"εφαρμογή v4l2-ctl."
+"άγκιστρα (π.χ.: "
+"{ρυθμός_μεταφοράς_δεδομένων_βίντεο=6000000,crc_ήχου=0,τύπος_ροής_δεδομένων=3} ). "
+"για να δημιουργήσετε μία λίστα με τα διαθέσιμα στοιχεία ελέγχου, αυξήστε την "
+"αναλυτικότητα (-vvv) ή χρησιμοποιήστε την εφαρμογή v4l2-ctl."
 
 #: modules/access/v4l2/v4l2.c:242 modules/codec/avcodec/avcodec.c:50
 #: modules/codec/avcodec/avcodec.c:54 modules/codec/x264.c:435
@@ -9711,9 +9713,9 @@ msgstr "Αρχείο όπου το vlc θα διαβάσει το key-uri και
 #: modules/access_output/livehttp.c:98
 #, fuzzy
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
 "Το αρχείο διαβάζεται όταν αρχίζει το τμήμα και υποτίθεται ότι είναι του "
 "τύπου: key-uri\\nkey-file. Το αρχείο διαβάζεται στο άνοιγμα του τμήματος και "
@@ -11239,7 +11241,6 @@ msgstr "Αποκωδικοποίηση"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "Κωδικοποίηση"
 
@@ -11805,11 +11806,11 @@ msgstr "Πακετοποιητής βίντεο Theora"
 msgid "Daala video encoder"
 msgstr "Κωδικοποιητής βίντεο Theora"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "Μορφή chroma"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr ""
@@ -11874,8 +11875,8 @@ msgstr "Θέση υποεικόνας"
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 "Μπορείτε να επιβάλλετε τη θέση της υποεικόνας στο βίντεο (0=κέντρο, "
 "1=αριστερά, 2=δεξιά, 4=επάνω, 8=κάτω, μπορείτε να χρησιμοποιήσετε και "
@@ -12666,13 +12667,13 @@ msgstr "Ακρίβεια ελέγχου ρυθμού"
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
-"Ανοχή ως ποσοστό της μεθόδου 'avbr' (μέσος μεταβλητός ρυθμός δεδομένων). (Π."
-"χ.10 με ρυθμό μετάδοσης δεδομένων 800 kbps θα σήμαινε ότι ο κωδικοποιητής "
+"Ανοχή ως ποσοστό της μεθόδου 'avbr' (μέσος μεταβλητός ρυθμός δεδομένων). "
+"(Π.χ.10 με ρυθμό μετάδοσης δεδομένων 800 kbps θα σήμαινε ότι ο κωδικοποιητής "
 "προσπαθεί να μην φτάσει πάνω από τα 880 kbps και κάτω από τα 730 kbps. Η "
 "επιθυμητή ακρίβεια επιτυγχάνεται μόνο μετά από μια περίοδο σύγκλισης. Δείτε "
 "την παράμετρο σύγκλισης"
@@ -12743,410 +12744,6 @@ msgstr "Ψευδής πακετοποιητής ανεπεξέργαστου β�
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "Κωδικοποιητής βίντεο Theora"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "Μέθοδος ελέγχου ρυθμού"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr ""
-"Η μέθοδος που χρησιμοποιείται για την κωδικοποίηση της ακολουθίας βίντεο"
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "Λειτουργία σταθερού κατωφλιού θορύβου"
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "Λειτουργία σταθερού ρυθμού μετάδοσης δεδομένων (CBR)"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "Λειτουργία χαμηλής καθυστέρησης"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "Λειτουργία χωρίς απώλειες"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "Λειτουργία σταθερού lambda"
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "Λειτουργία σταθερού σφάλματος"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "Λειτουργία σταθερής ποιότητας"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "Δομή GOP"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr ""
-"Η δομή GOP που χρησιμοποιήθηκε για την κωδικοποίηση της ακολουθίας βίντεο"
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-"Μη προκαθορισμένη δομή ομάδας εικόνων. Μία εικόνα μπορεί να είναι ενδοεικόνα "
-"ή διεικόνα και να αναφέρεται σε προηγούμενες ή μελλοντικές εικόνες."
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr "Ακολουθία μόνο των καρέ I"
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr "Οι διεικόνες αναφέρονται μόνο στις προηγούμενες εικόνες"
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr ""
-"Οι διεικόνες μπορεί να αναφέρονται σε προηγούμενες ή μελλοντικές εικόνες"
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "Συντελεστής σταθερής ποιότητας"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr ""
-"Συντελεστής ποιότητας που θα χρησιμοποιηθεί στη λειτουργία σταθερής ποιότητας"
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "Κατώφλι θορύβου"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr ""
-"Κατώφλι θορύβου που θα χρησιμοποιηθεί στη λειτουργία σταθερού κατωφλιού "
-"θορύβου"
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "Ρυθμός μετάδοσης δεδομένων CBR (kbps)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"Επιθυμητός ρυθμός μετάδοσης δεδομένων σε kbps όταν η κωδικοποίηση γίνεται "
-"στη λειτουργία σταθερού ρυθμού μετάδοσης δεδομένων"
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "Μέγιστος ρυθμός μετάδοσης δεδομένων (kbps)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"Μέγιστος ρυθμός μετάδοσης δεδομένων σε kbps κατά την κωδικοποίηση με "
-"λειτουργία σταθερού ρυθμού μετάδοσης δεδομένων"
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "Ελάχιστος ρυθμός μετάδοσης δεδομένων (kbps)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"Ελάχιστος ρυθμός μετάδοσης δεδομένων σε kbps κατά την κωδικοποίηση με "
-"λειτουργία σταθερού ρυθμού μετάδοσης δεδομένων"
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "Μήκος GOP"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr ""
-"Αριθμός εικόνων μεταξύ διαδοχικών κεφαλίδων ακολουθίας, π.χ. μήκος της "
-"ομάδας εικόνων"
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "Προφιλτράρισμα"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "Ενεργοποίηση προσαρμοστικού προφιλτραρίσματος"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "Χωρίς προφιλτράρισμα"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr "Διαμέσου σταθμισμένης στο κέντρο"
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "Φίλτρο χαμηλών συχνοτήτων Gauss"
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "Προσθήκη θορύβου"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "Προσαρμοστικό φίλτρο χαμηλών συχνοτήτων Gauss"
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "Φίλτρο χαμηλών συχνοτήτων"
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "Ποσό προφιλτραρίσματος"
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "Υψηλότερη τιμή συνεπάγεται περισσότερο προφιλτράρισμα"
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "Λειτουργία κωδικοποίησης εικόνας"
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-"Η κωδικοποίηση πεδίου είναι εκεί όπου τα διαπλεγμένα πεδία κωδικοποιούνται "
-"ξεχωριστά, σε αντίθεση με ένα ψευδο-προοδευτικό πλαίσιο"
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr ""
-"αυτόματη - ο κωδικοποιητής να αποφασίζει βασισμένος στην είσοδο (καλύτερη)"
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr "επιβολή πλαισίου κωδικοποίησης ως απλή εικόνα"
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr "επιβολή πλαισίου κωδικοποίησης ως ξεχωριστά διαπλεγμένα πεδία"
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr "Μέγεθος των ομάδων δεδομένων για την επανόρθωση της κίνησης"
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr ""
-"αυτόματη - ο κωδικοποιητής να αποφασίζει βασισμένος στην είσοδο (Καλύτερη)"
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr "μικρό - χρήση μικρών ομάδων δεδομένων για την επανόρθωση της κίνησης"
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr "μεσαίο - χρήση μεσαίων ομάδων δεδομένων για την επανόρθωση της κίνησης"
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr "μεγάλο - χρήση μεγάλων ομάδων δεδομένων για την επανόρθωση της κίνησης"
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr "Επικάλυψη των ομάδων δεδομένων για την επανόρθωση της κίνησης"
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr ""
-"καθόλου - Οι ομάδες δεδομένων για την επανόρθωση της κίνησης δεν "
-"επικαλύπτονται"
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr ""
-"μερικά - Οι ομάδες δεδομένων για την επανόρθωση της κίνησης επικαλύπτονται "
-"μόνο μερικά"
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr ""
-"πλήρως - Οι ομάδες δεδομένων για την επανόρθωση της κίνησης επικαλύπτονται "
-"πλήρως"
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "Ακρίβεια διανύσματος κίνησης"
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "Ακρίβεια διανύσματος κίνησης σε pels"
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "Εκτίμηση κίνησης τριών συστατικών"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "Χρήση chroma ως ένα μέρος της διαδικασίας εκτίμησης κίνησης"
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr "Φίλτρο DWT ενδοεικόνας"
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr "Φίλτρο DWT διαεικόνας"
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr "Αριθμός επαναλήψεων DWT"
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr "Επίσης γνωστά ως επίπεδα DWT"
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr "Ενεργοποίηση πολλαπλών κβαντιστών"
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr ""
-"Ενεργοποίηση πολλαπλών κβαντιστών ανά υποζώνη (ένας ανά πλοκαδικό κώδικα)"
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr "Απενεργοποίηση αριθμητικής κωδικοποίησης"
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr ""
-"Αντί αυτού, χρησιμοποιείστε κώδικες μεταβλητού μήκους, κάτι χρήσιμο για πολύ "
-"υψηλούς ρυθμούς μετάδοσης δεδομένων"
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "Μέθοδος αντιληπτικής στάθμισης"
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "Αντιληπτική απόσταση"
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr "αντιληπτική απόσταση για τον υπολογισμό της αντιληπτικής στάθμης"
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "Οριζόντια τμήματα ανά καρέ"
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr ""
-"Αριθμός οριζόντιων τμημάτων ανά καρέ κατά τη λειτουργία χαμηλής καθυστέρησης"
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "Κατακόρυφα τμήματα ανά καρέ"
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr ""
-"Αριθμός κατακόρυφων τμημάτων ανά καρέ κατά τη λειτουργία χαμηλής καθυστέρησης"
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr "Μέγεθος πλοκαδικών κωδίκων σε κάθε υποζώνη"
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr "μικρό - χρήση μικρών πλοκαδικών κωδίκων"
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr "μεσαίο - χρήση μεσαίων πλοκαδικών κωδίκων"
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr "μεγάλο - χρήση μεγάλων πλοκαδικών κωδίκων"
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr "πλήρες - Ένας πλοκαδικός κώδικας ανά υποζώνη"
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr "Ενεργοποίηση ιεραρχικής εκτίμησης κίνησης"
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr "Αριθμός επιπέδων της μείωσης ρυθμού δειγματοληψίας"
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr ""
-"Αριθμός επιπέδων της μείωσης ρυθμού δειγματοληψίας στη λειτουργία ιεραρχικής "
-"εκτίμησης κίνησης"
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr "Ενεργοποίηση εκτίμησης ολικής κίνησης"
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr "Ενεργοποίηση εκτίμησης συσχετισμού φάσης"
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr "Ενεργοποίηση ανίχνευσης αλλαγής σκηνής"
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "Επιβολή προφίλ"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr "Προφίλ χαμηλής καθυστέρησης VC2"
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr "Απλό προφίλ VC2"
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr "Κύριο προφίλ VC2"
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "Κύριο προφίλ"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr "Αποκωδικοποιητής βίντεο Dirac που χρησιμοποιεί libschroedinger"
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr "Κωδικοποιητής βίντεο Dirac που χρησιμοποιεί llibschroedinger"
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -15937,14 +15534,6 @@ msgstr "Εφόσον το αρχείο υπάρχει ήδη, δεν θα αντ
 msgid "File dumper"
 msgstr "Κατεκτυπωτής αρχείου"
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "Τιμή για την προσαρμογή του dts"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "Αποπολυπλέκτης βίντεο Dirac"
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -16436,8 +16025,8 @@ msgstr "Επιπρόσθετο PMT"
 #: modules/demux/mpeg/ts.c:82
 msgid "Allows a user to specify an extra pmt (pmt_pid=pid:stream_type[,...])."
 msgstr ""
-"Επιτρέπει σε ένα χρήστη να ορίσει ένα επιπρόσθετο pmt (pmt_pid=pid:"
-"stream_type[,...])."
+"Επιτρέπει σε ένα χρήστη να ορίσει ένα επιπρόσθετο pmt "
+"(pmt_pid=pid:stream_type[,...])."
 
 #: modules/demux/mpeg/ts.c:84
 msgid "Set id of ES to PID"
@@ -17039,8 +16628,8 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 "<p>Ο αναπαραγωγός πολυμέσων VLC είναι ένας δωρεάν αναπαραγωγός πολυμέσων "
@@ -17050,9 +16639,9 @@ msgstr ""
 "p><p>Ο VLC χρησιμοποιεί τους δικούς του εσωτερικούς codecs, δουλεύει "
 "ουσιαστικά σε κάθε δημοφιλή πλατφόρμα και μπορεί να διαβάσει σχεδόν όλα τα "
 "αρχεία, CD, DVD, ροές δεδομένων δικτύου, κάρτες σύλληψης και άλλους τύπους "
-"πολυμέσων!</p><p><a href=\"http://www.videolan.org/contribute/\"><span style="
-"\" text-decoration: underline; color:#0057ae;\">Βοηθήστε και ελάτε μαζί μας!"
-"</span></a>"
+"πολυμέσων!</p><p><a href=\"http://www.videolan.org/contribute/\"><span "
+"style=\" text-decoration: underline; color:#0057ae;\">Βοηθήστε και ελάτε "
+"μαζί μας!</span></a>"
 
 #: modules/gui/macosx/VLCAddonsWindowController.m:104
 #: modules/gui/macosx/VLCAddonsWindowController.m:355
@@ -17345,8 +16934,8 @@ msgstr "Η είσοδος έχει αλλάξει"
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "Η είσοδος έχει μεταβληθεί, αδυναμία αποθήκευσης σελιδοδείκτη. Αναστολή "
 "αναπαραγωγής με \"Παύση\" κατά τη διάρκεια της επεξεργασίας σελιδοδεικτών "
@@ -22570,8 +22159,8 @@ msgstr "Αποθήκευση λίστας αναπαραγωγής"
 #, fuzzy
 msgid "XSPF playlist |*.xspf|M3U file |*.m3u|HTML playlist |*.html"
 msgstr ""
-"Λίστα αναπαραγωγής XSPF|*.xspf|Αρχείο M3U|*.m3u|Λίστα αναπαραγωγής HTML|*."
-"html"
+"Λίστα αναπαραγωγής XSPF|*.xspf|Αρχείο M3U|*.m3u|Λίστα αναπαραγωγής HTML|"
+"*.html"
 
 #: modules/gui/skins2/src/skin_main.cpp:484
 msgid "Skin to use"
@@ -23178,8 +22767,8 @@ msgstr "Ρυθμίσεις διεπαφής lua"
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 "Στοιχειοσειρά ρυθμίσεων της διεπαφής lua. Η μορφή είναι: '[\"<όνομα ενότητας "
 "διεπαφής>\"] = { <επιλογή> = <τιμή>, ...}, ...'."
@@ -23229,10 +22818,10 @@ msgid ""
 "but can also bind to a plain TCP socket (\"localhost:4212\") or use the "
 "telnet protocol (\"telnet://0.0.0.0:4212\")"
 msgstr ""
-"Αποδοχή εντολών από αυτή την πηγή. Το CLI προεπιλέγει το stdin (\"*κονσόλα"
-"\"), αλλά μπορεί να συνδεθεί και σε έναν απλό υποδοχέα TCP (\"τοπικός "
-"κεντρικός υπολογιστής:4212\") ή να κάνει χρήση του πρωτοκόλλου telnet "
-"(\"telnet://0.0.0.0:4212\")"
+"Αποδοχή εντολών από αυτή την πηγή. Το CLI προεπιλέγει το stdin "
+"(\"*κονσόλα\"), αλλά μπορεί να συνδεθεί και σε έναν απλό υποδοχέα TCP "
+"(\"τοπικός κεντρικός υπολογιστής:4212\") ή να κάνει χρήση του πρωτοκόλλου "
+"telnet (\"telnet://0.0.0.0:4212\")"
 
 #: modules/lua/vlc.c:85
 msgid "Lua"
@@ -24301,9 +23890,10 @@ msgid ""
 "downloads and allow the user to start previewing the file while it is "
 "downloading."
 msgstr ""
-"Δημιουργήστε αρχεία \"Γρήγορης εκκίνησης\". Τα αρχεία \"Γρήγορης εκκίνησης"
-"\"  είναι βελτιστοποιημένα για κατεβάσματα και επιτρέπουν στο χρήστη να "
-"ξεκινήσει την προεπισκόπηση του αρχείου κατά τη διάρκεια του κατεβάσματος."
+"Δημιουργήστε αρχεία \"Γρήγορης εκκίνησης\". Τα αρχεία \"Γρήγορης "
+"εκκίνησης\"  είναι βελτιστοποιημένα για κατεβάσματα και επιτρέπουν στο "
+"χρήστη να ξεκινήσει την προεπισκόπηση του αρχείου κατά τη διάρκεια του "
+"κατεβάσματος."
 
 #: modules/mux/mp4/mp4.c:64
 msgid "MP4/MOV muxer"
@@ -24649,10 +24239,6 @@ msgstr "πακετοποιητής avparser "
 #: modules/packetizer/copy.c:48
 msgid "Copy packetizer"
 msgstr "Αντιγραφή πακετοποιητή"
-
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "Πακετοποιητής Dirac"
 
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
@@ -26654,8 +26240,8 @@ msgid ""
 "Filename for stream. Helper setting for dst, dst=bind+'/'+path. dst-"
 "parameter overrides this."
 msgstr ""
-"Όνομα αρχείου για τη ρύθμιση του βοηθού ροής δεδομένων dst, dst=σύνδεση"
-"+'/'+διαδρομή, η παράμετρος dst-το παρακάμπτει"
+"Όνομα αρχείου για τη ρύθμιση του βοηθού ροής δεδομένων dst, "
+"dst=σύνδεση+'/'+διαδρομή, η παράμετρος dst-το παρακάμπτει"
 
 #: modules/stream_out/standard.c:93
 msgid "Standard stream output"
@@ -30840,6 +30426,335 @@ msgstr "AAAA;"
 msgid "Media Manager List"
 msgstr "Λίστα διαχειριστή πολυμέσων"
 
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4"
+
+#~ msgid "Rate control method"
+#~ msgstr "Μέθοδος ελέγχου ρυθμού"
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr ""
+#~ "Η μέθοδος που χρησιμοποιείται για την κωδικοποίηση της ακολουθίας βίντεο"
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "Λειτουργία σταθερού κατωφλιού θορύβου"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "Λειτουργία σταθερού ρυθμού μετάδοσης δεδομένων (CBR)"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "Λειτουργία χαμηλής καθυστέρησης"
+
+#~ msgid "Lossless mode"
+#~ msgstr "Λειτουργία χωρίς απώλειες"
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "Λειτουργία σταθερού lambda"
+
+#~ msgid "Constant error mode"
+#~ msgstr "Λειτουργία σταθερού σφάλματος"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "Λειτουργία σταθερής ποιότητας"
+
+#~ msgid "GOP structure"
+#~ msgstr "Δομή GOP"
+
+#~ msgid "GOP structure used to encode the video sequence"
+#~ msgstr ""
+#~ "Η δομή GOP που χρησιμοποιήθηκε για την κωδικοποίηση της ακολουθίας βίντεο"
+
+#~ msgid ""
+#~ "No fixed gop structure. A picture can be intra or inter and refer to "
+#~ "previous or future pictures."
+#~ msgstr ""
+#~ "Μη προκαθορισμένη δομή ομάδας εικόνων. Μία εικόνα μπορεί να είναι "
+#~ "ενδοεικόνα ή διεικόνα και να αναφέρεται σε προηγούμενες ή μελλοντικές "
+#~ "εικόνες."
+
+#~ msgid "I-frame only sequence"
+#~ msgstr "Ακολουθία μόνο των καρέ I"
+
+#~ msgid "Inter pictures refere to previous pictures only"
+#~ msgstr "Οι διεικόνες αναφέρονται μόνο στις προηγούμενες εικόνες"
+
+#~ msgid "Inter pictures can refer to previous or future pictures"
+#~ msgstr ""
+#~ "Οι διεικόνες μπορεί να αναφέρονται σε προηγούμενες ή μελλοντικές εικόνες"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "Συντελεστής σταθερής ποιότητας"
+
+#~ msgid "Quality factor to use in constant quality mode"
+#~ msgstr ""
+#~ "Συντελεστής ποιότητας που θα χρησιμοποιηθεί στη λειτουργία σταθερής "
+#~ "ποιότητας"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "Κατώφλι θορύβου"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr ""
+#~ "Κατώφλι θορύβου που θα χρησιμοποιηθεί στη λειτουργία σταθερού κατωφλιού "
+#~ "θορύβου"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "Ρυθμός μετάδοσης δεδομένων CBR (kbps)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Επιθυμητός ρυθμός μετάδοσης δεδομένων σε kbps όταν η κωδικοποίηση γίνεται "
+#~ "στη λειτουργία σταθερού ρυθμού μετάδοσης δεδομένων"
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "Μέγιστος ρυθμός μετάδοσης δεδομένων (kbps)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Μέγιστος ρυθμός μετάδοσης δεδομένων σε kbps κατά την κωδικοποίηση με "
+#~ "λειτουργία σταθερού ρυθμού μετάδοσης δεδομένων"
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "Ελάχιστος ρυθμός μετάδοσης δεδομένων (kbps)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Ελάχιστος ρυθμός μετάδοσης δεδομένων σε kbps κατά την κωδικοποίηση με "
+#~ "λειτουργία σταθερού ρυθμού μετάδοσης δεδομένων"
+
+#~ msgid "GOP length"
+#~ msgstr "Μήκος GOP"
+
+#~ msgid ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+#~ msgstr ""
+#~ "Αριθμός εικόνων μεταξύ διαδοχικών κεφαλίδων ακολουθίας, π.χ. μήκος της "
+#~ "ομάδας εικόνων"
+
+#~ msgid "Prefilter"
+#~ msgstr "Προφιλτράρισμα"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "Ενεργοποίηση προσαρμοστικού προφιλτραρίσματος"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "Χωρίς προφιλτράρισμα"
+
+#~ msgid "Centre Weighted Median"
+#~ msgstr "Διαμέσου σταθμισμένης στο κέντρο"
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "Φίλτρο χαμηλών συχνοτήτων Gauss"
+
+#~ msgid "Add Noise"
+#~ msgstr "Προσθήκη θορύβου"
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "Προσαρμοστικό φίλτρο χαμηλών συχνοτήτων Gauss"
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "Φίλτρο χαμηλών συχνοτήτων"
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "Ποσό προφιλτραρίσματος"
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "Υψηλότερη τιμή συνεπάγεται περισσότερο προφιλτράρισμα"
+
+#~ msgid "Picture coding mode"
+#~ msgstr "Λειτουργία κωδικοποίησης εικόνας"
+
+#~ msgid ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+#~ msgstr ""
+#~ "Η κωδικοποίηση πεδίου είναι εκεί όπου τα διαπλεγμένα πεδία "
+#~ "κωδικοποιούνται ξεχωριστά, σε αντίθεση με ένα ψευδο-προοδευτικό πλαίσιο"
+
+#~ msgid "auto - let encoder decide based upon input (Best)"
+#~ msgstr ""
+#~ "αυτόματη - ο κωδικοποιητής να αποφασίζει βασισμένος στην είσοδο (καλύτερη)"
+
+#~ msgid "force coding frame as single picture"
+#~ msgstr "επιβολή πλαισίου κωδικοποίησης ως απλή εικόνα"
+
+#~ msgid "force coding frame as separate interlaced fields"
+#~ msgstr "επιβολή πλαισίου κωδικοποίησης ως ξεχωριστά διαπλεγμένα πεδία"
+
+#~ msgid "Size of motion compensation blocks"
+#~ msgstr "Μέγεθος των ομάδων δεδομένων για την επανόρθωση της κίνησης"
+
+#~ msgid "automatic - let encoder decide based upon input (Best)"
+#~ msgstr ""
+#~ "αυτόματη - ο κωδικοποιητής να αποφασίζει βασισμένος στην είσοδο (Καλύτερη)"
+
+#~ msgid "small - use small motion compensation blocks"
+#~ msgstr ""
+#~ "μικρό - χρήση μικρών ομάδων δεδομένων για την επανόρθωση της κίνησης"
+
+#~ msgid "medium - use medium motion compensation blocks"
+#~ msgstr ""
+#~ "μεσαίο - χρήση μεσαίων ομάδων δεδομένων για την επανόρθωση της κίνησης"
+
+#~ msgid "large - use large motion compensation blocks"
+#~ msgstr ""
+#~ "μεγάλο - χρήση μεγάλων ομάδων δεδομένων για την επανόρθωση της κίνησης"
+
+#~ msgid "Overlap of motion compensation blocks"
+#~ msgstr "Επικάλυψη των ομάδων δεδομένων για την επανόρθωση της κίνησης"
+
+#~ msgid "none - Motion compensation blocks do not overlap"
+#~ msgstr ""
+#~ "καθόλου - Οι ομάδες δεδομένων για την επανόρθωση της κίνησης δεν "
+#~ "επικαλύπτονται"
+
+#~ msgid "partial - Motion compensation blocks only partially overlap"
+#~ msgstr ""
+#~ "μερικά - Οι ομάδες δεδομένων για την επανόρθωση της κίνησης "
+#~ "επικαλύπτονται μόνο μερικά"
+
+#~ msgid "full - Motion compensation blocks fully overlap"
+#~ msgstr ""
+#~ "πλήρως - Οι ομάδες δεδομένων για την επανόρθωση της κίνησης "
+#~ "επικαλύπτονται πλήρως"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "Ακρίβεια διανύσματος κίνησης"
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "Ακρίβεια διανύσματος κίνησης σε pels"
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "Εκτίμηση κίνησης τριών συστατικών"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "Χρήση chroma ως ένα μέρος της διαδικασίας εκτίμησης κίνησης"
+
+#~ msgid "Intra picture DWT filter"
+#~ msgstr "Φίλτρο DWT ενδοεικόνας"
+
+#~ msgid "Inter picture DWT filter"
+#~ msgstr "Φίλτρο DWT διαεικόνας"
+
+#~ msgid "Number of DWT iterations"
+#~ msgstr "Αριθμός επαναλήψεων DWT"
+
+#~ msgid "Also known as DWT levels"
+#~ msgstr "Επίσης γνωστά ως επίπεδα DWT"
+
+#~ msgid "Enable multiple quantizers"
+#~ msgstr "Ενεργοποίηση πολλαπλών κβαντιστών"
+
+#~ msgid "Enable multiple quantizers per subband (one per codeblock)"
+#~ msgstr ""
+#~ "Ενεργοποίηση πολλαπλών κβαντιστών ανά υποζώνη (ένας ανά πλοκαδικό κώδικα)"
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr "Απενεργοποίηση αριθμητικής κωδικοποίησης"
+
+#~ msgid "Use variable length codes instead, useful for very high bitrates"
+#~ msgstr ""
+#~ "Αντί αυτού, χρησιμοποιείστε κώδικες μεταβλητού μήκους, κάτι χρήσιμο για "
+#~ "πολύ υψηλούς ρυθμούς μετάδοσης δεδομένων"
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "Μέθοδος αντιληπτικής στάθμισης"
+
+#~ msgid "perceptual distance"
+#~ msgstr "Αντιληπτική απόσταση"
+
+#~ msgid "perceptual distance to calculate perceptual weight"
+#~ msgstr "αντιληπτική απόσταση για τον υπολογισμό της αντιληπτικής στάθμης"
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "Οριζόντια τμήματα ανά καρέ"
+
+#~ msgid "Number of horizontal slices per frame in low delay mode"
+#~ msgstr ""
+#~ "Αριθμός οριζόντιων τμημάτων ανά καρέ κατά τη λειτουργία χαμηλής "
+#~ "καθυστέρησης"
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "Κατακόρυφα τμήματα ανά καρέ"
+
+#~ msgid "Number of vertical slices per frame in low delay mode"
+#~ msgstr ""
+#~ "Αριθμός κατακόρυφων τμημάτων ανά καρέ κατά τη λειτουργία χαμηλής "
+#~ "καθυστέρησης"
+
+#~ msgid "Size of code blocks in each subband"
+#~ msgstr "Μέγεθος πλοκαδικών κωδίκων σε κάθε υποζώνη"
+
+#~ msgid "small - use small code blocks"
+#~ msgstr "μικρό - χρήση μικρών πλοκαδικών κωδίκων"
+
+#~ msgid "medium - use medium sized code blocks"
+#~ msgstr "μεσαίο - χρήση μεσαίων πλοκαδικών κωδίκων"
+
+#~ msgid "large - use large code blocks"
+#~ msgstr "μεγάλο - χρήση μεγάλων πλοκαδικών κωδίκων"
+
+#~ msgid "full - One code block per subband"
+#~ msgstr "πλήρες - Ένας πλοκαδικός κώδικας ανά υποζώνη"
+
+#~ msgid "Enable hierarchical Motion Estimation"
+#~ msgstr "Ενεργοποίηση ιεραρχικής εκτίμησης κίνησης"
+
+#~ msgid "Number of levels of downsampling"
+#~ msgstr "Αριθμός επιπέδων της μείωσης ρυθμού δειγματοληψίας"
+
+#~ msgid ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+#~ msgstr ""
+#~ "Αριθμός επιπέδων της μείωσης ρυθμού δειγματοληψίας στη λειτουργία "
+#~ "ιεραρχικής εκτίμησης κίνησης"
+
+#~ msgid "Enable Global Motion Estimation"
+#~ msgstr "Ενεργοποίηση εκτίμησης ολικής κίνησης"
+
+#~ msgid "Enable Phase Correlation Estimation"
+#~ msgstr "Ενεργοποίηση εκτίμησης συσχετισμού φάσης"
+
+#~ msgid "Enable Scene Change Detection"
+#~ msgstr "Ενεργοποίηση ανίχνευσης αλλαγής σκηνής"
+
+#~ msgid "Force Profile"
+#~ msgstr "Επιβολή προφίλ"
+
+#~ msgid "VC2 Low Delay Profile"
+#~ msgstr "Προφίλ χαμηλής καθυστέρησης VC2"
+
+#~ msgid "VC2 Simple Profile"
+#~ msgstr "Απλό προφίλ VC2"
+
+#~ msgid "VC2 Main Profile"
+#~ msgstr "Κύριο προφίλ VC2"
+
+#~ msgid "Main Profile"
+#~ msgstr "Κύριο προφίλ"
+
+#~ msgid "Dirac video decoder using libschroedinger"
+#~ msgstr "Αποκωδικοποιητής βίντεο Dirac που χρησιμοποιεί libschroedinger"
+
+#~ msgid "Dirac video encoder using libschroedinger"
+#~ msgstr "Κωδικοποιητής βίντεο Dirac που χρησιμοποιεί llibschroedinger"
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "Τιμή για την προσαρμογή του dts"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "Αποπολυπλέκτης βίντεο Dirac"
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "Πακετοποιητής Dirac"
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr "Ένα αρχείο SoundFonts απαιτείται για τη σύνθεση λογισμικού."
@@ -30999,8 +30914,8 @@ msgstr "Λίστα διαχειριστή πολυμέσων"
 #~ "Sort items in a natural order (for example: 1.ogg 2.ogg 10.ogg). This "
 #~ "method does not take the current language's collation rules into account."
 #~ msgstr ""
-#~ "Ταξινόμηση αντικειμένων σε φυσική σειρά (για παράδειγμα: 1.ogg 2.ogg 10."
-#~ "ogg). Αυτή η μέθοδος δεν λαμβάνει υπόψη τους κανόνες ταξινόμησης της "
+#~ "Ταξινόμηση αντικειμένων σε φυσική σειρά (για παράδειγμα: 1.ogg 2.ogg "
+#~ "10.ogg). Αυτή η μέθοδος δεν λαμβάνει υπόψη τους κανόνες ταξινόμησης της "
 #~ "τρέχουσας γλώσσας."
 
 #~ msgid "Do not sort the items."
@@ -31059,9 +30974,9 @@ msgstr "Λίστα διαχειριστή πολυμέσων"
 #~ msgstr "Κωδικός χρήστη RTSP"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
 #~ "Ο διαμεσολαβητής HTTP που θα χρησιμοποιηθεί. Πρέπει να είναι της μορφής "
 #~ "http://[όνομα χρήστη[:κωδικός]@]myproxy.mydomain:myport/ Εάν παραμείνει "
@@ -32039,8 +31954,8 @@ msgstr "Λίστα διαχειριστή πολυμέσων"
 #~ "Enter either a valid path or use the \"Choose\" button to select a "
 #~ "location."
 #~ msgstr ""
-#~ "Είτε εισάγετε μία έγκυρη διαδρομή είτε χρησιμοποιήστε το κουμπί \"Επιλογή"
-#~ "\" για να επιλέξετε μία τοποθεσία."
+#~ "Είτε εισάγετε μία έγκυρη διαδρομή είτε χρησιμοποιήστε το κουμπί "
+#~ "\"Επιλογή\" για να επιλέξετε μία τοποθεσία."
 
 #~ msgid "Finish"
 #~ msgstr "Τερματισμός"
@@ -32856,8 +32771,8 @@ msgstr "Λίστα διαχειριστή πολυμέσων"
 #~ "if the resolution is large."
 #~ msgstr ""
 #~ "Ο οδηγός υλικού XVideo για την επιτάχυνση της αποτύπωσης δεν υποστηρίζει "
-#~ "την επιθυμητή ανάλυση των %ux%u εικονοστοιχεία αλλά των %<PRIu32>x"
-#~ "%<PRIu32> εικονοστοιχεία.\n"
+#~ "την επιθυμητή ανάλυση των %ux%u εικονοστοιχεία αλλά των "
+#~ "%<PRIu32>x%<PRIu32> εικονοστοιχεία.\n"
 #~ "Επομένως η επιτάχυνση θα απενεργοποιηθεί. Η απόδοση μπορεί να επηρεαστεί "
 #~ "σοβαρά αν η ανάλυση είναι μεγάλη."
 
@@ -33370,15 +33285,15 @@ msgstr "Λίστα διαχειριστή πολυμέσων"
 #~ msgid ""
 #~ "Force the subtiles format. Valid values are : \"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
 #~ "autodetection, this should always work)."
 #~ msgstr ""
 #~ "Επιβολή του τύπου των υπότιτλων. Έγκυρες τιμές είναι:: \"microdvd\", "
 #~ "\"subrip\", \"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", "
 #~ "\"sami\", \"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", "
-#~ "\"jacosub\", \"psb\", \"realtext\", \"dks\", \"subviewer1\",  και \"auto"
-#~ "\" (σημαίνει αυτόματη ανίχνευση, αυτό πρέπει να δουλεύει πάντοτε)."
+#~ "\"jacosub\", \"psb\", \"realtext\", \"dks\", \"subviewer1\",  και "
+#~ "\"auto\" (σημαίνει αυτόματη ανίχνευση, αυτό πρέπει να δουλεύει πάντοτε)."
 
 #~ msgid "Do not complain on encrypted PES."
 #~ msgstr "να μη γίνονται παράπονα για κρυπτογραφημένα PES."
@@ -33535,9 +33450,9 @@ msgstr "Λίστα διαχειριστή πολυμέσων"
 #~ "\"κείμενο\" (προεπιλογή) και \"html\"."
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", \"syslog\" (special mode to send to syslog instead of file), and "
-#~ "\"android\" (special mode to send to android logging facility)."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", \"syslog\" (special mode to send to syslog instead of file), "
+#~ "and \"android\" (special mode to send to android logging facility)."
 #~ msgstr ""
 #~ "Ορίστε τον τύπο του καταγραφολογίου. Οι διαθέσιμες επιλογές είναι "
 #~ "\"κείμενο\" (προεπιλογή), \"html\", \"καταγραφολόγιο συστήματος\" (ειδική "
@@ -33779,8 +33694,8 @@ msgstr "Λίστα διαχειριστή πολυμέσων"
 
 #~ msgid ""
 #~ "Use a unique dbus service id to identify this VLC instance on the DBUS "
-#~ "bus. The process identifier (PID) is added to the service name: org.mpris."
-#~ "vlc-<pid>"
+#~ "bus. The process identifier (PID) is added to the service name: "
+#~ "org.mpris.vlc-<pid>"
 #~ msgstr ""
 #~ "Χρησιμοποιήστε μία μοναδική ταυτότητα υπηρεσίας dbus για να ταυτοποιήσετε "
 #~ "αυτή την υπόσταση του VLC στην αρτηρία DBUS. Το αναγνωριστικό διεργασίας "
@@ -34924,8 +34839,8 @@ msgstr "Λίστα διαχειριστή πολυμέσων"
 #~ msgstr "dbus"
 
 #~ msgid ""
-#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be"
-#~ "\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
+#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
+#~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
 #~ msgstr ""
 #~ "Ένα από τα \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
 #~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" ή \"spdif\""
@@ -35489,8 +35404,8 @@ msgstr "Λίστα διαχειριστή πολυμέσων"
 
 #~ msgid "FFmpeg audio/video decoder/encoder ((MS)MPEG4,SVQ1,H263,WMV,WMA)"
 #~ msgstr ""
-#~ "Κωδικοποιητής/αποκωδικοποιητής ήχου/βίντεο FFmpeg ((MS)MPEG4,SVQ1,H263,"
-#~ "WMV,WMA)"
+#~ "Κωδικοποιητής/αποκωδικοποιητής ήχου/βίντεο FFmpeg "
+#~ "((MS)MPEG4,SVQ1,H263,WMV,WMA)"
 
 #, fuzzy
 #~ msgid "Growl UDP port"
@@ -39244,8 +39159,8 @@ msgstr "Λίστα διαχειριστή πολυμέσων"
 
 #, fuzzy
 #~ msgid ""
-#~ "Name of the audio device to use. If you don't specify anything, \"/dev/dsp"
-#~ "\" will be used for OSS."
+#~ "Name of the audio device to use. If you don't specify anything, \"/dev/"
+#~ "dsp\" will be used for OSS."
 #~ msgstr ""
 #~ "Όνομα της συσκευής ήχου που θα χρησιμοποιηθεί από το εμφύτευμα "
 #~ "DirectShow. Εάν δεν οριστεί κάτι, θα γίνει χρήση της προεπιλεγμένης "
@@ -39253,8 +39168,8 @@ msgstr "Λίστα διαχειριστή πολυμέσων"
 
 #, fuzzy
 #~ msgid ""
-#~ "Name of the audio device to use. If you don't specify anything, \"/dev/dsp"
-#~ "\" will be used for OSS, \"hw\" for Alsa."
+#~ "Name of the audio device to use. If you don't specify anything, \"/dev/"
+#~ "dsp\" will be used for OSS, \"hw\" for Alsa."
 #~ msgstr ""
 #~ "Όνομα της συσκευής ήχου που θα χρησιμοποιηθεί από το εμφύτευμα "
 #~ "DirectShow. Εάν δεν οριστεί κάτι, θα γίνει χρήση της προεπιλεγμένης "
@@ -39386,8 +39301,8 @@ msgstr "Λίστα διαχειριστή πολυμέσων"
 #~ "All playlists|*.pls;*.m3u;*.asx;*.b4s;*.xspf|M3U files|*.m3u|XSPF "
 #~ "playlist|*.xspf"
 #~ msgstr ""
-#~ "Λίστα αναπαραγωγής XSPF|*.xspf|Αρχείο M3U|*.m3u|Λίστα αναπαραγωγής HTML|*."
-#~ "html"
+#~ "Λίστα αναπαραγωγής XSPF|*.xspf|Αρχείο M3U|*.m3u|Λίστα αναπαραγωγής HTML|"
+#~ "*.html"
 
 #, fuzzy
 #~ msgid "WinCE interface module"
@@ -41197,10 +41112,11 @@ msgstr "Λίστα διαχειριστή πολυμέσων"
 #~ "transcoding. The subpictures produced by the filters will be overlayed "
 #~ "directly onto the video."
 #~ msgstr ""
-#~ "Αυτό σας επιτρέπει να προσθέσετε επικαλύψεις (γνωστές και ως \"υποεικόνες"
-#~ "\") στην επανακωδικοποιημένη ροή δεδομένων βίντεο. Οι υποεικόνες που "
-#~ "παράγονται από τα φίλτρα θα επικαλύπτονται απευθείας στο βίντεο. Μπορείτε "
-#~ "να ορίσετε μία λίστα ενοτήτων υποεικόνων χωρισμένη με άνω-κάτω τελείες."
+#~ "Αυτό σας επιτρέπει να προσθέσετε επικαλύψεις (γνωστές και ως "
+#~ "\"υποεικόνες\") στην επανακωδικοποιημένη ροή δεδομένων βίντεο. Οι "
+#~ "υποεικόνες που παράγονται από τα φίλτρα θα επικαλύπτονται απευθείας στο "
+#~ "βίντεο. Μπορείτε να ορίσετε μία λίστα ενοτήτων υποεικόνων χωρισμένη με "
+#~ "άνω-κάτω τελείες."
 
 #, fuzzy
 #~ msgid "You can move the logo by left-clicking on it."

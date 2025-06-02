@@ -595,54 +595,54 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>Vítejte v nápovědě pro VLC media player</"
-"h2><h3>Dokumentace</h3><p>Dokumentaci k VLC najdete na VideoLAN <a href="
-"\"http://wiki.videolan.org\">wiki</a>.</p><p>Pokud jste ve VLC media player "
-"nováček, přečtěte si<br><a href=\"http://wiki.videolan.org/Documentation:"
-"VLC_for_dummies\"><em>Úvod do VLC media player</em></a>.</p><p>Zde najdete "
-"nějaké informace o tom, jak používat přehrávač:<br>\"<a href=\"http://wiki."
-"videolan.org/Documentation:Play_HowTo\"><em>Jak přehrát soubory s VLC media "
-"player</em></a>\" dokument.</p><p>Pro všechny ukládání, zpracování, "
-"transkódování, kódování, multiplex a streamování úkolů, byste měli najít "
-"užitečné informace na <a href=\"http://wiki.videolan.org/Documentation:"
-"Streaming_HowTo\">Dokumentace Streamingu</a>.</p><p>Pokud si nejste jisti s "
-"terminologií, poraďte se s <a href=\"http://wiki.videolan.org/Knowledge_Base"
-"\">databází znalostí</a>.</p><p>Chcete-li porozumět hlavním klávesovým "
-"zkratkám, přečtěte si stránku: <a href=\"http://wiki.videolan.org/Hotkeys"
-"\">zkratky</a>.</p><h3>Pomoc</h3><p>Než položíte jakýkoliv dotaz, tak se "
-"převědčte, jestli to už někdo neudělal za vás: <a href=\"http://www.videolan."
-"org/support/faq.html\">FAQ</a>.</p><p>Zde se dá hledat pomoc:  <a href="
-"\"http://forum.videolan.org\">Fórum</a>, a <a href=\"http://www.videolan.org/"
-"vlc/lists.html\">Mailing-listy</a> nebo náš IRC kanál (<em>#videolan</em> na "
-"irc.freenode.net).</p><h3>Přispět na projekt</h3><p>Můžete pomoci projektu "
-"VideoLAN tím, že darujete část svého času na pomoc komunitě. Můžete "
-"navrhnout skiny (vzhled) rozhraní, překládat dokumentace, testovat a kód, "
-"apod... Můžete také darovat finanční prostředky a materiál, aby jste nám "
-"pomohli. A samozřejmě, můžete <b>propagovat</b> VLC media player.</p></"
-"body></html>"
+"h2><h3>Dokumentace</h3><p>Dokumentaci k VLC najdete na VideoLAN <a "
+"href=\"http://wiki.videolan.org\">wiki</a>.</p><p>Pokud jste ve VLC media "
+"player nováček, přečtěte si<br><a href=\"http://wiki.videolan.org/"
+"Documentation:VLC_for_dummies\"><em>Úvod do VLC media player</em></a>.</"
+"p><p>Zde najdete nějaké informace o tom, jak používat přehrávač:<br>\"<a "
+"href=\"http://wiki.videolan.org/Documentation:Play_HowTo\"><em>Jak přehrát "
+"soubory s VLC media player</em></a>\" dokument.</p><p>Pro všechny ukládání, "
+"zpracování, transkódování, kódování, multiplex a streamování úkolů, byste "
+"měli najít užitečné informace na <a href=\"http://wiki.videolan.org/"
+"Documentation:Streaming_HowTo\">Dokumentace Streamingu</a>.</p><p>Pokud si "
+"nejste jisti s terminologií, poraďte se s <a href=\"http://wiki.videolan.org/"
+"Knowledge_Base\">databází znalostí</a>.</p><p>Chcete-li porozumět hlavním "
+"klávesovým zkratkám, přečtěte si stránku: <a href=\"http://wiki.videolan.org/"
+"Hotkeys\">zkratky</a>.</p><h3>Pomoc</h3><p>Než položíte jakýkoliv dotaz, tak "
+"se převědčte, jestli to už někdo neudělal za vás: <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>Zde se dá hledat pomoc:  "
+"<a href=\"http://forum.videolan.org\">Fórum</a>, a <a href=\"http://"
+"www.videolan.org/vlc/lists.html\">Mailing-listy</a> nebo náš IRC kanál "
+"(<em>#videolan</em> na irc.freenode.net).</p><h3>Přispět na projekt</"
+"h3><p>Můžete pomoci projektu VideoLAN tím, že darujete část svého času na "
+"pomoc komunitě. Můžete navrhnout skiny (vzhled) rozhraní, překládat "
+"dokumentace, testovat a kód, apod... Můžete také darovat finanční prostředky "
+"a materiál, aby jste nám pomohli. A samozřejmě, můžete <b>propagovat</b> VLC "
+"media player.</p></body></html>"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -1582,13 +1582,13 @@ msgstr "Extra moduly vzhledu"
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "Můžete zvolit \"dodatečná rozhraní\" pro VLC. Budou spuštěna na pozadí navíc "
 "k výchozímu rozhraní. Použijte seznam modulů oddělených dvojtečkou (obvyklé "
-"moduly jsou například \"rc\" (dálkové ovládání), \"http\", \"gestures"
-"\", ...)."
+"moduly jsou například \"rc\" (dálkové ovládání), \"http\", "
+"\"gestures\", ...)."
 
 #: src/libvlc-module.c:83
 msgid "You can select control interfaces for VLC."
@@ -1660,8 +1660,8 @@ msgid ""
 msgstr ""
 "Volby umožnující upravit chování zvukového podsystému a přidávat zvukové "
 "filtry, které mohou být použity k postprocessingu nebo vizuálním efektům "
-"(spektrální alayzér, ...). Filtry povolíte zde a nastavíte v sekci rozšíření"
-"\"Zvukové filtry\"."
+"(spektrální alayzér, ...). Filtry povolíte zde a nastavíte v sekci "
+"rozšíření\"Zvukové filtry\"."
 
 #: src/libvlc-module.c:123
 msgid "Audio output module"
@@ -2358,8 +2358,8 @@ msgstr "Poměr stran zdroje"
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "Vynutí zdrojový poměr stran. Například některá DVD nárokují poměr 16:9, ale "
@@ -2905,10 +2905,10 @@ msgstr "Změnit název dle současného média"
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
 
 #: src/libvlc-module.c:699
@@ -7364,12 +7364,13 @@ msgstr "Proxy HTTP"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
-"Použitá proxy HTTP. Ve formátu http://[uživatel@]mojeproxy.mojedoména:"
-"můjport/ ; pokud je prázdná, zkusí aplikace použít proměnnou prostředí "
-"http_proxy."
+"Použitá proxy HTTP. Ve formátu http://"
+"[uživatel@]mojeproxy.mojedoména:můjport/ ; pokud je prázdná, zkusí aplikace "
+"použít proměnnou prostředí http_proxy."
 
 #: modules/access/http.c:65
 msgid "HTTP proxy password"
@@ -7933,8 +7934,8 @@ msgstr "Nebylo nalezeno žádné vstupní zařízení"
 
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 
 #: modules/access/qtsound.m:293
@@ -8344,8 +8345,8 @@ msgstr "Ověření RTSP"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -8797,9 +8798,9 @@ msgstr "nastavení ovladače v4l2"
 #: modules/access/v4l2/v4l2.c:190
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 
 #: modules/access/v4l2/v4l2.c:242 modules/codec/avcodec/avcodec.c:50
@@ -9184,9 +9185,9 @@ msgstr ""
 
 #: modules/access_output/livehttp.c:98
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
 
 #: modules/access_output/livehttp.c:102
@@ -10591,7 +10592,6 @@ msgstr "Dekódování"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "Kódování"
 
@@ -11073,11 +11073,11 @@ msgstr "Paketizér zvuku DTS"
 msgid "Daala video encoder"
 msgstr "Obrazový kodér PNG"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "Chroma formát"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr ""
@@ -11139,8 +11139,8 @@ msgstr ""
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 
 #: modules/codec/dvbsub.c:95
@@ -11827,10 +11827,10 @@ msgstr "Přesnost řízení datového toku"
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
 
 #: modules/codec/qsv.c:134
@@ -11885,377 +11885,6 @@ msgstr ""
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "Obrazový kodér PNG"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "Způsob řízení datového toku"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr "Metoda použitá pro kódování video sekvence"
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "Režim konstantního datového toku (CBR)"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "Nízkolatenční režim"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "Bezeztrátový režim"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "Režim konstantní lambdy"
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "Režim konstantní chyby"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "Režim konstantní kvality"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "Struktura GOP"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr ""
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr ""
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr ""
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr ""
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "Faktor konstantní kvality"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr ""
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "Datový tok CBR (kb/s)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "Maximální datový tok (kbps)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "Minimální datový tok (kbps)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "Délka GOPu"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr ""
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "Předfiltr"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "Povolit adaptivní předfiltrování"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "Bez před-filtrování"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr ""
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr ""
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "Přidat šum"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr ""
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "Dolní propust"
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr ""
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr ""
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr ""
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr ""
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr ""
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr ""
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr ""
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr ""
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr ""
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr ""
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr ""
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr ""
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr ""
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr ""
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr ""
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr ""
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr ""
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr ""
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr ""
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr "Zakázat aritmetické kódování"
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr ""
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr ""
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "Perceptuální vzdálenost"
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr ""
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr ""
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr ""
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr ""
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr ""
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr ""
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr ""
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr ""
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr ""
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr ""
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr ""
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr ""
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "Vynutit profil"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr ""
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr ""
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr ""
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "Hlavní profil"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr ""
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr ""
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -14774,14 +14403,6 @@ msgstr ""
 msgid "File dumper"
 msgstr ""
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr ""
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr ""
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -15814,8 +15435,8 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 
@@ -16111,8 +15732,8 @@ msgstr "Vstup se změnil"
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "Vstup se změnil a nelze uložit záložku. Při upravování záložek pozastavte "
 "přehrávání pomocí \"Pozastavit\" abyste uložili stejný vstupu."
@@ -21691,8 +21312,8 @@ msgstr "Nastavení rozhraní Lua"
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 
 #: modules/lua/vlc.c:55 modules/lua/vlc.c:71
@@ -23055,10 +22676,6 @@ msgstr "paketizér"
 
 #: modules/packetizer/copy.c:48
 msgid "Copy packetizer"
-msgstr ""
-
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
 msgstr ""
 
 #: modules/packetizer/dts.c:47
@@ -28748,6 +28365,84 @@ msgstr "AAAA; "
 #: modules/gui/qt/ui/vlm.h:302
 msgid "Media Manager List"
 msgstr "Seznam správců médií"
+
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4"
+
+#~ msgid "Rate control method"
+#~ msgstr "Způsob řízení datového toku"
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr "Metoda použitá pro kódování video sekvence"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "Režim konstantního datového toku (CBR)"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "Nízkolatenční režim"
+
+#~ msgid "Lossless mode"
+#~ msgstr "Bezeztrátový režim"
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "Režim konstantní lambdy"
+
+#~ msgid "Constant error mode"
+#~ msgstr "Režim konstantní chyby"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "Režim konstantní kvality"
+
+#~ msgid "GOP structure"
+#~ msgstr "Struktura GOP"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "Faktor konstantní kvality"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "Datový tok CBR (kb/s)"
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "Maximální datový tok (kbps)"
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "Minimální datový tok (kbps)"
+
+#~ msgid "GOP length"
+#~ msgstr "Délka GOPu"
+
+#~ msgid "Prefilter"
+#~ msgstr "Předfiltr"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "Povolit adaptivní předfiltrování"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "Bez před-filtrování"
+
+#~ msgid "Add Noise"
+#~ msgstr "Přidat šum"
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "Dolní propust"
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr "Zakázat aritmetické kódování"
+
+#~ msgid "perceptual distance"
+#~ msgstr "Perceptuální vzdálenost"
+
+#~ msgid "Force Profile"
+#~ msgstr "Vynutit profil"
+
+#~ msgid "Main Profile"
+#~ msgstr "Hlavní profil"
 
 #, fuzzy
 #~ msgid "Capture region heigh"

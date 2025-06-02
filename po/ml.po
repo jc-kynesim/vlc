@@ -278,8 +278,8 @@ msgid ""
 "Sout streams modules allow advanced stream processing (transcoding, "
 "duplicating...)."
 msgstr ""
-"ഒരു സ്ട്രീമിങ് സെര്‍വറൊ അല്ലെങ്കില്‍ അകത്തേക്ക് വരുന്ന സ്ട്രീമുകള്‍ സേവ് ചെയ്യുന്നതായോ പ്രവര്‍"
-"ത്തിക്കുമ്പോളാണ് സ്ട്രീം ഔട്ട്പുട്ട് സജ്ജീകരണങ്ങള്‍ ഉപയോഗിക്കുക.\n"
+"ഒരു സ്ട്രീമിങ് സെര്‍വറൊ അല്ലെങ്കില്‍ അകത്തേക്ക് വരുന്ന സ്ട്രീമുകള്‍ സേവ് ചെയ്യുന്നതായോ "
+"പ്രവര്‍ത്തിക്കുമ്പോളാണ് സ്ട്രീം ഔട്ട്പുട്ട് സജ്ജീകരണങ്ങള്‍ ഉപയോഗിക്കുക.\n"
 "സ്ട്രീമുകള്‍ ആദ്യം മക്സ് ചെയ്യുകയും കൂടാതെ പിന്നീട് തഥ സ്ട്രീമിനെ ഒരു ഫയലിലേക്ക് സേവ് ചെയ്യാനൊ "
 "അല്ലെങ്കില്‍ (യു‌ഡി‌പി, എച്ച്‌ടി‌ടി‌പി, ആര്‍‌ടി‌പി/ആര്‍‌ടി‌എസ്‌പി) ലേക്ക് പ്രവഹിപ്പിക്കാനോ കഴിയുന്ന ഒരു \" "
 "പ്രവേശന ഔട്ട്പുട്ട്\" ഘടകത്തിലൂടെ അയച്ചു.\n"
@@ -302,8 +302,8 @@ msgid ""
 "You can also set default parameters for each muxer."
 msgstr ""
 "എല്ലാ മൌലികമായ സ്ട്രീമുകളെയും (വീഡിയോ, ഓഡിയോ) ഒരുമിച്ച് നിക്ഷേപിക്കാന്‍ ഉപയോഗിക്കുന്ന "
-"ചുരുക്കിയവതരിപ്പിക്കുന്ന ഘടകങ്ങളെ മക്സറുകള്‍ സൃഷ്ട്ടിക്കുന്നു.  എപ്പോഴും വ്യക്തതയുള്ള മക്സറുകളെ നിര്‍"
-"ബന്ധിക്കാന്‍ ഈ സജ്ജീകരണം അനുവദിക്കും.  നിങ്ങള്‍ പ്രായേണ അത് ചെയ്യാതിരിക്കുക.\n"
+"ചുരുക്കിയവതരിപ്പിക്കുന്ന ഘടകങ്ങളെ മക്സറുകള്‍ സൃഷ്ട്ടിക്കുന്നു.  എപ്പോഴും വ്യക്തതയുള്ള മക്സറുകളെ "
+"നിര്‍ബന്ധിക്കാന്‍ ഈ സജ്ജീകരണം അനുവദിക്കും.  നിങ്ങള്‍ പ്രായേണ അത് ചെയ്യാതിരിക്കുക.\n"
 "ഓരോ മക്സറിനും സ്വയമേവയുള്ള ഘടകങ്ങളെ നിങ്ങള്‍ക്ക് സജ്ജീകരിക്കുകയും ചെയ്യാം."
 
 #: include/vlc_config_cat.h:147
@@ -575,53 +575,54 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>വി‌എല്‍‌സി മാധ്യമ പ്ലെയര്‍ സഹായിയിലേക്ക് സ്വാഗതം</"
-"h2><h3>പ്രമാണീകരണം</h3><p>വി‌എല്‍‌സിയുടെ പ്രമാണീകരണം നിങ്ങള്‍ക്ക് വീഡിയോലാന്റെ  <a href="
-"\"http://wiki.videolan.org\">wiki</a> വെബ്സൈറ്റില്‍ കാണാം.</p><p> നിങ്ങള്‍ വി‌എല്‍‌സി "
-"മാധ്യമ പ്ലെയറിലേക്ക് ഒരു നവാഗതനാണെങ്കില്‍ ദയവായി <br><a href=\"http://wiki.videolan."
-"org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media player</"
-"em></a> വായിക്കുക..</p><p>പ്ലേയര്‍ എങ്ങനെ ഉപയോഗിക്കണം എന്നതിനെ കുറിച്ചുള്ള ചില വിവരങ്ങള്‍ "
-"നിങ്ങള്‍ക്ക് <br>\"<a href=\"http://wiki.videolan.org/Documentation:Play_HowTo"
-"\"><em>How to play files with VLC media player</em></a> പ്രമാണത്തില്‍ കാണാം.</"
-"p><p> എല്ലാ പരിപാലിക്കാനും മാറ്റം വരുത്താനും ട്രാന്‍സ്കോട് ചെയ്യാനും എന്‍കോഡ് ചെയ്യാനും മക്സ് "
-"ചെയ്യാനും കൂടാതെ സ്ട്രീമിങ് കര്‍ത്തവ്യത്തിനും ആവ്ശ്യമായ വിവരങ്ങള്‍ നിങ്ങള്‍ക്ക് ഈ <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a> കാണാം.</p><p> നിങ്ങള്‍ക്ക് സങ്കേതഭാഷയെപറ്റി സംശയം ഉണ്ടെങ്കില്‍ ദയവായി  <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>പ്രധാന "
-"കീബോര്‍ഡ് കുറുക്കുവഴി മനസിലാക്കാന്‍ <a href=\"http://wiki.videolan.org/Hotkeys"
-"\">shortcuts</a> പേജ് വായിക്കുക.</p><h3>സഹായം</h3><p>ഏത് ചോദ്യം ചോദിക്കുന്നതിന് മുമ്പും "
-"നിങ്ങള്‍ സ്വയം <a href=\"http://www.videolan.org/support/faq.html\">FAQ</a> "
-"അന്വേഷിക്കുക.</p><p><a href=\"http://forum.videolan.org\">Forums</a>, <a href="
-"\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> അല്ലെങ്കില്‍ ഞങ്ങളുടെ "
-"ഐ‌ആര്‍‌സി ചാനലില്‍  (irc.freenode.net ലുള്ള <em>#videolan</em>) നിങ്ങള്‍ക്ക് സഹായം "
-"ലഭിക്കാം (കൂടാതെ കൊടുക്കാം).</p><h3>പദ്ധതിയിലേക്ക് സംഭാവന ചെയ്യുക</h3><p>സമൂഹത്തെ "
-"സഹായിക്കാനും, സ്കിന്‍ രൂപകല്‍പ്പന ചെയ്യാനും, പ്രമാണങ്ങള്‍ പരിഭാഷപ്പെടുത്താനും, പരീക്ഷണത്തിനും "
-"കൂടാതെ കോഡ് ചെയ്യാനും നിങ്ങളുടെ കുറച്ചു സമയം കൊടുത്തു നിങ്ങള്‍ക്ക് വീഡിയോലാന്‍ പദ്ധതിയെ "
-"സഹായിക്കാം. ഞങ്ങളെ സഹായിക്കാന്‍ നിങ്ങള്‍ക്ക് സംഭവനകളും സാമഗ്രികളും തരാം.  കൂടാതെ തീര്‍ച്ചയായും "
-"നിങ്ങള്‍ക്ക് വി‌എല്‍‌സി മാധ്യമ പ്ലെയറിനെ <b>പ്രചരിപ്പിക്കാം</b>.</p></body></html>"
+"h2><h3>പ്രമാണീകരണം</h3><p>വി‌എല്‍‌സിയുടെ പ്രമാണീകരണം നിങ്ങള്‍ക്ക് വീഡിയോലാന്റെ  <a "
+"href=\"http://wiki.videolan.org\">wiki</a> വെബ്സൈറ്റില്‍ കാണാം.</p><p> നിങ്ങള്‍ "
+"വി‌എല്‍‌സി മാധ്യമ പ്ലെയറിലേക്ക് ഒരു നവാഗതനാണെങ്കില്‍ ദയവായി <br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a> വായിക്കുക..</p><p>പ്ലേയര്‍ എങ്ങനെ ഉപയോഗിക്കണം എന്നതിനെ കുറിച്ചുള്ള "
+"ചില വിവരങ്ങള്‍ നിങ്ങള്‍ക്ക് <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a> പ്രമാണത്തില്‍ കാണാം.</p><p> എല്ലാ പരിപാലിക്കാനും മാറ്റം വരുത്താനും ട്രാന്‍സ്കോട് ചെയ്യാനും "
+"എന്‍കോഡ് ചെയ്യാനും മക്സ് ചെയ്യാനും കൂടാതെ സ്ട്രീമിങ് കര്‍ത്തവ്യത്തിനും ആവ്ശ്യമായ വിവരങ്ങള്‍ നിങ്ങള്‍ക്ക് "
+"ഈ <a href=\"http://wiki.videolan.org/"
+"Documentation:Streaming_HowTo\">Streaming Documentation</a> കാണാം.</p><p> "
+"നിങ്ങള്‍ക്ക് സങ്കേതഭാഷയെപറ്റി സംശയം ഉണ്ടെങ്കില്‍ ദയവായി  <a href=\"http://"
+"wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>പ്രധാന കീബോര്‍ഡ് "
+"കുറുക്കുവഴി മനസിലാക്കാന്‍ <a href=\"http://wiki.videolan.org/Hotkeys\">shortcuts</"
+"a> പേജ് വായിക്കുക.</p><h3>സഹായം</h3><p>ഏത് ചോദ്യം ചോദിക്കുന്നതിന് മുമ്പും നിങ്ങള്‍ സ്വയം <a "
+"href=\"http://www.videolan.org/support/faq.html\">FAQ</a> അന്വേഷിക്കുക.</"
+"p><p><a href=\"http://forum.videolan.org\">Forums</a>, <a href=\"http://"
+"www.videolan.org/vlc/lists.html\">mailing-lists</a> അല്ലെങ്കില്‍ ഞങ്ങളുടെ ഐ‌ആര്‍‌സി "
+"ചാനലില്‍  (irc.freenode.net ലുള്ള <em>#videolan</em>) നിങ്ങള്‍ക്ക് സഹായം ലഭിക്കാം "
+"(കൂടാതെ കൊടുക്കാം).</p><h3>പദ്ധതിയിലേക്ക് സംഭാവന ചെയ്യുക</h3><p>സമൂഹത്തെ സഹായിക്കാനും, "
+"സ്കിന്‍ രൂപകല്‍പ്പന ചെയ്യാനും, പ്രമാണങ്ങള്‍ പരിഭാഷപ്പെടുത്താനും, പരീക്ഷണത്തിനും കൂടാതെ കോഡ് "
+"ചെയ്യാനും നിങ്ങളുടെ കുറച്ചു സമയം കൊടുത്തു നിങ്ങള്‍ക്ക് വീഡിയോലാന്‍ പദ്ധതിയെ സഹായിക്കാം. ഞങ്ങളെ "
+"സഹായിക്കാന്‍ നിങ്ങള്‍ക്ക് സംഭവനകളും സാമഗ്രികളും തരാം.  കൂടാതെ തീര്‍ച്ചയായും നിങ്ങള്‍ക്ക് വി‌എല്‍‌സി "
+"മാധ്യമ പ്ലെയറിനെ <b>പ്രചരിപ്പിക്കാം</b>.</p></body></html>"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -1506,9 +1507,9 @@ msgid ""
 "select the main interface, additional interface modules, and define various "
 "related options."
 msgstr ""
-"വി‌എല്‍‌സി ഉപയോഗിക്കുന്ന സമ്പര്‍ക്കമുഖങ്ങള്‍ കോണ്‍ഫിഗര്‍ ചെയ്യാന്‍ ഈ ഐച്ഛികങ്ങള്‍ അനുവദിക്കും.  പ്രധാന സമ്പര്‍"
-"ക്കമുഖ ഘടകങ്ങള്‍, കൂട്ടിച്ചേര്‍ക്കപ്പെട്ട സമ്പര്‍ക്കമുഖ ഘടകങ്ങള്‍ കൂടാതെ പല ബന്ധമുള്ള ഐച്ഛികങ്ങള്‍ നിര്‍"
-"വചിക്കല്‍ നിങ്ങള്‍ക് തിരഞ്ഞെടുക്കാം."
+"വി‌എല്‍‌സി ഉപയോഗിക്കുന്ന സമ്പര്‍ക്കമുഖങ്ങള്‍ കോണ്‍ഫിഗര്‍ ചെയ്യാന്‍ ഈ ഐച്ഛികങ്ങള്‍ അനുവദിക്കും.  പ്രധാന "
+"സമ്പര്‍ക്കമുഖ ഘടകങ്ങള്‍, കൂട്ടിച്ചേര്‍ക്കപ്പെട്ട സമ്പര്‍ക്കമുഖ ഘടകങ്ങള്‍ കൂടാതെ പല ബന്ധമുള്ള ഐച്ഛികങ്ങള്‍ "
+"നിര്‍വചിക്കല്‍ നിങ്ങള്‍ക് തിരഞ്ഞെടുക്കാം."
 
 #: src/libvlc-module.c:68
 msgid "Interface module"
@@ -1530,12 +1531,12 @@ msgstr "അധിക ഇന്റര്‍ഫേസ് മോഡ്യൂള്�
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "വി‌എല്‍‌സിക്കു വേണ്ടി \"കൂട്ടിച്ചേര്‍ക്കപ്പെട്ട സമ്പര്‍ക്കമുഖങ്ങള്‍\" നിങ്ങള്‍ക്ക് തിരഞ്ഞെടുക്കാം. അവ "
-"സ്വയമേവയുള്ള സമ്പര്‍ക്കമുഖത്തെ കൂടാതെ പശ്ചാത്തലത്തില്‍ സമാരംഭിക്കും. ഒരു അപൂര്‍ണ്ണവിരാമത്താല്‍ വേര്‍"
-"തിരിച്ച സമ്പര്‍ക്കമുഖ ഘടകങ്ങള്‍ ഉപയോഗിക്കുക. (പൊതുവായ മൂല്യങ്ങള്‍ \"ആര്‍‌സി\"(റിമോട്ട് കണ്‍ട്രോള്‍)."
+"സ്വയമേവയുള്ള സമ്പര്‍ക്കമുഖത്തെ കൂടാതെ പശ്ചാത്തലത്തില്‍ സമാരംഭിക്കും. ഒരു അപൂര്‍ണ്ണവിരാമത്താല്‍ "
+"വേര്‍തിരിച്ച സമ്പര്‍ക്കമുഖ ഘടകങ്ങള്‍ ഉപയോഗിക്കുക. (പൊതുവായ മൂല്യങ്ങള്‍ \"ആര്‍‌സി\"(റിമോട്ട് കണ്‍ട്രോള്‍)."
 "\"എച്ച്‌ടി‌ടി‌പി\", \"ആംഗ്യങ്ങള്‍\" ...)"
 
 #: src/libvlc-module.c:83
@@ -1608,8 +1609,8 @@ msgid ""
 msgstr ""
 "ശ്രവ്യ ഉപവ്യൂഹത്തിന്റെ പെരുമാറ്റം പരിഷ്കരിക്കാന്‍ ഈ ഐച്ഛികങ്ങള്‍ നിങ്ങളെ അനുവദിക്കും കൂടാതെ "
 "പിന്നീടുള്ള സംസ്കരണത്തിന് ഉപയോഗിക്കാനുള്ള ശ്രവ്യ ഫില്‍റ്ററുകള്‍ അല്ലെങ്കില്‍ ദൃശ്യ പ്രതീതി (സ്പെക്ട്രം "
-"അനലൈസര്‍) കൂട്ടിച്ചേര്‍ക്കം. ഈ ഫില്‍റ്ററുകള്‍ ഇവിടെ പ്രവര്‍ത്തനക്ഷമമാക്കുക, കൂടാതെ അവയെ \"ശ്രവ്യ ഫീല്‍"
-"റ്ററുകള്‍\" ഘടകങ്ങളുടെ വിഭാഗത്തില്‍ കോണ്‍ഫിഗര്‍ ചെയ്യുക."
+"അനലൈസര്‍) കൂട്ടിച്ചേര്‍ക്കം. ഈ ഫില്‍റ്ററുകള്‍ ഇവിടെ പ്രവര്‍ത്തനക്ഷമമാക്കുക, കൂടാതെ അവയെ \"ശ്രവ്യ "
+"ഫീല്‍റ്ററുകള്‍\" ഘടകങ്ങളുടെ വിഭാഗത്തില്‍ കോണ്‍ഫിഗര്‍ ചെയ്യുക."
 
 #: src/libvlc-module.c:123
 msgid "Audio output module"
@@ -1620,8 +1621,8 @@ msgid ""
 "This is the audio output method used by VLC. The default behavior is to "
 "automatically select the best method available."
 msgstr ""
-"വി‌എല്‍‌സി ഉപയോഗിക്കുന്ന ശ്രവ്യ ഔട്പുട്ട് മാര്‍ഗ്ഗമാണ് ഇത്. സ്വയമേവയുള്ള പെരുമാറ്റം ലഭ്യമായ ഉത്തമ മാര്‍"
-"ഗ്ഗം സ്വയം തിരഞ്ഞെടുക്കല്‍ എന്നതാണു."
+"വി‌എല്‍‌സി ഉപയോഗിക്കുന്ന ശ്രവ്യ ഔട്പുട്ട് മാര്‍ഗ്ഗമാണ് ഇത്. സ്വയമേവയുള്ള പെരുമാറ്റം ലഭ്യമായ ഉത്തമ "
+"മാര്‍ഗ്ഗം സ്വയം തിരഞ്ഞെടുക്കല്‍ എന്നതാണു."
 
 #: src/libvlc-module.c:129
 #, fuzzy
@@ -1706,8 +1707,8 @@ msgstr "ഓഡിയോ വോള്യം ഓര്‍ക്കുക"
 msgid ""
 "The volume can be recorded and automatically restored next time VLC is used."
 msgstr ""
-"ശബ്ദമാത്ര റിക്കോര്‍ഡ് ചെയ്യുകയും കൂടാതെ അടുത്തപ്രവശ്യം വി‌എല്‍‌സി ഉപയോഗിക്കുമ്പോള്‍  സ്വയമേവ പൂര്‍"
-"വ്വസ്ഥിതിയിലാക്കും"
+"ശബ്ദമാത്ര റിക്കോര്‍ഡ് ചെയ്യുകയും കൂടാതെ അടുത്തപ്രവശ്യം വി‌എല്‍‌സി ഉപയോഗിക്കുമ്പോള്‍  സ്വയമേവ "
+"പൂര്‍വ്വസ്ഥിതിയിലാക്കും"
 
 #: src/libvlc-module.c:161
 msgid "Audio desynchronization compensation"
@@ -1875,11 +1876,11 @@ msgid ""
 "\"video filters\" modules section. You can also set many miscellaneous video "
 "options."
 msgstr ""
-"ദൃശ്യ ഔട്ട്പുട്ട് ഉപവ്യൂഹത്തിന്റെ പെരുമാറ്റം പരിഷ്കരിക്കാന്‍ ഈ ഐച്ഛികങ്ങള്‍ നിങ്ങളെ അനുവദിക്കും. നിങ്ങള്‍"
-"ക്ക് ഒരു ഉദാഹരണത്തിന് വീഡിയോ ഫില്‍റ്ററുകള്‍ (ഡിഇന്‍റര്‍ലേസിങ്, ഇമേജ് ക്രമീകരിക്കുക, ആദിയായി.) "
-"പ്രവര്‍ത്തനക്ഷമമാക്കാം. ഈ ഫില്‍റ്ററുകള്‍ ഇവിടെ പ്രവര്‍ത്തനക്ഷമമാക്കുക, കൂടാതെ അവയെ \"ദൃശ്യ ഫീല്‍റ്ററുകള്‍"
-"\" ഘടകങ്ങളുടെ വിഭാഗത്തില്‍ കോണ്‍ഫിഗര്‍ ചെയ്യുക. നിങ്ങള്‍ക്ക് ബഹുവിധ വീഡിയോ ഐച്ഛികങ്ങള്‍ "
-"സജ്ജീകരിക്കുകയും ചെയ്യാം."
+"ദൃശ്യ ഔട്ട്പുട്ട് ഉപവ്യൂഹത്തിന്റെ പെരുമാറ്റം പരിഷ്കരിക്കാന്‍ ഈ ഐച്ഛികങ്ങള്‍ നിങ്ങളെ അനുവദിക്കും. "
+"നിങ്ങള്‍ക്ക് ഒരു ഉദാഹരണത്തിന് വീഡിയോ ഫില്‍റ്ററുകള്‍ (ഡിഇന്‍റര്‍ലേസിങ്, ഇമേജ് ക്രമീകരിക്കുക, "
+"ആദിയായി.) പ്രവര്‍ത്തനക്ഷമമാക്കാം. ഈ ഫില്‍റ്ററുകള്‍ ഇവിടെ പ്രവര്‍ത്തനക്ഷമമാക്കുക, കൂടാതെ അവയെ "
+"\"ദൃശ്യ ഫീല്‍റ്ററുകള്‍\" ഘടകങ്ങളുടെ വിഭാഗത്തില്‍ കോണ്‍ഫിഗര്‍ ചെയ്യുക. നിങ്ങള്‍ക്ക് ബഹുവിധ വീഡിയോ "
+"ഐച്ഛികങ്ങള്‍ സജ്ജീകരിക്കുകയും ചെയ്യാം."
 
 #: src/libvlc-module.c:253
 msgid "Video output module"
@@ -1890,8 +1891,8 @@ msgid ""
 "This is the the video output method used by VLC. The default behavior is to "
 "automatically select the best method available."
 msgstr ""
-"വി‌എല്‍‌സി ഉപയോഗിക്കുന്ന ദൃശ്യ ഔട്പുട്ട് മാര്‍ഗ്ഗമാണ് ഇത്. സ്വയമേവയുള്ള പെരുമാറ്റം ലഭ്യമായ ഉത്തമ മാര്‍"
-"ഗ്ഗം സ്വയം തിരഞ്ഞെടുക്കല്‍ എന്നതാണു."
+"വി‌എല്‍‌സി ഉപയോഗിക്കുന്ന ദൃശ്യ ഔട്പുട്ട് മാര്‍ഗ്ഗമാണ് ഇത്. സ്വയമേവയുള്ള പെരുമാറ്റം ലഭ്യമായ ഉത്തമ "
+"മാര്‍ഗ്ഗം സ്വയം തിരഞ്ഞെടുക്കല്‍ എന്നതാണു."
 
 #: src/libvlc-module.c:258 modules/gui/macosx/VLCSimplePrefsController.m:346
 #: modules/stream_out/display.c:42 modules/gui/qt/ui/sprefs_video.h:312
@@ -2113,8 +2114,8 @@ msgstr "x മില്ലിസെക്കന്‍ഡു നേരത്തേ
 #: src/libvlc-module.c:330
 msgid "Show the video title for n milliseconds, default is 5000 ms (5 sec.)"
 msgstr ""
-"n മില്ലിസെക്കന്‍ഡ് സമയത്തേക്ക് വീഡിയോയുടെ തലകെട്ട് കാണിക്കുക, സ്വയമേവ അത് 5000 ms (5 സെക്കന്‍"
-"ഡ്)."
+"n മില്ലിസെക്കന്‍ഡ് സമയത്തേക്ക് വീഡിയോയുടെ തലകെട്ട് കാണിക്കുക, സ്വയമേവ അത് 5000 ms (5 "
+"സെക്കന്‍ഡ്)."
 
 #: src/libvlc-module.c:332
 msgid "Position of video title"
@@ -2198,8 +2199,8 @@ msgid ""
 "Inhibits the power management daemon during any playback, to avoid the "
 "computer being suspended because of inactivity."
 msgstr ""
-"പ്ലേബാക്കിന്‍റെ ഇടക്ക് ഊര്‍ജ്ജ നിയന്ത്രണ ഡിമോണ്‍ നിഷേധിക്കുന്നു, കമ്പ്യൂട്ടര്‍ നിഷ്‌ക്രിയത്വം കാരണം താല്‍"
-"കാലികമായി നിക്കുന്നത് ഒഴിവാക്കാന്‍ വേണ്ടിയാണ്."
+"പ്ലേബാക്കിന്‍റെ ഇടക്ക് ഊര്‍ജ്ജ നിയന്ത്രണ ഡിമോണ്‍ നിഷേധിക്കുന്നു, കമ്പ്യൂട്ടര്‍ നിഷ്‌ക്രിയത്വം കാരണം "
+"താല്‍കാലികമായി നിക്കുന്നത് ഒഴിവാക്കാന്‍ വേണ്ടിയാണ്."
 
 #: src/libvlc-module.c:378 modules/gui/macosx/VLCSimplePrefsController.m:351
 #: modules/gui/qt/ui/sprefs_video.h:317
@@ -2315,15 +2316,15 @@ msgstr "സ്രോതസ്സ് ആസ്പെക്ട് റേഷ്യ�
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
-"ഉറവിട വീഡിയോയുടെ ഭാവ അനുപാതത്തെ ഇത് നിര്‍ബന്ധിക്കും. ഉദാഹരണത്തിന് ചില ഡി‌വി‌ഡികള്‍ യാദാര്‍"
-"ത്തമായി 4:3 ആണെങ്കിലും 16:9 എന്നു അവകാശപ്പെടും. ഒരു സിനിമയ്ക്ക് ഭാവ അനുപാത വിവരം ഇല്ലാ "
-"എങ്കില്‍ വി‌എല്‍‌സി ഇതിനെ ഒരു സൂചികയായിട്ടും ഉപയോഗിക്കും. ആഗോള ഇമേജ് ഭാവം പ്രകടിപ്പിക്കാന്‍ "
-"സ്വീകരിക്കുന്ന ഘടനകളാണ് എക്സ്:വൈ(4:3,16:9, എന്നിവ) അല്ലെങ്കില്‍ പിക്സെല്‍ സ്ക്വേയര്‍നെസ്സ് "
-"പ്രകടിപ്പിക്കാന്‍ ഒരു ഫ്ലോട്ട് മൂല്യം(1.25,1.3333, എന്നിവ.)"
+"ഉറവിട വീഡിയോയുടെ ഭാവ അനുപാതത്തെ ഇത് നിര്‍ബന്ധിക്കും. ഉദാഹരണത്തിന് ചില ഡി‌വി‌ഡികള്‍ "
+"യാദാര്‍ത്തമായി 4:3 ആണെങ്കിലും 16:9 എന്നു അവകാശപ്പെടും. ഒരു സിനിമയ്ക്ക് ഭാവ അനുപാത വിവരം "
+"ഇല്ലാ എങ്കില്‍ വി‌എല്‍‌സി ഇതിനെ ഒരു സൂചികയായിട്ടും ഉപയോഗിക്കും. ആഗോള ഇമേജ് ഭാവം "
+"പ്രകടിപ്പിക്കാന്‍ സ്വീകരിക്കുന്ന ഘടനകളാണ് എക്സ്:വൈ(4:3,16:9, എന്നിവ) അല്ലെങ്കില്‍ പിക്സെല്‍ "
+"സ്ക്വേയര്‍നെസ്സ് പ്രകടിപ്പിക്കാന്‍ ഒരു ഫ്ലോട്ട് മൂല്യം(1.25,1.3333, എന്നിവ.)"
 
 #: src/libvlc-module.c:440
 msgid "Video Auto Scaling"
@@ -2354,8 +2355,8 @@ msgid ""
 "Comma separated list of crop ratios which will be added in the interface's "
 "crop ratios list."
 msgstr ""
-"സമ്പര്‍ക്കമുഖത്തിന്‍റെ ക്രോപ് അനുപാത പട്ടികയില്‍ ചേര്‍ക്കപ്പെടുന്ന അല്‍പവിരാമ ചിഹ്നത്താല്‍ വേര്‍"
-"തിരിക്കപ്പെട്ട ക്രോപ് അനുപാതങ്ങളുടെ പട്ടിക."
+"സമ്പര്‍ക്കമുഖത്തിന്‍റെ ക്രോപ് അനുപാത പട്ടികയില്‍ ചേര്‍ക്കപ്പെടുന്ന അല്‍പവിരാമ ചിഹ്നത്താല്‍ "
+"വേര്‍തിരിക്കപ്പെട്ട ക്രോപ് അനുപാതങ്ങളുടെ പട്ടിക."
 
 #: src/libvlc-module.c:454
 msgid "Custom aspect ratios list"
@@ -2366,8 +2367,8 @@ msgid ""
 "Comma separated list of aspect ratios which will be added in the interface's "
 "aspect ratio list."
 msgstr ""
-"സമ്പര്‍ക്കമുഖത്തിന്‍റെ ആസ്പെക്ട് അനുപാത പട്ടികയില്‍ ചേര്‍ക്കപ്പെടുന്ന അല്‍പവിരാമ ചിഹ്നത്താല്‍ വേര്‍"
-"തിരിക്കപ്പെട്ട ആസ്പെക്ട് അനുപാതങ്ങളുടെ പട്ടിക."
+"സമ്പര്‍ക്കമുഖത്തിന്‍റെ ആസ്പെക്ട് അനുപാത പട്ടികയില്‍ ചേര്‍ക്കപ്പെടുന്ന അല്‍പവിരാമ ചിഹ്നത്താല്‍ "
+"വേര്‍തിരിക്കപ്പെട്ട ആസ്പെക്ട് അനുപാതങ്ങളുടെ പട്ടിക."
 
 #: src/libvlc-module.c:459
 msgid "Fix HDTV height"
@@ -2381,8 +2382,8 @@ msgid ""
 msgstr ""
 "കേടായ എന്‍കോഡര്‍ ഉയരത്തെ തെറ്റായി 1088 രേഖകളായി സജ്ജീകരിച്ചാലും എച്ച്‌ഡി‌ടി‌വി-1080 "
 "രൂപഘടനയുള്ള വീഡിയോയെ ഉചിതമായി കൈകാര്യം ചെയ്യാന്‍ ഇത് അനുവദിക്കും. നിങ്ങളുടെ വീഡിയോയ്ക്കു "
-"1088 രേഖകള്‍ ആവശ്യമുള്ള നിലവാരമില്ലാത്ത ഘടനയാണെങ്കില്‍ മാത്രം നിങ്ങള്‍ ഈ ഐഛികം പ്രവര്‍"
-"ത്തനരഹിതമാക്കുക."
+"1088 രേഖകള്‍ ആവശ്യമുള്ള നിലവാരമില്ലാത്ത ഘടനയാണെങ്കില്‍ മാത്രം നിങ്ങള്‍ ഈ ഐഛികം "
+"പ്രവര്‍ത്തനരഹിതമാക്കുക."
 
 #: src/libvlc-module.c:466
 msgid "Monitor pixel aspect ratio"
@@ -2513,8 +2514,8 @@ msgid ""
 "It is possible to disable the input clock synchronisation for real-time "
 "sources. Use this if you experience jerky playback of network streams."
 msgstr ""
-"തല്‍സമയ ഉറവിടങ്ങള്‍ക്ക് വേണ്ടി ഇന്‍പുട്ട് ക്ലോക്ക് സമന്വയം പ്രവര്‍ത്തനരഹിതമാക്കാന്‍ സാധ്യമാണ്. നെറ്റ്വര്‍"
-"ക്ക് സ്ട്രീമുകളുടെ ഇടമുറിഞ്ഞ ആരംഭവിരാമ പ്ലേബാക്ക് അനുഭവിക്കുവാണെങ്കില്‍ ഇത് ഉപയോഗിക്കുക."
+"തല്‍സമയ ഉറവിടങ്ങള്‍ക്ക് വേണ്ടി ഇന്‍പുട്ട് ക്ലോക്ക് സമന്വയം പ്രവര്‍ത്തനരഹിതമാക്കാന്‍ സാധ്യമാണ്. "
+"നെറ്റ്വര്‍ക്ക് സ്ട്രീമുകളുടെ ഇടമുറിഞ്ഞ ആരംഭവിരാമ പ്ലേബാക്ക് അനുഭവിക്കുവാണെങ്കില്‍ ഇത് ഉപയോഗിക്കുക."
 
 #: src/libvlc-module.c:532
 msgid "Clock jitter"
@@ -2588,8 +2589,8 @@ msgid ""
 "multicast packets sent by the stream output (-1 = use operating system built-"
 "in default)."
 msgstr ""
-"സ്ട്രീം ഔട്ട്പുട്ട്  (-1 = സ്വയമേവ ഓപ്പറേറ്റിങ് സിസ്റ്റം ബില്‍ട്ട്-ഇന്‍ ഉപയോഗിക്കുന്നു ) അയക്കുന്ന മള്‍"
-"ടികാസ്റ്റ് പാക്കറ്റുകളുടെ ഹോപ് പരിധിയാണ് ( \"Time-To-Live\" അല്ലെങ്കില്‍ TTL എന്നും "
+"സ്ട്രീം ഔട്ട്പുട്ട്  (-1 = സ്വയമേവ ഓപ്പറേറ്റിങ് സിസ്റ്റം ബില്‍ട്ട്-ഇന്‍ ഉപയോഗിക്കുന്നു ) അയക്കുന്ന "
+"മള്‍ടികാസ്റ്റ് പാക്കറ്റുകളുടെ ഹോപ് പരിധിയാണ് ( \"Time-To-Live\" അല്ലെങ്കില്‍ TTL എന്നും "
 "അറിയപ്പെടുന്നു) ഇത്."
 
 #: src/libvlc-module.c:559
@@ -2671,8 +2672,8 @@ msgid ""
 "Language of the subtitle track you want to use (comma separated, two or "
 "three letters country code, you may use 'any' as a fallback)."
 msgstr ""
-"നിങ്ങള്‍ക്ക് തിരഞ്ഞെടുത്ത് ഉപയോഗിക്കേണ്ട ഉപശീര്‍ഷക ട്രാക്കിന്റെ ഭാഷ (അല്‍പവിരാമത്താല്‍ വേര്‍"
-"തിരിച്ചത്, രണ്ടോ അല്ലെങ്കില്‍ മൂന്നോ അക്ഷരമുള്ള രാജ്യത്തിന്റെ കോഡ്, പിന്‍വലിയുന്നത് ഒഴിവാക്കാന്‍ "
+"നിങ്ങള്‍ക്ക് തിരഞ്ഞെടുത്ത് ഉപയോഗിക്കേണ്ട ഉപശീര്‍ഷക ട്രാക്കിന്റെ ഭാഷ (അല്‍പവിരാമത്താല്‍ "
+"വേര്‍തിരിച്ചത്, രണ്ടോ അല്ലെങ്കില്‍ മൂന്നോ അക്ഷരമുള്ള രാജ്യത്തിന്റെ കോഡ്, പിന്‍വലിയുന്നത് ഒഴിവാക്കാന്‍ "
 "നിങ്ങള്‍ 'ഏതെങ്കിലും' ഉപയോഗിക്കാം)."
 
 #: src/libvlc-module.c:602
@@ -2819,8 +2820,9 @@ msgid ""
 "is experimental, not all formats are supported. Use a '#' separated list of "
 "inputs."
 msgstr ""
-"അനവധി ഇന്‍പുട്ടുകള്‍ ഒരേ സമയത്ത് പ്ലേ ചെയ്യാന്‍ ഇത് നിങ്ങളെ അനുവദിക്കും.  ഈ വിശേഷഗുണം പരീക്ഷണാര്‍"
-"ത്ഥമാണ്, എല്ലാ ഘടനകളും പിന്തുണക്കില്ല. ഒരു '#' ആല്‍ വേര്‍തിരിച്ച ഇന്‍പുട്ട് പട്ടികകള്‍ ഉപയോഗിക്കുക."
+"അനവധി ഇന്‍പുട്ടുകള്‍ ഒരേ സമയത്ത് പ്ലേ ചെയ്യാന്‍ ഇത് നിങ്ങളെ അനുവദിക്കും.  ഈ വിശേഷഗുണം "
+"പരീക്ഷണാര്‍ത്ഥമാണ്, എല്ലാ ഘടനകളും പിന്തുണക്കില്ല. ഒരു '#' ആല്‍ വേര്‍തിരിച്ച ഇന്‍പുട്ട് പട്ടികകള്‍ "
+"ഉപയോഗിക്കുക."
 
 #: src/libvlc-module.c:669
 msgid "Bookmarks list for a stream"
@@ -2832,8 +2834,9 @@ msgid ""
 "\"{name=bookmark-name,time=optional-time-offset,bytes=optional-byte-offset},"
 "{...}\""
 msgstr ""
-"ഒരു സ്ട്രീമിനുള്ള ബൂക്മാര്‍ക്കുകളുടെ ഒരു പട്ടിക ഫോര്‍മില്‍ നിങ്ങള്‍ക്ക് സ്വയം കൊടുക്കാം \"{പേര്=ബുക്ക്മാര്‍"
-"ക്ക്-പേര്,സമയം=ഐച്ഛികമായ-സമയം-പ്രതിതോലനം, ബൈറ്റ്സ്=ഐച്ഛിക-ബൈറ്റ്-പ്രതിതോലനം},{...}\""
+"ഒരു സ്ട്രീമിനുള്ള ബൂക്മാര്‍ക്കുകളുടെ ഒരു പട്ടിക ഫോര്‍മില്‍ നിങ്ങള്‍ക്ക് സ്വയം കൊടുക്കാം "
+"\"{പേര്=ബുക്ക്മാര്‍ക്ക്-പേര്,സമയം=ഐച്ഛികമായ-സമയം-പ്രതിതോലനം, ബൈറ്റ്സ്=ഐച്ഛിക-ബൈറ്റ്-"
+"പ്രതിതോലനം},{...}\""
 
 #: src/libvlc-module.c:675
 #, fuzzy
@@ -2883,15 +2886,15 @@ msgstr "നിലവിലെ മീഡിയ അനുസരിച്ച് ശ
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
-"എന്താണ് പ്ലേ ചെയ്യുന്നത് എന്നനുസരിച്ച് തലകെട്ട് സജ്ജീകരിക്കാന്‍ ഈ ഐഛികം നിങ്ങളെ അനുവദിക്കും <br>"
-"$a: കലാകാരന്‍<br>$b: ആല്‍ബം<br>$g: ഇനം<br>$n: ട്രാക്ക് സംഖ്യ<br>$p: ഇപ്പോള്‍ "
-"പ്ലേചെയ്യുന്നത്<br>$A: തീയതി<br>$D: സമയദൈര്‍ഖ്യം<br>$Z: \"ഇപ്പോള്‍ പ്ലേചെയ്യുന്നത്"
-"\" (ടൈറ്റിലിലേക്ക് തിരികെ വരുക - കലാകാരന്‍)"
+"എന്താണ് പ്ലേ ചെയ്യുന്നത് എന്നനുസരിച്ച് തലകെട്ട് സജ്ജീകരിക്കാന്‍ ഈ ഐഛികം നിങ്ങളെ അനുവദിക്കും "
+"<br>$a: കലാകാരന്‍<br>$b: ആല്‍ബം<br>$g: ഇനം<br>$n: ട്രാക്ക് സംഖ്യ<br>$p: ഇപ്പോള്‍ "
+"പ്ലേചെയ്യുന്നത്<br>$A: തീയതി<br>$D: സമയദൈര്‍ഖ്യം<br>$Z: \"ഇപ്പോള്‍ പ്ലേചെയ്യുന്നത്\" "
+"(ടൈറ്റിലിലേക്ക് തിരികെ വരുക - കലാകാരന്‍)"
 
 #: src/libvlc-module.c:699
 msgid "Disable all lua plugins"
@@ -3015,8 +3018,8 @@ msgid ""
 "3 = subtitle file matching the movie name with additional chars\n"
 "4 = subtitle file matching the movie name exactly"
 msgstr ""
-"അവ്യക്തമായ ഉപശീര്‍ഷകവും കൂടാതെ സിനിമ ഫയല്‍പേരും എങ്ങനെ ചേര്‍ച്ചയുള്ളതാക്കും എന്നു ഇത് നിര്‍"
-"ണ്ണയിക്കും. ഐച്ഛികങ്ങള്‍:\n"
+"അവ്യക്തമായ ഉപശീര്‍ഷകവും കൂടാതെ സിനിമ ഫയല്‍പേരും എങ്ങനെ ചേര്‍ച്ചയുള്ളതാക്കും എന്നു ഇത് "
+"നിര്‍ണ്ണയിക്കും. ഐച്ഛികങ്ങള്‍:\n"
 "0 = ഉപശീര്‍ഷകങ്ങള്‍ ഒന്നും സ്വയംകണ്ടുപിടിക്കപ്പെട്ടില്ല\n"
 "1 = ഏതെങ്കിലും ഉപശീര്‍ഷക ഫയല്‍\n"
 "2 = സിനിമയുടെ പേര് ഉള്‍കൊള്ളുന്ന ഏതെങ്കിലും ഉപശീര്‍ഷകം\n"
@@ -3064,16 +3067,16 @@ msgid ""
 "This is the default DVD drive (or file) to use. Don't forget the colon after "
 "the drive letter (e.g. D:)"
 msgstr ""
-"സ്വയമേവ ഉപയോഗിക്കാനുള്ള ഡി‌വി‌ഡി ഡ്രൈവ് (അല്ലെങ്കില്‍ ഫയല്‍) ആണ് ഇത്. ഡ്രൈവ് അക്ഷരത്തിന് ശേഷം അപൂര്‍"
-"ണ്ണവിരാമിടാന്‍ മറക്കരുത് (ഉദാ. ഡി:). "
+"സ്വയമേവ ഉപയോഗിക്കാനുള്ള ഡി‌വി‌ഡി ഡ്രൈവ് (അല്ലെങ്കില്‍ ഫയല്‍) ആണ് ഇത്. ഡ്രൈവ് അക്ഷരത്തിന് ശേഷം "
+"അപൂര്‍ണ്ണവിരാമിടാന്‍ മറക്കരുത് (ഉദാ. ഡി:). "
 
 #: src/libvlc-module.c:775
 msgid ""
 "This is the default VCD drive (or file) to use. Don't forget the colon after "
 "the drive letter (e.g. D:)"
 msgstr ""
-"സ്വയമേവ ഉപയോഗിക്കാനുള്ള വി‌സി‌ഡി ഡ്രൈവ് (അല്ലെങ്കില്‍ ഫയല്‍) ആണ് ഇത്. ഡ്രൈവ് അക്ഷരത്തിന് ശേഷം അപൂര്‍"
-"ണ്ണവിരാമിടാന്‍ മറക്കരുത് (ഉദാ. ഡി:). "
+"സ്വയമേവ ഉപയോഗിക്കാനുള്ള വി‌സി‌ഡി ഡ്രൈവ് (അല്ലെങ്കില്‍ ഫയല്‍) ആണ് ഇത്. ഡ്രൈവ് അക്ഷരത്തിന് ശേഷം "
+"അപൂര്‍ണ്ണവിരാമിടാന്‍ മറക്കരുത് (ഉദാ. ഡി:). "
 
 #: src/libvlc-module.c:778 modules/access/cdda.c:704
 msgid ""
@@ -3132,9 +3135,9 @@ msgid ""
 msgstr ""
 "ആര്‍‌ടി‌എസ്പി സെര്‍വര്‍ ഏത് വിലാസത്തിലേക്കാണു സ്രാധിക്കുന്നത് എന്നു ഇത് നിര്‍വചിക്കും, ആര്‍‌ടി‌എസ്‌പി വി‌ഓ‌ഡി "
 "മെഡിയയുടെ അടിസ്ഥാന വഴിയോടുകൂടി. വിലാസം അല്ലെങ്കില്‍ വഴി ആണ് പൊതുവയഘടന. സ്വയമേവ, സെര്‍വര്‍ "
-"ഏതെങ്കിലും പ്രാദേശിക ഐ‌പി വിലാസത്തോടയിരിക്കും ശ്രദ്ധിയ്ക്കുക. ഒരു പ്രത്യേക നെറ്റ്വര്‍ക്ക് സമ്പര്‍"
-"ക്കമുഖത്തിലേക്ക് പരിമിതപ്പെടുത്താന്‍ ഒരു ഐ‌പി വിലാസം (ഉദാ ::1 or 127.0.0.1) അല്ലെങ്കില്‍ ഒരു "
-"ആതിഥേയപേര് (ഉദാ. localhost) നിര്‍ദ്ദേശിക്കുക"
+"ഏതെങ്കിലും പ്രാദേശിക ഐ‌പി വിലാസത്തോടയിരിക്കും ശ്രദ്ധിയ്ക്കുക. ഒരു പ്രത്യേക നെറ്റ്വര്‍ക്ക് "
+"സമ്പര്‍ക്കമുഖത്തിലേക്ക് പരിമിതപ്പെടുത്താന്‍ ഒരു ഐ‌പി വിലാസം (ഉദാ ::1 or 127.0.0.1) അല്ലെങ്കില്‍ "
+"ഒരു ആതിഥേയപേര് (ഉദാ. localhost) നിര്‍ദ്ദേശിക്കുക"
 
 #: src/libvlc-module.c:821
 msgid "HTTP server port"
@@ -3344,9 +3347,9 @@ msgid ""
 "to learn how to build such chains. Warning: this chain will be enabled for "
 "all streams."
 msgstr ""
-"സ്വയമേവയുള്ള സ്ട്രീം ഔട്ട്പുട്ട് ശൃംഖല നിങ്ങള്‍ക്ക് ഇവിടെ ചേര്‍ക്കാം. ഇങ്ങനെയുള്ള ശൃംഖലകള്‍ എങ്ങനെ നിര്‍"
-"മ്മിക്കാം എന്നതിന് പ്രാമാണത്തില്‍ അന്വേഷിക്കുക. മുന്നറിയിപ്പ്: ഈ ശൃംഖല എല്ലാ സ്ട്രീമുകള്‍ക്കും പ്രവര്‍"
-"ത്തനക്ഷമമായിരിക്കും."
+"സ്വയമേവയുള്ള സ്ട്രീം ഔട്ട്പുട്ട് ശൃംഖല നിങ്ങള്‍ക്ക് ഇവിടെ ചേര്‍ക്കാം. ഇങ്ങനെയുള്ള ശൃംഖലകള്‍ എങ്ങനെ "
+"നിര്‍മ്മിക്കാം എന്നതിന് പ്രാമാണത്തില്‍ അന്വേഷിക്കുക. മുന്നറിയിപ്പ്: ഈ ശൃംഖല എല്ലാ സ്ട്രീമുകള്‍ക്കും "
+"പ്രവര്‍ത്തനക്ഷമമായിരിക്കും."
 
 #: src/libvlc-module.c:929
 msgid "Enable streaming of all ES"
@@ -3523,8 +3526,8 @@ msgid ""
 "automatically detected. You should not set this as a global option unless "
 "you really know what you are doing."
 msgstr ""
-"\"മൌലികമായ\" സ്ട്രീമുകള്‍ (ശ്രവ്യ കൂടാതെ ദൃശ്യ സ്ട്രീമുകളുടെ പോലെ) വേര്‍തിരിക്കാന്‍ ഡിമള്‍"
-"ട്ടിപ്ലക്സറുകള്‍ ഉപയോഗിക്കാം. ശരിയായ ഡിമക്സര്‍ സ്വയം ശ്രദ്ധയില്‍പെട്ടില്ലെങ്കില്‍ നിങ്ങള്‍ക്ക് ഇത് "
+"\"മൌലികമായ\" സ്ട്രീമുകള്‍ (ശ്രവ്യ കൂടാതെ ദൃശ്യ സ്ട്രീമുകളുടെ പോലെ) വേര്‍തിരിക്കാന്‍ "
+"ഡിമള്‍ട്ടിപ്ലക്സറുകള്‍ ഉപയോഗിക്കാം. ശരിയായ ഡിമക്സര്‍ സ്വയം ശ്രദ്ധയില്‍പെട്ടില്ലെങ്കില്‍ നിങ്ങള്‍ക്ക് ഇത് "
 "ഉപയോഗിക്കാം. നിങ്ങള്‍ യദാര്‍ഥമായി എന്താണ് ചെയ്യുന്നത് എന്നു അറിവില്ലാതെ നിങ്ങള്‍ ഇതിനെ ഒരു ആഗോള "
 "ഐച്ഛികമായി സജ്ജീകരിക്കരുത്. "
 
@@ -3567,8 +3570,8 @@ msgid ""
 "You can use it to tune VLC priority against other programs, or against other "
 "VLC instances."
 msgstr ""
-"VLCയുടെ സ്വമേധയാലുള്ള മുന്‍ഗണനകള്‍ക്ക് ഈ ഐഛികം ഒരു ഓഫ്സെറ്റ് (പോസിറ്റീവ് അല്ലെങ്കില്‍ നെഗറ്റീവ്) ചേര്‍"
-"ക്കുന്നു. മറ്റ് പ്രോഗ്രാമുകള്‍ക്ക് എതിരായിട്ട് നിങ്ങള്‍ക്ക് ഇതിനെ VLC മുന്‍ഗണന ട്യൂണ്‍ ചെയ്യുന്നതിന് "
+"VLCയുടെ സ്വമേധയാലുള്ള മുന്‍ഗണനകള്‍ക്ക് ഈ ഐഛികം ഒരു ഓഫ്സെറ്റ് (പോസിറ്റീവ് അല്ലെങ്കില്‍ നെഗറ്റീവ്) "
+"ചേര്‍ക്കുന്നു. മറ്റ് പ്രോഗ്രാമുകള്‍ക്ക് എതിരായിട്ട് നിങ്ങള്‍ക്ക് ഇതിനെ VLC മുന്‍ഗണന ട്യൂണ്‍ ചെയ്യുന്നതിന് "
 "ഉപയോഗിക്കുന്നു, അല്ലെങ്കില്‍ മറ്റ് VLC ഉദാഹരണങ്ങള്‍ക്ക് എതിരായിട്ട്."
 
 #: src/libvlc-module.c:1036
@@ -3656,8 +3659,8 @@ msgstr ""
 "വി‌എല്‍‌സിയുടെ ഒരു പ്രവര്‍ത്തിക്കുന്ന മാതൃക മാത്രം അനുവദിക്കുന്നത് ചില സമയത്ത് ഉപയോഗപ്രദമാകാം, "
 "ഉദാഹരണത്തിന് ചില മീഡിയ ഇനങ്ങളുമായി നിങ്ങള്‍ വി‌എല്‍‌സിയെ ബന്ധപ്പെടുത്തുമ്പോള്‍ കൂടാതെ നിങ്ങളുടെ "
 "ഫയല്‍ മാനേജെറില്‍ ഓരോ തവണയും നിങ്ങള്‍ ഒരു ഫയല്‍ തുറക്കുമ്പോള്‍ ഒരു പുതിയ വി‌എല്‍‌സിയുടെ മാതൃക നിങ്ങള്‍ക്ക് "
-"വേണ്ടെങ്കില്‍.  നേരത്തെതന്നെ പ്രവര്‍ത്തിക്കുന്ന വി‌എല്‍‌സിയുടെ മാതൃക ഉപയോഗിച്ച് ഒരു ഫയല്‍ പ്രവര്‍"
-"ത്തിപ്പിക്കുവാന്‍ അല്ലെങ്കില്‍ അതിനെ വരിയാക്കാന്‍ ഈ ഐഛികം നിങ്ങളെ അനുവദിക്കും."
+"വേണ്ടെങ്കില്‍.  നേരത്തെതന്നെ പ്രവര്‍ത്തിക്കുന്ന വി‌എല്‍‌സിയുടെ മാതൃക ഉപയോഗിച്ച് ഒരു ഫയല്‍ "
+"പ്രവര്‍ത്തിപ്പിക്കുവാന്‍ അല്ലെങ്കില്‍ അതിനെ വരിയാക്കാന്‍ ഈ ഐഛികം നിങ്ങളെ അനുവദിക്കും."
 
 #: src/libvlc-module.c:1076
 msgid "VLC is started from file association"
@@ -3686,8 +3689,8 @@ msgid ""
 msgstr ""
 "വളരെ അധികം പ്രോസസ്സര്‍ സമയം അല്ലെങ്കില്‍ എടുക്കാവുന്ന മറ്റുള്ള ആപ്ലികേഷനുകളാല്‍ വി‌എല്‍‌സിയെ "
 "വിഘ്‌നപ്പെടുത്താത്തത് അനുവദിക്കാന്‍  നടപടിക്രമങ്ങളുടെ മുന്‍ഗണന കൂട്ടുന്നത് നിങ്ങളുടെ പ്രവര്‍ത്തിപ്പിക്കുന്ന "
-"പരിചയം ഏറ്റവും സാധ്യതയോടെ മെച്ചപ്പെടുത്തും. എന്നിരുന്നാലും ചില സന്ദര്‍ഭങ്ങളില്‍ (തെറ്റുകള്‍) വി‌എല്‍‌"
-"സി മുഴുവന്‍ പ്രോസസ്സര്‍ സമയവും എടുക്കാം കൂടാതെ ഒരു മെഷിന്‍ റീബൂട് ആവശ്യമുണ്ടായേക്കാവുന്ന തരത്തില്‍ "
+"പരിചയം ഏറ്റവും സാധ്യതയോടെ മെച്ചപ്പെടുത്തും. എന്നിരുന്നാലും ചില സന്ദര്‍ഭങ്ങളില്‍ (തെറ്റുകള്‍) "
+"വി‌എല്‍‌സി മുഴുവന്‍ പ്രോസസ്സര്‍ സമയവും എടുക്കാം കൂടാതെ ഒരു മെഷിന്‍ റീബൂട് ആവശ്യമുണ്ടായേക്കാവുന്ന തരത്തില്‍ "
 "മുഴുവന്‍ സിസ്റ്റം പ്രതികരണരഹിതം ആകും."
 
 #: src/libvlc-module.c:1093 modules/gui/qt/ui/sprefs_interface.h:554
@@ -3806,8 +3809,8 @@ msgid ""
 "Specifies the services discovery modules to preload, separated by colons. "
 "Typical value is \"sap\"."
 msgstr ""
-"മുന്‍ചെര്‍ക്കനുള്ള സേവന കണ്ടുപിടുത്ത ഘടകങ്ങള്‍ നിര്‍ദ്ദേശിക്കുന്നു,  അപൂര്‍ണ്ണവിരാമത്താല്‍ വേര്‍"
-"തിരിക്കപ്പെട്ട.  മാതൃകാപരമായ മൂല്യം \"സാപ്\" ആണ്."
+"മുന്‍ചെര്‍ക്കനുള്ള സേവന കണ്ടുപിടുത്ത ഘടകങ്ങള്‍ നിര്‍ദ്ദേശിക്കുന്നു,  അപൂര്‍ണ്ണവിരാമത്താല്‍ "
+"വേര്‍തിരിക്കപ്പെട്ട.  മാതൃകാപരമായ മൂല്യം \"സാപ്\" ആണ്."
 
 #: src/libvlc-module.c:1150
 msgid "Play files randomly forever"
@@ -3897,8 +3900,8 @@ msgid ""
 "The media library is automatically saved and reloaded each time you start "
 "VLC."
 msgstr ""
-"മീഡിയ ലൈബ്രറി സ്വയമേവ സേവ് ചെയ്യപ്പെടുകയും കൂടാതെ നിങ്ങള്‍ വി‌എല്‍‌സി ഓരോ തവണയും പ്രവര്‍"
-"ത്തിപ്പിക്കുമ്പോളും വീണ്ടും ലോഡ് ചെയ്യപ്പെടും."
+"മീഡിയ ലൈബ്രറി സ്വയമേവ സേവ് ചെയ്യപ്പെടുകയും കൂടാതെ നിങ്ങള്‍ വി‌എല്‍‌സി ഓരോ തവണയും "
+"പ്രവര്‍ത്തിപ്പിക്കുമ്പോളും വീണ്ടും ലോഡ് ചെയ്യപ്പെടും."
 
 #: src/libvlc-module.c:1192 modules/gui/qt/ui/sprefs_interface.h:552
 msgid "Display playlist tree"
@@ -6409,8 +6412,8 @@ msgstr "ഓഡിയോ സാമ്പിള്‍റേറ്റ് (Hz)"
 msgid ""
 "Audio sampling rate (in hertz) for DeckLink captures. 0 disables audio input."
 msgstr ""
-"ഡെക്ക്ലിങ്ക് പിടിച്ചെടുകളുകള്‍ക്ക് വേണ്ടിയുള്ള ഓഡിയോ സാമ്പ്ലിങ് റേറ്റ് (ഹെര്‍ട്സില്‍). 0 ഓഡിയോ ഇന്‍"
-"പൂട്ടിനെ പ്രവര്‍ത്തനരഹിതമാക്കും."
+"ഡെക്ക്ലിങ്ക് പിടിച്ചെടുകളുകള്‍ക്ക് വേണ്ടിയുള്ള ഓഡിയോ സാമ്പ്ലിങ് റേറ്റ് (ഹെര്‍ട്സില്‍). 0 ഓഡിയോ "
+"ഇന്‍പൂട്ടിനെ പ്രവര്‍ത്തനരഹിതമാക്കും."
 
 #: modules/access/decklink.cpp:66 modules/access/dshow/dshow.cpp:197
 #: modules/video_output/decklink.cpp:105
@@ -6434,9 +6437,9 @@ msgid ""
 "Video connection to use for DeckLink captures. Valid choices: sdi, hdmi, "
 "opticalsdi, component, composite, svideo. Leave blank for card default."
 msgstr ""
-"ഡെക്ക്ലിങ്ക് പിടിച്ചെടുക്കലുകള്‍ക്ക് വേണ്ടി ഉപയോഗിക്കുന്ന ദൃശ്യ ബന്ധം. സാധുവായ ഐച്ഛികങ്ങള്‍: എസ്‌ഡി‌ഐ,"
-"എച്ച്‌ഡി‌എം‌ഐ,ഒപ്ടികല്‍എസ്‌ഡി‌ഐ, കംപോണന്‍റ്,കോംപോസിറ്റ്, എസ്വീഡിയോ. സ്വയമേവയുള്ള കാര്‍ഡിന്  ശൂന്യമായി "
-"ഉപേക്ഷിക്കുക"
+"ഡെക്ക്ലിങ്ക് പിടിച്ചെടുക്കലുകള്‍ക്ക് വേണ്ടി ഉപയോഗിക്കുന്ന ദൃശ്യ ബന്ധം. സാധുവായ ഐച്ഛികങ്ങള്‍: "
+"എസ്‌ഡി‌ഐ,എച്ച്‌ഡി‌എം‌ഐ,ഒപ്ടികല്‍എസ്‌ഡി‌ഐ, കംപോണന്‍റ്,കോംപോസിറ്റ്, എസ്വീഡിയോ. സ്വയമേവയുള്ള കാര്‍ഡിന്  "
+"ശൂന്യമായി ഉപേക്ഷിക്കുക"
 
 #: modules/access/decklink.cpp:82 modules/access/linsys/linsys_sdi.c:94
 msgid "SDI"
@@ -6529,8 +6532,8 @@ msgid ""
 "Name of the video device that will be used by the DirectShow plugin. If you "
 "don't specify anything, the default device will be used."
 msgstr ""
-"ഡിറക്റ്റ്ഷോ പ്ലഗിന്‍ ഉപയോഗിക്കാനിടയുള്ള വീഡിയോ ഉപകരണത്തിന്‍റെ പേര്. നിങ്ങള്‍ ഒന്നും നിര്‍"
-"ദ്ദേശിച്ചില്ലെങ്കില്‍, സ്വയമേവയുള്ള ഉപകരണം ഉപയോഗിക്കപ്പെടും."
+"ഡിറക്റ്റ്ഷോ പ്ലഗിന്‍ ഉപയോഗിക്കാനിടയുള്ള വീഡിയോ ഉപകരണത്തിന്‍റെ പേര്. നിങ്ങള്‍ ഒന്നും "
+"നിര്‍ദ്ദേശിച്ചില്ലെങ്കില്‍, സ്വയമേവയുള്ള ഉപകരണം ഉപയോഗിക്കപ്പെടും."
 
 #: modules/access/dshow/dshow.cpp:135
 #: modules/gui/qt/components/open_panels.cpp:826
@@ -6544,8 +6547,8 @@ msgid ""
 "Name of the audio device that will be used by the DirectShow plugin. If you "
 "don't specify anything, the default device will be used."
 msgstr ""
-"ഡിറക്റ്റ്ഷോ പ്ലഗിന്‍ ഉപയോഗിക്കാനിടയുള്ള ഓഡിയോ ഉപകരണത്തിന്‍റെ പേര്. നിങ്ങള്‍ ഒന്നും നിര്‍"
-"ദ്ദേശിച്ചില്ലെങ്കില്‍, സ്വയമേവയുള്ള ഉപകരണം ഉപയോഗിക്കപ്പെടും."
+"ഡിറക്റ്റ്ഷോ പ്ലഗിന്‍ ഉപയോഗിക്കാനിടയുള്ള ഓഡിയോ ഉപകരണത്തിന്‍റെ പേര്. നിങ്ങള്‍ ഒന്നും "
+"നിര്‍ദ്ദേശിച്ചില്ലെങ്കില്‍, സ്വയമേവയുള്ള ഉപകരണം ഉപയോഗിക്കപ്പെടും."
 
 #: modules/access/dshow/dshow.cpp:140
 #: modules/gui/qt/components/open_panels.cpp:793
@@ -6558,9 +6561,9 @@ msgid ""
 "don't specify anything the default size for your device will be used. You "
 "can specify a standard size (cif, d1, ...) or <width>x<height>."
 msgstr ""
-"ഡിറക്റ്റ്ഷോ പ്ലഗിന്‍ പ്രദര്‍ശിപ്പിക്കാനിടയുള്ള വീഡിയോയുടെ വലിപ്പം. നിങ്ങള്‍ ഒന്നും നിര്‍"
-"ദ്ദേശിച്ചില്ലെങ്കില്‍, സ്വയമേവയുള്ള വലിപ്പം ഉപയോഗിക്കപ്പെടും. നിങ്ങള്ക്ക് ഒരു നിലവാരമുള്ള വലിപ്പം "
-"(സി‌ഐ‌എഫ്,ഡി1, ...) നിര്‍ദ്ദേശിക്കാം അല്ലെങ്കില്‍ <വീതി>x<ഉയരം>"
+"ഡിറക്റ്റ്ഷോ പ്ലഗിന്‍ പ്രദര്‍ശിപ്പിക്കാനിടയുള്ള വീഡിയോയുടെ വലിപ്പം. നിങ്ങള്‍ ഒന്നും "
+"നിര്‍ദ്ദേശിച്ചില്ലെങ്കില്‍, സ്വയമേവയുള്ള വലിപ്പം ഉപയോഗിക്കപ്പെടും. നിങ്ങള്ക്ക് ഒരു നിലവാരമുള്ള "
+"വലിപ്പം (സി‌ഐ‌എഫ്,ഡി1, ...) നിര്‍ദ്ദേശിക്കാം അല്ലെങ്കില്‍ <വീതി>x<ഉയരം>"
 
 #: modules/access/dshow/dshow.cpp:145 modules/access/v4l2/v4l2.c:196
 msgid "Picture aspect-ratio n:m"
@@ -6665,9 +6668,9 @@ msgid ""
 "will not be changed."
 msgstr ""
 "കോംപോസിറ്റ്, എസ്-വീഡിയോ, അല്ലെങ്കില്‍ ട്യൂണര്‍ പോലുള്ള വീഡിയോ ഇന്‍പുട്ട് ഉറവിടം തിരഞ്ഞെടുക്കുക. ഈ "
-"സജ്ജീകരണങ്ങള്‍ ഹാര്‍ഡ്വെയര്‍-സവിശേഷമുള്ളവ ആയതുകൊണ്ട്, നിങ്ങള്‍ നല്ല സജ്ജീകരണങ്ങള്‍ \"ഡിവൈസ് കോന്‍ഫീഗ്"
-"\" സ്ഥലത്തു കാണാം, കൂടാതെ ഇവിടെയുള്ള ആ സംഖ്യകള്‍ ഉപയോഗിക്കുക. -1 എന്നുവെച്ചാല്‍ സജ്ജീകരണങ്ങള്‍ "
-"മാറ്റാന്‍ കഴിയില്ല."
+"സജ്ജീകരണങ്ങള്‍ ഹാര്‍ഡ്വെയര്‍-സവിശേഷമുള്ളവ ആയതുകൊണ്ട്, നിങ്ങള്‍ നല്ല സജ്ജീകരണങ്ങള്‍ \"ഡിവൈസ് "
+"കോന്‍ഫീഗ്\" സ്ഥലത്തു കാണാം, കൂടാതെ ഇവിടെയുള്ള ആ സംഖ്യകള്‍ ഉപയോഗിക്കുക. -1 എന്നുവെച്ചാല്‍ "
+"സജ്ജീകരണങ്ങള്‍ മാറ്റാന്‍ കഴിയില്ല."
 
 #: modules/access/dshow/dshow.cpp:182
 msgid "Audio input pin"
@@ -7097,8 +7100,8 @@ msgid ""
 "oscillator high frequency will be used as reference. Furthermore the "
 "automatic continuous 22kHz tone will be sent."
 msgstr ""
-"സാറ്റലൈറ്റ് സംപ്രഷണ ഫ്രീക്വെന്‍സി സ്വിച്ച് ഫ്രീക്വെന്‍സിയെ കടന്നാല്‍, ഓസിലേറ്റര്‍ കൂടിയ ഫ്രീക്വെന്‍"
-"സിയെ പ്രമനകോശമായി ഉപയോഗിക്കും. അതിനുപുറമേ 22 കിലോഹെര്‍ട്സ് സ്വയംപ്രേരിത തുടര്‍ ടോണ്‍ "
+"സാറ്റലൈറ്റ് സംപ്രഷണ ഫ്രീക്വെന്‍സി സ്വിച്ച് ഫ്രീക്വെന്‍സിയെ കടന്നാല്‍, ഓസിലേറ്റര്‍ കൂടിയ "
+"ഫ്രീക്വെന്‍സിയെ പ്രമനകോശമായി ഉപയോഗിക്കും. അതിനുപുറമേ 22 കിലോഹെര്‍ട്സ് സ്വയംപ്രേരിത തുടര്‍ ടോണ്‍ "
 "അയക്കപ്പെടും."
 
 #: modules/access/dtv/access.c:194
@@ -7504,12 +7507,13 @@ msgstr "എച്ച്ടിടിപി പ്രോക്സി"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
-"ഉപയോഗിക്കേണ്ട എച്ച്‌ടി‌ടി‌പി പ്രോക്സി അത് ഈ ആകാരത്തില്‍ ആയിരിക്കണം http://[user@]myproxy."
-"mydomain:myport/; ശൂന്യമാണെങ്കില്‍ എച്ച്‌ടി‌ടി‌പി_പ്രോക്സി പരിസ്ഥിതി പരിവര്‍ത്തിതവസ്‌തു "
-"ശ്രമിക്കപ്പെടും."
+"ഉപയോഗിക്കേണ്ട എച്ച്‌ടി‌ടി‌പി പ്രോക്സി അത് ഈ ആകാരത്തില്‍ ആയിരിക്കണം http://"
+"[user@]myproxy.mydomain:myport/; ശൂന്യമാണെങ്കില്‍ എച്ച്‌ടി‌ടി‌പി_പ്രോക്സി പരിസ്ഥിതി "
+"പരിവര്‍ത്തിതവസ്‌തു ശ്രമിക്കപ്പെടും."
 
 #: modules/access/http.c:65
 msgid "HTTP proxy password"
@@ -7594,9 +7598,9 @@ msgid ""
 "server, i.e. the HTTP \"User-Agent\". Name and version must be separated by "
 "a forward slash, e.g. \"FooBar/1.2.3\"."
 msgstr ""
-"പ്രോഗ്രാമിന്‍റെ പേരും കൂടാതെ വേര്‍ഷനും എച്ച്‌ടി‌ടി‌പി സെര്‍വറിനു നല്‍കപ്പെടും. അവ മുന്നോട്ടുള്ള ദീര്‍"
-"ഘച്ഛേദത്താല്‍ വേര്‍തിരിക്കപ്പെടണം, ഉദാ. ഫൂബാര്‍/1.2.3. ഈ ഐഛികം പ്രതി ഇന്‍പുട്ട് ഇനത്താല്‍ മാത്രം "
-"നിര്‍ദ്ദേശിക്കപ്പെട്ടതായിരിക്കണം, സാര്‍വ്വലൗകികമായി അല്ല."
+"പ്രോഗ്രാമിന്‍റെ പേരും കൂടാതെ വേര്‍ഷനും എച്ച്‌ടി‌ടി‌പി സെര്‍വറിനു നല്‍കപ്പെടും. അവ മുന്നോട്ടുള്ള "
+"ദീര്‍ഘച്ഛേദത്താല്‍ വേര്‍തിരിക്കപ്പെടണം, ഉദാ. ഫൂബാര്‍/1.2.3. ഈ ഐഛികം പ്രതി ഇന്‍പുട്ട് ഇനത്താല്‍ "
+"മാത്രം നിര്‍ദ്ദേശിക്കപ്പെട്ടതായിരിക്കണം, സാര്‍വ്വലൗകികമായി അല്ല."
 
 #: modules/access/idummy.c:41 modules/access_output/dummy.c:44
 #: modules/audio_output/adummy.c:36 modules/codec/ddummy.c:46
@@ -7868,8 +7872,8 @@ msgid ""
 "RTSP servers."
 msgstr ""
 "കസെന്ന സെര്‍വര്‍ ഒരു പഴയ കൂടാതെ നിലവാരമില്ലാത്ത ആര്‍‌ടി‌എസ്‌പിയുടെ ഡയലെക്റ്റ് ആണ് ഉപയോഗിക്കുന്നത്. ഈ "
-"ഘടകം കൊണ്ട് വി‌എല്‍‌സി  ഈ ഡയലെക്റ്റ് ശ്രമിക്കും, പക്ഷെ പിന്നീട് അതിനു സാധാരണ ആര്‍‌ടി‌എസ്‌പി സെര്‍"
-"വറുകളോട് ബന്ധപ്പെടാന്‍ സാധിക്കില്ല."
+"ഘടകം കൊണ്ട് വി‌എല്‍‌സി  ഈ ഡയലെക്റ്റ് ശ്രമിക്കും, പക്ഷെ പിന്നീട് അതിനു സാധാരണ ആര്‍‌ടി‌എസ്‌പി "
+"സെര്‍വറുകളോട് ബന്ധപ്പെടാന്‍ സാധിക്കില്ല."
 
 #: modules/access/live555.cpp:78
 msgid "WMServer RTSP dialect"
@@ -8101,8 +8105,8 @@ msgstr "ഇന്‍പുട്ട് ഡിവൈസ് കണ്ടെത്�
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 #, fuzzy
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "ഒരു ഉചിതമായ ഇന്‍പുട്ട് ഡിവൈസിനാല്‍ നിങ്ങളുടെ മാക് സജ്ജീകരിക്കപ്പെട്ടതായി കാണുന്നില്ല.  നിങ്ങളുടെ "
 "കണക്ടറുകളും കൂടാതെ ഡ്രൈവറുകളും ദയവായി പരിശോധിയ്ക്കുക."
@@ -8191,8 +8195,8 @@ msgid ""
 "RTP packets will be discarded if they are too much ahead (i.e. in the "
 "future) by this many packets from the last received packet."
 msgstr ""
-"അവസാനം ലഭിച്ച പാക്കറ്റുകളെ കാളും ഇത്ര അധികം പാക്കറ്റുകള്‍ മുന്നിലാണെകില്‍ (അതായത് ഭാവിയില്‍) ആര്‍‌"
-"ടി‌പി പാക്കറ്റുകള്‍ തള്ളികളയും."
+"അവസാനം ലഭിച്ച പാക്കറ്റുകളെ കാളും ഇത്ര അധികം പാക്കറ്റുകള്‍ മുന്നിലാണെകില്‍ (അതായത് ഭാവിയില്‍) "
+"ആര്‍‌ടി‌പി പാക്കറ്റുകള്‍ തള്ളികളയും."
 
 #: modules/access/rtp/rtp.c:73
 msgid "Maximum RTP sequence number misordering"
@@ -8236,8 +8240,8 @@ msgid ""
 "A description in SDP format is required to receive the RTP stream. Note that "
 "rtp:// URIs cannot work with dynamic RTP payload format (%<PRIu8>)."
 msgstr ""
-"ആര്‍‌ടി‌പി സ്ട്രീം ലഭിക്കാന്‍ എസ്‌ഡി‌പി ഘടനയില്‍ നിര്‍വചനം അനിവാര്യമാണ്. പരിവര്‍ത്തനാത്മകമായ ആര്‍‌"
-"ടി‌പി പേലോഡ് ഘടന (%<PRIu8>) കൊണ്ട് rtp;// യു‌ആര്‍‌എലുകള്‍ക്ക് പ്രവര്‍ത്തിക്കാന്‍ കഴിയില്ല എന്നു "
+"ആര്‍‌ടി‌പി സ്ട്രീം ലഭിക്കാന്‍ എസ്‌ഡി‌പി ഘടനയില്‍ നിര്‍വചനം അനിവാര്യമാണ്. പരിവര്‍ത്തനാത്മകമായ "
+"ആര്‍‌ടി‌പി പേലോഡ് ഘടന (%<PRIu8>) കൊണ്ട് rtp;// യു‌ആര്‍‌എലുകള്‍ക്ക് പ്രവര്‍ത്തിക്കാന്‍ കഴിയില്ല എന്നു "
 "ശ്രദ്ധിയ്ക്കുക."
 
 #: modules/access/rtsp/access.c:48 modules/access/rtsp/access.c:49
@@ -8536,8 +8540,8 @@ msgstr "ആര്‍ടിഎസ്പി ഓതന്റിക്കേഷന�
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -9000,9 +9004,9 @@ msgstr "v4l2 ഡ്രൈവര്‍ കണ്‍ട്രോളുകള്‍
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "അല്‍പവിരാമത്താല്‍ വേര്‍തിരിച്ച പട്ടിക ഐച്ഛികമായി ചുരുണ്ട ബ്രാക്കറ്റിനാല്‍ ചുറ്റപ്പെട്ടതു ഉപയോഗിച്ച് "
 "നിര്‍ദ്ദേശിക്കപ്പെട്ട മൂല്യങ്ങളിലേക്ക് വി412 ഡ്രൈവര്‍ നിയന്ത്രണങ്ങള്‍ സജ്ജീകരിക്കുക (ഉദാ: "
@@ -9396,9 +9400,9 @@ msgstr "സൂചിക-യു‌ആര്‍‌ഐ കൂടാതെ സൂച
 #: modules/access_output/livehttp.c:98
 #, fuzzy
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
 "ഘടകം തുടങ്ങുമ്പോള്‍ ഫയല്‍ വായിക്കപ്പെടും കൂടാതെ ഈ ആകാരത്തില്‍ ആയിരിക്കുമെന്ന് അനുമാനിക്കുന്നു:  key-"
 "uri\\nകീ-ഫയല്‍. ഘടകം തുറക്കുമ്പോള്‍ ഫയല്‍ വായിക്കപ്പെടും കൂടാതെ മൂല്യങ്ങള്‍ ആ ഘടകത്തില്‍ ഉപയോഗിക്കും."
@@ -9456,8 +9460,8 @@ msgid ""
 "shoutcast/icecast server."
 msgstr ""
 "നിങ്ങള്‍ സാധാരണമായി ഷൌട്കാസ്റ്റ് ഘടകങ്ങളെ ഓ‌ജി‌ജി സ്ട്രീമുകളാല്‍ പോഷിപ്പിക്കണം. പകരം എം‌പി3  "
-"സ്ട്രീം ചെയ്യാനും സാധ്യമാണ്, അതുകാരണം നിങ്ങള്ക്ക് എം‌പി3 സ്ട്രീമുകള്‍ ഷൌട്കാസ്റ്റ്/ ഐസ്കാസ്റ്റ് സെര്‍"
-"വറിലേക്ക് അയക്കാം."
+"സ്ട്രീം ചെയ്യാനും സാധ്യമാണ്, അതുകാരണം നിങ്ങള്ക്ക് എം‌പി3 സ്ട്രീമുകള്‍ ഷൌട്കാസ്റ്റ്/ ഐസ്കാസ്റ്റ് "
+"സെര്‍വറിലേക്ക് അയക്കാം."
 
 #: modules/access_output/shout.c:82
 msgid "Genre description"
@@ -9516,8 +9520,8 @@ msgid ""
 "of streams) on the icecast/shoutcast website. Requires the bitrate "
 "information specified for shoutcast. Requires Ogg streaming for icecast."
 msgstr ""
-"ഐസ്കാസ്റ്റ്/ ഷൌട്കാസ്റ്റ് വെബ്സൈറ്റിലുള്ള 'മഞ്ഞ പേജുകളില്‍' (സ്ട്രീമുകളുടെ ഡിറക്ടറി പട്ടിക) സെര്‍"
-"വറിനെ പൊതുവായി ലഭ്യമാക്കുക. ഷൌട്ട്കാസ്റ്റിന് നിര്‍ദ്ദേശിക്കപ്പെട്ട ബിറ്റ്നിരക്കിന്‍റെ വിവരം "
+"ഐസ്കാസ്റ്റ്/ ഷൌട്കാസ്റ്റ് വെബ്സൈറ്റിലുള്ള 'മഞ്ഞ പേജുകളില്‍' (സ്ട്രീമുകളുടെ ഡിറക്ടറി പട്ടിക) "
+"സെര്‍വറിനെ പൊതുവായി ലഭ്യമാക്കുക. ഷൌട്ട്കാസ്റ്റിന് നിര്‍ദ്ദേശിക്കപ്പെട്ട ബിറ്റ്നിരക്കിന്‍റെ വിവരം "
 "ആവ്ശ്യമാണ്.  ഐസ്കാസ്റ്റിന് വേണ്ട ഓ‌ജി‌ജി സ്ട്രീമിങ് ആവ്ശ്യമാണ്."
 
 #: modules/access_output/shout.c:111
@@ -9592,8 +9596,8 @@ msgid ""
 "Defines how often the barGraph information should be sent. Sends the "
 "barGraph information every n audio packets (default 4)."
 msgstr ""
-"ബാര്‍ഗ്രാഫ് വിവരങ്ങള്‍ എത്ര പതിവായി അയക്കണമെന്ന് നിര്‍വചിക്കുന്നു. എല്ലാ n ഓഡിയോ പാക്കറ്റിലും ബാര്‍"
-"ഗ്രാഫ് വിവരങ്ങള്‍ അയക്കപ്പെടും (സ്വയമേവ 4)."
+"ബാര്‍ഗ്രാഫ് വിവരങ്ങള്‍ എത്ര പതിവായി അയക്കണമെന്ന് നിര്‍വചിക്കുന്നു. എല്ലാ n ഓഡിയോ പാക്കറ്റിലും "
+"ബാര്‍ഗ്രാഫ് വിവരങ്ങള്‍ അയക്കപ്പെടും (സ്വയമേവ 4)."
 
 #: modules/audio_filter/audiobargraph_a.c:45
 msgid "Defines if silence alarm information should be sent"
@@ -9725,8 +9729,8 @@ msgid ""
 "headphone channel mixer. It gives the effect of standing in a room full of "
 "speakers."
 msgstr ""
-"ഈ ഐഛികം ഹെഡ്ഫോണ്‍ ചാനല്‍ മിക്സറില്‍ ഉപയോഗിക്കുന്ന ഒരു സ്റ്റീരിയോയില്‍ നിന്നും മോണോയിലേക്കുള്ള ഡൌണ്‍"
-"മിക്സ് അല്‍ഗോരിതം തിരഞ്ഞെടുക്കും. മുഴുവന്‍ സ്പീകറുകളുള്ള ഒരു മുറിയില്‍ നില്‍ക്കുന്ന പ്രതീതി തരും."
+"ഈ ഐഛികം ഹെഡ്ഫോണ്‍ ചാനല്‍ മിക്സറില്‍ ഉപയോഗിക്കുന്ന ഒരു സ്റ്റീരിയോയില്‍ നിന്നും മോണോയിലേക്കുള്ള "
+"ഡൌണ്‍മിക്സ് അല്‍ഗോരിതം തിരഞ്ഞെടുക്കും. മുഴുവന്‍ സ്പീകറുകളുള്ള ഒരു മുറിയില്‍ നില്‍ക്കുന്ന പ്രതീതി തരും."
 
 #: modules/audio_filter/channel_mixer/mono.c:83
 msgid "Select channel to keep"
@@ -10134,8 +10138,9 @@ msgid ""
 "A higher number of buffers will increase the response time of the filter to "
 "a spike but will make it less sensitive to short variations."
 msgstr ""
-"കരുത്തിന്‍റെ അളവ് നടത്തപ്പെടുന്ന ഓഡിയോ ബഫറുകളുടെ എണ്ണമാണ് ഇത്.  കൂടുതല്‍ ബഫറുകളുടെ എണ്ണം ഫില്‍റ്ററിന്‍"
-"റെ പ്രതികരണ സമയം മുനപോലെ കൂട്ടും പക്ഷെ ചെറിയ മാറ്റങ്ങളോട് കുറവ് പ്രതികരണം ആയിരിക്കും."
+"കരുത്തിന്‍റെ അളവ് നടത്തപ്പെടുന്ന ഓഡിയോ ബഫറുകളുടെ എണ്ണമാണ് ഇത്.  കൂടുതല്‍ ബഫറുകളുടെ എണ്ണം "
+"ഫില്‍റ്ററിന്‍റെ പ്രതികരണ സമയം മുനപോലെ കൂട്ടും പക്ഷെ ചെറിയ മാറ്റങ്ങളോട് കുറവ് പ്രതികരണം "
+"ആയിരിക്കും."
 
 #: modules/audio_filter/normvol.c:71
 msgid "Maximal volume level"
@@ -10550,8 +10555,8 @@ msgid ""
 "You should configure your speaker layout with \"Audio Midi Setup\" in /"
 "Applications/Utilities. VLC will output Stereo only."
 msgstr ""
-"/ആപ്ലികേഷന്‍സ്/യുറ്റിലിറ്റിസില്‍ സ്പീകര്‍ കരടുരൂപം \"Audio Midi Setup\"  ഉപയോഗിച്ച് നിങ്ങള്‍ കോണ്‍"
-"ഫിഗര്‍ ചെയ്യണം. വി‌എല്‍‌സി സ്റ്റീരിയോ മാത്രമേ പുറത്തേക് തരികയൊള്ളൂ."
+"/ആപ്ലികേഷന്‍സ്/യുറ്റിലിറ്റിസില്‍ സ്പീകര്‍ കരടുരൂപം \"Audio Midi Setup\"  ഉപയോഗിച്ച് നിങ്ങള്‍ "
+"കോണ്‍ഫിഗര്‍ ചെയ്യണം. വി‌എല്‍‌സി സ്റ്റീരിയോ മാത്രമേ പുറത്തേക് തരികയൊള്ളൂ."
 
 #: modules/audio_output/directsound.c:62
 msgid "Output device"
@@ -10669,8 +10674,8 @@ msgid ""
 "Enable this option if you want your audio not to be interrupted by the other "
 "audio."
 msgstr ""
-"മറ്റൊരു ഓഡിയോയാല്‍ ഇപ്പോളത്തെ നിങ്ങളുടെ ഓഡിയോ തടസപ്പെടാതിരിക്കാന്‍ ഈ ഐഛികം പ്രവര്‍"
-"ത്തനക്ഷമമാക്കുക."
+"മറ്റൊരു ഓഡിയോയാല്‍ ഇപ്പോളത്തെ നിങ്ങളുടെ ഓഡിയോ തടസപ്പെടാതിരിക്കാന്‍ ഈ ഐഛികം "
+"പ്രവര്‍ത്തനക്ഷമമാക്കുക."
 
 #: modules/audio_output/kai.c:110
 msgid "K Audio Interface audio output"
@@ -10748,8 +10753,8 @@ msgid ""
 "The option allows you to enable or disable the high-quality float32 audio "
 "output mode (which is not well supported by some soundcards)."
 msgstr ""
-"കൂടിയ- നിലവാര ഫ്ലോട്32 ഓഡിയോ ഔട്പുട് രീതി പ്രവര്‍ത്തനക്ഷമമാക്കാന്‍ അല്ലെങ്കില്‍ പ്രവര്‍"
-"ത്തനരഹിതമാക്കാന്‍ ഈ ഐഛികം നിങ്ങളെ അനുവദിക്കും (ഇത് ചില സൌണ്ട്കാര്‍ഡുകള്‍ നല്ലവണ്ണം "
+"കൂടിയ- നിലവാര ഫ്ലോട്32 ഓഡിയോ ഔട്പുട് രീതി പ്രവര്‍ത്തനക്ഷമമാക്കാന്‍ അല്ലെങ്കില്‍ "
+"പ്രവര്‍ത്തനരഹിതമാക്കാന്‍ ഈ ഐഛികം നിങ്ങളെ അനുവദിക്കും (ഇത് ചില സൌണ്ട്കാര്‍ഡുകള്‍ നല്ലവണ്ണം "
 "പിന്താങ്ങുന്നില്ല)."
 
 #: modules/codec/a52.c:70
@@ -10891,7 +10896,6 @@ msgstr "ഡീക്കോഡിംഗ്"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "എന്‍കോഡിങ്"
 
@@ -10925,8 +10929,8 @@ msgstr ""
 "libavcodec-ക്കിന് തെറ്റിന്‍റെ റിസയലെന്‍സ് ചെയ്യാം.\n"
 "എത്രയായാലും, ഒരു ബഗ്ഗി എന്‍കോഡര്‍ (എം‌എസ്സില്‍ നിന്നുള്ള ISO MPEG-4 എന്‍കോഡര്‍ പോലുള്ളവ) കൊണ്ട് "
 "ഇതിന് കുറേ അധികം തെറ്റുകള്‍ ഉണ്ടാക്കാം.\n"
-"സാധുവായ മൂല്യങ്ങളുടെ പരിധി 0 മുതല്‍ 4 വരെ (0 എല്ലാ തെറ്റുകളുടെയും റിസയലന്‍സ് പ്രവര്‍"
-"ത്തനരഹിതമാക്കുന്നു)."
+"സാധുവായ മൂല്യങ്ങളുടെ പരിധി 0 മുതല്‍ 4 വരെ (0 എല്ലാ തെറ്റുകളുടെയും റിസയലന്‍സ് "
+"പ്രവര്‍ത്തനരഹിതമാക്കുന്നു)."
 
 #: modules/codec/avcodec/avcodec.h:69
 msgid "Workaround bugs"
@@ -11304,10 +11308,11 @@ msgid ""
 "(default: low). hev1 and hev2 are currently supported only with libfdk-aac "
 "enabled libavcodec"
 msgstr ""
-"ഓഡിയോ ബിറ്റ്സ്ട്രീം എന്‍കോഡ് ചെയ്യുന്നതിന് വേണ്ടി ഉപയോഗിക്കേണ്ട എ‌എ‌സി ഓഡിയോ രൂപരേഖ നിര്‍"
-"ദ്ദേശിക്കുക.  അത് തുടര്‍ന്നുള്ള ഐച്ഛികങ്ങള്‍ എടുക്കും: പ്രധാന, കുറഞ്ഞ, എസ്‌എസ്‌ആര്‍(പിന്താങ്ങപ്പെടാത്ത), എല്‍‌"
-"ടി‌പി, എച്ച്‌ഇ‌വി1, എച്ച്‌ഇ‌വി2 (സ്വയമേവ:കുറവ്). libfdk-aac  പ്രവര്‍ത്തനക്ഷമമാക്കിയ "
-"libavcodecല്‍ മാത്രമാണു ഇപ്പോള്‍ എച്ച്‌ഇ‌വി1 കൂടാതെ എച്ച്‌ഇ‌വി2 പിന്താങ്ങപെട്ടിട്ടുള്ളത്."
+"ഓഡിയോ ബിറ്റ്സ്ട്രീം എന്‍കോഡ് ചെയ്യുന്നതിന് വേണ്ടി ഉപയോഗിക്കേണ്ട എ‌എ‌സി ഓഡിയോ രൂപരേഖ "
+"നിര്‍ദ്ദേശിക്കുക.  അത് തുടര്‍ന്നുള്ള ഐച്ഛികങ്ങള്‍ എടുക്കും: പ്രധാന, കുറഞ്ഞ, "
+"എസ്‌എസ്‌ആര്‍(പിന്താങ്ങപ്പെടാത്ത), എല്‍‌ടി‌പി, എച്ച്‌ഇ‌വി1, എച്ച്‌ഇ‌വി2 (സ്വയമേവ:കുറവ്). libfdk-aac  "
+"പ്രവര്‍ത്തനക്ഷമമാക്കിയ libavcodecല്‍ മാത്രമാണു ഇപ്പോള്‍ എച്ച്‌ഇ‌വി1 കൂടാതെ എച്ച്‌ഇ‌വി2 "
+"പിന്താങ്ങപെട്ടിട്ടുള്ളത്."
 
 #: modules/codec/avcodec/d3d11va.c:63
 #, fuzzy
@@ -11441,11 +11446,11 @@ msgstr "തിയോര വീഡിയോ പാക്കറ്റൈസര്�
 msgid "Daala video encoder"
 msgstr "പിഎന്‍ജി വീഡിയോ എന്‍കോഡര്‍"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "ക്രോമ ഫോര്‍മാറ്റ്"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr ""
@@ -11510,8 +11515,8 @@ msgstr "ഉപചിത്ര സ്ഥാനം"
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 "ഉപദൃശ്യരൂപത്തിന്‍റെ വീഡിയോയിലുള്ള സ്ഥാനം നിങ്ങള്‍ക്ക് നിര്‍ബന്ധമാറ്റം വരുത്താം (0=നടുക്ക്, 1=ഇടത്തു, "
 "2=വലത്തു, 3=മുകളില്‍, 4=ചുവട്ടില്‍, നിങ്ങള്‍ക്ക് ഈ മൂല്യങ്ങളുടെ സംയോഗവും ഉപയോഗിക്കാം, ഉദാ. "
@@ -11593,8 +11598,8 @@ msgid ""
 "This library will produce higher quality audio at the expense of additional "
 "CPU usage (default is enabled)"
 msgstr ""
-"അധിക സി‌പി‌യു ഉപയോഗ ചിലവില്‍ ഈ ലൈബ്രറി കൂടിയ നിലവാരമുള്ള ഓഡിയോ നിര്‍മ്മിക്കും (സ്വയമേവ പ്രവര്‍"
-"ത്തനക്ഷമമാക്കിയിരിക്കുന്നു)"
+"അധിക സി‌പി‌യു ഉപയോഗ ചിലവില്‍ ഈ ലൈബ്രറി കൂടിയ നിലവാരമുള്ള ഓഡിയോ നിര്‍മ്മിക്കും (സ്വയമേവ "
+"പ്രവര്‍ത്തനക്ഷമമാക്കിയിരിക്കുന്നു)"
 
 #: modules/codec/fdkaac.c:79
 msgid "Signaling mode of the extension AOT"
@@ -11757,8 +11762,8 @@ msgid ""
 "rendering via Tiger is enabled."
 msgstr ""
 "കേറ്റ് സ്ട്രീംസ് ടെക്സ്റ്റ് രൂപവല്‍ക്കരണത്തിന് സഹായിക്കുന്നു. VLC ഭാഗികമായേ ഇത് നിര്‍വ്വഹിക്കുന്നുള്ളൂ, "
-"എന്നാല്‍ നിങ്ങള്‍ക്ക് എല്ലാ രൂപവല്‍ക്കരണവും പ്രവര്‍ത്തനരഹിതമാക്കുന്നത് തിരഞ്ഞെടുക്കാം. ടൈഗര്‍  പ്രവര്‍"
-"ത്തനനിരതമാക്കിയിട്ടുണ്ട്  എങ്കില്‍ ഇതിന് പ്രത്യേകിച്ച് ഫലം ഒന്നും ഇല്ല എന്ന കാര്യം ശ്രദ്ധിയ്ക്കുക"
+"എന്നാല്‍ നിങ്ങള്‍ക്ക് എല്ലാ രൂപവല്‍ക്കരണവും പ്രവര്‍ത്തനരഹിതമാക്കുന്നത് തിരഞ്ഞെടുക്കാം. ടൈഗര്‍  "
+"പ്രവര്‍ത്തനനിരതമാക്കിയിട്ടുണ്ട്  എങ്കില്‍ ഇതിന് പ്രത്യേകിച്ച് ഫലം ഒന്നും ഇല്ല എന്ന കാര്യം ശ്രദ്ധിയ്ക്കുക"
 
 #: modules/codec/kate.c:199
 msgid "Shadow"
@@ -11950,8 +11955,8 @@ msgid ""
 "Default background color if the Kate stream does not specify a background "
 "color to use."
 msgstr ""
-"കേറ്റ് സ്ട്രീം ഏത് പശ്ചാത്തല നിറം ഉപയോഗിക്കണം എന്ന്‍ പറഞ്ഞിട്ടില്ലെങ്കില്‍ ഉപയോഗിക്കേണ്ട ഡിഫാള്‍"
-"ട്ട് പശ്ചാത്തല നിറം"
+"കേറ്റ് സ്ട്രീം ഏത് പശ്ചാത്തല നിറം ഉപയോഗിക്കണം എന്ന്‍ പറഞ്ഞിട്ടില്ലെങ്കില്‍ ഉപയോഗിക്കേണ്ട "
+"ഡിഫാള്‍ട്ട് പശ്ചാത്തല നിറം"
 
 #: modules/codec/kate.c:252
 msgid "Default background alpha"
@@ -11978,8 +11983,8 @@ msgstr ""
 "കോംപ്ലക്സ് കേറ്റ് സ്ട്രീമുകള്‍ റെന്‍ഡര്‍ ചെയ്യാനായി ടൈഗര്‍ റെണ്ടറിംഗ് ലൈബ്രറി ആവശ്യമാണ്, പക്ഷേ "
 "ലഭ്യമല്ലെങ്കിലും വിഎല്‍സിക്ക് സ്റ്റാറ്റിക് ടെക്സ്റ്റും ചിത്രാധിഷ്ഠിത ഉപശീര്‍ഷകങ്ങളും റെന്‍ഡര്‍ "
 "ചെയ്യാനാകുന്നതാണ്.\n"
-"പുതിയ സ്ട്രീം പ്ലേ ചെയ്യുന്നത് വരെ മാറ്റം വരുത്തിയ ക്രമീകരണങ്ങള്‍ പ്രാബല്യത്തില്‍ വരില്ല എന്നോര്‍"
-"ക്കുക. ഇത് ഉടനടി ശരിയാക്കുന്നതായിരിക്കും."
+"പുതിയ സ്ട്രീം പ്ലേ ചെയ്യുന്നത് വരെ മാറ്റം വരുത്തിയ ക്രമീകരണങ്ങള്‍ പ്രാബല്യത്തില്‍ വരില്ല "
+"എന്നോര്‍ക്കുക. ഇത് ഉടനടി ശരിയാക്കുന്നതായിരിക്കും."
 
 #: modules/codec/kate.c:268
 msgid "Kate"
@@ -12108,8 +12113,8 @@ msgid ""
 "Allow the use of the Intel Media SDK software implementation of the codecs "
 "if no QuickSync Video hardware acceleration is present on the system."
 msgstr ""
-"സിസ്റ്റത്തില്‍ ക്വിക്സിന്‍ഗ് വീഡിയോ ഹാര്‍ഡ് വയര്‍ ആക്സിലറേഷന്‍ ഒന്നും തന്നെ ലഭ്യമല്ല എങ്കില്‍ കോഡിക്സിന്‍"
-"റെ ഇന്‍റല്‍ മീഡിയ SDK സോഫ്റ്റ് വയര്‍ സംവിധാനം ഉപയോഗിക്കാന്‍ അനുവദിക്കുക"
+"സിസ്റ്റത്തില്‍ ക്വിക്സിന്‍ഗ് വീഡിയോ ഹാര്‍ഡ് വയര്‍ ആക്സിലറേഷന്‍ ഒന്നും തന്നെ ലഭ്യമല്ല എങ്കില്‍ "
+"കോഡിക്സിന്‍റെ ഇന്‍റല്‍ മീഡിയ SDK സോഫ്റ്റ് വയര്‍ സംവിധാനം ഉപയോഗിക്കാന്‍ അനുവദിക്കുക"
 
 #: modules/codec/qsv.c:61
 msgid "Codec Profile"
@@ -12136,8 +12141,8 @@ msgid ""
 "'4.2' for mpeg4-part10 or 'low' for mpeg2"
 msgstr ""
 "കോഡിക് ലെവല്‍ സ്പഷ്ടമായി പ്രസ്താവിക്കുക. നിങ്ങള്‍ അങ്ങനെ ചെയ്തില്ല എങ്കില്‍ കോഡിക് മറ്റ് "
-"ഉറവിടങ്ങളില്‍ നിന്ന്‍ ശരിയായ പ്രൊഫൈല്‍ തീരുമാനിക്കും,റസല്യൂഷന്‍,ബിറ്റ്റേറ്റ് എന്നിവയെപ്പോലെ, ഉദാ:"
-"mpeg4-part10 ന് '4.2' അല്ലെങ്കില്‍ mpeg2 ന് 'കുറഞ്ഞത്'"
+"ഉറവിടങ്ങളില്‍ നിന്ന്‍ ശരിയായ പ്രൊഫൈല്‍ തീരുമാനിക്കും,റസല്യൂഷന്‍,ബിറ്റ്റേറ്റ് എന്നിവയെപ്പോലെ, "
+"ഉദാ:mpeg4-part10 ന് '4.2' അല്ലെങ്കില്‍ mpeg2 ന് 'കുറഞ്ഞത്'"
 
 #: modules/codec/qsv.c:73
 msgid "Group of Picture size"
@@ -12222,9 +12227,9 @@ msgid ""
 "qpp and qpp. It has less precedence than the forementionned parameters. Used "
 "only if rc_method is 'qp'."
 msgstr ""
-"എല്ലാ തരത്തിലുമുള്ള ഫ്രൈയിംസിന്‍റെ ക്വാണ്ടൈസേഷന്‍ പരാമീറ്റര്‍. ഈ പരാമീറ്ററുകള്‍  ക്യുപിഐ,ക്യുപിപി,"
-"ക്യുപിപി, എന്നിവയെ സജ്ജമാക്കുന്നു. ഇതിന് മുന്‍ പറഞ്ഞിട്ടുള്ള പരാമീറ്ററുകളെക്കാള്‍ കുറഞ്ഞ പ്രാധാന്യമാണ് "
-"ഉള്ളത്.ആര്‍‌സി_മെത്തേഡ് 'ക്യൂ‌പി' ആണെങ്കില്‍ മാത്രമേ ഇത് ഉപയോഗിക്കപ്പെടുന്നുള്ളൂ"
+"എല്ലാ തരത്തിലുമുള്ള ഫ്രൈയിംസിന്‍റെ ക്വാണ്ടൈസേഷന്‍ പരാമീറ്റര്‍. ഈ പരാമീറ്ററുകള്‍  "
+"ക്യുപിഐ,ക്യുപിപി,ക്യുപിപി, എന്നിവയെ സജ്ജമാക്കുന്നു. ഇതിന് മുന്‍ പറഞ്ഞിട്ടുള്ള പരാമീറ്ററുകളെക്കാള്‍ "
+"കുറഞ്ഞ പ്രാധാന്യമാണ് ഉള്ളത്.ആര്‍‌സി_മെത്തേഡ് 'ക്യൂ‌പി' ആണെങ്കില്‍ മാത്രമേ ഇത് ഉപയോഗിക്കപ്പെടുന്നുള്ളൂ"
 
 #: modules/codec/qsv.c:110
 msgid "Quantization parameter for I-frames"
@@ -12286,10 +12291,10 @@ msgstr "റേറ്റ്കണ്ട്രോള്‍ ആക്വറസി"
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
 "Avbr ' ( ശരാശരി വേരിയബിൾ ബിറ്റ്റേറ്റ്) രീതികളുടെ ശതമാനം ടോളറൻസ് . ( ഉദാ 800 "
 "കെബിപിഎസ് ഒരു ബിറ്റ്റേറ്റ് 10 എൻകോഡർ 880 കെബിപിഎസ് മീതെ 730 കെബിപിഎസ് കീഴിൽ നിന്നു "
@@ -12357,387 +12362,6 @@ msgstr "സ്യൂഡോ റോ വീഡിയോ പാക്കറ്റൈ
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "പിഎന്‍ജി വീഡിയോ എന്‍കോഡര്‍"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "റേറ്റ് കണ്ട്രോള്‍ രീതി"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr "വീഡിയോ ക്രമം എന്‍കോഡ് ചെയ്യാന്‍ ഉപയോഗിയ്ക്കുന്ന വഴി"
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "സ്ഥിര നോയിസ് പരിധി രീതി"
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "സ്ഥിര ബിറ്റ്തോത് രീതി (സി‌ബി‌ആര്‍)"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "ലോ ഡിലേ മോഡ്"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "ലോസ്ലെസ് രീതി"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "കോണ്‍സ്റ്റന്റ് ലാംബഡ മോഡ്"
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "കോണ്‍സ്റ്റെന്റ് പിശക് രീതി"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "സ്ഥിരമായ ഗുണമേന്മ രീതി"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "ജിഒപി ഘടന"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr "വീഡിയോ ക്രമം എന്‍കോഡ് ചെയ്യാന്‍ ഉപയോഗിക്കുന്ന ജി‌ഓ‌പി ഘടന"
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-"സ്ഥിര ജി‌ഓ‌പി ഘടന ഇല്ല . ഒരു ദൃശ്യരൂപം ഉള്ളില്‍/അന്യോന്യം കൂടാതെ മുമ്പിലത്തെ അല്ലെങ്കില്‍ "
-"വരാനിരിക്കുന്ന ദൃഷ്യരൂപത്തോട് സംബന്ധിച്ച."
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr "ഐ-ഫ്രെയിം മാത്രം സീക്വന്‍സ്"
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr "തമ്മിലുള്ള ദൃഷ്യരൂപങ്ങള്‍ മുമ്പിലത്തെ ദൃസ്യരൂപങ്ങളോടെ സംബന്ധിക്കപ്പെട്ടത്"
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr ""
-"തമ്മിലുള്ള ദൃഷ്യരൂപങ്ങള്‍ മുമ്പിലത്തെ അല്ലെങ്കില്‍ വരാനിരിക്കുന്ന ദൃസ്യരൂപങ്ങളോടെ സംബന്ധിക്കപ്പെട്ടത്"
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "സ്ഥിരമായ ഗുണമേന്മ ഘടകം"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr "സ്ഥിര ഗുണ രീതിയില്‍ ഉപയോഗികേണ്ട ഗുണ അംശം"
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "നോയിസ് ത്രെഷ്ഹോള്‍ഡ്"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr "നോയിസ് പരിധി രീതിയില്‍ ഉപയോഗികേണ്ട നോയിസ് പരിധി"
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "സിബിആര്‍ ബിറ്റ്റേറ്റ്(കെബിപിഎസ്)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"സ്ഥിരമായ ബിറ്റ്റേറ്റ് രീതിയില്‍  എന്‍കോഡ് ചെയ്യുമ്പോള്‍ കെബിപിഎസ്സിലുള്ള ടാര്‍ജറ്റ് ബിറ്റ്റേറ്റ് "
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "കൂടിയ ബിറ്റ്റേറ്റ്(കെബിപിഎസ്)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"സ്ഥിരമായ ബിറ്റ്റേറ്റ് രീതിയില്‍  എന്‍കോഡ് ചെയ്യുമ്പോള്‍ കെബിപിഎസ്സിലുള്ള പരമാവധി ബിറ്റ്റേറ്റ് "
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "കുറഞ്ഞ ബിറ്റ്റേറ്റ്(കെബിപിഎസ്)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr "സ്ഥിരമായ ബിറ്റ്റേറ്റ് രീതിയില്‍  എന്‍കോഡ് ചെയ്യുമ്പോള്‍ കെബിപിഎസ്സിലുള്ള കുറഞ്ഞ ബിറ്റ്റേറ്റ് "
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "ജിഒപി ദൈര്‍ഘ്യം"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr ""
-"തുടര്‍ച്ചയായുള്ള സീക്വന്‍സ് ഹെഡറുകള്‍ക്കിടയിലുള്ള ചിത്രങ്ങളുടെ എണ്ണം, അതായത് ചിത്രങ്ങളുടെ ഗ്രൂപ്പിന്റെ "
-"നീളം"
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "പ്രീഫില്‍റ്റര്‍"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "അടാപ്റ്റീവ് പ്രീഫീല്‍റ്റേറിങ് പ്രവര്‍ത്തനക്ഷമമാകുക"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "പ്രീ-ഫില്‍റ്ററിംഗ് ഇല്ല"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr "സെന്റര്‍ വെയിറ്റഡ് മീഡിയന്‍"
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "ഗൗസിയന്‍ ലോ പാസ് ഫില്‍റ്റര്‍"
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "നോയിസ് ചേര്‍ക്കുക"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "ഗോസ്സിയന്‍ അടാപ്ടീവ് ലോ പാസ് ഫില്‍ട്ടര്‍"
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "ലോ പാസ് ഫില്‍റ്റര്‍"
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "പ്രീഫില്‍റ്ററിംഗ് തുക"
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "വലിയ മൂല്യങ്ങള്‍ എന്നുവെച്ചാല്‍ കൂടുതല്‍ പ്രീഫീല്‍റ്ററിങ്"
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "പിക്ച്ചര്‍ കോഡിംഗ് മോഡ്"
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-"സ്യൂഡോ-പ്രോഗ്രസ്സീവ് ഫ്രെയിമിന് എതിരായി ഇന്റര്‍ലേസ്ഡ്  ഫീല്‍ഡുകള്‍ പ്രത്യേകമായി കോഡ് ചെയ്യുന്നതാണ് ഫീല്‍"
-"ഡ് കോഡിംഗ്."
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr "സ്വയം - ഇന്‍പുട്ട് അനുസരിച്ചു എന്‍കോഡര്‍ തീരുമാനിച്ചുകൊള്ളട്ടെ (നല്ലത്)"
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr "കോഡിങ് ഫ്രെയിമിനെ ഒരു ദൃശ്യപടമായി നിര്‍ബന്ധപൂര്‍വം മാറ്റുന്നു"
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr "കോഡിങ് ഫ്രെയിമിനെ വേര്‍തിരിച്ച ഇടപിരിഞ്ഞ തലത്തെ നിര്‍ബന്ധപൂര്‍വം മാറ്റുന്നു"
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr "ചലന പ്രതിഫല ബ്ലോക്കുകളുടെ വലിപ്പം"
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr "സ്വയം - ഇന്‍പുട്ട് അനുസരിച്ചു എന്‍കോഡര്‍ തീരുമാനിച്ചുകൊള്ളട്ടെ (നല്ലത്)"
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr "ചെറുത് - ചെറിയ ചലന പ്രതിഫല ബ്ലോക്കുകള്‍ ഉപയോഗിക്കുക"
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr "ഇടത്തരം - ഇടത്തര ചലന പ്രതിഫല ബ്ലോക്കുകള്‍ ഉപയോഗിക്കുക"
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr "വലുത് - വലിയ ചലന പ്രതിഫല ബ്ലോക്കുകള്‍ ഉപയോഗിക്കുക"
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr "മേല്‍ക്കുമേലുള്ള ചലന പ്രതിഫല ബ്ലോക്കുകള്‍"
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr "ഒന്നുമില്ല - ചലന പ്രതിഫല ബ്ലോക്കുകള്‍ മേല്‍ക്കുമേലല്ല"
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr "ഭാഗികം - ചലന പ്രതിഫല ബ്ലോക്കുകള്‍ ഭാഗികമായി മേല്‍ക്കുമേല്‍"
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr "മുഴുവന്‍ - ചലന പ്രതിഫല ബ്ലോക്കുകള്‍ മുഴുവനും മേല്‍ക്കുമേല്‍"
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "മോഷന്‍ വെക്ടര്‍ പ്രിസിഷന്‍"
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "പെല്‍സിലുള്ള ചലന വെക്റ്ററിന്റെ കൃത്യത"
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "മൂന്നു ഭാഗ ചലന മൂല്യനിര്‍ണ്ണയം"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "ചലന മൂല്യനിര്‍ണയ നടപടിക്രമത്തിന്റെ ഭാഗമായി ക്രോമ ഉപയോഗിക്കുക"
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr "ഇന്‍ട്രാ പിക്ച്ചര്‍ ഡിഡബ്ല്യുടി ഫില്‍റ്റര്‍"
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr "ഇന്റര്‍ പിക്ച്ചര്‍ ഡിബ്ല്യുടി ഫില്‍റ്റര്‍"
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr "ഡി‌ഡബ്ല്യു‌ടി ആവര്‍ത്തനത്തിന്റെ എണ്ണം"
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr "ഡി‌ഡബ്ല്യു‌ടി നിരകളായും അറിയപ്പെടുന്നു"
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr "മള്‍ട്ടിപ്പിള്‍ ക്വാണ്ടൈസേഴ്സ് സാധ്യമാക്കകു"
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr "ഓരോ സബ് ബാന്‍ഡിലും ഒന്നിലധികം ക്വാന്‍ടൈസേര്‍സ് പ്രാപ്തമാക്കുക"
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr "അരിതമെറ്റിക് കോഡിംഗ് അസാധ്യമാക്കുക"
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr ""
-"പകരംവ്യത്യസ്തനീളമുള്ള കോഡുകള്‍ ഉപയോഗിക്കുക, വളരെ കൂടിയ ബിറ്റ്റേറ്റിന് ഉപയോഗപ്രദമാകുന്ന വിധത്തില്‍"
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "വ്യക്തമായ തൂക്കുന്ന വഴി"
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "പെര്‍സെപ്ച്വല്‍ ദൂരം"
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr "വ്യക്തമായ തൂക്കം കണക്കാക്കാനുള്ള വ്യക്തമായ ദൂരം"
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "ഒരു ഫ്രെയിമിലുള്ള തിരശ്ചീനമായ തുണ്ടുകള്‍"
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr "കുറഞ്ഞ താമസ രീതിയില്‍ ഒരു ഫ്രെയിമിലുള്ള തിരശ്ചീനമായ തുണ്ടുകള്‍"
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "ഒരു ഫ്രെയിമിലുള്ള ലംഭമായ തുണ്ടുകള്‍"
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr "കുറഞ്ഞ താമസ രീതിയില്‍ ഒരു ഫ്രെയിമിലുള്ള ലംഭമായ തുണ്ടുകള്‍"
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr "ഓരോ സബ്ബാന്‍റിലുമുള്ള കോഡ് ബ്ലോക്കുകളുടെ വലിപ്പം"
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr "ചെറുത് -  ചെറിയ കോഡ് ബ്ലോക്കുകള്‍ ഉപയോഗിക്കുക"
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr "ഇടത്തരം -  ഇടത്തര കോഡ് ബ്ലോക്കുകള്‍ ഉപയോഗിക്കുക"
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr "വലുത് -  വലിയ കോഡ് ബ്ലോക്കുകള്‍ ഉപയോഗിക്കുക"
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr "മുഴുവന്‍ - ഒരു സബ്ബാന്‍റില്‍ ഒരു കോഡ് ബ്ലോക്"
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr "ക്രമമനുസരിച്ചുള്ള ചലന മൂല്യനിര്‍ണ്ണയം പ്രവര്‍ത്തനക്ഷമമാക്കുക"
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr "ഡൌണ്‍സംബ്ലിങ്ങുകളുടെ നിരകളുടെ എണ്ണം"
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr "ക്രമമനുസരിച്ചുള്ള ചലന മൂല്യനിര്‍ണ്ണയത്തില്‍ ഡൌണ്‍സംബ്ലിങ്ങുകളുടെ നിരകളുടെ എണ്ണം"
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr "ആഗോള ചലന മൂല്യനിര്‍ണ്ണയം പ്രവര്‍ത്തനക്ഷമമാക്കുക"
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr "ഫേസ് പരസ്പരബന്ധം മൂല്യനിര്‍ണ്ണയം പ്രവര്‍ത്തനക്ഷമമാക്കുക"
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr "ദൃശ്യ മാറ്റം കണ്ടുപിടിക്കല്‍ പ്രവര്‍ത്തനക്ഷമമാക്കുക"
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "പ്രൊഫൈല്‍ ഫോഴ്സ് ചെയ്യുക"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr "വിസി2 ലോ ഡിലേ പ്രൊഫൈല്‍"
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr "വിസി2 സാധാരണ പ്രൊഫൈല്‍"
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr "വിസി2 പ്രധാന പ്രൊഫൈല്‍"
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "പ്രധാന പ്രൊഫൈല്‍"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr "ലിബ്ശ്ച്രൊഡിങര് ഉപയോഗിച്ചുള്ള ഡിറാക് വീഡിയോ ഡികോഡര്‍"
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr "ലിബ്ശ്ച്രൊഡിങര് ഉപയോഗിച്ചുള്ള ഡിറാക് വീഡിയോ എന്‍കോഡര്‍"
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -12817,8 +12441,8 @@ msgid ""
 "Enforce a constant bitrate encoding (CBR) instead of default variable "
 "bitrate encoding (VBR)."
 msgstr ""
-"ഡിഫാള്‍ട്ട് വാരിയബിള്‍ ബിറ്റ്റേറ്റ് എന്‍കോഡിംഗിന്(VBR) പകരമായി ഒരു സ്ഥിരമായ ബിറ്റ് റേറ്റ്എന്‍"
-"കോഡിങ്ങ്(CBR) നടപ്പിലാക്കുക"
+"ഡിഫാള്‍ട്ട് വാരിയബിള്‍ ബിറ്റ്റേറ്റ് എന്‍കോഡിംഗിന്(VBR) പകരമായി ഒരു സ്ഥിരമായ ബിറ്റ് "
+"റേറ്റ്എന്‍കോഡിങ്ങ്(CBR) നടപ്പിലാക്കുക"
 
 #: modules/codec/speex.c:80
 msgid "Voice activity detection"
@@ -14773,8 +14397,8 @@ msgid ""
 "foobar). It should be specified at install time so the Service is properly "
 "configured."
 msgstr ""
-"സര്‍വ്വീസ് ഉപയോഗിക്കുന്ന കോണ്‍ഫിഗറേഷന്‍ താല്പര്യങ്ങള്‍ (ഉദാ. --foo=bar --no-foobar). അത് ഇന്‍"
-"സ്റ്റാള്‍ സമയത്ത് സൂചിപ്പിക്കേണ്ടതാണ്, അപ്പോള്‍ സര്‍വ്വീസ് നേരെ കോണ്‍ഫിഗര്‍ ചെയ്യാനാകും."
+"സര്‍വ്വീസ് ഉപയോഗിക്കുന്ന കോണ്‍ഫിഗറേഷന്‍ താല്പര്യങ്ങള്‍ (ഉദാ. --foo=bar --no-foobar). അത് "
+"ഇന്‍സ്റ്റാള്‍ സമയത്ത് സൂചിപ്പിക്കേണ്ടതാണ്, അപ്പോള്‍ സര്‍വ്വീസ് നേരെ കോണ്‍ഫിഗര്‍ ചെയ്യാനാകും."
 
 #: modules/control/ntservice.c:61
 msgid ""
@@ -14840,8 +14464,8 @@ msgid ""
 "Accept commands over a socket rather than stdin. You can set the address and "
 "port the interface will bind to."
 msgstr ""
-"എസ്റ്റിഡിഇന്‍ നേക്കാളും ഒരു സോക്കറ്റിന്‍മേലുള്ള കമാന്‍ഡുകള്‍ സ്വീകരിക്കുക. ആ പൊതുപ്രതലം ഉള്‍"
-"പ്പെട്ടിരിക്കുന്നതിന്‍റെ വിലാസവും പോര്‍ട്ടും നിങ്ങള്ക്ക് തന്നെ നിശ്ചയിക്കാവുന്നതാണ്"
+"എസ്റ്റിഡിഇന്‍ നേക്കാളും ഒരു സോക്കറ്റിന്‍മേലുള്ള കമാന്‍ഡുകള്‍ സ്വീകരിക്കുക. ആ പൊതുപ്രതലം "
+"ഉള്‍പ്പെട്ടിരിക്കുന്നതിന്‍റെ വിലാസവും പോര്‍ട്ടും നിങ്ങള്ക്ക് തന്നെ നിശ്ചയിക്കാവുന്നതാണ്"
 
 #: modules/control/oldrc.c:178
 msgid ""
@@ -15373,8 +14997,8 @@ msgid ""
 "This step might take a long time on a large file.\n"
 "What do you want to do?"
 msgstr ""
-"ഈ എവിഐ ഫയല്‍ സൂചിക തകര്‍ന്നതോ കാണ്മാനില്ലാത്തതോ ആണ്, അതിനാല്‍ സീക്കിംഗ് ശരിയായി പ്രവര്‍"
-"ത്തിക്കില്ല.\n"
+"ഈ എവിഐ ഫയല്‍ സൂചിക തകര്‍ന്നതോ കാണ്മാനില്ലാത്തതോ ആണ്, അതിനാല്‍ സീക്കിംഗ് ശരിയായി "
+"പ്രവര്‍ത്തിക്കില്ല.\n"
 "വിഎല്‍സി താങ്കളുടെ ഫയല്‍ ശരിയാക്കുകയില്ല പക്ഷേ മെമ്മറിയില്‍ സൂചിക സൃഷ്ടിച്ച് താല്‍ക്കാലികമായി ഈ "
 "പ്രശ്നം പരിഹരിക്കാവുന്നതാണ്.\n"
 "വലിയ ഫയലുകളില്‍ ഈ നടപടി വളരെയധികം സമയമെടുക്കും.\n"
@@ -15436,14 +15060,6 @@ msgstr "ഫയല്‍ നേരത്തെ നിലനില്‍ക്ക�
 #: modules/demux/demuxdump.c:47
 msgid "File dumper"
 msgstr "ഫയല്‍ ഡംപര്‍"
-
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "ഡി‌ടി‌എസ് മൂല്യം ക്രമീകരിക്കുക ഇത്രയാല്‍"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "ഡിറാക് വീഡിയോ ഡീമക്സര്‍"
 
 #: modules/demux/directory.c:94
 #, fuzzy
@@ -15925,8 +15541,8 @@ msgstr "അധിക പിഎംടി"
 #: modules/demux/mpeg/ts.c:82
 msgid "Allows a user to specify an extra pmt (pmt_pid=pid:stream_type[,...])."
 msgstr ""
-"ഒരു അധിക പി‌എം‌ടി നിര്‍ദ്ദേശിക്കാന്‍ ഉപയോക്താവിനെ അവിവദിക്കുന്നു (പി‌എം‌ടി_പി‌ഐ‌ഡി=പി‌ഐ‌ഡി:"
-"Sട്രീമ്_ഇനം[,...])."
+"ഒരു അധിക പി‌എം‌ടി നിര്‍ദ്ദേശിക്കാന്‍ ഉപയോക്താവിനെ അവിവദിക്കുന്നു "
+"(പി‌എം‌ടി_പി‌ഐ‌ഡി=പി‌ഐ‌ഡി:Sട്രീമ്_ഇനം[,...])."
 
 #: modules/demux/mpeg/ts.c:84
 msgid "Set id of ES to PID"
@@ -15939,8 +15555,8 @@ msgid ""
 "'#duplicate{..., select=\"es=<pid>\"}'."
 msgstr ""
 "ടി.എസ് സ്ട്രീമിൽ PID അതേ മൂല്യം വിഎൽസി കൈകാര്യം ഓരോ പ്രാഥമിക തോട്ടിന്റെ ആന്തരിക ഐഡി "
-"സജ്ജമാക്കുക, 1, 2, 3, തുടങ്ങിയവയ്ക്ക പകരമായി.  '#duplicate{..., select=\"es=<pid>"
-"\"}' ഉപയോഗിക്കുന്നത് ഉപയോഗപ്രദമായിരിക്കും."
+"സജ്ജമാക്കുക, 1, 2, 3, തുടങ്ങിയവയ്ക്ക പകരമായി.  '#duplicate{..., "
+"select=\"es=<pid>\"}' ഉപയോഗിക്കുന്നത് ഉപയോഗപ്രദമായിരിക്കും."
 
 #: modules/demux/mpeg/ts.c:90 modules/mux/mpeg/ts.c:173
 msgid "CSA Key"
@@ -16348,8 +15964,8 @@ msgid ""
 "Override the normal frames per second settings. This will only work with "
 "MicroDVD and SubRIP (SRT) subtitles."
 msgstr ""
-"പ്രതി സെക്കന്‍ഡ് സാധാരാണ ഫ്രെയിം ക്രമീകരണങ്ങളെ ഓവര്‍റൈഡ് ചെയ്യുക. ഇത് മൈക്രോഡിവിഡിയുമായും സബ്ആര്‍"
-"ഐപി(എസ്ആര്‍ടി) ഉപശീര്‍ഷകങ്ങളുമായി മാത്രമേ പ്രവര്‍ത്തിക്കകയുള്ളു."
+"പ്രതി സെക്കന്‍ഡ് സാധാരാണ ഫ്രെയിം ക്രമീകരണങ്ങളെ ഓവര്‍റൈഡ് ചെയ്യുക. ഇത് മൈക്രോഡിവിഡിയുമായും "
+"സബ്ആര്‍ഐപി(എസ്ആര്‍ടി) ഉപശീര്‍ഷകങ്ങളുമായി മാത്രമേ പ്രവര്‍ത്തിക്കകയുള്ളു."
 
 #: modules/demux/subtitle.c:58
 msgid ""
@@ -16508,18 +16124,18 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 "<p>വിഎല്‍സി മീഡിയ പ്ലേയര്‍ ഒരു സൗജന്യ ഓപ്പണ്‍ സോഴ്സ് മീഡിയ പ്ലേയര്‍, എന്‍കോഡര്‍, സ്ട്രീമര്‍ ആണ്, <a "
 "href=\"http://www.videolan.org/\"><span style=\" text-decoration: underline; "
 "color:#0057ae;\">വീഡിയോലാന്‍</span></a> കമ്മ്യൂണിറ്റികളിലെ വോളണ്ടിയര്‍മാര്‍ ഉണ്ടാക്കുന്നത്.</"
-"p><p>വിഎല്‍സി അവരുടെ അകേമയുള്ള കോഡെക്കുകള്‍ ഉപയോഗിക്കുന്നു, അവ എല്ലാവിധ പ്ലാറ്റ്ഫോമിലും പ്രവര്‍"
-"ത്തിക്കുന്നു എല്ലാത്തരം ഫയലുകള്‍, സിഡി, ഡിവിഡി, നെറ്റ്വര്‍ക്ക് സ്ട്രീമുകള്‍, ക്യാപ്ച്ചര്‍ കോര്‍ഡുകള്‍ മീഡിയ "
-"ഫോര്‍മാറ്റുകള്‍ എന്നിവയെ റീഡ് ചെയ്യുന്നു. !</p><p><a href=\"http://www.videolan.org/"
-"contribute/\"><span style=\" text-decoration: underline; color:#0057ae;\"> "
-"സഹായിക്കുക നമ്മളിലൊന്നാവുക!</span></a>"
+"p><p>വിഎല്‍സി അവരുടെ അകേമയുള്ള കോഡെക്കുകള്‍ ഉപയോഗിക്കുന്നു, അവ എല്ലാവിധ പ്ലാറ്റ്ഫോമിലും "
+"പ്രവര്‍ത്തിക്കുന്നു എല്ലാത്തരം ഫയലുകള്‍, സിഡി, ഡിവിഡി, നെറ്റ്വര്‍ക്ക് സ്ട്രീമുകള്‍, ക്യാപ്ച്ചര്‍ കോര്‍ഡുകള്‍ "
+"മീഡിയ ഫോര്‍മാറ്റുകള്‍ എന്നിവയെ റീഡ് ചെയ്യുന്നു. !</p><p><a href=\"http://"
+"www.videolan.org/contribute/\"><span style=\" text-decoration: underline; "
+"color:#0057ae;\"> സഹായിക്കുക നമ്മളിലൊന്നാവുക!</span></a>"
 
 #: modules/gui/macosx/VLCAddonsWindowController.m:104
 #: modules/gui/macosx/VLCAddonsWindowController.m:355
@@ -16812,8 +16428,8 @@ msgstr "ഇന്‍പുട്ട് മാറി"
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "ഇന്‍പുട്ട് മാറിയിട്ടുണ്ട്, ബുക്ക്മാര്‍ക്ക് സംരക്ഷിക്കാന്‍ സാധിക്കുന്നില്ല.  ബുക്ക്മാര്‍ക്കുകള്‍ ചിട്ടപ്പെടുത്തുന്ന "
 "സമയത്ത് പ്ലേബാക്കിനെ  \"പോസ്\" ഉപയോഗിച്ച് നിര്‍ത്തുന്നത് ഒരേ ഇന്‍പുട്ട് തന്നെ എന്നുറപ്പു വരുത്തുന്നതിനാണ്"
@@ -17357,8 +16973,8 @@ msgid ""
 "With this option enabled, the playback will be automatically paused when "
 "minimizing the window."
 msgstr ""
-"ഈ ഓപ്ഷന്‍ പ്രാപ്തമാക്കിയിട്ടുണ്ടെങ്കില്‍, വിന്‍ഡോ ചെറുതാകുമ്പോള്‍  പ്ലേബാക്ക് സ്വയമേതന്നെ  അല്‍"
-"പ്പനേരത്തെയ്ക്ക് നിലയ്ക്കുന്നതാണ്"
+"ഈ ഓപ്ഷന്‍ പ്രാപ്തമാക്കിയിട്ടുണ്ടെങ്കില്‍, വിന്‍ഡോ ചെറുതാകുമ്പോള്‍  പ്ലേബാക്ക് സ്വയമേതന്നെ  "
+"അല്‍പ്പനേരത്തെയ്ക്ക് നിലയ്ക്കുന്നതാണ്"
 
 #: modules/gui/macosx/macosx.m:108 modules/gui/qt/qt.cpp:182
 msgid "Allow automatic icon changes"
@@ -17426,8 +17042,8 @@ msgstr "പുറമെയുള്ള മ്യൂസിക് പ്ലെയ�
 #: modules/gui/macosx/macosx.m:129
 msgid "VLC will pause and resume supported music players on playback."
 msgstr ""
-"പ്ലേബാക്ക് ചെയ്യുന്ന സമയത്ത് പിന്താങ്ങുന്ന മറ്റ് മ്യൂസിക് പ്ലെയറുകളെ VLC  അല്‍പ്പനേരത്തേയ്ക്ക് നിര്‍"
-"ത്തുകയും പിന്നെ തുടരുകയും ചെയ്യുന്നു"
+"പ്ലേബാക്ക് ചെയ്യുന്ന സമയത്ത് പിന്താങ്ങുന്ന മറ്റ് മ്യൂസിക് പ്ലെയറുകളെ VLC  അല്‍പ്പനേരത്തേയ്ക്ക് "
+"നിര്‍ത്തുകയും പിന്നെ തുടരുകയും ചെയ്യുന്നു"
 
 #: modules/gui/macosx/macosx.m:131
 msgid "Use large text for list views"
@@ -21058,8 +20674,8 @@ msgid ""
 "You should start by checking that source matches what you want your input to "
 "be and then press the \"Next\" button to continue.\n"
 msgstr ""
-"ഈ വിസാര്‍ഡ് നിങ്ങളുടെ മീഡിയയെ പ്രാദേശികമായി നിങ്ങളുടെ സ്വകാര്യ നെറ്റ്വര്‍ക്കില്‍ അല്ലെങ്കില്‍ ഇന്റര്‍"
-"നെറ്റില്‍ സ്ട്രീം ചെയ്യുന്നതിനോ മാറ്റുന്നതിനോ നിങ്ങളെ അനുവദിക്കുന്നു.\n"
+"ഈ വിസാര്‍ഡ് നിങ്ങളുടെ മീഡിയയെ പ്രാദേശികമായി നിങ്ങളുടെ സ്വകാര്യ നെറ്റ്വര്‍ക്കില്‍ അല്ലെങ്കില്‍ "
+"ഇന്റര്‍നെറ്റില്‍ സ്ട്രീം ചെയ്യുന്നതിനോ മാറ്റുന്നതിനോ നിങ്ങളെ അനുവദിക്കുന്നു.\n"
 "ഉറവിടെ പൊരുത്തപ്പെടുന്നുണ്ടോ എന്നും നിങ്ങളുടെ ഇന്‍പുട്ട് എന്തായിരിക്കണം എന്നുള്ളതും നിങ്ങള്‍ "
 "പരിശോധിച്ചതിന് ശേഷം തുടരുന്നതിന്  \"അടുത്തത്\" എന്ന ബട്ടണ്‍ അമര്‍ത്തുക\n"
 
@@ -21859,8 +21475,8 @@ msgid ""
 "Display background cone or current album art when not playing. Can be "
 "disabled to prevent burning screen."
 msgstr ""
-"പ്ലേ ചെയ്യപ്പെടാതെയിരിക്കുമ്പോള്‍ പശ്ചാത്തല വൃത്തസ്തൂപിക അല്ലെങ്കില്‍ നിലവിലുള്ള ആല്‍ബം ആര്‍ട്ട് പ്രദര്‍"
-"ശിപ്പിക്കുക. പ്രതലം കത്തുന്നതില്‍ നിന്നും സംരക്ഷിക്കുന്നതിന് ക്രിയാത്മകമല്ലാതാക്കുക."
+"പ്ലേ ചെയ്യപ്പെടാതെയിരിക്കുമ്പോള്‍ പശ്ചാത്തല വൃത്തസ്തൂപിക അല്ലെങ്കില്‍ നിലവിലുള്ള ആല്‍ബം ആര്‍ട്ട് "
+"പ്രദര്‍ശിപ്പിക്കുക. പ്രതലം കത്തുന്നതില്‍ നിന്നും സംരക്ഷിക്കുന്നതിന് ക്രിയാത്മകമല്ലാതാക്കുക."
 
 #: modules/gui/qt/qt.cpp:168
 #, fuzzy
@@ -22551,8 +22167,8 @@ msgstr "Lua പൊതുപ്രതല രൂപരേഖ"
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 "Lua പൊതുപ്രതല രൂപരേഖാ സ്ട്രീങ്ങ്. രൂപഘടന:  '[\"<interface module name>\"] = "
 "{ <option> = <value>, ...}, ...'."
@@ -23786,8 +23402,8 @@ msgid ""
 "Defines the descriptors of each SDT. This requires \"Set PID to ID of ES\" "
 "to be enabled."
 msgstr ""
-"ഓരോ SDTയുടെയും വിവരണികല്‍ വിശദീകരിക്കുക. ഇതിന് ക്രിയാത്മകമാകുവാന്‍ \"Set PID to ID of ES"
-"\" ആവശ്യമാണ്."
+"ഓരോ SDTയുടെയും വിവരണികല്‍ വിശദീകരിക്കുക. ഇതിന് ക്രിയാത്മകമാകുവാന്‍ \"Set PID to ID of "
+"ES\" ആവശ്യമാണ്."
 
 #: modules/mux/mpeg/ts.c:128
 msgid "Set PID to ID of ES"
@@ -23842,9 +23458,9 @@ msgid ""
 msgstr ""
 "ഒരുപക്ഷെ പ്രവര്‍ത്തനക്ഷമവും, കൂടാതെ രൂപമാറ്റം ആവശ്യമാണെങ്കില്‍, TS മക്സര്‍ I ചിത്രങ്ങളുടെ "
 "അവസാനമുള്ള അതിര്‍ത്തികളില്‍ സ്ഥാപിക്കുന്നു. അക്കാര്യത്തില്‍ എപ്പോഴാണോ പരാമര്‍ശ ഫ്രെയിം ഒന്നുംതന്നെ "
-"ലഭ്യമല്ലാത്തത് ഉപഭോക്താവിനാല്‍ നല്‍കപ്പെട്ട രൂപമാറ്റ കാലാവധി  വെറുതെയാകുന്നു. ഇത് ഷേപ്പിങ്ങ് അല്‍"
-"ഗോരിതത്തിന്റെ കാര്യക്ഷമത വര്‍ദ്ധിപ്പിക്കുന്നു, സ്ട്രീമിലെ വലിയ ഫ്രെയിമുകളായി സാധാരണരീതിയില്‍ I "
-"ഫ്രെയിമുകള്‍ മാറുന്നതുവരെ."
+"ലഭ്യമല്ലാത്തത് ഉപഭോക്താവിനാല്‍ നല്‍കപ്പെട്ട രൂപമാറ്റ കാലാവധി  വെറുതെയാകുന്നു. ഇത് ഷേപ്പിങ്ങ് "
+"അല്‍ഗോരിതത്തിന്റെ കാര്യക്ഷമത വര്‍ദ്ധിപ്പിക്കുന്നു, സ്ട്രീമിലെ വലിയ ഫ്രെയിമുകളായി സാധാരണരീതിയില്‍ "
+"I ഫ്രെയിമുകള്‍ മാറുന്നതുവരെ."
 
 #: modules/mux/mpeg/ts.c:151
 msgid "PCR interval (ms)"
@@ -23917,8 +23533,8 @@ msgid ""
 "Size of the TS packet to encrypt. The encryption routines subtract the TS-"
 "header from the value before encrypting."
 msgstr ""
-"ഗൂഢഭാഷയിലാക്കുന്നതിനുള്ള TS പാക്കറ്റിന്റെ വലിപ്പം. ഗൂഢഭാഷയിലാക്കുന്നതിന് മുന്‍പ് ഗൂഢഭാഷയാക്കല്‍ കര്‍"
-"മ്മങ്ങളും TS-ശീര്‍ഷകത്തെ മൂല്യത്തില്‍ നിന്ന് കുറയ്ക്കുന്നു."
+"ഗൂഢഭാഷയിലാക്കുന്നതിനുള്ള TS പാക്കറ്റിന്റെ വലിപ്പം. ഗൂഢഭാഷയിലാക്കുന്നതിന് മുന്‍പ് ഗൂഢഭാഷയാക്കല്‍ "
+"കര്‍മ്മങ്ങളും TS-ശീര്‍ഷകത്തെ മൂല്യത്തില്‍ നിന്ന് കുറയ്ക്കുന്നു."
 
 #: modules/mux/mpeg/ts.c:200
 msgid "TS muxer (libdvbpsi)"
@@ -24003,10 +23619,6 @@ msgstr "എവിപാര്‍സര്‍ പാക്കറ്റൈസര�
 #: modules/packetizer/copy.c:48
 msgid "Copy packetizer"
 msgstr "പാക്കറ്റൈസര്‍ പകര്‍ത്തുക"
-
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "ഡിറക് പാക്കറ്റൈസര്‍"
 
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
@@ -24830,8 +24442,8 @@ msgstr "വിഎന്‍സി പോളിംഗ്"
 #: modules/spu/remoteosd.c:89
 msgid "Activate VNC polling. Do NOT activate for use as VDR ffnetdev client."
 msgstr ""
-"VNC പോളിങ്ങ് പ്രവര്‍ത്തനസജ്ജമാക്കുന്നു.  VDR ffnetdev ഉപഭോക്താവായി ഉപയോഗിക്കുന്നതിന് പ്രവര്‍"
-"ത്തനസജ്ജമാക്കരുത്."
+"VNC പോളിങ്ങ് പ്രവര്‍ത്തനസജ്ജമാക്കുന്നു.  VDR ffnetdev ഉപഭോക്താവായി ഉപയോഗിക്കുന്നതിന് "
+"പ്രവര്‍ത്തനസജ്ജമാക്കരുത്."
 
 #: modules/spu/remoteosd.c:93
 msgid ""
@@ -25029,8 +24641,8 @@ msgid ""
 "predecessor has disappeared (subtitle delay will be extended to meet this "
 "requirement)."
 msgstr ""
-"ഉപശീര്‍ഷകം അതിന്റെ മുന്‍ഗാമി അപ്രത്യക്ഷമായതിന് ശേഷം നിലനില്‍ക്കുന്ന ചുരുങ്ങിയ സമയം (മില്ലിസെക്കന്‍"
-"ഡില്‍) (ഉപശീര്‍ഷക കാലതാമസം ഈ ആവശ്യവുമായി പൊരുത്തപ്പെടുന്നതിന് വേണ്ടി നീട്ടുക)."
+"ഉപശീര്‍ഷകം അതിന്റെ മുന്‍ഗാമി അപ്രത്യക്ഷമായതിന് ശേഷം നിലനില്‍ക്കുന്ന ചുരുങ്ങിയ സമയം "
+"(മില്ലിസെക്കന്‍ഡില്‍) (ഉപശീര്‍ഷക കാലതാമസം ഈ ആവശ്യവുമായി പൊരുത്തപ്പെടുന്നതിന് വേണ്ടി നീട്ടുക)."
 
 #: modules/spu/subsdelay.c:69
 msgid "Interval between disappearance and appearance"
@@ -25656,8 +25268,8 @@ msgid ""
 "(Session Descriptor)."
 msgstr ""
 "സ്ട്രീമിനെ കുറിച്ചുള്ള വിവരങ്ങള്‍ ഒരു URLന് ഒപ്പം നല്‍കാന്‍ ഇത് നിങ്ങളെ അനുവദിക്കുന്നു (പലപ്പോഴും "
-"സ്ട്രീമിങ്ങ് ഓര്‍ഗനൈസേഷന്റെ വെബ്സൈറ്റ്),  അത് SDPയില്‍ പ്രഖ്യാപിക്കപ്പെടുന്നതായിരിക്കും (സെഷന്‍ നിര്‍"
-"ദ്ദേശിനി)."
+"സ്ട്രീമിങ്ങ് ഓര്‍ഗനൈസേഷന്റെ വെബ്സൈറ്റ്),  അത് SDPയില്‍ പ്രഖ്യാപിക്കപ്പെടുന്നതായിരിക്കും (സെഷന്‍ "
+"നിര്‍ദ്ദേശിനി)."
 
 #: modules/stream_out/rtp.c:109 modules/stream_out/standard.c:72
 msgid "Session email"
@@ -25929,8 +25541,8 @@ msgid ""
 "address:port to bind vlc to listening incoming streams. Helper setting for "
 "dst, dst=bind+'/'+path. dst-parameter overrides this."
 msgstr ""
-"വിലാസത്തെ ബൈന്‍ഡ് vlcലോട്ട് പോര്‍ട്ട് ചെയ്യുന്നതിലൂടെ dst യ്ക്ക് വേണ്ടിയുള്ള സഹായ ക്രമീകരണം ഇന്‍"
-"കമിങ്ങ് സ്ട്രീം വഴി ശ്രദ്ധിക്കാം, dst=bind+'/'+path. dst-പരാമീറ്റര്‍ ഇതിനെ മറികടക്കുന്നു."
+"വിലാസത്തെ ബൈന്‍ഡ് vlcലോട്ട് പോര്‍ട്ട് ചെയ്യുന്നതിലൂടെ dst യ്ക്ക് വേണ്ടിയുള്ള സഹായ ക്രമീകരണം "
+"ഇന്‍കമിങ്ങ് സ്ട്രീം വഴി ശ്രദ്ധിക്കാം, dst=bind+'/'+path. dst-പരാമീറ്റര്‍ ഇതിനെ മറികടക്കുന്നു."
 
 #: modules/stream_out/standard.c:55
 #, fuzzy
@@ -26726,8 +26338,8 @@ msgid ""
 "Set the canvas' picture aspect ratio. If omitted, the canvas is assumed to "
 "have the same SAR as the input."
 msgstr ""
-"ക്യാന്‍വാസ് ചിത്ര വീക്ഷണ അനുപാതം ക്രമീകരിക്കുക. വിട്ടുകളയുകയാണെങ്കില്‍, ക്യാന്‍വാസ് അതേ SAR നെ ഇന്‍"
-"പുട്ടായി ഏറ്റെടുക്കുന്നു."
+"ക്യാന്‍വാസ് ചിത്ര വീക്ഷണ അനുപാതം ക്രമീകരിക്കുക. വിട്ടുകളയുകയാണെങ്കില്‍, ക്യാന്‍വാസ് അതേ SAR നെ "
+"ഇന്‍പുട്ടായി ഏറ്റെടുക്കുന്നു."
 
 #: modules/video_filter/canvas.c:93
 msgid "Pad video"
@@ -26738,8 +26350,8 @@ msgid ""
 "If enabled, video will be padded to fit in canvas after scaling. Otherwise, "
 "video will be cropped to fix in canvas after scaling."
 msgstr ""
-"പ്രാപ്തമാക്കുകയാണെങ്കില്‍, മാപനത്തിന് ശേഷം വീഡിയോ ക്യാന്‍വാസില്‍ അനുരൂപമാക്കുന്നതിന് ചേര്‍"
-"ക്കപ്പെടുന്നു. അല്ലാത്തപക്ഷം, മാപനത്തിന് ശേഷം വീഡിയോ ക്യാന്‍വാസിന് അനുരൂപമാക്കുന്നതിന് "
+"പ്രാപ്തമാക്കുകയാണെങ്കില്‍, മാപനത്തിന് ശേഷം വീഡിയോ ക്യാന്‍വാസില്‍ അനുരൂപമാക്കുന്നതിന് "
+"ചേര്‍ക്കപ്പെടുന്നു. അല്ലാത്തപക്ഷം, മാപനത്തിന് ശേഷം വീഡിയോ ക്യാന്‍വാസിന് അനുരൂപമാക്കുന്നതിന് "
 "മുറിയ്ക്കപ്പെടുന്നു."
 
 #: modules/video_filter/canvas.c:97
@@ -26775,8 +26387,8 @@ msgid ""
 "green, then blue. #000000 = black, #FF0000 = red, #00FF00 = green, #FFFF00 = "
 "yellow (red + green), #FFFFFF = white"
 msgstr ""
-"ഇതിന് അനുരൂപമായ നിറങ്ങള്‍ നിലനിര്‍ത്തപ്പെടുന്നു, മറ്റുള്ളവ ഗ്രേസ്കെയില്‍ ചെയ്യപ്പെടുന്നു. ഇത് തീര്‍"
-"ച്ചയായും ഒരു ഹെക്സാഡെസിമല്‍ (HTML നിറങ്ങളെ പോലെ) ആയിരിക്കും. ആദ്യത്തെ രണ്ട് അക്കങ്ങള്‍ "
+"ഇതിന് അനുരൂപമായ നിറങ്ങള്‍ നിലനിര്‍ത്തപ്പെടുന്നു, മറ്റുള്ളവ ഗ്രേസ്കെയില്‍ ചെയ്യപ്പെടുന്നു. ഇത് "
+"തീര്‍ച്ചയായും ഒരു ഹെക്സാഡെസിമല്‍ (HTML നിറങ്ങളെ പോലെ) ആയിരിക്കും. ആദ്യത്തെ രണ്ട് അക്കങ്ങള്‍ "
 "ചുവപ്പിന്, അതിന് ശേഷം പച്ച, പിന്നെ നീല.  #000000 = കറുപ്പ്, #FF0000 = ചുവപ്പ്, #00FF00 = "
 "പച്ച, #FFFF00 = മഞ്ഞ (ചുവപ്പ് + പച്ച), #FFFFFF = വെളുപ്പ്"
 
@@ -27782,8 +27394,8 @@ msgstr "ഡെക്ക്ലിങ്ക് ഔട്ട്പുട്ടി�
 msgid ""
 "Audio sampling rate (in hertz) for DeckLink output. 0 disables audio output."
 msgstr ""
-"ഡെക്ക് ലിങ്ക് ഔട്ട്പുട്ടിനുള്ള ഓഡിയോ സാമ്പിളിങ്ങ് നിരക്ക് (ഹെര്‍ട്ട്സില്‍). ൦ ഓഡിയോ ഔട്ട്പുട്ടിനെ പ്രവര്‍"
-"ത്തനരഹിതമാക്കുന്നു."
+"ഡെക്ക് ലിങ്ക് ഔട്ട്പുട്ടിനുള്ള ഓഡിയോ സാമ്പിളിങ്ങ് നിരക്ക് (ഹെര്‍ട്ട്സില്‍). ൦ ഓഡിയോ ഔട്ട്പുട്ടിനെ "
+"പ്രവര്‍ത്തനരഹിതമാക്കുന്നു."
 
 #: modules/video_output/decklink.cpp:107
 msgid ""
@@ -27843,8 +27455,8 @@ msgid ""
 "Video will be embedded in this pre-existing window. If zero, a new window "
 "will be created."
 msgstr ""
-"ഈ പൂര്‍വ്വസ്ഥിതിയിലാകുന്ന വിന്‍ഡോയില് വീഡിയോ എംബഡഡ് ചെയ്യപ്പെടുന്നു. പൂജ്യമാണെങ്കില്‍, ഒരു പുതിയ വിന്‍"
-"ഡോ സൃഷ്ടിക്കപ്പെടുന്നു."
+"ഈ പൂര്‍വ്വസ്ഥിതിയിലാകുന്ന വിന്‍ഡോയില് വീഡിയോ എംബഡഡ് ചെയ്യപ്പെടുന്നു. പൂജ്യമാണെങ്കില്‍, ഒരു പുതിയ "
+"വിന്‍ഡോ സൃഷ്ടിക്കപ്പെടുന്നു."
 
 #: modules/video_output/drawable.c:46 modules/video_output/xcb/window.c:728
 msgid "Drawable"
@@ -27871,8 +27483,8 @@ msgid ""
 "Run framebuffer on current TTY device (default enabled). (disable tty "
 "handling with caution)"
 msgstr ""
-"നിലവിലെ TTY ഉപകരണത്തില്‍ ഫ്രെയിംബഫര്‍ ഓടിക്കുക (സ്വമേധയാലുള്ളത് പ്രവര്‍"
-"ത്തനസജ്ജമാക്കിയിരിക്കുന്നു). (tty ഹാന്‍ഡിലിങ്ങ് കരുതലോടെ പ്രവര്‍ത്തനരഹിതമാക്കുക)"
+"നിലവിലെ TTY ഉപകരണത്തില്‍ ഫ്രെയിംബഫര്‍ ഓടിക്കുക (സ്വമേധയാലുള്ളത് "
+"പ്രവര്‍ത്തനസജ്ജമാക്കിയിരിക്കുന്നു). (tty ഹാന്‍ഡിലിങ്ങ് കരുതലോടെ പ്രവര്‍ത്തനരഹിതമാക്കുക)"
 
 #: modules/video_output/fb.c:65
 msgid "Framebuffer resolution to use"
@@ -27927,8 +27539,8 @@ msgid ""
 "Enable this option if the diagonal stripes are displayed when the window "
 "size is equal to or smaller than the movie size."
 msgstr ""
-"ചലച്ചിത്രത്തിന്റെ വലിപ്പം വിന്‍ഡോ വലിപ്പത്തിന് സമാനമോ ചെറുതോ ആണെങ്കിലോ ഡയഗണല്‍ സ്ട്രൈപ്സ് പ്രദര്‍"
-"ശിപ്പിക്കപ്പെട്ടിരിക്കുകയോ ചെയ്യുന്നെങ്കില്‍ ഈ ഐഛികം പ്രവര്‍ത്തനസജ്ജമാക്കുക."
+"ചലച്ചിത്രത്തിന്റെ വലിപ്പം വിന്‍ഡോ വലിപ്പത്തിന് സമാനമോ ചെറുതോ ആണെങ്കിലോ ഡയഗണല്‍ സ്ട്രൈപ്സ് "
+"പ്രദര്‍ശിപ്പിക്കപ്പെട്ടിരിക്കുകയോ ചെയ്യുന്നെങ്കില്‍ ഈ ഐഛികം പ്രവര്‍ത്തനസജ്ജമാക്കുക."
 
 #: modules/video_output/kva.c:55 modules/gui/qt/ui/sprefs_video.h:323
 msgid "Video mode"
@@ -28783,8 +28395,8 @@ msgid ""
 "Current effects include: dummy, scope, spectrum, spectrometer and vuMeter."
 msgstr ""
 "കോമകളാല്‍ വേര്‍തിരിക്കപ്പെട്ട ദൃശ്യ പ്രതീതിയുടെ  ഒരു പട്ടിക.\n"
-"\\vനിലവിലെ പ്രതീതി ഡമ്മി, സ്കോപ്പ്, സ്പെക്ട്രം, സ്പെക്ട്രോമീറ്റര്‍ കൂടാതെ vuMeter എന്നിവ ഉള്‍"
-"ക്കൊള്ളുന്നു."
+"\\vനിലവിലെ പ്രതീതി ഡമ്മി, സ്കോപ്പ്, സ്പെക്ട്രം, സ്പെക്ട്രോമീറ്റര്‍ കൂടാതെ vuMeter എന്നിവ "
+"ഉള്‍ക്കൊള്ളുന്നു."
 
 #: modules/visualization/visual/visual.c:55
 msgid "The width of the effects video window, in pixels."
@@ -28812,8 +28424,8 @@ msgid ""
 "The parameter alpha for the Kaiser window. Increasing alpha increases the "
 "main-lobe width and decreases the side-lobe amplitude."
 msgstr ""
-"കൈസര്‍ വിന്‍ഡോയ്ക്ക് വേണ്ടിയുള്ള പരാമീറ്റര്‍ ആല്‍ഫ. വര്‍ദ്ധിപ്പിക്കുന്ന ആല്‍ഫ പ്രധാന-ലോബ് വീതി വര്‍"
-"ദ്ധിപ്പിക്കുകയും പാര്‍ശ്വ-ലോബ് ആംമ്പ്ലീറ്റ്യൂട് കുറയ്ക്കുകയും ചെയ്യുന്നു."
+"കൈസര്‍ വിന്‍ഡോയ്ക്ക് വേണ്ടിയുള്ള പരാമീറ്റര്‍ ആല്‍ഫ. വര്‍ദ്ധിപ്പിക്കുന്ന ആല്‍ഫ പ്രധാന-ലോബ് വീതി "
+"വര്‍ദ്ധിപ്പിക്കുകയും പാര്‍ശ്വ-ലോബ് ആംമ്പ്ലീറ്റ്യൂട് കുറയ്ക്കുകയും ചെയ്യുന്നു."
 
 #: modules/visualization/visual/visual.c:70
 msgid "Show 80 bands instead of 20"
@@ -29110,8 +28722,8 @@ msgid ""
 "Once the stream is created, the <i>Media Viewer</i> window will display the "
 "stream."
 msgstr ""
-"ഒരുപ്രവാശ്യം സ്ട്രീം സൃഷ്ടിക്കപ്പെട്ടാല്‍, <i>മീഡിയാ വ്യൂവര്‍</i> വിന്‍ഡോ സ്ട്രീമിനെ പ്രദര്‍"
-"ശിപ്പിക്കുന്നു."
+"ഒരുപ്രവാശ്യം സ്ട്രീം സൃഷ്ടിക്കപ്പെട്ടാല്‍, <i>മീഡിയാ വ്യൂവര്‍</i> വിന്‍ഡോ സ്ട്രീമിനെ "
+"പ്രദര്‍ശിപ്പിക്കുന്നു."
 
 #: share/lua/http/index.html:269
 msgid ""
@@ -30008,6 +29620,307 @@ msgstr "AAAA; "
 msgid "Media Manager List"
 msgstr "മീഡിയ മാനേജര്‍ ലിസ്റ്റ്"
 
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4"
+
+#~ msgid "Rate control method"
+#~ msgstr "റേറ്റ് കണ്ട്രോള്‍ രീതി"
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr "വീഡിയോ ക്രമം എന്‍കോഡ് ചെയ്യാന്‍ ഉപയോഗിയ്ക്കുന്ന വഴി"
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "സ്ഥിര നോയിസ് പരിധി രീതി"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "സ്ഥിര ബിറ്റ്തോത് രീതി (സി‌ബി‌ആര്‍)"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "ലോ ഡിലേ മോഡ്"
+
+#~ msgid "Lossless mode"
+#~ msgstr "ലോസ്ലെസ് രീതി"
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "കോണ്‍സ്റ്റന്റ് ലാംബഡ മോഡ്"
+
+#~ msgid "Constant error mode"
+#~ msgstr "കോണ്‍സ്റ്റെന്റ് പിശക് രീതി"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "സ്ഥിരമായ ഗുണമേന്മ രീതി"
+
+#~ msgid "GOP structure"
+#~ msgstr "ജിഒപി ഘടന"
+
+#~ msgid "GOP structure used to encode the video sequence"
+#~ msgstr "വീഡിയോ ക്രമം എന്‍കോഡ് ചെയ്യാന്‍ ഉപയോഗിക്കുന്ന ജി‌ഓ‌പി ഘടന"
+
+#~ msgid ""
+#~ "No fixed gop structure. A picture can be intra or inter and refer to "
+#~ "previous or future pictures."
+#~ msgstr ""
+#~ "സ്ഥിര ജി‌ഓ‌പി ഘടന ഇല്ല . ഒരു ദൃശ്യരൂപം ഉള്ളില്‍/അന്യോന്യം കൂടാതെ മുമ്പിലത്തെ അല്ലെങ്കില്‍ "
+#~ "വരാനിരിക്കുന്ന ദൃഷ്യരൂപത്തോട് സംബന്ധിച്ച."
+
+#~ msgid "I-frame only sequence"
+#~ msgstr "ഐ-ഫ്രെയിം മാത്രം സീക്വന്‍സ്"
+
+#~ msgid "Inter pictures refere to previous pictures only"
+#~ msgstr "തമ്മിലുള്ള ദൃഷ്യരൂപങ്ങള്‍ മുമ്പിലത്തെ ദൃസ്യരൂപങ്ങളോടെ സംബന്ധിക്കപ്പെട്ടത്"
+
+#~ msgid "Inter pictures can refer to previous or future pictures"
+#~ msgstr ""
+#~ "തമ്മിലുള്ള ദൃഷ്യരൂപങ്ങള്‍ മുമ്പിലത്തെ അല്ലെങ്കില്‍ വരാനിരിക്കുന്ന ദൃസ്യരൂപങ്ങളോടെ സംബന്ധിക്കപ്പെട്ടത്"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "സ്ഥിരമായ ഗുണമേന്മ ഘടകം"
+
+#~ msgid "Quality factor to use in constant quality mode"
+#~ msgstr "സ്ഥിര ഗുണ രീതിയില്‍ ഉപയോഗികേണ്ട ഗുണ അംശം"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "നോയിസ് ത്രെഷ്ഹോള്‍ഡ്"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr "നോയിസ് പരിധി രീതിയില്‍ ഉപയോഗികേണ്ട നോയിസ് പരിധി"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "സിബിആര്‍ ബിറ്റ്റേറ്റ്(കെബിപിഎസ്)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "സ്ഥിരമായ ബിറ്റ്റേറ്റ് രീതിയില്‍  എന്‍കോഡ് ചെയ്യുമ്പോള്‍ കെബിപിഎസ്സിലുള്ള ടാര്‍ജറ്റ് ബിറ്റ്റേറ്റ് "
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "കൂടിയ ബിറ്റ്റേറ്റ്(കെബിപിഎസ്)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "സ്ഥിരമായ ബിറ്റ്റേറ്റ് രീതിയില്‍  എന്‍കോഡ് ചെയ്യുമ്പോള്‍ കെബിപിഎസ്സിലുള്ള പരമാവധി ബിറ്റ്റേറ്റ് "
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "കുറഞ്ഞ ബിറ്റ്റേറ്റ്(കെബിപിഎസ്)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "സ്ഥിരമായ ബിറ്റ്റേറ്റ് രീതിയില്‍  എന്‍കോഡ് ചെയ്യുമ്പോള്‍ കെബിപിഎസ്സിലുള്ള കുറഞ്ഞ ബിറ്റ്റേറ്റ് "
+
+#~ msgid "GOP length"
+#~ msgstr "ജിഒപി ദൈര്‍ഘ്യം"
+
+#~ msgid ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+#~ msgstr ""
+#~ "തുടര്‍ച്ചയായുള്ള സീക്വന്‍സ് ഹെഡറുകള്‍ക്കിടയിലുള്ള ചിത്രങ്ങളുടെ എണ്ണം, അതായത് ചിത്രങ്ങളുടെ "
+#~ "ഗ്രൂപ്പിന്റെ നീളം"
+
+#~ msgid "Prefilter"
+#~ msgstr "പ്രീഫില്‍റ്റര്‍"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "അടാപ്റ്റീവ് പ്രീഫീല്‍റ്റേറിങ് പ്രവര്‍ത്തനക്ഷമമാകുക"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "പ്രീ-ഫില്‍റ്ററിംഗ് ഇല്ല"
+
+#~ msgid "Centre Weighted Median"
+#~ msgstr "സെന്റര്‍ വെയിറ്റഡ് മീഡിയന്‍"
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "ഗൗസിയന്‍ ലോ പാസ് ഫില്‍റ്റര്‍"
+
+#~ msgid "Add Noise"
+#~ msgstr "നോയിസ് ചേര്‍ക്കുക"
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "ഗോസ്സിയന്‍ അടാപ്ടീവ് ലോ പാസ് ഫില്‍ട്ടര്‍"
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "ലോ പാസ് ഫില്‍റ്റര്‍"
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "പ്രീഫില്‍റ്ററിംഗ് തുക"
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "വലിയ മൂല്യങ്ങള്‍ എന്നുവെച്ചാല്‍ കൂടുതല്‍ പ്രീഫീല്‍റ്ററിങ്"
+
+#~ msgid "Picture coding mode"
+#~ msgstr "പിക്ച്ചര്‍ കോഡിംഗ് മോഡ്"
+
+#~ msgid ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+#~ msgstr ""
+#~ "സ്യൂഡോ-പ്രോഗ്രസ്സീവ് ഫ്രെയിമിന് എതിരായി ഇന്റര്‍ലേസ്ഡ്  ഫീല്‍ഡുകള്‍ പ്രത്യേകമായി കോഡ് ചെയ്യുന്നതാണ് "
+#~ "ഫീല്‍ഡ് കോഡിംഗ്."
+
+#~ msgid "auto - let encoder decide based upon input (Best)"
+#~ msgstr "സ്വയം - ഇന്‍പുട്ട് അനുസരിച്ചു എന്‍കോഡര്‍ തീരുമാനിച്ചുകൊള്ളട്ടെ (നല്ലത്)"
+
+#~ msgid "force coding frame as single picture"
+#~ msgstr "കോഡിങ് ഫ്രെയിമിനെ ഒരു ദൃശ്യപടമായി നിര്‍ബന്ധപൂര്‍വം മാറ്റുന്നു"
+
+#~ msgid "force coding frame as separate interlaced fields"
+#~ msgstr "കോഡിങ് ഫ്രെയിമിനെ വേര്‍തിരിച്ച ഇടപിരിഞ്ഞ തലത്തെ നിര്‍ബന്ധപൂര്‍വം മാറ്റുന്നു"
+
+#~ msgid "Size of motion compensation blocks"
+#~ msgstr "ചലന പ്രതിഫല ബ്ലോക്കുകളുടെ വലിപ്പം"
+
+#~ msgid "automatic - let encoder decide based upon input (Best)"
+#~ msgstr "സ്വയം - ഇന്‍പുട്ട് അനുസരിച്ചു എന്‍കോഡര്‍ തീരുമാനിച്ചുകൊള്ളട്ടെ (നല്ലത്)"
+
+#~ msgid "small - use small motion compensation blocks"
+#~ msgstr "ചെറുത് - ചെറിയ ചലന പ്രതിഫല ബ്ലോക്കുകള്‍ ഉപയോഗിക്കുക"
+
+#~ msgid "medium - use medium motion compensation blocks"
+#~ msgstr "ഇടത്തരം - ഇടത്തര ചലന പ്രതിഫല ബ്ലോക്കുകള്‍ ഉപയോഗിക്കുക"
+
+#~ msgid "large - use large motion compensation blocks"
+#~ msgstr "വലുത് - വലിയ ചലന പ്രതിഫല ബ്ലോക്കുകള്‍ ഉപയോഗിക്കുക"
+
+#~ msgid "Overlap of motion compensation blocks"
+#~ msgstr "മേല്‍ക്കുമേലുള്ള ചലന പ്രതിഫല ബ്ലോക്കുകള്‍"
+
+#~ msgid "none - Motion compensation blocks do not overlap"
+#~ msgstr "ഒന്നുമില്ല - ചലന പ്രതിഫല ബ്ലോക്കുകള്‍ മേല്‍ക്കുമേലല്ല"
+
+#~ msgid "partial - Motion compensation blocks only partially overlap"
+#~ msgstr "ഭാഗികം - ചലന പ്രതിഫല ബ്ലോക്കുകള്‍ ഭാഗികമായി മേല്‍ക്കുമേല്‍"
+
+#~ msgid "full - Motion compensation blocks fully overlap"
+#~ msgstr "മുഴുവന്‍ - ചലന പ്രതിഫല ബ്ലോക്കുകള്‍ മുഴുവനും മേല്‍ക്കുമേല്‍"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "മോഷന്‍ വെക്ടര്‍ പ്രിസിഷന്‍"
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "പെല്‍സിലുള്ള ചലന വെക്റ്ററിന്റെ കൃത്യത"
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "മൂന്നു ഭാഗ ചലന മൂല്യനിര്‍ണ്ണയം"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "ചലന മൂല്യനിര്‍ണയ നടപടിക്രമത്തിന്റെ ഭാഗമായി ക്രോമ ഉപയോഗിക്കുക"
+
+#~ msgid "Intra picture DWT filter"
+#~ msgstr "ഇന്‍ട്രാ പിക്ച്ചര്‍ ഡിഡബ്ല്യുടി ഫില്‍റ്റര്‍"
+
+#~ msgid "Inter picture DWT filter"
+#~ msgstr "ഇന്റര്‍ പിക്ച്ചര്‍ ഡിബ്ല്യുടി ഫില്‍റ്റര്‍"
+
+#~ msgid "Number of DWT iterations"
+#~ msgstr "ഡി‌ഡബ്ല്യു‌ടി ആവര്‍ത്തനത്തിന്റെ എണ്ണം"
+
+#~ msgid "Also known as DWT levels"
+#~ msgstr "ഡി‌ഡബ്ല്യു‌ടി നിരകളായും അറിയപ്പെടുന്നു"
+
+#~ msgid "Enable multiple quantizers"
+#~ msgstr "മള്‍ട്ടിപ്പിള്‍ ക്വാണ്ടൈസേഴ്സ് സാധ്യമാക്കകു"
+
+#~ msgid "Enable multiple quantizers per subband (one per codeblock)"
+#~ msgstr "ഓരോ സബ് ബാന്‍ഡിലും ഒന്നിലധികം ക്വാന്‍ടൈസേര്‍സ് പ്രാപ്തമാക്കുക"
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr "അരിതമെറ്റിക് കോഡിംഗ് അസാധ്യമാക്കുക"
+
+#~ msgid "Use variable length codes instead, useful for very high bitrates"
+#~ msgstr ""
+#~ "പകരംവ്യത്യസ്തനീളമുള്ള കോഡുകള്‍ ഉപയോഗിക്കുക, വളരെ കൂടിയ ബിറ്റ്റേറ്റിന് ഉപയോഗപ്രദമാകുന്ന "
+#~ "വിധത്തില്‍"
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "വ്യക്തമായ തൂക്കുന്ന വഴി"
+
+#~ msgid "perceptual distance"
+#~ msgstr "പെര്‍സെപ്ച്വല്‍ ദൂരം"
+
+#~ msgid "perceptual distance to calculate perceptual weight"
+#~ msgstr "വ്യക്തമായ തൂക്കം കണക്കാക്കാനുള്ള വ്യക്തമായ ദൂരം"
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "ഒരു ഫ്രെയിമിലുള്ള തിരശ്ചീനമായ തുണ്ടുകള്‍"
+
+#~ msgid "Number of horizontal slices per frame in low delay mode"
+#~ msgstr "കുറഞ്ഞ താമസ രീതിയില്‍ ഒരു ഫ്രെയിമിലുള്ള തിരശ്ചീനമായ തുണ്ടുകള്‍"
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "ഒരു ഫ്രെയിമിലുള്ള ലംഭമായ തുണ്ടുകള്‍"
+
+#~ msgid "Number of vertical slices per frame in low delay mode"
+#~ msgstr "കുറഞ്ഞ താമസ രീതിയില്‍ ഒരു ഫ്രെയിമിലുള്ള ലംഭമായ തുണ്ടുകള്‍"
+
+#~ msgid "Size of code blocks in each subband"
+#~ msgstr "ഓരോ സബ്ബാന്‍റിലുമുള്ള കോഡ് ബ്ലോക്കുകളുടെ വലിപ്പം"
+
+#~ msgid "small - use small code blocks"
+#~ msgstr "ചെറുത് -  ചെറിയ കോഡ് ബ്ലോക്കുകള്‍ ഉപയോഗിക്കുക"
+
+#~ msgid "medium - use medium sized code blocks"
+#~ msgstr "ഇടത്തരം -  ഇടത്തര കോഡ് ബ്ലോക്കുകള്‍ ഉപയോഗിക്കുക"
+
+#~ msgid "large - use large code blocks"
+#~ msgstr "വലുത് -  വലിയ കോഡ് ബ്ലോക്കുകള്‍ ഉപയോഗിക്കുക"
+
+#~ msgid "full - One code block per subband"
+#~ msgstr "മുഴുവന്‍ - ഒരു സബ്ബാന്‍റില്‍ ഒരു കോഡ് ബ്ലോക്"
+
+#~ msgid "Enable hierarchical Motion Estimation"
+#~ msgstr "ക്രമമനുസരിച്ചുള്ള ചലന മൂല്യനിര്‍ണ്ണയം പ്രവര്‍ത്തനക്ഷമമാക്കുക"
+
+#~ msgid "Number of levels of downsampling"
+#~ msgstr "ഡൌണ്‍സംബ്ലിങ്ങുകളുടെ നിരകളുടെ എണ്ണം"
+
+#~ msgid ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+#~ msgstr "ക്രമമനുസരിച്ചുള്ള ചലന മൂല്യനിര്‍ണ്ണയത്തില്‍ ഡൌണ്‍സംബ്ലിങ്ങുകളുടെ നിരകളുടെ എണ്ണം"
+
+#~ msgid "Enable Global Motion Estimation"
+#~ msgstr "ആഗോള ചലന മൂല്യനിര്‍ണ്ണയം പ്രവര്‍ത്തനക്ഷമമാക്കുക"
+
+#~ msgid "Enable Phase Correlation Estimation"
+#~ msgstr "ഫേസ് പരസ്പരബന്ധം മൂല്യനിര്‍ണ്ണയം പ്രവര്‍ത്തനക്ഷമമാക്കുക"
+
+#~ msgid "Enable Scene Change Detection"
+#~ msgstr "ദൃശ്യ മാറ്റം കണ്ടുപിടിക്കല്‍ പ്രവര്‍ത്തനക്ഷമമാക്കുക"
+
+#~ msgid "Force Profile"
+#~ msgstr "പ്രൊഫൈല്‍ ഫോഴ്സ് ചെയ്യുക"
+
+#~ msgid "VC2 Low Delay Profile"
+#~ msgstr "വിസി2 ലോ ഡിലേ പ്രൊഫൈല്‍"
+
+#~ msgid "VC2 Simple Profile"
+#~ msgstr "വിസി2 സാധാരണ പ്രൊഫൈല്‍"
+
+#~ msgid "VC2 Main Profile"
+#~ msgstr "വിസി2 പ്രധാന പ്രൊഫൈല്‍"
+
+#~ msgid "Main Profile"
+#~ msgstr "പ്രധാന പ്രൊഫൈല്‍"
+
+#~ msgid "Dirac video decoder using libschroedinger"
+#~ msgstr "ലിബ്ശ്ച്രൊഡിങര് ഉപയോഗിച്ചുള്ള ഡിറാക് വീഡിയോ ഡികോഡര്‍"
+
+#~ msgid "Dirac video encoder using libschroedinger"
+#~ msgstr "ലിബ്ശ്ച്രൊഡിങര് ഉപയോഗിച്ചുള്ള ഡിറാക് വീഡിയോ എന്‍കോഡര്‍"
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "ഡി‌ടി‌എസ് മൂല്യം ക്രമീകരിക്കുക ഇത്രയാല്‍"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "ഡിറാക് വീഡിയോ ഡീമക്സര്‍"
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "ഡിറക് പാക്കറ്റൈസര്‍"
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr "സോഫ്റ്റ്വെയര്‍ സങ്കലനത്തിന് വേണ്ടി ഒരു ബലിഷ്ടമായ ഫോണ്ടുകളുടെ ഫയല്‍ അനിവാര്യമാണ്."
@@ -30107,11 +30020,11 @@ msgstr "മീഡിയ മാനേജര്‍ ലിസ്റ്റ്"
 #~ msgstr ""
 #~ "വി‌എല്‍‌സിയുടെ ഒരു പ്രവര്‍ത്തിക്കുന്ന മാതൃക മാത്രം അനുവദിക്കുന്നത് ചില സമയത്ത് ഉപയോഗപ്രദമാകാം, "
 #~ "ഉദാഹരണത്തിന് ചില മീഡിയ ഇനങ്ങളുമായി നിങ്ങള്‍ വി‌എല്‍‌സിയെ ബന്ധപ്പെടുത്തുമ്പോള്‍ കൂടാതെ നിങ്ങളുടെ "
-#~ "ഫയല്‍ മാനേജെറില്‍ ഓരോ തവണയും നിങ്ങള്‍ ഒരു ഫയല്‍ തുറക്കുമ്പോള്‍ ഒരു പുതിയ വി‌എല്‍‌സിയുടെ മാതൃക നിങ്ങള്‍"
-#~ "ക്ക് വേണ്ടെങ്കില്‍.  നേരത്തെതന്നെ പ്രവര്‍ത്തിക്കുന്ന വി‌എല്‍‌സിയുടെ മാതൃക ഉപയോഗിച്ച് ഒരു ഫയല്‍ പ്രവര്‍"
-#~ "ത്തിപ്പിക്കുവാന്‍ അല്ലെങ്കില്‍ അതിനെ വരിയാക്കാന്‍ ഈ ഐഛികം നിങ്ങളെ അനുവദിക്കും. ഈ ഐച്ഛികത്തിന് "
-#~ "ഡി-ബസ് സെഷന്‍ ഡെമോണ്‍ പ്രവര്‍ത്തനക്ഷമമാകുകയും കൂടാതെ പ്രവര്‍ത്തിച്ചുകൊണ്ടിരിക്കുന്ന വി‌എല്‍‌സി മാതൃക "
-#~ "ഡി-ബസ് നിയന്ത്രണ സംബര്‍ക്കമുഖം ഉപയോഗിക്കുന്നതും ആവശ്യമാണ്. "
+#~ "ഫയല്‍ മാനേജെറില്‍ ഓരോ തവണയും നിങ്ങള്‍ ഒരു ഫയല്‍ തുറക്കുമ്പോള്‍ ഒരു പുതിയ വി‌എല്‍‌സിയുടെ മാതൃക "
+#~ "നിങ്ങള്‍ക്ക് വേണ്ടെങ്കില്‍.  നേരത്തെതന്നെ പ്രവര്‍ത്തിക്കുന്ന വി‌എല്‍‌സിയുടെ മാതൃക ഉപയോഗിച്ച് ഒരു ഫയല്‍ "
+#~ "പ്രവര്‍ത്തിപ്പിക്കുവാന്‍ അല്ലെങ്കില്‍ അതിനെ വരിയാക്കാന്‍ ഈ ഐഛികം നിങ്ങളെ അനുവദിക്കും. ഈ "
+#~ "ഐച്ഛികത്തിന് ഡി-ബസ് സെഷന്‍ ഡെമോണ്‍ പ്രവര്‍ത്തനക്ഷമമാകുകയും കൂടാതെ പ്രവര്‍ത്തിച്ചുകൊണ്ടിരിക്കുന്ന "
+#~ "വി‌എല്‍‌സി മാതൃക ഡി-ബസ് നിയന്ത്രണ സംബര്‍ക്കമുഖം ഉപയോഗിക്കുന്നതും ആവശ്യമാണ്. "
 
 #~ msgid "%ld B"
 #~ msgstr "%ld B"
@@ -30153,8 +30066,8 @@ msgstr "മീഡിയ മാനേജര്‍ ലിസ്റ്റ്"
 #~ "Sort items in a natural order (for example: 1.ogg 2.ogg 10.ogg). This "
 #~ "method does not take the current language's collation rules into account."
 #~ msgstr ""
-#~ "സ്വഭാവിക നില അനുസരിച്ചു ഇനങ്ങളെ തരം തിരിക്കുക (ഉദാഹരണത്തിന്: 1.ഓ‌ജി‌ജി 2.ഓ‌ജി‌ജി 10."
-#~ "ഓ‌ജി‌ജി). ഈ സമ്പ്രദായം നിലവിലുള്ള ഭാഷകളുടെ സംശോധന തത്വം കണക്കാക്കുന്നില്ല."
+#~ "സ്വഭാവിക നില അനുസരിച്ചു ഇനങ്ങളെ തരം തിരിക്കുക (ഉദാഹരണത്തിന്: 1.ഓ‌ജി‌ജി 2.ഓ‌ജി‌ജി "
+#~ "10.ഓ‌ജി‌ജി). ഈ സമ്പ്രദായം നിലവിലുള്ള ഭാഷകളുടെ സംശോധന തത്വം കണക്കാക്കുന്നില്ല."
 
 #~ msgid "Do not sort the items."
 #~ msgstr "വസ്തുക്കള്‍ ക്രമത്തിലാക്കരുത്"
@@ -30207,13 +30120,13 @@ msgstr "മീഡിയ മാനേജര്‍ ലിസ്റ്റ്"
 #~ msgstr "ആര്‍ടിഎസ്പി രഹസ്യവാക്ക്"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
-#~ "ഉപയോഗിക്കേണ്ട എച്ച്‌ടി‌ടി‌പി പ്രോക്സി അത് ഈ ആകാരത്തില്‍ ആയിരിക്കണം http://[user[:"
-#~ "pass]@]myproxy.mydomain:myport/ ; ശൂന്യമാണെങ്കില്‍ എച്ച്‌ടി‌ടി‌പി_പ്രോക്സി പരിസ്ഥിതി "
-#~ "പരിവര്‍ത്തിതവസ്‌തു ശ്രമിക്കപ്പെടും."
+#~ "ഉപയോഗിക്കേണ്ട എച്ച്‌ടി‌ടി‌പി പ്രോക്സി അത് ഈ ആകാരത്തില്‍ ആയിരിക്കണം http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; ശൂന്യമാണെങ്കില്‍ എച്ച്‌ടി‌ടി‌പി_പ്രോക്സി "
+#~ "പരിസ്ഥിതി പരിവര്‍ത്തിതവസ്‌തു ശ്രമിക്കപ്പെടും."
 
 #~ msgid "VLC could not open the file \"%s\": %s"
 #~ msgstr "വി‌എല്‍‌സിക്കു ഫയല്‍ തുറക്കാന്‍ സാധിച്ചില്ല \"%s\":%s"
@@ -30530,8 +30443,8 @@ msgstr "മീഡിയ മാനേജര്‍ ലിസ്റ്റ്"
 #~ "Click and move the mouse while keeping the button pressed to use this "
 #~ "slider to change current playback position."
 #~ msgstr ""
-#~ "ഈ സ്ലൈഡര്‍ ഉപയോഗിച്ച് ഇപ്പോഴത്തെ പ്ലേബാക്ക് സ്ഥാനം മാറ്റുന്നതിനായി ബട്ടണ്‍ അമര്‍"
-#~ "ത്തിപ്പിടിച്ചിരിക്കുമ്പോള്‍ തന്നെ മൌസ് ക്ലിക്ക് ചെയ്യുകയും നീക്കുകയും ചെയ്യുക"
+#~ "ഈ സ്ലൈഡര്‍ ഉപയോഗിച്ച് ഇപ്പോഴത്തെ പ്ലേബാക്ക് സ്ഥാനം മാറ്റുന്നതിനായി ബട്ടണ്‍ "
+#~ "അമര്‍ത്തിപ്പിടിച്ചിരിക്കുമ്പോള്‍ തന്നെ മൌസ് ക്ലിക്ക് ചെയ്യുകയും നീക്കുകയും ചെയ്യുക"
 
 #~ msgid "Click to enable fullscreen video playback."
 #~ msgstr "ഫുള്‍സ്ക്രീന്‍ വീഡിയോ പ്ലേബാക്ക് പാപ്തമാക്കുന്നതിനായി ക്ലിക്ക് ചെയ്യുക"
@@ -30551,8 +30464,8 @@ msgstr "മീഡിയ മാനേജര്‍ ലിസ്റ്റ്"
 #~ "Click to switch between video output and playlist. If no video is shown "
 #~ "in the main window, this allows you to hide the playlist."
 #~ msgstr ""
-#~ "വീഡിയോ ഔട്ട്പുട്ടിനും പ്ലേലിസ്റ്റിലുമായി മാറിമാറി പോകുന്നതിന് ക്ലിക്ക് ചെയ്യുക. പ്രധാന വിന്‍"
-#~ "ഡോയില്‍ വീഡിയോ ഒന്നും കാണിക്കുന്നില്ലെങ്കില്‍, ഇത് നിങ്ങളെ പ്ലേലിസ്റ്റ് ഒളിപ്പിക്കാന്‍ "
+#~ "വീഡിയോ ഔട്ട്പുട്ടിനും പ്ലേലിസ്റ്റിലുമായി മാറിമാറി പോകുന്നതിന് ക്ലിക്ക് ചെയ്യുക. പ്രധാന "
+#~ "വിന്‍ഡോയില്‍ വീഡിയോ ഒന്നും കാണിക്കുന്നില്ലെങ്കില്‍, ഇത് നിങ്ങളെ പ്ലേലിസ്റ്റ് ഒളിപ്പിക്കാന്‍ "
 #~ "സഹായിക്കുന്നതാണ്"
 
 #~ msgid "Click to enable or disable random playback."
@@ -30591,8 +30504,8 @@ msgstr "മീഡിയ മാനേജര്‍ ലിസ്റ്റ്"
 #~ "Don't display dialogs that don't require user action (Critical and error "
 #~ "panel)."
 #~ msgstr ""
-#~ "ഉപയോക്താവിന്‍റെ പ്രവര്‍ത്തികള്‍ ഒന്നും ആവശ്യമില്ലാത്ത ഡയലോഗുകള്‍ പ്രദര്‍ശിപ്പിക്കരുത്(ക്രിട്ടിക്കല്‍ ആന്‍"
-#~ "ഡ് എറര്‍ പാനല്‍)"
+#~ "ഉപയോക്താവിന്‍റെ പ്രവര്‍ത്തികള്‍ ഒന്നും ആവശ്യമില്ലാത്ത ഡയലോഗുകള്‍ പ്രദര്‍ശിപ്പിക്കരുത്(ക്രിട്ടിക്കല്‍ "
+#~ "ആന്‍ഡ് എറര്‍ പാനല്‍)"
 
 #~ msgid "(no item is being played)"
 #~ msgstr "ഒരു ഇനവും പ്രദര്‍ശിപ്പിക്കപ്പെടുന്നില്ല"
@@ -30634,8 +30547,8 @@ msgstr "മീഡിയ മാനേജര്‍ ലിസ്റ്റ്"
 #~ "മീഡിയ ഇന്‍പുട്ടിനിടയ്ക്ക് 4 ടാബുകള്‍ തിരഞ്ഞെടുക്കുക. EyeTV ആപ്ലിക്കേഷന്‍ "
 #~ "സംസ്ഥാപിക്കപ്പെട്ടുവെങ്കില്‍  'ഫയല്‍' എന്നത് ഫയലുകള്‍ക്ക് വേണ്ടിയും, 'ഡിസ്ക്' എന്നത് ഡിവിഡിക, "
 #~ "ഓഡിയോ സിഡികള്‍ അല്ലെങ്കില്‍ BRകള്‍ എന്നിങ്ങനെയുള്ള ഒപ്റ്റിക്കല്‍ മീഡിയകള്‍ക്കും, 'നെറ്റ്വര്‍ക്ക്' "
-#~ "എന്നത് നെറ്റ്വര്‍ക്ക് സ്ട്രീമുകള്‍ക്ക് അല്ലെങ്കില്‍ 'ആഗിരണം' എന്നത് മൈക്രോഫോണോ ക്യാമറയോ പോലുള്ള ഇന്‍"
-#~ "പുട്ട് ഉപാധികള്‍ക്കും, നിലവിലെ പ്രതലം അല്ലെങ്കില്‍ TV സ്ട്രീമുകള്‍ എന്നിങ്ങനെ തിരഞ്ഞെടുക്കുക."
+#~ "എന്നത് നെറ്റ്വര്‍ക്ക് സ്ട്രീമുകള്‍ക്ക് അല്ലെങ്കില്‍ 'ആഗിരണം' എന്നത് മൈക്രോഫോണോ ക്യാമറയോ പോലുള്ള "
+#~ "ഇന്‍പുട്ട് ഉപാധികള്‍ക്കും, നിലവിലെ പ്രതലം അല്ലെങ്കില്‍ TV സ്ട്രീമുകള്‍ എന്നിങ്ങനെ തിരഞ്ഞെടുക്കുക."
 
 #~ msgid ""
 #~ "This input allows you to save, stream or display your current screen "
@@ -30918,8 +30831,8 @@ msgstr "മീഡിയ മാനേജര്‍ ലിസ്റ്റ്"
 #~ msgstr ""
 #~ "ഒരു മള്‍ട്ടികാസ്റ്റ്-പ്രവര്‍ത്തനസജ്ജമാക്കിയ നെറ്റ്വര്‍ക്കിലെ ഒരു ഡൈനാമിക് ഗ്രൂപ്പിലുള്ള കമ്പ്യൂട്ടറകള്‍ "
 #~ "ഉപയോഗിക്കുക. നിരവധി കമ്പ്യൂട്ടറുകളുമായി സ്ട്രീം ചെയ്യുന്നതിനുള്ള വളരെ  കാര്യക്ഷമതയാര്‍ന്ന "
-#~ "രീതിയാണിത്, പക്ഷെ ഇത് ഇന്റര്‍നെറ്റില്‍ പ്രവര്‍ത്തിക്കില്ല. RTP ശീര്‍ഷകങ്ങളെ സ്ട്രീമിലേയ്ക്ക് ചേര്‍"
-#~ "ക്കപ്പെടും"
+#~ "രീതിയാണിത്, പക്ഷെ ഇത് ഇന്റര്‍നെറ്റില്‍ പ്രവര്‍ത്തിക്കില്ല. RTP ശീര്‍ഷകങ്ങളെ സ്ട്രീമിലേയ്ക്ക് "
+#~ "ചേര്‍ക്കപ്പെടും"
 
 #~ msgid "Streaming/Transcoding Wizard"
 #~ msgstr "സ്ട്രീമിങ്ങ്/ട്രാന്‍സ്കോഡിങ്ങ് വിസാര്‍ഡ്"
@@ -31599,8 +31512,8 @@ msgstr "മീഡിയ മാനേജര്‍ ലിസ്റ്റ്"
 #~ "Name of the serial port where the AtmoLight controller is attached to.\n"
 #~ "On Windows usually something like COM1 or COM2. On Linux /dev/ttyS01 f.e."
 #~ msgstr ""
-#~ "എവിടെയാണോ AtmoLight നിയന്ത്രകനെ യോജിപ്പിച്ച് വച്ചിരിക്കുന്നത് അതിന്റെ സീരിയല്‍ പോര്‍"
-#~ "ട്ടിന്റെ നാമം.\n"
+#~ "എവിടെയാണോ AtmoLight നിയന്ത്രകനെ യോജിപ്പിച്ച് വച്ചിരിക്കുന്നത് അതിന്റെ സീരിയല്‍ "
+#~ "പോര്‍ട്ടിന്റെ നാമം.\n"
 #~ "വിന്‍ഡോസില്‍ സാധാരണയായി COM1 അല്ലെങ്കില്‍ COM2 എന്നാണ്. ലിനക്സില്‍  /dev/ttyS01 f.e."
 
 #~ msgid "Edge weightning"
@@ -31621,8 +31534,8 @@ msgstr "മീഡിയ മാനേജര്‍ ലിസ്റ്റ്"
 #~ "Pixels with a saturation lower than this will be ignored. Should be "
 #~ "greater than one for letterboxed videos."
 #~ msgstr ""
-#~ "ഒരു പൂരിതാവസ്ഥയോടൊപ്പമുള്ള പിക്സല്‍ ഇതിനെക്കാള്‍ കുറവാണെങ്കില്‍ തിരസ്കരിക്കപ്പെടുന്നു. ലെറ്റര്‍"
-#~ "ബോക്സ്ഡ് വീഡിയോകള്‍ക്ക് ഒന്നിനെക്കാള്‍ കൂടുതലായിരിക്കണം."
+#~ "ഒരു പൂരിതാവസ്ഥയോടൊപ്പമുള്ള പിക്സല്‍ ഇതിനെക്കാള്‍ കുറവാണെങ്കില്‍ തിരസ്കരിക്കപ്പെടുന്നു. "
+#~ "ലെറ്റര്‍ബോക്സ്ഡ് വീഡിയോകള്‍ക്ക് ഒന്നിനെക്കാള്‍ കൂടുതലായിരിക്കണം."
 
 #~ msgid "Hue windowing"
 #~ msgstr "ഹ്യൂ വിന്‍ഡോവിംഗ്"
@@ -31756,9 +31669,9 @@ msgstr "മീഡിയ മാനേജര്‍ ലിസ്റ്റ്"
 #~ "Now preferred option to assign gradient bitmaps, put them as zone_0.bmp, "
 #~ "zone_1.bmp etc. into one folder and set the foldername here"
 #~ msgstr ""
-#~ "ഗ്രേഡിയന്റ് ബിറ്റ്മാപ്പ് നിയോഗിക്കുന്നതിന് ഇപ്പോഴുള്ള മുന്‍ഗണനാ ഐഛികം എന്നത്, അവയ്ക്ക് zone_0."
-#~ "bmp, zone_1.bmp എന്നിങ്ങനെ നല്‍കി ഒരു ഫോള്‍ഡറില്‍ നിക്ഷേപിക്കുകയും കൂടാതെ ഫോള്‍ഡര്‍ നാമം "
-#~ "ഇവിടെ ക്രമീകരിക്കുക"
+#~ "ഗ്രേഡിയന്റ് ബിറ്റ്മാപ്പ് നിയോഗിക്കുന്നതിന് ഇപ്പോഴുള്ള മുന്‍ഗണനാ ഐഛികം എന്നത്, അവയ്ക്ക് "
+#~ "zone_0.bmp, zone_1.bmp എന്നിങ്ങനെ നല്‍കി ഒരു ഫോള്‍ഡറില്‍ നിക്ഷേപിക്കുകയും കൂടാതെ ഫോള്‍ഡര്‍ "
+#~ "നാമം ഇവിടെ ക്രമീകരിക്കുക"
 
 #~ msgid "Filename of AtmoWin*.exe"
 #~ msgstr "AtmoWin*.exe ഫയല്‍നാമം"
@@ -31893,8 +31806,8 @@ msgstr "മീഡിയ മാനേജര്‍ ലിസ്റ്റ്"
 #~ "In this section you can force the behavior of the subtitle demuxer, for "
 #~ "example by setting the subtitles type or file name."
 #~ msgstr ""
-#~ "ഇവിടെ നിങ്ങള്ക്ക് ഉപശീര്‍ഷകങ്ങള്‍ സ്വഭാവം ബലമായി ക്രമീകരിക്കാം, ഉദാഹരണത്തിന് ഉപശീര്‍"
-#~ "ഷകങ്ങളുടെ താരവും ഫയല്‍ പേരുകളും"
+#~ "ഇവിടെ നിങ്ങള്ക്ക് ഉപശീര്‍ഷകങ്ങള്‍ സ്വഭാവം ബലമായി ക്രമീകരിക്കാം, ഉദാഹരണത്തിന് "
+#~ "ഉപശീര്‍ഷകങ്ങളുടെ താരവും ഫയല്‍ പേരുകളും"
 
 #~ msgid ""
 #~ "Some options are available but hidden. Check \"Advanced options\" to see "

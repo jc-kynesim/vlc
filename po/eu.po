@@ -593,58 +593,59 @@ msgid ""
 "charset=utf-8\" /></head><body><h2>Welcome to VLC media player Help</"
 "h2><h3>Documentation</h3><p>You can find VLC documentation on VideoLAN's <a "
 "href=\"http://wiki.videolan.org\">wiki</a> website.</p><p>If you are a "
-"newcomer to VLC media player, please read the<br><a href=\"http://wiki."
-"videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC media "
-"player</em></a>.</p><p>You will find some information on how to use the "
-"player in the <br>\"<a href=\"http://wiki.videolan.org/Documentation:"
-"Play_HowTo\"><em>How to play files with VLC media player</em></a>\" document."
-"</p><p>For all the saving, converting, transcoding, encoding, muxing and "
-"streaming tasks, you should find useful information in the <a href=\"http://"
-"wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming Documentation</"
-"a>.</p><p>If you are unsure about terminology, please consult the <a href="
-"\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</p><p>To "
-"understand the main keyboard shortcuts, read the <a href=\"http://wiki."
-"videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before asking "
-"any question, please refer yourself to the <a href=\"http://www.videolan.org/"
-"support/faq.html\">FAQ</a>.</p><p>You might then get (and give) help on the "
-"<a href=\"http://forum.videolan.org\">Forums</a>, the <a href=\"http://www."
-"videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC channel "
-"(<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the project</"
-"h3><p>You can help the VideoLAN project giving some of your time to help the "
-"community, to design skins, to translate the documentation, to test and to "
-"code. You can also give funds and material to help us. And of course, you "
-"can <b>promote</b> VLC media player.</p></body></html>"
+"newcomer to VLC media player, please read the<br><a href=\"http://"
+"wiki.videolan.org/Documentation:VLC_for_dummies\"><em>Introduction to VLC "
+"media player</em></a>.</p><p>You will find some information on how to use "
+"the player in the <br>\"<a href=\"http://wiki.videolan.org/"
+"Documentation:Play_HowTo\"><em>How to play files with VLC media player</em></"
+"a>\" document.</p><p>For all the saving, converting, transcoding, encoding, "
+"muxing and streaming tasks, you should find useful information in the <a "
+"href=\"http://wiki.videolan.org/Documentation:Streaming_HowTo\">Streaming "
+"Documentation</a>.</p><p>If you are unsure about terminology, please consult "
+"the <a href=\"http://wiki.videolan.org/Knowledge_Base\">knowledge base</a>.</"
+"p><p>To understand the main keyboard shortcuts, read the <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">shortcuts</a> page.</p><h3>Help</h3><p>Before "
+"asking any question, please refer yourself to the <a href=\"http://"
+"www.videolan.org/support/faq.html\">FAQ</a>.</p><p>You might then get (and "
+"give) help on the <a href=\"http://forum.videolan.org\">Forums</a>, the <a "
+"href=\"http://www.videolan.org/vlc/lists.html\">mailing-lists</a> or our IRC "
+"channel (<em>#videolan</em> on irc.freenode.net).</p><h3>Contribute to the "
+"project</h3><p>You can help the VideoLAN project giving some of your time to "
+"help the community, to design skins, to translate the documentation, to test "
+"and to code. You can also give funds and material to help us. And of course, "
+"you can <b>promote</b> VLC media player.</p></body></html>"
 msgstr ""
 "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; "
 "charset=utf-8\" /></head><body><h2>Ongi etorri VLC multimedia-"
 "erreproduzigailuaren laguntzara</h2><h3>Dokumentazioa</h3><p>VLCren "
-"dokumentazioa aurkituko duzu VideoLAN-en <a href=\"http://wiki.videolan.org"
-"\">wiki</a> web-orrian.</p><p>VLC multimedia-erreproduzigailua lehenengoz "
-"erabiltzen baduzu, arren irakur ezazu <br><a href=\"http://wiki.videolan.org/"
-"Documentation:VLC_for_dummies\"><em>VLC multimedia-errepdoduzigailuari "
-"buruzko sarrera</em></a>.</p><p>Erreproduzigailua erabiltzeko moduari "
-"buruzko informazioa aurkituko duzu <br>\"<a href=\"http://wiki.videolan.org/"
+"dokumentazioa aurkituko duzu VideoLAN-en <a href=\"http://"
+"wiki.videolan.org\">wiki</a> web-orrian.</p><p>VLC multimedia-"
+"erreproduzigailua lehenengoz erabiltzen baduzu, arren irakur ezazu <br><a "
+"href=\"http://wiki.videolan.org/Documentation:VLC_for_dummies\"><em>VLC "
+"multimedia-errepdoduzigailuari buruzko sarrera</em></a>.</"
+"p><p>Erreproduzigailua erabiltzeko moduari buruzko informazioa aurkituko "
+"duzu <br>\"<a href=\"http://wiki.videolan.org/"
 "Documentation:Play_HowTo\"><em>Nola erreproduzitu fitxategiak VLC multimedia-"
 "erreproduzigailuarekin</em></a>\" dokumentuan.</p><p>Gordetzeari, "
 "bihurtzeari, transkodeketari, kodeketari, multiplexatzeari eta modu "
 "jarraituan transmititzeari buruzko zeregin guztiei dagokienez, informazio "
-"erabilgarria aurkituko duzu <a href=\"http://wiki.videolan.org/Documentation:"
-"Streaming_HowTo\">Transmisio jarraituei buruzko dokumentazioan</a>.</"
-"p><p>Terminologia ezagutzen ez baduzu, kontsulta ezazu <a href=\"http://wiki."
-"videolan.org/Knowledge_Base\">jakintza-basea</a>.</p><p>Laster-tekla "
-"nagusiak ezagutzeko, irakurri <a href=\"http://wiki.videolan.org/Hotkeys"
-"\">laster-teklak</a> orria.</p><h3>Laguntza</h3><p>Galdera bat egin "
-"aurretik, mesedez kontsultatu <a href=\"http://www.videolan.org/support/faq."
-"html\">Maiz egiten diren galderak</a>.</p><p>Ondoren, laguntza eskuratu (eta "
-"eskaini) ahal izango duzu <a href=\"http://forum.videolan.org\">foroetan</"
-"a>, <a href=\"http://www.videolan.org/vlc/lists.html\">posta-zerrendetan</a> "
-"edo gure IRC kanalean (<em>#videolan</em>, hemen: irc.freenode.net).</"
-"p><h3>Parte hartu proiektuan</h3><p>VideoLAN proiektuari zure denboraren "
-"zati bat eskain diezaiokezu komunitateari laguntzeko, azalak diseinatzeko, "
-"dokumentazioa itzultzeko, probak egiteko eta kodea sortzeko. Horrez gain, "
-"dirua eta materiala eman ditzakezu guri laguntzeko. Eta, noski, VLC "
-"multimedia-erreproduzigailuaren <b>publizitatea</b> egin dezakezu.</p></"
-"body></html>"
+"erabilgarria aurkituko duzu <a href=\"http://wiki.videolan.org/"
+"Documentation:Streaming_HowTo\">Transmisio jarraituei buruzko "
+"dokumentazioan</a>.</p><p>Terminologia ezagutzen ez baduzu, kontsulta ezazu "
+"<a href=\"http://wiki.videolan.org/Knowledge_Base\">jakintza-basea</a>.</"
+"p><p>Laster-tekla nagusiak ezagutzeko, irakurri <a href=\"http://"
+"wiki.videolan.org/Hotkeys\">laster-teklak</a> orria.</p><h3>Laguntza</"
+"h3><p>Galdera bat egin aurretik, mesedez kontsultatu <a href=\"http://"
+"www.videolan.org/support/faq.html\">Maiz egiten diren galderak</a>.</"
+"p><p>Ondoren, laguntza eskuratu (eta eskaini) ahal izango duzu <a "
+"href=\"http://forum.videolan.org\">foroetan</a>, <a href=\"http://"
+"www.videolan.org/vlc/lists.html\">posta-zerrendetan</a> edo gure IRC "
+"kanalean (<em>#videolan</em>, hemen: irc.freenode.net).</p><h3>Parte hartu "
+"proiektuan</h3><p>VideoLAN proiektuari zure denboraren zati bat eskain "
+"diezaiokezu komunitateari laguntzeko, azalak diseinatzeko, dokumentazioa "
+"itzultzeko, probak egiteko eta kodea sortzeko. Horrez gain, dirua eta "
+"materiala eman ditzakezu guri laguntzeko. Eta, noski, VLC multimedia-"
+"erreproduzigailuaren <b>publizitatea</b> egin dezakezu.</p></body></html>"
 
 #: src/audio_output/filters.c:267
 msgid "Audio filtering failed"
@@ -1592,13 +1593,13 @@ msgstr "Interfaze-modulu gehigarriak"
 msgid ""
 "You can select \"additional interfaces\" for VLC. They will be launched in "
 "the background in addition to the default interface. Use a colon separated "
-"list of interface modules. (common values are \"rc\" (remote control), \"http"
-"\", \"gestures\" ...)"
+"list of interface modules. (common values are \"rc\" (remote control), "
+"\"http\", \"gestures\" ...)"
 msgstr ""
 "VLCrako \"interfaze gehigarriak\" hauta ditzakezu. Atzeko planoan abiaraziko "
 "dira, interfaze lehenetsiaz gain. Erabili interfaze-moduluen bi puntuz "
-"bereizitako zerrenda bat. (ohiko balioak \"rc\" (urruneko kontrola), \"http"
-"\", \"mugimenduak\", etab. dira)"
+"bereizitako zerrenda bat. (ohiko balioak \"rc\" (urruneko kontrola), "
+"\"http\", \"mugimenduak\", etab. dira)"
 
 #: src/libvlc-module.c:83
 msgid "You can select control interfaces for VLC."
@@ -2399,8 +2400,8 @@ msgstr "Jatorrizko aspektu-erlazioa"
 msgid ""
 "This forces the source aspect ratio. For instance, some DVDs claim to be "
 "16:9 while they are actually 4:3. This can also be used as a hint for VLC "
-"when a movie does not have aspect ratio information. Accepted formats are x:"
-"y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
+"when a movie does not have aspect ratio information. Accepted formats are "
+"x:y (4:3, 16:9, etc.) expressing the global image aspect, or a float value "
 "(1.25, 1.3333, etc.) expressing pixel squareness."
 msgstr ""
 "Honek jatorrizko aspektu-erlazioa behartzen du. Esate baterako, DVD batzuek "
@@ -2931,8 +2932,8 @@ msgid ""
 "{...}\""
 msgstr ""
 "Transmisio jarraitu baterako laster-marken zerrenda bat eskuz zehaztu "
-"dezakezu, forma honekin: \"{name=bookmark-name,time=optional-time-offset,"
-"bytes=optional-byte-offset},{...}\""
+"dezakezu, forma honekin: \"{name=bookmark-name,time=optional-time-"
+"offset,bytes=optional-byte-offset},{...}\""
 
 #: src/libvlc-module.c:675
 #, fuzzy
@@ -2983,10 +2984,10 @@ msgstr "Aldatu izenburua uneko multimediaren arabera"
 
 #: src/libvlc-module.c:694
 msgid ""
-"This option allows you to set the title according to what's being played<br>"
-"$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: Genre<br>$n: "
-"Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: \"Now playing"
-"\" (Fall back on Title - Artist)"
+"This option allows you to set the title according to what's being "
+"played<br>$a: Artist<br>$b: Album<br>$c: Copyright<br>$t: Title<br>$g: "
+"Genre<br>$n: Track num<br>$p: Now playing<br>$A: Date<br>$D: Duration<br>$Z: "
+"\"Now playing\" (Fall back on Title - Artist)"
 msgstr ""
 "Aukera honek ahalbidetzen dizu erreproduzitzen ari denarekin bat datorren "
 "izenburua ezartzea<br>$a: Artista<br>$b: Bilduma<br>$c: Copyrighta<br>$t: "
@@ -7713,8 +7714,9 @@ msgstr "HTTP proxya"
 
 #: modules/access/http.c:61
 msgid ""
-"HTTP proxy to be used It must be of the form http://[user@]myproxy.mydomain:"
-"myport/ ; if empty, the http_proxy environment variable will be tried."
+"HTTP proxy to be used It must be of the form http://"
+"[user@]myproxy.mydomain:myport/ ; if empty, the http_proxy environment "
+"variable will be tried."
 msgstr ""
 "Erabili beharreko HTTP proxyak forma hau eduki behar du: http://"
 "[erabiltzailea[:pasahitza]@]nireproxya.niredomeinua:nireataka/; hutsik "
@@ -8035,8 +8037,8 @@ msgstr "Audio-konfigurazioa"
 #: modules/access/linsys/linsys_sdi.c:79
 msgid "Allows you to set audio configuration (id=group,pair:id=group,pair...)."
 msgstr ""
-"Audio-konfigurazioa ezartzea baimentzen dizu (id=taldea,parea:id=taldea,"
-"parea...)."
+"Audio-konfigurazioa ezartzea baimentzen dizu "
+"(id=taldea,parea:id=taldea,parea...)."
 
 #: modules/access/linsys/linsys_hdsdi.c:89
 msgid "HD-SDI Input"
@@ -8321,8 +8323,8 @@ msgstr "Ez da sarrera-gailurik aurkitu"
 #: modules/access/qtsound.m:263 modules/access/qtsound.m:294
 #, fuzzy
 msgid ""
-"Your Mac does not seem to be equipped with a suitable audio input device."
-"Please check your connectors and drivers."
+"Your Mac does not seem to be equipped with a suitable audio input "
+"device.Please check your connectors and drivers."
 msgstr ""
 "Ez dirudi Mac ordenagailuak sarrera-gailu egokirik duenik. Egiaztatu "
 "konektoreak eta kontrolatzaileak."
@@ -8761,8 +8763,8 @@ msgstr "RTSP autentifikazioa"
 #, c-format
 msgid ""
 "The computer (%s) you are trying to connect to requires authentication.\n"
-"Please provide a username (ideally a domain name using the format DOMAIN;"
-"username) and a password."
+"Please provide a username (ideally a domain name using the format "
+"DOMAIN;username) and a password."
 msgstr ""
 
 #: modules/access/srt.c:288 modules/access_output/srt.c:311
@@ -9226,15 +9228,16 @@ msgstr "v4l2 kontrolatzaile-kontrolak"
 #, fuzzy
 msgid ""
 "Set the v4l2 driver controls to the values specified using a comma separated "
-"list optionally encapsulated by curly braces (e.g.: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). To list available controls, increase verbosity "
-"(-vv) or use the v4l2-ctl application."
+"list optionally encapsulated by curly braces (e.g.: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). To list available "
+"controls, increase verbosity (-vv) or use the v4l2-ctl application."
 msgstr ""
 "Ezarri zehaztutako balioak v4l2 kontrolatzailearen kontroletan; balio horiek "
 "komaz bereizitako zerrenda batean zehaztu behar dira eta, nahi izanez gero, "
-"kortxeteak erabiliz kapsulatu daitezke (adibidez: {video_bitrate=6000000,"
-"audio_crc=0,stream_type=3} ). Erabilgarri dauden kontrolak zerrendatzeko, "
-"handitu xehetasun-maila (-vvv) edo erabili v4l2-ctl aplikazioa."
+"kortxeteak erabiliz kapsulatu daitezke (adibidez: "
+"{video_bitrate=6000000,audio_crc=0,stream_type=3} ). Erabilgarri dauden "
+"kontrolak zerrendatzeko, handitu xehetasun-maila (-vvv) edo erabili v4l2-ctl "
+"aplikazioa."
 
 #: modules/access/v4l2/v4l2.c:242 modules/codec/avcodec/avcodec.c:50
 #: modules/codec/avcodec/avcodec.c:54 modules/codec/x264.c:435
@@ -9630,9 +9633,9 @@ msgstr ""
 #: modules/access_output/livehttp.c:98
 #, fuzzy
 msgid ""
-"File is read when segment starts and is assumed to be in format: key-uri"
-"\\nkey-file. File is read on the segment opening and values are used on that "
-"segment."
+"File is read when segment starts and is assumed to be in format: key-"
+"uri\\nkey-file. File is read on the segment opening and values are used on "
+"that segment."
 msgstr ""
 "Fitxategia segmentua hasterakoan irakurriko da eta formatu honetan dagoela "
 "onartuko da: key-uri\\nkey-file. Fitxategia irekitako segmentuan irakurriko "
@@ -11158,7 +11161,6 @@ msgstr "Deskodeketa"
 
 #: modules/codec/avcodec/avcodec.c:147 modules/codec/jpeg.c:119
 #: modules/codec/omxil/omxil.c:171 modules/codec/png.c:99
-#: modules/codec/schroedinger.c:370
 msgid "Encoding"
 msgstr "Kodeketa"
 
@@ -11711,11 +11713,11 @@ msgstr "Theora bideo-paketatzailea"
 msgid "Daala video encoder"
 msgstr "PNG bideo-deskodetzailea"
 
-#: modules/codec/daala.c:143 modules/codec/schroedinger.c:54
+#: modules/codec/daala.c:143
 msgid "Chroma format"
 msgstr "Krominantzia-formatua"
 
-#: modules/codec/daala.c:144 modules/codec/schroedinger.c:55
+#: modules/codec/daala.c:144
 msgid ""
 "Picking chroma format will force a conversion of the video into that format"
 msgstr ""
@@ -11781,8 +11783,8 @@ msgstr "Azpiirudiaren posizioa"
 #: modules/codec/dvbsub.c:91
 msgid ""
 "You can enforce the subpicture position on the video (0=center, 1=left, "
-"2=right, 4=top, 8=bottom, you can also use combinations of these values, e."
-"g. 6=top-right)."
+"2=right, 4=top, 8=bottom, you can also use combinations of these values, "
+"e.g. 6=top-right)."
 msgstr ""
 "Azpiirudiak bideoan duen posizioa zehaztu dezakezu (0=erdian, 1=ezkerrean, "
 "2=eskuinean, 4=goian, 8=behean; halaber, balio horiek konbina ditzakezu, "
@@ -12567,10 +12569,10 @@ msgstr "Zehaztasun emari-kontrola"
 
 #: modules/codec/qsv.c:128
 msgid ""
-"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. (e."
-"g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go above "
-"880 kpbs and under  730 kpbs. The targeted accuracy is only reached after a "
-"certained  convergence period. See the convergence parameter"
+"Tolerance in percentage of the 'avbr'  (Average Variable BitRate) method. "
+"(e.g. 10 with a bitrate of 800  kpbs means the encoder tries not to  go "
+"above 880 kpbs and under  730 kpbs. The targeted accuracy is only reached "
+"after a certained  convergence period. See the convergence parameter"
 msgstr ""
 "'avbr'(Average Variable BitRate) portzentaian tolerantzia metodoa. (adib. 10 "
 "800 kpbs-ko bit-emari batekin, esan nahi du kodetzailea 880 kpbs-tik gora "
@@ -12640,391 +12642,6 @@ msgstr "Pseudo raw bideo-paketatzailea"
 #, fuzzy
 msgid "Raw video encoder for RTP"
 msgstr "PNG bideo-deskodetzailea"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:0"
-msgstr "4:2:0"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:2:2"
-msgstr "4:2:2"
-
-#: modules/codec/schroedinger.c:60
-msgid "4:4:4"
-msgstr "4:4:4"
-
-#: modules/codec/schroedinger.c:63
-msgid "Rate control method"
-msgstr "Ratioa kontrolatzeko metodoa"
-
-#: modules/codec/schroedinger.c:64
-msgid "Method used to encode the video sequence"
-msgstr "Bideo-sekuentzia kodetzeko erabilitako metodoa"
-
-#: modules/codec/schroedinger.c:77
-msgid "Constant noise threshold mode"
-msgstr "Etengabeko zarataren muga modua"
-
-#: modules/codec/schroedinger.c:78
-msgid "Constant bitrate mode (CBR)"
-msgstr "Etengabeko bit-emari modua ('CBR')"
-
-#: modules/codec/schroedinger.c:79
-msgid "Low Delay mode"
-msgstr "Atzerapen txikiko modua"
-
-#: modules/codec/schroedinger.c:80
-msgid "Lossless mode"
-msgstr "Galerarik gabeko modua"
-
-#: modules/codec/schroedinger.c:81
-msgid "Constant lambda mode"
-msgstr "Etengabeko lambda modua"
-
-#: modules/codec/schroedinger.c:82
-msgid "Constant error mode"
-msgstr "Etengabeko errore modua"
-
-#: modules/codec/schroedinger.c:83
-msgid "Constant quality mode"
-msgstr "Etengabeko kalitatezko modua"
-
-#: modules/codec/schroedinger.c:87
-msgid "GOP structure"
-msgstr "GOP egitura"
-
-#: modules/codec/schroedinger.c:88
-msgid "GOP structure used to encode the video sequence"
-msgstr "Bideo-sekuentzia kodetzeko erabilitako GOP egitura"
-
-#: modules/codec/schroedinger.c:100
-msgid ""
-"No fixed gop structure. A picture can be intra or inter and refer to "
-"previous or future pictures."
-msgstr ""
-"Finkatu gabeko gop egitura. Irudi bat intra (barnekoa) edo inter (artekoa) "
-"izan daiteke, eta aurreko edo geroko irudi bati egin aipamena."
-
-#: modules/codec/schroedinger.c:101
-msgid "I-frame only sequence"
-msgstr "I-marko sekuentzia soilik"
-
-#: modules/codec/schroedinger.c:102 modules/codec/schroedinger.c:103
-msgid "Inter pictures refere to previous pictures only"
-msgstr "Inter-irudiak aurreko irudietara joko du soilik"
-
-#: modules/codec/schroedinger.c:104 modules/codec/schroedinger.c:105
-msgid "Inter pictures can refer to previous or future pictures"
-msgstr "Inter-irudiak aurreko irudietara edo aurrerantzekoetara jo dezake"
-
-#: modules/codec/schroedinger.c:109
-msgid "Constant quality factor"
-msgstr "Kalitate-faktore konstantea"
-
-#: modules/codec/schroedinger.c:110
-msgid "Quality factor to use in constant quality mode"
-msgstr "Kalitatea-faktorea etengabeko kalitate-moduan erabiltzeko"
-
-#: modules/codec/schroedinger.c:113
-msgid "Noise Threshold"
-msgstr "Zarataren muga"
-
-#: modules/codec/schroedinger.c:114
-msgid "Noise threshold to use in constant noise threshold mode"
-msgstr "Zarata-muga konstante moduan erabiltzeko zarata-muga"
-
-#: modules/codec/schroedinger.c:117
-msgid "CBR bitrate (kbps)"
-msgstr "CBR bit-emaria (kb/s)"
-
-#: modules/codec/schroedinger.c:118
-msgid "Target bitrate in kbps when encoding in constant bitrate mode"
-msgstr "Xede bit-tasa, kb segundotan, bit tasa konstante batean kodeatzerakoan"
-
-#: modules/codec/schroedinger.c:121
-msgid "Maximum bitrate (kbps)"
-msgstr "Gehienezko bit-tasa (kb/s)"
-
-#: modules/codec/schroedinger.c:122
-msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"Bit-tasa maximoa, kb segundoko, bit-tasa modu konstantean kodetzerakoan"
-
-#: modules/codec/schroedinger.c:125
-msgid "Minimum bitrate (kbps)"
-msgstr "Gutxieneko bit-tasa (kb/s)"
-
-#: modules/codec/schroedinger.c:126
-msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
-msgstr ""
-"Bit-tasa minimoa, kb segundoko, bit-tasa modu konstantean kodetzerakoan"
-
-#: modules/codec/schroedinger.c:129
-msgid "GOP length"
-msgstr "GOP luzera"
-
-#: modules/codec/schroedinger.c:130
-msgid ""
-"Number of pictures between successive sequence headers i.e. length of the "
-"group of pictures"
-msgstr ""
-"Segidan dauden goi-buruen bitarteko irudi kopurua, hau da, irudi taldearen "
-"luzera"
-
-#: modules/codec/schroedinger.c:134
-msgid "Prefilter"
-msgstr "Aurreiragazkia"
-
-#: modules/codec/schroedinger.c:135
-msgid "Enable adaptive prefiltering"
-msgstr "Gaitu aurreiragazte moldagarria"
-
-#: modules/codec/schroedinger.c:147
-msgid "No pre-filtering"
-msgstr "Aurre-iragazkirik ez"
-
-#: modules/codec/schroedinger.c:148
-msgid "Centre Weighted Median"
-msgstr "Batez besteko haztatua erdian"
-
-#: modules/codec/schroedinger.c:149
-msgid "Gaussian Low Pass Filter"
-msgstr "Igarotze Txikiko Gaussen Iragazkia"
-
-#: modules/codec/schroedinger.c:150
-msgid "Add Noise"
-msgstr "Gehitu zarata"
-
-#: modules/codec/schroedinger.c:151
-msgid "Gaussian Adaptive Low Pass Filter"
-msgstr "Igarotze Txikiko Gaussen Iragazki moldagarria"
-
-#: modules/codec/schroedinger.c:152
-msgid "Low Pass Filter"
-msgstr "Paso baxuko iragazkia"
-
-#: modules/codec/schroedinger.c:156
-msgid "Amount of prefiltering"
-msgstr "Aurreiragazte kopurua"
-
-#: modules/codec/schroedinger.c:157
-msgid "Higher value implies more prefiltering"
-msgstr "Balio handiagoak aurreiragazte gehiago esan nahi du"
-
-#: modules/codec/schroedinger.c:160
-msgid "Picture coding mode"
-msgstr "Irudiaren kodeketa modua"
-
-#: modules/codec/schroedinger.c:161
-msgid ""
-"Field coding is where interlaced fields are coded separately as opposed to a "
-"pseudo-progressive frame"
-msgstr ""
-"Eremu-kodeketan, gurutzelarkatutako eremuak bereizita kodetzen dira, marko "
-"sasiprogresiboetan ez bezala"
-
-#: modules/codec/schroedinger.c:166
-msgid "auto - let encoder decide based upon input (Best)"
-msgstr ""
-"automatikoa - utzi kodetzaileari sarreraren arabera erabakitzen (onena)"
-
-#: modules/codec/schroedinger.c:167
-msgid "force coding frame as single picture"
-msgstr "behartu kodeketa-markoa irudi soil gisa"
-
-#: modules/codec/schroedinger.c:168
-msgid "force coding frame as separate interlaced fields"
-msgstr "behartu markoa bereizitako eremu gurutzelarkatu gisa kodetzea"
-
-#: modules/codec/schroedinger.c:173
-msgid "Size of motion compensation blocks"
-msgstr "Mugimendua konpentsatzeko blokeen tamaina"
-
-#: modules/codec/schroedinger.c:182 modules/codec/schroedinger.c:199
-#: modules/codec/schroedinger.c:297 modules/codec/schroedinger.c:338
-msgid "automatic - let encoder decide based upon input (Best)"
-msgstr ""
-"automatikoa - utzi kodetzaileari sarreraren arabera erabakitzen (onena)"
-
-#: modules/codec/schroedinger.c:183
-msgid "small - use small motion compensation blocks"
-msgstr "txikia - erabili mugimendu orekatze bloke txikiak"
-
-#: modules/codec/schroedinger.c:184
-msgid "medium - use medium motion compensation blocks"
-msgstr "ertaina - erabili mugimendu orekatze bloke ertainak"
-
-#: modules/codec/schroedinger.c:185
-msgid "large - use large motion compensation blocks"
-msgstr "handia - erabili mugimendu orekatze bloke handiak"
-
-#: modules/codec/schroedinger.c:190
-msgid "Overlap of motion compensation blocks"
-msgstr "Blokeen mugitze-orekatzearen gainjartzea"
-
-#: modules/codec/schroedinger.c:200
-msgid "none - Motion compensation blocks do not overlap"
-msgstr "ezer ez - Blokeen mugitze-orekatzea gainjartzerik gabe"
-
-#: modules/codec/schroedinger.c:201
-msgid "partial - Motion compensation blocks only partially overlap"
-msgstr "partziala - Zatikako blokeen mugitze-orekatze  gainjartzea"
-
-#: modules/codec/schroedinger.c:202
-msgid "full - Motion compensation blocks fully overlap"
-msgstr "osoa - Blokeen mugitze-orekatzearen gainjartze osoa"
-
-#: modules/codec/schroedinger.c:207
-msgid "Motion Vector precision"
-msgstr "Mugimendu-bektorearen zehaztasuna"
-
-#: modules/codec/schroedinger.c:208
-msgid "Motion Vector precision in pels"
-msgstr "Mugimendu-bektorearen zehaztasuna pixeletan"
-
-#: modules/codec/schroedinger.c:214
-msgid "Three component motion estimation"
-msgstr "Hiru osagaiko mugimenduaren zenbatespena"
-
-#: modules/codec/schroedinger.c:215
-msgid "Use chroma as part of the motion estimation process"
-msgstr "Erabili krominantzia mugimendua zenbatesteko prozesuaren zati gisa"
-
-#: modules/codec/schroedinger.c:218
-msgid "Intra picture DWT filter"
-msgstr "Irudi barruko DWT iragazkia"
-
-#: modules/codec/schroedinger.c:221
-msgid "Inter picture DWT filter"
-msgstr "Irudi arteko DWT iragazkia"
-
-#: modules/codec/schroedinger.c:244
-msgid "Number of DWT iterations"
-msgstr "DWT iterazioen kopurua"
-
-#: modules/codec/schroedinger.c:245
-msgid "Also known as DWT levels"
-msgstr "DWT mailak ere deitzen zaie"
-
-#: modules/codec/schroedinger.c:250
-msgid "Enable multiple quantizers"
-msgstr "Gaitu kuantizatzaile bat baino gehiago"
-
-#: modules/codec/schroedinger.c:251
-msgid "Enable multiple quantizers per subband (one per codeblock)"
-msgstr "Gaitu kuantizatzaile bat baino gehiago azpibandako (bat kode-blokeko)"
-
-#: modules/codec/schroedinger.c:255
-msgid "Disable arithmetic coding"
-msgstr "Desgaitu kodetze aritmetikoa"
-
-#: modules/codec/schroedinger.c:256
-msgid "Use variable length codes instead, useful for very high bitrates"
-msgstr ""
-"Erabili luzera aldagarriko kodeak horren ordez; hori erabilgarria da oso bit-"
-"emaria handietarako"
-
-#: modules/codec/schroedinger.c:261
-msgid "perceptual weighting method"
-msgstr "Pisatzeko  pertzepzio metodoa"
-
-#: modules/codec/schroedinger.c:272
-msgid "perceptual distance"
-msgstr "pertzepzio distantzia"
-
-#: modules/codec/schroedinger.c:273
-msgid "perceptual distance to calculate perceptual weight"
-msgstr "pertzepzio distantiza pertzepzio pisua kalkulatzeko"
-
-#: modules/codec/schroedinger.c:277
-msgid "Horizontal slices per frame"
-msgstr "Atal horizontalak fotograma bakoitzeko "
-
-#: modules/codec/schroedinger.c:278
-msgid "Number of horizontal slices per frame in low delay mode"
-msgstr ""
-"Atal horizontalen kopurua fotograma bakoitzeko atzerapen txikiko moduan"
-
-#: modules/codec/schroedinger.c:282
-msgid "Vertical slices per frame"
-msgstr "Atal bertikalak fotograma bakoitzeko"
-
-#: modules/codec/schroedinger.c:283
-msgid "Number of vertical slices per frame in low delay mode"
-msgstr "Atal bertikalen kopurua fotograma bakoitzeko atzerapen txikiko moduan"
-
-#: modules/codec/schroedinger.c:287
-msgid "Size of code blocks in each subband"
-msgstr "Kode blokeen tamaina azpi-banda bakoitzean"
-
-#: modules/codec/schroedinger.c:298
-msgid "small - use small code blocks"
-msgstr "txiki - erabili kode bloke txikiak"
-
-#: modules/codec/schroedinger.c:299
-msgid "medium - use medium sized code blocks"
-msgstr "ertain - erabili kode bloke ertainak"
-
-#: modules/codec/schroedinger.c:300
-msgid "large - use large code blocks"
-msgstr "handi - erabili kode bloke handiak"
-
-#: modules/codec/schroedinger.c:301
-msgid "full - One code block per subband"
-msgstr "osorik - Kode bloke bat azpi-banda bakoitzeko"
-
-#: modules/codec/schroedinger.c:306
-msgid "Enable hierarchical Motion Estimation"
-msgstr "Gaitu hierarkiazko 'Mugimendu estimazioa' "
-
-#: modules/codec/schroedinger.c:310
-msgid "Number of levels of downsampling"
-msgstr "Seinale-murrizketaren maila kopurua"
-
-#: modules/codec/schroedinger.c:311
-msgid "Number of levels of downsampling in hierarchical motion estimation mode"
-msgstr ""
-"Seinale-murrizketaren maila kopurua mugimendu zenbatespen hierarkiko moduan"
-
-#: modules/codec/schroedinger.c:315
-msgid "Enable Global Motion Estimation"
-msgstr "Gaitu mugimendu zenbatespen orokorra"
-
-#: modules/codec/schroedinger.c:319
-msgid "Enable Phase Correlation Estimation"
-msgstr "Gaitu fase korrelazio zenbatespena"
-
-#: modules/codec/schroedinger.c:323
-msgid "Enable Scene Change Detection"
-msgstr "Gaitu eszena aldaketa atzematea"
-
-#: modules/codec/schroedinger.c:327
-msgid "Force Profile"
-msgstr "Behartu profila"
-
-#: modules/codec/schroedinger.c:339
-msgid "VC2 Low Delay Profile"
-msgstr "VC2 atzerapen txikiko profila"
-
-#: modules/codec/schroedinger.c:340
-msgid "VC2 Simple Profile"
-msgstr "VC2 profil arrunta"
-
-#: modules/codec/schroedinger.c:341
-msgid "VC2 Main Profile"
-msgstr "VC2 profil nagusia"
-
-#: modules/codec/schroedinger.c:342
-msgid "Main Profile"
-msgstr "Profil nagusia"
-
-#: modules/codec/schroedinger.c:363
-msgid "Dirac video decoder using libschroedinger"
-msgstr "Dirac bideo deskodetzailea, libschroedinger erabilita"
-
-#: modules/codec/schroedinger.c:371
-msgid "Dirac video encoder using libschroedinger"
-msgstr "Dirac bideo kodetzailea, libschroedinger erabilita"
 
 #: modules/codec/scte18.c:41
 #, fuzzy
@@ -14997,8 +14614,8 @@ msgid ""
 msgstr ""
 "\n"
 "Abisua: ez badaukazu interfaze grafikorako sarbiderik, ireki komando-lerroko "
-"leiho bat, joan VLC instalatuta dagoen direktoriora eta exekutatu \"vlc -I qt"
-"\"\n"
+"leiho bat, joan VLC instalatuta dagoen direktoriora eta exekutatu \"vlc -I "
+"qt\"\n"
 
 #: modules/control/lirc.c:47
 msgid "Change the lirc configuration file"
@@ -15792,14 +15409,6 @@ msgstr "Fitxategia lehendik ere badago, ez da gainidatziko."
 msgid "File dumper"
 msgstr "Fitxategi-iraultzailea"
 
-#: modules/demux/dirac.c:41
-msgid "Value to adjust dts by"
-msgstr "dts zer balioren arabera doitu behar den"
-
-#: modules/demux/dirac.c:54
-msgid "Dirac video demuxer"
-msgstr "Dirac bideo-demultiplexadorea"
-
 #: modules/demux/directory.c:94
 #, fuzzy
 msgid "Directory import"
@@ -16285,8 +15894,8 @@ msgstr "PMT gehigarria"
 #: modules/demux/mpeg/ts.c:82
 msgid "Allows a user to specify an extra pmt (pmt_pid=pid:stream_type[,...])."
 msgstr ""
-"Erabiltzaile bati pmt gehigarri bat zehazteko aukera ematen dio (pmt_pid=pid:"
-"stream_type[,...])."
+"Erabiltzaile bati pmt gehigarri bat zehazteko aukera ematen dio "
+"(pmt_pid=pid:stream_type[,...])."
 
 #: modules/demux/mpeg/ts.c:84
 msgid "Set id of ES to PID"
@@ -16885,8 +16494,8 @@ msgid ""
 "\"><span style=\" text-decoration: underline; color:#0057ae;\">VideoLAN</"
 "span></a> community.</p><p>VLC uses its internal codecs, works on "
 "essentially every popular platform, and can read almost all files, CDs, "
-"DVDs, network streams, capture cards and other media formats!</p><p><a href="
-"\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
+"DVDs, network streams, capture cards and other media formats!</p><p><a "
+"href=\"http://www.videolan.org/contribute/\"><span style=\" text-decoration: "
 "underline; color:#0057ae;\">Help and join us!</span></a>"
 msgstr ""
 "<p>VLC multimedia erreproduzigailua askea eta iturburu irekikoa, kodetzailea "
@@ -17190,8 +16799,8 @@ msgstr "Sarrera aldatu egin da"
 
 #: modules/gui/macosx/VLCBookmarksWindowController.m:215
 msgid ""
-"Input has changed, unable to save bookmark. Suspending playback with \"Pause"
-"\" while editing bookmarks to ensure to keep the same input."
+"Input has changed, unable to save bookmark. Suspending playback with "
+"\"Pause\" while editing bookmarks to ensure to keep the same input."
 msgstr ""
 "Sarrera aldatu egin da, ezin da laster-marka gorde. Sakatu \"Pausarazi\" "
 "laster-markak editatzen ari zaren bitartean erreprodukzioa eteteko, sarrera "
@@ -20883,8 +20492,8 @@ msgstr "Gorde fitxategia..."
 msgid ""
 "Containers (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv *.webm)"
 msgstr ""
-"Edukiontziak (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv *."
-"webm)"
+"Edukiontziak (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv "
+"*.webm)"
 
 #: modules/gui/qt/components/sout/sout_widgets.cpp:179
 msgid "This module outputs the transcoded stream to a network via HTTP."
@@ -22999,8 +22608,8 @@ msgstr "Lua interfazearen konfigurazioa"
 
 #: modules/lua/vlc.c:53
 msgid ""
-"Lua interface configuration string. Format is: '[\"<interface module name>"
-"\"] = { <option> = <value>, ...}, ...'."
+"Lua interface configuration string. Format is: '[\"<interface module "
+"name>\"] = { <option> = <value>, ...}, ...'."
 msgstr ""
 "Lua interfazearen konfigurazioaren katea. Hau da formatua: "
 "'[\"<interfazearen modulu-izena>\"] = { <aukera> = <balioa>, ...}, ...'."
@@ -23049,8 +22658,8 @@ msgid ""
 msgstr ""
 "Iturburu honetako komandoak onartzen ditu. CLI lehenetsiak stdin-rako "
 "(\"*console\"), baina batu daiteke ere TCP hartune batera "
-"(\"localhost:4212\") edo telnet protokoloa erabili "
-"(\"telnet://0.0.0.0:4212\")"
+"(\"localhost:4212\") edo telnet protokoloa erabili (\"telnet://"
+"0.0.0.0:4212\")"
 
 #: modules/lua/vlc.c:85
 msgid "Lua"
@@ -24466,10 +24075,6 @@ msgstr "avparser paketatzailea"
 msgid "Copy packetizer"
 msgstr "Kopiatu paketatzailea"
 
-#: modules/packetizer/dirac.c:87
-msgid "Dirac packetizer"
-msgstr "Dirac paketatzailea"
-
 #: modules/packetizer/dts.c:47
 msgid "DTS audio packetizer"
 msgstr "DTS audio-paketatzailea"
@@ -24619,8 +24224,8 @@ msgstr "Podcast URLen zerrenda"
 #: modules/services_discovery/podcast.c:57
 msgid "Enter the list of podcasts to retrieve, separated by '|' (pipe)."
 msgstr ""
-"Sartu eskuratu beharreko podcast-en zerrenda, honen bidez bereizita: "
-"'|' (kanalizazioa)."
+"Sartu eskuratu beharreko podcast-en zerrenda, honen bidez bereizita: '|' "
+"(kanalizazioa)."
 
 #: modules/services_discovery/pulse.c:39 modules/services_discovery/pulse.c:42
 #: modules/services_discovery/pulse.c:82 modules/services_discovery/udev.c:65
@@ -26442,9 +26047,9 @@ msgid ""
 "address:port to bind vlc to listening incoming streams. Helper setting for "
 "dst, dst=bind+'/'+path. dst-parameter overrides this."
 msgstr ""
-"vlc sarrerako transmisio jarraituei entzuteko lortu behar den helbidea:"
-"ataka, laguntzailearen ezarpena dst-rako, dst=lotu+'/'+bide-izena. dst-"
-"parameter-ek gainidatzi egiten du ezarpen hau"
+"vlc sarrerako transmisio jarraituei entzuteko lortu behar den "
+"helbidea:ataka, laguntzailearen ezarpena dst-rako, dst=lotu+'/'+bide-izena. "
+"dst-parameter-ek gainidatzi egiten du ezarpen hau"
 
 #: modules/stream_out/standard.c:55
 #, fuzzy
@@ -30579,6 +30184,313 @@ msgstr "AAAA; "
 msgid "Media Manager List"
 msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 
+#~ msgid "4:2:0"
+#~ msgstr "4:2:0"
+
+#~ msgid "4:2:2"
+#~ msgstr "4:2:2"
+
+#~ msgid "4:4:4"
+#~ msgstr "4:4:4"
+
+#~ msgid "Rate control method"
+#~ msgstr "Ratioa kontrolatzeko metodoa"
+
+#~ msgid "Method used to encode the video sequence"
+#~ msgstr "Bideo-sekuentzia kodetzeko erabilitako metodoa"
+
+#~ msgid "Constant noise threshold mode"
+#~ msgstr "Etengabeko zarataren muga modua"
+
+#~ msgid "Constant bitrate mode (CBR)"
+#~ msgstr "Etengabeko bit-emari modua ('CBR')"
+
+#~ msgid "Low Delay mode"
+#~ msgstr "Atzerapen txikiko modua"
+
+#~ msgid "Lossless mode"
+#~ msgstr "Galerarik gabeko modua"
+
+#~ msgid "Constant lambda mode"
+#~ msgstr "Etengabeko lambda modua"
+
+#~ msgid "Constant error mode"
+#~ msgstr "Etengabeko errore modua"
+
+#~ msgid "Constant quality mode"
+#~ msgstr "Etengabeko kalitatezko modua"
+
+#~ msgid "GOP structure"
+#~ msgstr "GOP egitura"
+
+#~ msgid "GOP structure used to encode the video sequence"
+#~ msgstr "Bideo-sekuentzia kodetzeko erabilitako GOP egitura"
+
+#~ msgid ""
+#~ "No fixed gop structure. A picture can be intra or inter and refer to "
+#~ "previous or future pictures."
+#~ msgstr ""
+#~ "Finkatu gabeko gop egitura. Irudi bat intra (barnekoa) edo inter "
+#~ "(artekoa) izan daiteke, eta aurreko edo geroko irudi bati egin aipamena."
+
+#~ msgid "I-frame only sequence"
+#~ msgstr "I-marko sekuentzia soilik"
+
+#~ msgid "Inter pictures refere to previous pictures only"
+#~ msgstr "Inter-irudiak aurreko irudietara joko du soilik"
+
+#~ msgid "Inter pictures can refer to previous or future pictures"
+#~ msgstr "Inter-irudiak aurreko irudietara edo aurrerantzekoetara jo dezake"
+
+#~ msgid "Constant quality factor"
+#~ msgstr "Kalitate-faktore konstantea"
+
+#~ msgid "Quality factor to use in constant quality mode"
+#~ msgstr "Kalitatea-faktorea etengabeko kalitate-moduan erabiltzeko"
+
+#~ msgid "Noise Threshold"
+#~ msgstr "Zarataren muga"
+
+#~ msgid "Noise threshold to use in constant noise threshold mode"
+#~ msgstr "Zarata-muga konstante moduan erabiltzeko zarata-muga"
+
+#~ msgid "CBR bitrate (kbps)"
+#~ msgstr "CBR bit-emaria (kb/s)"
+
+#~ msgid "Target bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Xede bit-tasa, kb segundotan, bit tasa konstante batean kodeatzerakoan"
+
+#~ msgid "Maximum bitrate (kbps)"
+#~ msgstr "Gehienezko bit-tasa (kb/s)"
+
+#~ msgid "Maximum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Bit-tasa maximoa, kb segundoko, bit-tasa modu konstantean kodetzerakoan"
+
+#~ msgid "Minimum bitrate (kbps)"
+#~ msgstr "Gutxieneko bit-tasa (kb/s)"
+
+#~ msgid "Minimum bitrate in kbps when encoding in constant bitrate mode"
+#~ msgstr ""
+#~ "Bit-tasa minimoa, kb segundoko, bit-tasa modu konstantean kodetzerakoan"
+
+#~ msgid "GOP length"
+#~ msgstr "GOP luzera"
+
+#~ msgid ""
+#~ "Number of pictures between successive sequence headers i.e. length of the "
+#~ "group of pictures"
+#~ msgstr ""
+#~ "Segidan dauden goi-buruen bitarteko irudi kopurua, hau da, irudi "
+#~ "taldearen luzera"
+
+#~ msgid "Prefilter"
+#~ msgstr "Aurreiragazkia"
+
+#~ msgid "Enable adaptive prefiltering"
+#~ msgstr "Gaitu aurreiragazte moldagarria"
+
+#~ msgid "No pre-filtering"
+#~ msgstr "Aurre-iragazkirik ez"
+
+#~ msgid "Centre Weighted Median"
+#~ msgstr "Batez besteko haztatua erdian"
+
+#~ msgid "Gaussian Low Pass Filter"
+#~ msgstr "Igarotze Txikiko Gaussen Iragazkia"
+
+#~ msgid "Add Noise"
+#~ msgstr "Gehitu zarata"
+
+#~ msgid "Gaussian Adaptive Low Pass Filter"
+#~ msgstr "Igarotze Txikiko Gaussen Iragazki moldagarria"
+
+#~ msgid "Low Pass Filter"
+#~ msgstr "Paso baxuko iragazkia"
+
+#~ msgid "Amount of prefiltering"
+#~ msgstr "Aurreiragazte kopurua"
+
+#~ msgid "Higher value implies more prefiltering"
+#~ msgstr "Balio handiagoak aurreiragazte gehiago esan nahi du"
+
+#~ msgid "Picture coding mode"
+#~ msgstr "Irudiaren kodeketa modua"
+
+#~ msgid ""
+#~ "Field coding is where interlaced fields are coded separately as opposed "
+#~ "to a pseudo-progressive frame"
+#~ msgstr ""
+#~ "Eremu-kodeketan, gurutzelarkatutako eremuak bereizita kodetzen dira, "
+#~ "marko sasiprogresiboetan ez bezala"
+
+#~ msgid "auto - let encoder decide based upon input (Best)"
+#~ msgstr ""
+#~ "automatikoa - utzi kodetzaileari sarreraren arabera erabakitzen (onena)"
+
+#~ msgid "force coding frame as single picture"
+#~ msgstr "behartu kodeketa-markoa irudi soil gisa"
+
+#~ msgid "force coding frame as separate interlaced fields"
+#~ msgstr "behartu markoa bereizitako eremu gurutzelarkatu gisa kodetzea"
+
+#~ msgid "Size of motion compensation blocks"
+#~ msgstr "Mugimendua konpentsatzeko blokeen tamaina"
+
+#~ msgid "automatic - let encoder decide based upon input (Best)"
+#~ msgstr ""
+#~ "automatikoa - utzi kodetzaileari sarreraren arabera erabakitzen (onena)"
+
+#~ msgid "small - use small motion compensation blocks"
+#~ msgstr "txikia - erabili mugimendu orekatze bloke txikiak"
+
+#~ msgid "medium - use medium motion compensation blocks"
+#~ msgstr "ertaina - erabili mugimendu orekatze bloke ertainak"
+
+#~ msgid "large - use large motion compensation blocks"
+#~ msgstr "handia - erabili mugimendu orekatze bloke handiak"
+
+#~ msgid "Overlap of motion compensation blocks"
+#~ msgstr "Blokeen mugitze-orekatzearen gainjartzea"
+
+#~ msgid "none - Motion compensation blocks do not overlap"
+#~ msgstr "ezer ez - Blokeen mugitze-orekatzea gainjartzerik gabe"
+
+#~ msgid "partial - Motion compensation blocks only partially overlap"
+#~ msgstr "partziala - Zatikako blokeen mugitze-orekatze  gainjartzea"
+
+#~ msgid "full - Motion compensation blocks fully overlap"
+#~ msgstr "osoa - Blokeen mugitze-orekatzearen gainjartze osoa"
+
+#~ msgid "Motion Vector precision"
+#~ msgstr "Mugimendu-bektorearen zehaztasuna"
+
+#~ msgid "Motion Vector precision in pels"
+#~ msgstr "Mugimendu-bektorearen zehaztasuna pixeletan"
+
+#~ msgid "Three component motion estimation"
+#~ msgstr "Hiru osagaiko mugimenduaren zenbatespena"
+
+#~ msgid "Use chroma as part of the motion estimation process"
+#~ msgstr "Erabili krominantzia mugimendua zenbatesteko prozesuaren zati gisa"
+
+#~ msgid "Intra picture DWT filter"
+#~ msgstr "Irudi barruko DWT iragazkia"
+
+#~ msgid "Inter picture DWT filter"
+#~ msgstr "Irudi arteko DWT iragazkia"
+
+#~ msgid "Number of DWT iterations"
+#~ msgstr "DWT iterazioen kopurua"
+
+#~ msgid "Also known as DWT levels"
+#~ msgstr "DWT mailak ere deitzen zaie"
+
+#~ msgid "Enable multiple quantizers"
+#~ msgstr "Gaitu kuantizatzaile bat baino gehiago"
+
+#~ msgid "Enable multiple quantizers per subband (one per codeblock)"
+#~ msgstr ""
+#~ "Gaitu kuantizatzaile bat baino gehiago azpibandako (bat kode-blokeko)"
+
+#~ msgid "Disable arithmetic coding"
+#~ msgstr "Desgaitu kodetze aritmetikoa"
+
+#~ msgid "Use variable length codes instead, useful for very high bitrates"
+#~ msgstr ""
+#~ "Erabili luzera aldagarriko kodeak horren ordez; hori erabilgarria da oso "
+#~ "bit-emaria handietarako"
+
+#~ msgid "perceptual weighting method"
+#~ msgstr "Pisatzeko  pertzepzio metodoa"
+
+#~ msgid "perceptual distance"
+#~ msgstr "pertzepzio distantzia"
+
+#~ msgid "perceptual distance to calculate perceptual weight"
+#~ msgstr "pertzepzio distantiza pertzepzio pisua kalkulatzeko"
+
+#~ msgid "Horizontal slices per frame"
+#~ msgstr "Atal horizontalak fotograma bakoitzeko "
+
+#~ msgid "Number of horizontal slices per frame in low delay mode"
+#~ msgstr ""
+#~ "Atal horizontalen kopurua fotograma bakoitzeko atzerapen txikiko moduan"
+
+#~ msgid "Vertical slices per frame"
+#~ msgstr "Atal bertikalak fotograma bakoitzeko"
+
+#~ msgid "Number of vertical slices per frame in low delay mode"
+#~ msgstr ""
+#~ "Atal bertikalen kopurua fotograma bakoitzeko atzerapen txikiko moduan"
+
+#~ msgid "Size of code blocks in each subband"
+#~ msgstr "Kode blokeen tamaina azpi-banda bakoitzean"
+
+#~ msgid "small - use small code blocks"
+#~ msgstr "txiki - erabili kode bloke txikiak"
+
+#~ msgid "medium - use medium sized code blocks"
+#~ msgstr "ertain - erabili kode bloke ertainak"
+
+#~ msgid "large - use large code blocks"
+#~ msgstr "handi - erabili kode bloke handiak"
+
+#~ msgid "full - One code block per subband"
+#~ msgstr "osorik - Kode bloke bat azpi-banda bakoitzeko"
+
+#~ msgid "Enable hierarchical Motion Estimation"
+#~ msgstr "Gaitu hierarkiazko 'Mugimendu estimazioa' "
+
+#~ msgid "Number of levels of downsampling"
+#~ msgstr "Seinale-murrizketaren maila kopurua"
+
+#~ msgid ""
+#~ "Number of levels of downsampling in hierarchical motion estimation mode"
+#~ msgstr ""
+#~ "Seinale-murrizketaren maila kopurua mugimendu zenbatespen hierarkiko "
+#~ "moduan"
+
+#~ msgid "Enable Global Motion Estimation"
+#~ msgstr "Gaitu mugimendu zenbatespen orokorra"
+
+#~ msgid "Enable Phase Correlation Estimation"
+#~ msgstr "Gaitu fase korrelazio zenbatespena"
+
+#~ msgid "Enable Scene Change Detection"
+#~ msgstr "Gaitu eszena aldaketa atzematea"
+
+#~ msgid "Force Profile"
+#~ msgstr "Behartu profila"
+
+#~ msgid "VC2 Low Delay Profile"
+#~ msgstr "VC2 atzerapen txikiko profila"
+
+#~ msgid "VC2 Simple Profile"
+#~ msgstr "VC2 profil arrunta"
+
+#~ msgid "VC2 Main Profile"
+#~ msgstr "VC2 profil nagusia"
+
+#~ msgid "Main Profile"
+#~ msgstr "Profil nagusia"
+
+#~ msgid "Dirac video decoder using libschroedinger"
+#~ msgstr "Dirac bideo deskodetzailea, libschroedinger erabilita"
+
+#~ msgid "Dirac video encoder using libschroedinger"
+#~ msgstr "Dirac bideo kodetzailea, libschroedinger erabilita"
+
+#~ msgid "Value to adjust dts by"
+#~ msgstr "dts zer balioren arabera doitu behar den"
+
+#~ msgid "Dirac video demuxer"
+#~ msgstr "Dirac bideo-demultiplexadorea"
+
+#~ msgid "Dirac packetizer"
+#~ msgstr "Dirac paketatzailea"
+
 #, fuzzy
 #~ msgid "The Sound Font file (SF2/DLS) to use for synthesis."
 #~ msgstr "Soinuen letra-tipoen fitxategia behar da software-sintesirako."
@@ -30789,9 +30701,9 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 #~ msgstr "RTSP pasahitza"
 
 #~ msgid ""
-#~ "HTTP proxy to be used It must be of the form http://[user[:pass]@]myproxy."
-#~ "mydomain:myport/ ; if empty, the http_proxy environment variable will be "
-#~ "tried."
+#~ "HTTP proxy to be used It must be of the form http://"
+#~ "[user[:pass]@]myproxy.mydomain:myport/ ; if empty, the http_proxy "
+#~ "environment variable will be tried."
 #~ msgstr ""
 #~ "Erabili beharreko HTTP proxyak forma hau eduki behar du: http://"
 #~ "[erabiltzailea[:pasahitza]@]nireproxya.niredomeinua:nireataka/ ; hutsik "
@@ -33052,16 +32964,16 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 #~ msgid ""
 #~ "Force the subtiles format. Valid values are : \"microdvd\", \"subrip\", "
 #~ "\"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", \"sami\", "
-#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", \"psb"
-#~ "\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
+#~ "\"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", \"jacosub\", "
+#~ "\"psb\", \"realtext\", \"dks\", \"subviewer1\",  and \"auto\" (meaning "
 #~ "autodetection, this should always work)."
 #~ msgstr ""
 #~ "Behartu azpitituluen formatua Balio hauek erabil daitezke : \"microdvd\", "
 #~ "\"subrip\", \"subviewer\", \"ssa1\", \"ssa2-4\", \"ass\", \"vplayer\", "
 #~ "\"sami\", \"dvdsubtitle\", \"mpl2\", \"aqt\", \"pjs\", \"mpsub\", "
-#~ "\"jacosub\", \"psb\", \"realtext\", \"dks\", \"subviewer1\" eta \"auto"
-#~ "\" (horrek detekzio automatikoa esan nahi du, eta beti funtzionatu "
-#~ "beharko luke)."
+#~ "\"jacosub\", \"psb\", \"realtext\", \"dks\", \"subviewer1\" eta \"auto\" "
+#~ "(horrek detekzio automatikoa esan nahi du, eta beti funtzionatu beharko "
+#~ "luke)."
 
 #~ msgid "Do not complain on encrypted PES."
 #~ msgstr "Ez egin protestarik enkriptatutako PESetan."
@@ -33212,8 +33124,8 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 #~ "Specify the log format. Available choices are \"text\" (default) and "
 #~ "\"html\"."
 #~ msgstr ""
-#~ "Zehaztu egunkari-formatua. Erabilgarri dauden aukerak \"testua"
-#~ "\" (lehenetsia) eta \"html\" dira."
+#~ "Zehaztu egunkari-formatua. Erabilgarri dauden aukerak \"testua\" "
+#~ "(lehenetsia) eta \"html\" dira."
 
 #~ msgid ""
 #~ "Select the syslog facility where logs will be forwarded. Available "
@@ -33462,12 +33374,12 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 
 #~ msgid ""
 #~ "Use a unique dbus service id to identify this VLC instance on the DBUS "
-#~ "bus. The process identifier (PID) is added to the service name: org.mpris."
-#~ "vlc-<pid>"
+#~ "bus. The process identifier (PID) is added to the service name: "
+#~ "org.mpris.vlc-<pid>"
 #~ msgstr ""
 #~ "Erabili dbus zerbitzu id bakarra VLC-ren eskabide hau DBUS busean "
-#~ "ezagutzeko. Prozesu ezagupena (PID) gehitzen da zerbitzu izenera: org."
-#~ "mpris.vlc-<pid>"
+#~ "ezagutzeko. Prozesu ezagupena (PID) gehitzen da zerbitzu izenera: "
+#~ "org.mpris.vlc-<pid>"
 
 #~ msgid ""
 #~ "To make sure that VLC no longer listens to your media key events, it "
@@ -33512,8 +33424,8 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 #~ msgstr "S/PDIF"
 
 #~ msgid ""
-#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", \"u16_be"
-#~ "\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
+#~ "One of \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
+#~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" or \"spdif\""
 #~ msgstr ""
 #~ "Hauetako bat:  \"u8\", \"s8\", \"u16\", \"s16\", \"u16_le\", \"s16_le\", "
 #~ "\"u16_be\", \"s16_be\", \"fixed32\", \"float32\" edo \"spdif\""
@@ -33528,12 +33440,12 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 #~ msgstr "Audioaren aurrerapena bideoarekiko:"
 
 #~ msgid ""
-#~ "Specify the log format. Available choices are \"text\" (default), \"html"
-#~ "\", and \"syslog\" (special mode to send to syslog instead of file."
+#~ "Specify the log format. Available choices are \"text\" (default), "
+#~ "\"html\", and \"syslog\" (special mode to send to syslog instead of file."
 #~ msgstr ""
-#~ "Zehaztu egunkari-formatua. Erabilgarri dauden aukerak hauek dira: \"testua"
-#~ "\" (lehenetsia), \"html\" eta  \"syslog\" (fitxategiaren ordez syslog-era "
-#~ "bidaltzeko modu berezia."
+#~ "Zehaztu egunkari-formatua. Erabilgarri dauden aukerak hauek dira: "
+#~ "\"testua\" (lehenetsia), \"html\" eta  \"syslog\" (fitxategiaren ordez "
+#~ "syslog-era bidaltzeko modu berezia."
 
 #~ msgid ""
 #~ "This defines the address, port and path the RTSP VOD server will listen "
@@ -34494,20 +34406,21 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 #~ "</style></head><body style=\" font-family:'DejaVu Sans'; font-size:8pt; "
 #~ "font-weight:400; font-style:normal;\">\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.example.com/stream.avi</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.example.com/stream.avi</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtp://@:1234</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtp://@:1234</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></html>"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></"
+#~ "html>"
 #~ msgstr ""
 #~ "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/"
 #~ "REC-html40/strict.dtd\">\n"
@@ -34517,20 +34430,21 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 #~ "</style></head><body style=\" font-family:'DejaVu Sans'; font-size:8pt; "
 #~ "font-weight:400; font-style:normal;\">\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.example.com/stream.avi</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.example.com/stream.avi</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtp://@:1234</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtp://@:1234</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">mms://mms.examples.com/stream.asx</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">rtsp://server.example.org:8080/test.sdp</span></p>\n"
 #~ "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-"
-#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" color:"
-#~ "#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></html>"
+#~ "right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" "
+#~ "color:#838383;\">http://www.yourtube.com/watch?v=gg64x</span></p></body></"
+#~ "html>"
 
 #~ msgid "Use GPU acceleration (experimental)"
 #~ msgstr "Erabili PUZ azelerazioa (esperimentala)"
@@ -35124,10 +35038,10 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 
 #, fuzzy
 #~ msgid ""
-#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title"
-#~ "\" ($a - $t). You can use the following substitutions: $a Artist, $b "
-#~ "Album, $c Copyright, $d Description, $e Encoder, $g Genre, $l Language, "
-#~ "$n number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
+#~ "Format of the string to send to Telepathy.Defaults to \"Artist - Title\" "
+#~ "($a - $t). You can use the following substitutions: $a Artist, $b Album, "
+#~ "$c Copyright, $d Description, $e Encoder, $g Genre, $l Language, $n "
+#~ "number, $p Now Playing, $r Rating, $s Subtitles language, $t Title, $u "
 #~ "URL, $A Date, $B Bitrate, $C Chapter, $D Duration, $F URI, $I Video "
 #~ "Title, $L Time Remaining, $N Name, $O Audio language, $P Position, $R "
 #~ "Rate, $S Sample rate, $T Time elapsed, $U Publisher, $V Volume"
@@ -35600,8 +35514,8 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 #~ "Number of image rows in the mosaic (only used if positionning method is "
 #~ "set to \"fixed\")."
 #~ msgstr ""
-#~ "Mosaikoko irudi-errenkaden zenbatekoa (soilik kokatzeko metodoa \"finkoa"
-#~ "\" ezartzen bada erabiliko da)."
+#~ "Mosaikoko irudi-errenkaden zenbatekoa (soilik kokatzeko metodoa "
+#~ "\"finkoa\" ezartzen bada erabiliko da)."
 
 #, fuzzy
 #~ msgid ""
@@ -37229,11 +37143,11 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 #~ "            and that overrides previous settings.\n"
 #~ "\n"
 #~ "Stream MRL syntax:\n"
-#~ "  [[access][/demux]://]URL[@[title][:chapter][-[title][:chapter]]] [:"
-#~ "option=value ...]\n"
+#~ "  [[access][/demux]://]URL[@[title][:chapter][-[title][:chapter]]] "
+#~ "[:option=value ...]\n"
 #~ "\n"
-#~ "  Many of the global --options can also be used as MRL specific :"
-#~ "options.\n"
+#~ "  Many of the global --options can also be used as MRL "
+#~ "specific :options.\n"
 #~ "  Multiple :option=value pairs can be specified.\n"
 #~ "\n"
 #~ "URL syntax:\n"
@@ -37264,8 +37178,8 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 #~ "            gainidazten dituen aukera.\n"
 #~ "\n"
 #~ "Korrontearen MRL sintaxia:\n"
-#~ "  [[access][/demux]://]URL[#[titulua][:kapitulua][-[titulua][:"
-#~ "kapitulua]]]\n"
+#~ "  [[access][/demux]://]URL[#[titulua][:kapitulua][-[titulua]"
+#~ "[:kapitulua]]]\n"
 #~ "  [:aukera=balioa ...]\n"
 #~ "\n"
 #~ "  --aukera orokorretako asko MRLren :aukera gisa erabil daitezke.\n"
@@ -37363,14 +37277,15 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 #~ msgid ""
 #~ "These options allow you to modify the behavior of the subpictures "
 #~ "subsystem. You can for example enable subpictures filters (logo, etc.). "
-#~ "Enable these filters here and configure them in the \"subpictures filters"
-#~ "\" modules section. You can also set many miscellaneous subpictures "
-#~ "options."
+#~ "Enable these filters here and configure them in the \"subpictures "
+#~ "filters\" modules section. You can also set many miscellaneous "
+#~ "subpictures options."
 #~ msgstr ""
 #~ "Aukera hauen bidez azpiirudien azpisistemaren portaera alda dezakezu. "
 #~ "Adibidez, azpiirudien iturburuak gaitu ditzakezu (logoa, etab.). Gaitu "
-#~ "iragazki horiek hemen, eta konfigura itzazu \"azpi-iturburuen iragazkiak"
-#~ "\" moduluen atalean. Askotariko azpiirudi-aukera ugari ere ezar ditzakezu."
+#~ "iragazki horiek hemen, eta konfigura itzazu \"azpi-iturburuen "
+#~ "iragazkiak\" moduluen atalean. Askotariko azpiirudi-aukera ugari ere ezar "
+#~ "ditzakezu."
 
 #, fuzzy
 #~ msgid ""
@@ -40023,8 +39938,8 @@ msgstr "Multimedia-fitxategien kudeatzaileen zerrenda"
 #~ msgid ""
 #~ "Containers (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv)"
 #~ msgstr ""
-#~ "Edukiontziak (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv *."
-#~ "webm)"
+#~ "Edukiontziak (*.ps *.ts *.mpg *.ogg *.asf *.mp4 *.mov *.wav *.raw *.flv "
+#~ "*.webm)"
 
 #, fuzzy
 #~ msgid "Key"
