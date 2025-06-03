@@ -743,7 +743,25 @@ out:
 
 #define A52_FRAME_NB 1536
 
-/** Initializes an ALSA playback stream */
+static bool passthrough_type_ok(audio_output_t * const aout, aout_sys_t * const sys, const vlc_fourcc_t fmt)
+{
+    const vlc_fourcc_t *p;
+
+    if (sys->passthrough_types == NULL)
+        return true;
+
+    // VLC_CODEC_UNKNOWN used as explicit "all"
+    for (p = sys->passthrough_types; *p != 0; ++p)
+        if (*p == fmt || *p == VLC_CODEC_UNKNOWN)
+            return true;
+
+    msg_Dbg(aout, "Codec %.4s not in passthrough-types", (const char *)&fmt);
+    return false;
+}
+
+/** Initializes an ALSA playback stream
+ *  Return EGENERIC if stream is passthrough but passthrough
+ *  not allowed rather than changing fmt */
 static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
 {
     struct vlc_logger *log = aout->obj.logger;
@@ -778,19 +796,8 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
         default:
             if (AOUT_FMT_SPDIF(fmt) || AOUT_FMT_HDMI(fmt))
             {
-                if (sys->passthrough_types != NULL)
-                {
-                    // VLC_CODEC_UNKNOWN used as explicit "all"
-                    const vlc_fourcc_t *p;
-                    for (p = sys->passthrough_types; *p != 0 || *p == VLC_CODEC_UNKNOWN; ++p)
-                        if (*p == fmt->i_format)
-                            break;
-                    if (*p == 0)
-                    {
-                        msg_Dbg(aout, "Codec %.4s not in passthrough-types", (const char *)&fmt->i_format);
-                        return VLC_EGENERIC;
-                    }
-                }
+                if (!passthrough_type_ok(aout, sys, fmt->i_format))
+                    return VLC_EGENERIC;
 
                 passthrough = var_InheritInteger(aout, PASSTHROUGH_NAME);
                 // Explicit passthrough will override spdif
@@ -799,6 +806,8 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                         var_InheritBool(aout, "spdif") ? PASSTHROUGH_SPDIF :
                         sys->passthrough_types != NULL ? PASSTHROUGH_HDMI : PASSTHROUGH_NONE;
                 msg_Dbg(aout, "Passthrough %d for format %4.4s", passthrough, (const char *)&fmt->i_format);
+                if (passthrough == PASSTHROUGH_NONE)
+                    return VLC_EGENERIC;
             }
 
             if (passthrough != PASSTHROUGH_NONE)
@@ -811,15 +820,16 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                     case VLC_CODEC_MLP:
                     case VLC_CODEC_TRUEHD:
                         if (passthrough == PASSTHROUGH_SPDIF)
-                            break;
+                            return VLC_EGENERIC;
                         sys->pause_bytes = 4 * 4;
                         arate    = fmt->i_rate % 44100 == 0 ? 176400 : 192000;
                         channels = 8;
                         break;
 
                     case VLC_CODEC_DTS:
+//                    case VLC_CODEC_DTSHD:
                         if (passthrough == PASSTHROUGH_SPDIF)
-                            break;
+                            return VLC_EGENERIC;
                         arate    = 192000;
                         channels = 8;
                         break;
@@ -910,6 +920,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     /* VLC always has a resampler. No need for ALSA's. */
     const int mode = SND_PCM_NO_AUTO_RESAMPLE | SND_PCM_NONBLOCK;
 
+    msg_Info(aout, "Alsa device='%s'", device);
     int val = snd_pcm_open (&pcm, device, SND_PCM_STREAM_PLAYBACK, mode);
     if (val != 0)
     {
@@ -1102,11 +1113,14 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     }
 
     /* Setup audio_output_t */
-    if (passthrough != PASSTHROUGH_NONE)
-    {
-        fmt->i_bytes_per_frame = AOUT_SPDIF_SIZE * (channels / 2);
-        fmt->i_frame_length = A52_FRAME_NB;
-    }
+//    if (passthrough != PASSTHROUGH_NONE)
+//    {
+//        fmt->i_bytes_per_frame = AOUT_SPDIF_SIZE * (channels / 2);
+//        fmt->i_frame_length = A52_FRAME_NB;
+//    }
+    fmt->i_frame_length = 1;
+    fmt->i_bytes_per_frame = snd_pcm_frames_to_bytes(pcm, fmt->i_frame_length);
+
     fmt->channel_type = AUDIO_CHANNEL_TYPE_BITMAP;
     sys->format = fmt->i_format;
 
