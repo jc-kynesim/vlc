@@ -2298,6 +2298,10 @@ static int Open(vout_display_t *vd,
     video_format_t req_fmt;
     VLC_UNUSED(context);
 
+    // If not under Wayland give up quickly
+    if (vd->cfg->window == NULL || vd->cfg->window->type != VLC_WINDOW_TYPE_WAYLAND)
+        return VLC_EGENERIC;
+
     if (!var_InheritBool(vd, WL_DMABUF_ENABLE_NAME))
         return VLC_EGENERIC;
 
@@ -2320,10 +2324,6 @@ static int Open(vout_display_t *vd,
 
         /* Get window */
     sys->embed = vd->cfg->window;
-    if (sys->embed == NULL) {
-        msg_Dbg(vd, "Cannot create window - probably not using Wayland");
-        goto error;
-    }
     sys->last_embed_surface = sys->embed->handle.wl;
 //    sys->last_embed_seq = sys->embed->handle_seq;
 
