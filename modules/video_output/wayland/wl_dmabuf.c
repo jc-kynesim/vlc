@@ -1175,7 +1175,7 @@ spe_changed(const subpic_ent_t * const spe, const struct subpicture_region_rende
 
 static void
 spe_update_rect(subpic_ent_t * const spe,
-                const vout_display_cfg_t * const cfg,
+                const vout_display_place_t * const orig,
                 const picture_t * const pic,
                 const struct subpicture_region_rendered * const sreg)
 {
@@ -1186,12 +1186,7 @@ spe_update_rect(subpic_ent_t * const spe,
         .height = pic->format.i_visible_height,
     };
     spe->dst_rect = sreg->place;
-    spe->orig_rect = (vout_display_place_t) {
-        .x = 0,
-        .y = 0,
-        .width  = cfg->display.width,
-        .height = cfg->display.height
-    };
+    spe->orig_rect = *orig;
 }
 
 static subpic_ent_t *
@@ -1232,7 +1227,7 @@ spe_new(vout_display_t * const vd, vout_display_sys_t * const sys,
 
     spe->alpha = sreg->i_alpha;
 
-    spe_update_rect(spe, vd->cfg, spic, sreg);
+    spe_update_rect(spe, &sys->video_spe_prep->orig_rect, spic, sreg);
 
     spe->pt = polltask_new_timer(sys->speq, spe_convert_cb, spe);
 
@@ -1803,8 +1798,6 @@ wl_dmabuf_prepare(vout_display_t *vd, picture_t *pic,
         wl_display_flush(video_display(sys)); // Kick off any work required by Wayland
     }
 
-#if 1
-
     if (subpic)
     {
         const struct subpicture_region_rendered *sreg;
@@ -1819,15 +1812,16 @@ wl_dmabuf_prepare(vout_display_t *vd, picture_t *pic,
             if (plane->spe_next != NULL)
             {
                 if (!spe_changed(plane->spe_next, sreg))
-                    spe_update_rect(plane->spe_next, vd->cfg, src, sreg);
+                    spe_update_rect(plane->spe_next, &sys->video_spe_prep->orig_rect, src, sreg);
                 // else if changed ignore as we are already doing stuff
             }
             else
             {
                 if (!spe_changed(plane->spe_cur, sreg))
-                    spe_update_rect(plane->spe_cur, vd->cfg, src, sreg);
+                    spe_update_rect(plane->spe_cur, &sys->video_spe_prep->orig_rect, src, sreg);
                 else
                 {
+                    plane->spe_next = spe_new(vd, sys, src, sreg);
                     plane->spe_next = spe_new(vd, sys, src, sreg);
                     spe_convert(plane->spe_next);
                 }
@@ -1842,41 +1836,9 @@ wl_dmabuf_prepare(vout_display_t *vd, picture_t *pic,
 
             // If we've run out of subplanes we could allocate - give up now
             if (++n == MAX_SUBPICS)
-                goto subpics_done;
+                break;
         }
     }
-#else
-
-    // Attempt to import the subpics
-    for (const subpicture_t * spic = subpic; spic != NULL; spic = spic->p_next)
-    {
-        for (const subpicture_region_t *sreg = spic->p_region; sreg != NULL; sreg = sreg->p_next)
-        {
-            subplane_t * const plane = sys->planes + n + PLANE_SUB;
-
-            if (plane->spe_next != NULL)
-            {
-                if (!spe_changed(plane->spe_next, sreg))
-                    spe_update_rect(plane->spe_next, spic, sreg);
-                // else if changed ignore as we are already doing stuff
-            }
-            else
-            {
-                if (!spe_changed(plane->spe_cur, sreg))
-                    spe_update_rect(plane->spe_cur, spic, sreg);
-                else
-                {
-                    plane->spe_next = spe_new(vd, sys, spic, sreg);
-                    spe_convert(plane->spe_next);
-                }
-            }
-
-            if (++n == MAX_SUBPICS)
-                goto subpics_done;
-        }
-    }
-#endif
-subpics_done:
 
     // Clear any other entries
     for (; n != MAX_SUBPICS; ++n) {
