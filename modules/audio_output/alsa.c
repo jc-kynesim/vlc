@@ -610,6 +610,8 @@ static void Stop (audio_output_t *aout)
     vlc_join(sys->thread, NULL);
 
     snd_pcm_close(pcm);
+
+    msg_Info(aout, ">>> Stop");
 }
 
 #if (SND_LIB_VERSION >= 0x01001B)
@@ -769,7 +771,6 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     snd_pcm_format_t pcm_format; /* ALSA sample format */
     unsigned channels;
     int passthrough = PASSTHROUGH_NONE;
-    unsigned int arate = fmt->i_rate;
 
     msg_Dbg(aout, "Start: Format: %.4s, Chans: %d, Rate:%d", (char*)&fmt->i_format, aout_FormatNbChannels(fmt), fmt->i_rate);
 
@@ -794,6 +795,8 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
             pcm_format = SND_PCM_FORMAT_U8;
             break;
         default:
+            // Validate passthrough format against list of allowed formats
+            // and passthrough type
             if (AOUT_FMT_SPDIF(fmt) || AOUT_FMT_HDMI(fmt))
             {
                 if (!passthrough_type_ok(aout, sys, fmt->i_format))
@@ -806,43 +809,51 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                         var_InheritBool(aout, "spdif") ? PASSTHROUGH_SPDIF :
                         sys->passthrough_types != NULL ? PASSTHROUGH_HDMI : PASSTHROUGH_NONE;
                 msg_Dbg(aout, "Passthrough %d for format %4.4s", passthrough, (const char *)&fmt->i_format);
-                if (passthrough == PASSTHROUGH_NONE)
+                if (passthrough == PASSTHROUGH_NONE ||
+                    (passthrough == PASSTHROUGH_SPDIF && !AOUT_FMT_SPDIF(fmt)))
                     return VLC_EGENERIC;
             }
 
+            // Get bitrate & channels
             if (passthrough != PASSTHROUGH_NONE)
             {
-                pcm_format = SND_PCM_FORMAT_S16;
-                sys->pause_bytes = 3 * 4;
-                channels    = 2;
-
-                switch (fmt->i_format) {
-                    case VLC_CODEC_MLP:
+                switch( fmt->i_format )
+                {
                     case VLC_CODEC_TRUEHD:
-                        if (passthrough == PASSTHROUGH_SPDIF)
-                            return VLC_EGENERIC;
-                        sys->pause_bytes = 4 * 4;
-                        arate    = fmt->i_rate % 44100 == 0 ? 176400 : 192000;
-                        channels = 8;
-                        break;
+                    case VLC_CODEC_MLP:
+                        fmt->i_rate = 192000;
+                        fmt->i_bytes_per_frame = 16;
 
+                        /* AudioFormat.ENCODING_IEC61937 documentation says that the
+                         * channel layout must be stereo. Well, not for TrueHD
+                         * apparently */
+                        fmt->i_physical_channels = AOUT_CHANS_7_1;
+                        break;
                     case VLC_CODEC_DTS:
-//                    case VLC_CODEC_DTSHD:
-                        if (passthrough == PASSTHROUGH_SPDIF)
-                            return VLC_EGENERIC;
-                        arate    = 192000;
-                        channels = 8;
+                        fmt->i_bytes_per_frame = 4;
+                        fmt->i_physical_channels = AOUT_CHANS_STEREO;
                         break;
-
+                    case VLC_CODEC_DTSHD:
+                        fmt->i_physical_channels = AOUT_CHANS_STEREO;
+                        fmt->i_rate = 192000;
+                        fmt->i_bytes_per_frame = 16;
+                        break;
                     case VLC_CODEC_EAC3:
-                        sys->pause_bytes = 4 * 4;
-                        arate   = fmt->i_rate * 4;
+                        fmt->i_rate = 192000;
+                        /* FALLTHRU */
+                    case VLC_CODEC_A52:
+                        fmt->i_physical_channels = AOUT_CHANS_STEREO;
+                        fmt->i_bytes_per_frame = 4;
                         break;
-
                     default:
-                        break;
+                        return VLC_EGENERIC;
                 }
+                fmt->i_frame_length = 1;
+                fmt->i_channels = aout_FormatNbChannels( fmt );
                 fmt->i_format = VLC_CODEC_SPDIFL;
+
+                pcm_format = SND_PCM_FORMAT_S16;
+                channels = fmt->i_bytes_per_frame / 2;
             }
             else
             if (HAVE_FPU)
@@ -887,7 +898,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
 #ifdef IEC958_AES3_CON_FS_22050
         unsigned aes3;
 
-        switch (arate)
+        switch (fmt->i_rate)
         {
 #define FS(freq) \
             case freq: aes3 = IEC958_AES3_CON_FS_ ## freq; break;
@@ -921,7 +932,17 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     const int mode = SND_PCM_NO_AUTO_RESAMPLE | SND_PCM_NONBLOCK;
 
     msg_Info(aout, "Alsa device='%s'", device);
-    int val = snd_pcm_open (&pcm, device, SND_PCM_STREAM_PLAYBACK, mode);
+
+    int val;
+    for (int i = 0; i != 10; ++i)
+    {
+        val = snd_pcm_open(&pcm, device, SND_PCM_STREAM_PLAYBACK, mode);
+        if (val == 0)
+            break;
+        usleep(500000);
+        msg_Err (aout, "cannot open ALSA device \"%s\": %s; attempt %d", device,
+                 snd_strerror (val), i);
+    }
     if (val != 0)
     {
         msg_Err (aout, "cannot open ALSA device \"%s\": %s", device,
@@ -1023,14 +1044,14 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     }
 
     /* Set sample rate */
-    msg_Dbg(aout, "Set rate: %d", arate);
-    val = snd_pcm_hw_params_set_rate_near (pcm, hw, &arate, NULL);
+    msg_Dbg(aout, "Set rate: %d", fmt->i_rate);
+    val = snd_pcm_hw_params_set_rate_near (pcm, hw, &fmt->i_rate, NULL);
     if (val)
     {
         msg_Err (aout, "cannot set sample rate: %s", snd_strerror (val));
         goto error;
     }
-    sys->rate = arate;
+    sys->rate = fmt->i_rate;
 
 #if 1 /* work-around for period-long latency outputs (e.g. PulseAudio): */
     param = AOUT_MIN_PREPARE_TIME;
