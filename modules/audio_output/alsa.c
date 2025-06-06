@@ -45,7 +45,7 @@
 #include <alsa/asoundlib.h>
 #include <alsa/version.h>
 
-enum {
+enum passthrough_e {
     PASSTHROUGH_UNSET = -1,
     PASSTHROUGH_NONE = 0,
     PASSTHROUGH_SPDIF,
@@ -60,6 +60,24 @@ static const int passthrough_modes[] = {
 static const char *const passthrough_modes_text[] = {
     N_("None"), N_("S/PDIF"), N_("HDMI"),
 };
+
+#define AUDIO_PCM_DEVICE_DEFAULT "default"
+#define AUDIO_PCM_DEVICE_NAME "alsa-audio-pcm-device"
+#define AUDIO_PCM_DEVICE_TEXT N_("Audio device for PCM")
+#define AUDIO_PCM_DEVICE_LONGTEXT N_("Audio device for PCM playback. Defaults to value of alsa-audio-device  if set, '"\
+    AUDIO_PCM_DEVICE_DEFAULT "' otherwise")
+
+#define AUDIO_SPDIF_DEVICE_DEFAULT "iec958"
+#define AUDIO_SPDIF_DEVICE_NAME "alsa-audio-spdif-device"
+#define AUDIO_SPDIF_DEVICE_TEXT N_("Audio device for SPDIF")
+#define AUDIO_SPDIF_DEVICE_LONGTEXT N_("Audio device for SPDIF playback. Defaults to value of alsa-audio-device if set, '"\
+    AUDIO_SPDIF_DEVICE_DEFAULT "' otherwise")
+
+#define AUDIO_HDMI_DEVICE_DEFAULT "hdmi"
+#define AUDIO_HDMI_DEVICE_NAME "alsa-audio-hdmi-device"
+#define AUDIO_HDMI_DEVICE_TEXT N_("Audio device for HDMI")
+#define AUDIO_HDMI_DEVICE_LONGTEXT N_("Audio device for HDMI playback. Defaults to value of  alsa-audio-device if set, '"\
+    AUDIO_HDMI_DEVICE_DEFAULT "' otherwise")
 
 #define PASSTHROUGH_TYPES_NAME "alsa-passthrough-types"
 #define PASSTHROUGH_TYPES_TEXT N_("List of codecs to accept for passthrough")
@@ -204,6 +222,9 @@ typedef struct
     bool soft_mute;
     float soft_gain;
     char *device;
+    char *pcm_device;
+    char *spdif_device;
+    char *hdmi_device;
 
     vlc_thread_t thread;
     pb_state_t state;
@@ -761,6 +782,22 @@ static bool passthrough_type_ok(audio_output_t * const aout, aout_sys_t * const 
     return false;
 }
 
+static const char * get_device_name(aout_sys_t * const sys, enum passthrough_e pass)
+{
+    if (sys->device != NULL)
+        return sys->device;
+    switch (pass)
+    {
+        case PASSTHROUGH_SPDIF:
+            return sys->spdif_device != NULL ? sys->spdif_device : AUDIO_SPDIF_DEVICE_DEFAULT;
+        case PASSTHROUGH_HDMI:
+            return sys->hdmi_device != NULL ? sys->hdmi_device : AUDIO_HDMI_DEVICE_DEFAULT;
+        default:
+            break;
+    }
+    return sys->pcm_device != NULL ? sys->pcm_device : AUDIO_PCM_DEVICE_DEFAULT;
+}
+
 /** Initializes an ALSA playback stream
  *  Return EGENERIC if stream is passthrough but passthrough
  *  not allowed rather than changing fmt */
@@ -868,7 +905,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
             }
     }
 
-    const char *device = sys->device;
+    const char *device = get_device_name(sys, passthrough);
 
     /* Choose the device for passthrough output */
     char sep = '\0';
@@ -930,8 +967,6 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     snd_pcm_t *pcm;
     /* VLC always has a resampler. No need for ALSA's. */
     const int mode = SND_PCM_NO_AUTO_RESAMPLE | SND_PCM_NONBLOCK;
-
-    msg_Info(aout, "Alsa device='%s'", device);
 
     int val;
     for (int i = 0; i != 10; ++i)
@@ -1271,8 +1306,9 @@ static int Open(vlc_object_t *obj)
 #endif
 
     sys->device = var_InheritString (aout, "alsa-audio-device");
-    if (unlikely(sys->device == NULL))
-        goto error;
+    sys->pcm_device = var_InheritString (aout, AUDIO_PCM_DEVICE_NAME);
+    sys->spdif_device = var_InheritString (aout, AUDIO_SPDIF_DEVICE_NAME);
+    sys->hdmi_device = var_InheritString (aout, AUDIO_HDMI_DEVICE_NAME);
 
     aout->sys = sys;
     aout->start = Start;
@@ -1334,6 +1370,9 @@ static void Close(vlc_object_t *obj)
     aout_sys_t *sys = aout->sys;
 
     free (sys->device);
+    free (sys->pcm_device);
+    free (sys->spdif_device);
+    free (sys->hdmi_device);
     if (sys->wakefd[1] != sys->wakefd[0])
       vlc_close(sys->wakefd[1]);
     vlc_close(sys->wakefd[0]);
@@ -1361,8 +1400,14 @@ vlc_module_begin()
     set_shortname("ALSA")
     set_description(N_("ALSA audio output"))
     set_subcategory(SUBCAT_AUDIO_AOUT)
-    add_string("alsa-audio-device", "default",
+    add_string("alsa-audio-device", NULL,
                AUDIO_DEV_TEXT, AUDIO_DEV_LONGTEXT)
+    add_string(AUDIO_PCM_DEVICE_NAME, NULL,
+               AUDIO_PCM_DEVICE_TEXT, AUDIO_PCM_DEVICE_LONGTEXT)
+    add_string(AUDIO_SPDIF_DEVICE_NAME, NULL,
+               AUDIO_SPDIF_DEVICE_TEXT, AUDIO_SPDIF_DEVICE_LONGTEXT)
+    add_string(AUDIO_HDMI_DEVICE_NAME, NULL,
+               AUDIO_HDMI_DEVICE_TEXT, AUDIO_HDMI_DEVICE_LONGTEXT)
     add_integer("alsa-audio-channels", AOUT_CHANS_FRONT,
                 AUDIO_CHAN_TEXT, AUDIO_CHAN_LONGTEXT)
         change_integer_list (channels, channels_text)
