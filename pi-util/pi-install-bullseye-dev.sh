@@ -51,6 +51,7 @@ libpam0g-dev \
 libpango1.0-dev \
 libpci-dev \
 libpcre3-dev \
+libpipewire-0.3-dev \
 libssl-dev \
 libudev-dev \
 libx11-dev \
