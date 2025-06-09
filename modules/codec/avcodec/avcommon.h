@@ -96,7 +96,7 @@ static inline void vlc_init_avutil(vlc_object_t *obj)
         break;
     case VLC_MSG_DBG + 1:
         level = AV_LOG_DEBUG;
-        break
+        break;
     default:
         if (verbose + VLC_MSG_ERR >= VLC_MSG_DBG+2)
             level = AV_LOG_TRACE;
