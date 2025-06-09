@@ -48,7 +48,7 @@ Date:   Wed Jun 12 10:59:10 2024 +0100
     Previously all output was via shm which can be inefficient.
     Depends on some files from drmu for DRM format info.
 
-commit e709884402ffeec286c377e3a9dc0127723b6894
+commit e709884402ffeec286c377e3a9dc0127723b6894 - Done
 Author: John Cox <jc@kynesim.co.uk>
 Date:   Wed Jun 12 10:54:53 2024 +0100
 
@@ -88,7 +88,7 @@ Date:   Wed Jun 12 10:03:51 2024 +0100
     
     * Would be worth finding a test case for this
 
-commit 9a767f3601b8e4f0d759cd2c8b432c4ade872db0
+commit 9a767f3601b8e4f0d759cd2c8b432c4ade872db0 - Pause/next now works but pause/play doesn't! - Skip
 Author: John Cox <jc@kynesim.co.uk>
 Date:   Tue Jun 11 18:49:22 2024 +0100
 
@@ -184,7 +184,7 @@ Date:   Tue Oct 22 15:42:27 2024 +0100
     This allows a module to create extra planes of the correct
     size and position in wayland.
 
-commit c6dfc209f90679d6ad52d1ce418ceb3a4eb69cc3
+commit c6dfc209f90679d6ad52d1ce418ceb3a4eb69cc3 - Ignore - seems unneeded
 Author: John Cox <jc@kynesim.co.uk>
 Date:   Tue Jun 11 17:05:36 2024 +0100
 
@@ -197,7 +197,7 @@ Date:   Tue Jun 11 17:05:36 2024 +0100
     Use the new window handle locks to signal this to the player to avoid it
     trying to use stale handles which will crash VLC.
 
-commit 0bdf4459758d351d03235fbe093c2189f416cc45
+commit 0bdf4459758d351d03235fbe093c2189f416cc45 - Ignore - seems unneeded
 Author: John Cox <jc@kynesim.co.uk>
 Date:   Wed Nov 1 10:42:57 2023 +0000
 
