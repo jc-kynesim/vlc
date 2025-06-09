@@ -511,6 +511,25 @@ static struct vlc_pw_stream *vlc_pw_stream_create(audio_output_t *aout,
             fmt->i_channels = 2;
             encoding = SPA_AUDIO_IEC958_CODEC_DTS;
             break;
+        case VLC_CODEC_TRUEHD:
+        case VLC_CODEC_MLP:
+            fmt->i_rate = 192000;
+            fmt->i_format = VLC_CODEC_SPDIFL;
+            fmt->i_bytes_per_frame = 16;
+            fmt->i_frame_length = 1;
+            fmt->i_physical_channels = AOUT_CHANS_7_1;
+            fmt->i_channels = 2;
+            encoding = SPA_AUDIO_IEC958_CODEC_TRUEHD;
+            break;
+        case VLC_CODEC_DTSHD:
+            fmt->i_rate = 192000;
+            fmt->i_format = VLC_CODEC_SPDIFL;
+            fmt->i_bytes_per_frame = 16;
+            fmt->i_frame_length = 1;
+            fmt->i_physical_channels = AOUT_CHANS_2_0;
+            fmt->i_channels = 2;
+            encoding = SPA_AUDIO_IEC958_CODEC_DTSHD;
+            break;
         default:
             vlc_pw_error(sys->context, "unknown format");
             errno = ENOTSUP;
