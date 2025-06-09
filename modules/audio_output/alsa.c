@@ -240,6 +240,14 @@ typedef struct
     vlc_frame_t *frame_chain;
     vlc_frame_t **frame_last;
     uint64_t queued_samples;
+
+    struct {
+        vlc_tick_t frames;
+        vlc_tick_t pts0;
+        vlc_tick_t t0;
+        vlc_tick_t tnext;
+    } tim;
+
     vlc_fourcc_t * passthrough_types;
     unsigned int pause_bytes;
 } aout_sys_t;
@@ -450,6 +458,39 @@ static void * InjectionThread(void * data)
             f->p_buffer += bytes;
             f->i_buffer -= bytes;
             sys->queued_samples -= frames;
+            sys->tim.frames += frames;
+
+            if (f->i_pts != VLC_TICK_INVALID)
+            {
+                const vlc_tick_t now = vlc_tick_now();
+
+                if (sys->tim.t0 == VLC_TICK_INVALID) {
+                    sys->tim.t0 = now;
+                    sys->tim.tnext = now;
+                }
+
+                if (now >= sys->tim.tnext)
+                {
+                    snd_pcm_sframes_t fdelay = 0;
+                    if (snd_pcm_delay(pcm, &fdelay) == 0)
+                    {
+                        vlc_tick_t tdelay = vlc_tick_from_samples(fdelay, sys->rate);
+                        vlc_tick_t tframes = vlc_tick_from_samples(frames, sys->rate);
+
+                        msg_Dbg(aout, "%s: tdelay=%" PRId64 ", tframes=%" PRId64", now-pts=%" PRId64, __func__, tdelay, tframes, now - f->i_pts);
+
+                        aout_TimingReport(aout, now + tdelay, f->i_pts + tframes);
+
+                        if (now - sys->tim.t0 > VLC_TICK_FROM_SEC(1))
+                            sys->tim.tnext = now + VLC_TICK_FROM_SEC(1);
+                    }
+                    else
+                        msg_Warn(aout, "%s: Failed to get delay", __func__);
+                }
+
+                f->i_pts = VLC_TICK_INVALID;
+            }
+
             // pts, length
             if (f->i_nb_samples == 0)
             {
@@ -522,6 +563,15 @@ static void Play(audio_output_t *aout, block_t *block, vlc_tick_t date)
         vlc_mutex_unlock(&sys->lock);
         return;
     }
+
+    {
+        vlc_tick_t now = vlc_tick_now();
+        msg_Dbg(aout, "%s: delay=%" PRId64, __func__, date - now);
+    }
+
+    if (sys->tim.pts0 == VLC_TICK_INVALID)
+        sys->tim.pts0 = block->i_pts;
+
     if (sys->frame_chain == NULL)
         wake_poll(sys);
     vlc_frame_ChainLastAppend(&sys->frame_last, block);
@@ -541,7 +591,7 @@ static void PauseDummy(audio_output_t *aout, bool pause, vlc_tick_t date)
     if (pause)
     {
         sys->state = PAUSED;
-        snd_pcm_drop(pcm);
+//        snd_pcm_drop(pcm);
     }
     else
     {
@@ -588,6 +638,9 @@ static void Flush (audio_output_t *aout)
     sys->frame_last = &sys->frame_chain;
     sys->queued_samples = 0;
     sys->draining = false;
+    sys->tim.frames = 0;
+    sys->tim.pts0 = VLC_TICK_INVALID;
+    sys->tim.t0 = VLC_TICK_INVALID;
 
     if (sys->state == IDLE)
         sys->state = PLAYING;
@@ -1193,6 +1246,9 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
 
     aout_SoftVolumeStart (aout);
 
+    sys->tim.frames = 0;
+    sys->tim.pts0 = VLC_TICK_INVALID;
+    sys->tim.t0 = VLC_TICK_INVALID;
     sys->queued_samples = 0;
     sys->started = true;
     sys->draining = false;
@@ -1350,7 +1406,7 @@ static int Open(vlc_object_t *obj)
     sys->frame_last = &sys->frame_chain;
     vlc_sem_init(&sys->init_sem, 0);
 
-    aout->time_get = TimeGet;
+//    aout->time_get = TimeGet;
     aout->play = Play;
     aout->flush = Flush;
     aout->drain = Drain;
