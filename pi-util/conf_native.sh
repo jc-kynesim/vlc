@@ -106,6 +106,7 @@ if [ $DO_CONFIGURE ]; then
      --disable-vdpau\
      --enable-wayland\
      --enable-gles2\
+     --enable-pipewire\
      $CONF_MMAL
     echo "==== Configured in $OUT"
 fi
