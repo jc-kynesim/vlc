@@ -496,6 +496,8 @@ static struct vlc_pw_stream *vlc_pw_stream_create(audio_output_t *aout,
             encoding = SPA_AUDIO_IEC958_CODEC_AC3;
             break;
         case VLC_CODEC_EAC3:
+            // Can have 32k, 44k1, 48k rates
+            fmt->i_rate = fmt->i_rate <= 48000 ? fmt->i_rate * 4 : 192000;
             fmt->i_format = VLC_CODEC_SPDIFL;
             fmt->i_bytes_per_frame = 4;
             fmt->i_frame_length = 1;
@@ -513,7 +515,8 @@ static struct vlc_pw_stream *vlc_pw_stream_create(audio_output_t *aout,
             break;
         case VLC_CODEC_TRUEHD:
         case VLC_CODEC_MLP:
-            fmt->i_rate = 192000;
+            // Can have 44k1, 48k, 88k1, 96k, 176k4, 192k rates
+            fmt->i_rate = fmt->i_rate % 44100 == 0 ? 176400 : 192000;
             fmt->i_format = VLC_CODEC_SPDIFL;
             fmt->i_bytes_per_frame = 16;
             fmt->i_frame_length = 1;
@@ -522,6 +525,7 @@ static struct vlc_pw_stream *vlc_pw_stream_create(audio_output_t *aout,
             encoding = SPA_AUDIO_IEC958_CODEC_TRUEHD;
             break;
         case VLC_CODEC_DTSHD:
+            // Only 96k, 192k
             fmt->i_rate = 192000;
             fmt->i_format = VLC_CODEC_SPDIFL;
             fmt->i_bytes_per_frame = 16;
