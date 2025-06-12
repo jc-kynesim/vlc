@@ -317,6 +317,9 @@ picture_t *picture_NewFromFormat(const video_format_t *restrict fmt)
             goto error;
     }
 
+    unsigned int page_mask = getpagesize() - 1;
+    pic_size = (pic_size + page_mask) & ~page_mask;
+
     if (unlikely(pic_size >= PICTURE_SW_SIZE_MAX))
         goto error;
 
