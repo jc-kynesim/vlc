@@ -13,7 +13,7 @@ Date:   Tue Oct 22 15:59:50 2024 +0100
     As codebase is now arranged to squash fixes into existing patches
     add a changelog so we know what deltas have occured
 
-commit b94d2ac0ea996f914e1d01e0eb893e8a0b4d0708
+commit b94d2ac0ea996f914e1d01e0eb893e8a0b4d0708 - Not needed - fixed in VLC4 anyway
 Author: John Cox <jc@kynesim.co.uk>
 Date:   Mon Aug 19 17:34:18 2024 +0100
 
@@ -23,7 +23,7 @@ Date:   Mon Aug 19 17:34:18 2024 +0100
     current exported interfaces from labwc do not include the unstable xdg
     shell. This updates the calls and bindings to work again.
 
-commit 1a8a4464609a36aafe60733bac23a213ac43098a
+commit 1a8a4464609a36aafe60733bac23a213ac43098a - Not needed - fixed in VLC4 anyway
 Author: John Cox <jc@kynesim.co.uk>
 Date:   Thu Aug 8 18:42:59 2024 +0100
 
@@ -39,7 +39,7 @@ Date:   Wed Jun 12 11:03:52 2024 +0100
 
     wayland/shm: Set priority to 0 to use wl-dmabuf instead
 
-commit 75a8f3200eeb625767e7646ac0bb2be536375a9a
+commit 75a8f3200eeb625767e7646ac0bb2be536375a9a - reworked
 Author: John Cox <jc@kynesim.co.uk>
 Date:   Wed Jun 12 10:59:10 2024 +0100
 
@@ -80,7 +80,7 @@ Date:   Wed Jun 12 10:16:27 2024 +0100
 
     video_output: Prioritise GLES over GL
 
-commit 4bbd7a15f80dc2004d64f536df131b6297931aa0
+commit 4bbd7a15f80dc2004d64f536df131b6297931aa0 - Ignored - unsure what the test case is
 Author: John Cox <jc@kynesim.co.uk>
 Date:   Wed Jun 12 10:03:51 2024 +0100
 
@@ -108,7 +108,7 @@ Date:   Tue Jun 11 18:43:19 2024 +0100
 
     qt: Disable HiDPIScaling if ratio is implausible
 
-commit 3a8e5d556dfd594df5ab274463e556de83b4897c
+commit 3a8e5d556dfd594df5ab274463e556de83b4897c - Ignored - doesn't seem to be needed
 Author: John Cox <jc@kynesim.co.uk>
 Date:   Fri Jun 10 15:32:40 2022 +0000
 
@@ -129,13 +129,13 @@ Date:   Tue Jun 11 18:00:33 2024 +0100
 
     drm_pic: Add DRM_PRIME picture type code
 
-commit d5a7f9ac1939ffcea4668aeb87455d62d1dc03b5
+commit d5a7f9ac1939ffcea4668aeb87455d62d1dc03b5 - Done - but may not be needed as Play doesn't block
 Author: John Cox <jc@kynesim.co.uk>
 Date:   Tue Apr 25 16:33:34 2023 +0000
 
     audio_output: When padding with silence add zeros in multiple small buffers
 
-commit 179640ce3358c8cc6994f5c3c008a8411431f68b
+commit 179640ce3358c8cc6994f5c3c008a8411431f68b - Ignored - no longer needed
 Author: John Cox <jc@kynesim.co.uk>
 Date:   Tue Jun 11 17:53:42 2024 +0100
 
