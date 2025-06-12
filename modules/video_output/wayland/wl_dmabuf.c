@@ -36,6 +36,10 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <linux/udmabuf.h>
+
 #include <wayland-client.h>
 #include "single-pixel-buffer-v1-client-protocol.h"
 #include "viewporter-client-protocol.h"
@@ -203,6 +207,8 @@ struct vout_display_sys_s
     atomic_int vdre_check_bkg;
     atomic_int vdre_check_fg;
 #endif
+
+    int udmabuf_fd;
 
     eq_env_t * eq;
 
@@ -1790,6 +1796,35 @@ wl_dmabuf_prepare(vout_display_t *vd, picture_t *pic,
         }
         sys->video_spe_prep = spe;
 
+
+        struct picture_buffer_t *picbuf = pic->p_sys;
+        if (picbuf == NULL)
+            msg_Dbg(vd, "picbuf NULL");
+        else if (sys->udmabuf_fd == -1)
+            msg_Dbg(vd, "no udmabuf");
+        else
+        {
+            struct udmabuf_create udc = {
+                .memfd = picbuf->fd,
+                .flags = UDMABUF_FLAGS_CLOEXEC,
+                .offset = 0,
+                .size = picbuf->size
+            };
+            int rv;
+
+            msg_Dbg(vd, "picbuf %.4s fd=%d, size=%zd/%lld, offset=%zd",
+                     (char *)&pic->format.i_chroma,
+                    picbuf->fd, picbuf->size, udc.size, picbuf->offset);
+
+            if (fcntl(picbuf->fd, F_ADD_SEALS, F_SEAL_SHRINK) < 0)
+                msg_Dbg(vd, "No seal");
+
+            while ((rv = ioctl(sys->udmabuf_fd, UDMABUF_CREATE, &udc)) == -1 && errno == EINTR)
+                /* Loop */;
+
+            msg_Dbg(vd, "rv=%d, fd=%d, %s", rv, udc.memfd, rv == -1 ? strerror(errno) : "OK");
+        }
+
         if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) == 0)
             copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &spe->vdre, &spe->wb);
         else
@@ -2247,6 +2282,9 @@ no_window:
     msg_Info(vd, "%s: vdre_check_fg: %d", __func__, atomic_load(&sys->vdre_check_fg));
 #endif
 
+    if (sys->udmabuf_fd != -1)
+        close(sys->udmabuf_fd);
+
     free(sys);
 
     msg_Dbg(vd, ">>> %s", __func__);
@@ -2270,6 +2308,8 @@ static int Open(vout_display_t *vd,
     sys = calloc(1, sizeof(*sys));
     if (unlikely(sys == NULL))
         return VLC_ENOMEM;
+
+    sys->udmabuf_fd = -1;
 
     vd->sys = sys;
     if (fmt_list_init(&sys->dmabuf_fmts, 128)) {
@@ -2365,6 +2405,9 @@ static int Open(vout_display_t *vd,
             msg_Warn(vd, "No compatible subpic formats found");
     }
 
+    sys->udmabuf_fd = open("/dev/udmabuf", O_RDWR | O_CLOEXEC);
+    msg_Dbg(vd, "Udmabuf device %s", sys->udmabuf_fd == -1 ? "not found" : "found");
+
     {
         struct dmabufs_ctl *dbsc = sys->use_shm ? dmabufs_shm_new() : dmabufs_ctl_new();
         if (dbsc == NULL)
@@ -2395,7 +2438,6 @@ static int Open(vout_display_t *vd,
 
     sys->want_stats = var_InheritBool(vd, WL_DMABUF_STATS_NAME);
 
-    // If we can invalidate the pic pool then DRI is disabled - we want DRI
     vd->info = (vout_display_info_t){
         .subpicture_chromas = sys->subpic_chromas,
     };
