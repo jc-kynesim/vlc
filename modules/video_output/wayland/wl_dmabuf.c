@@ -1763,6 +1763,114 @@ plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const s
     plane->dst_rect = dst_rect;
 }
 
+struct vdre_shm_env {
+    int fd;
+    picture_t * pic;
+};
+
+static void
+vdre_shm_del_cb(void * v)
+{
+    struct vdre_shm_env * vse = v;
+    close(vse->fd);
+    picture_Release(vse->pic);
+    free(vse);
+}
+
+static int
+shm_to_dma(vout_display_t * const vd, vout_display_sys_t * const sys, picture_t * const pic,
+           video_dmabuf_release_env_t ** pVdre, struct wl_buffer ** pW_buffer)
+{
+    struct picture_buffer_t * const picbuf = pic->p_sys;
+    AVDRMFrameDescriptor afd;
+    AVDRMFrameDescriptor * const desc = &afd;
+    int i;
+
+    if (sys->udmabuf_fd == -1 || picbuf == NULL || picbuf->fd == -1)
+    {
+        // Not a shm buffer or no udmabuf
+        msg_Dbg(vd, "%s: Not shm/no undmabuf", __func__);
+        return -1;
+    }
+
+    memset(desc, 0, sizeof(*desc));
+
+    desc->nb_objects = 1;
+    desc->nb_layers = 1;
+    desc->layers[0].nb_planes = pic->i_planes;
+    for (i = 0; i < pic->i_planes; ++i)
+    {
+        AVDRMPlaneDescriptor *const plane = desc->layers[0].planes + i;
+        ptrdiff_t offset = ((char *)pic->p[i].p_pixels - (char *)picbuf->base);
+
+        if (offset < 0 || (size_t)offset >= picbuf->size)
+        {
+            // Buffer appears to outside area described in picbuf
+            msg_Dbg(vd, "%s: Buffers exceed mapped range!", __func__);
+            return -1;
+        }
+
+        plane->object_index = 0;
+        plane->offset = offset;
+        plane->pitch = pic->p[i].i_pitch;
+    }
+
+    desc->layers[0].format = drmu_format_vlc_to_drm(&pic->format, &desc->objects[0].format_modifier);
+    if (desc->layers[0].format == 0)
+    {
+        // Format not compatible - this is unexpected
+        msg_Dbg(vd, "%s: No format map!", __func__);
+        return -1;
+    }
+
+    {
+        struct udmabuf_create udc = {
+            .memfd = picbuf->fd,
+            .flags = UDMABUF_FLAGS_CLOEXEC,
+            .offset = picbuf->offset,
+            .size = picbuf->size
+        };
+        int rv;
+
+        msg_Dbg(vd, "picbuf %.4s fd=%d, size=%zd/%lld, offset=%zd",
+                 (char *)&pic->format.i_chroma,
+                picbuf->fd, picbuf->size, udc.size, picbuf->offset);
+
+        if (fcntl(picbuf->fd, F_ADD_SEALS, F_SEAL_SHRINK) < 0)
+            msg_Dbg(vd, "No seal");
+
+        while ((rv = ioctl(sys->udmabuf_fd, UDMABUF_CREATE, &udc)) == -1 && errno == EINTR)
+            /* Loop */;
+
+        msg_Dbg(vd, "rv=%d, fd=%d, %s", rv, udc.memfd, rv == -1 ? strerror(errno) : "OK");
+        if (rv == -1)
+        {
+            msg_Dbg(vd, "%s: dmabuf create failed!", __func__);
+            return -1;
+        }
+
+        desc->objects[0].fd = rv;
+        desc->objects[0].size = picbuf->size;
+    }
+
+    {
+        struct vdre_shm_env * vse = malloc(sizeof(*vse));
+        video_dmabuf_release_env_t * vdre;
+        vse->fd = desc->objects[0].fd;
+        vse->pic = picture_Hold(pic);
+        vdre = vdre_new_null();
+        vdre->dma_rel_fn = vdre_shm_del_cb;
+        vdre->dma_rel_v = vse;
+        vdre_add_pt(vdre, sys->pollq, vse->fd);
+        *pVdre = vdre;
+    }
+
+    *pW_buffer = dfd_make_buffer(vd, sys, false, desc, pic->format.i_width, pic->format.i_height, 0);
+
+    return 0;
+}
+
+
 static void
 wl_dmabuf_prepare(vout_display_t *vd, picture_t *pic,
                   const struct vlc_render_subpicture *subpic, vlc_tick_t date)
@@ -1797,38 +1905,10 @@ wl_dmabuf_prepare(vout_display_t *vd, picture_t *pic,
         sys->video_spe_prep = spe;
 
 
-        struct picture_buffer_t *picbuf = pic->p_sys;
-        if (picbuf == NULL)
-            msg_Dbg(vd, "picbuf NULL");
-        else if (sys->udmabuf_fd == -1)
-            msg_Dbg(vd, "no udmabuf");
-        else
-        {
-            struct udmabuf_create udc = {
-                .memfd = picbuf->fd,
-                .flags = UDMABUF_FLAGS_CLOEXEC,
-                .offset = 0,
-                .size = picbuf->size
-            };
-            int rv;
-
-            msg_Dbg(vd, "picbuf %.4s fd=%d, size=%zd/%lld, offset=%zd",
-                     (char *)&pic->format.i_chroma,
-                    picbuf->fd, picbuf->size, udc.size, picbuf->offset);
-
-            if (fcntl(picbuf->fd, F_ADD_SEALS, F_SEAL_SHRINK) < 0)
-                msg_Dbg(vd, "No seal");
-
-            while ((rv = ioctl(sys->udmabuf_fd, UDMABUF_CREATE, &udc)) == -1 && errno == EINTR)
-                /* Loop */;
-
-            msg_Dbg(vd, "rv=%d, fd=%d, %s", rv, udc.memfd, rv == -1 ? strerror(errno) : "OK");
-        }
-
-        if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) == 0)
-            copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &spe->vdre, &spe->wb);
-        else
+        if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) != 0)
             do_display_dmabuf(vd, sys, pic, &spe->vdre, &spe->wb);
+        else if (shm_to_dma(vd, sys, pic, &spe->vdre, &spe->wb) != 0)
+            copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &spe->vdre, &spe->wb);
         atomic_store(&spe->ready, 1);
         wl_display_flush(video_display(sys)); // Kick off any work required by Wayland
     }
