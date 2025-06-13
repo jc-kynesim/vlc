@@ -1772,7 +1772,7 @@ static void
 vdre_shm_del_cb(void * v)
 {
     struct vdre_shm_env * vse = v;
-    close(vse->fd);
+//    close(vse->fd);
     picture_Release(vse->pic);
     free(vse);
 }
@@ -1823,6 +1823,7 @@ shm_to_dma(vout_display_t * const vd, vout_display_sys_t * const sys, picture_t 
         return -1;
     }
 
+    if (picbuf->dma_fd == -1)
     {
         struct udmabuf_create udc = {
             .memfd = picbuf->fd,
@@ -1849,9 +1850,11 @@ shm_to_dma(vout_display_t * const vd, vout_display_sys_t * const sys, picture_t 
             return -1;
         }
 
-        desc->objects[0].fd = rv;
-        desc->objects[0].size = picbuf->size;
+        picbuf->dma_fd = rv;
     }
+
+    desc->objects[0].fd = picbuf->dma_fd;
+    desc->objects[0].size = picbuf->size;
 
     {
         struct vdre_shm_env * vse = malloc(sizeof(*vse));

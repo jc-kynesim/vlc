@@ -78,6 +78,7 @@ typedef struct picture_buffer_t
     void *base;
     size_t size;
     off_t offset;
+    int dma_fd;
 } picture_buffer_t;
 
 typedef struct vlc_decoder_device vlc_decoder_device;
