@@ -40,6 +40,7 @@
 #include <vlc_block.h>
 
 #include <vlc_ancillary.h>
+#include <vlc_fs.h>
 
 static void PictureDestroyContext( picture_t *p_picture )
 {
@@ -70,8 +71,14 @@ static void picture_DestroyFromFormat(picture_t *pic)
 {
     picture_buffer_t *res = pic->p_sys;
 
-    if (res != NULL)
+    if (res != NULL) {
         picture_Deallocate(res->fd, res->base, res->size);
+        if (res->dma_fd != -1)
+        {
+            vlc_close(res->dma_fd);
+            res->dma_fd = -1;
+        }
+    }
 }
 
 VLC_WEAK void *picture_Allocate(int *restrict fdp, size_t size)
@@ -330,6 +337,7 @@ picture_t *picture_NewFromFormat(const video_format_t *restrict fmt)
     res->base = buf;
     res->size = pic_size;
     res->offset = 0;
+    res->dma_fd = -1;
 
     /* Fill the p_pixels field for each plane */
     for (int i = 0; i < pic->i_planes; i++)
