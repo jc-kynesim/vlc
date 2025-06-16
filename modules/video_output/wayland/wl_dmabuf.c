@@ -1940,7 +1940,6 @@ wl_dmabuf_prepare(vout_display_t *vd, picture_t *pic,
                 else
                 {
                     plane->spe_next = spe_new(vd, sys, src, sreg);
-                    plane->spe_next = spe_new(vd, sys, src, sreg);
                     spe_convert(plane->spe_next);
                 }
             }
