@@ -727,6 +727,9 @@ find_fmt_fallback(const vout_display_t * const vd, const vout_display_sys_t * co
 {
     VLC_UNUSED(vd);
 
+    if (fallback == NULL)
+        return NULL;
+
     for (; *fallback; ++fallback) {
         const video_frame_format_t vf = {.i_chroma = *fallback};
         const drmu_vlc_fmt_info_t * fi;
@@ -742,6 +745,45 @@ find_fmt_fallback(const vout_display_t * const vd, const vout_display_sys_t * co
     return NULL;
 }
 
+static const drmu_vlc_fmt_info_t *
+find_fmt_usable(vout_display_t * const vd, const vout_display_sys_t * const sys, const video_format_t *const fmtp)
+{
+    unsigned int i;
+    unsigned int n = 0;
+    const uint32_t * fmts = drmu_plane_formats(sys->dp, &n);
+    const vlc_chroma_description_t * const vcd = vlc_fourcc_GetChromaDescription(fmtp->i_chroma);
+    const drmu_vlc_fmt_info_t * vfi_best = NULL;
+    int score_best = -1;
+    VLC_UNUSED(vd);
+
+    if (vcd == NULL)
+        return NULL;
+
+//    const bool vcd_rgb = vlc_chroma_description_IsYUV(vcd);
+
+    for (i = 0; i != n; ++i) {
+        const drmu_vlc_fmt_info_t * const vfi = drmu_vlc_fmt_info_find_drm(fmts[i], 0);
+        const drmu_fmt_info_t * const fi = drmu_fmt_info_find_fmt(fmts[i]);
+        int score = 0;
+
+        if (vfi == NULL || fi == NULL)
+            continue;
+
+        const unsigned int bits = drmu_fmt_info_bit_depth(fi);
+        if (vcd->pixel_bits == bits)
+            score += 20;
+        else
+            score += bits;
+
+        // *** drmu_format_info currently doesn't directly give useful
+        //  RGB / YUV type info to try & match
+
+        if (score > score_best)
+            vfi_best = vfi;
+    }
+
+    return vfi_best;
+}
 
 // Adjust *fmtp to fix format for display (tweak chroma)
 static int
@@ -769,15 +811,12 @@ set_format(vout_display_t * const vd, vout_display_sys_t * const sys, video_form
         const vlc_fourcc_t *fallback = vlc_fourcc_IsYUV(fmtp->i_chroma) ?
             vlc_fourcc_GetYUVFallback(fmtp->i_chroma) :
             vlc_fourcc_GetRGBFallback(fmtp->i_chroma);
-        static const vlc_fourcc_t fallback2[] = {
-            VLC_CODEC_I420,
-            VLC_CODEC_XRGB,
-            0
-        };
 
         if ((fi = find_fmt_fallback(vd, sys, fallback)) == NULL &&
-            (fi = find_fmt_fallback(vd, sys, fallback2)) == NULL)
+            (fi = find_fmt_usable(vd, sys, fmtp)) == NULL)
+        {
             return VLC_EGENERIC;
+        }
 
         fmtp->i_chroma = drmu_vlc_fmt_info_vlc_chroma(fi);
 
