@@ -236,8 +236,8 @@ struct demux_sys_t
     bool             b_no_data;     /* if we never received any data */
     int              i_no_data_ti;  /* consecutive number of TaskInterrupt */
 
-    char             event_rtsp;
-    char             event_data;
+    EventLoopWatchVariable event_rtsp;
+    EventLoopWatchVariable event_data;
 
     bool             b_get_param;   /* Does the server support GET_PARAMETER */
     bool             b_paused;      /* Are we paused? */
