@@ -26,6 +26,9 @@
 #ifndef HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
 #define HAVE_WAYLAND_SINGLE_PIXEL_BUFFER 0
 #endif
+#ifndef HAVE_WAYLAND_COLOR_REPRESENTATION
+#define HAVE_WAYLAND_COLOR_REPRESENTATION 0
+#endif
 
 #include <assert.h>
 #include <stdatomic.h>
@@ -42,6 +45,9 @@
 #include <wayland-client.h>
 #if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
 #include "single-pixel-buffer-v1-client-protocol.h"
+#endif
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+#include "color-representation-v1-client-protocol.h"
 #endif
 #include "viewporter-client-protocol.h"
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
@@ -133,6 +139,14 @@ typedef struct subpic_ent_s {
     vout_display_place_t dst_rect;
     vout_display_place_t orig_rect;
 
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+    // 0 invalid for all of these
+    enum wp_color_representation_surface_v1_chroma_location chroma_loc;
+    enum wp_color_representation_surface_v1_coefficients coefficients;
+    enum wp_color_representation_surface_v1_range range;
+    enum wp_color_representation_surface_v1_alpha_mode alpha_mode;
+#endif
+
     atomic_int ready;
 
     struct polltask * pt;
@@ -144,6 +158,9 @@ typedef struct subplane_s {
     struct wl_surface * surface;
     struct wl_subsurface * subsurface;
     struct wp_viewport * viewport;
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+    struct wp_color_representation_surface_v1 * color_rep;
+#endif
 
     bool buffer_attached;
     bool commit_req;
@@ -152,6 +169,14 @@ typedef struct subplane_s {
     enum wl_output_transform trans;
     vout_display_place_t src_rect;
     vout_display_place_t dst_rect;
+
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+    // 0 invalid for all of these
+    enum wp_color_representation_surface_v1_chroma_location chroma_loc;
+    enum wp_color_representation_surface_v1_coefficients coefficients;
+    enum wp_color_representation_surface_v1_range range;
+    enum wp_color_representation_surface_v1_alpha_mode alpha_mode;
+#endif
 
     subpic_ent_t * spe_cur;
     subpic_ent_t * spe_next;
@@ -183,7 +208,16 @@ typedef struct w_bound_ss
 #if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
     struct wp_single_pixel_buffer_manager_v1 *single_pixel_buffer_manager_v1;
 #endif
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+    struct wp_color_representation_manager_v1 *color_representation_manager_v1;
+#endif
 } w_bound_t;
+
+struct coeff_and_range
+{
+    unsigned int coeff;
+    bool full_range;
+};
 
 #define PLANE_BKG 0
 #define PLANE_VID 1
@@ -238,6 +272,14 @@ struct vout_display_sys_t
 
     fmt_list_t dmabuf_fmts;
     fmt_list_t shm_fmts;
+
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+    bool has_straight_alpha;
+    struct {
+        enum wp_color_representation_surface_v1_coefficients coefficients;
+        unsigned int ranges; // b0 = full, b1 = restricted
+    }  primary_map[COLOR_PRIMARIES_MAX + 1];
+#endif
 
     unsigned int presentation_clock_id;
     pres_stats_env_t * pse;
@@ -333,6 +375,17 @@ viewport_destroy(struct wp_viewport ** const ppviewport)
     wp_viewport_destroy(*ppviewport);
     *ppviewport = NULL;
 }
+
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+static void
+color_representation_destroy(struct wp_color_representation_surface_v1 ** const ppcolor_rep)
+{
+    if (*ppcolor_rep == NULL)
+        return;
+    wp_color_representation_surface_v1_destroy(*ppcolor_rep);
+    *ppcolor_rep = NULL;
+}
+#endif
 
 static inline int
 scale_dst(const vout_display_sys_t * const sys, int x)
@@ -1294,6 +1347,39 @@ spe_update_rect(subpic_ent_t * const spe,
     };
 }
 
+static void
+spe_set_color_info(const vout_display_sys_t * const sys, subpic_ent_t * const spe, const video_format_t * const fmt)
+{
+#if !HAVE_WAYLAND_COLOR_REPRESENTATION
+    VLC_UNUSED(spe);
+    VLC_UNUSED(fmt);
+#else
+    static const enum wp_color_representation_surface_v1_chroma_location location_map[CHROMA_LOCATION_MAX + 1] = {
+        [CHROMA_LOCATION_LEFT] = WP_COLOR_REPRESENTATION_SURFACE_V1_CHROMA_LOCATION_TYPE_1,
+        [CHROMA_LOCATION_CENTER] = WP_COLOR_REPRESENTATION_SURFACE_V1_CHROMA_LOCATION_TYPE_2,
+        [CHROMA_LOCATION_TOP_LEFT] = WP_COLOR_REPRESENTATION_SURFACE_V1_CHROMA_LOCATION_TYPE_0,
+        [CHROMA_LOCATION_TOP_CENTER] = WP_COLOR_REPRESENTATION_SURFACE_V1_CHROMA_LOCATION_TYPE_3,
+        [CHROMA_LOCATION_BOTTOM_LEFT] = WP_COLOR_REPRESENTATION_SURFACE_V1_CHROMA_LOCATION_TYPE_4,
+        [CHROMA_LOCATION_BOTTOM_CENTER] = WP_COLOR_REPRESENTATION_SURFACE_V1_CHROMA_LOCATION_TYPE_5,
+    };
+
+    if (sys->bound.color_representation_manager_v1 == NULL)
+        return;
+
+    spe->coefficients = fmt->primaries < 0 || fmt->primaries >= ARRAY_SIZE(sys->primary_map) ? 0 :
+        sys->primary_map[fmt->primaries].coefficients;
+    spe->range = sys->primary_map[fmt->primaries].ranges == 1 ?
+            WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_FULL :
+        sys->primary_map[fmt->primaries].ranges == 2 ?
+            WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_LIMITED :
+        fmt->b_color_range_full ?
+            WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_FULL :
+            WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_LIMITED;
+    spe->chroma_loc = fmt->chroma_location < 0 || fmt->chroma_location >= ARRAY_SIZE(location_map) ? 0 :
+            location_map[fmt->chroma_location];
+#endif
+}
+
 static subpic_ent_t *
 spe_new_pic(vout_display_t * const vd, vout_display_sys_t * const sys,
             picture_t * const pic)
@@ -1434,6 +1520,9 @@ clear_all_buffers(vout_display_sys_t * const sys, const bool bkg_valid)
 static void
 plane_destroy(subplane_t * const spl)
 {
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+    color_representation_destroy(&spl->color_rep);
+#endif
     viewport_destroy(&spl->viewport);
     subsurface_destroy(&spl->subsurface);
     surface_destroy(&spl->surface);
@@ -1456,6 +1545,10 @@ plane_create(vout_display_sys_t * const sys, subplane_t * const plane,
         (plane->subsurface = wl_subcompositor_get_subsurface(sys->bound.subcompositor, plane->surface, parent)) == NULL ||
         (plane->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, plane->surface)) == NULL)
         return VLC_EGENERIC;
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+    if (sys->bound.color_representation_manager_v1 != NULL)
+        plane->color_rep = wp_color_representation_manager_v1_get_surface(sys->bound.color_representation_manager_v1, plane->surface);
+#endif
     wl_subsurface_place_above(plane->subsurface, above);
     if (sync)
         wl_subsurface_set_sync(plane->subsurface);
@@ -1860,6 +1953,31 @@ plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const s
         commit_req(sys, plane->commit_parent); // Subsurface pos needs parent commit (video)
     }
 
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+    if (plane->color_rep != NULL)
+    {
+        if (spe->alpha_mode && spe->alpha_mode != plane->alpha_mode)
+        {
+            wp_color_representation_surface_v1_set_alpha_mode(plane->color_rep, spe->alpha_mode);
+            plane->alpha_mode = spe->alpha_mode;
+            plane->commit_req = true;
+        }
+        if (spe->chroma_loc && spe->chroma_loc != plane->chroma_loc)
+        {
+            wp_color_representation_surface_v1_set_chroma_location(plane->color_rep, spe->chroma_loc);
+            plane->chroma_loc = spe->chroma_loc;
+            plane->commit_req = true;
+        }
+        if (spe->coefficients && (spe->coefficients != plane->coefficients || spe->range != plane->range))
+        {
+            wp_color_representation_surface_v1_set_coefficients_and_range(plane->color_rep, spe->coefficients, spe->range);
+            plane->coefficients = spe->coefficients;
+            plane->range = spe->range;
+            plane->commit_req = true;
+        }
+    }
+#endif
+
     plane->trans = spe->trans;
     plane->src_rect = spe->src_rect;
     plane->dst_rect = dst_rect;
@@ -1885,6 +2003,8 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
         spe->src_rect = sys->video_src_rect;
         spe->dst_rect = sys->video_dst_rect;
         spe->orig_rect = spe->dst_rect;
+
+        spe_set_color_info(sys, spe, &pic->format);
 
         if (sys->video_spe_prep)
         {
@@ -2261,6 +2381,97 @@ static const struct wp_presentation_listener presentation_listener = {
 };
 
 
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+
+/**
+ * supported alpha modes
+ *
+ * When this object is created, it shall immediately send this
+ * event once for each alpha mode the compositor supports.
+ *
+ * For the definition of the supported values, see the
+ * wp_color_representation_surface_v1::alpha_mode enum.
+ * @param alpha_mode supported alpha mode
+ */
+static void color_representation_manager_supported_alpha_mode(void *data,
+                 struct wp_color_representation_manager_v1 *wp_color_representation_manager_v1,
+                 uint32_t alpha_mode)
+{
+    vout_display_t * const vd = data;
+    vout_display_sys_t * const sys = vd->sys;
+    VLC_UNUSED(wp_color_representation_manager_v1);
+
+    if (alpha_mode == WP_COLOR_REPRESENTATION_SURFACE_V1_ALPHA_MODE_STRAIGHT)
+        sys->has_straight_alpha = true;
+}
+
+/**
+ * supported matrix coefficients and ranges
+ *
+ * When this object is created, it shall immediately send this
+ * event once for each matrix coefficient and color range
+ * combination the compositor supports.
+ *
+ * For the definition of the supported values, see the
+ * wp_color_representation_surface_v1::coefficients and
+ * wp_color_representation_surface_v1::range enums.
+ * @param coefficients supported matrix coefficients
+ * @param range full range flag
+ */
+static void color_representation_manager_supported_coefficients_and_ranges(void *data,
+                      struct wp_color_representation_manager_v1 *wp_color_representation_manager_v1,
+                      uint32_t coefficients,
+                      uint32_t range)
+{
+    vout_display_t * const vd = data;
+    vout_display_sys_t * const sys = vd->sys;
+    VLC_UNUSED(wp_color_representation_manager_v1);
+    const unsigned int rmask = (range != WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_LIMITED) ? 1 : 2;
+
+    switch (coefficients)
+    {
+        case WP_COLOR_REPRESENTATION_SURFACE_V1_COEFFICIENTS_BT601:
+            sys->primary_map[COLOR_PRIMARIES_BT601_525].coefficients = coefficients;
+            sys->primary_map[COLOR_PRIMARIES_BT601_525].ranges |= rmask;
+            sys->primary_map[COLOR_PRIMARIES_BT601_625].coefficients = coefficients;
+            sys->primary_map[COLOR_PRIMARIES_BT601_625].ranges |= rmask;
+            break;
+        case WP_COLOR_REPRESENTATION_SURFACE_V1_COEFFICIENTS_BT709:
+            sys->primary_map[COLOR_PRIMARIES_BT709].coefficients = coefficients;
+            sys->primary_map[COLOR_PRIMARIES_BT709].ranges |= rmask;
+            break;
+        case WP_COLOR_REPRESENTATION_SURFACE_V1_COEFFICIENTS_BT2020:
+            sys->primary_map[COLOR_PRIMARIES_BT2020].coefficients = coefficients;
+            sys->primary_map[COLOR_PRIMARIES_BT2020].ranges |= rmask;
+            break;
+        case WP_COLOR_REPRESENTATION_SURFACE_V1_COEFFICIENTS_FCC:
+            sys->primary_map[COLOR_PRIMARIES_FCC1953].coefficients = coefficients;
+            sys->primary_map[COLOR_PRIMARIES_FCC1953].ranges |= rmask;
+            break;
+        default:
+            break;
+    }
+}
+
+/**
+ * all features have been sent
+ *
+ * This event is sent when all supported features have been sent.
+ */
+static void color_representation_manager_done(void *data,
+         struct wp_color_representation_manager_v1 *wp_color_representation_manager_v1)
+{
+    VLC_UNUSED(data);
+    VLC_UNUSED(wp_color_representation_manager_v1);
+}
+
+static const struct wp_color_representation_manager_v1_listener color_representation_manager_v1_listener = {
+    .supported_alpha_mode = color_representation_manager_supported_alpha_mode,
+    .supported_coefficients_and_ranges = color_representation_manager_supported_coefficients_and_ranges,
+    .done = color_representation_manager_done,
+};
+#endif
+
 static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
                         struct wl_registry * const registry,
                         const uint32_t name, const char *const iface, const uint32_t vers)
@@ -2309,10 +2520,22 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
     if (strcmp(iface, wp_single_pixel_buffer_manager_v1_interface.name) == 0)
         b->single_pixel_buffer_manager_v1 = wl_registry_bind(registry, name, &wp_single_pixel_buffer_manager_v1_interface, 1);
 #endif
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+    else
+    if (strcmp(iface, wp_color_representation_manager_v1_interface.name) == 0)
+    {
+        b->color_representation_manager_v1 = wl_registry_bind(registry, name, &wp_color_representation_manager_v1_interface, 1);
+        wp_color_representation_manager_v1_add_listener(b->color_representation_manager_v1, &color_representation_manager_v1_listener, vd);
+    }
+#endif
 }
 
 static void w_bound_destroy(w_bound_t * const b)
 {
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+    if (b->color_representation_manager_v1 != NULL)
+        wp_color_representation_manager_v1_destroy(b->color_representation_manager_v1);
+#endif
     if (b->viewporter != NULL)
         wp_viewporter_destroy(b->viewporter);
     if (b->linux_dmabuf_v1 != NULL)

@@ -263,6 +263,14 @@ video_output/wayland/tablet-unstable-v2-client-protocol.h: \
 		$(WAYLAND_PROTOCOLS)/unstable/tablet/tablet-unstable-v2.xml
 	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
 
+video_output/wayland/color-representation-v1-client-protocol.h: \
+		$(WAYLAND_PROTOCOLS)/staging/color-representation/color-representation-v1.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
+
+video_output/wayland/color-representation-protocol.c: \
+		$(WAYLAND_PROTOCOLS)/staging/color-representation/color-representation-v1.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
+
 libwl_dmabuf_plugin_la_SOURCES = video_output/wayland/wl_dmabuf.c\
 	video_output/wayland/picpool.c video_output/wayland/picpool.h\
 	video_output/wayland/dmabuf_alloc.c video_output/wayland/dmabuf_alloc.h\
@@ -296,6 +304,16 @@ nodist_libwl_dmabuf_plugin_la_SOURCES +=\
 	video_output/wayland/single-pixel-buffer-v1-protocol.c
 libwl_dmabuf_plugin_la_CFLAGS += -DHAVE_WAYLAND_SINGLE_PIXEL_BUFFER=1
 endif
+if HAVE_WAYLAND_COLOR_REPRESENTATION
+video_output/wayland/color-representation-v1-protocol.c: \
+		$(WAYLAND_PROTOCOLS)/staging/color-representation/color-representation-v1.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
+nodist_libwl_dmabuf_plugin_la_SOURCES +=\
+	video_output/wayland/color-representation-v1-client-protocol.h \
+	video_output/wayland/color-representation-v1-protocol.c
+libwl_dmabuf_plugin_la_CFLAGS += -DHAVE_WAYLAND_COLOR_REPRESENTATION=1
+endif
+
 CLEANFILES += $(nodist_libwl_dmabuf_plugin_la_SOURCES)
 
 libwl_shell_plugin_la_SOURCES = video_output/wayland/shell.c
