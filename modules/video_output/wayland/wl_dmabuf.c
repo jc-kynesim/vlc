@@ -101,7 +101,6 @@ typedef struct fmt_list_s {
 
 typedef struct eq_env_ss {
     atomic_int eq_count;
-    sem_t sem;
 
     struct wl_display *display;
     struct pollqueue *pq;
@@ -580,7 +579,6 @@ eq_unref(eq_env_t ** const ppeq)
             wl_proxy_wrapper_destroy(eq->wrapped_display);
             wl_event_queue_destroy(eq->q);
 
-            sem_destroy(&eq->sem);
             free(eq);
 //            fprintf(stderr, "Eq closed\n");
         }
@@ -658,7 +656,6 @@ eq_new(struct wl_display * const display, struct pollqueue * const pq)
         return NULL;
 
     atomic_init(&eq->eq_count, 0);
-    sem_init(&eq->sem, 0, 0);
 
 #if WAYLAND_VERSION_MAJOR > 1 ||\
     (WAYLAND_VERSION_MAJOR == 1 && WAYLAND_VERSION_MINOR >= 23)
