@@ -2432,10 +2432,17 @@ static void Close(vlc_object_t *obj)
 
     eq_unref(&sys->eq);
 
-    // There is a risk of deadlock here if we wait for the pq to die as some
-    // wl buffers may only be relased after close returns so just unref and the
-    // pq will clean up after itself once the last buffer has been released.
-    pollqueue_unref(&sys->pollq);
+    // There is no guarantee that the compositor will release all buffers in
+    // a timely fashion or indeed at all before this function returns; having
+    // said that current compositors do seenm to be well behaved and return
+    // the buffer in a frame time or two.
+    // So finish the pollqueue with a shortish timeout, and if we do timeout
+    // just unref and hope that we will get the release sometime.
+    if (pollqueue_finish_timeout(&sys->pollq, 500) != 0)
+    {
+        msg_Warn(vd, "Not all buffers returned by exit time");
+        pollqueue_unref(&sys->pollq);
+    }
 
     vout_display_DeleteWindow(vd, sys->embed);
     sys->embed = NULL;
