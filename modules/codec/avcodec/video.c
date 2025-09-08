@@ -1978,7 +1978,8 @@ no_reuse:
         {
             if (swfmt == AV_PIX_FMT_P010)
                 defsw = AV_PIX_FMT_RPI4_10;
-            if (swfmt == AV_PIX_FMT_YUV420P)
+            if (swfmt == AV_PIX_FMT_YUV420P ||
+                swfmt == AV_PIX_FMT_YUVJ420P)
                 defsw = AV_PIX_FMT_RPI4_8;
         }
 #endif

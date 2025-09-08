@@ -60,6 +60,7 @@ vlc_fourcc_t vlc_va_GetChroma(enum PixelFormat hwfmt, enum PixelFormat swfmt)
         case AV_PIX_FMT_DRM_PRIME:
             switch (swfmt)
             {
+                case AV_PIX_FMT_YUVJ420P:
                 case AV_PIX_FMT_YUV420P:
                     return VLC_CODEC_DRM_PRIME_I420;
                 case AV_PIX_FMT_NV12:
