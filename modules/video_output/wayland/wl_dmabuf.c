@@ -1545,6 +1545,10 @@ plane_create(vout_display_sys_t * const sys, subplane_t * const plane,
         (plane->subsurface = wl_subcompositor_get_subsurface(sys->bound.subcompositor, plane->surface, parent)) == NULL ||
         (plane->viewport = wp_viewporter_get_viewport(sys->bound.viewporter, plane->surface)) == NULL)
         return VLC_EGENERIC;
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+    if (sys->bound.color_representation_manager_v1 != NULL)
+        plane->color_rep = wp_color_representation_manager_v1_get_surface(sys->bound.color_representation_manager_v1, plane->surface);
+#endif
     wl_subsurface_place_above(plane->subsurface, above);
     if (sync)
         wl_subsurface_set_sync(plane->subsurface);
@@ -1950,24 +1954,27 @@ plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const s
     }
 
 #if HAVE_WAYLAND_COLOR_REPRESENTATION
-    if (spe->alpha_mode && spe->alpha_mode != plane->alpha_mode)
+    if (plane->color_rep != NULL)
     {
-        wp_color_representation_surface_v1_set_alpha_mode(plane->color_rep, spe->alpha_mode);
-        plane->alpha_mode = spe->alpha_mode;
-        plane->commit_req = true;
-    }
-    if (spe->chroma_loc && spe->chroma_loc != plane->chroma_loc)
-    {
-        wp_color_representation_surface_v1_set_chroma_location(plane->color_rep, spe->chroma_loc);
-        plane->chroma_loc = spe->chroma_loc;
-        plane->commit_req = true;
-    }
-    if (spe->coefficients && (spe->coefficients != plane->coefficients || spe->range != plane->range))
-    {
-        wp_color_representation_surface_v1_set_coefficients_and_range(plane->color_rep, spe->coefficients, spe->range);
-        plane->coefficients = spe->coefficients;
-        plane->range = spe->range;
-        plane->commit_req = true;
+        if (spe->alpha_mode && spe->alpha_mode != plane->alpha_mode)
+        {
+            wp_color_representation_surface_v1_set_alpha_mode(plane->color_rep, spe->alpha_mode);
+            plane->alpha_mode = spe->alpha_mode;
+            plane->commit_req = true;
+        }
+        if (spe->chroma_loc && spe->chroma_loc != plane->chroma_loc)
+        {
+            wp_color_representation_surface_v1_set_chroma_location(plane->color_rep, spe->chroma_loc);
+            plane->chroma_loc = spe->chroma_loc;
+            plane->commit_req = true;
+        }
+        if (spe->coefficients && (spe->coefficients != plane->coefficients || spe->range != plane->range))
+        {
+            wp_color_representation_surface_v1_set_coefficients_and_range(plane->color_rep, spe->coefficients, spe->range);
+            plane->coefficients = spe->coefficients;
+            plane->range = spe->range;
+            plane->commit_req = true;
+        }
     }
 #endif
 
@@ -2525,6 +2532,10 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
 
 static void w_bound_destroy(w_bound_t * const b)
 {
+#if HAVE_WAYLAND_COLOR_REPRESENTATION
+    if (b->color_representation_manager_v1 != NULL)
+        wp_color_representation_manager_v1_destroy(b->color_representation_manager_v1);
+#endif
     if (b->viewporter != NULL)
         wp_viewporter_destroy(b->viewporter);
     if (b->linux_dmabuf_v1 != NULL)
