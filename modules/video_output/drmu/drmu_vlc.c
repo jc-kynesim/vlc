@@ -145,6 +145,32 @@ fb_vlc_chroma_siting(const video_format_t * const fmt)
     return DRMU_CHROMA_SITING_UNSPECIFIED;
 }
 
+static unsigned int
+fb_vlc_orientation(const video_format_t * const fmt)
+{
+    switch (fmt->orientation) {
+        case ORIENT_TOP_LEFT: /**< Top line represents top, left column left. */
+            return DRMU_ROTATION_0;
+        case ORIENT_TOP_RIGHT: /**< Flipped horizontally */
+            return DRMU_ROTATION_Y_FLIP;
+        case ORIENT_BOTTOM_LEFT: /**< Flipped vertically */
+            return DRMU_ROTATION_X_FLIP;
+        case ORIENT_BOTTOM_RIGHT: /**< Rotated 180 degrees */
+            return DRMU_ROTATION_180;
+        case ORIENT_LEFT_TOP: /**< Transposed */
+            return DRMU_ROTATION_TRANSPOSE;
+        case ORIENT_LEFT_BOTTOM: /**< Rotated 90 degrees clockwise */
+            return DRMU_ROTATION_90;
+        case ORIENT_RIGHT_TOP: /**< Rotated 90 degrees anti-clockwise */
+            return DRMU_ROTATION_270;
+        case ORIENT_RIGHT_BOTTOM: /**< Anti-transposed */
+            return DRMU_ROTATION_180_TRANSPOSE;
+        default:
+            break;
+    }
+    return DRMU_ROTATION_INVALID;
+}
+
 void
 drmu_fb_vlc_pic_set_metadata(drmu_fb_t * const dfb, const picture_t * const pic)
 {
@@ -158,6 +184,8 @@ drmu_fb_vlc_pic_set_metadata(drmu_fb_t * const dfb, const picture_t * const pic)
     drmu_fb_chroma_siting_set(dfb, fb_vlc_chroma_siting(&pic->format));
 
     drmu_fb_hdr_metadata_set(dfb, pic_hdr_metadata(&meta, &pic->format) == 0 ? &meta : NULL);
+
+    drmu_fb_orientation_set(dfb, fb_vlc_orientation(&pic->format));
 }
 
 #if HAS_DRMPRIME
