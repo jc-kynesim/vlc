@@ -149,21 +149,21 @@ static unsigned int
 fb_vlc_orientation(const video_format_t * const fmt)
 {
     switch (fmt->orientation) {
-        case ORIENT_TOP_LEFT: /**< Top line represents top, left column left. */
+        case ORIENT_NORMAL:
             return DRMU_ROTATION_0;
-        case ORIENT_TOP_RIGHT: /**< Flipped horizontally */
-            return DRMU_ROTATION_Y_FLIP;
-        case ORIENT_BOTTOM_LEFT: /**< Flipped vertically */
-            return DRMU_ROTATION_X_FLIP;
-        case ORIENT_BOTTOM_RIGHT: /**< Rotated 180 degrees */
+        case ORIENT_HFLIPPED:
+            return DRMU_ROTATION_H_FLIP;
+        case ORIENT_VFLIPPED:
+            return DRMU_ROTATION_V_FLIP;
+        case ORIENT_ROTATED_180:
             return DRMU_ROTATION_180;
-        case ORIENT_LEFT_TOP: /**< Transposed */
+        case ORIENT_TRANSPOSED:
             return DRMU_ROTATION_TRANSPOSE;
-        case ORIENT_LEFT_BOTTOM: /**< Rotated 90 degrees clockwise */
-            return DRMU_ROTATION_90;
-        case ORIENT_RIGHT_TOP: /**< Rotated 90 degrees anti-clockwise */
+        case ORIENT_ROTATED_270:
             return DRMU_ROTATION_270;
-        case ORIENT_RIGHT_BOTTOM: /**< Anti-transposed */
+        case ORIENT_ROTATED_90:
+            return DRMU_ROTATION_90;
+        case ORIENT_ANTI_TRANSPOSED:
             return DRMU_ROTATION_180_TRANSPOSE;
         default:
             break;

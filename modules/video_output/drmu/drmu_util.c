@@ -131,10 +131,10 @@ drmu_util_str_to_rotation(const char * s, char ** peos)
         unsigned int rot;
     } str_to_rot[] = {
         {"0", DRMU_ROTATION_0},
-        {"X_FLIP", DRMU_ROTATION_X_FLIP},
-        {"X", DRMU_ROTATION_X_FLIP},
-        {"Y_FLIP", DRMU_ROTATION_Y_FLIP},
-        {"Y", DRMU_ROTATION_Y_FLIP},
+        {"H_FLIP", DRMU_ROTATION_H_FLIP},
+        {"H", DRMU_ROTATION_H_FLIP},
+        {"V_FLIP", DRMU_ROTATION_V_FLIP},
+        {"V", DRMU_ROTATION_V_FLIP},
         {"180T", DRMU_ROTATION_180_TRANSPOSE},
         {"180_TRANSPOSE", DRMU_ROTATION_180_TRANSPOSE},
         {"180", DRMU_ROTATION_180},

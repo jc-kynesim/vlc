@@ -346,7 +346,7 @@ limit_rect(const drmu_rect_t dest_rect, const unsigned int rot_conn)
 
 int
 drmu_writeback_fb_queue(drmu_writeback_fb_t * wbq,
-                        const drmu_rect_t dest_rect, const unsigned int rot, const uint32_t fmt,
+                        const drmu_rect_t dest_rect, const unsigned int dest_rot, const uint32_t fmt,
                         drmu_writeback_fb_done_fn * const done_fn, void * const v,
                         drmu_fb_t * const fb)
 {
@@ -354,6 +354,7 @@ drmu_writeback_fb_queue(drmu_writeback_fb_t * wbq,
     drmu_writeback_env_t * const wbe = wbq->wbe;
     drmu_env_t * const du = wbe->du;
     drmu_atomic_t * da = drmu_atomic_new(du);
+    unsigned int rot_total;
     unsigned int rot_plane;
     unsigned int rot_conn;
     drmu_rect_t r;
@@ -375,14 +376,16 @@ drmu_writeback_fb_queue(drmu_writeback_fb_t * wbq,
         goto fail;
     }
 
-    rot_plane = drmu_rotation_find(rot, drmu_plane_rotation_mask(wbe->plane_pri),
+    rot_total = drmu_fb_rotation(fb, dest_rot);
+
+    rot_plane = drmu_rotation_find(rot_total, drmu_plane_rotation_mask(wbe->plane_pri),
                                    drmu_conn_rotation_mask(drmu_output_conn(wbe->dout, 0)));
     if (rot_plane == DRMU_ROTATION_INVALID) {
-        drmu_err(du, "Cannot find combination of rotations for %d", rot);
+        drmu_err(du, "Cannot find combination of rotations for %d", rot_total);
         rv = -EINVAL;
         goto fail;
     }
-    rot_conn = drmu_rotation_subb(rot_plane, rot);
+    rot_conn = drmu_rotation_subb(rot_plane, rot_total);
 
     r = limit_rect(dest_rect, rot_conn);
 
