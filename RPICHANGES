@@ -17,3 +17,16 @@ Fix Alsa TRUEHD passthrough rates when the notional sample rate is > 48k
 Add a --wl-dmabuf-stats option that collects data on frames presented and
 frames droped by wayland.
 Fix a segfault on VLC exit when using wl-dmabuf in fullscreen
+
+pi/3.0.21-trixie/rpi_50 (in progress)
+-----------------------
+Add YUV420J (i.e. full range YUV420) aliases to DRMPRIME processing. This fixes
+issues with a few 420J streams not getting h/w acceleertaion corrcetly.
+Add colour_representation support to wl_dmabuf. This should enable correct
+color representation of BT470 and BT2020 videos under wayland (as long as the
+compositor supports the extension).
+Add the ability to rotate video with DRM output. So far this is only the video,
+subtitles etc. are not rotated and so entire display rotation is currently not
+supported.
+
+
