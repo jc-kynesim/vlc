@@ -38,6 +38,7 @@
 #include "drmu_scan.h"
 #include "drmu_util.h"
 #include "drmu_vlc.h"
+#include "drmu_writeback.h"
 
 #include <vlc_common.h>
 
@@ -107,12 +108,25 @@ typedef struct subpic_ent_s {
     unsigned int alpha; // out of 0xff * 0xff
 } subpic_ent_t;
 
+typedef struct wb_display_env_s {
+    drmu_atomic_t * da;
+    drmu_rect_t display_rect;
+    drmu_plane_t * dp;
+} wb_display_env_t;
+
 typedef struct vout_display_sys_t {
     drmu_env_t * du;
     drmu_output_t * dout;
     drmu_plane_t * dp;
     drmu_pool_t * pic_pool;
     drmu_pool_t * sub_fb_pool;
+
+    unsigned int display_orientation;
+    drmu_writeback_env_t * wbe;
+    drmu_writeback_fb_t * pic_wbq;
+    wb_display_env_t * wde;
+    drmu_fb_t * wb_fb;
+
     drmu_plane_t * subplanes[SUBPICS_MAX];
     subpic_ent_t subpics[SUBPICS_MAX];
     vlc_fourcc_t * subpic_chromas;
@@ -501,6 +515,19 @@ static void set_display_windows(vout_display_t *const vd, vout_display_sys_t *co
             vplace_transpose(sys->display_rect) : sys->display_rect;
 }
 
+static void
+wb_display_done_cb(void * v, drmu_fb_t * fb)
+{
+    wb_display_env_t * const wde = v;
+    if (fb != NULL) {
+        drmu_atomic_plane_add_fb(wde->da, wde->dp, fb, wde->display_rect);
+        drmu_atomic_queue(&wde->da);
+    }
+    drmu_atomic_unref(&wde->da);
+    drmu_plane_unref(&wde->dp);
+    free(wde);
+}
+
 static void vd_drm_prepare(vout_display_t *vd, picture_t *pic,
                        subpicture_t *subpicture)
 {
@@ -652,7 +679,28 @@ subpics_done:
 #endif
     drmu_output_fb_info_set(sys->dout, dfb);
 
-    ret = drmu_atomic_plane_add_fb(da, sys->dp, dfb, r);
+    {
+        unsigned int pic_rot = drmu_fb_rotation(dfb, sys->display_orientation);
+        if (!drmu_plane_rotation_valid(sys->dp, pic_rot)) {
+
+            if (sys->wbe == NULL) {
+                sys->wbe = drmu_writeback_env_new(sys->du);
+                sys->pic_wbq = drmu_writeback_fb_new(sys->wbe, sys->pic_pool);
+            }
+
+            sys->wde = calloc(1, sizeof(*sys->wde));
+            sys->wde->display_rect = r;
+            sys->wde->dp = drmu_plane_ref(sys->dp);
+            sys->wde->da = drmu_atomic_ref(da); // Just a ref - not a copy so later adds apply
+            sys->wb_fb = drmu_fb_ref(dfb);
+            ret = 0;
+        }
+        else {
+            ret = drmu_atomic_plane_add_fb(da, sys->dp, dfb, r);
+            drmu_atomic_plane_add_rotation(da, sys->dp, pic_rot);
+        }
+    }
+
     drmu_atomic_output_add_props(da, sys->dout);
     drmu_fb_unref(&dfb);
 
@@ -701,7 +749,22 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic,
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
 
-    drmu_atomic_queue(&sys->display_set);
+    if (sys->wde) {
+        // Pick the smallest of display and source as writeback buffer size
+        drmu_rect_t wb_rect = drmu_rect_shr16(drmu_fb_crop_frac(sys->wb_fb));
+        if (sys->wde->display_rect.w < wb_rect.w)
+            wb_rect.w = sys->wde->display_rect.w;
+        if (sys->wde->display_rect.h < wb_rect.h)
+            wb_rect.h = sys->wde->display_rect.h;
+
+        drmu_atomic_unref(&sys->display_set);
+        drmu_writeback_fb_queue(sys->pic_wbq, wb_rect, sys->display_orientation, DRM_FORMAT_XRGB8888, wb_display_done_cb, sys->wde, sys->wb_fb);
+        sys->wde = NULL;
+        drmu_fb_unref(&sys->wb_fb);
+    }
+    else {
+        drmu_atomic_queue(&sys->display_set);
+    }
 
     if (subpicture)
         subpicture_Delete(subpicture);
@@ -1018,6 +1081,13 @@ static void CloseDrmVout(vout_display_t *vd)
     unsigned int i;
 
     msg_Dbg(vd, "<<< %s", __func__);
+
+    if (sys->wde != NULL)
+        wb_display_done_cb(sys->wde, NULL);
+    drmu_fb_unref(&sys->wb_fb);
+
+    drmu_writeback_fb_unref(&sys->pic_wbq);
+    drmu_writeback_env_finish(&sys->wbe);
 
     drmu_pool_kill(&sys->sub_fb_pool);
     drmu_pool_kill(&sys->pic_pool);
