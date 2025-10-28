@@ -492,6 +492,15 @@ void VideoWidget::release( bool forced )
         layout->removeWidget( stable );
         stable->deleteLater();
         stable = NULL;
+
+#ifdef QT5_HAS_WAYLAND
+        vlc_mutex_lock(&p_window->handle_lock);
+        msg_Dbg( p_intf, "video widget handle zap" );
+        p_window->handle.wl = NULL;
+        incnz(&p_window->handle_seq);
+        vlc_mutex_unlock(&p_window->handle_lock);
+#endif
+
         p_window = NULL;
     }
 
