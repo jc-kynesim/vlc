@@ -91,6 +91,10 @@
 "is specified (or set by Fullscreen Output Device in Preferences) " \
 "HDMI-<qt-fullscreen-screennumber+1> will be used, otherwise HDMI-1.")
 
+#define DRM_VOUT_ORIENTATION_NAME "drm-vout-orintation"
+#define DRM_VOUT_ORIENTATION_TEXT N_("Orientation of output display.")
+#define DRM_VOUT_ORIENTATION_LONGTEXT N_("Orientation of output display. [default: \"0\"]")
+
 #define DRM_VOUT_MODULE_NAME "drm-vout-module"
 #define DRM_VOUT_MODULE_TEXT N_("DRM module to use")
 #define DRM_VOUT_MODULE_LONGTEXT N_("DRM module for Rpi fullscreen")
@@ -1301,6 +1305,16 @@ static int OpenDrmVout(vlc_object_t *object)
         }
     }
 
+    {
+        char * orientation_str = var_InheritString(vd, DRM_VOUT_ORIENTATION_NAME);
+        char * p;
+        // Bad values will give orientation_0 which is what we want
+        sys->display_orientation = drmu_util_str_to_rotation(orientation_str, &p);
+        if (p == orientation_str)
+            msg_Err(vd, "Bad display orientation: '%s' using '0'", orientation_str);
+        free(orientation_str);
+    }
+
     drmu_env_restore_enable(sys->du);
 
     drmu_output_modeset_allow(sys->dout, !var_InheritBool(vd, DRM_VOUT_NO_MODESET_NAME));
@@ -1496,6 +1510,7 @@ vlc_module_begin()
     add_string(DRM_VOUT_MODE_NAME,         "none", DRM_VOUT_MODE_TEXT, DRM_VOUT_MODE_LONGTEXT, false)
     add_string(DRM_VOUT_WINDOW_NAME,       "fullscreen", DRM_VOUT_WINDOW_TEXT, DRM_VOUT_WINDOW_LONGTEXT, false)
     add_string(DRM_VOUT_DISPLAY_NAME,      "auto", DRM_VOUT_DISPLAY_TEXT, DRM_VOUT_DISPLAY_LONGTEXT, false)
+    add_string(DRM_VOUT_ORIENTATION_NAME,  "0",  DRM_VOUT_ORIENTATION_TEXT, DRM_VOUT_ORIENTATION_LONGTEXT, false)
     add_string(DRM_VOUT_MODULE_NAME,       DRM_MODULE, DRM_VOUT_MODULE_TEXT, DRM_VOUT_MODULE_LONGTEXT, false)
 
     set_callbacks(OpenDrmVout, CloseDrmVout)
