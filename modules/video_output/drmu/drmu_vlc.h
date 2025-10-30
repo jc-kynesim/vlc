@@ -67,6 +67,9 @@ plane_t drmu_fb_vlc_plane(drmu_fb_t * const dfb, const unsigned int plane_n);
 drmu_fb_t * drmu_fb_vlc_new_pic_cma_attach(drmu_env_t * const du, picture_t * const pic);
 #endif
 
+// VLC orientation -> DRMU rotation
+unsigned int drmu_rotation_vlc_orientation(const video_orientation_t orientation);
+
 // Copy properties like colour_space, hdr_metadata into the fb
 void drmu_fb_vlc_pic_set_metadata(drmu_fb_t * const dfb, const picture_t * const pic);
 
