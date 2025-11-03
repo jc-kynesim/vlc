@@ -93,7 +93,7 @@
 "is specified (or set by Fullscreen Output Device in Preferences) " \
 "HDMI-<qt-fullscreen-screennumber+1> will be used, otherwise HDMI-1.")
 
-#define DRM_VOUT_ORIENTATION_NAME "drm-vout-orintation"
+#define DRM_VOUT_ORIENTATION_NAME "drm-vout-orientation"
 #define DRM_VOUT_ORIENTATION_TEXT N_("Orientation of output display.")
 #define DRM_VOUT_ORIENTATION_LONGTEXT N_("Orientation of output display. [default: \"0\"]")
 
@@ -110,7 +110,7 @@ struct vout_display_sys_t;
 
 typedef struct subpic_ent_s {
     atomic_int ready;
-    int alpha; // out of 0xff * 0xff
+    unsigned int alpha; // out of 0xff * 0xff
 
     vout_display_t * vd;
     struct vout_display_sys_t * sys;
@@ -153,18 +153,21 @@ typedef struct vout_display_sys_t {
     drmu_writeback_fb_t * pic_wbq;
     wb_display_env_t * wde;
     drmu_fb_t * wb_fb;
+    drmu_fb_t * display_fb;
 
     subplane_t planes[MAX_SUBPICS + 1];
 //    subpic_ent_t subpics[MAX_SUBPICS];
     vlc_fourcc_t * subpic_chromas;
 
-    drmu_atomic_t * display_set;
+    drmu_rect_t r_display;              // Display rect (0,0; orient = display)
+    drmu_rect_t r_win;                  // Window rect (orient = display, inside display)
+    drmu_rect_t r_render;               // Render rect (0,0; orient = 0)
 
-    vout_display_place_t req_win;
-    vout_display_place_t spu_rect;
-    vout_display_place_t dest_rect;
-    vout_display_place_t win_rect;
-    vout_display_place_t display_rect;
+    vout_display_place_t req_win;       // Requested window 0x0 if unset
+    vout_display_place_t spu_rect;      // Subpics render target
+    vout_display_place_t dest_rect;     // Dest rect (??? within win_rect ???)
+    vout_display_place_t win_rect;      // Transformed display / requested window (render area)
+    vout_display_place_t display_rect;  // Non-transformed display size
 
     video_transform_t dest_transform;
 
@@ -214,7 +217,6 @@ copy_pic_to_fb(vout_display_t *const vd, drmu_pool_t *const pool, picture_t *con
     drmu_fb_write_end(fb);
 
     drmu_fb_vlc_pic_set_metadata(fb, src);
-
     return fb;
 }
 
@@ -418,6 +420,71 @@ static inline vout_display_place_t vplace_vflip(const vout_display_place_t s, co
     };
 }
 
+static drmu_rect_t
+r_win_from_display(const drmu_rect_t r_display, unsigned int display_orient)
+{
+    if (!drmu_rotation_is_transposed(display_orient))
+        return r_display;
+    return drmu_rect_transpose(r_display);
+}
+
+static drmu_rect_t
+r_dest_in_render(const vout_display_cfg_t * cfg,
+              const video_format_t * fmt,
+              const drmu_rect_t render)
+{
+    video_format_t tfmt;
+    vout_display_cfg_t tcfg;
+    vout_display_place_t place;
+
+    // Fix SAR if unknown
+    if (fmt->i_sar_den == 0 || fmt->i_sar_num == 0) {
+        tfmt = *fmt;
+        tfmt.i_sar_den = 1;
+        tfmt.i_sar_num = 1;
+        fmt = &tfmt;
+    }
+
+    // Override what VLC thinks might be going on with display size
+    // if we know better
+    if (render.w != 0 && render.h != 0)
+    {
+        tcfg = *cfg;
+        tcfg.display.width = render.w;
+        tcfg.display.height = render.h;
+        cfg = &tcfg;
+    }
+
+    vout_display_PlacePicture(&place, fmt, cfg, false);
+
+    place.x += render.x;
+    place.y += render.y;
+
+    return drmu_rect_vlc_plane(place);
+}
+
+// Display coords from render coords
+static drmu_rect_t
+r_display_from_render(drmu_rect_t s, const drmu_rect_t rend, const drmu_rect_t win, unsigned int win_orient)
+{
+    drmu_rect_t rr = drmu_rect_xy0(win);
+    if (drmu_rotation_is_transposed(win_orient))
+        rr = drmu_rect_transpose(rr);
+
+    s = drmu_rect_rescale(s, rr, rend);
+
+    if (drmu_rotation_is_transposed(rot))
+        s = drmu_rect_transpose(s);
+    if (drmu_rotation_is_hflipped(rot))
+        s.x = rr.w - (s.x + s.w);
+    if (drmu_rotation_is_vflipped(rot))
+        s.y = rr.h - (s.y + s.h);
+
+    s.x += win.x;
+    s.y += win.y;
+    return s;
+}
+
 static vout_display_place_t
 place_out(const vout_display_cfg_t * cfg,
           const video_format_t * fmt,
@@ -471,7 +538,7 @@ place_dest_rect(vout_display_sys_t * const sys,
           const video_format_t * fmt)
 {
     sys->dest_rect = rect_transform(place_out(cfg, fmt, sys->win_rect),
-                                    sys->display_rect, sys->dest_transform);
+                                    sys->display_rect, sys->display_orientation);
 }
 
 static void
@@ -555,6 +622,7 @@ spe_convert_cb(void * v, short revents)
     VLC_UNUSED(revents);
 
     spe->fb = copy_pic_to_fb(spe->vd, spe->sys->sub_fb_pool, spe->pic);
+    drmu_fb_pixel_blend_mode_set(spe->fb, DRMU_FB_PIXEL_BLEND_COVERAGE);
     atomic_store(&spe->ready, 1);
 }
 
@@ -565,12 +633,14 @@ spe_no_pic(const subpic_ent_t * const spe)
 }
 
 static bool
-spe_changed(const subpic_ent_t * const spe, const subpicture_region_t * const sreg)
+spe_changed(const subpic_ent_t * const spe,
+            const subpicture_t * const spic,
+            const subpicture_region_t * const sreg)
 {
-    const bool no_pic = (sreg == NULL || sreg->i_alpha == 0);
+    const bool no_pic = (sreg == NULL || spic == NULL || sreg->i_alpha * spic->i_alpha == 0);
     if (no_pic && spe_no_pic(spe))
         return false;
-    return no_pic || spe_no_pic(spe) || spe->pic != sreg->p_picture || spe->alpha != sreg->i_alpha;
+    return no_pic || spe_no_pic(spe) || spe->pic != sreg->p_picture || spe->alpha != (unsigned int)(sreg->i_alpha * spic->i_alpha);
 }
 
 static void
@@ -618,7 +688,7 @@ spe_new_pic(vout_display_t * const vd, vout_display_sys_t * const sys,
     }
 
     spe->pic = picture_Hold(pic);
-    spe->alpha = 0xff;
+    spe->alpha = 0xffff;
     return spe;
 }
 
@@ -633,7 +703,7 @@ spe_new(vout_display_t * const vd, vout_display_sys_t * const sys,
     if (spe_no_pic(spe))
         return spe;
 
-    spe->alpha = sreg->i_alpha;
+    spe->alpha = sreg->i_alpha * spic->i_alpha;
 
     spe_update_rect(spe, spic, sreg);
 
@@ -679,66 +749,15 @@ wb_display_done_cb(void * v, drmu_fb_t * fb)
     free(wde);
 }
 
-
-static void
-do_display(vout_display_t * const vd, vout_display_sys_t * const sys)
-{
-//    msg_Info(vd, "<<< %s: Surface: %p", __func__, sys->embed->handle.wl);
-#if 0
-    sys->stats.time_frameN = mdate();
-    if (!sys->stats.time_frame0)
-        sys->stats.time_frame0 = sys->stats.time_frameN;
-    ++sys->stats.frame_n;
-
-    if (spe_no_pic(sys->planes[PLANE_VID].spe_next))
-    {
-        msg_Warn(vd, "%s: No current pic", __func__);
-        return;
-    }
-
-    if (make_background_and_video(vd, sys) != 0)
-    {
-        msg_Warn(vd, "%s: Make background fail", __func__);
-        return;
-    }
-    make_subpic_surfaces(vd, sys);
-#endif
-    for (unsigned int i = PLANE_VID; i != PLANE_SUB + MAX_SUBPICS; ++i)
-    {
-        subplane_t * const plane = sys->planes + i;
-        subpic_ent_t * spe = plane->spe_cur;
-
-        if (plane->spe_next && atomic_load(&plane->spe_next->ready))
-        {
-            spe_delete(&plane->spe_cur);
-            spe = plane->spe_cur = plane->spe_next;
-            plane->spe_next = NULL;
-            subpic_ent_attach(plane, spe, sys->eq);
-        }
-    }
-    return;
-}
-
 static void vd_drm_prepare(vout_display_t *vd, picture_t *pic,
                        subpicture_t *subpicture)
 {
     vout_display_sys_t * const sys = vd->sys;
     unsigned int n = 0;
-    drmu_atomic_t * da = drmu_atomic_new(sys->du);
     drmu_fb_t * dfb = NULL;
     drmu_rect_t r;
-    unsigned int i;
+//    unsigned int i;
     int ret;
-
-    if (da == NULL)
-        goto fail;
-
-    if (sys->display_set != NULL) {
-        msg_Warn(vd, "sys->display_set != NULL");
-        drmu_atomic_unref(&sys->display_set);
-    }
-
-    // * Mode (currently) doesn't change whilst running so no need to set here
 
 #if 1
 
@@ -751,13 +770,13 @@ static void vd_drm_prepare(vout_display_t *vd, picture_t *pic,
 
             if (plane->spe_next != NULL)
             {
-                if (!spe_changed(plane->spe_next, sreg))
+                if (!spe_changed(plane->spe_next, spic, sreg))
                     spe_update_rect(plane->spe_next, spic, sreg);
                 // else if changed ignore as we are already doing stuff
             }
             else
             {
-                if (!spe_changed(plane->spe_cur, sreg))
+                if (!spe_changed(plane->spe_cur, spic, sreg))
                     spe_update_rect(plane->spe_cur, spic, sreg);
                 else
                 {
@@ -775,7 +794,7 @@ subpics_done:
     // Clear any other entries
     for (; n != MAX_SUBPICS; ++n) {
         subplane_t * const plane = sys->planes + n + PLANE_SUB;
-        if (plane->spe_next == NULL && spe_changed(plane->spe_cur, NULL))
+        if (plane->spe_next == NULL && spe_changed(plane->spe_cur, NULL, NULL))
             plane->spe_next = spe_new(vd, sys, NULL, NULL);
     }
 
@@ -925,18 +944,20 @@ subpics_done:
             sys->wde = calloc(1, sizeof(*sys->wde));
             sys->wde->display_rect = r;
             sys->wde->dp = drmu_plane_ref(sys->dp);
-            sys->wde->da = drmu_atomic_ref(da); // Just a ref - not a copy so later adds apply
-            sys->wb_fb = drmu_fb_ref(dfb);
+            sys->wb_fb = dfb;
             ret = 0;
         }
         else {
-            ret = drmu_atomic_plane_add_fb(da, sys->dp, dfb, r);
-            drmu_atomic_plane_add_rotation(da, sys->dp, pic_rot);
+            sys->display_fb = dfb;
+//            ret = drmu_atomic_plane_add_fb(da, sys->dp, dfb, r);
+//            drmu_atomic_plane_add_rotation(da, sys->dp, pic_rot);
         }
     }
+    dfb = NULL;
 
-    drmu_atomic_output_add_props(da, sys->dout);
-    drmu_fb_unref(&dfb);
+
+//    drmu_atomic_output_add_props(da, sys->dout);
+//    drmu_fb_unref(&dfb);
 
     if (ret != 0) {
         msg_Err(vd, "Failed to set video plane: %s", strerror(-ret));
@@ -964,7 +985,7 @@ subpics_done:
     }
 #endif
 
-    sys->display_set = da;
+//    sys->display_set = da;
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
@@ -973,17 +994,58 @@ subpics_done:
 
 fail:
     drmu_fb_unref(&dfb);
-    drmu_atomic_unref(&da);
+//    drmu_atomic_unref(&da);
 }
 
 static void vd_drm_display(vout_display_t *vd, picture_t *p_pic,
                 subpicture_t *subpicture)
 {
     vout_display_sys_t *const sys = vd->sys;
+    drmu_atomic_t * da = drmu_atomic_new(sys->du);
+    int ret;
+    const drmu_rect_t r = sys->output_simple ? drmu_rect_vlc_place(&sys->display_rect): drmu_rect_vlc_place(&sys->dest_rect);
 
 #if TRACE_ALL
     msg_Dbg(vd, "<<< %s", __func__);
 #endif
+
+    drmu_atomic_output_add_props(da, sys->dout);
+
+    for (unsigned int i = PLANE_VID; i != PLANE_SUB + MAX_SUBPICS; ++i)
+    {
+        subplane_t * const plane = sys->planes + i;
+        subpic_ent_t * spe;
+
+        msg_Info(vd, "tst sub %d: plane: %p, next: %p, ready: %d", i,
+                 plane->plane, plane->spe_next,
+                 plane->spe_next && atomic_load(&plane->spe_next->ready));
+
+        if (plane->plane == NULL)
+            break;
+
+        if (plane->spe_next && atomic_load(&plane->spe_next->ready))
+        {
+            drmu_rect_t d2;
+
+            spe_delete(&plane->spe_cur);
+            spe = plane->spe_cur = plane->spe_next;
+            plane->spe_next = NULL;
+
+            d2 = drmu_rect_rescale(spe->dst_rect, r, drmu_rect_vlc_place(&sys->spu_rect));
+
+            msg_Info(vd, "Add sub %d: dst %d,%d %dx%d, r %d,%d %dx%d place %d,%d %dx%d d2 %d,%d %dx%d alpha %d", i,
+                     spe->dst_rect.x, spe->dst_rect.y, spe->dst_rect.w, spe->dst_rect.h,
+                     r.x, r.y, r.w, r.h,
+                     drmu_rect_vlc_place(&sys->spu_rect).x, drmu_rect_vlc_place(&sys->spu_rect).y, drmu_rect_vlc_place(&sys->spu_rect).w, drmu_rect_vlc_place(&sys->spu_rect).h,
+                     d2.x, d2.y, d2.w, d2.h,
+                     spe->alpha);
+
+            if ((ret = drmu_atomic_plane_add_fb(da, sys->planes[i].plane, spe->fb, d2)) != 0) {
+                 msg_Err(vd, "drmModeSetPlane for subplane %d failed: %s", i, strerror(-ret));
+            }
+            drmu_atomic_plane_add_alpha(da, sys->planes[i].plane, (spe->alpha * DRMU_PLANE_ALPHA_OPAQUE) / (0xff * 0xff));
+        }
+    }
 
     if (sys->wde) {
         // Pick the smallest of display and source as writeback buffer size
@@ -993,13 +1055,18 @@ static void vd_drm_display(vout_display_t *vd, picture_t *p_pic,
         if (sys->wde->display_rect.h < wb_rect.h)
             wb_rect.h = sys->wde->display_rect.h;
 
-        drmu_atomic_unref(&sys->display_set);
+        sys->wde->da = drmu_atomic_take(&da);
         drmu_writeback_fb_queue(sys->pic_wbq, wb_rect, sys->display_orientation, DRM_FORMAT_XRGB8888, wb_display_done_cb, sys->wde, sys->wb_fb);
         sys->wde = NULL;
         drmu_fb_unref(&sys->wb_fb);
     }
     else {
-        drmu_atomic_queue(&sys->display_set);
+        unsigned int pic_rot = drmu_fb_rotation(sys->display_fb, sys->display_orientation);
+
+        drmu_atomic_plane_add_fb(da, sys->dp, sys->display_fb, r);
+        drmu_fb_unref(&sys->display_fb);
+        drmu_atomic_plane_add_rotation(da, sys->dp, pic_rot);
+        drmu_atomic_queue(&da);
     }
 
     if (subpicture)
@@ -1071,12 +1138,12 @@ fail:
 
 static void subpic_cache_flush(vout_display_sys_t * const sys)
 {
-    for (unsigned int i = 0; i != MAX_SUBPICS; ++i) {
-        if (sys->subpics[i].pic != NULL) {
-            picture_Release(sys->subpics[i].pic);
-            sys->subpics[i].pic = NULL;
-        }
-        drmu_fb_unref(&sys->subpics[i].fb);
+    for (unsigned int i = 0; i != MAX_SUBPICS; ++i)
+    {
+        subplane_t * const plane = sys->planes + i + PLANE_SUB;
+
+        spe_delete(&plane->spe_cur);
+        spe_delete(&plane->spe_next);
     }
 }
 

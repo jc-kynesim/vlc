@@ -2970,6 +2970,14 @@ plane_set_atomic(drmu_atomic_t * const da,
                 uint32_t src_w, uint32_t src_h)
 {
     const uint32_t plid = dp->plane.plane_id;
+
+    drmu_env_t *du = drmu_atomic_env(da);
+    drmu_info(du, "crtc %d,%d %dx%d, src %d.%d,%d.%d %d.%dx%d.%d",
+              crtc_x, crtc_y,
+              crtc_w, crtc_h,
+              src_x >> 16, src_x & 0xffff,  src_y >> 16, src_y & 0xffff,
+              src_w >> 16, src_w & 0xffff,  src_h >> 16, src_h & 0xffff);
+
     drmu_atomic_add_prop_value(da, plid, dp->pid.crtc_id, dfb == NULL ? 0 : drmu_crtc_id(dp->dc));
     drmu_atomic_add_prop_fb(da, plid, dp->pid.fb_id, dfb);
     drmu_atomic_add_prop_value(da, plid, dp->pid.crtc_x, crtc_x);
