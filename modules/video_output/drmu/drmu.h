@@ -465,6 +465,14 @@ static inline bool drmu_rotation_is_transposed(const unsigned int r)
 {
     return (r & 4) != 0;
 }
+static inline bool drmu_rotation_is_vflipped(const unsigned int r)
+{
+    return (r & 2) != 0;
+}
+static inline bool drmu_rotation_is_hflipped(const unsigned int r)
+{
+    return (r & 1) != 0;
+}
 
 static inline bool drmu_rotation_is_valid(const unsigned int r)
 {
@@ -623,6 +631,15 @@ drmu_atomic_t * drmu_atomic_new(drmu_env_t * const du);
 
 // Copy (rather than just ref) b
 drmu_atomic_t * drmu_atomic_copy(drmu_atomic_t * const b);
+
+// Return b and NULL *ppb no matter what the ref count
+// Faster than _move
+static inline drmu_atomic_t * drmu_atomic_take(drmu_atomic_t ** const ppb)
+{
+    drmu_atomic_t * const b = *ppb;
+    *ppb = NULL;
+    return b;
+}
 
 // 'Move' b to the return value
 // If b has a single ref then rv is simply b otherwise it is a copy of b
