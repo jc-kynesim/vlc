@@ -3882,6 +3882,12 @@ AC_ARG_ENABLE(qt, [
 have_qt5_x11="no"
 AS_IF([test "${enable_qt}" != "no"], [
   PKG_CHECK_MODULES([QT], [Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg], [
+      try_qt5="yes"
+  ],[
+      try_qt5="no"
+  ])
+  AS_IF([test -n "${with_qtconf}"], [try_qt5="no"])
+  AS_IF([test "${try_qt5}" != "no"], [
       PKG_CHECK_MODULES([QT5_X11], [Qt5X11Extras], [
           have_qt5_x11="yes"
       ],[
