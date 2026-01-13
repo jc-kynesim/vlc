@@ -8,6 +8,8 @@ DO_INSTALL=
 SUDO_INSTALL=
 DO_CONFIGURE=1
 USR_PREFIX=
+QTCONF=
+QTOUT=
 
 while [ "$1" != "" ] ; do
     case $1 in
@@ -26,6 +28,10 @@ while [ "$1" != "" ] ; do
 	--usr)
 	    USR_PREFIX=/usr
 	    SUDO_INSTALL=sudo
+	    ;;
+	--qt6)
+	    QTCONF="--with-qtconf=/usr/lib/aarch64-linux-gnu/qt6/qt6.conf"
+	    QTOUT=-qt6
 	    ;;
         *)
             echo "Usage $0: [--bootstrap] [--make|--install] [--usr]"
@@ -73,7 +79,7 @@ else
   echo "Unknown machine name: $MC"
   exit 1
 fi
-OUT=$OUT_BASE/$ARM-`lsb_release -sc`-rel
+OUT=$OUT_BASE/$ARM-`lsb_release -sc`$QTOUT-rel
 
 if [ $DO_BOOTSTRAP ]; then
     echo "==== Bootstrapping & cleaning $OUT"
@@ -106,6 +112,7 @@ if [ $DO_CONFIGURE ]; then
      --disable-vdpau\
      --enable-wayland\
      --enable-gles2\
+     $QTCONF\
      $CONF_MMAL
     echo "==== Configured in $OUT"
 fi
