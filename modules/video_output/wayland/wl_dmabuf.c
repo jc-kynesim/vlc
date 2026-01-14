@@ -241,6 +241,7 @@ struct vout_display_sys_t
     bool want_stats;
     bool bkg_null;  // Bkg is known null - expect a lack of display (debug)
 
+    bool bkg_setup;
     struct wp_viewport * bkg_viewport;
     // Current size of background viewport if we have one
     // If not created yet then the size that the viewport should be created
@@ -1474,11 +1475,9 @@ commit_do(vout_display_t * const vd, vout_display_sys_t * const sys)
         if (bkg_surface != NULL)
         {
             if (sys->bkg_viewport)
-            {
                 wp_viewport_set_destination(sys->bkg_viewport,
                                             scale_dst(sys, sys->bkg_w), scale_dst(sys, sys->bkg_h));
-                wl_surface_commit(bkg_surface);
-            }
+            wl_surface_commit(bkg_surface);
             bkg_surface_unlock(vd, sys);
             flush_req = true;
         }
@@ -1569,6 +1568,7 @@ unmap_all(vout_display_sys_t * const sys, const bool bkg_valid)
     for (unsigned int i = MAX_SUBPICS + PLANE_SUB - 1; i >= PLANE_VID; --i)
         plane_destroy(sys->planes + i);
 
+    sys->bkg_setup = false;
     viewport_destroy(&sys->bkg_viewport);
 }
 
@@ -1641,7 +1641,7 @@ make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const 
     struct wl_buffer * w_buffer = NULL;
     struct wl_surface * bkg_surface = NULL;
 
-    if (sys->bkg_viewport)
+    if (sys->bkg_setup)
         return VLC_SUCCESS;
 
 #if HAVE_WAYLAND_SINGLE_PIXEL_BUFFER
@@ -1699,12 +1699,16 @@ make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const 
     if ((bkg_surface = bkg_surface_get_lock(vd, sys)) == NULL)
         goto error;
 
-    sys->bkg_viewport = wp_viewporter_get_viewport(sys->bound.viewporter, bkg_surface);
-    if (sys->bkg_viewport == NULL)
+    if (!sys->embed->wl_surface_do_not_viewport)
     {
-        msg_Err(vd, "Failed to create background viewport");
-        goto err_unlock;
+        sys->bkg_viewport = wp_viewporter_get_viewport(sys->bound.viewporter, bkg_surface);
+        if (sys->bkg_viewport == NULL)
+        {
+            msg_Err(vd, "Failed to create background viewport");
+            goto err_unlock;
+        }
     }
+    sys->bkg_setup = true;
 
 #if CHECK_VDRE_COUNTS
     vdre_add_check(vdre, &sys->vdre_check_bkg);
@@ -1719,8 +1723,9 @@ make_background_and_video(vout_display_t * const vd, vout_display_sys_t * const 
     vdre = NULL;
     w_buffer = NULL;
 
-    wp_viewport_set_destination(sys->bkg_viewport,
-                                scale_dst(sys, sys->bkg_w), scale_dst(sys, sys->bkg_h));
+    if (sys->bkg_viewport)
+        wp_viewport_set_destination(sys->bkg_viewport,
+                                    scale_dst(sys, sys->bkg_w), scale_dst(sys, sys->bkg_h));
     wl_surface_set_opaque_region(bkg_surface, sys->region_all);
 
     wl_surface_damage(bkg_surface, 0, 0, INT32_MAX, INT32_MAX);
@@ -2068,7 +2073,7 @@ subpics_done:
 static void
 do_resize(vout_display_t * const vd, vout_display_sys_t * const sys)
 {
-    if (!sys->bkg_viewport)
+    if (!sys->bkg_setup)
         return;
 
     for (unsigned int i = PLANE_VID; i != PLANE_SUB + MAX_SUBPICS; ++i)
@@ -2079,7 +2084,8 @@ do_resize(vout_display_t * const vd, vout_display_sys_t * const sys)
         plane_set_rect(sys, plane, spe);
     }
 
-    if (sys->bkg_viewport != NULL && (vd->cfg->display.width != sys->bkg_w || vd->cfg->display.height != sys->bkg_h))
+    if (sys->bkg_viewport != NULL &&
+        (vd->cfg->display.width != sys->bkg_w || vd->cfg->display.height != sys->bkg_h))
     {
         msg_Dbg(vd, "Resize background: %dx%d", vd->cfg->display.width, vd->cfg->display.height);
         commit_req(sys, PLANE_BKG);
