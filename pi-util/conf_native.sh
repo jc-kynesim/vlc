@@ -8,8 +8,8 @@ DO_INSTALL=
 SUDO_INSTALL=
 DO_CONFIGURE=1
 USR_PREFIX=
-QTCONF=
 QTOUT=
+QT6REQ=
 
 while [ "$1" != "" ] ; do
     case $1 in
@@ -25,22 +25,22 @@ while [ "$1" != "" ] ; do
         --bootstrap)
             DO_BOOTSTRAP=1
             ;;
-	--usr)
-	    USR_PREFIX=/usr
-	    SUDO_INSTALL=sudo
-	    ;;
-	--qt6)
-	    QTCONF="--with-qtconf=/usr/lib/aarch64-linux-gnu/qt6/qt6.conf"
-	    QTOUT=-qt6
-	    ;;
+        --usr)
+            USR_PREFIX=/usr
+            SUDO_INSTALL=sudo
+            ;;
+        --qt6)
+            QT6REQ=1
+            QTOUT=-qt6
+            ;;
         *)
             echo "Usage $0: [--bootstrap] [--make|--install] [--usr]"
             echo "  bootstrap Clean <build dir> then bootstrap before configure"
             echo "            Will happen automatically if already clean"
             echo "  make      Do make after configure"
             echo "  install   Do make and install after configure"
-	    echo "  usr       Set install dir to /usr"
-	    echo "            Default is <build dir>/install for testing"
+            echo "  usr       Set install dir to /usr"
+            echo "            Default is <build dir>/install for testing"
             exit 1
             ;;
     esac
@@ -81,6 +81,17 @@ else
 fi
 OUT=$OUT_BASE/$ARM-`lsb_release -sc`$QTOUT-rel
 
+QTCONF_OPT=
+if [ $QT6REQ ]; then
+    QT6CONF_FILE=/usr/lib/$A/qt6/qt6.conf
+    if [ ! -f $QT6CONF_FILE ]; then
+        echo "QT6 config file not found at $QT6CONF_FILE"
+        exit 1
+    fi
+    QTCONF_OPT=--with-qtconf=$QT6CONF_FILE
+    echo "Qt6 selected. Check the config output to be sure configure has found it"
+fi
+
 if [ $DO_BOOTSTRAP ]; then
     echo "==== Bootstrapping & cleaning $OUT"
     rm -rf $OUT
@@ -112,7 +123,7 @@ if [ $DO_CONFIGURE ]; then
      --disable-vdpau\
      --enable-wayland\
      --enable-gles2\
-     $QTCONF\
+     $QTCONF_OPT\
      $CONF_MMAL
     echo "==== Configured in $OUT"
 fi
