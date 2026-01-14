@@ -50,6 +50,10 @@ static inline int qrand() {
     auto * q = QRandomGenerator::system();
     return q->generate();
 }
+
+#define QT_CLAIMS_VIEWPORT (true)
+#else
+#define QT_CLAIMS_VIEWPORT (false)
 #endif
 
 #if defined (QT_HAS_X11)
