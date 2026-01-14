@@ -1040,6 +1040,7 @@ static int Open(vout_window_t *wnd, const vout_window_cfg_t *cfg)
     if (surface == NULL)
         goto error;
     wnd->handle.wl = surface;  // Ensure NULL for error Close
+    wnd->wl_surface_do_not_viewport = false;
 
     sys->req_width = cfg->width;
     sys->req_height = cfg->height;
