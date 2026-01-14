@@ -50,6 +50,10 @@ static inline int qrand() {
     auto * q = QRandomGenerator::system();
     return q->generate();
 }
+
+#define QT_CLAIMS_VIEWPORT (true)
+#else
+#define QT_CLAIMS_VIEWPORT (false)
 #endif
 
 #if defined (QT5_HAS_X11)
@@ -222,6 +226,7 @@ bool VideoWidget::request( struct vout_window_t *p_wnd )
             p_wnd->display.wl = static_cast<wl_display*>(
                 qni->nativeResourceForIntegration(QByteArrayLiteral("wl_display")));
             p_wnd->handle_seq = 1;
+            p_wnd->wl_surface_do_not_viewport = QT_CLAIMS_VIEWPORT;
             break;
         }
 #endif
