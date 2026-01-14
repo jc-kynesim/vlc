@@ -205,6 +205,12 @@ struct vout_window_t {
      */
      vlc_mutex_t handle_lock;
      unsigned int handle_seq;
+     /* If set Qt has already got a viewport on the wl_surface so another
+      * cannot be created by the video code (wayland will crash vlc if that
+      * is tried).
+      */
+     bool wl_surface_do_not_viewport;
+
      /* Scale factor from reported size to physical, 0/0 if unknown */
      int scale_num;
      int scale_den;
