@@ -13,11 +13,15 @@
 #include <libavfilter/buffersink.h>
 #include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
+#include <libavutil/frame.h>
 #include <libavutil/opt.h>
 #include <libavutil/pixdesc.h>
 #include <libavutil/hwcontext.h>
 
-#define TRACE_ALL 1
+#define TRACE_ALL 0
+
+#define LIBAVUTIL_VERSION_CHECK( a, d, e ) \
+    (LIBAVUTIL_VERSION_MICRO >= 100 && LIBAVUTIL_VERSION_INT >= AV_VERSION_INT( a, d, e ) )
 
 typedef struct filter_sys_t {
     AVFilterGraph *filter_graph;
@@ -65,8 +69,16 @@ static picture_t * drmp_av_deinterlace(filter_t * filter, picture_t * in_pic)
     frame->crop_top    = in_pic->format.i_y_offset;
     frame->crop_right  = frame->width -  in_pic->format.i_visible_width -  frame->crop_left;
     frame->crop_bottom = frame->height - in_pic->format.i_visible_height - frame->crop_top;
+#if LIBAVUTIL_VERSION_CHECK( 58, 7, 100 )
+    frame->flags       = 0;
+    if (!in_pic->b_progressive)
+        frame->flags |= AV_FRAME_FLAG_INTERLACED;
+    if (in_pic->b_top_field_first)
+        frame->flags |= AV_FRAME_FLAG_TOP_FIELD_FIRST;
+#else
     frame->interlaced_frame = !in_pic->b_progressive;
     frame->top_field_first  = in_pic->b_top_field_first;
+#endif
     frame->pts         = (in_pic->date == VLC_TS_INVALID) ? AV_NOPTS_VALUE : in_pic->date;
 
     picture_Release(in_pic);
