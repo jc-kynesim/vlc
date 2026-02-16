@@ -41,6 +41,146 @@ static void drmp_av_flush(filter_t * filter)
 #endif
 }
 
+
+// Copied almost directly from ffmpeg filtering_video.c example
+static int init_filters(filter_t * const filter,
+                        const AVFrame * const frame)
+{
+    const char * const filters_descr = "deinterlace_v4l2m2m";
+    filter_sys_t *const sys = filter->p_sys;
+    int ret = 0;
+    const AVFilter *buffersrc  = avfilter_get_by_name("buffer");
+    const AVFilter *buffersink = avfilter_get_by_name("buffersink");
+    AVFilterInOut *outputs = avfilter_inout_alloc();
+    AVFilterInOut *inputs  = avfilter_inout_alloc();
+    enum AVPixelFormat pix_fmts[] = { AV_PIX_FMT_DRM_PRIME, AV_PIX_FMT_NONE };
+
+    msg_Dbg(filter, "Filter init start");
+
+    sys->out_frame = av_frame_alloc();
+    sys->filter_graph = avfilter_graph_alloc();
+    if (!outputs || !inputs || !sys->filter_graph || !sys->out_frame) {
+        ret = AVERROR(ENOMEM);
+        goto fail;
+    }
+
+    sys->buffersrc_ctx = avfilter_graph_alloc_filter(sys->filter_graph, buffersrc, "in");
+    if (sys->buffersrc_ctx == NULL) {
+        msg_Err(filter, "Cannot create buffer source");
+        goto fail;
+    }
+
+    {
+        AVBufferSrcParameters *par = av_buffersrc_parameters_alloc();
+        if (par == NULL) {
+            msg_Err(filter, "Failed to alloc buffersc parameters");
+            goto fail;
+        }
+        par->width =  frame->width;
+        par->height =  frame->height;
+        par->format = frame->format;
+#if LIBAVFILTER_BUILD >= AV_VERSION_INT(10, 1, 100)
+        par->color_range = frame->color_range;
+        par->color_space = frame->colorspace;
+#endif
+        par->time_base.num = 1;
+        par->time_base.den = CLOCK_FREQ;
+        par->sample_aspect_ratio = frame->sample_aspect_ratio;
+        // Buffersrc will take a ref - no need to keep locally
+        par->hw_frames_ctx = frame->hw_frames_ctx;
+        ret = av_buffersrc_parameters_set(sys->buffersrc_ctx, par);
+        av_freep(&par);
+        if (ret < 0) {
+            msg_Err(filter, "Failed to set buffersc parameters");
+            goto fail;
+        }
+    }
+
+    if (avfilter_init_dict(sys->buffersrc_ctx, NULL) < 0) {
+        msg_Err(filter, "Failed to init src dict");
+        goto fail;
+    }
+
+    /* buffer video sink: to terminate the filter chain. */
+    sys->buffersink_ctx = avfilter_graph_alloc_filter(sys->filter_graph, buffersink, "out");
+    if (sys->buffersink_ctx == NULL) {
+        msg_Err(filter, "Cannot create buffer sink");
+        goto fail;
+    }
+
+#if LIBAVFILTER_BUILD >= AV_VERSION_INT(10, 6, 100)
+    ret = av_opt_set_array(sys->buffersink_ctx, "pixel_formats",
+                           AV_OPT_SEARCH_CHILDREN | AV_OPT_ARRAY_REPLACE,
+                           0, sizeof(pix_fmts)/sizeof(pix_fmts[0]) - 1,
+                           AV_OPT_TYPE_PIXEL_FMT, pix_fmts);
+#else
+    ret = av_opt_set_int_list(sys->buffersink_ctx, "pix_fmts", pix_fmts,
+                              AV_PIX_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
+#endif
+    if (ret < 0) {
+        msg_Err(filter, "Cannot set output pixel format");
+        goto fail;
+    }
+
+    if (avfilter_init_dict(sys->buffersink_ctx, NULL) < 0) {
+        msg_Err(filter, "Failed to init dest dict");
+        goto fail;
+    }
+
+    /*
+     * Set the endpoints for the filter graph. The filter_graph will
+     * be linked to the graph described by filters_descr.
+     */
+
+    /*
+     * The buffer source output must be connected to the input pad of
+     * the first filter described by filters_descr; since the first
+     * filter input label is not specified, it is set to "in" by
+     * default.
+     */
+    outputs->name       = av_strdup("in");
+    outputs->filter_ctx = sys->buffersrc_ctx;
+    outputs->pad_idx    = 0;
+    outputs->next       = NULL;
+
+    /*
+     * The buffer sink input must be connected to the output pad of
+     * the last filter described by filters_descr; since the last
+     * filter output label is not specified, it is set to "out" by
+     * default.
+     */
+    inputs->name       = av_strdup("out");
+    inputs->filter_ctx = sys->buffersink_ctx;
+    inputs->pad_idx    = 0;
+    inputs->next       = NULL;
+
+    if ((ret = avfilter_graph_parse_ptr(sys->filter_graph, filters_descr,
+                                    &inputs, &outputs, NULL)) < 0) {
+        msg_Err(filter, "Filter graph parse failed");
+        goto fail;
+    }
+
+    if ((ret = avfilter_graph_config(sys->filter_graph, NULL)) < 0) {
+        msg_Err(filter, "Filter graph config failed");
+        goto fail;
+    }
+
+    msg_Dbg(filter, "Filter init OK");
+    avfilter_inout_free(&inputs);
+    avfilter_inout_free(&outputs);
+    return VLC_SUCCESS;
+
+fail:
+    msg_Dbg(filter, "Filter init FAIL");
+    avfilter_inout_free(&inputs);
+    avfilter_inout_free(&outputs);
+    av_frame_free(&sys->out_frame);
+    avfilter_graph_free(&sys->filter_graph);
+    sys->buffersink_ctx = NULL;
+    sys->buffersrc_ctx = NULL;
+    return ret == AVERROR(ENOMEM) ? VLC_ENOMEM : VLC_EGENERIC;
+}
+
 static picture_t * drmp_av_deinterlace(filter_t * filter, picture_t * in_pic)
 {
     filter_sys_t *const sys = filter->p_sys;
@@ -83,6 +223,13 @@ static picture_t * drmp_av_deinterlace(filter_t * filter, picture_t * in_pic)
 
     picture_Release(in_pic);
     in_pic = NULL;
+
+    if (!sys->filter_graph) {
+        if (init_filters(filter, frame) != 0) {
+            msg_Err(filter, "Filter init failure");
+            goto fail;
+        }
+    }
 
     if ((ret = av_buffersrc_add_frame_flags(sys->buffersrc_ctx, frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0) {
         msg_Err(filter, "Failed to feed filtergraph: %s", av_err2str(ret));
@@ -145,98 +292,6 @@ static void CloseDrmpAvDeinterlace(filter_t *filter)
     free(sys);
 }
 
-
-// Copied almost directly from ffmpeg filtering_video.c example
-static int init_filters(filter_t * const filter,
-                        const char * const filters_descr)
-{
-    filter_sys_t *const sys = filter->p_sys;
-    const video_format_t * const fmt = &filter->fmt_in.video;
-    char args[512];
-    int ret = 0;
-    const AVFilter *buffersrc  = avfilter_get_by_name("buffer");
-    const AVFilter *buffersink = avfilter_get_by_name("buffersink");
-    AVFilterInOut *outputs = avfilter_inout_alloc();
-    AVFilterInOut *inputs  = avfilter_inout_alloc();
-    enum AVPixelFormat pix_fmts[] = { AV_PIX_FMT_DRM_PRIME, AV_PIX_FMT_NONE };
-
-    sys->out_frame = av_frame_alloc();
-    sys->filter_graph = avfilter_graph_alloc();
-    if (!outputs || !inputs || !sys->filter_graph || !sys->out_frame) {
-        ret = AVERROR(ENOMEM);
-        goto end;
-    }
-
-    /* buffer video source: the decoded frames from the decoder will be inserted here. */
-    snprintf(args, sizeof(args),
-            "video_size=%dx%d:pix_fmt=%d:time_base=%d/%d:pixel_aspect=%d/%d",
-             fmt->i_visible_width, fmt->i_visible_height, AV_PIX_FMT_DRM_PRIME,
-             1, (int)CLOCK_FREQ,
-             fmt->i_sar_num, fmt->i_sar_den);
-
-    ret = avfilter_graph_create_filter(&sys->buffersrc_ctx, buffersrc, "in",
-                                       args, NULL, sys->filter_graph);
-    if (ret < 0) {
-        msg_Err(filter, "Cannot create buffer source");
-        goto end;
-    }
-
-    /* buffer video sink: to terminate the filter chain. */
-    ret = avfilter_graph_create_filter(&sys->buffersink_ctx, buffersink, "out",
-                                       NULL, NULL, sys->filter_graph);
-    if (ret < 0) {
-        msg_Err(filter, "Cannot create buffer sink");
-        goto end;
-    }
-
-    ret = av_opt_set_int_list(sys->buffersink_ctx, "pix_fmts", pix_fmts,
-                              AV_PIX_FMT_NONE, AV_OPT_SEARCH_CHILDREN);
-    if (ret < 0) {
-        msg_Err(filter, "Cannot set output pixel format");
-        goto end;
-    }
-
-    /*
-     * Set the endpoints for the filter graph. The filter_graph will
-     * be linked to the graph described by filters_descr.
-     */
-
-    /*
-     * The buffer source output must be connected to the input pad of
-     * the first filter described by filters_descr; since the first
-     * filter input label is not specified, it is set to "in" by
-     * default.
-     */
-    outputs->name       = av_strdup("in");
-    outputs->filter_ctx = sys->buffersrc_ctx;
-    outputs->pad_idx    = 0;
-    outputs->next       = NULL;
-
-    /*
-     * The buffer sink input must be connected to the output pad of
-     * the last filter described by filters_descr; since the last
-     * filter output label is not specified, it is set to "out" by
-     * default.
-     */
-    inputs->name       = av_strdup("out");
-    inputs->filter_ctx = sys->buffersink_ctx;
-    inputs->pad_idx    = 0;
-    inputs->next       = NULL;
-
-    if ((ret = avfilter_graph_parse_ptr(sys->filter_graph, filters_descr,
-                                    &inputs, &outputs, NULL)) < 0)
-        goto end;
-
-    if ((ret = avfilter_graph_config(sys->filter_graph, NULL)) < 0)
-        goto end;
-
-end:
-    avfilter_inout_free(&inputs);
-    avfilter_inout_free(&outputs);
-
-    return ret == 0 ? VLC_SUCCESS : ret == AVERROR(ENOMEM) ? VLC_ENOMEM : VLC_EGENERIC;
-}
-
 static bool is_fmt_valid_in(const vlc_fourcc_t fmt)
 {
     return fmt == VLC_CODEC_DRM_PRIME_I420 ||
@@ -247,7 +302,6 @@ static bool is_fmt_valid_in(const vlc_fourcc_t fmt)
 static int OpenDrmpAvDeinterlace(filter_t *filter)
 {
     filter_sys_t *sys;
-    int ret;
 
     msg_Dbg(filter, "<<< %s", __func__);
 
@@ -260,17 +314,13 @@ static int OpenDrmpAvDeinterlace(filter_t *filter)
         return VLC_ENOMEM;
     filter->p_sys = sys;
 
-    if ((ret = init_filters(filter, "deinterlace_v4l2m2m")) != 0)
-        goto fail;
+    // We would like to init the filter stack here but we need hw_frames_ctx
+    // and we don't have that till we have the first frame :-(
 
     filter->pf_video_filter = drmp_av_deinterlace;
     filter->pf_flush = drmp_av_flush;
 
     return VLC_SUCCESS;
-
-fail:
-    CloseDrmpAvDeinterlace(filter);
-    return VLC_EGENERIC;
 }
 
 vlc_module_begin()
