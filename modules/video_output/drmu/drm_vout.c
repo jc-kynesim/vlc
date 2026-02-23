@@ -884,7 +884,6 @@ static int vd_drm_control(vout_display_t *vd, int query)
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
         case VOUT_DISPLAY_CHANGE_SOURCE_PLACE:
-        case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
             if ((ret = reconfigure_display(vd, sys, vd->cfg, &fmt)) != 0)
                 break;
             // If simple then we only have one size we can be
