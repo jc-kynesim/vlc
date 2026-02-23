@@ -2093,7 +2093,6 @@ static int Control(vout_display_t *vd, int query)
         case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
         case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
         case VOUT_DISPLAY_CHANGE_SOURCE_PLACE:
-        case VOUT_DISPLAY_CHANGE_DISPLAY_SIZE:
             place_rects(vd, vd->cfg);
             do_resize(vd, sys);
             commit_do(vd, sys);
