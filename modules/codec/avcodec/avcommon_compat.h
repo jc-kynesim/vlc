@@ -76,6 +76,23 @@
 # define FF_API_AVIO_WRITE_NONCONST (LIBAVFORMAT_VERSION_MAJOR < 61)
 #endif
 
+// Should probably be the other way round
+#ifndef FF_PROFILE_AAC_LOW
+#define FF_PROFILE_AAC_MAIN     AV_PROFILE_AAC_MAIN
+#define FF_PROFILE_AAC_LOW      AV_PROFILE_AAC_LOW
+#define FF_PROFILE_AAC_SSR      AV_PROFILE_AAC_SSR
+#define FF_PROFILE_AAC_LTP      AV_PROFILE_AAC_LTP
+#define FF_PROFILE_AAC_HE_V2    AV_PROFILE_AAC_HE_V2
+#define FF_PROFILE_AAC_HE       AV_PROFILE_AAC_HE
+#define FF_PROFILE_AAC_LD       AV_PROFILE_AAC_LD
+#define FF_PROFILE_AAC_ELD      AV_PROFILE_AAC_ELD
+#endif
+
+#ifndef FF_PROFILE_AV1_MAIN
+#define FF_PROFILE_AV1_MAIN     AV_PROFILE_AV1_MAIN
+#define FF_PROFILE_AV1_HIGH     AV_PROFILE_AV1_HIGH
+#endif
+
 # include <libavutil/avutil.h>
 
 /* LIBAVUTIL_VERSION_CHECK checks for the right version of FFmpeg
