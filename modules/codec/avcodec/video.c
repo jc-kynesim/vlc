@@ -1991,8 +1991,8 @@ static int lavc_va_GetFrame(struct AVCodecContext *ctx, AVFrame *frame, int flag
     else
     {
         AVBufferRef **extended_buf = av_realloc_array(frame->extended_buf,
-                                                      sizeof(*extended_buf),
-                                                      frame->nb_extended_buf + 1);
+                                                      frame->nb_extended_buf + 1,
+                                                      sizeof(*extended_buf));
         if(!extended_buf)
         {
             av_buffer_unref(&buf);
