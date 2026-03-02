@@ -680,25 +680,42 @@ eq_ref(eq_env_t * const eq)
     return eq;
 }
 
+// Actually delete the Q - do in a pollqueue CB as that is safe
+static void
+eq_delete_cb(void * v, short revents)
+{
+    eq_env_t * const eq = v;
+    (void)revents;
+
+    pollqueue_set_pre_post(eq->pq, 0, 0, NULL);
+    pollqueue_unref(&eq->pq);
+
+    wl_proxy_wrapper_destroy(eq->wrapped_display);
+    wl_event_queue_destroy(eq->q);
+
+    free(eq);
+}
+
 static void
 eq_unref(eq_env_t ** const ppeq)
 {
-    eq_env_t * eq = *ppeq;
-    if (eq != NULL)
+    eq_env_t * const eq = *ppeq;
+    int n;
+
+    if (eq == NULL)
+        return;
+    *ppeq = NULL;
+
+    n = atomic_fetch_sub(&eq->eq_count, 1);
+    if (n == 0)
     {
-        int n;
-        *ppeq = NULL;
-        n = atomic_fetch_sub(&eq->eq_count, 1);
-        if (n == 0)
-        {
-            pollqueue_set_pre_post(eq->pq, 0, 0, NULL);
-            pollqueue_unref(&eq->pq);
-
-            wl_proxy_wrapper_destroy(eq->wrapped_display);
-            wl_event_queue_destroy(eq->q);
-
-            free(eq);
-        }
+        // We shouldn't have anything that has a callback left on this Q
+        // but we might have a destroy or the like that it would be good
+        // to flush before killing our Q
+        wl_display_flush(eq->display);
+        // Avoid destroying the Q whilst we might be  in one of its wayland
+        // callbacks (e.g. buffer destroy)
+        pollqueue_callback_once(eq->pq, eq_delete_cb, eq);
     }
 }
 
