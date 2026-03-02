@@ -105,7 +105,6 @@ typedef struct fmt_list_s {
 
 typedef struct eq_env_ss {
     atomic_int eq_count;
-    sem_t sem;
 
     struct wl_display *display;
     struct pollqueue *pq;
@@ -571,41 +570,43 @@ eq_ref(eq_env_t * const eq)
 //    fprintf(stderr, "Ref: count=%d\n", n + 1);
 }
 
+// Actually delete the Q - do in a pollqueue CB as that is safe
+static void
+eq_delete_cb(void * v, short revents)
+{
+    eq_env_t * const eq = v;
+    (void)revents;
+
+    pollqueue_set_pre_post(eq->pq, 0, 0, NULL);
+    pollqueue_unref(&eq->pq);
+
+    wl_proxy_wrapper_destroy(eq->wrapped_display);
+    wl_event_queue_destroy(eq->q);
+
+    free(eq);
+}
+
 static void
 eq_unref(eq_env_t ** const ppeq)
 {
-    eq_env_t * eq = *ppeq;
-    if (eq != NULL)
-    {
-        int n;
-        *ppeq = NULL;
-        n = atomic_fetch_sub(&eq->eq_count, 1);
-//        fprintf(stderr, "Unref: Buffer count=%d\n", n);
-        if (n == 0)
-        {
-            pollqueue_set_pre_post(eq->pq, 0, 0, NULL);
-            pollqueue_unref(&eq->pq);
-
-            wl_proxy_wrapper_destroy(eq->wrapped_display);
-            wl_event_queue_destroy(eq->q);
-
-            sem_destroy(&eq->sem);
-            free(eq);
-//            fprintf(stderr, "Eq closed\n");
-        }
-    }
-}
-
-static int
-eq_finish(eq_env_t ** const ppeq)
-{
     eq_env_t * const eq = *ppeq;
+    int n;
 
     if (eq == NULL)
-        return 0;
+        return;
+    *ppeq = NULL;
 
-    eq_unref(ppeq);
-    return 0;
+    n = atomic_fetch_sub(&eq->eq_count, 1);
+    if (n == 0)
+    {
+        // We shouldn't have anything that has a callback left on this Q
+        // but we might have a destroy or the like that it would be good
+        // to flush before killing our Q
+        wl_display_flush(eq->display);
+        // Avoid destroying the Q whilst we might be  in one of its wayland
+        // callbacks (e.g. buffer destroy)
+        pollqueue_callback_once(eq->pq, eq_delete_cb, eq);
+    }
 }
 
 static void
@@ -667,7 +668,6 @@ eq_new(struct wl_display * const display, struct pollqueue * const pq)
         return NULL;
 
     atomic_init(&eq->eq_count, 0);
-    sem_init(&eq->sem, 0, 0);
 
 #if WAYLAND_VERSION_MAJOR > 1 ||\
     (WAYLAND_VERSION_MAJOR == 1 && WAYLAND_VERSION_MINOR >= 23)
@@ -2339,13 +2339,19 @@ static void Close(vout_display_t *vd)
 
     eventq_sync(sys->eq);
 
-    if (eq_finish(&sys->eq) != 0)
-        msg_Err(vd, "Failed to reclaim all buffers on close");
+    eq_unref(&sys->eq);
 
-    // There is a risk of deadlock here if we wait for the pq to die as some
-    // wl buffers may only be relased after close returns so just unref and the
-    // pq will clean up after itself once the last buffer has been released.
-    pollqueue_unref(&sys->pollq);
+    // There is no guarantee that the compositor will release all buffers in
+    // a timely fashion or indeed at all before this function returns; having
+    // said that current compositors do seenm to be well behaved and return
+    // the buffer in a frame time or two.
+    // So finish the pollqueue with a shortish timeout, and if we do timeout
+    // just unref and hope that we will get the release sometime.
+    if (pollqueue_finish_timeout(&sys->pollq, 500) != 0)
+    {
+        msg_Warn(vd, "Not all buffers returned by exit time");
+        pollqueue_unref(&sys->pollq);
+    }
 
     sys->embed = NULL;
 
