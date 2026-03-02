@@ -49,6 +49,12 @@ int pollqueue_callback_once(struct pollqueue *const pq,
                             void (*const fn)(void *v, short revents),
                             void *const v);
 
+// Run a timer once on the poll thread
+int pollqueue_timer_once(struct pollqueue *const pq,
+                         void (*const fn)(void *v, short revents),
+                         void *const v,
+                         const int timeout_ms);
+
 // Create a pollqueue
 // Generates a new thread to do the polltask callbacks
 struct pollqueue * pollqueue_new(void);
@@ -64,6 +70,14 @@ void pollqueue_unref(struct pollqueue **const ppq);
 // has terminated so it is safe for use by any remaining polltasks (e.g. for
 // creating other tasks that need to complete before finishing.)
 void pollqueue_finish(struct pollqueue **const ppq);
+
+// As pollqueue_finish but with timeout
+// Returns:
+//  -ve Error
+//   0  Pollqueue finished within timeout. As pollqueue_finish
+//   1  Timeout. *ppq is left unchanged is still a reference to the Q
+//      i.e. another _unref or _finish call is required to shutdown
+int pollqueue_finish_timeout(struct pollqueue **const ppq, int timeout_ms);
 
 // Add a reference to a pollqueue
 struct pollqueue * pollqueue_ref(struct pollqueue *const pq);
