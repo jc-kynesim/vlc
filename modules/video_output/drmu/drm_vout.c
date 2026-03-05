@@ -460,7 +460,7 @@ r_dest_in_render(const vout_display_cfg_t * cfg,
     place.x += render.x;
     place.y += render.y;
 
-    return drmu_rect_vlc_plane(place);
+    return drmu_rect_vlc_place(&place);
 }
 
 // Display coords from render coords
@@ -472,16 +472,16 @@ r_display_from_render(drmu_rect_t s, const drmu_rect_t rend, const drmu_rect_t w
         rr = drmu_rect_transpose(rr);
 
     s = drmu_rect_rescale(s, rr, rend);
-
+#if 0
     if (drmu_rotation_is_transposed(rot))
         s = drmu_rect_transpose(s);
     if (drmu_rotation_is_hflipped(rot))
         s.x = rr.w - (s.x + s.w);
     if (drmu_rotation_is_vflipped(rot))
         s.y = rr.h - (s.y + s.h);
-
     s.x += win.x;
     s.y += win.y;
+#endif
     return s;
 }
 
