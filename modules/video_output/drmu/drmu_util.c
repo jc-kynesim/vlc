@@ -3,6 +3,7 @@
 #include "drmu.h"
 
 #include <ctype.h>
+#include <errno.h>
 #include <error.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -121,6 +122,94 @@ drmu_util_parse_mode(const char * s, unsigned int * pw, unsigned int * ph, unsig
     *ph = p.height;
     *phz = p.hz_x_1000;
     return r;
+}
+
+int
+drmu_parse_rect(const char * s, char ** peos, drmu_rect_t * pRect)
+{
+    char * p;
+
+    *pRect = (drmu_rect_t){0};
+
+    pRect->w = (uint32_t)strtoul(s, &p, 0);
+    if (*p != 'x' || p == s)
+        goto fail;
+    s = p + 1;
+    pRect->h = (uint32_t)strtoul(s, &p, 0);
+
+    if (*p == '@') {
+        s = p + 1;
+        pRect->x = (int32_t)strtol(s, &p, 0);
+        if (*p != ',' || p == s)
+            goto fail;
+        s = p + 1;
+        pRect->y = (int32_t)strtol(s, &p, 0);
+    }
+    if (p == s)
+        goto fail;
+
+    if (peos != NULL)
+        *peos = p;
+    return 0;
+
+fail:
+    *pRect = (drmu_rect_t){0};
+    if (peos != NULL)
+        *peos = p;
+    return -EINVAL;
+}
+
+unsigned int
+drmu_util_str_to_rotation(const char * s, char ** peos)
+{
+    static const struct {
+        const char * str;
+        unsigned int rot;
+    } str_to_rot[] = {
+        {"0", DRMU_ROTATION_0},
+        {"NONE", DRMU_ROTATION_0},
+        {"H_FLIP", DRMU_ROTATION_H_FLIP},
+        {"H", DRMU_ROTATION_H_FLIP},
+        {"V_FLIP", DRMU_ROTATION_V_FLIP},
+        {"V", DRMU_ROTATION_V_FLIP},
+        {"180T", DRMU_ROTATION_180_TRANSPOSE},
+        {"180_TRANSPOSE", DRMU_ROTATION_180_TRANSPOSE},
+        {"180", DRMU_ROTATION_180},
+        {"TRANSPOSE", DRMU_ROTATION_TRANSPOSE},
+        {"T", DRMU_ROTATION_TRANSPOSE},
+        {"90", DRMU_ROTATION_90},
+        {"270", DRMU_ROTATION_270},
+        {NULL, 0},
+    };
+    unsigned int i;
+
+    for (i = 0; str_to_rot[i].str != NULL; ++i) {
+        size_t n = strlen(str_to_rot[i].str);
+        if (strncasecmp(s, str_to_rot[i].str, n) == 0) {
+            if (peos != NULL)
+                *peos = (char*)(s + n);
+            return str_to_rot[i].rot;
+        }
+    }
+    if (peos != NULL)
+        *peos = (char*)s;
+    return DRMU_ROTATION_0;
+}
+
+const char *
+drmu_util_rotation_to_str(const unsigned int rot)
+{
+    static const char *rot_to_str[8] = {
+        [DRMU_ROTATION_0] = "none",
+        [DRMU_ROTATION_H_FLIP] = "H_flip",
+        [DRMU_ROTATION_V_FLIP] = "V_flip",
+        [DRMU_ROTATION_180_TRANSPOSE] = "180_Transpose",
+        [DRMU_ROTATION_180] = "180",
+        [DRMU_ROTATION_TRANSPOSE] = "Transpose",
+        [DRMU_ROTATION_90] = "90",
+        [DRMU_ROTATION_270] = "270"
+    };
+    return rot > 7 ? "???" : rot_to_str[rot];
 }
 
 drmu_ufrac_t

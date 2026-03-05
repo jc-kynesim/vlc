@@ -84,6 +84,12 @@ aprop_prop_ref(aprop_prop_t * const pp)
 }
 
 static void
+aprop_prop_committed(aprop_prop_t * const pp)
+{
+    pp->fns->commit(pp->v, pp->value);
+}
+
+static void
 aprop_obj_uninit(aprop_obj_t * const po)
 {
     unsigned int i;
@@ -306,6 +312,14 @@ aprop_obj_dump(drmu_env_t * const du,
 }
 
 static void
+aprop_obj_committed(const aprop_obj_t * const po)
+{
+    unsigned int i;
+    for (i = 0; i != po->n; ++i)
+        aprop_prop_committed(po->props + i);
+}
+
+static void
 aprop_hdr_dump(drmu_env_t * const du,
                const drmu_log_env_t * const log, const enum drmu_log_level_e lvl,
                const aprop_hdr_t * const ph)
@@ -314,6 +328,14 @@ aprop_hdr_dump(drmu_env_t * const du,
     drmu_log_lvl(log, lvl, "Header: size %d n %d", ph->size, ph->n);
     for (i = 0; i != ph->n; ++i)
         aprop_obj_dump(du, log, lvl, ph->objs + i);
+}
+
+static void
+aprop_hdr_committed(const aprop_hdr_t * const ph)
+{
+    unsigned int i;
+    for (i = 0; i != ph->n; ++i)
+        aprop_obj_committed(ph->objs + i);
 }
 
 static aprop_obj_t *
@@ -537,6 +559,18 @@ aprop_hdr_props_count(const aprop_hdr_t * const ph)
     return n;
 }
 
+// Total props
+static bool
+aprop_hdr_props_is_empty(const aprop_hdr_t * const ph)
+{
+    unsigned int i;
+
+    for (i = 0; i != ph->n; ++i)
+        if (ph->objs[i].n != 0)
+            return false;
+    return true;
+}
+
 static unsigned int
 aprop_hdr_objs_count(const aprop_hdr_t * const ph)
 {
@@ -608,6 +642,14 @@ drmu_atomic_clear_commit_callbacks(drmu_atomic_t * const da)
         free(p);
         p = next;
     }
+}
+
+void
+drmu_atomic_run_prop_commit_callbacks(const drmu_atomic_t * const da)
+{
+    if (da == NULL)
+        return;
+    aprop_hdr_committed(&da->props);
 }
 
 void
@@ -864,19 +906,17 @@ commit_find_good(drmu_env_t * const du, const struct drm_mode_atomic * const ato
     while (a + 1 < b) {
         struct drm_mode_atomic at = *atomic;
         unsigned int n = (a + b) / 2;
-        int rv;
         uint32_t * undo_p = NULL;
         uint32_t undo_v = 0;
 
         at.flags = DRM_MODE_ATOMIC_TEST_ONLY | (DRM_MODE_ATOMIC_ALLOW_MODESET & atomic->flags);
         atomic_props_crop(&at, n, &undo_p, &undo_v);
+        assert(undo_p != NULL);
 
-        if ((rv = drmu_ioctl(du, DRM_IOCTL_MODE_ATOMIC, &at)) == 0) {
+        if (drmu_ioctl(du, DRM_IOCTL_MODE_ATOMIC, &at) == 0)
             a = n;
-        }
-        else {
+        else
             b = n;
-        }
 
         *undo_p = undo_v;  // Should always be set
     }
@@ -911,7 +951,8 @@ drmu_atomic_commit_test(const drmu_atomic_t * const da, uint32_t flags, drmu_ato
         aprop_hdr_atomic_fill(&da->props, obj_ids, prop_counts, prop_ids, prop_values);
 
         rv = drmu_ioctl(du, DRM_IOCTL_MODE_ATOMIC, &atomic);
-
+        if (rv == 0)
+            drmu_atomic_run_prop_commit_callbacks(da);
         drmu_atomic_run_commit_callbacks(da);
 
         if (rv  == 0 || !da_fail)
@@ -943,4 +984,9 @@ drmu_atomic_commit(const drmu_atomic_t * const da, uint32_t flags)
     return drmu_atomic_commit_test(da, flags, NULL);
 }
 
+bool
+drmu_atomic_is_empty(const drmu_atomic_t * const da)
+{
+    return da == NULL || aprop_hdr_props_is_empty(&da->props);
+}
 

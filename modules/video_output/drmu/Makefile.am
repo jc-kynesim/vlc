@@ -19,6 +19,7 @@ libdrm_vout_plugin_la_SOURCES = video_output/drmu/drm_vout.c \
 	video_output/drmu/drmu_dmabuf.h \
 	video_output/drmu/drmu_fmts.c \
 	video_output/drmu/drmu_fmts.h \
+	video_output/drmu/drmu_fourcc.h \
 	video_output/drmu/drmu_math.c \
 	video_output/drmu/drmu_math.h \
 	video_output/drmu/drmu_poll.c \

@@ -590,7 +590,7 @@ subpics_done:
 
     r = sys->output_simple ? drmu_rect_vlc_place(&sys->display_rect): drmu_rect_vlc_place(&sys->dest_rect);
 
-#if 0
+#if 1
     {
         static int z = 0;
         if (--z < 0) {

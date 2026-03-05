@@ -1,5 +1,6 @@
 #include "drmu_vlc.h"
 #include "drmu_fmts.h"
+#include "drmu_fourcc.h"
 #include "drmu_log.h"
 
 #if HAS_ZC_CMA
@@ -11,12 +12,9 @@
 
 #include <errno.h>
 
+#include <vlc/libvlc_version.h>
 #include <libavutil/buffer.h>
 #include <libavutil/hwcontext_drm.h>
-
-#include <libdrm/drm_fourcc.h>
-
-#include <vlc/libvlc_version.h>
 
 typedef struct fb_aux_pic_s {
     picture_context_t * pic_ctx;
@@ -34,9 +32,8 @@ pic_fb_delete_cb(void * v)
     if (vctx)
         vlc_video_context_Release(vctx);
 #else
-    ctx->destroy(aux->pic_ctx);
+    ctx->destroy(ctx);
 #endif
-
     free(aux);
 }
 
@@ -156,6 +153,32 @@ fb_vlc_chroma_siting(const video_format_t * const fmt)
     return DRMU_CHROMA_SITING_UNSPECIFIED;
 }
 
+static unsigned int
+fb_vlc_orientation(const video_format_t * const fmt)
+{
+    switch (fmt->orientation) {
+        case ORIENT_NORMAL:
+            return DRMU_ROTATION_0;
+        case ORIENT_HFLIPPED:
+            return DRMU_ROTATION_H_FLIP;
+        case ORIENT_VFLIPPED:
+            return DRMU_ROTATION_V_FLIP;
+        case ORIENT_ROTATED_180:
+            return DRMU_ROTATION_180;
+        case ORIENT_TRANSPOSED:
+            return DRMU_ROTATION_TRANSPOSE;
+        case ORIENT_ROTATED_270:
+            return DRMU_ROTATION_270;
+        case ORIENT_ROTATED_90:
+            return DRMU_ROTATION_90;
+        case ORIENT_ANTI_TRANSPOSED:
+            return DRMU_ROTATION_180_TRANSPOSE;
+        default:
+            break;
+    }
+    return DRMU_ROTATION_INVALID;
+}
+
 void
 drmu_fb_vlc_pic_set_metadata(drmu_fb_t * const dfb, const picture_t * const pic)
 {
@@ -169,6 +192,8 @@ drmu_fb_vlc_pic_set_metadata(drmu_fb_t * const dfb, const picture_t * const pic)
     drmu_fb_chroma_siting_set(dfb, fb_vlc_chroma_siting(&pic->format));
 
     drmu_fb_hdr_metadata_set(dfb, pic_hdr_metadata(&meta, &pic->format) == 0 ? &meta : NULL);
+
+    drmu_fb_orientation_set(dfb, fb_vlc_orientation(&pic->format));
 }
 
 #if HAS_DRMPRIME
