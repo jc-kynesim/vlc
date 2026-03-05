@@ -1,5 +1,6 @@
 #include "drmu_vlc.h"
 #include "drmu_fmts.h"
+#include "drmu_fourcc.h"
 #include "drmu_log.h"
 
 #if HAS_ZC_CMA
@@ -11,10 +12,9 @@
 
 #include <errno.h>
 
+#include <vlc/libvlc_version.h>
 #include <libavutil/buffer.h>
 #include <libavutil/hwcontext_drm.h>
-
-#include <libdrm/drm_fourcc.h>
 
 typedef struct fb_aux_pic_s {
     picture_context_t * pic_ctx;
@@ -24,8 +24,16 @@ static void
 pic_fb_delete_cb(void * v)
 {
     fb_aux_pic_t * const aux = v;
+    picture_context_t * const ctx = aux->pic_ctx;
 
-    aux->pic_ctx->destroy(aux->pic_ctx);
+#if LIBVLC_VERSION_MAJOR >= 4
+    vlc_video_context *vctx = ctx->vctx;
+    ctx->destroy(ctx);
+    if (vctx)
+        vlc_video_context_Release(vctx);
+#else
+    ctx->destroy(ctx);
+#endif
     free(aux);
 }
 

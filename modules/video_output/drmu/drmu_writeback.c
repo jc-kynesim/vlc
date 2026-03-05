@@ -1,6 +1,5 @@
 #include "drmu_writeback.h"
 
-#include <drm_fourcc.h>
 #include <errno.h>
 #include <semaphore.h>
 #include <stdatomic.h>
@@ -8,6 +7,7 @@
 #include <unistd.h>
 
 #include "drmu.h"
+#include "drmu_fourcc.h"
 #include "drmu_log.h"
 #include "drmu_output.h"
 #include "drmu_pool.h"
@@ -49,8 +49,8 @@ writeback_env_free(drmu_writeback_env_t * const wbe)
 }
 
 // Get a "unique" non-zero tag no
-static unsigned int
-writeback_env_tag_new(drmu_writeback_env_t * const wbe)
+unsigned int
+drmu_writeback_env_tag_new(drmu_writeback_env_t * const wbe)
 {
     unsigned int n;
     while ((n = atomic_fetch_add(&wbe->tag_n, 1)) == 0)
@@ -152,22 +152,34 @@ drmu_writeback_env_output(const drmu_writeback_env_t * const wbe)
     return wbe == NULL ? NULL : wbe->dout;
 }
 
+struct drmu_queue_s *
+drmu_writeback_env_queue(const drmu_writeback_env_t * const wbe)
+{
+    return wbe == NULL ? NULL : wbe->dq;
+}
+
 drmu_plane_t *
 drmu_writeback_env_fmt_plane(drmu_writeback_env_t * const wbe,
                              drmu_output_t * const dest_dout, const unsigned int types,
                              uint32_t * const pFmt)
 {
-    size_t fmt_count = 1;
+    unsigned int fmt_count = 1;
     const uint32_t * fmts = drmu_conn_writeback_formats(drmu_output_conn(wbe->dout, 0), &fmt_count);
 
     // This is a simple & stupid search.
     // We expect the 1st format we try to be both "good enough" and compatible with the dest dout
-    for (size_t i = 0; i != fmt_count; ++i) {
+    for (unsigned int i = 0; i != fmt_count; ++i) {
         const uint32_t fmt = fmts[i];
 
         // *** Kludge for Pi not supporting rotation on this
         if (fmt == DRM_FORMAT_BGR888 || fmt == DRM_FORMAT_RGB888)
             continue;
+
+        // If no output given then just fill in the first format found
+        if (dest_dout == NULL) {
+            *pFmt = fmts[i];
+            return NULL;
+        }
 
         drmu_plane_t * const dp = drmu_output_plane_ref_format(dest_dout, types, fmt, 0);
 
@@ -297,7 +309,7 @@ drmu_writeback_fb_new(drmu_writeback_env_t * const wbe, drmu_pool_t * const fb_p
 
     wbq->wbe = drmu_writeback_env_ref(wbe);
     wbq->pool = drmu_pool_ref(fb_pool);
-    wbq->q_tag = writeback_env_tag_new(wbe);
+    wbq->q_tag = drmu_writeback_env_tag_new(wbe);
     wbq->q_merge = DRMU_QUEUE_MERGE_REPLACE;
 
     return wbq;

@@ -4,6 +4,7 @@
 
 #include "drmu.h"
 #include "drmu_fmts.h"
+#include "drmu_fourcc.h"
 #include "drmu_log.h"
 
 #include <pthread.h>
@@ -23,7 +24,6 @@
 
 #include <libdrm/drm.h>
 #include <libdrm/drm_mode.h>
-#include <libdrm/drm_fourcc.h>
 #include <xf86drm.h>
 
 #include <linux/dma-buf.h>
@@ -32,10 +32,6 @@
 
 #ifndef OPT_IO_CALLOC
 #define OPT_IO_CALLOC 0
-#endif
-
-#ifndef DRM_FORMAT_P030
-#define DRM_FORMAT_P030 fourcc_code('P', '0', '3', '0')
 #endif
 
 struct drmu_bo_env_s;
@@ -342,9 +338,6 @@ drmu_prop_enum_value(const drmu_prop_enum_t * const pen, const char * const name
         unsigned int i = pen->n / 2;
         unsigned int a = 0;
         unsigned int b = pen->n;
-
-        if (name == NULL)
-            return NULL;
 
         while (a < b) {
             const int r = strcmp(name, pen->enums[i].name);
@@ -1283,7 +1276,12 @@ drmu_fb_int_fmt_size_set(drmu_fb_t *const dfb, uint32_t fmt, uint32_t w, uint32_
     dfb->fb.height       = h;
     dfb->active          = active;
     dfb->crop            = drmu_rect_shl16(active);
+    // This may be later set by _chroma_siting_set but it is good to have defaults
     dfb->chroma_siting   = drmu_fmt_info_chroma_siting(dfb->fmt_info);
+    // These may be later set by _color_set but it is good to have defaults
+    dfb->color_encoding  = DRMU_COLOR_ENCODING_BT709;
+    dfb->color_range     = drmu_fmt_info_is_yuv(dfb->fmt_info) ? DRMU_COLOR_RANGE_YCBCR_LIMITED_RANGE : DRMU_COLOR_RANGE_YCBCR_FULL_RANGE;
+    dfb->colorspace      = DRMU_COLORSPACE_DEFAULT;
 }
 
 void
@@ -1408,6 +1406,12 @@ drmu_colorspace_t
 drmu_fb_colorspace_get(const drmu_fb_t * const dfb)
 {
     return dfb->colorspace;
+}
+
+drmu_color_encoding_t
+drmu_fb_color_encoding_get(const drmu_fb_t * const dfb)
+{
+    return dfb->color_encoding;
 }
 
 const char *
@@ -2524,7 +2528,8 @@ struct drmu_conn_s {
     drmu_blob_t * hdr_metadata_blob;
 
     uint32_t * writeback_fmts;
-    size_t writeback_fmts_count;
+    uint32_t * writeback_fmts_sorted;
+    unsigned int writeback_fmts_count;
 
     char name[32];
 };
@@ -2650,10 +2655,26 @@ fail:
 }
 
 const uint32_t *
-drmu_conn_writeback_formats(drmu_conn_t * const dn, size_t * const ppcount)
+drmu_conn_writeback_formats(drmu_conn_t * const dn, unsigned int * const ppcount)
 {
     *ppcount = dn->writeback_fmts_count;
     return dn->writeback_fmts;
+}
+
+static int
+wb_fmt_cmp_cb(const void * va, const void * vb)
+{
+    const uint32_t a = *(const uint32_t *)va;
+    const uint32_t b = *(const uint32_t *)vb;
+    return a == b ? 0 : a < b ? -1 : 1;
+}
+
+bool
+drmu_conn_has_writeback_format(drmu_conn_t * const dn, const uint32_t fmt)
+{
+    return dn->writeback_fmts_sorted != NULL &&
+        bsearch(&fmt, dn->writeback_fmts_sorted, dn->writeback_fmts_count,
+                sizeof(*dn->writeback_fmts_sorted), wb_fmt_cmp_cb) != NULL;
 }
 
 const struct drm_mode_modeinfo *
@@ -2719,9 +2740,11 @@ conn_uninit(drmu_conn_t * const dn)
     free(dn->modes);
     free(dn->enc_ids);
     free(dn->writeback_fmts);
+    free(dn->writeback_fmts_sorted);
     dn->modes = NULL;
     dn->enc_ids = NULL;
     dn->writeback_fmts = NULL;
+    dn->writeback_fmts_sorted = NULL;
     dn->modes_size = 0;
     dn->enc_ids_size = 0;
     dn->writeback_fmts_count = 0;
@@ -2820,6 +2843,12 @@ conn_init(drmu_env_t * const du, drmu_conn_t * const dn, unsigned int conn_idx, 
         props_free(props);
         dn->writeback_fmts = wb_blob_data;
         dn->writeback_fmts_count = wb_blob_len / sizeof(*dn->writeback_fmts);
+        if (dn->writeback_fmts != NULL &&
+            (dn->writeback_fmts_sorted = malloc(wb_blob_len)) != NULL) {
+            memcpy(dn->writeback_fmts_sorted, dn->writeback_fmts, wb_blob_len);
+            qsort(dn->writeback_fmts_sorted, dn->writeback_fmts_count,
+                  sizeof(*dn->writeback_fmts_sorted), wb_fmt_cmp_cb);
+        }
 
         dn->rot_mask = rotation_make_array(dn->pid.rotation, dn->rot_vals);
     }
@@ -2919,6 +2948,19 @@ drmu_rotation_find(const unsigned int req_rot, const unsigned int mask_a, const 
 //
 // Plane fns
 
+typedef struct drmu_fmt_idx_s {
+    uint32_t fmt;
+    uint32_t idx;
+} fmt_idx_t;
+
+static int
+fmt_idx_cmp(const void * va, const void * vb)
+{
+    const fmt_idx_t * a = va;
+    const fmt_idx_t * b = vb;
+    return a->fmt == b->fmt ? 0 : a->fmt < b->fmt ? -1 : 1;
+}
+
 typedef struct drmu_plane_s {
     struct drmu_env_s * du;
 
@@ -2934,6 +2976,7 @@ typedef struct drmu_plane_s {
     void * formats_in;
     size_t formats_in_len;
     const struct drm_format_modifier_blob * fmts_hdr;
+    fmt_idx_t * fmt_idxs; // Sorted formats with original index
 
     struct {
         uint32_t crtc_id;
@@ -3086,35 +3129,43 @@ drmu_plane_rotation_valid(const drmu_plane_t * const dp, const unsigned int rot)
     return drmu_rotation_is_valid(rot) && ((dp->rot_mask >> rot) & 1) != 0;
 }
 
+static int
+plane_format_find(const drmu_plane_t * const dp, const uint32_t format)
+{
+    if (dp == NULL || format == 0) {
+        return -1;
+    }
+    else {
+        const fmt_idx_t s = {.fmt = format, .idx = 0};
+        const fmt_idx_t * fmt_idx = bsearch(&s, dp->fmt_idxs, dp->fmts_hdr->count_formats, sizeof(*dp->fmt_idxs), fmt_idx_cmp);
+        return fmt_idx == NULL ? -1 : (int)fmt_idx->idx;
+    }
+}
+
 bool
 drmu_plane_format_check(const drmu_plane_t * const dp, const uint32_t format, const uint64_t modifier)
 {
     const struct drm_format_modifier * const mods = (const struct drm_format_modifier *)((const uint8_t *)dp->formats_in + dp->fmts_hdr->modifiers_offset);
-    const uint32_t * const fmts = (const uint32_t *)((const uint8_t *)dp->formats_in + dp->fmts_hdr->formats_offset);
     uint64_t modbase = modifier;
+    int fmt_no = plane_format_find(dp, format);
     unsigned int i;
 
-    if (!format)
+    if (fmt_no == -1)
         return false;
 
     // If broadcom then remove parameters before checking
     if ((modbase >> 56) == DRM_FORMAT_MOD_VENDOR_BROADCOM)
         modbase = fourcc_mod_broadcom_mod(modbase);
 
-    // * Simplistic lookup; Could be made much faster
-
+    // Probably few enough mods that linear search is OK
     for (i = 0; i != dp->fmts_hdr->count_modifiers; ++i) {
         const struct drm_format_modifier * const mod = mods + i;
-        uint64_t fbits;
-        unsigned int j;
 
-        if (mod->modifier != modbase)
-            continue;
-
-        for (fbits = mod->formats, j = mod->offset; fbits; fbits >>= 1, ++j) {
-            if ((fbits & 1) != 0 && fmts[j] == format)
-                return true;
-        }
+        if (mod->modifier == modbase &&
+            (uint32_t)fmt_no >= mod->offset &&
+            (uint32_t)fmt_no < mod->offset + 64 &&
+            ((mod->formats >> (fmt_no - mod->offset)) & 1) != 0)
+            return true;
     }
     return false;
 }
@@ -3235,6 +3286,8 @@ plane_uninit(drmu_plane_t * const dp)
     drmu_prop_enum_delete(&dp->pid.pixel_blend_mode);
     drmu_prop_enum_delete(&dp->pid.rotation);
     drmu_prop_range_delete(&dp->pid.zpos);
+    free(dp->fmt_idxs);
+    dp->fmt_idxs = NULL;
     free(dp->formats_in);
     dp->formats_in = NULL;
 }
@@ -3244,6 +3297,7 @@ static int
 plane_init(drmu_env_t * const du, drmu_plane_t * const dp, const uint32_t plane_id)
 {
     drmu_props_t *props;
+    unsigned int i;
     int rv;
 
     memset(dp, 0, sizeof(*dp));
@@ -3277,10 +3331,26 @@ plane_init(drmu_env_t * const du, drmu_plane_t * const dp, const uint32_t plane_
         props_name_get_blob(props, "IN_FORMATS", &dp->formats_in, &dp->formats_in_len) != 0)
     {
         drmu_err(du, "%s: failed to find required id", __func__);
-        props_free(props);
-        return -EINVAL;
+        goto fail;
     }
     dp->fmts_hdr = dp->formats_in;
+
+    if ((dp->fmt_idxs = malloc(sizeof(*dp->fmt_idxs) * dp->fmts_hdr->count_formats)) == NULL)
+    {
+        drmu_err(du, "Fmt alloc fail");
+        goto fail;
+    }
+    for (i = 0; i != dp->fmts_hdr->count_formats; ++i)
+        dp->fmt_idxs[i] = (fmt_idx_t){
+            .fmt = ((uint32_t*)((const uint8_t *)dp->formats_in + dp->fmts_hdr->formats_offset))[i],
+            .idx = i};
+    qsort(dp->fmt_idxs, dp->fmts_hdr->count_formats, sizeof(*dp->fmt_idxs), fmt_idx_cmp);
+#if 0
+    for (i = 0; i != dp->fmts_hdr->count_formats; ++i) {
+        drmu_info(du, "Format %s [%d] %s", drmu_log_fourcc(dp->fmt_idxs[i].fmt), dp->fmt_idxs[i].idx,
+                  drmu_fmt_info_name(drmu_fmt_info_find_fmt(dp->fmt_idxs[i].fmt)));
+    }
+#endif
 
     dp->pid.alpha            = drmu_prop_range_new(du, props_name_to_id(props, "alpha"));
     dp->pid.color_encoding   = drmu_prop_enum_new(du, props_name_to_id(props, "COLOR_ENCODING"));
@@ -3313,6 +3383,10 @@ plane_init(drmu_env_t * const du, drmu_plane_t * const dp, const uint32_t plane_
 
     props_free(props);
     return 0;
+
+fail:
+    props_free(props);
+    return -EINVAL;
 }
 
 //----------------------------------------------------------------------------
