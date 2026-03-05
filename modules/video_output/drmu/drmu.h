@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "drmu_chroma.h"
 #include "drmu_math.h"
@@ -129,6 +130,15 @@ struct drm_mode_create_dumb;
 // if flags are 0 then RDWR | CLOEXEC will be used
 int drmu_bo_export_fd(drmu_bo_t * bo, uint32_t flags);
 
+// Map a BO.
+// Size isn't saved in the BO so must be given here
+// Returns NULL on failure unlike system mmap
+// Mapping isn't held by the BO, must be umapped by user
+void * drmu_bo_mmap(const drmu_bo_t * const bo, const size_t length, const int prot, const int flags);
+
+// Get BO handle
+uint32_t drmu_bo_handle(const drmu_bo_t * const bo);
+
 void drmu_bo_unref(drmu_bo_t ** const ppbo);
 drmu_bo_t * drmu_bo_ref(drmu_bo_t * const bo);
 drmu_bo_t * drmu_bo_new_fd(drmu_env_t *const du, const int fd);
@@ -157,6 +167,8 @@ uint32_t drmu_fb_pixel_format(const drmu_fb_t * const dfb);
 uint64_t drmu_fb_modifier(const drmu_fb_t * const dfb, const unsigned int plane);
 drmu_fb_t * drmu_fb_new_dumb(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format);
 drmu_fb_t * drmu_fb_new_dumb_mod(drmu_env_t * const du, uint32_t w, uint32_t h, const uint32_t format, const uint64_t mod);
+drmu_fb_t * drmu_fb_new_dumb_multi(drmu_env_t * const du, uint32_t w, uint32_t h,
+                     const uint32_t format, const uint64_t mod, const bool multi);
 drmu_fb_t * drmu_fb_realloc_dumb(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format);
 drmu_fb_t * drmu_fb_realloc_dumb_mod(drmu_env_t * const du, drmu_fb_t * dfb, uint32_t w, uint32_t h, const uint32_t format, const uint64_t mod);
 // Try to reset geometry to these values
@@ -203,12 +215,15 @@ typedef const char * drmu_color_encoding_t;
 #define DRMU_COLOR_ENCODING_BT709               "ITU-R BT.709 YCbCr"
 #define DRMU_COLOR_ENCODING_BT601               "ITU-R BT.601 YCbCr"
 static inline bool drmu_color_encoding_is_set(const drmu_color_encoding_t x) {return x != NULL;}
+static inline bool drmu_color_encoding_eq(const drmu_color_encoding_t a, const drmu_color_encoding_t b) {return a != NULL && b != NULL && !strcmp(a, b);}
 // Note: Color range only applies to YCbCr planes - ignored for RGB
 typedef const char * drmu_color_range_t;
 #define DRMU_COLOR_RANGE_UNSET                  NULL
 #define DRMU_COLOR_RANGE_YCBCR_FULL_RANGE       "YCbCr full range"
 #define DRMU_COLOR_RANGE_YCBCR_LIMITED_RANGE    "YCbCr limited range"
 static inline bool drmu_color_range_is_set(const drmu_color_range_t x) {return x != NULL;}
+static inline bool drmu_color_range_is_full(const drmu_color_range_t x) {return x != NULL && strcmp(x, DRMU_COLOR_RANGE_YCBCR_FULL_RANGE) == 0;}
+static inline bool drmu_color_range_is_limited(const drmu_color_range_t x) {return x != NULL && strcmp(x, DRMU_COLOR_RANGE_YCBCR_LIMITED_RANGE) == 0;}
 typedef const char * drmu_colorspace_t;
 #define DRMU_COLORSPACE_UNSET                   NULL
 #define DRMU_COLORSPACE_DEFAULT                 "Default"
@@ -232,19 +247,31 @@ static inline bool drmu_broadcast_rgb_is_set(const drmu_broadcast_rgb_t x) {retu
 void drmu_fb_color_set(drmu_fb_t *const dfb, const drmu_color_encoding_t enc, const drmu_color_range_t range, const drmu_colorspace_t space);
 void drmu_fb_chroma_siting_set(drmu_fb_t *const dfb, const drmu_chroma_siting_t siting);
 void drmu_fb_int_on_delete_set(drmu_fb_t *const dfb, drmu_fb_on_delete_fn fn, void * v);
-void drmu_fb_int_bo_set(drmu_fb_t *const dfb, unsigned int i, drmu_bo_t * const bo);
+void drmu_fb_int_bo_set(drmu_fb_t *const dfb, const unsigned int obj_idx, drmu_bo_t * const bo);
 void drmu_fb_int_layer_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset);
 void drmu_fb_int_layer_mod_set(drmu_fb_t *const dfb, unsigned int i, unsigned int obj_idx, uint32_t pitch, uint32_t offset, uint64_t modifier);
-void drmu_fb_int_fd_set(drmu_fb_t *const dfb, const int fd);
-void drmu_fb_int_mmap_set(drmu_fb_t *const dfb, void * const buf, const size_t size, const size_t pitch);
+void drmu_fb_int_fd_set(drmu_fb_t *const dfb, const unsigned int obj_idx, const int fd);
+void drmu_fb_int_mmap_set(drmu_fb_t *const dfb, const unsigned int obj_idx, void * const buf, const size_t size, const size_t pitch);
 drmu_isset_t drmu_fb_hdr_metadata_isset(const drmu_fb_t *const dfb);
 const struct hdr_output_metadata * drmu_fb_hdr_metadata_get(const drmu_fb_t *const dfb);
 drmu_broadcast_rgb_t drmu_color_range_to_broadcast_rgb(const drmu_color_range_t range);
 drmu_colorspace_t drmu_fb_colorspace_get(const drmu_fb_t * const dfb);
+drmu_color_encoding_t drmu_fb_color_encoding_get(const drmu_fb_t * const dfb);
 drmu_color_range_t drmu_fb_color_range_get(const drmu_fb_t * const dfb);
 const struct drmu_fmt_info_s * drmu_fb_format_info_get(const drmu_fb_t * const dfb);
+#define drmu_fb_fmt_info drmu_fb_format_info_get
 void drmu_fb_hdr_metadata_set(drmu_fb_t *const dfb, const struct hdr_output_metadata * meta);
 int drmu_fb_int_make(drmu_fb_t *const dfb);
+
+// Set FB orientation.
+// Orienation is the orintatin of the FB i.e. the inverse of the rotation
+// required to display on an unrotated display
+int drmu_fb_orientation_set(drmu_fb_t *const dfb, const unsigned int orientation);
+// Get orientation
+unsigned int drmu_fb_orientation_get(const drmu_fb_t *const dfb);
+// Get rotation required on this fb for a display rotated dest_rot
+// helper fn - equivalent to _subb(dest_rot, orientation)
+unsigned int drmu_fb_rotation(const drmu_fb_t *const dfb, const unsigned int dest_rot);
 
 // Cached fb sync ops
 int drmu_fb_write_start(drmu_fb_t * const dfb);
@@ -252,12 +279,25 @@ int drmu_fb_write_end(drmu_fb_t * const dfb);
 int drmu_fb_read_start(drmu_fb_t * const dfb);
 int drmu_fb_read_end(drmu_fb_t * const dfb);
 
+// Called after commit succeeded and/or when atomic deleted
+//
+// On commit (with dfb != NULL, fd != -1) may possibly be called > once if
+// atomic copied or reused
+//
+// On delete (with dfb == NULL, fd == -1) will be called once after any commit
+// callbacks. If atomic deleted before commit or commit has error then commit
+// may never be called.
+typedef void drmu_fb_fence_fd_fn(void * v, int fd, drmu_fb_t * dfb);
+
 // Wait for data to become ready when fb used as destination of writeback
 // Returns:
 //  -ve   error
 //  0     timeout
 //  1     ready
 int drmu_fb_out_fence_wait(drmu_fb_t * const fb, const int timeout_ms);
+
+// Take the fence fd. Resets fb fence fd. User is now responsible for closing it.
+int drmu_fb_out_fence_take_fd(drmu_fb_t * const fb);
 
 // Object Id
 
@@ -328,10 +368,28 @@ int drmu_atomic_conn_add_broadcast_rgb(struct drmu_atomic_s * const da, drmu_con
 // Add crtc id
 int drmu_atomic_conn_add_crtc(struct drmu_atomic_s * const da, drmu_conn_t * const dn, drmu_crtc_t * const dc);
 
-// Add writeback fb & fence
+// Add writeback fb & fence with callback
 // Neither makes sense without the other so do together
-int drmu_atomic_conn_add_writeback_fb(struct drmu_atomic_s * const da, drmu_conn_t * const dn, drmu_fb_t * const dfb);
+// If fn is null then no callback, user must wait
+int drmu_atomic_conn_add_writeback_fb(struct drmu_atomic_s * const da_out, drmu_conn_t * const dn,
+                                      drmu_fb_t * const dfb,
+                                      drmu_fb_fence_fd_fn * const fn, void * const v);
 
+// List of supported writeback formats - no modifiers supported
+// *ppcount receives the count
+const uint32_t * drmu_conn_writeback_formats(drmu_conn_t * const dn, unsigned int * const ppcount);
+// Test if fmt is a valid writeback format
+bool drmu_conn_has_writeback_format(drmu_conn_t * const dn, const uint32_t fmt);
+
+// Connector might support some rotations - true if given rotation supported
+bool drmu_conn_has_rotation(const drmu_conn_t * const dn, const unsigned int rotation);
+
+// Get mask of rotations supported by this conn
+// Will return a mask with only _ROTATION_0 set if the property isn't supported
+unsigned int drmu_conn_rotation_mask(const drmu_conn_t * const dn);
+
+// Add rotation to connector
+int drmu_atomic_conn_add_rotation(struct drmu_atomic_s * const da, drmu_conn_t * const dn, const unsigned int rotation);
 
 const struct drm_mode_modeinfo * drmu_conn_modeinfo(const drmu_conn_t * const dn, const int mode_id);
 drmu_mode_simple_params_t drmu_conn_mode_simple_params(const drmu_conn_t * const dn, const int mode_id);
@@ -372,6 +430,12 @@ unsigned int drmu_plane_type(const drmu_plane_t * const dp);
 const uint32_t * drmu_plane_formats(const drmu_plane_t * const dp, unsigned int * const pCount);
 bool drmu_plane_format_check(const drmu_plane_t * const dp, const uint32_t format, const uint64_t modifier);
 
+// Get mask of rotations supported by this plane
+// Will return a mask with only _ROTATION_0 set if the property isn't supported
+unsigned int drmu_plane_rotation_mask(const drmu_plane_t * const dp);
+// Is rot a valid rotation for this plane?
+bool drmu_plane_rotation_valid(const drmu_plane_t * const dp, const unsigned int rot);
+
 // Alpha: -1 = no not set, 0 = transparent, 0xffff = opaque
 #define DRMU_PLANE_ALPHA_UNSET                  (-1)
 #define DRMU_PLANE_ALPHA_TRANSPARENT            0
@@ -381,15 +445,71 @@ int drmu_atomic_plane_add_alpha(struct drmu_atomic_s * const da, const drmu_plan
 int drmu_atomic_plane_add_zpos(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int zpos);
 
 // X, Y & TRANSPOSE can be ORed to get all others
-#define DRMU_PLANE_ROTATION_0                   0
-#define DRMU_PLANE_ROTATION_X_FLIP              1
-#define DRMU_PLANE_ROTATION_Y_FLIP              2
-#define DRMU_PLANE_ROTATION_180                 3
+#define DRMU_ROTATION_0                   0
+#define DRMU_ROTATION_H_FLIP              1  // Horizontal flip (x -> -x)
+#define DRMU_ROTATION_V_FLIP              2  // Vertical flip (y -> -y)
+#define DRMU_ROTATION_180                 3
 // *** These don't exist on Pi - no inherent transpose
-#define DRMU_PLANE_ROTATION_TRANSPOSE           4
-#define DRMU_PLANE_ROTATION_90                  5  // Rotate 90 clockwise
-#define DRMU_PLANE_ROTATION_270                 6  // Rotate 90 anti-cockwise
-#define DRMU_PLANE_ROTATION_180_TRANSPOSE       7  // Rotate 180 & transpose
+#define DRMU_ROTATION_TRANSPOSE           4
+#define DRMU_ROTATION_270                 5  // Rotate 90 anti-cockwise
+#define DRMU_ROTATION_90                  6  // Rotate 90 clockwise
+#define DRMU_ROTATION_180_TRANSPOSE       7  // Rotate 180 & transpose
+
+// Aliases that mirror (IMHO confusing) DRM naming
+#define DRMU_ROTATION_REFLECT_X           DRMU_ROTATION_H_FLIP
+#define DRMU_ROTATION_REFLECT_Y           DRMU_ROTATION_V_FLIP
+
+#define DRMU_ROTATION_INVALID             ~0U
+
+static inline bool drmu_rotation_is_transposed(const unsigned int r)
+{
+    return (r & 4) != 0;
+}
+
+static inline bool drmu_rotation_is_valid(const unsigned int r)
+{
+    return (r & ~7) == 0;
+}
+
+// Transpose r if c is transposed.
+// Probably not a useful user fn but used in +/-
+static inline unsigned int
+drmu_rotation_ctranspose(const unsigned int r, const unsigned int c)
+{
+    const unsigned int s = (c & 4) >> 2;
+    return (r & 4) | ((r & 2) >> s) | ((r & 1) << s);
+}
+
+// a then b
+// Beware a + b != b + a
+static inline unsigned int
+drmu_rotation_add(const unsigned int a, const unsigned int b)
+{
+    return ((a | b) & ~7) != 0 ? DRMU_ROTATION_INVALID : drmu_rotation_ctranspose(a, b) ^ b;
+}
+
+// Returns value that if b is added to gets a
+// i.e. suba(a, b) + b = a
+static inline unsigned int
+drmu_rotation_suba(const unsigned int a, const unsigned int b)
+{
+    return ((a | b) & ~7) != 0 ? DRMU_ROTATION_INVALID : drmu_rotation_ctranspose(a ^ b, b);
+}
+
+// Returns value that would need to be added to a to get b
+// i.e. a + subb(b, a) = b
+static inline unsigned int
+drmu_rotation_subb(const unsigned int b, const unsigned int a)
+{
+    return ((a | b) & ~7) != 0 ? DRMU_ROTATION_INVALID : drmu_rotation_ctranspose(a, a ^ b) ^ b;
+}
+
+// Find a rotation that exists in mask_a which when combined with a rotation
+// in mask_b gives req_rot. If req_rot exists in mask_a then the return value
+// will be req_rot. If no such value exists _INVALID will be returned
+// Use _subb(return_value, req_rot) to get rotation required in b
+unsigned int drmu_rotation_find(const unsigned int req_rot, const unsigned int mask_a, const unsigned int mask_b);
+
 int drmu_atomic_plane_add_rotation(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const int rot);
 
 int drmu_atomic_plane_add_chroma_siting(struct drmu_atomic_s * const da, const drmu_plane_t * const dp, const drmu_chroma_siting_t siting);
@@ -434,9 +554,9 @@ struct drmu_log_env_s;
 // Poll environment maintenance functions used by drmu_poll.c
 // Could be use to set up custom polling functions. struct drmu_poll_env_s is
 // opaque to drmu.c
-struct drmu_poll_env_s;
-typedef struct drmu_poll_env_s * (* drmu_poll_new_fn)(drmu_env_t * du);
-typedef void (* drmu_poll_destroy_fn)(struct drmu_poll_env_s ** ppPoll_env, drmu_env_t * du);
+struct drmu_queue_s;
+typedef struct drmu_queue_s * (* drmu_poll_new_fn)(drmu_env_t * du);
+typedef void (* drmu_poll_destroy_fn)(struct drmu_queue_s ** ppPoll_env, drmu_env_t * du);
 // Get/set poll environment. Value returned in *ppPe
 // If du killed then *ppPe = NULL and rv = -EBUSY
 // If already set then value returned and rv == 0
@@ -444,9 +564,9 @@ typedef void (* drmu_poll_destroy_fn)(struct drmu_poll_env_s ** ppPoll_env, drmu
 // destroy_fn called when du killed
 int drmu_env_int_poll_set(drmu_env_t * const du,
                   const drmu_poll_new_fn new_fn, const drmu_poll_destroy_fn destroy_fn,
-                  struct drmu_poll_env_s ** const ppPe);
+                  struct drmu_queue_s ** const ppPe);
 // Return poll env. NULL if unset
-struct drmu_poll_env_s * drmu_env_int_poll_get(drmu_env_t * const du);
+struct drmu_queue_s * drmu_env_int_poll_get(drmu_env_t * const du);
 
 // Do ioctl - returns -errno on error, 0 on success
 // deals with recalling the ioctl when required
@@ -529,6 +649,9 @@ static inline int drmu_atomic_move_merge(drmu_atomic_t ** const ppa, drmu_atomic
 // b may be sorted (if not already) but is otherwise unchanged
 void drmu_atomic_sub(drmu_atomic_t * const a, drmu_atomic_t * const b);
 
+// Is da NULL or has no properties set?
+bool drmu_atomic_is_empty(const drmu_atomic_t * const da);
+
 // flags are DRM_MODE_ATOMIC_xxx (e.g. DRM_MODE_ATOMIC_TEST_ONLY) and DRM_MODE_PAGE_FLIP_xxx
 int drmu_atomic_commit(const drmu_atomic_t * const da, uint32_t flags);
 // Attempt commit - if it fails add failing members to da_fail
@@ -545,6 +668,9 @@ int drmu_atomic_add_commit_callback(drmu_atomic_t * const da, drmu_atomic_commit
 void drmu_atomic_clear_commit_callbacks(drmu_atomic_t * const da);
 // Run all commit callbacks on this atomic. Callbacks are not cleared.
 void drmu_atomic_run_commit_callbacks(const drmu_atomic_t * const da);
+
+// Run the property commit callbacks - only call on a successful commit
+void drmu_atomic_run_prop_commit_callbacks(const drmu_atomic_t * const da);
 
 typedef void drmu_prop_unref_fn(void * v);
 typedef void drmu_prop_ref_fn(void * v);
