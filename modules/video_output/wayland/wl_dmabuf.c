@@ -66,6 +66,7 @@
 #include "picpool.h"
 #include "rgba_premul.h"
 #include "../drmu/drmu_log.h"
+#include "../drmu/drmu_fmts.h"
 #include "../drmu/drmu_vlc_fmts.h"
 #include "../drmu/pollqueue.h"
 #include "../../codec/avcodec/drm_pic.h"
@@ -1423,6 +1424,11 @@ spe_set_color_info(const vout_display_sys_t * const sys, subpic_ent_t * const sp
     VLC_UNUSED(spe);
     VLC_UNUSED(fmt);
 #else
+    uint64_t mod = 0;
+    const uint32_t dfmt = drmu_format_vlc_to_drm_prime(fmt, &mod);
+    const drmu_fmt_info_t * const fi = drmu_fmt_info_find_fmt(dfmt);
+    video_color_primaries_t primaries;
+
     static const enum wp_color_representation_surface_v1_chroma_location location_map[CHROMA_LOCATION_MAX + 1] = {
         [CHROMA_LOCATION_LEFT] = WP_COLOR_REPRESENTATION_SURFACE_V1_CHROMA_LOCATION_TYPE_1,
         [CHROMA_LOCATION_CENTER] = WP_COLOR_REPRESENTATION_SURFACE_V1_CHROMA_LOCATION_TYPE_2,
@@ -1435,17 +1441,43 @@ spe_set_color_info(const vout_display_sys_t * const sys, subpic_ent_t * const sp
     if (sys->bound.color_representation_manager_v1 == NULL)
         return;
 
-    spe->coefficients = fmt->primaries < 0 || fmt->primaries >= ARRAY_SIZE(sys->primary_map) ? 0 :
-        sys->primary_map[fmt->primaries].coefficients;
-    spe->range = sys->primary_map[fmt->primaries].ranges == 1 ?
+    if (fi == NULL) {
+        // Unknown - let Wayland deal with it in a default manner
+        spe->coefficients = 0;
+        return;
+    }
+
+    if (drmu_fmt_info_is_yuv(fi)) {
+        primaries = fmt->primaries;
+        if (primaries == COLOR_PRIMARIES_UNDEF) {
+            // Apply guesswork (same as drmu)
+            primaries = (fmt->i_visible_width > 1024 || fmt->i_visible_height > 600) ?
+                COLOR_PRIMARIES_BT709 :
+                COLOR_PRIMARIES_BT601_525;
+        }
+    }
+    else {
+        // All RGB for this purpose is mapped onto _PRIMARIES_UNDEF and we must set
+        // coefficients to LINEAR or we get a protocol error and crash
+        primaries = COLOR_PRIMARIES_UNDEF;
+    }
+
+    spe->coefficients = primaries < 0 || primaries >= ARRAY_SIZE(sys->primary_map) ? 0 :
+        sys->primary_map[primaries].coefficients;
+    spe->range = sys->primary_map[primaries].ranges == 1 ?
             WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_FULL :
-        sys->primary_map[fmt->primaries].ranges == 2 ?
+        sys->primary_map[primaries].ranges == 2 ?
             WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_LIMITED :
         fmt->b_color_range_full ?
             WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_FULL :
             WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_LIMITED;
-    spe->chroma_loc = fmt->chroma_location < 0 || fmt->chroma_location >= ARRAY_SIZE(location_map) ? 0 :
-            location_map[fmt->chroma_location];
+    // Could have a full conversion between drm & vlc location reps but left &
+    // left-top are the only ones that actually happen here
+    spe->chroma_loc = fmt->chroma_location > 0 && fmt->chroma_location < ARRAY_SIZE(location_map) ?
+            location_map[fmt->chroma_location] :
+        drmu_chroma_siting_eq(drmu_fmt_info_chroma_siting(fi), DRMU_CHROMA_SITING_LEFT) ?
+            WP_COLOR_REPRESENTATION_SURFACE_V1_CHROMA_LOCATION_TYPE_1 :
+            WP_COLOR_REPRESENTATION_SURFACE_V1_CHROMA_LOCATION_TYPE_0;
 #endif
 }
 
@@ -2521,6 +2553,11 @@ static void color_representation_manager_supported_coefficients_and_ranges(void 
 
     switch (coefficients)
     {
+        case WP_COLOR_REPRESENTATION_SURFACE_V1_COEFFICIENTS_IDENTITY:
+            // Abuse UNDEF for RGB/IDENTITY
+            sys->primary_map[COLOR_PRIMARIES_UNDEF].coefficients = coefficients;
+            sys->primary_map[COLOR_PRIMARIES_UNDEF].ranges |= rmask;
+            break;
         case WP_COLOR_REPRESENTATION_SURFACE_V1_COEFFICIENTS_BT601:
             sys->primary_map[COLOR_PRIMARIES_BT601_525].coefficients = coefficients;
             sys->primary_map[COLOR_PRIMARIES_BT601_525].ranges |= rmask;
