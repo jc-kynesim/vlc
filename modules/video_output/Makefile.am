@@ -286,6 +286,7 @@ libwl_dmabuf_plugin_la_SOURCES = video_output/wayland/wl_dmabuf.c\
 	video_output/wayland/rgba_premul.c video_output/wayland/rgba_premul.h\
 	video_output/drmu/pollqueue.c video_output/drmu/pollqueue.h\
 	video_output/drmu/drmu_vlc_fmts.c video_output/drmu/drmu_vlc_fmts.h\
+	video_output/drmu/drmu_fmts.c video_output/drmu/drmu_fmts.h\
 	video_output/drmu/drmu_fourcc.h
 nodist_libwl_dmabuf_plugin_la_SOURCES = \
 	video_output/wayland/viewporter-client-protocol.h \
