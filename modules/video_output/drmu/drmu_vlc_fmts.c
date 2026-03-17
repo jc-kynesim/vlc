@@ -186,6 +186,7 @@ drmu_vlc_fmt_info_vlc_rgb_masks(const drmu_vlc_fmt_info_t * const f, uint32_t * 
         *r = f->rmask;
         *g = f->gmask;
         *b = f->bmask;
+        return;
     }
 #else
     VLC_UNUSED(f);
