@@ -193,6 +193,12 @@ endif
 
 ### DRM ###
 
+video_output/drmu/mk_sorted_fmts: video_output/drmu/drmu_fmts.c video_output/drmu/drmu_fmts.h
+	$(CC) $(AM_CFLAGS) -DBUILD_MK_SORTED_FMTS_H=1 $< -o $@
+
+video_output/drmu/sorted_fmts.h: video_output/drmu/mk_sorted_fmts
+	$< $@
+
 libdrm_vout_plugin_la_SOURCES = video_output/drmu/drm_vout.c \
 	video_output/drmu/drmu_vlc.c video_output/drmu/drmu_vlc.h \
 	video_output/drmu/drmu_vlc_fmts.c video_output/drmu/drmu_vlc_fmts.h \
@@ -210,7 +216,8 @@ libdrm_vout_plugin_la_SOURCES = video_output/drmu/drm_vout.c \
 	video_output/drmu/drmu_pool.c video_output/drmu/drmu_pool.h \
 	video_output/drmu/drmu_math.c video_output/drmu/drmu_math.h \
 	video_output/drmu/pollqueue.c video_output/drmu/pollqueue.h
-libdrm_vout_plugin_la_CFLAGS = $(AM_CFLAGS) -pthread -I/usr/include/libdrm
+nodist_libdrm_vout_plugin_la_SOURCES = video_output/drmu/sorted_fmts.h
+libdrm_vout_plugin_la_CFLAGS = $(AM_CFLAGS) -DHAS_SORTED_FMTS=1 -pthread -I/usr/include/libdrm -I$(builddir)/video_output/drmu
 libdrm_vout_plugin_la_LDFLAGS = $(AM_LDFLAGS) -pthread
 libdrm_vout_plugin_la_LIBADD = -ldrm -lxcb-randr -lxcb
 if HAVE_MMAL
@@ -219,6 +226,7 @@ libdrm_vout_plugin_la_SOURCES += hw/mmal/mmal_cma_pic.h
 endif
 if HAVE_DRM
 vout_LTLIBRARIES += libdrm_vout_plugin.la
+BUILT_SOURCES += $(nodist_libdrm_vout_plugin_la_SOURCES)
 endif
 
 ### Wayland ###
