@@ -298,7 +298,7 @@ nodist_libwl_dmabuf_plugin_la_SOURCES = \
 
 libwl_dmabuf_plugin_la_CPPFLAGS = $(AM_CPPFLAGS) \
 	-I$(builddir)/video_output/wayland -pthread
-libwl_dmabuf_plugin_la_CFLAGS = $(WAYLAND_CLIENT_CFLAGS) -pthread
+libwl_dmabuf_plugin_la_CFLAGS = $(WAYLAND_CLIENT_CFLAGS) -DHAS_SORTED_FMTS=1  -I$(builddir)/video_output/drmu -pthread
 libwl_dmabuf_plugin_la_LIBADD = $(WAYLAND_CLIENT_LIBS)
 libwl_dmabuf_plugin_la_LDFLAGS = $(AM_LDFLAGS) -pthread
 if HAVE_ARM64
@@ -415,6 +415,7 @@ if HAVE_WAYLAND
 BUILT_SOURCES += $(nodist_libwl_shm_plugin_la_SOURCES)
 vout_LTLIBRARIES += libwl_shm_plugin.la
 BUILT_SOURCES += $(nodist_libwl_dmabuf_plugin_la_SOURCES)
+BUILT_SOURCES += $(nodist_libdrm_vout_plugin_la_SOURCES)
 vout_LTLIBRARIES += libwl_dmabuf_plugin.la
 vout_LTLIBRARIES += libwl_shell_plugin.la
 BUILT_SOURCES += $(nodist_libxdg_shell_plugin_la_SOURCES)
