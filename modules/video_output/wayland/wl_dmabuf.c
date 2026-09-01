@@ -2080,32 +2080,52 @@ done:
 #endif
 }
 
-static int Control(vout_display_t *vd, int query)
+
+static int SetDisplaySize(vout_display_t * vd, unsigned width, unsigned height)
+{
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s: %ux%u", __func__, width, height);
+#endif
+    return VLC_SUCCESS;
+}
+
+static int UpdateFormat(vout_display_t * vd, const video_format_t *fmt, vlc_video_context *ctx)
+{
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s", __func__);
+#endif
+    return VLC_SUCCESS;
+}
+
+static int
+PlaceChanged(vout_display_t * vd, const struct vout_display_place_t * place)
 {
     vout_display_sys_t * const sys = vd->sys;
 
 #if TRACE_ALL
-    msg_Dbg(vd, "<<< %s: Query=%d", __func__, query);
+    msg_Dbg(vd, "<<< %s", __func__);
 #endif
 
-    switch (query)
-    {
-        case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
-        case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
-        case VOUT_DISPLAY_CHANGE_SOURCE_PLACE:
-            place_rects(vd, vd->cfg);
-            do_resize(vd, sys);
-            commit_do(vd, sys);
-            break;
+    place_rects(vd, vd->cfg);
+    do_resize(vd, sys);
+    commit_do(vd, sys);
 
-        default:
-            msg_Err(vd, "unknown request %d", query);
-            return VLC_EGENERIC;
-    }
+    return VLC_SUCCESS;
+}
+
+static int
+AspectOrCropChanged(vout_display_t * vd, const video_format_t * fmt)
+{
+    vout_display_sys_t * const sys = vd->sys;
 
 #if TRACE_ALL
-    msg_Dbg(vd, ">>> %s: Surface: %p", __func__, sys->embed->handle.wl);
+    msg_Dbg(vd, "<<< %s", __func__);
 #endif
+
+    place_rects(vd, vd->cfg);
+    do_resize(vd, sys);
+    commit_do(vd, sys);
+
     return VLC_SUCCESS;
 }
 
@@ -2534,7 +2554,11 @@ static int Open(vout_display_t *vd,
             .close = Close,
             .prepare = wl_dmabuf_prepare,
             .display = Display,
-            .control = Control,
+            .set_display_size = SetDisplaySize,
+            .update_format = UpdateFormat,
+            .video_place_changed = PlaceChanged,
+            .set_source_aspect = AspectOrCropChanged,
+            .set_source_crop = AspectOrCropChanged,
             .reset_pictures = ResetPictures,
         };
         vd->ops = &ops;
