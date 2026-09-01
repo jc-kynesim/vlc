@@ -871,35 +871,63 @@ reconfigure_display(vout_display_t * const vd, vout_display_sys_t * const sys,
     return 0;
 }
 
-static int vd_drm_control(vout_display_t *vd, int query)
+static int
+vd_set_display_size(vout_display_t * vd, unsigned width, unsigned height)
+{
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s: %ux%u", __func__, width, height);
+#endif
+    return VLC_SUCCESS;
+}
+
+static int
+vd_update_format(vout_display_t * vd, const video_format_t *fmt, vlc_video_context *ctx)
+{
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s", __func__);
+#endif
+    return VLC_SUCCESS;
+}
+
+static int
+vd_place_changed(vout_display_t * vd, const struct vout_display_place_t * place)
 {
     vout_display_sys_t * const sys = vd->sys;
     video_format_t fmt;
     int ret;
+
 #if TRACE_ALL
-    msg_Dbg(vd, "<<< %s: query=%d", __func__, query);
+    msg_Dbg(vd, "<<< %s", __func__);
 #endif
 
-    switch (query) {
-        case VOUT_DISPLAY_CHANGE_SOURCE_ASPECT:
-        case VOUT_DISPLAY_CHANGE_SOURCE_CROP:
-        case VOUT_DISPLAY_CHANGE_SOURCE_PLACE:
-            if ((ret = reconfigure_display(vd, sys, vd->cfg, &fmt)) != 0)
-                break;
-            // If simple then we only have one size we can be
-            if (sys->output_simple && !video_format_IsSimilar(vd->fmt, &fmt))
-                ret = VLC_EGENERIC;
-            break;
+    if ((ret = reconfigure_display(vd, sys, vd->cfg, &fmt)) != 0)
+        return ret;
+    // If simple then we only have one size we can be
+    if (sys->output_simple && !video_format_IsSimilar(vd->fmt, &fmt))
+        return VLC_EGENERIC;
 
-        default:
-            msg_Warn(vd, "Unknown control query %d", query);
-            ret = VLC_EGENERIC;
-            break;
-    }
-
-    return ret;
+    return VLC_SUCCESS;
 }
 
+static int
+vd_aspect_or_crop_changed(vout_display_t * vd, const video_format_t * req_fmt)
+{
+    vout_display_sys_t * const sys = vd->sys;
+    video_format_t fmt;
+    int ret;
+
+#if TRACE_ALL
+    msg_Dbg(vd, "<<< %s", __func__);
+#endif
+
+    if ((ret = reconfigure_display(vd, sys, vd->cfg, &fmt)) != 0)
+        return ret;
+    // If simple then we only have one size we can be
+    if (sys->output_simple && !video_format_IsSimilar(vd->fmt, &fmt))
+        return VLC_EGENERIC;
+
+    return VLC_SUCCESS;
+}
 
 // Reset the picture format handled by the module
 // Happens after Control returns error
@@ -1307,7 +1335,10 @@ OpenDrmVout(vout_display_t *vd, video_format_t *fmtp, vlc_video_context *vctx)
             .close =            CloseDrmVout,
             .prepare =          vd_drm_prepare,
             .display =          vd_drm_display,
-            .control =          vd_drm_control,
+            .update_format =    vd_update_format,
+            .video_place_changed = vd_place_changed,
+            .set_source_aspect = vd_aspect_or_crop_changed,
+            .set_source_crop =  vd_aspect_or_crop_changed,
             .reset_pictures =   vd_drm_reset_pictures,
             .set_viewpoint =    NULL,
         };
