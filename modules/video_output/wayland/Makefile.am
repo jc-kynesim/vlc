@@ -154,9 +154,10 @@ libwl_dmabuf_plugin_la_CFLAGS += -DHAVE_WAYLAND_SINGLE_PIXEL_BUFFER=1
 CLEANFILES += $(nodist_libwl_dmabuf_plugin_la_SOURCES)
 
 if HAVE_WAYLAND
-BUILT_SOURCES += $(nodist_libwl_shm_plugin_la_SOURCES libwl_dmabuf_plugin_la_SOURCES)
+BUILT_SOURCES += $(nodist_libwl_shm_plugin_la_SOURCES)
 vout_PLUGINS += libwl_shm_plugin.la
 vout_PLUGINS += libwl_shell_plugin.la
+BUILT_SOURCES += $(nodist_libwl_dmabuf_plugin_la_SOURCES)
 vout_PLUGINS += libwl_dmabuf_plugin.la
 BUILT_SOURCES += $(nodist_libxdg_shell_plugin_la_SOURCES)
 vout_PLUGINS += libxdg_shell_plugin.la
