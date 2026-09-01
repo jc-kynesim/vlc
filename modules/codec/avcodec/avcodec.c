@@ -265,7 +265,7 @@ AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
     const char *psz_namecodec;
     const AVCodec *p_codec = NULL;
 //    const char * hw_dec_name = NULL;
-    const char * const psz_decoder = var_InheritString( p_dec, "avcodec-codec" );
+//    const char * const psz_decoder = var_InheritString( p_dec, "avcodec-codec" );
 
     // If named decoder do not attempt hw override - wait for non-hw pass
 //    if( hw != 0 && psz_decoder != NULL )
@@ -274,7 +274,8 @@ AVCodecContext *ffmpeg_AllocContext( decoder_t *p_dec,
     /* *** determine codec type *** */
     if( !GetFfmpegCodec( p_dec->fmt_in, &i_codec_id, &psz_namecodec ) ||
          i_codec_id == AV_CODEC_ID_RAWVIDEO )
-        goto fail_free_psz_decoder;
+        return NULL;
+//        goto fail_free_psz_decoder;
 
 //    if( hw != 0 && (hw_dec_name = hw_v4l2m2m_dec_str(i_codec_id)) == NULL )
 //        goto fail_free_psz_decoder;
