@@ -3986,6 +3986,7 @@ AC_ARG_ENABLE(qt, [
   ])
 ])
 have_qt5_x11="no"
+have_qt_gui_private="no"
 qt6_configured="no"
 AS_IF([test "${enable_qt}" != "no"], [
   PKG_CHECK_MODULES([QT], [Qt5Core >= 5.5.0 Qt5Widgets Qt5Gui Qt5Svg], [
@@ -4132,6 +4133,21 @@ AS_IF([test "${enable_qt}" != "no"], [
 AM_CONDITIONAL([HAVE_QT_X11], [test "${have_qt_x11}" = "yes"])
 AM_CONDITIONAL([HAVE_QT5_X11], [test "${have_qt5_x11}" = "yes"])
 AM_CONDITIONAL([HAVE_QT_GUI_PRIVATE], [test "${have_qt_gui_private}" = "yes"])
+
+dnl HAVE_QT_WAYLAND enables the code that hands the Wayland surface and display
+dnl of the video widget over to the vout. Qt exposes neither through its public
+dnl API (not even in Qt6, where QNativeInterface::QWaylandApplication covers the
+dnl display but nothing covers the per-window surface), so the QPA native
+dnl interface from the Qt GUI private headers is required. No Wayland library or
+dnl header is needed here: vlc_vout_window.h only ever forward declares the
+dnl wl_display and wl_surface types.
+have_qt_wayland="no"
+AS_IF([test "${enable_qt}" != "no" && test "${have_qt_gui_private}" = "yes"], [
+  AS_IF([test "${SYS}" != "mingw32" && test "${SYS}" != "darwin" && test "${SYS}" != "os2"], [
+    have_qt_wayland="yes"
+  ])
+])
+AM_CONDITIONAL([HAVE_QT_WAYLAND], [test "${have_qt_wayland}" = "yes"])
 
 dnl
 dnl detect kde4-config patch (used for kde solids).

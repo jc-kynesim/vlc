@@ -798,8 +798,11 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
 
     vout.clear();
 
-#ifdef QT5_HAS_WAYLAND
-    if( b_hasWayland )
+#ifdef QT_HAS_WAYLAND
+    /* p_sys->voutWindowType is not set yet when the FSC is built, so ask the
+     * QPA plugin directly. Qt reports "wayland", "wayland-egl" or
+     * "wayland-xcomposite-*" depending on the client buffer integration. */
+    if( qApp->platformName().startsWith( QLatin1String("wayland") ) )
     {
         // Popup is less than perfect in that it seems impossible to make it non-modal
         // and you can't get it to fade but at least it goes where it is asked to and

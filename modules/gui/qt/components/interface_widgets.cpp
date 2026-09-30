@@ -64,9 +64,13 @@ static inline int qrand() {
 # endif
 #endif
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(QT_HAS_WAYLAND)
 #include <QWindow>
-#include <qpa/qplatformnativeinterface.h>
+/* Qt provides no public way of getting at the wl_surface backing a QWindow,
+ * in Qt5 or in Qt6, so the QPA native interface (a private header, enabled by
+ * QT_GUI_PRIVATE) is the only option. It is still implemented by the Qt6
+ * Wayland plugin and still accepts the "surface" and "wl_display" keys. */
+#include <QtGui/qpa/qplatformnativeinterface.h>
 #endif
 
 #include <math.h>
@@ -126,7 +130,7 @@ static inline void incnz(unsigned int * px)
  **/
 void VideoWidget::refreshHandle()
 {
-#ifdef QT5_HAS_WAYLAND
+#ifdef QT_HAS_WAYLAND
     if (!p_window || p_window->type != VOUT_WINDOW_TYPE_WAYLAND)
         return;
 
@@ -178,10 +182,16 @@ bool VideoWidget::request( struct vout_window_t *p_wnd )
        Widgets with this attribute set do not participate in composition
        management */
     /* This is currently disabled on X11 as it does not seem to improve
-     * performance, but causes the video widget to be transparent... */
-#if !defined (QT_HAS_X11)
+     * performance, but causes the video widget to be transparent, and on
+     * Wayland where it is not wanted either. Both are a runtime property of
+     * the QPA plugin in use, not of the build, so test the window type rather
+     * than the compile time platform support. */
+#if !defined (QT_HAS_X11) && !defined (QT_HAS_WAYLAND)
     stable->setAttribute( Qt::WA_PaintOnScreen, true );
 #else
+    if( p_intf->p_sys->voutWindowType != VOUT_WINDOW_TYPE_XID &&
+        p_intf->p_sys->voutWindowType != VOUT_WINDOW_TYPE_WAYLAND )
+        stable->setAttribute( Qt::WA_PaintOnScreen, true );
     stable->setMouseTracking( true );
     setMouseTracking( true );
 #endif
@@ -203,6 +213,29 @@ bool VideoWidget::request( struct vout_window_t *p_wnd )
         case VOUT_WINDOW_TYPE_NSOBJECT:
             p_wnd->handle.nsobject = (void *)stable->winId();
             break;
+#ifdef QT_HAS_WAYLAND
+        case VOUT_WINDOW_TYPE_WAYLAND:
+        {
+            /* Ensure only the video widget is native (needed for Wayland) */
+            stable->setAttribute( Qt::WA_DontCreateNativeAncestors, true);
+
+            QWindow *window = stable->windowHandle();
+            assert(window != NULL);
+            window->create();
+
+            QPlatformNativeInterface *qni = qApp->platformNativeInterface();
+            assert(qni != NULL);
+
+            p_wnd->handle.wl = static_cast<wl_surface*>(
+                qni->nativeResourceForWindow(QByteArrayLiteral("surface"),
+                                             window));
+            p_wnd->display.wl = static_cast<wl_display*>(
+                qni->nativeResourceForIntegration(QByteArrayLiteral("wl_display")));
+            p_wnd->handle_seq = 1;
+            p_wnd->wl_surface_do_not_viewport = QT_CLAIMS_VIEWPORT;
+            break;
+        }
+#endif
         default:
             vlc_assert_unreachable();
     }
@@ -477,12 +510,15 @@ void VideoWidget::release( bool forced )
         stable->deleteLater();
         stable = NULL;
 
-#ifdef QT5_HAS_WAYLAND
-        vlc_mutex_lock(&p_window->handle_lock);
-        msg_Dbg( p_intf, "video widget handle zap" );
-        p_window->handle.wl = NULL;
-        incnz(&p_window->handle_seq);
-        vlc_mutex_unlock(&p_window->handle_lock);
+#ifdef QT_HAS_WAYLAND
+        if( p_window && p_window->type == VOUT_WINDOW_TYPE_WAYLAND )
+        {
+            vlc_mutex_lock(&p_window->handle_lock);
+            msg_Dbg( p_intf, "video widget handle zap" );
+            p_window->handle.wl = NULL;
+            incnz(&p_window->handle_seq);
+            vlc_mutex_unlock(&p_window->handle_lock);
+        }
 #endif
 
         p_window = NULL;

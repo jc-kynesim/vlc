@@ -34,13 +34,15 @@ while [ "$1" != "" ] ; do
             QTOUT=-qt6
             ;;
         *)
-            echo "Usage $0: [--bootstrap] [--make|--install] [--usr]"
+            echo "Usage $0: [--bootstrap] [--make|--install] [--usr] [--qt6]"
             echo "  bootstrap Clean <build dir> then bootstrap before configure"
             echo "            Will happen automatically if already clean"
             echo "  make      Do make after configure"
             echo "  install   Do make and install after configure"
             echo "  usr       Set install dir to /usr"
             echo "            Default is <build dir>/install for testing"
+            echo "  qt6       Build the Qt interface against Qt6 rather than Qt5"
+            echo "            (needed for the Qt Wayland video window)"
             exit 1
             ;;
     esac
@@ -88,7 +90,16 @@ if [ $QT6REQ ]; then
         echo "QT6 config file not found at $QT6CONF_FILE"
         exit 1
     fi
-    QTCONF_OPT=--with-qtconf=$QT6CONF_FILE
+    # Debian doesn't put qmake6 on the PATH, and configure would otherwise
+    # find /usr/bin/qmake (qtchooser), which mistakes -qtconf for its own
+    # -qt option, so name the Qt6 qmake explicitly
+    QT6QMAKE=`sed -n 's/^HostBinaries=//p' $QT6CONF_FILE`
+    QT6QMAKE=/usr/$QT6QMAKE/qmake6
+    if [ ! -x $QT6QMAKE ]; then
+        echo "QT6 qmake not found at $QT6QMAKE"
+        exit 1
+    fi
+    QTCONF_OPT="--with-qtconf=$QT6CONF_FILE QMAKE6=$QT6QMAKE"
     echo "Qt6 selected. Check the config output to be sure configure has found it"
 fi
 

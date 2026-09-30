@@ -657,8 +657,12 @@ static void *ThreadPlatform( void *obj, char *platform_name )
         QString platform = app.platformName();
         if( platform == qfu("xcb") )
             p_sys->voutWindowType = VOUT_WINDOW_TYPE_XID;
-        else if( platform == qfu("wayland") )
+#ifdef QT_HAS_WAYLAND
+        /* Qt reports "wayland", "wayland-egl" or "wayland-xcomposite-*"
+         * depending on the client buffer integration in use. */
+        else if( platform.startsWith( qfu("wayland") ) )
             p_sys->voutWindowType = VOUT_WINDOW_TYPE_WAYLAND;
+#endif
         else if( platform == qfu("windows") )
             p_sys->voutWindowType = VOUT_WINDOW_TYPE_HWND;
         else if( platform == qfu("cocoa" ) )

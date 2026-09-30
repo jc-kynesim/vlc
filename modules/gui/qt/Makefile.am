@@ -45,6 +45,10 @@ if HAVE_QT_GUI_PRIVATE
 libqt_plugin_la_CPPFLAGS += -DQT_GUI_PRIVATE $(QT_GUI_PRIVATE_CFLAGS)
 endif
 
+if HAVE_QT_WAYLAND
+libqt_plugin_la_CXXFLAGS += -DQT_HAS_WAYLAND
+endif
+
 libqt_plugin_la_SOURCES = \
 	gui/qt/qt.cpp gui/qt/qt.hpp gui/qt/qt_x11.hpp \
 	gui/qt/menus.cpp gui/qt/menus.hpp \
