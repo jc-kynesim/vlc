@@ -805,11 +805,11 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
 #ifdef QT5_HAS_WAYLAND
     if( b_hasWayland )
     {
-        // Popup is less than perfect in that it seems impossible to make it non-modal
-        // and you can't get it to fade but at least it goes where it is asked to and
-        // does less confusing things with other popups
-        setWindowFlags( Qt::Popup | Qt::FramelessWindowHint);
-        setWindowModality( Qt::NonModal );
+        // A Tool window is an xdg_toplevel which the compositor places as it
+        // likes. A ToolTip with a transient parent is an xdg_popup without a
+        // grab, so it is non-modal, can be positioned relative to the parent
+        // and (with xdg_popup.reposition) moved while visible
+        setWindowFlags( Qt::ToolTip | Qt::FramelessWindowHint );
     }
     else
 #endif
