@@ -795,6 +795,10 @@ FullscreenControllerWidget::FullscreenControllerWidget( intf_thread_t *_p_i, QWi
     b_fullscreen        = false;
     i_hide_timeout      = 1;
     i_screennumber      = -1;
+#ifdef QT5_HAS_WAYLAND
+    b_hasWayland = QGuiApplication::platformName()
+           .startsWith(QLatin1String("wayland"), Qt::CaseInsensitive);
+#endif
 
     vout.clear();
 
@@ -878,7 +882,12 @@ void FullscreenControllerWidget::restoreFSC()
         QWindow *wh = windowHandle();
         if ( wh != Q_NULLPTR )
         {
+#ifdef QT5_HAS_WAYLAND
+            if ( !b_hasWayland )
+                wh->setScreen(QGuiApplication::screens()[targetScreen()]);
+#else
             wh->setScreen(QGuiApplication::screens()[targetScreen()]);
+#endif
         }
 
         if( currentRes == screenRes &&
