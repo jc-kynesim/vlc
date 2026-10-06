@@ -85,7 +85,6 @@ if [ $QT6REQ ]; then
         exit 1
     fi
     QTCONF_OPT=--with-qtconf=$QT6CONF_FILE
-    echo "Qt6 selected. Check the config output to be sure configure has found it"
 fi
 
 if [ $DO_BOOTSTRAP ]; then
@@ -121,6 +120,13 @@ if [ $DO_CONFIGURE ]; then
      --enable-gles2\
      $QTCONF_OPT
     echo "==== Configured in $OUT"
+    QT_VER=$(sed -n 's/^S\["QT_VERSION"\]="\([^"]*\)".*/\1/p' config.status 2>/dev/null)
+    echo ".... Configure selected Qt ${QT_VER:-none}"
+    if [ $QT6REQ ] && [ "${QT_VER%%.*}" != "6" ]; then
+        echo "ERROR: --qt6 requested but configure selected Qt ${QT_VER:-none}"
+	rm -f Makefile
+        exit 1
+    fi
 fi
 
 if [ $DO_MAKE ]; then
