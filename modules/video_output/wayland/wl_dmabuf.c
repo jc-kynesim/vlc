@@ -29,6 +29,9 @@
 #ifndef HAVE_WAYLAND_COLOR_REPRESENTATION
 #define HAVE_WAYLAND_COLOR_REPRESENTATION 0
 #endif
+#ifndef HAVE_VAAPI_DRM
+#define HAVE_VAAPI_DRM 0
+#endif
 
 #include <assert.h>
 #include <stdatomic.h>
@@ -71,6 +74,21 @@
 #include "../drmu/pollqueue.h"
 #include "../../codec/avcodec/drm_pic.h"
 #include <libavutil/hwcontext_drm.h>
+
+// VAAPI surfaces are exported as dmabufs with vaExportSurfaceHandle which
+// needs libva >= 1.1
+#if HAVE_VAAPI_DRM
+#include <va/va.h>
+#if VA_CHECK_VERSION(1, 1, 0)
+#define USE_VAAPI 1
+#include <va/va_drm.h>
+#include <va/va_drmcommon.h>
+#include "../../hw/vaapi/vlc_vaapi.h"
+#endif
+#endif
+#ifndef USE_VAAPI
+#define USE_VAAPI 0
+#endif
 
 #define TRACE_ALL 0
 #define CHECK_VDRE_COUNTS 0
@@ -281,6 +299,14 @@ struct vout_display_sys_t
 
     fmt_list_t dmabuf_fmts;
     fmt_list_t shm_fmts;
+
+#if USE_VAAPI
+    // Non-NULL if we are taking VAAPI surfaces
+    struct vlc_vaapi_instance * va_inst;
+    VADisplay va_dpy;
+    VASurfaceID * va_surface_ids;
+    uint32_t va_drm_fmt;
+#endif
 
 #if HAVE_WAYLAND_COLOR_REPRESENTATION
     bool has_straight_alpha;
@@ -626,22 +652,31 @@ fmt_list_sort(fmt_list_t * const fl)
 }
 
 static int
-fmt_list_find(const fmt_list_t * const fl, const drmu_vlc_fmt_info_t * const fmti)
+fmt_list_find_drm(const fmt_list_t * const fl, const uint32_t fmt, const uint64_t mod)
 {
-    if (fmti == NULL || fl->len == 0)
+    if (fl->len == 0)
     {
         return -1;
     }
     else
     {
         const fmt_ent_t x = {
-            .fmt = drmu_vlc_fmt_info_drm_pixelformat(fmti),
-            .mod = drmu_vlc_fmt_info_drm_modifier(fmti),
+            .fmt = fmt,
+            .mod = mod,
         };
         const fmt_ent_t * const fe =
             bsearch(&x, fl->fmts, fl->len, sizeof(x), fmt_sort_cb);
         return fe == NULL ? -1 : fe->pri;
     }
+}
+
+static int
+fmt_list_find(const fmt_list_t * const fl, const drmu_vlc_fmt_info_t * const fmti)
+{
+    if (fmti == NULL)
+        return -1;
+    return fmt_list_find_drm(fl, drmu_vlc_fmt_info_drm_pixelformat(fmti),
+                             drmu_vlc_fmt_info_drm_modifier(fmti));
 }
 
 static void
@@ -1280,8 +1315,21 @@ static picture_pool_t *vd_dmabuf_pool(vout_display_t * const vd, unsigned count)
             vd->fmt.i_width, vd->fmt.i_height, vd->fmt.i_sar_num, vd->fmt.i_sar_den,
             vd->source.i_width, vd->source.i_height, count);
 
-    if (sys->vlc_pic_pool == NULL)
-        sys->vlc_pic_pool = picture_pool_NewFromFormat(&vd->fmt, count);
+    if (sys->vlc_pic_pool != NULL)
+        return sys->vlc_pic_pool;
+
+#if USE_VAAPI
+    if (sys->va_inst != NULL)
+    {
+        sys->vlc_pic_pool = vlc_vaapi_PoolNew(VLC_OBJECT(vd), sys->va_inst, sys->va_dpy,
+                                              count, &sys->va_surface_ids, &vd->fmt, true);
+        if (sys->vlc_pic_pool == NULL)
+            msg_Err(vd, "Failed to create VAAPI pool");
+        return sys->vlc_pic_pool;
+    }
+#endif
+
+    sys->vlc_pic_pool = picture_pool_NewFromFormat(&vd->fmt, count);
     return sys->vlc_pic_pool;
 }
 
@@ -1325,6 +1373,211 @@ error:
     vdre_free(vdre);
     return VLC_EGENERIC;
 }
+
+#if USE_VAAPI
+// Holds the VAAPI surface context & the exported dmabuf fds until the
+// compositor has finished with them
+typedef struct vaapi_rel_env_s {
+    struct picture_context_t * ctx;
+    VADRMPRIMESurfaceDescriptor vdesc;
+} vaapi_rel_env_t;
+
+static void
+vaapi_desc_close(const VADRMPRIMESurfaceDescriptor * const vdesc)
+{
+    for (unsigned int i = 0; i < vdesc->num_objects && i < ARRAY_SIZE(vdesc->objects); ++i)
+        close(vdesc->objects[i].fd);
+}
+
+static void
+vaapi_rel_cb(void * v)
+{
+    vaapi_rel_env_t * const vre = v;
+    vaapi_desc_close(&vre->vdesc);
+    if (vre->ctx != NULL)
+        vre->ctx->destroy(vre->ctx);
+    free(vre);
+}
+
+static int
+vaapi_export(vlc_object_t * const obj, VADisplay dpy, VASurfaceID surface,
+             VADRMPRIMESurfaceDescriptor * const vdesc)
+{
+    // Composed layers gives us a single multi-plane layer which is what
+    // linux_dmabuf wants
+    return vlc_vaapi_ExportSurfaceHandle(obj, dpy, surface,
+                                         VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME_2,
+                                         VA_EXPORT_SURFACE_READ_ONLY | VA_EXPORT_SURFACE_COMPOSED_LAYERS,
+                                         vdesc);
+}
+
+static int
+do_display_vaapi(vout_display_t * const vd, vout_display_sys_t * const sys, picture_t * const pic,
+                 video_dmabuf_release_env_t ** const pVdre, struct wl_buffer ** const pWbuffer)
+{
+    VADisplay const dpy = vlc_vaapi_PicGetDisplay(pic);
+    const VASurfaceID surface = vlc_vaapi_PicGetSurface(pic);
+    VADRMPRIMESurfaceDescriptor * vdesc;
+    AVDRMFrameDescriptor desc = {0};
+    video_dmabuf_release_env_t * vdre;
+    vaapi_rel_env_t * vre;
+    unsigned int flags = 0;
+    VAStatus va_rv;
+
+    assert(*pWbuffer == NULL);
+    assert(*pVdre == NULL);
+
+    // Once vdre exists all cleanup is done by vdre_free
+    if ((vdre = vdre_new_null()) == NULL)
+    {
+        msg_Err(vd, "Failed to create vdre");
+        return VLC_ENOMEM;
+    }
+    if ((vre = calloc(1, sizeof(*vre))) == NULL)
+        goto error;
+    vdre->dma_rel_fn = vaapi_rel_cb;
+    vdre->dma_rel_v = vre;
+    vdesc = &vre->vdesc;
+
+    if ((vre->ctx = pic->context->copy(pic->context)) == NULL)
+        goto error;
+
+    // Make sure decode has finished before we hand the buffer on
+    if ((va_rv = vaSyncSurface(dpy, surface)) != VA_STATUS_SUCCESS)
+        msg_Warn(vd, "vaSyncSurface failed: %s", vaErrorStr(va_rv));
+
+    if (vaapi_export(VLC_OBJECT(vd), dpy, surface, vdesc) != VLC_SUCCESS)
+    {
+        msg_Err(vd, "Failed to export VAAPI surface");
+        // Contents undefined on failure - make sure we don't try to close anything
+        vdesc->num_objects = 0;
+        goto error;
+    }
+
+    if (vdesc->num_objects > AV_DRM_MAX_PLANES || vdesc->num_layers > AV_DRM_MAX_PLANES)
+    {
+        msg_Err(vd, "VAAPI descriptor too big: objects=%u, layers=%u", vdesc->num_objects, vdesc->num_layers);
+        goto error;
+    }
+
+    desc.nb_objects = vdesc->num_objects;
+    for (unsigned int i = 0; i != vdesc->num_objects; ++i)
+    {
+        desc.objects[i] = (AVDRMObjectDescriptor){
+            .fd = vdesc->objects[i].fd,
+            .size = vdesc->objects[i].size,
+            .format_modifier = vdesc->objects[i].drm_format_modifier,
+        };
+        vdre_add_pt(vdre, sys->pollq, vdesc->objects[i].fd);
+    }
+    desc.nb_layers = vdesc->num_layers;
+    for (unsigned int i = 0; i != vdesc->num_layers; ++i)
+    {
+        desc.layers[i].format = vdesc->layers[i].drm_format;
+        desc.layers[i].nb_planes = vdesc->layers[i].num_planes;
+        for (unsigned int j = 0; j != vdesc->layers[i].num_planes; ++j)
+        {
+            desc.layers[i].planes[j] = (AVDRMPlaneDescriptor){
+                .object_index = vdesc->layers[i].object_index[j],
+                .offset = vdesc->layers[i].offset[j],
+                .pitch = vdesc->layers[i].pitch[j],
+            };
+        }
+    }
+
+    if (!pic->b_progressive)
+    {
+        flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_INTERLACED;
+        if (!pic->b_top_field_first)
+            flags |= ZWP_LINUX_BUFFER_PARAMS_V1_FLAGS_BOTTOM_FIRST;
+    }
+
+    *pWbuffer = dfd_make_buffer(vd, sys, false, &desc, vdesc->width, vdesc->height, flags);
+    if (*pWbuffer == NULL)
+        goto error;
+
+    *pVdre = vdre;
+    return VLC_SUCCESS;
+
+error:
+    vdre_free(vdre);
+    return VLC_EGENERIC;
+}
+
+// Init VAAPI & check that we can export surfaces in a format that the
+// compositor will accept
+static int
+vaapi_init(vout_display_t * const vd, vout_display_sys_t * const sys)
+{
+    const bool is_10bit = vd->source.i_chroma == VLC_CODEC_VAAPI_420_10BPP;
+    VASurfaceAttrib attrib = {
+        .type = VASurfaceAttribPixelFormat,
+        .flags = VA_SURFACE_ATTRIB_SETTABLE,
+        .value.type = VAGenericValueTypeInteger,
+        .value.value.i = is_10bit ? VA_FOURCC_P010 : VA_FOURCC_NV12,
+    };
+    VASurfaceID surface = VA_INVALID_SURFACE;
+    VADRMPRIMESurfaceDescriptor vdesc;
+    VAStatus va_rv;
+
+    if ((sys->va_inst = vlc_vaapi_InitializeInstanceDRM(VLC_OBJECT(vd), vaGetDisplayDRM,
+                                                        &sys->va_dpy, NULL)) == NULL)
+    {
+        msg_Warn(vd, "Failed to init VAAPI display");
+        return VLC_EGENERIC;
+    }
+
+    if ((va_rv = vaCreateSurfaces(sys->va_dpy,
+                                  is_10bit ? VA_RT_FORMAT_YUV420_10BPP : VA_RT_FORMAT_YUV420,
+                                  vd->source.i_visible_width, vd->source.i_visible_height,
+                                  &surface, 1, &attrib, 1)) != VA_STATUS_SUCCESS)
+    {
+        msg_Warn(vd, "Failed to create VAAPI test surface: %s", vaErrorStr(va_rv));
+        goto fail;
+    }
+
+    if (vaapi_export(VLC_OBJECT(vd), sys->va_dpy, surface, &vdesc) != VLC_SUCCESS)
+    {
+        msg_Warn(vd, "Failed to export VAAPI test surface");
+        goto fail;
+    }
+
+    {
+        // Only valid if num_layers != 0 - checked below before use
+        const uint32_t drm_fmt = vdesc.layers[0].drm_format;
+        const unsigned int obj = vdesc.layers[0].object_index[0];
+        const unsigned int nb_layers = vdesc.num_layers;
+        const bool obj_ok = obj < vdesc.num_objects && obj < ARRAY_SIZE(vdesc.objects);
+        const uint64_t mod = obj_ok ? vdesc.objects[obj].drm_format_modifier : 0;
+
+        vaapi_desc_close(&vdesc);
+
+        if (nb_layers != 1 || !obj_ok) {
+            msg_Warn(vd, "VAAPI export has %u layers (obj %u) - expected 1", nb_layers, obj);
+            goto fail;
+        }
+        if (fmt_list_find_drm(&sys->dmabuf_fmts, drm_fmt, mod) < 0) {
+            msg_Warn(vd, "VAAPI format %s mod %#"PRIx64" not supported by compositor",
+                     drmu_log_fourcc(drm_fmt), mod);
+            goto fail;
+        }
+
+        msg_Dbg(vd, "VAAPI format %s mod %#"PRIx64, drmu_log_fourcc(drm_fmt), mod);
+        sys->va_drm_fmt = drm_fmt;
+    }
+
+    vaDestroySurfaces(sys->va_dpy, &surface, 1);
+    return VLC_SUCCESS;
+
+fail:
+    if (surface != VA_INVALID_SURFACE)
+        vaDestroySurfaces(sys->va_dpy, &surface, 1);
+    vlc_vaapi_ReleaseInstance(sys->va_inst);
+    sys->va_inst = NULL;
+    sys->va_dpy = NULL;
+    return VLC_EGENERIC;
+}
+#endif
 
 static void
 subpic_ent_flush(subpic_ent_t * const spe)
@@ -1425,7 +1678,11 @@ spe_set_color_info(const vout_display_sys_t * const sys, subpic_ent_t * const sp
     VLC_UNUSED(fmt);
 #else
     uint64_t mod = 0;
-    const uint32_t dfmt = drmu_format_vlc_to_drm_prime(fmt, &mod);
+    uint32_t dfmt = drmu_format_vlc_to_drm_prime(fmt, &mod);
+#if USE_VAAPI
+    if (dfmt == 0 && vlc_vaapi_IsChromaOpaque(fmt->i_chroma))
+        dfmt = sys->va_drm_fmt;
+#endif
     const drmu_fmt_info_t * const fi = drmu_fmt_info_find_fmt(dfmt);
     video_color_primaries_t primaries;
 
@@ -2130,6 +2387,11 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
         }
         sys->video_spe_prep = spe;
 
+#if USE_VAAPI
+        if (vlc_vaapi_IsChromaOpaque(pic->format.i_chroma))
+            do_display_vaapi(vd, sys, pic, &spe->vdre, &spe->wb);
+        else
+#endif
         if (drmu_format_vlc_to_drm_prime(&pic->format, NULL) == 0)
             copy_subpic_to_w_buffer(vd, sys, pic, 0xff, &spe->vdre, &spe->wb);
         else
@@ -2805,6 +3067,13 @@ static void Close(vlc_object_t *obj)
     kill_pool(sys);
     picpool_unref(&sys->subpic_pool);
 
+#if USE_VAAPI
+    // Pool pics hold their own ref on the instance so this is safe even if
+    // some are still in flight
+    if (sys->va_inst != NULL)
+        vlc_vaapi_ReleaseInstance(sys->va_inst);
+#endif
+
     free(sys->subpic_chromas);
 
 no_window:
@@ -2915,6 +3184,18 @@ static int Open(vlc_object_t *obj)
     fmt_list_sort(&sys->shm_fmts);
     flist = sys->use_shm ? &sys->shm_fmts : &sys->dmabuf_fmts;
 
+#if USE_VAAPI
+    // If VAAPI is the source and we can export it directly then keep the
+    // opaque format, otherwise fall through to normal format selection
+    // which will cause the core to insert a converter
+    if (!sys->use_shm &&
+        vlc_vaapi_IsChromaOpaque(vd->source.i_chroma) &&
+        vaapi_init(vd, sys) == VLC_SUCCESS)
+    {
+        req_fmt = vd->source;
+    }
+    else
+#endif
     // Check PIC DRM format here
     if (set_req_format(vd, sys, &req_fmt) != VLC_SUCCESS)
         goto error;
