@@ -11,6 +11,9 @@ struct dmabufs_ctl * dmabufs_ctl_new(void);
 void dmabufs_ctl_unref(struct dmabufs_ctl ** const pdbsc);
 struct dmabufs_ctl * dmabufs_ctl_ref(struct dmabufs_ctl * const dbsc);
 
+// Udmabuf allocated buffer
+struct dmabufs_ctl * dmabufs_ctl_new_udmabuf(void);
+
 // Build a "dmabuf" struct that uses ordinary shared memory
 struct dmabufs_ctl * dmabufs_shm_new(void);
 
