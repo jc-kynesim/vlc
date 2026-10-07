@@ -29,6 +29,9 @@
 #ifndef HAVE_WAYLAND_COLOR_REPRESENTATION
 #define HAVE_WAYLAND_COLOR_REPRESENTATION 0
 #endif
+#ifndef HAVE_WAYLAND_COLOR_MANAGEMENT
+#define HAVE_WAYLAND_COLOR_MANAGEMENT 0
+#endif
 #ifndef HAVE_VAAPI_DRM
 #define HAVE_VAAPI_DRM 0
 #endif
@@ -51,6 +54,9 @@
 #endif
 #if HAVE_WAYLAND_COLOR_REPRESENTATION
 #include "color-representation-v1-client-protocol.h"
+#endif
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+#include "color-management-v1-client-protocol.h"
 #endif
 #include "viewporter-client-protocol.h"
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
@@ -108,6 +114,11 @@
 #define WL_DMABUF_CHEQUERBOARD_TEXT N_("Chequerboard background")
 #define WL_DMABUF_CHEQUERBOARD_LONGTEXT N_("Fill unused window area with chequerboard rather than black")
 
+#define WL_DMABUF_COLOR_MANAGEMENT_NAME "wl-dmabuf-color-management"
+#define WL_DMABUF_COLOR_MANAGEMENT_TEXT N_("Use Wayland colour management")
+#define WL_DMABUF_COLOR_MANAGEMENT_LONGTEXT N_("If the compositor supports wp_color_manager_v1 then tell it the "\
+    "transfer function, primaries and HDR metadata of the video so it can display HDR correctly")
+
 #define WL_DMABUF_STATS_NAME "wl-dmabuf-stats"
 #define WL_DMABUF_STATS_TEXT N_("Display some display stats")
 #define WL_DMABUF_STATS_LONGTEXT N_("When display is closed report frames displayed/discarded and avg fps. "\
@@ -153,6 +164,8 @@ typedef struct video_dmabuf_release_env_ss
 #endif
 } video_dmabuf_release_env_t;
 
+typedef struct cm_desc_s cm_desc_t;
+
 typedef struct subpic_ent_s {
     struct wl_buffer * wb;
     struct dmabuf_h * dh;
@@ -171,6 +184,9 @@ typedef struct subpic_ent_s {
     enum wp_color_representation_surface_v1_range range;
     enum wp_color_representation_surface_v1_alpha_mode alpha_mode;
 #endif
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+    cm_desc_t * cm_desc;  // Image description wanted for this pic (NULL = none)
+#endif
 
     atomic_int ready;
 
@@ -185,6 +201,11 @@ typedef struct subplane_s {
     struct wp_viewport * viewport;
 #if HAVE_WAYLAND_COLOR_REPRESENTATION
     struct wp_color_representation_surface_v1 * color_rep;
+#endif
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+    struct wp_color_management_surface_v1 * cm_surface;
+    cm_desc_t * cm_applied;  // Last desc dealt with (may have failed)
+    bool cm_set;             // An image description is currently set
 #endif
 
     bool buffer_attached;
@@ -237,6 +258,9 @@ typedef struct w_bound_ss
 #if HAVE_WAYLAND_COLOR_REPRESENTATION
     struct wp_color_representation_manager_v1 *color_representation_manager_v1;
 #endif
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+    struct wp_color_manager_v1 *color_manager_v1;
+#endif
 } w_bound_t;
 
 struct coeff_and_range
@@ -265,6 +289,7 @@ struct vout_display_sys_t
     bool use_shm;
     bool chequerboard;
     bool want_stats;
+    bool use_color_management;
     bool bkg_null;  // Bkg is known null - expect a lack of display (debug)
 
     bool bkg_setup;
@@ -314,6 +339,19 @@ struct vout_display_sys_t
         enum wp_color_representation_surface_v1_coefficients coefficients;
         unsigned int ranges; // b0 = full, b1 = restricted
     }  primary_map[COLOR_PRIMARIES_MAX + 1];
+#endif
+
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+    struct {
+        unsigned int version;
+        // Bitmasks of supported enum values (1 << value)
+        uint32_t intents;
+        uint32_t features;
+        uint32_t tfs;
+        uint32_t primaries;
+        cm_desc_t * cur;        // Most recently created description
+        bool untagged_logged;
+    } cm;
 #endif
 
     unsigned int presentation_clock_id;
@@ -883,6 +921,394 @@ eventq_sync(eq_env_t * const eq)
     sem_destroy(&eqs.sem);
     return rv;
 }
+
+// ----------------------------------------------------------------------------
+//
+// Colour management (HDR) image descriptions
+//
+// Image descriptions are created asynchronously - the compositor sends
+// ready or failed some time after creation. They are created & destroyed
+// in the event thread so the listener cannot race either; the vout thread
+// only looks at the atomic state.
+
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+
+#define CM_DESC_PENDING 0
+#define CM_DESC_READY   1
+#define CM_DESC_FAILED  (-1)
+
+// Everything used to build an image description. Compared with memcmp so
+// must be zeroed before filling
+typedef struct cm_params_s {
+    uint32_t tf;
+    uint32_t primaries;
+    bool has_mdp;
+    bool has_mdl;
+    int32_t mdp[8];         // Mastering display primaries R,G,B,W x,y * 1M
+    uint32_t mdl_min;       // Mastering min luminance cd/m2 * 10000
+    uint32_t mdl_max;       // Mastering max luminance cd/m2
+    uint32_t max_cll;
+    uint32_t max_fall;
+} cm_params_t;
+
+struct cm_desc_s {
+    atomic_int ref_count;
+    atomic_int state;       // CM_DESC_xxx
+    bool warned;            // Only used by vout thread
+    eq_env_t * eq;
+    struct wp_color_manager_v1 * manager;
+    struct wp_image_description_v1 * desc;
+    cm_params_t params;
+};
+
+static cm_desc_t *
+cm_desc_ref(cm_desc_t * const cmd)
+{
+    if (cmd != NULL)
+        atomic_fetch_add(&cmd->ref_count, 1);
+    return cmd;
+}
+
+static void
+cm_desc_delete_cb(void * v, short revents)
+{
+    cm_desc_t * const cmd = v;
+    VLC_UNUSED(revents);
+
+    if (cmd->desc != NULL)
+        wp_image_description_v1_destroy(cmd->desc);
+    eq_unref(&cmd->eq);
+    free(cmd);
+}
+
+static void
+cm_desc_unref(cm_desc_t ** const ppcmd)
+{
+    cm_desc_t * const cmd = *ppcmd;
+
+    if (cmd == NULL)
+        return;
+    *ppcmd = NULL;
+
+    if (atomic_fetch_sub(&cmd->ref_count, 1) != 1)
+        return;
+    // Destroy in the event thread so we cannot race a listener callback
+    pollqueue_callback_once(cmd->eq->pq, cm_desc_delete_cb, cmd);
+}
+
+static void
+image_desc_failed_cb(void *data, struct wp_image_description_v1 *desc,
+                     uint32_t cause, const char *msg)
+{
+    cm_desc_t * const cmd = data;
+    VLC_UNUSED(desc);
+    VLC_UNUSED(cause);
+    VLC_UNUSED(msg);
+    atomic_store(&cmd->state, CM_DESC_FAILED);
+}
+
+static void
+image_desc_ready_cb(void *data, struct wp_image_description_v1 *desc,
+                    uint32_t identity)
+{
+    cm_desc_t * const cmd = data;
+    VLC_UNUSED(desc);
+    VLC_UNUSED(identity);
+    atomic_store(&cmd->state, CM_DESC_READY);
+}
+
+#ifdef WP_IMAGE_DESCRIPTION_V1_READY2_SINCE_VERSION
+static void
+image_desc_ready2_cb(void *data, struct wp_image_description_v1 *desc,
+                     uint32_t identity_hi, uint32_t identity_lo)
+{
+    cm_desc_t * const cmd = data;
+    VLC_UNUSED(desc);
+    VLC_UNUSED(identity_hi);
+    VLC_UNUSED(identity_lo);
+    atomic_store(&cmd->state, CM_DESC_READY);
+}
+#endif
+
+static const struct wp_image_description_v1_listener image_desc_listener = {
+    .failed = image_desc_failed_cb,
+    .ready = image_desc_ready_cb,
+#ifdef WP_IMAGE_DESCRIPTION_V1_READY2_SINCE_VERSION
+    .ready2 = image_desc_ready2_cb,
+#endif
+};
+
+// Runs in the event thread
+static void
+cm_desc_create_cb(void * v, short revents)
+{
+    cm_desc_t * cmd = v;
+    const cm_params_t * const p = &cmd->params;
+    struct wp_image_description_creator_params_v1 * creator;
+    VLC_UNUSED(revents);
+
+    if ((creator = wp_color_manager_v1_create_parametric_creator(cmd->manager)) == NULL)
+    {
+        atomic_store(&cmd->state, CM_DESC_FAILED);
+        goto done;
+    }
+
+    wp_image_description_creator_params_v1_set_tf_named(creator, p->tf);
+    wp_image_description_creator_params_v1_set_primaries_named(creator, p->primaries);
+    if (p->has_mdp)
+        wp_image_description_creator_params_v1_set_mastering_display_primaries(creator,
+                p->mdp[0], p->mdp[1], p->mdp[2], p->mdp[3],
+                p->mdp[4], p->mdp[5], p->mdp[6], p->mdp[7]);
+    if (p->has_mdl)
+        wp_image_description_creator_params_v1_set_mastering_luminance(creator, p->mdl_min, p->mdl_max);
+    if (p->max_cll != 0)
+        wp_image_description_creator_params_v1_set_max_cll(creator, p->max_cll);
+    if (p->max_fall != 0)
+        wp_image_description_creator_params_v1_set_max_fall(creator, p->max_fall);
+
+    // Destroys creator
+    if ((cmd->desc = wp_image_description_creator_params_v1_create(creator)) == NULL)
+        atomic_store(&cmd->state, CM_DESC_FAILED);
+    else
+        wp_image_description_v1_add_listener(cmd->desc, &image_desc_listener, cmd);
+
+done:
+    // Drop the ref held for this callback
+    cm_desc_unref(&cmd);
+}
+
+#define CM_BIT(x) (((x) < 32) ? (1U << (x)) : 0)
+
+// Fill params from fmt
+// Returns false if we can't (or shouldn't) describe this format
+static bool
+cm_params_from_fmt(const vout_display_sys_t * const sys, const video_format_t * const fmt,
+                   cm_params_t * const p)
+{
+    static const uint32_t primaries_map[COLOR_PRIMARIES_MAX + 1] = {
+        [COLOR_PRIMARIES_BT601_525] = WP_COLOR_MANAGER_V1_PRIMARIES_NTSC,
+        [COLOR_PRIMARIES_BT601_625] = WP_COLOR_MANAGER_V1_PRIMARIES_PAL,
+        [COLOR_PRIMARIES_BT709]     = WP_COLOR_MANAGER_V1_PRIMARIES_SRGB,
+        [COLOR_PRIMARIES_BT2020]    = WP_COLOR_MANAGER_V1_PRIMARIES_BT2020,
+        [COLOR_PRIMARIES_DCI_P3]    = WP_COLOR_MANAGER_V1_PRIMARIES_DCI_P3,
+        [COLOR_PRIMARIES_FCC1953]   = WP_COLOR_MANAGER_V1_PRIMARIES_PAL_M,
+    };
+    static const uint32_t tf_map[TRANSFER_FUNC_MAX + 1] = {
+        [TRANSFER_FUNC_LINEAR]       = WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR,
+        [TRANSFER_FUNC_SRGB]         = WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_GAMMA22,
+        [TRANSFER_FUNC_BT470_BG]     = WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_GAMMA28,
+        [TRANSFER_FUNC_BT470_M]      = WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_GAMMA22,
+        // BT.709 OETF content is displayed with a BT.1886 EOTF
+        [TRANSFER_FUNC_BT709]        = WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_BT1886,
+        [TRANSFER_FUNC_SMPTE_ST2084] = WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ,
+        [TRANSFER_FUNC_SMPTE_240]    = WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST240,
+        [TRANSFER_FUNC_HLG]          = WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_HLG,
+    };
+
+    memset(p, 0, sizeof(*p));
+
+    // If we don't know then don't claim anything - leave it to the compositor
+    if ((unsigned int)fmt->primaries >= ARRAY_SIZE(primaries_map) ||
+        (unsigned int)fmt->transfer >= ARRAY_SIZE(tf_map) ||
+        (p->primaries = primaries_map[fmt->primaries]) == 0 ||
+        (p->tf = tf_map[fmt->transfer]) == 0)
+        return false;
+
+    if ((sys->cm.features & CM_BIT(WP_COLOR_MANAGER_V1_FEATURE_PARAMETRIC)) == 0 ||
+        (sys->cm.intents & CM_BIT(WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL)) == 0 ||
+        (sys->cm.primaries & CM_BIT(p->primaries)) == 0 ||
+        (sys->cm.tfs & CM_BIT(p->tf)) == 0)
+        return false;
+
+    if ((sys->cm.features & CM_BIT(WP_COLOR_MANAGER_V1_FEATURE_SET_MASTERING_DISPLAY_PRIMARIES)) != 0)
+    {
+        // VLC mastering primaries are G,B,R x,y in units of 1/50000
+        const uint16_t * const mp = fmt->mastering.primaries;
+        const uint16_t * const wp = fmt->mastering.white_point;
+
+        if (mp[0] && mp[1] && mp[2] && mp[3] && mp[4] && mp[5] && wp[0] && wp[1])
+        {
+            p->has_mdp = true;
+            p->mdp[0] = mp[4] * 20;  // R
+            p->mdp[1] = mp[5] * 20;
+            p->mdp[2] = mp[0] * 20;  // G
+            p->mdp[3] = mp[1] * 20;
+            p->mdp[4] = mp[2] * 20;  // B
+            p->mdp[5] = mp[3] * 20;
+            p->mdp[6] = wp[0] * 20;  // W
+            p->mdp[7] = wp[1] * 20;
+        }
+
+        // VLC luminances are in units of 1/10000 cd/m2
+        // Protocol error if max <= min
+        if (fmt->mastering.max_luminance / 10000 * 10000 > fmt->mastering.min_luminance)
+        {
+            p->has_mdl = true;
+            p->mdl_min = fmt->mastering.min_luminance;
+            p->mdl_max = fmt->mastering.max_luminance / 10000;
+        }
+    }
+
+    p->max_cll = fmt->lighting.MaxCLL;
+    p->max_fall = fmt->lighting.MaxFALL;
+    // Protocol error if max_fall > max_cll
+    if (p->max_cll != 0 && p->max_fall > p->max_cll)
+        p->max_fall = 0;
+    // V1 also requires min L < cll/fall <= max L
+    if (sys->cm.version < 2 && p->has_mdl)
+    {
+        if ((uint64_t)p->max_cll * 10000 <= p->mdl_min || p->max_cll > p->mdl_max)
+            p->max_cll = 0;
+        if ((uint64_t)p->max_fall * 10000 <= p->mdl_min || p->max_fall > p->mdl_max)
+            p->max_fall = 0;
+    }
+
+    return true;
+}
+
+// Get (ref'd) image description for fmt, creating a new one if it differs
+// from the last one. Vout thread only.
+static cm_desc_t *
+cm_desc_get(vout_display_t * const vd, vout_display_sys_t * const sys, const video_format_t * const fmt)
+{
+    cm_params_t params;
+    cm_desc_t * cmd;
+
+    if (sys->bound.color_manager_v1 == NULL)
+        return NULL;
+
+    if (!cm_params_from_fmt(sys, fmt, &params))
+    {
+        if (!sys->cm.untagged_logged)
+        {
+            msg_Dbg(vd, "No image description for primaries %d, transfer %d", fmt->primaries, fmt->transfer);
+            sys->cm.untagged_logged = true;
+        }
+        cm_desc_unref(&sys->cm.cur);
+        return NULL;
+    }
+
+    if (sys->cm.cur != NULL && memcmp(&params, &sys->cm.cur->params, sizeof(params)) == 0)
+        return cm_desc_ref(sys->cm.cur);
+
+    if ((cmd = calloc(1, sizeof(*cmd))) == NULL)
+        return NULL;
+    // Refs: sys->cm.cur, the create callback & the return value
+    atomic_init(&cmd->ref_count, 3);
+    atomic_init(&cmd->state, CM_DESC_PENDING);
+    cmd->eq = eq_ref(sys->eq);
+    cmd->manager = sys->bound.color_manager_v1;
+    cmd->params = params;
+
+    msg_Dbg(vd, "New image description: tf %u, primaries %u, mastering %s%s, cll %u, fall %u",
+            params.tf, params.primaries,
+            params.has_mdp ? "primaries " : "", params.has_mdl ? "luminance" : "",
+            params.max_cll, params.max_fall);
+
+    if (pollqueue_callback_once(sys->eq->pq, cm_desc_create_cb, cmd) != 0)
+    {
+        atomic_store(&cmd->state, CM_DESC_FAILED);
+        atomic_fetch_sub(&cmd->ref_count, 1);
+    }
+
+    cm_desc_unref(&sys->cm.cur);
+    sys->cm.cur = cmd;
+    sys->cm.untagged_logged = false;
+    return cmd;
+}
+
+// Set (or unset) the image description on the plane if it has changed
+// Vout thread only
+static void
+plane_set_image_desc(vout_display_t * const vd, subplane_t * const plane, cm_desc_t * const cmd)
+{
+    int state;
+
+    if (plane->cm_surface == NULL || cmd == plane->cm_applied)
+        return;
+
+    state = cmd == NULL ? CM_DESC_FAILED : atomic_load(&cmd->state);
+
+    // Not ready yet - leave whatever we had & try again next time
+    if (state == CM_DESC_PENDING)
+        return;
+
+    if (state == CM_DESC_READY)
+    {
+        wp_color_management_surface_v1_set_image_description(plane->cm_surface, cmd->desc,
+                                                             WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL);
+        plane->cm_set = true;
+    }
+    else
+    {
+        if (cmd != NULL && !cmd->warned)
+        {
+            msg_Warn(vd, "Compositor rejected image description");
+            cmd->warned = true;
+        }
+        if (plane->cm_set)
+        {
+            wp_color_management_surface_v1_unset_image_description(plane->cm_surface);
+            plane->cm_set = false;
+        }
+    }
+
+    cm_desc_unref(&plane->cm_applied);
+    plane->cm_applied = cm_desc_ref(cmd);
+    plane->commit_req = true;
+}
+
+static void
+color_manager_supported_intent(void *data, struct wp_color_manager_v1 *mgr, uint32_t render_intent)
+{
+    vout_display_t * const vd = data;
+    VLC_UNUSED(mgr);
+    vd->sys->cm.intents |= CM_BIT(render_intent);
+}
+
+static void
+color_manager_supported_feature(void *data, struct wp_color_manager_v1 *mgr, uint32_t feature)
+{
+    vout_display_t * const vd = data;
+    VLC_UNUSED(mgr);
+    vd->sys->cm.features |= CM_BIT(feature);
+}
+
+static void
+color_manager_supported_tf_named(void *data, struct wp_color_manager_v1 *mgr, uint32_t tf)
+{
+    vout_display_t * const vd = data;
+    VLC_UNUSED(mgr);
+    vd->sys->cm.tfs |= CM_BIT(tf);
+}
+
+static void
+color_manager_supported_primaries_named(void *data, struct wp_color_manager_v1 *mgr, uint32_t primaries)
+{
+    vout_display_t * const vd = data;
+    VLC_UNUSED(mgr);
+    vd->sys->cm.primaries |= CM_BIT(primaries);
+}
+
+static void
+color_manager_done(void *data, struct wp_color_manager_v1 *mgr)
+{
+    vout_display_t * const vd = data;
+    VLC_UNUSED(mgr);
+    msg_Dbg(vd, "Colour manager v%u: intents %#x, features %#x, tfs %#x, primaries %#x",
+            vd->sys->cm.version, vd->sys->cm.intents, vd->sys->cm.features,
+            vd->sys->cm.tfs, vd->sys->cm.primaries);
+}
+
+static const struct wp_color_manager_v1_listener color_manager_v1_listener = {
+    .supported_intent = color_manager_supported_intent,
+    .supported_feature = color_manager_supported_feature,
+    .supported_tf_named = color_manager_supported_tf_named,
+    .supported_primaries_named = color_manager_supported_primaries_named,
+    .done = color_manager_done,
+};
+
+#endif
 
 // ----------------------------------------------------------------------------
 
@@ -1767,6 +2193,9 @@ spe_free(subpic_ent_t * const spe)
 {
     polltask_delete(&spe->pt);
     subpic_ent_flush(spe);
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+    cm_desc_unref(&spe->cm_desc);
+#endif
     free(spe);
 }
 
@@ -1887,6 +2316,15 @@ plane_destroy(subplane_t * const spl)
 #if HAVE_WAYLAND_COLOR_REPRESENTATION
     color_representation_destroy(&spl->color_rep);
 #endif
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+    if (spl->cm_surface != NULL)
+    {
+        wp_color_management_surface_v1_destroy(spl->cm_surface);
+        spl->cm_surface = NULL;
+    }
+    cm_desc_unref(&spl->cm_applied);
+    spl->cm_set = false;
+#endif
     viewport_destroy(&spl->viewport);
     subsurface_destroy(&spl->subsurface);
     surface_destroy(&spl->surface);
@@ -1914,6 +2352,12 @@ plane_create(vout_display_sys_t * const sys, subplane_t * const plane,
 #if HAVE_WAYLAND_COLOR_REPRESENTATION
     if (sys->bound.color_representation_manager_v1 != NULL)
         plane->color_rep = wp_color_representation_manager_v1_get_surface(sys->bound.color_representation_manager_v1, plane->surface);
+#endif
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+    // Only the video plane gets an image description - subpics stay as the
+    // compositor default (sRGB)
+    if (sys->bound.color_manager_v1 != NULL && plane == sys->planes + PLANE_VID)
+        plane->cm_surface = wp_color_manager_v1_get_surface(sys->bound.color_manager_v1, plane->surface);
 #endif
     wl_subsurface_place_above(plane->subsurface, above);
     if (sync)
@@ -2349,6 +2793,9 @@ plane_set_rect(vout_display_sys_t * const sys, subplane_t * const plane, const s
         }
     }
 #endif
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+    plane_set_image_desc(spe->vd, plane, spe->cm_desc);
+#endif
 
     plane->trans = spe->trans;
     plane->src_rect = spe->src_rect;
@@ -2377,6 +2824,9 @@ static void Prepare(vout_display_t *vd, picture_t *pic, subpicture_t *subpic)
         spe->orig_rect = spe->dst_rect;
 
         spe_set_color_info(sys, spe, &pic->format);
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+        spe->cm_desc = cm_desc_get(vd, sys, &pic->format);
+#endif
 
         if (sys->video_spe_prep)
         {
@@ -2918,10 +3368,24 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
         wp_color_representation_manager_v1_add_listener(b->color_representation_manager_v1, &color_representation_manager_v1_listener, vd);
     }
 #endif
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+    else
+    if (vd->sys->use_color_management && strcmp(iface, wp_color_manager_v1_interface.name) == 0)
+    {
+        const uint32_t v = __MIN(vers, (uint32_t)wp_color_manager_v1_interface.version);
+        vd->sys->cm.version = v;
+        b->color_manager_v1 = wl_registry_bind(registry, name, &wp_color_manager_v1_interface, v);
+        wp_color_manager_v1_add_listener(b->color_manager_v1, &color_manager_v1_listener, vd);
+    }
+#endif
 }
 
 static void w_bound_destroy(w_bound_t * const b)
 {
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+    if (b->color_manager_v1 != NULL)
+        wp_color_manager_v1_destroy(b->color_manager_v1);
+#endif
 #if HAVE_WAYLAND_COLOR_REPRESENTATION
     if (b->color_representation_manager_v1 != NULL)
         wp_color_representation_manager_v1_destroy(b->color_representation_manager_v1);
@@ -3043,6 +3507,13 @@ static void Close(vlc_object_t *obj)
 
     pollqueue_finish(&sys->speq);
 
+#if HAVE_WAYLAND_COLOR_MANAGEMENT
+    cm_desc_unref(&sys->cm.cur);
+    // Make sure any pending image description creates (which use the
+    // manager) have run before we destroy it
+    eventq_sync(sys->eq);
+#endif
+
     w_bound_destroy(&sys->bound);
 
     eventq_sync(sys->eq);
@@ -3116,6 +3587,7 @@ static int Open(vlc_object_t *obj)
 
     sys->use_shm = var_InheritBool(vd, WL_DMABUF_USE_SHM_NAME);
     sys->chequerboard = var_InheritBool(vd, WL_DMABUF_CHEQUERBOARD_NAME);
+    sys->use_color_management = var_InheritBool(vd, WL_DMABUF_COLOR_MANAGEMENT_NAME);
 
         /* Get window */
     sys->embed = vout_display_NewWindow(vd, VOUT_WINDOW_TYPE_WAYLAND);
@@ -3302,5 +3774,6 @@ vlc_module_begin()
     add_bool(WL_DMABUF_ENABLE_NAME, true, WL_DMABUF_ENABLE_TEXT, WL_DMABUF_ENABLE_LONGTEXT, false)
     add_bool(WL_DMABUF_USE_SHM_NAME, false, WL_DMABUF_USE_SHM_TEXT, WL_DMABUF_USE_SHM_LONGTEXT, false)
     add_bool(WL_DMABUF_CHEQUERBOARD_NAME, false, WL_DMABUF_CHEQUERBOARD_TEXT, WL_DMABUF_CHEQUERBOARD_LONGTEXT, false)
+    add_bool(WL_DMABUF_COLOR_MANAGEMENT_NAME, true, WL_DMABUF_COLOR_MANAGEMENT_TEXT, WL_DMABUF_COLOR_MANAGEMENT_LONGTEXT, false)
     add_bool(WL_DMABUF_STATS_NAME, false, WL_DMABUF_STATS_TEXT, WL_DMABUF_STATS_LONGTEXT, false)
 vlc_module_end()
