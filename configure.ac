@@ -3334,6 +3334,7 @@ have_wayland="no"
 have_wayland_egl="no"
 have_wayland_single_pixel_buffer="no"
 have_wayland_color_representation="no"
+have_wayland_color_management="no"
 have_wayland_cursor_shape="no"
 dnl This controls building wl_xdg_shell and isn't a simple xdg-shell exists
 dnl Pkg 1.20 is what exists in bullseye
@@ -3356,6 +3357,13 @@ AS_IF([test "${enable_wayland}" = "yes"], [
       PKG_CHECK_EXISTS([wayland-protocols >= 1.44], [
          AC_MSG_RESULT([yes])
          have_wayland_color_representation="yes"
+      ], [
+         AC_MSG_RESULT([no])
+      ])
+      AC_MSG_CHECKING([for Wayland protocols color management])
+      PKG_CHECK_EXISTS([wayland-protocols >= 1.41], [
+         AC_MSG_RESULT([yes])
+         have_wayland_color_management="yes"
       ], [
          AC_MSG_RESULT([no])
       ])
@@ -3406,6 +3414,7 @@ AM_CONDITIONAL([HAVE_WAYLAND], [test "${have_wayland}" = "yes"])
 AM_CONDITIONAL([HAVE_WAYLAND_EGL], [test "${have_wayland_egl}" = "yes"])
 AM_CONDITIONAL([HAVE_WAYLAND_SINGLE_PIXEL_BUFFER], [test "${have_wayland_single_pixel_buffer}" = "yes"])
 AM_CONDITIONAL([HAVE_WAYLAND_COLOR_REPRESENTATION], [test "${have_wayland_color_representation}" = "yes"])
+AM_CONDITIONAL([HAVE_WAYLAND_COLOR_MANAGEMENT], [test "${have_wayland_color_management}" = "yes"])
 AM_CONDITIONAL([HAVE_WAYLAND_CURSOR_SHAPE], [test "${have_wayland_cursor_shape}" = "yes"])
 AM_CONDITIONAL([HAVE_WAYLAND_XDG_SHELL], [test "${have_wayland_xdg_shell}" = "yes"])
 
