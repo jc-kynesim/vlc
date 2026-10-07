@@ -447,31 +447,32 @@ static int buf_udma_alloc(struct dmabufs_ctl * const dbsc, struct dmabuf_h * dh,
 {
     int err;
     size_t size = (req_size + dbsc->page_size - 1) & ~(dbsc->page_size - 1);
+    int fd;
     struct udmabuf_create udc = {
-        .memfd = -1,
         .flags = UDMABUF_FLAGS_CLOEXEC,
         .offset = 0,
         .size = size
     };
 
-    if ((udc.memfd = memfd_create("ffmpeg-dmabuf", MFD_CLOEXEC | MFD_ALLOW_SEALING)) == -1) {
+    if ((fd = memfd_create("vlc-dmabuf", MFD_CLOEXEC | MFD_ALLOW_SEALING)) == -1) {
         err = -errno;
         request_log("%s: Failed to alloc memfd\n", __func__);
         goto fail0;
     }
 
-    if (ftruncate(udc.memfd, size) == -1) {
+    if (ftruncate(fd, size) == -1) {
         err = -errno;
         request_log("%s: Failed to resize memfd to %zd\n", __func__, size);
         goto fail_mfd;
     }
 
-    if (fcntl(udc.memfd, F_ADD_SEALS, F_SEAL_SHRINK) < 0) {
+    if (fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK) < 0) {
         err = -errno;
         request_log("%s: Failed to seal memfd\n", __func__);
         goto fail_mfd;
     }
 
+    udc.memfd = fd;
     while ((dh->fd = ioctl(dbsc->fd, UDMABUF_CREATE, &udc)) == -1) {
         err = -errno;
         if (err != -EINTR) {
@@ -481,11 +482,11 @@ static int buf_udma_alloc(struct dmabufs_ctl * const dbsc, struct dmabuf_h * dh,
     }
 
     dh->size = (size_t)size;
-    close(udc.memfd);
+    close(fd);
     return 0;
 
 fail_mfd:
-    close(udc.memfd);
+    close(fd);
 fail0:
     return err;
 
@@ -494,6 +495,7 @@ fail0:
 static void buf_udma_free(struct dmabuf_h * dh)
 {
     // Nothing needed
+    (void)dh;
 }
 
 static int ctl_udma_new(struct dmabufs_ctl * dbsc)

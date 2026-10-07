@@ -2944,7 +2944,19 @@ static int Open(vlc_object_t *obj)
     }
 
     {
-        struct dmabufs_ctl *dbsc = sys->use_shm ? dmabufs_shm_new() : dmabufs_ctl_new();
+        struct dmabufs_ctl *dbsc;
+
+        if (sys->use_shm)
+        {
+            dbsc = dmabufs_shm_new();
+        }
+        else
+        {
+            dbsc = dmabufs_ctl_new();
+            if (dbsc == NULL)
+                dbsc = dmabufs_ctl_new_udmabuf();
+        }
+
         if (dbsc == NULL)
         {
             msg_Err(vd, "Failed to create dmabuf ctl");
