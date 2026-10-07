@@ -324,6 +324,13 @@ nodist_libwl_dmabuf_plugin_la_SOURCES +=\
 	video_output/wayland/color-representation-v1-protocol.c
 libwl_dmabuf_plugin_la_CFLAGS += -DHAVE_WAYLAND_COLOR_REPRESENTATION=1
 endif
+if HAVE_VAAPI
+if HAVE_VAAPI_DRM
+libwl_dmabuf_plugin_la_SOURCES += hw/vaapi/vlc_vaapi.c hw/vaapi/vlc_vaapi.h
+libwl_dmabuf_plugin_la_CFLAGS += $(LIBVA_CFLAGS) $(LIBVA_DRM_CFLAGS) -DHAVE_VAAPI_DRM=1
+libwl_dmabuf_plugin_la_LIBADD += $(LIBVA_LIBS) $(LIBVA_DRM_LIBS)
+endif
+endif
 
 CLEANFILES += $(nodist_libwl_dmabuf_plugin_la_SOURCES)
 
