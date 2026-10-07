@@ -468,7 +468,6 @@ struct pollqueue * pollqueue_new(void)
     if (!pq)
         return NULL;
     *pq = (struct pollqueue){
-        .ref_count = ATOMIC_VAR_INIT(0),
         .lock = PTHREAD_MUTEX_INITIALIZER,
         .cond = PTHREAD_COND_INITIALIZER,
         .head = NULL,
@@ -477,6 +476,7 @@ struct pollqueue * pollqueue_new(void)
         .prod_fd = -1
     };
 
+    atomic_init(&pq->ref_count, 0);
     pq->prod_fd = eventfd(0, EFD_NONBLOCK);
     if (pq->prod_fd == -1)
         goto fail1;
