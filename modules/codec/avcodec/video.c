@@ -29,8 +29,6 @@
 # include "config.h"
 #endif
 
-#define OPT_RPI 1
-
 #include <vlc_common.h>
 #include <vlc_codec.h>
 #include <vlc_avcodec.h>
@@ -1976,7 +1974,7 @@ no_reuse:
             if( hwfmts[i] == pi_fmt[j] )
                 hwfmt = hwfmts[i];
 
-#if OPT_RPI
+#if AVUTIL_HAVE_PIX_FMT_SAND
         if (hwfmt == AV_PIX_FMT_DRM_PRIME && p_context->codec_id == AV_CODEC_ID_HEVC)
         {
             if (swfmt == AV_PIX_FMT_P010)
