@@ -272,6 +272,10 @@ video_output/wayland/color-representation-v1-client-protocol.h: \
 		$(WAYLAND_PROTOCOLS)/staging/color-representation/color-representation-v1.xml
 	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
 
+video_output/wayland/color-management-v1-client-protocol.h: \
+		$(WAYLAND_PROTOCOLS)/staging/color-management/color-management-v1.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
+
 video_output/wayland/cursor-shape-v1-client-protocol.h: \
 		$(WAYLAND_PROTOCOLS)/staging/cursor-shape/cursor-shape-v1.xml
 	$(AM_V_GEN)$(WAYLAND_SCANNER) client-header $< $@
@@ -323,6 +327,15 @@ nodist_libwl_dmabuf_plugin_la_SOURCES +=\
 	video_output/wayland/color-representation-v1-client-protocol.h \
 	video_output/wayland/color-representation-v1-protocol.c
 libwl_dmabuf_plugin_la_CFLAGS += -DHAVE_WAYLAND_COLOR_REPRESENTATION=1
+endif
+if HAVE_WAYLAND_COLOR_MANAGEMENT
+video_output/wayland/color-management-v1-protocol.c: \
+		$(WAYLAND_PROTOCOLS)/staging/color-management/color-management-v1.xml
+	$(AM_V_GEN)$(WAYLAND_SCANNER) private-code $< $@
+nodist_libwl_dmabuf_plugin_la_SOURCES +=\
+	video_output/wayland/color-management-v1-client-protocol.h \
+	video_output/wayland/color-management-v1-protocol.c
+libwl_dmabuf_plugin_la_CFLAGS += -DHAVE_WAYLAND_COLOR_MANAGEMENT=1
 endif
 if HAVE_VAAPI
 if HAVE_VAAPI_DRM
