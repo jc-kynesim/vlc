@@ -96,6 +96,10 @@
 #define USE_VAAPI 0
 #endif
 
+#ifndef MIN
+#define MIN(a,b) ((a)<(b)?(a):(b))
+#endif
+
 #define TRACE_ALL 0
 #define CHECK_VDRE_COUNTS 0
 
@@ -3372,7 +3376,7 @@ static void w_bound_add(vout_display_t * const vd, w_bound_t * const b,
     else
     if (vd->sys->use_color_management && strcmp(iface, wp_color_manager_v1_interface.name) == 0)
     {
-        const uint32_t v = __MIN(vers, (uint32_t)wp_color_manager_v1_interface.version);
+        const uint32_t v = MIN(vers, MIN((uint32_t)wp_color_manager_v1_interface.version, 3));
         vd->sys->cm.version = v;
         b->color_manager_v1 = wl_registry_bind(registry, name, &wp_color_manager_v1_interface, v);
         wp_color_manager_v1_add_listener(b->color_manager_v1, &color_manager_v1_listener, vd);
