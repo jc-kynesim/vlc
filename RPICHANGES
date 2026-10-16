@@ -62,3 +62,9 @@ properly in mainline. Reverted as we have fixes for its shortcomings and it is
 needed for our wl_dmabuf output (direct video->wayland surface output).
 Wayland Qt fullscreen controls work better
 Remove some remaining MMAL vestiges
+
+pi/3.0.24/rpi_55A (-- in progress --)
+----------------
+Remove obsolete patch that worked around implausible DPI values and crashed
+under KDE plasma
+
