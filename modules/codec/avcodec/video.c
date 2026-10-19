@@ -39,6 +39,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavutil/mem.h>
 #include <libavutil/pixdesc.h>
+#include <libavutil/hwcontext.h>
 #include "avcommon_compat.h"
 #if LIBAVUTIL_VERSION_CHECK( 55, 16, 101 )
 #include <libavutil/mastering_display_metadata.h>
@@ -52,6 +53,8 @@
 #include "../../packetizer/av1_obu.h"
 #include "../../packetizer/av1.h"
 #include "../codec/cc.h"
+
+#define OPT_RPI 1
 
 /*****************************************************************************
  * decoder_sys_t : decoder descriptor
@@ -758,6 +761,7 @@ static const enum PixelFormat hwfmts[] =
 {
 #if OPT_RPI
     // If Pi then do not bother with stuff we know will fail
+    AV_PIX_FMT_VAAPI,
     AV_PIX_FMT_DRM_PRIME,
 #else
 #ifdef _WIN32
@@ -773,6 +777,31 @@ static const enum PixelFormat hwfmts[] =
 #endif
     AV_PIX_FMT_NONE,
 };
+
+/* Check that VAAPI can actually be initialised (i.e. there is a usable
+ * driver) before we try it - otherwise we reconfigure the vout for VAAPI
+ * surfaces only to fail later. The result is cached for the process. */
+static bool vaapi_usable(decoder_t *p_dec)
+{
+    static vlc_mutex_t lock = VLC_STATIC_MUTEX;
+    static int state = -1; /* -1 untested, 0 unusable, 1 usable */
+    bool rv;
+
+    vlc_mutex_lock(&lock);
+    if (state < 0)
+    {
+        AVBufferRef *dev = NULL;
+        int err = av_hwdevice_ctx_create(&dev, AV_HWDEVICE_TYPE_VAAPI,
+                                         NULL, NULL, 0);
+        av_buffer_unref(&dev);
+        state = err >= 0;
+        if (!state)
+            msg_Dbg(p_dec, "VAAPI init failed: %s", av_err2str(err));
+    }
+    rv = state != 0;
+    vlc_mutex_unlock(&lock);
+    return rv;
+}
 
 static int ExtractAV1Profile(AVCodecContext *p_context, const es_format_t *fmt_in, decoder_sys_t *p_sys)
 {
@@ -1973,6 +2002,14 @@ no_reuse:
         for( size_t j = 0; hwfmt == AV_PIX_FMT_NONE && pi_fmt[j] != AV_PIX_FMT_NONE; j++ )
             if( hwfmts[i] == pi_fmt[j] )
                 hwfmt = hwfmts[i];
+
+        msg_Dbg(p_dec, "Try hw fmt %d", hwfmt);
+
+        if (hwfmt == AV_PIX_FMT_VAAPI && !vaapi_usable(p_dec))
+        {
+            msg_Dbg(p_dec, "VAAPI unusable - skipping");
+            continue;
+        }
 
 #if AVUTIL_HAVE_PIX_FMT_SAND
         if (hwfmt == AV_PIX_FMT_DRM_PRIME && p_context->codec_id == AV_CODEC_ID_HEVC)
