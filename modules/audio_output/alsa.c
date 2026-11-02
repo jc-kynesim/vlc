@@ -373,6 +373,36 @@ out:
 # define SetupChannels(obj, pcm, mask, tab) (0)
 #endif
 
+static unsigned int rate_to_aes3(const unsigned int rate)
+{
+    switch (rate)
+    {
+        case 22050:
+            return IEC958_AES3_CON_FS_22050;
+        case 24000:
+            return IEC958_AES3_CON_FS_24000;
+        case 32000:
+            return IEC958_AES3_CON_FS_32000;
+        case 44100:
+            return IEC958_AES3_CON_FS_44100;
+        case 48000:
+            return IEC958_AES3_CON_FS_48000;
+        case 88200:
+            return IEC958_AES3_CON_FS_88200;
+        case 96000:
+            return IEC958_AES3_CON_FS_96000;
+        case 176400:
+            return IEC958_AES3_CON_FS_176400;
+        case 192000:
+            return IEC958_AES3_CON_FS_192000;
+        case 768000:
+            return IEC958_AES3_CON_FS_768000;
+        default:
+            break;
+    }
+    return IEC958_AES3_CON_FS_NOTID;
+}
+
 static int TimeGet (audio_output_t *aout, vlc_tick_t *);
 static void Play (audio_output_t *, block_t *);
 static void Pause (audio_output_t *, bool, mtime_t);
@@ -390,6 +420,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     snd_pcm_uframes_t periodSize;
     snd_pcm_uframes_t bufferSize;
     unsigned int req_rate = fmt->i_rate;
+    unsigned int req_aes3 = IEC958_AES3_CON_FS_NOTID;
     vlc_fourcc_t req_format = fmt->i_format;
 
     msg_Dbg(aout, "Start: Format: %.4s, Chans: %d, Rate:%d", (char*)&fmt->i_format, aout_FormatNbChannels(fmt), fmt->i_rate);
@@ -453,6 +484,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                     case VLC_CODEC_TRUEHD:
                         sys->pause_bytes = 4 * 4;
                         req_rate   = fmt->i_rate % 44100 == 0 ? 176400 : 192000;
+                        req_aes3   = IEC958_AES3_CON_FS_768000;
                         channels   = 8;
                         break;
 
@@ -460,6 +492,7 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                         if (passthrough == PASSTHROUGH_SPDIF)
                             break;
                         req_rate   = 192000;
+                        req_aes3   = IEC958_AES3_CON_FS_768000;
                         channels   = 8;
                         break;
 
@@ -485,6 +518,9 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
             }
             break;
     }
+
+    if (req_aes3 == IEC958_AES3_CON_FS_NOTID)
+        req_aes3 = rate_to_aes3(req_rate);
 
     const char *device = sys->device;
 
@@ -513,33 +549,11 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     char *devbuf = NULL;
     if (sep != '\0')
     {
-        unsigned aes3;
-
-        // Use fmt->i_rate rather than req_rate as the number we want
-        // for aes3 is the decoded sample rate not the transmission rate
-        switch (fmt->i_rate)
-        {
-#define FS(freq) \
-            case freq: aes3 = IEC958_AES3_CON_FS_ ## freq; break;
-            FS( 44100) /* def. */ FS( 48000) FS( 32000)
-            FS( 22050)            FS( 24000)
-            FS( 88200) FS(768000) FS( 96000)
-            FS(176400)
-#undef FS
-            case 192000:
-                aes3 = (passthrough == PASSTHROUGH_HDMI && channels == 8) ?
-                    IEC958_AES3_CON_FS_768000 : IEC958_AES3_CON_FS_192000;
-                break;
-            default:
-                aes3 = IEC958_AES3_CON_FS_NOTID;
-                break;
-        }
-
         if (asprintf (&devbuf, "%s%cAES0=0x%x,AES1=0x%x,AES2=0x%x,AES3=0x%x",
                       device, sep,
                       IEC958_AES0_CON_EMPHASIS_NONE | IEC958_AES0_NONAUDIO,
                       IEC958_AES1_CON_ORIGINAL | IEC958_AES1_CON_PCM_CODER,
-                      0, aes3) == -1)
+                      0, req_aes3) == -1)
             return VLC_ENOMEM;
         device = devbuf;
     }
