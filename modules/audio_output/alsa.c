@@ -373,6 +373,15 @@ out:
 # define SetupChannels(obj, pcm, mask, tab) (0)
 #endif
 
+// Extended sample-rate codes (IEC 60958-3, bit 7 = extension); defined in
+// the kernel's asoundef.h but not in alsa-lib's
+#ifndef IEC958_AES3_CON_FS_128000
+#define IEC958_AES3_CON_FS_128000  ((1<<7) | (11<<0))
+#endif
+#ifndef IEC958_AES3_CON_FS_705600
+#define IEC958_AES3_CON_FS_705600  ((1<<7) | (13<<0))
+#endif
+
 static unsigned int rate_to_aes3(const unsigned int rate)
 {
     switch (rate)
@@ -391,10 +400,14 @@ static unsigned int rate_to_aes3(const unsigned int rate)
             return IEC958_AES3_CON_FS_88200;
         case 96000:
             return IEC958_AES3_CON_FS_96000;
+        case 128000:
+            return IEC958_AES3_CON_FS_128000;
         case 176400:
             return IEC958_AES3_CON_FS_176400;
         case 192000:
             return IEC958_AES3_CON_FS_192000;
+        case 705600:
+            return IEC958_AES3_CON_FS_705600;
         case 768000:
             return IEC958_AES3_CON_FS_768000;
         default:
@@ -422,8 +435,10 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
     unsigned int req_rate = fmt->i_rate;
     unsigned int req_aes3 = IEC958_AES3_CON_FS_NOTID;
     vlc_fourcc_t req_format = fmt->i_format;
+    // Kludge: given no CODEC_DTSHD decoder.c sets the "dtshd" var to indicate it
+    const bool dtshd = var_InheritBool(aout, "dtshd");
 
-    msg_Dbg(aout, "Start: Format: %.4s, Chans: %d, Rate:%d", (char*)&fmt->i_format, aout_FormatNbChannels(fmt), fmt->i_rate);
+    msg_Dbg(aout, "Start: Format: %.4s, Chans: %d, Rate:%d, dtshd=%d", (char*)&fmt->i_format, aout_FormatNbChannels(fmt), fmt->i_rate, dtshd);
 
     if (aout_FormatNbChannels(fmt) == 0 && AOUT_FMT_LINEAR(fmt))
         return VLC_EGENERIC;
@@ -484,12 +499,12 @@ static int Start (audio_output_t *aout, audio_sample_format_t *restrict fmt)
                     case VLC_CODEC_TRUEHD:
                         sys->pause_bytes = 4 * 4;
                         req_rate   = fmt->i_rate % 44100 == 0 ? 176400 : 192000;
-                        req_aes3   = IEC958_AES3_CON_FS_768000;
+                        req_aes3   = rate_to_aes3(req_rate * 4);
                         channels   = 8;
                         break;
 
                     case VLC_CODEC_DTS:
-                        if (passthrough == PASSTHROUGH_SPDIF)
+                        if (passthrough == PASSTHROUGH_SPDIF || !dtshd)
                             break;
                         req_rate   = 192000;
                         req_aes3   = IEC958_AES3_CON_FS_768000;
