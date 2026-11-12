@@ -1258,17 +1258,27 @@ static int OpenDrmVout(vlc_object_t *object)
         };
 
         if (display_name && strcasecmp(display_name, "auto") != 0) {
-            if (strcasecmp(display_name, "hdmi-1") == 0)
-                conn_name = "HDMI-A-1";
-            else if (strcasecmp(display_name, "hdmi-2") == 0)
-                conn_name = "HDMI-A-2";
-            else
-                conn_name = display_name;
+            if (strncasecmp(display_name, "hdmi-", 5) == 0) {
+                unsigned long hdmi_no = 0;
+                char * p;
+
+                hdmi_no = strtoul(display_name, &p, 10);
+                if (*p == 0) {
+                    free(display_name);
+                    if ((display_name = malloc(32)) == NULL)
+                        return VLC_ENOMEM;
+                    sprintf(display_name, "HDMI-A-%ul", hdmi_no);
+                }
+            }
+            conn_name = display_name;
         }
 
         dname = conn_name != NULL ? conn_name : "<auto>";
 
-        sys->du = drmu_env_new_xlease(&log);
+        // If we don't have a DISPLAY env variable there is no point looking
+        // for an X lease
+        if (getenv("DISPLAY") != NULL)
+            sys->du = drmu_env_new_xlease(&log);
 
         if (sys->du == NULL) {
             if (drmu_scan_output(conn_name, &log, &sys->du, &sys->dout) == 0)
