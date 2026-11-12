@@ -144,6 +144,15 @@ static uint32_t ffmpeg_CodecTag( vlc_fourcc_t fcc )
  * Local Functions
  *****************************************************************************/
 
+static inline unsigned int ticks_per_frame(const AVCodecContext *ctx)
+{
+#if LIBAVCODEC_VERSION_CHECK( 60, 12, 100 )
+    return ctx->codec_descriptor->props & AV_CODEC_PROP_FIELDS ? 2 : 1;
+#else
+    return = MAX(1, ctx->ticks_per_frame);
+#endif
+}
+
 /**
  * Sets the decoder output format.
  */
@@ -213,10 +222,8 @@ static int lavc_GetVideoFormat(decoder_t *dec, video_format_t *restrict fmt,
     {
         fmt->i_frame_rate = ctx->framerate.num;
         fmt->i_frame_rate_base = ctx->framerate.den;
-# if LIBAVCODEC_VERSION_MICRO <  100
         // for some reason libav don't thinkg framerate presents actually same thing as in ffmpeg
-        fmt->i_frame_rate_base *= __MAX(ctx->ticks_per_frame, 1);
-# endif
+        fmt->i_frame_rate_base *= ticks_per_frame(ctx);
     }
     else if (ctx->time_base.num > 0 && ctx->time_base.den > 0)
     {
@@ -342,11 +349,12 @@ static int lavc_UpdateVideoFormat(decoder_t *dec, AVCodecContext *ctx,
         return val;
 
     /* always have date in fields/ticks units */
+    /* Duplicate tick correction from interpolate_next_ppts */
     if(dec->p_sys->pts.i_divider_num)
-        date_Change(&dec->p_sys->pts, fmt_out.i_frame_rate,
+        date_Change(&dec->p_sys->pts, fmt_out.i_frame_rate * ticks_per_frame(ctx),
                                       fmt_out.i_frame_rate_base);
     else
-        date_Init(&dec->p_sys->pts, fmt_out.i_frame_rate,
+        date_Init(&dec->p_sys->pts, fmt_out.i_frame_rate * ticks_per_frame(ctx),
                                     fmt_out.i_frame_rate_base);
 
     fmt_out.p_palette = dec->fmt_out.video.p_palette;
@@ -1076,11 +1084,7 @@ static vlc_tick_t interpolate_next_pts( decoder_t *p_dec, AVFrame *frame )
         p_sys->pts.i_divider_num == 0 )
         return VLC_TICK_INVALID;
 
-#if LIBAVCODEC_VERSION_CHECK( 60, 12, 100 )
-    int i_tick = p_context->codec_descriptor->props & AV_CODEC_PROP_FIELDS ? 2 : 1;
-#else
-    int i_tick = p_context->ticks_per_frame;
-#endif
+    int i_tick = ticks_per_frame(p_context);
 
     /* interpolate the next PTS */
     return date_Increment( &p_sys->pts, i_tick + frame->repeat_pict );
