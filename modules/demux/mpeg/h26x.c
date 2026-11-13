@@ -81,6 +81,7 @@ struct demux_sys_t
     date_t      output_dts;
     unsigned    frame_rate_num;
     unsigned    frame_rate_den;
+    bool        b_fed;
 
     decoder_t *p_packetizer;
 };
@@ -333,6 +334,7 @@ static int GenericOpen( demux_t *p_demux, const char *psz_module,
     p_sys->p_es        = NULL;
     p_sys->frame_rate_num = 0;
     p_sys->frame_rate_den = 0;
+    p_sys->b_fed = false;
 
     float f_fps = 0;
     char *psz_fpsvar;
@@ -422,9 +424,15 @@ static int Demux( demux_t *p_demux)
     {
         b_eof = true;
     }
-    else
+    else if( !p_sys->b_fed )
     {
+        /* Only timestamp the very first block. The packetizer extrapolates
+         * its own dts from there and derives pts from the POC relative to
+         * it. Re-feeding a constant dts would reset its dts clock on every
+         * AU whilst its POC derived pts keeps advancing, making the pts-dts
+         * offset grow without bound. */
         p_block_in->i_dts = date_Get( &p_sys->feed_dts );
+        p_sys->b_fed = true;
     }
 
     while( (p_block_out = p_sys->p_packetizer->pf_packetize( p_sys->p_packetizer,
@@ -458,12 +466,6 @@ static int Demux( demux_t *p_demux)
             p_block_out->i_dts = dts;
             if( p_block_out->i_pts != VLC_TICK_INVALID )
                 p_block_out->i_pts = dts + dtsdiff;
-
-            if( p_block_in )
-            {
-                p_block_in->i_dts = date_Get( &p_sys->feed_dts );
-                p_block_in->i_pts = VLC_TICK_INVALID;
-            }
 
             if( p_sys->p_es == NULL )
             {
