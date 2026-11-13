@@ -1006,9 +1006,18 @@ static block_t *OutputPicture( decoder_t *p_dec )
         else if( p_sys->slice.type == H264_SLICE_TYPE_I &&
                  date_Get( &p_sys->dts ) != VLC_TICK_INVALID )
         {
-            /* Hell no PTS on IDR. We're totally blind */
+            /* Hell no PTS on IDR. We're totally blind.
+             * Delay by the reorder depth so that following reordered
+             * frames don't end up with pts < dts (and get clamped) */
+            uint8_t i_depth = 1;
+            unsigned i_delay;
+            if( !h264_get_dpb_values( p_sps, &i_depth, &i_delay ) ||
+                i_depth < 1 )
+                i_depth = 1;
+            else if( i_depth > 16 )
+                i_depth = 16;
             date_t pts = p_sys->dts;
-            date_Increment( &pts, 2 );
+            date_Increment( &pts, 2 * i_depth );
             p_pic->i_pts = date_Get( &pts );
         }
     }
