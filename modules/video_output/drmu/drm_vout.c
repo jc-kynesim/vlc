@@ -26,6 +26,7 @@
 #include "config.h"
 #endif
 
+#include <ctype.h>
 #include <errno.h>
 #include <pthread.h>
 
@@ -1258,16 +1259,17 @@ static int OpenDrmVout(vlc_object_t *object)
         };
 
         if (display_name && strcasecmp(display_name, "auto") != 0) {
-            if (strncasecmp(display_name, "hdmi-", 5) == 0) {
+            if (strncasecmp(display_name, "hdmi-", 5) == 0 &&
+                isdigit(display_name[5])) {
                 unsigned long hdmi_no = 0;
                 char * p;
 
-                hdmi_no = strtoul(display_name, &p, 10);
+                hdmi_no = strtoul(display_name + 5, &p, 10);
                 if (*p == 0) {
                     free(display_name);
                     if ((display_name = malloc(32)) == NULL)
                         return VLC_ENOMEM;
-                    sprintf(display_name, "HDMI-A-%ul", hdmi_no);
+                    sprintf(display_name, "HDMI-A-%lu", hdmi_no);
                 }
             }
             conn_name = display_name;
