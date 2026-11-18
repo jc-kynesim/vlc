@@ -2555,6 +2555,19 @@ AS_IF([test "${enable_avcodec}" != "no"], [
     CFLAGS="${CFLAGS} ${AVCODEC_CFLAGS}"
     AC_CHECK_HEADERS(libavcodec/avcodec.h)
     AC_CHECK_HEADERS(libavutil/avutil.h)
+    AC_CACHE_CHECK([for AV_PIX_FMT_RPI4_8 and AV_PIX_FMT_RPI4_10],
+      [ac_cv_av_pix_fmt_rpi4], [
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <libavutil/pixfmt.h>
+]], [[
+enum AVPixelFormat a = AV_PIX_FMT_RPI4_8;
+enum AVPixelFormat b = AV_PIX_FMT_RPI4_10;
+(void)a; (void)b;
+]])], [ac_cv_av_pix_fmt_rpi4=yes], [ac_cv_av_pix_fmt_rpi4=no])
+    ])
+    AS_IF([test "${ac_cv_av_pix_fmt_rpi4}" = "yes"], [
+      AC_DEFINE(HAVE_AV_PIX_FMT_RPI4, 1, [Define to 1 if libavutil has AV_PIX_FMT_RPI4_8 and AV_PIX_FMT_RPI4_10])
+    ])
     VLC_RESTORE_FLAGS
     have_avcodec="yes"
   ],[
